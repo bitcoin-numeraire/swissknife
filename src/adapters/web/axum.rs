@@ -1,7 +1,7 @@
 use std::{net::SocketAddr, sync::Arc};
 
 use async_trait::async_trait;
-use axum::{routing::get, Router, Server};
+use axum::{Router, Server};
 use tokio::sync::Mutex;
 
 use super::web::WebServer;
@@ -11,19 +11,15 @@ pub struct AxumServerConfig {
 
 pub struct AxumServer {
     addr: SocketAddr,
-    router: Arc<Mutex<Router>>,
+    router: Arc<Mutex<Option<Router>>>,
 }
 
 impl AxumServer {
     pub fn new(config: AxumServerConfig) -> Result<Self, Box<dyn std::error::Error>> {
-        let router = Arc::new(Mutex::new(Router::new().route("/", get(Self::root))));
+        let router = Arc::new(Mutex::new(Some(Router::new())));
         let addr: SocketAddr = config.addr.parse()?;
 
         Ok(Self { router, addr })
-    }
-
-    async fn root() -> &'static str {
-        "Hello, World!"
     }
 }
 
@@ -32,12 +28,25 @@ impl WebServer for AxumServer {
     async fn start(&self) -> Result<(), Box<dyn std::error::Error>> {
         let router = {
             let lock = self.router.lock().await;
-            lock.clone()
+            lock.clone().ok_or("router is missing")?
         };
 
         Server::bind(&self.addr)
             .serve(router.into_make_service())
             .await?;
+
+        Ok(())
+    }
+
+    async fn nest_router(
+        &self,
+        path: &str,
+        method: Router,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let mut lock = self.router.lock().await;
+        let router = lock.take().ok_or("router is missing")?;
+
+        *lock = Some(router.nest(path, method));
 
         Ok(())
     }
