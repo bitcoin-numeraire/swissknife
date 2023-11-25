@@ -22,6 +22,7 @@ async fn main() {
     .unwrap();
 
     let config = RGBLibClientConfig {
+        electrum_url: "localhost:50001".to_string(),
         data_dir: "storage".to_string(),
         mnemonic:
             "adapt lumber inherit square defy burden beyond assault drop lumber purpose satoshi"

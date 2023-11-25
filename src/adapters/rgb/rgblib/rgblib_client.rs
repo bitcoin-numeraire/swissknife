@@ -3,7 +3,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use rgb_lib::{
     restore_keys,
-    wallet::{DatabaseType, WalletData},
+    wallet::{DatabaseType, Online, WalletData},
     Wallet,
 };
 use tokio::{sync::Mutex, task};
@@ -18,9 +18,11 @@ use crate::{
 pub struct RGBLibClientConfig {
     pub data_dir: String,
     pub mnemonic: String,
+    pub electrum_url: String,
 }
 
 pub struct RGBLibClient {
+    url: String,
     wallet: Arc<Mutex<Wallet>>,
 }
 
@@ -46,28 +48,95 @@ impl RGBLibClient {
             .map_err(|e| ConfigError::Wallet(e.to_string()))?;
 
         Ok(Self {
+            url: config.electrum_url,
             wallet: Arc::new(Mutex::new(wallet)),
         })
+    }
+
+    async fn online(&self) -> Result<Online, RGBError> {
+        let mut wallet = self.wallet.lock().await;
+
+        let online = wallet
+            .go_online(false, self.url.clone())
+            .map_err(|e| RGBError::Online(e.to_string()))?;
+
+        Ok(online)
     }
 }
 
 #[async_trait]
 impl RGBClient for RGBLibClient {
-    async fn issue_contract(
+    async fn get_address(&self) -> Result<String, ApplicationError> {
+        let wallet = self.wallet.lock().await;
+
+        let address = wallet
+            .get_address()
+            .map_err(|e| RGBError::Address(e.to_string()))?;
+
+        Ok(address)
+    }
+
+    async fn get_btc_balance(&self) -> Result<u64, ApplicationError> {
+        let online = self.online().await?;
+
+        let wallet = self.wallet.lock().await;
+
+        let balance = wallet
+            .get_btc_balance(online)
+            .map_err(|e| RGBError::Balance(e.to_string()))?;
+
+        println!("Balance: {:?}", balance);
+
+        Ok(balance.vanilla.spendable)
+    }
+
+    async fn send_btc(
         &self,
-        url: String,
-        contract: RGBContract,
+        address: String,
+        amount: u64,
+        fee_rate: f32,
     ) -> Result<String, ApplicationError> {
+        let online = self.online().await?;
+
+        let wallet = self.wallet.lock().await;
+
+        let tx_id = wallet
+            .send_btc(online, address, amount, fee_rate)
+            .map_err(|e| RGBError::Send(e.to_string()))?;
+
+        Ok(tx_id)
+    }
+
+    async fn drain_btc(&self, address: String, fee_rate: f32) -> Result<String, ApplicationError> {
+        let online = self.online().await?;
+
+        let wallet = self.wallet.lock().await;
+
+        let tx_id = wallet
+            .drain_to(online, address, true, fee_rate)
+            .map_err(|e| RGBError::Send(e.to_string()))?;
+
+        Ok(tx_id)
+    }
+
+    async fn create_utxos(&self, fee_rate: f32) -> Result<u8, ApplicationError> {
+        let online = self.online().await?;
+
         let mut wallet = self.wallet.lock().await;
 
-        let test = wallet.get_address().unwrap();
-        println!("wallet got: {}", test);
+        let n = wallet
+            .create_utxos(online, false, None, None, fee_rate)
+            .map_err(|e| RGBError::Utxos(e.to_string()))?;
 
-        let online = wallet
-            .go_online(false, url.clone())
-            .map_err(|e| RGBError::ContractIssuanceError(e.to_string()))?;
+        println!("UTXOs created: {}", n);
 
-        println!("Online: {:?}", online);
+        Ok(n)
+    }
+
+    async fn issue_contract(&self, contract: RGBContract) -> Result<String, ApplicationError> {
+        let online = self.online().await?;
+
+        let mut wallet = self.wallet.lock().await;
 
         let contract = wallet
             .issue_asset_nia(
@@ -77,7 +146,7 @@ impl RGBClient for RGBLibClient {
                 contract.precision,
                 contract.amounts,
             )
-            .map_err(|e| RGBError::ContractIssuanceError(e.to_string()))?;
+            .map_err(|e| RGBError::ContractIssuance(e.to_string()))?;
 
         println!("Contract issued: {:?}", contract);
 

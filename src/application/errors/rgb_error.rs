@@ -1,4 +1,9 @@
 #[derive(Debug)]
 pub enum RGBError {
-    ContractIssuanceError(String),
+    Address(String),
+    Balance(String),
+    Utxos(String),
+    ContractIssuance(String),
+    Online(String),
+    Send(String),
 }
