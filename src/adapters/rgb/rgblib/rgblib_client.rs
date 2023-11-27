@@ -1,9 +1,12 @@
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use async_trait::async_trait;
 use rgb_lib::{
     restore_keys,
-    wallet::{DatabaseType, Online, Unspent, WalletData},
+    wallet::{
+        Assets, Balance, DatabaseType, Metadata, Online, ReceiveData, Recipient, Unspent,
+        WalletData,
+    },
     Wallet,
 };
 use tokio::{sync::Mutex, task};
@@ -114,7 +117,7 @@ impl RGBClient for RGBLibClient {
 
         let tx_id = wallet
             .send_btc(online, address, amount, fee_rate)
-            .map_err(|e| RGBError::Send(e.to_string()))?;
+            .map_err(|e| RGBError::SendBTC(e.to_string()))?;
 
         Ok(tx_id)
     }
@@ -126,7 +129,7 @@ impl RGBClient for RGBLibClient {
 
         let tx_id = wallet
             .drain_to(online, address, true, fee_rate)
-            .map_err(|e| RGBError::Send(e.to_string()))?;
+            .map_err(|e| RGBError::SendBTC(e.to_string()))?;
 
         Ok(tx_id)
     }
@@ -163,5 +166,80 @@ impl RGBClient for RGBLibClient {
         println!("Contract issued: {:?}", contract);
 
         Ok(contract.asset_id)
+    }
+
+    async fn list_assets(&self) -> Result<Assets, ApplicationError> {
+        let mut wallet = self.wallet.lock().await;
+
+        let assets = wallet
+            .list_assets(Vec::new())
+            .map_err(|e| RGBError::ListAssets(e.to_string()))?;
+
+        Ok(assets)
+    }
+
+    async fn get_asset(&self, asset_id: String) -> Result<Metadata, ApplicationError> {
+        let mut wallet = self.wallet.lock().await;
+
+        let asset = wallet
+            .get_asset_metadata(asset_id)
+            .map_err(|e| RGBError::GetAsset(e.to_string()))?;
+
+        Ok(asset)
+    }
+
+    async fn get_asset_balance(&self, asset_id: String) -> Result<Balance, ApplicationError> {
+        let wallet = self.wallet.lock().await;
+
+        let asset = wallet
+            .get_asset_balance(asset_id)
+            .map_err(|e| RGBError::GetAssetBalance(e.to_string()))?;
+
+        Ok(asset)
+    }
+
+    async fn send(
+        &self,
+        asset_id: String,
+        recipients: Vec<Recipient>,
+        donation: bool,
+        fee_rate: f32,
+        min_confirmations: u8,
+    ) -> Result<String, ApplicationError> {
+        let online = self.online().await?;
+
+        let mut wallet = self.wallet.lock().await;
+
+        let mut recipient_map: HashMap<String, Vec<Recipient>> = HashMap::new();
+        recipient_map.insert(asset_id, recipients);
+
+        let tx_id = wallet
+            .send(online, recipient_map, donation, fee_rate, min_confirmations)
+            .map_err(|e| RGBError::Send(e.to_string()))?;
+
+        Ok(tx_id)
+    }
+
+    async fn invoice(
+        &self,
+        asset_id: Option<String>,
+        amount: Option<u64>,
+        duration_seconds: Option<u32>,
+        transport_endpoints: Vec<String>,
+        min_confirmations: u8,
+    ) -> Result<ReceiveData, ApplicationError> {
+        let mut wallet = self.wallet.lock().await;
+
+        let invoice = wallet
+            .blind_receive(
+                asset_id,
+                amount,
+                duration_seconds,
+                transport_endpoints,
+                min_confirmations,
+            )
+            .map_err(|e| RGBError::Invoice(e.to_string()))?;
+
+        Ok(invoice)
     }
 }
