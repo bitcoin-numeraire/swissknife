@@ -1,2 +1,4 @@
 pub mod axum;
-pub mod web;
+mod web_server;
+
+pub use web_server::WebServer;

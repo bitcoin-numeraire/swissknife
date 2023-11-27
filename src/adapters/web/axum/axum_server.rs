@@ -4,7 +4,8 @@ use async_trait::async_trait;
 use axum::{Router, Server};
 use tokio::sync::Mutex;
 
-use super::web::WebServer;
+use crate::adapters::web::WebServer;
+
 pub struct AxumServerConfig {
     pub addr: String,
 }

@@ -1,11 +1,15 @@
-use adapters::web::{
-    axum::{AxumServer, AxumServerConfig},
-    web::WebServer,
-};
-use rgb::api::http::rgb_controller::RGBController;
-
 mod adapters;
-mod rgb;
+mod application;
+mod domains;
+
+use std::sync::Arc;
+
+use adapters::rgb::rgblib::{RGBLibClient, RGBLibClientConfig};
+use adapters::rgb::DynRGBClient;
+use adapters::web::axum::{AxumServer, AxumServerConfig};
+use domains::rgb::api::http::RGBHandler;
+
+use crate::adapters::web::WebServer;
 
 #[tokio::main]
 async fn main() {
@@ -17,8 +21,25 @@ async fn main() {
     })
     .unwrap();
 
+    let config = RGBLibClientConfig {
+        electrum_url: "localhost:50001".to_string(),
+        data_dir: "storage".to_string(),
+        mnemonic:
+            "adapt lumber inherit square defy burden beyond assault drop lumber purpose satoshi"
+                .to_string(),
+    };
+
+    let rgb_client = RGBLibClient::new(config.clone()).await.unwrap();
+
+    println!(
+        "Wallet created in directory `{}` with mnemonic: `{}`",
+        config.data_dir, config.mnemonic
+    );
+
+    let rgb_client = Arc::new(rgb_client) as DynRGBClient;
+
     server
-        .nest_router("/rgb", RGBController::new().routes())
+        .nest_router("/rgb", RGBHandler::new().routes(rgb_client))
         .await
         .unwrap();
 
