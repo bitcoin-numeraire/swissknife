@@ -5,15 +5,18 @@ use axum::{
 };
 use serde_json::json;
 
-use crate::application::errors::ApplicationError;
+use crate::application::errors::{ApplicationError, RGBError};
 
 impl IntoResponse for ApplicationError {
     fn into_response(self) -> Response {
         let (status, error_message) = match self {
-            // ApplicationError::Wallet => (StatusCode::NOT_FOUND, "User not found"),
+            ApplicationError::RGB(RGBError::ContractIssuance(msg))
+            | ApplicationError::RGB(RGBError::Utxos(msg)) => {
+                (StatusCode::UNPROCESSABLE_ENTITY, msg)
+            }
             _ => (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                "Internal server error, Please contact your administrator or try later",
+                "Internal server error, Please contact your administrator or try later".to_string(),
             ),
         };
 

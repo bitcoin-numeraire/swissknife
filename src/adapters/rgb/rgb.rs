@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use rgb_lib::wallet::Unspent;
 
 use crate::{application::errors::ApplicationError, domains::rgb::entities::RGBContract};
 
@@ -8,6 +9,7 @@ use crate::{application::errors::ApplicationError, domains::rgb::entities::RGBCo
 pub trait RGBClient {
     async fn get_address(&self) -> Result<String, ApplicationError>;
     async fn get_btc_balance(&self) -> Result<u64, ApplicationError>;
+    async fn list_unspents(&self) -> Result<Vec<Unspent>, ApplicationError>;
     async fn send_btc(
         &self,
         address: String,

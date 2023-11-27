@@ -1,4 +1,5 @@
 use axum::{extract::State, routing::get, routing::post, Json, Router};
+use rgb_lib::wallet::Unspent;
 
 use crate::{
     adapters::rgb::DynRGBClient,
@@ -23,6 +24,7 @@ impl RGBHandler {
         Router::new()
             .route("/contracts/issue", post(issue_contract))
             .route("/wallet/address", get(get_address))
+            .route("/wallet/unspents", get(unspents))
             .route("/wallet/balance", get(get_balance))
             .route("/wallet/prepare-issuance", post(prepare_issuance))
             .route("/wallet/send", post(send))
@@ -61,6 +63,24 @@ async fn get_balance(State(rgb_client): State<DynRGBClient>) -> Result<String, A
     println!("Balance fetched: {}", balance);
 
     Ok(balance.to_string())
+}
+
+async fn unspents(
+    State(rgb_client): State<DynRGBClient>,
+) -> Result<Json<Vec<Unspent>>, ApplicationError> {
+    println!("Fetching unspents");
+
+    let unspents = match rgb_client.list_unspents().await {
+        Ok(unspents) => unspents,
+        Err(e) => {
+            eprintln!("Error Fetching balance: {:?}", e);
+            return Err(e);
+        }
+    };
+
+    println!("Unspents fetched: {}", unspents.len());
+
+    Ok(unspents.into())
 }
 
 async fn send(

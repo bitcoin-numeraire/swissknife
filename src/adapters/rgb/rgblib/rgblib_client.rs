@@ -3,7 +3,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use rgb_lib::{
     restore_keys,
-    wallet::{DatabaseType, Online, WalletData},
+    wallet::{DatabaseType, Online, Unspent, WalletData},
     Wallet,
 };
 use tokio::{sync::Mutex, task};
@@ -90,6 +90,18 @@ impl RGBClient for RGBLibClient {
         Ok(balance.vanilla.spendable)
     }
 
+    async fn list_unspents(&self) -> Result<Vec<Unspent>, ApplicationError> {
+        let online = self.online().await?;
+
+        let wallet = self.wallet.lock().await;
+
+        let unspents = wallet
+            .list_unspents(Some(online), false)
+            .map_err(|e| RGBError::Unspents(e.to_string()))?;
+
+        Ok(unspents)
+    }
+
     async fn send_btc(
         &self,
         address: String,
@@ -125,7 +137,7 @@ impl RGBClient for RGBLibClient {
         let mut wallet = self.wallet.lock().await;
 
         let n = wallet
-            .create_utxos(online, false, None, None, fee_rate)
+            .create_utxos(online, true, None, None, fee_rate)
             .map_err(|e| RGBError::Utxos(e.to_string()))?;
 
         println!("UTXOs created: {}", n);
