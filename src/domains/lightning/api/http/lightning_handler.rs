@@ -71,7 +71,7 @@ async fn invoice(
 ) -> Result<Json<LightningInvoiceResponse>, ApplicationError> {
     println!("Generating invoice for {}", username);
 
-    let invoice = match lightning_client.get_invoice(query_params.amount).await {
+    let invoice = match lightning_client.invoice(query_params.amount).await {
         Ok(invoice) => invoice,
         Err(e) => {
             eprintln!("Error generating invoice: {:?}", e);
@@ -80,7 +80,7 @@ async fn invoice(
     };
 
     let response = LightningInvoiceResponse {
-        pr: invoice,
+        pr: "".to_string(),
         success_action: None,
         disposable: None,
         routes: vec![],
