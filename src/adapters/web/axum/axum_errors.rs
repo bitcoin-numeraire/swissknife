@@ -7,6 +7,8 @@ use serde_json::json;
 
 use crate::application::errors::{ApplicationError, RGBError};
 
+const STATUS_ERROR: String = "ERROR".to_string();
+
 impl IntoResponse for ApplicationError {
     fn into_response(self) -> Response {
         let (status, error_message) = match self {
@@ -21,7 +23,8 @@ impl IntoResponse for ApplicationError {
         };
 
         let body = Json(json!({
-            "error": error_message,
+            "status": STATUS_ERROR,
+            "reason": error_message,
         }));
 
         (status, body).into_response()

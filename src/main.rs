@@ -7,9 +7,10 @@ use std::sync::Arc;
 use adapters::rgb::rgblib::{RGBLibClient, RGBLibClientConfig};
 use adapters::rgb::DynRGBClient;
 use adapters::web::axum::{AxumServer, AxumServerConfig};
+use domains::lightning::api::http::LightningHandler;
 use domains::rgb::api::http::RGBHandler;
 
-use crate::adapters::web::WebServer;
+use adapters::web::WebServer;
 
 #[tokio::main]
 async fn main() {
@@ -30,16 +31,20 @@ async fn main() {
     };
 
     let rgb_client = RGBLibClient::new(config.clone()).await.unwrap();
+    let dyn_rgb_client = Arc::new(rgb_client) as DynRGBClient;
 
     println!(
-        "Wallet created in directory `{}` with mnemonic: `{}`",
+        "RGB Wallet created in directory `{}` with mnemonic: `{}`",
         config.data_dir, config.mnemonic
     );
 
-    let rgb_client = Arc::new(rgb_client) as DynRGBClient;
+    server
+        .nest_router("/rgb", RGBHandler::routes(dyn_rgb_client))
+        .await
+        .unwrap();
 
     server
-        .nest_router("/rgb", RGBHandler::new().routes(rgb_client))
+        .nest_router("/.well-known", LightningHandler::well_known_routes())
         .await
         .unwrap();
 

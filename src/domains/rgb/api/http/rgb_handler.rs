@@ -21,11 +21,7 @@ use crate::{
 pub struct RGBHandler;
 
 impl RGBHandler {
-    pub fn new() -> Self {
-        Self {}
-    }
-
-    pub fn routes(&self, rgb_client: DynRGBClient) -> Router {
+    pub fn routes(rgb_client: DynRGBClient) -> Router {
         Router::new()
             .route("/contracts", get(list_assets))
             .route("/contracts/issue", post(issue_contract))
