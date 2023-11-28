@@ -11,4 +11,6 @@ pub use contract::SendAssetsRequest;
 pub use wallet::DrainRequest;
 pub use wallet::SendBTCRequest;
 
+pub use lightning::LightningInvoiceQueryParams;
 pub use lightning::LightningInvoiceResponse;
+pub use lightning::LightningWellKnownResponse;
