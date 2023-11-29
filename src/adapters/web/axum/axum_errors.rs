@@ -5,7 +5,7 @@ use axum::{
 };
 use serde_json::json;
 
-use crate::application::errors::{ApplicationError, RGBError};
+use crate::application::errors::{ApplicationError, LightningError, RGBError};
 
 const STATUS_ERROR: &str = "ERROR";
 
@@ -16,6 +16,25 @@ impl IntoResponse for ApplicationError {
             | ApplicationError::RGB(RGBError::Utxos(msg))
             | ApplicationError::RGB(RGBError::Send(msg)) => (StatusCode::UNPROCESSABLE_ENTITY, msg),
             ApplicationError::RGB(RGBError::Invoice(msg)) => (StatusCode::BAD_REQUEST, msg),
+            _ => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Internal server error, Please contact your administrator or try later".to_string(),
+            ),
+        };
+
+        let body = Json(json!({
+            "status": STATUS_ERROR.to_string(),
+            "reason": error_message,
+        }));
+
+        (status, body).into_response()
+    }
+}
+
+impl IntoResponse for LightningError {
+    fn into_response(self) -> Response {
+        let (status, error_message) = match self {
+            LightningError::Invoice(msg) => (StatusCode::UNPROCESSABLE_ENTITY, msg),
             _ => (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "Internal server error, Please contact your administrator or try later".to_string(),

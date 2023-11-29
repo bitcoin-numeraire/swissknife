@@ -1,16 +1,11 @@
-use super::{AsyncError, ConfigError, RGBError};
+use super::{AsyncError, ConfigError, LightningError, RGBError};
 
 #[derive(Debug)]
 pub enum ApplicationError {
-    RGB(RGBError),
     Config(ConfigError),
     Async(AsyncError),
-}
-
-impl From<RGBError> for ApplicationError {
-    fn from(inner: RGBError) -> Self {
-        ApplicationError::RGB(inner)
-    }
+    RGB(RGBError),
+    Lightning(LightningError),
 }
 
 impl From<AsyncError> for ApplicationError {
@@ -22,5 +17,11 @@ impl From<AsyncError> for ApplicationError {
 impl From<ConfigError> for ApplicationError {
     fn from(inner: ConfigError) -> Self {
         ApplicationError::Config(inner)
+    }
+}
+
+impl From<LightningError> for ApplicationError {
+    fn from(inner: LightningError) -> Self {
+        ApplicationError::Lightning(inner)
     }
 }

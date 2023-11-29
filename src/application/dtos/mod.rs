@@ -14,3 +14,4 @@ pub use wallet::SendBTCRequest;
 pub use lightning::LightningInvoiceQueryParams;
 pub use lightning::LightningInvoiceResponse;
 pub use lightning::LightningWellKnownResponse;
+pub use lightning::SuccessAction;

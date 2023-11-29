@@ -21,8 +21,15 @@ pub struct LightningInvoiceQueryParams {
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LightningInvoiceResponse {
-    pub pr: String,                     // bech32-serialized lightning invoice
-    pub success_action: Option<String>, // An optional action to be executed after successfully paying an invoice
+    pub pr: String,                            // bech32-serialized lightning invoice
+    pub success_action: Option<SuccessAction>, // An optional action to be executed after successfully paying an invoice
     pub disposable: Option<bool>, // An optional flag to let a wallet know whether to persist the link from step 1, if null should be interpreted as true
     pub routes: Vec<String>, // array with payment routes, should be left empty if no routes are to be provided
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SuccessAction {
+    pub tag: String,             // action type (url, message, aes, ...)
+    pub message: Option<String>, // rest of fields depends on tag value
 }
