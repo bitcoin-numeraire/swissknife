@@ -3,7 +3,8 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use bip39::Mnemonic;
 use breez_sdk_core::{
-    BreezServices, EnvironmentType, GreenlightNodeConfig, NodeConfig, ReceivePaymentRequest,
+    BreezServices, EnvironmentType, GreenlightNodeConfig, ListPaymentsRequest, NodeConfig,
+    NodeState, Payment, ReceivePaymentRequest,
 };
 
 use crate::{
@@ -73,5 +74,26 @@ impl LightningClient for BreezClient {
             .map_err(|e| LightningError::Invoice(e.to_string()))?;
 
         Ok(response.ln_invoice.bolt11)
+    }
+
+    async fn node_info(&self) -> Result<NodeState, LightningError> {
+        let node_info = self
+            .sdk
+            .node_info()
+            .map_err(|e| LightningError::NodeInfo(e.to_string()))?;
+
+        Ok(node_info)
+    }
+
+    async fn list_payments(&self) -> Result<Vec<Payment>, LightningError> {
+        let payments = self
+            .sdk
+            .list_payments(ListPaymentsRequest {
+                ..Default::default()
+            })
+            .await
+            .map_err(|e| LightningError::ListPayments(e.to_string()))?;
+
+        Ok(payments)
     }
 }

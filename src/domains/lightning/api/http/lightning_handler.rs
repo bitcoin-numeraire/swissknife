@@ -3,6 +3,7 @@ use axum::{
     routing::get,
     Json, Router,
 };
+use breez_sdk_core::{NodeState, Payment};
 
 use crate::{
     adapters::lightning::DynLightningClient,
@@ -31,6 +32,8 @@ impl LightningHandler {
     pub fn routes(lightning_client: DynLightningClient) -> Router {
         Router::new()
             .route("/lnurlp/:username/callback", get(Self::invoice))
+            .route("/node-info", get(Self::node_info))
+            .route("/list-payments", get(Self::list_payments))
             .with_state(lightning_client)
     }
 
@@ -84,6 +87,38 @@ impl LightningHandler {
         };
 
         Ok(response.into())
+    }
+
+    async fn node_info(
+        State(lightning_client): State<DynLightningClient>,
+    ) -> Result<Json<NodeState>, ApplicationError> {
+        println!("Getting node info");
+
+        let node_info = match lightning_client.node_info().await {
+            Ok(node_info) => node_info,
+            Err(e) => {
+                eprintln!("Error getting node info: {:?}", e);
+                return Err(e.into());
+            }
+        };
+
+        Ok(node_info.into())
+    }
+
+    async fn list_payments(
+        State(lightning_client): State<DynLightningClient>,
+    ) -> Result<Json<Vec<Payment>>, ApplicationError> {
+        println!("Listing payments");
+
+        let payments = match lightning_client.list_payments().await {
+            Ok(payments) => payments,
+            Err(e) => {
+                eprintln!("Error listing payments: {:?}", e);
+                return Err(e.into());
+            }
+        };
+
+        Ok(payments.into())
     }
 }
 
