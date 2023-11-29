@@ -15,7 +15,7 @@ use domains::rgb::api::http::RGBHandler;
 
 #[tokio::main]
 async fn main() {
-    let addr = "0.0.0.0:3000";
+    let addr = "0.0.0.0:80";
 
     // Create app
     let server = AxumServer::new(AxumServerConfig {

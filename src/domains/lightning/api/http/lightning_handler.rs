@@ -19,7 +19,7 @@ const MAX_SENDABLE: u64 = 1000000000;
 const MIN_SENDABLE: u64 = 1000;
 const MAX_COMMENT_CHARS: u8 = 255;
 const LNURL_TYPE: &str = "payRequest";
-const DOMAIN: &str = "localhost:3000";
+const DOMAIN: &str = "numerairelocal.tech";
 
 pub struct LightningHandler;
 
@@ -43,7 +43,7 @@ impl LightningHandler {
         );
 
         let response = LightningWellKnownResponse {
-            callback: format!("{}/lightning/invoice/{}", DOMAIN, username),
+            callback: format!("http://{}/lightning/lnurlp/{}/callback", DOMAIN, username),
             max_sendable: MAX_SENDABLE,
             min_sendable: MIN_SENDABLE,
             metadata: generate_metadata(username),
