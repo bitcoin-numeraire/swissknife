@@ -2,13 +2,23 @@
 name = "swissknife"
 version = "0.1.0"
 edition = "2021"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+authors = ["Dario Anongba Varela <dario.varela@numeraire.tech>"]
+rust-version = "1.73"
+license = "MIT"
+description = "Numeraire's Bitcoin SwissKnife is a web application enabling easy integration of Bitcoin, the Lightning network and the RGB protocol."
+repository = "https://github.com/bitcoin-numeraire/swissknife"
+homepage = "https://numeraire.tech"
 
 [dependencies]
 async-trait = "0.1.74"
 axum = "0.6.20"
 rgb-lib = "0.2.1"
-serde = "1.0.192"
+serde = { version = "1.0.192", features = ["derive"] }
 serde_json = "1.0.108"
 tokio = { version = "1.34.0", features = ["full"] }
+breez-sdk-core = { git = "https://github.com/breez/breez-sdk", tag = "0.2.10" }
+bip39 = { version = "*", features=["rand_core"] }
+tokio-rustls = "0.24.1"
+rustls-pemfile = "1.0.4"
+hyper = { version = "0.14", features = ["full"] }
+futures-util = { version = "0.3", default-features = false, features = ["alloc"] }

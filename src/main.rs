@@ -4,42 +4,73 @@ mod domains;
 
 use std::sync::Arc;
 
+use adapters::lightning::breez::{BreezClient, BreezClientConfig};
+use adapters::lightning::DynLightningClient;
 use adapters::rgb::rgblib::{RGBLibClient, RGBLibClientConfig};
 use adapters::rgb::DynRGBClient;
 use adapters::web::axum::{AxumServer, AxumServerConfig};
+use adapters::web::WebServer;
+use domains::lightning::api::http::LightningHandler;
 use domains::rgb::api::http::RGBHandler;
-
-use crate::adapters::web::WebServer;
 
 #[tokio::main]
 async fn main() {
-    let addr = "0.0.0.0:3000";
+    let addr = "0.0.0.0:443";
 
     // Create app
-    let server = AxumServer::new(AxumServerConfig {
+    let axum_config = AxumServerConfig {
         addr: addr.to_string(),
-    })
-    .unwrap();
+        tls_key_path: Some("certs/localhost_key.pem".to_string()),
+        tls_cert_path: Some("certs/localhost_cert.pem".to_string()),
+    };
+    let server = AxumServer::new(axum_config).unwrap();
 
-    let config = RGBLibClientConfig {
+    let rgb_lib_config = RGBLibClientConfig {
         electrum_url: "localhost:50001".to_string(),
-        data_dir: "storage".to_string(),
+        data_dir: "storage/rgblib".to_string(),
         mnemonic:
             "adapt lumber inherit square defy burden beyond assault drop lumber purpose satoshi"
                 .to_string(),
     };
 
-    let rgb_client = RGBLibClient::new(config.clone()).await.unwrap();
+    let rgb_client = RGBLibClient::new(rgb_lib_config.clone()).await.unwrap();
 
     println!(
-        "Wallet created in directory `{}` with mnemonic: `{}`",
-        config.data_dir, config.mnemonic
+        "RGB Wallet created in directory `{}` with mnemonic: `{}`",
+        rgb_lib_config.data_dir, rgb_lib_config.mnemonic
     );
 
-    let rgb_client = Arc::new(rgb_client) as DynRGBClient;
+    server
+        .nest_router(
+            "/rgb",
+            RGBHandler::routes(Arc::new(rgb_client) as DynRGBClient),
+        )
+        .await
+        .unwrap();
 
     server
-        .nest_router("/rgb", RGBHandler::new().routes(rgb_client))
+        .nest_router("/.well-known", LightningHandler::well_known_routes())
+        .await
+        .unwrap();
+
+    let breez_config = BreezClientConfig {
+        api_key: "ea3d7d992a5e886ef36ca779b6e81afc80380624bd6f8341e6c75ce6de60a1f4".to_string(),
+        invite_code: "89NL-AKGQ".to_string(),
+        working_dir: "storage/breez".to_string(),
+        seed: "frost only system trade august ritual pyramid bracket range appear camp earth"
+            .to_string(),
+    };
+    let lightning_client = BreezClient::new(breez_config.clone()).await.unwrap();
+
+    println!(
+        "Breez client created in directory `{}` with mnemonic: `{}`",
+        breez_config.working_dir, breez_config.seed
+    );
+    server
+        .nest_router(
+            "/lightning",
+            LightningHandler::routes(Arc::new(lightning_client) as DynLightningClient),
+        )
         .await
         .unwrap();
 
@@ -52,7 +83,7 @@ async fn main() {
     tokio::select! {
         result = server_future => {
             if let Err(e) = result {
-                eprintln!("Server error: {}", e);
+                eprintln!("Server error: {:?}", e);
             }
         }
         _ = ctrl_c_future => {

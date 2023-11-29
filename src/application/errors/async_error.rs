@@ -2,11 +2,12 @@ use tokio::task::JoinError;
 
 #[derive(Debug)]
 pub enum AsyncError {
-    TaskJoinError(String),
+    TaskJoin(String),
+    Mutex(String),
 }
 
 impl From<JoinError> for AsyncError {
     fn from(error: JoinError) -> Self {
-        AsyncError::TaskJoinError(error.to_string())
+        AsyncError::TaskJoin(error.to_string())
     }
 }

@@ -20,8 +20,9 @@ Cargo.lock
 .env
 
 # Certificates
-certificates/
+certs/
 
 # Local env files
 tmp/
-storage/
+storage/breez/
+storage/rgblib/
