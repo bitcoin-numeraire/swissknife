@@ -43,7 +43,7 @@ impl LightningHandler {
         );
 
         let response = LightningWellKnownResponse {
-            callback: format!("http://{}/lightning/lnurlp/{}/callback", DOMAIN, username),
+            callback: format!("https://{}/lightning/lnurlp/{}/callback", DOMAIN, username),
             max_sendable: MAX_SENDABLE,
             min_sendable: MIN_SENDABLE,
             metadata: generate_metadata(username),

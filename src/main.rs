@@ -15,13 +15,15 @@ use domains::rgb::api::http::RGBHandler;
 
 #[tokio::main]
 async fn main() {
-    let addr = "0.0.0.0:80";
+    let addr = "0.0.0.0:443";
 
     // Create app
-    let server = AxumServer::new(AxumServerConfig {
+    let axum_config = AxumServerConfig {
         addr: addr.to_string(),
-    })
-    .unwrap();
+        tls_key_path: Some("certs/localhost_key.pem".to_string()),
+        tls_cert_path: Some("certs/localhost_cert.pem".to_string()),
+    };
+    let server = AxumServer::new(axum_config).unwrap();
 
     let rgb_lib_config = RGBLibClientConfig {
         electrum_url: "localhost:50001".to_string(),
@@ -81,7 +83,7 @@ async fn main() {
     tokio::select! {
         result = server_future => {
             if let Err(e) = result {
-                eprintln!("Server error: {}", e);
+                eprintln!("Server error: {:?}", e);
             }
         }
         _ = ctrl_c_future => {

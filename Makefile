@@ -2,7 +2,7 @@ COMPOSE := docker compose -f docker-compose.yml
 EXPOSED_PORTS := 50001 50002
 BCLI := $(COMPOSE) exec -T -u blits bitcoind bitcoin-cli -regtest
 
-.PHONY: up-bitcoin up-electrs down mine send create-wallet
+.PHONY: up-bitcoin up-electrs down mine send create-wallet generate-certs
 
 up-bitcoin:
 	@make down
@@ -31,3 +31,8 @@ mine:
 
 send:
 	$(BCLI) -rpcwallet=miner sendtoaddress $(recipient) $(amount)
+
+generate-certs:
+	@mkdir -p certs
+	@openssl genrsa -out certs/localhost_key.pem 2048
+	@openssl req -new -x509 -key certs/localhost_key.pem -out certs/localhost_cert.pem -days 365 -subj /CN=localhost
