@@ -20,6 +20,12 @@ impl From<ConfigError> for ApplicationError {
     }
 }
 
+impl From<RGBError> for ApplicationError {
+    fn from(inner: RGBError) -> Self {
+        ApplicationError::RGB(inner)
+    }
+}
+
 impl From<LightningError> for ApplicationError {
     fn from(inner: LightningError) -> Self {
         ApplicationError::Lightning(inner)

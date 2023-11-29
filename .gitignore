@@ -24,4 +24,5 @@ certificates/
 
 # Local env files
 tmp/
-storage/
+storage/breez-sdk/
+storage/rgb-lib/

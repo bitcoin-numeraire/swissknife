@@ -1,8 +1,9 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use bip39::Mnemonic;
 use breez_sdk_core::{
-    BreezServices, Config, EnvironmentType, GreenlightNodeConfig, NodeConfig, ReceivePaymentRequest,
+    BreezServices, EnvironmentType, GreenlightNodeConfig, NodeConfig, ReceivePaymentRequest,
 };
 
 use crate::{
@@ -14,14 +15,13 @@ use super::BreezListener;
 
 #[derive(Clone)]
 pub struct BreezClientConfig {
-    api_key: String,
-    invite_code: Option<String>,
-    working_dir: String,
-    seed: Vec<u8>,
+    pub api_key: String,
+    pub invite_code: String,
+    pub working_dir: String,
+    pub seed: String,
 }
 
 pub struct BreezClient {
-    config: Config,
     sdk: Arc<BreezServices>,
 }
 
@@ -33,20 +33,24 @@ impl BreezClient {
             NodeConfig::Greenlight {
                 config: GreenlightNodeConfig {
                     partner_credentials: None,
-                    invite_code: config.invite_code,
+                    invite_code: Some(config.invite_code),
                 },
             },
         );
         breez_config.working_dir = config.working_dir;
 
-        let sdk = BreezServices::connect(breez_config, config.seed, Box::new(BreezListener {}))
-            .await
-            .map_err(|e| ConfigError::Lightning(e.to_string()))?;
+        let seed =
+            Mnemonic::parse(config.seed).map_err(|e| ConfigError::Lightning(e.to_string()))?;
 
-        Ok(Self {
-            config: breez_config,
-            sdk,
-        })
+        let sdk = BreezServices::connect(
+            breez_config,
+            seed.to_seed("").to_vec(),
+            Box::new(BreezListener {}),
+        )
+        .await
+        .map_err(|e| ConfigError::Lightning(e.to_string()))?;
+
+        Ok(Self { sdk })
     }
 }
 
