@@ -3,7 +3,6 @@ use tokio::task::JoinError;
 #[derive(Debug)]
 pub enum AsyncError {
     TaskJoin(String),
-    Mutex(String),
 }
 
 impl From<JoinError> for AsyncError {

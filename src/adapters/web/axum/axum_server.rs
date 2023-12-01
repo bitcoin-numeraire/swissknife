@@ -19,20 +19,20 @@ use tokio_rustls::{rustls::ServerConfig, TlsAcceptor};
 
 use crate::{
     adapters::web::WebServer,
-    application::errors::{ApplicationError, AsyncError, ConfigError, WebServerError},
+    application::errors::{ConfigError, WebServerError},
 };
 
 use super::AxumServerConfig;
 
 pub struct AxumServer {
     addr: SocketAddr,
-    router: Arc<Mutex<Option<Router>>>,
+    router: Arc<Mutex<Router>>,
     tls_config: Option<Arc<ServerConfig>>,
 }
 
 impl AxumServer {
     pub fn new(config: AxumServerConfig) -> Result<Self, ConfigError> {
-        let router = Arc::new(Mutex::new(Some(Router::new())));
+        let router = Arc::new(Mutex::new(Router::new()));
         let addr: SocketAddr = config
             .addr
             .parse()
@@ -48,12 +48,10 @@ impl AxumServer {
 
 #[async_trait]
 impl WebServer for AxumServer {
-    async fn start(&self) -> Result<(), ApplicationError> {
+    async fn start(&self) -> Result<(), WebServerError> {
         let router = {
             let lock = self.router.lock().await;
             lock.clone()
-                .ok_or("router is missing")
-                .map_err(|e| AsyncError::Mutex(e.to_string()))?
         };
 
         if let Some(tls_config) = self.tls_config.clone() {
@@ -93,15 +91,15 @@ impl WebServer for AxumServer {
         }
     }
 
-    async fn nest_router(&self, path: &str, method: Router) -> Result<(), ApplicationError> {
-        let mut lock = self.router.lock().await;
-        let router = lock
-            .take()
-            .ok_or("router is missing")
-            .map_err(|e| AsyncError::Mutex(e.to_string()))?;
+    async fn nest_router(&mut self, path: &str, nested_router: Router) -> &mut Self {
+        let old_router = {
+            let lock = self.router.lock().await;
+            (*lock).clone()
+        };
 
-        *lock = Some(router.nest(path, method));
+        let new_router = old_router.clone().nest(path, nested_router);
+        self.router = Arc::new(Mutex::new(new_router));
 
-        Ok(())
+        self
     }
 }

@@ -1,3 +1,4 @@
+use serde::Deserialize;
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -14,7 +15,7 @@ use crate::{
 
 use super::BreezListener;
 
-#[derive(Clone)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct BreezClientConfig {
     pub api_key: String,
     pub invite_code: String,

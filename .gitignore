@@ -18,6 +18,7 @@ Cargo.lock
 
 # Env
 .env
+config/
 
 # Certificates
 certs/

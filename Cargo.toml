@@ -5,7 +5,7 @@ edition = "2021"
 authors = ["Dario Anongba Varela <dario.varela@numeraire.tech>"]
 rust-version = "1.73"
 license = "MIT"
-description = "Numeraire's Bitcoin SwissKnife is a web application enabling easy integration of Bitcoin, the Lightning network and the RGB protocol."
+description = "Numeraire's Bitcoin SwissKnife is a software application enabling easy integration of Bitcoin, the Lightning network and the RGB protocol."
 repository = "https://github.com/bitcoin-numeraire/swissknife"
 homepage = "https://numeraire.tech"
 
@@ -22,3 +22,4 @@ tokio-rustls = "0.24.1"
 rustls-pemfile = "1.0.4"
 hyper = { version = "0.14", features = ["full"] }
 futures-util = { version = "0.3", default-features = false, features = ["alloc"] }
+config = { version = "0.13.4", features = ["yaml", "json"] }
