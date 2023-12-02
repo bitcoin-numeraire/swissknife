@@ -19,7 +19,10 @@ use domains::rgb::api::http::RGBHandler;
 async fn main() {
     // Load config
     let config = ConfigRsLoader {}.load().unwrap();
-    println!("{:?}", config);
+    #[cfg(debug_assertions)]
+    {
+        println!("{:?}", config);
+    }
 
     // Create adapters
     let mut server = AxumServer::new(config.web.clone()).unwrap();

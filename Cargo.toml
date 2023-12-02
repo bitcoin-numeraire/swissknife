@@ -24,7 +24,5 @@ hyper = { version = "0.14", features = ["full"] }
 futures-util = { version = "0.3", default-features = false, features = [
     "alloc",
 ] }
-config = { version = "0.13.4", features = ["yaml", "json"] }
-
-[dev-dependencies]
+config = { version = "0.13.4", features = ["yaml", "json", "toml"] }
 dotenv = "0.15.0"
