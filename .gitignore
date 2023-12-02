@@ -18,12 +18,12 @@ Cargo.lock
 
 # Env
 .env
-config/
+config/development.yaml
+config/production.yaml
 
 # Certificates
 certs/
 
-# Local env files
-tmp/
+# Local storage files
 storage/breez/
 storage/rgblib/
