@@ -1,0 +1,16 @@
+# Web server settings
+[web]
+addr = "0.0.0.0:3000"
+
+# Lightning settings
+[lightning]
+working_dir = "storage/breez"
+
+# RGB settings
+[rgb]
+data_dir = "storage/rgblib"
+electrum_url = "localhost:50001"
+
+# Logging settings
+[logging]
+level = "debug"

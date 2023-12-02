@@ -1,8 +1,10 @@
+use serde::Deserialize;
 use std::{fs::File, io::BufReader, sync::Arc};
 
 use rustls_pemfile::{certs, pkcs8_private_keys};
 use tokio_rustls::rustls::{Certificate, PrivateKey, ServerConfig};
 
+#[derive(Clone, Debug, Deserialize)]
 pub struct AxumServerConfig {
     pub addr: String,
     pub tls_key_path: Option<String>,

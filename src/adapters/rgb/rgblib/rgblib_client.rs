@@ -1,3 +1,4 @@
+use serde::Deserialize;
 use std::{collections::HashMap, sync::Arc};
 
 use async_trait::async_trait;
@@ -17,7 +18,7 @@ use crate::{
     domains::rgb::entities::RGBContract,
 };
 
-#[derive(Clone)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct RGBLibClientConfig {
     pub data_dir: String,
     pub mnemonic: String,

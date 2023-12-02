@@ -1,3 +1,4 @@
+mod config;
 mod contract;
 mod lightning;
 mod wallet;
@@ -15,3 +16,5 @@ pub use lightning::LightningInvoiceQueryParams;
 pub use lightning::LightningInvoiceResponse;
 pub use lightning::LightningWellKnownResponse;
 pub use lightning::SuccessAction;
+
+pub use config::AppConfig;
