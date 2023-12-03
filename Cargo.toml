@@ -26,3 +26,5 @@ futures-util = { version = "0.3", default-features = false, features = [
 ] }
 config = { version = "0.13.4", features = ["yaml", "json", "toml"] }
 dotenv = "0.15.0"
+tracing = "0.1.40"
+tracing-subscriber = "0.3.18"
