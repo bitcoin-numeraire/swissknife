@@ -18,5 +18,5 @@ ansi = false
 line_number = false
 thread_ids = false
 thread_names = false
-target = "application_log"
 level = "info"
+filter = "swissknife"

@@ -15,15 +15,16 @@ use adapters::web::axum::AxumServer;
 use adapters::web::WebServer;
 use domains::lightning::api::http::LightningHandler;
 use domains::rgb::api::http::RGBHandler;
-use tracing::{error, info};
+use tracing::{debug, error, info};
 
 #[tokio::main]
 async fn main() {
-    // Load config
+    // Load config and logger
     let config: application::dtos::AppConfig = ConfigRsLoader {}.load().unwrap();
+    setup_tracing(config.logging.clone());
+    debug!(?config, "Loaded configuration");
 
     // Create adapters
-    setup_tracing(config.logging.clone());
     let mut server = AxumServer::new(config.web.clone()).unwrap();
     let rgb_client = RGBLibClient::new(config.rgb.clone()).await.unwrap();
     let lightning_client = BreezClient::new(config.lightning.clone()).await.unwrap();
@@ -52,7 +53,7 @@ async fn main() {
         result = server_future => {
             if let Err(e) = result {
                 error!(error = ?e, "Server error");
-                        }
+            }
         }
         _ = ctrl_c_future => {
             info!("Received Ctrl+C, shutting down");
