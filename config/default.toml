@@ -13,4 +13,10 @@ electrum_url = "localhost:50001"
 
 # Logging settings
 [logging]
-level = "debug"
+format = "json"
+ansi = false
+line_number = false
+thread_ids = false
+thread_names = false
+level = "info"
+filter = "swissknife"
