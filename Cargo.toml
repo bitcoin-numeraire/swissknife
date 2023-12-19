@@ -28,3 +28,7 @@ config = { version = "0.13.4", features = ["yaml", "json", "toml"] }
 dotenv = "0.15.0"
 tracing = "0.1.40"
 tracing-subscriber = { version = "0.3.18", features = ["json"] }
+axum-extra = { version = "0.9.0", features = ["typed-header"] }
+jsonwebtoken = "9.2.0"
+reqwest = "0.11.23"
+humantime = "2.1.0"

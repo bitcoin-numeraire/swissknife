@@ -1,5 +1,7 @@
 #[derive(Debug)]
 pub enum RGBError {
+    RestoreKeys(String),
+    CreateWallet(String),
     Address(String),
     Balance(String),
     Unspents(String),

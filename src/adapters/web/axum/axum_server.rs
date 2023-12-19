@@ -17,10 +17,7 @@ use hyper::{
 use tokio::{net::TcpListener, sync::Mutex};
 use tokio_rustls::{rustls::ServerConfig, TlsAcceptor};
 
-use crate::{
-    adapters::web::WebServer,
-    application::errors::{ConfigError, WebServerError},
-};
+use crate::{adapters::web::WebServer, application::errors::WebServerError};
 
 use super::AxumServerConfig;
 
@@ -31,12 +28,12 @@ pub struct AxumServer {
 }
 
 impl AxumServer {
-    pub fn new(config: AxumServerConfig) -> Result<Self, ConfigError> {
+    pub fn new(config: AxumServerConfig) -> Result<Self, WebServerError> {
         let router = Arc::new(Mutex::new(Router::new()));
         let addr: SocketAddr = config
             .addr
             .parse()
-            .map_err(|e: AddrParseError| ConfigError::WebServer(e.to_string()))?;
+            .map_err(|e: AddrParseError| WebServerError::Parse(e.to_string()))?;
 
         Ok(Self {
             router,

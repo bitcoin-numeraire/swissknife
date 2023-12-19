@@ -8,10 +8,7 @@ use breez_sdk_core::{
     NodeState, Payment, ReceivePaymentRequest,
 };
 
-use crate::{
-    adapters::lightning::LightningClient,
-    application::errors::{ApplicationError, ConfigError, LightningError},
-};
+use crate::{adapters::lightning::LightningClient, application::errors::LightningError};
 
 use super::BreezListener;
 
@@ -28,7 +25,7 @@ pub struct BreezClient {
 }
 
 impl BreezClient {
-    pub async fn new(config: BreezClientConfig) -> Result<Self, ApplicationError> {
+    pub async fn new(config: BreezClientConfig) -> Result<Self, LightningError> {
         let mut breez_config = BreezServices::default_config(
             EnvironmentType::Production,
             config.api_key,
@@ -41,8 +38,7 @@ impl BreezClient {
         );
         breez_config.working_dir = config.working_dir;
 
-        let seed =
-            Mnemonic::parse(config.seed).map_err(|e| ConfigError::Lightning(e.to_string()))?;
+        let seed = Mnemonic::parse(config.seed).map_err(|e| LightningError::Seed(e.to_string()))?;
 
         let sdk = BreezServices::connect(
             breez_config,
@@ -50,7 +46,7 @@ impl BreezClient {
             Box::new(BreezListener {}),
         )
         .await
-        .map_err(|e| ConfigError::Lightning(e.to_string()))?;
+        .map_err(|e| LightningError::Connect(e.to_string()))?;
 
         Ok(Self { sdk })
     }

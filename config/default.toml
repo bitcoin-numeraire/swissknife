@@ -20,3 +20,14 @@ thread_ids = false
 thread_names = false
 level = "info"
 filter = "swissknife"
+
+[auth]
+# If set to true, the server will require authentication
+enabled = false
+[auth.jwt]
+domain = "your-app.auth0.com"
+audience = "https://your-app.auth0.com/api/v2/"
+jwks_uri = "https://your-app.auth0.com/.well-known/jwks.json"
+algorithm = "RS256"
+issuer = "https://your-app.auth0.com/"
+jwks_refresh_interval = "12h"

@@ -1,4 +1,6 @@
-use super::{AsyncError, ConfigError, LightningError, RGBError, WebServerError};
+use super::{
+    AsyncError, AuthenticationError, ConfigError, LightningError, RGBError, WebServerError,
+};
 
 #[derive(Debug)]
 pub enum ApplicationError {
@@ -7,6 +9,7 @@ pub enum ApplicationError {
     RGB(RGBError),
     Lightning(LightningError),
     WebServer(WebServerError),
+    Authentication(AuthenticationError),
 }
 
 impl From<AsyncError> for ApplicationError {
@@ -36,5 +39,11 @@ impl From<LightningError> for ApplicationError {
 impl From<WebServerError> for ApplicationError {
     fn from(inner: WebServerError) -> Self {
         ApplicationError::WebServer(inner)
+    }
+}
+
+impl From<AuthenticationError> for ApplicationError {
+    fn from(inner: AuthenticationError) -> Self {
+        ApplicationError::Authentication(inner)
     }
 }

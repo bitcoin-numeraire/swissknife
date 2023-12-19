@@ -1,7 +1,7 @@
 use serde::Deserialize;
 
 use crate::adapters::{
-    lightning::breez::BreezClientConfig, logging::tracing::TracingLoggerConfig,
+    auth::AuthConfig, lightning::breez::BreezClientConfig, logging::tracing::TracingLoggerConfig,
     rgb::rgblib::RGBLibClientConfig, web::axum::AxumServerConfig,
 };
 
@@ -11,4 +11,5 @@ pub struct AppConfig {
     pub rgb: RGBLibClientConfig,
     pub web: AxumServerConfig,
     pub logging: TracingLoggerConfig,
+    pub auth: AuthConfig,
 }
