@@ -13,9 +13,7 @@ use rgb_lib::{
 use tokio::{sync::Mutex, task};
 
 use crate::{
-    adapters::rgb::RGBClient,
-    application::errors::RGBError,
-    domains::rgb::entities::RGBContract,
+    adapters::rgb::RGBClient, application::errors::RGBError, domains::rgb::entities::RGBContract,
 };
 
 #[derive(Clone, Debug, Deserialize)]
@@ -48,7 +46,7 @@ impl RGBLibClient {
         // Offload the blocking Wallet::new call to a separate thread
         let wallet = task::spawn_blocking(move || Wallet::new(wallet_data))
             .await
-            .map_err(|e| RGBError::CreateWallet(e.to_string()))?;
+            .map_err(|e| RGBError::CreateWallet(e.to_string()))?
             .map_err(|e| RGBError::CreateWallet(e.to_string()))?;
 
         Ok(Self {

@@ -46,7 +46,7 @@ async fn get_address(State(rgb_client): State<DynRGBClient>) -> Result<String, A
         Ok(address) => address,
         Err(e) => {
             eprintln!("Error Fetching address: {:?}", e);
-            return Err(e);
+            return Err(e.into());
         }
     };
 
@@ -62,7 +62,7 @@ async fn get_balance(State(rgb_client): State<DynRGBClient>) -> Result<String, A
         Ok(balance) => balance,
         Err(e) => {
             eprintln!("Error Fetching balance: {:?}", e);
-            return Err(e);
+            return Err(e.into());
         }
     };
 
@@ -80,7 +80,7 @@ async fn unspents(
         Ok(unspents) => unspents,
         Err(e) => {
             eprintln!("Error Fetching balance: {:?}", e);
-            return Err(e);
+            return Err(e.into());
         }
     };
 
@@ -102,7 +102,7 @@ async fn send(
         Ok(id) => id,
         Err(e) => {
             eprintln!("Error creating utxos: {:?}", e);
-            return Err(e);
+            return Err(e.into());
         }
     };
 
@@ -124,7 +124,7 @@ async fn drain(
         Ok(id) => id,
         Err(e) => {
             eprintln!("Error creating utxos: {:?}", e);
-            return Err(e);
+            return Err(e.into());
         }
     };
 
@@ -143,7 +143,7 @@ async fn prepare_issuance(
         Ok(id) => id,
         Err(e) => {
             eprintln!("Error creating utxos: {:?}", e);
-            return Err(e);
+            return Err(e.into());
         }
     };
 
@@ -170,7 +170,7 @@ async fn issue_contract(
         Ok(id) => id,
         Err(e) => {
             eprintln!("Error issuing contract: {:?}", e);
-            return Err(e);
+            return Err(e.into());
         }
     };
 
@@ -190,7 +190,7 @@ async fn list_assets(
         Ok(assets) => assets,
         Err(e) => {
             eprintln!("Error Fetching assets: {:?}", e);
-            return Err(e);
+            return Err(e.into());
         }
     };
 
@@ -207,7 +207,7 @@ async fn get_asset(
         Ok(asset) => asset,
         Err(e) => {
             eprintln!("Error Fetching asset {:?}", e);
-            return Err(e);
+            return Err(e.into());
         }
     };
 
@@ -224,7 +224,7 @@ async fn get_asset_balance(
         Ok(balance) => balance,
         Err(e) => {
             eprintln!("Error Fetching balance {:?}", e);
-            return Err(e);
+            return Err(e.into());
         }
     };
 
@@ -251,7 +251,7 @@ async fn send_assets(
         Ok(id) => id,
         Err(e) => {
             eprintln!("Error sending assets: {:?}", e);
-            return Err(e);
+            return Err(e.into());
         }
     };
 
@@ -279,7 +279,7 @@ async fn invoice(
         Ok(id) => id,
         Err(e) => {
             eprintln!("Error generating invoice: {:?}", e);
-            return Err(e);
+            return Err(e.into());
         }
     };
 

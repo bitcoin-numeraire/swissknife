@@ -25,9 +25,6 @@ filter = "swissknife"
 # If set to true, the server will require authentication
 enabled = false
 [auth.jwt]
-domain = "your-app.auth0.com"
-audience = "https://your-app.auth0.com/api/v2/"
-jwks_uri = "https://your-app.auth0.com/.well-known/jwks.json"
-algorithm = "RS256"
-issuer = "https://your-app.auth0.com/"
+domain = "domain.auth0.com"
+audience = "https://swissknife.numeraire.tech/api/v1"
 jwks_refresh_interval = "12h"

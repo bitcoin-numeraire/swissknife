@@ -4,6 +4,7 @@ mod domains;
 
 use std::sync::Arc;
 
+use adapters::auth::jwt::JWTValidator;
 use adapters::config::config_rs::ConfigRsLoader;
 use adapters::config::ConfigLoader;
 use adapters::lightning::breez::BreezClient;
@@ -28,6 +29,7 @@ async fn main() {
     let mut server = AxumServer::new(config.web.clone()).unwrap();
     let rgb_client = RGBLibClient::new(config.rgb.clone()).await.unwrap();
     let lightning_client = BreezClient::new(config.lightning.clone()).await.unwrap();
+    let _ = JWTValidator::new(config.auth.jwt.clone()).await.unwrap();
 
     server
         .nest_router(
