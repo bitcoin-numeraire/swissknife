@@ -1,5 +1,5 @@
 use axum::{
-    http::StatusCode,
+    http::{header::WWW_AUTHENTICATE, HeaderValue, StatusCode},
     response::{IntoResponse, Response},
     Json,
 };
@@ -54,20 +54,30 @@ impl IntoResponse for LightningError {
 
 impl IntoResponse for AuthenticationError {
     fn into_response(self) -> Response {
-        let (status, error_message) = match self {
-            AuthenticationError::MissingCredentials(msg) => (StatusCode::BAD_REQUEST, msg),
-            AuthenticationError::JWT(msg) => (StatusCode::UNAUTHORIZED, msg),
+        let (status, error_message, header_message) = match self {
+            AuthenticationError::MissingCredentials(msg)  => 
+                (StatusCode::UNAUTHORIZED, msg.clone(), format!("Bearer realm=\"swissknife\", error=\"invalid_request\", error_description=\"{}\"", msg)),
+            AuthenticationError::JWT(msg) => 
+                (StatusCode::UNAUTHORIZED, msg.clone(), format!("Bearer realm=\"swissknife\", error=\"invalid_token\", error_description=\"{}\"", msg)),
             _ => (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 INTERNAL_SERVER_ERROR.to_string(),
+                "".to_string()
             ),
         };
 
         let body = Json(json!({
-            "status": STATUS_ERROR.to_string(),
+            "status": status.canonical_reason(),
             "reason": error_message,
         }));
+        
+        let mut response = (status, body).into_response();
 
-        (status, body).into_response()
+        response.headers_mut().insert(
+            WWW_AUTHENTICATE,
+            HeaderValue::from_str(&header_message).unwrap(),
+        );
+
+        response
     }
 }

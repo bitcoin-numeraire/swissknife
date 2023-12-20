@@ -27,4 +27,4 @@ enabled = false
 [auth.jwt]
 domain = "domain.auth0.com"
 audience = "https://swissknife.numeraire.tech/api/v1"
-jwks_refresh_interval = "12h"
+jwks_refresh_interval = "1h"

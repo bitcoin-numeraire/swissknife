@@ -19,6 +19,7 @@ pub struct App {
 impl App {
     pub async fn new(config: AppConfig) -> Self {
         setup_tracing(config.logging.clone());
+        info!(config = ?config, "Starting server");
 
         // Create adapters
         let rgb_client = RGBLibClient::new(config.rgb.clone()).await.unwrap();
