@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use async_trait::async_trait;
 use serde::Deserialize;
 
@@ -15,3 +17,5 @@ pub struct AuthConfig {
 pub trait Authenticator {
     async fn validate(&self, token: &str) -> Result<AuthUser, AuthenticationError>;
 }
+
+pub type DynAuthenticator = Arc<dyn Authenticator + Send + Sync>;

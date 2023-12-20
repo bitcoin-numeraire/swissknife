@@ -1,12 +1,15 @@
+use std::sync::Arc;
+
 use axum::{
     extract::{Path, Query, State},
     routing::get,
     Json, Router,
 };
 use breez_sdk_core::{NodeState, Payment};
+use tracing::{debug, error};
 
 use crate::{
-    adapters::lightning::DynLightningClient,
+    adapters::app::AppState,
     application::{
         dtos::{
             LightningInvoiceQueryParams, LightningInvoiceResponse, LightningWellKnownResponse,
@@ -14,6 +17,7 @@ use crate::{
         },
         errors::ApplicationError,
     },
+    domains::users::entities::AuthUser,
 };
 
 const MAX_SENDABLE: u64 = 1000000000;
@@ -25,22 +29,21 @@ const DOMAIN: &str = "numerairelocal.tech";
 pub struct LightningHandler;
 
 impl LightningHandler {
-    pub fn well_known_routes() -> Router {
+    pub fn well_known_routes() -> Router<Arc<AppState>> {
         Router::new().route("/lnurlp/:username", get(Self::well_known_lnurlp))
     }
 
-    pub fn routes(lightning_client: DynLightningClient) -> Router {
+    pub fn routes() -> Router<Arc<AppState>> {
         Router::new()
             .route("/lnurlp/:username/callback", get(Self::invoice))
             .route("/node-info", get(Self::node_info))
             .route("/list-payments", get(Self::list_payments))
-            .with_state(lightning_client)
     }
 
     async fn well_known_lnurlp(
         Path(username): Path<String>,
     ) -> Result<Json<LightningWellKnownResponse>, ApplicationError> {
-        println!(
+        debug!(
             "Generating lightning well-known JSON response for {}",
             username
         );
@@ -61,9 +64,11 @@ impl LightningHandler {
     async fn invoice(
         Path(username): Path<String>,
         Query(query_params): Query<LightningInvoiceQueryParams>,
-        State(lightning_client): State<DynLightningClient>,
+        State(app_state): State<Arc<AppState>>,
     ) -> Result<Json<LightningInvoiceResponse>, ApplicationError> {
-        println!("Generating invoice for {}", username);
+        debug!("Generating invoice for {}", username);
+
+        let lightning_client = &app_state.lightning_client;
 
         let invoice = match lightning_client
             .invoice(query_params.amount, generate_metadata(username))
@@ -71,7 +76,7 @@ impl LightningHandler {
         {
             Ok(invoice) => invoice,
             Err(e) => {
-                eprintln!("Error generating invoice: {:?}", e);
+                error!(error = ?e, "Error generating invoice");
                 return Err(e.into());
             }
         };
@@ -90,14 +95,17 @@ impl LightningHandler {
     }
 
     async fn node_info(
-        State(lightning_client): State<DynLightningClient>,
+        State(app_state): State<Arc<AppState>>,
+        user: AuthUser,
     ) -> Result<Json<NodeState>, ApplicationError> {
-        println!("Getting node info");
+        debug!(user = ?user, "Getting node info");
+
+        let lightning_client = &app_state.lightning_client;
 
         let node_info = match lightning_client.node_info().await {
             Ok(node_info) => node_info,
             Err(e) => {
-                eprintln!("Error getting node info: {:?}", e);
+                error!(error = ?e, "Error getting node info");
                 return Err(e.into());
             }
         };
@@ -106,14 +114,16 @@ impl LightningHandler {
     }
 
     async fn list_payments(
-        State(lightning_client): State<DynLightningClient>,
+        State(app_state): State<Arc<AppState>>,
     ) -> Result<Json<Vec<Payment>>, ApplicationError> {
-        println!("Listing payments");
+        debug!("Listing payments");
+
+        let lightning_client = &app_state.lightning_client;
 
         let payments = match lightning_client.list_payments().await {
             Ok(payments) => payments,
             Err(e) => {
-                eprintln!("Error listing payments: {:?}", e);
+                error!(error = ?e, "Error listing payments");
                 return Err(e.into());
             }
         };
