@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use serde::Deserialize;
 
-use crate::application::errors::AuthenticationError;
+use crate::{application::errors::AuthenticationError, domains::users::entities::AuthUser};
 
 use super::jwt::JWTConfig;
 
@@ -13,5 +13,5 @@ pub struct AuthConfig {
 
 #[async_trait]
 pub trait Authenticator {
-    async fn validate(&self, token: &str) -> Result<(), AuthenticationError>;
+    async fn validate(&self, token: &str) -> Result<AuthUser, AuthenticationError>;
 }

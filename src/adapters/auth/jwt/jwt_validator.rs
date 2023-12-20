@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
-use crate::adapters::auth::Authenticator;
 use crate::application::errors::AuthenticationError;
+use crate::{adapters::auth::Authenticator, domains::users::entities::AuthUser};
 use async_trait::async_trait;
 use humantime::parse_duration;
 use jsonwebtoken::{
@@ -12,7 +12,7 @@ use jsonwebtoken::{
 use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
 use tokio::time::sleep;
-use tracing::{error, info, trace};
+use tracing::{error, trace};
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct JWTConfig {
@@ -31,6 +31,7 @@ struct Claims {
     sub: String, // Optional. Subject (whom token refers to)
 }
 
+#[derive(Clone, Debug)]
 pub struct JWTValidator {
     jwks: Arc<RwLock<JwkSet>>,
     validation: Validation,
@@ -43,7 +44,7 @@ impl JWTValidator {
 
         let jwks_uri = format!("https://{}/.well-known/jwks.json", config.domain);
 
-        let initial_jwks = Self::refresh_jwks(&jwks_uri)
+        let initial_jwks = Self::fetch_jwks(&jwks_uri)
             .await
             .map_err(|e| AuthenticationError::JWKS(e.to_string()))?;
 
@@ -52,7 +53,7 @@ impl JWTValidator {
 
         tokio::spawn(async move {
             loop {
-                match Self::refresh_jwks(&jwks_uri).await {
+                match Self::fetch_jwks(&jwks_uri).await {
                     Ok(new_jwks) => {
                         let mut jwks_write = jwks_clone.write().await;
                         *jwks_write = new_jwks;
@@ -68,21 +69,21 @@ impl JWTValidator {
 
         let mut validation = Validation::new(Algorithm::RS256);
         validation.set_audience(&[config.audience.as_str()]);
-        validation.set_issuer(&[format!("https://{}", config.domain)]);
+        validation.set_issuer(&[format!("https://{}/", config.domain)]);
+        validation.validate_nbf = true;
+        validation.leeway = 20;
 
         Ok(Self { jwks, validation })
     }
 
-    async fn refresh_jwks(jwks_uri: &str) -> Result<JwkSet, reqwest::Error> {
-        let jwks: JwkSet = reqwest::get(jwks_uri).await?.json().await?;
-
-        Ok(jwks)
+    async fn fetch_jwks(jwks_uri: &str) -> Result<JwkSet, reqwest::Error> {
+        Ok(reqwest::get(jwks_uri).await?.json().await?)
     }
 }
 
 #[async_trait]
 impl Authenticator for JWTValidator {
-    async fn validate(&self, token: &str) -> Result<(), AuthenticationError> {
+    async fn validate(&self, token: &str) -> Result<AuthUser, AuthenticationError> {
         // Access the JWKs and clone the data
         let jwks = self.jwks.read().await.clone();
 
@@ -105,7 +106,11 @@ impl Authenticator for JWTValidator {
                     let decoded_token = decode::<Claims>(token, &decoding_key, &self.validation)
                         .map_err(|e| AuthenticationError::JWT(e.to_string()))?;
 
-                    info!(claims = ?decoded_token.claims, "{:?}", decoded_token);
+                    trace!(claims = ?decoded_token.claims, "Decoded token {:?}", decoded_token);
+
+                    Ok(AuthUser {
+                        sub: decoded_token.claims.sub,
+                    })
                 }
                 _ => unreachable!("Only RSA algorithm is supported as JWK. should be unreachable"),
             }
@@ -114,7 +119,5 @@ impl Authenticator for JWTValidator {
                 "No matching JWK found for the given kid".to_string(),
             ));
         }
-
-        Ok(())
     }
 }
