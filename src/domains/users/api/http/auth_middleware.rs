@@ -22,17 +22,19 @@ impl FromRequestParts<AppState> for AuthUser {
     ) -> Result<Self, Self::Rejection> {
         let jwt_validator = &state.jwt_validator;
 
-        // TODO: Implement authentication when it is not enabled
+        // Check if auth is enabled
+        if !state.auth_enabled {
+            return Ok(AuthUser::default());
+        }
 
         // Extract the token from the authorization header
         let TypedHeader(Authorization(bearer)) = parts
             .extract::<TypedHeader<Authorization<Bearer>>>()
             .await
             .map_err(|_| {
-                AuthenticationError::MissingCredentials(
+                ApplicationError::Authentication(AuthenticationError::MissingCredentials(
                     "missing Bearer token for JWT authentication".to_string(),
-                )
-                .into()
+                ))
             })?;
 
         // Decode the user data

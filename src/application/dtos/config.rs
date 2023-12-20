@@ -5,7 +5,7 @@ use crate::adapters::{
     rgb::rgblib::RGBLibClientConfig, web::axum::AxumServerConfig,
 };
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct AppConfig {
     pub lightning: BreezClientConfig,
     pub rgb: RGBLibClientConfig,

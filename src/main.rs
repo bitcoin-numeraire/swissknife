@@ -13,12 +13,10 @@ async fn main() {
     let config = ConfigRsLoader {}.load().unwrap();
     debug!(?config, "Loaded configuration");
 
-    let app = App::new(config).await;
+    let app = App::new(config.clone()).await;
 
     let server_future = app.start(&config.web.addr);
     let ctrl_c_future = tokio::signal::ctrl_c();
-
-    info!(addr = %config.web.addr, "Listening on");
 
     tokio::select! {
         result = server_future => {

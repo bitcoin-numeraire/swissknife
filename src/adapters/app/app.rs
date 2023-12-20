@@ -1,9 +1,7 @@
-use std::{
-    net::{AddrParseError, SocketAddr},
-    sync::Arc,
-};
+use std::sync::Arc;
 
-use axum::{Extension, Router, Server};
+use axum::{Extension, Router};
+use tracing::info;
 
 use crate::{
     adapters::{
@@ -52,14 +50,15 @@ impl App {
     }
 
     pub async fn start(&self, addr: &str) -> Result<(), WebServerError> {
-        let socket_addr: SocketAddr = addr
-            .parse()
-            .map_err(|e: AddrParseError| WebServerError::Parse(e.to_string()))?;
-
-        Server::bind(&socket_addr)
-            .serve(self.router.clone().into_make_service())
+        let listener = tokio::net::TcpListener::bind(addr)
             .await
             .map_err(|e| WebServerError::Listener(e.to_string()))?;
+
+        info!(addr, "Listening on");
+
+        axum::serve(listener, self.router.clone())
+            .await
+            .map_err(|e| WebServerError::Serve(e.to_string()))?;
 
         Ok(())
     }

@@ -11,7 +11,7 @@ homepage = "https://numeraire.tech"
 
 [dependencies]
 async-trait = "0.1.74"
-axum = "0.6.20"
+axum = "0.7.2"
 rgb-lib = "0.2.1"
 serde = { version = "1.0.192", features = ["derive"] }
 serde_json = "1.0.108"

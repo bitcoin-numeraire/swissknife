@@ -5,9 +5,11 @@ use axum::{
 };
 use serde_json::json;
 
-use crate::application::errors::{ApplicationError, LightningError, RGBError};
+use crate::application::errors::{ApplicationError, AuthenticationError, LightningError, RGBError};
 
 const STATUS_ERROR: &str = "ERROR";
+const INTERNAL_SERVER_ERROR: &str =
+    "Internal server error, Please contact your administrator or try later";
 
 impl IntoResponse for ApplicationError {
     fn into_response(self) -> Response {
@@ -18,7 +20,7 @@ impl IntoResponse for ApplicationError {
             ApplicationError::RGB(RGBError::Invoice(msg)) => (StatusCode::BAD_REQUEST, msg),
             _ => (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                "Internal server error, Please contact your administrator or try later".to_string(),
+                INTERNAL_SERVER_ERROR.to_string(),
             ),
         };
 
@@ -37,7 +39,27 @@ impl IntoResponse for LightningError {
             LightningError::Invoice(msg) => (StatusCode::UNPROCESSABLE_ENTITY, msg),
             _ => (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                "Internal server error, Please contact your administrator or try later".to_string(),
+                INTERNAL_SERVER_ERROR.to_string(),
+            ),
+        };
+
+        let body = Json(json!({
+            "status": STATUS_ERROR.to_string(),
+            "reason": error_message,
+        }));
+
+        (status, body).into_response()
+    }
+}
+
+impl IntoResponse for AuthenticationError {
+    fn into_response(self) -> Response {
+        let (status, error_message) = match self {
+            AuthenticationError::MissingCredentials(msg) => (StatusCode::BAD_REQUEST, msg),
+            AuthenticationError::JWT(msg) => (StatusCode::UNAUTHORIZED, msg),
+            _ => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                INTERNAL_SERVER_ERROR.to_string(),
             ),
         };
 
