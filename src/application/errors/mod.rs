@@ -1,12 +1,12 @@
 mod application_error;
-mod async_error;
+mod authentication_error;
 mod config_error;
 mod lightning_error;
 mod rgb_error;
 mod web_server_error;
 
 pub use application_error::ApplicationError;
-pub use async_error::AsyncError;
+pub use authentication_error::AuthenticationError;
 pub use config_error::ConfigError;
 pub use lightning_error::LightningError;
 pub use rgb_error::RGBError;

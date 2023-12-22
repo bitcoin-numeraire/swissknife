@@ -13,9 +13,7 @@ use rgb_lib::{
 use tokio::{sync::Mutex, task};
 
 use crate::{
-    adapters::rgb::RGBClient,
-    application::errors::{ApplicationError, AsyncError, ConfigError, RGBError},
-    domains::rgb::entities::RGBContract,
+    adapters::rgb::RGBClient, application::errors::RGBError, domains::rgb::entities::RGBContract,
 };
 
 #[derive(Clone, Debug, Deserialize)]
@@ -31,9 +29,9 @@ pub struct RGBLibClient {
 }
 
 impl RGBLibClient {
-    pub async fn new(config: RGBLibClientConfig) -> Result<Self, ApplicationError> {
+    pub async fn new(config: RGBLibClientConfig) -> Result<Self, RGBError> {
         let keys = restore_keys(rgb_lib::BitcoinNetwork::Regtest, config.mnemonic)
-            .map_err(|e| ConfigError::Wallet(e.to_string()))?;
+            .map_err(|e| RGBError::RestoreKeys(e.to_string()))?;
 
         let wallet_data = WalletData {
             bitcoin_network: rgb_lib::BitcoinNetwork::Regtest,
@@ -48,8 +46,8 @@ impl RGBLibClient {
         // Offload the blocking Wallet::new call to a separate thread
         let wallet = task::spawn_blocking(move || Wallet::new(wallet_data))
             .await
-            .map_err(AsyncError::from)?
-            .map_err(|e| ConfigError::Wallet(e.to_string()))?;
+            .map_err(|e| RGBError::CreateWallet(e.to_string()))?
+            .map_err(|e| RGBError::CreateWallet(e.to_string()))?;
 
         Ok(Self {
             url: config.electrum_url,
@@ -70,7 +68,7 @@ impl RGBLibClient {
 
 #[async_trait]
 impl RGBClient for RGBLibClient {
-    async fn get_address(&self) -> Result<String, ApplicationError> {
+    async fn get_address(&self) -> Result<String, RGBError> {
         let wallet = self.wallet.lock().await;
 
         let address = wallet
@@ -80,7 +78,7 @@ impl RGBClient for RGBLibClient {
         Ok(address)
     }
 
-    async fn get_btc_balance(&self) -> Result<u64, ApplicationError> {
+    async fn get_btc_balance(&self) -> Result<u64, RGBError> {
         let online = self.online().await?;
 
         let wallet = self.wallet.lock().await;
@@ -94,7 +92,7 @@ impl RGBClient for RGBLibClient {
         Ok(balance.vanilla.spendable)
     }
 
-    async fn list_unspents(&self) -> Result<Vec<Unspent>, ApplicationError> {
+    async fn list_unspents(&self) -> Result<Vec<Unspent>, RGBError> {
         let online = self.online().await?;
 
         let wallet = self.wallet.lock().await;
@@ -111,7 +109,7 @@ impl RGBClient for RGBLibClient {
         address: String,
         amount: u64,
         fee_rate: f32,
-    ) -> Result<String, ApplicationError> {
+    ) -> Result<String, RGBError> {
         let online = self.online().await?;
 
         let wallet = self.wallet.lock().await;
@@ -123,7 +121,7 @@ impl RGBClient for RGBLibClient {
         Ok(tx_id)
     }
 
-    async fn drain_btc(&self, address: String, fee_rate: f32) -> Result<String, ApplicationError> {
+    async fn drain_btc(&self, address: String, fee_rate: f32) -> Result<String, RGBError> {
         let online = self.online().await?;
 
         let wallet = self.wallet.lock().await;
@@ -135,7 +133,7 @@ impl RGBClient for RGBLibClient {
         Ok(tx_id)
     }
 
-    async fn create_utxos(&self, fee_rate: f32) -> Result<u8, ApplicationError> {
+    async fn create_utxos(&self, fee_rate: f32) -> Result<u8, RGBError> {
         let online = self.online().await?;
 
         let mut wallet = self.wallet.lock().await;
@@ -149,7 +147,7 @@ impl RGBClient for RGBLibClient {
         Ok(n)
     }
 
-    async fn issue_contract(&self, contract: RGBContract) -> Result<String, ApplicationError> {
+    async fn issue_contract(&self, contract: RGBContract) -> Result<String, RGBError> {
         let online = self.online().await?;
 
         let mut wallet = self.wallet.lock().await;
@@ -169,7 +167,7 @@ impl RGBClient for RGBLibClient {
         Ok(contract.asset_id)
     }
 
-    async fn list_assets(&self) -> Result<Assets, ApplicationError> {
+    async fn list_assets(&self) -> Result<Assets, RGBError> {
         let mut wallet = self.wallet.lock().await;
 
         let assets = wallet
@@ -179,7 +177,7 @@ impl RGBClient for RGBLibClient {
         Ok(assets)
     }
 
-    async fn get_asset(&self, asset_id: String) -> Result<Metadata, ApplicationError> {
+    async fn get_asset(&self, asset_id: String) -> Result<Metadata, RGBError> {
         let mut wallet = self.wallet.lock().await;
 
         let asset = wallet
@@ -189,7 +187,7 @@ impl RGBClient for RGBLibClient {
         Ok(asset)
     }
 
-    async fn get_asset_balance(&self, asset_id: String) -> Result<Balance, ApplicationError> {
+    async fn get_asset_balance(&self, asset_id: String) -> Result<Balance, RGBError> {
         let wallet = self.wallet.lock().await;
 
         let asset = wallet
@@ -206,7 +204,7 @@ impl RGBClient for RGBLibClient {
         donation: bool,
         fee_rate: f32,
         min_confirmations: u8,
-    ) -> Result<String, ApplicationError> {
+    ) -> Result<String, RGBError> {
         let online = self.online().await?;
 
         let mut wallet = self.wallet.lock().await;
@@ -228,7 +226,7 @@ impl RGBClient for RGBLibClient {
         duration_seconds: Option<u32>,
         transport_endpoints: Vec<String>,
         min_confirmations: u8,
-    ) -> Result<ReceiveData, ApplicationError> {
+    ) -> Result<ReceiveData, RGBError> {
         let mut wallet = self.wallet.lock().await;
 
         let invoice = wallet

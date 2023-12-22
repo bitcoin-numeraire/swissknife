@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use axum::{
     extract::{Path, State},
     routing::get,
@@ -7,7 +9,7 @@ use axum::{
 use rgb_lib::wallet::{Assets, Balance, Metadata, ReceiveData, Unspent};
 
 use crate::{
-    adapters::rgb::DynRGBClient,
+    adapters::app::AppState,
     application::{
         dtos::{
             ContractResponse, DrainRequest, InvoiceAssetRequest, IssueContractRequest,
@@ -21,7 +23,7 @@ use crate::{
 pub struct RGBHandler;
 
 impl RGBHandler {
-    pub fn routes(rgb_client: DynRGBClient) -> Router {
+    pub fn routes() -> Router<Arc<AppState>> {
         Router::new()
             .route("/contracts", get(list_assets))
             .route("/contracts/issue", post(issue_contract))
@@ -35,18 +37,19 @@ impl RGBHandler {
             .route("/wallet/prepare-issuance", post(prepare_issuance))
             .route("/wallet/send", post(send))
             .route("/wallet/drain", post(drain))
-            .with_state(rgb_client)
     }
 }
 
-async fn get_address(State(rgb_client): State<DynRGBClient>) -> Result<String, ApplicationError> {
+async fn get_address(State(app_state): State<Arc<AppState>>) -> Result<String, ApplicationError> {
     println!("Fetching address");
+
+    let rgb_client = &app_state.rgb_client;
 
     let address = match rgb_client.get_address().await {
         Ok(address) => address,
         Err(e) => {
             eprintln!("Error Fetching address: {:?}", e);
-            return Err(e);
+            return Err(e.into());
         }
     };
 
@@ -55,14 +58,16 @@ async fn get_address(State(rgb_client): State<DynRGBClient>) -> Result<String, A
     Ok(address)
 }
 
-async fn get_balance(State(rgb_client): State<DynRGBClient>) -> Result<String, ApplicationError> {
+async fn get_balance(State(app_state): State<Arc<AppState>>) -> Result<String, ApplicationError> {
     println!("Fetching balance");
+
+    let rgb_client = &app_state.rgb_client;
 
     let balance = match rgb_client.get_btc_balance().await {
         Ok(balance) => balance,
         Err(e) => {
             eprintln!("Error Fetching balance: {:?}", e);
-            return Err(e);
+            return Err(e.into());
         }
     };
 
@@ -72,15 +77,17 @@ async fn get_balance(State(rgb_client): State<DynRGBClient>) -> Result<String, A
 }
 
 async fn unspents(
-    State(rgb_client): State<DynRGBClient>,
+    State(app_state): State<Arc<AppState>>,
 ) -> Result<Json<Vec<Unspent>>, ApplicationError> {
     println!("Fetching unspents");
+
+    let rgb_client = &app_state.rgb_client;
 
     let unspents = match rgb_client.list_unspents().await {
         Ok(unspents) => unspents,
         Err(e) => {
             eprintln!("Error Fetching balance: {:?}", e);
-            return Err(e);
+            return Err(e.into());
         }
     };
 
@@ -90,10 +97,12 @@ async fn unspents(
 }
 
 async fn send(
-    State(rgb_client): State<DynRGBClient>,
+    State(app_state): State<Arc<AppState>>,
     Json(payload): Json<SendBTCRequest>,
 ) -> Result<String, ApplicationError> {
     println!("Sending BTC: {:?}", payload);
+
+    let rgb_client = &app_state.rgb_client;
 
     let tx_id = match rgb_client
         .send_btc(payload.address, payload.amount, payload.fee_rate)
@@ -102,7 +111,7 @@ async fn send(
         Ok(id) => id,
         Err(e) => {
             eprintln!("Error creating utxos: {:?}", e);
-            return Err(e);
+            return Err(e.into());
         }
     };
 
@@ -112,10 +121,12 @@ async fn send(
 }
 
 async fn drain(
-    State(rgb_client): State<DynRGBClient>,
+    State(app_state): State<Arc<AppState>>,
     Json(payload): Json<DrainRequest>,
 ) -> Result<String, ApplicationError> {
     println!("Draining BTC: {:?}", payload);
+
+    let rgb_client = &app_state.rgb_client;
 
     let tx_id = match rgb_client
         .drain_btc(payload.address, payload.fee_rate)
@@ -124,7 +135,7 @@ async fn drain(
         Ok(id) => id,
         Err(e) => {
             eprintln!("Error creating utxos: {:?}", e);
-            return Err(e);
+            return Err(e.into());
         }
     };
 
@@ -134,16 +145,18 @@ async fn drain(
 }
 
 async fn prepare_issuance(
-    State(rgb_client): State<DynRGBClient>,
+    State(app_state): State<Arc<AppState>>,
     Json(payload): Json<PrepareIssuanceRequest>,
 ) -> Result<String, ApplicationError> {
     println!("Preparing utxos: {:?}", payload);
+
+    let rgb_client = &app_state.rgb_client;
 
     let n_utxos = match rgb_client.create_utxos(payload.fee_rate).await {
         Ok(id) => id,
         Err(e) => {
             eprintln!("Error creating utxos: {:?}", e);
-            return Err(e);
+            return Err(e.into());
         }
     };
 
@@ -153,10 +166,12 @@ async fn prepare_issuance(
 }
 
 async fn issue_contract(
-    State(rgb_client): State<DynRGBClient>,
+    State(app_state): State<Arc<AppState>>,
     Json(payload): Json<IssueContractRequest>,
 ) -> Result<Json<ContractResponse>, ApplicationError> {
     println!("Issuing contract: {:?}", payload);
+
+    let rgb_client = &app_state.rgb_client;
 
     let contract_id = match rgb_client
         .issue_contract(RGBContract {
@@ -170,7 +185,7 @@ async fn issue_contract(
         Ok(id) => id,
         Err(e) => {
             eprintln!("Error issuing contract: {:?}", e);
-            return Err(e);
+            return Err(e.into());
         }
     };
 
@@ -182,15 +197,17 @@ async fn issue_contract(
 }
 
 async fn list_assets(
-    State(rgb_client): State<DynRGBClient>,
+    State(app_state): State<Arc<AppState>>,
 ) -> Result<Json<Assets>, ApplicationError> {
     println!("Fetching assets");
+
+    let rgb_client = &app_state.rgb_client;
 
     let assets = match rgb_client.list_assets().await {
         Ok(assets) => assets,
         Err(e) => {
             eprintln!("Error Fetching assets: {:?}", e);
-            return Err(e);
+            return Err(e.into());
         }
     };
 
@@ -199,15 +216,17 @@ async fn list_assets(
 
 async fn get_asset(
     Path(id): Path<String>,
-    State(rgb_client): State<DynRGBClient>,
+    State(app_state): State<Arc<AppState>>,
 ) -> Result<Json<Metadata>, ApplicationError> {
     println!("Fetching asset: {}", id);
+
+    let rgb_client = &app_state.rgb_client;
 
     let asset = match rgb_client.get_asset(id).await {
         Ok(asset) => asset,
         Err(e) => {
             eprintln!("Error Fetching asset {:?}", e);
-            return Err(e);
+            return Err(e.into());
         }
     };
 
@@ -216,15 +235,17 @@ async fn get_asset(
 
 async fn get_asset_balance(
     Path(id): Path<String>,
-    State(rgb_client): State<DynRGBClient>,
+    State(app_state): State<Arc<AppState>>,
 ) -> Result<Json<Balance>, ApplicationError> {
     println!("Fetching asset balance: {}", id);
+
+    let rgb_client = &app_state.rgb_client;
 
     let balance = match rgb_client.get_asset_balance(id).await {
         Ok(balance) => balance,
         Err(e) => {
             eprintln!("Error Fetching balance {:?}", e);
-            return Err(e);
+            return Err(e.into());
         }
     };
 
@@ -233,10 +254,12 @@ async fn get_asset_balance(
 
 async fn send_assets(
     Path(id): Path<String>,
-    State(rgb_client): State<DynRGBClient>,
+    State(app_state): State<Arc<AppState>>,
     Json(payload): Json<SendAssetsRequest>,
 ) -> Result<String, ApplicationError> {
     println!("Sending asset: {} with payload {:?}", id, payload);
+
+    let rgb_client = &app_state.rgb_client;
 
     let tx_id = match rgb_client
         .send(
@@ -251,7 +274,7 @@ async fn send_assets(
         Ok(id) => id,
         Err(e) => {
             eprintln!("Error sending assets: {:?}", e);
-            return Err(e);
+            return Err(e.into());
         }
     };
 
@@ -261,10 +284,12 @@ async fn send_assets(
 }
 
 async fn invoice(
-    State(rgb_client): State<DynRGBClient>,
+    State(app_state): State<Arc<AppState>>,
     Json(payload): Json<InvoiceAssetRequest>,
 ) -> Result<Json<ReceiveData>, ApplicationError> {
     println!("Generating invoice  {:?}", payload);
+
+    let rgb_client = &app_state.rgb_client;
 
     let invoice = match rgb_client
         .invoice(
@@ -279,7 +304,7 @@ async fn invoice(
         Ok(id) => id,
         Err(e) => {
             eprintln!("Error generating invoice: {:?}", e);
-            return Err(e);
+            return Err(e.into());
         }
     };
 

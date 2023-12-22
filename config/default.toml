@@ -20,3 +20,12 @@ thread_ids = false
 thread_names = false
 level = "info"
 filter = "swissknife"
+
+[auth]
+# If set to true, the server will require authentication
+enabled = false
+[auth.jwt]
+domain = "domain.auth0.com"
+audience = "https://swissknife.numeraire.tech/api/v1"
+jwks_refresh_interval = "1h"
+leeway = 60
