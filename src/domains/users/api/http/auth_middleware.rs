@@ -6,7 +6,7 @@ use axum_extra::{
     headers::{authorization::Bearer, Authorization},
     TypedHeader,
 };
-use tracing::debug;
+use tracing::{debug, trace};
 
 use crate::{
     adapters::app::AppState, application::errors::AuthenticationError,
@@ -21,16 +21,15 @@ impl FromRequestParts<Arc<AppState>> for AuthUser {
         parts: &mut Parts,
         state: &Arc<AppState>,
     ) -> Result<Self, Self::Rejection> {
-        debug!("Authenticating user");
+        trace!("Start authentication");
 
         let jwt_validator = &state.jwt_validator;
 
         // Check if auth is enabled
         if !state.auth_enabled {
+            trace!("Authentication disabled, returning anonymous user");
             return Ok(AuthUser::default());
         }
-
-        debug!("Auth enabled");
 
         // Extract the token from the authorization header
         let TypedHeader(Authorization(bearer)) = parts
@@ -44,7 +43,7 @@ impl FromRequestParts<Arc<AppState>> for AuthUser {
 
         // Decode the user data
         let user = jwt_validator.validate(bearer.token()).await?;
-        debug!(user = ?user, "Authenticated user");
+        trace!(user = ?user, "Authentication successful");
 
         Ok(user)
     }

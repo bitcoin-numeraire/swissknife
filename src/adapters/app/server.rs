@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use axum::Router;
-use tracing::info;
+use tracing::{info, trace};
 
 use crate::{
     adapters::{
@@ -13,13 +13,13 @@ use crate::{
 };
 
 pub struct App {
-    state: AppState,
+    router: Router,
 }
 
 impl App {
     pub async fn new(config: AppConfig) -> Self {
         setup_tracing(config.logging.clone());
-        info!(config = ?config, "Starting server");
+        trace!("Starting server");
 
         // Create adapters
         let rgb_client = RGBLibClient::new(config.rgb.clone()).await.unwrap();
@@ -34,23 +34,23 @@ impl App {
             rgb_client: Arc::new(rgb_client),
         };
 
-        Self { state }
-    }
-
-    pub async fn start(&self, addr: &str) -> Result<(), WebServerError> {
         let router = Router::new()
             .nest("/rgb", RGBHandler::routes())
             .nest("/.well-known", LightningHandler::well_known_routes())
             .nest("/lightning", LightningHandler::routes())
-            .with_state(Arc::new(self.state.clone()));
+            .with_state(Arc::new(state));
 
+        Self { router }
+    }
+
+    pub async fn start(&self, addr: &str) -> Result<(), WebServerError> {
         let listener = tokio::net::TcpListener::bind(addr)
             .await
             .map_err(|e| WebServerError::Listener(e.to_string()))?;
 
         info!(addr, "Listening on");
 
-        axum::serve(listener, router)
+        axum::serve(listener, self.router.clone())
             .await
             .map_err(|e| WebServerError::Serve(e.to_string()))?;
 
