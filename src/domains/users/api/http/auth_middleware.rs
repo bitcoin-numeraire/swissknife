@@ -27,7 +27,7 @@ impl FromRequestParts<Arc<AppState>> for AuthUser {
 
         // Check if auth is enabled
         if !state.auth_enabled {
-            trace!("Authentication disabled, returning anonymous user");
+            debug!("Authentication disabled, returning anonymous user");
             return Ok(AuthUser::default());
         }
 
@@ -36,14 +36,14 @@ impl FromRequestParts<Arc<AppState>> for AuthUser {
             .extract::<TypedHeader<Authorization<Bearer>>>()
             .await
             .map_err(|e| {
-                let err_message = "missing Bearer token for JWT authentication";
+                let err_message = "Missing Bearer token for JWT authentication";
                 debug!(error = ?e, err_message);
-                AuthenticationError::MissingCredentials(err_message.to_string())
+                AuthenticationError::MissingCredentials(e.to_string())
             })?;
 
         // Decode the user data
         let user = jwt_validator.validate(bearer.token()).await?;
-        trace!(user = ?user, "Authentication successful");
+        debug!(user = ?user, "Authentication successful");
 
         Ok(user)
     }
