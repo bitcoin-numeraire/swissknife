@@ -23,12 +23,12 @@ up-electrs:
 	until $(COMPOSE) logs electrs-2 | grep 'finished full compaction'; do sleep 1; done
 
 up-postgres:
-    @$(COMPOSE) up -d $(DB_SERVICE)
-    until $(COMPOSE) logs $(DB_SERVICE) | grep 'database system is ready to accept connections'; do sleep 1; done
+	@$(COMPOSE) up -d $(DB_SERVICE)
+	@until $(COMPOSE) logs $(DB_SERVICE) | grep 'database system is ready to accept connections'; do sleep 1; done
 
 up-pgadmin:
-    @$(COMPOSE) up -d $(PGADMIN_SERVICE)
-    until $(COMPOSE) logs $(PGADMIN_SERVICE) | grep 'pgAdmin 4 - Application Initialisation'; do sleep 1; done
+	@$(COMPOSE) up -d $(PGADMIN_SERVICE)
+	@until $(COMPOSE) logs $(PGADMIN_SERVICE) | grep 'pgAdmin 4 - Application Initialisation'; do sleep 1; done
 
 down:
 	@$(COMPOSE) down -v
