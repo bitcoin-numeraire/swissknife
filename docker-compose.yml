@@ -6,6 +6,7 @@ services:
     command: "-fallbackfee=0.0002"
     volumes:
       - bitcoin:/srv/app/.bitcoin
+
   electrs:
     image: registry.gitlab.com/hashbeam/docker/electrs:0.9.14
     volumes:
@@ -14,12 +15,14 @@ services:
       - 50001:50001
     depends_on:
       - bitcoind
+
   electrs-2:
     image: registry.gitlab.com/hashbeam/docker/electrs:0.9.14
     ports:
       - 50002:50001
     depends_on:
       - bitcoind
+
   postgres:
     image: postgres:15.5
     environment:
@@ -30,6 +33,7 @@ services:
       - 5432:5432
     volumes:
       - db:/var/lib/postgresql/data
+
   pgadmin:
     image: dpage/pgadmin4:8.1
     environment:

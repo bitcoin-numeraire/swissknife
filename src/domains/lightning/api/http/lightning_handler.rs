@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use axum::{
     extract::{Path, Query, State},
-    routing::get,
+    routing::{get, post},
     Json, Router,
 };
 use breez_sdk_core::{NodeState, Payment};
@@ -12,11 +12,12 @@ use crate::{
     adapters::app::AppState,
     application::{
         dtos::{
-            LightningInvoiceQueryParams, LightningInvoiceResponse, LightningWellKnownResponse,
-            SuccessAction,
+            LightningAddressResponse, LightningInvoiceQueryParams, LightningInvoiceResponse,
+            LightningWellKnownResponse, RegisterLightningAddressRequest, SuccessAction,
         },
-        errors::ApplicationError,
+        errors::{ApplicationError, DatabaseError},
     },
+    domains::lightning::entities::LightningAddress,
     domains::users::entities::AuthUser,
 };
 
@@ -38,6 +39,10 @@ impl LightningHandler {
             .route("/lnurlp/:username/callback", get(Self::invoice))
             .route("/node-info", get(Self::node_info))
             .route("/list-payments", get(Self::list_payments))
+            .route(
+                "/lightning_addresses",
+                post(Self::register_lightning_address),
+            )
     }
 
     async fn well_known_lnurlp(
@@ -129,6 +134,46 @@ impl LightningHandler {
         };
 
         Ok(payments.into())
+    }
+
+    async fn register_lightning_address(
+        State(app_state): State<Arc<AppState>>,
+        user: AuthUser,
+        Json(payload): Json<RegisterLightningAddressRequest>,
+    ) -> Result<Json<LightningAddressResponse>, ApplicationError> {
+        println!("Registering lightning address: {:?}", payload);
+
+        let db_client = &app_state.db_client;
+
+        let lightning_address = sqlx::query_as!(
+            LightningAddress,
+            // language=PostgreSQL
+            r#"
+                insert into "lightning_addresses"(user_id, username)
+                values ($1, $2)
+                returning *
+            "#,
+            user.sub,
+            payload.username
+        )
+        .fetch_one(&db_client.pool())
+        .await
+        .map_err(|e| {
+            let err_message = "Database error";
+            debug!(error = ?e, err_message);
+            DatabaseError::Query(e.to_string())
+        })?;
+
+        let response = LightningAddressResponse {
+            user_id: lightning_address.user_id,
+            username: lightning_address.username,
+            active: lightning_address.active,
+            created_at: lightning_address.created_at,
+            updated_at: lightning_address.updated_at,
+            deleted_at: lightning_address.deleted_at,
+        };
+
+        Ok(response.into())
     }
 }
 

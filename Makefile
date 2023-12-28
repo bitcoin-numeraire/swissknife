@@ -25,6 +25,7 @@ up-electrs:
 up-postgres:
 	@$(COMPOSE) up -d $(DB_SERVICE)
 	@until $(COMPOSE) logs $(DB_SERVICE) | grep 'database system is ready to accept connections'; do sleep 1; done
+	@sqlx migrate run
 
 up-pgadmin:
 	@$(COMPOSE) up -d $(PGADMIN_SERVICE)
@@ -41,6 +42,9 @@ mine:
 
 send:
 	$(BCLI) -rpcwallet=miner sendtoaddress $(recipient) $(amount)
+
+install-tools:
+	@cargo install sqlx-cli --no-default-features --features native-tls,postgres
 
 generate-certs:
 	@mkdir -p certs

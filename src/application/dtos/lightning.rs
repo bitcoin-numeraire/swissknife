@@ -1,3 +1,5 @@
+use chrono::DateTime;
+use chrono::Utc;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -32,4 +34,19 @@ pub struct LightningInvoiceResponse {
 pub struct SuccessAction {
     pub tag: String,             // action type (url, message, aes, ...)
     pub message: Option<String>, // rest of fields depends on tag value
+}
+
+#[derive(Debug, Deserialize)]
+pub struct RegisterLightningAddressRequest {
+    pub username: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct LightningAddressResponse {
+    pub user_id: String,
+    pub username: String,
+    pub active: bool,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: Option<DateTime<Utc>>,
+    pub deleted_at: Option<DateTime<Utc>>,
 }
