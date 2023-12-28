@@ -35,3 +35,4 @@ max_lifetime = "30m"
 idle_timeout = "5m"
 max_connections = 10
 min_connections = 0
+acquire_timeout = "5s"

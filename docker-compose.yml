@@ -26,6 +26,8 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       POSTGRES_DB: ${POSTGRES_DB:-numeraire}
+    ports:
+      - 5432:5432
     volumes:
       - db:/var/lib/postgresql/data
   pgadmin:

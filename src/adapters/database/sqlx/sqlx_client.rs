@@ -1,6 +1,9 @@
+use std::time::Duration;
+
 use async_trait::async_trait;
 use humantime::parse_duration;
 use sqlx::{postgres::PgPoolOptions, PgPool};
+use tracing::error;
 
 use crate::{
     adapters::database::{DatabaseClient, DatabaseConfig},
@@ -16,9 +19,7 @@ impl SQLxClient {
         let mut pool_options = PgPoolOptions::new();
 
         if let Some(idle_timeout_str) = config.idle_timeout {
-            let idle_timeout = parse_duration(&idle_timeout_str)
-                .map_err(|e| DatabaseError::Connect(e.to_string()))?;
-
+            let idle_timeout = Self::parse_duration(&idle_timeout_str)?;
             pool_options = pool_options.idle_timeout(idle_timeout);
         }
 
@@ -31,20 +32,36 @@ impl SQLxClient {
         }
 
         if let Some(max_lifetime_str) = config.max_lifetime {
-            let max_lifetime = parse_duration(&max_lifetime_str)
-                .map_err(|e| DatabaseError::Connect(e.to_string()))?;
-
+            let max_lifetime = Self::parse_duration(&max_lifetime_str)?;
             pool_options = pool_options.max_lifetime(max_lifetime);
         }
 
-        let pool = pool_options
-            .connect(&config.url)
-            .await
-            .map_err(|e| DatabaseError::Connect(e.to_string()))?;
+        if let Some(acquire_timeout_str) = config.acquire_timeout {
+            let acquire_timeout = Self::parse_duration(&acquire_timeout_str)?;
+            pool_options = pool_options.acquire_timeout(acquire_timeout);
+        }
+
+        let pool = pool_options.connect(&config.url).await.map_err(|e| {
+            let err_message = "Failed to connect to database";
+            error!(error = ?e, err_message);
+            DatabaseError::Connect(e.to_string())
+        })?;
 
         Ok(Self { pool })
+    }
+
+    fn parse_duration(duration_str: &str) -> Result<Duration, DatabaseError> {
+        parse_duration(duration_str).map_err(|e| {
+            let err_message = "Failed to parse duration from config";
+            error!(error = ?e, err_message);
+            DatabaseError::ParseConfig(e.to_string())
+        })
     }
 }
 
 #[async_trait]
-impl DatabaseClient for SQLxClient {}
+impl DatabaseClient for SQLxClient {
+    fn pool(&self) -> PgPool {
+        self.pool.clone()
+    }
+}
