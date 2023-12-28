@@ -1,8 +1,10 @@
 COMPOSE := docker compose -f docker-compose.yml
 EXPOSED_PORTS := 50001 50002
 BCLI := $(COMPOSE) exec -T -u blits bitcoind bitcoin-cli -regtest
+DB_SERVICE := postgres
+PGADMIN_SERVICE := pgadmin
 
-.PHONY: up-bitcoin up-electrs down mine send create-wallet generate-certs
+.PHONY: up-bitcoin up-electrs up-postgres up-pgadmin down mine send create-wallet generate-certs
 
 up-bitcoin:
 	@make down
@@ -19,6 +21,14 @@ up-electrs:
 	@$(COMPOSE) up -d electrs electrs-2
 	until $(COMPOSE) logs electrs | grep 'finished full compaction'; do sleep 1; done
 	until $(COMPOSE) logs electrs-2 | grep 'finished full compaction'; do sleep 1; done
+
+up-postgres:
+    @$(COMPOSE) up -d $(DB_SERVICE)
+    until $(COMPOSE) logs $(DB_SERVICE) | grep 'database system is ready to accept connections'; do sleep 1; done
+
+up-pgadmin:
+    @$(COMPOSE) up -d $(PGADMIN_SERVICE)
+    until $(COMPOSE) logs $(PGADMIN_SERVICE) | grep 'pgAdmin 4 - Application Initialisation'; do sleep 1; done
 
 down:
 	@$(COMPOSE) down -v

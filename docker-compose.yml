@@ -20,7 +20,28 @@ services:
       - 50002:50001
     depends_on:
       - bitcoind
+  postgres:
+    image: postgres:15.5
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-numeraire}
+    volumes:
+      - db:/var/lib/postgresql/data
+  pgadmin:
+    image: dpage/pgadmin4:8.1
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-pgadmin4@pgadmin.org}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:-admin}
+    ports:
+      - 5050:80
+    volumes:
+      - pgadmin:/root/.pgadmin
+    depends_on:
+      - postgres
 
 volumes:
   bitcoin:
   electrs:
+  db:
+  pgadmin:
