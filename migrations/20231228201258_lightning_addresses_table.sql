@@ -1,3 +1,7 @@
+CREATE OR REPLACE FUNCTION update_timestamp() RETURNS TRIGGER AS $$ BEGIN NEW.updated_at = NOW();
+RETURN NEW;
+END;
+$$ language 'plpgsql';
 create table "lightning_addresses" (
     id uuid primary key default gen_random_uuid(),
     user_id varchar(255) unique not null,
