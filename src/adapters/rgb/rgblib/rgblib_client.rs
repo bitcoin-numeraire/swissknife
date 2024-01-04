@@ -136,7 +136,7 @@ impl RGBClient for RGBLibClient {
     async fn create_utxos(&self, fee_rate: f32) -> Result<u8, RGBError> {
         let online = self.online().await?;
 
-        let mut wallet = self.wallet.lock().await;
+        let wallet = self.wallet.lock().await;
 
         let n = wallet
             .create_utxos(online, true, None, None, fee_rate)
@@ -150,7 +150,7 @@ impl RGBClient for RGBLibClient {
     async fn issue_contract(&self, contract: RGBContract) -> Result<String, RGBError> {
         let online = self.online().await?;
 
-        let mut wallet = self.wallet.lock().await;
+        let wallet = self.wallet.lock().await;
 
         let contract = wallet
             .issue_asset_nia(
@@ -168,7 +168,7 @@ impl RGBClient for RGBLibClient {
     }
 
     async fn list_assets(&self) -> Result<Assets, RGBError> {
-        let mut wallet = self.wallet.lock().await;
+        let wallet = self.wallet.lock().await;
 
         let assets = wallet
             .list_assets(Vec::new())
@@ -178,7 +178,7 @@ impl RGBClient for RGBLibClient {
     }
 
     async fn get_asset(&self, asset_id: String) -> Result<Metadata, RGBError> {
-        let mut wallet = self.wallet.lock().await;
+        let wallet = self.wallet.lock().await;
 
         let asset = wallet
             .get_asset_metadata(asset_id)
@@ -207,7 +207,7 @@ impl RGBClient for RGBLibClient {
     ) -> Result<String, RGBError> {
         let online = self.online().await?;
 
-        let mut wallet = self.wallet.lock().await;
+        let wallet = self.wallet.lock().await;
 
         let mut recipient_map: HashMap<String, Vec<Recipient>> = HashMap::new();
         recipient_map.insert(asset_id, recipients);
@@ -227,7 +227,7 @@ impl RGBClient for RGBLibClient {
         transport_endpoints: Vec<String>,
         min_confirmations: u8,
     ) -> Result<ReceiveData, RGBError> {
-        let mut wallet = self.wallet.lock().await;
+        let wallet = self.wallet.lock().await;
 
         let invoice = wallet
             .blind_receive(

@@ -5,8 +5,8 @@ use tracing::{info, trace};
 
 use crate::{
     adapters::{
-        app::app_state::AppState, auth::jwt::JWTValidator, lightning::breez::BreezClient,
-        logging::tracing::setup_tracing, rgb::rgblib::RGBLibClient,
+        app::app_state::AppState, auth::jwt::JWTValidator, database::sqlx::SQLxClient,
+        lightning::breez::BreezClient, logging::tracing::setup_tracing, rgb::rgblib::RGBLibClient,
     },
     application::{dtos::AppConfig, errors::WebServerError},
     domains::{lightning::api::http::LightningHandler, rgb::api::http::RGBHandler},
@@ -22,6 +22,7 @@ impl App {
         trace!("Starting server");
 
         // Create adapters
+        let db_client = SQLxClient::connect(config.database.clone()).await.unwrap();
         let rgb_client = RGBLibClient::new(config.rgb.clone()).await.unwrap();
         let lightning_client = BreezClient::new(config.lightning.clone()).await.unwrap();
         let jwt_validator = JWTValidator::new(config.auth.jwt.clone()).await.unwrap();
@@ -32,6 +33,7 @@ impl App {
             jwt_validator: Arc::new(jwt_validator),
             lightning_client: Arc::new(lightning_client),
             rgb_client: Arc::new(rgb_client),
+            db_client: Arc::new(db_client),
         };
 
         let router = Router::new()

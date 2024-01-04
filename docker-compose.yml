@@ -6,6 +6,7 @@ services:
     command: "-fallbackfee=0.0002"
     volumes:
       - bitcoin:/srv/app/.bitcoin
+
   electrs:
     image: registry.gitlab.com/hashbeam/docker/electrs:0.9.14
     volumes:
@@ -14,6 +15,7 @@ services:
       - 50001:50001
     depends_on:
       - bitcoind
+
   electrs-2:
     image: registry.gitlab.com/hashbeam/docker/electrs:0.9.14
     ports:
@@ -21,6 +23,33 @@ services:
     depends_on:
       - bitcoind
 
+  postgres:
+    image: postgres:15.5
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-numeraire}
+    ports:
+      - 5432:5432
+    volumes:
+      - db:/var/lib/postgresql/data
+
+  pgadmin:
+    image: dpage/pgadmin4:8.1
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-pgadmin4@pgadmin.org}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:-admin}
+      PGADMIN_SERVER_JSON_FILE: /servers.json
+    ports:
+      - 5050:80
+    volumes:
+      - pgadmin:/root/.pgadmin
+      - ./deps/pgadmin/servers.json:/servers.json
+    depends_on:
+      - postgres
+
 volumes:
   bitcoin:
   electrs:
+  db:
+  pgadmin:
