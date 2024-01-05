@@ -9,25 +9,25 @@ use axum_extra::{
 use tracing::{debug, trace};
 
 use crate::{
-    adapters::auth::Authenticator, application::errors::AuthenticationError,
+    adapters::app::AppState, application::errors::AuthenticationError,
     domains::users::entities::AuthUser,
 };
 
 #[async_trait]
-impl FromRequestParts<Option<Arc<dyn Authenticator>>> for AuthUser {
+impl FromRequestParts<Arc<AppState>> for AuthUser {
     type Rejection = AuthenticationError;
 
     async fn from_request_parts(
         parts: &mut Parts,
-        jwt_authenticator: &Option<Arc<dyn Authenticator>>,
+        state: &Arc<AppState>,
     ) -> Result<Self, Self::Rejection> {
         trace!("Start authentication");
 
-        if jwt_authenticator.is_none() {
+        if state.jwt_authenticator.is_none() {
             return Ok(AuthUser::default());
         }
 
-        let jwt_authenticator = jwt_authenticator.as_ref().unwrap();
+        let jwt_authenticator = state.jwt_authenticator.as_ref().unwrap();
 
         // Extract the token from the Authorization header
         let TypedHeader(Authorization(bearer)) = parts

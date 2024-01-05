@@ -1,13 +1,14 @@
 use std::sync::Arc;
 
-use axum::{Extension, Router};
+use axum::Router;
 use tracing::{info, trace, warn};
 
 use crate::{
     adapters::{
+        app::AppState,
         auth::{jwt::JWTAuthenticator, Authenticator},
         database::sqlx::SQLxClient,
-        lightning::{breez::BreezClient, LightningClient},
+        lightning::breez::BreezClient,
         logging::tracing::setup_tracing,
         rgb::rgblib::RGBLibClient,
     },
@@ -33,7 +34,7 @@ impl App {
                 JWTAuthenticator::new(config.auth.jwt.clone())
                     .await
                     .unwrap(),
-            ))
+            ) as Arc<dyn Authenticator>)
         } else {
             warn!("Authentication disabled, all requests will be accepted as superuser");
             None
@@ -41,12 +42,21 @@ impl App {
 
         // TODO: Create services (use cases)
 
+        // Create App state
+        let state = AppState {
+            jwt_authenticator,
+            lightning_client: Arc::new(lightning_client),
+            rgb_client: Arc::new(rgb_client),
+            db_client: Arc::new(db_client),
+        };
+
         // Create controllers (handlers)
         let router = Router::new()
-            // .nest("/rgb", RGBHandler::routes())
+            .nest("/rgb", RGBHandler::routes())
             .nest("/.well-known", LightningHandler::well_known_routes())
-            .nest("/lightning", LightningHandler::routes(lightning_client))
-            .layer(Extension(jwt_authenticator));
+            .nest("/lightning", LightningHandler::routes())
+            .with_state(Arc::new(state));
+
         Self { router }
     }
 
