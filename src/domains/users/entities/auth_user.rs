@@ -6,7 +6,7 @@ pub struct AuthUser {
 impl Default for AuthUser {
     fn default() -> Self {
         Self {
-            sub: "anonymous".to_string(),
+            sub: "superuser".to_string(),
         }
     }
 }

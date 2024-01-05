@@ -5,7 +5,7 @@ $$ language 'plpgsql';
 create table "lightning_addresses" (
     id uuid primary key default gen_random_uuid(),
     user_id varchar(255) unique not null,
-    username text unique not null,
+    username varchar(255) unique not null,
     active boolean not null default true,
     created_at timestamptz not null default current_timestamp,
     updated_at timestamptz,
