@@ -5,4 +5,5 @@ pub enum LightningError {
     Invoice(String),
     NodeInfo(String),
     ListPayments(String),
+    Register(String),
 }
