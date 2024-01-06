@@ -67,6 +67,7 @@ impl LightningAddressesUseCases for LightningService {
 
         // TODO: Verify the username is not already registered
 
+        // TODO: Implement this as a repository function
         let lightning_address = sqlx::query_as!(
             LightningAddress,
             // language=PostgreSQL

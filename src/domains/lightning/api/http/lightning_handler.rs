@@ -29,7 +29,7 @@ impl LightningHandler {
     }
 
     pub fn addresses_routes() -> Router<Arc<AppState>> {
-        Router::new().route("/addresses", post(Self::register_lightning_address))
+        Router::new().route("/register", post(Self::register_lightning_address))
     }
 
     pub fn node_routes() -> Router<Arc<AppState>> {
