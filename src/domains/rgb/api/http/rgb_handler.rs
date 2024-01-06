@@ -15,7 +15,7 @@ use crate::{
             ContractResponse, DrainRequest, InvoiceAssetRequest, IssueContractRequest,
             PrepareIssuanceRequest, SendAssetsRequest, SendBTCRequest,
         },
-        errors::ApplicationError,
+        errors::RGBError,
     },
     domains::rgb::entities::RGBContract,
 };
@@ -40,176 +40,101 @@ impl RGBHandler {
     }
 }
 
-async fn get_address(State(app_state): State<Arc<AppState>>) -> Result<String, ApplicationError> {
+async fn get_address(State(app_state): State<Arc<AppState>>) -> Result<String, RGBError> {
     println!("Fetching address");
 
-    let rgb_client = &app_state.rgb_client;
-
-    let address = match rgb_client.get_address().await {
-        Ok(address) => address,
-        Err(e) => {
-            eprintln!("Error Fetching address: {:?}", e);
-            return Err(e.into());
-        }
-    };
+    let address = app_state.rgb.get_address().await?;
 
     println!("Address fetched: {}", address);
-
     Ok(address)
 }
 
-async fn get_balance(State(app_state): State<Arc<AppState>>) -> Result<String, ApplicationError> {
+async fn get_balance(State(app_state): State<Arc<AppState>>) -> Result<String, RGBError> {
     println!("Fetching balance");
 
-    let rgb_client = &app_state.rgb_client;
-
-    let balance = match rgb_client.get_btc_balance().await {
-        Ok(balance) => balance,
-        Err(e) => {
-            eprintln!("Error Fetching balance: {:?}", e);
-            return Err(e.into());
-        }
-    };
+    let balance = app_state.rgb.get_btc_balance().await?;
 
     println!("Balance fetched: {}", balance);
-
     Ok(balance.to_string())
 }
 
-async fn unspents(
-    State(app_state): State<Arc<AppState>>,
-) -> Result<Json<Vec<Unspent>>, ApplicationError> {
+async fn unspents(State(app_state): State<Arc<AppState>>) -> Result<Json<Vec<Unspent>>, RGBError> {
     println!("Fetching unspents");
 
-    let rgb_client = &app_state.rgb_client;
-
-    let unspents = match rgb_client.list_unspents().await {
-        Ok(unspents) => unspents,
-        Err(e) => {
-            eprintln!("Error Fetching balance: {:?}", e);
-            return Err(e.into());
-        }
-    };
+    let unspents = app_state.rgb.list_unspents().await?;
 
     println!("Unspents fetched: {}", unspents.len());
-
     Ok(unspents.into())
 }
 
 async fn send(
     State(app_state): State<Arc<AppState>>,
     Json(payload): Json<SendBTCRequest>,
-) -> Result<String, ApplicationError> {
+) -> Result<String, RGBError> {
     println!("Sending BTC: {:?}", payload);
 
-    let rgb_client = &app_state.rgb_client;
-
-    let tx_id = match rgb_client
+    let tx_id = app_state
+        .rgb
         .send_btc(payload.address, payload.amount, payload.fee_rate)
-        .await
-    {
-        Ok(id) => id,
-        Err(e) => {
-            eprintln!("Error creating utxos: {:?}", e);
-            return Err(e.into());
-        }
-    };
+        .await?;
 
     println!("BTC sent, tx id: {}", tx_id);
-
     Ok(tx_id)
 }
 
 async fn drain(
     State(app_state): State<Arc<AppState>>,
     Json(payload): Json<DrainRequest>,
-) -> Result<String, ApplicationError> {
+) -> Result<String, RGBError> {
     println!("Draining BTC: {:?}", payload);
 
-    let rgb_client = &app_state.rgb_client;
-
-    let tx_id = match rgb_client
+    let tx_id = app_state
+        .rgb
         .drain_btc(payload.address, payload.fee_rate)
-        .await
-    {
-        Ok(id) => id,
-        Err(e) => {
-            eprintln!("Error creating utxos: {:?}", e);
-            return Err(e.into());
-        }
-    };
+        .await?;
 
     println!("BTC drained, tx id: {}", tx_id);
-
     Ok(tx_id)
 }
 
 async fn prepare_issuance(
     State(app_state): State<Arc<AppState>>,
     Json(payload): Json<PrepareIssuanceRequest>,
-) -> Result<String, ApplicationError> {
+) -> Result<String, RGBError> {
     println!("Preparing utxos: {:?}", payload);
 
-    let rgb_client = &app_state.rgb_client;
-
-    let n_utxos = match rgb_client.create_utxos(payload.fee_rate).await {
-        Ok(id) => id,
-        Err(e) => {
-            eprintln!("Error creating utxos: {:?}", e);
-            return Err(e.into());
-        }
-    };
+    let n_utxos = app_state.rgb.create_utxos(payload.fee_rate).await?;
 
     println!("UTXOs created: {}", n_utxos);
-
     Ok(n_utxos.to_string())
 }
 
 async fn issue_contract(
     State(app_state): State<Arc<AppState>>,
     Json(payload): Json<IssueContractRequest>,
-) -> Result<Json<ContractResponse>, ApplicationError> {
+) -> Result<Json<ContractResponse>, RGBError> {
     println!("Issuing contract: {:?}", payload);
 
-    let rgb_client = &app_state.rgb_client;
-
-    let contract_id = match rgb_client
+    let contract_id = app_state
+        .rgb
         .issue_contract(RGBContract {
             ticker: payload.ticker,
             name: payload.name,
             precision: payload.precision,
             amounts: payload.amounts,
         })
-        .await
-    {
-        Ok(id) => id,
-        Err(e) => {
-            eprintln!("Error issuing contract: {:?}", e);
-            return Err(e.into());
-        }
-    };
+        .await?;
 
     println!("Contract issued: {}", contract_id);
-
     let contract = ContractResponse { id: contract_id };
 
     Ok(contract.into())
 }
 
-async fn list_assets(
-    State(app_state): State<Arc<AppState>>,
-) -> Result<Json<Assets>, ApplicationError> {
+async fn list_assets(State(app_state): State<Arc<AppState>>) -> Result<Json<Assets>, RGBError> {
     println!("Fetching assets");
 
-    let rgb_client = &app_state.rgb_client;
-
-    let assets = match rgb_client.list_assets().await {
-        Ok(assets) => assets,
-        Err(e) => {
-            eprintln!("Error Fetching assets: {:?}", e);
-            return Err(e.into());
-        }
-    };
+    let assets = app_state.rgb.list_assets().await?;
 
     Ok(assets.into())
 }
@@ -217,18 +142,10 @@ async fn list_assets(
 async fn get_asset(
     Path(id): Path<String>,
     State(app_state): State<Arc<AppState>>,
-) -> Result<Json<Metadata>, ApplicationError> {
+) -> Result<Json<Metadata>, RGBError> {
     println!("Fetching asset: {}", id);
 
-    let rgb_client = &app_state.rgb_client;
-
-    let asset = match rgb_client.get_asset(id).await {
-        Ok(asset) => asset,
-        Err(e) => {
-            eprintln!("Error Fetching asset {:?}", e);
-            return Err(e.into());
-        }
-    };
+    let asset = app_state.rgb.get_asset(id).await?;
 
     Ok(asset.into())
 }
@@ -236,18 +153,10 @@ async fn get_asset(
 async fn get_asset_balance(
     Path(id): Path<String>,
     State(app_state): State<Arc<AppState>>,
-) -> Result<Json<Balance>, ApplicationError> {
+) -> Result<Json<Balance>, RGBError> {
     println!("Fetching asset balance: {}", id);
 
-    let rgb_client = &app_state.rgb_client;
-
-    let balance = match rgb_client.get_asset_balance(id).await {
-        Ok(balance) => balance,
-        Err(e) => {
-            eprintln!("Error Fetching balance {:?}", e);
-            return Err(e.into());
-        }
-    };
+    let balance = app_state.rgb.get_asset_balance(id).await?;
 
     Ok(balance.into())
 }
@@ -256,12 +165,11 @@ async fn send_assets(
     Path(id): Path<String>,
     State(app_state): State<Arc<AppState>>,
     Json(payload): Json<SendAssetsRequest>,
-) -> Result<String, ApplicationError> {
+) -> Result<String, RGBError> {
     println!("Sending asset: {} with payload {:?}", id, payload);
 
-    let rgb_client = &app_state.rgb_client;
-
-    let tx_id = match rgb_client
+    let tx_id = app_state
+        .rgb
         .send(
             id,
             payload.recipients,
@@ -269,29 +177,20 @@ async fn send_assets(
             payload.fee_rate,
             payload.min_confirmations,
         )
-        .await
-    {
-        Ok(id) => id,
-        Err(e) => {
-            eprintln!("Error sending assets: {:?}", e);
-            return Err(e.into());
-        }
-    };
+        .await?;
 
     println!("Assets sent, tx id: {}", tx_id);
-
     Ok(tx_id)
 }
 
 async fn invoice(
     State(app_state): State<Arc<AppState>>,
     Json(payload): Json<InvoiceAssetRequest>,
-) -> Result<Json<ReceiveData>, ApplicationError> {
+) -> Result<Json<ReceiveData>, RGBError> {
     println!("Generating invoice  {:?}", payload);
 
-    let rgb_client = &app_state.rgb_client;
-
-    let invoice = match rgb_client
+    let invoice = app_state
+        .rgb
         .invoice(
             payload.asset_id,
             payload.amount,
@@ -299,14 +198,7 @@ async fn invoice(
             payload.transport_endpoints,
             payload.min_confirmations,
         )
-        .await
-    {
-        Ok(id) => id,
-        Err(e) => {
-            eprintln!("Error generating invoice: {:?}", e);
-            return Err(e.into());
-        }
-    };
+        .await?;
 
     Ok(invoice.into())
 }

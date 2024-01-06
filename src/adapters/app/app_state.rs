@@ -20,7 +20,7 @@ use crate::{
 pub struct AppState {
     pub jwt_authenticator: Option<Arc<dyn Authenticator>>,
     pub lightning: Arc<dyn LightningUseCases>,
-    pub rgb_client: Arc<dyn RGBClient>,
+    pub rgb: Arc<dyn RGBClient>,
 }
 
 impl AppState {
@@ -41,12 +41,13 @@ impl AppState {
 
         // Create services (use cases)
         let lightning = LightningService::new(Box::new(db_client), Box::new(lightning_client));
+        // let rgb = RGBService::new(Box::new(rgb_client));
 
         // Create App state
         Ok(Self {
             jwt_authenticator,
             lightning: Arc::new(lightning),
-            rgb_client: Arc::new(rgb_client),
+            rgb: Arc::new(rgb_client),
         })
     }
 }
