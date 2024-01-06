@@ -1,5 +1,5 @@
+mod app;
 mod app_state;
-mod server;
 
+pub use app::App;
 pub use app_state::AppState;
-pub use server::App;

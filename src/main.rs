@@ -4,16 +4,20 @@ mod domains;
 
 use crate::adapters::config::config_rs::ConfigRsLoader;
 use crate::adapters::config::ConfigLoader;
+use crate::adapters::logging::tracing::setup_tracing;
 use adapters::app::App;
+use adapters::app::AppState;
 use tracing::{debug, error, info};
 
 #[tokio::main]
 async fn main() {
     // Load config and logger
     let config = ConfigRsLoader {}.load().unwrap();
-    debug!(?config, "Loaded configuration");
+    setup_tracing(config.logging.clone());
+    debug!(?config, "Loaded configuration"); // TODO: remove this line
 
-    let app = App::new(config.clone()).await;
+    let app_state = AppState::new(config.clone()).await.unwrap();
+    let app = App::new(app_state);
 
     let server_future = app.start(&config.web.addr);
     let ctrl_c_future = tokio::signal::ctrl_c();

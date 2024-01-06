@@ -1,8 +1,5 @@
 use serde::Deserialize;
 use sqlx::PgPool;
-use std::sync::Arc;
-
-use async_trait::async_trait;
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct DatabaseConfig {
@@ -14,8 +11,6 @@ pub struct DatabaseConfig {
     pub acquire_timeout: Option<String>,
 }
 
-#[async_trait]
-pub trait DatabaseClient {
+pub trait DatabaseClient: Send + Sync {
     fn pool(&self) -> PgPool;
 }
-pub type DynDatabaseClient = Arc<dyn DatabaseClient + Send + Sync>;

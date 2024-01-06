@@ -2,6 +2,7 @@ use chrono::DateTime;
 use chrono::Utc;
 use serde::Deserialize;
 use serde::Serialize;
+use uuid::Uuid;
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -43,10 +44,13 @@ pub struct RegisterLightningAddressRequest {
 
 #[derive(Debug, Serialize)]
 pub struct LightningAddressResponse {
+    pub id: Uuid,
     pub user_id: String,
     pub username: String,
     pub active: bool,
     pub created_at: DateTime<Utc>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub updated_at: Option<DateTime<Utc>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub deleted_at: Option<DateTime<Utc>>,
 }

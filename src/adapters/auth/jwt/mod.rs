@@ -1,4 +1,4 @@
-mod jwt_validator;
+mod jwt_authenticator;
 
-pub use jwt_validator::JWTConfig;
-pub use jwt_validator::JWTValidator;
+pub use jwt_authenticator::JWTAuthenticator;
+pub use jwt_authenticator::JWTConfig;

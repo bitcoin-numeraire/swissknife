@@ -23,15 +23,13 @@ impl FromRequestParts<Arc<AppState>> for AuthUser {
     ) -> Result<Self, Self::Rejection> {
         trace!("Start authentication");
 
-        let jwt_validator = &state.jwt_validator;
-
-        // Check if auth is enabled
-        if !state.auth_enabled {
-            debug!("Authentication disabled, returning anonymous user");
+        if state.jwt_authenticator.is_none() {
             return Ok(AuthUser::default());
         }
 
-        // Extract the token from the authorization header
+        let jwt_authenticator = state.jwt_authenticator.as_ref().unwrap();
+
+        // Extract the token from the Authorization header
         let TypedHeader(Authorization(bearer)) = parts
             .extract::<TypedHeader<Authorization<Bearer>>>()
             .await
@@ -42,7 +40,7 @@ impl FromRequestParts<Arc<AppState>> for AuthUser {
             })?;
 
         // Decode the user data
-        let user = jwt_validator.validate(bearer.token()).await?;
+        let user = jwt_authenticator.authenticate(bearer.token()).await?;
         debug!(user = ?user, "Authentication successful");
 
         Ok(user)

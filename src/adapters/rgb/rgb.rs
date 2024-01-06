@@ -1,12 +1,10 @@
-use std::sync::Arc;
-
 use async_trait::async_trait;
 use rgb_lib::wallet::{Assets, Balance, Metadata, ReceiveData, Recipient, Unspent};
 
 use crate::{application::errors::RGBError, domains::rgb::entities::RGBContract};
 
 #[async_trait]
-pub trait RGBClient {
+pub trait RGBClient: Send + Sync {
     async fn get_address(&self) -> Result<String, RGBError>;
     async fn get_btc_balance(&self) -> Result<u64, RGBError>;
     async fn list_unspents(&self) -> Result<Vec<Unspent>, RGBError>;
@@ -39,5 +37,3 @@ pub trait RGBClient {
         min_confirmations: u8,
     ) -> Result<ReceiveData, RGBError>;
 }
-
-pub type DynRGBClient = Arc<dyn RGBClient + Send + Sync>;

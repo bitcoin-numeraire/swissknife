@@ -32,12 +32,12 @@ struct Claims {
 }
 
 #[derive(Clone, Debug)]
-pub struct JWTValidator {
+pub struct JWTAuthenticator {
     jwks: Arc<RwLock<JwkSet>>,
     validation: Validation,
 }
 
-impl JWTValidator {
+impl JWTAuthenticator {
     pub async fn new(config: JWTConfig) -> Result<Self, AuthenticationError> {
         let refresh_interval = parse_duration(&config.jwks_refresh_interval)
             .map_err(|e| AuthenticationError::JWKS(e.to_string()))?;
@@ -84,8 +84,8 @@ impl JWTValidator {
 }
 
 #[async_trait]
-impl Authenticator for JWTValidator {
-    async fn validate(&self, token: &str) -> Result<AuthUser, AuthenticationError> {
+impl Authenticator for JWTAuthenticator {
+    async fn authenticate(&self, token: &str) -> Result<AuthUser, AuthenticationError> {
         trace!(token, "Start JWT validation");
 
         // Access the JWKs and clone the data
