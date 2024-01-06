@@ -1,6 +1,7 @@
 use crate::adapters::{database::DatabaseClient, lightning::LightningClient};
 
 pub struct LightningService {
+    pub domain: String,
     pub db_client: Box<dyn DatabaseClient>,
     pub lightning_client: Box<dyn LightningClient>,
 }
@@ -13,6 +14,7 @@ impl LightningService {
         LightningService {
             db_client,
             lightning_client,
+            domain: "numeraire.tech".to_string(),
         }
     }
 }

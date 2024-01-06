@@ -6,4 +6,5 @@ pub enum LightningError {
     NodeInfo(String),
     ListPayments(String),
     Register(String),
+    ParseMetadata(String),
 }

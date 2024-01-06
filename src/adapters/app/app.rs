@@ -19,8 +19,9 @@ impl App {
 
         let router = Router::new()
             .nest("/rgb", RGBHandler::routes())
-            .nest("/.well-known", LightningHandler::well_known_routes())
-            .nest("/lightning", LightningHandler::routes())
+            .nest("/.well-known/lnurlp", LightningHandler::well_known_routes())
+            .nest("/lightning/addresses", LightningHandler::addresses_routes())
+            .nest("/lightning/node", LightningHandler::node_routes())
             .with_state(Arc::new(state));
 
         trace!("App initialised successfully");
