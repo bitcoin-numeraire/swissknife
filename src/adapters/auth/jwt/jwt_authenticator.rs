@@ -12,7 +12,7 @@ use jsonwebtoken::{
 use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
 use tokio::time::sleep;
-use tracing::{debug, error, trace};
+use tracing::{error, trace};
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct JWTConfig {
@@ -40,7 +40,7 @@ pub struct JWTAuthenticator {
 impl JWTAuthenticator {
     pub async fn new(config: JWTConfig) -> Result<Self, AuthenticationError> {
         let refresh_interval = parse_duration(&config.jwks_refresh_interval)
-            .map_err(|e| AuthenticationError::JWKS(e.to_string()))?;
+            .map_err(|e| AuthenticationError::ParseConfig(e.to_string()))?;
 
         let jwks_uri = format!("https://{}/.well-known/jwks.json", config.domain);
 
@@ -86,41 +86,27 @@ impl JWTAuthenticator {
 #[async_trait]
 impl Authenticator for JWTAuthenticator {
     async fn authenticate(&self, token: &str) -> Result<AuthUser, AuthenticationError> {
-        trace!(token, "Start JWT validation");
-
         // Access the JWKs and clone the data
         let jwks = self.jwks.read().await.clone();
 
-        let header = decode_header(token).map_err(|e| {
-            let err_message = "Invalid JWT token";
-            debug!(error = ?e, err_message);
-            AuthenticationError::JWT(err_message.to_string()) // Do not return the error message to avoid revealing internal details.
-        })?;
+        let header = decode_header(token).map_err(|e| AuthenticationError::JWT(e.to_string()))?;
         let kid = match header.kid {
             Some(k) => k,
             None => {
-                let err_message = "Token doesn't have a `kid` header field";
-                debug!(err_message);
-                return Err(AuthenticationError::JWT(err_message.to_string()));
+                return Err(AuthenticationError::JWT(
+                    "Missing `kid` header field".to_string(),
+                ))
             }
         };
 
         if let Some(j) = jwks.find(&kid) {
             match &j.algorithm {
                 AlgorithmParameters::RSA(rsa) => {
-                    let decoding_key =
-                        DecodingKey::from_rsa_components(&rsa.n, &rsa.e).map_err(|e| {
-                            let err_message = "Failed to create RSA decoding key";
-                            debug!(error = ?e, err_message);
-                            AuthenticationError::JWT(e.to_string())
-                        })?;
+                    let decoding_key = DecodingKey::from_rsa_components(&rsa.n, &rsa.e)
+                        .map_err(|e| AuthenticationError::JWT(e.to_string()))?;
 
                     let decoded_token = decode::<Claims>(token, &decoding_key, &self.validation)
-                        .map_err(|e| {
-                            let err_message = "Failed to decode JWT token";
-                            debug!(error = ?e, err_message);
-                            AuthenticationError::JWT(err_message.to_string()) // Do not return the error message to avoid revealing internal details.
-                        })?;
+                        .map_err(|e| AuthenticationError::JWT(e.to_string()))?;
 
                     trace!(decoded_token = ?decoded_token, "JWT Token decoded successfully");
 
@@ -131,9 +117,9 @@ impl Authenticator for JWTAuthenticator {
                 _ => unreachable!("Only RSA algorithm is supported as JWK. should be unreachable"),
             }
         } else {
-            let err_message = "No matching JWK found for the given kid";
-            debug!(err_message);
-            return Err(AuthenticationError::JWT(err_message.to_string()));
+            Err(AuthenticationError::JWT(
+                "No matching JWK found for the given kid".to_string(),
+            ))
         }
     }
 }

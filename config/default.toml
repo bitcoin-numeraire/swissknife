@@ -1,6 +1,7 @@
 # Web server settings
 [web]
 addr = "0.0.0.0:3000"
+request_timeout = "10s"
 
 # Lightning settings
 [lightning]

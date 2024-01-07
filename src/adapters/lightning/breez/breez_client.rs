@@ -38,7 +38,8 @@ impl BreezClient {
         );
         breez_config.working_dir = config.working_dir;
 
-        let seed = Mnemonic::parse(config.seed).map_err(|e| LightningError::Seed(e.to_string()))?;
+        let seed =
+            Mnemonic::parse(config.seed).map_err(|e| LightningError::ParseSeed(e.to_string()))?;
 
         let sdk = BreezServices::connect(
             breez_config,
@@ -73,7 +74,7 @@ impl LightningClient for BreezClient {
         Ok(response.ln_invoice.bolt11)
     }
 
-    async fn node_info(&self) -> Result<NodeState, LightningError> {
+    fn node_info(&self) -> Result<NodeState, LightningError> {
         let node_info = self
             .sdk
             .node_info()

@@ -1,49 +1,26 @@
+use thiserror::Error;
+
 use super::{
     AuthenticationError, ConfigError, DatabaseError, LightningError, RGBError, WebServerError,
 };
 
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum ApplicationError {
-    Config(ConfigError),
-    RGB(RGBError),
-    Lightning(LightningError),
-    WebServer(WebServerError),
-    Authentication(AuthenticationError),
-    Database(DatabaseError),
-}
+    #[error(transparent)]
+    Config(#[from] ConfigError),
 
-impl From<ConfigError> for ApplicationError {
-    fn from(inner: ConfigError) -> Self {
-        ApplicationError::Config(inner)
-    }
-}
+    #[error("RGB Error: {0}")]
+    RGB(#[from] RGBError),
 
-impl From<RGBError> for ApplicationError {
-    fn from(inner: RGBError) -> Self {
-        ApplicationError::RGB(inner)
-    }
-}
+    #[error("Lightning Error: {0}")]
+    Lightning(#[from] LightningError),
 
-impl From<LightningError> for ApplicationError {
-    fn from(inner: LightningError) -> Self {
-        ApplicationError::Lightning(inner)
-    }
-}
+    #[error("Web Server Error: {0}")]
+    WebServer(#[from] WebServerError),
 
-impl From<WebServerError> for ApplicationError {
-    fn from(inner: WebServerError) -> Self {
-        ApplicationError::WebServer(inner)
-    }
-}
+    #[error("Authentication Error: {0}")]
+    Authentication(#[from] AuthenticationError),
 
-impl From<AuthenticationError> for ApplicationError {
-    fn from(inner: AuthenticationError) -> Self {
-        ApplicationError::Authentication(inner)
-    }
-}
-
-impl From<DatabaseError> for ApplicationError {
-    fn from(inner: DatabaseError) -> Self {
-        ApplicationError::Database(inner)
-    }
+    #[error("Database Error: {0}")]
+    Database(#[from] DatabaseError),
 }
