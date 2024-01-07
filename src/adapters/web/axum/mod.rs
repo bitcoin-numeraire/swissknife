@@ -1,4 +1,4 @@
 mod axum_config;
-mod axum_errors;
+mod axum_response;
 
 pub use axum_config::AxumServerConfig;
