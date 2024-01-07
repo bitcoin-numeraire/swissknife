@@ -5,7 +5,7 @@ use crate::application::errors::LightningError;
 
 #[async_trait]
 pub trait LightningClient: Sync + Send {
-    async fn node_info(&self) -> Result<NodeState, LightningError>;
+    fn node_info(&self) -> Result<NodeState, LightningError>;
     async fn list_payments(&self) -> Result<Vec<Payment>, LightningError>;
     async fn invoice(
         &self,

@@ -9,18 +9,18 @@ pub enum ApplicationError {
     #[error(transparent)]
     Config(#[from] ConfigError),
 
-    #[error(transparent)]
+    #[error("RGB Error: {0}")]
     RGB(#[from] RGBError),
 
-    #[error(transparent)]
+    #[error("Lightning Error: {0}")]
     Lightning(#[from] LightningError),
 
-    #[error(transparent)]
+    #[error("Web Server Error: {0}")]
     WebServer(#[from] WebServerError),
 
-    #[error(transparent)]
+    #[error("Authentication Error: {0}")]
     Authentication(#[from] AuthenticationError),
 
-    #[error(transparent)]
+    #[error("Database Error: {0}")]
     Database(#[from] DatabaseError),
 }

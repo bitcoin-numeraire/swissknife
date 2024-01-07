@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use tracing::{debug, info, trace};
+use tracing::{info, trace};
 
 use crate::{
     application::errors::LightningError,
@@ -38,7 +38,7 @@ impl LightningAddressesUseCases for LightningService {
             tag: LNURL_TYPE.to_string(),
         };
 
-        trace!(username, "LNURLp generated successfully");
+        info!(username, "LNURLp generated successfully");
         Ok(lnurlp)
     }
 
@@ -81,11 +81,7 @@ impl LightningAddressesUseCases for LightningService {
         )
         .fetch_one(&self.db_client.pool())
         .await
-        .map_err(|e| {
-            let err_message = "Database error";
-            debug!(error = ?e, err_message);
-            LightningError::Register(e.to_string())
-        })?;
+        .map_err(|e| LightningError::Register(e.to_string()))?;
 
         info!(
             user_id,
@@ -106,9 +102,5 @@ fn generate_lnurlp_metadata(username: &str, domain: &str) -> Result<String, Ligh
             format!("{}@{}", username, domain),
         ],
     ])
-    .map_err(|e| {
-        let err_message = "Failed to generate metadata for lightning invoice";
-        debug!(error = ?e, err_message);
-        LightningError::ParseMetadata(e.to_string())
-    })
+    .map_err(|e| LightningError::ParseMetadata(e.to_string()))
 }

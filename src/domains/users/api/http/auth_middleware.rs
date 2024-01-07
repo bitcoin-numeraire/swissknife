@@ -33,16 +33,14 @@ impl FromRequestParts<Arc<AppState>> for AuthUser {
         let TypedHeader(Authorization(bearer)) = parts
             .extract::<TypedHeader<Authorization<Bearer>>>()
             .await
-            .map_err(|e| {
-                let err_message = "Missing Bearer token for JWT authentication";
-                debug!(error = ?e, err_message);
-                AuthenticationError::MissingCredentials(e.to_string())
-            })?;
+            .map_err(|e| AuthenticationError::MissingBearerToken(e.to_string()))?;
 
         // Decode the user data
-        let user = jwt_authenticator.authenticate(bearer.token()).await?;
-        debug!(user = ?user, "Authentication successful");
+        trace!(token = bearer.token(), "Start JWT validation");
 
+        let user = jwt_authenticator.authenticate(bearer.token()).await?;
+
+        debug!(user = ?user, "Authentication successful");
         Ok(user)
     }
 }

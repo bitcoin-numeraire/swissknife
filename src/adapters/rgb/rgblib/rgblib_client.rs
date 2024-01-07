@@ -87,8 +87,6 @@ impl RGBClient for RGBLibClient {
             .get_btc_balance(online)
             .map_err(|e| RGBError::Balance(e.to_string()))?;
 
-        println!("Balance: {:?}", balance);
-
         Ok(balance.vanilla.spendable)
     }
 
@@ -99,7 +97,7 @@ impl RGBClient for RGBLibClient {
 
         let unspents = wallet
             .list_unspents(Some(online), false)
-            .map_err(|e| RGBError::Unspents(e.to_string()))?;
+            .map_err(|e| RGBError::ListUnspents(e.to_string()))?;
 
         Ok(unspents)
     }
@@ -140,9 +138,7 @@ impl RGBClient for RGBLibClient {
 
         let n = wallet
             .create_utxos(online, true, None, None, fee_rate)
-            .map_err(|e| RGBError::Utxos(e.to_string()))?;
-
-        println!("UTXOs created: {}", n);
+            .map_err(|e| RGBError::CreateUtxos(e.to_string()))?;
 
         Ok(n)
     }
@@ -161,8 +157,6 @@ impl RGBClient for RGBLibClient {
                 contract.amounts,
             )
             .map_err(|e| RGBError::ContractIssuance(e.to_string()))?;
-
-        println!("Contract issued: {:?}", contract);
 
         Ok(contract.asset_id)
     }

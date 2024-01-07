@@ -3,7 +3,6 @@ use std::time::Duration;
 use async_trait::async_trait;
 use humantime::parse_duration;
 use sqlx::{postgres::PgPoolOptions, PgPool};
-use tracing::error;
 
 use crate::{
     adapters::database::{DatabaseClient, DatabaseConfig},
@@ -41,21 +40,16 @@ impl SQLxClient {
             pool_options = pool_options.acquire_timeout(acquire_timeout);
         }
 
-        let pool = pool_options.connect(&config.url).await.map_err(|e| {
-            let err_message = "Failed to connect to database";
-            error!(error = ?e, err_message);
-            DatabaseError::Connect(e.to_string())
-        })?;
+        let pool = pool_options
+            .connect(&config.url)
+            .await
+            .map_err(|e| DatabaseError::Connect(e.to_string()))?;
 
         Ok(Self { pool })
     }
 
     fn parse_duration(duration_str: &str) -> Result<Duration, DatabaseError> {
-        parse_duration(duration_str).map_err(|e| {
-            let err_message = "Failed to parse duration from config";
-            error!(error = ?e, err_message);
-            DatabaseError::ParseConfig(e.to_string())
-        })
+        parse_duration(duration_str).map_err(|e| DatabaseError::ParseConfig(e.to_string()))
     }
 }
 
