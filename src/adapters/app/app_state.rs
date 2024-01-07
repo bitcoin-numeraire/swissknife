@@ -6,7 +6,7 @@ use crate::{
     domains::lightning::usecases::LightningUseCases,
 };
 use humantime::parse_duration;
-use tower_http::{timeout::TimeoutLayer, trace::TraceLayer};
+use tower_http::timeout::TimeoutLayer;
 use tracing::warn;
 
 use crate::{
