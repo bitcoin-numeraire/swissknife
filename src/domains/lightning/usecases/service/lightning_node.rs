@@ -16,7 +16,7 @@ impl LightningNodeUseCases for LightningService {
         // TODO: RBAC
 
         // TODO: Implement entity for node info and not NodeState
-        let node_info = self.lightning_client.node_info().await?;
+        let node_info = self.lightning_client.node_info()?;
 
         debug!("Node info retrieved successfully");
         Ok(node_info)

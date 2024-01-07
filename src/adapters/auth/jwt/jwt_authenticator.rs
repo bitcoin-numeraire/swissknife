@@ -92,9 +92,11 @@ impl Authenticator for JWTAuthenticator {
         let header = decode_header(token).map_err(|e| AuthenticationError::JWT(e.to_string()))?;
         let kid = match header.kid {
             Some(k) => k,
-            None => Err(AuthenticationError::JWT(
-                "Missing `kid` header field".to_string(),
-            )),
+            None => {
+                return Err(AuthenticationError::JWT(
+                    "Missing `kid` header field".to_string(),
+                ))
+            }
         };
 
         if let Some(j) = jwks.find(&kid) {

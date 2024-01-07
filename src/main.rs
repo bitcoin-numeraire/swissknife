@@ -12,7 +12,7 @@ use crate::adapters::logging::tracing::setup_tracing;
 
 use adapters::app::App;
 use adapters::app::AppState;
-use tracing::{error, info};
+use tracing::error;
 
 #[tokio::main]
 async fn main() {
@@ -34,24 +34,14 @@ async fn main() {
     let app_state = match AppState::new(config.clone()).await {
         Ok(app_state) => app_state,
         Err(e) => {
-            error!(error = ?e, "Failed to initialize application");
+            error!(error = ?e);
             exit(1);
         }
     };
 
     let app = App::new(app_state);
-
-    let server_future = app.start(&config.web.addr);
-    let ctrl_c_future = tokio::signal::ctrl_c();
-
-    tokio::select! {
-        result = server_future => {
-            if let Err(e) = result {
-                error!(error = ?e, "Server error");
-            }
-        }
-        _ = ctrl_c_future => {
-            info!("Received Ctrl+C, shutting down");
-        }
+    if let Err(e) = app.start(&config.web.addr).await {
+        error!(error = ?e);
+        exit(1);
     }
 }

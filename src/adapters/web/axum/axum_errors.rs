@@ -15,7 +15,7 @@ impl IntoResponse for RGBError {
     fn into_response(self) -> Response {
         let (status, error_message) = match self {
             RGBError::ContractIssuance(msg)
-            | RGBError::Utxos(msg)
+            | RGBError::CreateUtxos(msg)
             | RGBError::Send(msg) => (StatusCode::UNPROCESSABLE_ENTITY, msg),
             RGBError::Invoice(msg) => (StatusCode::BAD_REQUEST, msg),
             _ => (
@@ -55,7 +55,7 @@ impl IntoResponse for LightningError {
 impl IntoResponse for AuthenticationError {
     fn into_response(self) -> Response {
         let (status, error_message, header_message) = match self {
-            AuthenticationError::MissingCredentials(msg)  => 
+            AuthenticationError::MissingBearerToken(msg)  => 
                 (StatusCode::UNAUTHORIZED, msg.clone(), format!("Bearer realm=\"swissknife\", error=\"invalid_request\", error_description=\"{}\"", msg)),
             AuthenticationError::JWT(msg) => 
                 (StatusCode::UNAUTHORIZED, msg.clone(), format!("Bearer realm=\"swissknife\", error=\"invalid_token\", error_description=\"{}\"", msg)),
