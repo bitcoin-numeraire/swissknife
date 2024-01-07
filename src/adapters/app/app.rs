@@ -31,7 +31,8 @@ impl App {
             .nest("/.well-known/lnurlp", LightningHandler::well_known_routes())
             .nest("/lightning/addresses", LightningHandler::addresses_routes())
             .nest("/lightning/node", LightningHandler::node_routes())
-            .layer((TraceLayer::new_for_http(), state.timeout_layer))
+            .layer(TraceLayer::new_for_http())
+            .layer(state.timeout_layer)
             .with_state(Arc::new(state));
 
         debug!("App initialised successfully");
