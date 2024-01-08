@@ -13,4 +13,7 @@ pub enum AuthenticationError {
 
     #[error("Missing Bearer token for authentication: {0}")]
     MissingBearerToken(String),
+
+    #[error("Failed to parse permission: {0}")]
+    ParsePermission(String),
 }

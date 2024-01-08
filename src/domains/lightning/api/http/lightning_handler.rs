@@ -84,6 +84,7 @@ impl LightningHandler {
         State(app_state): State<Arc<AppState>>,
         user: AuthUser,
     ) -> Result<Json<NodeState>, LightningError> {
+        println!("user: {:?}", user);
         let node_info = app_state.lightning.node_info(user.sub).await?;
 
         Ok(node_info.into())
