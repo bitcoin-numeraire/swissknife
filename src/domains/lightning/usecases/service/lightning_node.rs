@@ -3,17 +3,21 @@ use breez_sdk_core::{NodeState, Payment};
 use tracing::{debug, trace};
 
 use crate::{
-    application::errors::LightningError, domains::lightning::usecases::LightningNodeUseCases,
+    application::errors::ApplicationError,
+    domains::{
+        lightning::usecases::LightningNodeUseCases,
+        users::entities::{AuthUser, Permission},
+    },
 };
 
 use super::LightningService;
 
 #[async_trait]
 impl LightningNodeUseCases for LightningService {
-    async fn node_info(&self, user_id: String) -> Result<NodeState, LightningError> {
-        trace!(user_id, "Getting node info");
+    async fn node_info(&self, user: AuthUser) -> Result<NodeState, ApplicationError> {
+        trace!(user_id = user.sub, "Getting node info");
 
-        // TODO: RBAC
+        user.check_permission(Permission::ReadLightningNode)?;
 
         // TODO: Implement entity for node info and not NodeState
         let node_info = self.lightning_client.node_info()?;
@@ -22,10 +26,10 @@ impl LightningNodeUseCases for LightningService {
         Ok(node_info)
     }
 
-    async fn list_payments(&self, user_id: String) -> Result<Vec<Payment>, LightningError> {
-        trace!(user_id, "Listing payments");
+    async fn list_payments(&self, user: AuthUser) -> Result<Vec<Payment>, ApplicationError> {
+        trace!(user_id = user.sub, "Listing payments");
 
-        // TODO: RBAC
+        user.check_permission(Permission::ReadLightningNode)?;
 
         // TODO: Implement entity for payments
         let payments = self.lightning_client.list_payments().await?;

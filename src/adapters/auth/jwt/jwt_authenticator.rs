@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use crate::application::errors::AuthenticationError;
+use crate::domains::users::entities::Permission;
 use crate::{adapters::auth::Authenticator, domains::users::entities::AuthUser};
 use async_trait::async_trait;
 use humantime::parse_duration;
@@ -29,6 +30,7 @@ struct Claims {
     iat: usize, // Optional. Issued at (as UTC timestamp)
     iss: String, // Optional. Issuer
     sub: String, // Optional. Subject (whom token refers to)
+    permissions: Option<Vec<String>>,
 }
 
 #[derive(Clone, Debug)]
@@ -110,8 +112,17 @@ impl Authenticator for JWTAuthenticator {
 
                     trace!(decoded_token = ?decoded_token, "JWT Token decoded successfully");
 
+                    let permissions = match decoded_token.claims.permissions {
+                        Some(perms) => perms
+                            .into_iter()
+                            .filter_map(|p| p.parse::<Permission>().ok())
+                            .collect(),
+                        None => vec![],
+                    };
+
                     Ok(AuthUser {
                         sub: decoded_token.claims.sub,
+                        permissions,
                     })
                 }
                 _ => unreachable!("Only RSA algorithm is supported as JWK. should be unreachable"),

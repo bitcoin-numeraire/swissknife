@@ -6,33 +6,39 @@ use axum::{
 use serde_json::{json, Value};
 use tracing::{error, warn};
 
-use crate::application::errors::{AuthenticationError, LightningError, RGBError};
+use crate::application::errors::{ApplicationError, AuthenticationError, AuthorizationError};
 
-const INTERNAL_SERVER_ERROR: &str =
+const INTERNAL_SERVER_ERROR_MSG: &str =
     "Internal server error, Please contact your administrator or try later";
 
-// TODO: Match errors with appropriate status codes when use cases are implemented
-impl IntoResponse for RGBError {
+impl IntoResponse for ApplicationError {
     fn into_response(self) -> Response {
-        let (status, error_message) = match self {
-            _ => (StatusCode::INTERNAL_SERVER_ERROR, INTERNAL_SERVER_ERROR),
-        };
+        match self {
+            ApplicationError::Authentication(error) => error.into_response(),
+            ApplicationError::Authorization(error) => error.into_response(),
+            _ => {
+                error!("{}", self.to_string());
 
-        error!("{}", self.to_string());
-
-        let body = generate_body(status, error_message);
-        (status, body).into_response()
+                let status = StatusCode::INTERNAL_SERVER_ERROR;
+                let body = generate_body(status, INTERNAL_SERVER_ERROR_MSG);
+                (status, body).into_response()
+            } // Add additional cases as needed
+        }
     }
 }
 
-impl IntoResponse for LightningError {
+impl IntoResponse for AuthorizationError {
     fn into_response(self) -> Response {
-        let (status, error_message) = match self {
-            _ => (StatusCode::INTERNAL_SERVER_ERROR, INTERNAL_SERVER_ERROR),
+        let error_message = match self {
+            AuthorizationError::MissingPermission(_) => {
+                "Access denied due to insufficient permissions"
+            }
+            _ => "Access denied",
         };
 
-        error!("{}", self.to_string());
+        warn!("{}", self.to_string());
 
+        let status = StatusCode::FORBIDDEN;
         let body = generate_body(status, error_message);
         (status, body).into_response()
     }
@@ -40,26 +46,24 @@ impl IntoResponse for LightningError {
 
 impl IntoResponse for AuthenticationError {
     fn into_response(self) -> Response {
-        let (status, error_message, header_message) = match self {
+        let (error_message, header_message) = match self {
             AuthenticationError::MissingBearerToken(_) => (
-                StatusCode::UNAUTHORIZED,
                 "Missing authentication token",
                 "Bearer realm=\"swissknife\", error=\"invalid_request\"",
             ),
             AuthenticationError::JWT(_) => (
-                StatusCode::UNAUTHORIZED,
                 "Invalid authentication token",
                 "Bearer realm=\"swissknife\", error=\"invalid_token\"",
             ),
-            _ => (StatusCode::INTERNAL_SERVER_ERROR, INTERNAL_SERVER_ERROR, ""),
+            _ => (
+                "Failed authentication",
+                "Bearer realm=\"swissknife\", error=\"failed_authentication\"",
+            ),
         };
 
-        // Log the error with appropriate level and message
-        match status {
-            StatusCode::UNAUTHORIZED => warn!("{}", self.to_string()),
-            _ => error!("{}", self.to_string()),
-        }
+        warn!("{}", self.to_string());
 
+        let status = StatusCode::UNAUTHORIZED;
         let body = generate_body(status, error_message);
         let mut response = (status, body).into_response();
 
@@ -78,9 +82,9 @@ impl IntoResponse for AuthenticationError {
     }
 }
 
-fn generate_body(status: StatusCode, error_message: &str) -> Json<Value> {
+fn generate_body(status: StatusCode, reason: &str) -> Json<Value> {
     Json(json!({
         "status": status.as_str(),
-        "reason": error_message,
+        "reason": reason,
     }))
 }

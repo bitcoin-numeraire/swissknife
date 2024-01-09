@@ -2,10 +2,13 @@ use async_trait::async_trait;
 use tracing::{info, trace};
 
 use crate::{
-    application::errors::LightningError,
-    domains::lightning::{
-        entities::{LNURLp, LightningAddress},
-        usecases::LightningAddressesUseCases,
+    application::errors::{ApplicationError, LightningError},
+    domains::{
+        lightning::{
+            entities::{LNURLp, LightningAddress},
+            usecases::LightningAddressesUseCases,
+        },
+        users::entities::{AuthUser, Permission},
     },
 };
 
@@ -18,7 +21,7 @@ const LNURL_TYPE: &str = "payRequest";
 
 #[async_trait]
 impl LightningAddressesUseCases for LightningService {
-    async fn generate_lnurlp(&self, username: String) -> Result<LNURLp, LightningError> {
+    async fn generate_lnurlp(&self, username: String) -> Result<LNURLp, ApplicationError> {
         trace!(username, "Generating LNURLp");
 
         // TODO: Verify the username exists
@@ -38,7 +41,7 @@ impl LightningAddressesUseCases for LightningService {
             tag: LNURL_TYPE.to_string(),
         };
 
-        info!(username, "LNURLp generated successfully");
+        info!(username, "LNURLp returned successfully");
         Ok(lnurlp)
     }
 
@@ -46,7 +49,7 @@ impl LightningAddressesUseCases for LightningService {
         &self,
         username: String,
         amount: u64,
-    ) -> Result<String, LightningError> {
+    ) -> Result<String, ApplicationError> {
         trace!(username, "Generating lightning invoice");
 
         // TODO: Verify the username exists
@@ -60,10 +63,16 @@ impl LightningAddressesUseCases for LightningService {
 
     async fn register_lightning_address(
         &self,
-        user_id: String,
+        user: AuthUser,
         username: String,
-    ) -> Result<LightningAddress, LightningError> {
-        trace!(user_id, username, "Registering lightning address");
+    ) -> Result<LightningAddress, ApplicationError> {
+        trace!(
+            user_id = user.sub,
+            username,
+            "Registering lightning address"
+        );
+
+        user.check_permission(Permission::RegisterLightningAddress)?;
 
         // TODO: Verify the username is not already registered
 
@@ -76,7 +85,7 @@ impl LightningAddressesUseCases for LightningService {
                 values ($1, $2)
                 returning *
             "#,
-            user_id,
+            user.sub,
             username
         )
         .fetch_one(&self.db_client.pool())
@@ -84,7 +93,7 @@ impl LightningAddressesUseCases for LightningService {
         .map_err(|e| LightningError::Register(e.to_string()))?;
 
         info!(
-            user_id,
+            user_id = user.sub,
             username, "Lightning address registered successfully"
         );
         Ok(lightning_address)

@@ -14,7 +14,7 @@ use crate::{
             LightningAddressResponse, LightningInvoiceQueryParams, LightningInvoiceResponse,
             LightningWellKnownResponse, RegisterLightningAddressRequest, SuccessAction,
         },
-        errors::LightningError,
+        errors::ApplicationError,
     },
     domains::users::entities::AuthUser,
 };
@@ -41,7 +41,7 @@ impl LightningHandler {
     async fn well_known_lnurlp(
         Path(username): Path<String>,
         State(app_state): State<Arc<AppState>>,
-    ) -> Result<Json<LightningWellKnownResponse>, LightningError> {
+    ) -> Result<Json<LightningWellKnownResponse>, ApplicationError> {
         let lnurlp = app_state.lightning.generate_lnurlp(username).await?;
 
         let response = LightningWellKnownResponse {
@@ -61,7 +61,7 @@ impl LightningHandler {
         Path(username): Path<String>,
         Query(query_params): Query<LightningInvoiceQueryParams>,
         State(app_state): State<Arc<AppState>>,
-    ) -> Result<Json<LightningInvoiceResponse>, LightningError> {
+    ) -> Result<Json<LightningInvoiceResponse>, ApplicationError> {
         let invoice = app_state
             .lightning
             .generate_invoice(username, query_params.amount)
@@ -83,8 +83,8 @@ impl LightningHandler {
     async fn node_info(
         State(app_state): State<Arc<AppState>>,
         user: AuthUser,
-    ) -> Result<Json<NodeState>, LightningError> {
-        let node_info = app_state.lightning.node_info(user.sub).await?;
+    ) -> Result<Json<NodeState>, ApplicationError> {
+        let node_info = app_state.lightning.node_info(user).await?;
 
         Ok(node_info.into())
     }
@@ -92,8 +92,8 @@ impl LightningHandler {
     async fn list_payments(
         State(app_state): State<Arc<AppState>>,
         user: AuthUser,
-    ) -> Result<Json<Vec<Payment>>, LightningError> {
-        let payments = app_state.lightning.list_payments(user.sub).await?;
+    ) -> Result<Json<Vec<Payment>>, ApplicationError> {
+        let payments = app_state.lightning.list_payments(user).await?;
 
         Ok(payments.into())
     }
@@ -102,10 +102,10 @@ impl LightningHandler {
         State(app_state): State<Arc<AppState>>,
         user: AuthUser,
         Json(payload): Json<RegisterLightningAddressRequest>,
-    ) -> Result<Json<LightningAddressResponse>, LightningError> {
+    ) -> Result<Json<LightningAddressResponse>, ApplicationError> {
         let lightning_address = app_state
             .lightning
-            .register_lightning_address(user.sub, payload.username)
+            .register_lightning_address(user, payload.username)
             .await?;
 
         let response = LightningAddressResponse {

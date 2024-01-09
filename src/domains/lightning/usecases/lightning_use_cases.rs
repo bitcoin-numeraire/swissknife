@@ -2,31 +2,34 @@ use async_trait::async_trait;
 use breez_sdk_core::{NodeState, Payment};
 
 use crate::{
-    application::errors::LightningError,
-    domains::lightning::entities::{LNURLp, LightningAddress},
+    application::errors::ApplicationError,
+    domains::{
+        lightning::entities::{LNURLp, LightningAddress},
+        users::entities::AuthUser,
+    },
 };
 
 #[async_trait]
 pub trait LightningAddressesUseCases: Send + Sync {
-    async fn generate_lnurlp(&self, username: String) -> Result<LNURLp, LightningError>;
+    async fn generate_lnurlp(&self, username: String) -> Result<LNURLp, ApplicationError>;
 
     async fn generate_invoice(
         &self,
         username: String,
         amount: u64,
-    ) -> Result<String, LightningError>;
+    ) -> Result<String, ApplicationError>;
 
     async fn register_lightning_address(
         &self,
-        user_id: String,
+        user: AuthUser,
         username: String,
-    ) -> Result<LightningAddress, LightningError>;
+    ) -> Result<LightningAddress, ApplicationError>;
 }
 
 #[async_trait]
 pub trait LightningNodeUseCases: Send + Sync {
-    async fn node_info(&self, username: String) -> Result<NodeState, LightningError>;
-    async fn list_payments(&self, username: String) -> Result<Vec<Payment>, LightningError>;
+    async fn node_info(&self, user: AuthUser) -> Result<NodeState, ApplicationError>;
+    async fn list_payments(&self, user: AuthUser) -> Result<Vec<Payment>, ApplicationError>;
 }
 
 pub trait LightningUseCases: LightningAddressesUseCases + LightningNodeUseCases {}
