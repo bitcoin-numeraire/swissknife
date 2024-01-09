@@ -14,7 +14,7 @@ use crate::{
             LightningAddressResponse, LightningInvoiceQueryParams, LightningInvoiceResponse,
             LightningWellKnownResponse, RegisterLightningAddressRequest, SuccessAction,
         },
-        errors::LightningError,
+        errors::{ApplicationError, LightningError},
     },
     domains::users::entities::AuthUser,
 };
@@ -83,9 +83,8 @@ impl LightningHandler {
     async fn node_info(
         State(app_state): State<Arc<AppState>>,
         user: AuthUser,
-    ) -> Result<Json<NodeState>, LightningError> {
-        println!("user: {:?}", user);
-        let node_info = app_state.lightning.node_info(user.sub).await?;
+    ) -> Result<Json<NodeState>, ApplicationError> {
+        let node_info = app_state.lightning.node_info(user).await?;
 
         Ok(node_info.into())
     }
@@ -93,8 +92,8 @@ impl LightningHandler {
     async fn list_payments(
         State(app_state): State<Arc<AppState>>,
         user: AuthUser,
-    ) -> Result<Json<Vec<Payment>>, LightningError> {
-        let payments = app_state.lightning.list_payments(user.sub).await?;
+    ) -> Result<Json<Vec<Payment>>, ApplicationError> {
+        let payments = app_state.lightning.list_payments(user).await?;
 
         Ok(payments.into())
     }
@@ -103,10 +102,10 @@ impl LightningHandler {
         State(app_state): State<Arc<AppState>>,
         user: AuthUser,
         Json(payload): Json<RegisterLightningAddressRequest>,
-    ) -> Result<Json<LightningAddressResponse>, LightningError> {
+    ) -> Result<Json<LightningAddressResponse>, ApplicationError> {
         let lightning_address = app_state
             .lightning
-            .register_lightning_address(user.sub, payload.username)
+            .register_lightning_address(user, payload.username)
             .await?;
 
         let response = LightningAddressResponse {

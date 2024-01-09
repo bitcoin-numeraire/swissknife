@@ -3,9 +3,12 @@ use tracing::{info, trace};
 
 use crate::{
     application::errors::LightningError,
-    domains::lightning::{
-        entities::{LNURLp, LightningAddress},
-        usecases::LightningAddressesUseCases,
+    domains::{
+        lightning::{
+            entities::{LNURLp, LightningAddress},
+            usecases::LightningAddressesUseCases,
+        },
+        users::entities::{AuthUser, Permission},
     },
 };
 
@@ -38,7 +41,7 @@ impl LightningAddressesUseCases for LightningService {
             tag: LNURL_TYPE.to_string(),
         };
 
-        info!(username, "LNURLp generated successfully");
+        info!(username, "LNURLp returned successfully");
         Ok(lnurlp)
     }
 
@@ -60,10 +63,16 @@ impl LightningAddressesUseCases for LightningService {
 
     async fn register_lightning_address(
         &self,
-        user_id: String,
+        user: AuthUser,
         username: String,
     ) -> Result<LightningAddress, LightningError> {
-        trace!(user_id, username, "Registering lightning address");
+        trace!(
+            user_id = user.sub,
+            username,
+            "Registering lightning address"
+        );
+
+        user.check_permission(Permission::RegisterLightningAddress)?;
 
         // TODO: Verify the username is not already registered
 
@@ -84,7 +93,7 @@ impl LightningAddressesUseCases for LightningService {
         .map_err(|e| LightningError::Register(e.to_string()))?;
 
         info!(
-            user_id,
+            user_id = user.sub,
             username, "Lightning address registered successfully"
         );
         Ok(lightning_address)

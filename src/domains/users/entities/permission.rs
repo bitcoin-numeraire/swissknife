@@ -2,7 +2,7 @@ use std::str::FromStr;
 
 use tracing::warn;
 
-use crate::application::errors::AuthenticationError;
+use crate::application::errors::AuthorizationError;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Permission {
@@ -12,7 +12,7 @@ pub enum Permission {
 }
 
 impl FromStr for Permission {
-    type Err = AuthenticationError;
+    type Err = AuthorizationError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
@@ -20,7 +20,7 @@ impl FromStr for Permission {
             "read:lightning_node" => Ok(Permission::ReadLightningNode),
             // ... handle other permissions ...
             _ => {
-                let err = AuthenticationError::ParsePermission(s.to_string());
+                let err = AuthorizationError::ParsePermission(s.to_string());
                 warn!("{}", err.to_string());
                 Err(err)
             }
