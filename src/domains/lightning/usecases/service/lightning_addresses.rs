@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use tracing::{info, trace};
 
 use crate::{
-    application::errors::LightningError,
+    application::errors::{ApplicationError, LightningError},
     domains::{
         lightning::{
             entities::{LNURLp, LightningAddress},
@@ -21,7 +21,7 @@ const LNURL_TYPE: &str = "payRequest";
 
 #[async_trait]
 impl LightningAddressesUseCases for LightningService {
-    async fn generate_lnurlp(&self, username: String) -> Result<LNURLp, LightningError> {
+    async fn generate_lnurlp(&self, username: String) -> Result<LNURLp, ApplicationError> {
         trace!(username, "Generating LNURLp");
 
         // TODO: Verify the username exists
@@ -49,7 +49,7 @@ impl LightningAddressesUseCases for LightningService {
         &self,
         username: String,
         amount: u64,
-    ) -> Result<String, LightningError> {
+    ) -> Result<String, ApplicationError> {
         trace!(username, "Generating lightning invoice");
 
         // TODO: Verify the username exists
@@ -65,7 +65,7 @@ impl LightningAddressesUseCases for LightningService {
         &self,
         user: AuthUser,
         username: String,
-    ) -> Result<LightningAddress, LightningError> {
+    ) -> Result<LightningAddress, ApplicationError> {
         trace!(
             user_id = user.sub,
             username,
@@ -85,7 +85,7 @@ impl LightningAddressesUseCases for LightningService {
                 values ($1, $2)
                 returning *
             "#,
-            user_id,
+            user.sub,
             username
         )
         .fetch_one(&self.db_client.pool())

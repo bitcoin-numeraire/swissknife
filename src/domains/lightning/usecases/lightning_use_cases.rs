@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use breez_sdk_core::{NodeState, Payment};
 
 use crate::{
-    application::errors::{ApplicationError, LightningError},
+    application::errors::ApplicationError,
     domains::{
         lightning::entities::{LNURLp, LightningAddress},
         users::entities::AuthUser,
@@ -11,19 +11,19 @@ use crate::{
 
 #[async_trait]
 pub trait LightningAddressesUseCases: Send + Sync {
-    async fn generate_lnurlp(&self, username: String) -> Result<LNURLp, LightningError>;
+    async fn generate_lnurlp(&self, username: String) -> Result<LNURLp, ApplicationError>;
 
     async fn generate_invoice(
         &self,
         username: String,
         amount: u64,
-    ) -> Result<String, LightningError>;
+    ) -> Result<String, ApplicationError>;
 
     async fn register_lightning_address(
         &self,
         user: AuthUser,
         username: String,
-    ) -> Result<LightningAddress, LightningError>;
+    ) -> Result<LightningAddress, ApplicationError>;
 }
 
 #[async_trait]

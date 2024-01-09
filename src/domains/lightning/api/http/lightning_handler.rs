@@ -14,7 +14,7 @@ use crate::{
             LightningAddressResponse, LightningInvoiceQueryParams, LightningInvoiceResponse,
             LightningWellKnownResponse, RegisterLightningAddressRequest, SuccessAction,
         },
-        errors::{ApplicationError, LightningError},
+        errors::ApplicationError,
     },
     domains::users::entities::AuthUser,
 };
@@ -41,7 +41,7 @@ impl LightningHandler {
     async fn well_known_lnurlp(
         Path(username): Path<String>,
         State(app_state): State<Arc<AppState>>,
-    ) -> Result<Json<LightningWellKnownResponse>, LightningError> {
+    ) -> Result<Json<LightningWellKnownResponse>, ApplicationError> {
         let lnurlp = app_state.lightning.generate_lnurlp(username).await?;
 
         let response = LightningWellKnownResponse {
@@ -61,7 +61,7 @@ impl LightningHandler {
         Path(username): Path<String>,
         Query(query_params): Query<LightningInvoiceQueryParams>,
         State(app_state): State<Arc<AppState>>,
-    ) -> Result<Json<LightningInvoiceResponse>, LightningError> {
+    ) -> Result<Json<LightningInvoiceResponse>, ApplicationError> {
         let invoice = app_state
             .lightning
             .generate_invoice(username, query_params.amount)
