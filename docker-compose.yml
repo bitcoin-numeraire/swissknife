@@ -16,12 +16,10 @@ services:
     depends_on:
       - bitcoind
 
-  electrs-2:
-    image: registry.gitlab.com/hashbeam/docker/electrs:0.9.14
-    ports:
-      - 50002:50001
-    depends_on:
-      - bitcoind
+  proxy:
+      image: ghcr.io/rgb-tools/rgb-proxy-server:0.2.1
+      ports:
+        - 3030:3000
 
   postgres:
     image: postgres:15.5
