@@ -10,7 +10,10 @@ working_dir = "storage/breez"
 # RGB settings
 [rgb]
 data_dir = "storage/rgblib"
+media_dir = "storage/media"
 electrum_url = "localhost:50001"
+proxy_server_url = "rpc://localhost:3030/json-rpc"
+min_confirmations = 3
 
 # Logging settings
 [logging]
