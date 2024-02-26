@@ -9,6 +9,7 @@ pub enum Permission {
     RegisterLightningAddress,
 
     ReadLightningNode,
+    SendLightningPayment,
 }
 
 impl FromStr for Permission {
@@ -18,6 +19,7 @@ impl FromStr for Permission {
         match s {
             "register:lightning_addresses" => Ok(Permission::RegisterLightningAddress),
             "read:lightning_node" => Ok(Permission::ReadLightningNode),
+            "pay:lightning_node" => Ok(Permission::ReadLightningNode),
             // ... handle other permissions ...
             _ => {
                 let err = AuthorizationError::ParsePermission(s.to_string());
@@ -33,6 +35,7 @@ impl Permission {
         vec![
             Permission::RegisterLightningAddress,
             Permission::ReadLightningNode,
+            Permission::SendLightningPayment,
             // ... include all other permission variants ...
         ]
     }

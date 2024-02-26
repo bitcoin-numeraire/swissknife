@@ -4,8 +4,8 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use bip39::Mnemonic;
 use breez_sdk_core::{
-    BreezServices, EnvironmentType, GreenlightNodeConfig, ListPaymentsRequest, NodeConfig,
-    NodeState, Payment, ReceivePaymentRequest,
+    BreezServices, EnvironmentType, GreenlightNodeConfig, ListPaymentsRequest, LspInformation,
+    NodeConfig, NodeState, Payment, ReceivePaymentRequest, SendPaymentRequest,
 };
 
 use crate::{adapters::lightning::LightningClient, application::errors::LightningError};
@@ -83,6 +83,24 @@ impl LightningClient for BreezClient {
         Ok(node_info)
     }
 
+    async fn lsp_info(&self) -> Result<LspInformation, LightningError> {
+        let list_lsps = self
+            .sdk
+            .list_lsps()
+            .await
+            .map_err(|e| LightningError::LSPInfo(e.to_string()))?;
+
+        println!("list_lsps: {:?}", list_lsps);
+
+        let lsp_info = self
+            .sdk
+            .lsp_info()
+            .await
+            .map_err(|e| LightningError::LSPInfo(e.to_string()))?;
+
+        Ok(lsp_info)
+    }
+
     async fn list_payments(&self) -> Result<Vec<Payment>, LightningError> {
         let payments = self
             .sdk
@@ -93,5 +111,22 @@ impl LightningClient for BreezClient {
             .map_err(|e| LightningError::ListPayments(e.to_string()))?;
 
         Ok(payments)
+    }
+
+    async fn send_payment(
+        &self,
+        bolt11: String,
+        amount_msat: Option<u64>,
+    ) -> Result<Payment, LightningError> {
+        let response = self
+            .sdk
+            .send_payment(SendPaymentRequest {
+                bolt11,
+                amount_msat,
+            })
+            .await
+            .map_err(|e| LightningError::SendBolt11Payment(e.to_string()))?;
+
+        Ok(response.payment)
     }
 }

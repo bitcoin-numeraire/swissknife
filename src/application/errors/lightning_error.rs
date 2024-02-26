@@ -14,6 +14,9 @@ pub enum LightningError {
     #[error("Failed to get Lightning node info: {0}")]
     NodeInfo(String),
 
+    #[error("Failed to get LSP info: {0}")]
+    LSPInfo(String),
+
     #[error("Failed to get list payments from Lightning node: {0}")]
     ListPayments(String),
 
@@ -22,4 +25,7 @@ pub enum LightningError {
 
     #[error("Failed to parse LNURLp metadata: {0}")]
     ParseMetadata(String),
+
+    #[error("Failed to send Bolt11 payment: {0}")]
+    SendBolt11Payment(String),
 }
