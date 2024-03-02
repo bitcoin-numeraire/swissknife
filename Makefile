@@ -7,7 +7,7 @@ PGADMIN_SERVICE := pgadmin
 .PHONY: up up-bitcoin up-electrs up-proxy up-postgres up-pgadmin shutdown down mine send create-wallet generate-certs
 
 up:
-	@$(MAKE) down
+	@$(MAKE) shutdown
 	@$(MAKE) up-bitcoin
 	@$(MAKE) create-wallet name=miner
 	@$(MAKE) mine wallet=miner blocks=150

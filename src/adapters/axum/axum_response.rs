@@ -54,7 +54,11 @@ impl IntoResponse for AuthenticationError {
                 "Missing authentication token",
                 "Bearer realm=\"swissknife\", error=\"invalid_request\"",
             ),
-            AuthenticationError::JWT(_) => (
+            AuthenticationError::DecodeJWT(_)
+            | AuthenticationError::DecodeJWTHeader(_)
+            | AuthenticationError::DecodeJWTKey(_)
+            | AuthenticationError::MissingJWTKid
+            | AuthenticationError::MissingJWK => (
                 "Invalid authentication token",
                 "Bearer realm=\"swissknife\", error=\"invalid_token\"",
             ),

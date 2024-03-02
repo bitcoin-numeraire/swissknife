@@ -9,7 +9,7 @@ use tokio::{
         unix::{signal, SignalKind},
     },
 };
-use tower_http::trace::TraceLayer;
+use tower_http::{cors::CorsLayer, trace::TraceLayer};
 use tracing::{debug, error, info, trace};
 
 use crate::{
@@ -27,12 +27,19 @@ impl App {
         trace!("Initializing app");
 
         let router = Router::new()
-            .nest("/rgb", RGBHandler::routes())
-            .nest("/.well-known/lnurlp", LightningHandler::well_known_routes())
-            .nest("/lightning/addresses", LightningHandler::addresses_routes())
-            .nest("/lightning/node", LightningHandler::node_routes())
+            .nest("/api/rgb", RGBHandler::routes())
+            .nest(
+                "/api/.well-known/lnurlp",
+                LightningHandler::well_known_routes(),
+            )
+            .nest(
+                "/api/lightning/addresses",
+                LightningHandler::addresses_routes(),
+            )
+            .nest("/api/lightning/node", LightningHandler::node_routes())
             .layer(TraceLayer::new_for_http())
             .layer(state.timeout_layer)
+            .layer(CorsLayer::permissive())
             .with_state(Arc::new(state));
 
         debug!("App initialised successfully");

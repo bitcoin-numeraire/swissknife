@@ -1,4 +1,4 @@
-version: '3.2'
+version: "3.2"
 
 services:
   bitcoind:
@@ -17,9 +17,9 @@ services:
       - bitcoind
 
   proxy:
-      image: ghcr.io/rgb-tools/rgb-proxy-server:0.2.1
-      ports:
-        - 3030:3000
+    image: ghcr.io/rgb-tools/rgb-proxy-server:0.2.1
+    ports:
+      - 3030:3000
 
   postgres:
     image: postgres:15.5
