@@ -1,9 +1,9 @@
 use serde::Deserialize;
 
 use crate::adapters::{
-    auth::AuthConfig, database::DatabaseConfig, lightning::breez::BreezClientConfig,
-    logging::tracing::TracingLoggerConfig, rgb::rgblib::RGBLibClientConfig,
-    web::axum::AxumServerConfig,
+    auth::AuthConfig, axum::AxumServerConfig, database::DatabaseConfig,
+    lightning::breez::BreezClientConfig, logging::tracing::TracingLoggerConfig,
+    rgb::rgblib::RGBLibClientConfig,
 };
 
 #[derive(Debug, Deserialize, Clone)]

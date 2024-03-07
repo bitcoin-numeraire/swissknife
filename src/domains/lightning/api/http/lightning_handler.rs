@@ -5,14 +5,15 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
-use breez_sdk_core::{NodeState, Payment};
+use breez_sdk_core::{LspInformation, NodeState, Payment};
 
 use crate::{
     adapters::app::AppState,
     application::{
         dtos::{
             LightningAddressResponse, LightningInvoiceQueryParams, LightningInvoiceResponse,
-            LightningWellKnownResponse, RegisterLightningAddressRequest, SuccessAction,
+            LightningWellKnownResponse, RegisterLightningAddressRequest, SendPaymentRequest,
+            SuccessAction,
         },
         errors::ApplicationError,
     },
@@ -35,7 +36,9 @@ impl LightningHandler {
     pub fn node_routes() -> Router<Arc<AppState>> {
         Router::new()
             .route("/info", get(Self::node_info))
+            .route("/lsp-info", get(Self::lsp_info))
             .route("/list-payments", get(Self::list_payments))
+            .route("/send-payment", get(Self::send_payment))
     }
 
     async fn well_known_lnurlp(
@@ -89,6 +92,15 @@ impl LightningHandler {
         Ok(node_info.into())
     }
 
+    async fn lsp_info(
+        State(app_state): State<Arc<AppState>>,
+        user: AuthUser,
+    ) -> Result<Json<LspInformation>, ApplicationError> {
+        let lsp_info = app_state.lightning.lsp_info(user).await?;
+
+        Ok(lsp_info.into())
+    }
+
     async fn list_payments(
         State(app_state): State<Arc<AppState>>,
         user: AuthUser,
@@ -119,5 +131,18 @@ impl LightningHandler {
         };
 
         Ok(response.into())
+    }
+
+    async fn send_payment(
+        State(app_state): State<Arc<AppState>>,
+        user: AuthUser,
+        Json(payload): Json<SendPaymentRequest>,
+    ) -> Result<Json<Payment>, ApplicationError> {
+        let payment = app_state
+            .lightning
+            .send_bolt11_payment(user, payload.bolt11, payload.amount_msat)
+            .await?;
+
+        Ok(payment.into())
     }
 }

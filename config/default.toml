@@ -1,7 +1,7 @@
 # Web server settings
 [web]
 addr = "0.0.0.0:3000"
-request_timeout = "10s"
+request_timeout = "20s"
 
 # Lightning settings
 [lightning]
@@ -10,7 +10,10 @@ working_dir = "storage/breez"
 # RGB settings
 [rgb]
 data_dir = "storage/rgblib"
+media_dir = "storage/media"
 electrum_url = "localhost:50001"
+proxy_server_url = "rpc://localhost:3030/json-rpc"
+min_confirmations = 3
 
 # Logging settings
 [logging]

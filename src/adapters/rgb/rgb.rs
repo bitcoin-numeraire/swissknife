@@ -1,7 +1,7 @@
 use async_trait::async_trait;
-use rgb_lib::wallet::{Assets, Balance, Metadata, ReceiveData, Recipient, Unspent};
+use rgb_lib::wallet::{Assets, Balance, Metadata, ReceiveData, SendResult, Transfer, Unspent};
 
-use crate::{application::errors::RGBError, domains::rgb::entities::RGBContract};
+use crate::{application::errors::RGBError, domains::rgb::entities::RGBAsset};
 
 #[async_trait]
 pub trait RGBClient: Send + Sync {
@@ -16,24 +16,32 @@ pub trait RGBClient: Send + Sync {
     ) -> Result<String, RGBError>;
     async fn drain_btc(&self, address: String, fee_rate: f32) -> Result<String, RGBError>;
     async fn create_utxos(&self, fee_rate: f32) -> Result<u8, RGBError>;
-    async fn issue_contract(&self, contract: RGBContract) -> Result<String, RGBError>;
+    async fn issue_asset_nia(&self, contract: RGBAsset) -> Result<String, RGBError>;
+    async fn issue_asset_cfa(&self, contract: RGBAsset) -> Result<String, RGBError>;
+    async fn issue_asset_uda(&self, contract: RGBAsset) -> Result<String, RGBError>;
     async fn list_assets(&self) -> Result<Assets, RGBError>;
+    async fn list_transfers(&self, asset_id: Option<String>) -> Result<Vec<Transfer>, RGBError>;
     async fn get_asset(&self, asset_id: String) -> Result<Metadata, RGBError>;
     async fn get_asset_balance(&self, asset_id: String) -> Result<Balance, RGBError>;
     async fn send(
         &self,
         asset_id: String,
-        recipients: Vec<Recipient>,
+        recipient_id: String,
         donation: bool,
         fee_rate: f32,
-        min_confirmations: u8,
-    ) -> Result<String, RGBError>;
-    async fn invoice(
+        amount: u64,
+    ) -> Result<SendResult, RGBError>;
+    async fn blind_receive(
         &self,
         asset_id: Option<String>,
         amount: Option<u64>,
         duration_seconds: Option<u32>,
-        transport_endpoints: Vec<String>,
-        min_confirmations: u8,
     ) -> Result<ReceiveData, RGBError>;
+    async fn witness_receive(
+        &self,
+        asset_id: Option<String>,
+        amount: Option<u64>,
+        duration_seconds: Option<u32>,
+    ) -> Result<ReceiveData, RGBError>;
+    async fn refresh(&self, asset_id: Option<String>) -> Result<(), RGBError>;
 }

@@ -4,7 +4,16 @@ BCLI := $(COMPOSE) exec -T -u blits bitcoind bitcoin-cli -regtest
 DB_SERVICE := postgres
 PGADMIN_SERVICE := pgadmin
 
-.PHONY: up-bitcoin up-electrs up-postgres up-pgadmin down mine send create-wallet generate-certs
+.PHONY: up up-bitcoin up-electrs up-proxy up-postgres up-pgadmin shutdown down mine send create-wallet generate-certs
+
+up:
+	@$(MAKE) shutdown
+	@$(MAKE) up-bitcoin
+	@$(MAKE) create-wallet name=miner
+	@$(MAKE) mine wallet=miner blocks=150
+	@$(MAKE) up-electrs
+	@$(MAKE) up-proxy
+	@$(MAKE) up-postgres
 
 up-bitcoin:
 	@make down
@@ -18,9 +27,12 @@ up-bitcoin:
 	until $(COMPOSE) logs bitcoind | grep 'Bound to'; do sleep 1; done
 
 up-electrs:
-	@$(COMPOSE) up -d electrs electrs-2
+	@$(COMPOSE) up -d electrs
 	until $(COMPOSE) logs electrs | grep 'finished full compaction'; do sleep 1; done
-	until $(COMPOSE) logs electrs-2 | grep 'finished full compaction'; do sleep 1; done
+
+up-proxy:
+	@$(COMPOSE) up -d proxy
+	until $(COMPOSE) logs proxy | grep 'App is running at http://localhost:3000'; do sleep 1; done
 
 up-postgres:
 	@$(COMPOSE) up -d $(DB_SERVICE)
@@ -32,7 +44,11 @@ up-pgadmin:
 	@until $(COMPOSE) logs $(PGADMIN_SERVICE) | grep 'pgAdmin 4 - Application Initialisation'; do sleep 1; done
 
 down:
+	@$(COMPOSE) down
+
+shutdown:
 	@$(COMPOSE) down -v
+	@rm -rf storage/rgblib/*
 
 create-wallet:
 	@$(BCLI) createwallet $(name)
@@ -42,6 +58,7 @@ mine:
 
 send:
 	$(BCLI) -rpcwallet=miner sendtoaddress $(recipient) $(amount)
+	@$(BCLI) -rpcwallet=$(wallet) -generate 4
 
 install-tools:
 	@cargo install sqlx-cli --no-default-features --features native-tls,postgres

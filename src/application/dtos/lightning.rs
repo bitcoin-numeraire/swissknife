@@ -54,3 +54,9 @@ pub struct LightningAddressResponse {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub deleted_at: Option<DateTime<Utc>>,
 }
+
+#[derive(Debug, Deserialize)]
+pub struct SendPaymentRequest {
+    pub bolt11: String,
+    pub amount_msat: Option<u64>,
+}

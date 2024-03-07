@@ -25,7 +25,7 @@ pub struct JWTConfig {
 
 #[derive(Debug, Serialize, Deserialize)]
 struct Claims {
-    aud: String, // Optional. Audience
+    aud: Vec<String>, // Optional. Audience
     exp: usize, // Required (validate_exp defaults to true in validation). Expiration time (as UTC timestamp)
     iat: usize, // Optional. Issued at (as UTC timestamp)
     iss: String, // Optional. Issuer
@@ -91,13 +91,12 @@ impl Authenticator for JWTAuthenticator {
         // Access the JWKs and clone the data
         let jwks = self.jwks.read().await.clone();
 
-        let header = decode_header(token).map_err(|e| AuthenticationError::JWT(e.to_string()))?;
+        let header = decode_header(token)
+            .map_err(|e| AuthenticationError::DecodeJWTHeader(e.to_string()))?;
         let kid = match header.kid {
             Some(k) => k,
             None => {
-                return Err(AuthenticationError::JWT(
-                    "Missing `kid` header field".to_string(),
-                ))
+                return Err(AuthenticationError::MissingJWTKid);
             }
         };
 
@@ -105,10 +104,10 @@ impl Authenticator for JWTAuthenticator {
             match &j.algorithm {
                 AlgorithmParameters::RSA(rsa) => {
                     let decoding_key = DecodingKey::from_rsa_components(&rsa.n, &rsa.e)
-                        .map_err(|e| AuthenticationError::JWT(e.to_string()))?;
+                        .map_err(|e| AuthenticationError::DecodeJWTKey(e.to_string()))?;
 
                     let decoded_token = decode::<Claims>(token, &decoding_key, &self.validation)
-                        .map_err(|e| AuthenticationError::JWT(e.to_string()))?;
+                        .map_err(|e| AuthenticationError::DecodeJWT(e.to_string()))?;
 
                     trace!(decoded_token = ?decoded_token, "JWT Token decoded successfully");
 
@@ -128,9 +127,7 @@ impl Authenticator for JWTAuthenticator {
                 _ => unreachable!("Only RSA algorithm is supported as JWK. should be unreachable"),
             }
         } else {
-            Err(AuthenticationError::JWT(
-                "No matching JWK found for the given kid".to_string(),
-            ))
+            Err(AuthenticationError::MissingJWK)
         }
     }
 }

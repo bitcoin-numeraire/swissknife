@@ -1,4 +1,4 @@
-version: '3.2'
+version: "3.2"
 
 services:
   bitcoind:
@@ -16,12 +16,10 @@ services:
     depends_on:
       - bitcoind
 
-  electrs-2:
-    image: registry.gitlab.com/hashbeam/docker/electrs:0.9.14
+  proxy:
+    image: ghcr.io/rgb-tools/rgb-proxy-server:0.2.1
     ports:
-      - 50002:50001
-    depends_on:
-      - bitcoind
+      - 3030:3000
 
   postgres:
     image: postgres:15.5

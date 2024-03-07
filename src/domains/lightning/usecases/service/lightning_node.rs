@@ -1,6 +1,6 @@
 use async_trait::async_trait;
-use breez_sdk_core::{NodeState, Payment};
-use tracing::{debug, trace};
+use breez_sdk_core::{LspInformation, NodeState, Payment};
+use tracing::{debug, info, trace};
 
 use crate::{
     application::errors::ApplicationError,
@@ -26,6 +26,18 @@ impl LightningNodeUseCases for LightningService {
         Ok(node_info)
     }
 
+    async fn lsp_info(&self, user: AuthUser) -> Result<LspInformation, ApplicationError> {
+        trace!(user_id = user.sub, "Getting LSP info");
+
+        user.check_permission(Permission::ReadLightningNode)?;
+
+        // TODO: Implement entity for LSP info and not LspInformation
+        let lsp_info = self.lightning_client.lsp_info().await?;
+
+        debug!("LSP info retrieved successfully");
+        Ok(lsp_info)
+    }
+
     async fn list_payments(&self, user: AuthUser) -> Result<Vec<Payment>, ApplicationError> {
         trace!(user_id = user.sub, "Listing payments");
 
@@ -36,5 +48,28 @@ impl LightningNodeUseCases for LightningService {
 
         debug!("Payments retrieved successfully from node");
         Ok(payments)
+    }
+
+    async fn send_bolt11_payment(
+        &self,
+        user: AuthUser,
+        bolt11: String,
+        amount_msat: Option<u64>,
+    ) -> Result<Payment, ApplicationError> {
+        trace!(
+            user_id = user.sub,
+            bolt11,
+            "Sending payment to bolt11 invoice"
+        );
+
+        user.check_permission(Permission::ReadLightningNode)?;
+
+        let payment = self
+            .lightning_client
+            .send_payment(bolt11.clone(), amount_msat)
+            .await?;
+
+        info!(user_id = user.sub, bolt11, "Payment sent successfully");
+        Ok(payment)
     }
 }
