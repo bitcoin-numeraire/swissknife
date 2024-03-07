@@ -4,10 +4,10 @@ use axum::{
     Json,
 };
 use serde_json::{json, Value};
-use tracing::{error, warn};
+use tracing::{debug, error, warn};
 
 use crate::application::errors::{
-    ApplicationError, AuthenticationError, AuthorizationError, RGBError,
+    ApplicationError, AuthenticationError, AuthorizationError, DataError, RGBError,
 };
 
 const INTERNAL_SERVER_ERROR_MSG: &str =
@@ -19,6 +19,7 @@ impl IntoResponse for ApplicationError {
             ApplicationError::Authentication(error) => error.into_response(),
             ApplicationError::Authorization(error) => error.into_response(),
             ApplicationError::RGB(error) => error.into_response(),
+            ApplicationError::Data(error) => error.into_response(),
             _ => {
                 error!("{}", self.to_string());
 
@@ -109,6 +110,25 @@ impl IntoResponse for RGBError {
         (status, body).into_response()
     }
 }
+
+impl IntoResponse for DataError {
+    fn into_response(self) -> Response {
+        let (error_message, status) = match self {
+            DataError::NotFound(msg) => {
+                debug!("{}", msg);
+                (msg, StatusCode::NOT_FOUND)
+            }
+            DataError::Conflict(msg) => {
+                warn!("{}", msg);
+                (msg, StatusCode::CONFLICT)
+            }
+        };
+
+        let body = generate_body(status, error_message.as_str());
+        (status, body).into_response()
+    }
+}
+
 fn generate_body(status: StatusCode, reason: &str) -> Json<Value> {
     Json(json!({
         "status": status.as_str(),

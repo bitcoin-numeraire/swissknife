@@ -1,8 +1,8 @@
 use thiserror::Error;
 
 use super::{
-    AuthenticationError, AuthorizationError, ConfigError, DatabaseError, LightningError, RGBError,
-    WebServerError,
+    AuthenticationError, AuthorizationError, ConfigError, DataError, DatabaseError, LightningError,
+    RGBError, WebServerError,
 };
 
 #[derive(Debug, Error)]
@@ -27,4 +27,7 @@ pub enum ApplicationError {
 
     #[error("Database Error: {0}")]
     Database(#[from] DatabaseError),
+
+    #[error("Data Error: {0}")]
+    Data(#[from] DataError),
 }

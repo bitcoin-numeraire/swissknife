@@ -1,18 +1,20 @@
-use crate::adapters::{database::DatabaseClient, lightning::LightningClient};
+use crate::{
+    adapters::lightning::LightningClient, domains::lightning::store::LightningAddressRepository,
+};
 
 pub struct LightningService {
     pub domain: String,
-    pub db_client: Box<dyn DatabaseClient>,
+    pub store: Box<dyn LightningAddressRepository>,
     pub lightning_client: Box<dyn LightningClient>,
 }
 
 impl LightningService {
     pub fn new(
-        db_client: Box<dyn DatabaseClient>,
+        store: Box<dyn LightningAddressRepository>,
         lightning_client: Box<dyn LightningClient>,
     ) -> Self {
         LightningService {
-            db_client,
+            store,
             lightning_client,
             domain: "numeraire.tech".to_string(),
         }

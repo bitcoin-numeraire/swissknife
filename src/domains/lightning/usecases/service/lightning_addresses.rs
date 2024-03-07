@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use tracing::{info, trace};
 
 use crate::{
-    application::errors::{ApplicationError, LightningError},
+    application::errors::{ApplicationError, DataError, LightningError},
     domains::{
         lightning::{
             entities::{LNURLp, LightningAddress},
@@ -24,8 +24,10 @@ impl LightningAddressesUseCases for LightningService {
     async fn generate_lnurlp(&self, username: String) -> Result<LNURLp, ApplicationError> {
         trace!(username, "Generating LNURLp");
 
-        // TODO: Verify the username exists
-
+        let lightning_address = self.store.get(&username).await?;
+        if lightning_address.is_none() {
+            return Err(DataError::NotFound("Lightning address not found.".into()).into());
+        }
         let metadata = generate_lnurlp_metadata(&username, &self.domain)?;
 
         let lnurlp = LNURLp {
@@ -52,7 +54,10 @@ impl LightningAddressesUseCases for LightningService {
     ) -> Result<String, ApplicationError> {
         trace!(username, "Generating lightning invoice");
 
-        // TODO: Verify the username exists
+        let lightning_address = self.store.get(&username).await?;
+        if lightning_address.is_none() {
+            return Err(DataError::NotFound("Lightning address not found.".into()).into());
+        }
 
         let metadata = generate_lnurlp_metadata(&username, &self.domain)?;
         let invoice = self.lightning_client.invoice(amount, metadata).await?;
@@ -74,23 +79,11 @@ impl LightningAddressesUseCases for LightningService {
 
         user.check_permission(Permission::RegisterLightningAddress)?;
 
-        // TODO: Verify the username is not already registered
+        if let Some(_) = self.store.get(&username).await? {
+            return Err(DataError::Conflict("Username already exists.".to_string()).into());
+        }
 
-        // TODO: Implement this as a repository function
-        let lightning_address = sqlx::query_as!(
-            LightningAddress,
-            // language=PostgreSQL
-            r#"
-                insert into "lightning_addresses"(user_id, username)
-                values ($1, $2)
-                returning *
-            "#,
-            user.sub,
-            username
-        )
-        .fetch_one(&self.db_client.pool())
-        .await
-        .map_err(|e| LightningError::Register(e.to_string()))?;
+        let lightning_address = self.store.insert(&user.sub, &username).await?;
 
         info!(
             user_id = user.sub,
