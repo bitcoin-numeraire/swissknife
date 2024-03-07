@@ -122,6 +122,10 @@ impl IntoResponse for DataError {
                 warn!("{}", msg);
                 (msg, StatusCode::CONFLICT)
             }
+            DataError::Unprocessable(msg) => {
+                warn!("{}", msg);
+                (msg, StatusCode::UNPROCESSABLE_ENTITY)
+            }
         };
 
         let body = generate_body(status, error_message.as_str());

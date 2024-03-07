@@ -24,6 +24,19 @@ pub trait LightningAddressesUseCases: Send + Sync {
         user: AuthUser,
         username: String,
     ) -> Result<LightningAddress, ApplicationError>;
+
+    async fn get_lightning_address(
+        &self,
+        user: AuthUser,
+        username: String,
+    ) -> Result<LightningAddress, ApplicationError>;
+
+    async fn list_lightning_addresses(
+        &self,
+        user: AuthUser,
+        limit: usize,
+        offset: usize,
+    ) -> Result<Vec<LightningAddress>, ApplicationError>;
 }
 
 #[async_trait]

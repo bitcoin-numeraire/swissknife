@@ -12,8 +12,8 @@ use crate::{
     application::{
         dtos::{
             LightningAddressResponse, LightningInvoiceQueryParams, LightningInvoiceResponse,
-            LightningWellKnownResponse, RegisterLightningAddressRequest, SendPaymentRequest,
-            SuccessAction,
+            LightningWellKnownResponse, PaginationQueryParams, RegisterLightningAddressRequest,
+            SendPaymentRequest, SuccessAction,
         },
         errors::ApplicationError,
     },
@@ -30,7 +30,10 @@ impl LightningHandler {
     }
 
     pub fn addresses_routes() -> Router<Arc<AppState>> {
-        Router::new().route("/register", post(Self::register_lightning_address))
+        Router::new()
+            .route("/", get(Self::list_lightning_addresses))
+            .route("/:username", get(Self::get_lightning_address))
+            .route("/register", post(Self::register_lightning_address))
     }
 
     pub fn node_routes() -> Router<Arc<AppState>> {
@@ -120,15 +123,37 @@ impl LightningHandler {
             .register_lightning_address(user, payload.username)
             .await?;
 
-        let response = LightningAddressResponse {
-            id: lightning_address.id,
-            user_id: lightning_address.user_id,
-            username: lightning_address.username,
-            active: lightning_address.active,
-            created_at: lightning_address.created_at,
-            updated_at: lightning_address.updated_at,
-            deleted_at: lightning_address.deleted_at,
-        };
+        Ok(Json(lightning_address.into()))
+    }
+
+    async fn get_lightning_address(
+        State(app_state): State<Arc<AppState>>,
+        user: AuthUser,
+        Path(username): Path<String>,
+    ) -> Result<Json<LightningAddressResponse>, ApplicationError> {
+        let lightning_address = app_state
+            .lightning
+            .get_lightning_address(user, username)
+            .await?;
+
+        Ok(Json(lightning_address.into()))
+    }
+
+    async fn list_lightning_addresses(
+        State(app_state): State<Arc<AppState>>,
+        user: AuthUser,
+        Query(query_params): Query<PaginationQueryParams>,
+    ) -> Result<Json<Vec<LightningAddressResponse>>, ApplicationError> {
+        let limit = query_params.limit.unwrap_or(100);
+        let offset = query_params.offset.unwrap_or(0);
+
+        let lightning_addresses = app_state
+            .lightning
+            .list_lightning_addresses(user, limit, offset)
+            .await?;
+
+        let response: Vec<LightningAddressResponse> =
+            lightning_addresses.into_iter().map(Into::into).collect();
 
         Ok(response.into())
     }

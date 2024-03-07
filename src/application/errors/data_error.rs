@@ -7,4 +7,7 @@ pub enum DataError {
 
     #[error("Not Found: {0}")]
     NotFound(String),
+
+    #[error("Unprocessable: {0}")]
+    Unprocessable(String),
 }

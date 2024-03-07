@@ -18,37 +18,76 @@ impl<D: DatabaseClient> SqlxLightningAddressRepository<D> {
 
 #[async_trait]
 impl<D: DatabaseClient> LightningAddressRepository for SqlxLightningAddressRepository<D> {
-    async fn get(&self, username: &str) -> Result<Option<LightningAddress>, DatabaseError> {
+    async fn get_by_user_id(
+        &self,
+        user: &str,
+    ) -> Result<Option<LightningAddress>, DatabaseError> {
+        let result
+             = sqlx::query_as!(
+                LightningAddress,
+                r#"
+                    SELECT * FROM "lightning_addresses" WHERE user_id = $1
+                "#,
+                user
+            )
+            .fetch_optional(&self.db_client.pool()) // fetch_optional for zero or one result
+            .await
+            .map_err(|e| DatabaseError::Get(e.to_string()))?;
+             
+        Ok(result)
+    }
+
+    async fn get_by_username(
+        &self,
+        username: &str,
+    ) -> Result<Option<LightningAddress>, DatabaseError> {
         let result = sqlx::query_as!(
-            LightningAddress,
-            r#"
-                SELECT * FROM "lightning_addresses" WHERE username = $1
-            "#,
-            username
-        )
-        .fetch_optional(&self.db_client.pool()) // fetch_optional for zero or one result
-        .await
-        .map_err(|e| DatabaseError::Get(e.to_string()))?;
+                LightningAddress,
+                r#"
+                    SELECT * FROM "lightning_addresses" WHERE username = $1
+                "#,
+                username,
+            )
+            .fetch_optional(&self.db_client.pool()) // fetch_optional for zero or one result
+            .await
+            .map_err(|e| DatabaseError::Get(e.to_string()))?;
 
         Ok(result)
     }
 
     async fn list(
         &self,
-        limit: Option<usize>,
-        offset: Option<usize>,
+        user: &str,
+        limit: usize,
+        offset: usize,
     ) -> Result<Vec<LightningAddress>, DatabaseError> {
-        let result = sqlx::query_as!(
-            LightningAddress,
-            r#"
-                SELECT * FROM "lightning_addresses" ORDER BY username LIMIT $1 OFFSET $2
-            "#,
-            limit.unwrap_or(100) as i64, // Default to 100 records if None provided
-            offset.unwrap_or(0) as i64   // Default to start at 0 if None provided
-        )
-        .fetch_all(&self.db_client.pool()) // fetch_all for multiple results
-        .await
-        .map_err(|e| DatabaseError::List(e.to_string()))?;
+        let result: Vec<LightningAddress>;
+        if user.is_empty() {
+            result = sqlx::query_as!(
+                LightningAddress,
+                r#"
+                    SELECT * FROM "lightning_addresses" ORDER BY username LIMIT $1 OFFSET $2
+                "#,
+                limit as i64, 
+                offset as i64   
+            )
+            .fetch_all(&self.db_client.pool()) // fetch_all for multiple results
+            .await
+            .map_err(|e| DatabaseError::List(e.to_string()))?;
+        } else {
+            result = sqlx::query_as!(
+                LightningAddress,
+                r#"
+                    SELECT * FROM "lightning_addresses" WHERE user_id = $1 ORDER BY username LIMIT $2 OFFSET $3
+                "#,
+                user,
+                limit as i64, 
+                offset as i64   
+            )
+            .fetch_all(&self.db_client.pool()) // fetch_all for multiple results
+            .await
+            .map_err(|e| DatabaseError::List(e.to_string()))?;
+        }
 
         Ok(result)
     }

@@ -20,9 +20,6 @@ pub enum LightningError {
     #[error("Failed to get list payments from Lightning node: {0}")]
     ListPayments(String),
 
-    #[error("Failed to register Lightning address: {0}")]
-    Register(String),
-
     #[error("Failed to parse LNURLp metadata: {0}")]
     ParseMetadata(String),
 
