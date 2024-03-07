@@ -28,10 +28,7 @@ impl App {
 
         let router = Router::new()
             .nest("/api/rgb", RGBHandler::routes())
-            .nest(
-                "/api/.well-known/lnurlp",
-                LightningHandler::well_known_routes(),
-            )
+            .nest("/.well-known/lnurlp", LightningHandler::well_known_routes())
             .nest(
                 "/api/lightning/addresses",
                 LightningHandler::addresses_routes(),
