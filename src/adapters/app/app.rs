@@ -15,7 +15,10 @@ use tracing::{debug, error, info, trace};
 use crate::{
     adapters::app::AppState,
     application::errors::WebServerError,
-    domains::{lightning::api::http::LightningHandler, rgb::api::http::RGBHandler},
+    domains::{
+        lightning::api::http::{LightningAddressHandler, LightningNodeHandler},
+        rgb::api::http::RGBHandler,
+    },
 };
 
 pub struct App {
@@ -28,12 +31,15 @@ impl App {
 
         let router = Router::new()
             .nest("/api/rgb", RGBHandler::routes())
-            .nest("/.well-known/lnurlp", LightningHandler::well_known_routes())
+            .nest(
+                "/.well-known/lnurlp",
+                LightningAddressHandler::well_known_routes(),
+            )
             .nest(
                 "/api/lightning/addresses",
-                LightningHandler::addresses_routes(),
+                LightningAddressHandler::addresses_routes(),
             )
-            .nest("/api/lightning/node", LightningHandler::node_routes())
+            .nest("/api/lightning/node", LightningNodeHandler::routes())
             .layer(TraceLayer::new_for_http())
             .layer(state.timeout_layer)
             .layer(CorsLayer::permissive())

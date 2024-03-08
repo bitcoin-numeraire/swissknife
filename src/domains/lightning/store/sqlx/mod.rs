@@ -1,0 +1,3 @@
+mod lightning_address_repository;
+
+pub use lightning_address_repository::SqlxLightningAddressRepository;

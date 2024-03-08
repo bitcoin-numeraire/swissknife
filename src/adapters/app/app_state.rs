@@ -3,7 +3,9 @@ use std::sync::Arc;
 use crate::{
     adapters::{auth::Authenticator, rgb::RGBClient},
     application::errors::{ApplicationError, WebServerError},
-    domains::lightning::usecases::LightningUseCases,
+    domains::lightning::{
+        store::sqlx::SqlxLightningAddressRepository, usecases::LightningUseCases,
+    },
 };
 use humantime::parse_duration;
 use tower_http::timeout::TimeoutLayer;
@@ -46,8 +48,12 @@ impl AppState {
             None
         };
 
+        // Create repositories
+        let lightning_store = SqlxLightningAddressRepository::new(db_client);
+
         // Create services (use cases)
-        let lightning = LightningService::new(Box::new(db_client), Box::new(lightning_client));
+        let lightning =
+            LightningService::new(Box::new(lightning_store), Box::new(lightning_client));
         // let rgb = RGBService::new(Box::new(rgb_client));
 
         // Create App state
