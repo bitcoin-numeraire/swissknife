@@ -83,13 +83,13 @@ impl LightningAddressesUseCases for LightningService {
         // Length check
         let username_length = username.len();
         if username_length < MIN_USERNAME_LENGTH || username_length > MAX_USERNAME_LENGTH {
-            return Err(DataError::Unprocessable("Invlaid username length.".to_string()).into());
+            return Err(DataError::Validation("Invlaid username length.".to_string()).into());
         }
 
         // Regex validation for allowed characters
         let email_username_re = Regex::new(r"^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+$").unwrap(); // Can't fail by assertion
         if !email_username_re.is_match(&username) {
-            return Err(DataError::Unprocessable("Invalid username format.".to_string()).into());
+            return Err(DataError::Validation("Invalid username format.".to_string()).into());
         }
 
         if let Some(_) = self.store.get_by_user_id(&user.sub).await? {

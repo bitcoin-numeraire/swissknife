@@ -122,7 +122,7 @@ impl IntoResponse for DataError {
                 warn!("{}", msg);
                 (msg, StatusCode::CONFLICT)
             }
-            DataError::Unprocessable(msg) => {
+            DataError::Validation(msg) => {
                 warn!("{}", msg);
                 (msg, StatusCode::UNPROCESSABLE_ENTITY)
             }
