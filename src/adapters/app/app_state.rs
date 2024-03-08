@@ -4,7 +4,11 @@ use crate::{
     adapters::{auth::Authenticator, rgb::RGBClient},
     application::errors::{ApplicationError, WebServerError},
     domains::lightning::{
-        store::sqlx::SqlxLightningAddressRepository, usecases::LightningUseCases,
+        store::{
+            sqlx::{SqlxLightningAddressRepository, SqlxLightningInvoiceRepository},
+            LightningStore,
+        },
+        usecases::LightningUseCases,
     },
 };
 use humantime::parse_duration;
@@ -49,11 +53,13 @@ impl AppState {
         };
 
         // Create repositories
-        let lightning_store = SqlxLightningAddressRepository::new(db_client);
+        let lightning_address = SqlxLightningAddressRepository::new(db_client.clone());
+        let lightning_invoice = SqlxLightningInvoiceRepository::new(db_client.clone());
+        let lightning_store =
+            LightningStore::new(Box::new(lightning_address), Box::new(lightning_invoice));
 
         // Create services (use cases)
-        let lightning =
-            LightningService::new(Box::new(lightning_store), Box::new(lightning_client));
+        let lightning = LightningService::new(lightning_store, Box::new(lightning_client));
         // let rgb = RGBService::new(Box::new(rgb_client));
 
         // Create App state

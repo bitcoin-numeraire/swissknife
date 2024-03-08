@@ -10,7 +10,7 @@ use crate::{
     adapters::app::AppState,
     application::{
         dtos::{
-            LightningAddressResponse, LightningInvoiceQueryParams, LightningInvoiceResponse,
+            LNUrlpInvoiceQueryParams, LNUrlpInvoiceResponse, LightningAddressResponse,
             LightningWellKnownResponse, PaginationQueryParams, RegisterLightningAddressRequest,
             SuccessAction,
         },
@@ -56,16 +56,16 @@ impl LightningAddressHandler {
 
     async fn invoice(
         Path(username): Path<String>,
-        Query(query_params): Query<LightningInvoiceQueryParams>,
+        Query(query_params): Query<LNUrlpInvoiceQueryParams>,
         State(app_state): State<Arc<AppState>>,
-    ) -> Result<Json<LightningInvoiceResponse>, ApplicationError> {
+    ) -> Result<Json<LNUrlpInvoiceResponse>, ApplicationError> {
         let invoice = app_state
             .lightning
             .generate_invoice(username, query_params.amount)
             .await?;
 
-        let response = LightningInvoiceResponse {
-            pr: invoice,
+        let response = LNUrlpInvoiceResponse {
+            pr: invoice.bolt11,
             success_action: Some(SuccessAction {
                 tag: "message".to_string(),
                 message: Some("Thanks for the sats!".to_string()),

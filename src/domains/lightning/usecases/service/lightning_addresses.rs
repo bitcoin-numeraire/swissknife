@@ -6,7 +6,7 @@ use crate::{
     application::errors::{ApplicationError, DataError, LightningError},
     domains::{
         lightning::{
-            entities::{LNURLp, LightningAddress},
+            entities::{LNURLp, LightningAddress, LightningInvoice},
             usecases::LightningAddressesUseCases,
         },
         users::entities::{AuthUser, Permission},
@@ -27,7 +27,7 @@ impl LightningAddressesUseCases for LightningService {
     async fn generate_lnurlp(&self, username: String) -> Result<LNURLp, ApplicationError> {
         trace!(username, "Generating LNURLp");
 
-        let lightning_address = self.store.get_by_username(&username).await?;
+        let lightning_address = self.store.address.get_by_username(&username).await?;
         if lightning_address.is_none() {
             return Err(DataError::NotFound("Lightning address not found.".into()).into());
         }
@@ -54,16 +54,19 @@ impl LightningAddressesUseCases for LightningService {
         &self,
         username: String,
         amount: u64,
-    ) -> Result<String, ApplicationError> {
+    ) -> Result<LightningInvoice, ApplicationError> {
         trace!(username, "Generating lightning invoice");
 
-        let lightning_address = self.store.get_by_username(&username).await?;
+        let lightning_address = self.store.address.get_by_username(&username).await?;
         if lightning_address.is_none() {
             return Err(DataError::NotFound("Lightning address not found.".into()).into());
         }
 
         let metadata = generate_lnurlp_metadata(&username, &self.domain)?;
-        let invoice = self.lightning_client.invoice(amount, metadata).await?;
+        let mut invoice = self.lightning_client.invoice(amount, metadata).await?;
+
+        invoice.lightning_address = Some(username.clone());
+        invoice = self.store.invoice.insert(invoice).await?;
 
         info!(username, "Lightning invoice generated successfully");
         Ok(invoice)
@@ -92,18 +95,18 @@ impl LightningAddressesUseCases for LightningService {
             return Err(DataError::Validation("Invalid username format.".to_string()).into());
         }
 
-        if let Some(_) = self.store.get_by_user_id(&user.sub).await? {
+        if let Some(_) = self.store.address.get_by_user_id(&user.sub).await? {
             return Err(DataError::Conflict(
                 "User has already registered a lightning address.".to_string(),
             )
             .into());
         }
 
-        if let Some(_) = self.store.get_by_username(&username).await? {
+        if let Some(_) = self.store.address.get_by_username(&username).await? {
             return Err(DataError::Conflict("Username already exists.".to_string()).into());
         }
 
-        let lightning_address = self.store.insert(&user.sub, &username).await?;
+        let lightning_address = self.store.address.insert(&user.sub, &username).await?;
 
         info!(
             user_id = user.sub,
@@ -119,7 +122,7 @@ impl LightningAddressesUseCases for LightningService {
     ) -> Result<LightningAddress, ApplicationError> {
         trace!(user_id = user.sub, "Fetching lightning address");
 
-        let lightning_address = self.store.get_by_username(&username).await?;
+        let lightning_address = self.store.address.get_by_username(&username).await?;
 
         match lightning_address {
             Some(addr) if addr.user_id == user.sub => {
@@ -156,10 +159,13 @@ impl LightningAddressesUseCases for LightningService {
 
         let lightning_addresses = if user.permissions.contains(&Permission::ReadLightningAddress) {
             // The user has permission to view all addresses
-            self.store.list("", limit, offset).await?
+            self.store.address.list(limit, offset).await?
         } else {
             // The user can only view their own addresses
-            self.store.list(&user.sub, limit, offset).await?
+            self.store
+                .address
+                .list_by_user_id(&user.sub, limit, offset)
+                .await?
         };
 
         info!(

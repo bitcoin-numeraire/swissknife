@@ -9,6 +9,7 @@ use crate::{
     application::errors::DatabaseError,
 };
 
+#[derive(Clone)]
 pub struct SQLxClient {
     pool: PgPool,
 }
