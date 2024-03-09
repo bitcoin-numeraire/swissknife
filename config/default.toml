@@ -6,6 +6,7 @@ request_timeout = "20s"
 # Lightning settings
 [lightning]
 working_dir = "storage/breez"
+webhook_url = "https://webhook-test.com/813faad2493bfe0f9e665bca280519ce"
 
 # RGB settings
 [rgb]

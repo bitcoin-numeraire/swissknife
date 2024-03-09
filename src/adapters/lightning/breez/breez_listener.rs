@@ -7,9 +7,6 @@ pub struct BreezListener {}
 impl EventListener for BreezListener {
     fn on_event(&self, e: BreezEvent) {
         match e {
-            BreezEvent::InvoicePaid { details } => {
-                println!("Invoice received: {:?}", details.payment_hash);
-            }
             _ => {}
         }
     }

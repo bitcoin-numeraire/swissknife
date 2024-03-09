@@ -37,6 +37,11 @@ pub trait LightningAddressesUseCases: Send + Sync {
         limit: usize,
         offset: usize,
     ) -> Result<Vec<LightningAddress>, ApplicationError>;
+
+    async fn process_payment(
+        &self,
+        payment_hash: String,
+    ) -> Result<LightningInvoice, ApplicationError>;
 }
 
 #[async_trait]

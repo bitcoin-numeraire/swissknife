@@ -28,7 +28,12 @@ pub trait LightningAddressRepository: Sync + Send {
 }
 #[async_trait]
 pub trait LightningInvoiceRepository: Sync + Send {
+    async fn get_by_hash(
+        &self,
+        payment_hash: &str,
+    ) -> Result<Option<LightningInvoice>, DatabaseError>;
     async fn insert(&self, invoice: LightningInvoice) -> Result<LightningInvoice, DatabaseError>;
+    async fn update(&self, invoice: LightningInvoice) -> Result<LightningInvoice, DatabaseError>;
 }
 
 pub struct LightningStore {

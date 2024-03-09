@@ -17,6 +17,9 @@ pub struct LightningInvoice {
     pub timestamp: i64,
     pub expiry: i64,
     pub min_final_cltv_expiry_delta: i64,
+    pub status: String,
+    pub fee_msat: Option<i64>,
+    pub payment_time: Option<i64>,
     pub created_at: Option<DateTime<Utc>>,
     pub updated_at: Option<DateTime<Utc>>,
 }

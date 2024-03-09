@@ -174,6 +174,40 @@ impl LightningAddressesUseCases for LightningService {
         );
         Ok(lightning_addresses)
     }
+
+    async fn process_payment(
+        &self,
+        payment_hash: String,
+    ) -> Result<LightningInvoice, ApplicationError> {
+        trace!(payment_hash, "Processing lightning payment");
+
+        let lightning_payment = self
+            .lightning_client
+            .payment_by_hash(payment_hash.clone())
+            .await?;
+
+        match lightning_payment {
+            Some(payment) => {
+                let invoice_option = self.store.invoice.get_by_hash(&payment_hash).await?;
+
+                if let Some(mut invoice) = invoice_option {
+                    invoice.fee_msat = Some(payment.fee_msat as i64);
+                    invoice.status = "PAID".to_string();
+                    invoice.payment_time = Some(payment.payment_time);
+
+                    invoice = self.store.invoice.update(invoice).await?;
+
+                    info!(payment_hash, "Lightning payment processed successfully");
+                    return Ok(invoice);
+                }
+
+                return Err(DataError::NotFound("Lightning invoice not found.".into()).into());
+            }
+            None => {
+                Err(DataError::NotFound("Lightning payment not found from node.".into()).into())
+            }
+        }
+    }
 }
 
 fn generate_lnurlp_metadata(username: &str, domain: &str) -> Result<String, LightningError> {

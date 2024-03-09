@@ -6,6 +6,7 @@ use crate::{
     domains::lightning::{entities::LightningAddress, store::LightningAddressRepository},
 };
 
+#[derive(Clone)]
 pub struct SqlxLightningAddressRepository<D: DatabaseClient> {
     db_client: D,
 }

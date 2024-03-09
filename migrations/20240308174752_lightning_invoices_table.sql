@@ -16,6 +16,9 @@ CREATE TABLE "lightning_invoices" (
     timestamp bigint NOT NULL,
     expiry bigint NOT NULL,
     min_final_cltv_expiry_delta bigint NOT NULL,
+    status varchar NOT NULL,
+    fee_msat bigint,
+    payment_time bigint,
     created_at timestamptz NOT NULL DEFAULT current_timestamp,
     updated_at timestamptz
 );

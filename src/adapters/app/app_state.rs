@@ -40,8 +40,8 @@ impl AppState {
         // Create adapters
         let timeout_layer = TimeoutLayer::new(timeout_request);
         let db_client = SQLxClient::connect(config.database.clone()).await?;
-        let rgb_client = RGBLibClient::new(config.rgb.clone()).await?;
         let lightning_client = BreezClient::new(config.lightning.clone()).await?;
+        let rgb_client = RGBLibClient::new(config.rgb.clone()).await?;
         let jwt_authenticator = if config.auth.enabled {
             Some(
                 Arc::new(JWTAuthenticator::new(config.auth.jwt.clone()).await?)
@@ -53,12 +53,11 @@ impl AppState {
         };
 
         // Create repositories
-        let lightning_address = SqlxLightningAddressRepository::new(db_client.clone());
-        let lightning_invoice = SqlxLightningInvoiceRepository::new(db_client.clone());
-        let lightning_store =
-            LightningStore::new(Box::new(lightning_address), Box::new(lightning_invoice));
+        let lightning_address = Box::new(SqlxLightningAddressRepository::new(db_client.clone()));
+        let lightning_invoice = Box::new(SqlxLightningInvoiceRepository::new(db_client.clone()));
+        let lightning_store = LightningStore::new(lightning_address, lightning_invoice.clone());
 
-        // Create services (use cases)
+        // Create services
         let lightning = LightningService::new(lightning_store, Box::new(lightning_client));
         // let rgb = RGBService::new(Box::new(rgb_client));
 

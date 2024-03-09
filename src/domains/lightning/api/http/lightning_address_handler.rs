@@ -11,10 +11,10 @@ use crate::{
     application::{
         dtos::{
             LNUrlpInvoiceQueryParams, LNUrlpInvoiceResponse, LightningAddressResponse,
-            LightningWellKnownResponse, PaginationQueryParams, RegisterLightningAddressRequest,
-            SuccessAction,
+            LightningInvoiceResponse, LightningWellKnownResponse, PaginationQueryParams,
+            ProcessEventRequest, RegisterLightningAddressRequest, SuccessAction,
         },
-        errors::ApplicationError,
+        errors::{ApplicationError, DataError},
     },
     domains::users::entities::AuthUser,
 };
@@ -30,9 +30,10 @@ impl LightningAddressHandler {
 
     pub fn addresses_routes() -> Router<Arc<AppState>> {
         Router::new()
-            .route("/", get(Self::list_lightning_addresses))
-            .route("/:username", get(Self::get_lightning_address))
-            .route("/register", post(Self::register_lightning_address))
+            .route("/", get(Self::list))
+            .route("/:username", get(Self::get))
+            .route("/register", post(Self::register))
+            .route("/webhook", post(Self::process_event))
     }
 
     async fn well_known_lnurlp(
@@ -77,7 +78,7 @@ impl LightningAddressHandler {
         Ok(response.into())
     }
 
-    async fn register_lightning_address(
+    async fn register(
         State(app_state): State<Arc<AppState>>,
         user: AuthUser,
         Json(payload): Json<RegisterLightningAddressRequest>,
@@ -90,7 +91,7 @@ impl LightningAddressHandler {
         Ok(Json(lightning_address.into()))
     }
 
-    async fn get_lightning_address(
+    async fn get(
         State(app_state): State<Arc<AppState>>,
         user: AuthUser,
         Path(username): Path<String>,
@@ -103,7 +104,7 @@ impl LightningAddressHandler {
         Ok(Json(lightning_address.into()))
     }
 
-    async fn list_lightning_addresses(
+    async fn list(
         State(app_state): State<Arc<AppState>>,
         user: AuthUser,
         Query(query_params): Query<PaginationQueryParams>,
@@ -120,5 +121,21 @@ impl LightningAddressHandler {
             lightning_addresses.into_iter().map(Into::into).collect();
 
         Ok(response.into())
+    }
+
+    async fn process_event(
+        State(app_state): State<Arc<AppState>>,
+        Json(payload): Json<ProcessEventRequest>,
+    ) -> Result<Json<LightningInvoiceResponse>, ApplicationError> {
+        if payload.template != "payment_received" {
+            return Err(DataError::Validation("Unsupported template".to_string()).into());
+        }
+
+        let invoice = app_state
+            .lightning
+            .process_payment(payload.data.payment_hash)
+            .await?;
+
+        Ok(Json(invoice.into()))
     }
 }

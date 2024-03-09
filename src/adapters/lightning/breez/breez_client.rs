@@ -21,6 +21,7 @@ pub struct BreezClientConfig {
     pub invite_code: String,
     pub working_dir: String,
     pub seed: String,
+    pub webhook_url: String,
 }
 
 pub struct BreezClient {
@@ -45,12 +46,16 @@ impl BreezClient {
             Mnemonic::parse(config.seed).map_err(|e| LightningError::ParseSeed(e.to_string()))?;
 
         let sdk = BreezServices::connect(
-            breez_config,
+            breez_config.clone(),
             seed.to_seed("").to_vec(),
             Box::new(BreezListener {}),
         )
         .await
         .map_err(|e| LightningError::Connect(e.to_string()))?;
+
+        sdk.register_webhook(config.webhook_url)
+            .await
+            .map_err(|e| LightningError::Webhook(e.to_string()))?;
 
         Ok(Self { sdk })
     }
@@ -88,6 +93,9 @@ impl LightningClient for BreezClient {
             min_final_cltv_expiry_delta: response.ln_invoice.min_final_cltv_expiry_delta as i64,
             timestamp: response.ln_invoice.timestamp as i64,
             expiry: response.ln_invoice.expiry as i64,
+            status: "PENDING".to_string(),
+            fee_msat: None,
+            payment_time: None,
             created_at: None,
             updated_at: None,
         };
@@ -149,5 +157,18 @@ impl LightningClient for BreezClient {
             .map_err(|e| LightningError::SendBolt11Payment(e.to_string()))?;
 
         Ok(response.payment)
+    }
+
+    async fn payment_by_hash(
+        &self,
+        payment_hash: String,
+    ) -> Result<Option<Payment>, LightningError> {
+        let response = self
+            .sdk
+            .payment_by_hash(payment_hash)
+            .await
+            .map_err(|e| LightningError::PaymentByHash(e.to_string()))?;
+
+        Ok(response)
     }
 }

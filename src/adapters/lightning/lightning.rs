@@ -18,4 +18,8 @@ pub trait LightningClient: Sync + Send {
         bolt11: String,
         amount_msat: Option<u64>,
     ) -> Result<Payment, LightningError>;
+    async fn payment_by_hash(
+        &self,
+        payment_hash: String,
+    ) -> Result<Option<Payment>, LightningError>;
 }
