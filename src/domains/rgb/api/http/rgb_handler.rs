@@ -40,7 +40,6 @@ impl RGBHandler {
             .route("/wallet/send", post(send))
             .route("/wallet/drain", post(drain))
             .route("/wallet/refresh", post(refresh))
-            .route("/wallet/drain", post(drain))
             .route("/wallet/list-transfers", post(list_transfers))
     }
 }

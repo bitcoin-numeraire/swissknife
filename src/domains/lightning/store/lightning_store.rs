@@ -35,17 +35,3 @@ pub trait LightningInvoiceRepository: Sync + Send {
     async fn insert(&self, invoice: LightningInvoice) -> Result<LightningInvoice, DatabaseError>;
     async fn update(&self, invoice: LightningInvoice) -> Result<LightningInvoice, DatabaseError>;
 }
-
-pub struct LightningStore {
-    pub address: Box<dyn LightningAddressRepository>,
-    pub invoice: Box<dyn LightningInvoiceRepository>,
-}
-
-impl LightningStore {
-    pub fn new(
-        address: Box<dyn LightningAddressRepository>,
-        invoice: Box<dyn LightningInvoiceRepository>,
-    ) -> Self {
-        LightningStore { address, invoice }
-    }
-}

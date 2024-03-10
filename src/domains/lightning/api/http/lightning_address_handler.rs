@@ -11,10 +11,10 @@ use crate::{
     application::{
         dtos::{
             LNUrlpInvoiceQueryParams, LNUrlpInvoiceResponse, LightningAddressResponse,
-            LightningInvoiceResponse, LightningWellKnownResponse, PaginationQueryParams,
-            ProcessEventRequest, RegisterLightningAddressRequest, SuccessAction,
+            LightningWellKnownResponse, PaginationQueryParams, RegisterLightningAddressRequest,
+            SuccessAction,
         },
-        errors::{ApplicationError, DataError},
+        errors::ApplicationError,
     },
     domains::users::entities::AuthUser,
 };
@@ -33,7 +33,6 @@ impl LightningAddressHandler {
             .route("/", get(Self::list))
             .route("/:username", get(Self::get))
             .route("/register", post(Self::register))
-            .route("/webhook", post(Self::process_event))
     }
 
     async fn well_known_lnurlp(
@@ -121,21 +120,5 @@ impl LightningAddressHandler {
             lightning_addresses.into_iter().map(Into::into).collect();
 
         Ok(response.into())
-    }
-
-    async fn process_event(
-        State(app_state): State<Arc<AppState>>,
-        Json(payload): Json<ProcessEventRequest>,
-    ) -> Result<Json<LightningInvoiceResponse>, ApplicationError> {
-        if payload.template != "payment_received" {
-            return Err(DataError::Validation("Unsupported template".to_string()).into());
-        }
-
-        let invoice = app_state
-            .lightning
-            .process_payment(payload.data.payment_hash)
-            .await?;
-
-        Ok(Json(invoice.into()))
     }
 }

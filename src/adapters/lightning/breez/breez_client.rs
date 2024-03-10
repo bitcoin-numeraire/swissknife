@@ -21,7 +21,6 @@ pub struct BreezClientConfig {
     pub invite_code: String,
     pub working_dir: String,
     pub seed: String,
-    pub webhook_url: String,
 }
 
 pub struct BreezClient {
@@ -29,7 +28,10 @@ pub struct BreezClient {
 }
 
 impl BreezClient {
-    pub async fn new(config: BreezClientConfig) -> Result<Self, LightningError> {
+    pub async fn new(
+        config: BreezClientConfig,
+        listener: Box<BreezListener>,
+    ) -> Result<Self, LightningError> {
         let mut breez_config = BreezServices::default_config(
             EnvironmentType::Production,
             config.api_key,
@@ -45,17 +47,9 @@ impl BreezClient {
         let seed =
             Mnemonic::parse(config.seed).map_err(|e| LightningError::ParseSeed(e.to_string()))?;
 
-        let sdk = BreezServices::connect(
-            breez_config.clone(),
-            seed.to_seed("").to_vec(),
-            Box::new(BreezListener {}),
-        )
-        .await
-        .map_err(|e| LightningError::Connect(e.to_string()))?;
-
-        sdk.register_webhook(config.webhook_url)
+        let sdk = BreezServices::connect(breez_config.clone(), seed.to_seed("").to_vec(), listener)
             .await
-            .map_err(|e| LightningError::Webhook(e.to_string()))?;
+            .map_err(|e| LightningError::Connect(e.to_string()))?;
 
         Ok(Self { sdk })
     }

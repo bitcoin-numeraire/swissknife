@@ -8,9 +8,6 @@ pub enum LightningError {
     #[error("Failed to connect to lightning node or service: {0}")]
     Connect(String),
 
-    #[error("Failed to register webhook: {0}")]
-    Webhook(String),
-
     #[error("Failed to generate Lightning invoice: {0}")]
     Invoice(String),
 

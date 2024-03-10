@@ -27,7 +27,7 @@ impl LightningAddressesUseCases for LightningService {
     async fn generate_lnurlp(&self, username: String) -> Result<LNURLp, ApplicationError> {
         trace!(username, "Generating LNURLp");
 
-        let lightning_address = self.store.address.get_by_username(&username).await?;
+        let lightning_address = self.address_repo.get_by_username(&username).await?;
         if lightning_address.is_none() {
             return Err(DataError::NotFound("Lightning address not found.".into()).into());
         }
@@ -57,7 +57,7 @@ impl LightningAddressesUseCases for LightningService {
     ) -> Result<LightningInvoice, ApplicationError> {
         trace!(username, "Generating lightning invoice");
 
-        let lightning_address = self.store.address.get_by_username(&username).await?;
+        let lightning_address = self.address_repo.get_by_username(&username).await?;
         if lightning_address.is_none() {
             return Err(DataError::NotFound("Lightning address not found.".into()).into());
         }
@@ -66,7 +66,7 @@ impl LightningAddressesUseCases for LightningService {
         let mut invoice = self.lightning_client.invoice(amount, metadata).await?;
 
         invoice.lightning_address = Some(username.clone());
-        invoice = self.store.invoice.insert(invoice).await?;
+        invoice = self.invoice_repo.insert(invoice).await?;
 
         info!(username, "Lightning invoice generated successfully");
         Ok(invoice)
@@ -95,18 +95,18 @@ impl LightningAddressesUseCases for LightningService {
             return Err(DataError::Validation("Invalid username format.".to_string()).into());
         }
 
-        if let Some(_) = self.store.address.get_by_user_id(&user.sub).await? {
+        if let Some(_) = self.address_repo.get_by_user_id(&user.sub).await? {
             return Err(DataError::Conflict(
                 "User has already registered a lightning address.".to_string(),
             )
             .into());
         }
 
-        if let Some(_) = self.store.address.get_by_username(&username).await? {
+        if let Some(_) = self.address_repo.get_by_username(&username).await? {
             return Err(DataError::Conflict("Username already exists.".to_string()).into());
         }
 
-        let lightning_address = self.store.address.insert(&user.sub, &username).await?;
+        let lightning_address = self.address_repo.insert(&user.sub, &username).await?;
 
         info!(
             user_id = user.sub,
@@ -122,7 +122,7 @@ impl LightningAddressesUseCases for LightningService {
     ) -> Result<LightningAddress, ApplicationError> {
         trace!(user_id = user.sub, "Fetching lightning address");
 
-        let lightning_address = self.store.address.get_by_username(&username).await?;
+        let lightning_address = self.address_repo.get_by_username(&username).await?;
 
         match lightning_address {
             Some(addr) if addr.user_id == user.sub => {
@@ -159,11 +159,10 @@ impl LightningAddressesUseCases for LightningService {
 
         let lightning_addresses = if user.permissions.contains(&Permission::ReadLightningAddress) {
             // The user has permission to view all addresses
-            self.store.address.list(limit, offset).await?
+            self.address_repo.list(limit, offset).await?
         } else {
             // The user can only view their own addresses
-            self.store
-                .address
+            self.address_repo
                 .list_by_user_id(&user.sub, limit, offset)
                 .await?
         };
@@ -173,40 +172,6 @@ impl LightningAddressesUseCases for LightningService {
             "Lightning addresses listed successfully"
         );
         Ok(lightning_addresses)
-    }
-
-    async fn process_payment(
-        &self,
-        payment_hash: String,
-    ) -> Result<LightningInvoice, ApplicationError> {
-        trace!(payment_hash, "Processing lightning payment");
-
-        let lightning_payment = self
-            .lightning_client
-            .payment_by_hash(payment_hash.clone())
-            .await?;
-
-        match lightning_payment {
-            Some(payment) => {
-                let invoice_option = self.store.invoice.get_by_hash(&payment_hash).await?;
-
-                if let Some(mut invoice) = invoice_option {
-                    invoice.fee_msat = Some(payment.fee_msat as i64);
-                    invoice.status = "PAID".to_string();
-                    invoice.payment_time = Some(payment.payment_time);
-
-                    invoice = self.store.invoice.update(invoice).await?;
-
-                    info!(payment_hash, "Lightning payment processed successfully");
-                    return Ok(invoice);
-                }
-
-                return Err(DataError::NotFound("Lightning invoice not found.".into()).into());
-            }
-            None => {
-                Err(DataError::NotFound("Lightning payment not found from node.".into()).into())
-            }
-        }
     }
 }
 
