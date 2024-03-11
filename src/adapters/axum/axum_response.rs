@@ -7,7 +7,7 @@ use serde_json::{json, Value};
 use tracing::{debug, error, warn};
 
 use crate::application::errors::{
-    ApplicationError, AuthenticationError, AuthorizationError, DataError, RGBError,
+    ApplicationError, AuthenticationError, AuthorizationError, DataError, LightningError, RGBError,
 };
 
 const INTERNAL_SERVER_ERROR_MSG: &str =
@@ -20,6 +20,7 @@ impl IntoResponse for ApplicationError {
             ApplicationError::Authorization(error) => error.into_response(),
             ApplicationError::RGB(error) => error.into_response(),
             ApplicationError::Data(error) => error.into_response(),
+            ApplicationError::Lightning(error) => error.into_response(),
             _ => {
                 error!("{}", self.to_string());
 
@@ -125,6 +126,34 @@ impl IntoResponse for DataError {
             DataError::Validation(msg) => {
                 warn!("{}", msg);
                 (msg, StatusCode::UNPROCESSABLE_ENTITY)
+            }
+            DataError::RequestValidation(msg) => {
+                debug!("{}", msg);
+                (msg, StatusCode::BAD_REQUEST)
+            }
+        };
+
+        let body = generate_body(status, error_message.as_str());
+        (status, body).into_response()
+    }
+}
+
+impl IntoResponse for LightningError {
+    fn into_response(self) -> Response {
+        let (error_message, status) = match self {
+            LightningError::UnsupportedPaymentFormat(msg)
+            | LightningError::SendBolt11Payment(msg)
+            | LightningError::SendLNURLPayment(msg)
+            | LightningError::NodeInfo(msg) => {
+                debug!("{}", msg);
+                (msg, StatusCode::UNPROCESSABLE_ENTITY)
+            }
+            _ => {
+                error!("{}", self.to_string());
+                (
+                    INTERNAL_SERVER_ERROR_MSG.to_string(),
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                )
             }
         };
 

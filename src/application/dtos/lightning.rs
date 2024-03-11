@@ -9,8 +9,9 @@ use crate::domains::lightning::entities::LightningInvoice;
 
 #[derive(Debug, Deserialize)]
 pub struct SendPaymentRequest {
-    pub bolt11: String,
+    pub input: String,
     pub amount_msat: Option<u64>,
+    pub comment: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]

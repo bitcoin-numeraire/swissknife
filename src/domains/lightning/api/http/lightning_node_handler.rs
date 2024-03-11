@@ -6,7 +6,7 @@ use breez_sdk_core::{LspInformation, NodeState, Payment};
 use crate::{
     adapters::app::AppState,
     application::{dtos::SendPaymentRequest, errors::ApplicationError},
-    domains::users::entities::AuthUser,
+    domains::{lightning::entities::LightningPayment, users::entities::AuthUser},
 };
 
 pub struct LightningNodeHandler;
@@ -51,7 +51,7 @@ impl LightningNodeHandler {
         State(app_state): State<Arc<AppState>>,
         user: AuthUser,
         Json(payload): Json<SendPaymentRequest>,
-    ) -> Result<Json<Payment>, ApplicationError> {
+    ) -> Result<Json<LightningPayment>, ApplicationError> {
         let payment = app_state
             .lightning
             .send_bolt11_payment(user, payload.bolt11, payload.amount_msat)

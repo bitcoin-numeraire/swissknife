@@ -1,10 +1,9 @@
 use async_trait::async_trait;
 use breez_sdk_core::{parse, InputType};
-use regex::Regex;
 use tracing::{info, trace};
 
 use crate::{
-    application::errors::{ApplicationError, DataError},
+    application::errors::{ApplicationError, DataError, LightningError},
     domains::{
         lightning::{
             entities::{LNURLPayRequest, LightningAddress, LightningInvoice, LightningPayment},
@@ -16,19 +15,16 @@ use crate::{
 
 use super::LightningService;
 
-// TODO: Move to application layer (Bad request if not compliant)
-const MIN_USERNAME_LENGTH: usize = 1;
-const MAX_USERNAME_LENGTH: usize = 64;
-
 #[async_trait]
 impl LightningAddressesUseCases for LightningService {
     async fn generate_lnurlp(&self, username: String) -> Result<LNURLPayRequest, ApplicationError> {
         trace!(username, "Generating LNURLp");
 
-        let lightning_address = self.address_repo.get_by_username(&username).await?;
-        if lightning_address.is_none() {
-            return Err(DataError::NotFound("Lightning address not found.".into()).into());
-        }
+        let lightning_address = self
+            .address_repo
+            .get_by_username(&username)
+            .await?
+            .ok_or_else(|| DataError::NotFound("Lightning address not found.".to_string()))?;
 
         info!(username, "LNURLp returned successfully");
         Ok(LNURLPayRequest::new(&username, &self.domain))
@@ -38,14 +34,15 @@ impl LightningAddressesUseCases for LightningService {
         &self,
         username: String,
         amount: u64,
-        description: Option<String>,
+        description: String,
     ) -> Result<LightningInvoice, ApplicationError> {
         trace!(username, "Generating lightning invoice");
 
-        let lightning_address = self.address_repo.get_by_username(&username).await?;
-        if lightning_address.is_none() {
-            return Err(DataError::NotFound("Lightning address not found.".into()).into());
-        }
+        let lightning_address = self
+            .address_repo
+            .get_by_username(&username)
+            .await?
+            .ok_or_else(|| DataError::NotFound("Lightning address not found.".to_string()))?;
 
         let mut invoice = self.lightning_client.invoice(amount, description).await?;
 
@@ -67,26 +64,19 @@ impl LightningAddressesUseCases for LightningService {
             "Registering lightning address"
         );
 
-        // Length check
-        let username_length = username.len();
-        if username_length < MIN_USERNAME_LENGTH || username_length > MAX_USERNAME_LENGTH {
-            return Err(DataError::Validation("Invlaid username length.".to_string()).into());
-        }
-
-        // Regex validation for allowed characters
-        let email_username_re = Regex::new(r"^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+$").unwrap(); // Can't fail by assertion
-        if !email_username_re.is_match(&username) {
-            return Err(DataError::Validation("Invalid username format.".to_string()).into());
-        }
-
-        if let Some(_) = self.address_repo.get_by_user_id(&user.sub).await? {
+        if self.address_repo.get_by_user_id(&user.sub).await?.is_some() {
             return Err(DataError::Conflict(
                 "User has already registered a lightning address.".to_string(),
             )
             .into());
         }
 
-        if let Some(_) = self.address_repo.get_by_username(&username).await? {
+        if self
+            .address_repo
+            .get_by_username(&username)
+            .await?
+            .is_some()
+        {
             return Err(DataError::Conflict("Username already exists.".to_string()).into());
         }
 
@@ -106,26 +96,19 @@ impl LightningAddressesUseCases for LightningService {
     ) -> Result<LightningAddress, ApplicationError> {
         trace!(user_id = user.sub, "Fetching lightning address");
 
-        let lightning_address = self.address_repo.get_by_username(&username).await?;
+        let lightning_address = self
+            .address_repo
+            .get_by_username(&username)
+            .await?
+            .ok_or_else(|| DataError::NotFound("Lightning address not found.".to_string()))?;
 
-        match lightning_address {
-            Some(addr) if addr.user_id == user.sub => {
-                // The user is accessing their own address, no extra permission needed
-                info!(user_id = user.sub, "Lightning address fetched successfully");
-                Ok(addr)
-            }
-            Some(addr) => {
-                // Here, the user is trying to access someone else's address
-                // Check if the user has the permission to view all lightning address
-                user.check_permission(Permission::ReadLightningAddress)?;
-                info!(
-                    user_id = user.sub,
-                    "Lightning address fetched successfully by authorized user"
-                );
-                Ok(addr)
-            }
-            None => Err(DataError::NotFound("Lightning address not found.".into()).into()),
+        // The user is accessing their own address, no extra permission needed
+        if lightning_address.user_id != user.sub {
+            user.check_permission(Permission::ReadLightningAddress)?;
         }
+
+        info!(user_id = user.sub, "Lightning address fetched successfully");
+        Ok(lightning_address)
     }
 
     async fn list_lightning_addresses(
@@ -163,21 +146,21 @@ impl LightningAddressesUseCases for LightningService {
         user: AuthUser,
         input: String,
         amount_msat: Option<u64>,
+        comment: Option<String>,
     ) -> Result<LightningPayment, ApplicationError> {
         trace!(user_id = user.sub, input, "Sending payment");
 
-        let lightning_address = self.address_repo.get_by_user_id(&user.sub).await?;
-        if lightning_address.is_none() {
-            return Err(DataError::NotFound("Lightning address not found.".into()).into());
-        }
+        let lightning_address = self
+            .address_repo
+            .get_by_user_id(&user.sub)
+            .await?
+            .ok_or_else(|| DataError::NotFound("Lightning address not found.".to_string()))?;
 
-        // Here we can directly use Breez parsing function, no need to go through an adapter as this follows a standard
-        // and is therefore part of the business layer
         let input_type = parse(&input)
             .await
             .map_err(|e| DataError::Validation(e.to_string()))?;
 
-        match input_type {
+        let payment = match input_type {
             InputType::Bolt11 { invoice } => {
                 println!(
                     "invoice amount_msat vs passed amount_msat: {} vs {}",
@@ -185,67 +168,45 @@ impl LightningAddressesUseCases for LightningService {
                     amount_msat.unwrap_or(0)
                 );
 
-                let payment = self
-                    .lightning_client
+                self.lightning_client
                     .send_payment(invoice.bolt11.clone(), amount_msat)
-                    .await?;
-
-                info!(
-                    user_id = user.sub,
-                    bolt11 = invoice.bolt11,
-                    amount_msat,
-                    "Bolt11 payment sent successfully"
-                );
-                Ok(payment)
+                    .await
             }
             InputType::LnUrlPay { data } => {
-                let payment = self
-                    .lightning_client
-                    .send_payment(data, amount_msat)
-                    .await?;
+                let amount = validate_amount(amount_msat)?;
 
-                info!(
-                    user_id = user.sub,
-                    bolt11 = invoice.bolt11,
-                    amount_msat,
-                    "Bolt11 payment sent successfully"
-                );
-                Ok(payment)
+                self.lightning_client.lnurl_pay(data, amount, comment).await
             }
             InputType::NodeId { node_id } => {
-                let amount = amount_msat.ok_or_else(|| {
-                    DataError::Validation(
-                        "amount_msat must be defined for spontaneous payments".to_string(),
-                    )
-                })?;
-                if amount <= 0 {
-                    return Err(DataError::Validation(
-                        "amount_msat must be greater than 0 for spontaneous payments".to_string(),
-                    )
-                    .into());
-                }
-
-                let payment = self
-                    .lightning_client
+                let amount = validate_amount(amount_msat)?;
+                self.lightning_client
                     .send_spontaneous_payment(node_id.clone(), amount)
-                    .await?;
-
-                info!(
-                    user_id = user.sub,
-                    node_id, amount_msat, "Payment sent to node successfully"
-                );
-                Ok(payment)
+                    .await
             }
-            InputType::BitcoinAddress { address: _ } => Err(DataError::Validation(
-                "Sending to Bitcoin addresses is not yet supported. Coming soon".to_string(),
+            InputType::LnUrlError { data } => Err(LightningError::SendLNURLPayment(data.reason)),
+            _ => Err(LightningError::UnsupportedPaymentFormat(
+                "Unsupported payment format".to_string(),
             )
             .into()),
-            InputType::LnUrlError { data } => Err(DataError::Validation(format!(
-                "LNURL error from beneficiary: {}",
-                data.reason
-            ))
-            .into()),
-            _ => Err(DataError::Validation("unsupported payment format".to_string()).into()),
-        }
+        }?;
+
+        info!(
+            user_id = user.sub,
+            input,
+            payment_hash = payment.payment_hash,
+            amount_msat,
+            "Payment sent successfully"
+        );
+        Ok(payment)
     }
+}
+
+pub fn validate_amount(amount_msat: Option<u64>) -> Result<u64, ApplicationError> {
+    let amount =
+        amount_msat.ok_or_else(|| DataError::Validation("Amount must be defined".to_string()))?;
+    if amount <= 0 {
+        return Err(DataError::Validation("Amount must be greater than 0".to_string()).into());
+    }
+
+    Ok(amount)
 }

@@ -19,7 +19,7 @@ pub trait LightningAddressesUseCases: Send + Sync {
         &self,
         username: String,
         amount: u64,
-        description: Option<String>,
+        description: String,
     ) -> Result<LightningInvoice, ApplicationError>;
 
     async fn register_lightning_address(
@@ -46,6 +46,7 @@ pub trait LightningAddressesUseCases: Send + Sync {
         user: AuthUser,
         input: String,
         amount_msat: Option<u64>,
+        comment: Option<String>,
     ) -> Result<LightningPayment, ApplicationError>;
 }
 

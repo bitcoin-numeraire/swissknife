@@ -5,18 +5,25 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
+use regex::Regex;
 
 use crate::{
     adapters::app::AppState,
     application::{
         dtos::{
             LNUrlpInvoiceQueryParams, LNUrlpInvoiceResponse, LightningAddressResponse,
-            PaginationQueryParams, RegisterLightningAddressRequest,
+            PaginationQueryParams, RegisterLightningAddressRequest, SendPaymentRequest,
         },
-        errors::ApplicationError,
+        errors::{ApplicationError, DataError},
     },
-    domains::{lightning::entities::LNURLPayRequest, users::entities::AuthUser},
+    domains::{
+        lightning::entities::{LNURLPayRequest, LightningPayment},
+        users::entities::AuthUser,
+    },
 };
+
+const MIN_USERNAME_LENGTH: usize = 1;
+const MAX_USERNAME_LENGTH: usize = 64;
 
 pub struct LightningAddressHandler;
 
@@ -28,9 +35,10 @@ impl LightningAddressHandler {
     pub fn addresses_routes() -> Router<Arc<AppState>> {
         Router::new()
             .route("/", get(Self::list))
+            .route("/", post(Self::register))
+            .route("/pay", get(Self::pay))
             .route("/:username", get(Self::get))
             .route("/:username/invoice", get(Self::invoice))
-            .route("/register", post(Self::register))
     }
 
     async fn well_known_lnurlp(
@@ -49,7 +57,11 @@ impl LightningAddressHandler {
     ) -> Result<Json<LNUrlpInvoiceResponse>, ApplicationError> {
         let invoice = app_state
             .lightning
-            .generate_invoice(username, query_params.amount, query_params.description)
+            .generate_invoice(
+                username,
+                query_params.amount,
+                query_params.description.unwrap_or_default(),
+            )
             .await?;
 
         Ok(LNUrlpInvoiceResponse::new(invoice.bolt11).into())
@@ -60,6 +72,22 @@ impl LightningAddressHandler {
         user: AuthUser,
         Json(payload): Json<RegisterLightningAddressRequest>,
     ) -> Result<Json<LightningAddressResponse>, ApplicationError> {
+        // Length check
+        let username_length = payload.username.len();
+        if username_length < MIN_USERNAME_LENGTH || username_length > MAX_USERNAME_LENGTH {
+            return Err(
+                DataError::RequestValidation("Invlaid username length.".to_string()).into(),
+            );
+        }
+
+        // Regex validation for allowed characters
+        let email_username_re = Regex::new(r"^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+$").unwrap(); // Can't fail by assertion
+        if !email_username_re.is_match(&payload.username) {
+            return Err(
+                DataError::RequestValidation("Invalid username format.".to_string()).into(),
+            );
+        }
+
         let lightning_address = app_state
             .lightning
             .register_lightning_address(user, payload.username)
@@ -98,5 +126,18 @@ impl LightningAddressHandler {
             lightning_addresses.into_iter().map(Into::into).collect();
 
         Ok(response.into())
+    }
+
+    async fn pay(
+        State(app_state): State<Arc<AppState>>,
+        user: AuthUser,
+        Json(payload): Json<SendPaymentRequest>,
+    ) -> Result<Json<LightningPayment>, ApplicationError> {
+        let payment = app_state
+            .lightning
+            .send_payment(user, payload.input, payload.amount_msat, payload.comment)
+            .await?;
+
+        Ok(payment.into())
     }
 }
