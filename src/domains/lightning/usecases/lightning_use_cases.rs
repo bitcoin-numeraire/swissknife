@@ -4,7 +4,7 @@ use breez_sdk_core::{LspInformation, NodeState, Payment};
 use crate::{
     application::errors::ApplicationError,
     domains::{
-        lightning::entities::{LNURLp, LightningAddress},
+        lightning::entities::{LNURLp, LightningAddress, LightningInvoice},
         users::entities::AuthUser,
     },
 };
@@ -17,7 +17,8 @@ pub trait LightningAddressesUseCases: Send + Sync {
         &self,
         username: String,
         amount: u64,
-    ) -> Result<String, ApplicationError>;
+        comment: Option<String>,
+    ) -> Result<LightningInvoice, ApplicationError>;
 
     async fn register_lightning_address(
         &self,
@@ -37,6 +38,14 @@ pub trait LightningAddressesUseCases: Send + Sync {
         limit: usize,
         offset: usize,
     ) -> Result<Vec<LightningAddress>, ApplicationError>;
+}
+
+#[async_trait]
+pub trait LightningPaymentsUseCases: Send + Sync {
+    async fn process_incoming_payment(
+        &self,
+        payment: Payment,
+    ) -> Result<LightningInvoice, ApplicationError>;
 }
 
 #[async_trait]

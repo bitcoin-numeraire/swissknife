@@ -25,4 +25,7 @@ pub enum LightningError {
 
     #[error("Failed to send Bolt11 payment: {0}")]
     SendBolt11Payment(String),
+
+    #[error("Failed to retrieve payment by hash: {0}")]
+    PaymentByHash(String),
 }

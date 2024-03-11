@@ -1,10 +1,11 @@
 use std::sync::Arc;
 
 use crate::{
-    adapters::{auth::Authenticator, rgb::RGBClient},
+    adapters::{auth::Authenticator, lightning::breez::BreezListener, rgb::RGBClient},
     application::errors::{ApplicationError, WebServerError},
     domains::lightning::{
-        store::sqlx::SqlxLightningAddressRepository, usecases::LightningUseCases,
+        store::sqlx::{SqlxLightningAddressRepository, SqlxLightningInvoiceRepository},
+        usecases::{service::LightningPaymentsProcessor, LightningUseCases},
     },
 };
 use humantime::parse_duration;
@@ -37,7 +38,6 @@ impl AppState {
         let timeout_layer = TimeoutLayer::new(timeout_request);
         let db_client = SQLxClient::connect(config.database.clone()).await?;
         let rgb_client = RGBLibClient::new(config.rgb.clone()).await?;
-        let lightning_client = BreezClient::new(config.lightning.clone()).await?;
         let jwt_authenticator = if config.auth.enabled {
             Some(
                 Arc::new(JWTAuthenticator::new(config.auth.jwt.clone()).await?)
@@ -49,11 +49,20 @@ impl AppState {
         };
 
         // Create repositories
-        let lightning_store = SqlxLightningAddressRepository::new(db_client);
+        let lightning_address = Box::new(SqlxLightningAddressRepository::new(db_client.clone()));
+        let lightning_invoice = Box::new(SqlxLightningInvoiceRepository::new(db_client.clone()));
+        let payments_processor = LightningPaymentsProcessor::new(lightning_invoice.clone());
 
-        // Create services (use cases)
-        let lightning =
-            LightningService::new(Box::new(lightning_store), Box::new(lightning_client));
+        // Create services
+        let listener = BreezListener::new(Arc::new(payments_processor));
+        let lightning_client =
+            BreezClient::new(config.lightning.clone(), Box::new(listener)).await?;
+        let lightning = LightningService::new(
+            lightning_invoice.clone(),
+            lightning_address,
+            Box::new(lightning_client),
+            config.lightning.domain,
+        );
         // let rgb = RGBService::new(Box::new(rgb_client));
 
         // Create App state

@@ -39,6 +39,8 @@ impl RGBHandler {
             .route("/wallet/prepare-issuance", post(prepare_issuance))
             .route("/wallet/send", post(send))
             .route("/wallet/drain", post(drain))
+            .route("/wallet/refresh", post(refresh))
+            .route("/wallet/list-transfers", post(list_transfers))
     }
 }
 

@@ -6,6 +6,7 @@ use crate::{
     domains::lightning::{entities::LightningAddress, store::LightningAddressRepository},
 };
 
+#[derive(Clone)]
 pub struct SqlxLightningAddressRepository<D: DatabaseClient> {
     db_client: D,
 }
@@ -57,13 +58,10 @@ impl<D: DatabaseClient> LightningAddressRepository for SqlxLightningAddressRepos
 
     async fn list(
         &self,
-        user: &str,
         limit: usize,
         offset: usize,
     ) -> Result<Vec<LightningAddress>, DatabaseError> {
-        let result: Vec<LightningAddress>;
-        if user.is_empty() {
-            result = sqlx::query_as!(
+        let result = sqlx::query_as!(
                 LightningAddress,
                 r#"
                     SELECT * FROM "lightning_addresses" ORDER BY username LIMIT $1 OFFSET $2
@@ -74,8 +72,17 @@ impl<D: DatabaseClient> LightningAddressRepository for SqlxLightningAddressRepos
             .fetch_all(&self.db_client.pool()) // fetch_all for multiple results
             .await
             .map_err(|e| DatabaseError::List(e.to_string()))?;
-        } else {
-            result = sqlx::query_as!(
+        
+        Ok(result)
+    }
+
+    async fn list_by_user_id(
+        &self,
+        user: &str,
+        limit: usize,
+        offset: usize,
+    ) -> Result<Vec<LightningAddress>, DatabaseError> {
+        let result = sqlx::query_as!(
                 LightningAddress,
                 r#"
                     SELECT * FROM "lightning_addresses" WHERE user_id = $1 ORDER BY username LIMIT $2 OFFSET $3
@@ -87,7 +94,6 @@ impl<D: DatabaseClient> LightningAddressRepository for SqlxLightningAddressRepos
             .fetch_all(&self.db_client.pool()) // fetch_all for multiple results
             .await
             .map_err(|e| DatabaseError::List(e.to_string()))?;
-        }
 
         Ok(result)
     }

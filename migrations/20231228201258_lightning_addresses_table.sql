@@ -2,7 +2,7 @@ CREATE OR REPLACE FUNCTION update_timestamp() RETURNS TRIGGER AS $$ BEGIN NEW.up
 RETURN NEW;
 END;
 $$ language 'plpgsql';
-create table "lightning_addresses" (
+CREATE TABLE "lightning_addresses" (
     id uuid primary key default gen_random_uuid(),
     user_id varchar(255) unique not null,
     username varchar(255) unique not null,

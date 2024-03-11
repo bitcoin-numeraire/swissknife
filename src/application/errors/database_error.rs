@@ -16,4 +16,7 @@ pub enum DatabaseError {
 
     #[error("Failed to insert resource: {0}")]
     Insert(String),
+
+    #[error("Failed to update resource: {0}")]
+    Update(String),
 }

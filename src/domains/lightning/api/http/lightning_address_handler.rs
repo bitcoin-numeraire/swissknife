@@ -10,7 +10,7 @@ use crate::{
     adapters::app::AppState,
     application::{
         dtos::{
-            LightningAddressResponse, LightningInvoiceQueryParams, LightningInvoiceResponse,
+            LNUrlpInvoiceQueryParams, LNUrlpInvoiceResponse, LightningAddressResponse,
             LightningWellKnownResponse, PaginationQueryParams, RegisterLightningAddressRequest,
             SuccessAction,
         },
@@ -23,16 +23,15 @@ pub struct LightningAddressHandler;
 
 impl LightningAddressHandler {
     pub fn well_known_routes() -> Router<Arc<AppState>> {
-        Router::new()
-            .route("/:username", get(Self::well_known_lnurlp))
-            .route("/:username/callback", get(Self::invoice))
+        Router::new().route("/:username", get(Self::well_known_lnurlp))
     }
 
     pub fn addresses_routes() -> Router<Arc<AppState>> {
         Router::new()
-            .route("/", get(Self::list_lightning_addresses))
-            .route("/:username", get(Self::get_lightning_address))
-            .route("/register", post(Self::register_lightning_address))
+            .route("/", get(Self::list))
+            .route("/:username", get(Self::get))
+            .route("/:username/invoice", get(Self::invoice))
+            .route("/register", post(Self::register))
     }
 
     async fn well_known_lnurlp(
@@ -56,16 +55,16 @@ impl LightningAddressHandler {
 
     async fn invoice(
         Path(username): Path<String>,
-        Query(query_params): Query<LightningInvoiceQueryParams>,
+        Query(query_params): Query<LNUrlpInvoiceQueryParams>,
         State(app_state): State<Arc<AppState>>,
-    ) -> Result<Json<LightningInvoiceResponse>, ApplicationError> {
+    ) -> Result<Json<LNUrlpInvoiceResponse>, ApplicationError> {
         let invoice = app_state
             .lightning
-            .generate_invoice(username, query_params.amount)
+            .generate_invoice(username, query_params.amount, query_params.comment)
             .await?;
 
-        let response = LightningInvoiceResponse {
-            pr: invoice,
+        let response = LNUrlpInvoiceResponse {
+            pr: invoice.bolt11,
             success_action: Some(SuccessAction {
                 tag: "message".to_string(),
                 message: Some("Thanks for the sats!".to_string()),
@@ -77,7 +76,7 @@ impl LightningAddressHandler {
         Ok(response.into())
     }
 
-    async fn register_lightning_address(
+    async fn register(
         State(app_state): State<Arc<AppState>>,
         user: AuthUser,
         Json(payload): Json<RegisterLightningAddressRequest>,
@@ -90,7 +89,7 @@ impl LightningAddressHandler {
         Ok(Json(lightning_address.into()))
     }
 
-    async fn get_lightning_address(
+    async fn get(
         State(app_state): State<Arc<AppState>>,
         user: AuthUser,
         Path(username): Path<String>,
@@ -103,7 +102,7 @@ impl LightningAddressHandler {
         Ok(Json(lightning_address.into()))
     }
 
-    async fn list_lightning_addresses(
+    async fn list(
         State(app_state): State<Arc<AppState>>,
         user: AuthUser,
         Query(query_params): Query<PaginationQueryParams>,

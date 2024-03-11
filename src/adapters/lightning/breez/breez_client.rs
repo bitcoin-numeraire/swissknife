@@ -8,7 +8,10 @@ use breez_sdk_core::{
     NodeConfig, NodeState, Payment, ReceivePaymentRequest, SendPaymentRequest,
 };
 
-use crate::{adapters::lightning::LightningClient, application::errors::LightningError};
+use crate::{
+    adapters::lightning::LightningClient, application::errors::LightningError,
+    domains::lightning::entities::LightningInvoice,
+};
 
 use super::BreezListener;
 
@@ -18,6 +21,7 @@ pub struct BreezClientConfig {
     pub invite_code: String,
     pub working_dir: String,
     pub seed: String,
+    pub domain: String,
 }
 
 pub struct BreezClient {
@@ -25,7 +29,10 @@ pub struct BreezClient {
 }
 
 impl BreezClient {
-    pub async fn new(config: BreezClientConfig) -> Result<Self, LightningError> {
+    pub async fn new(
+        config: BreezClientConfig,
+        listener: Box<BreezListener>,
+    ) -> Result<Self, LightningError> {
         let mut breez_config = BreezServices::default_config(
             EnvironmentType::Production,
             config.api_key,
@@ -41,13 +48,9 @@ impl BreezClient {
         let seed =
             Mnemonic::parse(config.seed).map_err(|e| LightningError::ParseSeed(e.to_string()))?;
 
-        let sdk = BreezServices::connect(
-            breez_config,
-            seed.to_seed("").to_vec(),
-            Box::new(BreezListener {}),
-        )
-        .await
-        .map_err(|e| LightningError::Connect(e.to_string()))?;
+        let sdk = BreezServices::connect(breez_config.clone(), seed.to_seed("").to_vec(), listener)
+            .await
+            .map_err(|e| LightningError::Connect(e.to_string()))?;
 
         Ok(Self { sdk })
     }
@@ -59,7 +62,7 @@ impl LightningClient for BreezClient {
         &self,
         amount_msat: u64,
         description: String,
-    ) -> Result<String, LightningError> {
+    ) -> Result<LightningInvoice, LightningError> {
         let response = self
             .sdk
             .receive_payment(ReceivePaymentRequest {
@@ -71,7 +74,29 @@ impl LightningClient for BreezClient {
             .await
             .map_err(|e| LightningError::Invoice(e.to_string()))?;
 
-        Ok(response.ln_invoice.bolt11)
+        let invoice = LightningInvoice {
+            id: None,
+            lightning_address: None,
+            bolt11: response.ln_invoice.bolt11,
+            network: response.ln_invoice.network.to_string(),
+            payee_pubkey: response.ln_invoice.payee_pubkey,
+            payment_hash: response.ln_invoice.payment_hash,
+            description: response.ln_invoice.description,
+            comment: None,
+            description_hash: response.ln_invoice.description_hash,
+            amount_msat: response.ln_invoice.amount_msat.map(|amt| amt as i64),
+            payment_secret: response.ln_invoice.payment_secret,
+            min_final_cltv_expiry_delta: response.ln_invoice.min_final_cltv_expiry_delta as i64,
+            timestamp: response.ln_invoice.timestamp as i64,
+            expiry: response.ln_invoice.expiry as i64,
+            status: "PENDING".to_string(),
+            fee_msat: None,
+            payment_time: None,
+            created_at: None,
+            updated_at: None,
+        };
+
+        Ok(invoice)
     }
 
     fn node_info(&self) -> Result<NodeState, LightningError> {
@@ -128,5 +153,18 @@ impl LightningClient for BreezClient {
             .map_err(|e| LightningError::SendBolt11Payment(e.to_string()))?;
 
         Ok(response.payment)
+    }
+
+    async fn payment_by_hash(
+        &self,
+        payment_hash: String,
+    ) -> Result<Option<Payment>, LightningError> {
+        let response = self
+            .sdk
+            .payment_by_hash(payment_hash)
+            .await
+            .map_err(|e| LightningError::PaymentByHash(e.to_string()))?;
+
+        Ok(response)
     }
 }
