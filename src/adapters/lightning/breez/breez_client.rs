@@ -21,6 +21,7 @@ pub struct BreezClientConfig {
     pub invite_code: String,
     pub working_dir: String,
     pub seed: String,
+    pub domain: String,
 }
 
 pub struct BreezClient {
@@ -81,6 +82,7 @@ impl LightningClient for BreezClient {
             payee_pubkey: response.ln_invoice.payee_pubkey,
             payment_hash: response.ln_invoice.payment_hash,
             description: response.ln_invoice.description,
+            comment: None,
             description_hash: response.ln_invoice.description_hash,
             amount_msat: response.ln_invoice.amount_msat.map(|amt| amt as i64),
             payment_secret: response.ln_invoice.payment_secret,

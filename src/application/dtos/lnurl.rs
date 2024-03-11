@@ -15,7 +15,8 @@ pub struct LightningWellKnownResponse {
 
 #[derive(Deserialize)]
 pub struct LNUrlpInvoiceQueryParams {
-    pub amount: u64, // Amount in milli-satoshis
+    pub amount: u64,             // Amount in milli-satoshis
+    pub comment: Option<String>, // Optional comment
 }
 
 #[derive(Debug, Serialize)]

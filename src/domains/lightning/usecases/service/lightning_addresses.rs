@@ -35,7 +35,7 @@ impl LightningAddressesUseCases for LightningService {
 
         let lnurlp = LNURLp {
             callback: format!(
-                "https://{}/lightning/lnurlp/{}/callback",
+                "https://{}/api/lightning/addresses/{}/invoice",
                 self.domain, username
             ),
             max_sendable: MAX_SENDABLE,
@@ -54,6 +54,7 @@ impl LightningAddressesUseCases for LightningService {
         &self,
         username: String,
         amount: u64,
+        comment: Option<String>,
     ) -> Result<LightningInvoice, ApplicationError> {
         trace!(username, "Generating lightning invoice");
 
@@ -66,6 +67,7 @@ impl LightningAddressesUseCases for LightningService {
         let mut invoice = self.lightning_client.invoice(amount, metadata).await?;
 
         invoice.lightning_address = Some(username.clone());
+        invoice.comment = comment;
         invoice = self.invoice_repo.insert(invoice).await?;
 
         info!(username, "Lightning invoice generated successfully");

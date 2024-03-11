@@ -23,15 +23,14 @@ pub struct LightningAddressHandler;
 
 impl LightningAddressHandler {
     pub fn well_known_routes() -> Router<Arc<AppState>> {
-        Router::new()
-            .route("/:username", get(Self::well_known_lnurlp))
-            .route("/:username/callback", get(Self::invoice))
+        Router::new().route("/:username", get(Self::well_known_lnurlp))
     }
 
     pub fn addresses_routes() -> Router<Arc<AppState>> {
         Router::new()
             .route("/", get(Self::list))
             .route("/:username", get(Self::get))
+            .route("/:username/invoice", get(Self::invoice))
             .route("/register", post(Self::register))
     }
 
@@ -61,7 +60,7 @@ impl LightningAddressHandler {
     ) -> Result<Json<LNUrlpInvoiceResponse>, ApplicationError> {
         let invoice = app_state
             .lightning
-            .generate_invoice(username, query_params.amount)
+            .generate_invoice(username, query_params.amount, query_params.comment)
             .await?;
 
         let response = LNUrlpInvoiceResponse {

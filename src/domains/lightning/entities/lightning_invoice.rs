@@ -11,6 +11,7 @@ pub struct LightningInvoice {
     pub payee_pubkey: String,
     pub payment_hash: String,
     pub description: Option<String>,
+    pub comment: Option<String>,
     pub description_hash: Option<String>,
     pub amount_msat: Option<i64>,
     pub payment_secret: Vec<u8>,

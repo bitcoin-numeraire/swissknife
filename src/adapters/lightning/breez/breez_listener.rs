@@ -21,7 +21,7 @@ impl EventListener for BreezListener {
     fn on_event(&self, e: BreezEvent) {
         match e {
             BreezEvent::InvoicePaid { details } => {
-                trace!("New invoice paid event received");
+                trace!("New InvoicePaid event received");
 
                 if let Some(payment) = details.payment {
                     let payments_processor = self.payments_processor.clone();

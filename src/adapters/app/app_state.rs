@@ -61,6 +61,7 @@ impl AppState {
             lightning_invoice.clone(),
             lightning_address,
             Box::new(lightning_client),
+            config.lightning.domain,
         );
         // let rgb = RGBService::new(Box::new(rgb_client));
 

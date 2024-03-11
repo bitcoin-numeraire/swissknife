@@ -15,12 +15,13 @@ impl LightningService {
         invoice_repo: Box<dyn LightningInvoiceRepository>,
         address_repo: Box<dyn LightningAddressRepository>,
         lightning_client: Box<dyn LightningClient>,
+        domain: String,
     ) -> Self {
         LightningService {
             invoice_repo,
             address_repo,
             lightning_client,
-            domain: "numeraire.tech".to_string(),
+            domain,
         }
     }
 }
