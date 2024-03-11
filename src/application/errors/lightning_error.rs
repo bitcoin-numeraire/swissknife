@@ -21,10 +21,16 @@ pub enum LightningError {
     ListPayments(String),
 
     #[error("Failed to parse LNURLp metadata: {0}")]
-    ParseMetadata(String),
+    GenerateMetadata(String),
 
     #[error("Failed to send Bolt11 payment: {0}")]
     SendBolt11Payment(String),
+
+    #[error("Failed to send payment to node: {0}")]
+    SendNodeIdPayment(String),
+
+    #[error("Failed to send LNURL payment: {0}")]
+    SendLNURLPayment(String),
 
     #[error("Failed to retrieve payment by hash: {0}")]
     PaymentByHash(String),

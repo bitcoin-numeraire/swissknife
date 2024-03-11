@@ -5,7 +5,7 @@ use tracing::{debug, info, trace};
 use crate::{
     application::errors::ApplicationError,
     domains::{
-        lightning::usecases::LightningNodeUseCases,
+        lightning::{entities::LightningPayment, usecases::LightningNodeUseCases},
         users::entities::{AuthUser, Permission},
     },
 };
@@ -55,7 +55,7 @@ impl LightningNodeUseCases for LightningService {
         user: AuthUser,
         bolt11: String,
         amount_msat: Option<u64>,
-    ) -> Result<Payment, ApplicationError> {
+    ) -> Result<LightningPayment, ApplicationError> {
         trace!(
             user_id = user.sub,
             bolt11,

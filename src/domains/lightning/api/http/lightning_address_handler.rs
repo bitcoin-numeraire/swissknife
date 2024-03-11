@@ -11,12 +11,11 @@ use crate::{
     application::{
         dtos::{
             LNUrlpInvoiceQueryParams, LNUrlpInvoiceResponse, LightningAddressResponse,
-            LightningWellKnownResponse, PaginationQueryParams, RegisterLightningAddressRequest,
-            SuccessAction,
+            PaginationQueryParams, RegisterLightningAddressRequest,
         },
         errors::ApplicationError,
     },
-    domains::users::entities::AuthUser,
+    domains::{lightning::entities::LNURLPayRequest, users::entities::AuthUser},
 };
 
 pub struct LightningAddressHandler;
@@ -37,20 +36,10 @@ impl LightningAddressHandler {
     async fn well_known_lnurlp(
         Path(username): Path<String>,
         State(app_state): State<Arc<AppState>>,
-    ) -> Result<Json<LightningWellKnownResponse>, ApplicationError> {
+    ) -> Result<Json<LNURLPayRequest>, ApplicationError> {
         let lnurlp = app_state.lightning.generate_lnurlp(username).await?;
 
-        let response = LightningWellKnownResponse {
-            callback: lnurlp.callback,
-            max_sendable: lnurlp.max_sendable,
-            min_sendable: lnurlp.min_sendable,
-            metadata: lnurlp.metadata,
-            comment_allowed: lnurlp.comment_allowed,
-            withdraw_link: lnurlp.withdraw_link,
-            tag: lnurlp.tag,
-        };
-
-        Ok(response.into())
+        Ok(lnurlp.into())
     }
 
     async fn invoice(
@@ -60,20 +49,10 @@ impl LightningAddressHandler {
     ) -> Result<Json<LNUrlpInvoiceResponse>, ApplicationError> {
         let invoice = app_state
             .lightning
-            .generate_invoice(username, query_params.amount, query_params.comment)
+            .generate_invoice(username, query_params.amount, query_params.description)
             .await?;
 
-        let response = LNUrlpInvoiceResponse {
-            pr: invoice.bolt11,
-            success_action: Some(SuccessAction {
-                tag: "message".to_string(),
-                message: Some("Thanks for the sats!".to_string()),
-            }),
-            disposable: None,
-            routes: vec![],
-        };
-
-        Ok(response.into())
+        Ok(LNUrlpInvoiceResponse::new(invoice.bolt11).into())
     }
 
     async fn register(

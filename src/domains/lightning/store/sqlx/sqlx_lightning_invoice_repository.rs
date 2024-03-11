@@ -49,7 +49,6 @@ impl<D: DatabaseClient> LightningInvoiceRepository for SqlxLightningInvoiceRepos
                     payee_pubkey, 
                     payment_hash, 
                     description,
-                    comment, 
                     description_hash, 
                     amount_msat, 
                     payment_secret, 
@@ -60,7 +59,7 @@ impl<D: DatabaseClient> LightningInvoiceRepository for SqlxLightningInvoiceRepos
                     fee_msat,
                     payment_time
                 ) VALUES (
-                    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16
+                    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15
                 ) RETURNING *;
             "#,
             invoice.lightning_address,
@@ -69,7 +68,6 @@ impl<D: DatabaseClient> LightningInvoiceRepository for SqlxLightningInvoiceRepos
             invoice.payee_pubkey,
             invoice.payment_hash,
             invoice.description,
-            invoice.comment,
             invoice.description_hash,
             invoice.amount_msat,
             invoice.payment_secret,
