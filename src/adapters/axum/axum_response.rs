@@ -115,21 +115,21 @@ impl IntoResponse for RGBError {
 impl IntoResponse for DataError {
     fn into_response(self) -> Response {
         let (error_message, status) = match self {
-            DataError::NotFound(msg) => {
-                debug!("{}", msg);
-                (msg, StatusCode::NOT_FOUND)
+            DataError::NotFound(_) => {
+                debug!("{}", self.to_string());
+                (self.to_string(), StatusCode::NOT_FOUND)
             }
-            DataError::Conflict(msg) => {
-                warn!("{}", msg);
-                (msg, StatusCode::CONFLICT)
+            DataError::Conflict(_) => {
+                warn!("{}", self.to_string());
+                (self.to_string(), StatusCode::CONFLICT)
             }
-            DataError::Validation(msg) => {
-                warn!("{}", msg);
-                (msg, StatusCode::UNPROCESSABLE_ENTITY)
+            DataError::Validation(_) => {
+                warn!("{}", self.to_string());
+                (self.to_string(), StatusCode::UNPROCESSABLE_ENTITY)
             }
-            DataError::RequestValidation(msg) => {
-                debug!("{}", msg);
-                (msg, StatusCode::BAD_REQUEST)
+            DataError::RequestValidation(_) => {
+                debug!("{}", self.to_string());
+                (self.to_string(), StatusCode::BAD_REQUEST)
             }
         };
 

@@ -3,8 +3,8 @@ use serde::Serialize;
 
 #[derive(Deserialize)]
 pub struct LNUrlpInvoiceQueryParams {
-    pub amount: u64,                 // Amount in milli-satoshis
-    pub description: Option<String>, // Optional description
+    pub amount: u64,             // Amount in milli-satoshis
+    pub comment: Option<String>, // Optional comment
 }
 
 #[derive(Debug, Serialize)]

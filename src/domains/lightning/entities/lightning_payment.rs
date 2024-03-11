@@ -26,7 +26,7 @@ impl LightningPayment {
             id: None,
             lightning_address: None,
             payment_hash,
-            error,
+            error: error.clone(),
             amount_msat,
             fee_msat: None,
             payment_time: None,

@@ -20,8 +20,7 @@ impl LightningAddressesUseCases for LightningService {
     async fn generate_lnurlp(&self, username: String) -> Result<LNURLPayRequest, ApplicationError> {
         trace!(username, "Generating LNURLp");
 
-        let lightning_address = self
-            .address_repo
+        self.address_repo
             .get_by_username(&username)
             .await?
             .ok_or_else(|| DataError::NotFound("Lightning address not found.".to_string()))?;
@@ -38,8 +37,7 @@ impl LightningAddressesUseCases for LightningService {
     ) -> Result<LightningInvoice, ApplicationError> {
         trace!(username, "Generating lightning invoice");
 
-        let lightning_address = self
-            .address_repo
+        self.address_repo
             .get_by_username(&username)
             .await?
             .ok_or_else(|| DataError::NotFound("Lightning address not found.".to_string()))?;
@@ -150,8 +148,7 @@ impl LightningAddressesUseCases for LightningService {
     ) -> Result<LightningPayment, ApplicationError> {
         trace!(user_id = user.sub, input, "Sending payment");
 
-        let lightning_address = self
-            .address_repo
+        self.address_repo
             .get_by_user_id(&user.sub)
             .await?
             .ok_or_else(|| DataError::NotFound("Lightning address not found.".to_string()))?;
@@ -162,19 +159,12 @@ impl LightningAddressesUseCases for LightningService {
 
         let payment = match input_type {
             InputType::Bolt11 { invoice } => {
-                println!(
-                    "invoice amount_msat vs passed amount_msat: {} vs {}",
-                    invoice.amount_msat.unwrap_or(0),
-                    amount_msat.unwrap_or(0)
-                );
-
                 self.lightning_client
                     .send_payment(invoice.bolt11.clone(), amount_msat)
                     .await
             }
             InputType::LnUrlPay { data } => {
                 let amount = validate_amount(amount_msat)?;
-
                 self.lightning_client.lnurl_pay(data, amount, comment).await
             }
             InputType::NodeId { node_id } => {
@@ -202,10 +192,10 @@ impl LightningAddressesUseCases for LightningService {
 }
 
 pub fn validate_amount(amount_msat: Option<u64>) -> Result<u64, ApplicationError> {
-    let amount =
-        amount_msat.ok_or_else(|| DataError::Validation("Amount must be defined".to_string()))?;
+    let amount = amount_msat
+        .ok_or_else(|| DataError::Validation("amount_msat must be defined".to_string()))?;
     if amount <= 0 {
-        return Err(DataError::Validation("Amount must be greater than 0".to_string()).into());
+        return Err(DataError::Validation("amount_msat must be greater than 0".to_string()).into());
     }
 
     Ok(amount)

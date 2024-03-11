@@ -19,6 +19,8 @@ impl BreezListener {
 #[async_trait]
 impl EventListener for BreezListener {
     fn on_event(&self, e: BreezEvent) {
+        trace!(event = ?e, "New event received");
+
         match e {
             BreezEvent::InvoicePaid { details } => {
                 trace!("New InvoicePaid event received");

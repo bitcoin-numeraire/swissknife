@@ -23,7 +23,7 @@ impl AuthUser {
     }
 
     pub fn check_permission(&self, permission: Permission) -> Result<(), AuthorizationError> {
-        if !self.has_permission(permission) {
+        if !self.has_permission(permission.clone()) {
             return Err(AuthorizationError::MissingPermission(permission));
         }
 

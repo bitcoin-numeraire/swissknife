@@ -36,7 +36,7 @@ impl LightningAddressHandler {
         Router::new()
             .route("/", get(Self::list))
             .route("/", post(Self::register))
-            .route("/pay", get(Self::pay))
+            .route("/pay", post(Self::pay))
             .route("/:username", get(Self::get))
             .route("/:username/invoice", get(Self::invoice))
     }
@@ -60,7 +60,7 @@ impl LightningAddressHandler {
             .generate_invoice(
                 username,
                 query_params.amount,
-                query_params.description.unwrap_or_default(),
+                query_params.comment.unwrap_or_default(),
             )
             .await?;
 

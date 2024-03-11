@@ -33,7 +33,7 @@ impl Into<LightningPayment> for Payment {
             id: None,
             payment_hash: self.id,
             lightning_address: None,
-            error: self.error,
+            error: self.error.clone(),
             amount_msat: self.amount_msat as i64,
             fee_msat: Some(self.fee_msat as i64),
             payment_time: Some(self.payment_time),
