@@ -123,7 +123,8 @@ impl<D: DatabaseClient> LightningAddressRepository for SqlxLightningAddressRepos
             WITH sent AS (
                 SELECT
                     COALESCE(SUM(CASE WHEN status = 'PAID' THEN amount_msat ELSE 0 END) - 
-                    COALESCE(SUM(CASE WHEN status = 'PENDING' THEN amount_msat ELSE 0 END), 0), 0)::BIGINT AS sent_msat
+                    COALESCE(SUM(CASE WHEN status = 'PENDING' THEN amount_msat ELSE 0 END), 0), 0)::BIGINT AS sent_msat,
+                    COALESCE(SUM(CASE WHEN status = 'PAID' THEN COALESCE(fee_msat, 0) ELSE 0 END), 0)::BIGINT AS fees_paid_msat
                 FROM lightning_payments
                 WHERE lightning_address = $1
             ),
@@ -136,18 +137,20 @@ impl<D: DatabaseClient> LightningAddressRepository for SqlxLightningAddressRepos
             SELECT
                 received.received_msat,
                 sent.sent_msat,
-                (received.received_msat - sent.sent_msat) AS available_msat
+                sent.fees_paid_msat,
+                (received.received_msat - (sent.sent_msat + sent.fees_paid_msat)) AS available_msat
             FROM received, sent;
             "#,
             username
         )
-            .fetch_one(&self.db_client.pool())
-            .await
-            .map_err(|e| DatabaseError::Balance(e.to_string()))?;
+        .fetch_one(&self.db_client.pool())
+        .await
+        .map_err(|e| DatabaseError::Balance(e.to_string()))?;
 
         let balance = UserBalance {
             received_msat: record.received_msat.unwrap_or(0),
             sent_msat: record.sent_msat.unwrap_or(0),
+            fees_paid_msat: record.fees_paid_msat.unwrap_or(0),
             available_msat: record.available_msat.unwrap_or(0),
         };
 
