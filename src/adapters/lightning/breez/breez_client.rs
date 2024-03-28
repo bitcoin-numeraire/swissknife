@@ -170,8 +170,6 @@ impl LightningClient for BreezClient {
             .await
             .map_err(|e| LightningError::SendLNURLPayment(e.to_string()))?;
 
-        debug!(result = ?result, "Payment debug content");
-
         match result {
             LnUrlPayResult::EndpointSuccess { data } => Ok(LightningPayment::new(
                 data.payment_hash,
