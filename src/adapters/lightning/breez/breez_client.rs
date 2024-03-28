@@ -1,5 +1,6 @@
 use serde::Deserialize;
 use std::sync::Arc;
+use tracing::debug;
 
 use async_trait::async_trait;
 use bip39::Mnemonic;
@@ -168,6 +169,8 @@ impl LightningClient for BreezClient {
             })
             .await
             .map_err(|e| LightningError::SendLNURLPayment(e.to_string()))?;
+
+        debug!(result = ?result, "Payment debug content");
 
         match result {
             LnUrlPayResult::EndpointSuccess { data } => Ok(LightningPayment::new(

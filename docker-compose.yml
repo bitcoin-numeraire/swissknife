@@ -51,3 +51,4 @@ volumes:
   electrs:
   db:
   pgadmin:
+  lightning:

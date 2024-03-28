@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use breez_sdk_core::{parse, InputType};
-use tracing::{info, trace};
+use tracing::{debug, info};
 
 use crate::{
     application::errors::{ApplicationError, DataError, LightningError},
@@ -18,7 +18,7 @@ use super::LightningService;
 #[async_trait]
 impl LightningAddressesUseCases for LightningService {
     async fn generate_lnurlp(&self, username: String) -> Result<LNURLPayRequest, ApplicationError> {
-        trace!(username, "Generating LNURLp");
+        debug!(username, "Generating LNURLp");
 
         self.address_repo
             .get_by_username(&username)
@@ -35,7 +35,7 @@ impl LightningAddressesUseCases for LightningService {
         amount: u64,
         description: String,
     ) -> Result<LightningInvoice, ApplicationError> {
-        trace!(username, "Generating lightning invoice");
+        debug!(username, "Generating lightning invoice");
 
         self.address_repo
             .get_by_username(&username)
@@ -56,10 +56,9 @@ impl LightningAddressesUseCases for LightningService {
         user: AuthUser,
         username: String,
     ) -> Result<LightningAddress, ApplicationError> {
-        trace!(
+        debug!(
             user_id = user.sub,
-            username,
-            "Registering lightning address"
+            username, "Registering lightning address"
         );
 
         if self.address_repo.get_by_user_id(&user.sub).await?.is_some() {
@@ -92,7 +91,7 @@ impl LightningAddressesUseCases for LightningService {
         user: AuthUser,
         username: String,
     ) -> Result<LightningAddress, ApplicationError> {
-        trace!(user_id = user.sub, "Fetching lightning address");
+        debug!(user_id = user.sub, "Fetching lightning address");
 
         let lightning_address = self
             .address_repo
@@ -115,11 +114,9 @@ impl LightningAddressesUseCases for LightningService {
         limit: usize,
         offset: usize,
     ) -> Result<Vec<LightningAddress>, ApplicationError> {
-        trace!(
+        debug!(
             user_id = user.sub,
-            limit,
-            offset,
-            "Listing lightning addresses"
+            limit, offset, "Listing lightning addresses"
         );
 
         let lightning_addresses = if user.has_permission(Permission::ReadLightningAddress) {
@@ -146,18 +143,21 @@ impl LightningAddressesUseCases for LightningService {
         amount_msat: Option<u64>,
         comment: Option<String>,
     ) -> Result<LightningPayment, ApplicationError> {
-        trace!(user_id = user.sub, input, "Sending payment");
+        debug!(user_id = user.sub, input, "Sending payment");
 
-        self.address_repo
+        let ln_address = self
+            .address_repo
             .get_by_user_id(&user.sub)
             .await?
             .ok_or_else(|| DataError::NotFound("Lightning address not found.".to_string()))?;
+
+        // TODO: get balance
 
         let input_type = parse(&input)
             .await
             .map_err(|e| DataError::Validation(e.to_string()))?;
 
-        let payment = match input_type {
+        let mut payment = match input_type {
             InputType::Bolt11 { invoice } => {
                 self.lightning_client
                     .send_payment(invoice.bolt11.clone(), amount_msat)
@@ -179,6 +179,9 @@ impl LightningAddressesUseCases for LightningService {
             )
             .into()),
         }?;
+
+        payment.lightning_address = Some(ln_address.username.clone());
+        payment = self.payment_repo.insert(payment).await?;
 
         info!(
             user_id = user.sub,

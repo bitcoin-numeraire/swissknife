@@ -2,7 +2,7 @@ use async_trait::async_trait;
 
 use crate::{
     application::errors::DatabaseError,
-    domains::lightning::entities::{LightningAddress, LightningInvoice},
+    domains::lightning::entities::{LightningAddress, LightningInvoice, LightningPayment},
 };
 
 #[async_trait]
@@ -34,4 +34,14 @@ pub trait LightningInvoiceRepository: Sync + Send {
     ) -> Result<Option<LightningInvoice>, DatabaseError>;
     async fn insert(&self, invoice: LightningInvoice) -> Result<LightningInvoice, DatabaseError>;
     async fn update(&self, invoice: LightningInvoice) -> Result<LightningInvoice, DatabaseError>;
+}
+
+#[async_trait]
+pub trait LightningPaymentRepository: Sync + Send {
+    async fn get_by_hash(
+        &self,
+        payment_hash: &str,
+    ) -> Result<Option<LightningPayment>, DatabaseError>;
+    async fn insert(&self, payment: LightningPayment) -> Result<LightningPayment, DatabaseError>;
+    async fn update(&self, payment: LightningPayment) -> Result<LightningPayment, DatabaseError>;
 }

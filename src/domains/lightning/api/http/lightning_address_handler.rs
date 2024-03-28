@@ -12,14 +12,12 @@ use crate::{
     application::{
         dtos::{
             LNUrlpInvoiceQueryParams, LNUrlpInvoiceResponse, LightningAddressResponse,
-            PaginationQueryParams, RegisterLightningAddressRequest, SendPaymentRequest,
+            LightningPaymentResponse, PaginationQueryParams, RegisterLightningAddressRequest,
+            SendPaymentRequest,
         },
         errors::{ApplicationError, DataError},
     },
-    domains::{
-        lightning::entities::{LNURLPayRequest, LightningPayment},
-        users::entities::AuthUser,
-    },
+    domains::{lightning::entities::LNURLPayRequest, users::entities::AuthUser},
 };
 
 const MIN_USERNAME_LENGTH: usize = 1;
@@ -132,12 +130,12 @@ impl LightningAddressHandler {
         State(app_state): State<Arc<AppState>>,
         user: AuthUser,
         Json(payload): Json<SendPaymentRequest>,
-    ) -> Result<Json<LightningPayment>, ApplicationError> {
+    ) -> Result<Json<LightningPaymentResponse>, ApplicationError> {
         let payment = app_state
             .lightning
             .send_payment(user, payload.input, payload.amount_msat, payload.comment)
             .await?;
 
-        Ok(payment.into())
+        Ok(Json(payment.into()))
     }
 }

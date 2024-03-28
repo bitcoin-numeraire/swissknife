@@ -44,7 +44,6 @@ impl Into<LightningPayment> for Payment {
             },
             description: self.description,
             metadata: self.metadata,
-            details: Some(self.details),
             created_at: None,
             updated_at: None,
         }

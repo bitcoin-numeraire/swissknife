@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use breez_sdk_core::{LspInformation, NodeState, Payment};
+use breez_sdk_core::{LspInformation, NodeState, Payment, PaymentFailedData};
 
 use crate::{
     application::errors::ApplicationError,
@@ -56,6 +56,14 @@ pub trait LightningPaymentsUseCases: Send + Sync {
         &self,
         payment: Payment,
     ) -> Result<LightningInvoice, ApplicationError>;
+    async fn process_outgoing_payment(
+        &self,
+        payment: Payment,
+    ) -> Result<LightningPayment, ApplicationError>;
+    async fn process_failed_payment(
+        &self,
+        payment: PaymentFailedData,
+    ) -> Result<(), ApplicationError>;
 }
 
 #[async_trait]

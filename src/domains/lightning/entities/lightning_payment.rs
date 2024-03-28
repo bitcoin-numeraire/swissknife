@@ -1,4 +1,3 @@
-use breez_sdk_core::PaymentDetails;
 use chrono::{DateTime, Utc};
 use serde::Serialize;
 use uuid::Uuid;
@@ -15,7 +14,6 @@ pub struct LightningPayment {
     pub status: String, // TODO: Use enum
     pub description: Option<String>,
     pub metadata: Option<String>,
-    pub details: Option<PaymentDetails>, // Could be any type, currently only Breez data
     pub created_at: Option<DateTime<Utc>>,
     pub updated_at: Option<DateTime<Utc>>,
 }
@@ -37,7 +35,6 @@ impl LightningPayment {
             },
             description: None,
             metadata: None,
-            details: None,
             created_at: None,
             updated_at: None,
         }
