@@ -11,7 +11,7 @@ CREATE TABLE "lightning_invoices" (
     payment_hash varchar unique NOT NULL,
     description varchar,
     description_hash varchar,
-    amount_msat bigint,
+    amount_msat bigint NOT NULL,
     payment_secret bytea NOT NULL,
     timestamp bigint NOT NULL,
     expiry bigint NOT NULL,

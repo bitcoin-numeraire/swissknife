@@ -6,7 +6,9 @@ use crate::{
     application::errors::{ApplicationError, DataError, LightningError},
     domains::{
         lightning::{
-            entities::{LNURLPayRequest, LightningAddress, LightningInvoice, LightningPayment},
+            entities::{
+                LNURLPayRequest, LightningAddress, LightningInvoice, LightningPayment, UserBalance,
+            },
             usecases::LightningAddressesUseCases,
         },
         users::entities::{AuthUser, Permission},
@@ -99,7 +101,6 @@ impl LightningAddressesUseCases for LightningService {
             .await?
             .ok_or_else(|| DataError::NotFound("Lightning address not found.".to_string()))?;
 
-        // The user is accessing their own address, no extra permission needed
         if lightning_address.user_id != user.sub {
             user.check_permission(Permission::ReadLightningAddress)?;
         }
@@ -136,6 +137,29 @@ impl LightningAddressesUseCases for LightningService {
         Ok(lightning_addresses)
     }
 
+    async fn get_balance(
+        &self,
+        user: AuthUser,
+        username: String,
+    ) -> Result<UserBalance, ApplicationError> {
+        debug!(user_id = user.sub, "Fetching balance");
+
+        let lightning_address = self
+            .address_repo
+            .get_by_username(&username)
+            .await?
+            .ok_or_else(|| DataError::NotFound("Lightning address not found.".to_string()))?;
+
+        if lightning_address.user_id != user.sub {
+            user.check_permission(Permission::ReadLightningAddress)?;
+        }
+
+        let balance = self.address_repo.get_balance_by_username(&username).await?;
+
+        info!(user_id = user.sub, "Balance fetched successfully");
+        Ok(balance)
+    }
+
     async fn send_payment(
         &self,
         user: AuthUser,
@@ -151,7 +175,16 @@ impl LightningAddressesUseCases for LightningService {
             .await?
             .ok_or_else(|| DataError::NotFound("Lightning address not found.".to_string()))?;
 
-        // TODO: get balance
+        // TODO: Run in a transacion and create a PENDING payment before actually sending it so we reduce the available amount for concurrent requests
+
+        let balance = self
+            .address_repo
+            .get_balance_by_username(&ln_address.username)
+            .await?;
+
+        if balance.available_msat < amount_msat.unwrap_or_default() as i64 {
+            return Err(LightningError::InsufficientFunds.into());
+        }
 
         let input_type = parse(&input)
             .await
@@ -188,7 +221,8 @@ impl LightningAddressesUseCases for LightningService {
             input,
             payment_hash = payment.payment_hash,
             amount_msat,
-            "Payment sent successfully"
+            status = payment.status,
+            "Payment processed successfully"
         );
         Ok(payment)
     }

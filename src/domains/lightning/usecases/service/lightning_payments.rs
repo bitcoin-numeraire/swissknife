@@ -111,9 +111,43 @@ impl LightningPaymentsUseCases for LightningPaymentsProcessor {
     async fn process_failed_payment(
         &self,
         payment_failed: PaymentFailedData,
-    ) -> Result<(), ApplicationError> {
-        trace!(payment_failed = ?payment_failed, "Processing failed outgoing lightning payment");
+    ) -> Result<LightningPayment, ApplicationError> {
+        if payment_failed.invoice.is_none() {
+            return Err(
+                DataError::Validation("Failed payment is missing an Invoice.".into()).into(),
+            );
+        }
 
-        Ok(())
+        let invoice = payment_failed.invoice.unwrap();
+        trace!(
+            payment_hash = invoice.payment_hash,
+            "Processing outgoing failed lightning payment"
+        );
+
+        let payment_option = self.payment_repo.get_by_hash(&invoice.payment_hash).await?;
+
+        if let Some(mut payment) = payment_option {
+            if payment.status == "PAID".to_string() {
+                debug!(
+                    payment_hash = invoice.payment_hash,
+                    "Lightning invoice is already paid."
+                );
+                return Ok(payment);
+            }
+
+            payment.status = "FAILED".to_string();
+            payment.payment_time = Some(invoice.timestamp as i64);
+            payment.error = Some(payment_failed.error);
+            payment = self.payment_repo.update(payment).await?;
+
+            info!(
+                payment_hash = invoice.payment_hash,
+                username = payment.lightning_address,
+                "Outgoing Lightning payment processed successfully"
+            );
+            return Ok(payment);
+        }
+
+        return Err(DataError::NotFound("Lightning payment not found.".into()).into());
     }
 }

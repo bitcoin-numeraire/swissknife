@@ -141,12 +141,13 @@ impl IntoResponse for DataError {
 impl IntoResponse for LightningError {
     fn into_response(self) -> Response {
         let (error_message, status) = match self {
-            LightningError::UnsupportedPaymentFormat(msg)
-            | LightningError::SendBolt11Payment(msg)
-            | LightningError::SendLNURLPayment(msg)
-            | LightningError::NodeInfo(msg) => {
-                debug!("{}", msg);
-                (msg, StatusCode::UNPROCESSABLE_ENTITY)
+            LightningError::UnsupportedPaymentFormat(_)
+            | LightningError::SendBolt11Payment(_)
+            | LightningError::SendLNURLPayment(_)
+            | LightningError::NodeInfo(_)
+            | LightningError::InsufficientFunds => {
+                debug!("{}", self.to_string());
+                (self.to_string(), StatusCode::UNPROCESSABLE_ENTITY)
             }
             _ => {
                 error!("{}", self.to_string());

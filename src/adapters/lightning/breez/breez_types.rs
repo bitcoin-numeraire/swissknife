@@ -13,7 +13,7 @@ impl Into<LightningInvoice> for LNInvoice {
             payment_hash: self.payment_hash,
             description: self.description,
             description_hash: self.description_hash,
-            amount_msat: self.amount_msat.map(|amt| amt as i64),
+            amount_msat: self.amount_msat.unwrap_or_default() as i64,
             payment_secret: self.payment_secret,
             min_final_cltv_expiry_delta: self.min_final_cltv_expiry_delta as i64,
             timestamp: self.timestamp as i64,
