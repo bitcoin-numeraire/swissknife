@@ -5,19 +5,23 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
+use regex::Regex;
 
 use crate::{
     adapters::app::AppState,
     application::{
         dtos::{
             LNUrlpInvoiceQueryParams, LNUrlpInvoiceResponse, LightningAddressResponse,
-            LightningWellKnownResponse, PaginationQueryParams, RegisterLightningAddressRequest,
-            SuccessAction,
+            LightningPaymentResponse, PaginationQueryParams, RegisterLightningAddressRequest,
+            SendPaymentRequest,
         },
-        errors::ApplicationError,
+        errors::{ApplicationError, DataError},
     },
-    domains::users::entities::AuthUser,
+    domains::{lightning::entities::LNURLPayRequest, users::entities::AuthUser},
 };
+
+const MIN_USERNAME_LENGTH: usize = 1;
+const MAX_USERNAME_LENGTH: usize = 64;
 
 pub struct LightningAddressHandler;
 
@@ -29,28 +33,19 @@ impl LightningAddressHandler {
     pub fn addresses_routes() -> Router<Arc<AppState>> {
         Router::new()
             .route("/", get(Self::list))
+            .route("/", post(Self::register))
+            .route("/pay", post(Self::pay))
             .route("/:username", get(Self::get))
             .route("/:username/invoice", get(Self::invoice))
-            .route("/register", post(Self::register))
     }
 
     async fn well_known_lnurlp(
         Path(username): Path<String>,
         State(app_state): State<Arc<AppState>>,
-    ) -> Result<Json<LightningWellKnownResponse>, ApplicationError> {
+    ) -> Result<Json<LNURLPayRequest>, ApplicationError> {
         let lnurlp = app_state.lightning.generate_lnurlp(username).await?;
 
-        let response = LightningWellKnownResponse {
-            callback: lnurlp.callback,
-            max_sendable: lnurlp.max_sendable,
-            min_sendable: lnurlp.min_sendable,
-            metadata: lnurlp.metadata,
-            comment_allowed: lnurlp.comment_allowed,
-            withdraw_link: lnurlp.withdraw_link,
-            tag: lnurlp.tag,
-        };
-
-        Ok(response.into())
+        Ok(lnurlp.into())
     }
 
     async fn invoice(
@@ -60,20 +55,14 @@ impl LightningAddressHandler {
     ) -> Result<Json<LNUrlpInvoiceResponse>, ApplicationError> {
         let invoice = app_state
             .lightning
-            .generate_invoice(username, query_params.amount, query_params.comment)
+            .generate_invoice(
+                username,
+                query_params.amount,
+                query_params.comment.unwrap_or_default(),
+            )
             .await?;
 
-        let response = LNUrlpInvoiceResponse {
-            pr: invoice.bolt11,
-            success_action: Some(SuccessAction {
-                tag: "message".to_string(),
-                message: Some("Thanks for the sats!".to_string()),
-            }),
-            disposable: None,
-            routes: vec![],
-        };
-
-        Ok(response.into())
+        Ok(LNUrlpInvoiceResponse::new(invoice.bolt11).into())
     }
 
     async fn register(
@@ -81,6 +70,22 @@ impl LightningAddressHandler {
         user: AuthUser,
         Json(payload): Json<RegisterLightningAddressRequest>,
     ) -> Result<Json<LightningAddressResponse>, ApplicationError> {
+        // Length check
+        let username_length = payload.username.len();
+        if username_length < MIN_USERNAME_LENGTH || username_length > MAX_USERNAME_LENGTH {
+            return Err(
+                DataError::RequestValidation("Invlaid username length.".to_string()).into(),
+            );
+        }
+
+        // Regex validation for allowed characters
+        let email_username_re = Regex::new(r"^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+$").unwrap(); // Can't fail by assertion
+        if !email_username_re.is_match(&payload.username) {
+            return Err(
+                DataError::RequestValidation("Invalid username format.".to_string()).into(),
+            );
+        }
+
         let lightning_address = app_state
             .lightning
             .register_lightning_address(user, payload.username)
@@ -119,5 +124,18 @@ impl LightningAddressHandler {
             lightning_addresses.into_iter().map(Into::into).collect();
 
         Ok(response.into())
+    }
+
+    async fn pay(
+        State(app_state): State<Arc<AppState>>,
+        user: AuthUser,
+        Json(payload): Json<SendPaymentRequest>,
+    ) -> Result<Json<LightningPaymentResponse>, ApplicationError> {
+        let payment = app_state
+            .lightning
+            .send_payment(user, payload.input, payload.amount_msat, payload.comment)
+            .await?;
+
+        Ok(Json(payment.into()))
     }
 }

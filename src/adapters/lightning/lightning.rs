@@ -1,7 +1,10 @@
 use async_trait::async_trait;
-use breez_sdk_core::{LspInformation, NodeState, Payment};
+use breez_sdk_core::{LnUrlPayRequestData, LspInformation, NodeState, Payment};
 
-use crate::{application::errors::LightningError, domains::lightning::entities::LightningInvoice};
+use crate::{
+    application::errors::LightningError,
+    domains::lightning::entities::{LightningInvoice, LightningPayment},
+};
 
 #[async_trait]
 pub trait LightningClient: Sync + Send {
@@ -13,13 +16,24 @@ pub trait LightningClient: Sync + Send {
         amount_msat: u64,
         description: String,
     ) -> Result<LightningInvoice, LightningError>;
-    async fn send_payment(
-        &self,
-        bolt11: String,
-        amount_msat: Option<u64>,
-    ) -> Result<Payment, LightningError>;
     async fn payment_by_hash(
         &self,
         payment_hash: String,
     ) -> Result<Option<Payment>, LightningError>;
+    async fn send_payment(
+        &self,
+        bolt11: String,
+        amount_msat: Option<u64>,
+    ) -> Result<LightningPayment, LightningError>;
+    async fn send_spontaneous_payment(
+        &self,
+        node_id: String,
+        amount_msat: u64,
+    ) -> Result<LightningPayment, LightningError>;
+    async fn lnurl_pay(
+        &self,
+        data: LnUrlPayRequestData,
+        amount_msat: u64,
+        comment: Option<String>,
+    ) -> Result<LightningPayment, LightningError>;
 }

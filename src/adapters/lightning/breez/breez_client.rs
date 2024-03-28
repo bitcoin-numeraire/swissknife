@@ -1,16 +1,19 @@
 use serde::Deserialize;
 use std::sync::Arc;
+use tracing::debug;
 
 use async_trait::async_trait;
 use bip39::Mnemonic;
 use breez_sdk_core::{
-    BreezServices, EnvironmentType, GreenlightNodeConfig, ListPaymentsRequest, LspInformation,
-    NodeConfig, NodeState, Payment, ReceivePaymentRequest, SendPaymentRequest,
+    BreezServices, EnvironmentType, GreenlightNodeConfig, ListPaymentsRequest, LnUrlPayRequest,
+    LnUrlPayRequestData, LnUrlPayResult, LspInformation, NodeConfig, NodeState, Payment,
+    ReceivePaymentRequest, SendPaymentRequest, SendSpontaneousPaymentRequest,
 };
 
 use crate::{
-    adapters::lightning::LightningClient, application::errors::LightningError,
-    domains::lightning::entities::LightningInvoice,
+    adapters::lightning::LightningClient,
+    application::errors::LightningError,
+    domains::lightning::entities::{LightningInvoice, LightningPayment},
 };
 
 use super::BreezListener;
@@ -74,29 +77,7 @@ impl LightningClient for BreezClient {
             .await
             .map_err(|e| LightningError::Invoice(e.to_string()))?;
 
-        let invoice = LightningInvoice {
-            id: None,
-            lightning_address: None,
-            bolt11: response.ln_invoice.bolt11,
-            network: response.ln_invoice.network.to_string(),
-            payee_pubkey: response.ln_invoice.payee_pubkey,
-            payment_hash: response.ln_invoice.payment_hash,
-            description: response.ln_invoice.description,
-            comment: None,
-            description_hash: response.ln_invoice.description_hash,
-            amount_msat: response.ln_invoice.amount_msat.map(|amt| amt as i64),
-            payment_secret: response.ln_invoice.payment_secret,
-            min_final_cltv_expiry_delta: response.ln_invoice.min_final_cltv_expiry_delta as i64,
-            timestamp: response.ln_invoice.timestamp as i64,
-            expiry: response.ln_invoice.expiry as i64,
-            status: "PENDING".to_string(),
-            fee_msat: None,
-            payment_time: None,
-            created_at: None,
-            updated_at: None,
-        };
-
-        Ok(invoice)
+        Ok(response.ln_invoice.into())
     }
 
     fn node_info(&self) -> Result<NodeState, LightningError> {
@@ -142,7 +123,7 @@ impl LightningClient for BreezClient {
         &self,
         bolt11: String,
         amount_msat: Option<u64>,
-    ) -> Result<Payment, LightningError> {
+    ) -> Result<LightningPayment, LightningError> {
         let response = self
             .sdk
             .send_payment(SendPaymentRequest {
@@ -152,7 +133,58 @@ impl LightningClient for BreezClient {
             .await
             .map_err(|e| LightningError::SendBolt11Payment(e.to_string()))?;
 
-        Ok(response.payment)
+        Ok(response.payment.into())
+    }
+
+    async fn send_spontaneous_payment(
+        &self,
+        node_id: String,
+        amount_msat: u64,
+    ) -> Result<LightningPayment, LightningError> {
+        let response = self
+            .sdk
+            .send_spontaneous_payment(SendSpontaneousPaymentRequest {
+                node_id,
+                amount_msat,
+                extra_tlvs: None, // TODO: Add support for extra TLVs
+            })
+            .await
+            .map_err(|e| LightningError::SendNodeIdPayment(e.to_string()))?;
+
+        Ok(response.payment.into())
+    }
+
+    async fn lnurl_pay(
+        &self,
+        data: LnUrlPayRequestData,
+        amount_msat: u64,
+        comment: Option<String>,
+    ) -> Result<LightningPayment, LightningError> {
+        let result = self
+            .sdk
+            .lnurl_pay(LnUrlPayRequest {
+                data,
+                amount_msat,
+                comment,
+            })
+            .await
+            .map_err(|e| LightningError::SendLNURLPayment(e.to_string()))?;
+
+        match result {
+            LnUrlPayResult::EndpointSuccess { data } => Ok(LightningPayment::new(
+                data.payment_hash,
+                amount_msat as i64,
+                None,
+            )),
+            LnUrlPayResult::EndpointError { data } => {
+                return Err(LightningError::SendLNURLPayment(data.reason));
+            }
+            LnUrlPayResult::PayError { data } => Ok(LightningPayment::new(
+                data.payment_hash,
+                amount_msat as i64,
+                Some(data.reason),
+            )),
+        }
     }
 
     async fn payment_by_hash(

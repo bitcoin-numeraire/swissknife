@@ -6,11 +6,13 @@ use uuid::Uuid;
 
 use crate::domains::lightning::entities::LightningAddress;
 use crate::domains::lightning::entities::LightningInvoice;
+use crate::domains::lightning::entities::LightningPayment;
 
 #[derive(Debug, Deserialize)]
 pub struct SendPaymentRequest {
-    pub bolt11: String,
+    pub input: String,
     pub amount_msat: Option<u64>,
+    pub comment: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -97,6 +99,47 @@ impl From<LightningInvoice> for LightningInvoiceResponse {
             status: invoice.status,
             created_at: invoice.created_at.unwrap(), // Can't be empty on the API layer
             updated_at: invoice.updated_at,
+        }
+    }
+}
+
+#[derive(Debug, Serialize)]
+pub struct LightningPaymentResponse {
+    pub id: Uuid,
+    pub lightning_address: Option<String>,
+    pub payment_hash: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+    pub amount_msat: i64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fee_msat: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub payment_time: Option<i64>,
+    pub status: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<String>,
+    pub created_at: DateTime<Utc>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub updated_at: Option<DateTime<Utc>>,
+}
+
+impl From<LightningPayment> for LightningPaymentResponse {
+    fn from(payment: LightningPayment) -> Self {
+        Self {
+            id: payment.id.unwrap(), // Can't be empty on the API layer
+            lightning_address: payment.lightning_address,
+            payment_hash: payment.payment_hash,
+            error: payment.error,
+            amount_msat: payment.amount_msat,
+            fee_msat: payment.fee_msat,
+            payment_time: payment.payment_time,
+            status: payment.status,
+            description: payment.description,
+            metadata: payment.metadata,
+            created_at: payment.created_at.unwrap(), // Can't be empty on the API layer
+            updated_at: payment.updated_at,
         }
     }
 }

@@ -1,23 +1,25 @@
 use async_trait::async_trait;
-use breez_sdk_core::{LspInformation, NodeState, Payment};
+use breez_sdk_core::{LspInformation, NodeState, Payment, PaymentFailedData};
 
 use crate::{
     application::errors::ApplicationError,
     domains::{
-        lightning::entities::{LNURLp, LightningAddress, LightningInvoice},
+        lightning::entities::{
+            LNURLPayRequest, LightningAddress, LightningInvoice, LightningPayment,
+        },
         users::entities::AuthUser,
     },
 };
 
 #[async_trait]
 pub trait LightningAddressesUseCases: Send + Sync {
-    async fn generate_lnurlp(&self, username: String) -> Result<LNURLp, ApplicationError>;
+    async fn generate_lnurlp(&self, username: String) -> Result<LNURLPayRequest, ApplicationError>;
 
     async fn generate_invoice(
         &self,
         username: String,
         amount: u64,
-        comment: Option<String>,
+        description: String,
     ) -> Result<LightningInvoice, ApplicationError>;
 
     async fn register_lightning_address(
@@ -38,6 +40,14 @@ pub trait LightningAddressesUseCases: Send + Sync {
         limit: usize,
         offset: usize,
     ) -> Result<Vec<LightningAddress>, ApplicationError>;
+
+    async fn send_payment(
+        &self,
+        user: AuthUser,
+        input: String,
+        amount_msat: Option<u64>,
+        comment: Option<String>,
+    ) -> Result<LightningPayment, ApplicationError>;
 }
 
 #[async_trait]
@@ -46,6 +56,14 @@ pub trait LightningPaymentsUseCases: Send + Sync {
         &self,
         payment: Payment,
     ) -> Result<LightningInvoice, ApplicationError>;
+    async fn process_outgoing_payment(
+        &self,
+        payment: Payment,
+    ) -> Result<LightningPayment, ApplicationError>;
+    async fn process_failed_payment(
+        &self,
+        payment: PaymentFailedData,
+    ) -> Result<(), ApplicationError>;
 }
 
 #[async_trait]
@@ -58,7 +76,7 @@ pub trait LightningNodeUseCases: Send + Sync {
         user: AuthUser,
         bolt11_invoice: String,
         amount_msat: Option<u64>,
-    ) -> Result<Payment, ApplicationError>;
+    ) -> Result<LightningPayment, ApplicationError>;
 }
 
 pub trait LightningUseCases: LightningAddressesUseCases + LightningNodeUseCases {}

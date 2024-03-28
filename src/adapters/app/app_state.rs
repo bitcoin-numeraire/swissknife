@@ -4,7 +4,10 @@ use crate::{
     adapters::{auth::Authenticator, lightning::breez::BreezListener, rgb::RGBClient},
     application::errors::{ApplicationError, WebServerError},
     domains::lightning::{
-        store::sqlx::{SqlxLightningAddressRepository, SqlxLightningInvoiceRepository},
+        store::sqlx::{
+            SqlxLightningAddressRepository, SqlxLightningInvoiceRepository,
+            SqlxLightningPaymentRepository,
+        },
         usecases::{service::LightningPaymentsProcessor, LightningUseCases},
     },
 };
@@ -51,15 +54,18 @@ impl AppState {
         // Create repositories
         let lightning_address = Box::new(SqlxLightningAddressRepository::new(db_client.clone()));
         let lightning_invoice = Box::new(SqlxLightningInvoiceRepository::new(db_client.clone()));
-        let payments_processor = LightningPaymentsProcessor::new(lightning_invoice.clone());
+        let lightning_payment = Box::new(SqlxLightningPaymentRepository::new(db_client.clone()));
+        let payments_processor =
+            LightningPaymentsProcessor::new(lightning_invoice.clone(), lightning_payment.clone());
 
         // Create services
         let listener = BreezListener::new(Arc::new(payments_processor));
         let lightning_client =
             BreezClient::new(config.lightning.clone(), Box::new(listener)).await?;
         let lightning = LightningService::new(
-            lightning_invoice.clone(),
+            lightning_invoice,
             lightning_address,
+            lightning_payment,
             Box::new(lightning_client),
             config.lightning.domain,
         );
