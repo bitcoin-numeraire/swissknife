@@ -1,6 +1,5 @@
 use serde::Deserialize;
 use std::sync::Arc;
-use tracing::debug;
 
 use async_trait::async_trait;
 use bip39::Mnemonic;

@@ -19,4 +19,7 @@ pub enum DatabaseError {
 
     #[error("Failed to update resource: {0}")]
     Update(String),
+
+    #[error("Failed to compute balance: {0}")]
+    Balance(String),
 }

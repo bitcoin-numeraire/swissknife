@@ -17,7 +17,10 @@ use crate::{
         },
         errors::{ApplicationError, DataError},
     },
-    domains::{lightning::entities::LNURLPayRequest, users::entities::AuthUser},
+    domains::{
+        lightning::entities::{LNURLPayRequest, UserBalance},
+        users::entities::AuthUser,
+    },
 };
 
 const MIN_USERNAME_LENGTH: usize = 1;
@@ -37,6 +40,7 @@ impl LightningAddressHandler {
             .route("/pay", post(Self::pay))
             .route("/:username", get(Self::get))
             .route("/:username/invoice", get(Self::invoice))
+            .route("/:username/balance", get(Self::get_balance))
     }
 
     async fn well_known_lnurlp(
@@ -124,6 +128,16 @@ impl LightningAddressHandler {
             lightning_addresses.into_iter().map(Into::into).collect();
 
         Ok(response.into())
+    }
+
+    async fn get_balance(
+        State(app_state): State<Arc<AppState>>,
+        user: AuthUser,
+        Path(username): Path<String>,
+    ) -> Result<Json<UserBalance>, ApplicationError> {
+        let balance = app_state.lightning.get_balance(user, username).await?;
+
+        Ok(balance.into())
     }
 
     async fn pay(

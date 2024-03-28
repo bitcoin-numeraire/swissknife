@@ -3,7 +3,7 @@ use async_trait::async_trait;
 use crate::{
     adapters::database::DatabaseClient,
     application::errors::DatabaseError,
-    domains::lightning::{entities::LightningAddress, store::LightningAddressRepository},
+    domains::lightning::{entities::{LightningAddress, UserBalance}, store::LightningAddressRepository},
 };
 
 #[derive(Clone)]
@@ -115,5 +115,42 @@ impl<D: DatabaseClient> LightningAddressRepository for SqlxLightningAddressRepos
         .map_err(|e| DatabaseError::Insert(e.to_string()))?;
 
         Ok(lightning_address)
+    }
+
+    async fn get_balance_by_username(&self, username: &str) -> Result<UserBalance, DatabaseError> {
+        let record = sqlx::query!(
+            r#"
+            WITH sent AS (
+                SELECT
+                    COALESCE(SUM(CASE WHEN status = 'PAID' THEN amount_msat ELSE 0 END) - 
+                    COALESCE(SUM(CASE WHEN status = 'PENDING' THEN amount_msat ELSE 0 END), 0), 0)::BIGINT AS sent_msat
+                FROM lightning_payments
+                WHERE lightning_address = $1
+            ),
+            received AS (
+                SELECT
+                    COALESCE(SUM(CASE WHEN status = 'PAID' THEN amount_msat ELSE 0 END), 0)::BIGINT AS received_msat
+                FROM lightning_invoices
+                WHERE lightning_address = $1
+            )
+            SELECT
+                received.received_msat,
+                sent.sent_msat,
+                (received.received_msat - sent.sent_msat) AS available_msat
+            FROM received, sent;
+            "#,
+            username
+        )
+            .fetch_one(&self.db_client.pool())
+            .await
+            .map_err(|e| DatabaseError::Balance(e.to_string()))?;
+
+        let balance = UserBalance {
+            received_msat: record.received_msat.unwrap_or(0),
+            sent_msat: record.sent_msat.unwrap_or(0),
+            available_msat: record.available_msat.unwrap_or(0),
+        };
+
+        Ok(balance)
     }
 }

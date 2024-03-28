@@ -12,7 +12,7 @@ pub struct LightningInvoice {
     pub payment_hash: String,
     pub description: Option<String>,
     pub description_hash: Option<String>,
-    pub amount_msat: Option<i64>,
+    pub amount_msat: i64,
     pub payment_secret: Vec<u8>,
     pub timestamp: i64,
     pub expiry: i64,

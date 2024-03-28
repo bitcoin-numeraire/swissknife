@@ -5,5 +5,5 @@ mod lnurl;
 
 pub use lightning_address::*;
 pub use lightning_invoice::*;
-pub use lightning_payment::LightningPayment;
+pub use lightning_payment::*;
 pub use lnurl::LNURLPayRequest;

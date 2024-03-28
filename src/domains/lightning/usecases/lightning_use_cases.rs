@@ -5,7 +5,7 @@ use crate::{
     application::errors::ApplicationError,
     domains::{
         lightning::entities::{
-            LNURLPayRequest, LightningAddress, LightningInvoice, LightningPayment,
+            LNURLPayRequest, LightningAddress, LightningInvoice, LightningPayment, UserBalance,
         },
         users::entities::AuthUser,
     },
@@ -41,6 +41,12 @@ pub trait LightningAddressesUseCases: Send + Sync {
         offset: usize,
     ) -> Result<Vec<LightningAddress>, ApplicationError>;
 
+    async fn get_balance(
+        &self,
+        user: AuthUser,
+        username: String,
+    ) -> Result<UserBalance, ApplicationError>;
+
     async fn send_payment(
         &self,
         user: AuthUser,
@@ -63,7 +69,7 @@ pub trait LightningPaymentsUseCases: Send + Sync {
     async fn process_failed_payment(
         &self,
         payment: PaymentFailedData,
-    ) -> Result<(), ApplicationError>;
+    ) -> Result<LightningPayment, ApplicationError>;
 }
 
 #[async_trait]
