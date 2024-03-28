@@ -175,7 +175,16 @@ impl LightningAddressesUseCases for LightningService {
             .await?
             .ok_or_else(|| DataError::NotFound("Lightning address not found.".to_string()))?;
 
-        // TODO: get balance
+        // TODO: Run in a transacion and create a PENDING payment before actually sending it so we reduce the available amount for concurrent requests
+
+        let balance = self
+            .address_repo
+            .get_balance_by_username(&ln_address.username)
+            .await?;
+
+        if balance.available_msat < amount_msat.unwrap_or_default() as i64 {
+            return Err(LightningError::InsufficientFunds.into());
+        }
 
         let input_type = parse(&input)
             .await

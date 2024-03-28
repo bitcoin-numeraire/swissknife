@@ -34,4 +34,7 @@ pub enum LightningError {
 
     #[error("Unsupported payment format: {0}")]
     UnsupportedPaymentFormat(String),
+
+    #[error("Insufficient funds")]
+    InsufficientFunds,
 }
