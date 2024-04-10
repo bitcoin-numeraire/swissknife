@@ -7,18 +7,18 @@ use crate::{
 };
 
 #[derive(Clone)]
-pub struct SqlxLightningPaymentRepository<D: DatabaseClient> {
+pub struct PgLightningPaymentRepository<D: DatabaseClient> {
     db_client: D,
 }
 
-impl<D: DatabaseClient> SqlxLightningPaymentRepository<D> {
+impl<D: DatabaseClient> PgLightningPaymentRepository<D> {
     pub fn new(db_client: D) -> Self {
         Self { db_client }
     }
 }
 
 #[async_trait]
-impl<D: DatabaseClient> LightningPaymentRepository for SqlxLightningPaymentRepository<D> {
+impl<D: DatabaseClient> LightningPaymentRepository for PgLightningPaymentRepository<D> {
     async fn get_by_hash(
         &self,
         payment_hash: &str,
@@ -40,7 +40,6 @@ impl<D: DatabaseClient> LightningPaymentRepository for SqlxLightningPaymentRepos
     async fn insert(&self, payment: LightningPayment) -> Result<LightningPayment, DatabaseError> {
         let lightning_payment = sqlx::query_as!(
             LightningPayment,
-            // language=PostgreSQL
             r#"
                 INSERT INTO lightning_payments (
                     lightning_address, 

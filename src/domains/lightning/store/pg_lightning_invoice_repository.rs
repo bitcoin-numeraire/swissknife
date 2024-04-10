@@ -7,18 +7,18 @@ use crate::{
 };
 
 #[derive(Clone)]
-pub struct SqlxLightningInvoiceRepository<D: DatabaseClient> {
+pub struct PgLightningInvoiceRepository<D: DatabaseClient> {
     db_client: D,
 }
 
-impl<D: DatabaseClient> SqlxLightningInvoiceRepository<D> {
+impl<D: DatabaseClient> PgLightningInvoiceRepository<D> {
     pub fn new(db_client: D) -> Self {
         Self { db_client }
     }
 }
 
 #[async_trait]
-impl<D: DatabaseClient> LightningInvoiceRepository for SqlxLightningInvoiceRepository<D> {
+impl<D: DatabaseClient> LightningInvoiceRepository for PgLightningInvoiceRepository<D> {
     async fn get_by_hash(
         &self,
         payment_hash: &str,

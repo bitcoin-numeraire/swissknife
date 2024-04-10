@@ -22,7 +22,8 @@ impl LightningAddressesUseCases for LightningService {
     async fn generate_lnurlp(&self, username: String) -> Result<LNURLPayRequest, ApplicationError> {
         debug!(username, "Generating LNURLp");
 
-        self.address_repo
+        self.store
+            .address_repo
             .get_by_username(&username)
             .await?
             .ok_or_else(|| DataError::NotFound("Lightning address not found.".to_string()))?;
@@ -39,7 +40,8 @@ impl LightningAddressesUseCases for LightningService {
     ) -> Result<LightningInvoice, ApplicationError> {
         debug!(username, "Generating lightning invoice");
 
-        self.address_repo
+        self.store
+            .address_repo
             .get_by_username(&username)
             .await?
             .ok_or_else(|| DataError::NotFound("Lightning address not found.".to_string()))?;
@@ -47,7 +49,7 @@ impl LightningAddressesUseCases for LightningService {
         let mut invoice = self.lightning_client.invoice(amount, description).await?;
 
         invoice.lightning_address = Some(username.clone());
-        invoice = self.invoice_repo.insert(invoice).await?;
+        invoice = self.store.invoice_repo.insert(invoice).await?;
 
         info!(username, "Lightning invoice generated successfully");
         Ok(invoice)
@@ -63,7 +65,13 @@ impl LightningAddressesUseCases for LightningService {
             username, "Registering lightning address"
         );
 
-        if self.address_repo.get_by_user_id(&user.sub).await?.is_some() {
+        if self
+            .store
+            .address_repo
+            .get_by_user_id(&user.sub)
+            .await?
+            .is_some()
+        {
             return Err(DataError::Conflict(
                 "User has already registered a lightning address.".to_string(),
             )
@@ -71,6 +79,7 @@ impl LightningAddressesUseCases for LightningService {
         }
 
         if self
+            .store
             .address_repo
             .get_by_username(&username)
             .await?
@@ -79,7 +88,7 @@ impl LightningAddressesUseCases for LightningService {
             return Err(DataError::Conflict("Username already exists.".to_string()).into());
         }
 
-        let lightning_address = self.address_repo.insert(&user.sub, &username).await?;
+        let lightning_address = self.store.address_repo.insert(&user.sub, &username).await?;
 
         info!(
             user_id = user.sub,
@@ -96,6 +105,7 @@ impl LightningAddressesUseCases for LightningService {
         debug!(user_id = user.sub, "Fetching lightning address");
 
         let lightning_address = self
+            .store
             .address_repo
             .get_by_username(&username)
             .await?
@@ -122,10 +132,11 @@ impl LightningAddressesUseCases for LightningService {
 
         let lightning_addresses = if user.has_permission(Permission::ReadLightningAddress) {
             // The user has permission to view all addresses
-            self.address_repo.list(limit, offset).await?
+            self.store.address_repo.list(limit, offset).await?
         } else {
             // The user can only view their own addresses
-            self.address_repo
+            self.store
+                .address_repo
                 .list_by_user_id(&user.sub, limit, offset)
                 .await?
         };
@@ -145,6 +156,7 @@ impl LightningAddressesUseCases for LightningService {
         debug!(user_id = user.sub, "Fetching balance");
 
         let lightning_address = self
+            .store
             .address_repo
             .get_by_username(&username)
             .await?
@@ -154,7 +166,11 @@ impl LightningAddressesUseCases for LightningService {
             user.check_permission(Permission::ReadLightningAddress)?;
         }
 
-        let balance = self.address_repo.get_balance_by_username(&username).await?;
+        let balance = self
+            .store
+            .address_repo
+            .get_balance_by_username(&username)
+            .await?;
 
         info!(user_id = user.sub, "Balance fetched successfully");
         Ok(balance)
@@ -170,14 +186,15 @@ impl LightningAddressesUseCases for LightningService {
         debug!(user_id = user.sub, input, "Sending payment");
 
         let ln_address = self
+            .store
             .address_repo
             .get_by_user_id(&user.sub)
             .await?
             .ok_or_else(|| DataError::NotFound("Lightning address not found.".to_string()))?;
 
         // TODO: Run in a transacion and create a PENDING payment before actually sending it so we reduce the available amount for concurrent requests
-
         let balance = self
+            .store
             .address_repo
             .get_balance_by_username(&ln_address.username)
             .await?;
@@ -185,6 +202,10 @@ impl LightningAddressesUseCases for LightningService {
         if balance.available_msat < amount_msat.unwrap_or_default() as i64 {
             return Err(LightningError::InsufficientFunds.into());
         }
+
+        let mut payment = LightningPayment::new(payment_hash, amount_msat, error);
+        payment.lightning_address = Some(ln_address.username.clone());
+        payment = self.store.payment_repo.insert(payment).await?;
 
         let input_type = parse(&input)
             .await
@@ -214,7 +235,7 @@ impl LightningAddressesUseCases for LightningService {
         }?;
 
         payment.lightning_address = Some(ln_address.username.clone());
-        payment = self.payment_repo.insert(payment).await?;
+        payment = self.store.payment_repo.update(payment).await?;
 
         info!(
             user_id = user.sub,

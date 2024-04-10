@@ -1,3 +1,3 @@
-mod sqlx_client;
+mod pg_client;
 
-pub use sqlx_client::SQLxClient;
+pub use pg_client::PgClient;

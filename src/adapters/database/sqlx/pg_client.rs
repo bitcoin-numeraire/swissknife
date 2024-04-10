@@ -10,11 +10,11 @@ use crate::{
 };
 
 #[derive(Clone)]
-pub struct SQLxClient {
+pub struct PgClient {
     pool: PgPool,
 }
 
-impl SQLxClient {
+impl PgClient {
     pub async fn connect(config: DatabaseConfig) -> Result<Self, DatabaseError> {
         let mut pool_options = PgPoolOptions::new();
 
@@ -55,7 +55,7 @@ impl SQLxClient {
 }
 
 #[async_trait]
-impl DatabaseClient for SQLxClient {
+impl DatabaseClient for PgClient {
     fn pool(&self) -> PgPool {
         self.pool.clone()
     }

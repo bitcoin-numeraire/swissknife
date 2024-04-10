@@ -1,28 +1,27 @@
 use std::sync::Arc;
 
 use crate::{
-    adapters::{auth::Authenticator, lightning::breez::BreezListener, rgb::RGBClient},
-    application::errors::{ApplicationError, WebServerError},
+    adapters::{
+        auth::{jwt::JWTAuthenticator, Authenticator},
+        database::sqlx::PgClient,
+        lightning::breez::{BreezClient, BreezListener},
+        rgb::{rgblib::RGBLibClient, RGBClient},
+    },
+    application::{
+        dtos::AppConfig,
+        errors::{ApplicationError, WebServerError},
+    },
     domains::lightning::{
-        store::sqlx::{
-            SqlxLightningAddressRepository, SqlxLightningInvoiceRepository,
-            SqlxLightningPaymentRepository,
-        },
-        usecases::{service::LightningPaymentsProcessor, LightningUseCases},
+        store::LightningStore,
+        store::PgLightningAddressRepository,
+        store::PgLightningInvoiceRepository,
+        store::PgLightningPaymentRepository,
+        usecases::{service::LightningPaymentsProcessor, LightningService, LightningUseCases},
     },
 };
 use humantime::parse_duration;
 use tower_http::timeout::TimeoutLayer;
 use tracing::warn;
-
-use crate::{
-    adapters::{
-        auth::jwt::JWTAuthenticator, database::sqlx::SQLxClient, lightning::breez::BreezClient,
-        rgb::rgblib::RGBLibClient,
-    },
-    application::dtos::AppConfig,
-    domains::lightning::usecases::LightningService,
-};
 
 #[derive(Clone)]
 pub struct AppState {
@@ -39,7 +38,7 @@ impl AppState {
 
         // Create adapters
         let timeout_layer = TimeoutLayer::new(timeout_request);
-        let db_client = SQLxClient::connect(config.database.clone()).await?;
+        let db_client = PgClient::connect(config.database.clone()).await?;
         let rgb_client = RGBLibClient::new(config.rgb.clone()).await?;
         let jwt_authenticator = if config.auth.enabled {
             Some(
@@ -51,21 +50,20 @@ impl AppState {
             None
         };
 
-        // Create repositories
-        let lightning_address = Box::new(SqlxLightningAddressRepository::new(db_client.clone()));
-        let lightning_invoice = Box::new(SqlxLightningInvoiceRepository::new(db_client.clone()));
-        let lightning_payment = Box::new(SqlxLightningPaymentRepository::new(db_client.clone()));
-        let payments_processor =
-            LightningPaymentsProcessor::new(lightning_invoice.clone(), lightning_payment.clone());
+        // Create repositories and stores
+        let store = LightningStore::new(
+            Arc::new(PgLightningInvoiceRepository::new(db_client.clone())),
+            Arc::new(PgLightningAddressRepository::new(db_client.clone())),
+            Arc::new(PgLightningPaymentRepository::new(db_client.clone())),
+        );
 
         // Create services
+        let payments_processor = LightningPaymentsProcessor::new(store.clone());
         let listener = BreezListener::new(Arc::new(payments_processor));
         let lightning_client =
             BreezClient::new(config.lightning.clone(), Box::new(listener)).await?;
         let lightning = LightningService::new(
-            lightning_invoice,
-            lightning_address,
-            lightning_payment,
+            store.clone(),
             Box::new(lightning_client),
             config.lightning.domain,
         );

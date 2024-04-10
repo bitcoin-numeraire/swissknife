@@ -7,18 +7,18 @@ use crate::{
 };
 
 #[derive(Clone)]
-pub struct SqlxLightningAddressRepository<D: DatabaseClient> {
+pub struct PgLightningAddressRepository<D: DatabaseClient> {
     db_client: D,
 }
 
-impl<D: DatabaseClient> SqlxLightningAddressRepository<D> {
+impl<D: DatabaseClient> PgLightningAddressRepository<D> {
     pub fn new(db_client: D) -> Self {
         Self { db_client }
     }
 }
 
 #[async_trait]
-impl<D: DatabaseClient> LightningAddressRepository for SqlxLightningAddressRepository<D> {
+impl<D: DatabaseClient> LightningAddressRepository for PgLightningAddressRepository<D> {
     async fn get_by_user_id(
         &self,
         user: &str,

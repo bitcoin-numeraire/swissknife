@@ -6,25 +6,18 @@ use crate::{
     application::errors::{ApplicationError, DataError},
     domains::lightning::{
         entities::{LightningInvoice, LightningPayment},
-        store::{LightningInvoiceRepository, LightningPaymentRepository},
+        store::LightningStore,
         usecases::LightningPaymentsUseCases,
     },
 };
 
 pub struct LightningPaymentsProcessor {
-    pub invoice_repo: Box<dyn LightningInvoiceRepository>,
-    pub payment_repo: Box<dyn LightningPaymentRepository>,
+    pub store: LightningStore,
 }
 
 impl LightningPaymentsProcessor {
-    pub fn new(
-        invoice_repo: Box<dyn LightningInvoiceRepository>,
-        payment_repo: Box<dyn LightningPaymentRepository>,
-    ) -> Self {
-        LightningPaymentsProcessor {
-            invoice_repo,
-            payment_repo,
-        }
+    pub fn new(store: LightningStore) -> Self {
+        LightningPaymentsProcessor { store }
     }
 }
 
@@ -45,7 +38,7 @@ impl LightningPaymentsUseCases for LightningPaymentsProcessor {
             return Err(DataError::Validation("Payment is not Received.".into()).into());
         }
 
-        let invoice_option = self.invoice_repo.get_by_hash(&payment_hash).await?;
+        let invoice_option = self.store.invoice_repo.get_by_hash(&payment_hash).await?;
 
         if let Some(mut invoice) = invoice_option {
             if invoice.status == "PAID".to_string() {
@@ -57,7 +50,7 @@ impl LightningPaymentsUseCases for LightningPaymentsProcessor {
             invoice.status = "PAID".to_string();
             invoice.payment_time = Some(payment.payment_time);
 
-            invoice = self.invoice_repo.update(invoice).await?;
+            invoice = self.store.invoice_repo.update(invoice).await?;
 
             info!(
                 payment_hash,
@@ -84,7 +77,7 @@ impl LightningPaymentsUseCases for LightningPaymentsProcessor {
             return Err(DataError::Validation("Payment is not Sent.".into()).into());
         }
 
-        let payment_option = self.payment_repo.get_by_hash(&payment_hash).await?;
+        let payment_option = self.store.payment_repo.get_by_hash(&payment_hash).await?;
 
         if let Some(mut payment) = payment_option {
             if payment.status == "PAID".to_string() {
@@ -96,7 +89,7 @@ impl LightningPaymentsUseCases for LightningPaymentsProcessor {
             payment.status = "PAID".to_string();
             payment.payment_time = Some(payment_success.payment_time);
 
-            payment = self.payment_repo.update(payment).await?;
+            payment = self.store.payment_repo.update(payment).await?;
 
             info!(
                 payment_hash,
@@ -124,7 +117,11 @@ impl LightningPaymentsUseCases for LightningPaymentsProcessor {
             "Processing outgoing failed lightning payment"
         );
 
-        let payment_option = self.payment_repo.get_by_hash(&invoice.payment_hash).await?;
+        let payment_option = self
+            .store
+            .payment_repo
+            .get_by_hash(&invoice.payment_hash)
+            .await?;
 
         if let Some(mut payment) = payment_option {
             if payment.status == "PAID".to_string() {
@@ -138,7 +135,7 @@ impl LightningPaymentsUseCases for LightningPaymentsProcessor {
             payment.status = "FAILED".to_string();
             payment.payment_time = Some(invoice.timestamp as i64);
             payment.error = Some(payment_failed.error);
-            payment = self.payment_repo.update(payment).await?;
+            payment = self.store.payment_repo.update(payment).await?;
 
             info!(
                 payment_hash = invoice.payment_hash,
