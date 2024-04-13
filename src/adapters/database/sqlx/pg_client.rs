@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 use humantime::parse_duration;
-use sqlx::{postgres::PgPoolOptions, PgPool};
+use sqlx::{postgres::PgPoolOptions, PgPool, Pool, Postgres};
 
 use crate::{
     adapters::database::{DatabaseClient, DatabaseConfig},
@@ -56,7 +56,9 @@ impl PgClient {
 
 #[async_trait]
 impl DatabaseClient for PgClient {
-    fn pool(&self) -> PgPool {
-        self.pool.clone()
+    type DB = Postgres;
+
+    fn pool(&self) -> &Pool<Self::DB> {
+        &self.pool
     }
 }

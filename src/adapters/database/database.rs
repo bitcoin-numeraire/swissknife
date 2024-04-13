@@ -1,5 +1,6 @@
+use async_trait::async_trait;
 use serde::Deserialize;
-use sqlx::PgPool;
+use sqlx::{Database, Pool};
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct DatabaseConfig {
@@ -11,6 +12,9 @@ pub struct DatabaseConfig {
     pub acquire_timeout: Option<String>,
 }
 
+#[async_trait]
 pub trait DatabaseClient: Send + Sync {
-    fn pool(&self) -> PgPool;
+    type DB: Database;
+
+    fn pool(&self) -> &Pool<Self::DB>;
 }

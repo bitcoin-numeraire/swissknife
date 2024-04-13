@@ -23,6 +23,6 @@ pub enum DatabaseError {
     #[error("Failed to compute balance: {0}")]
     Balance(String),
 
-    #[error("Failed to begin transaction: {0}")]
+    #[error("Failed to perform transaction operation: {0}")]
     Transaction(String),
 }
