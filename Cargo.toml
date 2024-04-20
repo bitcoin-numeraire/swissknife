@@ -9,9 +9,7 @@ description = "Numeraire's Bitcoin SwissKnife is a software application enabling
 repository = "https://github.com/bitcoin-numeraire/swissknife"
 homepage = "https://numeraire.tech"
 
-[workspace]
-members = [".", "migration"]
-
+[dependencies]
 async-trait = "0.1.74"
 axum = "0.7.2"
 rgb-lib = { git = "https://github.com/RGB-Tools/rgb-lib", branch = "master" }

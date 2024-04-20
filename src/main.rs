@@ -1,6 +1,7 @@
 mod application;
 mod domains;
 mod infra;
+mod models;
 
 use std::process::exit;
 
