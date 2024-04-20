@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use crate::application::errors::AuthenticationError;
 use crate::domains::users::entities::Permission;
-use crate::{adapters::auth::Authenticator, domains::users::entities::AuthUser};
+use crate::{domains::users::entities::AuthUser, infra::auth::Authenticator};
 use async_trait::async_trait;
 use humantime::parse_duration;
 use jsonwebtoken::{

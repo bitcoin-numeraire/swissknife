@@ -9,8 +9,8 @@ use axum_extra::{
 use tracing::{debug, trace};
 
 use crate::{
-    adapters::app::AppState, application::errors::AuthenticationError,
-    domains::users::entities::AuthUser,
+    application::errors::AuthenticationError, domains::users::entities::AuthUser,
+    infra::app::AppState,
 };
 
 #[async_trait]

@@ -1,22 +1,22 @@
 use std::sync::Arc;
 
 use crate::{
-    adapters::{
-        auth::{jwt::JWTAuthenticator, Authenticator},
-        database::sqlx::PgClient,
-        lightning::breez::{BreezClient, BreezListener},
-        rgb::{rgblib::RGBLibClient, RGBClient},
-    },
     application::{
         dtos::AppConfig,
         errors::{ApplicationError, WebServerError},
     },
     domains::lightning::{
-        store::LightningStore,
-        store::PgLightningAddressRepository,
-        store::PgLightningInvoiceRepository,
-        store::PgLightningPaymentRepository,
+        store::{
+            LightningStore, SqlLightningAddressRepository, SqlLightningInvoiceRepository,
+            SqlLightningPaymentRepository,
+        },
         usecases::{service::LightningPaymentsProcessor, LightningService, LightningUseCases},
+    },
+    infra::{
+        auth::{jwt::JWTAuthenticator, Authenticator},
+        database::{sqlx::PgClient, DatabaseClient},
+        lightning::breez::{BreezClient, BreezListener},
+        rgb::{rgblib::RGBLibClient, RGBClient},
     },
 };
 use humantime::parse_duration;
@@ -52,9 +52,9 @@ impl AppState {
 
         // Create repositories and stores
         let store = LightningStore::new(
-            Arc::new(PgLightningInvoiceRepository::new(db_client.clone())),
-            Arc::new(PgLightningAddressRepository::new(db_client.clone())),
-            Arc::new(PgLightningPaymentRepository::new(db_client.clone())),
+            Arc::new(SqlLightningInvoiceRepository::new(db_client.pool())),
+            Arc::new(SqlLightningAddressRepository::new(db_client.pool())),
+            Arc::new(SqlLightningPaymentRepository::new(db_client.pool())),
         );
 
         // Create services

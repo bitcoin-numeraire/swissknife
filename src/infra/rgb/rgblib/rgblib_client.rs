@@ -13,7 +13,7 @@ use rgb_lib::{
 use tokio::{sync::Mutex, task::spawn_blocking};
 
 use crate::{
-    adapters::rgb::RGBClient, application::errors::RGBError, domains::rgb::entities::RGBAsset,
+    application::errors::RGBError, domains::rgb::entities::RGBAsset, infra::rgb::RGBClient,
 };
 
 #[derive(Clone, Debug, Deserialize)]

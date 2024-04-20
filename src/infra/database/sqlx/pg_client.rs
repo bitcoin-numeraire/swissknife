@@ -2,11 +2,11 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 use humantime::parse_duration;
-use sqlx::{postgres::PgPoolOptions, PgPool, Pool, Postgres};
+use sqlx::{postgres::PgPoolOptions, PgPool, Postgres, Transaction};
 
 use crate::{
-    adapters::database::{DatabaseClient, DatabaseConfig},
     application::errors::DatabaseError,
+    infra::database::{DatabaseClient, DatabaseConfig, TransactionManager},
 };
 
 #[derive(Clone)]
@@ -55,10 +55,33 @@ impl PgClient {
 }
 
 #[async_trait]
-impl DatabaseClient for PgClient {
-    type DB = Postgres;
+impl TransactionManager for PgClient {
+    async fn run_in_transaction<F, T>(&self, func: F) -> Result<T, DatabaseError>
+    where
+        F: FnOnce(&mut Transaction<'_, Postgres>) -> T + Send + 'static,
+        T: std::future::Future<Output = Result<T, DatabaseError>> + Send,
+    {
+        // Begin a transaction
+        let mut tx = self
+            .pool
+            .begin()
+            .await
+            .map_err(|e| DatabaseError::Transaction(e.to_string()))?;
 
-    fn pool(&self) -> &Pool<Self::DB> {
-        &self.pool
+        // Execute the provided function with the transaction
+        let result = func(&mut tx).await;
+
+        // Commit or rollback based on the result of the function
+        if result.is_ok() {
+            tx.commit()
+                .await
+                .map_err(|e| DatabaseError::Transaction(e.to_string()))?;
+        } else {
+            tx.rollback()
+                .await
+                .map_err(|e| DatabaseError::Transaction(e.to_string()))?;
+        }
+
+        result
     }
 }

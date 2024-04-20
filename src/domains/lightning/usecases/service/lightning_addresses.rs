@@ -193,19 +193,26 @@ impl LightningAddressesUseCases for LightningService {
             .ok_or_else(|| DataError::NotFound("Lightning address not found.".to_string()))?;
 
         // TODO: Run in a transacion and create a PENDING payment before actually sending it so we reduce the available amount for concurrent requests
-        let balance = self
-            .store
-            .address_repo
-            .get_balance_by_username(&ln_address.username)
+        let payment = self
+            .db_client
+            .run_in_transaction(|tx| async move {
+                let balance = self
+                    .store
+                    .address_repo
+                    .get_balance_by_username(&ln_address.username)
+                    .await?;
+
+                if balance.available_msat < amount_msat.unwrap_or_default() as i64 {
+                    return Err(LightningError::InsufficientFunds.into());
+                }
+
+                let mut payment = LightningPayment::new(payment_hash, amount_msat, error);
+                payment.lightning_address = Some(ln_address.username.clone());
+                payment = self.store.payment_repo.insert(payment).await?;
+
+                Ok(payment)
+            })
             .await?;
-
-        if balance.available_msat < amount_msat.unwrap_or_default() as i64 {
-            return Err(LightningError::InsufficientFunds.into());
-        }
-
-        let mut payment = LightningPayment::new(payment_hash, amount_msat, error);
-        payment.lightning_address = Some(ln_address.username.clone());
-        payment = self.store.payment_repo.insert(payment).await?;
 
         let input_type = parse(&input)
             .await

@@ -8,7 +8,6 @@ use axum::{
 use regex::Regex;
 
 use crate::{
-    adapters::app::AppState,
     application::{
         dtos::{
             LNUrlpInvoiceQueryParams, LNUrlpInvoiceResponse, LightningAddressResponse,
@@ -21,6 +20,7 @@ use crate::{
         lightning::entities::{LNURLPayRequest, UserBalance},
         users::entities::AuthUser,
     },
+    infra::app::AppState,
 };
 
 const MIN_USERNAME_LENGTH: usize = 1;

@@ -9,7 +9,9 @@ description = "Numeraire's Bitcoin SwissKnife is a software application enabling
 repository = "https://github.com/bitcoin-numeraire/swissknife"
 homepage = "https://numeraire.tech"
 
-[dependencies]
+[workspace]
+members = [".", "migration"]
+
 async-trait = "0.1.74"
 axum = "0.7.2"
 rgb-lib = { git = "https://github.com/RGB-Tools/rgb-lib", branch = "master" }
@@ -37,3 +39,11 @@ chrono = "0.4.31"
 thiserror = "1.0.56"
 tower-http = { version = "0.5", features = ["timeout", "trace", "cors"] }
 regex = "1"
+sea-orm = { version = "0.12", features = [
+    "sqlx-postgres",
+    "runtime-tokio-rustls",
+    "macros",
+    "with-chrono",
+    "with-uuid",
+    "debug-print",
+] }

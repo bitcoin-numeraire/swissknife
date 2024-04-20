@@ -4,9 +4,9 @@ use axum::{extract::State, routing::get, Json, Router};
 use breez_sdk_core::{LspInformation, NodeState, Payment};
 
 use crate::{
-    adapters::app::AppState,
     application::{dtos::SendPaymentRequest, errors::ApplicationError},
     domains::{lightning::entities::LightningPayment, users::entities::AuthUser},
+    infra::app::AppState,
 };
 
 pub struct LightningNodeHandler;

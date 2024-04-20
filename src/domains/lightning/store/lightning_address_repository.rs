@@ -1,24 +1,24 @@
 use async_trait::async_trait;
+use sqlx::{PgPool, Postgres, Transaction};
 
 use crate::{
-    adapters::database::DatabaseClient,
     application::errors::DatabaseError,
     domains::lightning::{entities::{LightningAddress, UserBalance}, store::LightningAddressRepository},
 };
 
 #[derive(Clone)]
-pub struct PgLightningAddressRepository<D: DatabaseClient> {
-    db_client: D,
+pub struct SqlLightningAddressRepository{
+    executor: PgPool
 }
 
-impl<D: DatabaseClient> PgLightningAddressRepository<D> {
-    pub fn new(db_client: D) -> Self {
-        Self { db_client }
+impl SqlLightningAddressRepository {
+    pub fn new(executor: PgPool) -> Self {
+        Self { executor }
     }
 }
 
 #[async_trait]
-impl<D: DatabaseClient> LightningAddressRepository for PgLightningAddressRepository<D> {
+impl LightningAddressRepository for SqlLightningAddressRepository {
     async fn get_by_user_id(
         &self,
         user: &str,
@@ -31,7 +31,7 @@ impl<D: DatabaseClient> LightningAddressRepository for PgLightningAddressReposit
                 "#,
                 user
             )
-            .fetch_optional(&self.db_client.pool()) // fetch_optional for zero or one result
+            .fetch_optional(&self.executor) // fetch_optional for zero or one result
             .await
             .map_err(|e| DatabaseError::Get(e.to_string()))?;
              
@@ -49,7 +49,7 @@ impl<D: DatabaseClient> LightningAddressRepository for PgLightningAddressReposit
                 "#,
                 username,
             )
-            .fetch_optional(&self.db_client.pool()) // fetch_optional for zero or one result
+            .fetch_optional(&self.executor) // fetch_optional for zero or one result
             .await
             .map_err(|e| DatabaseError::Get(e.to_string()))?;
 
@@ -69,7 +69,7 @@ impl<D: DatabaseClient> LightningAddressRepository for PgLightningAddressReposit
                 limit as i64, 
                 offset as i64   
             )
-            .fetch_all(&self.db_client.pool()) // fetch_all for multiple results
+            .fetch_all(&self.executor) // fetch_all for multiple results
             .await
             .map_err(|e| DatabaseError::List(e.to_string()))?;
         
@@ -91,7 +91,7 @@ impl<D: DatabaseClient> LightningAddressRepository for PgLightningAddressReposit
                 limit as i64, 
                 offset as i64   
             )
-            .fetch_all(&self.db_client.pool()) // fetch_all for multiple results
+            .fetch_all(&self.executor) // fetch_all for multiple results
             .await
             .map_err(|e| DatabaseError::List(e.to_string()))?;
 
@@ -110,15 +110,19 @@ impl<D: DatabaseClient> LightningAddressRepository for PgLightningAddressReposit
             user,
             username
         )
-        .fetch_one(&self.db_client.pool())
+        .fetch_one(&self.executor)
         .await
         .map_err(|e| DatabaseError::Insert(e.to_string()))?;
 
         Ok(lightning_address)
     }
 
-    async fn get_balance_by_username(&self, username: &str) -> Result<UserBalance, DatabaseError> {
-        let record = sqlx::query!(
+    async fn get_balance_by_username(
+        &self,
+        executor: Option<&mut Transaction<'_, Postgres>>,
+        username: &str,
+    ) -> Result<UserBalance, DatabaseError> {
+       let query = sqlx::query!(
             r#"
             WITH sent AS (
                 SELECT
@@ -142,11 +146,17 @@ impl<D: DatabaseClient> LightningAddressRepository for PgLightningAddressReposit
             FROM received, sent;
             "#,
             username
-        )
-        .fetch_one(&self.db_client.pool())
-        .await
-        .map_err(|e| DatabaseError::Balance(e.to_string()))?;
+        );
 
+        let result = if let Some(tx) = executor {
+            let test = &mut **tx;
+            query.fetch_one(&mut **tx).await
+        } else {
+            query.fetch_one(&self.executor).await
+        };
+    
+        let record = result.map_err(|e| DatabaseError::Balance(e.to_string()))?;
+    
         let balance = UserBalance {
             received_msat: record.received_msat.unwrap_or(0),
             sent_msat: record.sent_msat.unwrap_or(0),

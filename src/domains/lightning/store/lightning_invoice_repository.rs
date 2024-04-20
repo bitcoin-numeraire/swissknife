@@ -1,24 +1,24 @@
 use async_trait::async_trait;
+use sqlx::PgPool;
 
 use crate::{
-    adapters::database::DatabaseClient,
     application::errors::DatabaseError,
     domains::lightning::{entities::LightningInvoice, store::LightningInvoiceRepository},
 };
 
 #[derive(Clone)]
-pub struct PgLightningInvoiceRepository<D: DatabaseClient> {
-    db_client: D,
+pub struct SqlLightningInvoiceRepository {
+    executor: PgPool,
 }
 
-impl<D: DatabaseClient> PgLightningInvoiceRepository<D> {
-    pub fn new(db_client: D) -> Self {
-        Self { db_client }
+impl SqlLightningInvoiceRepository {
+    pub fn new(executor: PgPool) -> Self {
+        Self { executor }
     }
 }
 
 #[async_trait]
-impl<D: DatabaseClient> LightningInvoiceRepository for PgLightningInvoiceRepository<D> {
+impl LightningInvoiceRepository for SqlLightningInvoiceRepository {
     async fn get_by_hash(
         &self,
         payment_hash: &str,
@@ -30,7 +30,7 @@ impl<D: DatabaseClient> LightningInvoiceRepository for PgLightningInvoiceReposit
            "#,
             payment_hash
         )
-        .fetch_optional(&self.db_client.pool())
+        .fetch_optional(&self.executor)
         .await
         .map_err(|e| DatabaseError::Get(e.to_string()))?;
 
@@ -40,7 +40,6 @@ impl<D: DatabaseClient> LightningInvoiceRepository for PgLightningInvoiceReposit
     async fn insert(&self, invoice: LightningInvoice) -> Result<LightningInvoice, DatabaseError> {
         let lightning_invoice = sqlx::query_as!(
             LightningInvoice,
-            // language=PostgreSQL
             r#"
                 INSERT INTO lightning_invoices (
                     lightning_address, 
@@ -78,7 +77,7 @@ impl<D: DatabaseClient> LightningInvoiceRepository for PgLightningInvoiceReposit
             invoice.fee_msat,
             invoice.payment_time
         )
-        .fetch_one(&self.db_client.pool())
+        .fetch_one(&self.executor)
         .await
         .map_err(|e| DatabaseError::Insert(e.to_string()))?;
 
@@ -103,7 +102,7 @@ impl<D: DatabaseClient> LightningInvoiceRepository for PgLightningInvoiceReposit
             invoice.payment_time,
             invoice.payment_hash
         )
-        .fetch_one(&self.db_client.pool())
+        .fetch_one(&self.executor)
         .await
         .map_err(|e| DatabaseError::Update(e.to_string()))?;
 

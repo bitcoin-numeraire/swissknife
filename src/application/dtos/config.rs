@@ -1,6 +1,6 @@
 use serde::Deserialize;
 
-use crate::adapters::{
+use crate::infra::{
     auth::AuthConfig, axum::AxumServerConfig, database::DatabaseConfig,
     lightning::breez::BreezClientConfig, logging::tracing::TracingLoggerConfig,
     rgb::rgblib::RGBLibClientConfig,

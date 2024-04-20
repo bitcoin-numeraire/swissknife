@@ -11,7 +11,6 @@ use rgb_lib::wallet::{Assets, Balance, Metadata, ReceiveData, Transfer, Unspent}
 use tracing::{debug, info, trace};
 
 use crate::{
-    adapters::app::AppState,
     application::{
         dtos::{
             DrainRequest, InvoiceAssetRequest, IssueAssetRequest, PrepareIssuanceRequest,
@@ -20,6 +19,7 @@ use crate::{
         errors::ApplicationError,
     },
     domains::rgb::entities::{RGBAsset, RGBAssetType, RGBInvoiceType},
+    infra::app::AppState,
 };
 
 pub struct RGBHandler;

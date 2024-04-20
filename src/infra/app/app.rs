@@ -13,12 +13,12 @@ use tower_http::{cors::CorsLayer, trace::TraceLayer};
 use tracing::{debug, error, info, trace};
 
 use crate::{
-    adapters::app::AppState,
     application::errors::WebServerError,
     domains::{
         lightning::api::http::{LightningAddressHandler, LightningNodeHandler},
         rgb::api::http::RGBHandler,
     },
+    infra::app::AppState,
 };
 
 pub struct App {

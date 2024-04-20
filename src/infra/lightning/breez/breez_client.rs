@@ -10,9 +10,9 @@ use breez_sdk_core::{
 };
 
 use crate::{
-    adapters::lightning::LightningClient,
     application::errors::LightningError,
     domains::lightning::entities::{LightningInvoice, LightningPayment},
+    infra::lightning::LightningClient,
 };
 
 use super::BreezListener;

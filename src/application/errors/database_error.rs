@@ -8,6 +8,9 @@ pub enum DatabaseError {
     #[error("Failed to connect to database: {0}")]
     Connect(String),
 
+    #[error("Failed to run migrations: {0}")]
+    Migrations(String),
+
     #[error("Failed to get resource: {0}")]
     Get(String),
 
@@ -22,6 +25,9 @@ pub enum DatabaseError {
 
     #[error("Failed to compute balance: {0}")]
     Balance(String),
+
+    #[error("Failed to acquire connection from pool: {0}")]
+    Acquire(String),
 
     #[error("Failed to perform transaction operation: {0}")]
     Transaction(String),

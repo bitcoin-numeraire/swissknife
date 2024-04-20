@@ -1,24 +1,24 @@
 use async_trait::async_trait;
+use sqlx::{PgPool, Postgres, Transaction};
 
 use crate::{
-    adapters::database::DatabaseClient,
     application::errors::DatabaseError,
     domains::lightning::{entities::LightningPayment, store::LightningPaymentRepository},
 };
 
 #[derive(Clone)]
-pub struct PgLightningPaymentRepository<D: DatabaseClient> {
-    db_client: D,
+pub struct SqlLightningPaymentRepository {
+    executor: PgPool,
 }
 
-impl<D: DatabaseClient> PgLightningPaymentRepository<D> {
-    pub fn new(db_client: D) -> Self {
-        Self { db_client }
+impl SqlLightningPaymentRepository {
+    pub fn new(executor: PgPool) -> Self {
+        Self { executor }
     }
 }
 
 #[async_trait]
-impl<D: DatabaseClient> LightningPaymentRepository for PgLightningPaymentRepository<D> {
+impl LightningPaymentRepository for SqlLightningPaymentRepository {
     async fn get_by_hash(
         &self,
         payment_hash: &str,
@@ -30,15 +30,19 @@ impl<D: DatabaseClient> LightningPaymentRepository for PgLightningPaymentReposit
            "#,
             payment_hash
         )
-        .fetch_optional(&self.db_client.pool())
+        .fetch_optional(&self.executor)
         .await
         .map_err(|e| DatabaseError::Get(e.to_string()))?;
 
         Ok(result)
     }
 
-    async fn insert(&self, payment: LightningPayment) -> Result<LightningPayment, DatabaseError> {
-        let lightning_payment = sqlx::query_as!(
+    async fn insert(
+        &self,
+        executor: Option<&mut Transaction<'_, Postgres>>,
+        payment: LightningPayment,
+    ) -> Result<LightningPayment, DatabaseError> {
+        let query = sqlx::query_as!(
             LightningPayment,
             r#"
                 INSERT INTO lightning_payments (
@@ -64,10 +68,15 @@ impl<D: DatabaseClient> LightningPaymentRepository for PgLightningPaymentReposit
             payment.status,
             payment.description,
             payment.metadata,
-        )
-        .fetch_one(&self.db_client.pool())
-        .await
-        .map_err(|e| DatabaseError::Insert(e.to_string()))?;
+        );
+
+        let result = if let Some(tx) = executor {
+            query.fetch_one(&mut **tx).await
+        } else {
+            query.fetch_one(&self.executor).await
+        };
+
+        let lightning_payment = result.map_err(|e| DatabaseError::Insert(e.to_string()))?;
 
         Ok(lightning_payment)
     }
@@ -89,7 +98,7 @@ impl<D: DatabaseClient> LightningPaymentRepository for PgLightningPaymentReposit
             payment.payment_time,
             payment.payment_hash
         )
-        .fetch_one(&self.db_client.pool())
+        .fetch_one(&self.executor)
         .await
         .map_err(|e| DatabaseError::Update(e.to_string()))?;
 

@@ -1,4 +1,4 @@
-use crate::{adapters::lightning::LightningClient, domains::lightning::store::LightningStore};
+use crate::{domains::lightning::store::LightningStore, infra::lightning::LightningClient};
 
 pub struct LightningService {
     pub domain: String,
