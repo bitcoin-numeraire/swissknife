@@ -4,4 +4,4 @@ mod lightning_payments;
 mod lightning_service;
 
 pub use lightning_payments::LightningPaymentsProcessor;
-pub use lightning_service::LightningService; // To avoid using the trait
+pub use lightning_service::LightningService;

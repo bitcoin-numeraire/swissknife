@@ -1,41 +1,32 @@
 use async_trait::async_trait;
 use sea_orm::ActiveValue::Set;
-use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter};
+use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter};
 
-use crate::{
-    application::errors::DatabaseError,
-    domains::lightning::{entities::LightningPayment, store::LightningPaymentRepository},
-};
+use crate::domains::lightning::adapters::models::lightning_payment::{ActiveModel, Column, Entity};
+use crate::domains::lightning::adapters::repository::LightningPaymentRepository;
+use crate::{application::errors::DatabaseError, domains::lightning::entities::LightningPayment};
 
-use super::models::lightning_payment::{ActiveModel, Column, Entity};
-
-#[derive(Clone)]
-pub struct SqlLightningPaymentRepository {
-    executor: DatabaseConnection,
-}
-
-impl SqlLightningPaymentRepository {
-    pub fn new(executor: DatabaseConnection) -> Self {
-        Self { executor }
-    }
-}
+use super::LightningStore;
 
 #[async_trait]
-impl LightningPaymentRepository for SqlLightningPaymentRepository {
-    async fn find_by_hash(
+impl LightningPaymentRepository for LightningStore {
+    async fn find_payment_by_hash(
         &self,
         payment_hash: &str,
     ) -> Result<Option<LightningPayment>, DatabaseError> {
         let model = Entity::find()
             .filter(Column::PaymentHash.eq(payment_hash))
-            .one(&self.executor)
+            .one(&self.db)
             .await
             .map_err(|e| DatabaseError::Find(e.to_string()))?;
 
         Ok(model.map(Into::into))
     }
 
-    async fn insert(&self, payment: LightningPayment) -> Result<LightningPayment, DatabaseError> {
+    async fn insert_payment(
+        &self,
+        payment: LightningPayment,
+    ) -> Result<LightningPayment, DatabaseError> {
         let model = ActiveModel {
             lightning_address: Set(payment.lightning_address),
             payment_hash: Set(payment.payment_hash),
@@ -50,14 +41,17 @@ impl LightningPaymentRepository for SqlLightningPaymentRepository {
         };
 
         let model = model
-            .insert(&self.executor)
+            .insert(&self.db)
             .await
             .map_err(|e| DatabaseError::Insert(e.to_string()))?;
 
         Ok(model.into())
     }
 
-    async fn update(&self, payment: LightningPayment) -> Result<LightningPayment, DatabaseError> {
+    async fn update_payment(
+        &self,
+        payment: LightningPayment,
+    ) -> Result<LightningPayment, DatabaseError> {
         let model = ActiveModel {
             id: Set(payment.id),
             status: Set(payment.status),
@@ -67,7 +61,7 @@ impl LightningPaymentRepository for SqlLightningPaymentRepository {
         };
 
         let model = model
-            .update(&self.executor)
+            .update(&self.db)
             .await
             .map_err(|e| DatabaseError::Update(e.to_string()))?;
 

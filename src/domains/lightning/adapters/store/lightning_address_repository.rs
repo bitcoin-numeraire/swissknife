@@ -1,60 +1,49 @@
 use async_trait::async_trait;
 use sea_orm::ActiveValue::Set;
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, DatabaseConnection, DbBackend, EntityTrait, FromQueryResult,
-    QueryFilter, QueryOrder, QuerySelect, Statement,
+    ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, FromQueryResult, QueryFilter,
+    QueryOrder, QuerySelect, Statement,
 };
 
+use crate::domains::lightning::adapters::models::lightning_address::{ActiveModel, Column, Entity};
+use crate::domains::lightning::adapters::models::user_balance::UserBalanceModel;
+use crate::domains::lightning::adapters::repository::LightningAddressRepository;
 use crate::{
     application::errors::DatabaseError,
-    domains::lightning::{
-        entities::{LightningAddress, UserBalance},
-        store::LightningAddressRepository,
-    },
+    domains::lightning::entities::{LightningAddress, UserBalance},
 };
 
-use super::models::lightning_address::{ActiveModel, Column, Entity};
-use super::models::user_balance::UserBalanceModel;
-
-pub struct SqlLightningAddressRepository {
-    executor: DatabaseConnection,
-}
-
-impl SqlLightningAddressRepository {
-    pub fn new(executor: DatabaseConnection) -> Self {
-        Self { executor }
-    }
-}
+use super::LightningStore;
 
 #[async_trait]
-impl LightningAddressRepository for SqlLightningAddressRepository {
-    async fn find_by_user_id(
+impl LightningAddressRepository for LightningStore {
+    async fn find_address_by_user_id(
         &self,
         user_id: &str,
     ) -> Result<Option<LightningAddress>, DatabaseError> {
         let model = Entity::find()
             .filter(Column::UserId.eq(user_id))
-            .one(&self.executor)
+            .one(&self.db)
             .await
             .map_err(|e| DatabaseError::Find(e.to_string()))?;
 
         Ok(model.map(Into::into))
     }
 
-    async fn find_by_username(
+    async fn find_address_by_username(
         &self,
         username: &str,
     ) -> Result<Option<LightningAddress>, DatabaseError> {
         let model = Entity::find()
             .filter(Column::Username.eq(username))
-            .one(&self.executor)
+            .one(&self.db)
             .await
             .map_err(|e| DatabaseError::Find(e.to_string()))?;
 
         Ok(model.map(Into::into))
     }
 
-    async fn find_all(
+    async fn find_all_addresses(
         &self,
         limit: Option<u64>,
         offset: Option<u64>,
@@ -63,14 +52,14 @@ impl LightningAddressRepository for SqlLightningAddressRepository {
             .order_by_asc(Column::CreatedAt)
             .offset(offset)
             .limit(limit)
-            .all(&self.executor)
+            .all(&self.db)
             .await
             .map_err(|e| DatabaseError::FindAll(e.to_string()))?;
 
         Ok(models.into_iter().map(Into::into).collect())
     }
 
-    async fn find_all_by_user_id(
+    async fn find_all_addresses_by_user_id(
         &self,
         user_id: &str,
         limit: Option<u64>,
@@ -81,14 +70,14 @@ impl LightningAddressRepository for SqlLightningAddressRepository {
             .order_by_asc(Column::CreatedAt)
             .offset(offset)
             .limit(limit)
-            .all(&self.executor)
+            .all(&self.db)
             .await
             .map_err(|e| DatabaseError::FindAll(e.to_string()))?;
 
         Ok(models.into_iter().map(Into::into).collect())
     }
 
-    async fn insert(
+    async fn insert_address(
         &self,
         user_id: &str,
         username: &str,
@@ -100,7 +89,7 @@ impl LightningAddressRepository for SqlLightningAddressRepository {
         };
 
         let model = model
-            .insert(&self.executor)
+            .insert(&self.db)
             .await
             .map_err(|e| DatabaseError::Insert(e.to_string()))?;
 
@@ -109,7 +98,7 @@ impl LightningAddressRepository for SqlLightningAddressRepository {
 
     async fn get_balance_by_username(&self, username: &str) -> Result<UserBalance, DatabaseError> {
         let result = UserBalanceModel::find_by_statement(Statement::from_sql_and_values(
-            DbBackend::Postgres,
+            self.db.get_database_backend(),
             r#"
             WITH sent AS (
                 SELECT
@@ -133,7 +122,7 @@ impl LightningAddressRepository for SqlLightningAddressRepository {
             FROM received, sent;
             "#,
             [username.into()],
-        )).one(&self.executor).await.map_err(|e| DatabaseError::FindByStatement(e.to_string()))?;
+        )).one(&self.db).await.map_err(|e| DatabaseError::FindByStatement(e.to_string()))?;
 
         match result {
             Some(model) => Ok(model.into()),

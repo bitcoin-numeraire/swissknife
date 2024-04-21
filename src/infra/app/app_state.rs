@@ -6,10 +6,7 @@ use crate::{
         errors::{ApplicationError, WebServerError},
     },
     domains::lightning::{
-        store::{
-            LightningStore, SqlLightningAddressRepository, SqlLightningInvoiceRepository,
-            SqlLightningPaymentRepository,
-        },
+        adapters::LightningStore,
         usecases::{service::LightningPaymentsProcessor, LightningService, LightningUseCases},
     },
     infra::{
@@ -48,12 +45,7 @@ impl AppState {
         };
 
         // Create repositories and stores
-        let store = LightningStore::new(
-            Arc::new(SqlLightningInvoiceRepository::new(db_conn.clone())),
-            Arc::new(SqlLightningAddressRepository::new(db_conn.clone())),
-            Arc::new(SqlLightningPaymentRepository::new(db_conn.clone())),
-            db_conn,
-        );
+        let store = Box::new(LightningStore::new(db_conn));
 
         // Create services
         let payments_processor = LightningPaymentsProcessor::new(store.clone());

@@ -1,6 +1,5 @@
 use async_trait::async_trait;
 use breez_sdk_core::{parse, InputType};
-use sea_orm::TransactionTrait;
 use tracing::{debug, info};
 use uuid::Uuid;
 
@@ -25,8 +24,7 @@ impl LightningAddressesUseCases for LightningService {
         debug!(username, "Generating LNURLp");
 
         self.store
-            .address_repo
-            .find_by_username(&username)
+            .find_address_by_username(&username)
             .await?
             .ok_or_else(|| DataError::NotFound("Lightning address not found.".to_string()))?;
 
@@ -43,8 +41,7 @@ impl LightningAddressesUseCases for LightningService {
         debug!(username, "Generating lightning invoice");
 
         self.store
-            .address_repo
-            .find_by_username(&username)
+            .find_address_by_username(&username)
             .await?
             .ok_or_else(|| DataError::NotFound("Lightning address not found.".to_string()))?;
 
@@ -53,7 +50,7 @@ impl LightningAddressesUseCases for LightningService {
         invoice.status = "PENDING".to_string();
         invoice.id = Uuid::new_v4();
 
-        let invoice = self.store.invoice_repo.insert(invoice).await?;
+        let invoice = self.store.insert_invoice(invoice).await?;
 
         info!(username, "Lightning invoice generated successfully");
         Ok(invoice)
@@ -71,8 +68,7 @@ impl LightningAddressesUseCases for LightningService {
 
         if self
             .store
-            .address_repo
-            .find_by_username(&user.sub)
+            .find_address_by_username(&user.sub)
             .await?
             .is_some()
         {
@@ -84,15 +80,14 @@ impl LightningAddressesUseCases for LightningService {
 
         if self
             .store
-            .address_repo
-            .find_by_username(&username)
+            .find_address_by_username(&username)
             .await?
             .is_some()
         {
             return Err(DataError::Conflict("Username already exists.".to_string()).into());
         }
 
-        let lightning_address = self.store.address_repo.insert(&user.sub, &username).await?;
+        let lightning_address = self.store.insert_address(&user.sub, &username).await?;
 
         info!(
             user_id = user.sub,
@@ -110,8 +105,7 @@ impl LightningAddressesUseCases for LightningService {
 
         let lightning_address = self
             .store
-            .address_repo
-            .find_by_username(&username)
+            .find_address_by_username(&username)
             .await?
             .ok_or_else(|| DataError::NotFound("Lightning address not found.".to_string()))?;
 
@@ -136,12 +130,11 @@ impl LightningAddressesUseCases for LightningService {
 
         let lightning_addresses = if user.has_permission(Permission::ReadLightningAddress) {
             // The user has permission to view all addresses
-            self.store.address_repo.find_all(limit, offset).await?
+            self.store.find_all_addresses(limit, offset).await?
         } else {
             // The user can only view their own addresses
             self.store
-                .address_repo
-                .find_all_by_user_id(&user.sub, limit, offset)
+                .find_all_addresses_by_user_id(&user.sub, limit, offset)
                 .await?
         };
 
@@ -161,8 +154,7 @@ impl LightningAddressesUseCases for LightningService {
 
         let lightning_address = self
             .store
-            .address_repo
-            .find_by_username(&username)
+            .find_address_by_username(&username)
             .await?
             .ok_or_else(|| DataError::NotFound("Lightning address not found.".to_string()))?;
 
@@ -170,11 +162,7 @@ impl LightningAddressesUseCases for LightningService {
             user.check_permission(Permission::ReadLightningAddress)?;
         }
 
-        let balance = self
-            .store
-            .address_repo
-            .get_balance_by_username(&username)
-            .await?;
+        let balance = self.store.get_balance_by_username(&username).await?;
 
         info!(user_id = user.sub, "Balance fetched successfully");
         Ok(balance)
@@ -191,8 +179,7 @@ impl LightningAddressesUseCases for LightningService {
 
         let ln_address = self
             .store
-            .address_repo
-            .find_by_user_id(&user.sub)
+            .find_address_by_user_id(&user.sub)
             .await?
             .ok_or_else(|| DataError::NotFound("Lightning address not found.".to_string()))?;
 
@@ -207,7 +194,6 @@ impl LightningAddressesUseCases for LightningService {
         // TODO: Add UUID to labels and only encapsulate the insert PENDING in a transaction
         let balance = self
             .store
-            .address_repo
             .get_balance_by_username(&ln_address.username)
             .await?;
 
@@ -248,7 +234,7 @@ impl LightningAddressesUseCases for LightningService {
             None => "PENDING".to_string(),
         };
         payment.id = Uuid::new_v4();
-        payment = self.store.payment_repo.insert(payment).await?;
+        payment = self.store.insert_payment(payment).await?;
 
         txn.commit()
             .await
