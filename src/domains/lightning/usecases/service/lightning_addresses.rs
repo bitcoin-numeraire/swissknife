@@ -196,34 +196,24 @@ impl LightningAddressesUseCases for LightningService {
             .await?
             .ok_or_else(|| DataError::NotFound("Lightning address not found.".to_string()))?;
 
-        // TODO: Run in a transacion and create a PENDING payment before actually sending it so we reduce the available amount for concurrent requests
-        let payment = self
+        let txn = self
             .store
             .db
-            .transaction(|tx| {
-                Box::pin(async move {
-                    let balance = self
-                        .store
-                        .address_repo
-                        .get_balance_by_username(&ln_address.username)
-                        .await?;
-
-                    if balance.available_msat < amount_msat.unwrap_or_default() as i64 {
-                        return Err(LightningError::InsufficientFunds.into());
-                    }
-
-                    let mut payment = LightningPayment::new(payment_hash, amount_msat, error);
-                    payment.lightning_address = Some(ln_address.username.clone());
-                    payment.status = "PENDING".to_string();
-                    payment.id = Uuid::new_v4();
-
-                    payment = self.store.payment_repo.insert(payment).await?;
-
-                    Ok(payment)
-                })
-            })
+            .begin()
             .await
             .map_err(|e| DatabaseError::Transaction(e.to_string()))?;
+
+        // TODO: Create a PENDING payment before actually sending it so we reduce the available amount for concurrent requests
+        // TODO: Add UUID to labels and only encapsulate the insert PENDING in a transaction
+        let balance = self
+            .store
+            .address_repo
+            .get_balance_by_username(&ln_address.username)
+            .await?;
+
+        if balance.available_msat < amount_msat.unwrap_or_default() as i64 {
+            return Err(LightningError::InsufficientFunds.into());
+        }
 
         let input_type = parse(&input)
             .await
@@ -253,7 +243,16 @@ impl LightningAddressesUseCases for LightningService {
         }?;
 
         payment.lightning_address = Some(ln_address.username.clone());
-        payment = self.store.payment_repo.update(payment).await?;
+        payment.status = match payment.error {
+            Some(_) => "FAILED".to_string(),
+            None => "PENDING".to_string(),
+        };
+        payment.id = Uuid::new_v4();
+        payment = self.store.payment_repo.insert(payment).await?;
+
+        txn.commit()
+            .await
+            .map_err(|e| DatabaseError::Transaction(e.to_string()))?;
 
         info!(
             user_id = user.sub,

@@ -170,19 +170,20 @@ impl LightningClient for BreezClient {
             .map_err(|e| LightningError::SendLNURLPayment(e.to_string()))?;
 
         match result {
-            LnUrlPayResult::EndpointSuccess { data } => Ok(LightningPayment::new(
-                data.payment_hash,
-                amount_msat as i64,
-                None,
-            )),
+            LnUrlPayResult::EndpointSuccess { data } => Ok(LightningPayment {
+                payment_hash: data.payment_hash,
+                amount_msat,
+                ..Default::default()
+            }),
             LnUrlPayResult::EndpointError { data } => {
                 return Err(LightningError::SendLNURLPayment(data.reason));
             }
-            LnUrlPayResult::PayError { data } => Ok(LightningPayment::new(
-                data.payment_hash,
-                amount_msat as i64,
-                Some(data.reason),
-            )),
+            LnUrlPayResult::PayError { data } => Ok(LightningPayment {
+                payment_hash: data.payment_hash,
+                error: Some(data.reason),
+                amount_msat,
+                ..Default::default()
+            }),
         }
     }
 

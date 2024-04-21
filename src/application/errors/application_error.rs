@@ -2,16 +2,13 @@ use thiserror::Error;
 
 use super::{
     AuthenticationError, AuthorizationError, ConfigError, DataError, DatabaseError, LightningError,
-    RGBError, WebServerError,
+    WebServerError,
 };
 
 #[derive(Debug, Error)]
 pub enum ApplicationError {
     #[error(transparent)]
     Config(#[from] ConfigError),
-
-    #[error("RGB Error: {0}")]
-    RGB(#[from] RGBError),
 
     #[error("Lightning Error: {0}")]
     Lightning(#[from] LightningError),
