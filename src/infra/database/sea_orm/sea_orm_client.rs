@@ -1,22 +1,15 @@
 use std::time::Duration;
 
-use async_trait::async_trait;
 use humantime::parse_duration;
 use sea_orm::{ConnectOptions, Database, DatabaseConnection};
-use sqlx::{PgPool, Postgres, Transaction};
 
-use crate::{
-    application::errors::DatabaseError,
-    infra::database::{DatabaseClient, DatabaseConfig, TransactionManager},
-};
+use crate::{application::errors::DatabaseError, infra::database::DatabaseConfig};
 
 #[derive(Clone)]
-pub struct SeaORMClient {
-    db_conn: DatabaseConnection,
-}
+pub struct SeaORMClient {}
 
 impl SeaORMClient {
-    pub async fn connect(config: DatabaseConfig) -> Result<Self, DatabaseError> {
+    pub async fn connect(config: DatabaseConfig) -> Result<DatabaseConnection, DatabaseError> {
         let mut opt = ConnectOptions::new(config.url);
 
         if let Some(connect_timeout_str) = config.connect_timeout {
@@ -55,13 +48,10 @@ impl SeaORMClient {
             .await
             .map_err(|e| DatabaseError::Connect(e.to_string()))?;
 
-        Ok(Self { db_conn })
+        Ok(db_conn)
     }
 
     fn parse_duration(duration_str: &str) -> Result<Duration, DatabaseError> {
         parse_duration(duration_str).map_err(|e| DatabaseError::ParseConfig(e.to_string()))
     }
 }
-
-#[async_trait]
-impl DatabaseClient for SeaORMClient {}

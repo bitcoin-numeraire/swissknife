@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use sqlx::{Postgres, Transaction};
+use sea_orm::DatabaseConnection;
 
 use crate::{
     application::errors::DatabaseError,
@@ -10,33 +10,29 @@ use crate::{
 
 #[async_trait]
 pub trait LightningAddressRepository: Sync + Send {
-    async fn get_by_username(
+    async fn find_by_username(
         &self,
         username: &str,
     ) -> Result<Option<LightningAddress>, DatabaseError>;
-    async fn get_by_user_id(&self, user: &str) -> Result<Option<LightningAddress>, DatabaseError>;
-    async fn list(
+    async fn find_by_user_id(&self, user: &str) -> Result<Option<LightningAddress>, DatabaseError>;
+    async fn find_all(
         &self,
-        limit: usize,
-        offset: usize,
+        limit: Option<u64>,
+        offset: Option<u64>,
     ) -> Result<Vec<LightningAddress>, DatabaseError>;
-    async fn list_by_user_id(
+    async fn find_all_by_user_id(
         &self,
         user: &str,
-        limit: usize,
-        offset: usize,
+        limit: Option<u64>,
+        offset: Option<u64>,
     ) -> Result<Vec<LightningAddress>, DatabaseError>;
     async fn insert(&self, user: &str, username: &str) -> Result<LightningAddress, DatabaseError>;
-    async fn get_balance_by_username(
-        &self,
-        executor: Option<&mut Transaction<'_, Postgres>>,
-        username: &str,
-    ) -> Result<UserBalance, DatabaseError>;
+    async fn get_balance_by_username(&self, username: &str) -> Result<UserBalance, DatabaseError>;
 }
 
 #[async_trait]
 pub trait LightningInvoiceRepository: Sync + Send {
-    async fn get_by_hash(
+    async fn find_by_hash(
         &self,
         payment_hash: &str,
     ) -> Result<Option<LightningInvoice>, DatabaseError>;
@@ -46,13 +42,13 @@ pub trait LightningInvoiceRepository: Sync + Send {
 
 #[async_trait]
 pub trait LightningPaymentRepository: Sync + Send {
-    async fn get_by_hash(
+    async fn find_by_hash(
         &self,
         payment_hash: &str,
     ) -> Result<Option<LightningPayment>, DatabaseError>;
     async fn insert(
         &self,
-        executor: Option<&mut Transaction<'_, Postgres>>,
+        executor: &DatabaseConnection,
         payment: LightningPayment,
     ) -> Result<LightningPayment, DatabaseError>;
     async fn update(&self, payment: LightningPayment) -> Result<LightningPayment, DatabaseError>;

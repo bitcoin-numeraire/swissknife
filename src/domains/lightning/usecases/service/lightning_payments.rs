@@ -38,7 +38,7 @@ impl LightningPaymentsUseCases for LightningPaymentsProcessor {
             return Err(DataError::Validation("Payment is not Received.".into()).into());
         }
 
-        let invoice_option = self.store.invoice_repo.get_by_hash(&payment_hash).await?;
+        let invoice_option = self.store.invoice_repo.find_by_hash(&payment_hash).await?;
 
         if let Some(mut invoice) = invoice_option {
             if invoice.status == "PAID".to_string() {
@@ -77,7 +77,7 @@ impl LightningPaymentsUseCases for LightningPaymentsProcessor {
             return Err(DataError::Validation("Payment is not Sent.".into()).into());
         }
 
-        let payment_option = self.store.payment_repo.get_by_hash(&payment_hash).await?;
+        let payment_option = self.store.payment_repo.find_by_hash(&payment_hash).await?;
 
         if let Some(mut payment) = payment_option {
             if payment.status == "PAID".to_string() {
@@ -120,7 +120,7 @@ impl LightningPaymentsUseCases for LightningPaymentsProcessor {
         let payment_option = self
             .store
             .payment_repo
-            .get_by_hash(&invoice.payment_hash)
+            .find_by_hash(&invoice.payment_hash)
             .await?;
 
         if let Some(mut payment) = payment_option {

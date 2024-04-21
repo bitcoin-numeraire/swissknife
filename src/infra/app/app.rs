@@ -14,10 +14,7 @@ use tracing::{debug, error, info, trace};
 
 use crate::{
     application::errors::WebServerError,
-    domains::{
-        lightning::api::http::{LightningAddressHandler, LightningNodeHandler},
-        rgb::api::http::RGBHandler,
-    },
+    domains::lightning::api::http::{LightningAddressHandler, LightningNodeHandler},
     infra::app::AppState,
 };
 
@@ -30,7 +27,6 @@ impl App {
         trace!("Initializing app");
 
         let router = Router::new()
-            .nest("/api/rgb", RGBHandler::routes())
             .nest(
                 "/.well-known/lnurlp",
                 LightningAddressHandler::well_known_routes(),

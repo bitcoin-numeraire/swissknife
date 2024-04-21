@@ -14,9 +14,8 @@ use crate::{
     },
     infra::{
         auth::{jwt::JWTAuthenticator, Authenticator},
-        database::{sqlx::PgClient, DatabaseClient},
+        database::sea_orm::SeaORMClient,
         lightning::breez::{BreezClient, BreezListener},
-        rgb::{rgblib::RGBLibClient, RGBClient},
     },
 };
 use humantime::parse_duration;
@@ -27,7 +26,6 @@ use tracing::warn;
 pub struct AppState {
     pub jwt_authenticator: Option<Arc<dyn Authenticator>>,
     pub lightning: Arc<dyn LightningUseCases>,
-    pub rgb: Arc<dyn RGBClient>,
     pub timeout_layer: TimeoutLayer,
 }
 
@@ -38,8 +36,7 @@ impl AppState {
 
         // Create adapters
         let timeout_layer = TimeoutLayer::new(timeout_request);
-        let db_client = PgClient::connect(config.database.clone()).await?;
-        let rgb_client = RGBLibClient::new(config.rgb.clone()).await?;
+        let db_conn = SeaORMClient::connect(config.database.clone()).await?;
         let jwt_authenticator = if config.auth.enabled {
             Some(
                 Arc::new(JWTAuthenticator::new(config.auth.jwt.clone()).await?)
@@ -52,9 +49,10 @@ impl AppState {
 
         // Create repositories and stores
         let store = LightningStore::new(
-            Arc::new(SqlLightningInvoiceRepository::new(db_client.pool())),
-            Arc::new(SqlLightningAddressRepository::new(db_client.pool())),
-            Arc::new(SqlLightningPaymentRepository::new(db_client.pool())),
+            Arc::new(SqlLightningInvoiceRepository::new(db_conn.clone())),
+            Arc::new(SqlLightningAddressRepository::new(db_conn.clone())),
+            Arc::new(SqlLightningPaymentRepository::new(db_conn.clone())),
+            db_conn,
         );
 
         // Create services
@@ -67,13 +65,11 @@ impl AppState {
             Box::new(lightning_client),
             config.lightning.domain,
         );
-        // let rgb = RGBService::new(Box::new(rgb_client));
 
         // Create App state
         Ok(Self {
             jwt_authenticator,
             lightning: Arc::new(lightning),
-            rgb: Arc::new(rgb_client),
             timeout_layer,
         })
     }

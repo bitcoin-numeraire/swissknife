@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use sqlx::{PgPool, Postgres, Transaction};
+use sea_orm::DatabaseConnection;
 
 use crate::{
     application::errors::DatabaseError,
@@ -8,18 +8,18 @@ use crate::{
 
 #[derive(Clone)]
 pub struct SqlLightningPaymentRepository {
-    executor: PgPool,
+    executor: DatabaseConnection,
 }
 
 impl SqlLightningPaymentRepository {
-    pub fn new(executor: PgPool) -> Self {
+    pub fn new(executor: DatabaseConnection) -> Self {
         Self { executor }
     }
 }
 
 #[async_trait]
 impl LightningPaymentRepository for SqlLightningPaymentRepository {
-    async fn get_by_hash(
+    async fn find_by_hash(
         &self,
         payment_hash: &str,
     ) -> Result<Option<LightningPayment>, DatabaseError> {
@@ -32,28 +32,28 @@ impl LightningPaymentRepository for SqlLightningPaymentRepository {
         )
         .fetch_optional(&self.executor)
         .await
-        .map_err(|e| DatabaseError::Get(e.to_string()))?;
+        .map_err(|e| DatabaseError::Find(e.to_string()))?;
 
         Ok(result)
     }
 
     async fn insert(
         &self,
-        executor: Option<&mut Transaction<'_, Postgres>>,
+        executor: &DatabaseConnection,
         payment: LightningPayment,
     ) -> Result<LightningPayment, DatabaseError> {
         let query = sqlx::query_as!(
             LightningPayment,
             r#"
                 INSERT INTO lightning_payments (
-                    lightning_address, 
-                    payment_hash, 
-                    error, 
-                    amount_msat, 
-                    fee_msat, 
+                    lightning_address,
+                    payment_hash,
+                    error,
+                    amount_msat,
+                    fee_msat,
                     payment_time,
-                    status, 
-                    description, 
+                    status,
+                    description,
                     metadata
                 ) VALUES (
                     $1, $2, $3, $4, $5, $6, $7, $8, $9
@@ -76,7 +76,7 @@ impl LightningPaymentRepository for SqlLightningPaymentRepository {
             query.fetch_one(&self.executor).await
         };
 
-        let lightning_payment = result.map_err(|e| DatabaseError::Insert(e.to_string()))?;
+        let lightning_payment = result.map_err(|e| DatabaseError::Save(e.to_string()))?;
 
         Ok(lightning_payment)
     }
@@ -86,7 +86,7 @@ impl LightningPaymentRepository for SqlLightningPaymentRepository {
             LightningPayment,
             r#"
                 UPDATE lightning_payments
-                SET 
+                SET
                     status = $1,
                     fee_msat = $2,
                     payment_time = $3

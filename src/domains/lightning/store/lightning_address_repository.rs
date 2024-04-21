@@ -1,132 +1,121 @@
 use async_trait::async_trait;
-use sqlx::{PgPool, Postgres, Transaction};
+use sea_orm::ActiveValue::Set;
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, DatabaseConnection, DbBackend, EntityTrait, FromQueryResult,
+    QueryFilter, QueryOrder, QuerySelect, Statement,
+};
 
 use crate::{
     application::errors::DatabaseError,
-    domains::lightning::{entities::{LightningAddress, UserBalance}, store::LightningAddressRepository},
+    domains::lightning::{
+        entities::{LightningAddress, UserBalance},
+        store::LightningAddressRepository,
+    },
 };
 
-#[derive(Clone)]
-pub struct SqlLightningAddressRepository{
-    executor: PgPool
+use super::models::lightning_address::{ActiveModel, Column, Entity};
+use super::models::user_balance::UserBalanceModel;
+
+pub struct SqlLightningAddressRepository {
+    executor: DatabaseConnection,
 }
 
 impl SqlLightningAddressRepository {
-    pub fn new(executor: PgPool) -> Self {
+    pub fn new(executor: DatabaseConnection) -> Self {
         Self { executor }
     }
 }
 
 #[async_trait]
 impl LightningAddressRepository for SqlLightningAddressRepository {
-    async fn get_by_user_id(
+    async fn find_by_user_id(
         &self,
-        user: &str,
+        user_id: &str,
     ) -> Result<Option<LightningAddress>, DatabaseError> {
-        let result
-             = sqlx::query_as!(
-                LightningAddress,
-                r#"
-                    SELECT * FROM "lightning_addresses" WHERE user_id = $1
-                "#,
-                user
-            )
-            .fetch_optional(&self.executor) // fetch_optional for zero or one result
+        let model = Entity::find()
+            .filter(Column::UserId.eq(user_id))
+            .one(&self.executor)
             .await
-            .map_err(|e| DatabaseError::Get(e.to_string()))?;
-             
-        Ok(result)
+            .map_err(|e| DatabaseError::Find(e.to_string()))?;
+
+        Ok(model.map(Into::into))
     }
 
-    async fn get_by_username(
+    async fn find_by_username(
         &self,
         username: &str,
     ) -> Result<Option<LightningAddress>, DatabaseError> {
-        let result = sqlx::query_as!(
-                LightningAddress,
-                r#"
-                    SELECT * FROM "lightning_addresses" WHERE username = $1
-                "#,
-                username,
-            )
-            .fetch_optional(&self.executor) // fetch_optional for zero or one result
+        let model = Entity::find()
+            .filter(Column::Username.eq(username))
+            .one(&self.executor)
             .await
-            .map_err(|e| DatabaseError::Get(e.to_string()))?;
+            .map_err(|e| DatabaseError::Find(e.to_string()))?;
 
-        Ok(result)
+        Ok(model.map(Into::into))
     }
 
-    async fn list(
+    async fn find_all(
         &self,
-        limit: usize,
-        offset: usize,
+        limit: Option<u64>,
+        offset: Option<u64>,
     ) -> Result<Vec<LightningAddress>, DatabaseError> {
-        let result = sqlx::query_as!(
-                LightningAddress,
-                r#"
-                    SELECT * FROM "lightning_addresses" ORDER BY username LIMIT $1 OFFSET $2
-                "#,
-                limit as i64, 
-                offset as i64   
-            )
-            .fetch_all(&self.executor) // fetch_all for multiple results
+        let models = Entity::find()
+            .order_by_asc(Column::CreatedAt)
+            .offset(offset)
+            .limit(limit)
+            .all(&self.executor)
             .await
-            .map_err(|e| DatabaseError::List(e.to_string()))?;
-        
-        Ok(result)
+            .map_err(|e| DatabaseError::FindAll(e.to_string()))?;
+
+        Ok(models.into_iter().map(Into::into).collect())
     }
 
-    async fn list_by_user_id(
+    async fn find_all_by_user_id(
         &self,
-        user: &str,
-        limit: usize,
-        offset: usize,
+        user_id: &str,
+        limit: Option<u64>,
+        offset: Option<u64>,
     ) -> Result<Vec<LightningAddress>, DatabaseError> {
-        let result = sqlx::query_as!(
-                LightningAddress,
-                r#"
-                    SELECT * FROM "lightning_addresses" WHERE user_id = $1 ORDER BY username LIMIT $2 OFFSET $3
-                "#,
-                user,
-                limit as i64, 
-                offset as i64   
-            )
-            .fetch_all(&self.executor) // fetch_all for multiple results
+        let models = Entity::find()
+            .filter(Column::UserId.eq(user_id))
+            .order_by_asc(Column::CreatedAt)
+            .offset(offset)
+            .limit(limit)
+            .all(&self.executor)
             .await
-            .map_err(|e| DatabaseError::List(e.to_string()))?;
+            .map_err(|e| DatabaseError::FindAll(e.to_string()))?;
 
-        Ok(result)
+        Ok(models.into_iter().map(Into::into).collect())
     }
 
-    async fn insert(&self, user: &str, username: &str) -> Result<LightningAddress, DatabaseError> {
-        let lightning_address = sqlx::query_as!(
-            LightningAddress,
-            // language=PostgreSQL
-            r#"
-                insert into "lightning_addresses"(user_id, username)
-                values ($1, $2)
-                returning *
-            "#,
-            user,
-            username
-        )
-        .fetch_one(&self.executor)
-        .await
-        .map_err(|e| DatabaseError::Insert(e.to_string()))?;
-
-        Ok(lightning_address)
-    }
-
-    async fn get_balance_by_username(
+    async fn insert(
         &self,
-        executor: Option<&mut Transaction<'_, Postgres>>,
+        user_id: &str,
         username: &str,
-    ) -> Result<UserBalance, DatabaseError> {
-       let query = sqlx::query!(
+    ) -> Result<LightningAddress, DatabaseError> {
+        let model = ActiveModel {
+            user_id: Set(user_id.to_owned()),
+            username: Set(username.to_owned()),
+            ..Default::default()
+        };
+
+        println!("model: {:?}", model);
+
+        let model = model
+            .insert(&self.executor)
+            .await
+            .map_err(|e| DatabaseError::Save(e.to_string()))?;
+
+        Ok(model.into())
+    }
+
+    async fn get_balance_by_username(&self, username: &str) -> Result<UserBalance, DatabaseError> {
+        let result = UserBalanceModel::find_by_statement(Statement::from_sql_and_values(
+            DbBackend::Postgres,
             r#"
             WITH sent AS (
                 SELECT
-                    COALESCE(SUM(CASE WHEN status = 'PAID' THEN amount_msat ELSE 0 END) - 
+                    COALESCE(SUM(CASE WHEN status = 'PAID' THEN amount_msat ELSE 0 END) -
                     COALESCE(SUM(CASE WHEN status = 'PENDING' THEN amount_msat ELSE 0 END), 0), 0)::BIGINT AS sent_msat,
                     COALESCE(SUM(CASE WHEN status = 'PAID' THEN COALESCE(fee_msat, 0) ELSE 0 END), 0)::BIGINT AS fees_paid_msat
                 FROM lightning_payments
@@ -139,31 +128,18 @@ impl LightningAddressRepository for SqlLightningAddressRepository {
                 WHERE lightning_address = $1
             )
             SELECT
-                received.received_msat,
-                sent.sent_msat,
-                sent.fees_paid_msat,
-                (received.received_msat - (sent.sent_msat + sent.fees_paid_msat)) AS available_msat
+                COALESCE(received.received_msat, 0) AS received_msat,
+                COALESCE(sent.sent_msat, 0) AS sent_msat,
+                COALESCE(sent.fees_paid_msat, 0) AS fees_paid_msat,
+                COALESCE((received.received_msat - (sent.sent_msat + sent.fees_paid_msat)), 0) AS available_msat
             FROM received, sent;
             "#,
-            username
-        );
+            [username.into()],
+        )).one(&self.executor).await.map_err(|e| DatabaseError::FindByStatement(e.to_string()))?;
 
-        let result = if let Some(tx) = executor {
-            let test = &mut **tx;
-            query.fetch_one(&mut **tx).await
-        } else {
-            query.fetch_one(&self.executor).await
-        };
-    
-        let record = result.map_err(|e| DatabaseError::Balance(e.to_string()))?;
-    
-        let balance = UserBalance {
-            received_msat: record.received_msat.unwrap_or(0),
-            sent_msat: record.sent_msat.unwrap_or(0),
-            fees_paid_msat: record.fees_paid_msat.unwrap_or(0),
-            available_msat: record.available_msat.unwrap_or(0),
-        };
-
-        Ok(balance)
+        match result {
+            Some(model) => Ok(model.into()),
+            None => Ok(UserBalance::default()),
+        }
     }
 }

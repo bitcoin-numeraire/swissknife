@@ -3,7 +3,7 @@
 use sea_orm::entity::prelude::*;
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
-#[sea_orm(table_name = "lightning_invoices")]
+#[sea_orm(table_name = "lightning_invoice")]
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
     pub id: Uuid,
@@ -32,18 +32,18 @@ pub struct Model {
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
     #[sea_orm(
-        belongs_to = "super::lightning_addresses::Entity",
+        belongs_to = "super::lightning_address::Entity",
         from = "Column::LightningAddress",
-        to = "super::lightning_addresses::Column::Username",
+        to = "super::lightning_address::Column::Username",
         on_update = "Cascade",
         on_delete = "Cascade"
     )]
-    LightningAddresses,
+    LightningAddress,
 }
 
-impl Related<super::lightning_addresses::Entity> for Entity {
+impl Related<super::lightning_address::Entity> for Entity {
     fn to() -> RelationDef {
-        Relation::LightningAddresses.def()
+        Relation::LightningAddress.def()
     }
 }
 

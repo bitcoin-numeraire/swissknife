@@ -2,6 +2,7 @@ mod lightning_address_repository;
 mod lightning_invoice_repository;
 mod lightning_payment_repository;
 mod lightning_store;
+mod models;
 mod repositories;
 
 pub use lightning_address_repository::SqlLightningAddressRepository;

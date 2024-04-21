@@ -38,7 +38,7 @@ up-postgres:
 	@$(COMPOSE) up -d $(DB_SERVICE)
 	@until $(COMPOSE) logs $(DB_SERVICE) | grep 'database system is ready to accept connections'; do sleep 1; done
 	@sea-orm-cli migrate up
-	@sea-orm-cli generate entity -o src/models
+	@sea-orm-cli generate entity -o src/application/models
 
 up-pgadmin:
 	@$(COMPOSE) up -d $(PGADMIN_SERVICE)

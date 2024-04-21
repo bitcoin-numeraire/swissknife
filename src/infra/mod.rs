@@ -5,4 +5,3 @@ pub mod config;
 pub mod database;
 pub mod lightning;
 pub mod logging;
-pub mod rgb;
