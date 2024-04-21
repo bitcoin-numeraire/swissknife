@@ -162,7 +162,7 @@ impl LightningAddressesUseCases for LightningService {
             user.check_permission(Permission::ReadLightningAddress)?;
         }
 
-        let balance = self.store.get_balance_by_username(&username).await?;
+        let balance = self.store.get_balance_by_username(None, &username).await?;
 
         info!(user_id = user.sub, "Balance fetched successfully");
         Ok(balance)
@@ -185,7 +185,6 @@ impl LightningAddressesUseCases for LightningService {
 
         let txn = self
             .store
-            .db
             .begin()
             .await
             .map_err(|e| DatabaseError::Transaction(e.to_string()))?;
@@ -194,7 +193,7 @@ impl LightningAddressesUseCases for LightningService {
         // TODO: Add UUID to labels and only encapsulate the insert PENDING in a transaction
         let balance = self
             .store
-            .get_balance_by_username(&ln_address.username)
+            .get_balance_by_username(Some(&txn), &ln_address.username)
             .await?;
 
         if balance.available_msat < amount_msat.unwrap_or_default() as i64 {
@@ -234,7 +233,7 @@ impl LightningAddressesUseCases for LightningService {
             None => "PENDING".to_string(),
         };
         payment.id = Uuid::new_v4();
-        payment = self.store.insert_payment(payment).await?;
+        payment = self.store.insert_payment(Some(&txn), payment).await?;
 
         txn.commit()
             .await

@@ -1,8 +1,8 @@
 use async_trait::async_trait;
 use sea_orm::ActiveValue::Set;
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, FromQueryResult, QueryFilter,
-    QueryOrder, QuerySelect, Statement,
+    ActiveModelTrait, ColumnTrait, ConnectionTrait, DatabaseTransaction, EntityTrait,
+    FromQueryResult, QueryFilter, QueryOrder, QuerySelect, Statement,
 };
 
 use crate::domains::lightning::adapters::models::lightning_address::{ActiveModel, Column, Entity};
@@ -96,8 +96,12 @@ impl LightningAddressRepository for LightningStore {
         Ok(model.into())
     }
 
-    async fn get_balance_by_username(&self, username: &str) -> Result<UserBalance, DatabaseError> {
-        let result = UserBalanceModel::find_by_statement(Statement::from_sql_and_values(
+    async fn get_balance_by_username(
+        &self,
+        txn: Option<&DatabaseTransaction>,
+        username: &str,
+    ) -> Result<UserBalance, DatabaseError> {
+        let query = UserBalanceModel::find_by_statement(Statement::from_sql_and_values(
             self.db.get_database_backend(),
             r#"
             WITH sent AS (
@@ -122,7 +126,14 @@ impl LightningAddressRepository for LightningStore {
             FROM received, sent;
             "#,
             [username.into()],
-        )).one(&self.db).await.map_err(|e| DatabaseError::FindByStatement(e.to_string()))?;
+        ));
+
+        let result = match txn {
+            Some(txn) => query.one(txn).await,
+            None => query.one(&self.db).await,
+        };
+
+        let result = result.map_err(|e| DatabaseError::FindByStatement(e.to_string()))?;
 
         match result {
             Some(model) => Ok(model.into()),

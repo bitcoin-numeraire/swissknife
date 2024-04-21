@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use sea_orm::ActiveValue::Set;
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter};
+use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseTransaction, EntityTrait, QueryFilter};
 
 use crate::domains::lightning::adapters::models::lightning_payment::{ActiveModel, Column, Entity};
 use crate::domains::lightning::adapters::repository::LightningPaymentRepository;
@@ -25,6 +25,7 @@ impl LightningPaymentRepository for LightningStore {
 
     async fn insert_payment(
         &self,
+        txn: Option<&DatabaseTransaction>,
         payment: LightningPayment,
     ) -> Result<LightningPayment, DatabaseError> {
         let model = ActiveModel {
@@ -40,10 +41,12 @@ impl LightningPaymentRepository for LightningStore {
             ..Default::default()
         };
 
-        let model = model
-            .insert(&self.db)
-            .await
-            .map_err(|e| DatabaseError::Insert(e.to_string()))?;
+        let result = match txn {
+            Some(txn) => model.insert(txn).await,
+            None => model.insert(&self.db).await,
+        };
+
+        let model = result.map_err(|e| DatabaseError::Insert(e.to_string()))?;
 
         Ok(model.into())
     }

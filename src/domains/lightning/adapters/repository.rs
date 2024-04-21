@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use sea_orm::DatabaseTransaction;
 
 use crate::{
     application::errors::DatabaseError,
@@ -8,7 +9,7 @@ use crate::{
 };
 
 #[async_trait]
-pub trait LightningAddressRepository: Sync + Send {
+pub trait LightningAddressRepository {
     async fn find_address_by_username(
         &self,
         username: &str,
@@ -33,11 +34,15 @@ pub trait LightningAddressRepository: Sync + Send {
         user: &str,
         username: &str,
     ) -> Result<LightningAddress, DatabaseError>;
-    async fn get_balance_by_username(&self, username: &str) -> Result<UserBalance, DatabaseError>;
+    async fn get_balance_by_username(
+        &self,
+        txn: Option<&DatabaseTransaction>,
+        username: &str,
+    ) -> Result<UserBalance, DatabaseError>;
 }
 
 #[async_trait]
-pub trait LightningInvoiceRepository: Sync + Send {
+pub trait LightningInvoiceRepository {
     async fn find_invoice_by_hash(
         &self,
         payment_hash: &str,
@@ -53,13 +58,14 @@ pub trait LightningInvoiceRepository: Sync + Send {
 }
 
 #[async_trait]
-pub trait LightningPaymentRepository: Sync + Send {
+pub trait LightningPaymentRepository {
     async fn find_payment_by_hash(
         &self,
         payment_hash: &str,
     ) -> Result<Option<LightningPayment>, DatabaseError>;
     async fn insert_payment(
         &self,
+        txn: Option<&DatabaseTransaction>,
         payment: LightningPayment,
     ) -> Result<LightningPayment, DatabaseError>;
     async fn update_payment(
@@ -68,13 +74,28 @@ pub trait LightningPaymentRepository: Sync + Send {
     ) -> Result<LightningPayment, DatabaseError>;
 }
 
+#[async_trait]
+pub trait TransactionManager {
+    async fn begin(&self) -> Result<DatabaseTransaction, DatabaseError>;
+}
+
 pub trait LightningRepository:
-    LightningAddressRepository + LightningPaymentRepository + LightningInvoiceRepository
+    LightningAddressRepository
+    + LightningPaymentRepository
+    + LightningInvoiceRepository
+    + TransactionManager
+    + Sync
+    + Send
 {
 }
 
 // Ensure that any type that implements the individual traits also implements the new trait.
 impl<T> LightningRepository for T where
-    T: LightningAddressRepository + LightningPaymentRepository + LightningInvoiceRepository
+    T: LightningAddressRepository
+        + LightningPaymentRepository
+        + LightningInvoiceRepository
+        + TransactionManager
+        + Sync
+        + Send
 {
 }
