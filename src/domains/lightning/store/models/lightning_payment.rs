@@ -2,6 +2,8 @@
 
 use sea_orm::entity::prelude::*;
 
+use crate::domains::lightning::entities::LightningPayment;
+
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
 #[sea_orm(table_name = "lightning_payment")]
 pub struct Model {
@@ -40,3 +42,22 @@ impl Related<super::lightning_address::Entity> for Entity {
 }
 
 impl ActiveModelBehavior for ActiveModel {}
+
+impl From<Model> for LightningPayment {
+    fn from(model: Model) -> Self {
+        LightningPayment {
+            id: model.id,
+            lightning_address: model.lightning_address,
+            payment_hash: model.payment_hash,
+            error: model.error,
+            amount_msat: model.amount_msat as u64,
+            fee_msat: model.fee_msat.map(|v| v as u64),
+            payment_time: model.payment_time,
+            status: model.status,
+            description: model.description,
+            metadata: model.metadata,
+            created_at: model.created_at,
+            updated_at: model.updated_at,
+        }
+    }
+}

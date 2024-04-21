@@ -21,7 +21,7 @@ pub enum DatabaseError {
     FindByStatement(String),
 
     #[error("Failed to save resource: {0}")]
-    Save(String),
+    Insert(String),
 
     #[error("Failed to update resource: {0}")]
     Update(String),

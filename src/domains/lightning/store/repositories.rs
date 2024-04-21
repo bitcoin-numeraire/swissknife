@@ -1,5 +1,4 @@
 use async_trait::async_trait;
-use sea_orm::DatabaseConnection;
 
 use crate::{
     application::errors::DatabaseError,
@@ -46,10 +45,6 @@ pub trait LightningPaymentRepository: Sync + Send {
         &self,
         payment_hash: &str,
     ) -> Result<Option<LightningPayment>, DatabaseError>;
-    async fn insert(
-        &self,
-        executor: &DatabaseConnection,
-        payment: LightningPayment,
-    ) -> Result<LightningPayment, DatabaseError>;
+    async fn insert(&self, payment: LightningPayment) -> Result<LightningPayment, DatabaseError>;
     async fn update(&self, payment: LightningPayment) -> Result<LightningPayment, DatabaseError>;
 }

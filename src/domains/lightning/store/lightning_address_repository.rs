@@ -99,12 +99,10 @@ impl LightningAddressRepository for SqlLightningAddressRepository {
             ..Default::default()
         };
 
-        println!("model: {:?}", model);
-
         let model = model
             .insert(&self.executor)
             .await
-            .map_err(|e| DatabaseError::Save(e.to_string()))?;
+            .map_err(|e| DatabaseError::Insert(e.to_string()))?;
 
         Ok(model.into())
     }

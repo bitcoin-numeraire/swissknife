@@ -46,7 +46,7 @@ impl LightningPaymentsUseCases for LightningPaymentsProcessor {
                 return Ok(invoice);
             }
 
-            invoice.fee_msat = Some(payment.fee_msat as i64);
+            invoice.fee_msat = Some(payment.fee_msat);
             invoice.status = "PAID".to_string();
             invoice.payment_time = Some(payment.payment_time);
 
@@ -85,7 +85,7 @@ impl LightningPaymentsUseCases for LightningPaymentsProcessor {
                 return Ok(payment);
             }
 
-            payment.fee_msat = Some(payment_success.fee_msat as i64);
+            payment.fee_msat = Some(payment_success.fee_msat);
             payment.status = "PAID".to_string();
             payment.payment_time = Some(payment_success.payment_time);
 

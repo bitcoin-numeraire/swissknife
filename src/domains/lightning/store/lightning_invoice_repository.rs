@@ -1,10 +1,12 @@
-use async_trait::async_trait;
-use sea_orm::DatabaseConnection;
-
 use crate::{
     application::errors::DatabaseError,
     domains::lightning::{entities::LightningInvoice, store::LightningInvoiceRepository},
 };
+use async_trait::async_trait;
+use sea_orm::ActiveValue::Set;
+use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter};
+
+use super::models::lightning_invoice::{ActiveModel, Column, Entity};
 
 #[derive(Clone)]
 pub struct SqlLightningInvoiceRepository {
@@ -23,89 +25,55 @@ impl LightningInvoiceRepository for SqlLightningInvoiceRepository {
         &self,
         payment_hash: &str,
     ) -> Result<Option<LightningInvoice>, DatabaseError> {
-        let result = sqlx::query_as!(
-            LightningInvoice,
-            r#"
-               SELECT * FROM "lightning_invoices" WHERE payment_hash = $1
-           "#,
-            payment_hash
-        )
-        .fetch_optional(&self.executor)
-        .await
-        .map_err(|e| DatabaseError::Find(e.to_string()))?;
+        let model = Entity::find()
+            .filter(Column::PaymentHash.eq(payment_hash))
+            .one(&self.executor)
+            .await
+            .map_err(|e| DatabaseError::Find(e.to_string()))?;
 
-        Ok(result)
+        Ok(model.map(Into::into))
     }
 
     async fn insert(&self, invoice: LightningInvoice) -> Result<LightningInvoice, DatabaseError> {
-        let lightning_invoice = sqlx::query_as!(
-            LightningInvoice,
-            r#"
-                INSERT INTO lightning_invoices (
-                    lightning_address,
-                    bolt11,
-                    network,
-                    payee_pubkey,
-                    payment_hash,
-                    description,
-                    description_hash,
-                    amount_msat,
-                    payment_secret,
-                    timestamp,
-                    expiry,
-                    min_final_cltv_expiry_delta,
-                    status,
-                    fee_msat,
-                    payment_time
-                ) VALUES (
-                    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15
-                ) RETURNING *;
-            "#,
-            invoice.lightning_address,
-            invoice.bolt11,
-            invoice.network,
-            invoice.payee_pubkey,
-            invoice.payment_hash,
-            invoice.description,
-            invoice.description_hash,
-            invoice.amount_msat,
-            invoice.payment_secret,
-            invoice.timestamp,
-            invoice.expiry,
-            invoice.min_final_cltv_expiry_delta,
-            invoice.status,
-            invoice.fee_msat,
-            invoice.payment_time
-        )
-        .fetch_one(&self.executor)
-        .await
-        .map_err(|e| DatabaseError::Save(e.to_string()))?;
+        let model = ActiveModel {
+            lightning_address: Set(invoice.lightning_address),
+            bolt11: Set(invoice.bolt11),
+            network: Set(invoice.network),
+            payee_pubkey: Set(invoice.payee_pubkey),
+            payment_hash: Set(invoice.payment_hash),
+            description: Set(invoice.description),
+            description_hash: Set(invoice.description_hash),
+            amount_msat: Set(invoice.amount_msat.map(|v| v as i64)),
+            payment_secret: Set(invoice.payment_secret),
+            timestamp: Set(invoice.timestamp as i64),
+            expiry: Set(invoice.expiry as i64),
+            min_final_cltv_expiry_delta: Set(invoice.min_final_cltv_expiry_delta as i64),
+            status: Set(invoice.status),
+            ..Default::default()
+        };
 
-        Ok(lightning_invoice)
+        let model = model
+            .insert(&self.executor)
+            .await
+            .map_err(|e| DatabaseError::Insert(e.to_string()))?;
+
+        Ok(model.into())
     }
 
     async fn update(&self, invoice: LightningInvoice) -> Result<LightningInvoice, DatabaseError> {
-        let lightning_invoice = sqlx::query_as!(
-            LightningInvoice,
-            r#"
-                UPDATE lightning_invoices
-                SET
-                    status = $1,
-                    fee_msat = $2,
-                    payment_time = $3,
-                    updated_at = NOW()
-                WHERE payment_hash = $4
-                RETURNING *;
-            "#,
-            invoice.status,
-            invoice.fee_msat,
-            invoice.payment_time,
-            invoice.payment_hash
-        )
-        .fetch_one(&self.executor)
-        .await
-        .map_err(|e| DatabaseError::Update(e.to_string()))?;
+        let model = ActiveModel {
+            id: Set(invoice.id),
+            status: Set(invoice.status),
+            fee_msat: Set(invoice.fee_msat.map(|v| v as i64)),
+            payment_time: Set(invoice.payment_time.map(|v| v as i64)),
+            ..Default::default()
+        };
 
-        Ok(lightning_invoice)
+        let model = model
+            .update(&self.executor)
+            .await
+            .map_err(|e| DatabaseError::Update(e.to_string()))?;
+
+        Ok(model.into())
     }
 }

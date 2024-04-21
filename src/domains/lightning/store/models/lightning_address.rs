@@ -54,17 +54,3 @@ impl From<Model> for LightningAddress {
         }
     }
 }
-
-impl From<LightningAddress> for Model {
-    fn from(entity: LightningAddress) -> Self {
-        Model {
-            id: entity.id,
-            user_id: entity.user_id,
-            username: entity.username,
-            active: entity.active,
-            created_at: entity.created_at,
-            updated_at: entity.updated_at,
-            deleted_at: entity.deleted_at,
-        }
-    }
-}

@@ -1,10 +1,13 @@
 use async_trait::async_trait;
-use sea_orm::DatabaseConnection;
+use sea_orm::ActiveValue::Set;
+use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter};
 
 use crate::{
     application::errors::DatabaseError,
     domains::lightning::{entities::LightningPayment, store::LightningPaymentRepository},
 };
+
+use super::models::lightning_payment::{ActiveModel, Column, Entity};
 
 #[derive(Clone)]
 pub struct SqlLightningPaymentRepository {
@@ -23,85 +26,51 @@ impl LightningPaymentRepository for SqlLightningPaymentRepository {
         &self,
         payment_hash: &str,
     ) -> Result<Option<LightningPayment>, DatabaseError> {
-        let result = sqlx::query_as!(
-            LightningPayment,
-            r#"
-               SELECT * FROM "lightning_payments" WHERE payment_hash = $1
-           "#,
-            payment_hash
-        )
-        .fetch_optional(&self.executor)
-        .await
-        .map_err(|e| DatabaseError::Find(e.to_string()))?;
+        let model = Entity::find()
+            .filter(Column::PaymentHash.eq(payment_hash))
+            .one(&self.executor)
+            .await
+            .map_err(|e| DatabaseError::Find(e.to_string()))?;
 
-        Ok(result)
+        Ok(model.map(Into::into))
     }
 
-    async fn insert(
-        &self,
-        executor: &DatabaseConnection,
-        payment: LightningPayment,
-    ) -> Result<LightningPayment, DatabaseError> {
-        let query = sqlx::query_as!(
-            LightningPayment,
-            r#"
-                INSERT INTO lightning_payments (
-                    lightning_address,
-                    payment_hash,
-                    error,
-                    amount_msat,
-                    fee_msat,
-                    payment_time,
-                    status,
-                    description,
-                    metadata
-                ) VALUES (
-                    $1, $2, $3, $4, $5, $6, $7, $8, $9
-                ) RETURNING *;
-            "#,
-            payment.lightning_address,
-            payment.payment_hash,
-            payment.error,
-            payment.amount_msat,
-            payment.fee_msat,
-            payment.payment_time,
-            payment.status,
-            payment.description,
-            payment.metadata,
-        );
-
-        let result = if let Some(tx) = executor {
-            query.fetch_one(&mut **tx).await
-        } else {
-            query.fetch_one(&self.executor).await
+    async fn insert(&self, payment: LightningPayment) -> Result<LightningPayment, DatabaseError> {
+        let model = ActiveModel {
+            lightning_address: Set(payment.lightning_address),
+            payment_hash: Set(payment.payment_hash),
+            error: Set(payment.error),
+            amount_msat: Set(payment.amount_msat as i64),
+            fee_msat: Set(payment.fee_msat.map(|v| v as i64)),
+            payment_time: Set(payment.payment_time.map(|v| v as i64)),
+            status: Set(payment.status),
+            description: Set(payment.description),
+            metadata: Set(payment.metadata),
+            ..Default::default()
         };
 
-        let lightning_payment = result.map_err(|e| DatabaseError::Save(e.to_string()))?;
+        let model = model
+            .insert(&self.executor)
+            .await
+            .map_err(|e| DatabaseError::Insert(e.to_string()))?;
 
-        Ok(lightning_payment)
+        Ok(model.into())
     }
 
     async fn update(&self, payment: LightningPayment) -> Result<LightningPayment, DatabaseError> {
-        let lightning_payment = sqlx::query_as!(
-            LightningPayment,
-            r#"
-                UPDATE lightning_payments
-                SET
-                    status = $1,
-                    fee_msat = $2,
-                    payment_time = $3
-                WHERE payment_hash = $4
-                RETURNING *;
-            "#,
-            payment.status,
-            payment.fee_msat,
-            payment.payment_time,
-            payment.payment_hash
-        )
-        .fetch_one(&self.executor)
-        .await
-        .map_err(|e| DatabaseError::Update(e.to_string()))?;
+        let model = ActiveModel {
+            id: Set(payment.id),
+            status: Set(payment.status),
+            fee_msat: Set(payment.fee_msat.map(|v| v as i64)),
+            payment_time: Set(payment.payment_time.map(|v| v as i64)),
+            ..Default::default()
+        };
 
-        Ok(lightning_payment)
+        let model = model
+            .update(&self.executor)
+            .await
+            .map_err(|e| DatabaseError::Update(e.to_string()))?;
+
+        Ok(model.into())
     }
 }

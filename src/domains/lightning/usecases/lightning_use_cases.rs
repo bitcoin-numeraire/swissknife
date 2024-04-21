@@ -37,8 +37,8 @@ pub trait LightningAddressesUseCases: Send + Sync {
     async fn list_lightning_addresses(
         &self,
         user: AuthUser,
-        limit: usize,
-        offset: usize,
+        limit: Option<u64>,
+        offset: Option<u64>,
     ) -> Result<Vec<LightningAddress>, ApplicationError>;
 
     async fn get_balance(
