@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use breez_sdk_core::{parse, InputType};
+use breez_sdk_core::{parse, InputType, LNInvoice, LnUrlPayRequestData};
 use tracing::{debug, info};
 use uuid::Uuid;
 
@@ -17,6 +17,113 @@ use crate::{
 };
 
 use super::LightningService;
+
+impl LightningService {
+    fn validate_amount(amount_msat: Option<u64>) -> Result<u64, ApplicationError> {
+        let amount = amount_msat
+            .ok_or_else(|| DataError::Validation("amount_msat must be defined".to_string()))?;
+        if amount <= 0 {
+            return Err(
+                DataError::Validation("amount_msat must be greater than 0".to_string()).into(),
+            );
+        }
+
+        Ok(amount)
+    }
+
+    async fn send_bolt11(
+        &self,
+        invoice: LNInvoice,
+        username: String,
+        amount_msat: Option<u64>,
+    ) -> Result<LightningPayment, ApplicationError> {
+        let txn = self.store.begin().await?;
+
+        // TODO: Add UUID to labels and only encapsulate the insert PENDING in a transaction
+        let balance = self
+            .store
+            .get_balance_by_username(Some(&txn), &username)
+            .await?;
+
+        let mut amount = invoice.amount_msat.unwrap_or_default();
+
+        // If invoice is zero-amount bolt11, balance must be bigger than invoice amount,
+        // otherwise, balance must be bigger than the amount to be sent
+        if amount > 0 {
+            if balance.available_msat <= amount as i64 {
+                return Err(LightningError::InsufficientFunds.into());
+            }
+        } else {
+            amount = LightningService::validate_amount(amount_msat)?;
+            if balance.available_msat <= amount as i64 {
+                return Err(LightningError::InsufficientFunds.into());
+            }
+        }
+
+        let pending_payment = self
+            .store
+            .insert_payment(Some(&txn), Some(username), "PENDING".to_string(), amount)
+            .await?;
+
+        println!("payment: {:?}", pending_payment);
+        println!("invoice bolt11: {:?}", invoice);
+
+        txn.commit()
+            .await
+            .map_err(|e| DatabaseError::Transaction(e.to_string()))?;
+
+        let mut payment = self
+            .lightning_client
+            .send_payment(invoice.bolt11.clone(), amount_msat)
+            .await?;
+
+        payment.id = pending_payment.id;
+
+        Ok(payment)
+    }
+
+    async fn send_lnurl_pay(
+        &self,
+        data: LnUrlPayRequestData,
+        username: String,
+        amount_msat: Option<u64>,
+        comment: Option<String>,
+    ) -> Result<LightningPayment, ApplicationError> {
+        let amount = LightningService::validate_amount(amount_msat)?;
+
+        let txn = self.store.begin().await?;
+
+        // TODO: Add UUID to labels and only encapsulate the insert PENDING in a transaction
+        let balance = self
+            .store
+            .get_balance_by_username(Some(&txn), &username)
+            .await?;
+
+        if balance.available_msat <= amount as i64 {
+            return Err(LightningError::InsufficientFunds.into());
+        }
+
+        let pending_payment = self
+            .store
+            .insert_payment(Some(&txn), Some(username), "PENDING".to_string(), amount)
+            .await?;
+
+        println!("payment: {:?}", pending_payment);
+
+        txn.commit()
+            .await
+            .map_err(|e| DatabaseError::Transaction(e.to_string()))?;
+
+        let mut payment = self
+            .lightning_client
+            .lnurl_pay(data, amount, comment)
+            .await?;
+
+        payment.id = pending_payment.id;
+
+        Ok(payment)
+    }
+}
 
 #[async_trait]
 impl LightningAddressesUseCases for LightningService {
@@ -183,61 +290,33 @@ impl LightningAddressesUseCases for LightningService {
             .await?
             .ok_or_else(|| DataError::NotFound("Lightning address not found.".to_string()))?;
 
-        let txn = self
-            .store
-            .begin()
-            .await
-            .map_err(|e| DatabaseError::Transaction(e.to_string()))?;
-
-        // TODO: Create a PENDING payment before actually sending it so we reduce the available amount for concurrent requests
-        // TODO: Add UUID to labels and only encapsulate the insert PENDING in a transaction
-        let balance = self
-            .store
-            .get_balance_by_username(Some(&txn), &ln_address.username)
-            .await?;
-
-        if balance.available_msat < amount_msat.unwrap_or_default() as i64 {
-            return Err(LightningError::InsufficientFunds.into());
-        }
-
         let input_type = parse(&input)
             .await
             .map_err(|e| DataError::Validation(e.to_string()))?;
 
         let mut payment = match input_type {
             InputType::Bolt11 { invoice } => {
-                self.lightning_client
-                    .send_payment(invoice.bolt11.clone(), amount_msat)
+                self.send_bolt11(invoice, ln_address.username, amount_msat)
                     .await
             }
             InputType::LnUrlPay { data } => {
-                let amount = validate_amount(amount_msat)?;
-                self.lightning_client.lnurl_pay(data, amount, comment).await
-            }
-            InputType::NodeId { node_id } => {
-                let amount = validate_amount(amount_msat)?;
-                self.lightning_client
-                    .send_spontaneous_payment(node_id.clone(), amount)
+                self.send_lnurl_pay(data, ln_address.username, amount_msat, comment)
                     .await
             }
-            InputType::LnUrlError { data } => Err(LightningError::SendLNURLPayment(data.reason)),
+            InputType::LnUrlError { data } => {
+                Err(LightningError::SendLNURLPayment(data.reason).into())
+            }
             _ => Err(LightningError::UnsupportedPaymentFormat(
                 "Unsupported payment format".to_string(),
             )
             .into()),
         }?;
 
-        payment.lightning_address = Some(ln_address.username.clone());
         payment.status = match payment.error {
             Some(_) => "FAILED".to_string(),
-            None => "PENDING".to_string(),
+            None => "SETTLED".to_string(),
         };
-        payment.id = Uuid::new_v4();
-        payment = self.store.insert_payment(Some(&txn), payment).await?;
-
-        txn.commit()
-            .await
-            .map_err(|e| DatabaseError::Transaction(e.to_string()))?;
+        let payment = self.store.update_payment(payment).await?;
 
         info!(
             user_id = user.sub,
@@ -249,14 +328,4 @@ impl LightningAddressesUseCases for LightningService {
         );
         Ok(payment)
     }
-}
-
-pub fn validate_amount(amount_msat: Option<u64>) -> Result<u64, ApplicationError> {
-    let amount = amount_msat
-        .ok_or_else(|| DataError::Validation("amount_msat must be defined".to_string()))?;
-    if amount <= 0 {
-        return Err(DataError::Validation("amount_msat must be greater than 0".to_string()).into());
-    }
-
-    Ok(amount)
 }

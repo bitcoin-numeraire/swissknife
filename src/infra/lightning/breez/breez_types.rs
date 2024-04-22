@@ -25,7 +25,6 @@ impl Into<LightningPayment> for Payment {
     fn into(self) -> LightningPayment {
         LightningPayment {
             payment_hash: self.id,
-            lightning_address: None,
             error: self.error,
             amount_msat: self.amount_msat,
             fee_msat: Some(self.fee_msat),

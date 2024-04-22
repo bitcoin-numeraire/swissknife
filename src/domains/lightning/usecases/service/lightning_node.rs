@@ -62,7 +62,7 @@ impl LightningNodeUseCases for LightningService {
             "Sending payment to bolt11 invoice"
         );
 
-        user.check_permission(Permission::ReadLightningNode)?;
+        user.check_permission(Permission::SendLightningPayment)?;
 
         let payment = self
             .lightning_client

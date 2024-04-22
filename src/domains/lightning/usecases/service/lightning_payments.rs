@@ -41,13 +41,13 @@ impl LightningPaymentsUseCases for LightningPaymentsProcessor {
         let invoice_option = self.store.find_invoice_by_hash(&payment_hash).await?;
 
         if let Some(mut invoice) = invoice_option {
-            if invoice.status == "PAID".to_string() {
-                debug!(payment_hash, "Lightning invoice is already paid.");
+            if invoice.status == "SETTLED".to_string() {
+                debug!(payment_hash, "Lightning invoice is already settled.");
                 return Ok(invoice);
             }
 
             invoice.fee_msat = Some(payment.fee_msat);
-            invoice.status = "PAID".to_string();
+            invoice.status = "SETTLED".to_string();
             invoice.payment_time = Some(payment.payment_time);
 
             invoice = self.store.update_invoice(invoice).await?;
@@ -66,7 +66,7 @@ impl LightningPaymentsUseCases for LightningPaymentsProcessor {
         &self,
         payment_success: Payment,
     ) -> Result<LightningPayment, ApplicationError> {
-        let payment_hash = payment_success.id;
+        let payment_hash = payment_success.id.clone();
         trace!(payment_hash, "Processing outgoing lightning payment");
 
         if payment_success.status != PaymentStatus::Complete {
@@ -79,20 +79,16 @@ impl LightningPaymentsUseCases for LightningPaymentsProcessor {
 
         let payment_option = self.store.find_payment_by_hash(&payment_hash).await?;
 
-        if let Some(mut payment) = payment_option {
-            if payment.status == "PAID".to_string() {
-                debug!(payment_hash, "Lightning invoice is already paid.");
-                return Ok(payment);
-            }
+        if let Some(payment_retrieved) = payment_option {
+            let mut payment: LightningPayment = payment_success.clone().into();
+            payment.id = payment_retrieved.id;
+            payment.status = "SETTLED".to_string();
 
-            payment.fee_msat = Some(payment_success.fee_msat);
-            payment.status = "PAID".to_string();
-            payment.payment_time = Some(payment_success.payment_time);
-
-            payment = self.store.update_payment(payment).await?;
+            let payment = self.store.update_payment(payment).await?;
 
             info!(
                 payment_hash,
+                username = payment.lightning_address,
                 "Outgoing Lightning payment processed successfully"
             );
             return Ok(payment);
@@ -123,17 +119,10 @@ impl LightningPaymentsUseCases for LightningPaymentsProcessor {
             .await?;
 
         if let Some(mut payment) = payment_option {
-            if payment.status == "PAID".to_string() {
-                debug!(
-                    payment_hash = invoice.payment_hash,
-                    "Lightning invoice is already paid."
-                );
-                return Ok(payment);
-            }
-
             payment.status = "FAILED".to_string();
             payment.payment_time = Some(invoice.timestamp as i64);
             payment.error = Some(payment_failed.error);
+
             payment = self.store.update_payment(payment).await?;
 
             info!(

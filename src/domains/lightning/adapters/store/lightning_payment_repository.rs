@@ -26,18 +26,15 @@ impl LightningPaymentRepository for LightningStore {
     async fn insert_payment(
         &self,
         txn: Option<&DatabaseTransaction>,
-        payment: LightningPayment,
+        lightning_address: Option<String>,
+        status: String,
+        amount_msat: u64,
     ) -> Result<LightningPayment, DatabaseError> {
         let model = ActiveModel {
-            lightning_address: Set(payment.lightning_address),
-            payment_hash: Set(payment.payment_hash),
-            error: Set(payment.error),
-            amount_msat: Set(payment.amount_msat as i64),
-            fee_msat: Set(payment.fee_msat.map(|v| v as i64)),
-            payment_time: Set(payment.payment_time.map(|v| v as i64)),
-            status: Set(payment.status),
-            description: Set(payment.description),
-            metadata: Set(payment.metadata),
+            lightning_address: Set(lightning_address),
+            amount_msat: Set(amount_msat as i64),
+            status: Set(status),
+            payment_hash: Set("test".to_string()),
             ..Default::default()
         };
 
@@ -60,6 +57,11 @@ impl LightningPaymentRepository for LightningStore {
             status: Set(payment.status),
             fee_msat: Set(payment.fee_msat.map(|v| v as i64)),
             payment_time: Set(payment.payment_time.map(|v| v as i64)),
+            payment_hash: Set(payment.payment_hash),
+            error: Set(payment.error),
+            amount_msat: Set(payment.amount_msat as i64),
+            description: Set(payment.description),
+            metadata: Set(payment.metadata),
             ..Default::default()
         };
 

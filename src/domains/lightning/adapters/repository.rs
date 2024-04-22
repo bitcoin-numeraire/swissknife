@@ -66,7 +66,9 @@ pub trait LightningPaymentRepository {
     async fn insert_payment(
         &self,
         txn: Option<&DatabaseTransaction>,
-        payment: LightningPayment,
+        lightning_address: Option<String>,
+        status: String,
+        amount_msat: u64,
     ) -> Result<LightningPayment, DatabaseError>;
     async fn update_payment(
         &self,

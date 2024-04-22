@@ -106,16 +106,16 @@ impl LightningAddressRepository for LightningStore {
             r#"
             WITH sent AS (
                 SELECT
-                    COALESCE(SUM(CASE WHEN status = 'PAID' THEN amount_msat ELSE 0 END) -
+                    COALESCE(SUM(CASE WHEN status = 'SETTLED' THEN amount_msat ELSE 0 END) -
                     COALESCE(SUM(CASE WHEN status = 'PENDING' THEN amount_msat ELSE 0 END), 0), 0)::BIGINT AS sent_msat,
-                    COALESCE(SUM(CASE WHEN status = 'PAID' THEN COALESCE(fee_msat, 0) ELSE 0 END), 0)::BIGINT AS fees_paid_msat
-                FROM lightning_payments
+                    COALESCE(SUM(CASE WHEN status = 'SETTLED' THEN COALESCE(fee_msat, 0) ELSE 0 END), 0)::BIGINT AS fees_paid_msat
+                FROM lightning_payment
                 WHERE lightning_address = $1
             ),
             received AS (
                 SELECT
-                    COALESCE(SUM(CASE WHEN status = 'PAID' THEN amount_msat ELSE 0 END), 0)::BIGINT AS received_msat
-                FROM lightning_invoices
+                    COALESCE(SUM(CASE WHEN status = 'SETTLED' THEN amount_msat ELSE 0 END), 0)::BIGINT AS received_msat
+                FROM lightning_invoice
                 WHERE lightning_address = $1
             )
             SELECT

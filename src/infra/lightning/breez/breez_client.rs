@@ -89,14 +89,6 @@ impl LightningClient for BreezClient {
     }
 
     async fn lsp_info(&self) -> Result<LspInformation, LightningError> {
-        let list_lsps = self
-            .sdk
-            .list_lsps()
-            .await
-            .map_err(|e| LightningError::LSPInfo(e.to_string()))?;
-
-        println!("list_lsps: {:?}", list_lsps);
-
         let lsp_info = self
             .sdk
             .lsp_info()
