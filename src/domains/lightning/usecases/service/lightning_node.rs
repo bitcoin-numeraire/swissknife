@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use breez_sdk_core::{LspInformation, NodeState, Payment};
+use breez_sdk_core::{LspInformation, NodeState, Payment, ServiceHealthCheckResponse};
 use tracing::{debug, info, trace};
 
 use crate::{
@@ -62,7 +62,7 @@ impl LightningNodeUseCases for LightningService {
             "Sending payment to bolt11 invoice"
         );
 
-        user.check_permission(Permission::ReadLightningNode)?;
+        user.check_permission(Permission::SendLightningPayment)?;
 
         let payment = self
             .lightning_client
@@ -71,5 +71,18 @@ impl LightningNodeUseCases for LightningService {
 
         info!(user_id = user.sub, bolt11, "Payment sent successfully");
         Ok(payment)
+    }
+
+    async fn health_check(
+        &self,
+        user: AuthUser,
+    ) -> Result<ServiceHealthCheckResponse, ApplicationError> {
+        trace!(user_id = user.sub, "Checking health of lightning service");
+
+        user.check_permission(Permission::ReadLightningNode)?;
+
+        let health = self.lightning_client.health().await?;
+
+        Ok(health)
     }
 }

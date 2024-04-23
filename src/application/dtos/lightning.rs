@@ -1,5 +1,5 @@
 use chrono::DateTime;
-use chrono::Utc;
+use chrono::FixedOffset;
 use serde::Deserialize;
 use serde::Serialize;
 use uuid::Uuid;
@@ -37,11 +37,11 @@ pub struct LightningAddressResponse {
     pub user_id: String,
     pub username: String,
     pub active: bool,
-    pub created_at: DateTime<Utc>,
+    pub created_at: DateTime<FixedOffset>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub updated_at: Option<DateTime<Utc>>,
+    pub updated_at: Option<DateTime<FixedOffset>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub deleted_at: Option<DateTime<Utc>>,
+    pub deleted_at: Option<DateTime<FixedOffset>>,
 }
 
 impl From<LightningAddress> for LightningAddressResponse {
@@ -68,21 +68,21 @@ pub struct LightningInvoiceResponse {
     pub payment_hash: String,
     pub description: Option<String>,
     pub description_hash: Option<String>,
-    pub amount_msat: i64,
-    pub timestamp: i64,
-    pub expiry: i64,
-    pub min_final_cltv_expiry_delta: i64,
-    pub fee_msat: Option<i64>,
+    pub amount_msat: Option<u64>,
+    pub timestamp: u64,
+    pub expiry: u64,
+    pub min_final_cltv_expiry_delta: u64,
+    pub fee_msat: Option<u64>,
     pub payment_time: Option<i64>,
     pub status: String,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: Option<DateTime<Utc>>,
+    pub created_at: DateTime<FixedOffset>,
+    pub updated_at: Option<DateTime<FixedOffset>>,
 }
 
 impl From<LightningInvoice> for LightningInvoiceResponse {
     fn from(invoice: LightningInvoice) -> Self {
         Self {
-            id: invoice.id.unwrap(), // Can't be empty on the API layer
+            id: invoice.id,
             lightning_address: invoice.lightning_address,
             bolt11: invoice.bolt11,
             network: invoice.network,
@@ -97,7 +97,7 @@ impl From<LightningInvoice> for LightningInvoiceResponse {
             fee_msat: invoice.fee_msat,
             payment_time: invoice.payment_time,
             status: invoice.status,
-            created_at: invoice.created_at.unwrap(), // Can't be empty on the API layer
+            created_at: invoice.created_at,
             updated_at: invoice.updated_at,
         }
     }
@@ -107,12 +107,12 @@ impl From<LightningInvoice> for LightningInvoiceResponse {
 pub struct LightningPaymentResponse {
     pub id: Uuid,
     pub lightning_address: Option<String>,
-    pub payment_hash: String,
+    pub payment_hash: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
-    pub amount_msat: i64,
+    pub amount_msat: u64,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub fee_msat: Option<i64>,
+    pub fee_msat: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub payment_time: Option<i64>,
     pub status: String,
@@ -120,15 +120,15 @@ pub struct LightningPaymentResponse {
     pub description: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metadata: Option<String>,
-    pub created_at: DateTime<Utc>,
+    pub created_at: DateTime<FixedOffset>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub updated_at: Option<DateTime<Utc>>,
+    pub updated_at: Option<DateTime<FixedOffset>>,
 }
 
 impl From<LightningPayment> for LightningPaymentResponse {
     fn from(payment: LightningPayment) -> Self {
         Self {
-            id: payment.id.unwrap(), // Can't be empty on the API layer
+            id: payment.id,
             lightning_address: payment.lightning_address,
             payment_hash: payment.payment_hash,
             error: payment.error,
@@ -138,7 +138,7 @@ impl From<LightningPayment> for LightningPaymentResponse {
             status: payment.status,
             description: payment.description,
             metadata: payment.metadata,
-            created_at: payment.created_at.unwrap(), // Can't be empty on the API layer
+            created_at: payment.created_at,
             updated_at: payment.updated_at,
         }
     }

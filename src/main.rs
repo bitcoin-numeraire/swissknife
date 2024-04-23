@@ -1,17 +1,17 @@
-mod adapters;
 mod application;
 mod domains;
+mod infra;
 
 use std::process::exit;
 
 #[cfg(debug_assertions)]
 use dotenv::dotenv;
 
-use crate::adapters::config::config_rs::load_config;
-use crate::adapters::logging::tracing::setup_tracing;
+use crate::infra::app::App;
+use crate::infra::app::AppState;
+use crate::infra::config::config_rs::load_config;
+use crate::infra::logging::tracing::setup_tracing;
 
-use adapters::app::App;
-use adapters::app::AppState;
 use tracing::error;
 
 #[tokio::main]

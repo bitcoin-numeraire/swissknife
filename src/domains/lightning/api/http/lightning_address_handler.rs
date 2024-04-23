@@ -8,7 +8,6 @@ use axum::{
 use regex::Regex;
 
 use crate::{
-    adapters::app::AppState,
     application::{
         dtos::{
             LNUrlpInvoiceQueryParams, LNUrlpInvoiceResponse, LightningAddressResponse,
@@ -21,6 +20,7 @@ use crate::{
         lightning::entities::{LNURLPayRequest, UserBalance},
         users::entities::AuthUser,
     },
+    infra::app::AppState,
 };
 
 const MIN_USERNAME_LENGTH: usize = 1;
@@ -116,12 +116,9 @@ impl LightningAddressHandler {
         user: AuthUser,
         Query(query_params): Query<PaginationQueryParams>,
     ) -> Result<Json<Vec<LightningAddressResponse>>, ApplicationError> {
-        let limit = query_params.limit.unwrap_or(100);
-        let offset = query_params.offset.unwrap_or(0);
-
         let lightning_addresses = app_state
             .lightning
-            .list_lightning_addresses(user, limit, offset)
+            .list_lightning_addresses(user, query_params.limit, query_params.offset)
             .await?;
 
         let response: Vec<LightningAddressResponse> =

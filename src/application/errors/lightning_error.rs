@@ -2,6 +2,9 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum LightningError {
+    #[error("Failed to initialize logging: {0}")]
+    Logging(String),
+
     #[error("Failed to parse mnemonic seed: {0}")]
     ParseSeed(String),
 
@@ -32,9 +35,6 @@ pub enum LightningError {
     #[error("Failed to retrieve payment by hash: {0}")]
     PaymentByHash(String),
 
-    #[error("Unsupported payment format: {0}")]
-    UnsupportedPaymentFormat(String),
-
-    #[error("Insufficient funds")]
-    InsufficientFunds,
+    #[error("Failed to retrieve healthcheck: {0}")]
+    HealthCheck(String),
 }

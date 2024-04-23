@@ -37,7 +37,7 @@ up-proxy:
 up-postgres:
 	@$(COMPOSE) up -d $(DB_SERVICE)
 	@until $(COMPOSE) logs $(DB_SERVICE) | grep 'database system is ready to accept connections'; do sleep 1; done
-	@sqlx migrate run
+	@sea-orm-cli migrate up
 
 up-pgadmin:
 	@$(COMPOSE) up -d $(PGADMIN_SERVICE)
@@ -61,7 +61,7 @@ send:
 	@$(BCLI) -rpcwallet=$(wallet) -generate 4
 
 install-tools:
-	@cargo install sqlx-cli --no-default-features --features native-tls,postgres
+	@cargo install sea-orm-cli
 
 generate-certs:
 	@mkdir -p certs

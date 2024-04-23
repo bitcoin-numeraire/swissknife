@@ -13,4 +13,8 @@ pub enum DataError {
 
     #[error("Validation failed: {0}")]
     Validation(String),
+
+    // TODO: Might make sense to move to a different error type such as AccountError
+    #[error("Insufficient funds")]
+    InsufficientFunds,
 }

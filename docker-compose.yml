@@ -1,5 +1,3 @@
-version: "3.2"
-
 services:
   bitcoind:
     image: registry.gitlab.com/hashbeam/docker/bitcoind:25.0
@@ -27,13 +25,26 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       POSTGRES_DB: ${POSTGRES_DB:-numeraire}
+      # Enable logging
+      POSTGRES_LOGGING: "on"
+      # Environment variables to control PostgreSQL logging behavior
+      POSTGRES_LOG_MIN_DURATION_STATEMENT: "0" # Log all statements immediately
+      POSTGRES_LOG_STATEMENTS: "all"
     ports:
       - 5432:5432
     volumes:
       - db:/var/lib/postgresql/data
+    command:
+      - "postgres"
+      - "-c"
+      - "logging_collector=off" # Ensure logging collector is turned off to use stderr
+      - "-c"
+      - "log_statement=all" # Log all statements
+      - "-c"
+      - "log_destination=stderr" # Send logs to stderr
 
   pgadmin:
-    image: dpage/pgadmin4:8.1
+    image: dpage/pgadmin4:8.5
     environment:
       PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-pgadmin4@pgadmin.org}
       PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:-admin}

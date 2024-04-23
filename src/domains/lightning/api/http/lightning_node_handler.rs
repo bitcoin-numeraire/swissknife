@@ -1,12 +1,12 @@
 use std::sync::Arc;
 
 use axum::{extract::State, routing::get, Json, Router};
-use breez_sdk_core::{LspInformation, NodeState, Payment};
+use breez_sdk_core::{LspInformation, NodeState, Payment, ServiceHealthCheckResponse};
 
 use crate::{
-    adapters::app::AppState,
     application::{dtos::SendPaymentRequest, errors::ApplicationError},
     domains::{lightning::entities::LightningPayment, users::entities::AuthUser},
+    infra::app::AppState,
 };
 
 pub struct LightningNodeHandler;
@@ -18,6 +18,7 @@ impl LightningNodeHandler {
             .route("/lsp-info", get(Self::lsp_info))
             .route("/list-payments", get(Self::list_payments))
             .route("/send-payment", get(Self::send_payment))
+            .route("/health", get(Self::health_check))
     }
 
     async fn node_info(
@@ -58,5 +59,14 @@ impl LightningNodeHandler {
             .await?;
 
         Ok(payment.into())
+    }
+
+    async fn health_check(
+        State(app_state): State<Arc<AppState>>,
+        user: AuthUser,
+    ) -> Result<Json<ServiceHealthCheckResponse>, ApplicationError> {
+        let health = app_state.lightning.health_check(user).await?;
+
+        Ok(health.into())
     }
 }
