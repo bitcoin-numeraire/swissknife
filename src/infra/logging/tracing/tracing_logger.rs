@@ -11,6 +11,7 @@ pub struct TracingLoggerConfig {
     ansi: bool,
     filter: String,
     format: String,
+    file: bool,
 }
 
 impl TracingLoggerConfig {
@@ -33,6 +34,7 @@ pub fn setup_tracing(config: TracingLoggerConfig) {
         .with_thread_names(config.thread_names)
         .with_line_number(config.line_number)
         .with_ansi(config.ansi)
+        .with_file(config.file)
         .with_env_filter(EnvFilter::new(config.filter));
 
     match config.format.as_str() {

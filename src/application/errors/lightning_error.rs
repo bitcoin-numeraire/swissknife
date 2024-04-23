@@ -2,6 +2,9 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum LightningError {
+    #[error("Failed to initialize logging: {0}")]
+    Logging(String),
+
     #[error("Failed to parse mnemonic seed: {0}")]
     ParseSeed(String),
 

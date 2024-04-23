@@ -25,6 +25,7 @@ pub struct BreezClientConfig {
     pub working_dir: String,
     pub seed: String,
     pub domain: String,
+    pub log_in_file: bool,
 }
 
 pub struct BreezClient {
@@ -36,6 +37,11 @@ impl BreezClient {
         config: BreezClientConfig,
         listener: Box<BreezListener>,
     ) -> Result<Self, LightningError> {
+        if config.log_in_file {
+            BreezServices::init_logging(&config.working_dir, None)
+                .map_err(|e| LightningError::Logging(e.to_string()))?;
+        }
+
         let mut breez_config = BreezServices::default_config(
             EnvironmentType::Production,
             config.api_key,

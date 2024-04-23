@@ -107,7 +107,7 @@ impl From<LightningInvoice> for LightningInvoiceResponse {
 pub struct LightningPaymentResponse {
     pub id: Uuid,
     pub lightning_address: Option<String>,
-    pub payment_hash: String,
+    pub payment_hash: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
     pub amount_msat: u64,
@@ -130,7 +130,7 @@ impl From<LightningPayment> for LightningPaymentResponse {
         Self {
             id: payment.id,
             lightning_address: payment.lightning_address,
-            payment_hash: payment.payment_hash.unwrap_or_default(), // Always exists in the API layer
+            payment_hash: payment.payment_hash,
             error: payment.error,
             amount_msat: payment.amount_msat,
             fee_msat: payment.fee_msat,
