@@ -53,7 +53,7 @@ impl LightningPaymentRepository for LightningStore {
     ) -> Result<LightningPayment, DatabaseError> {
         let model = ActiveModel {
             id: Set(payment.id),
-            status: Set(payment.status),
+            status: Set(payment.status.to_string()),
             fee_msat: Set(payment.fee_msat.map(|v| v as i64)),
             payment_time: Set(payment.payment_time.map(|v| v as i64)),
             payment_hash: Set(payment.payment_hash),

@@ -1,8 +1,8 @@
 use chrono::{DateTime, FixedOffset};
-use serde::Serialize;
+use strum_macros::{Display, EnumString};
 use uuid::Uuid;
 
-#[derive(Clone, Debug, Serialize, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct LightningPayment {
     pub id: Uuid,
     pub lightning_address: Option<String>,
@@ -11,9 +11,17 @@ pub struct LightningPayment {
     pub amount_msat: u64,
     pub fee_msat: Option<u64>,
     pub payment_time: Option<i64>,
-    pub status: String, // TODO: Use enum
+    pub status: LightningPaymentStatus,
     pub description: Option<String>,
     pub metadata: Option<String>,
     pub created_at: DateTime<FixedOffset>,
     pub updated_at: Option<DateTime<FixedOffset>>,
+}
+
+#[derive(Clone, Debug, EnumString, Display, PartialEq, Eq, Default)]
+pub enum LightningPaymentStatus {
+    #[default]
+    PENDING,
+    SETTLED,
+    FAILED,
 }
