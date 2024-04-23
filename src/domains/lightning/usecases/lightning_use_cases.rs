@@ -1,5 +1,7 @@
 use async_trait::async_trait;
-use breez_sdk_core::{LspInformation, NodeState, Payment, PaymentFailedData};
+use breez_sdk_core::{
+    LspInformation, NodeState, Payment, PaymentFailedData, ServiceHealthCheckResponse,
+};
 
 use crate::{
     application::errors::ApplicationError,
@@ -83,6 +85,10 @@ pub trait LightningNodeUseCases: Send + Sync {
         bolt11_invoice: String,
         amount_msat: Option<u64>,
     ) -> Result<LightningPayment, ApplicationError>;
+    async fn health_check(
+        &self,
+        user: AuthUser,
+    ) -> Result<ServiceHealthCheckResponse, ApplicationError>;
 }
 
 pub trait LightningUseCases: LightningAddressesUseCases + LightningNodeUseCases {}

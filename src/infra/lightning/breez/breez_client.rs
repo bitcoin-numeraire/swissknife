@@ -7,6 +7,7 @@ use breez_sdk_core::{
     BreezServices, EnvironmentType, GreenlightNodeConfig, ListPaymentsRequest, LnUrlPayRequest,
     LnUrlPayRequestData, LnUrlPayResult, LspInformation, NodeConfig, NodeState, Payment,
     ReceivePaymentRequest, SendPaymentRequest, SendSpontaneousPaymentRequest,
+    ServiceHealthCheckResponse,
 };
 
 use crate::{
@@ -163,7 +164,7 @@ impl LightningClient for BreezClient {
 
         match result {
             LnUrlPayResult::EndpointSuccess { data } => Ok(LightningPayment {
-                payment_hash: data.payment_hash,
+                payment_hash: Some(data.payment_hash),
                 amount_msat,
                 ..Default::default()
             }),
@@ -171,7 +172,7 @@ impl LightningClient for BreezClient {
                 return Err(LightningError::SendLNURLPayment(data.reason));
             }
             LnUrlPayResult::PayError { data } => Ok(LightningPayment {
-                payment_hash: data.payment_hash,
+                payment_hash: Some(data.payment_hash),
                 error: Some(data.reason),
                 amount_msat,
                 ..Default::default()
@@ -188,6 +189,16 @@ impl LightningClient for BreezClient {
             .payment_by_hash(payment_hash)
             .await
             .map_err(|e| LightningError::PaymentByHash(e.to_string()))?;
+
+        Ok(response)
+    }
+
+    async fn health(&self) -> Result<ServiceHealthCheckResponse, LightningError> {
+        let response = self
+            .sdk
+            .service_health_check()
+            .await
+            .map_err(|e| LightningError::HealthCheck(e.to_string()))?;
 
         Ok(response)
     }

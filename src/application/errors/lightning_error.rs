@@ -32,9 +32,6 @@ pub enum LightningError {
     #[error("Failed to retrieve payment by hash: {0}")]
     PaymentByHash(String),
 
-    #[error("Unsupported payment format: {0}")]
-    UnsupportedPaymentFormat(String),
-
-    #[error("Insufficient funds")]
-    InsufficientFunds,
+    #[error("Failed to retrieve healthcheck: {0}")]
+    HealthCheck(String),
 }

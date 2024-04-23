@@ -6,7 +6,7 @@ use uuid::Uuid;
 pub struct LightningPayment {
     pub id: Uuid,
     pub lightning_address: Option<String>,
-    pub payment_hash: String,
+    pub payment_hash: Option<String>,
     pub error: Option<String>,
     pub amount_msat: u64,
     pub fee_msat: Option<u64>,

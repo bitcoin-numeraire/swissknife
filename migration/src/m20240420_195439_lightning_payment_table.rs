@@ -17,7 +17,7 @@ impl MigrationTrait for Migration {
             CREATE TABLE lightning_payment (
                 id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
                 lightning_address varchar(255),
-                payment_hash varchar unique NOT NULL,
+                payment_hash varchar unique,
                 error varchar,
                 amount_msat bigint NOT NULL,
                 fee_msat bigint,

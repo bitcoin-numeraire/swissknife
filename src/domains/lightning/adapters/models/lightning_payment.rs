@@ -11,7 +11,7 @@ pub struct Model {
     pub id: Uuid,
     pub lightning_address: Option<String>,
     #[sea_orm(unique)]
-    pub payment_hash: String,
+    pub payment_hash: Option<String>,
     pub error: Option<String>,
     pub amount_msat: i64,
     pub fee_msat: Option<i64>,

@@ -106,23 +106,20 @@ impl LightningAddressRepository for LightningStore {
             r#"
             WITH sent AS (
                 SELECT
-                    COALESCE(SUM(CASE WHEN status = 'SETTLED' THEN amount_msat ELSE 0 END) -
-                    COALESCE(SUM(CASE WHEN status = 'PENDING' THEN amount_msat ELSE 0 END), 0), 0)::BIGINT AS sent_msat,
-                    COALESCE(SUM(CASE WHEN status = 'SETTLED' THEN COALESCE(fee_msat, 0) ELSE 0 END), 0)::BIGINT AS fees_paid_msat
+                    SUM(amount_msat) FILTER (WHERE status IN ('SETTLED', 'PENDING')) AS sent_msat,
+                    SUM(COALESCE(fee_msat, 0)) FILTER (WHERE status = 'SETTLED') AS fees_paid_msat
                 FROM lightning_payment
                 WHERE lightning_address = $1
             ),
             received AS (
-                SELECT
-                    COALESCE(SUM(CASE WHEN status = 'SETTLED' THEN amount_msat ELSE 0 END), 0)::BIGINT AS received_msat
+                SELECT SUM(amount_msat) AS received_msat
                 FROM lightning_invoice
-                WHERE lightning_address = $1
+                WHERE lightning_address = $1 AND status = 'SETTLED'
             )
             SELECT
-                COALESCE(received.received_msat, 0) AS received_msat,
-                COALESCE(sent.sent_msat, 0) AS sent_msat,
-                COALESCE(sent.fees_paid_msat, 0) AS fees_paid_msat,
-                COALESCE((received.received_msat - (sent.sent_msat + sent.fees_paid_msat)), 0) AS available_msat
+                COALESCE(received.received_msat, 0)::BIGINT AS received_msat,
+                COALESCE(sent.sent_msat, 0)::BIGINT AS sent_msat,
+                COALESCE(sent.fees_paid_msat, 0)::BIGINT AS fees_paid_msat
             FROM received, sent;
             "#,
             [username.into()],

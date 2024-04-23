@@ -34,7 +34,6 @@ impl LightningPaymentRepository for LightningStore {
             lightning_address: Set(lightning_address),
             amount_msat: Set(amount_msat as i64),
             status: Set(status),
-            payment_hash: Set("test".to_string()),
             ..Default::default()
         };
 

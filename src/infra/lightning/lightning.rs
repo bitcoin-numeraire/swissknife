@@ -1,5 +1,7 @@
 use async_trait::async_trait;
-use breez_sdk_core::{LnUrlPayRequestData, LspInformation, NodeState, Payment};
+use breez_sdk_core::{
+    LnUrlPayRequestData, LspInformation, NodeState, Payment, ServiceHealthCheckResponse,
+};
 
 use crate::{
     application::errors::LightningError,
@@ -36,4 +38,5 @@ pub trait LightningClient: Sync + Send {
         amount_msat: u64,
         comment: Option<String>,
     ) -> Result<LightningPayment, LightningError>;
+    async fn health(&self) -> Result<ServiceHealthCheckResponse, LightningError>;
 }

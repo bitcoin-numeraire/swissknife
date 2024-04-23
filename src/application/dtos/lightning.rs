@@ -130,7 +130,7 @@ impl From<LightningPayment> for LightningPaymentResponse {
         Self {
             id: payment.id,
             lightning_address: payment.lightning_address,
-            payment_hash: payment.payment_hash,
+            payment_hash: payment.payment_hash.unwrap_or_default(), // Always exists in the API layer
             error: payment.error,
             amount_msat: payment.amount_msat,
             fee_msat: payment.fee_msat,

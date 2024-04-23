@@ -101,7 +101,7 @@ impl IntoResponse for DataError {
                 warn!("{}", self.to_string());
                 (self.to_string(), StatusCode::CONFLICT)
             }
-            DataError::Validation(_) => {
+            DataError::Validation(_) | DataError::InsufficientFunds => {
                 warn!("{}", self.to_string());
                 (self.to_string(), StatusCode::UNPROCESSABLE_ENTITY)
             }
@@ -119,12 +119,10 @@ impl IntoResponse for DataError {
 impl IntoResponse for LightningError {
     fn into_response(self) -> Response {
         let (error_message, status) = match self {
-            LightningError::UnsupportedPaymentFormat(_)
-            | LightningError::SendBolt11Payment(_)
+            LightningError::SendBolt11Payment(_)
             | LightningError::SendLNURLPayment(_)
-            | LightningError::NodeInfo(_)
-            | LightningError::InsufficientFunds => {
-                debug!("{}", self.to_string());
+            | LightningError::SendNodeIdPayment(_) => {
+                warn!("{}", self.to_string());
                 (self.to_string(), StatusCode::UNPROCESSABLE_ENTITY)
             }
             _ => {
