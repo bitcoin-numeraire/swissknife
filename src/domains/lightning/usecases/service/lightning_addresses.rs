@@ -57,7 +57,13 @@ impl LightningService {
 
             let pending_payment = self
                 .store
-                .insert_payment(Some(&txn), Some(username), "PENDING".to_string(), amount)
+                .insert_payment(
+                    Some(&txn),
+                    Some(username),
+                    LightningPaymentStatus::PENDING,
+                    amount,
+                    Some(invoice.payment_hash),
+                )
                 .await?;
 
             txn.commit()
@@ -108,7 +114,13 @@ impl LightningService {
 
         let pending_payment = self
             .store
-            .insert_payment(Some(&txn), Some(username), "PENDING".to_string(), amount)
+            .insert_payment(
+                Some(&txn),
+                Some(username),
+                LightningPaymentStatus::PENDING,
+                amount,
+                None,
+            )
             .await?;
 
         txn.commit()

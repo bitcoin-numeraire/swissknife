@@ -4,7 +4,7 @@ use sea_orm::DatabaseTransaction;
 use crate::{
     application::errors::DatabaseError,
     domains::lightning::entities::{
-        LightningAddress, LightningInvoice, LightningPayment, UserBalance,
+        LightningAddress, LightningInvoice, LightningPayment, LightningPaymentStatus, UserBalance,
     },
 };
 
@@ -67,8 +67,9 @@ pub trait LightningPaymentRepository {
         &self,
         txn: Option<&DatabaseTransaction>,
         lightning_address: Option<String>,
-        status: String,
+        status: LightningPaymentStatus,
         amount_msat: u64,
+        payment_hash: Option<String>,
     ) -> Result<LightningPayment, DatabaseError>;
     async fn update_payment(
         &self,
