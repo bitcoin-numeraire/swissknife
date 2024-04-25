@@ -8,7 +8,8 @@ use crate::{
     domains::{
         lightning::{
             entities::{
-                LNURLPayRequest, LightningAddress, LightningInvoice, LightningPayment, UserBalance,
+                LNURLPayRequest, LightningAddress, LightningInvoice, LightningInvoiceStatus,
+                LightningPayment, LightningPaymentStatus, UserBalance,
             },
             usecases::LightningAddressesUseCases,
         },
@@ -56,7 +57,13 @@ impl LightningService {
 
             let pending_payment = self
                 .store
-                .insert_payment(Some(&txn), Some(username), "PENDING".to_string(), amount)
+                .insert_payment(
+                    Some(&txn),
+                    Some(username),
+                    LightningPaymentStatus::PENDING,
+                    amount,
+                    Some(invoice.payment_hash),
+                )
                 .await?;
 
             txn.commit()
@@ -107,7 +114,13 @@ impl LightningService {
 
         let pending_payment = self
             .store
-            .insert_payment(Some(&txn), Some(username), "PENDING".to_string(), amount)
+            .insert_payment(
+                Some(&txn),
+                Some(username),
+                LightningPaymentStatus::PENDING,
+                amount,
+                None,
+            )
             .await?;
 
         txn.commit()
@@ -129,14 +142,14 @@ impl LightningService {
                 payment.id = pending_payment.id;
                 payment.status = match payment.error {
                     // There is a case where the payment fails but still has a payment_hash and a payment is returned insteaf of an error
-                    Some(_) => "FAILED".to_string(),
-                    None => "SETTLED".to_string(),
+                    Some(_) => LightningPaymentStatus::FAILED,
+                    None => LightningPaymentStatus::SETTLED,
                 };
                 let payment: LightningPayment = self.store.update_payment(payment).await?;
                 Ok(payment)
             }
             Err(error) => {
-                pending_payment.status = "FAILED".to_string();
+                pending_payment.status = LightningPaymentStatus::FAILED;
                 pending_payment.error = Some(error.to_string());
                 let payment: LightningPayment = self.store.update_payment(pending_payment).await?;
                 Ok(payment)
@@ -174,7 +187,7 @@ impl LightningAddressesUseCases for LightningService {
 
         let mut invoice = self.lightning_client.invoice(amount, description).await?;
         invoice.lightning_address = Some(username.clone());
-        invoice.status = "PENDING".to_string();
+        invoice.status = LightningInvoiceStatus::PENDING;
         invoice.id = Uuid::new_v4();
 
         let invoice = self.store.insert_invoice(invoice).await?;
@@ -331,7 +344,7 @@ impl LightningAddressesUseCases for LightningService {
             user_id = user.sub,
             input,
             amount_msat,
-            status = payment.status,
+            status = payment.status.to_string(),
             "Payment processed successfully"
         );
 

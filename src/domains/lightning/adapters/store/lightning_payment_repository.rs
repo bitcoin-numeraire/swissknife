@@ -4,6 +4,7 @@ use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseTransaction, EntityTrait, Q
 
 use crate::domains::lightning::adapters::models::lightning_payment::{ActiveModel, Column, Entity};
 use crate::domains::lightning::adapters::repository::LightningPaymentRepository;
+use crate::domains::lightning::entities::LightningPaymentStatus;
 use crate::{application::errors::DatabaseError, domains::lightning::entities::LightningPayment};
 
 use super::LightningStore;
@@ -27,13 +28,15 @@ impl LightningPaymentRepository for LightningStore {
         &self,
         txn: Option<&DatabaseTransaction>,
         lightning_address: Option<String>,
-        status: String,
+        status: LightningPaymentStatus,
         amount_msat: u64,
+        payment_hash: Option<String>,
     ) -> Result<LightningPayment, DatabaseError> {
         let model = ActiveModel {
             lightning_address: Set(lightning_address),
             amount_msat: Set(amount_msat as i64),
-            status: Set(status),
+            status: Set(status.to_string()),
+            payment_hash: Set(payment_hash),
             ..Default::default()
         };
 
@@ -53,7 +56,7 @@ impl LightningPaymentRepository for LightningStore {
     ) -> Result<LightningPayment, DatabaseError> {
         let model = ActiveModel {
             id: Set(payment.id),
-            status: Set(payment.status),
+            status: Set(payment.status.to_string()),
             fee_msat: Set(payment.fee_msat.map(|v| v as i64)),
             payment_time: Set(payment.payment_time.map(|v| v as i64)),
             payment_hash: Set(payment.payment_hash),

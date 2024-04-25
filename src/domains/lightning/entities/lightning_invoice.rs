@@ -1,8 +1,8 @@
 use chrono::{DateTime, FixedOffset};
-use serde::Serialize;
+use strum_macros::{Display, EnumString};
 use uuid::Uuid;
 
-#[derive(Clone, Debug, Serialize, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct LightningInvoice {
     pub id: Uuid,
     pub lightning_address: Option<String>,
@@ -17,9 +17,17 @@ pub struct LightningInvoice {
     pub timestamp: u64,
     pub expiry: u64,
     pub min_final_cltv_expiry_delta: u64,
-    pub status: String,
+    pub status: LightningInvoiceStatus,
     pub fee_msat: Option<u64>,
     pub payment_time: Option<i64>,
     pub created_at: DateTime<FixedOffset>,
     pub updated_at: Option<DateTime<FixedOffset>>,
+}
+
+#[derive(Clone, Debug, EnumString, Display, PartialEq, Eq, Default)]
+pub enum LightningInvoiceStatus {
+    #[default]
+    PENDING,
+    SETTLED,
+    FAILED,
 }

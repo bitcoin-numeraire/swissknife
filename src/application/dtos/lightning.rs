@@ -96,7 +96,7 @@ impl From<LightningInvoice> for LightningInvoiceResponse {
             min_final_cltv_expiry_delta: invoice.min_final_cltv_expiry_delta,
             fee_msat: invoice.fee_msat,
             payment_time: invoice.payment_time,
-            status: invoice.status,
+            status: invoice.status.to_string(),
             created_at: invoice.created_at,
             updated_at: invoice.updated_at,
         }
@@ -135,7 +135,7 @@ impl From<LightningPayment> for LightningPaymentResponse {
             amount_msat: payment.amount_msat,
             fee_msat: payment.fee_msat,
             payment_time: payment.payment_time,
-            status: payment.status,
+            status: payment.status.to_string(),
             description: payment.description,
             metadata: payment.metadata,
             created_at: payment.created_at,

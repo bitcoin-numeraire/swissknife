@@ -2,7 +2,7 @@
 
 use sea_orm::entity::prelude::*;
 
-use crate::domains::lightning::entities::LightningInvoice;
+use crate::domains::lightning::entities::{LightningInvoice, LightningInvoiceStatus};
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
 #[sea_orm(table_name = "lightning_invoice")]
@@ -67,7 +67,7 @@ impl From<Model> for LightningInvoice {
             min_final_cltv_expiry_delta: model.min_final_cltv_expiry_delta as u64,
             timestamp: model.timestamp as u64,
             expiry: model.expiry as u64,
-            status: model.status,
+            status: model.status.parse::<LightningInvoiceStatus>().unwrap(),
             fee_msat: None,
             payment_time: model.payment_time,
             created_at: model.created_at,

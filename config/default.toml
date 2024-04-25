@@ -7,7 +7,7 @@ request_timeout = "60s"
 [lightning]
 working_dir = "storage/breez"
 domain = "numeraire.tech"
-log_in_file = true
+log_in_file = false
 
 # RGB settings
 [rgb]

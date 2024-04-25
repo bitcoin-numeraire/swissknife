@@ -4,8 +4,11 @@ use axum::{extract::State, routing::get, Json, Router};
 use breez_sdk_core::{LspInformation, NodeState, Payment, ServiceHealthCheckResponse};
 
 use crate::{
-    application::{dtos::SendPaymentRequest, errors::ApplicationError},
-    domains::{lightning::entities::LightningPayment, users::entities::AuthUser},
+    application::{
+        dtos::{LightningPaymentResponse, SendPaymentRequest},
+        errors::ApplicationError,
+    },
+    domains::users::entities::AuthUser,
     infra::app::AppState,
 };
 
@@ -52,13 +55,13 @@ impl LightningNodeHandler {
         State(app_state): State<Arc<AppState>>,
         user: AuthUser,
         Json(payload): Json<SendPaymentRequest>,
-    ) -> Result<Json<LightningPayment>, ApplicationError> {
+    ) -> Result<Json<LightningPaymentResponse>, ApplicationError> {
         let payment = app_state
             .lightning
             .send_bolt11_payment(user, payload.input, payload.amount_msat)
             .await?;
 
-        Ok(payment.into())
+        Ok(Json(payment.into()))
     }
 
     async fn health_check(

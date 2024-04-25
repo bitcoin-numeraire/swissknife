@@ -2,7 +2,7 @@
 
 use sea_orm::entity::prelude::*;
 
-use crate::domains::lightning::entities::LightningPayment;
+use crate::domains::lightning::entities::{LightningPayment, LightningPaymentStatus};
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
 #[sea_orm(table_name = "lightning_payment")]
@@ -53,7 +53,7 @@ impl From<Model> for LightningPayment {
             amount_msat: model.amount_msat as u64,
             fee_msat: model.fee_msat.map(|v| v as u64),
             payment_time: model.payment_time,
-            status: model.status,
+            status: model.status.parse::<LightningPaymentStatus>().unwrap(),
             description: model.description,
             metadata: model.metadata,
             created_at: model.created_at,

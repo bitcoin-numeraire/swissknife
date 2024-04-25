@@ -1,12 +1,14 @@
 use async_trait::async_trait;
 use breez_sdk_core::{Payment, PaymentFailedData, PaymentStatus, PaymentType};
-use tracing::{debug, info, trace};
+use tracing::{info, trace};
 
 use crate::{
     application::errors::{ApplicationError, DataError},
     domains::lightning::{
         adapters::LightningRepository,
-        entities::{LightningInvoice, LightningPayment},
+        entities::{
+            LightningInvoice, LightningInvoiceStatus, LightningPayment, LightningPaymentStatus,
+        },
         usecases::LightningPaymentsUseCases,
     },
 };
@@ -41,13 +43,8 @@ impl LightningPaymentsUseCases for LightningPaymentsProcessor {
         let invoice_option = self.store.find_invoice_by_hash(&payment_hash).await?;
 
         if let Some(mut invoice) = invoice_option {
-            if invoice.status == "SETTLED".to_string() {
-                debug!(payment_hash, "Lightning invoice is already settled.");
-                return Ok(invoice);
-            }
-
             invoice.fee_msat = Some(payment.fee_msat);
-            invoice.status = "SETTLED".to_string();
+            invoice.status = LightningInvoiceStatus::SETTLED;
             invoice.payment_time = Some(payment.payment_time);
 
             invoice = self.store.update_invoice(invoice).await?;
@@ -82,7 +79,7 @@ impl LightningPaymentsUseCases for LightningPaymentsProcessor {
         if let Some(payment_retrieved) = payment_option {
             let mut payment: LightningPayment = payment_success.clone().into();
             payment.id = payment_retrieved.id;
-            payment.status = "SETTLED".to_string();
+            payment.status = LightningPaymentStatus::SETTLED;
 
             let payment = self.store.update_payment(payment).await?;
 
@@ -119,7 +116,7 @@ impl LightningPaymentsUseCases for LightningPaymentsProcessor {
             .await?;
 
         if let Some(mut payment) = payment_option {
-            payment.status = "FAILED".to_string();
+            payment.status = LightningPaymentStatus::FAILED;
             payment.payment_time = Some(invoice.timestamp as i64);
             payment.error = Some(payment_failed.error);
 
