@@ -25,6 +25,7 @@ impl MigrationTrait for Migration {
                 status varchar NOT NULL,
                 description varchar,
                 metadata varchar,
+                success_action jsonb,
                 created_at timestamptz NOT NULL DEFAULT current_timestamp,
                 updated_at timestamptz
             );

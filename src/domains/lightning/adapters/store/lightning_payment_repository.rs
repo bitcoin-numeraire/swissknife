@@ -1,6 +1,8 @@
 use async_trait::async_trait;
 use sea_orm::ActiveValue::Set;
-use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseTransaction, EntityTrait, QueryFilter};
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, DatabaseTransaction, EntityTrait, QueryFilter, Unchanged,
+};
 use uuid::Uuid;
 
 use crate::domains::lightning::adapters::models::lightning_payment::{ActiveModel, Column, Entity};
@@ -65,7 +67,7 @@ impl LightningPaymentRepository for LightningStore {
         &self,
         payment: LightningPayment,
     ) -> Result<LightningPayment, DatabaseError> {
-        let model = ActiveModel {
+        let mut model = ActiveModel {
             id: Set(payment.id),
             status: Set(payment.status.to_string()),
             fee_msat: Set(payment.fee_msat.map(|v| v as i64)),
@@ -77,6 +79,16 @@ impl LightningPaymentRepository for LightningStore {
             metadata: Set(payment.metadata),
             ..Default::default()
         };
+
+        // TODO: Remove when event contains success_action or when we retrieve payments by querying the API after queue implementation
+        match payment.success_action {
+            Some(_) => {
+                model.success_action = Set(payment.success_action);
+            }
+            None => {
+                model.success_action = Unchanged(payment.success_action);
+            }
+        }
 
         let model = model
             .update(&self.db)

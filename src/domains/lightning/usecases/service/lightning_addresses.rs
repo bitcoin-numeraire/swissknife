@@ -44,7 +44,6 @@ impl LightningService {
 
         let txn = self.store.begin().await?;
 
-        // TODO: Add UUID to labels
         let balance = self
             .store
             .get_balance_by_username(Some(&txn), &username)
@@ -103,7 +102,6 @@ impl LightningService {
 
         let txn = self.store.begin().await?;
 
-        // TODO: Add UUID to labels and only encapsulate the insert PENDING in a transaction
         let balance = self
             .store
             .get_balance_by_username(Some(&txn), &username)

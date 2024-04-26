@@ -19,6 +19,7 @@ pub struct Model {
     pub status: String,
     pub description: Option<String>,
     pub metadata: Option<String>,
+    pub success_action: Option<serde_json::Value>,
     pub created_at: DateTimeWithTimeZone,
     pub updated_at: Option<DateTimeWithTimeZone>,
 }
@@ -56,6 +57,7 @@ impl From<Model> for LightningPayment {
             status: model.status.parse::<LightningPaymentStatus>().unwrap(),
             description: model.description,
             metadata: model.metadata,
+            success_action: model.success_action,
             created_at: model.created_at,
             updated_at: model.updated_at,
         }

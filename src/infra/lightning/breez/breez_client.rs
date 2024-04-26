@@ -187,7 +187,14 @@ impl LightningClient for BreezClient {
             .map_err(|e| LightningError::SendLNURLPayment(e.to_string()))?;
 
         match result {
-            LnUrlPayResult::EndpointSuccess { data } => Ok(data.payment.into()),
+            LnUrlPayResult::EndpointSuccess { data } => {
+                let mut payment: LightningPayment = data.payment.clone().into();
+                payment.success_action = data
+                    .success_action
+                    .and_then(|action| serde_json::to_value(action).ok());
+
+                Ok(payment)
+            }
             LnUrlPayResult::EndpointError { data } => {
                 return Err(LightningError::SendLNURLPayment(data.reason));
             }
