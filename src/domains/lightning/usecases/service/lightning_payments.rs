@@ -1,6 +1,7 @@
 use async_trait::async_trait;
-use breez_sdk_core::{Payment, PaymentFailedData, PaymentStatus, PaymentType};
+use breez_sdk_core::{Payment, PaymentDetails, PaymentFailedData, PaymentStatus, PaymentType};
 use tracing::{info, trace};
+use uuid::Uuid;
 
 use crate::{
     application::errors::{ApplicationError, DataError},
@@ -63,8 +64,20 @@ impl LightningPaymentsUseCases for LightningPaymentsProcessor {
         &self,
         payment_success: Payment,
     ) -> Result<LightningPayment, ApplicationError> {
+        let payment_id = match payment_success.details.clone() {
+            PaymentDetails::Ln { data } => {
+                Uuid::parse_str(&data.label).map_err(|e| DataError::Validation(e.to_string()))
+            }
+            _ => {
+                Err(DataError::NotFound("Lightning payment not found. Missing label".into()).into())
+            }
+        }?;
         let payment_hash = payment_success.id.clone();
-        trace!(payment_hash, "Processing outgoing lightning payment");
+        trace!(
+            payment_id = payment_id.to_string(),
+            payment_hash,
+            "Processing outgoing lightning payment"
+        );
 
         if payment_success.status != PaymentStatus::Complete {
             return Err(DataError::Validation("Payment is not Complete.".into()).into());
@@ -74,9 +87,10 @@ impl LightningPaymentsUseCases for LightningPaymentsProcessor {
             return Err(DataError::Validation("Payment is not Sent.".into()).into());
         }
 
-        let payment_option = self.store.find_payment_by_hash(&payment_hash).await?;
+        let payment_option = self.store.find_payment(payment_id).await?;
 
         if let Some(payment_retrieved) = payment_option {
+            // We overwrite the payment with the new one at the correct status
             let mut payment: LightningPayment = payment_success.clone().into();
             payment.id = payment_retrieved.id;
             payment.status = LightningPaymentStatus::SETTLED;
@@ -84,6 +98,7 @@ impl LightningPaymentsUseCases for LightningPaymentsProcessor {
             let payment = self.store.update_payment(payment).await?;
 
             info!(
+                payment_id = payment_id.to_string(),
                 payment_hash,
                 username = payment.lightning_address,
                 "Outgoing Lightning payment processed successfully"

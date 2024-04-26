@@ -1,6 +1,7 @@
 use async_trait::async_trait;
 use sea_orm::ActiveValue::Set;
 use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseTransaction, EntityTrait, QueryFilter};
+use uuid::Uuid;
 
 use crate::domains::lightning::adapters::models::lightning_payment::{ActiveModel, Column, Entity};
 use crate::domains::lightning::adapters::repository::LightningPaymentRepository;
@@ -11,6 +12,16 @@ use super::LightningStore;
 
 #[async_trait]
 impl LightningPaymentRepository for LightningStore {
+    async fn find_payment(&self, id: Uuid) -> Result<Option<LightningPayment>, DatabaseError> {
+        let model = Entity::find_by_id(id)
+            .one(&self.db)
+            .await
+            .map_err(|e| DatabaseError::Find(e.to_string()))?;
+
+        Ok(model.map(Into::into))
+    }
+
+    // TODO: Temporary before fix by Breez
     async fn find_payment_by_hash(
         &self,
         payment_hash: &str,
