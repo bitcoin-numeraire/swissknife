@@ -1,6 +1,7 @@
 use async_trait::async_trait;
 use breez_sdk_core::{LspInformation, NodeState, Payment, ServiceHealthCheckResponse};
 use tracing::{debug, info, trace};
+use uuid::Uuid;
 
 use crate::{
     application::errors::ApplicationError,
@@ -64,9 +65,11 @@ impl LightningNodeUseCases for LightningService {
 
         user.check_permission(Permission::SendLightningPayment)?;
 
+        // TODO: After moving to using User_id instead of username, use send_payment function here as well by saving the payment in DB
+        // associating it with the admin user and assigning its uuid to the label, to be found on event of payment success
         let payment = self
             .lightning_client
-            .send_payment(bolt11.clone(), amount_msat)
+            .send_payment(bolt11.clone(), amount_msat, Uuid::new_v4())
             .await?;
 
         info!(user_id = user.sub, bolt11, "Payment sent successfully");

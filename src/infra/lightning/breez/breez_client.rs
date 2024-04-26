@@ -1,12 +1,13 @@
 use serde::Deserialize;
 use std::sync::Arc;
+use uuid::Uuid;
 
 use async_trait::async_trait;
 use bip39::Mnemonic;
 use breez_sdk_core::{
-    BreezServices, EnvironmentType, GreenlightNodeConfig, ListPaymentsRequest, LnUrlPayRequest,
-    LnUrlPayRequestData, LnUrlPayResult, LspInformation, NodeConfig, NodeState, Payment,
-    ReceivePaymentRequest, SendPaymentRequest, SendSpontaneousPaymentRequest,
+    BreezServices, ConnectRequest, EnvironmentType, GreenlightNodeConfig, ListPaymentsRequest,
+    LnUrlPayRequest, LnUrlPayRequestData, LnUrlPayResult, LspInformation, NodeConfig, NodeState,
+    Payment, ReceivePaymentRequest, SendPaymentRequest, SendSpontaneousPaymentRequest,
     ServiceHealthCheckResponse,
 };
 
@@ -29,6 +30,7 @@ pub struct BreezClientConfig {
 }
 
 pub struct BreezClient {
+    api_key: String,
     sdk: Arc<BreezServices>,
 }
 
@@ -44,7 +46,7 @@ impl BreezClient {
 
         let mut breez_config = BreezServices::default_config(
             EnvironmentType::Production,
-            config.api_key,
+            config.api_key.clone(),
             NodeConfig::Greenlight {
                 config: GreenlightNodeConfig {
                     partner_credentials: None,
@@ -57,11 +59,21 @@ impl BreezClient {
         let seed =
             Mnemonic::parse(config.seed).map_err(|e| LightningError::ParseSeed(e.to_string()))?;
 
-        let sdk = BreezServices::connect(breez_config.clone(), seed.to_seed("").to_vec(), listener)
-            .await
-            .map_err(|e| LightningError::Connect(e.to_string()))?;
+        let sdk = BreezServices::connect(
+            ConnectRequest {
+                config: breez_config.clone(),
+                seed: seed.to_seed("").to_vec(),
+                restore_only: Some(true),
+            },
+            listener,
+        )
+        .await
+        .map_err(|e| LightningError::Connect(e.to_string()))?;
 
-        Ok(Self { sdk })
+        Ok(Self {
+            api_key: config.api_key.clone(),
+            sdk,
+        })
     }
 }
 
@@ -121,12 +133,14 @@ impl LightningClient for BreezClient {
         &self,
         bolt11: String,
         amount_msat: Option<u64>,
+        label: Uuid,
     ) -> Result<LightningPayment, LightningError> {
         let response = self
             .sdk
             .send_payment(SendPaymentRequest {
                 bolt11,
                 amount_msat,
+                label: Some(label.to_string()),
             })
             .await
             .map_err(|e| LightningError::SendBolt11Payment(e.to_string()))?;
@@ -138,6 +152,7 @@ impl LightningClient for BreezClient {
         &self,
         node_id: String,
         amount_msat: u64,
+        label: Uuid,
     ) -> Result<LightningPayment, LightningError> {
         let response = self
             .sdk
@@ -145,6 +160,7 @@ impl LightningClient for BreezClient {
                 node_id,
                 amount_msat,
                 extra_tlvs: None, // TODO: Add support for extra TLVs
+                label: Some(label.to_string()),
             })
             .await
             .map_err(|e| LightningError::SendNodeIdPayment(e.to_string()))?;
@@ -157,6 +173,7 @@ impl LightningClient for BreezClient {
         data: LnUrlPayRequestData,
         amount_msat: u64,
         comment: Option<String>,
+        label: Uuid,
     ) -> Result<LightningPayment, LightningError> {
         let result = self
             .sdk
@@ -164,16 +181,13 @@ impl LightningClient for BreezClient {
                 data,
                 amount_msat,
                 comment,
+                payment_label: Some(label.to_string()),
             })
             .await
             .map_err(|e| LightningError::SendLNURLPayment(e.to_string()))?;
 
         match result {
-            LnUrlPayResult::EndpointSuccess { data } => Ok(LightningPayment {
-                payment_hash: Some(data.payment_hash),
-                amount_msat,
-                ..Default::default()
-            }),
+            LnUrlPayResult::EndpointSuccess { data } => Ok(data.payment.into()),
             LnUrlPayResult::EndpointError { data } => {
                 return Err(LightningError::SendLNURLPayment(data.reason));
             }
@@ -200,9 +214,7 @@ impl LightningClient for BreezClient {
     }
 
     async fn health(&self) -> Result<ServiceHealthCheckResponse, LightningError> {
-        let response = self
-            .sdk
-            .service_health_check()
+        let response = BreezServices::service_health_check(self.api_key.clone())
             .await
             .map_err(|e| LightningError::HealthCheck(e.to_string()))?;
 

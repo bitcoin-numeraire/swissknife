@@ -79,6 +79,7 @@ impl LightningService {
                     } else {
                         Some(amount)
                     },
+                    pending_payment.id,
                 )
                 .await;
 
@@ -127,7 +128,10 @@ impl LightningService {
             .await
             .map_err(|e| DatabaseError::Transaction(e.to_string()))?;
 
-        let result = self.lightning_client.lnurl_pay(data, amount, comment).await;
+        let result = self
+            .lightning_client
+            .lnurl_pay(data, amount, comment, pending_payment.id)
+            .await;
 
         self.handle_processed_payment(pending_payment, result).await
     }
