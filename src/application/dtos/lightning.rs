@@ -2,6 +2,7 @@ use chrono::DateTime;
 use chrono::FixedOffset;
 use serde::Deserialize;
 use serde::Serialize;
+use serde_json::Value;
 use uuid::Uuid;
 
 use crate::domains::lightning::entities::LightningAddress;
@@ -107,6 +108,7 @@ impl From<LightningInvoice> for LightningInvoiceResponse {
 pub struct LightningPaymentResponse {
     pub id: Uuid,
     pub lightning_address: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub payment_hash: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
@@ -120,6 +122,8 @@ pub struct LightningPaymentResponse {
     pub description: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metadata: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub success_aciton: Option<Value>,
     pub created_at: DateTime<FixedOffset>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub updated_at: Option<DateTime<FixedOffset>>,
@@ -138,6 +142,7 @@ impl From<LightningPayment> for LightningPaymentResponse {
             status: payment.status.to_string(),
             description: payment.description,
             metadata: payment.metadata,
+            success_aciton: payment.success_action,
             created_at: payment.created_at,
             updated_at: payment.updated_at,
         }

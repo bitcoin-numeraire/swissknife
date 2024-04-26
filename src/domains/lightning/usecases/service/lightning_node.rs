@@ -57,10 +57,9 @@ impl LightningNodeUseCases for LightningService {
         bolt11: String,
         amount_msat: Option<u64>,
     ) -> Result<LightningPayment, ApplicationError> {
-        trace!(
+        debug!(
             user_id = user.sub,
-            bolt11,
-            "Sending payment to bolt11 invoice"
+            bolt11, "Sending payment to bolt11 invoice"
         );
 
         user.check_permission(Permission::SendLightningPayment)?;

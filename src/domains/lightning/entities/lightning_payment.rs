@@ -1,4 +1,5 @@
 use chrono::{DateTime, FixedOffset};
+use serde_json::Value;
 use strum_macros::{Display, EnumString};
 use uuid::Uuid;
 
@@ -14,6 +15,7 @@ pub struct LightningPayment {
     pub status: LightningPaymentStatus,
     pub description: Option<String>,
     pub metadata: Option<String>,
+    pub success_action: Option<Value>,
     pub created_at: DateTime<FixedOffset>,
     pub updated_at: Option<DateTime<FixedOffset>>,
 }
