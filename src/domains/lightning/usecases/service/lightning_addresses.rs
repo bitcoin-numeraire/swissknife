@@ -31,30 +31,33 @@ impl LightningAddressesUseCases for LightningService {
         Ok(LNURLPayRequest::new(&username, &self.domain))
     }
 
-    async fn generate_invoice(
+    async fn generate_lnurlp_invoice(
         &self,
         username: String,
         amount: u64,
         description: String,
     ) -> Result<LightningInvoice, ApplicationError> {
-        debug!(username, "Generating lightning invoice");
+        debug!(username, "Generating LNURLp invoice");
 
-        self.store
+        let lightning_address = self
+            .store
             .find_address_by_username(&username)
             .await?
             .ok_or_else(|| DataError::NotFound("Lightning address not found.".to_string()))?;
 
         let mut invoice = self.lightning_client.invoice(amount, description).await?;
+        invoice.user_id = lightning_address.user_id.clone();
         invoice.lightning_address = Some(username.clone());
         invoice.status = LightningInvoiceStatus::PENDING;
 
+        // TODO: Get or add more information to make this a LNURLp invoice (like fetching a success action specific to the user)
         let invoice = self.store.insert_invoice(invoice).await?;
 
         info!(username, "Lightning invoice generated successfully");
         Ok(invoice)
     }
 
-    async fn register_lightning_address(
+    async fn register_address(
         &self,
         user: AuthUser,
         username: String,
@@ -100,7 +103,7 @@ impl LightningAddressesUseCases for LightningService {
         Ok(lightning_address)
     }
 
-    async fn get_lightning_address(
+    async fn get_address(
         &self,
         user: AuthUser,
         username: String,
@@ -121,7 +124,7 @@ impl LightningAddressesUseCases for LightningService {
         Ok(lightning_address)
     }
 
-    async fn list_lightning_addresses(
+    async fn list_addresses(
         &self,
         user: AuthUser,
         limit: Option<u64>,

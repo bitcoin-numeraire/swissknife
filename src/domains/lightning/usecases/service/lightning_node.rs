@@ -39,7 +39,7 @@ impl LightningNodeUseCases for LightningService {
         Ok(lsp_info)
     }
 
-    async fn list_payments(&self, user: AuthUser) -> Result<Vec<Payment>, ApplicationError> {
+    async fn list_node_payments(&self, user: AuthUser) -> Result<Vec<Payment>, ApplicationError> {
         trace!(user_id = user.sub, "Listing payments");
 
         user.check_permission(Permission::ReadLightningNode)?;

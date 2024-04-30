@@ -14,7 +14,7 @@ use super::LightningService;
 
 #[async_trait]
 impl LightningPaymentsUseCases for LightningService {
-    async fn get_lightning_payment(
+    async fn get_payment(
         &self,
         user: AuthUser,
         id: Uuid,
@@ -39,7 +39,7 @@ impl LightningPaymentsUseCases for LightningService {
         Ok(lightning_payment)
     }
 
-    async fn list_lightning_payments(
+    async fn list_payments(
         &self,
         user: AuthUser,
         limit: Option<u64>,

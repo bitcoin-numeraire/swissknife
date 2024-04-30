@@ -10,6 +10,12 @@ use crate::domains::lightning::entities::LightningInvoice;
 use crate::domains::lightning::entities::LightningPayment;
 
 #[derive(Debug, Deserialize)]
+pub struct NewInvoiceRequest {
+    pub amount_msat: u64,
+    pub comment: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
 pub struct SendPaymentRequest {
     pub input: String,
     pub amount_msat: Option<u64>,

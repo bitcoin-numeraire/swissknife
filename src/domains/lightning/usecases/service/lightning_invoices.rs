@@ -4,7 +4,10 @@ use tracing::{debug, info};
 use crate::{
     application::errors::{ApplicationError, DataError},
     domains::{
-        lightning::{entities::LightningInvoice, usecases::LightningInvoicesUseCases},
+        lightning::{
+            entities::{LightningInvoice, LightningInvoiceStatus},
+            usecases::LightningInvoicesUseCases,
+        },
         users::entities::{AuthUser, Permission},
     },
 };
@@ -13,7 +16,28 @@ use super::LightningService;
 
 #[async_trait]
 impl LightningInvoicesUseCases for LightningService {
-    async fn get_lightning_invoice(
+    async fn generate_invoice(
+        &self,
+        user: AuthUser,
+        amount: u64,
+        description: String,
+    ) -> Result<LightningInvoice, ApplicationError> {
+        debug!(user_id = user.sub, "Generating lightning invoice");
+
+        let mut invoice = self.lightning_client.invoice(amount, description).await?;
+        invoice.status = LightningInvoiceStatus::PENDING;
+        invoice.user_id = user.sub.clone();
+
+        let invoice = self.store.insert_invoice(invoice).await?;
+
+        info!(
+            user_id = user.sub,
+            "Lightning invoice generated successfully"
+        );
+        Ok(invoice)
+    }
+
+    async fn get_invoice(
         &self,
         user: AuthUser,
         payment_hash: String,
@@ -40,7 +64,7 @@ impl LightningInvoicesUseCases for LightningService {
         Ok(lightning_invoice)
     }
 
-    async fn list_lightning_invoices(
+    async fn list_invoices(
         &self,
         user: AuthUser,
         limit: Option<u64>,

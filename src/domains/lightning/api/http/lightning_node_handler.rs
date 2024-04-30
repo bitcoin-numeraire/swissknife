@@ -46,7 +46,7 @@ impl LightningNodeHandler {
         State(app_state): State<Arc<AppState>>,
         user: AuthUser,
     ) -> Result<Json<Vec<Payment>>, ApplicationError> {
-        let payments = app_state.lightning.list_payments(user).await?;
+        let payments = app_state.lightning.list_node_payments(user).await?;
 
         Ok(payments.into())
     }

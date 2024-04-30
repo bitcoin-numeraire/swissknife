@@ -29,13 +29,20 @@ pub trait WalletUseCases {
 
 #[async_trait]
 pub trait LightningInvoicesUseCases {
-    async fn get_lightning_invoice(
+    async fn generate_invoice(
+        &self,
+        user: AuthUser,
+        amount: u64,
+        description: String,
+    ) -> Result<LightningInvoice, ApplicationError>;
+
+    async fn get_invoice(
         &self,
         user: AuthUser,
         payment_hash: String,
     ) -> Result<LightningInvoice, ApplicationError>;
 
-    async fn list_lightning_invoices(
+    async fn list_invoices(
         &self,
         user: AuthUser,
         limit: Option<u64>,
@@ -45,13 +52,13 @@ pub trait LightningInvoicesUseCases {
 
 #[async_trait]
 pub trait LightningPaymentsUseCases {
-    async fn get_lightning_payment(
+    async fn get_payment(
         &self,
         user: AuthUser,
         id: Uuid,
     ) -> Result<LightningPayment, ApplicationError>;
 
-    async fn list_lightning_payments(
+    async fn list_payments(
         &self,
         user: AuthUser,
         limit: Option<u64>,
@@ -62,26 +69,26 @@ pub trait LightningPaymentsUseCases {
 #[async_trait]
 pub trait LightningAddressesUseCases {
     async fn generate_lnurlp(&self, username: String) -> Result<LNURLPayRequest, ApplicationError>;
-    async fn generate_invoice(
+    async fn generate_lnurlp_invoice(
         &self,
         username: String,
         amount: u64,
         description: String,
     ) -> Result<LightningInvoice, ApplicationError>;
 
-    async fn register_lightning_address(
+    async fn register_address(
         &self,
         user: AuthUser,
         username: String,
     ) -> Result<LightningAddress, ApplicationError>;
 
-    async fn get_lightning_address(
+    async fn get_address(
         &self,
         user: AuthUser,
         username: String,
     ) -> Result<LightningAddress, ApplicationError>;
 
-    async fn list_lightning_addresses(
+    async fn list_addresses(
         &self,
         user: AuthUser,
         limit: Option<u64>,
@@ -93,7 +100,7 @@ pub trait LightningAddressesUseCases {
 pub trait LightningNodeUseCases {
     async fn node_info(&self, user: AuthUser) -> Result<NodeState, ApplicationError>;
     async fn lsp_info(&self, user: AuthUser) -> Result<LspInformation, ApplicationError>;
-    async fn list_payments(&self, user: AuthUser) -> Result<Vec<Payment>, ApplicationError>;
+    async fn list_node_payments(&self, user: AuthUser) -> Result<Vec<Payment>, ApplicationError>;
     async fn send_bolt11_payment(
         &self,
         user: AuthUser,

@@ -5,12 +5,13 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
+use uuid::Uuid;
 
 use crate::{
     application::{
         dtos::{
-            LNUrlpInvoiceQueryParams, LightningAddressResponse, LightningInvoiceResponse,
-            LightningPaymentResponse, PaginationQueryParams, SendPaymentRequest,
+            LightningAddressResponse, LightningInvoiceResponse, LightningPaymentResponse,
+            NewInvoiceRequest, PaginationQueryParams, SendPaymentRequest,
         },
         errors::ApplicationError,
     },
@@ -25,10 +26,12 @@ impl LightningWalletHandler {
         Router::new()
             .route("/pay", post(Self::pay))
             .route("/balance", get(Self::get_balance))
-            .route("/new-invoice", get(Self::new_invoice))
+            .route("/new-invoice", post(Self::new_invoice))
             .route("/addresses", get(Self::list_addresses))
             .route("/payments", get(Self::list_payments))
+            .route("/payments/:id", get(Self::get_payment))
             .route("/invoices", get(Self::list_invoices))
+            .route("/invoices/:payment_hash", get(Self::get_invoice))
     }
 
     async fn pay(
@@ -54,16 +57,16 @@ impl LightningWalletHandler {
     }
 
     async fn new_invoice(
-        Path(username): Path<String>,
-        Query(query_params): Query<LNUrlpInvoiceQueryParams>,
         State(app_state): State<Arc<AppState>>,
+        user: AuthUser,
+        Json(payload): Json<NewInvoiceRequest>,
     ) -> Result<Json<LightningInvoiceResponse>, ApplicationError> {
         let invoice = app_state
             .lightning
             .generate_invoice(
-                username,
-                query_params.amount,
-                query_params.comment.unwrap_or_default(),
+                user,
+                payload.amount_msat,
+                payload.comment.unwrap_or_default(),
             )
             .await?;
 
@@ -74,10 +77,7 @@ impl LightningWalletHandler {
         State(app_state): State<Arc<AppState>>,
         user: AuthUser,
     ) -> Result<Json<Vec<LightningAddressResponse>>, ApplicationError> {
-        let lightning_addresses = app_state
-            .lightning
-            .list_lightning_addresses(user, None, None)
-            .await?;
+        let lightning_addresses = app_state.lightning.list_addresses(user, None, None).await?;
 
         let response: Vec<LightningAddressResponse> =
             lightning_addresses.into_iter().map(Into::into).collect();
@@ -92,13 +92,23 @@ impl LightningWalletHandler {
     ) -> Result<Json<Vec<LightningPaymentResponse>>, ApplicationError> {
         let payments = app_state
             .lightning
-            .list_lightning_payments(user, query_params.limit, query_params.offset)
+            .list_payments(user, query_params.limit, query_params.offset)
             .await?;
 
         let response: Vec<LightningPaymentResponse> =
             payments.into_iter().map(Into::into).collect();
 
         Ok(response.into())
+    }
+
+    async fn get_payment(
+        State(app_state): State<Arc<AppState>>,
+        user: AuthUser,
+        Path(id): Path<Uuid>,
+    ) -> Result<Json<LightningPaymentResponse>, ApplicationError> {
+        let payment = app_state.lightning.get_payment(user, id).await?;
+
+        Ok(Json(payment.into()))
     }
 
     async fn list_invoices(
@@ -108,12 +118,22 @@ impl LightningWalletHandler {
     ) -> Result<Json<Vec<LightningInvoiceResponse>>, ApplicationError> {
         let invoices = app_state
             .lightning
-            .list_lightning_invoices(user, query_params.limit, query_params.offset)
+            .list_invoices(user, query_params.limit, query_params.offset)
             .await?;
 
         let response: Vec<LightningInvoiceResponse> =
             invoices.into_iter().map(Into::into).collect();
 
         Ok(response.into())
+    }
+
+    async fn get_invoice(
+        State(app_state): State<Arc<AppState>>,
+        user: AuthUser,
+        Path(payment_hash): Path<String>,
+    ) -> Result<Json<LightningInvoiceResponse>, ApplicationError> {
+        let payment = app_state.lightning.get_invoice(user, payment_hash).await?;
+
+        Ok(Json(payment.into()))
     }
 }

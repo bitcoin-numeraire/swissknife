@@ -42,7 +42,7 @@ impl LightningAddressHandler {
 
         let lightning_address = app_state
             .lightning
-            .register_lightning_address(user, payload.username)
+            .register_address(user, payload.username)
             .await?;
 
         Ok(Json(lightning_address.into()))
@@ -53,10 +53,7 @@ impl LightningAddressHandler {
         user: AuthUser,
         Path(username): Path<String>,
     ) -> Result<Json<LightningAddressResponse>, ApplicationError> {
-        let lightning_address = app_state
-            .lightning
-            .get_lightning_address(user, username)
-            .await?;
+        let lightning_address = app_state.lightning.get_address(user, username).await?;
 
         Ok(Json(lightning_address.into()))
     }
@@ -68,7 +65,7 @@ impl LightningAddressHandler {
     ) -> Result<Json<Vec<LightningAddressResponse>>, ApplicationError> {
         let lightning_addresses = app_state
             .lightning
-            .list_lightning_addresses(user, query_params.limit, query_params.offset)
+            .list_addresses(user, query_params.limit, query_params.offset)
             .await?;
 
         let response: Vec<LightningAddressResponse> =
