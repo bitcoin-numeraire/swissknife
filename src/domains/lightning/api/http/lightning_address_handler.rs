@@ -38,9 +38,9 @@ impl LightningAddressHandler {
             .route("/", get(Self::list))
             .route("/", post(Self::register))
             .route("/pay", post(Self::pay))
+            .route("/balance", get(Self::get_balance))
             .route("/:username", get(Self::get))
             .route("/:username/invoice", get(Self::invoice))
-            .route("/:username/balance", get(Self::get_balance))
     }
 
     async fn well_known_lnurlp(
@@ -78,7 +78,7 @@ impl LightningAddressHandler {
         let username_length = payload.username.len();
         if username_length < MIN_USERNAME_LENGTH || username_length > MAX_USERNAME_LENGTH {
             return Err(
-                DataError::RequestValidation("Invlaid username length.".to_string()).into(),
+                DataError::RequestValidation("Invalid username length.".to_string()).into(),
             );
         }
 
@@ -130,9 +130,8 @@ impl LightningAddressHandler {
     async fn get_balance(
         State(app_state): State<Arc<AppState>>,
         user: AuthUser,
-        Path(username): Path<String>,
     ) -> Result<Json<UserBalance>, ApplicationError> {
-        let balance = app_state.lightning.get_balance(user, username).await?;
+        let balance = app_state.lightning.get_balance(user).await?;
 
         Ok(balance.into())
     }
@@ -144,7 +143,7 @@ impl LightningAddressHandler {
     ) -> Result<Json<LightningPaymentResponse>, ApplicationError> {
         let payment = app_state
             .lightning
-            .send_payment(user, payload.input, payload.amount_msat, payload.comment)
+            .pay(user, payload.input, payload.amount_msat, payload.comment)
             .await?;
 
         Ok(Json(payment.into()))

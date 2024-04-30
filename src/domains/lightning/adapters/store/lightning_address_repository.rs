@@ -45,28 +45,16 @@ impl LightningAddressRepository for LightningStore {
 
     async fn find_all_addresses(
         &self,
+        user: Option<String>,
         limit: Option<u64>,
         offset: Option<u64>,
     ) -> Result<Vec<LightningAddress>, DatabaseError> {
-        let models = Entity::find()
-            .order_by_asc(Column::CreatedAt)
-            .offset(offset)
-            .limit(limit)
-            .all(&self.db)
-            .await
-            .map_err(|e| DatabaseError::FindAll(e.to_string()))?;
+        let filter = match user {
+            Some(user_id) => Entity::find().filter(Column::UserId.eq(user_id)),
+            None => Entity::find(),
+        };
 
-        Ok(models.into_iter().map(Into::into).collect())
-    }
-
-    async fn find_all_addresses_by_user_id(
-        &self,
-        user_id: &str,
-        limit: Option<u64>,
-        offset: Option<u64>,
-    ) -> Result<Vec<LightningAddress>, DatabaseError> {
-        let models = Entity::find()
-            .filter(Column::UserId.eq(user_id))
+        let models = filter
             .order_by_asc(Column::CreatedAt)
             .offset(offset)
             .limit(limit)
@@ -96,10 +84,10 @@ impl LightningAddressRepository for LightningStore {
         Ok(model.into())
     }
 
-    async fn get_balance_by_username(
+    async fn get_balance(
         &self,
         txn: Option<&DatabaseTransaction>,
-        username: &str,
+        user: &str,
     ) -> Result<UserBalance, DatabaseError> {
         let query = UserBalanceModel::find_by_statement(Statement::from_sql_and_values(
             self.db.get_database_backend(),
@@ -109,12 +97,12 @@ impl LightningAddressRepository for LightningStore {
                     SUM(amount_msat) FILTER (WHERE status IN ('SETTLED', 'PENDING')) AS sent_msat,
                     SUM(COALESCE(fee_msat, 0)) FILTER (WHERE status = 'SETTLED') AS fees_paid_msat
                 FROM lightning_payment
-                WHERE lightning_address = $1
+                WHERE user_id = $1
             ),
             received AS (
                 SELECT SUM(amount_msat) AS received_msat
                 FROM lightning_invoice
-                WHERE lightning_address = $1 AND status = 'SETTLED'
+                WHERE user_id = $1 AND status = 'SETTLED'
             )
             SELECT
                 COALESCE(received.received_msat, 0)::BIGINT AS received_msat,
@@ -122,7 +110,7 @@ impl LightningAddressRepository for LightningStore {
                 COALESCE(sent.fees_paid_msat, 0)::BIGINT AS fees_paid_msat
             FROM received, sent;
             "#,
-            [username.into()],
+            [user.into()],
         ));
 
         let result = match txn {

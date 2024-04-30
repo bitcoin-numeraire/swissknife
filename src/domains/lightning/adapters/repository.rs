@@ -5,7 +5,7 @@ use uuid::Uuid;
 use crate::{
     application::errors::DatabaseError,
     domains::lightning::entities::{
-        LightningAddress, LightningInvoice, LightningPayment, LightningPaymentStatus, UserBalance,
+        LightningAddress, LightningInvoice, LightningPayment, UserBalance,
     },
 };
 
@@ -21,12 +21,7 @@ pub trait LightningAddressRepository {
     ) -> Result<Option<LightningAddress>, DatabaseError>;
     async fn find_all_addresses(
         &self,
-        limit: Option<u64>,
-        offset: Option<u64>,
-    ) -> Result<Vec<LightningAddress>, DatabaseError>;
-    async fn find_all_addresses_by_user_id(
-        &self,
-        user: &str,
+        user: Option<String>,
         limit: Option<u64>,
         offset: Option<u64>,
     ) -> Result<Vec<LightningAddress>, DatabaseError>;
@@ -35,19 +30,25 @@ pub trait LightningAddressRepository {
         user: &str,
         username: &str,
     ) -> Result<LightningAddress, DatabaseError>;
-    async fn get_balance_by_username(
+    async fn get_balance(
         &self,
         txn: Option<&DatabaseTransaction>,
-        username: &str,
+        user: &str,
     ) -> Result<UserBalance, DatabaseError>;
 }
 
 #[async_trait]
 pub trait LightningInvoiceRepository {
-    async fn find_invoice_by_hash(
+    async fn find_invoice(
         &self,
         payment_hash: &str,
     ) -> Result<Option<LightningInvoice>, DatabaseError>;
+    async fn find_all_invoices(
+        &self,
+        user: Option<String>,
+        limit: Option<u64>,
+        offset: Option<u64>,
+    ) -> Result<Vec<LightningInvoice>, DatabaseError>;
     async fn insert_invoice(
         &self,
         invoice: LightningInvoice,
@@ -65,13 +66,16 @@ pub trait LightningPaymentRepository {
         &self,
         payment_hash: &str,
     ) -> Result<Option<LightningPayment>, DatabaseError>;
+    async fn find_all_payments(
+        &self,
+        user: Option<String>,
+        limit: Option<u64>,
+        offset: Option<u64>,
+    ) -> Result<Vec<LightningPayment>, DatabaseError>;
     async fn insert_payment(
         &self,
         txn: Option<&DatabaseTransaction>,
-        lightning_address: Option<String>,
-        status: LightningPaymentStatus,
-        amount_msat: u64,
-        payment_hash: Option<String>,
+        payment: LightningPayment,
     ) -> Result<LightningPayment, DatabaseError>;
     async fn update_payment(
         &self,

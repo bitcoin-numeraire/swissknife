@@ -61,12 +61,11 @@ impl From<LightningAddress> for LightningAddressResponse {
 
 #[derive(Debug, Serialize)]
 pub struct LightningInvoiceResponse {
-    pub id: Uuid,
+    pub payment_hash: String,
     pub lightning_address: Option<String>,
     pub bolt11: String,
     pub network: String,
     pub payee_pubkey: String,
-    pub payment_hash: String,
     pub description: Option<String>,
     pub description_hash: Option<String>,
     pub amount_msat: Option<u64>,
@@ -83,12 +82,11 @@ pub struct LightningInvoiceResponse {
 impl From<LightningInvoice> for LightningInvoiceResponse {
     fn from(invoice: LightningInvoice) -> Self {
         Self {
-            id: invoice.id,
+            payment_hash: invoice.payment_hash,
             lightning_address: invoice.lightning_address,
             bolt11: invoice.bolt11,
             network: invoice.network,
             payee_pubkey: invoice.payee_pubkey,
-            payment_hash: invoice.payment_hash,
             description: invoice.description,
             description_hash: invoice.description_hash,
             amount_msat: invoice.amount_msat,

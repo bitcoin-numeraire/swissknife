@@ -15,11 +15,11 @@ impl MigrationTrait for Migration {
             END;
             $$ language 'plpgsql';
             CREATE TABLE lightning_address (
-                id uuid primary key default gen_random_uuid(),
-                user_id varchar(255) unique not null,
-                username varchar(255) unique not null,
-                active boolean not null default true,
-                created_at timestamptz not null default current_timestamp,
+                id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+                user_id varchar(255) unique NOT NULL,
+                username varchar(255) unique NOT NULL,
+                active boolean NOT NULL DEFAULT true,
+                created_at timestamptz NOT NULL DEFAULT current_timestamp,
                 updated_at timestamptz,
                 deleted_at timestamptz
             );

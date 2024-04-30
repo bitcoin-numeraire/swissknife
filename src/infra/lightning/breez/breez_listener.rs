@@ -5,14 +5,14 @@ use breez_sdk_core::{BreezEvent, EventListener};
 use tokio::time::{sleep, Duration};
 use tracing::{trace, warn};
 
-use crate::domains::lightning::usecases::LightningPaymentsUseCases;
+use crate::domains::lightning::usecases::LightningPaymentsProcessorUseCases;
 
 pub struct BreezListener {
-    pub payments_processor: Arc<dyn LightningPaymentsUseCases>,
+    pub payments_processor: Arc<dyn LightningPaymentsProcessorUseCases>,
 }
 
 impl BreezListener {
-    pub fn new(payments_processor: Arc<dyn LightningPaymentsUseCases>) -> Self {
+    pub fn new(payments_processor: Arc<dyn LightningPaymentsProcessorUseCases>) -> Self {
         Self { payments_processor }
     }
 }

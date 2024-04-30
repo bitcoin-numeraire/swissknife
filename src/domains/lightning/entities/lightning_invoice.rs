@@ -1,15 +1,14 @@
 use chrono::{DateTime, FixedOffset};
 use strum_macros::{Display, EnumString};
-use uuid::Uuid;
 
 #[derive(Clone, Debug, Default)]
 pub struct LightningInvoice {
-    pub id: Uuid,
+    pub payment_hash: String,
+    pub user_id: String,
     pub lightning_address: Option<String>,
     pub bolt11: String,
     pub network: String,
     pub payee_pubkey: String,
-    pub payment_hash: String,
     pub description: Option<String>,
     pub description_hash: Option<String>,
     pub amount_msat: Option<u64>,

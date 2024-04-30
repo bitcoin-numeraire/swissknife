@@ -9,6 +9,7 @@ use crate::domains::lightning::entities::{LightningPayment, LightningPaymentStat
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
     pub id: Uuid,
+    pub user_id: String,
     pub lightning_address: Option<String>,
     #[sea_orm(unique)]
     pub payment_hash: Option<String>,
@@ -48,6 +49,7 @@ impl From<Model> for LightningPayment {
     fn from(model: Model) -> Self {
         LightningPayment {
             id: model.id,
+            user_id: model.user_id,
             lightning_address: model.lightning_address,
             payment_hash: model.payment_hash,
             error: model.error,

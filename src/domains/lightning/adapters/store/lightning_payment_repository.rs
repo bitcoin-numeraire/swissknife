@@ -1,13 +1,13 @@
 use async_trait::async_trait;
 use sea_orm::ActiveValue::Set;
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, DatabaseTransaction, EntityTrait, QueryFilter, Unchanged,
+    ActiveModelTrait, ColumnTrait, DatabaseTransaction, EntityTrait, QueryFilter, QueryOrder,
+    QuerySelect, Unchanged,
 };
 use uuid::Uuid;
 
 use crate::domains::lightning::adapters::models::lightning_payment::{ActiveModel, Column, Entity};
 use crate::domains::lightning::adapters::repository::LightningPaymentRepository;
-use crate::domains::lightning::entities::LightningPaymentStatus;
 use crate::{application::errors::DatabaseError, domains::lightning::entities::LightningPayment};
 
 use super::LightningStore;
@@ -37,19 +37,39 @@ impl LightningPaymentRepository for LightningStore {
         Ok(model.map(Into::into))
     }
 
+    async fn find_all_payments(
+        &self,
+        user: Option<String>,
+        limit: Option<u64>,
+        offset: Option<u64>,
+    ) -> Result<Vec<LightningPayment>, DatabaseError> {
+        let filter = match user {
+            Some(user_id) => Entity::find().filter(Column::UserId.eq(user_id)),
+            None => Entity::find(),
+        };
+
+        let models = filter
+            .order_by_asc(Column::CreatedAt)
+            .offset(offset)
+            .limit(limit)
+            .all(&self.db)
+            .await
+            .map_err(|e| DatabaseError::FindAll(e.to_string()))?;
+
+        Ok(models.into_iter().map(Into::into).collect())
+    }
+
     async fn insert_payment(
         &self,
         txn: Option<&DatabaseTransaction>,
-        lightning_address: Option<String>,
-        status: LightningPaymentStatus,
-        amount_msat: u64,
-        payment_hash: Option<String>,
+        payment: LightningPayment,
     ) -> Result<LightningPayment, DatabaseError> {
         let model = ActiveModel {
-            lightning_address: Set(lightning_address),
-            amount_msat: Set(amount_msat as i64),
-            status: Set(status.to_string()),
-            payment_hash: Set(payment_hash),
+            user_id: Set(payment.user_id),
+            lightning_address: Set(payment.lightning_address),
+            amount_msat: Set(payment.amount_msat as i64),
+            status: Set(payment.status.to_string()),
+            payment_hash: Set(payment.payment_hash),
             ..Default::default()
         };
 
