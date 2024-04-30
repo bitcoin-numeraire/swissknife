@@ -40,11 +40,7 @@ impl LNURLpHandler {
     ) -> Result<Json<LNUrlpInvoiceResponse>, ApplicationError> {
         let invoice = app_state
             .lightning
-            .generate_lnurlp_invoice(
-                username,
-                query_params.amount,
-                query_params.comment.unwrap_or_default(),
-            )
+            .generate_lnurlp_invoice(username, query_params.amount, query_params.comment)
             .await?;
 
         Ok(Json(invoice.into()))

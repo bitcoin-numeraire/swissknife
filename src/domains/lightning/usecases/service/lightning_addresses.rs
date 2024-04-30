@@ -35,7 +35,7 @@ impl LightningAddressesUseCases for LightningService {
         &self,
         username: String,
         amount: u64,
-        description: String,
+        description: Option<String>,
     ) -> Result<LightningInvoice, ApplicationError> {
         debug!(username, "Generating LNURLp invoice");
 
@@ -45,10 +45,14 @@ impl LightningAddressesUseCases for LightningService {
             .await?
             .ok_or_else(|| DataError::NotFound("Lightning address not found.".to_string()))?;
 
-        let mut invoice = self.lightning_client.invoice(amount, description).await?;
+        let mut invoice = self
+            .lightning_client
+            .invoice(amount, description.clone().unwrap_or_default(), None)
+            .await?;
         invoice.user_id = lightning_address.user_id.clone();
         invoice.lightning_address = Some(username.clone());
         invoice.status = LightningInvoiceStatus::PENDING;
+        invoice.description = description;
 
         // TODO: Get or add more information to make this a LNURLp invoice (like fetching a success action specific to the user)
         let invoice = self.store.insert_invoice(invoice).await?;

@@ -26,7 +26,8 @@ pub trait LightningInvoicesUseCases {
         &self,
         user: AuthUser,
         amount: u64,
-        description: String,
+        description: Option<String>,
+        expiry: Option<u32>,
     ) -> Result<LightningInvoice, ApplicationError>;
 
     async fn get_invoice(
@@ -74,7 +75,7 @@ pub trait LightningAddressesUseCases {
         &self,
         username: String,
         amount: u64,
-        description: String,
+        description: Option<String>,
     ) -> Result<LightningInvoice, ApplicationError>;
 
     async fn register_address(

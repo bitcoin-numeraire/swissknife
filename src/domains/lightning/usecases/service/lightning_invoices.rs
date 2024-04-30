@@ -20,13 +20,18 @@ impl LightningInvoicesUseCases for LightningService {
         &self,
         user: AuthUser,
         amount: u64,
-        description: String,
+        description: Option<String>,
+        expiry: Option<u32>,
     ) -> Result<LightningInvoice, ApplicationError> {
         debug!(user_id = user.sub, "Generating lightning invoice");
 
-        let mut invoice = self.lightning_client.invoice(amount, description).await?;
+        let mut invoice = self
+            .lightning_client
+            .invoice(amount, description.clone().unwrap_or_default(), expiry)
+            .await?;
         invoice.status = LightningInvoiceStatus::PENDING;
         invoice.user_id = user.sub.clone();
+        invoice.description = description;
 
         let invoice = self.store.insert_invoice(invoice).await?;
 
@@ -34,6 +39,7 @@ impl LightningInvoicesUseCases for LightningService {
             user_id = user.sub,
             "Lightning invoice generated successfully"
         );
+
         Ok(invoice)
     }
 

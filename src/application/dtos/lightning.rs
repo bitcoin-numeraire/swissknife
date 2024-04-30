@@ -13,6 +13,7 @@ use crate::domains::lightning::entities::LightningPayment;
 pub struct NewInvoiceRequest {
     pub amount_msat: u64,
     pub comment: Option<String>,
+    pub expiry: Option<u32>,
 }
 
 #[derive(Debug, Deserialize)]

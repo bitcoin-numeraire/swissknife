@@ -27,11 +27,13 @@ pub struct BreezClientConfig {
     pub seed: String,
     pub domain: String,
     pub log_in_file: bool,
+    pub invoice_expiry: Option<u32>,
 }
 
 pub struct BreezClient {
     api_key: String,
     sdk: Arc<BreezServices>,
+    invoice_expiry: u32,
 }
 
 impl BreezClient {
@@ -73,6 +75,7 @@ impl BreezClient {
         Ok(Self {
             api_key: config.api_key.clone(),
             sdk,
+            invoice_expiry: config.invoice_expiry.unwrap_or(3600),
         })
     }
 }
@@ -83,6 +86,7 @@ impl LightningClient for BreezClient {
         &self,
         amount_msat: u64,
         description: String,
+        expiry: Option<u32>,
     ) -> Result<LightningInvoice, LightningError> {
         let response = self
             .sdk
@@ -90,6 +94,7 @@ impl LightningClient for BreezClient {
                 amount_msat,
                 description,
                 use_description_hash: Some(true),
+                expiry: Some(expiry.unwrap_or(self.invoice_expiry)),
                 ..Default::default()
             })
             .await
