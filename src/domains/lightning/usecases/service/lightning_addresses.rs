@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use regex::Regex;
 use tracing::{debug, info};
 
 use crate::{
@@ -63,9 +64,15 @@ impl LightningAddressesUseCases for LightningService {
             username, "Registering lightning address"
         );
 
+        // Regex validation for allowed characters
+        let email_username_re = Regex::new(r"^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+$").unwrap(); // Can't fail by assertion
+        if !email_username_re.is_match(&username) {
+            return Err(DataError::Validation("Invalid username format.".to_string()).into());
+        }
+
         if self
             .store
-            .find_address_by_username(&user.sub)
+            .find_address_by_user_id(&user.sub)
             .await?
             .is_some()
         {
