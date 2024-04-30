@@ -18,13 +18,6 @@ use crate::{
 #[async_trait]
 pub trait WalletUseCases {
     async fn get_balance(&self, user: AuthUser) -> Result<UserBalance, ApplicationError>;
-    async fn pay(
-        &self,
-        user: AuthUser,
-        input: String,
-        amount_msat: Option<u64>,
-        comment: Option<String>,
-    ) -> Result<LightningPayment, ApplicationError>;
 }
 
 #[async_trait]
@@ -64,6 +57,14 @@ pub trait LightningPaymentsUseCases {
         limit: Option<u64>,
         offset: Option<u64>,
     ) -> Result<Vec<LightningPayment>, ApplicationError>;
+
+    async fn pay(
+        &self,
+        user: AuthUser,
+        input: String,
+        amount_msat: Option<u64>,
+        comment: Option<String>,
+    ) -> Result<LightningPayment, ApplicationError>;
 }
 
 #[async_trait]
