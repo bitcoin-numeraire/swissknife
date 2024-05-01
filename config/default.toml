@@ -5,12 +5,18 @@ request_timeout = "60s"
 
 # Lightning settings
 [lightning]
+invoice_expiry = 3600
+domain = "numeraire.tech"
+provider = "breez"
+
+[lightning.breez_config]
 working_dir = "storage/breez"
 certs_dir = "certs/greenlight"
-domain = "numeraire.tech"
 log_in_file = false
-invoice_expiry = 3600
 restore_only = true
+
+[lightning.cln_config]
+certs_dir = "certs/cln"
 
 # RGB settings
 [rgb]

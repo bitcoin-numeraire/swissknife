@@ -12,7 +12,7 @@ use crate::{
     infra::{
         auth::{jwt::JWTAuthenticator, Authenticator},
         database::sea_orm::SeaORMClient,
-        lightning::breez::{BreezClient, BreezListener},
+        lightning::breez::BreezListener,
     },
 };
 use humantime::parse_duration;
@@ -29,9 +29,9 @@ pub struct AppState {
 impl AppState {
     pub async fn new(config: AppConfig) -> Result<Self, ApplicationError> {
         let timeout_request = parse_duration(&config.web.request_timeout)
-            .map_err(|e| WebServerError::ParseConfig(e.to_string()))?;
+            .map_err(|e: humantime::DurationError| WebServerError::ParseConfig(e.to_string()))?;
 
-        // Create adapters
+        // Create infra
         let timeout_layer = TimeoutLayer::new(timeout_request);
         let db_conn = SeaORMClient::connect(config.database.clone()).await?;
         let jwt_authenticator = if config.auth.enabled {
@@ -44,18 +44,18 @@ impl AppState {
             None
         };
 
-        // Create repositories and stores
+        // Create adapters
         let store = Box::new(LightningStore::new(db_conn));
-
-        // Create services
         let payments_processor = LightningPaymentsProcessor::new(store.clone());
         let listener = BreezListener::new(Arc::new(payments_processor));
-        let lightning_client =
-            BreezClient::new(config.lightning.clone(), Box::new(listener)).await?;
+        let lightning_client = config.lightning.get_client(Box::new(listener)).await?;
+
+        // Create services
         let lightning = LightningService::new(
             store.clone(),
-            Box::new(lightning_client),
+            lightning_client,
             config.lightning.domain,
+            config.lightning.invoice_expiry,
         );
 
         // Create App state
