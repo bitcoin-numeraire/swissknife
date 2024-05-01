@@ -1,6 +1,8 @@
 use serde::Deserialize;
 use serde::Serialize;
 
+use crate::domains::lightning::entities::LightningInvoice;
+
 #[derive(Deserialize)]
 pub struct LNUrlpInvoiceQueryParams {
     pub amount: u64,             // Amount in milli-satoshis
@@ -23,10 +25,10 @@ pub struct SuccessAction {
     pub message: Option<String>, // rest of fields depends on tag value
 }
 
-impl LNUrlpInvoiceResponse {
-    pub fn new(bolt11: String) -> Self {
+impl From<LightningInvoice> for LNUrlpInvoiceResponse {
+    fn from(invoice: LightningInvoice) -> Self {
         Self {
-            pr: bolt11,
+            pr: invoice.bolt11,
             success_action: Some(SuccessAction {
                 tag: "message".to_string(),
                 message: Some("Thanks for the sats!".to_string()),

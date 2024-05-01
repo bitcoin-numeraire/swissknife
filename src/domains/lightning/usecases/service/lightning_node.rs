@@ -1,10 +1,12 @@
 use async_trait::async_trait;
-use breez_sdk_core::{LspInformation, NodeState, Payment, ServiceHealthCheckResponse};
+use breez_sdk_core::{
+    parse, InputType, LspInformation, NodeState, Payment, ServiceHealthCheckResponse,
+};
 use tracing::{debug, info, trace};
 use uuid::Uuid;
 
 use crate::{
-    application::errors::ApplicationError,
+    application::errors::{ApplicationError, DataError, LightningError},
     domains::{
         lightning::{entities::LightningPayment, usecases::LightningNodeUseCases},
         users::entities::{AuthUser, Permission},
@@ -39,7 +41,7 @@ impl LightningNodeUseCases for LightningService {
         Ok(lsp_info)
     }
 
-    async fn list_payments(&self, user: AuthUser) -> Result<Vec<Payment>, ApplicationError> {
+    async fn list_node_payments(&self, user: AuthUser) -> Result<Vec<Payment>, ApplicationError> {
         trace!(user_id = user.sub, "Listing payments");
 
         user.check_permission(Permission::ReadLightningNode)?;
@@ -51,27 +53,47 @@ impl LightningNodeUseCases for LightningService {
         Ok(payments)
     }
 
-    async fn send_bolt11_payment(
+    async fn send_payment(
         &self,
         user: AuthUser,
-        bolt11: String,
+        input: String,
         amount_msat: Option<u64>,
+        comment: Option<String>,
     ) -> Result<LightningPayment, ApplicationError> {
-        debug!(
-            user_id = user.sub,
-            bolt11, "Sending payment to bolt11 invoice"
-        );
+        debug!(user_id = user.sub, input, "Sending payment from node");
 
         user.check_permission(Permission::SendLightningPayment)?;
 
         // TODO: After moving to using User_id instead of username, use send_payment function here as well by saving the payment in DB
         // associating it with the admin user and assigning its uuid to the label, to be found on event of payment success
-        let payment = self
-            .lightning_client
-            .send_payment(bolt11.clone(), amount_msat, Uuid::new_v4())
-            .await?;
 
-        info!(user_id = user.sub, bolt11, "Payment sent successfully");
+        let input_type = parse(&input)
+            .await
+            .map_err(|e| DataError::Validation(e.to_string()))?;
+
+        let id = Uuid::new_v4();
+
+        let payment = match input_type {
+            InputType::Bolt11 { invoice } => {
+                self.lightning_client
+                    .send_payment(invoice.bolt11, amount_msat, id)
+                    .await
+            }
+            InputType::LnUrlPay { data } => {
+                let amount = LightningService::validate_amount(amount_msat)?;
+                self.lightning_client
+                    .lnurl_pay(data, amount, comment, id)
+                    .await
+            }
+            InputType::LnUrlError { data } => Err(LightningError::SendLNURLPayment(data.reason)),
+            _ => Err(LightningError::UnsupportedPaymentInput(input.clone())),
+        }?;
+
+        info!(
+            user_id = user.sub,
+            input, "Payment sent successfully from node"
+        );
+
         Ok(payment)
     }
 

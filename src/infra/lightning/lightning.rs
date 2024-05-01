@@ -18,6 +18,7 @@ pub trait LightningClient: Sync + Send {
         &self,
         amount_msat: u64,
         description: String,
+        expiry: Option<u32>,
     ) -> Result<LightningInvoice, LightningError>;
     async fn payment_by_hash(
         &self,
@@ -43,4 +44,5 @@ pub trait LightningClient: Sync + Send {
         label: Uuid,
     ) -> Result<LightningPayment, LightningError>;
     async fn health(&self) -> Result<ServiceHealthCheckResponse, LightningError>;
+    async fn list_lsps(&self) -> Result<Vec<LspInformation>, LightningError>;
 }

@@ -10,18 +10,17 @@ use crate::{
 };
 use async_trait::async_trait;
 use sea_orm::ActiveValue::Set;
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter};
+use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect};
 
 use super::LightningStore;
 
 #[async_trait]
 impl LightningInvoiceRepository for LightningStore {
-    async fn find_invoice_by_hash(
+    async fn find_invoice(
         &self,
         payment_hash: &str,
     ) -> Result<Option<LightningInvoice>, DatabaseError> {
-        let model = Entity::find()
-            .filter(Column::PaymentHash.eq(payment_hash))
+        let model = Entity::find_by_id(payment_hash)
             .one(&self.db)
             .await
             .map_err(|e| DatabaseError::Find(e.to_string()))?;
@@ -29,11 +28,34 @@ impl LightningInvoiceRepository for LightningStore {
         Ok(model.map(Into::into))
     }
 
+    async fn find_all_invoices(
+        &self,
+        user: Option<String>,
+        limit: Option<u64>,
+        offset: Option<u64>,
+    ) -> Result<Vec<LightningInvoice>, DatabaseError> {
+        let filter = match user {
+            Some(user_id) => Entity::find().filter(Column::UserId.eq(user_id)),
+            None => Entity::find(),
+        };
+
+        let models = filter
+            .order_by_asc(Column::CreatedAt)
+            .offset(offset)
+            .limit(limit)
+            .all(&self.db)
+            .await
+            .map_err(|e| DatabaseError::FindAll(e.to_string()))?;
+
+        Ok(models.into_iter().map(Into::into).collect())
+    }
+
     async fn insert_invoice(
         &self,
         invoice: LightningInvoice,
     ) -> Result<LightningInvoice, DatabaseError> {
         let model = ActiveModel {
+            user_id: Set(invoice.user_id),
             lightning_address: Set(invoice.lightning_address),
             bolt11: Set(invoice.bolt11),
             network: Set(invoice.network),
@@ -63,7 +85,7 @@ impl LightningInvoiceRepository for LightningStore {
         invoice: LightningInvoice,
     ) -> Result<LightningInvoice, DatabaseError> {
         let model = ActiveModel {
-            id: Set(invoice.id),
+            payment_hash: Set(invoice.payment_hash),
             status: Set(invoice.status.to_string()),
             fee_msat: Set(invoice.fee_msat.map(|v| v as i64)),
             payment_time: Set(invoice.payment_time.map(|v| v as i64)),

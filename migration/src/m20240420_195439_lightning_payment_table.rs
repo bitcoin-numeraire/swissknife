@@ -16,8 +16,9 @@ impl MigrationTrait for Migration {
             $$ language 'plpgsql';
             CREATE TABLE lightning_payment (
                 id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+                user_id varchar(255) NOT NULL,
                 lightning_address varchar(255),
-                payment_hash varchar,
+                payment_hash varchar(255),
                 error varchar,
                 amount_msat bigint NOT NULL,
                 fee_msat bigint,
@@ -30,9 +31,7 @@ impl MigrationTrait for Migration {
                 updated_at timestamptz
             );
             CREATE TRIGGER update_lightning_payment_timestamp BEFORE
-            UPDATE ON lightning_payment FOR EACH ROW EXECUTE PROCEDURE update_payment_timestamp();
-            ALTER TABLE lightning_payment
-            ADD CONSTRAINT fk_lightning_address FOREIGN KEY (lightning_address) REFERENCES lightning_address(username) ON DELETE CASCADE ON UPDATE CASCADE;",
+            UPDATE ON lightning_payment FOR EACH ROW EXECUTE PROCEDURE update_payment_timestamp();",
         )
         .await?;
 

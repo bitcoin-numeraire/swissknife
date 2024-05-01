@@ -6,8 +6,7 @@ use crate::application::errors::AuthorizationError;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Permission {
-    ReadLightningAddress,
-
+    ReadLightningAccounts,
     ReadLightningNode,
     SendLightningPayment,
 }
@@ -17,9 +16,9 @@ impl FromStr for Permission {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "read:lightning_address" => Ok(Permission::ReadLightningAddress),
+            "read:lightning_accounts" => Ok(Permission::ReadLightningAccounts),
             "read:lightning_node" => Ok(Permission::ReadLightningNode),
-            "pay:lightning_node" => Ok(Permission::ReadLightningNode),
+            "pay:lightning_node" => Ok(Permission::SendLightningPayment),
             // ... handle other permissions ...
             _ => {
                 let err = AuthorizationError::ParsePermission(s.to_string());
@@ -33,7 +32,7 @@ impl FromStr for Permission {
 impl Permission {
     pub fn all_permissions() -> Vec<Self> {
         vec![
-            Permission::ReadLightningAddress,
+            Permission::ReadLightningAccounts,
             Permission::ReadLightningNode,
             Permission::SendLightningPayment,
             // ... include all other permission variants ...

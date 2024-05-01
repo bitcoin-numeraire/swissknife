@@ -46,7 +46,7 @@ impl LightningNodeHandler {
         State(app_state): State<Arc<AppState>>,
         user: AuthUser,
     ) -> Result<Json<Vec<Payment>>, ApplicationError> {
-        let payments = app_state.lightning.list_payments(user).await?;
+        let payments = app_state.lightning.list_node_payments(user).await?;
 
         Ok(payments.into())
     }
@@ -58,7 +58,7 @@ impl LightningNodeHandler {
     ) -> Result<Json<LightningPaymentResponse>, ApplicationError> {
         let payment = app_state
             .lightning
-            .send_bolt11_payment(user, payload.input, payload.amount_msat)
+            .send_payment(user, payload.input, payload.amount_msat, payload.comment)
             .await?;
 
         Ok(Json(payment.into()))

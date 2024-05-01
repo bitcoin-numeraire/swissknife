@@ -8,14 +8,13 @@ use crate::domains::lightning::entities::{LightningInvoice, LightningInvoiceStat
 #[sea_orm(table_name = "lightning_invoice")]
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
-    pub id: Uuid,
+    pub payment_hash: String,
+    pub user_id: String,
     pub lightning_address: Option<String>,
     #[sea_orm(unique)]
     pub bolt11: String,
     pub network: String,
     pub payee_pubkey: String,
-    #[sea_orm(unique)]
-    pub payment_hash: String,
     pub description: Option<String>,
     pub description_hash: Option<String>,
     pub amount_msat: Option<i64>,
@@ -54,12 +53,12 @@ impl ActiveModelBehavior for ActiveModel {}
 impl From<Model> for LightningInvoice {
     fn from(model: Model) -> Self {
         LightningInvoice {
-            id: model.id,
+            payment_hash: model.payment_hash,
+            user_id: model.user_id,
             lightning_address: model.lightning_address,
             bolt11: model.bolt11,
             network: model.network,
             payee_pubkey: model.payee_pubkey,
-            payment_hash: model.payment_hash,
             description: model.description,
             description_hash: model.description_hash,
             amount_msat: model.amount_msat.map(|v| v as u64),

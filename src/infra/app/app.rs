@@ -14,7 +14,9 @@ use tracing::{debug, error, info, trace};
 
 use crate::{
     application::errors::WebServerError,
-    domains::lightning::api::http::{LightningAddressHandler, LightningNodeHandler},
+    domains::lightning::api::http::{
+        LNURLpHandler, LightningAddressHandler, LightningNodeHandler, LightningWalletHandler,
+    },
     infra::app::AppState,
 };
 
@@ -27,21 +29,19 @@ impl App {
         trace!("Initializing app");
 
         let router = Router::new()
-            .nest(
-                "/.well-known/lnurlp",
-                LightningAddressHandler::well_known_routes(),
-            )
+            .nest("/lnurlp", LNURLpHandler::routes())
             .nest(
                 "/api/lightning/addresses",
-                LightningAddressHandler::addresses_routes(),
+                LightningAddressHandler::routes(),
             )
+            .nest("/api/lightning/wallet", LightningWalletHandler::routes())
             .nest("/api/lightning/node", LightningNodeHandler::routes())
             .layer(TraceLayer::new_for_http())
             .layer(state.timeout_layer)
             .layer(CorsLayer::permissive())
             .with_state(Arc::new(state));
 
-        debug!("App initialised successfully");
+        debug!("App initialized successfully");
         Self { router }
     }
 

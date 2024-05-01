@@ -1,14 +1,14 @@
 use serde::Deserialize;
-use std::sync::Arc;
+use std::{fs, io, path::PathBuf, sync::Arc};
 use uuid::Uuid;
 
 use async_trait::async_trait;
 use bip39::Mnemonic;
 use breez_sdk_core::{
-    BreezServices, ConnectRequest, EnvironmentType, GreenlightNodeConfig, ListPaymentsRequest,
-    LnUrlPayRequest, LnUrlPayRequestData, LnUrlPayResult, LspInformation, NodeConfig, NodeState,
-    Payment, ReceivePaymentRequest, SendPaymentRequest, SendSpontaneousPaymentRequest,
-    ServiceHealthCheckResponse,
+    BreezServices, ConnectRequest, EnvironmentType, GreenlightCredentials, GreenlightNodeConfig,
+    ListPaymentsRequest, LnUrlPayRequest, LnUrlPayRequestData, LnUrlPayResult, LspInformation,
+    NodeConfig, NodeState, Payment, ReceivePaymentRequest, SendPaymentRequest,
+    SendSpontaneousPaymentRequest, ServiceHealthCheckResponse,
 };
 
 use crate::{
@@ -22,16 +22,22 @@ use super::BreezListener;
 #[derive(Clone, Debug, Deserialize)]
 pub struct BreezClientConfig {
     pub api_key: String,
-    pub invite_code: String,
     pub working_dir: String,
+    pub certs_dir: String,
     pub seed: String,
     pub domain: String,
     pub log_in_file: bool,
+    pub invoice_expiry: Option<u32>,
 }
+
+const DEFAULT_INVOICE_EXPIRY: u32 = 3600;
+const DEFAULT_CLIENT_CERT_FILENAME: &str = "client.crt";
+const DEFAULT_CLIENT_KEY_FILENAME: &str = "client-key.pem";
 
 pub struct BreezClient {
     api_key: String,
     sdk: Arc<BreezServices>,
+    invoice_expiry: u32,
 }
 
 impl BreezClient {
@@ -44,13 +50,19 @@ impl BreezClient {
                 .map_err(|e| LightningError::Logging(e.to_string()))?;
         }
 
+        let (client_key, client_crt) = Self::read_certificates(PathBuf::from(&config.certs_dir))
+            .map_err(|e| LightningError::ReadCertificates(e.to_string()))?;
+
         let mut breez_config = BreezServices::default_config(
             EnvironmentType::Production,
             config.api_key.clone(),
             NodeConfig::Greenlight {
                 config: GreenlightNodeConfig {
-                    partner_credentials: None,
-                    invite_code: Some(config.invite_code),
+                    partner_credentials: Some(GreenlightCredentials {
+                        device_cert: client_crt,
+                        device_key: client_key,
+                    }),
+                    invite_code: None,
                 },
             },
         );
@@ -63,7 +75,7 @@ impl BreezClient {
             ConnectRequest {
                 config: breez_config.clone(),
                 seed: seed.to_seed("").to_vec(),
-                restore_only: Some(true),
+                restore_only: None,
             },
             listener,
         )
@@ -73,7 +85,18 @@ impl BreezClient {
         Ok(Self {
             api_key: config.api_key.clone(),
             sdk,
+            invoice_expiry: config.invoice_expiry.unwrap_or(DEFAULT_INVOICE_EXPIRY),
         })
+    }
+
+    fn read_certificates(cert_dir: PathBuf) -> io::Result<(Vec<u8>, Vec<u8>)> {
+        let key_path = cert_dir.join(DEFAULT_CLIENT_KEY_FILENAME);
+        let crt_path = cert_dir.join(DEFAULT_CLIENT_CERT_FILENAME);
+
+        let client_key = fs::read(key_path)?;
+        let client_crt = fs::read(crt_path)?;
+
+        Ok((client_key, client_crt))
     }
 }
 
@@ -83,6 +106,7 @@ impl LightningClient for BreezClient {
         &self,
         amount_msat: u64,
         description: String,
+        expiry: Option<u32>,
     ) -> Result<LightningInvoice, LightningError> {
         let response = self
             .sdk
@@ -90,6 +114,7 @@ impl LightningClient for BreezClient {
                 amount_msat,
                 description,
                 use_description_hash: Some(true),
+                expiry: Some(expiry.unwrap_or(self.invoice_expiry)),
                 ..Default::default()
             })
             .await
@@ -224,6 +249,16 @@ impl LightningClient for BreezClient {
         let response = BreezServices::service_health_check(self.api_key.clone())
             .await
             .map_err(|e| LightningError::HealthCheck(e.to_string()))?;
+
+        Ok(response)
+    }
+
+    async fn list_lsps(&self) -> Result<Vec<LspInformation>, LightningError> {
+        let response = self
+            .sdk
+            .list_lsps()
+            .await
+            .map_err(|e| LightningError::ListLSPs(e.to_string()))?;
 
         Ok(response)
     }
