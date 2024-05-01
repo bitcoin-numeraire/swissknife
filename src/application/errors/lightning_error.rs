@@ -8,6 +8,9 @@ pub enum LightningError {
     #[error("Failed to parse mnemonic seed: {0}")]
     ParseSeed(String),
 
+    #[error("Failed to read certificates: {0}")]
+    ReadCertificates(String),
+
     #[error("Failed to connect to lightning node or service: {0}")]
     Connect(String),
 
@@ -19,6 +22,9 @@ pub enum LightningError {
 
     #[error("Failed to get LSP info: {0}")]
     LSPInfo(String),
+
+    #[error("Failed to list LSPs: {0}")]
+    ListLSPs(String),
 
     #[error("Failed to get list payments from Lightning node: {0}")]
     ListPayments(String),

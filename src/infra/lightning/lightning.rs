@@ -44,4 +44,5 @@ pub trait LightningClient: Sync + Send {
         label: Uuid,
     ) -> Result<LightningPayment, LightningError>;
     async fn health(&self) -> Result<ServiceHealthCheckResponse, LightningError>;
+    async fn list_lsps(&self) -> Result<Vec<LspInformation>, LightningError>;
 }
