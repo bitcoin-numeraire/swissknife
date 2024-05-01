@@ -17,7 +17,7 @@ use crate::{
 use super::LightningService;
 
 impl LightningService {
-    fn validate_amount(amount_msat: Option<u64>) -> Result<u64, ApplicationError> {
+    pub(crate) fn validate_amount(amount_msat: Option<u64>) -> Result<u64, ApplicationError> {
         let amount = amount_msat.unwrap_or_default();
         if amount == 0 {
             return Err(DataError::Validation("Amount must be greater than 0".to_string()).into());

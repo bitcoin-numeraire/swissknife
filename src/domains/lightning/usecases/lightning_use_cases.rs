@@ -103,11 +103,12 @@ pub trait LightningNodeUseCases {
     async fn node_info(&self, user: AuthUser) -> Result<NodeState, ApplicationError>;
     async fn lsp_info(&self, user: AuthUser) -> Result<LspInformation, ApplicationError>;
     async fn list_node_payments(&self, user: AuthUser) -> Result<Vec<Payment>, ApplicationError>;
-    async fn send_bolt11_payment(
+    async fn send_payment(
         &self,
         user: AuthUser,
-        bolt11_invoice: String,
+        input: String,
         amount_msat: Option<u64>,
+        comment: Option<String>,
     ) -> Result<LightningPayment, ApplicationError>;
     async fn health_check(
         &self,

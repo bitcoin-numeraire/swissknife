@@ -58,7 +58,7 @@ impl LightningNodeHandler {
     ) -> Result<Json<LightningPaymentResponse>, ApplicationError> {
         let payment = app_state
             .lightning
-            .send_bolt11_payment(user, payload.input, payload.amount_msat)
+            .send_payment(user, payload.input, payload.amount_msat, payload.comment)
             .await?;
 
         Ok(Json(payment.into()))
