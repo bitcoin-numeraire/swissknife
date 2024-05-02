@@ -23,10 +23,9 @@ async fn main() {
 
     // Load config and logger
     let config = match load_config() {
-        Ok(app_state) => app_state,
+        Ok(c) => c,
         Err(e) => {
-            error!(error = ?e);
-            exit(1);
+            panic!("Error loading config: {:?}", e);
         }
     };
     setup_tracing(config.logging.clone());
@@ -34,7 +33,7 @@ async fn main() {
     let app_state = match AppState::new(config.clone()).await {
         Ok(app_state) => app_state,
         Err(e) => {
-            error!(error = ?e);
+            error!(error = e.to_string(), "failed to create app state");
             exit(1);
         }
     };

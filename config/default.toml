@@ -16,6 +16,7 @@ log_in_file = false
 restore_only = true
 
 [lightning.cln_config]
+endpoint = "https://127.0.0.1:11003"
 certs_dir = "certs/cln"
 
 # RGB settings
