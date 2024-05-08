@@ -25,19 +25,15 @@ pub struct BreezClientConfig {
     pub working_dir: String,
     pub certs_dir: String,
     pub seed: String,
-    pub domain: String,
     pub log_in_file: bool,
-    pub invoice_expiry: Option<u32>,
 }
 
-const DEFAULT_INVOICE_EXPIRY: u32 = 3600;
 const DEFAULT_CLIENT_CERT_FILENAME: &str = "client.crt";
 const DEFAULT_CLIENT_KEY_FILENAME: &str = "client-key.pem";
 
 pub struct BreezClient {
     api_key: String,
     sdk: Arc<BreezServices>,
-    invoice_expiry: u32,
 }
 
 impl BreezClient {
@@ -85,7 +81,6 @@ impl BreezClient {
         Ok(Self {
             api_key: config.api_key.clone(),
             sdk,
-            invoice_expiry: config.invoice_expiry.unwrap_or(DEFAULT_INVOICE_EXPIRY),
         })
     }
 
@@ -106,7 +101,7 @@ impl LightningClient for BreezClient {
         &self,
         amount_msat: u64,
         description: String,
-        expiry: Option<u32>,
+        expiry: u32,
     ) -> Result<LightningInvoice, LightningError> {
         let response = self
             .sdk
@@ -114,7 +109,7 @@ impl LightningClient for BreezClient {
                 amount_msat,
                 description,
                 use_description_hash: Some(true),
-                expiry: Some(expiry.unwrap_or(self.invoice_expiry)),
+                expiry: Some(expiry),
                 ..Default::default()
             })
             .await

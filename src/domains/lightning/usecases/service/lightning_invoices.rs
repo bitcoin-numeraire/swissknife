@@ -27,7 +27,11 @@ impl LightningInvoicesUseCases for LightningService {
 
         let mut invoice = self
             .lightning_client
-            .invoice(amount, description.clone().unwrap_or_default(), expiry)
+            .invoice(
+                amount,
+                description.clone().unwrap_or_default(),
+                expiry.unwrap_or(self.invoice_expiry),
+            )
             .await?;
         invoice.status = LightningInvoiceStatus::PENDING;
         invoice.user_id = user.sub.clone();

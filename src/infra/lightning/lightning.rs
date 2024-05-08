@@ -18,7 +18,7 @@ pub trait LightningClient: Sync + Send {
         &self,
         amount_msat: u64,
         description: String,
-        expiry: Option<u32>,
+        expiry: u32,
     ) -> Result<LightningInvoice, LightningError>;
     async fn payment_by_hash(
         &self,

@@ -47,7 +47,11 @@ impl LightningAddressesUseCases for LightningService {
 
         let mut invoice = self
             .lightning_client
-            .invoice(amount, description.clone().unwrap_or_default(), None)
+            .invoice(
+                amount,
+                description.clone().unwrap_or_default(),
+                self.invoice_expiry,
+            )
             .await?;
         invoice.user_id = lightning_address.user_id.clone();
         invoice.lightning_address = Some(username.clone());
