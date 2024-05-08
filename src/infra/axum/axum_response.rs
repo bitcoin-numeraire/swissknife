@@ -21,7 +21,7 @@ impl IntoResponse for ApplicationError {
             ApplicationError::Data(error) => error.into_response(),
             ApplicationError::Lightning(error) => error.into_response(),
             _ => {
-                error!("{}", self.to_string());
+                error!(%self);
 
                 let status = StatusCode::INTERNAL_SERVER_ERROR;
                 let body = generate_body(status, INTERNAL_SERVER_ERROR_MSG);
@@ -40,7 +40,7 @@ impl IntoResponse for AuthorizationError {
             _ => "Access denied",
         };
 
-        warn!("{}", self.to_string());
+        warn!(%self);
 
         let status = StatusCode::FORBIDDEN;
         let body = generate_body(status, error_message);
@@ -69,7 +69,7 @@ impl IntoResponse for AuthenticationError {
             ),
         };
 
-        warn!("{}", self.to_string());
+        warn!(%self);
 
         let status = StatusCode::UNAUTHORIZED;
         let body = generate_body(status, error_message);
@@ -94,19 +94,19 @@ impl IntoResponse for DataError {
     fn into_response(self) -> Response {
         let (error_message, status) = match self {
             DataError::NotFound(_) => {
-                debug!("{}", self.to_string());
+                debug!(%self);
                 (self.to_string(), StatusCode::NOT_FOUND)
             }
             DataError::Conflict(_) => {
-                warn!("{}", self.to_string());
+                warn!(%self);
                 (self.to_string(), StatusCode::CONFLICT)
             }
             DataError::Validation(_) | DataError::InsufficientFunds => {
-                warn!("{}", self.to_string());
+                warn!(%self);
                 (self.to_string(), StatusCode::UNPROCESSABLE_ENTITY)
             }
             DataError::RequestValidation(_) => {
-                debug!("{}", self.to_string());
+                debug!(%self);
                 (self.to_string(), StatusCode::BAD_REQUEST)
             }
         };
@@ -122,11 +122,11 @@ impl IntoResponse for LightningError {
             LightningError::SendBolt11Payment(_)
             | LightningError::SendLNURLPayment(_)
             | LightningError::SendNodeIdPayment(_) => {
-                warn!("{}", self.to_string());
+                warn!(%self);
                 (self.to_string(), StatusCode::UNPROCESSABLE_ENTITY)
             }
             _ => {
-                error!("{}", self.to_string());
+                error!(%self);
                 (
                     INTERNAL_SERVER_ERROR_MSG.to_string(),
                     StatusCode::INTERNAL_SERVER_ERROR,

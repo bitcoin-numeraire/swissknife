@@ -34,7 +34,7 @@ impl EventListener for BreezListener {
 
                         if let Err(err) = payments_processor.process_incoming_payment(payment).await
                         {
-                            warn!(err = err.to_string(), "Failed to process incoming payment");
+                            warn!(%err, "Failed to process incoming payment");
                         }
                     });
                 } else {
@@ -50,7 +50,7 @@ impl EventListener for BreezListener {
                     sleep(Duration::from_millis(500)).await;
 
                     if let Err(err) = payments_processor.process_outgoing_payment(details).await {
-                        warn!(err = err.to_string(), "Failed to process outgoing payment");
+                        warn!(%err, "Failed to process outgoing payment");
                     }
                 });
             }
@@ -63,7 +63,7 @@ impl EventListener for BreezListener {
                     sleep(Duration::from_millis(500)).await;
 
                     if let Err(err) = payments_processor.process_failed_payment(details).await {
-                        warn!(err = err.to_string(), "Failed to process outgoing payment");
+                        warn!(%err, "Failed to process outgoing payment");
                     }
                 });
             }

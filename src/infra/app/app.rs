@@ -64,8 +64,8 @@ impl App {
 
     async fn shutdown_signal() {
         let ctrl_c = async {
-            if let Err(e) = ctrl_c().await {
-                error!(error = ?e, "Failed to install Ctrl+C handler");
+            if let Err(err) = ctrl_c().await {
+                error!(%err, "Failed to install Ctrl+C handler");
             }
             info!("Received Ctrl+C signal. Shutting down gracefully");
         };
@@ -77,7 +77,7 @@ impl App {
                     stream.recv().await;
                     info!("Received SIGTERM. Shutting down gracefully");
                 }
-                Err(e) => error!(error = ?e, "Failed to install SIGTERM handler"),
+                Err(err) => error!(%err, "Failed to install SIGTERM handler"),
             }
         };
 

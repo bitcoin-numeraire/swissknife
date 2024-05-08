@@ -68,14 +68,10 @@ impl LightningPaymentsProcessorUseCases for LightningPaymentsProcessor {
             PaymentDetails::Ln { data } => {
                 Uuid::parse_str(&data.label).map_err(|e| DataError::Validation(e.to_string()))
             }
-            _ => {
-                Err(DataError::NotFound("Lightning payment not found. Missing label".into()).into())
-            }
+            _ => Err(DataError::NotFound("Missing lightning payment details".into()).into()),
         }?;
-        let payment_hash = payment_success.id.clone();
         trace!(
-            payment_id = payment_id.to_string(),
-            payment_hash,
+            %payment_id,
             "Processing outgoing lightning payment"
         );
 
@@ -98,9 +94,7 @@ impl LightningPaymentsProcessorUseCases for LightningPaymentsProcessor {
             let payment = self.store.update_payment(payment).await?;
 
             info!(
-                payment_id = payment_id.to_string(),
-                payment_hash,
-                username = payment.lightning_address,
+                %payment_id,
                 "Outgoing Lightning payment processed successfully"
             );
             return Ok(payment);
@@ -113,33 +107,38 @@ impl LightningPaymentsProcessorUseCases for LightningPaymentsProcessor {
         &self,
         payment_failed: PaymentFailedData,
     ) -> Result<LightningPayment, ApplicationError> {
-        if payment_failed.invoice.is_none() {
-            return Err(
-                DataError::Validation("Failed payment is missing an Invoice.".into()).into(),
-            );
-        }
-
-        let invoice = payment_failed.invoice.unwrap();
+        let payment_id = match payment_failed.label {
+            Some(invoice) => {
+                Uuid::parse_str(&data.label).map_err(|e| DataError::Validation(e.to_string()))
+            }
+            None => Err(DataError::NotFound("Missing lightning payment label".into()).into()),
+        }?;
         trace!(
-            payment_hash = invoice.payment_hash,
+            %payment_id,
             "Processing outgoing failed lightning payment"
         );
 
-        let payment_option = self
-            .store
-            .find_payment_by_hash(&invoice.payment_hash)
-            .await?;
+        let invoice = match payment_failed.invoice {
+            Some(invoice) => invoice,
+            None => {
+                return Err(
+                    DataError::Validation("Failed payment is missing an Invoice.".into()).into(),
+                );
+            }
+        };
+
+        let payment_option = self.store.find_payment(payment_id).await?;
 
         if let Some(mut payment) = payment_option {
             payment.status = LightningPaymentStatus::FAILED;
             payment.payment_time = Some(invoice.timestamp as i64);
             payment.error = Some(payment_failed.error);
+            payment.payment_hash = Some(invoice.payment_hash);
 
             payment = self.store.update_payment(payment).await?;
 
             info!(
-                payment_hash = invoice.payment_hash,
-                username = payment.lightning_address,
+                %payment_id,
                 "Outgoing Lightning payment processed successfully"
             );
             return Ok(payment);

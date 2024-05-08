@@ -61,8 +61,8 @@ impl JWTAuthenticator {
                         *jwks_write = new_jwks;
                         trace!(jwks_uri, "Refreshed JWKS");
                     }
-                    Err(e) => {
-                        error!(error = ?e, jwks_uri, "Error refreshing jwks")
+                    Err(err) => {
+                        error!(%err, jwks_uri, "Error refreshing jwks")
                     }
                 }
                 sleep(refresh_interval).await;
