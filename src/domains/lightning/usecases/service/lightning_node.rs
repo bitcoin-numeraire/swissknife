@@ -1,14 +1,11 @@
 use async_trait::async_trait;
-use breez_sdk_core::{
-    parse, InputType, LspInformation, NodeState, Payment, ServiceHealthCheckResponse,
-};
-use tracing::{debug, info, trace};
-use uuid::Uuid;
+use breez_sdk_core::{LspInformation, NodeState, Payment, ServiceHealthCheckResponse};
+use tracing::{debug, trace};
 
 use crate::{
-    application::errors::{ApplicationError, DataError, LightningError},
+    application::errors::ApplicationError,
     domains::{
-        lightning::{entities::LightningPayment, usecases::LightningNodeUseCases},
+        lightning::usecases::LightningNodeUseCases,
         users::entities::{AuthUser, Permission},
     },
 };
@@ -41,6 +38,18 @@ impl LightningNodeUseCases for LightningService {
         Ok(lsp_info)
     }
 
+    async fn list_lsps(&self, user: AuthUser) -> Result<Vec<LspInformation>, ApplicationError> {
+        trace!(user_id = user.sub, "Listing available LSPs");
+
+        user.check_permission(Permission::ReadLightningNode)?;
+
+        // TODO: Implement entity for LSP info and not LspInformation
+        let lsps = self.lightning_client.list_lsps().await?;
+
+        debug!("LSPs retrieved successfully");
+        Ok(lsps)
+    }
+
     async fn list_node_payments(&self, user: AuthUser) -> Result<Vec<Payment>, ApplicationError> {
         trace!(user_id = user.sub, "Listing payments");
 
@@ -51,50 +60,6 @@ impl LightningNodeUseCases for LightningService {
 
         debug!("Payments retrieved successfully from node");
         Ok(payments)
-    }
-
-    async fn send_payment(
-        &self,
-        user: AuthUser,
-        input: String,
-        amount_msat: Option<u64>,
-        comment: Option<String>,
-    ) -> Result<LightningPayment, ApplicationError> {
-        debug!(user_id = user.sub, input, "Sending payment from node");
-
-        user.check_permission(Permission::SendLightningPayment)?;
-
-        // TODO: After moving to using User_id instead of username, use send_payment function here as well by saving the payment in DB
-        // associating it with the admin user and assigning its uuid to the label, to be found on event of payment success
-
-        let input_type = parse(&input)
-            .await
-            .map_err(|e| DataError::Validation(e.to_string()))?;
-
-        let id = Uuid::new_v4();
-
-        let payment = match input_type {
-            InputType::Bolt11 { invoice } => {
-                self.lightning_client
-                    .send_payment(invoice.bolt11, amount_msat, id)
-                    .await
-            }
-            InputType::LnUrlPay { data } => {
-                let amount = LightningService::validate_amount(amount_msat)?;
-                self.lightning_client
-                    .lnurl_pay(data, amount, comment, id)
-                    .await
-            }
-            InputType::LnUrlError { data } => Err(LightningError::SendLNURLPayment(data.reason)),
-            _ => Err(LightningError::UnsupportedPaymentInput(input.clone())),
-        }?;
-
-        info!(
-            user_id = user.sub,
-            input, "Payment sent successfully from node"
-        );
-
-        Ok(payment)
     }
 
     async fn health_check(

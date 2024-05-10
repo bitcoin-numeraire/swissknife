@@ -19,8 +19,9 @@ impl LightningNodeHandler {
         Router::new()
             .route("/info", get(Self::node_info))
             .route("/lsp-info", get(Self::lsp_info))
-            .route("/list-payments", get(Self::list_payments))
-            .route("/send-payment", get(Self::send_payment))
+            .route("/lsps", get(Self::list_lsps))
+            .route("/payments", get(Self::list_payments))
+            .route("/pay", get(Self::send_payment))
             .route("/health", get(Self::health_check))
     }
 
@@ -58,10 +59,19 @@ impl LightningNodeHandler {
     ) -> Result<Json<LightningPaymentResponse>, ApplicationError> {
         let payment = app_state
             .lightning
-            .send_payment(user, payload.input, payload.amount_msat, payload.comment)
+            .pay(user, payload.input, payload.amount_msat, payload.comment)
             .await?;
 
         Ok(Json(payment.into()))
+    }
+
+    async fn list_lsps(
+        State(app_state): State<Arc<AppState>>,
+        user: AuthUser,
+    ) -> Result<Json<Vec<LspInformation>>, ApplicationError> {
+        let lsps = app_state.lightning.list_lsps(user).await?;
+
+        Ok(lsps.into())
     }
 
     async fn health_check(

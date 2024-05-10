@@ -108,8 +108,8 @@ impl LightningPaymentsProcessorUseCases for LightningPaymentsProcessor {
         payment_failed: PaymentFailedData,
     ) -> Result<LightningPayment, ApplicationError> {
         let payment_id = match payment_failed.label {
-            Some(invoice) => {
-                Uuid::parse_str(&data.label).map_err(|e| DataError::Validation(e.to_string()))
+            Some(label) => {
+                Uuid::parse_str(&label).map_err(|e| DataError::Validation(e.to_string()))
             }
             None => Err(DataError::NotFound("Missing lightning payment label".into()).into()),
         }?;

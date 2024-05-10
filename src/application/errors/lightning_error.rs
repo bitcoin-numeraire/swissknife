@@ -46,7 +46,4 @@ pub enum LightningError {
 
     #[error("Failed to retrieve healthcheck: {0}")]
     HealthCheck(String),
-
-    #[error("Unsupported payment input: {0}")]
-    UnsupportedPaymentInput(String),
 }
