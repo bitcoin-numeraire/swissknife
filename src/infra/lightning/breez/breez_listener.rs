@@ -2,7 +2,6 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use breez_sdk_core::{BreezEvent, EventListener};
-use tokio::time::{sleep, Duration};
 use tracing::{trace, warn};
 
 use crate::domains::lightning::usecases::LightningPaymentsProcessorUseCases;
@@ -20,8 +19,6 @@ impl BreezListener {
 #[async_trait]
 impl EventListener for BreezListener {
     fn on_event(&self, e: BreezEvent) {
-        trace!(event = ?e, "New event received");
-
         match e {
             BreezEvent::InvoicePaid { details } => {
                 trace!("New InvoicePaid event received");
@@ -29,9 +26,6 @@ impl EventListener for BreezListener {
                 if let Some(payment) = details.payment {
                     let payments_processor = self.payments_processor.clone();
                     tokio::spawn(async move {
-                        // TODO: Remove sleep once sending function becomes asynchronous
-                        sleep(Duration::from_millis(500)).await;
-
                         if let Err(err) = payments_processor.process_incoming_payment(payment).await
                         {
                             warn!(%err, "Failed to process incoming payment");
@@ -46,9 +40,6 @@ impl EventListener for BreezListener {
 
                 let payments_processor = self.payments_processor.clone();
                 tokio::spawn(async move {
-                    // TODO: Remove sleep once sending function becomes asynchronous
-                    sleep(Duration::from_millis(500)).await;
-
                     if let Err(err) = payments_processor.process_outgoing_payment(details).await {
                         warn!(%err, "Failed to process outgoing payment");
                     }
@@ -59,15 +50,14 @@ impl EventListener for BreezListener {
 
                 let payments_processor = self.payments_processor.clone();
                 tokio::spawn(async move {
-                    // TODO: Remove sleep once sending function becomes asynchronous
-                    sleep(Duration::from_millis(500)).await;
-
                     if let Err(err) = payments_processor.process_failed_payment(details).await {
                         warn!(%err, "Failed to process outgoing payment");
                     }
                 });
             }
-            _ => {}
+            _ => {
+                trace!(event = ?e, "New event received");
+            }
         }
     }
 }

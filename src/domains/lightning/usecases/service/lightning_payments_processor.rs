@@ -95,6 +95,7 @@ impl LightningPaymentsProcessorUseCases for LightningPaymentsProcessor {
 
             info!(
                 %payment_id,
+                payment_status = %payment.status,
                 "Outgoing Lightning payment processed successfully"
             );
             return Ok(payment);
@@ -139,6 +140,7 @@ impl LightningPaymentsProcessorUseCases for LightningPaymentsProcessor {
 
             info!(
                 %payment_id,
+                payment_status = %payment.status,
                 "Outgoing Lightning payment processed successfully"
             );
             return Ok(payment);

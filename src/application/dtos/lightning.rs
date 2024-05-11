@@ -69,6 +69,7 @@ impl From<LightningAddress> for LightningAddressResponse {
 #[derive(Debug, Serialize)]
 pub struct LightningInvoiceResponse {
     pub payment_hash: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub lightning_address: Option<String>,
     pub bolt11: String,
     pub network: String,
@@ -79,10 +80,13 @@ pub struct LightningInvoiceResponse {
     pub timestamp: u64,
     pub expiry: u64,
     pub min_final_cltv_expiry_delta: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub fee_msat: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub payment_time: Option<i64>,
     pub status: String,
     pub created_at: DateTime<FixedOffset>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub updated_at: Option<DateTime<FixedOffset>>,
 }
 

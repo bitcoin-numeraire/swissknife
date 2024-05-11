@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use breez_sdk_core::{parse, InputType, LNInvoice, LnUrlPayRequestData};
-use tracing::{debug, info};
+use tracing::{debug, info, trace, warn};
 use uuid::Uuid;
 
 use crate::{
@@ -43,6 +43,7 @@ impl LightningService {
         }
 
         let txn = if send_from_node {
+            warn!(user_id = user.sub, "Sending payment from node");
             None
         } else {
             Some(self.store.begin().await?)
@@ -176,7 +177,7 @@ impl LightningService {
             Ok(mut payment) => {
                 payment.id = pending_payment.id;
                 payment.status = match payment.error {
-                    // There is a case where the payment fails but still has a payment_hash and a payment is returned insteaf of an error
+                    // There is a case where the payment fails but still has a payment_hash and a payment is returned instead of an error
                     Some(_) => LightningPaymentStatus::FAILED,
                     None => LightningPaymentStatus::SETTLED,
                 };
@@ -200,7 +201,7 @@ impl LightningPaymentsUseCases for LightningService {
         user: AuthUser,
         id: Uuid,
     ) -> Result<LightningPayment, ApplicationError> {
-        debug!(user_id = user.sub, "Fetching lightning payment");
+        trace!(user_id = user.sub, "Fetching lightning payment");
 
         let lightning_payment = self
             .store
@@ -212,7 +213,7 @@ impl LightningPaymentsUseCases for LightningService {
             user.check_permission(Permission::ReadLightningAccounts)?;
         }
 
-        info!(
+        debug!(
             user_id = user.sub,
             id = id.to_string(),
             "Lightning payment fetched successfully"
@@ -226,9 +227,11 @@ impl LightningPaymentsUseCases for LightningService {
         limit: Option<u64>,
         offset: Option<u64>,
     ) -> Result<Vec<LightningPayment>, ApplicationError> {
-        debug!(
+        trace!(
             user_id = user.sub,
-            limit, offset, "Listing lightning payments"
+            limit,
+            offset,
+            "Listing lightning payments"
         );
 
         let lightning_payments = if user.has_permission(Permission::ReadLightningAccounts) {
@@ -241,7 +244,7 @@ impl LightningPaymentsUseCases for LightningService {
                 .await?
         };
 
-        info!(user_id = user.sub, "Lightning payments listed successfully");
+        debug!(user_id = user.sub, "Lightning payments listed successfully");
         Ok(lightning_payments)
     }
 
