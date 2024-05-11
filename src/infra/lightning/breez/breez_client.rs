@@ -7,8 +7,8 @@ use bip39::Mnemonic;
 use breez_sdk_core::{
     BreezServices, ConnectRequest, EnvironmentType, GreenlightCredentials, GreenlightNodeConfig,
     ListPaymentsRequest, LnUrlPayRequest, LnUrlPayRequestData, LnUrlPayResult, LspInformation,
-    NodeConfig, NodeState, OpenChannelFeeRequest, Payment, ReceivePaymentRequest,
-    SendPaymentRequest, SendSpontaneousPaymentRequest, ServiceHealthCheckResponse,
+    NodeConfig, NodeState, Payment, ReceivePaymentRequest, SendPaymentRequest,
+    SendSpontaneousPaymentRequest, ServiceHealthCheckResponse,
 };
 
 use crate::{
@@ -123,7 +123,9 @@ impl LightningClient for BreezClient {
         let node_info = self
             .sdk
             .node_info()
-            .map_err(|e| LightningError::NodeInfo(e.to_string()))?;
+            .map_err(|e: breez_sdk_core::error::SdkError| {
+                LightningError::NodeInfo(e.to_string())
+            })?;
 
         Ok(node_info)
     }
@@ -134,17 +136,6 @@ impl LightningClient for BreezClient {
             .lsp_info()
             .await
             .map_err(|e| LightningError::LSPInfo(e.to_string()))?;
-
-        let fee = self
-            .sdk
-            .open_channel_fee(OpenChannelFeeRequest {
-                amount_msat: Some(5000000),
-                expiry: Some(3600),
-            })
-            .await
-            .map_err(|e| LightningError::LSPInfo(e.to_string()))?;
-
-        println!("{:?}", fee);
 
         Ok(lsp_info)
     }

@@ -1,6 +1,10 @@
 use std::sync::Arc;
 
-use axum::{extract::State, routing::get, Json, Router};
+use axum::{
+    extract::State,
+    routing::{get, post},
+    Json, Router,
+};
 use breez_sdk_core::{LspInformation, NodeState, Payment, ServiceHealthCheckResponse};
 
 use crate::{
@@ -21,8 +25,8 @@ impl LightningNodeHandler {
             .route("/lsp-info", get(Self::lsp_info))
             .route("/lsps", get(Self::list_lsps))
             .route("/payments", get(Self::list_payments))
-            .route("/pay", get(Self::send_payment))
-            .route("/close-channels", get(Self::close_lsp_channels))
+            .route("/pay", post(Self::send_payment))
+            .route("/close-channels", post(Self::close_lsp_channels))
             .route("/health", get(Self::health_check))
     }
 
