@@ -104,6 +104,7 @@ pub trait LightningNodeUseCases {
     async fn lsp_info(&self, user: AuthUser) -> Result<LspInformation, ApplicationError>;
     async fn list_lsps(&self, user: AuthUser) -> Result<Vec<LspInformation>, ApplicationError>;
     async fn list_node_payments(&self, user: AuthUser) -> Result<Vec<Payment>, ApplicationError>;
+    async fn close_lsp_channels(&self, user: AuthUser) -> Result<Vec<String>, ApplicationError>;
     async fn health_check(
         &self,
         user: AuthUser,

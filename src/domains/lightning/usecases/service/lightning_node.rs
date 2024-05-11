@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use breez_sdk_core::{LspInformation, NodeState, Payment, ServiceHealthCheckResponse};
-use tracing::{debug, trace};
+use tracing::{debug, info, trace};
 
 use crate::{
     application::errors::ApplicationError,
@@ -60,6 +60,17 @@ impl LightningNodeUseCases for LightningService {
 
         debug!("Payments retrieved successfully from node");
         Ok(payments)
+    }
+
+    async fn close_lsp_channels(&self, user: AuthUser) -> Result<Vec<String>, ApplicationError> {
+        debug!(user_id = user.sub, "Closing LSP channels");
+
+        user.check_permission(Permission::WriteLightningNode)?;
+
+        let tx_ids = self.lightning_client.close_lsp_channels().await?;
+
+        info!(?tx_ids, "LSP Channels closed sucessfully");
+        Ok(tx_ids)
     }
 
     async fn health_check(

@@ -262,6 +262,16 @@ impl LightningClient for BreezClient {
         Ok(response)
     }
 
+    async fn close_lsp_channels(&self) -> Result<Vec<String>, LightningError> {
+        let tx_ids = self
+            .sdk
+            .close_lsp_channels()
+            .await
+            .map_err(|e| LightningError::CloseLSPChannels(e.to_string()))?;
+
+        Ok(tx_ids)
+    }
+
     async fn health(&self) -> Result<ServiceHealthCheckResponse, LightningError> {
         let response = BreezServices::service_health_check(self.api_key.clone())
             .await

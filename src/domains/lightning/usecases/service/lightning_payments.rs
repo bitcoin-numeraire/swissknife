@@ -43,7 +43,7 @@ impl LightningService {
         }
 
         let txn = if send_from_node {
-            warn!(user_id = user.sub, "Sending payment from node");
+            warn!(user_id = user.sub, "Sending Bolt11 payment from node");
             None
         } else {
             Some(self.store.begin().await?)
@@ -119,6 +119,7 @@ impl LightningService {
         let amount = LightningService::validate_amount(amount_msat)?;
 
         let txn = if send_from_node {
+            warn!(user_id = user.sub, "Sending LNURL payment from node");
             None
         } else {
             Some(self.store.begin().await?)

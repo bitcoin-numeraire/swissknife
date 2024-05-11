@@ -8,6 +8,7 @@ use crate::application::errors::AuthorizationError;
 pub enum Permission {
     ReadLightningAccounts,
     ReadLightningNode,
+    WriteLightningNode,
     SendLightningPayment,
 }
 
@@ -18,6 +19,7 @@ impl FromStr for Permission {
         match s {
             "read:lightning_accounts" => Ok(Permission::ReadLightningAccounts),
             "read:lightning_node" => Ok(Permission::ReadLightningNode),
+            "write:lightning_node" => Ok(Permission::WriteLightningNode),
             "pay:lightning_node" => Ok(Permission::SendLightningPayment),
             // ... handle other permissions ...
             _ => {
@@ -34,6 +36,7 @@ impl Permission {
         vec![
             Permission::ReadLightningAccounts,
             Permission::ReadLightningNode,
+            Permission::WriteLightningNode,
             Permission::SendLightningPayment,
             // ... include all other permission variants ...
         ]

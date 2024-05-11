@@ -22,6 +22,7 @@ impl LightningNodeHandler {
             .route("/lsps", get(Self::list_lsps))
             .route("/payments", get(Self::list_payments))
             .route("/pay", get(Self::send_payment))
+            .route("/close-channels", get(Self::close_lsp_channels))
             .route("/health", get(Self::health_check))
     }
 
@@ -72,6 +73,15 @@ impl LightningNodeHandler {
         let lsps = app_state.lightning.list_lsps(user).await?;
 
         Ok(lsps.into())
+    }
+
+    async fn close_lsp_channels(
+        State(app_state): State<Arc<AppState>>,
+        user: AuthUser,
+    ) -> Result<Json<Vec<String>>, ApplicationError> {
+        let tx_ids = app_state.lightning.close_lsp_channels(user).await?;
+
+        Ok(tx_ids.into())
     }
 
     async fn health_check(
