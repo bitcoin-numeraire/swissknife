@@ -4,6 +4,7 @@ use crate::domains::lightning::entities::{LightningInvoice, LightningPayment};
 
 impl Into<LightningInvoice> for LNInvoice {
     fn into(self) -> LightningInvoice {
+        let details = serde_json::to_value(self.clone()).ok();
         LightningInvoice {
             bolt11: self.bolt11,
             network: self.network.to_string(),
@@ -16,6 +17,7 @@ impl Into<LightningInvoice> for LNInvoice {
             min_final_cltv_expiry_delta: self.min_final_cltv_expiry_delta,
             timestamp: self.timestamp,
             expiry: self.expiry,
+            details,
             ..Default::default()
         }
     }

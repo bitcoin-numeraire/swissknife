@@ -1,4 +1,5 @@
 use chrono::{DateTime, FixedOffset};
+use serde_json::Value;
 use strum_macros::{Display, EnumString};
 
 #[derive(Clone, Debug, Default)]
@@ -8,17 +9,18 @@ pub struct LightningInvoice {
     pub lightning_address: Option<String>,
     pub bolt11: String,
     pub network: String,
-    pub payee_pubkey: String,
     pub description: Option<String>,
     pub description_hash: Option<String>,
+    pub payee_pubkey: String,
+    pub min_final_cltv_expiry_delta: u64,
     pub amount_msat: Option<u64>,
     pub payment_secret: Vec<u8>,
     pub timestamp: u64,
     pub expiry: u64,
-    pub min_final_cltv_expiry_delta: u64,
     pub status: LightningInvoiceStatus,
     pub fee_msat: Option<u64>,
     pub payment_time: Option<i64>,
+    pub details: Option<Value>,
     pub created_at: DateTime<FixedOffset>,
     pub updated_at: Option<DateTime<FixedOffset>>,
 }

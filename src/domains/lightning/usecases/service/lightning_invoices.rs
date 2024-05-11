@@ -4,10 +4,7 @@ use tracing::{debug, info, trace};
 use crate::{
     application::errors::{ApplicationError, DataError},
     domains::{
-        lightning::{
-            entities::{LightningInvoice, LightningInvoiceStatus},
-            usecases::LightningInvoicesUseCases,
-        },
+        lightning::{entities::LightningInvoice, usecases::LightningInvoicesUseCases},
         users::entities::{AuthUser, Permission},
     },
 };
@@ -33,7 +30,6 @@ impl LightningInvoicesUseCases for LightningService {
                 expiry.unwrap_or(self.invoice_expiry),
             )
             .await?;
-        invoice.status = LightningInvoiceStatus::PENDING;
         invoice.user_id = user.sub.clone();
         invoice.description = description;
 
