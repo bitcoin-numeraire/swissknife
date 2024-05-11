@@ -23,20 +23,6 @@ impl LightningPaymentRepository for LightningStore {
         Ok(model.map(Into::into))
     }
 
-    // TODO: Temporary before fix by Breez
-    async fn find_payment_by_hash(
-        &self,
-        payment_hash: &str,
-    ) -> Result<Option<LightningPayment>, DatabaseError> {
-        let model = Entity::find()
-            .filter(Column::PaymentHash.eq(payment_hash))
-            .one(&self.db)
-            .await
-            .map_err(|e| DatabaseError::Find(e.to_string()))?;
-
-        Ok(model.map(Into::into))
-    }
-
     async fn find_all_payments(
         &self,
         user: Option<String>,

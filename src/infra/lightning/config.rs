@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use strum_macros::{Display, EnumString};
+use tracing::info;
 
 use crate::application::errors::LightningError;
 
@@ -38,7 +39,13 @@ impl LightningConfig {
                     LightningError::MissingLightningProviderConfig(self.provider.to_string())
                 })?;
 
-                let client = BreezClient::new(breez_config, listener).await?;
+                let client = BreezClient::new(breez_config.clone(), listener).await?;
+
+                info!(
+                    working_dir = %breez_config.working_dir,
+                    "Lightning provider: Breez"
+                );
+
                 Ok(Box::new(client))
             }
             LightningProvider::Cln => {
@@ -46,7 +53,13 @@ impl LightningConfig {
                     LightningError::MissingLightningProviderConfig(self.provider.to_string())
                 })?;
 
-                let client = ClnClient::new(cln_config).await?;
+                let client = ClnClient::new(cln_config.clone()).await?;
+
+                info!(
+                    endpoint = %cln_config.endpoint,
+                    "Lightning provider: Core Lightning"
+                );
+
                 Ok(Box::new(client))
             }
         }

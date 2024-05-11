@@ -24,23 +24,24 @@ async fn main() {
     // Load config and logger
     let config = match load_config() {
         Ok(c) => c,
-        Err(e) => {
-            panic!("Error loading config: {:?}", e);
+        Err(err) => {
+            error!(%err, "failed to load config");
+            exit(1);
         }
     };
     setup_tracing(config.logging.clone());
 
     let app_state = match AppState::new(config.clone()).await {
         Ok(app_state) => app_state,
-        Err(e) => {
-            error!(error = e.to_string(), "failed to create app state");
+        Err(err) => {
+            error!(%err, "failed to create app state");
             exit(1);
         }
     };
 
     let app = App::new(app_state);
-    if let Err(e) = app.start(&config.web.addr).await {
-        error!(error = ?e);
+    if let Err(err) = app.start(&config.web.addr).await {
+        error!(%err, "failed to start API server");
         exit(1);
     }
 }

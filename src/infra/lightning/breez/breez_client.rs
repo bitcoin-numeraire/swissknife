@@ -26,6 +26,7 @@ pub struct BreezClientConfig {
     pub certs_dir: String,
     pub seed: String,
     pub log_in_file: bool,
+    pub restore_only: bool,
 }
 
 const DEFAULT_CLIENT_CERT_FILENAME: &str = "client.crt";
@@ -71,7 +72,7 @@ impl BreezClient {
             ConnectRequest {
                 config: breez_config.clone(),
                 seed: seed.to_seed("").to_vec(),
-                restore_only: None,
+                restore_only: Some(config.restore_only),
             },
             listener,
         )
@@ -122,7 +123,9 @@ impl LightningClient for BreezClient {
         let node_info = self
             .sdk
             .node_info()
-            .map_err(|e| LightningError::NodeInfo(e.to_string()))?;
+            .map_err(|e: breez_sdk_core::error::SdkError| {
+                LightningError::NodeInfo(e.to_string())
+            })?;
 
         Ok(node_info)
     }
@@ -135,6 +138,16 @@ impl LightningClient for BreezClient {
             .map_err(|e| LightningError::LSPInfo(e.to_string()))?;
 
         Ok(lsp_info)
+    }
+
+    async fn list_lsps(&self) -> Result<Vec<LspInformation>, LightningError> {
+        let response = self
+            .sdk
+            .list_lsps()
+            .await
+            .map_err(|e| LightningError::ListLSPs(e.to_string()))?;
+
+        Ok(response)
     }
 
     async fn list_payments(&self) -> Result<Vec<Payment>, LightningError> {
@@ -240,20 +253,20 @@ impl LightningClient for BreezClient {
         Ok(response)
     }
 
+    async fn close_lsp_channels(&self) -> Result<Vec<String>, LightningError> {
+        let tx_ids = self
+            .sdk
+            .close_lsp_channels()
+            .await
+            .map_err(|e| LightningError::CloseLSPChannels(e.to_string()))?;
+
+        Ok(tx_ids)
+    }
+
     async fn health(&self) -> Result<ServiceHealthCheckResponse, LightningError> {
         let response = BreezServices::service_health_check(self.api_key.clone())
             .await
             .map_err(|e| LightningError::HealthCheck(e.to_string()))?;
-
-        Ok(response)
-    }
-
-    async fn list_lsps(&self) -> Result<Vec<LspInformation>, LightningError> {
-        let response = self
-            .sdk
-            .list_lsps()
-            .await
-            .map_err(|e| LightningError::ListLSPs(e.to_string()))?;
 
         Ok(response)
     }

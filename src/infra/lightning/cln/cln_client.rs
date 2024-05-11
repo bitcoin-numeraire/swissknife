@@ -168,4 +168,8 @@ impl LightningClient for ClnClient {
     async fn list_lsps(&self) -> Result<Vec<LspInformation>, LightningError> {
         todo!();
     }
+
+    async fn close_lsp_channels(&self) -> Result<Vec<String>, LightningError> {
+        todo!();
+    }
 }

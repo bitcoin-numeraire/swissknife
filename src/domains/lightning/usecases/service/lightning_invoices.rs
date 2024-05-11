@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use tracing::{debug, info};
+use tracing::{debug, info, trace};
 
 use crate::{
     application::errors::{ApplicationError, DataError},
@@ -52,9 +52,10 @@ impl LightningInvoicesUseCases for LightningService {
         user: AuthUser,
         payment_hash: String,
     ) -> Result<LightningInvoice, ApplicationError> {
-        debug!(
+        trace!(
             user_id = user.sub,
-            payment_hash, "Fetching lightning invoice"
+            payment_hash,
+            "Fetching lightning invoice"
         );
 
         let lightning_invoice = self
@@ -67,7 +68,7 @@ impl LightningInvoicesUseCases for LightningService {
             user.check_permission(Permission::ReadLightningAccounts)?;
         }
 
-        info!(
+        debug!(
             user_id = user.sub,
             payment_hash, "Lightning invoice fetched successfully"
         );
@@ -80,9 +81,11 @@ impl LightningInvoicesUseCases for LightningService {
         limit: Option<u64>,
         offset: Option<u64>,
     ) -> Result<Vec<LightningInvoice>, ApplicationError> {
-        debug!(
+        trace!(
             user_id = user.sub,
-            limit, offset, "Listing lightning invoices"
+            limit,
+            offset,
+            "Listing lightning invoices"
         );
 
         let lightning_invoices = if user.has_permission(Permission::ReadLightningAccounts) {
@@ -95,7 +98,7 @@ impl LightningInvoicesUseCases for LightningService {
                 .await?
         };
 
-        info!(user_id = user.sub, "Lightning invoices listed successfully");
+        debug!(user_id = user.sub, "Lightning invoices listed successfully");
         Ok(lightning_invoices)
     }
 }

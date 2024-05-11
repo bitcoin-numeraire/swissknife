@@ -102,14 +102,9 @@ pub trait LightningAddressesUseCases {
 pub trait LightningNodeUseCases {
     async fn node_info(&self, user: AuthUser) -> Result<NodeState, ApplicationError>;
     async fn lsp_info(&self, user: AuthUser) -> Result<LspInformation, ApplicationError>;
+    async fn list_lsps(&self, user: AuthUser) -> Result<Vec<LspInformation>, ApplicationError>;
     async fn list_node_payments(&self, user: AuthUser) -> Result<Vec<Payment>, ApplicationError>;
-    async fn send_payment(
-        &self,
-        user: AuthUser,
-        input: String,
-        amount_msat: Option<u64>,
-        comment: Option<String>,
-    ) -> Result<LightningPayment, ApplicationError>;
+    async fn close_lsp_channels(&self, user: AuthUser) -> Result<Vec<String>, ApplicationError>;
     async fn health_check(
         &self,
         user: AuthUser,

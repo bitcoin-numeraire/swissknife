@@ -44,9 +44,9 @@ pub enum LightningError {
     #[error("Failed to retrieve payment by hash: {0}")]
     PaymentByHash(String),
 
+    #[error("Failed to close LSP channels: {0}")]
+    CloseLSPChannels(String),
+
     #[error("Failed to retrieve healthcheck: {0}")]
     HealthCheck(String),
-
-    #[error("Unsupported payment input: {0}")]
-    UnsupportedPaymentInput(String),
 }

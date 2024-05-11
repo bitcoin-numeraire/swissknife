@@ -1,6 +1,10 @@
 use std::sync::Arc;
 
-use axum::{extract::State, routing::get, Json, Router};
+use axum::{
+    extract::State,
+    routing::{get, post},
+    Json, Router,
+};
 use breez_sdk_core::{LspInformation, NodeState, Payment, ServiceHealthCheckResponse};
 
 use crate::{
@@ -19,8 +23,10 @@ impl LightningNodeHandler {
         Router::new()
             .route("/info", get(Self::node_info))
             .route("/lsp-info", get(Self::lsp_info))
-            .route("/list-payments", get(Self::list_payments))
-            .route("/send-payment", get(Self::send_payment))
+            .route("/lsps", get(Self::list_lsps))
+            .route("/payments", get(Self::list_payments))
+            .route("/pay", post(Self::send_payment))
+            .route("/close-channels", post(Self::close_lsp_channels))
             .route("/health", get(Self::health_check))
     }
 
@@ -58,10 +64,28 @@ impl LightningNodeHandler {
     ) -> Result<Json<LightningPaymentResponse>, ApplicationError> {
         let payment = app_state
             .lightning
-            .send_payment(user, payload.input, payload.amount_msat, payload.comment)
+            .pay(user, payload.input, payload.amount_msat, payload.comment)
             .await?;
 
         Ok(Json(payment.into()))
+    }
+
+    async fn list_lsps(
+        State(app_state): State<Arc<AppState>>,
+        user: AuthUser,
+    ) -> Result<Json<Vec<LspInformation>>, ApplicationError> {
+        let lsps = app_state.lightning.list_lsps(user).await?;
+
+        Ok(lsps.into())
+    }
+
+    async fn close_lsp_channels(
+        State(app_state): State<Arc<AppState>>,
+        user: AuthUser,
+    ) -> Result<Json<Vec<String>>, ApplicationError> {
+        let tx_ids = app_state.lightning.close_lsp_channels(user).await?;
+
+        Ok(tx_ids.into())
     }
 
     async fn health_check(
