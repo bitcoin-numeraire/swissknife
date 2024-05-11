@@ -23,7 +23,6 @@ pub struct Model {
     pub timestamp: i64,
     pub expiry: i64,
     pub min_final_cltv_expiry_delta: i64,
-    pub status: String,
     pub fee_msat: Option<i64>,
     pub payment_time: Option<i64>,
     pub created_at: DateTimeWithTimeZone,
@@ -52,6 +51,14 @@ impl ActiveModelBehavior for ActiveModel {}
 
 impl From<Model> for LightningInvoice {
     fn from(model: Model) -> Self {
+        let status = if model.payment_time.is_some() {
+            LightningInvoiceStatus::SETTLED
+        } else if (model.timestamp + model.expiry) < chrono::Utc::now().timestamp() {
+            LightningInvoiceStatus::EXPIRED
+        } else {
+            LightningInvoiceStatus::PENDING
+        };
+
         LightningInvoice {
             payment_hash: model.payment_hash,
             user_id: model.user_id,
@@ -66,7 +73,7 @@ impl From<Model> for LightningInvoice {
             min_final_cltv_expiry_delta: model.min_final_cltv_expiry_delta as u64,
             timestamp: model.timestamp as u64,
             expiry: model.expiry as u64,
-            status: model.status.parse::<LightningInvoiceStatus>().unwrap(),
+            status,
             fee_msat: None,
             payment_time: model.payment_time,
             created_at: model.created_at,

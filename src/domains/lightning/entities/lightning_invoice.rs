@@ -28,5 +28,5 @@ pub enum LightningInvoiceStatus {
     #[default]
     PENDING,
     SETTLED,
-    FAILED,
+    EXPIRED,
 }

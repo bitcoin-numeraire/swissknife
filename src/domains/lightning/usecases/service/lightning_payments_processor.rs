@@ -7,9 +7,7 @@ use crate::{
     application::errors::{ApplicationError, DataError},
     domains::lightning::{
         adapters::LightningRepository,
-        entities::{
-            LightningInvoice, LightningInvoiceStatus, LightningPayment, LightningPaymentStatus,
-        },
+        entities::{LightningInvoice, LightningPayment, LightningPaymentStatus},
         usecases::LightningPaymentsProcessorUseCases,
     },
 };
@@ -45,7 +43,6 @@ impl LightningPaymentsProcessorUseCases for LightningPaymentsProcessor {
 
         if let Some(mut invoice) = invoice_option {
             invoice.fee_msat = Some(payment.fee_msat);
-            invoice.status = LightningInvoiceStatus::SETTLED;
             invoice.payment_time = Some(payment.payment_time);
 
             invoice = self.store.update_invoice(invoice).await?;
