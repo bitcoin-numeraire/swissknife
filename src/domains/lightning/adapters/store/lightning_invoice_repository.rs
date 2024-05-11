@@ -68,7 +68,6 @@ impl LightningInvoiceRepository for LightningStore {
             timestamp: Set(invoice.timestamp as i64),
             expiry: Set(invoice.expiry as i64),
             min_final_cltv_expiry_delta: Set(invoice.min_final_cltv_expiry_delta as i64),
-            status: Set(invoice.status.to_string()),
             ..Default::default()
         };
 
@@ -86,7 +85,6 @@ impl LightningInvoiceRepository for LightningStore {
     ) -> Result<LightningInvoice, DatabaseError> {
         let model = ActiveModel {
             payment_hash: Set(invoice.payment_hash),
-            status: Set(invoice.status.to_string()),
             fee_msat: Set(invoice.fee_msat.map(|v| v as i64)),
             payment_time: Set(invoice.payment_time.map(|v| v as i64)),
             ..Default::default()
