@@ -82,7 +82,7 @@ pub struct LightningInvoiceResponse {
     pub payment_time: Option<i64>,
     pub status: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub details: Option<Value>,
+    pub label: Option<Uuid>,
     pub created_at: DateTime<FixedOffset>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub updated_at: Option<DateTime<FixedOffset>>,
@@ -105,7 +105,7 @@ impl From<LightningInvoice> for LightningInvoiceResponse {
             fee_msat: invoice.fee_msat,
             payment_time: invoice.payment_time,
             status: invoice.status.to_string(),
-            details: invoice.details,
+            label: invoice.label,
             created_at: invoice.created_at,
             updated_at: invoice.updated_at,
         }

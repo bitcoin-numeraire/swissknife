@@ -1,6 +1,5 @@
 use lightning_invoice::{Bolt11Invoice, Bolt11InvoiceDescription};
 use serde_bolt::bitcoin::hashes::hex::ToHex;
-use serde_json::json;
 use std::str::FromStr;
 
 use super::cln::InvoiceResponse;
@@ -33,14 +32,6 @@ impl Into<LightningInvoice> for InvoiceResponse {
                 Bolt11InvoiceDescription::Hash(h) => Some(h.0.to_string()),
             },
             min_final_cltv_expiry_delta: invoice.min_final_cltv_expiry_delta(),
-            details: Some(json!({
-                "created_index": self.created_index,
-                "warning_capacity": self.warning_capacity,
-                "warning_deadends": self.warning_deadends,
-                "warning_mpp": self.warning_mpp,
-                "warning_offline": self.warning_offline,
-                "warning_private_unused": self.warning_private_unused,
-            })),
             ..Default::default()
         }
     }

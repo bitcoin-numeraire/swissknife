@@ -30,7 +30,7 @@ impl MigrationTrait for Migration {
                 min_final_cltv_expiry_delta bigint NOT NULL,
                 fee_msat bigint,
                 payment_time bigint,
-                details jsonb,
+                label varchar,
                 created_at timestamptz NOT NULL DEFAULT current_timestamp,
                 updated_at timestamptz
             );

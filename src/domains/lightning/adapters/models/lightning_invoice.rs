@@ -25,7 +25,7 @@ pub struct Model {
     pub expiry: i64,
     pub fee_msat: Option<i64>,
     pub payment_time: Option<i64>,
-    pub details: Option<serde_json::Value>,
+    pub label: Option<Uuid>,
     pub created_at: DateTimeWithTimeZone,
     pub updated_at: Option<DateTimeWithTimeZone>,
 }
@@ -77,7 +77,7 @@ impl From<Model> for LightningInvoice {
             status,
             fee_msat: None,
             payment_time: model.payment_time,
-            details: model.details,
+            label: model.label,
             created_at: model.created_at,
             updated_at: model.updated_at,
         }

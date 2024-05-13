@@ -93,11 +93,12 @@ impl LightningClient for ClnClient {
     ) -> Result<LightningInvoice, LightningError> {
         let mut client = self.client.clone();
 
+        let label = Uuid::new_v4();
         let response = client
             .invoice(InvoiceRequest {
                 description,
                 expiry: Some(expiry as u64),
-                label: Uuid::new_v4().to_string(),
+                label: label.to_string(),
                 deschashonly: Some(true),
                 amount_msat: Some(cln::AmountOrAny {
                     value: Some(cln::amount_or_any::Value::Amount(cln::Amount {
@@ -109,7 +110,12 @@ impl LightningClient for ClnClient {
             .await
             .map_err(|e| LightningError::Invoice(e.to_string()))?;
 
-        Ok(response.into_inner().into())
+        // TODO: Add warnings from node if necessary for alerting
+
+        let mut invoice: LightningInvoice = response.into_inner().into();
+        invoice.label = Some(label);
+
+        Ok(invoice)
     }
 
     fn node_info(&self) -> Result<NodeState, LightningError> {
