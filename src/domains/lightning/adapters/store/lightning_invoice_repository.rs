@@ -68,6 +68,7 @@ impl LightningInvoiceRepository for LightningStore {
             timestamp: Set(invoice.timestamp as i64),
             expiry: Set(invoice.expiry as i64),
             min_final_cltv_expiry_delta: Set(invoice.min_final_cltv_expiry_delta as i64),
+            label: Set(invoice.label),
             ..Default::default()
         };
 

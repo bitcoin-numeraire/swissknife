@@ -43,6 +43,7 @@ strum = "0.26"
 strum_macros = "0.26"
 tonic = { version = "0.11.0", features = ["tls"] }
 prost = "0.12.4"
+lightning-invoice = "0.31.0"
 
 [build-dependencies]
 tonic-build = "0.11.0"

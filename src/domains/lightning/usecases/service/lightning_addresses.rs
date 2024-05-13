@@ -6,9 +6,7 @@ use crate::{
     application::errors::{ApplicationError, DataError},
     domains::{
         lightning::{
-            entities::{
-                LNURLPayRequest, LightningAddress, LightningInvoice, LightningInvoiceStatus,
-            },
+            entities::{LNURLPayRequest, LightningAddress, LightningInvoice},
             usecases::LightningAddressesUseCases,
         },
         users::entities::{AuthUser, Permission},
@@ -55,7 +53,6 @@ impl LightningAddressesUseCases for LightningService {
             .await?;
         invoice.user_id = lightning_address.user_id.clone();
         invoice.lightning_address = Some(username.clone());
-        invoice.status = LightningInvoiceStatus::PENDING;
         invoice.description = description;
 
         // TODO: Get or add more information to make this a LNURLp invoice (like fetching a success action specific to the user)
