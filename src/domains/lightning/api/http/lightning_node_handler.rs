@@ -5,11 +5,16 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
-use breez_sdk_core::{LspInformation, NodeState, Payment, ServiceHealthCheckResponse};
+use breez_sdk_core::{
+    LspInformation, NodeState, Payment, ReverseSwapInfo, ServiceHealthCheckResponse,
+};
 
 use crate::{
     application::{
-        dtos::{LightningPaymentResponse, SendPaymentRequest},
+        dtos::{
+            LightningPaymentResponse, RedeemOnchainRequest, SendOnchainPaymentRequest,
+            SendPaymentRequest,
+        },
         errors::ApplicationError,
     },
     domains::users::entities::AuthUser,
@@ -27,6 +32,8 @@ impl LightningNodeHandler {
             .route("/payments", get(Self::list_payments))
             .route("/pay", post(Self::send_payment))
             .route("/close-channels", post(Self::close_lsp_channels))
+            .route("/swap", post(Self::swap))
+            .route("/redeem", post(Self::redeem))
             .route("/health", get(Self::health_check))
     }
 
@@ -86,6 +93,38 @@ impl LightningNodeHandler {
         let tx_ids = app_state.lightning.close_lsp_channels(user).await?;
 
         Ok(tx_ids.into())
+    }
+
+    // TODO: Move to pay and parse the input to check if it's a BTC address instead of own endpoint
+    async fn swap(
+        State(app_state): State<Arc<AppState>>,
+        user: AuthUser,
+        Json(payload): Json<SendOnchainPaymentRequest>,
+    ) -> Result<Json<ReverseSwapInfo>, ApplicationError> {
+        let payment_info = app_state
+            .lightning
+            .pay_onchain(
+                user,
+                payload.amount_msat,
+                payload.recipient_address,
+                payload.feerate,
+            )
+            .await?;
+
+        Ok(payment_info.into())
+    }
+
+    async fn redeem(
+        State(app_state): State<Arc<AppState>>,
+        user: AuthUser,
+        Json(payload): Json<RedeemOnchainRequest>,
+    ) -> Result<String, ApplicationError> {
+        let txid = app_state
+            .lightning
+            .redeem(user, payload.to_address, payload.feerate)
+            .await?;
+
+        Ok(txid)
     }
 
     async fn health_check(

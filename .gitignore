@@ -15,6 +15,7 @@ target/
 
 # Visual Studio Code
 .vscode
+.DS_Store
 
 # Env
 .env
@@ -25,5 +26,4 @@ config/production.yaml
 certs/
 
 # Local storage files
-storage/breez/
-storage/rgblib/
+storage/*

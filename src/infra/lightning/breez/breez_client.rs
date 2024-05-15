@@ -1,5 +1,7 @@
 use serde::Deserialize;
+use serde_bolt::bitcoin::hashes::hex::ToHex;
 use std::{fs, io, path::PathBuf, sync::Arc};
+use tracing::{debug, info};
 use uuid::Uuid;
 
 use async_trait::async_trait;
@@ -7,8 +9,10 @@ use bip39::Mnemonic;
 use breez_sdk_core::{
     BreezServices, ConnectRequest, EnvironmentType, GreenlightCredentials, GreenlightNodeConfig,
     ListPaymentsRequest, LnUrlPayRequest, LnUrlPayRequestData, LnUrlPayResult, LspInformation,
-    NodeConfig, NodeState, Payment, ReceivePaymentRequest, SendPaymentRequest,
-    SendSpontaneousPaymentRequest, ServiceHealthCheckResponse,
+    NodeConfig, NodeState, OpenChannelFeeRequest, PayOnchainRequest, Payment,
+    PrepareOnchainPaymentRequest, PrepareRedeemOnchainFundsRequest, ReceivePaymentRequest,
+    RedeemOnchainFundsRequest, ReverseSwapInfo, SendPaymentRequest, SendSpontaneousPaymentRequest,
+    ServiceHealthCheckResponse, SwapAmountType,
 };
 
 use crate::{
@@ -104,6 +108,17 @@ impl LightningClient for BreezClient {
         description: String,
         expiry: u32,
     ) -> Result<LightningInvoice, LightningError> {
+        let channel_fees = self
+            .sdk
+            .open_channel_fee(OpenChannelFeeRequest {
+                amount_msat: Some(amount_msat),
+                expiry: Some(expiry),
+            })
+            .await
+            .map_err(|e| LightningError::Invoice(e.to_string()))?;
+
+        info!(?channel_fees, "Channel fees");
+
         let response = self
             .sdk
             .receive_payment(ReceivePaymentRequest {
@@ -261,6 +276,81 @@ impl LightningClient for BreezClient {
             .map_err(|e| LightningError::CloseLSPChannels(e.to_string()))?;
 
         Ok(tx_ids)
+    }
+
+    async fn pay_onchain(
+        &self,
+        amount_sat: u64,
+        recipient_address: String,
+        feerate: u32,
+    ) -> Result<ReverseSwapInfo, LightningError> {
+        let current_limits = self
+            .sdk
+            .onchain_payment_limits()
+            .await
+            .map_err(|e| LightningError::PayOnChain(e.to_string()))?;
+
+        debug!(
+            "Minimum amount: {} sats, Maximum amount: {} sats",
+            current_limits.min_sat, current_limits.max_sat
+        );
+
+        let prepare_res = self
+            .sdk
+            .prepare_onchain_payment(PrepareOnchainPaymentRequest {
+                amount_sat,
+                amount_type: SwapAmountType::Send,
+                claim_tx_feerate: feerate,
+            })
+            .await
+            .map_err(|e| LightningError::PayOnChain(e.to_string()))?;
+
+        info!(
+            "Sender amount: {} sats, Recipient amount: {} sats, Total fees: {} sats",
+            prepare_res.sender_amount_sat, prepare_res.recipient_amount_sat, prepare_res.total_fees
+        );
+
+        let response = self
+            .sdk
+            .pay_onchain(PayOnchainRequest {
+                recipient_address,
+                prepare_res,
+            })
+            .await
+            .map_err(|e| LightningError::PayOnChain(e.to_string()))?;
+
+        Ok(response.reverse_swap_info)
+    }
+
+    async fn redeem_onchain(
+        &self,
+        to_address: String,
+        feerate: u32,
+    ) -> Result<String, LightningError> {
+        let prepare_res = self
+            .sdk
+            .prepare_redeem_onchain_funds(PrepareRedeemOnchainFundsRequest {
+                to_address: to_address.clone(),
+                sat_per_vbyte: feerate,
+            })
+            .await
+            .map_err(|e| LightningError::RedeemOnChain(e.to_string()))?;
+
+        info!(
+            "Fees: {} sats, Weight: {} sats",
+            prepare_res.tx_fee_sat, prepare_res.tx_weight,
+        );
+
+        let response = self
+            .sdk
+            .redeem_onchain_funds(RedeemOnchainFundsRequest {
+                to_address,
+                sat_per_vbyte: feerate,
+            })
+            .await
+            .map_err(|e| LightningError::RedeemOnChain(e.to_string()))?;
+
+        Ok(response.txid.to_hex())
     }
 
     async fn health(&self) -> Result<ServiceHealthCheckResponse, LightningError> {

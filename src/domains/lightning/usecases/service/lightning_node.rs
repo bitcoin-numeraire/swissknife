@@ -1,5 +1,7 @@
 use async_trait::async_trait;
-use breez_sdk_core::{LspInformation, NodeState, Payment, ServiceHealthCheckResponse};
+use breez_sdk_core::{
+    LspInformation, NodeState, Payment, ReverseSwapInfo, ServiceHealthCheckResponse,
+};
 use tracing::{debug, info, trace};
 
 use crate::{
@@ -71,6 +73,45 @@ impl LightningNodeUseCases for LightningService {
 
         info!(?tx_ids, "LSP Channels closed sucessfully");
         Ok(tx_ids)
+    }
+
+    async fn pay_onchain(
+        &self,
+        user: AuthUser,
+        amount_sat: u64,
+        recipient_address: String,
+        feerate: u32,
+    ) -> Result<ReverseSwapInfo, ApplicationError> {
+        debug!(user_id = user.sub, "Initiating on-chain payment");
+
+        user.check_permission(Permission::WriteLightningNode)?;
+
+        let payment_info = self
+            .lightning_client
+            .pay_onchain(amount_sat, recipient_address, feerate)
+            .await?;
+
+        info!("Onchain payment initiated successfully");
+        Ok(payment_info)
+    }
+
+    async fn redeem(
+        &self,
+        user: AuthUser,
+        to_address: String,
+        feerate: u32,
+    ) -> Result<String, ApplicationError> {
+        debug!(user_id = user.sub, "Initiating on-chain redemption");
+
+        user.check_permission(Permission::WriteLightningNode)?;
+
+        let txid = self
+            .lightning_client
+            .redeem_onchain(to_address, feerate)
+            .await?;
+
+        info!("Onchain redemption initiated successfully");
+        Ok(txid)
     }
 
     async fn health_check(

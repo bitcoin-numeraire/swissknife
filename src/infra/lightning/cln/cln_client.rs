@@ -1,7 +1,8 @@
 use std::path::PathBuf;
 
 use breez_sdk_core::{
-    LnUrlPayRequestData, LspInformation, NodeState, Payment, ServiceHealthCheckResponse,
+    LnUrlPayRequestData, LspInformation, NodeState, Payment, ReverseSwapInfo,
+    ServiceHealthCheckResponse,
 };
 use serde::Deserialize;
 use tokio::{fs, io};
@@ -174,6 +175,23 @@ impl LightningClient for ClnClient {
     }
 
     async fn close_lsp_channels(&self) -> Result<Vec<String>, LightningError> {
+        todo!();
+    }
+
+    async fn pay_onchain(
+        &self,
+        amount_sat: u64,
+        recipient_address: String,
+        feerate: u32,
+    ) -> Result<ReverseSwapInfo, LightningError> {
+        todo!();
+    }
+
+    async fn redeem_onchain(
+        &self,
+        to_address: String,
+        feerate: u32,
+    ) -> Result<String, LightningError> {
         todo!();
     }
 }
