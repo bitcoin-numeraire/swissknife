@@ -19,6 +19,20 @@ pub struct SendPaymentRequest {
     pub comment: Option<String>,
 }
 
+// Part of the lightning types because this is the payload to send from the node with a swap service
+#[derive(Debug, Deserialize)]
+pub struct SendOnchainPaymentRequest {
+    pub amount_msat: u64,
+    pub recipient_address: String,
+    pub feerate: u32,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct RedeemOnchainRequest {
+    pub to_address: String,
+    pub feerate: u32,
+}
+
 #[derive(Debug, Deserialize)]
 pub struct RegisterLightningAddressRequest {
     pub username: String,

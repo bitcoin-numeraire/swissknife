@@ -1,6 +1,7 @@
 use async_trait::async_trait;
 use breez_sdk_core::{
-    LspInformation, NodeState, Payment, PaymentFailedData, ServiceHealthCheckResponse,
+    LspInformation, NodeState, Payment, PaymentFailedData, ReverseSwapInfo,
+    ServiceHealthCheckResponse,
 };
 use uuid::Uuid;
 
@@ -105,10 +106,23 @@ pub trait LightningNodeUseCases {
     async fn list_lsps(&self, user: AuthUser) -> Result<Vec<LspInformation>, ApplicationError>;
     async fn list_node_payments(&self, user: AuthUser) -> Result<Vec<Payment>, ApplicationError>;
     async fn close_lsp_channels(&self, user: AuthUser) -> Result<Vec<String>, ApplicationError>;
+    async fn pay_onchain(
+        &self,
+        user: AuthUser,
+        amount_sat: u64,
+        recipient_address: String,
+        feerate: u32,
+    ) -> Result<ReverseSwapInfo, ApplicationError>;
     async fn health_check(
         &self,
         user: AuthUser,
     ) -> Result<ServiceHealthCheckResponse, ApplicationError>;
+    async fn redeem(
+        &self,
+        user: AuthUser,
+        to_address: String,
+        feerate: u32,
+    ) -> Result<String, ApplicationError>;
 }
 
 #[async_trait]
