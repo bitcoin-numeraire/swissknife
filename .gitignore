@@ -27,3 +27,5 @@ certs/
 # Local storage files
 storage/breez/
 storage/rgblib/
+
+.DS_Store
