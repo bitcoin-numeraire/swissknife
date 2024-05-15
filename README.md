@@ -4,10 +4,10 @@ Numeraire's Bitcoin SwissKnife is a wallet application and transaction orhcestra
 
 ## Lightning Integration
 
-Numeraire SwissKnife allows Lightning integration via integration with well-known providers in a custodial or non-custodial manner.
+Numeraire SwissKnife allows Lightning integration via well-known providers in a custodial or non-custodial manner.
 
 - Avoid the complexity of running your own node and managing liquidity by connecting to a liquidity provider ([`Breez LSPs`](https://breez.technology/lsp/), [`Phoenix`](https://phoenix.acinq.co/server)) and an Infrastructure as a Service provider ([`Greenlight`](https://blockstream.com/lightning/greenlight/)).
-- Choose to run your own node by integrating with [`LND`](https://github.com/lightningnetwork/lnd) or [`Core Lightning`](https://corelightning.org/) node.
+- Choose to run your own node by integrating with [`LND`](https://github.com/lightningnetwork/lnd) or [`Core Lightning`](https://corelightning.org/) node. In which case you are responsible for liquidity management but keep full control of the whole infrastructure.
 - Avoid all complexities by choosing a custodial provider ([`LightSpark`](https://www.lightspark.com/)).
 
 ### Providers
