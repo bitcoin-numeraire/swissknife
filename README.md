@@ -1,6 +1,29 @@
 # Numeraire Bitcoin SwissKnife
 
-Numeraire's Bitcoin SwissKnife is an orchestator application made of several components and a frontend application enabling easy integration of Bitcoin, the Lightning network and the RGB protocol to any entity or organization that wishes to do so without handling the complexity of the above technologies.
+Numeraire's Bitcoin SwissKnife is a wallet application and transaction orhcestrator enabling easy integration of Bitcoin, the Lightning network and smart contract protocols (RGB, Taproot Assets) to any entity or organization that wishes to do so without handling the complexity of the above technologies.
+
+## Lightning Integration
+
+Numeraire SwissKnife allows Lightning integration via integration with well-known providers in a custodial or non-custodial manner.
+
+- Avoid the complexity of running your own node and managing liquidity by connecting to a liquidity provider ([`Breez LSPs`](https://breez.technology/lsp/), [`Phoenix`](https://phoenix.acinq.co/server)) and an Infrastructure as a Service provider ([`Greenlight`](https://blockstream.com/lightning/greenlight/)).
+- Choose to run your own node by integrating with [`LND`](https://github.com/lightningnetwork/lnd) or [`Core Lightning`](https://corelightning.org/) node.
+- Avoid all complexities by choosing a custodial provider ([`LightSpark`](https://www.lightspark.com/)).
+
+### Providers
+
+The compatible providers are:
+
+- [x] [`Greenlight`](https://blockstream.com/lightning/greenlight/) (mainly used in conjunction with `Breez`)
+- [x] [`Breez SDK`](https://breez.technology/sdk/) (allowing switching between LSPs.). Please contact us to get your API key.
+- [] [`Phoenixd`](https://phoenix.acinq.co/server). (TODO)
+- [] [`LightSpark`](https://www.lightspark.com/) (TODO)
+- [] Direct [`Core Lightning`](https://corelightning.org/) integration. (WIP)
+- [] Direct [`LND`](https://github.com/lightningnetwork/lnd) Integration (TODO)
+
+### Lightning Address
+
+Numeraire SwissKnife allows any entity or organization to create its own Lightning Address infrastructure. Like an email provider, any company can deploy Lightning Addresses (`username@your.domain`) to send and receive Lightning payments.
 
 ## Account and Key management (WIP)
 
@@ -13,28 +36,6 @@ The compatible HSMs are:
 - [] [`Hashicorp Vault`](https://www.vaultproject.io/) (with the use of a custom plugin)
 - [] Bare-metal HSMs (to be decided)
 - [] Cold storage hardware wallets by exporting and importing `PSBTs`
-
-## Lightning Integration
-
-### Providers
-
-Numeraire SwissKnife allows Lightning integration via integration with well-known providers.
-
-The compatible providers are:
-
-- [x] [`Greenlight`](https://blockstream.com/lightning/greenlight/) (mainly used in conjunction with `Breez`)
-- [x] [`Breez SDK`](https://breez.technology/sdk/) (allowing switching between LSPs.). Please contact us to get your API key.
-- [] [`LightSpark`](https://www.lightspark.com/)
-- [] Direct [`Core Lightning`](https://corelightning.org/) integration. (WIP)
-- [] Direct [`LND`](https://github.com/lightningnetwork/lnd) Integration
-
-### Lightning Address
-
-Numeraire SwissKnife allows any entity or organization to create its own Lightning Address infrastructure. Like an email provider, any company can deploy Lightning Addresses (`username@your.domain`) to send and receive Lightning payments.
-
-> This functionality needs to be coupled with a Provider for liquidity purposes.
-
-Lightning addresses can then be used to create complex flows by triggering webhooks or performing specific actions upon payment reception on RGB smart contracts.
 
 ## RGB protocol and Taproot Assets
 
