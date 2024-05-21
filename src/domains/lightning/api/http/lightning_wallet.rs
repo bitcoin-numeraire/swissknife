@@ -26,12 +26,12 @@ impl LightningWalletHandler {
         Router::new()
             .route("/pay", post(Self::pay))
             .route("/balance", get(Self::get_balance))
-            .route("/new-invoice", post(Self::new_invoice))
             .route("/addresses", get(Self::list_addresses))
             .route("/payments", get(Self::list_payments))
             .route("/payments/:id", get(Self::get_payment))
             .route("/invoices", get(Self::list_invoices))
             .route("/invoices/:payment_hash", get(Self::get_invoice))
+            .route("/invoices", post(Self::new_invoice))
     }
 
     async fn pay(

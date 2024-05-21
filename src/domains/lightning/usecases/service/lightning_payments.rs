@@ -258,8 +258,8 @@ impl LightningPaymentsUseCases for LightningService {
     ) -> Result<LightningPayment, ApplicationError> {
         debug!(user_id = user.sub, input, "Sending payment");
 
-        // If user has permission, we do not check the balance but the node balance
-        let can_send_from_node = user.has_permission(Permission::SendLightningPayment);
+        // If user has permission, we do not check the user balance but the node balance
+        let can_send_from_node = user.has_permission(Permission::WriteLightningNode);
 
         let input_type = parse(&input)
             .await
