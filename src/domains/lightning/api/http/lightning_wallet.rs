@@ -30,7 +30,7 @@ impl LightningWalletHandler {
             .route("/payments", get(Self::list_payments))
             .route("/payments/:id", get(Self::get_payment))
             .route("/invoices", get(Self::list_invoices))
-            .route("/invoices/:payment_hash", get(Self::get_invoice))
+            .route("/invoices/:id", get(Self::get_invoice))
             .route("/invoices", post(Self::new_invoice))
     }
 
@@ -126,9 +126,9 @@ impl LightningWalletHandler {
     async fn get_invoice(
         State(app_state): State<Arc<AppState>>,
         user: AuthUser,
-        Path(payment_hash): Path<String>,
+        Path(id): Path<Uuid>,
     ) -> Result<Json<LightningInvoiceResponse>, ApplicationError> {
-        let payment = app_state.lightning.get_invoice(user, payment_hash).await?;
+        let payment = app_state.lightning.get_invoice(user, id).await?;
 
         Ok(Json(payment.into()))
     }

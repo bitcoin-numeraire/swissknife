@@ -1,5 +1,6 @@
 use async_trait::async_trait;
 use tracing::{debug, info, trace};
+use uuid::Uuid;
 
 use crate::{
     application::errors::{ApplicationError, DataError},
@@ -46,17 +47,17 @@ impl LightningInvoicesUseCases for LightningService {
     async fn get_invoice(
         &self,
         user: AuthUser,
-        payment_hash: String,
+        id: Uuid,
     ) -> Result<LightningInvoice, ApplicationError> {
         trace!(
             user_id = user.sub,
-            payment_hash,
+            %id,
             "Fetching lightning invoice"
         );
 
         let lightning_invoice = self
             .store
-            .find_invoice(&payment_hash)
+            .find_invoice(id)
             .await?
             .ok_or_else(|| DataError::NotFound("Lightning invoice not found.".to_string()))?;
 
@@ -66,7 +67,7 @@ impl LightningInvoicesUseCases for LightningService {
 
         debug!(
             user_id = user.sub,
-            payment_hash, "Lightning invoice fetched successfully"
+            %id, "Lightning invoice fetched successfully"
         );
         Ok(lightning_invoice)
     }

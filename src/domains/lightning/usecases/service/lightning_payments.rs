@@ -74,6 +74,7 @@ impl LightningService {
                         amount_msat: amount,
                         status: LightningPaymentStatus::PENDING,
                         payment_hash: Some(invoice.payment_hash),
+                        description: invoice.description,
                         ..Default::default()
                     },
                 )
@@ -149,6 +150,7 @@ impl LightningService {
                     amount_msat: amount,
                     status: LightningPaymentStatus::PENDING,
                     lightning_address: data.ln_address.clone(),
+                    description: comment.clone(),
                     ..Default::default()
                 },
             )

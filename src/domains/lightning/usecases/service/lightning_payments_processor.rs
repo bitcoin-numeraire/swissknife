@@ -39,11 +39,17 @@ impl LightningPaymentsProcessorUseCases for LightningPaymentsProcessor {
             return Err(DataError::Validation("Payment is not Received.".into()).into());
         }
 
-        let invoice_option = self.store.find_invoice(&payment_hash).await?;
+        let invoice_option = self
+            .store
+            .find_invoice_by_payment_hash(&payment_hash)
+            .await?;
 
         if let Some(mut invoice) = invoice_option {
             invoice.fee_msat = Some(payment.fee_msat);
             invoice.payment_time = Some(payment.payment_time);
+            // This is needed because the amount_msat is not always the same as the invoice amount because of fees and fees are not part of the event
+            // Until this is fixed: https://github.com/breez/breez-sdk/issues/982
+            invoice.amount_msat = Some(payment.amount_msat);
 
             invoice = self.store.update_invoice(invoice).await?;
 

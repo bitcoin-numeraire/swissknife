@@ -56,6 +56,7 @@ impl LightningPaymentRepository for LightningStore {
             amount_msat: Set(payment.amount_msat as i64),
             status: Set(payment.status.to_string()),
             payment_hash: Set(payment.payment_hash),
+            description: Set(payment.description),
             ..Default::default()
         };
 
@@ -81,7 +82,6 @@ impl LightningPaymentRepository for LightningStore {
             payment_hash: Set(payment.payment_hash),
             error: Set(payment.error),
             amount_msat: Set(payment.amount_msat as i64),
-            description: Set(payment.description),
             metadata: Set(payment.metadata),
             ..Default::default()
         };

@@ -34,7 +34,7 @@ pub trait LightningInvoicesUseCases {
     async fn get_invoice(
         &self,
         user: AuthUser,
-        payment_hash: String,
+        id: Uuid,
     ) -> Result<LightningInvoice, ApplicationError>;
 
     async fn list_invoices(
