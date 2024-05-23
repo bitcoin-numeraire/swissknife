@@ -66,7 +66,6 @@ impl LightningInvoiceRepository for LightningStore {
         invoice: LightningInvoice,
     ) -> Result<LightningInvoice, DatabaseError> {
         let model = ActiveModel {
-            id: Set(invoice.id),
             user_id: Set(invoice.user_id),
             lightning_address: Set(invoice.lightning_address),
             bolt11: Set(invoice.bolt11),

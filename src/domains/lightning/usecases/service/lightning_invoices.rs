@@ -23,16 +23,22 @@ impl LightningInvoicesUseCases for LightningService {
     ) -> Result<LightningInvoice, ApplicationError> {
         debug!(user_id = user.sub, "Generating lightning invoice");
 
+        let description = match description {
+            Some(desc) if desc.is_empty() => self.invoice_description.clone(),
+            Some(desc) => desc,
+            None => self.invoice_description.clone(),
+        };
+
         let mut invoice = self
             .lightning_client
             .invoice(
                 amount,
-                description.clone().unwrap_or_default(),
+                description.clone(),
                 expiry.unwrap_or(self.invoice_expiry),
             )
             .await?;
         invoice.user_id = user.sub.clone();
-        invoice.description = description;
+        invoice.description = Some(description);
 
         let invoice = self.store.insert_invoice(invoice).await?;
 

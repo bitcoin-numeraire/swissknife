@@ -33,7 +33,7 @@ impl LightningAddressesUseCases for LightningService {
         &self,
         username: String,
         amount: u64,
-        description: Option<String>,
+        comment: Option<String>,
     ) -> Result<LightningInvoice, ApplicationError> {
         debug!(username, "Generating LNURLp invoice");
 
@@ -47,13 +47,13 @@ impl LightningAddressesUseCases for LightningService {
             .lightning_client
             .invoice(
                 amount,
-                description.clone().unwrap_or_default(),
+                comment.clone().unwrap_or_default(),
                 self.invoice_expiry,
             )
             .await?;
         invoice.user_id = lightning_address.user_id.clone();
         invoice.lightning_address = Some(username.clone());
-        invoice.description = description;
+        invoice.description = comment;
 
         // TODO: Get or add more information to make this a LNURLp invoice (like fetching a success action specific to the user)
         let invoice = self.store.insert_invoice(invoice).await?;

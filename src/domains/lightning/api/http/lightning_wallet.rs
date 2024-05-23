@@ -63,7 +63,12 @@ impl LightningWalletHandler {
     ) -> Result<Json<LightningInvoiceResponse>, ApplicationError> {
         let invoice = app_state
             .lightning
-            .generate_invoice(user, payload.amount_msat, payload.comment, payload.expiry)
+            .generate_invoice(
+                user,
+                payload.amount_msat,
+                payload.description,
+                payload.expiry,
+            )
             .await?;
 
         Ok(Json(invoice.into()))

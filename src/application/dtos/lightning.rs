@@ -8,7 +8,7 @@ use crate::domains::lightning::entities::{LightningAddress, LightningInvoice, Li
 #[derive(Debug, Deserialize)]
 pub struct NewInvoiceRequest {
     pub amount_msat: u64,
-    pub comment: Option<String>,
+    pub description: Option<String>,
     pub expiry: Option<u32>,
 }
 
@@ -78,6 +78,7 @@ impl From<LightningAddress> for LightningAddressResponse {
 
 #[derive(Debug, Serialize)]
 pub struct LightningInvoiceResponse {
+    pub id: Uuid,
     pub payment_hash: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub lightning_address: Option<String>,
@@ -105,6 +106,7 @@ pub struct LightningInvoiceResponse {
 impl From<LightningInvoice> for LightningInvoiceResponse {
     fn from(invoice: LightningInvoice) -> Self {
         Self {
+            id: invoice.id,
             payment_hash: invoice.payment_hash,
             lightning_address: invoice.lightning_address,
             bolt11: invoice.bolt11,
