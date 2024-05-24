@@ -8,7 +8,7 @@ use crate::{
     domains::{
         lightning::{
             entities::{LightningPayment, LightningPaymentStatus},
-            usecases::LightningPaymentsUseCases,
+            services::LightningPaymentsUseCases,
         },
         users::entities::{AuthUser, Permission},
     },

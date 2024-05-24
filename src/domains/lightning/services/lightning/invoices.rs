@@ -7,7 +7,7 @@ use crate::{
     domains::{
         lightning::{
             entities::{LightningInvoice, LightningInvoiceDeleteFilter},
-            usecases::LightningInvoicesUseCases,
+            services::LightningInvoicesUseCases,
         },
         users::entities::{AuthUser, Permission},
     },

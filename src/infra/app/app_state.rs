@@ -7,9 +7,9 @@ use crate::{
     },
     domains::lightning::{
         adapters::LightningStore,
-        usecases::{
-            lightning_service::BreezPaymentsProcessor, LightningService, LightningUseCases,
-            WalletService, WalletUseCases,
+        services::{
+            lightning::BreezPaymentsProcessor, LightningService, LightningUseCases, WalletService,
+            WalletUseCases,
         },
     },
     infra::{

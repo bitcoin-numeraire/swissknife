@@ -7,7 +7,7 @@ use crate::{
     domains::{
         lightning::{
             entities::{LNURLPayRequest, LightningAddress, LightningInvoice},
-            usecases::LightningAddressesUseCases,
+            services::LightningAddressesUseCases,
         },
         users::entities::{AuthUser, Permission},
     },

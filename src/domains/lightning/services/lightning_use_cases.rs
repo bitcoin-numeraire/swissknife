@@ -1,7 +1,6 @@
 use async_trait::async_trait;
 use breez_sdk_core::{
-    LspInformation, NodeState, Payment, PaymentFailedData, ReverseSwapInfo,
-    ServiceHealthCheckResponse,
+    LspInformation, NodeState, Payment, ReverseSwapInfo, ServiceHealthCheckResponse,
 };
 use uuid::Uuid;
 
@@ -119,22 +118,6 @@ pub trait LightningNodeUseCases {
         to_address: String,
         feerate: u32,
     ) -> Result<String, ApplicationError>;
-}
-
-#[async_trait]
-pub trait BreezPaymentsProcessorUseCases: Send + Sync {
-    async fn process_incoming_payment(
-        &self,
-        payment: Payment,
-    ) -> Result<LightningInvoice, ApplicationError>;
-    async fn process_outgoing_payment(
-        &self,
-        payment: Payment,
-    ) -> Result<LightningPayment, ApplicationError>;
-    async fn process_failed_payment(
-        &self,
-        payment: PaymentFailedData,
-    ) -> Result<LightningPayment, ApplicationError>;
 }
 
 pub trait LightningUseCases:

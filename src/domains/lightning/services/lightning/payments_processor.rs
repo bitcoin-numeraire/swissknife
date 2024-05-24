@@ -9,7 +9,7 @@ use crate::{
     domains::lightning::{
         adapters::LightningRepository,
         entities::{LightningInvoice, LightningPayment, LightningPaymentStatus},
-        usecases::BreezPaymentsProcessorUseCases,
+        services::PaymentsProcessorUseCases,
     },
 };
 
@@ -24,7 +24,7 @@ impl BreezPaymentsProcessor {
 }
 
 #[async_trait]
-impl BreezPaymentsProcessorUseCases for BreezPaymentsProcessor {
+impl PaymentsProcessorUseCases for BreezPaymentsProcessor {
     async fn process_incoming_payment(
         &self,
         payment: Payment,

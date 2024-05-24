@@ -1,15 +1,24 @@
-use async_trait::async_trait;
-use tracing::{debug, trace};
-
 use crate::{
     application::errors::ApplicationError,
     domains::{
-        lightning::{entities::UserBalance, usecases::WalletUseCases},
+        lightning::{
+            adapters::LightningRepository, entities::UserBalance, services::WalletUseCases,
+        },
         users::entities::AuthUser,
     },
 };
+use async_trait::async_trait;
+use tracing::{debug, trace};
 
-use super::WalletService;
+pub struct WalletService {
+    pub store: Box<dyn LightningRepository>,
+}
+
+impl WalletService {
+    pub fn new(store: Box<dyn LightningRepository>) -> Self {
+        WalletService { store }
+    }
+}
 
 #[async_trait]
 impl WalletUseCases for WalletService {
