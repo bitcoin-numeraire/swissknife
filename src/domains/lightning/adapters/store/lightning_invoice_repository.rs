@@ -11,16 +11,27 @@ use crate::{
 use async_trait::async_trait;
 use sea_orm::ActiveValue::Set;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect};
+use uuid::Uuid;
 
 use super::LightningStore;
 
 #[async_trait]
 impl LightningInvoiceRepository for LightningStore {
-    async fn find_invoice(
+    async fn find_invoice(&self, id: Uuid) -> Result<Option<LightningInvoice>, DatabaseError> {
+        let model = Entity::find_by_id(id)
+            .one(&self.db)
+            .await
+            .map_err(|e| DatabaseError::Find(e.to_string()))?;
+
+        Ok(model.map(Into::into))
+    }
+
+    async fn find_invoice_by_payment_hash(
         &self,
         payment_hash: &str,
     ) -> Result<Option<LightningInvoice>, DatabaseError> {
-        let model = Entity::find_by_id(payment_hash)
+        let model = Entity::find()
+            .filter(Column::PaymentHash.eq(payment_hash))
             .one(&self.db)
             .await
             .map_err(|e| DatabaseError::Find(e.to_string()))?;

@@ -15,7 +15,8 @@ impl MigrationTrait for Migration {
             END;
             $$ language 'plpgsql';
             CREATE TABLE lightning_invoice (
-                payment_hash varchar(255) PRIMARY KEY,
+                id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+                payment_hash varchar(255) NOT NULL,
                 user_id varchar(255) NOT NULL,
                 lightning_address varchar(255),
                 bolt11 varchar unique NOT NULL,

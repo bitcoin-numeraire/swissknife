@@ -56,6 +56,7 @@ impl AppState {
             lightning_client,
             config.lightning.domain,
             config.lightning.invoice_expiry,
+            config.lightning.invoice_description,
         );
 
         // Create App state

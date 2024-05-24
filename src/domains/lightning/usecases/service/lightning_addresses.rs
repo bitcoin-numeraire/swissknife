@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use regex::Regex;
-use tracing::{debug, info};
+use tracing::{debug, info, trace};
 
 use crate::{
     application::errors::{ApplicationError, DataError},
@@ -33,7 +33,7 @@ impl LightningAddressesUseCases for LightningService {
         &self,
         username: String,
         amount: u64,
-        description: Option<String>,
+        comment: Option<String>,
     ) -> Result<LightningInvoice, ApplicationError> {
         debug!(username, "Generating LNURLp invoice");
 
@@ -47,13 +47,13 @@ impl LightningAddressesUseCases for LightningService {
             .lightning_client
             .invoice(
                 amount,
-                description.clone().unwrap_or_default(),
+                comment.clone().unwrap_or_default(),
                 self.invoice_expiry,
             )
             .await?;
         invoice.user_id = lightning_address.user_id.clone();
         invoice.lightning_address = Some(username.clone());
-        invoice.description = description;
+        invoice.description = comment;
 
         // TODO: Get or add more information to make this a LNURLp invoice (like fetching a success action specific to the user)
         let invoice = self.store.insert_invoice(invoice).await?;
@@ -113,7 +113,7 @@ impl LightningAddressesUseCases for LightningService {
         user: AuthUser,
         username: String,
     ) -> Result<LightningAddress, ApplicationError> {
-        debug!(user_id = user.sub, "Fetching lightning address");
+        trace!(user_id = user.sub, "Fetching lightning address");
 
         let lightning_address = self
             .store
@@ -125,7 +125,7 @@ impl LightningAddressesUseCases for LightningService {
             user.check_permission(Permission::ReadLightningAccounts)?;
         }
 
-        info!(user_id = user.sub, "Lightning address fetched successfully");
+        debug!(user_id = user.sub, "Lightning address fetched successfully");
         Ok(lightning_address)
     }
 
@@ -135,9 +135,11 @@ impl LightningAddressesUseCases for LightningService {
         limit: Option<u64>,
         offset: Option<u64>,
     ) -> Result<Vec<LightningAddress>, ApplicationError> {
-        debug!(
+        trace!(
             user_id = user.sub,
-            limit, offset, "Listing lightning addresses"
+            limit,
+            offset,
+            "Listing lightning addresses"
         );
 
         let lightning_addresses = if user.has_permission(Permission::ReadLightningAccounts) {
@@ -150,7 +152,7 @@ impl LightningAddressesUseCases for LightningService {
                 .await?
         };
 
-        info!(
+        debug!(
             user_id = user.sub,
             "Lightning addresses listed successfully"
         );

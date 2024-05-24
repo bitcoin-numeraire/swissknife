@@ -39,7 +39,8 @@ pub trait LightningAddressRepository {
 
 #[async_trait]
 pub trait LightningInvoiceRepository {
-    async fn find_invoice(
+    async fn find_invoice(&self, id: Uuid) -> Result<Option<LightningInvoice>, DatabaseError>;
+    async fn find_invoice_by_payment_hash(
         &self,
         payment_hash: &str,
     ) -> Result<Option<LightningInvoice>, DatabaseError>;

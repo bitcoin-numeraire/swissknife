@@ -14,6 +14,7 @@ use super::{
 pub struct LightningConfig {
     pub domain: String,
     pub invoice_expiry: Option<u32>,
+    pub invoice_description: Option<String>,
     pub provider: LightningProvider,
     pub breez_config: Option<BreezClientConfig>,
     pub cln_config: Option<ClnClientConfig>,

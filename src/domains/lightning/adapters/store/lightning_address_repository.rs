@@ -102,7 +102,7 @@ impl LightningAddressRepository for LightningStore {
             received AS (
                 SELECT SUM(amount_msat) AS received_msat
                 FROM lightning_invoice
-                WHERE user_id = $1 AND payment_time IS NULL
+                WHERE user_id = $1 AND payment_time IS NOT NULL
             )
             SELECT
                 COALESCE(received.received_msat, 0)::BIGINT AS received_msat,

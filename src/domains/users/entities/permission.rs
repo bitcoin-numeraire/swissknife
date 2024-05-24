@@ -9,7 +9,6 @@ pub enum Permission {
     ReadLightningAccounts,
     ReadLightningNode,
     WriteLightningNode,
-    SendLightningPayment,
 }
 
 impl FromStr for Permission {
@@ -20,7 +19,6 @@ impl FromStr for Permission {
             "read:lightning_accounts" => Ok(Permission::ReadLightningAccounts),
             "read:lightning_node" => Ok(Permission::ReadLightningNode),
             "write:lightning_node" => Ok(Permission::WriteLightningNode),
-            "pay:lightning_node" => Ok(Permission::SendLightningPayment),
             // ... handle other permissions ...
             _ => {
                 let err = AuthorizationError::ParsePermission(s.to_string());
@@ -37,7 +35,6 @@ impl Permission {
             Permission::ReadLightningAccounts,
             Permission::ReadLightningNode,
             Permission::WriteLightningNode,
-            Permission::SendLightningPayment,
             // ... include all other permission variants ...
         ]
     }

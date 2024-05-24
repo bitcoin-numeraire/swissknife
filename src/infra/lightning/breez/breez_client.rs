@@ -9,10 +9,10 @@ use bip39::Mnemonic;
 use breez_sdk_core::{
     BreezServices, ConnectRequest, EnvironmentType, GreenlightCredentials, GreenlightNodeConfig,
     ListPaymentsRequest, LnUrlPayRequest, LnUrlPayRequestData, LnUrlPayResult, LspInformation,
-    NodeConfig, NodeState, OpenChannelFeeRequest, PayOnchainRequest, Payment,
-    PrepareOnchainPaymentRequest, PrepareRedeemOnchainFundsRequest, ReceivePaymentRequest,
-    RedeemOnchainFundsRequest, ReverseSwapInfo, SendPaymentRequest, SendSpontaneousPaymentRequest,
-    ServiceHealthCheckResponse, SwapAmountType,
+    NodeConfig, NodeState, PayOnchainRequest, Payment, PrepareOnchainPaymentRequest,
+    PrepareRedeemOnchainFundsRequest, ReceivePaymentRequest, RedeemOnchainFundsRequest,
+    ReverseSwapInfo, SendPaymentRequest, SendSpontaneousPaymentRequest, ServiceHealthCheckResponse,
+    SwapAmountType,
 };
 
 use crate::{
@@ -108,17 +108,6 @@ impl LightningClient for BreezClient {
         description: String,
         expiry: u32,
     ) -> Result<LightningInvoice, LightningError> {
-        let channel_fees = self
-            .sdk
-            .open_channel_fee(OpenChannelFeeRequest {
-                amount_msat: Some(amount_msat),
-                expiry: Some(expiry),
-            })
-            .await
-            .map_err(|e| LightningError::Invoice(e.to_string()))?;
-
-        info!(?channel_fees, "Channel fees");
-
         let response = self
             .sdk
             .receive_payment(ReceivePaymentRequest {
