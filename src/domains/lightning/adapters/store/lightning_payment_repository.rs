@@ -74,7 +74,7 @@ impl LightningPaymentRepository for LightningStore {
             id: Set(payment.id),
             status: Set(payment.status.to_string()),
             fee_msat: Set(payment.fee_msat.map(|v| v as i64)),
-            payment_time: Set(payment.payment_time.map(|v| v as i64)),
+            payment_time: Set(payment.payment_time),
             payment_hash: Set(payment.payment_hash),
             error: Set(payment.error),
             amount_msat: Set(payment.amount_msat as i64),

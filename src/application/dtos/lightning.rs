@@ -142,7 +142,7 @@ pub struct LightningPaymentResponse {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub fee_msat: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub payment_time: Option<i64>,
+    pub payment_time: Option<DateTime<Utc>>,
     pub status: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,

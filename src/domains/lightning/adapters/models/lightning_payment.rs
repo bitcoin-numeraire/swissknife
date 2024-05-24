@@ -16,7 +16,7 @@ pub struct Model {
     pub error: Option<String>,
     pub amount_msat: i64,
     pub fee_msat: Option<i64>,
-    pub payment_time: Option<i64>,
+    pub payment_time: Option<DateTimeUtc>,
     pub status: String,
     pub description: Option<String>,
     pub metadata: Option<String>,

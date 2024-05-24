@@ -12,7 +12,7 @@ pub struct LightningPayment {
     pub error: Option<String>,
     pub amount_msat: u64,
     pub fee_msat: Option<u64>,
-    pub payment_time: Option<i64>,
+    pub payment_time: Option<DateTime<Utc>>,
     pub status: LightningPaymentStatus,
     pub description: Option<String>,
     pub metadata: Option<String>,

@@ -41,7 +41,6 @@ impl LightningInvoicesUseCases for LightningService {
             )
             .await?;
         invoice.user_id = user.sub.clone();
-        invoice.description = Some(description);
 
         let invoice = self.store.insert_invoice(invoice).await?;
 

@@ -97,6 +97,7 @@ impl LightningInvoiceRepository for LightningStore {
             payment_hash: Set(invoice.payment_hash),
             fee_msat: Set(invoice.fee_msat.map(|v| v as i64)),
             payment_time: Set(invoice.payment_time),
+            description: Set(invoice.description),
             ..Default::default()
         };
 

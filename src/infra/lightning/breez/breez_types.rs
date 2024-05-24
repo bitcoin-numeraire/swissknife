@@ -34,7 +34,7 @@ impl Into<LightningPayment> for Payment {
             error: self.error,
             amount_msat: self.amount_msat,
             fee_msat: Some(self.fee_msat),
-            payment_time: Some(self.payment_time),
+            payment_time: Some(Utc.timestamp_opt(self.payment_time, 0).unwrap()),
             description: self.description,
             metadata: self.metadata,
             ..Default::default()

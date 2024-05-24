@@ -136,7 +136,7 @@ impl LightningPaymentsProcessorUseCases for LightningPaymentsProcessor {
 
         if let Some(mut payment) = payment_option {
             payment.status = LightningPaymentStatus::FAILED;
-            payment.payment_time = Some(invoice.timestamp as i64);
+            payment.payment_time = Some(Utc.timestamp_opt(invoice.timestamp as i64, 0).unwrap());
             payment.error = Some(payment_failed.error);
             payment.payment_hash = Some(invoice.payment_hash);
 

@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use breez_sdk_core::{parse, InputType, LNInvoice, LnUrlPayRequestData};
-use tracing::{debug, info, trace, warn};
+use tracing::{debug, info, trace};
 use uuid::Uuid;
 
 use crate::{
@@ -43,22 +43,16 @@ impl LightningService {
         }
 
         let txn = if send_from_node {
-            warn!(user_id = user.sub, "Sending Bolt11 payment from node");
             None
         } else {
             Some(self.store.begin().await?)
         };
 
-        // If we are in a transaction, we check in DB as we are paying from the user's balance
-        let balance = match txn {
-            Some(_) => {
-                self.store
-                    .get_balance(txn.as_ref(), &user.sub)
-                    .await?
-                    .available_msat as u64
-            }
-            None => self.lightning_client.node_info()?.max_payable_msat,
-        };
+        let balance = self
+            .store
+            .get_balance(txn.as_ref(), &user.sub)
+            .await?
+            .available_msat as u64;
 
         if let Some(amount) = specified_amount {
             if balance < amount {
@@ -120,7 +114,6 @@ impl LightningService {
         let amount = LightningService::validate_amount(amount_msat)?;
 
         let txn = if send_from_node {
-            warn!(user_id = user.sub, "Sending LNURL payment from node");
             None
         } else {
             Some(self.store.begin().await?)
