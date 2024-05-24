@@ -1,3 +1,4 @@
+use chrono::{TimeZone, Utc};
 use lightning_invoice::{Bolt11Invoice, Bolt11InvoiceDescription};
 use serde_bolt::bitcoin::hashes::hex::ToHex;
 use std::str::FromStr;
@@ -19,8 +20,13 @@ impl Into<LightningInvoice> for InvoiceResponse {
             payment_hash: invoice.payment_hash().to_hex(),
             amount_msat: invoice.amount_milli_satoshis(),
             payment_secret: self.payment_secret,
-            timestamp: invoice.duration_since_epoch().as_secs(),
-            expiry: invoice.expiry_time().as_secs(),
+            timestamp: Utc
+                .timestamp_opt(
+                    invoice.duration_since_epoch().as_secs() as i64,
+                    invoice.duration_since_epoch().subsec_nanos(),
+                )
+                .unwrap(),
+            expiry: invoice.expiry_time(),
             network: invoice.network().to_string(),
             payee_pubkey,
             description: match invoice.description() {

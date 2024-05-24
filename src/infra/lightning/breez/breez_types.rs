@@ -1,4 +1,7 @@
+use std::time::Duration;
+
 use breez_sdk_core::{LNInvoice, Payment};
+use chrono::{TimeZone, Utc};
 
 use crate::domains::lightning::entities::{LightningInvoice, LightningPayment};
 
@@ -14,8 +17,8 @@ impl Into<LightningInvoice> for LNInvoice {
             amount_msat: self.amount_msat,
             payment_secret: self.payment_secret,
             min_final_cltv_expiry_delta: self.min_final_cltv_expiry_delta,
-            timestamp: self.timestamp,
-            expiry: self.expiry,
+            timestamp: Utc.timestamp_opt(self.timestamp as i64, 0).unwrap(),
+            expiry: Duration::from_secs(self.expiry),
             ..Default::default()
         }
     }

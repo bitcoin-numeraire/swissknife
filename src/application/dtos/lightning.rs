@@ -1,4 +1,4 @@
-use chrono::{DateTime, FixedOffset};
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use uuid::Uuid;
@@ -55,11 +55,11 @@ pub struct LightningAddressResponse {
     pub user_id: String,
     pub username: String,
     pub active: bool,
-    pub created_at: DateTime<FixedOffset>,
+    pub created_at: DateTime<Utc>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub updated_at: Option<DateTime<FixedOffset>>,
+    pub updated_at: Option<DateTime<Utc>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub deleted_at: Option<DateTime<FixedOffset>>,
+    pub deleted_at: Option<DateTime<Utc>>,
 }
 
 impl From<LightningAddress> for LightningAddressResponse {
@@ -87,20 +87,20 @@ pub struct LightningInvoiceResponse {
     pub description: Option<String>,
     pub description_hash: Option<String>,
     pub amount_msat: Option<u64>,
-    pub timestamp: u64,
+    pub timestamp: DateTime<Utc>,
     pub expiry: u64,
     pub payee_pubkey: String,
     pub min_final_cltv_expiry_delta: u64,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub fee_msat: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub payment_time: Option<i64>,
+    pub payment_time: Option<DateTime<Utc>>,
     pub status: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub label: Option<Uuid>,
-    pub created_at: DateTime<FixedOffset>,
+    pub created_at: DateTime<Utc>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub updated_at: Option<DateTime<FixedOffset>>,
+    pub updated_at: Option<DateTime<Utc>>,
 }
 
 impl From<LightningInvoice> for LightningInvoiceResponse {
@@ -115,7 +115,7 @@ impl From<LightningInvoice> for LightningInvoiceResponse {
             description_hash: invoice.description_hash,
             amount_msat: invoice.amount_msat,
             timestamp: invoice.timestamp,
-            expiry: invoice.expiry,
+            expiry: invoice.expiry.as_secs(),
             payee_pubkey: invoice.payee_pubkey,
             min_final_cltv_expiry_delta: invoice.min_final_cltv_expiry_delta,
             fee_msat: invoice.fee_msat,
@@ -148,9 +148,9 @@ pub struct LightningPaymentResponse {
     pub metadata: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub success_action: Option<Value>,
-    pub created_at: DateTime<FixedOffset>,
+    pub created_at: DateTime<Utc>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub updated_at: Option<DateTime<FixedOffset>>,
+    pub updated_at: Option<DateTime<Utc>>,
 }
 
 impl From<LightningPayment> for LightningPaymentResponse {

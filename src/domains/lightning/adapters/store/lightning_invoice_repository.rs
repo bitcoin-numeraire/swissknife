@@ -72,8 +72,8 @@ impl LightningInvoiceRepository for LightningStore {
             description_hash: Set(invoice.description_hash),
             amount_msat: Set(invoice.amount_msat.map(|v| v as i64)),
             payment_secret: Set(invoice.payment_secret),
-            timestamp: Set(invoice.timestamp as i64),
-            expiry: Set(invoice.expiry as i64),
+            timestamp: Set(invoice.timestamp),
+            expiry: Set(invoice.expiry.as_secs() as i64),
             min_final_cltv_expiry_delta: Set(invoice.min_final_cltv_expiry_delta as i64),
             label: Set(invoice.label),
             ..Default::default()
@@ -95,7 +95,7 @@ impl LightningInvoiceRepository for LightningStore {
             id: Set(invoice.id),
             payment_hash: Set(invoice.payment_hash),
             fee_msat: Set(invoice.fee_msat.map(|v| v as i64)),
-            payment_time: Set(invoice.payment_time.map(|v| v as i64)),
+            payment_time: Set(invoice.payment_time),
             ..Default::default()
         };
 

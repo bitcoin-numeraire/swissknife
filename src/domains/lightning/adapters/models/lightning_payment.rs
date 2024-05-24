@@ -21,8 +21,8 @@ pub struct Model {
     pub description: Option<String>,
     pub metadata: Option<String>,
     pub success_action: Option<serde_json::Value>,
-    pub created_at: DateTimeWithTimeZone,
-    pub updated_at: Option<DateTimeWithTimeZone>,
+    pub created_at: DateTimeUtc,
+    pub updated_at: Option<DateTimeUtc>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

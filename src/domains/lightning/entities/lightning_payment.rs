@@ -1,4 +1,4 @@
-use chrono::{DateTime, FixedOffset};
+use chrono::{DateTime, Utc};
 use serde_json::Value;
 use strum_macros::{Display, EnumString};
 use uuid::Uuid;
@@ -17,8 +17,8 @@ pub struct LightningPayment {
     pub description: Option<String>,
     pub metadata: Option<String>,
     pub success_action: Option<Value>,
-    pub created_at: DateTime<FixedOffset>,
-    pub updated_at: Option<DateTime<FixedOffset>>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: Option<DateTime<Utc>>,
 }
 
 #[derive(Clone, Debug, EnumString, Display, PartialEq, Eq, Default)]

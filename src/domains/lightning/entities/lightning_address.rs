@@ -1,4 +1,4 @@
-use chrono::{DateTime, FixedOffset};
+use chrono::{DateTime, Utc};
 use serde::Serialize;
 use uuid::Uuid;
 
@@ -8,7 +8,7 @@ pub struct LightningAddress {
     pub user_id: String,
     pub username: String,
     pub active: bool,
-    pub created_at: DateTime<FixedOffset>,
-    pub updated_at: Option<DateTime<FixedOffset>>,
-    pub deleted_at: Option<DateTime<FixedOffset>>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: Option<DateTime<Utc>>,
+    pub deleted_at: Option<DateTime<Utc>>,
 }
