@@ -5,7 +5,8 @@ use uuid::Uuid;
 use crate::{
     application::errors::DatabaseError,
     domains::lightning::entities::{
-        LightningAddress, LightningInvoice, LightningPayment, UserBalance,
+        LightningAddress, LightningInvoice, LightningInvoiceDeleteFilter, LightningPayment,
+        UserBalance,
     },
 };
 
@@ -44,7 +45,7 @@ pub trait LightningInvoiceRepository {
         &self,
         payment_hash: &str,
     ) -> Result<Option<LightningInvoice>, DatabaseError>;
-    async fn find_all_invoices(
+    async fn find_invoices(
         &self,
         user: Option<String>,
         limit: Option<u64>,
@@ -58,6 +59,11 @@ pub trait LightningInvoiceRepository {
         &self,
         invoice: LightningInvoice,
     ) -> Result<LightningInvoice, DatabaseError>;
+    async fn delete_invoices(
+        &self,
+        user: Option<String>,
+        filter: LightningInvoiceDeleteFilter,
+    ) -> Result<u64, DatabaseError>;
 }
 
 #[async_trait]

@@ -26,14 +26,15 @@ impl MigrationTrait for Migration {
                 description_hash varchar,
                 amount_msat bigint,
                 payment_secret bytea NOT NULL,
-                timestamp bigint NOT NULL,
+                timestamp timestamptz NOT NULL,
                 expiry bigint NOT NULL,
                 min_final_cltv_expiry_delta bigint NOT NULL,
                 fee_msat bigint,
-                payment_time bigint,
+                payment_time timestamptz,
                 label varchar,
                 created_at timestamptz NOT NULL DEFAULT current_timestamp,
-                updated_at timestamptz
+                updated_at timestamptz,
+                expires_at timestamptz NOT NULL
             );
             CREATE TRIGGER update_lightning_invoice_timestamp BEFORE
             UPDATE ON lightning_invoice FOR EACH ROW EXECUTE PROCEDURE update_invoice_timestamp();",

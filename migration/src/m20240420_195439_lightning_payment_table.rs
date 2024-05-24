@@ -22,7 +22,7 @@ impl MigrationTrait for Migration {
                 error varchar,
                 amount_msat bigint NOT NULL,
                 fee_msat bigint,
-                payment_time bigint,
+                payment_time timestamptz,
                 status varchar NOT NULL,
                 description varchar,
                 metadata varchar,

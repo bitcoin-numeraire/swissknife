@@ -5,11 +5,11 @@ use crate::{
             models::lightning_invoice::{ActiveModel, Column, Entity},
             repository::LightningInvoiceRepository,
         },
-        entities::LightningInvoice,
+        entities::{LightningInvoice, LightningInvoiceDeleteFilter},
     },
 };
 use async_trait::async_trait;
-use sea_orm::ActiveValue::Set;
+use sea_orm::{sea_query::Expr, ActiveValue::Set, QueryTrait};
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect};
 use uuid::Uuid;
 
@@ -39,19 +39,15 @@ impl LightningInvoiceRepository for LightningStore {
         Ok(model.map(Into::into))
     }
 
-    async fn find_all_invoices(
+    async fn find_invoices(
         &self,
         user: Option<String>,
         limit: Option<u64>,
         offset: Option<u64>,
     ) -> Result<Vec<LightningInvoice>, DatabaseError> {
-        let filter = match user {
-            Some(user_id) => Entity::find().filter(Column::UserId.eq(user_id)),
-            None => Entity::find(),
-        };
-
-        let models = filter
-            .order_by_asc(Column::CreatedAt)
+        let models = Entity::find()
+            .apply_if(user, |q, v| q.filter(Column::UserId.eq(v)))
+            .order_by_desc(Column::CreatedAt)
             .offset(offset)
             .limit(limit)
             .all(&self.db)
@@ -76,10 +72,11 @@ impl LightningInvoiceRepository for LightningStore {
             description_hash: Set(invoice.description_hash),
             amount_msat: Set(invoice.amount_msat.map(|v| v as i64)),
             payment_secret: Set(invoice.payment_secret),
-            timestamp: Set(invoice.timestamp as i64),
-            expiry: Set(invoice.expiry as i64),
+            timestamp: Set(invoice.timestamp),
+            expiry: Set(invoice.expiry.as_secs() as i64),
             min_final_cltv_expiry_delta: Set(invoice.min_final_cltv_expiry_delta as i64),
             label: Set(invoice.label),
+            expires_at: Set(invoice.expires_at),
             ..Default::default()
         };
 
@@ -96,9 +93,10 @@ impl LightningInvoiceRepository for LightningStore {
         invoice: LightningInvoice,
     ) -> Result<LightningInvoice, DatabaseError> {
         let model = ActiveModel {
+            id: Set(invoice.id),
             payment_hash: Set(invoice.payment_hash),
             fee_msat: Set(invoice.fee_msat.map(|v| v as i64)),
-            payment_time: Set(invoice.payment_time.map(|v| v as i64)),
+            payment_time: Set(invoice.payment_time),
             ..Default::default()
         };
 
@@ -108,5 +106,24 @@ impl LightningInvoiceRepository for LightningStore {
             .map_err(|e| DatabaseError::Update(e.to_string()))?;
 
         Ok(model.into())
+    }
+
+    async fn delete_invoices(
+        &self,
+        user: Option<String>,
+        filter: LightningInvoiceDeleteFilter,
+    ) -> Result<u64, DatabaseError> {
+        let mut query = Entity::delete_many().apply_if(user, |q, v| q.filter(Column::UserId.eq(v)));
+
+        if let Some(true) = filter.expired {
+            query = query.filter(Expr::col(Column::ExpiresAt).lte(Expr::current_timestamp()));
+        }
+
+        let result = query
+            .exec(&self.db)
+            .await
+            .map_err(|e| DatabaseError::Delete(e.to_string()))?;
+
+        Ok(result.rows_affected)
     }
 }

@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use sea_orm::ActiveValue::Set;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, DatabaseTransaction, EntityTrait, QueryFilter, QueryOrder,
-    QuerySelect, Unchanged,
+    QuerySelect, QueryTrait, Unchanged,
 };
 use uuid::Uuid;
 
@@ -29,13 +29,9 @@ impl LightningPaymentRepository for LightningStore {
         limit: Option<u64>,
         offset: Option<u64>,
     ) -> Result<Vec<LightningPayment>, DatabaseError> {
-        let filter = match user {
-            Some(user_id) => Entity::find().filter(Column::UserId.eq(user_id)),
-            None => Entity::find(),
-        };
-
-        let models = filter
-            .order_by_asc(Column::CreatedAt)
+        let models = Entity::find()
+            .apply_if(user, |q, v| q.filter(Column::UserId.eq(v)))
+            .order_by_desc(Column::CreatedAt)
             .offset(offset)
             .limit(limit)
             .all(&self.db)

@@ -43,6 +43,8 @@ pub trait LightningInvoicesUseCases {
         limit: Option<u64>,
         offset: Option<u64>,
     ) -> Result<Vec<LightningInvoice>, ApplicationError>;
+
+    async fn delete_expired_invoices(&self, user: AuthUser) -> Result<u64, ApplicationError>;
 }
 
 #[async_trait]

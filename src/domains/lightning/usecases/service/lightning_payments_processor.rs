@@ -1,5 +1,6 @@
 use async_trait::async_trait;
 use breez_sdk_core::{Payment, PaymentDetails, PaymentFailedData, PaymentStatus, PaymentType};
+use chrono::{TimeZone, Utc};
 use tracing::{info, trace};
 use uuid::Uuid;
 
@@ -46,7 +47,7 @@ impl LightningPaymentsProcessorUseCases for LightningPaymentsProcessor {
 
         if let Some(mut invoice) = invoice_option {
             invoice.fee_msat = Some(payment.fee_msat);
-            invoice.payment_time = Some(payment.payment_time);
+            invoice.payment_time = Some(Utc.timestamp_opt(payment.payment_time, 0).unwrap());
             // This is needed because the amount_msat is not always the same as the invoice amount because of fees and fees are not part of the event
             // Until this is fixed: https://github.com/breez/breez-sdk/issues/982
             invoice.amount_msat = Some(payment.amount_msat);

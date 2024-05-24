@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use axum::{
     extract::{Path, Query, State},
-    routing::{get, post},
+    routing::{delete, get, post},
     Json, Router,
 };
 use uuid::Uuid;
@@ -32,6 +32,7 @@ impl LightningWalletHandler {
             .route("/invoices", get(Self::list_invoices))
             .route("/invoices/:id", get(Self::get_invoice))
             .route("/invoices", post(Self::new_invoice))
+            .route("/invoices", delete(Self::delete_expired_invoices))
     }
 
     async fn pay(
@@ -136,5 +137,13 @@ impl LightningWalletHandler {
         let payment = app_state.lightning.get_invoice(user, id).await?;
 
         Ok(Json(payment.into()))
+    }
+
+    async fn delete_expired_invoices(
+        State(app_state): State<Arc<AppState>>,
+        user: AuthUser,
+    ) -> Result<Json<u64>, ApplicationError> {
+        let n_deleted = app_state.lightning.delete_expired_invoices(user).await?;
+        Ok(n_deleted.into())
     }
 }

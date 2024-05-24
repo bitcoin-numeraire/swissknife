@@ -14,9 +14,9 @@ pub struct Model {
     #[sea_orm(unique)]
     pub username: String,
     pub active: bool,
-    pub created_at: DateTimeWithTimeZone,
-    pub updated_at: Option<DateTimeWithTimeZone>,
-    pub deleted_at: Option<DateTimeWithTimeZone>,
+    pub created_at: DateTimeUtc,
+    pub updated_at: Option<DateTimeUtc>,
+    pub deleted_at: Option<DateTimeUtc>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
