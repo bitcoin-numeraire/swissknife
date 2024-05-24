@@ -19,9 +19,9 @@ use crate::{
     infra::app::AppState,
 };
 
-pub struct LightningWalletHandler;
+pub struct WalletHandler;
 
-impl LightningWalletHandler {
+impl WalletHandler {
     pub fn routes() -> Router<Arc<AppState>> {
         Router::new()
             .route("/pay", post(Self::pay))
@@ -52,7 +52,7 @@ impl LightningWalletHandler {
         State(app_state): State<Arc<AppState>>,
         user: AuthUser,
     ) -> Result<Json<UserBalance>, ApplicationError> {
-        let balance = app_state.lightning.get_balance(user).await?;
+        let balance = app_state.wallet.get_balance(user).await?;
 
         Ok(balance.into())
     }

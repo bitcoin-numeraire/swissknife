@@ -9,22 +9,22 @@ use crate::{
     domains::lightning::{
         adapters::LightningRepository,
         entities::{LightningInvoice, LightningPayment, LightningPaymentStatus},
-        usecases::LightningPaymentsProcessorUseCases,
+        usecases::BreezPaymentsProcessorUseCases,
     },
 };
 
-pub struct LightningPaymentsProcessor {
+pub struct BreezPaymentsProcessor {
     pub store: Box<dyn LightningRepository>,
 }
 
-impl LightningPaymentsProcessor {
+impl BreezPaymentsProcessor {
     pub fn new(store: Box<dyn LightningRepository>) -> Self {
-        LightningPaymentsProcessor { store }
+        BreezPaymentsProcessor { store }
     }
 }
 
 #[async_trait]
-impl LightningPaymentsProcessorUseCases for LightningPaymentsProcessor {
+impl BreezPaymentsProcessorUseCases for BreezPaymentsProcessor {
     async fn process_incoming_payment(
         &self,
         payment: Payment,

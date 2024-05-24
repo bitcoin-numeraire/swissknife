@@ -9,10 +9,10 @@ use crate::{
     },
 };
 
-use super::LightningService;
+use super::WalletService;
 
 #[async_trait]
-impl WalletUseCases for LightningService {
+impl WalletUseCases for WalletService {
     async fn get_balance(&self, user: AuthUser) -> Result<UserBalance, ApplicationError> {
         trace!(user_id = user.sub, "Fetching balance");
 

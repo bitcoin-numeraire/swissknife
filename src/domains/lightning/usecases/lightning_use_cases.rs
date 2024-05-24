@@ -9,17 +9,11 @@ use crate::{
     application::errors::ApplicationError,
     domains::{
         lightning::entities::{
-            LNURLPayRequest, LightningAddress, LightningInvoice, LightningPayment, UserBalance,
+            LNURLPayRequest, LightningAddress, LightningInvoice, LightningPayment,
         },
         users::entities::AuthUser,
     },
 };
-
-// TODO: This trait is not necessarily linked to Lighting, move to a better domain once other use cases arise.
-#[async_trait]
-pub trait WalletUseCases {
-    async fn get_balance(&self, user: AuthUser) -> Result<UserBalance, ApplicationError>;
-}
 
 #[async_trait]
 pub trait LightningInvoicesUseCases {
@@ -128,7 +122,7 @@ pub trait LightningNodeUseCases {
 }
 
 #[async_trait]
-pub trait LightningPaymentsProcessorUseCases: Send + Sync {
+pub trait BreezPaymentsProcessorUseCases: Send + Sync {
     async fn process_incoming_payment(
         &self,
         payment: Payment,
@@ -144,8 +138,7 @@ pub trait LightningPaymentsProcessorUseCases: Send + Sync {
 }
 
 pub trait LightningUseCases:
-    WalletUseCases
-    + LightningPaymentsUseCases
+    LightningPaymentsUseCases
     + LightningInvoicesUseCases
     + LightningAddressesUseCases
     + LightningNodeUseCases
@@ -156,8 +149,7 @@ pub trait LightningUseCases:
 
 // Ensure that any type that implements the individual traits also implements the new trait.
 impl<T> LightningUseCases for T where
-    T: WalletUseCases
-        + LightningPaymentsUseCases
+    T: LightningPaymentsUseCases
         + LightningInvoicesUseCases
         + LightningAddressesUseCases
         + LightningNodeUseCases
