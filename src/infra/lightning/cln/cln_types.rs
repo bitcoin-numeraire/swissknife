@@ -27,6 +27,12 @@ impl Into<LightningInvoice> for InvoiceResponse {
                 )
                 .unwrap(),
             expiry: invoice.expiry_time(),
+            expires_at: Utc
+                .timestamp_opt(
+                    invoice.duration_until_expiry().as_secs() as i64,
+                    invoice.duration_until_expiry().subsec_nanos(),
+                )
+                .unwrap(),
             network: invoice.network().to_string(),
             payee_pubkey,
             description: match invoice.description() {

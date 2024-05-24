@@ -33,6 +33,7 @@ pub struct Model {
     pub label: Option<Uuid>,
     pub created_at: DateTimeUtc,
     pub updated_at: Option<DateTimeUtc>,
+    pub expires_at: DateTimeUtc,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
@@ -59,7 +60,7 @@ impl From<Model> for LightningInvoice {
     fn from(model: Model) -> Self {
         let status = if model.payment_time.is_some() {
             LightningInvoiceStatus::SETTLED
-        } else if model.timestamp + Duration::from_secs(model.expiry as u64) < Utc::now() {
+        } else if Utc::now() > model.expires_at {
             LightningInvoiceStatus::EXPIRED
         } else {
             LightningInvoiceStatus::PENDING
@@ -86,6 +87,7 @@ impl From<Model> for LightningInvoice {
             label: model.label,
             created_at: model.created_at,
             updated_at: model.updated_at,
+            expires_at: model.expires_at,
         }
     }
 }

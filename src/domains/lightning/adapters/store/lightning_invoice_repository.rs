@@ -9,7 +9,7 @@ use crate::{
     },
 };
 use async_trait::async_trait;
-use sea_orm::{sea_query::Expr, ActiveValue::Set, ConnectionTrait, QueryTrait};
+use sea_orm::{sea_query::Expr, ActiveValue::Set, QueryTrait};
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect};
 use uuid::Uuid;
 
@@ -76,6 +76,7 @@ impl LightningInvoiceRepository for LightningStore {
             expiry: Set(invoice.expiry.as_secs() as i64),
             min_final_cltv_expiry_delta: Set(invoice.min_final_cltv_expiry_delta as i64),
             label: Set(invoice.label),
+            expires_at: Set(invoice.expires_at),
             ..Default::default()
         };
 
@@ -115,13 +116,8 @@ impl LightningInvoiceRepository for LightningStore {
         let mut query = Entity::delete_many().apply_if(user, |q, v| q.filter(Column::UserId.eq(v)));
 
         if let Some(true) = filter.expired {
-            query = query.filter(Expr::cust("timestamp + expiry >= CURRENT_TIMESTAMP"))
+            query = query.filter(Expr::col(Column::ExpiresAt).lte(Expr::current_timestamp()));
         }
-
-        println!(
-            "{}",
-            query.build(self.db.get_database_backend()).to_string()
-        );
 
         let result = query
             .exec(&self.db)

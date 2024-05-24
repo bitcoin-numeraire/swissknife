@@ -19,6 +19,9 @@ impl Into<LightningInvoice> for LNInvoice {
             min_final_cltv_expiry_delta: self.min_final_cltv_expiry_delta,
             timestamp: Utc.timestamp_opt(self.timestamp as i64, 0).unwrap(),
             expiry: Duration::from_secs(self.expiry),
+            expires_at: Utc
+                .timestamp_opt((self.timestamp + self.expiry) as i64, 0)
+                .unwrap(),
             ..Default::default()
         }
     }

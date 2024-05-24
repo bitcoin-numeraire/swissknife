@@ -101,6 +101,7 @@ pub struct LightningInvoiceResponse {
     pub created_at: DateTime<Utc>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub updated_at: Option<DateTime<Utc>>,
+    pub expires_at: DateTime<Utc>,
 }
 
 impl From<LightningInvoice> for LightningInvoiceResponse {
@@ -124,6 +125,7 @@ impl From<LightningInvoice> for LightningInvoiceResponse {
             label: invoice.label,
             created_at: invoice.created_at,
             updated_at: invoice.updated_at,
+            expires_at: invoice.expires_at,
         }
     }
 }
