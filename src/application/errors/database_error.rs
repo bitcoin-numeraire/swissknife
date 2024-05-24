@@ -23,6 +23,9 @@ pub enum DatabaseError {
     #[error("Failed to update resource: {0}")]
     Update(String),
 
+    #[error("Failed to delete resource: {0}")]
+    Delete(String),
+
     #[error("Failed to perform transaction operation: {0}")]
     Transaction(String),
 }

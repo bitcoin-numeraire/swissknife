@@ -33,3 +33,7 @@ pub enum LightningInvoiceStatus {
     SETTLED,
     EXPIRED,
 }
+
+pub struct LightningInvoiceDeleteFilter {
+    pub expired: Option<bool>,
+}

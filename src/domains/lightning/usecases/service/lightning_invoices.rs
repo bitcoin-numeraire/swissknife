@@ -5,7 +5,10 @@ use uuid::Uuid;
 use crate::{
     application::errors::{ApplicationError, DataError},
     domains::{
-        lightning::{entities::LightningInvoice, usecases::LightningInvoicesUseCases},
+        lightning::{
+            entities::{LightningInvoice, LightningInvoiceDeleteFilter},
+            usecases::LightningInvoicesUseCases,
+        },
         users::entities::{AuthUser, Permission},
     },
 };
@@ -93,15 +96,36 @@ impl LightningInvoicesUseCases for LightningService {
 
         let lightning_invoices = if user.has_permission(Permission::ReadLightningAccounts) {
             // The user has permission to view all addresses
-            self.store.find_all_invoices(None, limit, offset).await?
+            self.store.find_invoices(None, limit, offset).await?
         } else {
             // The user can only view their own payments
             self.store
-                .find_all_invoices(Some(user.sub.clone()), limit, offset)
+                .find_invoices(Some(user.sub.clone()), limit, offset)
                 .await?
         };
 
         debug!(user_id = user.sub, "Lightning invoices listed successfully");
         Ok(lightning_invoices)
+    }
+
+    async fn delete_expired_invoices(&self, user: AuthUser) -> Result<u64, ApplicationError> {
+        trace!(user_id = user.sub, "Deleting expired lightning invoices");
+
+        let n_deleted = self
+            .store
+            .delete_invoices(
+                Some(user.sub.clone()),
+                LightningInvoiceDeleteFilter {
+                    expired: Some(true),
+                },
+            )
+            .await?;
+
+        info!(
+            user_id = user.sub,
+            n_deleted, "Expired lightning invoices deleted successfully"
+        );
+
+        Ok(n_deleted)
     }
 }
