@@ -5,7 +5,7 @@ use crate::{
             models::lightning_invoice::{ActiveModel, Column, Entity},
             repository::LightningInvoiceRepository,
         },
-        entities::{LightningInvoice, LightningInvoiceDeleteFilter},
+        entities::{LightningInvoice, LightningInvoiceFilter, LightningInvoiceStatus},
     },
 };
 use async_trait::async_trait;
@@ -41,15 +41,25 @@ impl LightningInvoiceRepository for LightningStore {
 
     async fn find_invoices(
         &self,
-        user: Option<String>,
-        limit: Option<u64>,
-        offset: Option<u64>,
+        filter: LightningInvoiceFilter,
     ) -> Result<Vec<LightningInvoice>, DatabaseError> {
         let models = Entity::find()
-            .apply_if(user, |q, v| q.filter(Column::UserId.eq(v)))
+            .apply_if(filter.user_id, |q, user| q.filter(Column::UserId.eq(user)))
+            .apply_if(filter.id, |q, id| q.filter(Column::Id.eq(id)))
+            .apply_if(filter.status, |q, s| match s {
+                LightningInvoiceStatus::PENDING => {
+                    q.filter(Expr::col(Column::ExpiresAt).gt(Expr::current_timestamp()))
+                }
+                LightningInvoiceStatus::SETTLED => {
+                    q.filter(Expr::col(Column::PaymentTime).is_not_null())
+                }
+                LightningInvoiceStatus::EXPIRED => {
+                    q.filter(Expr::col(Column::ExpiresAt).lte(Expr::current_timestamp()))
+                }
+            })
             .order_by_desc(Column::CreatedAt)
-            .offset(offset)
-            .limit(limit)
+            .offset(filter.offset)
+            .limit(filter.limit)
             .all(&self.db)
             .await
             .map_err(|e| DatabaseError::FindAll(e.to_string()))?;
@@ -109,18 +119,20 @@ impl LightningInvoiceRepository for LightningStore {
         Ok(model.into())
     }
 
-    async fn delete_invoices(
-        &self,
-        user: Option<String>,
-        filter: LightningInvoiceDeleteFilter,
-    ) -> Result<u64, DatabaseError> {
-        let mut query = Entity::delete_many().apply_if(user, |q, v| q.filter(Column::UserId.eq(v)));
-
-        if let Some(true) = filter.expired {
-            query = query.filter(Expr::col(Column::ExpiresAt).lte(Expr::current_timestamp()));
-        }
-
-        let result = query
+    async fn delete_invoices(&self, filter: LightningInvoiceFilter) -> Result<u64, DatabaseError> {
+        let result = Entity::delete_many()
+            .apply_if(filter.user_id, |q, user| q.filter(Column::UserId.eq(user)))
+            .apply_if(filter.status, |q, s| match s {
+                LightningInvoiceStatus::PENDING => {
+                    q.filter(Expr::col(Column::ExpiresAt).gt(Expr::current_timestamp()))
+                }
+                LightningInvoiceStatus::SETTLED => {
+                    q.filter(Expr::col(Column::PaymentTime).is_not_null())
+                }
+                LightningInvoiceStatus::EXPIRED => {
+                    q.filter(Expr::col(Column::ExpiresAt).lte(Expr::current_timestamp()))
+                }
+            })
             .exec(&self.db)
             .await
             .map_err(|e| DatabaseError::Delete(e.to_string()))?;

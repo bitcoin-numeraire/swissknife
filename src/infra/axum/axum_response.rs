@@ -105,10 +105,6 @@ impl IntoResponse for DataError {
                 warn!("{}", self);
                 (self.to_string(), StatusCode::UNPROCESSABLE_ENTITY)
             }
-            DataError::RequestValidation(_) => {
-                debug!("{}", self);
-                (self.to_string(), StatusCode::BAD_REQUEST)
-            }
         };
 
         let body = generate_body(status, error_message.as_str());

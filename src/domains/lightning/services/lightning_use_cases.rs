@@ -8,7 +8,8 @@ use crate::{
     application::errors::ApplicationError,
     domains::{
         lightning::entities::{
-            LNURLPayRequest, LightningAddress, LightningInvoice, LightningPayment,
+            LNURLPayRequest, LightningAddress, LightningInvoice, LightningInvoiceFilter,
+            LightningPayment,
         },
         users::entities::AuthUser,
     },
@@ -35,8 +36,8 @@ pub trait LightningInvoicesUseCases {
         user: AuthUser,
         limit: Option<u64>,
         offset: Option<u64>,
+        filter: LightningInvoiceFilter,
     ) -> Result<Vec<LightningInvoice>, ApplicationError>;
-
     async fn delete_expired_invoices(&self, user: AuthUser) -> Result<u64, ApplicationError>;
 }
 
@@ -77,13 +78,14 @@ pub trait LightningAddressesUseCases {
     async fn register_address(
         &self,
         user: AuthUser,
+        user_id: String,
         username: String,
     ) -> Result<LightningAddress, ApplicationError>;
 
     async fn get_address(
         &self,
         user: AuthUser,
-        username: String,
+        id: Uuid,
     ) -> Result<LightningAddress, ApplicationError>;
 
     async fn list_addresses(

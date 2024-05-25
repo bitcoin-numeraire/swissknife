@@ -206,7 +206,7 @@ impl LightningPaymentsUseCases for LightningService {
             .ok_or_else(|| DataError::NotFound("Lightning payment not found.".to_string()))?;
 
         if lightning_payment.user_id != user.sub {
-            user.check_permission(Permission::ReadLightningAccounts)?;
+            user.check_permission(Permission::ReadLightning)?;
         }
 
         debug!(
@@ -230,7 +230,7 @@ impl LightningPaymentsUseCases for LightningService {
             "Listing lightning payments"
         );
 
-        let lightning_payments = if user.has_permission(Permission::ReadLightningAccounts) {
+        let lightning_payments = if user.has_permission(Permission::ReadLightning) {
             // The user has permission to view all addresses
             self.store.find_all_payments(None, limit, offset).await?
         } else {

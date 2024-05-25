@@ -1,22 +1,25 @@
 use async_trait::async_trait;
 use sea_orm::ActiveValue::Set;
-use sea_orm::{
-    ActiveModelTrait, ColumnTrait, ConnectionTrait, DatabaseTransaction, EntityTrait,
-    FromQueryResult, QueryFilter, QueryOrder, QuerySelect, QueryTrait, Statement,
-};
+use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect};
+use uuid::Uuid;
 
 use crate::domains::lightning::adapters::models::lightning_address::{ActiveModel, Column, Entity};
-use crate::domains::lightning::adapters::models::user_balance::UserBalanceModel;
 use crate::domains::lightning::adapters::repository::LightningAddressRepository;
-use crate::{
-    application::errors::DatabaseError,
-    domains::lightning::entities::{LightningAddress, UserBalance},
-};
+use crate::{application::errors::DatabaseError, domains::lightning::entities::LightningAddress};
 
 use super::LightningStore;
 
 #[async_trait]
 impl LightningAddressRepository for LightningStore {
+    async fn find_address(&self, id: Uuid) -> Result<Option<LightningAddress>, DatabaseError> {
+        let model = Entity::find_by_id(id)
+            .one(&self.db)
+            .await
+            .map_err(|e| DatabaseError::Find(e.to_string()))?;
+
+        Ok(model.map(Into::into))
+    }
+
     async fn find_address_by_user_id(
         &self,
         user_id: &str,
@@ -43,14 +46,12 @@ impl LightningAddressRepository for LightningStore {
         Ok(model.map(Into::into))
     }
 
-    async fn find_all_addresses(
+    async fn find_addresses(
         &self,
-        user: Option<String>,
         limit: Option<u64>,
         offset: Option<u64>,
     ) -> Result<Vec<LightningAddress>, DatabaseError> {
         let models = Entity::find()
-            .apply_if(user, |q, v| q.filter(Column::UserId.eq(v)))
             .order_by_desc(Column::CreatedAt)
             .offset(offset)
             .limit(limit)
@@ -78,47 +79,5 @@ impl LightningAddressRepository for LightningStore {
             .map_err(|e| DatabaseError::Insert(e.to_string()))?;
 
         Ok(model.into())
-    }
-
-    async fn get_balance(
-        &self,
-        txn: Option<&DatabaseTransaction>,
-        user: &str,
-    ) -> Result<UserBalance, DatabaseError> {
-        let query = UserBalanceModel::find_by_statement(Statement::from_sql_and_values(
-            self.db.get_database_backend(),
-            r#"
-            WITH sent AS (
-                SELECT
-                    SUM(amount_msat) FILTER (WHERE status IN ('SETTLED', 'PENDING')) AS sent_msat,
-                    SUM(COALESCE(fee_msat, 0)) FILTER (WHERE status = 'SETTLED') AS fees_paid_msat
-                FROM lightning_payment
-                WHERE user_id = $1
-            ),
-            received AS (
-                SELECT SUM(amount_msat) AS received_msat
-                FROM lightning_invoice
-                WHERE user_id = $1 AND payment_time IS NOT NULL
-            )
-            SELECT
-                COALESCE(received.received_msat, 0)::BIGINT AS received_msat,
-                COALESCE(sent.sent_msat, 0)::BIGINT AS sent_msat,
-                COALESCE(sent.fees_paid_msat, 0)::BIGINT AS fees_paid_msat
-            FROM received, sent;
-            "#,
-            [user.into()],
-        ));
-
-        let result = match txn {
-            Some(txn) => query.one(txn).await,
-            None => query.one(&self.db).await,
-        };
-
-        let result = result.map_err(|e| DatabaseError::FindByStatement(e.to_string()))?;
-
-        match result {
-            Some(model) => Ok(model.into()),
-            None => Ok(UserBalance::default()),
-        }
     }
 }

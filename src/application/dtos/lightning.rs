@@ -35,6 +35,7 @@ pub struct RedeemOnchainRequest {
 
 #[derive(Debug, Deserialize)]
 pub struct RegisterLightningAddressRequest {
+    pub user_id: String,
     pub username: String,
 }
 

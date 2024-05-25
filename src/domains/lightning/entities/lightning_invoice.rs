@@ -37,6 +37,11 @@ pub enum LightningInvoiceStatus {
     EXPIRED,
 }
 
-pub struct LightningInvoiceDeleteFilter {
-    pub expired: Option<bool>,
+#[derive(Clone, Debug, Default)]
+pub struct LightningInvoiceFilter {
+    pub user_id: Option<String>,
+    pub status: Option<LightningInvoiceStatus>,
+    pub limit: Option<u64>,
+    pub offset: Option<u64>,
+    pub id: Option<Uuid>,
 }

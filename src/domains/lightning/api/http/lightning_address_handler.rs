@@ -5,18 +5,16 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
+use uuid::Uuid;
 
 use crate::{
     application::{
         dtos::{LightningAddressResponse, PaginationQueryParams, RegisterLightningAddressRequest},
-        errors::{ApplicationError, DataError},
+        errors::ApplicationError,
     },
     domains::users::entities::AuthUser,
     infra::app::AppState,
 };
-
-const MIN_USERNAME_LENGTH: usize = 1;
-const MAX_USERNAME_LENGTH: usize = 64;
 
 pub struct LightningAddressHandler;
 
@@ -25,7 +23,7 @@ impl LightningAddressHandler {
         Router::new()
             .route("/", get(Self::list))
             .route("/", post(Self::register))
-            .route("/:username", get(Self::get))
+            .route("/:id", get(Self::get))
     }
 
     async fn register(
@@ -33,28 +31,19 @@ impl LightningAddressHandler {
         user: AuthUser,
         Json(payload): Json<RegisterLightningAddressRequest>,
     ) -> Result<Json<LightningAddressResponse>, ApplicationError> {
-        let username_length = payload.username.len();
-        if username_length < MIN_USERNAME_LENGTH || username_length > MAX_USERNAME_LENGTH {
-            return Err(
-                DataError::RequestValidation("Invalid username length.".to_string()).into(),
-            );
-        }
-
         let lightning_address = app_state
             .lightning
-            .register_address(user, payload.username)
+            .register_address(user, payload.user_id, payload.username)
             .await?;
-
         Ok(Json(lightning_address.into()))
     }
 
     async fn get(
         State(app_state): State<Arc<AppState>>,
         user: AuthUser,
-        Path(username): Path<String>,
+        Path(id): Path<Uuid>,
     ) -> Result<Json<LightningAddressResponse>, ApplicationError> {
-        let lightning_address = app_state.lightning.get_address(user, username).await?;
-
+        let lightning_address = app_state.lightning.get_address(user, id).await?;
         Ok(Json(lightning_address.into()))
     }
 
