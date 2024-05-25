@@ -5,11 +5,13 @@ use breez_sdk_core::{
 use uuid::Uuid;
 
 use crate::{
-    application::errors::ApplicationError,
+    application::{
+        dtos::{LightningAddressFilter, LightningInvoiceFilter},
+        errors::ApplicationError,
+    },
     domains::{
         lightning::entities::{
-            LNURLPayRequest, LightningAddress, LightningInvoice, LightningInvoiceFilter,
-            LightningPayment,
+            LNURLPayRequest, LightningAddress, LightningInvoice, LightningPayment,
         },
         users::entities::AuthUser,
     },
@@ -77,22 +79,17 @@ pub trait LightningAddressesUseCases {
 
     async fn register_address(
         &self,
-        user: AuthUser,
         user_id: String,
         username: String,
     ) -> Result<LightningAddress, ApplicationError>;
-
-    async fn get_address(
+    async fn get_address(&self, id: Uuid) -> Result<LightningAddress, ApplicationError>;
+    async fn get_address_by_user_id(
         &self,
-        user: AuthUser,
-        id: Uuid,
+        user_id: String,
     ) -> Result<LightningAddress, ApplicationError>;
-
     async fn list_addresses(
         &self,
-        user: AuthUser,
-        limit: Option<u64>,
-        offset: Option<u64>,
+        filter: LightningAddressFilter,
     ) -> Result<Vec<LightningAddress>, ApplicationError>;
 }
 

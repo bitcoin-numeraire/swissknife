@@ -18,7 +18,7 @@ impl LightningPaymentRepository for LightningStore {
         let model = Entity::find_by_id(id)
             .one(&self.db)
             .await
-            .map_err(|e| DatabaseError::Find(e.to_string()))?;
+            .map_err(|e| DatabaseError::FindOne(e.to_string()))?;
 
         Ok(model.map(Into::into))
     }
@@ -36,7 +36,7 @@ impl LightningPaymentRepository for LightningStore {
             .limit(limit)
             .all(&self.db)
             .await
-            .map_err(|e| DatabaseError::FindAll(e.to_string()))?;
+            .map_err(|e| DatabaseError::FindMany(e.to_string()))?;
 
         Ok(models.into_iter().map(Into::into).collect())
     }

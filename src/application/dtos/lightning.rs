@@ -3,7 +3,10 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use uuid::Uuid;
 
-use crate::domains::lightning::entities::{LightningAddress, LightningInvoice, LightningPayment};
+use crate::domains::lightning::entities::{
+    LightningAddress, LightningInvoice, LightningInvoiceStatus, LightningPayment,
+    LightningPaymentStatus,
+};
 
 #[derive(Debug, Deserialize)]
 pub struct NewInvoiceRequest {
@@ -96,7 +99,7 @@ pub struct LightningInvoiceResponse {
     pub fee_msat: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub payment_time: Option<DateTime<Utc>>,
-    pub status: String,
+    pub status: LightningInvoiceStatus,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub label: Option<Uuid>,
     pub created_at: DateTime<Utc>,
@@ -122,7 +125,7 @@ impl From<LightningInvoice> for LightningInvoiceResponse {
             min_final_cltv_expiry_delta: invoice.min_final_cltv_expiry_delta,
             fee_msat: invoice.fee_msat,
             payment_time: invoice.payment_time,
-            status: invoice.status.to_string(),
+            status: invoice.status,
             label: invoice.label,
             created_at: invoice.created_at,
             updated_at: invoice.updated_at,
@@ -144,7 +147,7 @@ pub struct LightningPaymentResponse {
     pub fee_msat: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub payment_time: Option<DateTime<Utc>>,
-    pub status: String,
+    pub status: LightningPaymentStatus,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -166,7 +169,7 @@ impl From<LightningPayment> for LightningPaymentResponse {
             amount_msat: payment.amount_msat,
             fee_msat: payment.fee_msat,
             payment_time: payment.payment_time,
-            status: payment.status.to_string(),
+            status: payment.status,
             description: payment.description,
             metadata: payment.metadata,
             success_action: payment.success_action,
@@ -174,4 +177,22 @@ impl From<LightningPayment> for LightningPaymentResponse {
             updated_at: payment.updated_at,
         }
     }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct LightningInvoiceFilter {
+    pub user_id: Option<String>,
+    pub status: Option<LightningInvoiceStatus>,
+    pub limit: Option<u64>,
+    pub offset: Option<u64>,
+    pub id: Option<Uuid>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct LightningAddressFilter {
+    pub username: Option<String>,
+    pub user_id: Option<String>,
+    pub limit: Option<u64>,
+    pub offset: Option<u64>,
+    pub id: Option<Uuid>,
 }

@@ -1,4 +1,5 @@
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use strum_macros::{Display, EnumString};
 use uuid::Uuid;
@@ -21,7 +22,7 @@ pub struct LightningPayment {
     pub updated_at: Option<DateTime<Utc>>,
 }
 
-#[derive(Clone, Debug, EnumString, Display, PartialEq, Eq, Default)]
+#[derive(Clone, Debug, EnumString, Display, Deserialize, Serialize, PartialEq, Eq, Default)]
 pub enum LightningPaymentStatus {
     #[default]
     PENDING,

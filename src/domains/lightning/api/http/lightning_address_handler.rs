@@ -9,10 +9,10 @@ use uuid::Uuid;
 
 use crate::{
     application::{
-        dtos::{LightningAddressResponse, PaginationQueryParams, RegisterLightningAddressRequest},
+        dtos::{LightningAddressFilter, LightningAddressResponse, RegisterLightningAddressRequest},
         errors::ApplicationError,
     },
-    domains::users::entities::AuthUser,
+    domains::users::entities::{AuthUser, Permission},
     infra::app::AppState,
 };
 
@@ -31,9 +31,11 @@ impl LightningAddressHandler {
         user: AuthUser,
         Json(payload): Json<RegisterLightningAddressRequest>,
     ) -> Result<Json<LightningAddressResponse>, ApplicationError> {
+        user.check_permission(Permission::WriteLightningAddress)?;
+
         let lightning_address = app_state
             .lightning
-            .register_address(user, payload.user_id, payload.username)
+            .register_address(payload.user_id, payload.username)
             .await?;
         Ok(Json(lightning_address.into()))
     }
@@ -43,19 +45,20 @@ impl LightningAddressHandler {
         user: AuthUser,
         Path(id): Path<Uuid>,
     ) -> Result<Json<LightningAddressResponse>, ApplicationError> {
-        let lightning_address = app_state.lightning.get_address(user, id).await?;
+        user.check_permission(Permission::ReadLightningAddress)?;
+
+        let lightning_address = app_state.lightning.get_address(id).await?;
         Ok(Json(lightning_address.into()))
     }
 
     async fn list(
         State(app_state): State<Arc<AppState>>,
         user: AuthUser,
-        Query(query_params): Query<PaginationQueryParams>,
+        Query(query_params): Query<LightningAddressFilter>,
     ) -> Result<Json<Vec<LightningAddressResponse>>, ApplicationError> {
-        let lightning_addresses = app_state
-            .lightning
-            .list_addresses(user, query_params.limit, query_params.offset)
-            .await?;
+        user.check_permission(Permission::ReadLightningAddress)?;
+
+        let lightning_addresses = app_state.lightning.list_addresses(query_params).await?;
 
         let response: Vec<LightningAddressResponse> =
             lightning_addresses.into_iter().map(Into::into).collect();

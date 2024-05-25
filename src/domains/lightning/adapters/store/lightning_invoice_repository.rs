@@ -1,11 +1,11 @@
 use crate::{
-    application::errors::DatabaseError,
+    application::{dtos::LightningInvoiceFilter, errors::DatabaseError},
     domains::lightning::{
         adapters::{
             models::lightning_invoice::{ActiveModel, Column, Entity},
             repository::LightningInvoiceRepository,
         },
-        entities::{LightningInvoice, LightningInvoiceFilter, LightningInvoiceStatus},
+        entities::{LightningInvoice, LightningInvoiceStatus},
     },
 };
 use async_trait::async_trait;
@@ -21,7 +21,7 @@ impl LightningInvoiceRepository for LightningStore {
         let model = Entity::find_by_id(id)
             .one(&self.db)
             .await
-            .map_err(|e| DatabaseError::Find(e.to_string()))?;
+            .map_err(|e| DatabaseError::FindOne(e.to_string()))?;
 
         Ok(model.map(Into::into))
     }
@@ -34,7 +34,7 @@ impl LightningInvoiceRepository for LightningStore {
             .filter(Column::PaymentHash.eq(payment_hash))
             .one(&self.db)
             .await
-            .map_err(|e| DatabaseError::Find(e.to_string()))?;
+            .map_err(|e| DatabaseError::FindOne(e.to_string()))?;
 
         Ok(model.map(Into::into))
     }
@@ -62,7 +62,7 @@ impl LightningInvoiceRepository for LightningStore {
             .limit(filter.limit)
             .all(&self.db)
             .await
-            .map_err(|e| DatabaseError::FindAll(e.to_string()))?;
+            .map_err(|e| DatabaseError::FindMany(e.to_string()))?;
 
         Ok(models.into_iter().map(Into::into).collect())
     }
@@ -122,7 +122,8 @@ impl LightningInvoiceRepository for LightningStore {
     async fn delete_invoices(&self, filter: LightningInvoiceFilter) -> Result<u64, DatabaseError> {
         let result = Entity::delete_many()
             .apply_if(filter.user_id, |q, user| q.filter(Column::UserId.eq(user)))
-            .apply_if(filter.status, |q, s| match s {
+            .apply_if(filter.id, |q, id| q.filter(Column::Id.eq(id)))
+            .apply_if(filter.status, |q, status| match status {
                 LightningInvoiceStatus::PENDING => {
                     q.filter(Expr::col(Column::ExpiresAt).gt(Expr::current_timestamp()))
                 }

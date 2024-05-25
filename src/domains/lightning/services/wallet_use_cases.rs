@@ -4,7 +4,7 @@ use uuid::Uuid;
 use crate::{
     application::errors::ApplicationError,
     domains::{
-        lightning::entities::{LightningAddress, LightningInvoice, UserBalance},
+        lightning::entities::{LightningInvoice, UserBalance},
         users::entities::AuthUser,
     },
 };
@@ -12,15 +12,6 @@ use crate::{
 #[async_trait]
 pub trait WalletUseCases: Send + Sync {
     async fn get_balance(&self, user: AuthUser) -> Result<UserBalance, ApplicationError>;
-    async fn get_lightning_address(
-        &self,
-        user: AuthUser,
-    ) -> Result<LightningAddress, ApplicationError>;
-    async fn register_lightning_address(
-        &self,
-        user: AuthUser,
-        username: String,
-    ) -> Result<LightningAddress, ApplicationError>;
     async fn generate_Lightning_invoice(
         &self,
         user: AuthUser,

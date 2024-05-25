@@ -4,13 +4,13 @@ use tracing::{debug, info, trace};
 use uuid::Uuid;
 
 use crate::{
-    application::errors::{ApplicationError, DataError},
-    domains::{
-        lightning::{
-            entities::{LNURLPayRequest, LightningAddress, LightningInvoice},
-            services::LightningAddressesUseCases,
-        },
-        users::entities::{AuthUser, Permission},
+    application::{
+        dtos::LightningAddressFilter,
+        errors::{ApplicationError, DataError},
+    },
+    domains::lightning::{
+        entities::{LNURLPayRequest, LightningAddress, LightningInvoice},
+        services::LightningAddressesUseCases,
     },
 };
 
@@ -69,16 +69,10 @@ impl LightningAddressesUseCases for LightningService {
 
     async fn register_address(
         &self,
-        user: AuthUser,
         user_id: String,
         username: String,
     ) -> Result<LightningAddress, ApplicationError> {
-        debug!(
-            user = user.sub,
-            user_id, username, "Registering lightning address"
-        );
-
-        user.check_permission(Permission::WriteLightningAddress)?;
+        debug!(user_id, username, "Registering lightning address");
 
         if username.len() < MIN_USERNAME_LENGTH || username.len() > MAX_USERNAME_LENGTH {
             return Err(DataError::Validation("Invalid username length.".to_string()).into());
@@ -111,20 +105,14 @@ impl LightningAddressesUseCases for LightningService {
         let lightning_address = self.store.insert_address(&user_id, &username).await?;
 
         info!(
-            user = user.sub,
-            user_id, username, "Lightning address registered successfully"
+            user_id,
+            username, "Lightning address registered successfully"
         );
         Ok(lightning_address)
     }
 
-    async fn get_address(
-        &self,
-        user: AuthUser,
-        id: Uuid,
-    ) -> Result<LightningAddress, ApplicationError> {
-        trace!(user_id = user.sub, %id, "Fetching lightning address");
-
-        user.check_permission(Permission::ReadLightningAddress)?;
+    async fn get_address(&self, id: Uuid) -> Result<LightningAddress, ApplicationError> {
+        trace!(%id, "Fetching lightning address");
 
         let lightning_address = self
             .store
@@ -133,33 +121,36 @@ impl LightningAddressesUseCases for LightningService {
             .ok_or_else(|| DataError::NotFound("Lightning address not found.".to_string()))?;
 
         debug!(
-            user_id = user.sub,
             %id, "Lightning address fetched successfully"
         );
         Ok(lightning_address)
     }
 
+    async fn get_address_by_user_id(
+        &self,
+        user_id: String,
+    ) -> Result<LightningAddress, ApplicationError> {
+        trace!(%user_id, "Fetching lightning address");
+
+        let lightning_address = self
+            .store
+            .find_address_by_user_id(&user_id)
+            .await?
+            .ok_or_else(|| DataError::NotFound("Lightning address not found.".to_string()))?;
+
+        debug!(%user_id, "Lightning address fetched successfully");
+        Ok(lightning_address)
+    }
+
     async fn list_addresses(
         &self,
-        user: AuthUser,
-        limit: Option<u64>,
-        offset: Option<u64>,
+        filter: LightningAddressFilter,
     ) -> Result<Vec<LightningAddress>, ApplicationError> {
-        trace!(
-            user_id = user.sub,
-            limit,
-            offset,
-            "Listing lightning addresses"
-        );
+        trace!(?filter, "Listing lightning addresses");
 
-        user.check_permission(Permission::ReadLightningAddress)?;
+        let lightning_addresses = self.store.find_addresses(filter.clone()).await?;
 
-        let lightning_addresses = self.store.find_addresses(limit, offset).await?;
-
-        debug!(
-            user_id = user.sub,
-            limit, offset, "Lightning addresses listed successfully"
-        );
+        debug!(?filter, "Lightning addresses listed successfully");
         Ok(lightning_addresses)
     }
 }

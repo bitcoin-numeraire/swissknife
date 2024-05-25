@@ -3,9 +3,12 @@ use sea_orm::DatabaseTransaction;
 use uuid::Uuid;
 
 use crate::{
-    application::errors::DatabaseError,
+    application::{
+        dtos::{LightningAddressFilter, LightningInvoiceFilter},
+        errors::DatabaseError,
+    },
     domains::lightning::entities::{
-        LightningAddress, LightningInvoice, LightningInvoiceFilter, LightningPayment, UserBalance,
+        LightningAddress, LightningInvoice, LightningPayment, UserBalance,
     },
 };
 
@@ -31,8 +34,7 @@ pub trait LightningAddressRepository {
     ) -> Result<Option<LightningAddress>, DatabaseError>;
     async fn find_addresses(
         &self,
-        limit: Option<u64>,
-        offset: Option<u64>,
+        filter: LightningAddressFilter,
     ) -> Result<Vec<LightningAddress>, DatabaseError>;
     async fn insert_address(
         &self,

@@ -1,6 +1,7 @@
 use std::time::Duration;
 
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 use strum_macros::{Display, EnumString};
 use uuid::Uuid;
 
@@ -29,19 +30,10 @@ pub struct LightningInvoice {
     pub expires_at: DateTime<Utc>,
 }
 
-#[derive(Clone, Debug, EnumString, Display, PartialEq, Eq, Default)]
+#[derive(Clone, Debug, EnumString, Deserialize, Serialize, Display, PartialEq, Eq, Default)]
 pub enum LightningInvoiceStatus {
     #[default]
     PENDING,
     SETTLED,
     EXPIRED,
-}
-
-#[derive(Clone, Debug, Default)]
-pub struct LightningInvoiceFilter {
-    pub user_id: Option<String>,
-    pub status: Option<LightningInvoiceStatus>,
-    pub limit: Option<u64>,
-    pub offset: Option<u64>,
-    pub id: Option<Uuid>,
 }

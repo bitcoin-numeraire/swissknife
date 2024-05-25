@@ -4,8 +4,7 @@ use crate::{
         lightning::{
             adapters::LightningRepository,
             entities::{
-                LightningAddress, LightningInvoice, LightningInvoiceFilter, LightningInvoiceStatus,
-                UserBalance,
+                LightningInvoice, LightningInvoiceFilter, LightningInvoiceStatus, UserBalance,
             },
             services::WalletUseCases,
         },
@@ -13,7 +12,6 @@ use crate::{
     },
 };
 use async_trait::async_trait;
-use regex::Regex;
 use tracing::{debug, info, trace};
 use uuid::Uuid;
 
@@ -27,9 +25,6 @@ impl WalletService {
     }
 }
 
-const MIN_USERNAME_LENGTH: usize = 1;
-const MAX_USERNAME_LENGTH: usize = 64;
-
 #[async_trait]
 impl WalletUseCases for WalletService {
     async fn get_balance(&self, user: AuthUser) -> Result<UserBalance, ApplicationError> {
@@ -39,72 +34,6 @@ impl WalletUseCases for WalletService {
 
         debug!(user_id = user.sub, "Balance fetched successfully");
         Ok(balance)
-    }
-
-    async fn get_lightning_address(
-        &self,
-        user: AuthUser,
-    ) -> Result<LightningAddress, ApplicationError> {
-        trace!(user_id = user.sub, "Fetching lightning address");
-
-        let lightning_address = self
-            .store
-            .find_address_by_user_id(&user.sub)
-            .await?
-            .ok_or_else(|| DataError::NotFound("Lightning address not found.".to_string()))?;
-
-        debug!(user_id = user.sub, "Lightning address fetched successfully");
-        Ok(lightning_address)
-    }
-
-    async fn register_lightning_address(
-        &self,
-        user: AuthUser,
-        username: String,
-    ) -> Result<LightningAddress, ApplicationError> {
-        debug!(
-            user_id = user.sub,
-            username, "Registering lightning address"
-        );
-
-        if username.len() < MIN_USERNAME_LENGTH || username.len() > MAX_USERNAME_LENGTH {
-            return Err(DataError::Validation("Invalid username length.".to_string()).into());
-        }
-
-        // Regex validation for allowed characters
-        let email_username_re = Regex::new(r"^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+$").unwrap(); // Can't fail by assertion
-        if !email_username_re.is_match(&username) {
-            return Err(DataError::Validation("Invalid username format.".to_string()).into());
-        }
-
-        if self
-            .store
-            .find_address_by_user_id(&user.sub)
-            .await?
-            .is_some()
-        {
-            return Err(DataError::Conflict(
-                "User has already registered a lightning address.".to_string(),
-            )
-            .into());
-        }
-
-        if self
-            .store
-            .find_address_by_username(&username)
-            .await?
-            .is_some()
-        {
-            return Err(DataError::Conflict("Username already exists.".to_string()).into());
-        }
-
-        let lightning_address = self.store.insert_address(&user.sub, &username).await?;
-
-        info!(
-            user_id = user.sub,
-            username, "Lightning address registered successfully"
-        );
-        Ok(lightning_address)
     }
 
     async fn generate_Lightning_invoice(

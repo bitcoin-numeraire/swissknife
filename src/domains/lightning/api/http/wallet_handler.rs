@@ -81,7 +81,7 @@ impl WalletHandler {
         State(app_state): State<Arc<AppState>>,
         user: AuthUser,
     ) -> Result<Json<LightningAddressResponse>, ApplicationError> {
-        let lightning_address = app_state.wallet.get_lightning_address(user).await?;
+        let lightning_address = app_state.lightning.get_address_by_user_id(user.sub).await?;
         Ok(Json(lightning_address.into()))
     }
 
@@ -91,8 +91,8 @@ impl WalletHandler {
         Json(payload): Json<RegisterLightningAddressRequest>,
     ) -> Result<Json<LightningAddressResponse>, ApplicationError> {
         let lightning_address = app_state
-            .wallet
-            .register_lightning_address(user, payload.username)
+            .lightning
+            .register_address(user.sub, payload.username)
             .await?;
         Ok(Json(lightning_address.into()))
     }

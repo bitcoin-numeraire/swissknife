@@ -9,10 +9,10 @@ pub enum DatabaseError {
     Connect(String),
 
     #[error("Failed to find resource: {0}")]
-    Find(String),
+    FindOne(String),
 
-    #[error("Failed to find all resources: {0}")]
-    FindAll(String),
+    #[error("Failed to find multiple resources: {0}")]
+    FindMany(String),
 
     #[error("Failed to find resource by statement: {0}")]
     FindByStatement(String),
