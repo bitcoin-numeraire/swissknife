@@ -10,13 +10,16 @@ use uuid::Uuid;
 use crate::{
     application::{
         dtos::{
-            LightningAddressResponse, LightningInvoiceResponse, LightningPaymentResponse,
-            NewInvoiceRequest, PaginationQueryParams, RegisterLightningAddressRequest,
-            SendPaymentRequest,
+            LightningAddressFilter, LightningAddressResponse, LightningInvoiceFilter,
+            LightningInvoiceResponse, LightningPaymentResponse, NewInvoiceRequest,
+            RegisterLightningAddressRequest, SendPaymentRequest,
         },
-        errors::ApplicationError,
+        errors::{ApplicationError, DataError},
     },
-    domains::{lightning::entities::UserBalance, users::entities::AuthUser},
+    domains::{
+        lightning::entities::{LightningInvoiceStatus, UserBalance},
+        users::entities::AuthUser,
+    },
     infra::app::AppState,
 };
 
@@ -55,7 +58,6 @@ impl WalletHandler {
         user: AuthUser,
     ) -> Result<Json<UserBalance>, ApplicationError> {
         let balance = app_state.wallet.get_balance(user).await?;
-
         Ok(balance.into())
     }
 
@@ -65,9 +67,9 @@ impl WalletHandler {
         Json(payload): Json<NewInvoiceRequest>,
     ) -> Result<Json<LightningInvoiceResponse>, ApplicationError> {
         let invoice = app_state
-            .wallet
-            .generate_Lightning_invoice(
-                user,
+            .lightning
+            .generate_invoice(
+                user.sub,
                 payload.amount_msat,
                 payload.description,
                 payload.expiry,
@@ -81,7 +83,19 @@ impl WalletHandler {
         State(app_state): State<Arc<AppState>>,
         user: AuthUser,
     ) -> Result<Json<LightningAddressResponse>, ApplicationError> {
-        let lightning_address = app_state.lightning.get_address_by_user_id(user.sub).await?;
+        let lightning_addresses = app_state
+            .lightning
+            .list_addresses(LightningAddressFilter {
+                user_id: Some(user.sub),
+                ..Default::default()
+            })
+            .await?;
+
+        let lightning_address = lightning_addresses
+            .first()
+            .cloned()
+            .ok_or_else(|| DataError::NotFound("Lightning address not found.".to_string()))?;
+
         Ok(Json(lightning_address.into()))
     }
 
@@ -126,12 +140,10 @@ impl WalletHandler {
     async fn list_invoices(
         State(app_state): State<Arc<AppState>>,
         user: AuthUser,
-        Query(query_params): Query<PaginationQueryParams>,
+        Query(mut query_params): Query<LightningInvoiceFilter>,
     ) -> Result<Json<Vec<LightningInvoiceResponse>>, ApplicationError> {
-        let invoices = app_state
-            .wallet
-            .list_lightning_invoices(user, query_params.limit, query_params.offset)
-            .await?;
+        query_params.user_id = Some(user.sub);
+        let invoices = app_state.lightning.list_invoices(query_params).await?;
 
         let response: Vec<LightningInvoiceResponse> =
             invoices.into_iter().map(Into::into).collect();
@@ -144,15 +156,35 @@ impl WalletHandler {
         user: AuthUser,
         Path(id): Path<Uuid>,
     ) -> Result<Json<LightningInvoiceResponse>, ApplicationError> {
-        let payment = app_state.wallet.get_lightning_invoice(user, id).await?;
-        Ok(Json(payment.into()))
+        let invoices = app_state
+            .lightning
+            .list_invoices(LightningInvoiceFilter {
+                user_id: Some(user.sub),
+                id: Some(id),
+                ..Default::default()
+            })
+            .await?;
+
+        let lightning_invoice = invoices
+            .first()
+            .cloned()
+            .ok_or_else(|| DataError::NotFound("Lightning invoice not found.".to_string()))?;
+
+        Ok(Json(lightning_invoice.into()))
     }
 
     async fn delete_expired_invoices(
         State(app_state): State<Arc<AppState>>,
         user: AuthUser,
     ) -> Result<Json<u64>, ApplicationError> {
-        let n_deleted = app_state.wallet.delete_expired_invoices(user).await?;
+        let n_deleted = app_state
+            .lightning
+            .delete_invoices(LightningInvoiceFilter {
+                user_id: Some(user.sub),
+                status: Some(LightningInvoiceStatus::EXPIRED),
+                ..Default::default()
+            })
+            .await?;
         Ok(n_deleted.into())
     }
 }

@@ -126,22 +126,6 @@ impl LightningAddressesUseCases for LightningService {
         Ok(lightning_address)
     }
 
-    async fn get_address_by_user_id(
-        &self,
-        user_id: String,
-    ) -> Result<LightningAddress, ApplicationError> {
-        trace!(%user_id, "Fetching lightning address");
-
-        let lightning_address = self
-            .store
-            .find_address_by_user_id(&user_id)
-            .await?
-            .ok_or_else(|| DataError::NotFound("Lightning address not found.".to_string()))?;
-
-        debug!(%user_id, "Lightning address fetched successfully");
-        Ok(lightning_address)
-    }
-
     async fn list_addresses(
         &self,
         filter: LightningAddressFilter,

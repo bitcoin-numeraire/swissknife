@@ -10,6 +10,7 @@ use crate::domains::lightning::entities::{
 
 #[derive(Debug, Deserialize)]
 pub struct NewInvoiceRequest {
+    pub user_id: String,
     pub amount_msat: u64,
     pub description: Option<String>,
     pub expiry: Option<u32>,
@@ -179,7 +180,7 @@ impl From<LightningPayment> for LightningPaymentResponse {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, Default)]
 pub struct LightningInvoiceFilter {
     pub user_id: Option<String>,
     pub status: Option<LightningInvoiceStatus>,
@@ -188,7 +189,7 @@ pub struct LightningInvoiceFilter {
     pub id: Option<Uuid>,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, Default)]
 pub struct LightningAddressFilter {
     pub username: Option<String>,
     pub user_id: Option<String>,

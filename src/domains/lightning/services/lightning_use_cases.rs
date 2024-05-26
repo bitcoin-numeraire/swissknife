@@ -21,26 +21,21 @@ use crate::{
 pub trait LightningInvoicesUseCases {
     async fn generate_invoice(
         &self,
-        user: AuthUser,
+        user_id: String,
         amount: u64,
         description: Option<String>,
         expiry: Option<u32>,
     ) -> Result<LightningInvoice, ApplicationError>;
-
-    async fn get_invoice(
-        &self,
-        user: AuthUser,
-        id: Uuid,
-    ) -> Result<LightningInvoice, ApplicationError>;
-
+    async fn get_invoice(&self, id: Uuid) -> Result<LightningInvoice, ApplicationError>;
     async fn list_invoices(
         &self,
-        user: AuthUser,
-        limit: Option<u64>,
-        offset: Option<u64>,
         filter: LightningInvoiceFilter,
     ) -> Result<Vec<LightningInvoice>, ApplicationError>;
-    async fn delete_expired_invoices(&self, user: AuthUser) -> Result<u64, ApplicationError>;
+    async fn delete_invoice(&self, id: Uuid) -> Result<(), ApplicationError>;
+    async fn delete_invoices(
+        &self,
+        filter: LightningInvoiceFilter,
+    ) -> Result<u64, ApplicationError>;
 }
 
 #[async_trait]
@@ -83,10 +78,6 @@ pub trait LightningAddressesUseCases {
         username: String,
     ) -> Result<LightningAddress, ApplicationError>;
     async fn get_address(&self, id: Uuid) -> Result<LightningAddress, ApplicationError>;
-    async fn get_address_by_user_id(
-        &self,
-        user_id: String,
-    ) -> Result<LightningAddress, ApplicationError>;
     async fn list_addresses(
         &self,
         filter: LightningAddressFilter,

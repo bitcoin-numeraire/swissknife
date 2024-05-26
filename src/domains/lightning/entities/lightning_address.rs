@@ -2,7 +2,7 @@ use chrono::{DateTime, Utc};
 use serde::Serialize;
 use uuid::Uuid;
 
-#[derive(Serialize, Debug)]
+#[derive(Clone, Serialize, Debug)]
 pub struct LightningAddress {
     pub id: Uuid,
     pub user_id: String,

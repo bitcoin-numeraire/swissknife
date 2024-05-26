@@ -9,7 +9,7 @@ use crate::{
     },
 };
 use async_trait::async_trait;
-use sea_orm::{sea_query::Expr, ActiveValue::Set, QueryTrait};
+use sea_orm::{sea_query::Expr, ActiveValue::Set, Condition, QueryTrait};
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect};
 use uuid::Uuid;
 
@@ -47,9 +47,11 @@ impl LightningInvoiceRepository for LightningStore {
             .apply_if(filter.user_id, |q, user| q.filter(Column::UserId.eq(user)))
             .apply_if(filter.id, |q, id| q.filter(Column::Id.eq(id)))
             .apply_if(filter.status, |q, s| match s {
-                LightningInvoiceStatus::PENDING => {
-                    q.filter(Expr::col(Column::ExpiresAt).gt(Expr::current_timestamp()))
-                }
+                LightningInvoiceStatus::PENDING => q.filter(
+                    Condition::all()
+                        .add(Expr::col(Column::ExpiresAt).gt(Expr::current_timestamp()))
+                        .add(Expr::col(Column::PaymentTime).is_null()),
+                ),
                 LightningInvoiceStatus::SETTLED => {
                     q.filter(Expr::col(Column::PaymentTime).is_not_null())
                 }
@@ -124,15 +126,13 @@ impl LightningInvoiceRepository for LightningStore {
             .apply_if(filter.user_id, |q, user| q.filter(Column::UserId.eq(user)))
             .apply_if(filter.id, |q, id| q.filter(Column::Id.eq(id)))
             .apply_if(filter.status, |q, status| match status {
-                LightningInvoiceStatus::PENDING => {
-                    q.filter(Expr::col(Column::ExpiresAt).gt(Expr::current_timestamp()))
-                }
                 LightningInvoiceStatus::SETTLED => {
                     q.filter(Expr::col(Column::PaymentTime).is_not_null())
                 }
                 LightningInvoiceStatus::EXPIRED => {
                     q.filter(Expr::col(Column::ExpiresAt).lte(Expr::current_timestamp()))
                 }
+                _ => q, // Can't delete PENDING invoices
             })
             .exec(&self.db)
             .await
