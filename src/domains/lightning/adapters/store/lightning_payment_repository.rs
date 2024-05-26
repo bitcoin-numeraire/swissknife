@@ -6,6 +6,7 @@ use sea_orm::{
 };
 use uuid::Uuid;
 
+use crate::application::dtos::LightningPaymentFilter;
 use crate::domains::lightning::adapters::models::lightning_payment::{ActiveModel, Column, Entity};
 use crate::domains::lightning::adapters::repository::LightningPaymentRepository;
 use crate::{application::errors::DatabaseError, domains::lightning::entities::LightningPayment};
@@ -23,17 +24,19 @@ impl LightningPaymentRepository for LightningStore {
         Ok(model.map(Into::into))
     }
 
-    async fn find_all_payments(
+    async fn find_payments(
         &self,
-        user: Option<String>,
-        limit: Option<u64>,
-        offset: Option<u64>,
+        filter: LightningPaymentFilter,
     ) -> Result<Vec<LightningPayment>, DatabaseError> {
         let models = Entity::find()
-            .apply_if(user, |q, v| q.filter(Column::UserId.eq(v)))
+            .apply_if(filter.user_id, |q, user| q.filter(Column::UserId.eq(user)))
+            .apply_if(filter.id, |q, id| q.filter(Column::Id.eq(id)))
+            .apply_if(filter.status, |q, s| {
+                q.filter(Column::Status.eq(s.to_string()))
+            })
             .order_by_desc(Column::CreatedAt)
-            .offset(offset)
-            .limit(limit)
+            .offset(filter.offset)
+            .limit(filter.limit)
             .all(&self.db)
             .await
             .map_err(|e| DatabaseError::FindMany(e.to_string()))?;
@@ -98,5 +101,19 @@ impl LightningPaymentRepository for LightningStore {
             .map_err(|e| DatabaseError::Update(e.to_string()))?;
 
         Ok(model.into())
+    }
+
+    async fn delete_payments(&self, filter: LightningPaymentFilter) -> Result<u64, DatabaseError> {
+        let result = Entity::delete_many()
+            .apply_if(filter.user_id, |q, user| q.filter(Column::UserId.eq(user)))
+            .apply_if(filter.id, |q, id| q.filter(Column::Id.eq(id)))
+            .apply_if(filter.status, |q, s| {
+                q.filter(Column::Status.eq(s.to_string()))
+            })
+            .exec(&self.db)
+            .await
+            .map_err(|e| DatabaseError::Delete(e.to_string()))?;
+
+        Ok(result.rows_affected)
     }
 }

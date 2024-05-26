@@ -6,7 +6,10 @@ use uuid::Uuid;
 
 use crate::{
     application::{
-        dtos::{LightningAddressFilter, LightningInvoiceFilter},
+        dtos::{
+            LightningAddressFilter, LightningInvoiceFilter, LightningPaymentFilter,
+            SendPaymentRequest,
+        },
         errors::ApplicationError,
     },
     domains::{
@@ -40,26 +43,17 @@ pub trait LightningInvoicesUseCases {
 
 #[async_trait]
 pub trait LightningPaymentsUseCases {
-    async fn get_payment(
-        &self,
-        user: AuthUser,
-        id: Uuid,
-    ) -> Result<LightningPayment, ApplicationError>;
-
+    async fn pay(&self, req: SendPaymentRequest) -> Result<LightningPayment, ApplicationError>;
+    async fn get_payment(&self, id: Uuid) -> Result<LightningPayment, ApplicationError>;
     async fn list_payments(
         &self,
-        user: AuthUser,
-        limit: Option<u64>,
-        offset: Option<u64>,
+        filter: LightningPaymentFilter,
     ) -> Result<Vec<LightningPayment>, ApplicationError>;
-
-    async fn pay(
+    async fn delete_payment(&self, id: Uuid) -> Result<(), ApplicationError>;
+    async fn delete_payments(
         &self,
-        user: AuthUser,
-        input: String,
-        amount_msat: Option<u64>,
-        comment: Option<String>,
-    ) -> Result<LightningPayment, ApplicationError>;
+        filter: LightningPaymentFilter,
+    ) -> Result<u64, ApplicationError>;
 }
 
 #[async_trait]

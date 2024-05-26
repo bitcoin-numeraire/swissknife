@@ -42,7 +42,7 @@ impl LightningInvoicesUseCases for LightningService {
         let invoice = self.store.insert_invoice(invoice).await?;
 
         info!(
-            %user_id,
+            id = invoice.id.to_string(),
             "Lightning invoice generated successfully"
         );
 

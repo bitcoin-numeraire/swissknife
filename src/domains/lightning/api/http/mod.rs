@@ -1,6 +1,7 @@
 pub mod lightning_address_handler;
 pub mod lightning_invoice_handler;
 pub mod lightning_node_handler;
+pub mod lightning_payment_handler;
 pub mod lnurlp_handler;
 pub mod wallet_handler;
 

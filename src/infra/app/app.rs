@@ -15,7 +15,9 @@ use tracing::{debug, error, info, trace};
 use crate::{
     application::errors::WebServerError,
     domains::lightning::api::http::{
-        LNURLpHandler, LightningAddressHandler, LightningNodeHandler, WalletHandler,
+        lightning_invoice_handler::LightningInvoiceHandler,
+        lightning_payment_handler::LightningPaymentHandler, LNURLpHandler, LightningAddressHandler,
+        LightningNodeHandler, WalletHandler,
     },
     infra::app::AppState,
 };
@@ -34,8 +36,10 @@ impl App {
                 "/api/lightning/addresses",
                 LightningAddressHandler::routes(),
             )
-            .nest("/api/lightning/wallet", WalletHandler::routes())
+            .nest("/api/lightning/invoices", LightningInvoiceHandler::routes())
+            .nest("/api/lightning/payments", LightningPaymentHandler::routes())
             .nest("/api/lightning/node", LightningNodeHandler::routes())
+            .nest("/api/wallet", WalletHandler::routes())
             .layer(TraceLayer::new_for_http())
             .layer(state.timeout_layer)
             .layer(CorsLayer::permissive())

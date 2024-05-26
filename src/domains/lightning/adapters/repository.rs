@@ -4,7 +4,7 @@ use uuid::Uuid;
 
 use crate::{
     application::{
-        dtos::{LightningAddressFilter, LightningInvoiceFilter},
+        dtos::{LightningAddressFilter, LightningInvoiceFilter, LightningPaymentFilter},
         errors::DatabaseError,
     },
     domains::lightning::entities::{
@@ -68,11 +68,9 @@ pub trait LightningInvoiceRepository {
 #[async_trait]
 pub trait LightningPaymentRepository {
     async fn find_payment(&self, id: Uuid) -> Result<Option<LightningPayment>, DatabaseError>;
-    async fn find_all_payments(
+    async fn find_payments(
         &self,
-        user: Option<String>,
-        limit: Option<u64>,
-        offset: Option<u64>,
+        filter: LightningPaymentFilter,
     ) -> Result<Vec<LightningPayment>, DatabaseError>;
     async fn insert_payment(
         &self,
@@ -83,6 +81,7 @@ pub trait LightningPaymentRepository {
         &self,
         payment: LightningPayment,
     ) -> Result<LightningPayment, DatabaseError>;
+    async fn delete_payments(&self, filter: LightningPaymentFilter) -> Result<u64, DatabaseError>;
 }
 
 #[async_trait]

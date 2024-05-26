@@ -18,6 +18,7 @@ pub struct NewInvoiceRequest {
 
 #[derive(Debug, Deserialize)]
 pub struct SendPaymentRequest {
+    pub user_id: String,
     pub input: String,
     pub amount_msat: Option<u64>,
     pub comment: Option<String>,
@@ -193,6 +194,15 @@ pub struct LightningInvoiceFilter {
 pub struct LightningAddressFilter {
     pub username: Option<String>,
     pub user_id: Option<String>,
+    pub limit: Option<u64>,
+    pub offset: Option<u64>,
+    pub id: Option<Uuid>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, Default)]
+pub struct LightningPaymentFilter {
+    pub user_id: Option<String>,
+    pub status: Option<LightningPaymentStatus>,
     pub limit: Option<u64>,
     pub offset: Option<u64>,
     pub id: Option<Uuid>,

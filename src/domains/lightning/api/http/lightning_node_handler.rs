@@ -11,10 +11,7 @@ use breez_sdk_core::{
 
 use crate::{
     application::{
-        dtos::{
-            LightningPaymentResponse, RedeemOnchainRequest, SendOnchainPaymentRequest,
-            SendPaymentRequest,
-        },
+        dtos::{RedeemOnchainRequest, SendOnchainPaymentRequest},
         errors::ApplicationError,
     },
     domains::users::entities::AuthUser,
@@ -30,7 +27,6 @@ impl LightningNodeHandler {
             .route("/lsp-info", get(Self::lsp_info))
             .route("/lsps", get(Self::list_lsps))
             .route("/payments", get(Self::list_payments))
-            .route("/pay", post(Self::send_payment))
             .route("/close-channels", post(Self::close_lsp_channels))
             .route("/swap", post(Self::swap))
             .route("/redeem", post(Self::redeem))
@@ -62,19 +58,6 @@ impl LightningNodeHandler {
         let payments = app_state.lightning.list_node_payments(user).await?;
 
         Ok(payments.into())
-    }
-
-    async fn send_payment(
-        State(app_state): State<Arc<AppState>>,
-        user: AuthUser,
-        Json(payload): Json<SendPaymentRequest>,
-    ) -> Result<Json<LightningPaymentResponse>, ApplicationError> {
-        let payment = app_state
-            .lightning
-            .pay(user, payload.input, payload.amount_msat, payload.comment)
-            .await?;
-
-        Ok(Json(payment.into()))
     }
 
     async fn list_lsps(

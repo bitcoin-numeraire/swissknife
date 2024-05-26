@@ -4,13 +4,13 @@ use tracing::{debug, info, trace};
 use uuid::Uuid;
 
 use crate::{
-    application::errors::{ApplicationError, DataError, DatabaseError, LightningError},
-    domains::{
-        lightning::{
-            entities::{LightningPayment, LightningPaymentStatus},
-            services::LightningPaymentsUseCases,
-        },
-        users::entities::{AuthUser, Permission},
+    application::{
+        dtos::{LightningPaymentFilter, SendPaymentRequest},
+        errors::{ApplicationError, DataError, DatabaseError, LightningError},
+    },
+    domains::lightning::{
+        entities::{LightningPayment, LightningPaymentStatus},
+        services::LightningPaymentsUseCases,
     },
 };
 
@@ -30,10 +30,9 @@ impl LightningService {
 
     async fn send_bolt11(
         &self,
-        user: AuthUser,
+        user_id: String,
         invoice: LNInvoice,
         amount_msat: Option<u64>,
-        send_from_node: bool,
     ) -> Result<LightningPayment, ApplicationError> {
         let specified_amount = invoice.amount_msat.or(amount_msat);
         if specified_amount == Some(0) {
@@ -42,15 +41,11 @@ impl LightningService {
             );
         }
 
-        let txn = if send_from_node {
-            None
-        } else {
-            Some(self.store.begin().await?)
-        };
+        let txn = self.store.begin().await?;
 
         let balance = self
             .store
-            .get_balance(txn.as_ref(), &user.sub)
+            .get_balance(Some(&txn), &user_id)
             .await?
             .available_msat as u64;
 
@@ -62,9 +57,9 @@ impl LightningService {
             let pending_payment = self
                 .store
                 .insert_payment(
-                    txn.as_ref(),
+                    Some(&txn),
                     LightningPayment {
-                        user_id: user.sub,
+                        user_id,
                         amount_msat: amount,
                         status: LightningPaymentStatus::PENDING,
                         payment_hash: Some(invoice.payment_hash),
@@ -74,12 +69,9 @@ impl LightningService {
                 )
                 .await?;
 
-            // Commit transaction if available
-            if let Some(t) = txn {
-                t.commit()
-                    .await
-                    .map_err(|e| DatabaseError::Transaction(e.to_string()))?;
-            }
+            txn.commit()
+                .await
+                .map_err(|e| DatabaseError::Transaction(e.to_string()))?;
 
             let result = self
                 .lightning_client
@@ -105,30 +97,20 @@ impl LightningService {
 
     async fn send_lnurl_pay(
         &self,
-        user: AuthUser,
+        user_id: String,
         data: LnUrlPayRequestData,
         amount_msat: Option<u64>,
         comment: Option<String>,
-        send_from_node: bool,
     ) -> Result<LightningPayment, ApplicationError> {
         let amount = LightningService::validate_amount(amount_msat)?;
 
-        let txn = if send_from_node {
-            None
-        } else {
-            Some(self.store.begin().await?)
-        };
+        let txn = self.store.begin().await?;
 
-        // If we are in a transaction, we check in DB as we are paying from the user's balance
-        let balance = match txn {
-            Some(_) => {
-                self.store
-                    .get_balance(txn.as_ref(), &user.sub)
-                    .await?
-                    .available_msat as u64
-            }
-            None => self.lightning_client.node_info()?.max_payable_msat,
-        };
+        let balance = self
+            .store
+            .get_balance(Some(&txn), &user_id)
+            .await?
+            .available_msat as u64;
 
         if balance <= amount {
             return Err(DataError::InsufficientFunds.into());
@@ -137,9 +119,9 @@ impl LightningService {
         let pending_payment = self
             .store
             .insert_payment(
-                txn.as_ref(),
+                Some(&txn),
                 LightningPayment {
-                    user_id: user.sub,
+                    user_id,
                     amount_msat: amount,
                     status: LightningPaymentStatus::PENDING,
                     lightning_address: data.ln_address.clone(),
@@ -149,12 +131,9 @@ impl LightningService {
             )
             .await?;
 
-        // Commit transaction if available
-        if let Some(t) = txn {
-            t.commit()
-                .await
-                .map_err(|e| DatabaseError::Transaction(e.to_string()))?;
-        }
+        txn.commit()
+            .await
+            .map_err(|e| DatabaseError::Transaction(e.to_string()))?;
 
         let result = self
             .lightning_client
@@ -192,12 +171,8 @@ impl LightningService {
 
 #[async_trait]
 impl LightningPaymentsUseCases for LightningService {
-    async fn get_payment(
-        &self,
-        user: AuthUser,
-        id: Uuid,
-    ) -> Result<LightningPayment, ApplicationError> {
-        trace!(user_id = user.sub, "Fetching lightning payment");
+    async fn get_payment(&self, id: Uuid) -> Result<LightningPayment, ApplicationError> {
+        trace!(%id, "Fetching lightning payment");
 
         let lightning_payment = self
             .store
@@ -205,13 +180,8 @@ impl LightningPaymentsUseCases for LightningService {
             .await?
             .ok_or_else(|| DataError::NotFound("Lightning payment not found.".to_string()))?;
 
-        if lightning_payment.user_id != user.sub {
-            user.check_permission(Permission::ReadLightning)?;
-        }
-
         debug!(
-            user_id = user.sub,
-            id = id.to_string(),
+            %id,
             "Lightning payment fetched successfully"
         );
         Ok(lightning_payment)
@@ -219,54 +189,30 @@ impl LightningPaymentsUseCases for LightningService {
 
     async fn list_payments(
         &self,
-        user: AuthUser,
-        limit: Option<u64>,
-        offset: Option<u64>,
+        filter: LightningPaymentFilter,
     ) -> Result<Vec<LightningPayment>, ApplicationError> {
-        trace!(
-            user_id = user.sub,
-            limit,
-            offset,
-            "Listing lightning payments"
-        );
+        trace!(?filter, "Listing lightning payments");
 
-        let lightning_payments = if user.has_permission(Permission::ReadLightning) {
-            // The user has permission to view all addresses
-            self.store.find_all_payments(None, limit, offset).await?
-        } else {
-            // The user can only view their own payments
-            self.store
-                .find_all_payments(Some(user.sub.clone()), limit, offset)
-                .await?
-        };
+        let lightning_payments = self.store.find_payments(filter.clone()).await?;
 
-        debug!(user_id = user.sub, "Lightning payments listed successfully");
+        debug!(?filter, "Lightning payments listed successfully");
         Ok(lightning_payments)
     }
 
-    async fn pay(
-        &self,
-        user: AuthUser,
-        input: String,
-        amount_msat: Option<u64>,
-        comment: Option<String>,
-    ) -> Result<LightningPayment, ApplicationError> {
-        debug!(user_id = user.sub, input, "Sending payment");
+    async fn pay(&self, req: SendPaymentRequest) -> Result<LightningPayment, ApplicationError> {
+        debug!(?req, "Sending payment");
 
-        // If user has permission, we do not check the user balance but the node balance
-        let can_send_from_node = user.has_permission(Permission::WriteLightningNode);
-
-        let input_type = parse(&input)
+        let input_type = parse(&req.input)
             .await
             .map_err(|e| DataError::Validation(e.to_string()))?;
 
         let payment = match input_type {
             InputType::Bolt11 { invoice } => {
-                self.send_bolt11(user.clone(), invoice, amount_msat, can_send_from_node)
+                self.send_bolt11(req.user_id, invoice, req.amount_msat)
                     .await
             }
             InputType::LnUrlPay { data } => {
-                self.send_lnurl_pay(user.clone(), data, amount_msat, comment, can_send_from_node)
+                self.send_lnurl_pay(req.user_id, data, req.amount_msat, req.comment)
                     .await
             }
             InputType::LnUrlError { data } => Err(DataError::Validation(data.reason).into()),
@@ -274,13 +220,44 @@ impl LightningPaymentsUseCases for LightningService {
         }?;
 
         info!(
-            user_id = user.sub,
-            input,
-            amount_msat,
-            status = payment.status.to_string(),
+            id = payment.id.to_string(),
             "Payment processed successfully"
         );
 
         Ok(payment)
+    }
+
+    async fn delete_payment(&self, id: Uuid) -> Result<(), ApplicationError> {
+        debug!(%id, "Deleting lightning payment");
+
+        let n_deleted = self
+            .store
+            .delete_payments(LightningPaymentFilter {
+                id: Some(id),
+                ..Default::default()
+            })
+            .await?;
+
+        if n_deleted == 0 {
+            return Err(DataError::NotFound("Lightning payment not found.".to_string()).into());
+        }
+
+        info!(%id, "Lightning payments deleted successfully");
+        Ok(())
+    }
+
+    async fn delete_payments(
+        &self,
+        filter: LightningPaymentFilter,
+    ) -> Result<u64, ApplicationError> {
+        debug!(?filter, "Deleting lightning payments");
+
+        let n_deleted = self.store.delete_payments(filter.clone()).await?;
+
+        info!(
+            ?filter,
+            n_deleted, "Lightning payments deleted successfully"
+        );
+        Ok(n_deleted)
     }
 }
