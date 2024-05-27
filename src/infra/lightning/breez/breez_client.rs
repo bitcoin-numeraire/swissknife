@@ -113,7 +113,7 @@ impl LightningClient for BreezClient {
             .receive_payment(ReceivePaymentRequest {
                 amount_msat,
                 description,
-                use_description_hash: Some(true),
+                use_description_hash: Some(false),
                 expiry: Some(expiry),
                 ..Default::default()
             })

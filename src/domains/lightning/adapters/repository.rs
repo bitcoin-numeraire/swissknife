@@ -5,13 +5,23 @@ use uuid::Uuid;
 use crate::{
     application::errors::DatabaseError,
     domains::lightning::entities::{
-        LightningAddress, LightningInvoice, LightningInvoiceDeleteFilter, LightningPayment,
-        UserBalance,
+        LightningAddress, LightningAddressFilter, LightningInvoice, LightningInvoiceFilter,
+        LightningPayment, LightningPaymentFilter, UserBalance,
     },
 };
 
 #[async_trait]
+pub trait WalletRepository {
+    async fn get_balance(
+        &self,
+        txn: Option<&DatabaseTransaction>,
+        user: &str,
+    ) -> Result<UserBalance, DatabaseError>;
+}
+
+#[async_trait]
 pub trait LightningAddressRepository {
+    async fn find_address(&self, id: Uuid) -> Result<Option<LightningAddress>, DatabaseError>;
     async fn find_address_by_username(
         &self,
         username: &str,
@@ -20,22 +30,16 @@ pub trait LightningAddressRepository {
         &self,
         user: &str,
     ) -> Result<Option<LightningAddress>, DatabaseError>;
-    async fn find_all_addresses(
+    async fn find_addresses(
         &self,
-        user: Option<String>,
-        limit: Option<u64>,
-        offset: Option<u64>,
+        filter: LightningAddressFilter,
     ) -> Result<Vec<LightningAddress>, DatabaseError>;
     async fn insert_address(
         &self,
         user: &str,
         username: &str,
     ) -> Result<LightningAddress, DatabaseError>;
-    async fn get_balance(
-        &self,
-        txn: Option<&DatabaseTransaction>,
-        user: &str,
-    ) -> Result<UserBalance, DatabaseError>;
+    async fn delete_addresses(&self, filter: LightningAddressFilter) -> Result<u64, DatabaseError>;
 }
 
 #[async_trait]
@@ -47,9 +51,7 @@ pub trait LightningInvoiceRepository {
     ) -> Result<Option<LightningInvoice>, DatabaseError>;
     async fn find_invoices(
         &self,
-        user: Option<String>,
-        limit: Option<u64>,
-        offset: Option<u64>,
+        filter: LightningInvoiceFilter,
     ) -> Result<Vec<LightningInvoice>, DatabaseError>;
     async fn insert_invoice(
         &self,
@@ -59,21 +61,15 @@ pub trait LightningInvoiceRepository {
         &self,
         invoice: LightningInvoice,
     ) -> Result<LightningInvoice, DatabaseError>;
-    async fn delete_invoices(
-        &self,
-        user: Option<String>,
-        filter: LightningInvoiceDeleteFilter,
-    ) -> Result<u64, DatabaseError>;
+    async fn delete_invoices(&self, filter: LightningInvoiceFilter) -> Result<u64, DatabaseError>;
 }
 
 #[async_trait]
 pub trait LightningPaymentRepository {
     async fn find_payment(&self, id: Uuid) -> Result<Option<LightningPayment>, DatabaseError>;
-    async fn find_all_payments(
+    async fn find_payments(
         &self,
-        user: Option<String>,
-        limit: Option<u64>,
-        offset: Option<u64>,
+        filter: LightningPaymentFilter,
     ) -> Result<Vec<LightningPayment>, DatabaseError>;
     async fn insert_payment(
         &self,
@@ -84,6 +80,7 @@ pub trait LightningPaymentRepository {
         &self,
         payment: LightningPayment,
     ) -> Result<LightningPayment, DatabaseError>;
+    async fn delete_payments(&self, filter: LightningPaymentFilter) -> Result<u64, DatabaseError>;
 }
 
 #[async_trait]
@@ -95,6 +92,7 @@ pub trait LightningRepository:
     LightningAddressRepository
     + LightningPaymentRepository
     + LightningInvoiceRepository
+    + WalletRepository
     + TransactionManager
     + Sync
     + Send
@@ -106,6 +104,7 @@ impl<T> LightningRepository for T where
     T: LightningAddressRepository
         + LightningPaymentRepository
         + LightningInvoiceRepository
+        + WalletRepository
         + TransactionManager
         + Sync
         + Send

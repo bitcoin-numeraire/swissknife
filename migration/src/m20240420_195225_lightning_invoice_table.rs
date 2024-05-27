@@ -25,7 +25,7 @@ impl MigrationTrait for Migration {
                 description varchar,
                 description_hash varchar,
                 amount_msat bigint,
-                payment_secret bytea NOT NULL,
+                payment_secret varchar NOT NULL,
                 timestamp timestamptz NOT NULL,
                 expiry bigint NOT NULL,
                 min_final_cltv_expiry_delta bigint NOT NULL,

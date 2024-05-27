@@ -7,7 +7,10 @@ use crate::{
     },
     domains::lightning::{
         adapters::LightningStore,
-        usecases::{service::LightningPaymentsProcessor, LightningService, LightningUseCases},
+        services::{
+            lightning::BreezPaymentsProcessor, LightningService, LightningUseCases, WalletService,
+            WalletUseCases,
+        },
     },
     infra::{
         auth::{jwt::JWTAuthenticator, Authenticator},
@@ -23,6 +26,7 @@ use tracing::warn;
 pub struct AppState {
     pub jwt_authenticator: Option<Arc<dyn Authenticator>>,
     pub lightning: Arc<dyn LightningUseCases>,
+    pub wallet: Arc<dyn WalletUseCases>,
     pub timeout_layer: TimeoutLayer,
 }
 
@@ -46,7 +50,7 @@ impl AppState {
 
         // Create adapters
         let store = Box::new(LightningStore::new(db_conn));
-        let payments_processor = LightningPaymentsProcessor::new(store.clone());
+        let payments_processor = BreezPaymentsProcessor::new(store.clone());
         let listener = BreezListener::new(Arc::new(payments_processor));
         let lightning_client = config.lightning.get_client(Box::new(listener)).await?;
 
@@ -58,11 +62,13 @@ impl AppState {
             config.lightning.invoice_expiry,
             config.lightning.invoice_description,
         );
+        let wallet = WalletService::new(store.clone());
 
         // Create App state
         Ok(Self {
             jwt_authenticator,
             lightning: Arc::new(lightning),
+            wallet: Arc::new(wallet),
             timeout_layer,
         })
     }

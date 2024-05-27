@@ -9,22 +9,22 @@ use crate::{
     domains::lightning::{
         adapters::LightningRepository,
         entities::{LightningInvoice, LightningPayment, LightningPaymentStatus},
-        usecases::LightningPaymentsProcessorUseCases,
+        services::PaymentsProcessorUseCases,
     },
 };
 
-pub struct LightningPaymentsProcessor {
+pub struct BreezPaymentsProcessor {
     pub store: Box<dyn LightningRepository>,
 }
 
-impl LightningPaymentsProcessor {
+impl BreezPaymentsProcessor {
     pub fn new(store: Box<dyn LightningRepository>) -> Self {
-        LightningPaymentsProcessor { store }
+        BreezPaymentsProcessor { store }
     }
 }
 
 #[async_trait]
-impl LightningPaymentsProcessorUseCases for LightningPaymentsProcessor {
+impl PaymentsProcessorUseCases for BreezPaymentsProcessor {
     async fn process_incoming_payment(
         &self,
         payment: Payment,
@@ -136,7 +136,7 @@ impl LightningPaymentsProcessorUseCases for LightningPaymentsProcessor {
 
         if let Some(mut payment) = payment_option {
             payment.status = LightningPaymentStatus::FAILED;
-            payment.payment_time = Some(invoice.timestamp as i64);
+            payment.payment_time = Some(Utc.timestamp_opt(invoice.timestamp as i64, 0).unwrap());
             payment.error = Some(payment_failed.error);
             payment.payment_hash = Some(invoice.payment_hash);
 

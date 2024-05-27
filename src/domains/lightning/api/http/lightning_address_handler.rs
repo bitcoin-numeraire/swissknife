@@ -2,21 +2,19 @@ use std::sync::Arc;
 
 use axum::{
     extract::{Path, Query, State},
-    routing::{get, post},
+    routing::{delete, get, post},
     Json, Router,
 };
+use uuid::Uuid;
 
 use crate::{
-    application::{
-        dtos::{LightningAddressResponse, PaginationQueryParams, RegisterLightningAddressRequest},
-        errors::{ApplicationError, DataError},
+    application::{dtos::RegisterLightningAddressRequest, errors::ApplicationError},
+    domains::{
+        lightning::entities::{LightningAddress, LightningAddressFilter},
+        users::entities::{AuthUser, Permission},
     },
-    domains::users::entities::AuthUser,
     infra::app::AppState,
 };
-
-const MIN_USERNAME_LENGTH: usize = 1;
-const MAX_USERNAME_LENGTH: usize = 64;
 
 pub struct LightningAddressHandler;
 
@@ -25,52 +23,70 @@ impl LightningAddressHandler {
         Router::new()
             .route("/", get(Self::list))
             .route("/", post(Self::register))
-            .route("/:username", get(Self::get))
+            .route("/:id", get(Self::get))
+            .route("/:id", delete(Self::delete))
+            .route("/", delete(Self::delete_many))
     }
 
     async fn register(
         State(app_state): State<Arc<AppState>>,
         user: AuthUser,
         Json(payload): Json<RegisterLightningAddressRequest>,
-    ) -> Result<Json<LightningAddressResponse>, ApplicationError> {
-        let username_length = payload.username.len();
-        if username_length < MIN_USERNAME_LENGTH || username_length > MAX_USERNAME_LENGTH {
-            return Err(
-                DataError::RequestValidation("Invalid username length.".to_string()).into(),
-            );
-        }
+    ) -> Result<Json<LightningAddress>, ApplicationError> {
+        user.check_permission(Permission::WriteLightningAddress)?;
 
         let lightning_address = app_state
             .lightning
-            .register_address(user, payload.username)
+            .register_address(payload.user_id.unwrap_or(user.sub), payload.username)
             .await?;
-
         Ok(Json(lightning_address.into()))
     }
 
     async fn get(
         State(app_state): State<Arc<AppState>>,
         user: AuthUser,
-        Path(username): Path<String>,
-    ) -> Result<Json<LightningAddressResponse>, ApplicationError> {
-        let lightning_address = app_state.lightning.get_address(user, username).await?;
+        Path(id): Path<Uuid>,
+    ) -> Result<Json<LightningAddress>, ApplicationError> {
+        user.check_permission(Permission::ReadLightningAddress)?;
 
+        let lightning_address = app_state.lightning.get_address(id).await?;
         Ok(Json(lightning_address.into()))
     }
 
     async fn list(
         State(app_state): State<Arc<AppState>>,
         user: AuthUser,
-        Query(query_params): Query<PaginationQueryParams>,
-    ) -> Result<Json<Vec<LightningAddressResponse>>, ApplicationError> {
-        let lightning_addresses = app_state
-            .lightning
-            .list_addresses(user, query_params.limit, query_params.offset)
-            .await?;
+        Query(query_params): Query<LightningAddressFilter>,
+    ) -> Result<Json<Vec<LightningAddress>>, ApplicationError> {
+        user.check_permission(Permission::ReadLightningAddress)?;
 
-        let response: Vec<LightningAddressResponse> =
+        let lightning_addresses = app_state.lightning.list_addresses(query_params).await?;
+
+        let response: Vec<LightningAddress> =
             lightning_addresses.into_iter().map(Into::into).collect();
 
         Ok(response.into())
+    }
+
+    async fn delete(
+        State(app_state): State<Arc<AppState>>,
+        user: AuthUser,
+        Path(id): Path<Uuid>,
+    ) -> Result<(), ApplicationError> {
+        user.check_permission(Permission::WriteLightningAddress)?;
+
+        app_state.lightning.delete_address(id).await?;
+        Ok(())
+    }
+
+    async fn delete_many(
+        State(app_state): State<Arc<AppState>>,
+        user: AuthUser,
+        Query(query_params): Query<LightningAddressFilter>,
+    ) -> Result<Json<u64>, ApplicationError> {
+        user.check_permission(Permission::WriteLightningAddress)?;
+
+        let n_deleted = app_state.lightning.delete_addresses(query_params).await?;
+        Ok(n_deleted.into())
     }
 }

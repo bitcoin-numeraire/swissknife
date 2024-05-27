@@ -8,6 +8,7 @@ use uuid::Uuid;
 
 use crate::domains::lightning::adapters::models::lightning_payment::{ActiveModel, Column, Entity};
 use crate::domains::lightning::adapters::repository::LightningPaymentRepository;
+use crate::domains::lightning::entities::LightningPaymentFilter;
 use crate::{application::errors::DatabaseError, domains::lightning::entities::LightningPayment};
 
 use super::LightningStore;
@@ -18,25 +19,27 @@ impl LightningPaymentRepository for LightningStore {
         let model = Entity::find_by_id(id)
             .one(&self.db)
             .await
-            .map_err(|e| DatabaseError::Find(e.to_string()))?;
+            .map_err(|e| DatabaseError::FindOne(e.to_string()))?;
 
         Ok(model.map(Into::into))
     }
 
-    async fn find_all_payments(
+    async fn find_payments(
         &self,
-        user: Option<String>,
-        limit: Option<u64>,
-        offset: Option<u64>,
+        filter: LightningPaymentFilter,
     ) -> Result<Vec<LightningPayment>, DatabaseError> {
         let models = Entity::find()
-            .apply_if(user, |q, v| q.filter(Column::UserId.eq(v)))
+            .apply_if(filter.user_id, |q, user| q.filter(Column::UserId.eq(user)))
+            .apply_if(filter.id, |q, id| q.filter(Column::Id.eq(id)))
+            .apply_if(filter.status, |q, s| {
+                q.filter(Column::Status.eq(s.to_string()))
+            })
             .order_by_desc(Column::CreatedAt)
-            .offset(offset)
-            .limit(limit)
+            .offset(filter.offset)
+            .limit(filter.limit)
             .all(&self.db)
             .await
-            .map_err(|e| DatabaseError::FindAll(e.to_string()))?;
+            .map_err(|e| DatabaseError::FindMany(e.to_string()))?;
 
         Ok(models.into_iter().map(Into::into).collect())
     }
@@ -74,7 +77,7 @@ impl LightningPaymentRepository for LightningStore {
             id: Set(payment.id),
             status: Set(payment.status.to_string()),
             fee_msat: Set(payment.fee_msat.map(|v| v as i64)),
-            payment_time: Set(payment.payment_time.map(|v| v as i64)),
+            payment_time: Set(payment.payment_time),
             payment_hash: Set(payment.payment_hash),
             error: Set(payment.error),
             amount_msat: Set(payment.amount_msat as i64),
@@ -98,5 +101,19 @@ impl LightningPaymentRepository for LightningStore {
             .map_err(|e| DatabaseError::Update(e.to_string()))?;
 
         Ok(model.into())
+    }
+
+    async fn delete_payments(&self, filter: LightningPaymentFilter) -> Result<u64, DatabaseError> {
+        let result = Entity::delete_many()
+            .apply_if(filter.user_id, |q, user| q.filter(Column::UserId.eq(user)))
+            .apply_if(filter.id, |q, id| q.filter(Column::Id.eq(id)))
+            .apply_if(filter.status, |q, s| {
+                q.filter(Column::Status.eq(s.to_string()))
+            })
+            .exec(&self.db)
+            .await
+            .map_err(|e| DatabaseError::Delete(e.to_string()))?;
+
+        Ok(result.rows_affected)
     }
 }

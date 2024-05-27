@@ -7,7 +7,7 @@ use tracing::{debug, info, trace};
 use crate::{
     application::errors::ApplicationError,
     domains::{
-        lightning::usecases::LightningNodeUseCases,
+        lightning::services::LightningNodeUseCases,
         users::entities::{AuthUser, Permission},
     },
 };

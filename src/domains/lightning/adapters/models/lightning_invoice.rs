@@ -25,7 +25,7 @@ pub struct Model {
     pub description_hash: Option<String>,
     pub amount_msat: Option<i64>,
     #[sea_orm(column_type = "Binary(BlobSize::Blob(None))")]
-    pub payment_secret: Vec<u8>,
+    pub payment_secret: String,
     pub timestamp: DateTimeUtc,
     pub expiry: i64,
     pub fee_msat: Option<i64>,

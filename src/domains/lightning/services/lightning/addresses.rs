@@ -1,19 +1,20 @@
 use async_trait::async_trait;
 use regex::Regex;
 use tracing::{debug, info, trace};
+use uuid::Uuid;
 
 use crate::{
     application::errors::{ApplicationError, DataError},
-    domains::{
-        lightning::{
-            entities::{LNURLPayRequest, LightningAddress, LightningInvoice},
-            usecases::LightningAddressesUseCases,
-        },
-        users::entities::{AuthUser, Permission},
+    domains::lightning::{
+        entities::{LNURLPayRequest, LightningAddress, LightningAddressFilter, LightningInvoice},
+        services::LightningAddressesUseCases,
     },
 };
 
 use super::LightningService;
+
+const MIN_USERNAME_LENGTH: usize = 1;
+const MAX_USERNAME_LENGTH: usize = 64;
 
 #[async_trait]
 impl LightningAddressesUseCases for LightningService {
@@ -35,7 +36,7 @@ impl LightningAddressesUseCases for LightningService {
         amount: u64,
         comment: Option<String>,
     ) -> Result<LightningInvoice, ApplicationError> {
-        debug!(username, "Generating LNURLp invoice");
+        debug!(username, amount, comment, "Generating LNURLp invoice");
 
         let lightning_address = self
             .store
@@ -43,17 +44,18 @@ impl LightningAddressesUseCases for LightningService {
             .await?
             .ok_or_else(|| DataError::NotFound("Lightning address not found.".to_string()))?;
 
+        let comment = match comment {
+            Some(comm) if comm.is_empty() => self.invoice_description.clone(),
+            Some(comm) => comm,
+            None => self.invoice_description.clone(),
+        };
+
         let mut invoice = self
             .lightning_client
-            .invoice(
-                amount,
-                comment.clone().unwrap_or_default(),
-                self.invoice_expiry,
-            )
+            .invoice(amount, comment.clone(), self.invoice_expiry)
             .await?;
         invoice.user_id = lightning_address.user_id.clone();
         invoice.lightning_address = Some(username.clone());
-        invoice.description = comment;
 
         // TODO: Get or add more information to make this a LNURLp invoice (like fetching a success action specific to the user)
         let invoice = self.store.insert_invoice(invoice).await?;
@@ -64,13 +66,14 @@ impl LightningAddressesUseCases for LightningService {
 
     async fn register_address(
         &self,
-        user: AuthUser,
+        user_id: String,
         username: String,
     ) -> Result<LightningAddress, ApplicationError> {
-        debug!(
-            user_id = user.sub,
-            username, "Registering lightning address"
-        );
+        debug!(user_id, username, "Registering lightning address");
+
+        if username.len() < MIN_USERNAME_LENGTH || username.len() > MAX_USERNAME_LENGTH {
+            return Err(DataError::Validation("Invalid username length.".to_string()).into());
+        }
 
         // Regex validation for allowed characters
         let email_username_re = Regex::new(r"^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+$").unwrap(); // Can't fail by assertion
@@ -80,14 +83,11 @@ impl LightningAddressesUseCases for LightningService {
 
         if self
             .store
-            .find_address_by_user_id(&user.sub)
+            .find_address_by_user_id(&user_id)
             .await?
             .is_some()
         {
-            return Err(DataError::Conflict(
-                "User has already registered a lightning address.".to_string(),
-            )
-            .into());
+            return Err(DataError::Conflict("Duplicate User ID.".to_string()).into());
         }
 
         if self
@@ -96,66 +96,76 @@ impl LightningAddressesUseCases for LightningService {
             .await?
             .is_some()
         {
-            return Err(DataError::Conflict("Username already exists.".to_string()).into());
+            return Err(DataError::Conflict("Duplicate username.".to_string()).into());
         }
 
-        let lightning_address = self.store.insert_address(&user.sub, &username).await?;
+        let lightning_address = self.store.insert_address(&user_id, &username).await?;
 
         info!(
-            user_id = user.sub,
+            user_id,
             username, "Lightning address registered successfully"
         );
         Ok(lightning_address)
     }
 
-    async fn get_address(
-        &self,
-        user: AuthUser,
-        username: String,
-    ) -> Result<LightningAddress, ApplicationError> {
-        trace!(user_id = user.sub, "Fetching lightning address");
+    async fn get_address(&self, id: Uuid) -> Result<LightningAddress, ApplicationError> {
+        trace!(%id, "Fetching lightning address");
 
         let lightning_address = self
             .store
-            .find_address_by_username(&username)
+            .find_address(id)
             .await?
             .ok_or_else(|| DataError::NotFound("Lightning address not found.".to_string()))?;
 
-        if lightning_address.user_id != user.sub {
-            user.check_permission(Permission::ReadLightningAccounts)?;
-        }
-
-        debug!(user_id = user.sub, "Lightning address fetched successfully");
+        debug!(
+            %id, "Lightning address fetched successfully"
+        );
         Ok(lightning_address)
     }
 
     async fn list_addresses(
         &self,
-        user: AuthUser,
-        limit: Option<u64>,
-        offset: Option<u64>,
+        filter: LightningAddressFilter,
     ) -> Result<Vec<LightningAddress>, ApplicationError> {
-        trace!(
-            user_id = user.sub,
-            limit,
-            offset,
-            "Listing lightning addresses"
-        );
+        trace!(?filter, "Listing lightning addresses");
 
-        let lightning_addresses = if user.has_permission(Permission::ReadLightningAccounts) {
-            // The user has permission to view all addresses
-            self.store.find_all_addresses(None, limit, offset).await?
-        } else {
-            // The user can only view their own addresses
-            self.store
-                .find_all_addresses(Some(user.sub.clone()), limit, offset)
-                .await?
-        };
+        let lightning_addresses = self.store.find_addresses(filter.clone()).await?;
 
-        debug!(
-            user_id = user.sub,
-            "Lightning addresses listed successfully"
-        );
+        debug!(?filter, "Lightning addresses listed successfully");
         Ok(lightning_addresses)
+    }
+
+    async fn delete_address(&self, id: Uuid) -> Result<(), ApplicationError> {
+        debug!(%id, "Deleting lightning address");
+
+        let n_deleted = self
+            .store
+            .delete_addresses(LightningAddressFilter {
+                id: Some(id),
+                ..Default::default()
+            })
+            .await?;
+
+        if n_deleted == 0 {
+            return Err(DataError::NotFound("Lightning address not found.".to_string()).into());
+        }
+
+        info!(%id, "Lightning address deleted successfully");
+        Ok(())
+    }
+
+    async fn delete_addresses(
+        &self,
+        filter: LightningAddressFilter,
+    ) -> Result<u64, ApplicationError> {
+        debug!(?filter, "Deleting lightning addresses");
+
+        let n_deleted = self.store.delete_addresses(filter.clone()).await?;
+
+        info!(
+            ?filter,
+            n_deleted, "Lightning addresses deleted successfully"
+        );
+        Ok(n_deleted)
     }
 }
