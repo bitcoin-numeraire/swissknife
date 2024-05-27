@@ -55,9 +55,11 @@ impl LightningInvoiceRepository for LightningStore {
                 LightningInvoiceStatus::SETTLED => {
                     q.filter(Expr::col(Column::PaymentTime).is_not_null())
                 }
-                LightningInvoiceStatus::EXPIRED => {
-                    q.filter(Expr::col(Column::ExpiresAt).lte(Expr::current_timestamp()))
-                }
+                LightningInvoiceStatus::EXPIRED => q.filter(
+                    Condition::all()
+                        .add(Expr::col(Column::ExpiresAt).lte(Expr::current_timestamp()))
+                        .add(Expr::col(Column::PaymentTime).is_null()),
+                ),
             })
             .order_by_desc(Column::CreatedAt)
             .offset(filter.offset)
@@ -134,9 +136,11 @@ impl LightningInvoiceRepository for LightningStore {
                 LightningInvoiceStatus::SETTLED => {
                     q.filter(Expr::col(Column::PaymentTime).is_not_null())
                 }
-                LightningInvoiceStatus::EXPIRED => {
-                    q.filter(Expr::col(Column::ExpiresAt).lte(Expr::current_timestamp()))
-                }
+                LightningInvoiceStatus::EXPIRED => q.filter(
+                    Condition::all()
+                        .add(Expr::col(Column::ExpiresAt).lte(Expr::current_timestamp()))
+                        .add(Expr::col(Column::PaymentTime).is_null()),
+                ),
             })
             .exec(&self.db)
             .await
