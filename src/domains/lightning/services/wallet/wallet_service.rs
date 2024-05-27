@@ -1,3 +1,5 @@
+use std::u64::MAX;
+
 use crate::{
     application::errors::ApplicationError,
     domains::lightning::{
@@ -19,6 +21,9 @@ impl WalletService {
     }
 }
 
+const PAYMENTS_LIMIT: u64 = 15;
+const INVOICES_LIMIT: u64 = 15;
+
 #[async_trait]
 impl WalletUseCases for WalletService {
     async fn get_balance(&self, user_id: String) -> Result<UserBalance, ApplicationError> {
@@ -38,6 +43,7 @@ impl WalletUseCases for WalletService {
             .store
             .find_payments(LightningPaymentFilter {
                 user_id: Some(user_id.clone()),
+                limit: Some(PAYMENTS_LIMIT),
                 ..Default::default()
             })
             .await?;
@@ -45,6 +51,7 @@ impl WalletUseCases for WalletService {
             .store
             .find_invoices(LightningInvoiceFilter {
                 user_id: Some(user_id.clone()),
+                limit: Some(INVOICES_LIMIT),
                 ..Default::default()
             })
             .await?;
