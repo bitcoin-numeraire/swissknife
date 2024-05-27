@@ -8,11 +8,11 @@ use axum::{
 use uuid::Uuid;
 
 use crate::{
-    application::{
-        dtos::{LightningInvoiceFilter, LightningInvoiceResponse, NewInvoiceRequest},
-        errors::ApplicationError,
+    application::{dtos::NewInvoiceRequest, errors::ApplicationError},
+    domains::{
+        lightning::entities::{LightningInvoice, LightningInvoiceFilter},
+        users::entities::{AuthUser, Permission},
     },
-    domains::users::entities::{AuthUser, Permission},
     infra::app::AppState,
 };
 
@@ -32,13 +32,13 @@ impl LightningInvoiceHandler {
         State(app_state): State<Arc<AppState>>,
         user: AuthUser,
         Json(payload): Json<NewInvoiceRequest>,
-    ) -> Result<Json<LightningInvoiceResponse>, ApplicationError> {
+    ) -> Result<Json<LightningInvoice>, ApplicationError> {
         user.check_permission(Permission::WriteLightningTransaction)?;
 
         let lightning_address = app_state
             .lightning
             .generate_invoice(
-                payload.user_id,
+                payload.user_id.unwrap_or(user.sub),
                 payload.amount_msat,
                 payload.description,
                 payload.expiry,
@@ -51,7 +51,7 @@ impl LightningInvoiceHandler {
         State(app_state): State<Arc<AppState>>,
         user: AuthUser,
         Path(id): Path<Uuid>,
-    ) -> Result<Json<LightningInvoiceResponse>, ApplicationError> {
+    ) -> Result<Json<LightningInvoice>, ApplicationError> {
         user.check_permission(Permission::ReadLightningTransaction)?;
 
         let lightning_address = app_state.lightning.get_invoice(id).await?;
@@ -62,12 +62,12 @@ impl LightningInvoiceHandler {
         State(app_state): State<Arc<AppState>>,
         user: AuthUser,
         Query(query_params): Query<LightningInvoiceFilter>,
-    ) -> Result<Json<Vec<LightningInvoiceResponse>>, ApplicationError> {
+    ) -> Result<Json<Vec<LightningInvoice>>, ApplicationError> {
         user.check_permission(Permission::ReadLightningTransaction)?;
 
         let lightning_invoices = app_state.lightning.list_invoices(query_params).await?;
 
-        let response: Vec<LightningInvoiceResponse> =
+        let response: Vec<LightningInvoice> =
             lightning_invoices.into_iter().map(Into::into).collect();
 
         Ok(response.into())

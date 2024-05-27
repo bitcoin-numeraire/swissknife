@@ -2,10 +2,11 @@ use async_trait::async_trait;
 
 use crate::{
     application::errors::ApplicationError,
-    domains::{lightning::entities::UserBalance, users::entities::AuthUser},
+    domains::lightning::entities::{UserBalance, Wallet},
 };
 
 #[async_trait]
 pub trait WalletUseCases: Send + Sync {
-    async fn get_balance(&self, user: AuthUser) -> Result<UserBalance, ApplicationError>;
+    async fn get_balance(&self, user: String) -> Result<UserBalance, ApplicationError>;
+    async fn get(&self, user_id: String) -> Result<Wallet, ApplicationError>;
 }

@@ -1,11 +1,11 @@
 use crate::{
-    application::{dtos::LightningInvoiceFilter, errors::DatabaseError},
+    application::errors::DatabaseError,
     domains::lightning::{
         adapters::{
             models::lightning_invoice::{ActiveModel, Column, Entity},
             repository::LightningInvoiceRepository,
         },
-        entities::{LightningInvoice, LightningInvoiceStatus},
+        entities::{LightningInvoice, LightningInvoiceFilter, LightningInvoiceStatus},
     },
 };
 use async_trait::async_trait;

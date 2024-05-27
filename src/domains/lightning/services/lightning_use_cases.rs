@@ -5,16 +5,11 @@ use breez_sdk_core::{
 use uuid::Uuid;
 
 use crate::{
-    application::{
-        dtos::{
-            LightningAddressFilter, LightningInvoiceFilter, LightningPaymentFilter,
-            SendPaymentRequest,
-        },
-        errors::ApplicationError,
-    },
+    application::{dtos::SendPaymentRequest, errors::ApplicationError},
     domains::{
         lightning::entities::{
-            LNURLPayRequest, LightningAddress, LightningInvoice, LightningPayment,
+            LNURLPayRequest, LightningAddress, LightningAddressFilter, LightningInvoice,
+            LightningInvoiceFilter, LightningPayment, LightningPaymentFilter,
         },
         users::entities::AuthUser,
     },

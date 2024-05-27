@@ -3,11 +3,11 @@ use tracing::{debug, info, trace};
 use uuid::Uuid;
 
 use crate::{
-    application::{
-        dtos::LightningInvoiceFilter,
-        errors::{ApplicationError, DataError},
+    application::errors::{ApplicationError, DataError},
+    domains::lightning::{
+        entities::{LightningInvoice, LightningInvoiceFilter},
+        services::LightningInvoicesUseCases,
     },
-    domains::lightning::{entities::LightningInvoice, services::LightningInvoicesUseCases},
 };
 
 use super::LightningService;

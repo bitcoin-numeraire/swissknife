@@ -3,12 +3,10 @@ use sea_orm::DatabaseTransaction;
 use uuid::Uuid;
 
 use crate::{
-    application::{
-        dtos::{LightningAddressFilter, LightningInvoiceFilter, LightningPaymentFilter},
-        errors::DatabaseError,
-    },
+    application::errors::DatabaseError,
     domains::lightning::entities::{
-        LightningAddress, LightningInvoice, LightningPayment, UserBalance,
+        LightningAddress, LightningAddressFilter, LightningInvoice, LightningInvoiceFilter,
+        LightningPayment, LightningPaymentFilter, UserBalance,
     },
 };
 

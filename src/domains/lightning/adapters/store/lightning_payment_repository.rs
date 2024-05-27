@@ -6,9 +6,9 @@ use sea_orm::{
 };
 use uuid::Uuid;
 
-use crate::application::dtos::LightningPaymentFilter;
 use crate::domains::lightning::adapters::models::lightning_payment::{ActiveModel, Column, Entity};
 use crate::domains::lightning::adapters::repository::LightningPaymentRepository;
+use crate::domains::lightning::entities::LightningPaymentFilter;
 use crate::{application::errors::DatabaseError, domains::lightning::entities::LightningPayment};
 
 use super::LightningStore;

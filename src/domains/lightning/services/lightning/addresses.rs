@@ -4,12 +4,9 @@ use tracing::{debug, info, trace};
 use uuid::Uuid;
 
 use crate::{
-    application::{
-        dtos::LightningAddressFilter,
-        errors::{ApplicationError, DataError},
-    },
+    application::errors::{ApplicationError, DataError},
     domains::lightning::{
-        entities::{LNURLPayRequest, LightningAddress, LightningInvoice},
+        entities::{LNURLPayRequest, LightningAddress, LightningAddressFilter, LightningInvoice},
         services::LightningAddressesUseCases,
     },
 };

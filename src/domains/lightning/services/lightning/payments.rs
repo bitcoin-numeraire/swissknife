@@ -5,11 +5,11 @@ use uuid::Uuid;
 
 use crate::{
     application::{
-        dtos::{LightningPaymentFilter, SendPaymentRequest},
+        dtos::SendPaymentRequest,
         errors::{ApplicationError, DataError, DatabaseError, LightningError},
     },
     domains::lightning::{
-        entities::{LightningPayment, LightningPaymentStatus},
+        entities::{LightningPayment, LightningPaymentFilter, LightningPaymentStatus},
         services::LightningPaymentsUseCases,
     },
 };
@@ -208,11 +208,11 @@ impl LightningPaymentsUseCases for LightningService {
 
         let payment = match input_type {
             InputType::Bolt11 { invoice } => {
-                self.send_bolt11(req.user_id, invoice, req.amount_msat)
+                self.send_bolt11(req.user_id.unwrap(), invoice, req.amount_msat)
                     .await
             }
             InputType::LnUrlPay { data } => {
-                self.send_lnurl_pay(req.user_id, data, req.amount_msat, req.comment)
+                self.send_lnurl_pay(req.user_id.unwrap(), data, req.amount_msat, req.comment)
                     .await
             }
             InputType::LnUrlError { data } => Err(DataError::Validation(data.reason).into()),

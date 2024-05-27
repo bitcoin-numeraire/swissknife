@@ -19,7 +19,7 @@ impl Into<LightningInvoice> for InvoiceResponse {
             bolt11: self.bolt11,
             payment_hash: invoice.payment_hash().to_hex(),
             amount_msat: invoice.amount_milli_satoshis(),
-            payment_secret: self.payment_secret,
+            payment_secret: self.payment_secret.to_hex(),
             timestamp: Utc
                 .timestamp_opt(
                     invoice.duration_since_epoch().as_secs() as i64,

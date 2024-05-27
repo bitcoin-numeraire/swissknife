@@ -5,9 +5,9 @@ use sea_orm::{
 };
 use uuid::Uuid;
 
-use crate::application::dtos::LightningAddressFilter;
 use crate::domains::lightning::adapters::models::lightning_address::{ActiveModel, Column, Entity};
 use crate::domains::lightning::adapters::repository::LightningAddressRepository;
+use crate::domains::lightning::entities::LightningAddressFilter;
 use crate::{application::errors::DatabaseError, domains::lightning::entities::LightningAddress};
 
 use super::LightningStore;

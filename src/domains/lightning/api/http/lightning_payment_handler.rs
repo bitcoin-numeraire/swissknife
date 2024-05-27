@@ -8,11 +8,11 @@ use axum::{
 use uuid::Uuid;
 
 use crate::{
-    application::{
-        dtos::{LightningPaymentFilter, LightningPaymentResponse, SendPaymentRequest},
-        errors::ApplicationError,
+    application::{dtos::SendPaymentRequest, errors::ApplicationError},
+    domains::{
+        lightning::entities::{LightningPayment, LightningPaymentFilter},
+        users::entities::{AuthUser, Permission},
     },
-    domains::users::entities::{AuthUser, Permission},
     infra::app::AppState,
 };
 
@@ -32,7 +32,7 @@ impl LightningPaymentHandler {
         State(app_state): State<Arc<AppState>>,
         user: AuthUser,
         Json(payload): Json<SendPaymentRequest>,
-    ) -> Result<Json<LightningPaymentResponse>, ApplicationError> {
+    ) -> Result<Json<LightningPayment>, ApplicationError> {
         user.check_permission(Permission::WriteLightningTransaction)?;
 
         let payment = app_state.lightning.pay(payload).await?;
@@ -43,7 +43,7 @@ impl LightningPaymentHandler {
         State(app_state): State<Arc<AppState>>,
         user: AuthUser,
         Path(id): Path<Uuid>,
-    ) -> Result<Json<LightningPaymentResponse>, ApplicationError> {
+    ) -> Result<Json<LightningPayment>, ApplicationError> {
         user.check_permission(Permission::ReadLightningTransaction)?;
 
         let lightning_address = app_state.lightning.get_payment(id).await?;
@@ -54,12 +54,12 @@ impl LightningPaymentHandler {
         State(app_state): State<Arc<AppState>>,
         user: AuthUser,
         Query(query_params): Query<LightningPaymentFilter>,
-    ) -> Result<Json<Vec<LightningPaymentResponse>>, ApplicationError> {
+    ) -> Result<Json<Vec<LightningPayment>>, ApplicationError> {
         user.check_permission(Permission::ReadLightningTransaction)?;
 
         let lightning_payments = app_state.lightning.list_payments(query_params).await?;
 
-        let response: Vec<LightningPaymentResponse> =
+        let response: Vec<LightningPayment> =
             lightning_payments.into_iter().map(Into::into).collect();
 
         Ok(response.into())
