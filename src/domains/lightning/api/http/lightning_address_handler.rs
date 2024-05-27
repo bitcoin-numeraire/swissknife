@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use axum::{
     extract::{Path, Query, State},
-    routing::{get, post},
+    routing::{delete, get, post},
     Json, Router,
 };
 use uuid::Uuid;
@@ -24,6 +24,8 @@ impl LightningAddressHandler {
             .route("/", get(Self::list))
             .route("/", post(Self::register))
             .route("/:id", get(Self::get))
+            .route("/:id", delete(Self::delete))
+            .route("/", delete(Self::delete_many))
     }
 
     async fn register(
@@ -64,5 +66,27 @@ impl LightningAddressHandler {
             lightning_addresses.into_iter().map(Into::into).collect();
 
         Ok(response.into())
+    }
+
+    async fn delete(
+        State(app_state): State<Arc<AppState>>,
+        user: AuthUser,
+        Path(id): Path<Uuid>,
+    ) -> Result<(), ApplicationError> {
+        user.check_permission(Permission::WriteLightningAddress)?;
+
+        app_state.lightning.delete_address(id).await?;
+        Ok(())
+    }
+
+    async fn delete_many(
+        State(app_state): State<Arc<AppState>>,
+        user: AuthUser,
+        Query(query_params): Query<LightningAddressFilter>,
+    ) -> Result<Json<u64>, ApplicationError> {
+        user.check_permission(Permission::WriteLightningAddress)?;
+
+        let n_deleted = app_state.lightning.delete_addresses(query_params).await?;
+        Ok(n_deleted.into())
     }
 }

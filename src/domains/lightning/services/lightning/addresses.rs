@@ -134,4 +134,38 @@ impl LightningAddressesUseCases for LightningService {
         debug!(?filter, "Lightning addresses listed successfully");
         Ok(lightning_addresses)
     }
+
+    async fn delete_address(&self, id: Uuid) -> Result<(), ApplicationError> {
+        debug!(%id, "Deleting lightning address");
+
+        let n_deleted = self
+            .store
+            .delete_addresses(LightningAddressFilter {
+                id: Some(id),
+                ..Default::default()
+            })
+            .await?;
+
+        if n_deleted == 0 {
+            return Err(DataError::NotFound("Lightning address not found.".to_string()).into());
+        }
+
+        info!(%id, "Lightning address deleted successfully");
+        Ok(())
+    }
+
+    async fn delete_addresses(
+        &self,
+        filter: LightningAddressFilter,
+    ) -> Result<u64, ApplicationError> {
+        debug!(?filter, "Deleting lightning addresses");
+
+        let n_deleted = self.store.delete_addresses(filter.clone()).await?;
+
+        info!(
+            ?filter,
+            n_deleted, "Lightning addresses deleted successfully"
+        );
+        Ok(n_deleted)
+    }
 }

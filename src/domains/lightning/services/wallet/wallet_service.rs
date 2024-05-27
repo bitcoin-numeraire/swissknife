@@ -1,5 +1,3 @@
-use std::u64::MAX;
-
 use crate::{
     application::errors::ApplicationError,
     domains::lightning::{

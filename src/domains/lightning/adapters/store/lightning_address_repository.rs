@@ -87,4 +87,18 @@ impl LightningAddressRepository for LightningStore {
 
         Ok(model.into())
     }
+
+    async fn delete_addresses(&self, filter: LightningAddressFilter) -> Result<u64, DatabaseError> {
+        let result = Entity::delete_many()
+            .apply_if(filter.user_id, |q, user| q.filter(Column::UserId.eq(user)))
+            .apply_if(filter.id, |q, id| q.filter(Column::Id.eq(id)))
+            .apply_if(filter.username, |q, username| {
+                q.filter(Column::Username.eq(username))
+            })
+            .exec(&self.db)
+            .await
+            .map_err(|e| DatabaseError::Delete(e.to_string()))?;
+
+        Ok(result.rows_affected)
+    }
 }

@@ -39,6 +39,7 @@ pub trait LightningAddressRepository {
         user: &str,
         username: &str,
     ) -> Result<LightningAddress, DatabaseError>;
+    async fn delete_addresses(&self, filter: LightningAddressFilter) -> Result<u64, DatabaseError>;
 }
 
 #[async_trait]

@@ -71,6 +71,11 @@ pub trait LightningAddressesUseCases {
         &self,
         filter: LightningAddressFilter,
     ) -> Result<Vec<LightningAddress>, ApplicationError>;
+    async fn delete_address(&self, id: Uuid) -> Result<(), ApplicationError>;
+    async fn delete_addresses(
+        &self,
+        filter: LightningAddressFilter,
+    ) -> Result<u64, ApplicationError>;
 }
 
 #[async_trait]
