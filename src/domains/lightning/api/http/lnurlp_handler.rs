@@ -18,10 +18,12 @@ use crate::{
 pub struct LNURLpHandler;
 
 impl LNURLpHandler {
-    pub fn routes() -> Router<Arc<AppState>> {
-        Router::new()
-            .route("/:username", get(Self::well_known_lnurlp))
-            .route("/:username/callback", get(Self::invoice))
+    pub fn well_known_route() -> Router<Arc<AppState>> {
+        Router::new().route("/:username", get(Self::well_known_lnurlp))
+    }
+
+    pub fn callback_route() -> Router<Arc<AppState>> {
+        Router::new().route("/:username/callback", get(Self::invoice))
     }
 
     async fn well_known_lnurlp(
@@ -29,7 +31,6 @@ impl LNURLpHandler {
         State(app_state): State<Arc<AppState>>,
     ) -> Result<Json<LNURLPayRequest>, ApplicationError> {
         let lnurlp = app_state.lightning.generate_lnurlp(username).await?;
-
         Ok(lnurlp.into())
     }
 
@@ -42,7 +43,6 @@ impl LNURLpHandler {
             .lightning
             .generate_lnurlp_invoice(username, query_params.amount, query_params.comment)
             .await?;
-
         Ok(Json(invoice.into()))
     }
 }

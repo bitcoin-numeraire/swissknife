@@ -1,10 +1,10 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use breez_sdk_core::{BreezEvent, EventListener};
+use breez_sdk_core::{BreezEvent, EventListener, PaymentStatus, PaymentType};
 use tracing::{trace, warn};
 
-use crate::domains::lightning::services::PaymentsProcessorUseCases;
+use crate::domains::payments::services::PaymentsProcessorUseCases;
 
 pub struct BreezListener {
     pub payments_processor: Arc<dyn PaymentsProcessorUseCases>,
@@ -24,6 +24,22 @@ impl EventListener for BreezListener {
                 trace!("New InvoicePaid event received");
 
                 if let Some(payment) = details.payment {
+                    if payment.status != PaymentStatus::Complete {
+                        warn!(
+                            payment_hash = payment.id,
+                            "Invalid payment status. Expected Complete."
+                        );
+                        return;
+                    }
+
+                    if payment.payment_type != PaymentType::Received {
+                        warn!(
+                            payment_hash = payment.id,
+                            "Invalid payment type. Expected Received."
+                        );
+                        return;
+                    }
+
                     let payments_processor = self.payments_processor.clone();
                     tokio::spawn(async move {
                         if let Err(err) = payments_processor.process_incoming_payment(payment).await
@@ -37,6 +53,22 @@ impl EventListener for BreezListener {
             }
             BreezEvent::PaymentSucceed { details } => {
                 trace!("New PaymentSucceed event received");
+
+                if details.status != PaymentStatus::Complete {
+                    warn!(
+                        payment_hash = details.id,
+                        "Invalid payment status. Expected Complete."
+                    );
+                    return;
+                }
+
+                if details.payment_type != PaymentType::Sent {
+                    warn!(
+                        payment_hash = details.id,
+                        "Invalid payment type. Expected Sent."
+                    );
+                    return;
+                }
 
                 let payments_processor = self.payments_processor.clone();
                 tokio::spawn(async move {

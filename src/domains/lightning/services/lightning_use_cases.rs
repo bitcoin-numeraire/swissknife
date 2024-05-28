@@ -1,54 +1,32 @@
 use async_trait::async_trait;
 use breez_sdk_core::{
-    LspInformation, NodeState, Payment, ReverseSwapInfo, ServiceHealthCheckResponse,
+    LspInformation, NodeState, Payment as BreezPayment, ReverseSwapInfo, ServiceHealthCheckResponse,
 };
 use uuid::Uuid;
 
 use crate::{
-    application::{dtos::SendPaymentRequest, errors::ApplicationError},
+    application::errors::ApplicationError,
     domains::{
         lightning::entities::{
-            LNURLPayRequest, LightningAddress, LightningAddressFilter, LightningInvoice,
-            LightningInvoiceFilter, LightningPayment, LightningPaymentFilter,
+            Invoice, InvoiceFilter, LNURLPayRequest, LightningAddress, LightningAddressFilter,
         },
         users::entities::AuthUser,
     },
 };
 
 #[async_trait]
-pub trait LightningInvoicesUseCases {
+pub trait InvoicesUseCases {
     async fn generate_invoice(
         &self,
         user_id: String,
         amount: u64,
         description: Option<String>,
         expiry: Option<u32>,
-    ) -> Result<LightningInvoice, ApplicationError>;
-    async fn get_invoice(&self, id: Uuid) -> Result<LightningInvoice, ApplicationError>;
-    async fn list_invoices(
-        &self,
-        filter: LightningInvoiceFilter,
-    ) -> Result<Vec<LightningInvoice>, ApplicationError>;
+    ) -> Result<Invoice, ApplicationError>;
+    async fn get_invoice(&self, id: Uuid) -> Result<Invoice, ApplicationError>;
+    async fn list_invoices(&self, filter: InvoiceFilter) -> Result<Vec<Invoice>, ApplicationError>;
     async fn delete_invoice(&self, id: Uuid) -> Result<(), ApplicationError>;
-    async fn delete_invoices(
-        &self,
-        filter: LightningInvoiceFilter,
-    ) -> Result<u64, ApplicationError>;
-}
-
-#[async_trait]
-pub trait LightningPaymentsUseCases {
-    async fn pay(&self, req: SendPaymentRequest) -> Result<LightningPayment, ApplicationError>;
-    async fn get_payment(&self, id: Uuid) -> Result<LightningPayment, ApplicationError>;
-    async fn list_payments(
-        &self,
-        filter: LightningPaymentFilter,
-    ) -> Result<Vec<LightningPayment>, ApplicationError>;
-    async fn delete_payment(&self, id: Uuid) -> Result<(), ApplicationError>;
-    async fn delete_payments(
-        &self,
-        filter: LightningPaymentFilter,
-    ) -> Result<u64, ApplicationError>;
+    async fn delete_invoices(&self, filter: InvoiceFilter) -> Result<u64, ApplicationError>;
 }
 
 #[async_trait]
@@ -59,8 +37,7 @@ pub trait LightningAddressesUseCases {
         username: String,
         amount: u64,
         description: Option<String>,
-    ) -> Result<LightningInvoice, ApplicationError>;
-
+    ) -> Result<Invoice, ApplicationError>;
     async fn register_address(
         &self,
         user_id: String,
@@ -83,7 +60,10 @@ pub trait LightningNodeUseCases {
     async fn node_info(&self, user: AuthUser) -> Result<NodeState, ApplicationError>;
     async fn lsp_info(&self, user: AuthUser) -> Result<LspInformation, ApplicationError>;
     async fn list_lsps(&self, user: AuthUser) -> Result<Vec<LspInformation>, ApplicationError>;
-    async fn list_node_payments(&self, user: AuthUser) -> Result<Vec<Payment>, ApplicationError>;
+    async fn list_node_payments(
+        &self,
+        user: AuthUser,
+    ) -> Result<Vec<BreezPayment>, ApplicationError>;
     async fn close_lsp_channels(&self, user: AuthUser) -> Result<Vec<String>, ApplicationError>;
     async fn pay_onchain(
         &self,
@@ -105,22 +85,12 @@ pub trait LightningNodeUseCases {
 }
 
 pub trait LightningUseCases:
-    LightningPaymentsUseCases
-    + LightningInvoicesUseCases
-    + LightningAddressesUseCases
-    + LightningNodeUseCases
-    + Send
-    + Sync
+    InvoicesUseCases + LightningAddressesUseCases + LightningNodeUseCases + Send + Sync
 {
 }
 
 // Ensure that any type that implements the individual traits also implements the new trait.
 impl<T> LightningUseCases for T where
-    T: LightningPaymentsUseCases
-        + LightningInvoicesUseCases
-        + LightningAddressesUseCases
-        + LightningNodeUseCases
-        + Send
-        + Sync
+    T: InvoicesUseCases + LightningAddressesUseCases + LightningNodeUseCases + Send + Sync
 {
 }

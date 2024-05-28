@@ -10,15 +10,15 @@ use uuid::Uuid;
 use crate::{
     application::{dtos::NewInvoiceRequest, errors::ApplicationError},
     domains::{
-        lightning::entities::{LightningInvoice, LightningInvoiceFilter},
+        lightning::entities::{Invoice, InvoiceFilter},
         users::entities::{AuthUser, Permission},
     },
     infra::app::AppState,
 };
 
-pub struct LightningInvoiceHandler;
+pub struct InvoiceHandler;
 
-impl LightningInvoiceHandler {
+impl InvoiceHandler {
     pub fn routes() -> Router<Arc<AppState>> {
         Router::new()
             .route("/", post(Self::generate))
@@ -32,7 +32,7 @@ impl LightningInvoiceHandler {
         State(app_state): State<Arc<AppState>>,
         user: AuthUser,
         Json(payload): Json<NewInvoiceRequest>,
-    ) -> Result<Json<LightningInvoice>, ApplicationError> {
+    ) -> Result<Json<Invoice>, ApplicationError> {
         user.check_permission(Permission::WriteLightningTransaction)?;
 
         let lightning_address = app_state
@@ -51,7 +51,7 @@ impl LightningInvoiceHandler {
         State(app_state): State<Arc<AppState>>,
         user: AuthUser,
         Path(id): Path<Uuid>,
-    ) -> Result<Json<LightningInvoice>, ApplicationError> {
+    ) -> Result<Json<Invoice>, ApplicationError> {
         user.check_permission(Permission::ReadLightningTransaction)?;
 
         let lightning_address = app_state.lightning.get_invoice(id).await?;
@@ -61,14 +61,13 @@ impl LightningInvoiceHandler {
     async fn list(
         State(app_state): State<Arc<AppState>>,
         user: AuthUser,
-        Query(query_params): Query<LightningInvoiceFilter>,
-    ) -> Result<Json<Vec<LightningInvoice>>, ApplicationError> {
+        Query(query_params): Query<InvoiceFilter>,
+    ) -> Result<Json<Vec<Invoice>>, ApplicationError> {
         user.check_permission(Permission::ReadLightningTransaction)?;
 
         let lightning_invoices = app_state.lightning.list_invoices(query_params).await?;
 
-        let response: Vec<LightningInvoice> =
-            lightning_invoices.into_iter().map(Into::into).collect();
+        let response: Vec<Invoice> = lightning_invoices.into_iter().map(Into::into).collect();
 
         Ok(response.into())
     }
@@ -87,7 +86,7 @@ impl LightningInvoiceHandler {
     async fn delete_many(
         State(app_state): State<Arc<AppState>>,
         user: AuthUser,
-        Query(query_params): Query<LightningInvoiceFilter>,
+        Query(query_params): Query<InvoiceFilter>,
     ) -> Result<Json<u64>, ApplicationError> {
         user.check_permission(Permission::WriteLightningTransaction)?;
 

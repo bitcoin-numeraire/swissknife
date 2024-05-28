@@ -6,7 +6,6 @@ request_timeout = "60s"
 # Lightning settings
 [lightning]
 invoice_expiry = 3600
-invoice_description = "Numeraire Invoice"
 domain = "numeraire.tech"
 provider = "breez"
 

@@ -5,8 +5,7 @@ use uuid::Uuid;
 use crate::{
     application::errors::DatabaseError,
     domains::lightning::entities::{
-        LightningAddress, LightningAddressFilter, LightningInvoice, LightningInvoiceFilter,
-        LightningPayment, LightningPaymentFilter, UserBalance,
+        Invoice, InvoiceFilter, LightningAddress, LightningAddressFilter, UserBalance,
     },
 };
 
@@ -43,44 +42,24 @@ pub trait LightningAddressRepository {
 }
 
 #[async_trait]
-pub trait LightningInvoiceRepository {
-    async fn find_invoice(&self, id: Uuid) -> Result<Option<LightningInvoice>, DatabaseError>;
+pub trait InvoiceRepository {
+    async fn find_invoice(&self, id: Uuid) -> Result<Option<Invoice>, DatabaseError>;
     async fn find_invoice_by_payment_hash(
         &self,
         payment_hash: &str,
-    ) -> Result<Option<LightningInvoice>, DatabaseError>;
-    async fn find_invoices(
-        &self,
-        filter: LightningInvoiceFilter,
-    ) -> Result<Vec<LightningInvoice>, DatabaseError>;
+    ) -> Result<Option<Invoice>, DatabaseError>;
+    async fn find_invoices(&self, filter: InvoiceFilter) -> Result<Vec<Invoice>, DatabaseError>;
     async fn insert_invoice(
         &self,
-        invoice: LightningInvoice,
-    ) -> Result<LightningInvoice, DatabaseError>;
+        txn: Option<&DatabaseTransaction>,
+        invoice: Invoice,
+    ) -> Result<Invoice, DatabaseError>;
     async fn update_invoice(
         &self,
-        invoice: LightningInvoice,
-    ) -> Result<LightningInvoice, DatabaseError>;
-    async fn delete_invoices(&self, filter: LightningInvoiceFilter) -> Result<u64, DatabaseError>;
-}
-
-#[async_trait]
-pub trait LightningPaymentRepository {
-    async fn find_payment(&self, id: Uuid) -> Result<Option<LightningPayment>, DatabaseError>;
-    async fn find_payments(
-        &self,
-        filter: LightningPaymentFilter,
-    ) -> Result<Vec<LightningPayment>, DatabaseError>;
-    async fn insert_payment(
-        &self,
         txn: Option<&DatabaseTransaction>,
-        payment: LightningPayment,
-    ) -> Result<LightningPayment, DatabaseError>;
-    async fn update_payment(
-        &self,
-        payment: LightningPayment,
-    ) -> Result<LightningPayment, DatabaseError>;
-    async fn delete_payments(&self, filter: LightningPaymentFilter) -> Result<u64, DatabaseError>;
+        invoice: Invoice,
+    ) -> Result<Invoice, DatabaseError>;
+    async fn delete_invoices(&self, filter: InvoiceFilter) -> Result<u64, DatabaseError>;
 }
 
 #[async_trait]
@@ -89,21 +68,14 @@ pub trait TransactionManager {
 }
 
 pub trait LightningRepository:
-    LightningAddressRepository
-    + LightningPaymentRepository
-    + LightningInvoiceRepository
-    + WalletRepository
-    + TransactionManager
-    + Sync
-    + Send
+    LightningAddressRepository + InvoiceRepository + WalletRepository + TransactionManager + Sync + Send
 {
 }
 
 // Ensure that any type that implements the individual traits also implements the new trait.
 impl<T> LightningRepository for T where
     T: LightningAddressRepository
-        + LightningPaymentRepository
-        + LightningInvoiceRepository
+        + InvoiceRepository
         + WalletRepository
         + TransactionManager
         + Sync

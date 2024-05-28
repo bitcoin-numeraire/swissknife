@@ -3,4 +3,4 @@ mod repository;
 mod store;
 
 pub use repository::LightningRepository;
-pub use store::LightningStore;
+pub use store::SqlxStore;

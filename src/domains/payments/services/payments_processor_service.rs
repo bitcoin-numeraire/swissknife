@@ -1,25 +1,36 @@
 use async_trait::async_trait;
-use breez_sdk_core::{Payment, PaymentDetails, PaymentFailedData, PaymentStatus, PaymentType};
+use breez_sdk_core::{Payment as BreezPayment, PaymentDetails, PaymentFailedData};
 use chrono::{TimeZone, Utc};
 use tracing::{info, trace};
 use uuid::Uuid;
 
 use crate::{
     application::errors::{ApplicationError, DataError},
-    domains::lightning::{
-        adapters::LightningRepository,
-        entities::{LightningInvoice, LightningPayment, LightningPaymentStatus},
-        services::PaymentsProcessorUseCases,
+    domains::{
+        lightning::{adapters::LightningRepository, entities::Invoice},
+        payments::{
+            adapters::PaymentRepository,
+            entities::{Payment, PaymentStatus},
+        },
     },
 };
 
+use super::PaymentsProcessorUseCases;
+
 pub struct BreezPaymentsProcessor {
-    pub store: Box<dyn LightningRepository>,
+    pub lightning_repo: Box<dyn LightningRepository>,
+    pub payment_repo: Box<dyn PaymentRepository>,
 }
 
 impl BreezPaymentsProcessor {
-    pub fn new(store: Box<dyn LightningRepository>) -> Self {
-        BreezPaymentsProcessor { store }
+    pub fn new(
+        lightning_repo: Box<dyn LightningRepository>,
+        payment_repo: Box<dyn PaymentRepository>,
+    ) -> Self {
+        BreezPaymentsProcessor {
+            lightning_repo,
+            payment_repo,
+        }
     }
 }
 
@@ -27,21 +38,13 @@ impl BreezPaymentsProcessor {
 impl PaymentsProcessorUseCases for BreezPaymentsProcessor {
     async fn process_incoming_payment(
         &self,
-        payment: Payment,
-    ) -> Result<LightningInvoice, ApplicationError> {
+        payment: BreezPayment,
+    ) -> Result<Invoice, ApplicationError> {
         let payment_hash = payment.id;
         trace!(payment_hash, "Processing incoming lightning payment");
 
-        if payment.status != PaymentStatus::Complete {
-            return Err(DataError::Validation("Payment is not Complete.".into()).into());
-        }
-
-        if payment.payment_type != PaymentType::Received {
-            return Err(DataError::Validation("Payment is not Received.".into()).into());
-        }
-
         let invoice_option = self
-            .store
+            .lightning_repo
             .find_invoice_by_payment_hash(&payment_hash)
             .await?;
 
@@ -52,7 +55,7 @@ impl PaymentsProcessorUseCases for BreezPaymentsProcessor {
             // Until this is fixed: https://github.com/breez/breez-sdk/issues/982
             invoice.amount_msat = Some(payment.amount_msat);
 
-            invoice = self.store.update_invoice(invoice).await?;
+            invoice = self.lightning_repo.update_invoice(None, invoice).await?;
 
             info!(
                 payment_hash,
@@ -66,8 +69,8 @@ impl PaymentsProcessorUseCases for BreezPaymentsProcessor {
 
     async fn process_outgoing_payment(
         &self,
-        payment_success: Payment,
-    ) -> Result<LightningPayment, ApplicationError> {
+        payment_success: BreezPayment,
+    ) -> Result<Payment, ApplicationError> {
         let payment_id = match payment_success.details.clone() {
             PaymentDetails::Ln { data } => {
                 Uuid::parse_str(&data.label).map_err(|e| DataError::Validation(e.to_string()))
@@ -79,23 +82,15 @@ impl PaymentsProcessorUseCases for BreezPaymentsProcessor {
             "Processing outgoing lightning payment"
         );
 
-        if payment_success.status != PaymentStatus::Complete {
-            return Err(DataError::Validation("Payment is not Complete.".into()).into());
-        }
-
-        if payment_success.payment_type != PaymentType::Sent {
-            return Err(DataError::Validation("Payment is not Sent.".into()).into());
-        }
-
-        let payment_option = self.store.find_payment(payment_id).await?;
+        let payment_option = self.payment_repo.find(payment_id).await?;
 
         if let Some(payment_retrieved) = payment_option {
             // We overwrite the payment with the new one at the correct status
-            let mut payment: LightningPayment = payment_success.clone().into();
+            let mut payment: Payment = payment_success.clone().into();
             payment.id = payment_retrieved.id;
-            payment.status = LightningPaymentStatus::SETTLED;
+            payment.status = PaymentStatus::SETTLED;
 
-            let payment = self.store.update_payment(payment).await?;
+            let payment = self.payment_repo.update(payment).await?;
 
             info!(
                 %payment_id,
@@ -111,7 +106,7 @@ impl PaymentsProcessorUseCases for BreezPaymentsProcessor {
     async fn process_failed_payment(
         &self,
         payment_failed: PaymentFailedData,
-    ) -> Result<LightningPayment, ApplicationError> {
+    ) -> Result<Payment, ApplicationError> {
         let payment_id = match payment_failed.label {
             Some(label) => {
                 Uuid::parse_str(&label).map_err(|e| DataError::Validation(e.to_string()))
@@ -132,15 +127,15 @@ impl PaymentsProcessorUseCases for BreezPaymentsProcessor {
             }
         };
 
-        let payment_option = self.store.find_payment(payment_id).await?;
+        let payment_option = self.payment_repo.find(payment_id).await?;
 
         if let Some(mut payment) = payment_option {
-            payment.status = LightningPaymentStatus::FAILED;
+            payment.status = PaymentStatus::FAILED;
             payment.payment_time = Some(Utc.timestamp_opt(invoice.timestamp as i64, 0).unwrap());
             payment.error = Some(payment_failed.error);
             payment.payment_hash = Some(invoice.payment_hash);
 
-            payment = self.store.update_payment(payment).await?;
+            payment = self.payment_repo.update(payment).await?;
 
             info!(
                 %payment_id,

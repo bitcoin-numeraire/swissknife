@@ -5,10 +5,10 @@ use crate::domains::lightning::adapters::models::user_balance::UserBalanceModel;
 use crate::domains::lightning::adapters::repository::WalletRepository;
 use crate::{application::errors::DatabaseError, domains::lightning::entities::UserBalance};
 
-use super::LightningStore;
+use super::SqlxStore;
 
 #[async_trait]
-impl WalletRepository for LightningStore {
+impl WalletRepository for SqlxStore {
     async fn get_balance(
         &self,
         txn: Option<&DatabaseTransaction>,
@@ -21,12 +21,12 @@ impl WalletRepository for LightningStore {
                 SELECT
                     SUM(amount_msat) FILTER (WHERE status IN ('SETTLED', 'PENDING')) AS sent_msat,
                     SUM(COALESCE(fee_msat, 0)) FILTER (WHERE status = 'SETTLED') AS fees_paid_msat
-                FROM lightning_payment
+                FROM payment
                 WHERE user_id = $1
             ),
             received AS (
                 SELECT SUM(amount_msat) AS received_msat
-                FROM lightning_invoice
+                FROM invoice
                 WHERE user_id = $1 AND payment_time IS NOT NULL
             )
             SELECT

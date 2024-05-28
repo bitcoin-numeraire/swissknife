@@ -10,15 +10,15 @@ use uuid::Uuid;
 use crate::{
     application::{dtos::SendPaymentRequest, errors::ApplicationError},
     domains::{
-        lightning::entities::{LightningPayment, LightningPaymentFilter},
+        payments::entities::{Payment, PaymentFilter},
         users::entities::{AuthUser, Permission},
     },
     infra::app::AppState,
 };
 
-pub struct LightningPaymentHandler;
+pub struct PaymentHandler;
 
-impl LightningPaymentHandler {
+impl PaymentHandler {
     pub fn routes() -> Router<Arc<AppState>> {
         Router::new()
             .route("/", post(Self::pay))
@@ -32,10 +32,10 @@ impl LightningPaymentHandler {
         State(app_state): State<Arc<AppState>>,
         user: AuthUser,
         Json(payload): Json<SendPaymentRequest>,
-    ) -> Result<Json<LightningPayment>, ApplicationError> {
+    ) -> Result<Json<Payment>, ApplicationError> {
         user.check_permission(Permission::WriteLightningTransaction)?;
 
-        let payment = app_state.lightning.pay(payload).await?;
+        let payment = app_state.payments.pay(payload).await?;
         Ok(Json(payment.into()))
     }
 
@@ -43,24 +43,23 @@ impl LightningPaymentHandler {
         State(app_state): State<Arc<AppState>>,
         user: AuthUser,
         Path(id): Path<Uuid>,
-    ) -> Result<Json<LightningPayment>, ApplicationError> {
+    ) -> Result<Json<Payment>, ApplicationError> {
         user.check_permission(Permission::ReadLightningTransaction)?;
 
-        let lightning_address = app_state.lightning.get_payment(id).await?;
+        let lightning_address = app_state.payments.get(id).await?;
         Ok(Json(lightning_address.into()))
     }
 
     async fn list(
         State(app_state): State<Arc<AppState>>,
         user: AuthUser,
-        Query(query_params): Query<LightningPaymentFilter>,
-    ) -> Result<Json<Vec<LightningPayment>>, ApplicationError> {
+        Query(query_params): Query<PaymentFilter>,
+    ) -> Result<Json<Vec<Payment>>, ApplicationError> {
         user.check_permission(Permission::ReadLightningTransaction)?;
 
-        let lightning_payments = app_state.lightning.list_payments(query_params).await?;
+        let lightning_payments = app_state.payments.list(query_params).await?;
 
-        let response: Vec<LightningPayment> =
-            lightning_payments.into_iter().map(Into::into).collect();
+        let response: Vec<Payment> = lightning_payments.into_iter().map(Into::into).collect();
 
         Ok(response.into())
     }
@@ -72,18 +71,18 @@ impl LightningPaymentHandler {
     ) -> Result<(), ApplicationError> {
         user.check_permission(Permission::WriteLightningTransaction)?;
 
-        app_state.lightning.delete_payment(id).await?;
+        app_state.payments.delete(id).await?;
         Ok(())
     }
 
     async fn delete_many(
         State(app_state): State<Arc<AppState>>,
         user: AuthUser,
-        Query(query_params): Query<LightningPaymentFilter>,
+        Query(query_params): Query<PaymentFilter>,
     ) -> Result<Json<u64>, ApplicationError> {
         user.check_permission(Permission::WriteLightningTransaction)?;
 
-        let n_deleted = app_state.lightning.delete_payments(query_params).await?;
+        let n_deleted = app_state.payments.delete_many(query_params).await?;
         Ok(n_deleted.into())
     }
 }

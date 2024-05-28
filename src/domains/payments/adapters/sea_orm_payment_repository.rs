@@ -1,21 +1,34 @@
 use async_trait::async_trait;
-use sea_orm::ActiveValue::Set;
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, DatabaseTransaction, EntityTrait, QueryFilter, QueryOrder,
-    QuerySelect, QueryTrait, Unchanged,
+    ActiveModelTrait, ActiveValue::Set, ColumnTrait, DatabaseConnection, DatabaseTransaction,
+    EntityTrait, QueryFilter, QueryOrder, QuerySelect, QueryTrait, Unchanged,
 };
 use uuid::Uuid;
 
-use crate::domains::lightning::adapters::models::lightning_payment::{ActiveModel, Column, Entity};
-use crate::domains::lightning::adapters::repository::LightningPaymentRepository;
-use crate::domains::lightning::entities::LightningPaymentFilter;
-use crate::{application::errors::DatabaseError, domains::lightning::entities::LightningPayment};
+use crate::{
+    application::errors::DatabaseError,
+    domains::payments::entities::{Payment, PaymentFilter},
+};
 
-use super::LightningStore;
+use super::{
+    payment_model::{ActiveModel, Column, Entity},
+    PaymentRepository,
+};
+
+#[derive(Clone)]
+pub struct SeaOrmPaymentRepository {
+    pub db: DatabaseConnection,
+}
+
+impl SeaOrmPaymentRepository {
+    pub fn new(db: DatabaseConnection) -> Self {
+        Self { db }
+    }
+}
 
 #[async_trait]
-impl LightningPaymentRepository for LightningStore {
-    async fn find_payment(&self, id: Uuid) -> Result<Option<LightningPayment>, DatabaseError> {
+impl PaymentRepository for SeaOrmPaymentRepository {
+    async fn find(&self, id: Uuid) -> Result<Option<Payment>, DatabaseError> {
         let model = Entity::find_by_id(id)
             .one(&self.db)
             .await
@@ -24,10 +37,7 @@ impl LightningPaymentRepository for LightningStore {
         Ok(model.map(Into::into))
     }
 
-    async fn find_payments(
-        &self,
-        filter: LightningPaymentFilter,
-    ) -> Result<Vec<LightningPayment>, DatabaseError> {
+    async fn find_many(&self, filter: PaymentFilter) -> Result<Vec<Payment>, DatabaseError> {
         let models = Entity::find()
             .apply_if(filter.user_id, |q, user| q.filter(Column::UserId.eq(user)))
             .apply_if(filter.id, |q, id| q.filter(Column::Id.eq(id)))
@@ -35,8 +45,8 @@ impl LightningPaymentRepository for LightningStore {
                 q.filter(Column::Status.eq(s.to_string()))
             })
             .order_by_desc(Column::CreatedAt)
-            .offset(filter.offset)
-            .limit(filter.limit)
+            .offset(filter.pagination.offset)
+            .limit(filter.pagination.limit)
             .all(&self.db)
             .await
             .map_err(|e| DatabaseError::FindMany(e.to_string()))?;
@@ -44,18 +54,22 @@ impl LightningPaymentRepository for LightningStore {
         Ok(models.into_iter().map(Into::into).collect())
     }
 
-    async fn insert_payment(
+    async fn insert(
         &self,
         txn: Option<&DatabaseTransaction>,
-        payment: LightningPayment,
-    ) -> Result<LightningPayment, DatabaseError> {
+        payment: Payment,
+    ) -> Result<Payment, DatabaseError> {
         let model = ActiveModel {
             user_id: Set(payment.user_id),
             lightning_address: Set(payment.lightning_address),
             amount_msat: Set(payment.amount_msat as i64),
             status: Set(payment.status.to_string()),
+            payment_type: Set(payment.payment_type.to_string()),
+            fee_msat: Set(payment.fee_msat.map(|v| v as i64)),
+            payment_time: Set(payment.payment_time),
             payment_hash: Set(payment.payment_hash),
             description: Set(payment.description),
+            metadata: Set(payment.metadata),
             ..Default::default()
         };
 
@@ -69,10 +83,7 @@ impl LightningPaymentRepository for LightningStore {
         Ok(model.into())
     }
 
-    async fn update_payment(
-        &self,
-        payment: LightningPayment,
-    ) -> Result<LightningPayment, DatabaseError> {
+    async fn update(&self, payment: Payment) -> Result<Payment, DatabaseError> {
         let mut model = ActiveModel {
             id: Set(payment.id),
             status: Set(payment.status.to_string()),
@@ -103,7 +114,7 @@ impl LightningPaymentRepository for LightningStore {
         Ok(model.into())
     }
 
-    async fn delete_payments(&self, filter: LightningPaymentFilter) -> Result<u64, DatabaseError> {
+    async fn delete_many(&self, filter: PaymentFilter) -> Result<u64, DatabaseError> {
         let result = Entity::delete_many()
             .apply_if(filter.user_id, |q, user| q.filter(Column::UserId.eq(user)))
             .apply_if(filter.id, |q, id| q.filter(Column::Id.eq(id)))

@@ -2,6 +2,8 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+use crate::application::entities::PaginationFilter;
+
 #[derive(Clone, Debug, Serialize)]
 pub struct LightningAddress {
     pub id: Uuid,
@@ -17,9 +19,9 @@ pub struct LightningAddress {
 
 #[derive(Clone, Debug, Deserialize, Serialize, Default)]
 pub struct LightningAddressFilter {
-    pub username: Option<String>,
-    pub user_id: Option<String>,
-    pub limit: Option<u64>,
-    pub offset: Option<u64>,
+    #[serde(flatten)]
+    pub pagination: PaginationFilter,
     pub id: Option<Uuid>,
+    pub user_id: Option<String>,
+    pub username: Option<String>,
 }

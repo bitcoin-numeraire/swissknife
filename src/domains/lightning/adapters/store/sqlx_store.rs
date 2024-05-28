@@ -7,18 +7,18 @@ use crate::{
 };
 
 #[derive(Clone)]
-pub struct LightningStore {
+pub struct SqlxStore {
     pub db: DatabaseConnection,
 }
 
-impl LightningStore {
+impl SqlxStore {
     pub fn new(db: DatabaseConnection) -> Self {
         Self { db }
     }
 }
 
 #[async_trait]
-impl TransactionManager for LightningStore {
+impl TransactionManager for SqlxStore {
     async fn begin(&self) -> Result<DatabaseTransaction, DatabaseError> {
         self.db
             .begin()

@@ -63,6 +63,9 @@ send:
 install-tools:
 	@cargo install sea-orm-cli
 
+generate-models:
+	@sea-orm-cli generate entity --output-dir models --verbose 
+
 generate-certs:
 	@mkdir -p certs
 	@openssl genrsa -out certs/localhost_key.pem 2048
