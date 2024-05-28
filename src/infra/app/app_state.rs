@@ -72,6 +72,7 @@ impl AppState {
             lightning_repo.clone(),
             lightning_client,
             config.lightning.domain,
+            config.lightning.fee_buffer.unwrap_or_default(),
         );
         let wallet = WalletService::new(lightning_repo.clone(), payment_repo.clone());
 
