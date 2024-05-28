@@ -1,21 +1,34 @@
 use async_trait::async_trait;
-use sea_orm::ActiveValue::Set;
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, DatabaseTransaction, EntityTrait, QueryFilter, QueryOrder,
-    QuerySelect, QueryTrait, Unchanged,
+    ActiveModelTrait, ActiveValue::Set, ColumnTrait, DatabaseConnection, DatabaseTransaction,
+    EntityTrait, QueryFilter, QueryOrder, QuerySelect, QueryTrait, Unchanged,
 };
 use uuid::Uuid;
 
-use crate::domains::lightning::adapters::models::lightning_payment::{ActiveModel, Column, Entity};
-use crate::domains::lightning::adapters::repository::PaymentRepository;
-use crate::domains::lightning::entities::PaymentFilter;
-use crate::{application::errors::DatabaseError, domains::lightning::entities::Payment};
+use crate::{
+    application::errors::DatabaseError,
+    domains::payments::entities::{Payment, PaymentFilter},
+};
 
-use super::SqlxStore;
+use super::{
+    payment_model::{ActiveModel, Column, Entity},
+    PaymentRepository,
+};
+
+#[derive(Clone)]
+pub struct SeaOrmPaymentRepository {
+    pub db: DatabaseConnection,
+}
+
+impl SeaOrmPaymentRepository {
+    pub fn new(db: DatabaseConnection) -> Self {
+        Self { db }
+    }
+}
 
 #[async_trait]
-impl PaymentRepository for SqlxStore {
-    async fn find_payment(&self, id: Uuid) -> Result<Option<Payment>, DatabaseError> {
+impl PaymentRepository for SeaOrmPaymentRepository {
+    async fn find(&self, id: Uuid) -> Result<Option<Payment>, DatabaseError> {
         let model = Entity::find_by_id(id)
             .one(&self.db)
             .await
@@ -24,7 +37,7 @@ impl PaymentRepository for SqlxStore {
         Ok(model.map(Into::into))
     }
 
-    async fn find_payments(&self, filter: PaymentFilter) -> Result<Vec<Payment>, DatabaseError> {
+    async fn find_many(&self, filter: PaymentFilter) -> Result<Vec<Payment>, DatabaseError> {
         let models = Entity::find()
             .apply_if(filter.user_id, |q, user| q.filter(Column::UserId.eq(user)))
             .apply_if(filter.id, |q, id| q.filter(Column::Id.eq(id)))
@@ -41,7 +54,7 @@ impl PaymentRepository for SqlxStore {
         Ok(models.into_iter().map(Into::into).collect())
     }
 
-    async fn insert_payment(
+    async fn insert(
         &self,
         txn: Option<&DatabaseTransaction>,
         payment: Payment,
@@ -70,7 +83,7 @@ impl PaymentRepository for SqlxStore {
         Ok(model.into())
     }
 
-    async fn update_payment(&self, payment: Payment) -> Result<Payment, DatabaseError> {
+    async fn update(&self, payment: Payment) -> Result<Payment, DatabaseError> {
         let mut model = ActiveModel {
             id: Set(payment.id),
             status: Set(payment.status.to_string()),
@@ -101,7 +114,7 @@ impl PaymentRepository for SqlxStore {
         Ok(model.into())
     }
 
-    async fn delete_payments(&self, filter: PaymentFilter) -> Result<u64, DatabaseError> {
+    async fn delete_many(&self, filter: PaymentFilter) -> Result<u64, DatabaseError> {
         let result = Entity::delete_many()
             .apply_if(filter.user_id, |q, user| q.filter(Column::UserId.eq(user)))
             .apply_if(filter.id, |q, id| q.filter(Column::Id.eq(id)))

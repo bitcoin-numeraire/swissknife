@@ -7,7 +7,7 @@ use serde_with::DurationSeconds;
 use strum_macros::{Display, EnumString};
 use uuid::Uuid;
 
-use super::pagination::PaginationFilter;
+use crate::application::entities::PaginationFilter;
 
 #[serde_as]
 #[derive(Clone, Debug, Default, Serialize)]
@@ -15,13 +15,11 @@ pub struct Invoice {
     pub id: Uuid,
     pub user_id: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub lightning_address: Option<String>,
+    pub lightning_address: Option<Uuid>,
     pub network: String,
     pub description: Option<String>,
     pub amount_msat: Option<u64>,
     pub timestamp: DateTime<Utc>,
-    #[serde_as(as = "DurationSeconds<u64>")]
-    pub expiry: Duration,
     pub status: InvoiceStatus,
     pub invoice_type: InvoiceType,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -33,8 +31,8 @@ pub struct Invoice {
     pub created_at: DateTime<Utc>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub updated_at: Option<DateTime<Utc>>,
-    pub expires_at: DateTime<Utc>,
     #[serde(flatten)]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub lightning: Option<LightningInvoice>,
 }
 
@@ -48,6 +46,9 @@ pub struct LightningInvoice {
     pub payee_pubkey: String,
     pub min_final_cltv_expiry_delta: u64,
     pub payment_secret: String,
+    #[serde_as(as = "DurationSeconds<u64>")]
+    pub expiry: Duration,
+    pub expires_at: DateTime<Utc>,
 }
 
 #[derive(Clone, Debug, EnumString, Deserialize, Serialize, Display, PartialEq, Eq, Default)]

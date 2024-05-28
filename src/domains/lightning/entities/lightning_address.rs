@@ -2,7 +2,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use super::pagination::PaginationFilter;
+use crate::application::entities::PaginationFilter;
 
 #[derive(Clone, Debug, Serialize)]
 pub struct LightningAddress {

@@ -5,8 +5,7 @@ use uuid::Uuid;
 use crate::{
     application::errors::DatabaseError,
     domains::lightning::entities::{
-        Invoice, InvoiceFilter, LightningAddress, LightningAddressFilter, Payment, PaymentFilter,
-        UserBalance,
+        Invoice, InvoiceFilter, LightningAddress, LightningAddressFilter, UserBalance,
     },
 };
 
@@ -64,38 +63,18 @@ pub trait InvoiceRepository {
 }
 
 #[async_trait]
-pub trait PaymentRepository {
-    async fn find_payment(&self, id: Uuid) -> Result<Option<Payment>, DatabaseError>;
-    async fn find_payments(&self, filter: PaymentFilter) -> Result<Vec<Payment>, DatabaseError>;
-    async fn insert_payment(
-        &self,
-        txn: Option<&DatabaseTransaction>,
-        payment: Payment,
-    ) -> Result<Payment, DatabaseError>;
-    async fn update_payment(&self, payment: Payment) -> Result<Payment, DatabaseError>;
-    async fn delete_payments(&self, filter: PaymentFilter) -> Result<u64, DatabaseError>;
-}
-
-#[async_trait]
 pub trait TransactionManager {
     async fn begin(&self) -> Result<DatabaseTransaction, DatabaseError>;
 }
 
 pub trait LightningRepository:
-    LightningAddressRepository
-    + PaymentRepository
-    + InvoiceRepository
-    + WalletRepository
-    + TransactionManager
-    + Sync
-    + Send
+    LightningAddressRepository + InvoiceRepository + WalletRepository + TransactionManager + Sync + Send
 {
 }
 
 // Ensure that any type that implements the individual traits also implements the new trait.
 impl<T> LightningRepository for T where
     T: LightningAddressRepository
-        + PaymentRepository
         + InvoiceRepository
         + WalletRepository
         + TransactionManager

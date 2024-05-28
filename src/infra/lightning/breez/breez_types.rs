@@ -4,8 +4,9 @@ use breez_sdk_core::{LNInvoice, Payment as BreezPayment};
 use chrono::{TimeZone, Utc};
 use serde_bolt::bitcoin::hashes::hex::ToHex;
 
-use crate::domains::lightning::entities::{
-    Invoice, InvoiceType, LightningInvoice, Payment, PaymentType,
+use crate::domains::{
+    lightning::entities::{Invoice, InvoiceType, LightningInvoice},
+    payments::entities::{Payment, PaymentType},
 };
 
 impl Into<Invoice> for LNInvoice {
@@ -16,10 +17,6 @@ impl Into<Invoice> for LNInvoice {
             description: self.description,
             amount_msat: self.amount_msat,
             timestamp: Utc.timestamp_opt(self.timestamp as i64, 0).unwrap(),
-            expiry: Duration::from_secs(self.expiry),
-            expires_at: Utc
-                .timestamp_opt((self.timestamp + self.expiry) as i64, 0)
-                .unwrap(),
             lightning: Some(LightningInvoice {
                 bolt11: self.bolt11,
                 payee_pubkey: self.payee_pubkey,
@@ -27,6 +24,10 @@ impl Into<Invoice> for LNInvoice {
                 description_hash: self.description_hash,
                 payment_secret: self.payment_secret.to_hex(),
                 min_final_cltv_expiry_delta: self.min_final_cltv_expiry_delta,
+                expiry: Duration::from_secs(self.expiry),
+                expires_at: Utc
+                    .timestamp_opt((self.timestamp + self.expiry) as i64, 0)
+                    .unwrap(),
             }),
             ..Default::default()
         }

@@ -2,5 +2,4 @@
 
 pub mod lightning_address;
 pub mod lightning_invoice;
-pub mod lightning_payment;
 pub mod user_balance;

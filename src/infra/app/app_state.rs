@@ -5,11 +5,14 @@ use crate::{
         dtos::AppConfig,
         errors::{ApplicationError, WebServerError},
     },
-    domains::lightning::{
-        adapters::SqlxStore,
-        services::{
-            lightning::BreezPaymentsProcessor, LightningService, LightningUseCases, WalletService,
-            WalletUseCases,
+    domains::{
+        lightning::{
+            adapters::SqlxStore,
+            services::{LightningService, LightningUseCases, WalletService, WalletUseCases},
+        },
+        payments::{
+            adapters::SeaOrmPaymentRepository,
+            services::{BreezPaymentsProcessor, PaymentsService, PaymentsUseCases},
         },
     },
     infra::{
@@ -26,6 +29,7 @@ use tracing::warn;
 pub struct AppState {
     pub jwt_authenticator: Option<Arc<dyn Authenticator>>,
     pub lightning: Arc<dyn LightningUseCases>,
+    pub payments: Arc<dyn PaymentsUseCases>,
     pub wallet: Arc<dyn WalletUseCases>,
     pub timeout_layer: TimeoutLayer,
 }
@@ -49,25 +53,34 @@ impl AppState {
         };
 
         // Create adapters
-        let store = Box::new(SqlxStore::new(db_conn));
-        let payments_processor = BreezPaymentsProcessor::new(store.clone());
+        let lightning_repo = Box::new(SqlxStore::new(db_conn.clone()));
+        let payment_repo = Box::new(SeaOrmPaymentRepository::new(db_conn));
+        let payments_processor =
+            BreezPaymentsProcessor::new(lightning_repo.clone(), payment_repo.clone());
         let listener = BreezListener::new(Arc::new(payments_processor));
         let lightning_client = config.lightning.get_client(Box::new(listener)).await?;
 
         // Create services
         let lightning = LightningService::new(
-            store.clone(),
+            lightning_repo.clone(),
+            lightning_client.clone(),
+            config.lightning.domain.clone(),
+            config.lightning.invoice_expiry.clone(),
+            config.lightning.invoice_description.clone(),
+        );
+        let payments = PaymentsService::new(
+            payment_repo.clone(),
+            lightning_repo.clone(),
             lightning_client,
             config.lightning.domain,
-            config.lightning.invoice_expiry,
-            config.lightning.invoice_description,
         );
-        let wallet = WalletService::new(store.clone());
+        let wallet = WalletService::new(lightning_repo.clone(), payment_repo.clone());
 
         // Create App state
         Ok(Self {
             jwt_authenticator,
             lightning: Arc::new(lightning),
+            payments: Arc::new(payments),
             wallet: Arc::new(wallet),
             timeout_layer,
         })

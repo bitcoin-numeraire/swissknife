@@ -10,7 +10,7 @@ use uuid::Uuid;
 use crate::{
     application::{dtos::SendPaymentRequest, errors::ApplicationError},
     domains::{
-        lightning::entities::{Payment, PaymentFilter},
+        payments::entities::{Payment, PaymentFilter},
         users::entities::{AuthUser, Permission},
     },
     infra::app::AppState,
@@ -35,7 +35,7 @@ impl PaymentHandler {
     ) -> Result<Json<Payment>, ApplicationError> {
         user.check_permission(Permission::WriteLightningTransaction)?;
 
-        let payment = app_state.lightning.pay(payload).await?;
+        let payment = app_state.payments.pay(payload).await?;
         Ok(Json(payment.into()))
     }
 
@@ -46,7 +46,7 @@ impl PaymentHandler {
     ) -> Result<Json<Payment>, ApplicationError> {
         user.check_permission(Permission::ReadLightningTransaction)?;
 
-        let lightning_address = app_state.lightning.get_payment(id).await?;
+        let lightning_address = app_state.payments.get(id).await?;
         Ok(Json(lightning_address.into()))
     }
 
@@ -57,7 +57,7 @@ impl PaymentHandler {
     ) -> Result<Json<Vec<Payment>>, ApplicationError> {
         user.check_permission(Permission::ReadLightningTransaction)?;
 
-        let lightning_payments = app_state.lightning.list_payments(query_params).await?;
+        let lightning_payments = app_state.payments.list(query_params).await?;
 
         let response: Vec<Payment> = lightning_payments.into_iter().map(Into::into).collect();
 
@@ -71,7 +71,7 @@ impl PaymentHandler {
     ) -> Result<(), ApplicationError> {
         user.check_permission(Permission::WriteLightningTransaction)?;
 
-        app_state.lightning.delete_payment(id).await?;
+        app_state.payments.delete(id).await?;
         Ok(())
     }
 
@@ -82,7 +82,7 @@ impl PaymentHandler {
     ) -> Result<Json<u64>, ApplicationError> {
         user.check_permission(Permission::WriteLightningTransaction)?;
 
-        let n_deleted = app_state.lightning.delete_payments(query_params).await?;
+        let n_deleted = app_state.payments.delete_many(query_params).await?;
         Ok(n_deleted.into())
     }
 }

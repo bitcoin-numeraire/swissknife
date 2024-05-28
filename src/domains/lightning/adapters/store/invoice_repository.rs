@@ -81,20 +81,21 @@ impl InvoiceRepository for SqlxStore {
             description: Set(invoice.description),
             amount_msat: Set(invoice.amount_msat.map(|v| v as i64)),
             timestamp: Set(invoice.timestamp),
-            expiry: Set(invoice.expiry.as_secs() as i64),
             label: Set(invoice.label),
-            expires_at: Set(invoice.expires_at),
             ..Default::default()
         };
 
         if invoice.invoice_type == InvoiceType::LIGHTNING {
             let lightning = invoice.lightning.unwrap();
-            model.bolt11 = Set(lightning.bolt11);
-            model.payee_pubkey = Set(lightning.payee_pubkey);
-            model.payment_hash = Set(lightning.payment_hash);
+            model.bolt11 = Set(lightning.bolt11.into());
+            model.payee_pubkey = Set(lightning.payee_pubkey.into());
+            model.payment_hash = Set(lightning.payment_hash.into());
             model.description_hash = Set(lightning.description_hash);
-            model.payment_secret = Set(lightning.payment_secret);
-            model.min_final_cltv_expiry_delta = Set(lightning.min_final_cltv_expiry_delta as i64);
+            model.payment_secret = Set(lightning.payment_secret.into());
+            model.min_final_cltv_expiry_delta =
+                Set((lightning.min_final_cltv_expiry_delta as i64).into());
+            model.expiry = Set((lightning.expiry.as_secs() as i64).into());
+            model.expires_at = Set(lightning.expires_at.into());
         }
 
         let result = match txn {

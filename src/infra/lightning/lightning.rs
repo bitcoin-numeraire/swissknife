@@ -7,7 +7,7 @@ use uuid::Uuid;
 
 use crate::{
     application::errors::LightningError,
-    domains::lightning::entities::{Invoice, Payment},
+    domains::{lightning::entities::Invoice, payments::entities::Payment},
 };
 
 #[async_trait]

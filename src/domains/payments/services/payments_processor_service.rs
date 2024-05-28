@@ -6,20 +6,31 @@ use uuid::Uuid;
 
 use crate::{
     application::errors::{ApplicationError, DataError},
-    domains::lightning::{
-        adapters::LightningRepository,
-        entities::{Invoice, Payment, PaymentStatus},
-        services::PaymentsProcessorUseCases,
+    domains::{
+        lightning::{adapters::LightningRepository, entities::Invoice},
+        payments::{
+            adapters::PaymentRepository,
+            entities::{Payment, PaymentStatus},
+        },
     },
 };
 
+use super::PaymentsProcessorUseCases;
+
 pub struct BreezPaymentsProcessor {
-    pub store: Box<dyn LightningRepository>,
+    pub lightning_repo: Box<dyn LightningRepository>,
+    pub payment_repo: Box<dyn PaymentRepository>,
 }
 
 impl BreezPaymentsProcessor {
-    pub fn new(store: Box<dyn LightningRepository>) -> Self {
-        BreezPaymentsProcessor { store }
+    pub fn new(
+        lightning_repo: Box<dyn LightningRepository>,
+        payment_repo: Box<dyn PaymentRepository>,
+    ) -> Self {
+        BreezPaymentsProcessor {
+            lightning_repo,
+            payment_repo,
+        }
     }
 }
 
@@ -33,7 +44,7 @@ impl PaymentsProcessorUseCases for BreezPaymentsProcessor {
         trace!(payment_hash, "Processing incoming lightning payment");
 
         let invoice_option = self
-            .store
+            .lightning_repo
             .find_invoice_by_payment_hash(&payment_hash)
             .await?;
 
@@ -44,7 +55,7 @@ impl PaymentsProcessorUseCases for BreezPaymentsProcessor {
             // Until this is fixed: https://github.com/breez/breez-sdk/issues/982
             invoice.amount_msat = Some(payment.amount_msat);
 
-            invoice = self.store.update_invoice(None, invoice).await?;
+            invoice = self.lightning_repo.update_invoice(None, invoice).await?;
 
             info!(
                 payment_hash,
@@ -71,7 +82,7 @@ impl PaymentsProcessorUseCases for BreezPaymentsProcessor {
             "Processing outgoing lightning payment"
         );
 
-        let payment_option = self.store.find_payment(payment_id).await?;
+        let payment_option = self.payment_repo.find(payment_id).await?;
 
         if let Some(payment_retrieved) = payment_option {
             // We overwrite the payment with the new one at the correct status
@@ -79,7 +90,7 @@ impl PaymentsProcessorUseCases for BreezPaymentsProcessor {
             payment.id = payment_retrieved.id;
             payment.status = PaymentStatus::SETTLED;
 
-            let payment = self.store.update_payment(payment).await?;
+            let payment = self.payment_repo.update(payment).await?;
 
             info!(
                 %payment_id,
@@ -116,7 +127,7 @@ impl PaymentsProcessorUseCases for BreezPaymentsProcessor {
             }
         };
 
-        let payment_option = self.store.find_payment(payment_id).await?;
+        let payment_option = self.payment_repo.find(payment_id).await?;
 
         if let Some(mut payment) = payment_option {
             payment.status = PaymentStatus::FAILED;
@@ -124,7 +135,7 @@ impl PaymentsProcessorUseCases for BreezPaymentsProcessor {
             payment.error = Some(payment_failed.error);
             payment.payment_hash = Some(invoice.payment_hash);
 
-            payment = self.store.update_payment(payment).await?;
+            payment = self.payment_repo.update(payment).await?;
 
             info!(
                 %payment_id,

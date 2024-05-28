@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use crate::{domains::lightning::adapters::LightningRepository, infra::lightning::LightningClient};
 
 const DEFAULT_INVOICE_EXPIRY: u32 = 3600;
@@ -8,13 +10,13 @@ pub struct LightningService {
     pub invoice_expiry: u32,
     pub invoice_description: String,
     pub store: Box<dyn LightningRepository>,
-    pub lightning_client: Box<dyn LightningClient>,
+    pub lightning_client: Arc<dyn LightningClient>,
 }
 
 impl LightningService {
     pub fn new(
         store: Box<dyn LightningRepository>,
-        lightning_client: Box<dyn LightningClient>,
+        lightning_client: Arc<dyn LightningClient>,
         domain: String,
         invoice_expiry: Option<u32>,
         invoice_description: Option<String>,

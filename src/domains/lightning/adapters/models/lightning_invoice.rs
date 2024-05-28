@@ -8,30 +8,30 @@ use sea_orm::entity::prelude::*;
 use crate::domains::lightning::entities::{Invoice, InvoiceStatus, LightningInvoice};
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
-#[sea_orm(table_name = "lightning_invoice")]
+#[sea_orm(table_name = "invoice")]
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
     pub id: Uuid,
-    pub invoice_type: String,
-    pub payment_hash: String,
     pub user_id: String,
-    pub lightning_address: Option<String>,
-    pub bolt11: String,
+    pub invoice_type: String,
+    pub payment_hash: Option<String>,
+    pub lightning_address: Option<Uuid>,
+    pub bolt11: Option<String>,
     pub network: String,
-    pub payee_pubkey: String,
-    pub min_final_cltv_expiry_delta: i64,
+    pub payee_pubkey: Option<String>,
     pub description: Option<String>,
     pub description_hash: Option<String>,
     pub amount_msat: Option<i64>,
-    pub payment_secret: String,
+    pub payment_secret: Option<String>,
     pub timestamp: DateTimeUtc,
-    pub expiry: i64,
+    pub expiry: Option<i64>,
+    pub min_final_cltv_expiry_delta: Option<i64>,
     pub fee_msat: Option<i64>,
     pub payment_time: Option<DateTimeUtc>,
     pub label: Option<Uuid>,
     pub created_at: DateTimeUtc,
     pub updated_at: Option<DateTimeUtc>,
-    pub expires_at: DateTimeUtc,
+    pub expires_at: Option<DateTimeUtc>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
@@ -39,9 +39,9 @@ pub enum Relation {
     #[sea_orm(
         belongs_to = "super::lightning_address::Entity",
         from = "Column::LightningAddress",
-        to = "super::lightning_address::Column::Username",
-        on_update = "Cascade",
-        on_delete = "Cascade"
+        to = "super::lightning_address::Column::Id",
+        on_update = "NoAction",
+        on_delete = "SetNull"
     )]
     LightningAddress,
 }
@@ -56,22 +56,24 @@ impl ActiveModelBehavior for ActiveModel {}
 
 impl From<Model> for Invoice {
     fn from(model: Model) -> Self {
-        let status = if model.payment_time.is_some() {
-            InvoiceStatus::SETTLED
-        } else if Utc::now() > model.expires_at {
-            InvoiceStatus::EXPIRED
-        } else {
-            InvoiceStatus::PENDING
+        let status = match model.payment_time {
+            Some(_) => InvoiceStatus::SETTLED,
+            None => match model.expires_at {
+                Some(expires_at) if Utc::now() > expires_at => InvoiceStatus::EXPIRED,
+                _ => InvoiceStatus::PENDING,
+            },
         };
 
         let lightning = match model.invoice_type.as_str() {
             "LIGHTNING" => Some(LightningInvoice {
-                payment_hash: model.payment_hash,
-                bolt11: model.bolt11,
+                payment_hash: model.payment_hash.unwrap(),
+                bolt11: model.bolt11.unwrap(),
                 description_hash: model.description_hash,
-                payee_pubkey: model.payee_pubkey,
-                min_final_cltv_expiry_delta: model.min_final_cltv_expiry_delta as u64,
-                payment_secret: model.payment_secret,
+                payee_pubkey: model.payee_pubkey.unwrap(),
+                min_final_cltv_expiry_delta: model.min_final_cltv_expiry_delta.unwrap() as u64,
+                payment_secret: model.payment_secret.unwrap(),
+                expiry: Duration::from_secs(model.expiry.unwrap() as u64),
+                expires_at: model.expires_at.unwrap(),
             }),
             _ => None,
         };
@@ -84,7 +86,6 @@ impl From<Model> for Invoice {
             description: model.description,
             amount_msat: model.amount_msat.map(|v| v as u64),
             timestamp: model.timestamp,
-            expiry: Duration::from_secs(model.expiry as u64),
             network: model.network,
             status,
             fee_msat: None,
@@ -92,7 +93,6 @@ impl From<Model> for Invoice {
             label: model.label,
             created_at: model.created_at,
             updated_at: model.updated_at,
-            expires_at: model.expires_at,
             lightning,
         }
     }

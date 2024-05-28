@@ -14,10 +14,10 @@ use crate::{
     },
     domains::{
         lightning::entities::{
-            LightningAddress, LightningAddressFilter, Invoice, InvoiceFilter,
-            InvoiceStatus, Payment, PaymentFilter, PaymentStatus, UserBalance,
-            Wallet,
+            Invoice, InvoiceFilter, InvoiceStatus, LightningAddress, LightningAddressFilter,
+            UserBalance, Wallet,
         },
+        payments::entities::{Payment, PaymentFilter, PaymentStatus},
         users::entities::AuthUser,
     },
     infra::app::AppState,
@@ -56,7 +56,7 @@ impl WalletHandler {
         Json(mut payload): Json<SendPaymentRequest>,
     ) -> Result<Json<Payment>, ApplicationError> {
         payload.user_id = Some(user.sub);
-        let payment = app_state.lightning.pay(payload).await?;
+        let payment = app_state.payments.pay(payload).await?;
         Ok(Json(payment.into()))
     }
 
@@ -124,7 +124,7 @@ impl WalletHandler {
         Query(mut query_params): Query<PaymentFilter>,
     ) -> Result<Json<Vec<Payment>>, ApplicationError> {
         query_params.user_id = Some(user.sub);
-        let payments = app_state.lightning.list_payments(query_params).await?;
+        let payments = app_state.payments.list(query_params).await?;
 
         let response: Vec<Payment> = payments.into_iter().map(Into::into).collect();
 
@@ -137,8 +137,8 @@ impl WalletHandler {
         Path(id): Path<Uuid>,
     ) -> Result<Json<Payment>, ApplicationError> {
         let payments = app_state
-            .lightning
-            .list_payments(PaymentFilter {
+            .payments
+            .list(PaymentFilter {
                 user_id: Some(user.sub),
                 id: Some(id),
                 ..Default::default()
@@ -208,8 +208,8 @@ impl WalletHandler {
         user: AuthUser,
     ) -> Result<Json<u64>, ApplicationError> {
         let n_deleted = app_state
-            .lightning
-            .delete_payments(PaymentFilter {
+            .payments
+            .delete_many(PaymentFilter {
                 user_id: Some(user.sub),
                 status: Some(PaymentStatus::FAILED),
                 ..Default::default()

@@ -6,7 +6,7 @@ use uuid::Uuid;
 use crate::{
     application::errors::{ApplicationError, DataError},
     domains::lightning::{
-        entities::{LNURLPayRequest, LightningAddress, LightningAddressFilter, Invoice},
+        entities::{Invoice, LNURLPayRequest, LightningAddress, LightningAddressFilter},
         services::LightningAddressesUseCases,
     },
 };
@@ -55,7 +55,7 @@ impl LightningAddressesUseCases for LightningService {
             .invoice(amount, comment.clone(), self.invoice_expiry)
             .await?;
         invoice.user_id = lightning_address.user_id.clone();
-        invoice.lightning_address = Some(username.clone());
+        invoice.lightning_address = Some(lightning_address.id);
 
         // TODO: Get or add more information to make this a LNURLp invoice (like fetching a success action specific to the user)
         let invoice = self.store.insert_invoice(None, invoice).await?;

@@ -5,11 +5,10 @@ use breez_sdk_core::{
 use uuid::Uuid;
 
 use crate::{
-    application::{dtos::SendPaymentRequest, errors::ApplicationError},
+    application::errors::ApplicationError,
     domains::{
         lightning::entities::{
             Invoice, InvoiceFilter, LNURLPayRequest, LightningAddress, LightningAddressFilter,
-            Payment, PaymentFilter,
         },
         users::entities::AuthUser,
     },
@@ -28,15 +27,6 @@ pub trait InvoicesUseCases {
     async fn list_invoices(&self, filter: InvoiceFilter) -> Result<Vec<Invoice>, ApplicationError>;
     async fn delete_invoice(&self, id: Uuid) -> Result<(), ApplicationError>;
     async fn delete_invoices(&self, filter: InvoiceFilter) -> Result<u64, ApplicationError>;
-}
-
-#[async_trait]
-pub trait PaymentsUseCases {
-    async fn pay(&self, req: SendPaymentRequest) -> Result<Payment, ApplicationError>;
-    async fn get_payment(&self, id: Uuid) -> Result<Payment, ApplicationError>;
-    async fn list_payments(&self, filter: PaymentFilter) -> Result<Vec<Payment>, ApplicationError>;
-    async fn delete_payment(&self, id: Uuid) -> Result<(), ApplicationError>;
-    async fn delete_payments(&self, filter: PaymentFilter) -> Result<u64, ApplicationError>;
 }
 
 #[async_trait]
@@ -96,22 +86,12 @@ pub trait LightningNodeUseCases {
 }
 
 pub trait LightningUseCases:
-    PaymentsUseCases
-    + InvoicesUseCases
-    + LightningAddressesUseCases
-    + LightningNodeUseCases
-    + Send
-    + Sync
+    InvoicesUseCases + LightningAddressesUseCases + LightningNodeUseCases + Send + Sync
 {
 }
 
 // Ensure that any type that implements the individual traits also implements the new trait.
 impl<T> LightningUseCases for T where
-    T: PaymentsUseCases
-        + InvoicesUseCases
-        + LightningAddressesUseCases
-        + LightningNodeUseCases
-        + Send
-        + Sync
+    T: InvoicesUseCases + LightningAddressesUseCases + LightningNodeUseCases + Send + Sync
 {
 }

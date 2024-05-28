@@ -2,16 +2,15 @@
 
 use sea_orm::entity::prelude::*;
 
-use crate::domains::lightning::entities::Payment;
+use crate::domains::payments::entities::Payment;
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
-#[sea_orm(table_name = "lightning_payment")]
+#[sea_orm(table_name = "payment")]
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
     pub id: Uuid,
     pub user_id: String,
     pub lightning_address: Option<String>,
-    #[sea_orm(unique)]
     pub payment_hash: Option<String>,
     pub error: Option<String>,
     pub amount_msat: i64,
@@ -21,28 +20,14 @@ pub struct Model {
     pub payment_type: String,
     pub description: Option<String>,
     pub metadata: Option<String>,
-    pub success_action: Option<serde_json::Value>,
+    #[sea_orm(column_type = "JsonBinary", nullable)]
+    pub success_action: Option<Json>,
     pub created_at: DateTimeUtc,
     pub updated_at: Option<DateTimeUtc>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
-pub enum Relation {
-    #[sea_orm(
-        belongs_to = "super::lightning_address::Entity",
-        from = "Column::LightningAddress",
-        to = "super::lightning_address::Column::Username",
-        on_update = "Cascade",
-        on_delete = "Cascade"
-    )]
-    LightningAddress,
-}
-
-impl Related<super::lightning_address::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::LightningAddress.def()
-    }
-}
+pub enum Relation {}
 
 impl ActiveModelBehavior for ActiveModel {}
 

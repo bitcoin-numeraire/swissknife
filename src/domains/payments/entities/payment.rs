@@ -4,7 +4,7 @@ use serde_json::Value;
 use strum_macros::{Display, EnumString};
 use uuid::Uuid;
 
-use super::pagination::PaginationFilter;
+use crate::application::entities::PaginationFilter;
 
 #[derive(Clone, Debug, Default, Serialize)]
 pub struct Payment {

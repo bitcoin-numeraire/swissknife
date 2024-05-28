@@ -24,13 +24,6 @@ impl Into<Invoice> for InvoiceResponse {
                     invoice.duration_since_epoch().subsec_nanos(),
                 )
                 .unwrap(),
-            expiry: invoice.expiry_time(),
-            expires_at: Utc
-                .timestamp_opt(
-                    invoice.duration_until_expiry().as_secs() as i64,
-                    invoice.duration_until_expiry().subsec_nanos(),
-                )
-                .unwrap(),
             network: invoice.network().to_string(),
             description: match invoice.description() {
                 Bolt11InvoiceDescription::Direct(msg) => Some(msg.to_string()),
@@ -46,6 +39,13 @@ impl Into<Invoice> for InvoiceResponse {
                 },
                 payment_secret: self.payment_secret.to_hex(),
                 min_final_cltv_expiry_delta: invoice.min_final_cltv_expiry_delta(),
+                expiry: invoice.expiry_time(),
+                expires_at: Utc
+                    .timestamp_opt(
+                        invoice.duration_until_expiry().as_secs() as i64,
+                        invoice.duration_until_expiry().subsec_nanos(),
+                    )
+                    .unwrap(),
             }),
             ..Default::default()
         }

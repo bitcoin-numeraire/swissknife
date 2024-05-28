@@ -1,6 +1,8 @@
 use serde::Serialize;
 
-use super::{LightningAddress, Invoice, Payment};
+use crate::domains::payments::entities::Payment;
+
+use super::{Invoice, LightningAddress};
 
 #[derive(Debug, Clone, Serialize)]
 pub struct Wallet {
