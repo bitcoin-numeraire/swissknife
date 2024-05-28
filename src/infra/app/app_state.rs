@@ -66,7 +66,6 @@ impl AppState {
             lightning_client.clone(),
             config.lightning.domain.clone(),
             config.lightning.invoice_expiry.clone(),
-            config.lightning.invoice_description.clone(),
         );
         let payments = PaymentsService::new(
             payment_repo.clone(),

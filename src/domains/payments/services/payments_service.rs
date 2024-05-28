@@ -27,8 +27,8 @@ use crate::{
 
 use super::PaymentsUseCases;
 
-const DEFAULT_INTERNAL_INVOICE_DESCRIPTION: &str = "From Numeraire Swissknife User";
-const DEFAULT_INTERNAL_PAYMENT_DESCRIPTION: &str = "Payment to Numeraire Swissknife User";
+const DEFAULT_INTERNAL_INVOICE_DESCRIPTION: &str = "From Numeraire Swissknife";
+const DEFAULT_INTERNAL_PAYMENT_DESCRIPTION: &str = "Payment to Numeraire Swissknife";
 
 pub struct PaymentsService {
     domain: String,

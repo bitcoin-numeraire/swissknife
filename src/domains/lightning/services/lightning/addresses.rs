@@ -44,15 +44,13 @@ impl LightningAddressesUseCases for LightningService {
             .await?
             .ok_or_else(|| DataError::NotFound("Lightning address not found.".to_string()))?;
 
-        let comment = match comment {
-            Some(comm) if comm.is_empty() => self.invoice_description.clone(),
-            Some(comm) => comm,
-            None => self.invoice_description.clone(),
-        };
-
         let mut invoice = self
             .lightning_client
-            .invoice(amount, comment.clone(), self.invoice_expiry)
+            .invoice(
+                amount,
+                comment.unwrap_or(format!("Payment to {}@{}", username, self.domain)),
+                self.invoice_expiry,
+            )
             .await?;
         invoice.user_id = lightning_address.user_id.clone();
         invoice.lightning_address = Some(lightning_address.id);

@@ -12,6 +12,8 @@ use crate::{
 
 use super::LightningService;
 
+const DEFAULT_INVOICE_DESCRIPTION: &str = "Numeraire Swissknife Invoice";
+
 #[async_trait]
 impl InvoicesUseCases for LightningService {
     async fn generate_invoice(
@@ -23,17 +25,11 @@ impl InvoicesUseCases for LightningService {
     ) -> Result<Invoice, ApplicationError> {
         debug!(%user_id, "Generating lightning invoice");
 
-        let description = match description {
-            Some(desc) if desc.is_empty() => self.invoice_description.clone(),
-            Some(desc) => desc,
-            None => self.invoice_description.clone(),
-        };
-
         let mut invoice = self
             .lightning_client
             .invoice(
                 amount,
-                description.clone(),
+                description.unwrap_or(DEFAULT_INVOICE_DESCRIPTION.to_string()),
                 expiry.unwrap_or(self.invoice_expiry),
             )
             .await?;
