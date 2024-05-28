@@ -29,8 +29,8 @@ impl WalletService {
     }
 }
 
-const PAYMENTS_LIMIT: u64 = 15;
-const INVOICES_LIMIT: u64 = 15;
+const PAYMENTS_LIMIT: u64 = 10;
+const INVOICES_LIMIT: u64 = 10;
 
 #[async_trait]
 impl WalletUseCases for WalletService {

@@ -33,7 +33,8 @@ impl App {
         trace!("Initializing app");
 
         let router = Router::new()
-            .nest("/lnurlp", LNURLpHandler::routes())
+            .nest("/.well-known/lnurlp", LNURLpHandler::well_known_route())
+            .nest("/api/lnurlp", LNURLpHandler::callback_route())
             .nest(
                 "/api/lightning/addresses",
                 LightningAddressHandler::routes(),

@@ -27,10 +27,7 @@ impl LNURLPayRequest {
         .unwrap();
 
         Self {
-            callback: format!(
-                "https://{}/api/lightning/addresses/{}/invoice",
-                domain, username
-            ),
+            callback: format!("https://{}/api/lnurlp/{}/callback", domain, username),
             max_sendable: 1000000000,
             min_sendable: 1000,
             metadata,

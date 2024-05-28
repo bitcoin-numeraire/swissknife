@@ -181,63 +181,74 @@ impl PaymentsService {
         if data.domain == self.domain {
             match data.ln_address.clone() {
                 Some(ln_address) => {
+                    let address = ln_address.split('@').next().unwrap();
                     let address_opt = self
                         .lightning_repo
-                        .find_address_by_username(&ln_address)
+                        .find_address_by_username(&address)
                         .await?;
-                    if let Some(retrieved_address) = address_opt {
-                        if retrieved_address.user_id == user_id {
-                            return Err(DataError::Validation(
-                                "Cannot pay to own lightning address.".to_string(),
+
+                    match address_opt {
+                        Some(retrieved_address) => {
+                            if retrieved_address.user_id == user_id {
+                                return Err(DataError::Validation(
+                                    "Cannot pay to own lightning address.".to_string(),
+                                )
+                                .into());
+                            }
+
+                            // Internal payment
+                            let curr_time = Utc::now();
+
+                            let txn = self.lightning_repo.begin().await?;
+                            self.lightning_repo
+                                .insert_invoice(
+                                    Some(&txn),
+                                    Invoice {
+                                        user_id: retrieved_address.user_id,
+                                        lightning_address: Some(retrieved_address.id),
+                                        network: Network::Bitcoin.to_string(),
+                                        description: comment.clone().or(
+                                            DEFAULT_INTERNAL_INVOICE_DESCRIPTION.to_string().into(),
+                                        ),
+                                        amount_msat: Some(amount),
+                                        timestamp: curr_time,
+                                        status: InvoiceStatus::SETTLED,
+                                        invoice_type: InvoiceType::INTERNAL,
+                                        fee_msat: Some(0),
+                                        payment_time: Some(curr_time),
+                                        ..Default::default()
+                                    },
+                                )
+                                .await?;
+
+                            let internal_payment = self
+                                .insert_payment(Payment {
+                                    user_id,
+                                    amount_msat: amount,
+                                    status: PaymentStatus::SETTLED,
+                                    description: comment.or(DEFAULT_INTERNAL_PAYMENT_DESCRIPTION
+                                        .to_string()
+                                        .into()),
+                                    fee_msat: Some(0),
+                                    payment_time: Some(Utc::now()),
+                                    payment_type: PaymentType::INTERNAL,
+                                    lightning_address: Some(ln_address),
+                                    ..Default::default()
+                                })
+                                .await?;
+
+                            txn.commit()
+                                .await
+                                .map_err(|e| DatabaseError::Transaction(e.to_string()))?;
+
+                            return Ok(internal_payment);
+                        }
+                        None => {
+                            return Err(DataError::NotFound(
+                                "Lightning address not found.".to_string(),
                             )
                             .into());
                         }
-
-                        // Internal payment
-                        let curr_time = Utc::now();
-
-                        let txn = self.lightning_repo.begin().await?;
-                        self.lightning_repo
-                            .insert_invoice(
-                                Some(&txn),
-                                Invoice {
-                                    user_id: user_id.clone(),
-                                    lightning_address: Some(retrieved_address.id),
-                                    network: Network::Bitcoin.to_string(),
-                                    description: comment.clone().or(
-                                        DEFAULT_INTERNAL_INVOICE_DESCRIPTION.to_string().into(),
-                                    ),
-                                    amount_msat: Some(amount),
-                                    timestamp: curr_time,
-                                    status: InvoiceStatus::SETTLED,
-                                    invoice_type: InvoiceType::INTERNAL,
-                                    fee_msat: Some(0),
-                                    payment_time: Some(curr_time),
-                                    ..Default::default()
-                                },
-                            )
-                            .await?;
-
-                        let internal_payment = self
-                            .insert_payment(Payment {
-                                user_id,
-                                amount_msat: amount,
-                                status: PaymentStatus::SETTLED,
-                                description: comment
-                                    .or(DEFAULT_INTERNAL_PAYMENT_DESCRIPTION.to_string().into()),
-                                fee_msat: Some(0),
-                                payment_time: Some(Utc::now()),
-                                payment_type: PaymentType::INTERNAL,
-                                lightning_address: Some(ln_address),
-                                ..Default::default()
-                            })
-                            .await?;
-
-                        txn.commit()
-                            .await
-                            .map_err(|e| DatabaseError::Transaction(e.to_string()))?;
-
-                        return Ok(internal_payment);
                     }
                 }
                 None => {

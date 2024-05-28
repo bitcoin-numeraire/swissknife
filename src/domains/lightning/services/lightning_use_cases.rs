@@ -38,7 +38,6 @@ pub trait LightningAddressesUseCases {
         amount: u64,
         description: Option<String>,
     ) -> Result<Invoice, ApplicationError>;
-
     async fn register_address(
         &self,
         user_id: String,
