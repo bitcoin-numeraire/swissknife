@@ -5,10 +5,10 @@ use crate::domains::lightning::adapters::models::user_balance::UserBalanceModel;
 use crate::domains::lightning::adapters::repository::WalletRepository;
 use crate::{application::errors::DatabaseError, domains::lightning::entities::UserBalance};
 
-use super::LightningStore;
+use super::SqlxStore;
 
 #[async_trait]
-impl WalletRepository for LightningStore {
+impl WalletRepository for SqlxStore {
     async fn get_balance(
         &self,
         txn: Option<&DatabaseTransaction>,

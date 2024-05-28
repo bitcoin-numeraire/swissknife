@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use breez_sdk_core::{
-    LnUrlPayRequestData, LspInformation, NodeState, Payment, ReverseSwapInfo,
+    LnUrlPayRequestData, LspInformation, NodeState, Payment as BreezPayment, ReverseSwapInfo,
     ServiceHealthCheckResponse,
 };
 use serde::Deserialize;
@@ -14,7 +14,7 @@ use cln::node_client::NodeClient;
 
 use crate::{
     application::errors::LightningError,
-    domains::lightning::entities::{Invoice, LightningPayment},
+    domains::lightning::entities::{Invoice, Payment},
     infra::lightning::LightningClient,
 };
 
@@ -127,7 +127,7 @@ impl LightningClient for ClnClient {
         todo!();
     }
 
-    async fn list_payments(&self) -> Result<Vec<Payment>, LightningError> {
+    async fn list_payments(&self) -> Result<Vec<BreezPayment>, LightningError> {
         todo!();
     }
 
@@ -136,7 +136,7 @@ impl LightningClient for ClnClient {
         bolt11: String,
         amount_msat: Option<u64>,
         label: Uuid,
-    ) -> Result<LightningPayment, LightningError> {
+    ) -> Result<Payment, LightningError> {
         todo!();
     }
 
@@ -145,7 +145,7 @@ impl LightningClient for ClnClient {
         node_id: String,
         amount_msat: u64,
         label: Uuid,
-    ) -> Result<LightningPayment, LightningError> {
+    ) -> Result<Payment, LightningError> {
         todo!();
     }
 
@@ -155,14 +155,14 @@ impl LightningClient for ClnClient {
         amount_msat: u64,
         comment: Option<String>,
         label: Uuid,
-    ) -> Result<LightningPayment, LightningError> {
+    ) -> Result<Payment, LightningError> {
         todo!();
     }
 
     async fn payment_by_hash(
         &self,
         payment_hash: String,
-    ) -> Result<Option<Payment>, LightningError> {
+    ) -> Result<Option<BreezPayment>, LightningError> {
         todo!();
     }
 

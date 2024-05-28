@@ -14,10 +14,9 @@ use crate::{
     },
     domains::lightning::{
         entities::{
-            Invoice, InvoiceStatus, InvoiceType, LightningPayment, PaymentFilter, PaymentStatus,
-            PaymentType,
+            Invoice, InvoiceStatus, InvoiceType, Payment, PaymentFilter, PaymentStatus, PaymentType,
         },
-        services::LightningPaymentsUseCases,
+        services::PaymentsUseCases,
     },
 };
 
@@ -40,7 +39,7 @@ impl LightningService {
         user_id: String,
         invoice: LNInvoice,
         amount_msat: Option<u64>,
-    ) -> Result<LightningPayment, ApplicationError> {
+    ) -> Result<Payment, ApplicationError> {
         let specified_amount = invoice.amount_msat.or(amount_msat);
         if specified_amount == Some(0) {
             return Err(
@@ -76,7 +75,7 @@ impl LightningService {
                         let txn = self.store.begin().await?;
 
                         let internal_payment = self
-                            .insert_payment(LightningPayment {
+                            .insert_payment(Payment {
                                 user_id,
                                 amount_msat: amount,
                                 status: PaymentStatus::SETTLED,
@@ -106,7 +105,7 @@ impl LightningService {
 
             // External  payment
             let pending_payment = self
-                .insert_payment(LightningPayment {
+                .insert_payment(Payment {
                     user_id,
                     amount_msat: amount,
                     status: PaymentStatus::PENDING,
@@ -144,7 +143,7 @@ impl LightningService {
         data: LnUrlPayRequestData,
         amount_msat: Option<u64>,
         comment: Option<String>,
-    ) -> Result<LightningPayment, ApplicationError> {
+    ) -> Result<Payment, ApplicationError> {
         let amount = LightningService::validate_amount(amount_msat)?;
 
         // Check if internal payment
@@ -187,7 +186,7 @@ impl LightningService {
                             .await?;
 
                         let internal_payment = self
-                            .insert_payment(LightningPayment {
+                            .insert_payment(Payment {
                                 user_id,
                                 amount_msat: amount,
                                 status: PaymentStatus::SETTLED,
@@ -218,7 +217,7 @@ impl LightningService {
         }
 
         let pending_payment = self
-            .insert_payment(LightningPayment {
+            .insert_payment(Payment {
                 user_id: user_id.clone(),
                 amount_msat: amount,
                 status: PaymentStatus::PENDING,
@@ -236,10 +235,7 @@ impl LightningService {
         self.handle_processed_payment(pending_payment, result).await
     }
 
-    async fn insert_payment(
-        &self,
-        payment: LightningPayment,
-    ) -> Result<LightningPayment, ApplicationError> {
+    async fn insert_payment(&self, payment: Payment) -> Result<Payment, ApplicationError> {
         let txn = self.store.begin().await?;
 
         let balance = self
@@ -264,9 +260,9 @@ impl LightningService {
 
     async fn handle_processed_payment(
         &self,
-        mut pending_payment: LightningPayment,
-        result: Result<LightningPayment, LightningError>,
-    ) -> Result<LightningPayment, ApplicationError> {
+        mut pending_payment: Payment,
+        result: Result<Payment, LightningError>,
+    ) -> Result<Payment, ApplicationError> {
         match result {
             Ok(mut payment) => {
                 payment.id = pending_payment.id;
@@ -275,13 +271,13 @@ impl LightningService {
                     Some(_) => PaymentStatus::FAILED,
                     None => PaymentStatus::SETTLED,
                 };
-                let payment: LightningPayment = self.store.update_payment(payment).await?;
+                let payment: Payment = self.store.update_payment(payment).await?;
                 Ok(payment)
             }
             Err(error) => {
                 pending_payment.status = PaymentStatus::FAILED;
                 pending_payment.error = Some(error.to_string());
-                let payment: LightningPayment = self.store.update_payment(pending_payment).await?;
+                let payment: Payment = self.store.update_payment(pending_payment).await?;
                 Ok(payment)
             }
         }
@@ -289,8 +285,8 @@ impl LightningService {
 }
 
 #[async_trait]
-impl LightningPaymentsUseCases for LightningService {
-    async fn get_payment(&self, id: Uuid) -> Result<LightningPayment, ApplicationError> {
+impl PaymentsUseCases for LightningService {
+    async fn get_payment(&self, id: Uuid) -> Result<Payment, ApplicationError> {
         trace!(%id, "Fetching lightning payment");
 
         let lightning_payment = self
@@ -306,10 +302,7 @@ impl LightningPaymentsUseCases for LightningService {
         Ok(lightning_payment)
     }
 
-    async fn list_payments(
-        &self,
-        filter: PaymentFilter,
-    ) -> Result<Vec<LightningPayment>, ApplicationError> {
+    async fn list_payments(&self, filter: PaymentFilter) -> Result<Vec<Payment>, ApplicationError> {
         trace!(?filter, "Listing lightning payments");
 
         let lightning_payments = self.store.find_payments(filter.clone()).await?;
@@ -318,7 +311,7 @@ impl LightningPaymentsUseCases for LightningService {
         Ok(lightning_payments)
     }
 
-    async fn pay(&self, req: SendPaymentRequest) -> Result<LightningPayment, ApplicationError> {
+    async fn pay(&self, req: SendPaymentRequest) -> Result<Payment, ApplicationError> {
         debug!(?req, "Sending payment");
 
         let input_type = parse(&req.input)

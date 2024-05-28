@@ -7,15 +7,15 @@ use sea_orm::{
 use uuid::Uuid;
 
 use crate::domains::lightning::adapters::models::lightning_payment::{ActiveModel, Column, Entity};
-use crate::domains::lightning::adapters::repository::LightningPaymentRepository;
+use crate::domains::lightning::adapters::repository::PaymentRepository;
 use crate::domains::lightning::entities::PaymentFilter;
-use crate::{application::errors::DatabaseError, domains::lightning::entities::LightningPayment};
+use crate::{application::errors::DatabaseError, domains::lightning::entities::Payment};
 
-use super::LightningStore;
+use super::SqlxStore;
 
 #[async_trait]
-impl LightningPaymentRepository for LightningStore {
-    async fn find_payment(&self, id: Uuid) -> Result<Option<LightningPayment>, DatabaseError> {
+impl PaymentRepository for SqlxStore {
+    async fn find_payment(&self, id: Uuid) -> Result<Option<Payment>, DatabaseError> {
         let model = Entity::find_by_id(id)
             .one(&self.db)
             .await
@@ -24,10 +24,7 @@ impl LightningPaymentRepository for LightningStore {
         Ok(model.map(Into::into))
     }
 
-    async fn find_payments(
-        &self,
-        filter: PaymentFilter,
-    ) -> Result<Vec<LightningPayment>, DatabaseError> {
+    async fn find_payments(&self, filter: PaymentFilter) -> Result<Vec<Payment>, DatabaseError> {
         let models = Entity::find()
             .apply_if(filter.user_id, |q, user| q.filter(Column::UserId.eq(user)))
             .apply_if(filter.id, |q, id| q.filter(Column::Id.eq(id)))
@@ -47,8 +44,8 @@ impl LightningPaymentRepository for LightningStore {
     async fn insert_payment(
         &self,
         txn: Option<&DatabaseTransaction>,
-        payment: LightningPayment,
-    ) -> Result<LightningPayment, DatabaseError> {
+        payment: Payment,
+    ) -> Result<Payment, DatabaseError> {
         let model = ActiveModel {
             user_id: Set(payment.user_id),
             lightning_address: Set(payment.lightning_address),
@@ -73,10 +70,7 @@ impl LightningPaymentRepository for LightningStore {
         Ok(model.into())
     }
 
-    async fn update_payment(
-        &self,
-        payment: LightningPayment,
-    ) -> Result<LightningPayment, DatabaseError> {
+    async fn update_payment(&self, payment: Payment) -> Result<Payment, DatabaseError> {
         let mut model = ActiveModel {
             id: Set(payment.id),
             status: Set(payment.status.to_string()),

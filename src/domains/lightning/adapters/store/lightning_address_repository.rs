@@ -10,10 +10,10 @@ use crate::domains::lightning::adapters::repository::LightningAddressRepository;
 use crate::domains::lightning::entities::LightningAddressFilter;
 use crate::{application::errors::DatabaseError, domains::lightning::entities::LightningAddress};
 
-use super::LightningStore;
+use super::SqlxStore;
 
 #[async_trait]
-impl LightningAddressRepository for LightningStore {
+impl LightningAddressRepository for SqlxStore {
     async fn find_address(&self, id: Uuid) -> Result<Option<LightningAddress>, DatabaseError> {
         let model = Entity::find_by_id(id)
             .one(&self.db)

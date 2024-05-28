@@ -9,15 +9,15 @@ use bip39::Mnemonic;
 use breez_sdk_core::{
     BreezServices, ConnectRequest, EnvironmentType, GreenlightCredentials, GreenlightNodeConfig,
     ListPaymentsRequest, LnUrlPayRequest, LnUrlPayRequestData, LnUrlPayResult, LspInformation,
-    NodeConfig, NodeState, PayOnchainRequest, Payment, PrepareOnchainPaymentRequest,
-    PrepareRedeemOnchainFundsRequest, ReceivePaymentRequest, RedeemOnchainFundsRequest,
-    ReverseSwapInfo, SendPaymentRequest, SendSpontaneousPaymentRequest, ServiceHealthCheckResponse,
-    SwapAmountType,
+    NodeConfig, NodeState, PayOnchainRequest, Payment as BreezPayment,
+    PrepareOnchainPaymentRequest, PrepareRedeemOnchainFundsRequest, ReceivePaymentRequest,
+    RedeemOnchainFundsRequest, ReverseSwapInfo, SendPaymentRequest, SendSpontaneousPaymentRequest,
+    ServiceHealthCheckResponse, SwapAmountType,
 };
 
 use crate::{
     application::errors::LightningError,
-    domains::lightning::entities::{Invoice, LightningPayment},
+    domains::lightning::entities::{Invoice, Payment},
     infra::lightning::LightningClient,
 };
 
@@ -154,7 +154,7 @@ impl LightningClient for BreezClient {
         Ok(response)
     }
 
-    async fn list_payments(&self) -> Result<Vec<Payment>, LightningError> {
+    async fn list_payments(&self) -> Result<Vec<BreezPayment>, LightningError> {
         let payments = self
             .sdk
             .list_payments(ListPaymentsRequest {
@@ -171,7 +171,7 @@ impl LightningClient for BreezClient {
         bolt11: String,
         amount_msat: Option<u64>,
         label: Uuid,
-    ) -> Result<LightningPayment, LightningError> {
+    ) -> Result<Payment, LightningError> {
         let response = self
             .sdk
             .send_payment(SendPaymentRequest {
@@ -190,7 +190,7 @@ impl LightningClient for BreezClient {
         node_id: String,
         amount_msat: u64,
         label: Uuid,
-    ) -> Result<LightningPayment, LightningError> {
+    ) -> Result<Payment, LightningError> {
         let response = self
             .sdk
             .send_spontaneous_payment(SendSpontaneousPaymentRequest {
@@ -211,7 +211,7 @@ impl LightningClient for BreezClient {
         amount_msat: u64,
         comment: Option<String>,
         label: Uuid,
-    ) -> Result<LightningPayment, LightningError> {
+    ) -> Result<Payment, LightningError> {
         let result = self
             .sdk
             .lnurl_pay(LnUrlPayRequest {
@@ -225,7 +225,7 @@ impl LightningClient for BreezClient {
 
         match result {
             LnUrlPayResult::EndpointSuccess { data } => {
-                let mut payment: LightningPayment = data.payment.clone().into();
+                let mut payment: Payment = data.payment.clone().into();
                 payment.success_action = data
                     .success_action
                     .and_then(|action| serde_json::to_value(action).ok());
@@ -235,7 +235,7 @@ impl LightningClient for BreezClient {
             LnUrlPayResult::EndpointError { data } => {
                 return Err(LightningError::SendLNURLPayment(data.reason));
             }
-            LnUrlPayResult::PayError { data } => Ok(LightningPayment {
+            LnUrlPayResult::PayError { data } => Ok(Payment {
                 payment_hash: Some(data.payment_hash),
                 error: Some(data.reason),
                 amount_msat,
@@ -247,7 +247,7 @@ impl LightningClient for BreezClient {
     async fn payment_by_hash(
         &self,
         payment_hash: String,
-    ) -> Result<Option<Payment>, LightningError> {
+    ) -> Result<Option<BreezPayment>, LightningError> {
         let response = self
             .sdk
             .payment_by_hash(payment_hash)

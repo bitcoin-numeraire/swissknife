@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use breez_sdk_core::{
-    LspInformation, NodeState, Payment, ReverseSwapInfo, ServiceHealthCheckResponse,
+    LspInformation, NodeState, Payment as BreezPayment, ReverseSwapInfo, ServiceHealthCheckResponse,
 };
 use uuid::Uuid;
 
@@ -8,15 +8,15 @@ use crate::{
     application::{dtos::SendPaymentRequest, errors::ApplicationError},
     domains::{
         lightning::entities::{
-            LNURLPayRequest, LightningAddress, LightningAddressFilter, Invoice,
-            InvoiceFilter, LightningPayment, PaymentFilter,
+            Invoice, InvoiceFilter, LNURLPayRequest, LightningAddress, LightningAddressFilter,
+            Payment, PaymentFilter,
         },
         users::entities::AuthUser,
     },
 };
 
 #[async_trait]
-pub trait LightningInvoicesUseCases {
+pub trait InvoicesUseCases {
     async fn generate_invoice(
         &self,
         user_id: String,
@@ -25,30 +25,18 @@ pub trait LightningInvoicesUseCases {
         expiry: Option<u32>,
     ) -> Result<Invoice, ApplicationError>;
     async fn get_invoice(&self, id: Uuid) -> Result<Invoice, ApplicationError>;
-    async fn list_invoices(
-        &self,
-        filter: InvoiceFilter,
-    ) -> Result<Vec<Invoice>, ApplicationError>;
+    async fn list_invoices(&self, filter: InvoiceFilter) -> Result<Vec<Invoice>, ApplicationError>;
     async fn delete_invoice(&self, id: Uuid) -> Result<(), ApplicationError>;
-    async fn delete_invoices(
-        &self,
-        filter: InvoiceFilter,
-    ) -> Result<u64, ApplicationError>;
+    async fn delete_invoices(&self, filter: InvoiceFilter) -> Result<u64, ApplicationError>;
 }
 
 #[async_trait]
-pub trait LightningPaymentsUseCases {
-    async fn pay(&self, req: SendPaymentRequest) -> Result<LightningPayment, ApplicationError>;
-    async fn get_payment(&self, id: Uuid) -> Result<LightningPayment, ApplicationError>;
-    async fn list_payments(
-        &self,
-        filter: PaymentFilter,
-    ) -> Result<Vec<LightningPayment>, ApplicationError>;
+pub trait PaymentsUseCases {
+    async fn pay(&self, req: SendPaymentRequest) -> Result<Payment, ApplicationError>;
+    async fn get_payment(&self, id: Uuid) -> Result<Payment, ApplicationError>;
+    async fn list_payments(&self, filter: PaymentFilter) -> Result<Vec<Payment>, ApplicationError>;
     async fn delete_payment(&self, id: Uuid) -> Result<(), ApplicationError>;
-    async fn delete_payments(
-        &self,
-        filter: PaymentFilter,
-    ) -> Result<u64, ApplicationError>;
+    async fn delete_payments(&self, filter: PaymentFilter) -> Result<u64, ApplicationError>;
 }
 
 #[async_trait]
@@ -83,7 +71,10 @@ pub trait LightningNodeUseCases {
     async fn node_info(&self, user: AuthUser) -> Result<NodeState, ApplicationError>;
     async fn lsp_info(&self, user: AuthUser) -> Result<LspInformation, ApplicationError>;
     async fn list_lsps(&self, user: AuthUser) -> Result<Vec<LspInformation>, ApplicationError>;
-    async fn list_node_payments(&self, user: AuthUser) -> Result<Vec<Payment>, ApplicationError>;
+    async fn list_node_payments(
+        &self,
+        user: AuthUser,
+    ) -> Result<Vec<BreezPayment>, ApplicationError>;
     async fn close_lsp_channels(&self, user: AuthUser) -> Result<Vec<String>, ApplicationError>;
     async fn pay_onchain(
         &self,
@@ -105,8 +96,8 @@ pub trait LightningNodeUseCases {
 }
 
 pub trait LightningUseCases:
-    LightningPaymentsUseCases
-    + LightningInvoicesUseCases
+    PaymentsUseCases
+    + InvoicesUseCases
     + LightningAddressesUseCases
     + LightningNodeUseCases
     + Send
@@ -116,8 +107,8 @@ pub trait LightningUseCases:
 
 // Ensure that any type that implements the individual traits also implements the new trait.
 impl<T> LightningUseCases for T where
-    T: LightningPaymentsUseCases
-        + LightningInvoicesUseCases
+    T: PaymentsUseCases
+        + InvoicesUseCases
         + LightningAddressesUseCases
         + LightningNodeUseCases
         + Send

@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use breez_sdk_core::{Payment, PaymentDetails, PaymentFailedData};
+use breez_sdk_core::{Payment as BreezPayment, PaymentDetails, PaymentFailedData};
 use chrono::{TimeZone, Utc};
 use tracing::{info, trace};
 use uuid::Uuid;
@@ -8,7 +8,7 @@ use crate::{
     application::errors::{ApplicationError, DataError},
     domains::lightning::{
         adapters::LightningRepository,
-        entities::{Invoice, LightningPayment, PaymentStatus},
+        entities::{Invoice, Payment, PaymentStatus},
         services::PaymentsProcessorUseCases,
     },
 };
@@ -27,7 +27,7 @@ impl BreezPaymentsProcessor {
 impl PaymentsProcessorUseCases for BreezPaymentsProcessor {
     async fn process_incoming_payment(
         &self,
-        payment: Payment,
+        payment: BreezPayment,
     ) -> Result<Invoice, ApplicationError> {
         let payment_hash = payment.id;
         trace!(payment_hash, "Processing incoming lightning payment");
@@ -58,8 +58,8 @@ impl PaymentsProcessorUseCases for BreezPaymentsProcessor {
 
     async fn process_outgoing_payment(
         &self,
-        payment_success: Payment,
-    ) -> Result<LightningPayment, ApplicationError> {
+        payment_success: BreezPayment,
+    ) -> Result<Payment, ApplicationError> {
         let payment_id = match payment_success.details.clone() {
             PaymentDetails::Ln { data } => {
                 Uuid::parse_str(&data.label).map_err(|e| DataError::Validation(e.to_string()))
@@ -75,7 +75,7 @@ impl PaymentsProcessorUseCases for BreezPaymentsProcessor {
 
         if let Some(payment_retrieved) = payment_option {
             // We overwrite the payment with the new one at the correct status
-            let mut payment: LightningPayment = payment_success.clone().into();
+            let mut payment: Payment = payment_success.clone().into();
             payment.id = payment_retrieved.id;
             payment.status = PaymentStatus::SETTLED;
 
@@ -95,7 +95,7 @@ impl PaymentsProcessorUseCases for BreezPaymentsProcessor {
     async fn process_failed_payment(
         &self,
         payment_failed: PaymentFailedData,
-    ) -> Result<LightningPayment, ApplicationError> {
+    ) -> Result<Payment, ApplicationError> {
         let payment_id = match payment_failed.label {
             Some(label) => {
                 Uuid::parse_str(&label).map_err(|e| DataError::Validation(e.to_string()))

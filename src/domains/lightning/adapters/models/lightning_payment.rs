@@ -2,7 +2,7 @@
 
 use sea_orm::entity::prelude::*;
 
-use crate::domains::lightning::entities::LightningPayment;
+use crate::domains::lightning::entities::Payment;
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
 #[sea_orm(table_name = "lightning_payment")]
@@ -46,9 +46,9 @@ impl Related<super::lightning_address::Entity> for Entity {
 
 impl ActiveModelBehavior for ActiveModel {}
 
-impl From<Model> for LightningPayment {
+impl From<Model> for Payment {
     fn from(model: Model) -> Self {
-        LightningPayment {
+        Payment {
             id: model.id,
             user_id: model.user_id,
             lightning_address: model.lightning_address,

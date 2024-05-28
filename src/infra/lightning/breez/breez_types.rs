@@ -1,11 +1,11 @@
 use std::time::Duration;
 
-use breez_sdk_core::{LNInvoice, Payment};
+use breez_sdk_core::{LNInvoice, Payment as BreezPayment};
 use chrono::{TimeZone, Utc};
 use serde_bolt::bitcoin::hashes::hex::ToHex;
 
 use crate::domains::lightning::entities::{
-    Invoice, InvoiceType, LightningInvoice, LightningPayment, PaymentType,
+    Invoice, InvoiceType, LightningInvoice, Payment, PaymentType,
 };
 
 impl Into<Invoice> for LNInvoice {
@@ -33,9 +33,9 @@ impl Into<Invoice> for LNInvoice {
     }
 }
 
-impl Into<LightningPayment> for Payment {
-    fn into(self) -> LightningPayment {
-        LightningPayment {
+impl Into<Payment> for BreezPayment {
+    fn into(self) -> Payment {
+        Payment {
             payment_type: PaymentType::LIGHTNING,
             payment_hash: Some(self.id),
             error: self.error,

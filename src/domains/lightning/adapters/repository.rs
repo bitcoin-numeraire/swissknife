@@ -5,8 +5,8 @@ use uuid::Uuid;
 use crate::{
     application::errors::DatabaseError,
     domains::lightning::entities::{
-        Invoice, InvoiceFilter, LightningAddress, LightningAddressFilter, LightningPayment,
-        PaymentFilter, UserBalance,
+        Invoice, InvoiceFilter, LightningAddress, LightningAddressFilter, Payment, PaymentFilter,
+        UserBalance,
     },
 };
 
@@ -43,7 +43,7 @@ pub trait LightningAddressRepository {
 }
 
 #[async_trait]
-pub trait LightningInvoiceRepository {
+pub trait InvoiceRepository {
     async fn find_invoice(&self, id: Uuid) -> Result<Option<Invoice>, DatabaseError>;
     async fn find_invoice_by_payment_hash(
         &self,
@@ -64,21 +64,15 @@ pub trait LightningInvoiceRepository {
 }
 
 #[async_trait]
-pub trait LightningPaymentRepository {
-    async fn find_payment(&self, id: Uuid) -> Result<Option<LightningPayment>, DatabaseError>;
-    async fn find_payments(
-        &self,
-        filter: PaymentFilter,
-    ) -> Result<Vec<LightningPayment>, DatabaseError>;
+pub trait PaymentRepository {
+    async fn find_payment(&self, id: Uuid) -> Result<Option<Payment>, DatabaseError>;
+    async fn find_payments(&self, filter: PaymentFilter) -> Result<Vec<Payment>, DatabaseError>;
     async fn insert_payment(
         &self,
         txn: Option<&DatabaseTransaction>,
-        payment: LightningPayment,
-    ) -> Result<LightningPayment, DatabaseError>;
-    async fn update_payment(
-        &self,
-        payment: LightningPayment,
-    ) -> Result<LightningPayment, DatabaseError>;
+        payment: Payment,
+    ) -> Result<Payment, DatabaseError>;
+    async fn update_payment(&self, payment: Payment) -> Result<Payment, DatabaseError>;
     async fn delete_payments(&self, filter: PaymentFilter) -> Result<u64, DatabaseError>;
 }
 
@@ -89,8 +83,8 @@ pub trait TransactionManager {
 
 pub trait LightningRepository:
     LightningAddressRepository
-    + LightningPaymentRepository
-    + LightningInvoiceRepository
+    + PaymentRepository
+    + InvoiceRepository
     + WalletRepository
     + TransactionManager
     + Sync
@@ -101,8 +95,8 @@ pub trait LightningRepository:
 // Ensure that any type that implements the individual traits also implements the new trait.
 impl<T> LightningRepository for T where
     T: LightningAddressRepository
-        + LightningPaymentRepository
-        + LightningInvoiceRepository
+        + PaymentRepository
+        + InvoiceRepository
         + WalletRepository
         + TransactionManager
         + Sync

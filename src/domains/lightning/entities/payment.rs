@@ -7,7 +7,7 @@ use uuid::Uuid;
 use super::pagination::PaginationFilter;
 
 #[derive(Clone, Debug, Default, Serialize)]
-pub struct LightningPayment {
+pub struct Payment {
     pub id: Uuid,
     pub user_id: String,
     pub lightning_address: Option<String>,

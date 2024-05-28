@@ -6,7 +6,7 @@ use crate::{
         errors::{ApplicationError, WebServerError},
     },
     domains::lightning::{
-        adapters::LightningStore,
+        adapters::SqlxStore,
         services::{
             lightning::BreezPaymentsProcessor, LightningService, LightningUseCases, WalletService,
             WalletUseCases,
@@ -49,7 +49,7 @@ impl AppState {
         };
 
         // Create adapters
-        let store = Box::new(LightningStore::new(db_conn));
+        let store = Box::new(SqlxStore::new(db_conn));
         let payments_processor = BreezPaymentsProcessor::new(store.clone());
         let listener = BreezListener::new(Arc::new(payments_processor));
         let lightning_client = config.lightning.get_client(Box::new(listener)).await?;

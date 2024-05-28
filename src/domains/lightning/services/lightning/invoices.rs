@@ -5,15 +5,15 @@ use uuid::Uuid;
 use crate::{
     application::errors::{ApplicationError, DataError},
     domains::lightning::{
-        entities::{InvoiceFilter, Invoice},
-        services::LightningInvoicesUseCases,
+        entities::{Invoice, InvoiceFilter},
+        services::InvoicesUseCases,
     },
 };
 
 use super::LightningService;
 
 #[async_trait]
-impl LightningInvoicesUseCases for LightningService {
+impl InvoicesUseCases for LightningService {
     async fn generate_invoice(
         &self,
         user_id: String,
@@ -67,10 +67,7 @@ impl LightningInvoicesUseCases for LightningService {
         Ok(lightning_invoice)
     }
 
-    async fn list_invoices(
-        &self,
-        filter: InvoiceFilter,
-    ) -> Result<Vec<Invoice>, ApplicationError> {
+    async fn list_invoices(&self, filter: InvoiceFilter) -> Result<Vec<Invoice>, ApplicationError> {
         trace!(?filter, "Listing lightning invoices");
 
         let lightning_invoices = self.store.find_invoices(filter.clone()).await?;

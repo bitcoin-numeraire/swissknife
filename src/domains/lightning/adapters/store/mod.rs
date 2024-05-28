@@ -1,7 +1,7 @@
+mod invoice_repository;
 mod lightning_address_repository;
-mod lightning_invoice_repository;
-mod lightning_payment_repository;
-mod lightning_store;
+mod payment_repository;
+mod sqlx_store;
 mod wallet_repository;
 
-pub use lightning_store::LightningStore;
+pub use sqlx_store::SqlxStore;

@@ -15,7 +15,7 @@ use crate::{
     domains::{
         lightning::entities::{
             LightningAddress, LightningAddressFilter, Invoice, InvoiceFilter,
-            InvoiceStatus, LightningPayment, PaymentFilter, PaymentStatus, UserBalance,
+            InvoiceStatus, Payment, PaymentFilter, PaymentStatus, UserBalance,
             Wallet,
         },
         users::entities::AuthUser,
@@ -54,7 +54,7 @@ impl WalletHandler {
         State(app_state): State<Arc<AppState>>,
         user: AuthUser,
         Json(mut payload): Json<SendPaymentRequest>,
-    ) -> Result<Json<LightningPayment>, ApplicationError> {
+    ) -> Result<Json<Payment>, ApplicationError> {
         payload.user_id = Some(user.sub);
         let payment = app_state.lightning.pay(payload).await?;
         Ok(Json(payment.into()))
@@ -122,11 +122,11 @@ impl WalletHandler {
         State(app_state): State<Arc<AppState>>,
         user: AuthUser,
         Query(mut query_params): Query<PaymentFilter>,
-    ) -> Result<Json<Vec<LightningPayment>>, ApplicationError> {
+    ) -> Result<Json<Vec<Payment>>, ApplicationError> {
         query_params.user_id = Some(user.sub);
         let payments = app_state.lightning.list_payments(query_params).await?;
 
-        let response: Vec<LightningPayment> = payments.into_iter().map(Into::into).collect();
+        let response: Vec<Payment> = payments.into_iter().map(Into::into).collect();
 
         Ok(response.into())
     }
@@ -135,7 +135,7 @@ impl WalletHandler {
         State(app_state): State<Arc<AppState>>,
         user: AuthUser,
         Path(id): Path<Uuid>,
-    ) -> Result<Json<LightningPayment>, ApplicationError> {
+    ) -> Result<Json<Payment>, ApplicationError> {
         let payments = app_state
             .lightning
             .list_payments(PaymentFilter {
