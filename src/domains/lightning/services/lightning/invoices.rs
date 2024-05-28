@@ -5,7 +5,7 @@ use uuid::Uuid;
 use crate::{
     application::errors::{ApplicationError, DataError},
     domains::lightning::{
-        entities::{LightningInvoice, LightningInvoiceFilter},
+        entities::{InvoiceFilter, Invoice},
         services::LightningInvoicesUseCases,
     },
 };
@@ -20,7 +20,7 @@ impl LightningInvoicesUseCases for LightningService {
         amount: u64,
         description: Option<String>,
         expiry: Option<u32>,
-    ) -> Result<LightningInvoice, ApplicationError> {
+    ) -> Result<Invoice, ApplicationError> {
         debug!(%user_id, "Generating lightning invoice");
 
         let description = match description {
@@ -39,7 +39,7 @@ impl LightningInvoicesUseCases for LightningService {
             .await?;
         invoice.user_id = user_id.clone();
 
-        let invoice = self.store.insert_invoice(invoice).await?;
+        let invoice = self.store.insert_invoice(None, invoice).await?;
 
         info!(
             id = invoice.id.to_string(),
@@ -49,7 +49,7 @@ impl LightningInvoicesUseCases for LightningService {
         Ok(invoice)
     }
 
-    async fn get_invoice(&self, id: Uuid) -> Result<LightningInvoice, ApplicationError> {
+    async fn get_invoice(&self, id: Uuid) -> Result<Invoice, ApplicationError> {
         trace!(
             %id,
             "Fetching lightning invoice"
@@ -69,8 +69,8 @@ impl LightningInvoicesUseCases for LightningService {
 
     async fn list_invoices(
         &self,
-        filter: LightningInvoiceFilter,
-    ) -> Result<Vec<LightningInvoice>, ApplicationError> {
+        filter: InvoiceFilter,
+    ) -> Result<Vec<Invoice>, ApplicationError> {
         trace!(?filter, "Listing lightning invoices");
 
         let lightning_invoices = self.store.find_invoices(filter.clone()).await?;
@@ -84,7 +84,7 @@ impl LightningInvoicesUseCases for LightningService {
 
         let n_deleted = self
             .store
-            .delete_invoices(LightningInvoiceFilter {
+            .delete_invoices(InvoiceFilter {
                 id: Some(id),
                 ..Default::default()
             })
@@ -98,10 +98,7 @@ impl LightningInvoicesUseCases for LightningService {
         Ok(())
     }
 
-    async fn delete_invoices(
-        &self,
-        filter: LightningInvoiceFilter,
-    ) -> Result<u64, ApplicationError> {
+    async fn delete_invoices(&self, filter: InvoiceFilter) -> Result<u64, ApplicationError> {
         debug!(?filter, "Deleting lightning invoices");
 
         let n_deleted = self.store.delete_invoices(filter.clone()).await?;

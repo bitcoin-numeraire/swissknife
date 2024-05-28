@@ -4,6 +4,8 @@ use serde_json::Value;
 use strum_macros::{Display, EnumString};
 use uuid::Uuid;
 
+use super::pagination::PaginationFilter;
+
 #[derive(Clone, Debug, Default, Serialize)]
 pub struct LightningPayment {
     pub id: Uuid,
@@ -18,7 +20,8 @@ pub struct LightningPayment {
     pub fee_msat: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub payment_time: Option<DateTime<Utc>>,
-    pub status: LightningPaymentStatus,
+    pub payment_type: PaymentType,
+    pub status: PaymentStatus,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -31,18 +34,26 @@ pub struct LightningPayment {
 }
 
 #[derive(Clone, Debug, EnumString, Display, Deserialize, Serialize, PartialEq, Eq, Default)]
-pub enum LightningPaymentStatus {
+pub enum PaymentStatus {
     #[default]
     PENDING,
     SETTLED,
     FAILED,
 }
 
+#[derive(Clone, Debug, EnumString, Display, Deserialize, Serialize, PartialEq, Eq, Default)]
+pub enum PaymentType {
+    #[default]
+    LIGHTNING,
+    INTERNAL,
+    ONCHAIN,
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize, Default)]
-pub struct LightningPaymentFilter {
-    pub user_id: Option<String>,
-    pub status: Option<LightningPaymentStatus>,
-    pub limit: Option<u64>,
-    pub offset: Option<u64>,
+pub struct PaymentFilter {
+    #[serde(flatten)]
+    pub pagination: PaginationFilter,
     pub id: Option<Uuid>,
+    pub user_id: Option<String>,
+    pub status: Option<PaymentStatus>,
 }

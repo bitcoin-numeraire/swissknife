@@ -14,21 +14,22 @@ impl MigrationTrait for Migration {
             RETURN NEW;
             END;
             $$ language 'plpgsql';
-            CREATE TABLE lightning_invoice (
+            CREATE TABLE invoice (
                 id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-                payment_hash varchar(255) NOT NULL,
                 user_id varchar(255) NOT NULL,
+                invoice_type varchar(255) NOT NULL,
+                payment_hash varchar(255),
                 lightning_address varchar(255),
-                bolt11 varchar unique NOT NULL,
+                bolt11 varchar unique,
                 network varchar NOT NULL,
-                payee_pubkey varchar NOT NULL,
+                payee_pubkey varchar,
                 description varchar,
                 description_hash varchar,
                 amount_msat bigint,
-                payment_secret varchar NOT NULL,
+                payment_secret varchar,
                 timestamp timestamptz NOT NULL,
                 expiry bigint NOT NULL,
-                min_final_cltv_expiry_delta bigint NOT NULL,
+                min_final_cltv_expiry_delta bigint,
                 fee_msat bigint,
                 payment_time timestamptz,
                 label varchar,
@@ -36,8 +37,11 @@ impl MigrationTrait for Migration {
                 updated_at timestamptz,
                 expires_at timestamptz NOT NULL
             );
-            CREATE TRIGGER update_lightning_invoice_timestamp BEFORE
-            UPDATE ON lightning_invoice FOR EACH ROW EXECUTE PROCEDURE update_invoice_timestamp();",
+            CREATE UNIQUE INDEX unique_payment_hash ON invoice(payment_hash) WHERE payment_hash IS NOT NULL;
+            CREATE UNIQUE INDEX unique_bolt11 ON invoice(bolt11) WHERE bolt11 IS NOT NULL;
+
+            CREATE TRIGGER update_invoice_timestamp BEFORE
+            UPDATE ON invoice FOR EACH ROW EXECUTE PROCEDURE update_invoice_timestamp();",
         )
         .await?;
 
@@ -47,7 +51,7 @@ impl MigrationTrait for Migration {
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager
             .get_connection()
-            .execute_unprepared("DROP TABLE `lightning_invoice`")
+            .execute_unprepared("DROP TABLE `invoice`")
             .await?;
 
         Ok(())

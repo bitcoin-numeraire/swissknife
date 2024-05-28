@@ -17,7 +17,7 @@ use breez_sdk_core::{
 
 use crate::{
     application::errors::LightningError,
-    domains::lightning::entities::{LightningInvoice, LightningPayment},
+    domains::lightning::entities::{Invoice, LightningPayment},
     infra::lightning::LightningClient,
 };
 
@@ -107,7 +107,7 @@ impl LightningClient for BreezClient {
         amount_msat: u64,
         description: String,
         expiry: u32,
-    ) -> Result<LightningInvoice, LightningError> {
+    ) -> Result<Invoice, LightningError> {
         let response = self
             .sdk
             .receive_payment(ReceivePaymentRequest {

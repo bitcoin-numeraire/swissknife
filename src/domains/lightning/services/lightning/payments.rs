@@ -1,5 +1,9 @@
+use std::time::Duration;
+
 use async_trait::async_trait;
 use breez_sdk_core::{parse, InputType, LNInvoice, LnUrlPayRequestData};
+use chrono::Utc;
+use serde_bolt::bitcoin::Network;
 use tracing::{debug, info, trace};
 use uuid::Uuid;
 
@@ -9,7 +13,10 @@ use crate::{
         errors::{ApplicationError, DataError, DatabaseError, LightningError},
     },
     domains::lightning::{
-        entities::{LightningPayment, LightningPaymentFilter, LightningPaymentStatus},
+        entities::{
+            Invoice, InvoiceStatus, InvoiceType, LightningPayment, PaymentFilter, PaymentStatus,
+            PaymentType,
+        },
         services::LightningPaymentsUseCases,
     },
 };
@@ -41,37 +48,73 @@ impl LightningService {
             );
         }
 
-        let txn = self.store.begin().await?;
-
-        let balance = self
-            .store
-            .get_balance(Some(&txn), &user_id)
-            .await?
-            .available_msat as u64;
-
         if let Some(amount) = specified_amount {
-            if balance < amount {
-                return Err(DataError::InsufficientFunds.into());
+            // Check if internal payment
+            let invoice_opt = self
+                .store
+                .find_invoice_by_payment_hash(&invoice.payment_hash)
+                .await?;
+            if let Some(mut retrieved_invoice) = invoice_opt {
+                if retrieved_invoice.user_id == user_id {
+                    return Err(
+                        DataError::Validation("Cannot pay for own invoice.".to_string()).into(),
+                    );
+                }
+
+                match retrieved_invoice.status {
+                    InvoiceStatus::SETTLED => {
+                        return Err(DataError::Validation(
+                            "Invoice has already been paid.".to_string(),
+                        )
+                        .into());
+                    }
+                    InvoiceStatus::EXPIRED => {
+                        return Err(DataError::Validation("Invoice is expired.".to_string()).into());
+                    }
+                    InvoiceStatus::PENDING => {
+                        // Internal payment
+                        let txn = self.store.begin().await?;
+
+                        let internal_payment = self
+                            .insert_payment(LightningPayment {
+                                user_id,
+                                amount_msat: amount,
+                                status: PaymentStatus::SETTLED,
+                                payment_hash: Some(invoice.payment_hash),
+                                description: invoice.description,
+                                fee_msat: Some(0),
+                                payment_time: Some(Utc::now()),
+                                payment_type: PaymentType::INTERNAL,
+                                ..Default::default()
+                            })
+                            .await?;
+
+                        retrieved_invoice.fee_msat = Some(0);
+                        retrieved_invoice.payment_time = internal_payment.payment_time;
+                        self.store
+                            .update_invoice(Some(&txn), retrieved_invoice)
+                            .await?;
+
+                        txn.commit()
+                            .await
+                            .map_err(|e| DatabaseError::Transaction(e.to_string()))?;
+
+                        return Ok(internal_payment);
+                    }
+                }
             }
 
+            // External  payment
             let pending_payment = self
-                .store
-                .insert_payment(
-                    Some(&txn),
-                    LightningPayment {
-                        user_id,
-                        amount_msat: amount,
-                        status: LightningPaymentStatus::PENDING,
-                        payment_hash: Some(invoice.payment_hash),
-                        description: invoice.description,
-                        ..Default::default()
-                    },
-                )
+                .insert_payment(LightningPayment {
+                    user_id,
+                    amount_msat: amount,
+                    status: PaymentStatus::PENDING,
+                    payment_hash: Some(invoice.payment_hash),
+                    description: invoice.description,
+                    ..Default::default()
+                })
                 .await?;
-
-            txn.commit()
-                .await
-                .map_err(|e| DatabaseError::Transaction(e.to_string()))?;
 
             let result = self
                 .lightning_client
@@ -104,36 +147,86 @@ impl LightningService {
     ) -> Result<LightningPayment, ApplicationError> {
         let amount = LightningService::validate_amount(amount_msat)?;
 
-        let txn = self.store.begin().await?;
+        // Check if internal payment
+        if data.domain == self.domain {
+            match data.ln_address.clone() {
+                Some(ln_address) => {
+                    let address_opt = self.store.find_address_by_username(&ln_address).await?;
+                    if let Some(retrieved_address) = address_opt {
+                        if retrieved_address.user_id == user_id {
+                            return Err(DataError::Validation(
+                                "Cannot pay to own lightning address.".to_string(),
+                            )
+                            .into());
+                        }
 
-        let balance = self
-            .store
-            .get_balance(Some(&txn), &user_id)
-            .await?
-            .available_msat as u64;
+                        // Internal payment
+                        let curr_time = Utc::now();
+                        let expiry = Duration::from_secs(self.invoice_expiry as u64);
 
-        if balance <= amount {
-            return Err(DataError::InsufficientFunds.into());
+                        let txn = self.store.begin().await?;
+                        self.store
+                            .insert_invoice(
+                                Some(&txn),
+                                Invoice {
+                                    user_id: user_id.clone(),
+                                    lightning_address: Some(ln_address.clone()),
+                                    network: Network::Bitcoin.to_string(),
+                                    description: comment.clone(),
+                                    amount_msat: Some(amount),
+                                    timestamp: curr_time,
+                                    expiry,
+                                    status: InvoiceStatus::SETTLED,
+                                    invoice_type: InvoiceType::INTERNAL,
+                                    fee_msat: Some(0),
+                                    payment_time: Some(curr_time),
+                                    expires_at: curr_time + expiry,
+                                    ..Default::default()
+                                },
+                            )
+                            .await?;
+
+                        let internal_payment = self
+                            .insert_payment(LightningPayment {
+                                user_id,
+                                amount_msat: amount,
+                                status: PaymentStatus::SETTLED,
+                                description: comment,
+                                fee_msat: Some(0),
+                                payment_time: Some(Utc::now()),
+                                payment_type: PaymentType::INTERNAL,
+                                lightning_address: Some(ln_address),
+                                ..Default::default()
+                            })
+                            .await?;
+
+                        txn.commit()
+                            .await
+                            .map_err(|e| DatabaseError::Transaction(e.to_string()))?;
+
+                        return Ok(internal_payment);
+                    }
+                }
+                None => {
+                    return Err(DataError::Validation(
+                        "Invalid LNURL, Lighting address must be defined for internal payments."
+                            .to_string(),
+                    )
+                    .into());
+                }
+            }
         }
 
         let pending_payment = self
-            .store
-            .insert_payment(
-                Some(&txn),
-                LightningPayment {
-                    user_id,
-                    amount_msat: amount,
-                    status: LightningPaymentStatus::PENDING,
-                    lightning_address: data.ln_address.clone(),
-                    description: comment.clone(),
-                    ..Default::default()
-                },
-            )
+            .insert_payment(LightningPayment {
+                user_id: user_id.clone(),
+                amount_msat: amount,
+                status: PaymentStatus::PENDING,
+                lightning_address: data.ln_address.clone(),
+                description: comment.clone(),
+                ..Default::default()
+            })
             .await?;
-
-        txn.commit()
-            .await
-            .map_err(|e| DatabaseError::Transaction(e.to_string()))?;
 
         let result = self
             .lightning_client
@@ -141,6 +234,32 @@ impl LightningService {
             .await;
 
         self.handle_processed_payment(pending_payment, result).await
+    }
+
+    async fn insert_payment(
+        &self,
+        payment: LightningPayment,
+    ) -> Result<LightningPayment, ApplicationError> {
+        let txn = self.store.begin().await?;
+
+        let balance = self
+            .store
+            .get_balance(Some(&txn), &payment.user_id)
+            .await?
+            .available_msat as u64;
+
+        // TODO: Check buffer
+        if balance <= payment.amount_msat {
+            return Err(DataError::InsufficientFunds.into());
+        }
+
+        let pending_payment = self.store.insert_payment(Some(&txn), payment).await?;
+
+        txn.commit()
+            .await
+            .map_err(|e| DatabaseError::Transaction(e.to_string()))?;
+
+        return Ok(pending_payment);
     }
 
     async fn handle_processed_payment(
@@ -153,14 +272,14 @@ impl LightningService {
                 payment.id = pending_payment.id;
                 payment.status = match payment.error {
                     // There is a case where the payment fails but still has a payment_hash and a payment is returned instead of an error
-                    Some(_) => LightningPaymentStatus::FAILED,
-                    None => LightningPaymentStatus::SETTLED,
+                    Some(_) => PaymentStatus::FAILED,
+                    None => PaymentStatus::SETTLED,
                 };
                 let payment: LightningPayment = self.store.update_payment(payment).await?;
                 Ok(payment)
             }
             Err(error) => {
-                pending_payment.status = LightningPaymentStatus::FAILED;
+                pending_payment.status = PaymentStatus::FAILED;
                 pending_payment.error = Some(error.to_string());
                 let payment: LightningPayment = self.store.update_payment(pending_payment).await?;
                 Ok(payment)
@@ -189,7 +308,7 @@ impl LightningPaymentsUseCases for LightningService {
 
     async fn list_payments(
         &self,
-        filter: LightningPaymentFilter,
+        filter: PaymentFilter,
     ) -> Result<Vec<LightningPayment>, ApplicationError> {
         trace!(?filter, "Listing lightning payments");
 
@@ -216,7 +335,7 @@ impl LightningPaymentsUseCases for LightningService {
                     .await
             }
             InputType::LnUrlError { data } => Err(DataError::Validation(data.reason).into()),
-            _ => Err(DataError::Validation("Unsupported payment format".to_string()).into()),
+            _ => Err(DataError::Validation("Unsupported payment input".to_string()).into()),
         }?;
 
         info!(
@@ -232,7 +351,7 @@ impl LightningPaymentsUseCases for LightningService {
 
         let n_deleted = self
             .store
-            .delete_payments(LightningPaymentFilter {
+            .delete_payments(PaymentFilter {
                 id: Some(id),
                 ..Default::default()
             })
@@ -246,10 +365,7 @@ impl LightningPaymentsUseCases for LightningService {
         Ok(())
     }
 
-    async fn delete_payments(
-        &self,
-        filter: LightningPaymentFilter,
-    ) -> Result<u64, ApplicationError> {
+    async fn delete_payments(&self, filter: PaymentFilter) -> Result<u64, ApplicationError> {
         debug!(?filter, "Deleting lightning payments");
 
         let n_deleted = self.store.delete_payments(filter.clone()).await?;

@@ -7,7 +7,7 @@ use uuid::Uuid;
 
 use crate::{
     application::errors::LightningError,
-    domains::lightning::entities::{LightningInvoice, LightningPayment},
+    domains::lightning::entities::{Invoice, LightningPayment},
 };
 
 #[async_trait]
@@ -20,7 +20,7 @@ pub trait LightningClient: Sync + Send {
         amount_msat: u64,
         description: String,
         expiry: u32,
-    ) -> Result<LightningInvoice, LightningError>;
+    ) -> Result<Invoice, LightningError>;
     async fn payment_by_hash(
         &self,
         payment_hash: String,

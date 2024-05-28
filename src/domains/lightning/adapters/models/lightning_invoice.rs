@@ -5,18 +5,17 @@ use std::time::Duration;
 use chrono::Utc;
 use sea_orm::entity::prelude::*;
 
-use crate::domains::lightning::entities::{LightningInvoice, LightningInvoiceStatus};
+use crate::domains::lightning::entities::{Invoice, InvoiceStatus, LightningInvoice};
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
 #[sea_orm(table_name = "lightning_invoice")]
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
     pub id: Uuid,
-    #[sea_orm(unique)]
+    pub invoice_type: String,
     pub payment_hash: String,
     pub user_id: String,
     pub lightning_address: Option<String>,
-    #[sea_orm(unique)]
     pub bolt11: String,
     pub network: String,
     pub payee_pubkey: String,
@@ -24,7 +23,6 @@ pub struct Model {
     pub description: Option<String>,
     pub description_hash: Option<String>,
     pub amount_msat: Option<i64>,
-    #[sea_orm(column_type = "Binary(BlobSize::Blob(None))")]
     pub payment_secret: String,
     pub timestamp: DateTimeUtc,
     pub expiry: i64,
@@ -56,31 +54,38 @@ impl Related<super::lightning_address::Entity> for Entity {
 
 impl ActiveModelBehavior for ActiveModel {}
 
-impl From<Model> for LightningInvoice {
+impl From<Model> for Invoice {
     fn from(model: Model) -> Self {
         let status = if model.payment_time.is_some() {
-            LightningInvoiceStatus::SETTLED
+            InvoiceStatus::SETTLED
         } else if Utc::now() > model.expires_at {
-            LightningInvoiceStatus::EXPIRED
+            InvoiceStatus::EXPIRED
         } else {
-            LightningInvoiceStatus::PENDING
+            InvoiceStatus::PENDING
         };
 
-        LightningInvoice {
+        let lightning = match model.invoice_type.as_str() {
+            "LIGHTNING" => Some(LightningInvoice {
+                payment_hash: model.payment_hash,
+                bolt11: model.bolt11,
+                description_hash: model.description_hash,
+                payee_pubkey: model.payee_pubkey,
+                min_final_cltv_expiry_delta: model.min_final_cltv_expiry_delta as u64,
+                payment_secret: model.payment_secret,
+            }),
+            _ => None,
+        };
+
+        Invoice {
             id: model.id,
-            payment_hash: model.payment_hash,
+            invoice_type: model.invoice_type.parse().unwrap(),
             user_id: model.user_id,
             lightning_address: model.lightning_address,
-            bolt11: model.bolt11,
             description: model.description,
-            description_hash: model.description_hash,
             amount_msat: model.amount_msat.map(|v| v as u64),
-            payment_secret: model.payment_secret,
             timestamp: model.timestamp,
             expiry: Duration::from_secs(model.expiry as u64),
             network: model.network,
-            payee_pubkey: model.payee_pubkey,
-            min_final_cltv_expiry_delta: model.min_final_cltv_expiry_delta as u64,
             status,
             fee_msat: None,
             payment_time: model.payment_time,
@@ -88,6 +93,7 @@ impl From<Model> for LightningInvoice {
             created_at: model.created_at,
             updated_at: model.updated_at,
             expires_at: model.expires_at,
+            lightning,
         }
     }
 }

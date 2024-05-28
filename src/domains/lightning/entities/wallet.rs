@@ -1,12 +1,12 @@
 use serde::Serialize;
 
-use super::{LightningAddress, LightningInvoice, LightningPayment};
+use super::{LightningAddress, Invoice, LightningPayment};
 
 #[derive(Debug, Clone, Serialize)]
 pub struct Wallet {
     pub user_balance: UserBalance,
     pub payments: Vec<LightningPayment>,
-    pub invoices: Vec<LightningInvoice>,
+    pub invoices: Vec<Invoice>,
     pub address: Option<LightningAddress>,
 }
 

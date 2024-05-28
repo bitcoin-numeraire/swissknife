@@ -5,19 +5,21 @@ use crate::{
             models::lightning_invoice::{ActiveModel, Column, Entity},
             repository::LightningInvoiceRepository,
         },
-        entities::{LightningInvoice, LightningInvoiceFilter, LightningInvoiceStatus},
+        entities::{Invoice, InvoiceFilter, InvoiceStatus, InvoiceType},
     },
 };
 use async_trait::async_trait;
-use sea_orm::{sea_query::Expr, ActiveValue::Set, Condition, QueryTrait};
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect};
+use sea_orm::{
+    sea_query::Expr, ActiveModelTrait, ActiveValue::Set, ColumnTrait, Condition,
+    DatabaseTransaction, EntityTrait, QueryFilter, QueryOrder, QuerySelect, QueryTrait,
+};
 use uuid::Uuid;
 
 use super::LightningStore;
 
 #[async_trait]
 impl LightningInvoiceRepository for LightningStore {
-    async fn find_invoice(&self, id: Uuid) -> Result<Option<LightningInvoice>, DatabaseError> {
+    async fn find_invoice(&self, id: Uuid) -> Result<Option<Invoice>, DatabaseError> {
         let model = Entity::find_by_id(id)
             .one(&self.db)
             .await
@@ -29,7 +31,7 @@ impl LightningInvoiceRepository for LightningStore {
     async fn find_invoice_by_payment_hash(
         &self,
         payment_hash: &str,
-    ) -> Result<Option<LightningInvoice>, DatabaseError> {
+    ) -> Result<Option<Invoice>, DatabaseError> {
         let model = Entity::find()
             .filter(Column::PaymentHash.eq(payment_hash))
             .one(&self.db)
@@ -39,31 +41,26 @@ impl LightningInvoiceRepository for LightningStore {
         Ok(model.map(Into::into))
     }
 
-    async fn find_invoices(
-        &self,
-        filter: LightningInvoiceFilter,
-    ) -> Result<Vec<LightningInvoice>, DatabaseError> {
+    async fn find_invoices(&self, filter: InvoiceFilter) -> Result<Vec<Invoice>, DatabaseError> {
         let models = Entity::find()
             .apply_if(filter.user_id, |q, user| q.filter(Column::UserId.eq(user)))
             .apply_if(filter.id, |q, id| q.filter(Column::Id.eq(id)))
             .apply_if(filter.status, |q, s| match s {
-                LightningInvoiceStatus::PENDING => q.filter(
+                InvoiceStatus::PENDING => q.filter(
                     Condition::all()
                         .add(Expr::col(Column::ExpiresAt).gt(Expr::current_timestamp()))
                         .add(Expr::col(Column::PaymentTime).is_null()),
                 ),
-                LightningInvoiceStatus::SETTLED => {
-                    q.filter(Expr::col(Column::PaymentTime).is_not_null())
-                }
-                LightningInvoiceStatus::EXPIRED => q.filter(
+                InvoiceStatus::SETTLED => q.filter(Expr::col(Column::PaymentTime).is_not_null()),
+                InvoiceStatus::EXPIRED => q.filter(
                     Condition::all()
                         .add(Expr::col(Column::ExpiresAt).lte(Expr::current_timestamp()))
                         .add(Expr::col(Column::PaymentTime).is_null()),
                 ),
             })
             .order_by_desc(Column::CreatedAt)
-            .offset(filter.offset)
-            .limit(filter.limit)
+            .offset(filter.pagination.offset)
+            .limit(filter.pagination.limit)
             .all(&self.db)
             .await
             .map_err(|e| DatabaseError::FindMany(e.to_string()))?;
@@ -73,70 +70,78 @@ impl LightningInvoiceRepository for LightningStore {
 
     async fn insert_invoice(
         &self,
-        invoice: LightningInvoice,
-    ) -> Result<LightningInvoice, DatabaseError> {
-        let model = ActiveModel {
+        txn: Option<&DatabaseTransaction>,
+        invoice: Invoice,
+    ) -> Result<Invoice, DatabaseError> {
+        let mut model = ActiveModel {
             user_id: Set(invoice.user_id),
+            invoice_type: Set(invoice.invoice_type.to_string()),
             lightning_address: Set(invoice.lightning_address),
-            bolt11: Set(invoice.bolt11),
             network: Set(invoice.network),
-            payee_pubkey: Set(invoice.payee_pubkey),
-            payment_hash: Set(invoice.payment_hash),
             description: Set(invoice.description),
-            description_hash: Set(invoice.description_hash),
             amount_msat: Set(invoice.amount_msat.map(|v| v as i64)),
-            payment_secret: Set(invoice.payment_secret),
             timestamp: Set(invoice.timestamp),
             expiry: Set(invoice.expiry.as_secs() as i64),
-            min_final_cltv_expiry_delta: Set(invoice.min_final_cltv_expiry_delta as i64),
             label: Set(invoice.label),
             expires_at: Set(invoice.expires_at),
             ..Default::default()
         };
 
-        let model = model
-            .insert(&self.db)
-            .await
-            .map_err(|e| DatabaseError::Insert(e.to_string()))?;
+        if invoice.invoice_type == InvoiceType::LIGHTNING {
+            let lightning = invoice.lightning.unwrap();
+            model.bolt11 = Set(lightning.bolt11);
+            model.payee_pubkey = Set(lightning.payee_pubkey);
+            model.payment_hash = Set(lightning.payment_hash);
+            model.description_hash = Set(lightning.description_hash);
+            model.payment_secret = Set(lightning.payment_secret);
+            model.min_final_cltv_expiry_delta = Set(lightning.min_final_cltv_expiry_delta as i64);
+        }
+
+        let result = match txn {
+            Some(txn) => model.insert(txn).await,
+            None => model.insert(&self.db).await,
+        };
+
+        let model = result.map_err(|e| DatabaseError::Insert(e.to_string()))?;
 
         Ok(model.into())
     }
 
     async fn update_invoice(
         &self,
-        invoice: LightningInvoice,
-    ) -> Result<LightningInvoice, DatabaseError> {
+        txn: Option<&DatabaseTransaction>,
+        invoice: Invoice,
+    ) -> Result<Invoice, DatabaseError> {
         let model = ActiveModel {
             id: Set(invoice.id),
-            payment_hash: Set(invoice.payment_hash),
             fee_msat: Set(invoice.fee_msat.map(|v| v as i64)),
             payment_time: Set(invoice.payment_time),
             description: Set(invoice.description),
             ..Default::default()
         };
 
-        let model = model
-            .update(&self.db)
-            .await
-            .map_err(|e| DatabaseError::Update(e.to_string()))?;
+        let result = match txn {
+            Some(txn) => model.update(txn).await,
+            None => model.update(&self.db).await,
+        };
+
+        let model = result.map_err(|e| DatabaseError::Update(e.to_string()))?;
 
         Ok(model.into())
     }
 
-    async fn delete_invoices(&self, filter: LightningInvoiceFilter) -> Result<u64, DatabaseError> {
+    async fn delete_invoices(&self, filter: InvoiceFilter) -> Result<u64, DatabaseError> {
         let result = Entity::delete_many()
             .apply_if(filter.user_id, |q, user| q.filter(Column::UserId.eq(user)))
             .apply_if(filter.id, |q, id| q.filter(Column::Id.eq(id)))
             .apply_if(filter.status, |q, status| match status {
-                LightningInvoiceStatus::PENDING => q.filter(
+                InvoiceStatus::PENDING => q.filter(
                     Condition::all()
                         .add(Expr::col(Column::ExpiresAt).gt(Expr::current_timestamp()))
                         .add(Expr::col(Column::PaymentTime).is_null()),
                 ),
-                LightningInvoiceStatus::SETTLED => {
-                    q.filter(Expr::col(Column::PaymentTime).is_not_null())
-                }
-                LightningInvoiceStatus::EXPIRED => q.filter(
+                InvoiceStatus::SETTLED => q.filter(Expr::col(Column::PaymentTime).is_not_null()),
+                InvoiceStatus::EXPIRED => q.filter(
                     Condition::all()
                         .add(Expr::col(Column::ExpiresAt).lte(Expr::current_timestamp()))
                         .add(Expr::col(Column::PaymentTime).is_null()),

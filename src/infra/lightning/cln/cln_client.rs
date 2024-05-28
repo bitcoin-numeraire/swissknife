@@ -14,7 +14,7 @@ use cln::node_client::NodeClient;
 
 use crate::{
     application::errors::LightningError,
-    domains::lightning::entities::{LightningInvoice, LightningPayment},
+    domains::lightning::entities::{Invoice, LightningPayment},
     infra::lightning::LightningClient,
 };
 
@@ -91,7 +91,7 @@ impl LightningClient for ClnClient {
         amount_msat: u64,
         description: String,
         expiry: u32,
-    ) -> Result<LightningInvoice, LightningError> {
+    ) -> Result<Invoice, LightningError> {
         let mut client = self.client.clone();
 
         let label = Uuid::new_v4();
@@ -113,7 +113,7 @@ impl LightningClient for ClnClient {
 
         // TODO: Add warnings from node if necessary for alerting
 
-        let mut invoice: LightningInvoice = response.into_inner().into();
+        let mut invoice: Invoice = response.into_inner().into();
         invoice.label = Some(label);
 
         Ok(invoice)

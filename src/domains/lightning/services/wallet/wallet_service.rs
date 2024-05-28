@@ -2,7 +2,7 @@ use crate::{
     application::errors::ApplicationError,
     domains::lightning::{
         adapters::LightningRepository,
-        entities::{LightningInvoiceFilter, LightningPaymentFilter, UserBalance, Wallet},
+        entities::{InvoiceFilter, PaginationFilter, PaymentFilter, UserBalance, Wallet},
         services::WalletUseCases,
     },
 };
@@ -39,17 +39,23 @@ impl WalletUseCases for WalletService {
         let balance = self.store.get_balance(None, &user_id).await?;
         let payments = self
             .store
-            .find_payments(LightningPaymentFilter {
+            .find_payments(PaymentFilter {
                 user_id: Some(user_id.clone()),
-                limit: Some(PAYMENTS_LIMIT),
+                pagination: PaginationFilter {
+                    limit: Some(PAYMENTS_LIMIT),
+                    ..Default::default()
+                },
                 ..Default::default()
             })
             .await?;
         let invoices = self
             .store
-            .find_invoices(LightningInvoiceFilter {
+            .find_invoices(InvoiceFilter {
                 user_id: Some(user_id.clone()),
-                limit: Some(INVOICES_LIMIT),
+                pagination: PaginationFilter {
+                    limit: Some(INVOICES_LIMIT),
+                    ..Default::default()
+                },
                 ..Default::default()
             })
             .await?;

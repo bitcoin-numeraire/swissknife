@@ -8,7 +8,7 @@ use uuid::Uuid;
 
 use crate::domains::lightning::adapters::models::lightning_payment::{ActiveModel, Column, Entity};
 use crate::domains::lightning::adapters::repository::LightningPaymentRepository;
-use crate::domains::lightning::entities::LightningPaymentFilter;
+use crate::domains::lightning::entities::PaymentFilter;
 use crate::{application::errors::DatabaseError, domains::lightning::entities::LightningPayment};
 
 use super::LightningStore;
@@ -26,7 +26,7 @@ impl LightningPaymentRepository for LightningStore {
 
     async fn find_payments(
         &self,
-        filter: LightningPaymentFilter,
+        filter: PaymentFilter,
     ) -> Result<Vec<LightningPayment>, DatabaseError> {
         let models = Entity::find()
             .apply_if(filter.user_id, |q, user| q.filter(Column::UserId.eq(user)))
@@ -35,8 +35,8 @@ impl LightningPaymentRepository for LightningStore {
                 q.filter(Column::Status.eq(s.to_string()))
             })
             .order_by_desc(Column::CreatedAt)
-            .offset(filter.offset)
-            .limit(filter.limit)
+            .offset(filter.pagination.offset)
+            .limit(filter.pagination.limit)
             .all(&self.db)
             .await
             .map_err(|e| DatabaseError::FindMany(e.to_string()))?;
@@ -54,8 +54,12 @@ impl LightningPaymentRepository for LightningStore {
             lightning_address: Set(payment.lightning_address),
             amount_msat: Set(payment.amount_msat as i64),
             status: Set(payment.status.to_string()),
+            payment_type: Set(payment.payment_type.to_string()),
+            fee_msat: Set(payment.fee_msat.map(|v| v as i64)),
+            payment_time: Set(payment.payment_time),
             payment_hash: Set(payment.payment_hash),
             description: Set(payment.description),
+            metadata: Set(payment.metadata),
             ..Default::default()
         };
 
@@ -103,7 +107,7 @@ impl LightningPaymentRepository for LightningStore {
         Ok(model.into())
     }
 
-    async fn delete_payments(&self, filter: LightningPaymentFilter) -> Result<u64, DatabaseError> {
+    async fn delete_payments(&self, filter: PaymentFilter) -> Result<u64, DatabaseError> {
         let result = Entity::delete_many()
             .apply_if(filter.user_id, |q, user| q.filter(Column::UserId.eq(user)))
             .apply_if(filter.id, |q, id| q.filter(Column::Id.eq(id)))

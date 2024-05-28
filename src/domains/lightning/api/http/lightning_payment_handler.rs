@@ -10,7 +10,7 @@ use uuid::Uuid;
 use crate::{
     application::{dtos::SendPaymentRequest, errors::ApplicationError},
     domains::{
-        lightning::entities::{LightningPayment, LightningPaymentFilter},
+        lightning::entities::{LightningPayment, PaymentFilter},
         users::entities::{AuthUser, Permission},
     },
     infra::app::AppState,
@@ -53,7 +53,7 @@ impl LightningPaymentHandler {
     async fn list(
         State(app_state): State<Arc<AppState>>,
         user: AuthUser,
-        Query(query_params): Query<LightningPaymentFilter>,
+        Query(query_params): Query<PaymentFilter>,
     ) -> Result<Json<Vec<LightningPayment>>, ApplicationError> {
         user.check_permission(Permission::ReadLightningTransaction)?;
 
@@ -79,7 +79,7 @@ impl LightningPaymentHandler {
     async fn delete_many(
         State(app_state): State<Arc<AppState>>,
         user: AuthUser,
-        Query(query_params): Query<LightningPaymentFilter>,
+        Query(query_params): Query<PaymentFilter>,
     ) -> Result<Json<u64>, ApplicationError> {
         user.check_permission(Permission::WriteLightningTransaction)?;
 

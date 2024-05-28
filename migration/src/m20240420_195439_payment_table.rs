@@ -14,7 +14,7 @@ impl MigrationTrait for Migration {
             RETURN NEW;
             END;
             $$ language 'plpgsql';
-            CREATE TABLE lightning_payment (
+            CREATE TABLE payment (
                 id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
                 user_id varchar(255) NOT NULL,
                 lightning_address varchar(255),
@@ -24,14 +24,15 @@ impl MigrationTrait for Migration {
                 fee_msat bigint,
                 payment_time timestamptz,
                 status varchar NOT NULL,
+                payment_type varchar NOT NULL,
                 description varchar,
                 metadata varchar,
                 success_action jsonb,
                 created_at timestamptz NOT NULL DEFAULT current_timestamp,
                 updated_at timestamptz
             );
-            CREATE TRIGGER update_lightning_payment_timestamp BEFORE
-            UPDATE ON lightning_payment FOR EACH ROW EXECUTE PROCEDURE update_payment_timestamp();",
+            CREATE TRIGGER update_payment_timestamp BEFORE
+            UPDATE ON payment FOR EACH ROW EXECUTE PROCEDURE update_payment_timestamp();",
         )
         .await?;
 
@@ -41,7 +42,7 @@ impl MigrationTrait for Migration {
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager
             .get_connection()
-            .execute_unprepared("DROP TABLE `lightning_payment`")
+            .execute_unprepared("DROP TABLE `payment`")
             .await?;
 
         Ok(())

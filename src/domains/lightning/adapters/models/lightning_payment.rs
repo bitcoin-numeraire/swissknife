@@ -2,7 +2,7 @@
 
 use sea_orm::entity::prelude::*;
 
-use crate::domains::lightning::entities::{LightningPayment, LightningPaymentStatus};
+use crate::domains::lightning::entities::LightningPayment;
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
 #[sea_orm(table_name = "lightning_payment")]
@@ -18,6 +18,7 @@ pub struct Model {
     pub fee_msat: Option<i64>,
     pub payment_time: Option<DateTimeUtc>,
     pub status: String,
+    pub payment_type: String,
     pub description: Option<String>,
     pub metadata: Option<String>,
     pub success_action: Option<serde_json::Value>,
@@ -56,7 +57,8 @@ impl From<Model> for LightningPayment {
             amount_msat: model.amount_msat as u64,
             fee_msat: model.fee_msat.map(|v| v as u64),
             payment_time: model.payment_time,
-            status: model.status.parse::<LightningPaymentStatus>().unwrap(),
+            status: model.status.parse().unwrap(),
+            payment_type: model.payment_type.parse().unwrap(),
             description: model.description,
             metadata: model.metadata,
             success_action: model.success_action,

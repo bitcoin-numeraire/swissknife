@@ -6,7 +6,7 @@ use uuid::Uuid;
 use crate::{
     application::errors::{ApplicationError, DataError},
     domains::lightning::{
-        entities::{LNURLPayRequest, LightningAddress, LightningAddressFilter, LightningInvoice},
+        entities::{LNURLPayRequest, LightningAddress, LightningAddressFilter, Invoice},
         services::LightningAddressesUseCases,
     },
 };
@@ -35,7 +35,7 @@ impl LightningAddressesUseCases for LightningService {
         username: String,
         amount: u64,
         comment: Option<String>,
-    ) -> Result<LightningInvoice, ApplicationError> {
+    ) -> Result<Invoice, ApplicationError> {
         debug!(username, amount, comment, "Generating LNURLp invoice");
 
         let lightning_address = self
@@ -58,7 +58,7 @@ impl LightningAddressesUseCases for LightningService {
         invoice.lightning_address = Some(username.clone());
 
         // TODO: Get or add more information to make this a LNURLp invoice (like fetching a success action specific to the user)
-        let invoice = self.store.insert_invoice(invoice).await?;
+        let invoice = self.store.insert_invoice(None, invoice).await?;
 
         info!(username, "Lightning invoice generated successfully");
         Ok(invoice)

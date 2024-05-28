@@ -1,7 +1,7 @@
 use serde::Deserialize;
 use serde::Serialize;
 
-use crate::domains::lightning::entities::LightningInvoice;
+use crate::domains::lightning::entities::Invoice;
 
 #[derive(Deserialize)]
 pub struct LNUrlpInvoiceQueryParams {
@@ -25,10 +25,10 @@ pub struct SuccessAction {
     pub message: Option<String>, // rest of fields depends on tag value
 }
 
-impl From<LightningInvoice> for LNUrlpInvoiceResponse {
-    fn from(invoice: LightningInvoice) -> Self {
+impl From<Invoice> for LNUrlpInvoiceResponse {
+    fn from(invoice: Invoice) -> Self {
         Self {
-            pr: invoice.bolt11,
+            pr: invoice.lightning.unwrap().bolt11,
             success_action: Some(SuccessAction {
                 tag: "message".to_string(),
                 message: Some("Thanks for the sats!".to_string()),

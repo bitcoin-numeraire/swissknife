@@ -8,8 +8,8 @@ use crate::{
     application::{dtos::SendPaymentRequest, errors::ApplicationError},
     domains::{
         lightning::entities::{
-            LNURLPayRequest, LightningAddress, LightningAddressFilter, LightningInvoice,
-            LightningInvoiceFilter, LightningPayment, LightningPaymentFilter,
+            LNURLPayRequest, LightningAddress, LightningAddressFilter, Invoice,
+            InvoiceFilter, LightningPayment, PaymentFilter,
         },
         users::entities::AuthUser,
     },
@@ -23,16 +23,16 @@ pub trait LightningInvoicesUseCases {
         amount: u64,
         description: Option<String>,
         expiry: Option<u32>,
-    ) -> Result<LightningInvoice, ApplicationError>;
-    async fn get_invoice(&self, id: Uuid) -> Result<LightningInvoice, ApplicationError>;
+    ) -> Result<Invoice, ApplicationError>;
+    async fn get_invoice(&self, id: Uuid) -> Result<Invoice, ApplicationError>;
     async fn list_invoices(
         &self,
-        filter: LightningInvoiceFilter,
-    ) -> Result<Vec<LightningInvoice>, ApplicationError>;
+        filter: InvoiceFilter,
+    ) -> Result<Vec<Invoice>, ApplicationError>;
     async fn delete_invoice(&self, id: Uuid) -> Result<(), ApplicationError>;
     async fn delete_invoices(
         &self,
-        filter: LightningInvoiceFilter,
+        filter: InvoiceFilter,
     ) -> Result<u64, ApplicationError>;
 }
 
@@ -42,12 +42,12 @@ pub trait LightningPaymentsUseCases {
     async fn get_payment(&self, id: Uuid) -> Result<LightningPayment, ApplicationError>;
     async fn list_payments(
         &self,
-        filter: LightningPaymentFilter,
+        filter: PaymentFilter,
     ) -> Result<Vec<LightningPayment>, ApplicationError>;
     async fn delete_payment(&self, id: Uuid) -> Result<(), ApplicationError>;
     async fn delete_payments(
         &self,
-        filter: LightningPaymentFilter,
+        filter: PaymentFilter,
     ) -> Result<u64, ApplicationError>;
 }
 
@@ -59,7 +59,7 @@ pub trait LightningAddressesUseCases {
         username: String,
         amount: u64,
         description: Option<String>,
-    ) -> Result<LightningInvoice, ApplicationError>;
+    ) -> Result<Invoice, ApplicationError>;
 
     async fn register_address(
         &self,

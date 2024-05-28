@@ -60,8 +60,8 @@ impl LightningAddressRepository for LightningStore {
             })
             .apply_if(filter.id, |q, id| q.filter(Column::Id.eq(id)))
             .order_by_desc(Column::CreatedAt)
-            .offset(filter.offset)
-            .limit(filter.limit)
+            .offset(filter.pagination.offset)
+            .limit(filter.pagination.limit)
             .all(&self.db)
             .await
             .map_err(|e| DatabaseError::FindMany(e.to_string()))?;
