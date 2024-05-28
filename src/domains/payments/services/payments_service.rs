@@ -27,7 +27,7 @@ use crate::{
 
 use super::PaymentsUseCases;
 
-const DEFAULT_INTERNAL_INVOICE_DESCRIPTION: &str = "From Numeraire Swissknife";
+const DEFAULT_INTERNAL_INVOICE_DESCRIPTION: &str = "Numeraire Swissknife Invoice";
 const DEFAULT_INTERNAL_PAYMENT_DESCRIPTION: &str = "Payment to Numeraire Swissknife";
 
 pub struct PaymentsService {
@@ -35,6 +35,7 @@ pub struct PaymentsService {
     repo: Box<dyn PaymentRepository>,
     lightning_repo: Box<dyn LightningRepository>,
     lightning_client: Arc<dyn LightningClient>,
+    fee_buffer: f64,
 }
 
 impl PaymentsService {
@@ -43,12 +44,14 @@ impl PaymentsService {
         lightning_repo: Box<dyn LightningRepository>,
         lightning_client: Arc<dyn LightningClient>,
         domain: String,
+        fee_buffer: f64,
     ) -> Self {
         PaymentsService {
             repo,
             lightning_repo,
             lightning_client,
             domain,
+            fee_buffer,
         }
     }
 }
@@ -106,17 +109,20 @@ impl PaymentsService {
                         let txn = self.lightning_repo.begin().await?;
 
                         let internal_payment = self
-                            .insert_payment(Payment {
-                                user_id,
-                                amount_msat: amount,
-                                status: PaymentStatus::SETTLED,
-                                payment_hash: Some(invoice.payment_hash),
-                                description: invoice.description,
-                                fee_msat: Some(0),
-                                payment_time: Some(Utc::now()),
-                                payment_type: PaymentType::INTERNAL,
-                                ..Default::default()
-                            })
+                            .insert_payment(
+                                Payment {
+                                    user_id,
+                                    amount_msat: amount,
+                                    status: PaymentStatus::SETTLED,
+                                    payment_hash: Some(invoice.payment_hash),
+                                    description: invoice.description,
+                                    fee_msat: Some(0),
+                                    payment_time: Some(Utc::now()),
+                                    payment_type: PaymentType::INTERNAL,
+                                    ..Default::default()
+                                },
+                                0.0,
+                            )
                             .await?;
 
                         retrieved_invoice.fee_msat = Some(0);
@@ -136,14 +142,17 @@ impl PaymentsService {
 
             // External  payment
             let pending_payment = self
-                .insert_payment(Payment {
-                    user_id,
-                    amount_msat: amount,
-                    status: PaymentStatus::PENDING,
-                    payment_hash: Some(invoice.payment_hash),
-                    description: invoice.description,
-                    ..Default::default()
-                })
+                .insert_payment(
+                    Payment {
+                        user_id,
+                        amount_msat: amount,
+                        status: PaymentStatus::PENDING,
+                        payment_hash: Some(invoice.payment_hash),
+                        description: invoice.description,
+                        ..Default::default()
+                    },
+                    self.fee_buffer,
+                )
                 .await?;
 
             let result = self
@@ -222,19 +231,22 @@ impl PaymentsService {
                                 .await?;
 
                             let internal_payment = self
-                                .insert_payment(Payment {
-                                    user_id,
-                                    amount_msat: amount,
-                                    status: PaymentStatus::SETTLED,
-                                    description: comment.or(DEFAULT_INTERNAL_PAYMENT_DESCRIPTION
-                                        .to_string()
-                                        .into()),
-                                    fee_msat: Some(0),
-                                    payment_time: Some(Utc::now()),
-                                    payment_type: PaymentType::INTERNAL,
-                                    lightning_address: Some(ln_address),
-                                    ..Default::default()
-                                })
+                                .insert_payment(
+                                    Payment {
+                                        user_id,
+                                        amount_msat: amount,
+                                        status: PaymentStatus::SETTLED,
+                                        description: comment.or(
+                                            DEFAULT_INTERNAL_PAYMENT_DESCRIPTION.to_string().into(),
+                                        ),
+                                        fee_msat: Some(0),
+                                        payment_time: Some(Utc::now()),
+                                        payment_type: PaymentType::INTERNAL,
+                                        lightning_address: Some(ln_address),
+                                        ..Default::default()
+                                    },
+                                    0.0,
+                                )
                                 .await?;
 
                             txn.commit()
@@ -262,14 +274,17 @@ impl PaymentsService {
         }
 
         let pending_payment = self
-            .insert_payment(Payment {
-                user_id: user_id.clone(),
-                amount_msat: amount,
-                status: PaymentStatus::PENDING,
-                lightning_address: data.ln_address.clone(),
-                description: comment.clone(),
-                ..Default::default()
-            })
+            .insert_payment(
+                Payment {
+                    user_id: user_id.clone(),
+                    amount_msat: amount,
+                    status: PaymentStatus::PENDING,
+                    lightning_address: data.ln_address.clone(),
+                    description: comment.clone(),
+                    ..Default::default()
+                },
+                self.fee_buffer,
+            )
             .await?;
 
         let result = self
@@ -280,18 +295,22 @@ impl PaymentsService {
         self.handle_processed_payment(pending_payment, result).await
     }
 
-    async fn insert_payment(&self, payment: Payment) -> Result<Payment, ApplicationError> {
+    async fn insert_payment(
+        &self,
+        payment: Payment,
+        fee_buffer: f64,
+    ) -> Result<Payment, ApplicationError> {
         let txn = self.lightning_repo.begin().await?;
 
         let balance = self
             .lightning_repo
             .get_balance(Some(&txn), &payment.user_id)
             .await?
-            .available_msat as u64;
+            .available_msat as f64;
 
-        // TODO: Check buffer
-        if balance <= payment.amount_msat {
-            return Err(DataError::InsufficientFunds.into());
+        let required_balance = payment.amount_msat as f64 * (1.0 + fee_buffer);
+        if balance < required_balance {
+            return Err(DataError::InsufficientFunds(required_balance).into());
         }
 
         let pending_payment = self.repo.insert(Some(&txn), payment).await?;

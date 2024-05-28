@@ -101,7 +101,7 @@ impl IntoResponse for DataError {
                 warn!("{}", self);
                 (self.to_string(), StatusCode::CONFLICT)
             }
-            DataError::Validation(_) | DataError::InsufficientFunds => {
+            DataError::Validation(_) | DataError::InsufficientFunds(_) => {
                 warn!("{}", self);
                 (self.to_string(), StatusCode::UNPROCESSABLE_ENTITY)
             }
