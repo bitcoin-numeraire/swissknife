@@ -16,12 +16,12 @@ use crate::{
 use super::LnNodeUseCases;
 
 pub struct LnNodeService {
-    lightning_client: Arc<dyn LnClient>,
+    ln_client: Arc<dyn LnClient>,
 }
 
 impl LnNodeService {
-    pub fn new(lightning_client: Arc<dyn LnClient>) -> Self {
-        LnNodeService { lightning_client }
+    pub fn new(ln_client: Arc<dyn LnClient>) -> Self {
+        LnNodeService { ln_client }
     }
 }
 
@@ -33,7 +33,7 @@ impl LnNodeUseCases for LnNodeService {
         user.check_permission(Permission::ReadLightningNode)?;
 
         // TODO: Implement entity for node info and not NodeState
-        let node_info = self.lightning_client.node_info()?;
+        let node_info = self.ln_client.node_info()?;
 
         debug!("Node info retrieved successfully");
         Ok(node_info)
@@ -45,7 +45,7 @@ impl LnNodeUseCases for LnNodeService {
         user.check_permission(Permission::ReadLightningNode)?;
 
         // TODO: Implement entity for LSP info and not LspInformation
-        let lsp_info = self.lightning_client.lsp_info().await?;
+        let lsp_info = self.ln_client.lsp_info().await?;
 
         debug!("LSP info retrieved successfully");
         Ok(lsp_info)
@@ -57,7 +57,7 @@ impl LnNodeUseCases for LnNodeService {
         user.check_permission(Permission::ReadLightningNode)?;
 
         // TODO: Implement entity for LSP info and not LspInformation
-        let lsps = self.lightning_client.list_lsps().await?;
+        let lsps = self.ln_client.list_lsps().await?;
 
         debug!("LSPs retrieved successfully");
         Ok(lsps)
@@ -69,7 +69,7 @@ impl LnNodeUseCases for LnNodeService {
         user.check_permission(Permission::ReadLightningNode)?;
 
         // TODO: Implement entity for payments
-        let payments = self.lightning_client.list_payments().await?;
+        let payments = self.ln_client.list_payments().await?;
 
         debug!("Payments retrieved successfully from node");
         Ok(payments)
@@ -80,7 +80,7 @@ impl LnNodeUseCases for LnNodeService {
 
         user.check_permission(Permission::WriteLightningNode)?;
 
-        let tx_ids = self.lightning_client.close_lsp_channels().await?;
+        let tx_ids = self.ln_client.close_lsp_channels().await?;
 
         info!(?tx_ids, "LSP Channels closed sucessfully");
         Ok(tx_ids)
@@ -98,7 +98,7 @@ impl LnNodeUseCases for LnNodeService {
         user.check_permission(Permission::WriteLightningNode)?;
 
         let payment_info = self
-            .lightning_client
+            .ln_client
             .pay_onchain(amount_sat, recipient_address, feerate)
             .await?;
 
@@ -116,10 +116,7 @@ impl LnNodeUseCases for LnNodeService {
 
         user.check_permission(Permission::WriteLightningNode)?;
 
-        let txid = self
-            .lightning_client
-            .redeem_onchain(to_address, feerate)
-            .await?;
+        let txid = self.ln_client.redeem_onchain(to_address, feerate).await?;
 
         info!("Onchain redemption initiated successfully");
         Ok(txid)
@@ -133,7 +130,7 @@ impl LnNodeUseCases for LnNodeService {
 
         user.check_permission(Permission::ReadLightningNode)?;
 
-        let health = self.lightning_client.health().await?;
+        let health = self.ln_client.health().await?;
 
         Ok(health)
     }

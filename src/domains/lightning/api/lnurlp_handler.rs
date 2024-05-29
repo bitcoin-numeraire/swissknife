@@ -7,11 +7,8 @@ use axum::{
 };
 
 use crate::{
-    application::{
-        dtos::{LNUrlpInvoiceQueryParams, LNUrlpInvoiceResponse},
-        errors::ApplicationError,
-    },
-    domains::lightning::entities::LnURLPayRequest,
+    application::{dtos::LNUrlpInvoiceQueryParams, errors::ApplicationError},
+    domains::{invoices::entities::LnURLpInvoice, lightning::entities::LnURLPayRequest},
     infra::app::AppState,
 };
 
@@ -30,11 +27,7 @@ impl LnURLpHandler {
         Path(username): Path<String>,
         State(app_state): State<Arc<AppState>>,
     ) -> Result<Json<LnURLPayRequest>, ApplicationError> {
-        let lnurlp = app_state
-            .services
-            .ln_address
-            .generate_lnurlp(username)
-            .await?;
+        let lnurlp = app_state.services.ln_address.lnurlp(username).await?;
         Ok(lnurlp.into())
     }
 
@@ -42,11 +35,11 @@ impl LnURLpHandler {
         Path(username): Path<String>,
         Query(query_params): Query<LNUrlpInvoiceQueryParams>,
         State(app_state): State<Arc<AppState>>,
-    ) -> Result<Json<LNUrlpInvoiceResponse>, ApplicationError> {
+    ) -> Result<Json<LnURLpInvoice>, ApplicationError> {
         let invoice = app_state
             .services
-            .ln_address
-            .generate_lnurlp_invoice(username, query_params.amount, query_params.comment)
+            .invoice
+            .invoice_lnurlp(username, query_params.amount, query_params.comment)
             .await?;
         Ok(Json(invoice.into()))
     }

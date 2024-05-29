@@ -5,7 +5,7 @@ use sea_orm::entity::prelude::*;
 use crate::domains::lightning::entities::LnAddress;
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
-#[sea_orm(table_name = "lightning_address")]
+#[sea_orm(table_name = "ln_address")]
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
     pub id: Uuid,

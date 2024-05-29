@@ -61,7 +61,7 @@ impl PaymentRepository for SeaOrmPaymentRepository {
     ) -> Result<Payment, DatabaseError> {
         let model = ActiveModel {
             user_id: Set(payment.user_id),
-            lightning_address: Set(payment.lightning_address),
+            ln_address: Set(payment.ln_address),
             amount_msat: Set(payment.amount_msat as i64),
             status: Set(payment.status.to_string()),
             payment_type: Set(payment.payment_type.to_string()),

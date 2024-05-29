@@ -8,7 +8,6 @@ use uuid::Uuid;
 use crate::{
     application::errors::ApplicationError,
     domains::{
-        invoices::entities::Invoice,
         lightning::entities::{LnAddress, LnAddressFilter, LnURLPayRequest},
         users::entities::AuthUser,
     },
@@ -16,13 +15,7 @@ use crate::{
 
 #[async_trait]
 pub trait LnAddressesUseCases: Send + Sync {
-    async fn generate_lnurlp(&self, username: String) -> Result<LnURLPayRequest, ApplicationError>;
-    async fn generate_lnurlp_invoice(
-        &self,
-        username: String,
-        amount: u64,
-        description: Option<String>,
-    ) -> Result<Invoice, ApplicationError>;
+    async fn lnurlp(&self, username: String) -> Result<LnURLPayRequest, ApplicationError>;
     async fn register(
         &self,
         user_id: String,

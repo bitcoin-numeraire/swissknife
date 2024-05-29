@@ -15,7 +15,7 @@ pub struct Invoice {
     pub id: Uuid,
     pub user_id: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub lightning_address: Option<Uuid>,
+    pub ln_address: Option<Uuid>,
     pub network: String,
     pub description: Option<String>,
     pub amount_msat: Option<u64>,
@@ -49,6 +49,22 @@ pub struct LightningInvoice {
     #[serde_as(as = "DurationSeconds<u64>")]
     pub expiry: Duration,
     pub expires_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LnURLpInvoice {
+    pub pr: String,                            // bech32-serialized lightning invoice
+    pub success_action: Option<SuccessAction>, // An optional action to be executed after successfully paying an invoice
+    pub disposable: Option<bool>, // An optional flag to let a wallet know whether to persist the link from step 1, if null should be interpreted as true
+    pub routes: Vec<String>, // array with payment routes, should be left empty if no routes are to be provided
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SuccessAction {
+    pub tag: String,             // action type (url, message, aes, ...)
+    pub message: Option<String>, // rest of fields depends on tag value
 }
 
 #[derive(Clone, Debug, EnumString, Deserialize, Serialize, Display, PartialEq, Eq, Default)]

@@ -15,7 +15,7 @@ pub struct Model {
     pub user_id: String,
     pub invoice_type: String,
     pub payment_hash: Option<String>,
-    pub lightning_address: Option<Uuid>,
+    pub ln_address: Option<Uuid>,
     pub bolt11: Option<String>,
     pub network: String,
     pub payee_pubkey: Option<String>,
@@ -38,7 +38,7 @@ pub struct Model {
 pub enum Relation {
     #[sea_orm(
         belongs_to = "crate::domains::lightning::adapters::ln_address_model::Entity",
-        from = "Column::LightningAddress",
+        from = "Column::LnAddress",
         to = "crate::domains::lightning::adapters::ln_address_model::Column::Id",
         on_update = "NoAction",
         on_delete = "SetNull"
@@ -82,7 +82,7 @@ impl From<Model> for Invoice {
             id: model.id,
             invoice_type: model.invoice_type.parse().unwrap(),
             user_id: model.user_id,
-            lightning_address: model.lightning_address,
+            ln_address: model.ln_address,
             description: model.description,
             amount_msat: model.amount_msat.map(|v| v as u64),
             timestamp: model.timestamp,

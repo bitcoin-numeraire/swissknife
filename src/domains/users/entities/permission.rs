@@ -19,8 +19,8 @@ impl FromStr for Permission {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "read:lightning_address" => Ok(Permission::ReadLightningAddress),
-            "write:lightning_address" => Ok(Permission::WriteLightningAddress),
+            "read:ln_address" => Ok(Permission::ReadLightningAddress),
+            "write:ln_address" => Ok(Permission::WriteLightningAddress),
             "read:lightning_transaction" => Ok(Permission::ReadLightningTransaction),
             "write:lightning_transacion" => Ok(Permission::WriteLightningTransaction),
             "read:lightning_node" => Ok(Permission::ReadLightningNode),

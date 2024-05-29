@@ -43,10 +43,10 @@ impl AppState {
 
         // Adapters
         let store = AppStore::new_sea_orm(db_conn);
-        let lightning_client = get_lightning_client(config.clone(), store.clone()).await?;
+        let ln_client = get_ln_client(config.clone(), store.clone()).await?;
 
         // Services
-        let services = AppServices::new(config, store, lightning_client);
+        let services = AppServices::new(config, store, ln_client);
 
         Ok(Self {
             jwt_authenticator,
@@ -56,7 +56,7 @@ impl AppState {
     }
 }
 
-pub async fn get_lightning_client(
+pub async fn get_ln_client(
     config: AppConfig,
     store: AppStore,
 ) -> Result<Arc<dyn LnClient>, ApplicationError> {

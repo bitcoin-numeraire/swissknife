@@ -19,7 +19,7 @@ impl MigrationTrait for Migration {
                 user_id varchar(255) NOT NULL,
                 invoice_type varchar(255) NOT NULL,
                 payment_hash varchar(255),
-                lightning_address uuid,
+                ln_address uuid,
                 bolt11 varchar,
                 network varchar NOT NULL,
                 payee_pubkey varchar,
@@ -36,8 +36,8 @@ impl MigrationTrait for Migration {
                 created_at timestamptz NOT NULL DEFAULT current_timestamp,
                 updated_at timestamptz,
                 expires_at timestamptz,
-                CONSTRAINT fk_lightning_address FOREIGN KEY (lightning_address)
-                REFERENCES lightning_address (id)
+                CONSTRAINT fk_ln_address FOREIGN KEY (ln_address)
+                REFERENCES ln_address (id)
                 ON DELETE SET NULL
             );
             CREATE UNIQUE INDEX unique_payment_hash ON invoice(payment_hash) WHERE payment_hash IS NOT NULL;

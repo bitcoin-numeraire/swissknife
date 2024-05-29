@@ -28,20 +28,20 @@ const DEFAULT_INTERNAL_PAYMENT_DESCRIPTION: &str = "Payment to Numeraire Swisskn
 pub struct PaymentService {
     domain: String,
     store: AppStore,
-    lightning_client: Arc<dyn LnClient>,
+    ln_client: Arc<dyn LnClient>,
     fee_buffer: f64,
 }
 
 impl PaymentService {
     pub fn new(
         store: AppStore,
-        lightning_client: Arc<dyn LnClient>,
+        ln_client: Arc<dyn LnClient>,
         domain: String,
         fee_buffer: f64,
     ) -> Self {
         PaymentService {
             store,
-            lightning_client,
+            ln_client,
             domain,
             fee_buffer,
         }
@@ -150,7 +150,7 @@ impl PaymentService {
                 .await?;
 
             let result = self
-                .lightning_client
+                .ln_client
                 .send_payment(
                     invoice.bolt11.clone(),
                     if invoice.amount_msat.is_some() {
@@ -206,7 +206,7 @@ impl PaymentService {
                                     Some(&txn),
                                     Invoice {
                                         user_id: retrieved_address.user_id,
-                                        lightning_address: Some(retrieved_address.id),
+                                        ln_address: Some(retrieved_address.id),
                                         network: Network::Bitcoin.to_string(),
                                         description: comment.clone().or(
                                             DEFAULT_INTERNAL_INVOICE_DESCRIPTION.to_string().into(),
@@ -234,7 +234,7 @@ impl PaymentService {
                                         fee_msat: Some(0),
                                         payment_time: Some(Utc::now()),
                                         payment_type: PaymentType::INTERNAL,
-                                        lightning_address: Some(ln_address),
+                                        ln_address: Some(ln_address),
                                         ..Default::default()
                                     },
                                     0.0,
@@ -271,7 +271,7 @@ impl PaymentService {
                     user_id: user_id.clone(),
                     amount_msat: amount,
                     status: PaymentStatus::PENDING,
-                    lightning_address: data.ln_address.clone(),
+                    ln_address: data.ln_address.clone(),
                     description: comment.clone(),
                     ..Default::default()
                 },
@@ -280,7 +280,7 @@ impl PaymentService {
             .await?;
 
         let result = self
-            .lightning_client
+            .ln_client
             .lnurl_pay(data, amount, comment, pending_payment.id)
             .await;
 

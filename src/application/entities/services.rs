@@ -24,25 +24,21 @@ pub struct AppServices {
 }
 
 impl AppServices {
-    pub fn new(config: AppConfig, store: AppStore, lightning_client: Arc<dyn LnClient>) -> Self {
+    pub fn new(config: AppConfig, store: AppStore, ln_client: Arc<dyn LnClient>) -> Self {
         let payments = PaymentService::new(
             store.clone(),
-            lightning_client.clone(),
+            ln_client.clone(),
             config.domain.clone(),
             config.fee_buffer.unwrap_or_default(),
         );
         let invoices = InvoiceService::new(
             store.clone(),
-            lightning_client.clone(),
-            config.invoice_expiry.clone(),
-        );
-        let ln_address = LnAddressService::new(
-            store.clone(),
-            lightning_client.clone(),
+            ln_client.clone(),
+            config.invoice_expiry,
             config.domain.clone(),
-            config.invoice_expiry.clone(),
         );
-        let ln_node = LnNodeService::new(lightning_client);
+        let ln_address = LnAddressService::new(store.clone(), config.domain);
+        let ln_node = LnNodeService::new(ln_client);
         let wallet = WalletService::new(store);
 
         AppServices {

@@ -35,12 +35,12 @@ impl LnAddressHandler {
     ) -> Result<Json<LnAddress>, ApplicationError> {
         user.check_permission(Permission::WriteLightningAddress)?;
 
-        let lightning_address = app_state
+        let ln_address = app_state
             .services
             .ln_address
             .register(payload.user_id.unwrap_or(user.sub), payload.username)
             .await?;
-        Ok(Json(lightning_address.into()))
+        Ok(Json(ln_address.into()))
     }
 
     async fn get(
@@ -50,8 +50,8 @@ impl LnAddressHandler {
     ) -> Result<Json<LnAddress>, ApplicationError> {
         user.check_permission(Permission::ReadLightningAddress)?;
 
-        let lightning_address = app_state.services.ln_address.get(id).await?;
-        Ok(Json(lightning_address.into()))
+        let ln_address = app_state.services.ln_address.get(id).await?;
+        Ok(Json(ln_address.into()))
     }
 
     async fn list(
@@ -61,9 +61,9 @@ impl LnAddressHandler {
     ) -> Result<Json<Vec<LnAddress>>, ApplicationError> {
         user.check_permission(Permission::ReadLightningAddress)?;
 
-        let lightning_addresses = app_state.services.ln_address.list(query_params).await?;
+        let ln_addresses = app_state.services.ln_address.list(query_params).await?;
 
-        let response: Vec<LnAddress> = lightning_addresses.into_iter().map(Into::into).collect();
+        let response: Vec<LnAddress> = ln_addresses.into_iter().map(Into::into).collect();
 
         Ok(response.into())
     }

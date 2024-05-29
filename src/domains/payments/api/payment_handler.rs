@@ -46,8 +46,8 @@ impl PaymentHandler {
     ) -> Result<Json<Payment>, ApplicationError> {
         user.check_permission(Permission::ReadLightningTransaction)?;
 
-        let lightning_address = app_state.services.payment.get(id).await?;
-        Ok(Json(lightning_address.into()))
+        let ln_address = app_state.services.payment.get(id).await?;
+        Ok(Json(ln_address.into()))
     }
 
     async fn list(

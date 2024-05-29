@@ -11,28 +11,3 @@ pub struct LnURLPayRequest {
     pub comment_allowed: u16, // Optional number of characters accepted for the `comment` query parameter on subsequent callback, defaults to 0 if not provided. (no comment allowed). See <https://github.com/lnurl/luds/blob/luds/12.md>
     pub tag: String,          // Type of LNURL
 }
-
-impl LnURLPayRequest {
-    pub fn new(username: &str, domain: &str) -> Self {
-        let metadata = serde_json::to_string(&[
-            [
-                "text/plain".to_string(),
-                format!("{} never refuses sats", username),
-            ],
-            [
-                "text/identifier".to_string(),
-                format!("{}@{}", username, domain),
-            ],
-        ])
-        .unwrap();
-
-        Self {
-            callback: format!("https://{}/api/lnurlp/{}/callback", domain, username),
-            max_sendable: 1000000000,
-            min_sendable: 1000,
-            metadata,
-            comment_allowed: 255,
-            tag: "payRequest".to_string(),
-        }
-    }
-}

@@ -1,6 +1,5 @@
 use async_trait::async_trait;
 use regex::Regex;
-use std::sync::Arc;
 use tracing::{debug, info, trace};
 use uuid::Uuid;
 
@@ -9,45 +8,28 @@ use crate::{
         entities::AppStore,
         errors::{ApplicationError, DataError},
     },
-    domains::{
-        invoices::entities::Invoice,
-        lightning::entities::{LnAddress, LnAddressFilter, LnURLPayRequest},
-    },
-    infra::lightning::LnClient,
+    domains::lightning::entities::{LnAddress, LnAddressFilter, LnURLPayRequest},
 };
 
 use super::LnAddressesUseCases;
 
-const DEFAULT_INVOICE_EXPIRY: u32 = 3600;
 const MIN_USERNAME_LENGTH: usize = 1;
 const MAX_USERNAME_LENGTH: usize = 64;
 
 pub struct LnAddressService {
     domain: String,
-    invoice_expiry: u32,
     store: AppStore,
-    ln_client: Arc<dyn LnClient>,
 }
 
 impl LnAddressService {
-    pub fn new(
-        store: AppStore,
-        ln_client: Arc<dyn LnClient>,
-        domain: String,
-        invoice_expiry: Option<u32>,
-    ) -> Self {
-        LnAddressService {
-            store,
-            ln_client,
-            domain,
-            invoice_expiry: invoice_expiry.unwrap_or(DEFAULT_INVOICE_EXPIRY),
-        }
+    pub fn new(store: AppStore, domain: String) -> Self {
+        LnAddressService { store, domain }
     }
 }
 
 #[async_trait]
 impl LnAddressesUseCases for LnAddressService {
-    async fn generate_lnurlp(&self, username: String) -> Result<LnURLPayRequest, ApplicationError> {
+    async fn lnurlp(&self, username: String) -> Result<LnURLPayRequest, ApplicationError> {
         debug!(username, "Generating LNURLp");
 
         self.store
@@ -56,41 +38,29 @@ impl LnAddressesUseCases for LnAddressService {
             .await?
             .ok_or_else(|| DataError::NotFound("Lightning address not found.".to_string()))?;
 
+        let metadata = serde_json::to_string(&[
+            [
+                "text/plain".to_string(),
+                format!("{} never refuses sats", username),
+            ],
+            [
+                "text/identifier".to_string(),
+                format!("{}@{}", username, self.domain),
+            ],
+        ])
+        .unwrap();
+
+        let lnurlp = LnURLPayRequest {
+            callback: format!("https://{}/api/lnurlp/{}/callback", self.domain, username),
+            max_sendable: 1000000000,
+            min_sendable: 1000,
+            metadata,
+            comment_allowed: 255,
+            tag: "payRequest".to_string(),
+        };
+
         info!(username, "LNURLp returned successfully");
-        Ok(LnURLPayRequest::new(&username, &self.domain))
-    }
-
-    async fn generate_lnurlp_invoice(
-        &self,
-        username: String,
-        amount: u64,
-        comment: Option<String>,
-    ) -> Result<Invoice, ApplicationError> {
-        debug!(username, amount, comment, "Generating LNURLp invoice");
-
-        let lightning_address = self
-            .store
-            .ln_address
-            .find_by_username(&username)
-            .await?
-            .ok_or_else(|| DataError::NotFound("Lightning address not found.".to_string()))?;
-
-        let mut invoice = self
-            .ln_client
-            .invoice(
-                amount,
-                comment.unwrap_or(format!("Payment to {}@{}", username, self.domain)),
-                self.invoice_expiry,
-            )
-            .await?;
-        invoice.user_id = lightning_address.user_id.clone();
-        invoice.lightning_address = Some(lightning_address.id);
-
-        // TODO: Get or add more information to make this a LNURLp invoice (like fetching a success action specific to the user)
-        let invoice = self.store.invoice.insert(None, invoice).await?;
-
-        info!(username, "Lightning invoice generated successfully");
-        Ok(invoice)
+        Ok(lnurlp)
     }
 
     async fn register(
@@ -130,19 +100,19 @@ impl LnAddressesUseCases for LnAddressService {
             return Err(DataError::Conflict("Duplicate username.".to_string()).into());
         }
 
-        let lightning_address = self.store.ln_address.insert(&user_id, &username).await?;
+        let ln_address = self.store.ln_address.insert(&user_id, &username).await?;
 
         info!(
             user_id,
             username, "Lightning address registered successfully"
         );
-        Ok(lightning_address)
+        Ok(ln_address)
     }
 
     async fn get(&self, id: Uuid) -> Result<LnAddress, ApplicationError> {
         trace!(%id, "Fetching lightning address");
 
-        let lightning_address = self
+        let ln_address = self
             .store
             .ln_address
             .find(id)
@@ -152,16 +122,16 @@ impl LnAddressesUseCases for LnAddressService {
         debug!(
             %id, "Lightning address fetched successfully"
         );
-        Ok(lightning_address)
+        Ok(ln_address)
     }
 
     async fn list(&self, filter: LnAddressFilter) -> Result<Vec<LnAddress>, ApplicationError> {
         trace!(?filter, "Listing lightning addresses");
 
-        let lightning_addresses = self.store.ln_address.find_many(filter.clone()).await?;
+        let ln_addresses = self.store.ln_address.find_many(filter.clone()).await?;
 
         debug!(?filter, "Lightning addresses listed successfully");
-        Ok(lightning_addresses)
+        Ok(ln_addresses)
     }
 
     async fn delete(&self, id: Uuid) -> Result<(), ApplicationError> {

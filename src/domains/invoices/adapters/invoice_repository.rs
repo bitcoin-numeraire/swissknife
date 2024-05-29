@@ -85,7 +85,7 @@ impl InvoiceRepository for SeaOrmInvoiceRepository {
         let mut model = ActiveModel {
             user_id: Set(invoice.user_id),
             invoice_type: Set(invoice.invoice_type.to_string()),
-            lightning_address: Set(invoice.lightning_address),
+            ln_address: Set(invoice.ln_address),
             network: Set(invoice.network),
             description: Set(invoice.description),
             amount_msat: Set(invoice.amount_msat.map(|v| v as i64)),
