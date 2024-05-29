@@ -11,7 +11,7 @@ use crate::{
         dtos::{LNUrlpInvoiceQueryParams, LNUrlpInvoiceResponse},
         errors::ApplicationError,
     },
-    domains::lightning::entities::LNURLPayRequest,
+    domains::lightning::entities::LnURLPayRequest,
     infra::app::AppState,
 };
 
@@ -29,7 +29,7 @@ impl LnURLpHandler {
     async fn well_known_lnurlp(
         Path(username): Path<String>,
         State(app_state): State<Arc<AppState>>,
-    ) -> Result<Json<LNURLPayRequest>, ApplicationError> {
+    ) -> Result<Json<LnURLPayRequest>, ApplicationError> {
         let lnurlp = app_state
             .services
             .ln_address

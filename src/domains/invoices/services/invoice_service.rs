@@ -12,7 +12,7 @@ use crate::{
 
 use std::sync::Arc;
 
-use crate::infra::lightning::LightningClient;
+use crate::infra::lightning::LnClient;
 
 use super::InvoiceUseCases;
 
@@ -21,14 +21,14 @@ const DEFAULT_INVOICE_DESCRIPTION: &str = "Numeraire Swissknife Invoice";
 
 pub struct InvoiceService {
     store: AppStore,
-    lightning_client: Arc<dyn LightningClient>,
+    lightning_client: Arc<dyn LnClient>,
     invoice_expiry: u32,
 }
 
 impl InvoiceService {
     pub fn new(
         store: AppStore,
-        lightning_client: Arc<dyn LightningClient>,
+        lightning_client: Arc<dyn LnClient>,
         invoice_expiry: Option<u32>,
     ) -> Self {
         InvoiceService {

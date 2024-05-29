@@ -1,6 +1,7 @@
 use async_trait::async_trait;
 use breez_sdk_core::{
-    LspInformation, NodeState, Payment as BreezPayment, ReverseSwapInfo, ServiceHealthCheckResponse,
+    LspInformation, NodeState, Payment as BreezPayment, PaymentFailedData, ReverseSwapInfo,
+    ServiceHealthCheckResponse,
 };
 use uuid::Uuid;
 
@@ -8,14 +9,14 @@ use crate::{
     application::errors::ApplicationError,
     domains::{
         invoices::entities::Invoice,
-        lightning::entities::{LNURLPayRequest, LnAddress, LnAddressFilter},
+        lightning::entities::{LnAddress, LnAddressFilter, LnURLPayRequest},
         users::entities::AuthUser,
     },
 };
 
 #[async_trait]
 pub trait LnAddressesUseCases: Send + Sync {
-    async fn generate_lnurlp(&self, username: String) -> Result<LNURLPayRequest, ApplicationError>;
+    async fn generate_lnurlp(&self, username: String) -> Result<LnURLPayRequest, ApplicationError>;
     async fn generate_lnurlp_invoice(
         &self,
         username: String,
@@ -35,13 +36,10 @@ pub trait LnAddressesUseCases: Send + Sync {
 
 #[async_trait]
 pub trait LnNodeUseCases: Send + Sync {
-    async fn node_info(&self, user: AuthUser) -> Result<NodeState, ApplicationError>;
-    async fn lsp_info(&self, user: AuthUser) -> Result<LspInformation, ApplicationError>;
+    async fn info(&self, user: AuthUser) -> Result<NodeState, ApplicationError>;
+    async fn lsp(&self, user: AuthUser) -> Result<LspInformation, ApplicationError>;
     async fn list_lsps(&self, user: AuthUser) -> Result<Vec<LspInformation>, ApplicationError>;
-    async fn list_node_payments(
-        &self,
-        user: AuthUser,
-    ) -> Result<Vec<BreezPayment>, ApplicationError>;
+    async fn list_payments(&self, user: AuthUser) -> Result<Vec<BreezPayment>, ApplicationError>;
     async fn close_lsp_channels(&self, user: AuthUser) -> Result<Vec<String>, ApplicationError>;
     async fn pay_onchain(
         &self,
@@ -60,4 +58,11 @@ pub trait LnNodeUseCases: Send + Sync {
         to_address: String,
         feerate: u32,
     ) -> Result<String, ApplicationError>;
+}
+
+#[async_trait]
+pub trait LnEventsUseCases: Send + Sync {
+    async fn incoming_payment(&self, payment: BreezPayment) -> Result<(), ApplicationError>;
+    async fn outgoing_payment(&self, payment: BreezPayment) -> Result<(), ApplicationError>;
+    async fn failed_payment(&self, payment: PaymentFailedData) -> Result<(), ApplicationError>;
 }

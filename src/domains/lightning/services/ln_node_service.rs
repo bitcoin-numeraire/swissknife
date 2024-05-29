@@ -8,41 +8,26 @@ use breez_sdk_core::{
 use tracing::{debug, info, trace};
 
 use crate::{
-    application::{entities::AppStore, errors::ApplicationError},
+    application::errors::ApplicationError,
     domains::users::entities::{AuthUser, Permission},
-    infra::lightning::LightningClient,
+    infra::lightning::LnClient,
 };
 
 use super::LnNodeUseCases;
 
-const DEFAULT_INVOICE_EXPIRY: u32 = 3600;
-
 pub struct LnNodeService {
-    pub domain: String,
-    pub invoice_expiry: u32,
-    pub store: AppStore,
-    pub lightning_client: Arc<dyn LightningClient>,
+    lightning_client: Arc<dyn LnClient>,
 }
 
 impl LnNodeService {
-    pub fn new(
-        store: AppStore,
-        lightning_client: Arc<dyn LightningClient>,
-        domain: String,
-        invoice_expiry: Option<u32>,
-    ) -> Self {
-        LnNodeService {
-            store,
-            lightning_client,
-            domain,
-            invoice_expiry: invoice_expiry.unwrap_or(DEFAULT_INVOICE_EXPIRY),
-        }
+    pub fn new(lightning_client: Arc<dyn LnClient>) -> Self {
+        LnNodeService { lightning_client }
     }
 }
 
 #[async_trait]
 impl LnNodeUseCases for LnNodeService {
-    async fn node_info(&self, user: AuthUser) -> Result<NodeState, ApplicationError> {
+    async fn info(&self, user: AuthUser) -> Result<NodeState, ApplicationError> {
         trace!(user_id = user.sub, "Getting node info");
 
         user.check_permission(Permission::ReadLightningNode)?;
@@ -54,7 +39,7 @@ impl LnNodeUseCases for LnNodeService {
         Ok(node_info)
     }
 
-    async fn lsp_info(&self, user: AuthUser) -> Result<LspInformation, ApplicationError> {
+    async fn lsp(&self, user: AuthUser) -> Result<LspInformation, ApplicationError> {
         trace!(user_id = user.sub, "Getting LSP info");
 
         user.check_permission(Permission::ReadLightningNode)?;
@@ -78,7 +63,7 @@ impl LnNodeUseCases for LnNodeService {
         Ok(lsps)
     }
 
-    async fn list_node_payments(&self, user: AuthUser) -> Result<Vec<Payment>, ApplicationError> {
+    async fn list_payments(&self, user: AuthUser) -> Result<Vec<Payment>, ApplicationError> {
         trace!(user_id = user.sub, "Listing payments");
 
         user.check_permission(Permission::ReadLightningNode)?;

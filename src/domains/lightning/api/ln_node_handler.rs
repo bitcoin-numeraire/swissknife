@@ -37,7 +37,7 @@ impl LnNodeHandler {
         State(app_state): State<Arc<AppState>>,
         user: AuthUser,
     ) -> Result<Json<NodeState>, ApplicationError> {
-        let node_info = app_state.services.ln_node.node_info(user).await?;
+        let node_info = app_state.services.ln_node.info(user).await?;
 
         Ok(node_info.into())
     }
@@ -46,7 +46,7 @@ impl LnNodeHandler {
         State(app_state): State<Arc<AppState>>,
         user: AuthUser,
     ) -> Result<Json<LspInformation>, ApplicationError> {
-        let lsp_info = app_state.services.ln_node.lsp_info(user).await?;
+        let lsp_info = app_state.services.ln_node.lsp(user).await?;
 
         Ok(lsp_info.into())
     }
@@ -55,7 +55,7 @@ impl LnNodeHandler {
         State(app_state): State<Arc<AppState>>,
         user: AuthUser,
     ) -> Result<Json<Vec<Payment>>, ApplicationError> {
-        let payments = app_state.services.ln_node.list_node_payments(user).await?;
+        let payments = app_state.services.ln_node.list_payments(user).await?;
 
         Ok(payments.into())
     }

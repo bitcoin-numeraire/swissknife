@@ -17,7 +17,7 @@ use crate::{
         invoices::entities::{Invoice, InvoiceStatus, InvoiceType},
         payments::entities::{Payment, PaymentFilter, PaymentStatus, PaymentType},
     },
-    infra::lightning::LightningClient,
+    infra::lightning::LnClient,
 };
 
 use super::PaymentsUseCases;
@@ -28,14 +28,14 @@ const DEFAULT_INTERNAL_PAYMENT_DESCRIPTION: &str = "Payment to Numeraire Swisskn
 pub struct PaymentService {
     domain: String,
     store: AppStore,
-    lightning_client: Arc<dyn LightningClient>,
+    lightning_client: Arc<dyn LnClient>,
     fee_buffer: f64,
 }
 
 impl PaymentService {
     pub fn new(
         store: AppStore,
-        lightning_client: Arc<dyn LightningClient>,
+        lightning_client: Arc<dyn LnClient>,
         domain: String,
         fee_buffer: f64,
     ) -> Self {

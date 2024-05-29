@@ -18,10 +18,10 @@ use breez_sdk_core::{
 use crate::{
     application::errors::LightningError,
     domains::{
-        invoices::entities::Invoice,
-        payments::{entities::Payment, services::LnEventsUseCases},
+        invoices::entities::Invoice, lightning::services::LnEventsUseCases,
+        payments::entities::Payment,
     },
-    infra::lightning::LightningClient,
+    infra::lightning::LnClient,
 };
 
 use super::BreezListener;
@@ -106,7 +106,7 @@ impl BreezClient {
 }
 
 #[async_trait]
-impl LightningClient for BreezClient {
+impl LnClient for BreezClient {
     async fn invoice(
         &self,
         amount_msat: u64,

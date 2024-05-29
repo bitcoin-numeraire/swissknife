@@ -10,7 +10,7 @@ use crate::{
         payments::services::{PaymentService, PaymentsUseCases},
         users::services::{WalletService, WalletUseCases},
     },
-    infra::lightning::LightningClient,
+    infra::lightning::LnClient,
 };
 
 use super::AppStore;
@@ -24,11 +24,7 @@ pub struct AppServices {
 }
 
 impl AppServices {
-    pub fn new(
-        config: AppConfig,
-        store: AppStore,
-        lightning_client: Arc<dyn LightningClient>,
-    ) -> Self {
+    pub fn new(config: AppConfig, store: AppStore, lightning_client: Arc<dyn LnClient>) -> Self {
         let payments = PaymentService::new(
             store.clone(),
             lightning_client.clone(),
@@ -46,12 +42,7 @@ impl AppServices {
             config.domain.clone(),
             config.invoice_expiry.clone(),
         );
-        let ln_node = LnNodeService::new(
-            store.clone(),
-            lightning_client.clone(),
-            config.domain.clone(),
-            config.invoice_expiry.clone(),
-        );
+        let ln_node = LnNodeService::new(lightning_client);
         let wallet = WalletService::new(store);
 
         AppServices {

@@ -26,7 +26,7 @@ impl LnEventsService {
 
 #[async_trait]
 impl LnEventsUseCases for LnEventsService {
-    async fn process_incoming_payment(
+    async fn incoming_payment(
         &self,
         payment: BreezPayment,
     ) -> Result<(), ApplicationError> {
@@ -58,7 +58,7 @@ impl LnEventsUseCases for LnEventsService {
         return Err(DataError::NotFound("Lightning invoice not found.".into()).into());
     }
 
-    async fn process_outgoing_payment(
+    async fn outgoing_payment(
         &self,
         payment_success: BreezPayment,
     ) -> Result<(), ApplicationError> {
@@ -94,7 +94,7 @@ impl LnEventsUseCases for LnEventsService {
         return Err(DataError::NotFound("Lightning payment not found.".into()).into());
     }
 
-    async fn process_failed_payment(
+    async fn failed_payment(
         &self,
         payment_failed: PaymentFailedData,
     ) -> Result<(), ApplicationError> {

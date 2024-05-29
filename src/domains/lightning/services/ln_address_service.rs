@@ -1,44 +1,44 @@
 use async_trait::async_trait;
 use regex::Regex;
+use std::sync::Arc;
 use tracing::{debug, info, trace};
 use uuid::Uuid;
 
 use crate::{
-    application::errors::{ApplicationError, DataError},
+    application::{
+        entities::AppStore,
+        errors::{ApplicationError, DataError},
+    },
     domains::{
         invoices::entities::Invoice,
-        lightning::entities::{LNURLPayRequest, LnAddress, LnAddressFilter},
+        lightning::entities::{LnAddress, LnAddressFilter, LnURLPayRequest},
     },
+    infra::lightning::LnClient,
 };
-
-const MIN_USERNAME_LENGTH: usize = 1;
-const MAX_USERNAME_LENGTH: usize = 64;
-
-use std::sync::Arc;
-
-use crate::{application::entities::AppStore, infra::lightning::LightningClient};
 
 use super::LnAddressesUseCases;
 
 const DEFAULT_INVOICE_EXPIRY: u32 = 3600;
+const MIN_USERNAME_LENGTH: usize = 1;
+const MAX_USERNAME_LENGTH: usize = 64;
 
 pub struct LnAddressService {
-    pub domain: String,
-    pub invoice_expiry: u32,
-    pub store: AppStore,
-    pub lightning_client: Arc<dyn LightningClient>,
+    domain: String,
+    invoice_expiry: u32,
+    store: AppStore,
+    ln_client: Arc<dyn LnClient>,
 }
 
 impl LnAddressService {
     pub fn new(
         store: AppStore,
-        lightning_client: Arc<dyn LightningClient>,
+        ln_client: Arc<dyn LnClient>,
         domain: String,
         invoice_expiry: Option<u32>,
     ) -> Self {
         LnAddressService {
             store,
-            lightning_client,
+            ln_client,
             domain,
             invoice_expiry: invoice_expiry.unwrap_or(DEFAULT_INVOICE_EXPIRY),
         }
@@ -47,7 +47,7 @@ impl LnAddressService {
 
 #[async_trait]
 impl LnAddressesUseCases for LnAddressService {
-    async fn generate_lnurlp(&self, username: String) -> Result<LNURLPayRequest, ApplicationError> {
+    async fn generate_lnurlp(&self, username: String) -> Result<LnURLPayRequest, ApplicationError> {
         debug!(username, "Generating LNURLp");
 
         self.store
@@ -57,7 +57,7 @@ impl LnAddressesUseCases for LnAddressService {
             .ok_or_else(|| DataError::NotFound("Lightning address not found.".to_string()))?;
 
         info!(username, "LNURLp returned successfully");
-        Ok(LNURLPayRequest::new(&username, &self.domain))
+        Ok(LnURLPayRequest::new(&username, &self.domain))
     }
 
     async fn generate_lnurlp_invoice(
@@ -76,7 +76,7 @@ impl LnAddressesUseCases for LnAddressService {
             .ok_or_else(|| DataError::NotFound("Lightning address not found.".to_string()))?;
 
         let mut invoice = self
-            .lightning_client
+            .ln_client
             .invoice(
                 amount,
                 comment.unwrap_or(format!("Payment to {}@{}", username, self.domain)),

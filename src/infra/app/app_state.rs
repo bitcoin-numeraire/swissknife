@@ -6,11 +6,11 @@ use crate::{
         entities::{AppServices, AppStore},
         errors::{ApplicationError, ConfigError, WebServerError},
     },
-    domains::payments::services::LnEventsService,
+    domains::lightning::services::LnEventsService,
     infra::{
         auth::{jwt::JWTAuthenticator, Authenticator},
         database::sea_orm::SeaORMClient,
-        lightning::{breez::BreezClient, cln::ClnClient, LightningClient},
+        lightning::{breez::BreezClient, cln::ClnClient, LnClient},
     },
 };
 use humantime::parse_duration;
@@ -59,7 +59,7 @@ impl AppState {
 pub async fn get_lightning_client(
     config: AppConfig,
     store: AppStore,
-) -> Result<Arc<dyn LightningClient>, ApplicationError> {
+) -> Result<Arc<dyn LnClient>, ApplicationError> {
     match config.lightning_provider {
         LightningProvider::Breez => {
             let breez_config = config.breez_config.clone().ok_or_else(|| {

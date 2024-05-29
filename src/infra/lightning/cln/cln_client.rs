@@ -15,7 +15,7 @@ use cln::node_client::NodeClient;
 use crate::{
     application::errors::LightningError,
     domains::{invoices::entities::Invoice, payments::entities::Payment},
-    infra::lightning::LightningClient,
+    infra::lightning::LnClient,
 };
 
 use self::cln::{GetinfoRequest, InvoiceRequest};
@@ -85,7 +85,7 @@ impl ClnClient {
 }
 
 #[async_trait]
-impl LightningClient for ClnClient {
+impl LnClient for ClnClient {
     async fn invoice(
         &self,
         amount_msat: u64,
