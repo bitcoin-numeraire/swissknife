@@ -16,7 +16,7 @@ pub trait PaymentsUseCases: Send + Sync {
 }
 
 #[async_trait]
-pub trait LightningEventsUseCases: Send + Sync {
+pub trait LnEventsUseCases: Send + Sync {
     async fn process_incoming_payment(&self, payment: BreezPayment)
         -> Result<(), ApplicationError>;
     async fn process_outgoing_payment(&self, payment: BreezPayment)

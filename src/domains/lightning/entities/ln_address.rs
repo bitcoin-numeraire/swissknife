@@ -5,7 +5,7 @@ use uuid::Uuid;
 use crate::application::entities::PaginationFilter;
 
 #[derive(Clone, Debug, Serialize)]
-pub struct LightningAddress {
+pub struct LnAddress {
     pub id: Uuid,
     pub user_id: String,
     pub username: String,
@@ -18,7 +18,7 @@ pub struct LightningAddress {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, Default)]
-pub struct LightningAddressFilter {
+pub struct LnAddressFilter {
     #[serde(flatten)]
     pub pagination: PaginationFilter,
     pub id: Option<Uuid>,

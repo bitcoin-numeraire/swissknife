@@ -19,7 +19,7 @@ use crate::{
     application::errors::LightningError,
     domains::{
         invoices::entities::Invoice,
-        payments::{entities::Payment, services::LightningEventsUseCases},
+        payments::{entities::Payment, services::LnEventsUseCases},
     },
     infra::lightning::LightningClient,
 };
@@ -47,7 +47,7 @@ pub struct BreezClient {
 impl BreezClient {
     pub async fn new(
         config: BreezClientConfig,
-        payments_processor: Arc<dyn LightningEventsUseCases>,
+        payments_processor: Arc<dyn LnEventsUseCases>,
     ) -> Result<Self, LightningError> {
         if config.log_in_file {
             BreezServices::init_logging(&config.working_dir, None)

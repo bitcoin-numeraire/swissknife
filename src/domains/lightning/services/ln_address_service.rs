@@ -7,26 +7,52 @@ use crate::{
     application::errors::{ApplicationError, DataError},
     domains::{
         invoices::entities::Invoice,
-        lightning::{
-            entities::{LNURLPayRequest, LightningAddress, LightningAddressFilter},
-            services::LightningAddressesUseCases,
-        },
+        lightning::entities::{LNURLPayRequest, LnAddress, LnAddressFilter},
     },
 };
-
-use super::LightningService;
 
 const MIN_USERNAME_LENGTH: usize = 1;
 const MAX_USERNAME_LENGTH: usize = 64;
 
+use std::sync::Arc;
+
+use crate::{application::entities::AppStore, infra::lightning::LightningClient};
+
+use super::LnAddressesUseCases;
+
+const DEFAULT_INVOICE_EXPIRY: u32 = 3600;
+
+pub struct LnAddressService {
+    pub domain: String,
+    pub invoice_expiry: u32,
+    pub store: AppStore,
+    pub lightning_client: Arc<dyn LightningClient>,
+}
+
+impl LnAddressService {
+    pub fn new(
+        store: AppStore,
+        lightning_client: Arc<dyn LightningClient>,
+        domain: String,
+        invoice_expiry: Option<u32>,
+    ) -> Self {
+        LnAddressService {
+            store,
+            lightning_client,
+            domain,
+            invoice_expiry: invoice_expiry.unwrap_or(DEFAULT_INVOICE_EXPIRY),
+        }
+    }
+}
+
 #[async_trait]
-impl LightningAddressesUseCases for LightningService {
+impl LnAddressesUseCases for LnAddressService {
     async fn generate_lnurlp(&self, username: String) -> Result<LNURLPayRequest, ApplicationError> {
         debug!(username, "Generating LNURLp");
 
         self.store
-            .lightning
-            .find_address_by_username(&username)
+            .ln_address
+            .find_by_username(&username)
             .await?
             .ok_or_else(|| DataError::NotFound("Lightning address not found.".to_string()))?;
 
@@ -44,8 +70,8 @@ impl LightningAddressesUseCases for LightningService {
 
         let lightning_address = self
             .store
-            .lightning
-            .find_address_by_username(&username)
+            .ln_address
+            .find_by_username(&username)
             .await?
             .ok_or_else(|| DataError::NotFound("Lightning address not found.".to_string()))?;
 
@@ -67,11 +93,11 @@ impl LightningAddressesUseCases for LightningService {
         Ok(invoice)
     }
 
-    async fn register_address(
+    async fn register(
         &self,
         user_id: String,
         username: String,
-    ) -> Result<LightningAddress, ApplicationError> {
+    ) -> Result<LnAddress, ApplicationError> {
         debug!(user_id, username, "Registering lightning address");
 
         if username.len() < MIN_USERNAME_LENGTH || username.len() > MAX_USERNAME_LENGTH {
@@ -86,8 +112,8 @@ impl LightningAddressesUseCases for LightningService {
 
         if self
             .store
-            .lightning
-            .find_address_by_user_id(&user_id)
+            .ln_address
+            .find_by_user_id(&user_id)
             .await?
             .is_some()
         {
@@ -96,19 +122,15 @@ impl LightningAddressesUseCases for LightningService {
 
         if self
             .store
-            .lightning
-            .find_address_by_username(&username)
+            .ln_address
+            .find_by_username(&username)
             .await?
             .is_some()
         {
             return Err(DataError::Conflict("Duplicate username.".to_string()).into());
         }
 
-        let lightning_address = self
-            .store
-            .lightning
-            .insert_address(&user_id, &username)
-            .await?;
+        let lightning_address = self.store.ln_address.insert(&user_id, &username).await?;
 
         info!(
             user_id,
@@ -117,13 +139,13 @@ impl LightningAddressesUseCases for LightningService {
         Ok(lightning_address)
     }
 
-    async fn get_address(&self, id: Uuid) -> Result<LightningAddress, ApplicationError> {
+    async fn get(&self, id: Uuid) -> Result<LnAddress, ApplicationError> {
         trace!(%id, "Fetching lightning address");
 
         let lightning_address = self
             .store
-            .lightning
-            .find_address(id)
+            .ln_address
+            .find(id)
             .await?
             .ok_or_else(|| DataError::NotFound("Lightning address not found.".to_string()))?;
 
@@ -133,25 +155,22 @@ impl LightningAddressesUseCases for LightningService {
         Ok(lightning_address)
     }
 
-    async fn list_addresses(
-        &self,
-        filter: LightningAddressFilter,
-    ) -> Result<Vec<LightningAddress>, ApplicationError> {
+    async fn list(&self, filter: LnAddressFilter) -> Result<Vec<LnAddress>, ApplicationError> {
         trace!(?filter, "Listing lightning addresses");
 
-        let lightning_addresses = self.store.lightning.find_addresses(filter.clone()).await?;
+        let lightning_addresses = self.store.ln_address.find_many(filter.clone()).await?;
 
         debug!(?filter, "Lightning addresses listed successfully");
         Ok(lightning_addresses)
     }
 
-    async fn delete_address(&self, id: Uuid) -> Result<(), ApplicationError> {
+    async fn delete(&self, id: Uuid) -> Result<(), ApplicationError> {
         debug!(%id, "Deleting lightning address");
 
         let n_deleted = self
             .store
-            .lightning
-            .delete_addresses(LightningAddressFilter {
+            .ln_address
+            .delete_many(LnAddressFilter {
                 id: Some(id),
                 ..Default::default()
             })
@@ -165,17 +184,10 @@ impl LightningAddressesUseCases for LightningService {
         Ok(())
     }
 
-    async fn delete_addresses(
-        &self,
-        filter: LightningAddressFilter,
-    ) -> Result<u64, ApplicationError> {
+    async fn delete_many(&self, filter: LnAddressFilter) -> Result<u64, ApplicationError> {
         debug!(?filter, "Deleting lightning addresses");
 
-        let n_deleted = self
-            .store
-            .lightning
-            .delete_addresses(filter.clone())
-            .await?;
+        let n_deleted = self.store.ln_address.delete_many(filter.clone()).await?;
 
         info!(
             ?filter,

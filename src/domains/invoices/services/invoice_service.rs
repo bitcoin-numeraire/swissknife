@@ -14,24 +14,24 @@ use std::sync::Arc;
 
 use crate::infra::lightning::LightningClient;
 
-use super::InvoicesUseCases;
+use super::InvoiceUseCases;
 
 const DEFAULT_INVOICE_EXPIRY: u32 = 3600;
 const DEFAULT_INVOICE_DESCRIPTION: &str = "Numeraire Swissknife Invoice";
 
-pub struct InvoicesService {
+pub struct InvoiceService {
     store: AppStore,
     lightning_client: Arc<dyn LightningClient>,
     invoice_expiry: u32,
 }
 
-impl InvoicesService {
+impl InvoiceService {
     pub fn new(
         store: AppStore,
         lightning_client: Arc<dyn LightningClient>,
         invoice_expiry: Option<u32>,
     ) -> Self {
-        InvoicesService {
+        InvoiceService {
             store,
             lightning_client,
             invoice_expiry: invoice_expiry.unwrap_or(DEFAULT_INVOICE_EXPIRY),
@@ -40,7 +40,7 @@ impl InvoicesService {
 }
 
 #[async_trait]
-impl InvoicesUseCases for InvoicesService {
+impl InvoiceUseCases for InvoiceService {
     async fn invoice(
         &self,
         user_id: String,

@@ -67,18 +67,14 @@ impl WalletUseCases for WalletService {
                 ..Default::default()
             })
             .await?;
-        let address = self
-            .store
-            .lightning
-            .find_address_by_user_id(&user_id)
-            .await?;
+        let ln_address = self.store.ln_address.find_by_user_id(&user_id).await?;
 
         debug!(user_id, "wallet fetched successfully");
         Ok(Wallet {
             user_balance: balance,
             payments,
             invoices,
-            address,
+            ln_address,
         })
     }
 }

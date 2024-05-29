@@ -14,7 +14,7 @@ use crate::{
     },
     domains::{
         invoices::entities::{Invoice, InvoiceFilter, InvoiceStatus},
-        lightning::entities::{LightningAddress, LightningAddressFilter},
+        lightning::entities::{LnAddress, LnAddressFilter},
         payments::entities::{Payment, PaymentFilter, PaymentStatus},
         users::entities::{AuthUser, UserBalance, Wallet},
     },
@@ -54,7 +54,7 @@ impl WalletHandler {
         Json(mut payload): Json<SendPaymentRequest>,
     ) -> Result<Json<Payment>, ApplicationError> {
         payload.user_id = Some(user.sub);
-        let payment = app_state.services.payments.pay(payload).await?;
+        let payment = app_state.services.payment.pay(payload).await?;
         Ok(Json(payment.into()))
     }
 
@@ -73,7 +73,7 @@ impl WalletHandler {
     ) -> Result<Json<Invoice>, ApplicationError> {
         let invoice = app_state
             .services
-            .invoices
+            .invoice
             .invoice(
                 user.sub,
                 payload.amount_msat,
@@ -88,35 +88,35 @@ impl WalletHandler {
     async fn get_address(
         State(app_state): State<Arc<AppState>>,
         user: AuthUser,
-    ) -> Result<Json<LightningAddress>, ApplicationError> {
-        let lightning_addresses = app_state
+    ) -> Result<Json<LnAddress>, ApplicationError> {
+        let ln_addresses = app_state
             .services
-            .lightning
-            .list_addresses(LightningAddressFilter {
+            .ln_address
+            .list(LnAddressFilter {
                 user_id: Some(user.sub),
                 ..Default::default()
             })
             .await?;
 
-        let lightning_address = lightning_addresses
+        let ln_address = ln_addresses
             .first()
             .cloned()
             .ok_or_else(|| DataError::NotFound("Lightning address not found.".to_string()))?;
 
-        Ok(Json(lightning_address.into()))
+        Ok(Json(ln_address.into()))
     }
 
     async fn register_address(
         State(app_state): State<Arc<AppState>>,
         user: AuthUser,
         Json(payload): Json<RegisterLightningAddressRequest>,
-    ) -> Result<Json<LightningAddress>, ApplicationError> {
-        let lightning_address = app_state
+    ) -> Result<Json<LnAddress>, ApplicationError> {
+        let ln_address = app_state
             .services
-            .lightning
-            .register_address(user.sub, payload.username)
+            .ln_address
+            .register(user.sub, payload.username)
             .await?;
-        Ok(Json(lightning_address.into()))
+        Ok(Json(ln_address.into()))
     }
 
     async fn list_payments(
@@ -125,7 +125,7 @@ impl WalletHandler {
         Query(mut query_params): Query<PaymentFilter>,
     ) -> Result<Json<Vec<Payment>>, ApplicationError> {
         query_params.user_id = Some(user.sub);
-        let payments = app_state.services.payments.list(query_params).await?;
+        let payments = app_state.services.payment.list(query_params).await?;
 
         let response: Vec<Payment> = payments.into_iter().map(Into::into).collect();
 
@@ -139,7 +139,7 @@ impl WalletHandler {
     ) -> Result<Json<Payment>, ApplicationError> {
         let payments = app_state
             .services
-            .payments
+            .payment
             .list(PaymentFilter {
                 user_id: Some(user.sub),
                 id: Some(id),
@@ -161,7 +161,7 @@ impl WalletHandler {
         Query(mut query_params): Query<InvoiceFilter>,
     ) -> Result<Json<Vec<Invoice>>, ApplicationError> {
         query_params.user_id = Some(user.sub);
-        let invoices = app_state.services.invoices.list(query_params).await?;
+        let invoices = app_state.services.invoice.list(query_params).await?;
 
         let response: Vec<Invoice> = invoices.into_iter().map(Into::into).collect();
 
@@ -175,7 +175,7 @@ impl WalletHandler {
     ) -> Result<Json<Invoice>, ApplicationError> {
         let invoices = app_state
             .services
-            .invoices
+            .invoice
             .list(InvoiceFilter {
                 user_id: Some(user.sub),
                 id: Some(id),
@@ -197,7 +197,7 @@ impl WalletHandler {
     ) -> Result<Json<u64>, ApplicationError> {
         let n_deleted = app_state
             .services
-            .invoices
+            .invoice
             .delete_many(InvoiceFilter {
                 user_id: Some(user.sub),
                 status: Some(InvoiceStatus::EXPIRED),
@@ -213,7 +213,7 @@ impl WalletHandler {
     ) -> Result<Json<u64>, ApplicationError> {
         let n_deleted = app_state
             .services
-            .payments
+            .payment
             .delete_many(PaymentFilter {
                 user_id: Some(user.sub),
                 status: Some(PaymentStatus::FAILED),

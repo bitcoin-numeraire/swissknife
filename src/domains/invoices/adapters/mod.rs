@@ -1,7 +1,7 @@
 mod invoice_model;
+mod invoice_repository;
 mod repository;
-mod sea_orm_invoice_repository;
 
 pub use invoice_model::Entity as InvoiceModel;
+pub use invoice_repository::SeaOrmInvoiceRepository;
 pub use repository::InvoiceRepository;
-pub use sea_orm_invoice_repository::SeaOrmInvoiceRepository;

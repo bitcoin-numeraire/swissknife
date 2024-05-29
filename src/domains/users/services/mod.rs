@@ -1,5 +1,5 @@
-pub mod users_service;
-mod users_use_cases;
+pub mod user_service;
+mod user_use_cases;
 
-pub use users_service::WalletService;
-pub use users_use_cases::*;
+pub use user_service::WalletService;
+pub use user_use_cases::*;

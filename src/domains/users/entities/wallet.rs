@@ -1,7 +1,7 @@
 use serde::Serialize;
 
 use crate::domains::{
-    invoices::entities::Invoice, lightning::entities::LightningAddress, payments::entities::Payment,
+    invoices::entities::Invoice, lightning::entities::LnAddress, payments::entities::Payment,
 };
 
 #[derive(Debug, Clone, Serialize)]
@@ -9,7 +9,7 @@ pub struct Wallet {
     pub user_balance: UserBalance,
     pub payments: Vec<Payment>,
     pub invoices: Vec<Invoice>,
-    pub address: Option<LightningAddress>,
+    pub ln_address: Option<LnAddress>,
 }
 
 #[derive(Debug, Clone, Serialize, Default)]

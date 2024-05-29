@@ -16,7 +16,7 @@ use crate::{
     application::errors::WebServerError,
     domains::{
         invoices::api::InvoiceHandler,
-        lightning::api::http::{LNURLpHandler, LightningAddressHandler, LightningNodeHandler},
+        lightning::api::{LnAddressHandler, LnNodeHandler, LnURLpHandler},
         payments::api::PaymentHandler,
         users::api::WalletHandler,
     },
@@ -32,15 +32,12 @@ impl App {
         trace!("Initializing app");
 
         let router = Router::new()
-            .nest("/.well-known/lnurlp", LNURLpHandler::well_known_route())
-            .nest("/api/lnurlp", LNURLpHandler::callback_route())
-            .nest(
-                "/api/lightning/addresses",
-                LightningAddressHandler::routes(),
-            )
+            .nest("/.well-known/lnurlp", LnURLpHandler::well_known_route())
+            .nest("/api/lnurlp", LnURLpHandler::callback_route())
+            .nest("/api/lightning/addresses", LnAddressHandler::routes())
+            .nest("/api/lightning/node", LnNodeHandler::routes())
             .nest("/api/invoices", InvoiceHandler::routes())
             .nest("/api/payments", PaymentHandler::routes())
-            .nest("/api/lightning/node", LightningNodeHandler::routes())
             .nest("/api/wallet", WalletHandler::routes())
             .layer(TraceLayer::new_for_http())
             .layer(state.timeout_layer)

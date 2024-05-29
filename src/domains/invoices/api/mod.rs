@@ -1,2 +1,2 @@
-mod invoice_http_handler;
-pub use invoice_http_handler::InvoiceHandler;
+mod invoice_handler;
+pub use invoice_handler::InvoiceHandler;

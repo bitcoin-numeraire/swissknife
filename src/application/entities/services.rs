@@ -3,9 +3,11 @@ use std::sync::Arc;
 use crate::{
     application::dtos::AppConfig,
     domains::{
-        invoices::services::{InvoicesService, InvoicesUseCases},
-        lightning::services::{LightningService, LightningUseCases},
-        payments::services::{PaymentsService, PaymentsUseCases},
+        invoices::services::{InvoiceService, InvoiceUseCases},
+        lightning::services::{
+            LnAddressService, LnAddressesUseCases, LnNodeService, LnNodeUseCases,
+        },
+        payments::services::{PaymentService, PaymentsUseCases},
         users::services::{WalletService, WalletUseCases},
     },
     infra::lightning::LightningClient,
@@ -14,10 +16,11 @@ use crate::{
 use super::AppStore;
 
 pub struct AppServices {
-    pub invoices: Box<dyn InvoicesUseCases>,
-    pub payments: Box<dyn PaymentsUseCases>,
+    pub invoice: Box<dyn InvoiceUseCases>,
+    pub payment: Box<dyn PaymentsUseCases>,
     pub wallet: Box<dyn WalletUseCases>,
-    pub lightning: Box<dyn LightningUseCases>,
+    pub ln_address: Box<dyn LnAddressesUseCases>,
+    pub ln_node: Box<dyn LnNodeUseCases>,
 }
 
 impl AppServices {
@@ -26,30 +29,37 @@ impl AppServices {
         store: AppStore,
         lightning_client: Arc<dyn LightningClient>,
     ) -> Self {
-        let lightning = LightningService::new(
-            store.clone(),
-            lightning_client.clone(),
-            config.domain.clone(),
-            config.invoice_expiry.clone(),
-        );
-        let payments = PaymentsService::new(
+        let payments = PaymentService::new(
             store.clone(),
             lightning_client.clone(),
             config.domain.clone(),
             config.fee_buffer.unwrap_or_default(),
         );
-        let invoices = InvoicesService::new(
+        let invoices = InvoiceService::new(
             store.clone(),
-            lightning_client,
+            lightning_client.clone(),
+            config.invoice_expiry.clone(),
+        );
+        let ln_address = LnAddressService::new(
+            store.clone(),
+            lightning_client.clone(),
+            config.domain.clone(),
+            config.invoice_expiry.clone(),
+        );
+        let ln_node = LnNodeService::new(
+            store.clone(),
+            lightning_client.clone(),
+            config.domain.clone(),
             config.invoice_expiry.clone(),
         );
         let wallet = WalletService::new(store);
 
         AppServices {
-            invoices: Box::new(invoices),
-            payments: Box::new(payments),
+            invoice: Box::new(invoices),
+            payment: Box::new(payments),
             wallet: Box::new(wallet),
-            lightning: Box::new(lightning),
+            ln_address: Box::new(ln_address),
+            ln_node: Box::new(ln_node),
         }
     }
 }

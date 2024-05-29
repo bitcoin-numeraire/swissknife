@@ -6,7 +6,7 @@ use crate::{
         entities::{AppServices, AppStore},
         errors::{ApplicationError, ConfigError, WebServerError},
     },
-    domains::payments::services::LightningEventsService,
+    domains::payments::services::LnEventsService,
     infra::{
         auth::{jwt::JWTAuthenticator, Authenticator},
         database::sea_orm::SeaORMClient,
@@ -66,7 +66,7 @@ pub async fn get_lightning_client(
                 ConfigError::MissingLightningProviderConfig(config.lightning_provider.to_string())
             })?;
 
-            let lightning_events: LightningEventsService = LightningEventsService::new(store);
+            let lightning_events: LnEventsService = LnEventsService::new(store);
             let client = BreezClient::new(breez_config.clone(), Arc::new(lightning_events)).await?;
 
             info!(

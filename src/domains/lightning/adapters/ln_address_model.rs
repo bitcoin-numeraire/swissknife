@@ -2,7 +2,7 @@
 
 use sea_orm::entity::prelude::*;
 
-use crate::domains::lightning::entities::LightningAddress;
+use crate::domains::lightning::entities::LnAddress;
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
 #[sea_orm(table_name = "lightning_address")]
@@ -33,9 +33,9 @@ impl Related<crate::domains::invoices::adapters::InvoiceModel> for Entity {
 
 impl ActiveModelBehavior for ActiveModel {}
 
-impl From<Model> for LightningAddress {
+impl From<Model> for LnAddress {
     fn from(model: Model) -> Self {
-        LightningAddress {
+        LnAddress {
             id: model.id,
             user_id: model.user_id,
             username: model.username,

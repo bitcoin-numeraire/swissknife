@@ -8,13 +8,13 @@ use crate::{
     application::errors::ApplicationError,
     domains::{
         invoices::entities::Invoice,
-        lightning::entities::{LNURLPayRequest, LightningAddress, LightningAddressFilter},
+        lightning::entities::{LNURLPayRequest, LnAddress, LnAddressFilter},
         users::entities::AuthUser,
     },
 };
 
 #[async_trait]
-pub trait LightningAddressesUseCases {
+pub trait LnAddressesUseCases: Send + Sync {
     async fn generate_lnurlp(&self, username: String) -> Result<LNURLPayRequest, ApplicationError>;
     async fn generate_lnurlp_invoice(
         &self,
@@ -22,25 +22,19 @@ pub trait LightningAddressesUseCases {
         amount: u64,
         description: Option<String>,
     ) -> Result<Invoice, ApplicationError>;
-    async fn register_address(
+    async fn register(
         &self,
         user_id: String,
         username: String,
-    ) -> Result<LightningAddress, ApplicationError>;
-    async fn get_address(&self, id: Uuid) -> Result<LightningAddress, ApplicationError>;
-    async fn list_addresses(
-        &self,
-        filter: LightningAddressFilter,
-    ) -> Result<Vec<LightningAddress>, ApplicationError>;
-    async fn delete_address(&self, id: Uuid) -> Result<(), ApplicationError>;
-    async fn delete_addresses(
-        &self,
-        filter: LightningAddressFilter,
-    ) -> Result<u64, ApplicationError>;
+    ) -> Result<LnAddress, ApplicationError>;
+    async fn get(&self, id: Uuid) -> Result<LnAddress, ApplicationError>;
+    async fn list(&self, filter: LnAddressFilter) -> Result<Vec<LnAddress>, ApplicationError>;
+    async fn delete(&self, id: Uuid) -> Result<(), ApplicationError>;
+    async fn delete_many(&self, filter: LnAddressFilter) -> Result<u64, ApplicationError>;
 }
 
 #[async_trait]
-pub trait LightningNodeUseCases {
+pub trait LnNodeUseCases: Send + Sync {
     async fn node_info(&self, user: AuthUser) -> Result<NodeState, ApplicationError>;
     async fn lsp_info(&self, user: AuthUser) -> Result<LspInformation, ApplicationError>;
     async fn list_lsps(&self, user: AuthUser) -> Result<Vec<LspInformation>, ApplicationError>;
@@ -66,15 +60,4 @@ pub trait LightningNodeUseCases {
         to_address: String,
         feerate: u32,
     ) -> Result<String, ApplicationError>;
-}
-
-pub trait LightningUseCases:
-    LightningAddressesUseCases + LightningNodeUseCases + Send + Sync
-{
-}
-
-// Ensure that any type that implements the individual traits also implements the new trait.
-impl<T> LightningUseCases for T where
-    T: LightningAddressesUseCases + LightningNodeUseCases + Send + Sync
-{
 }

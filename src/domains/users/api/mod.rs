@@ -1,4 +1,4 @@
 mod auth_middleware;
-mod wallet_http_handler;
+mod wallet_handler;
 
-pub use wallet_http_handler::WalletHandler;
+pub use wallet_handler::WalletHandler;

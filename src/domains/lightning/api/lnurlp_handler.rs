@@ -15,9 +15,9 @@ use crate::{
     infra::app::AppState,
 };
 
-pub struct LNURLpHandler;
+pub struct LnURLpHandler;
 
-impl LNURLpHandler {
+impl LnURLpHandler {
     pub fn well_known_route() -> Router<Arc<AppState>> {
         Router::new().route("/:username", get(Self::well_known_lnurlp))
     }
@@ -32,7 +32,7 @@ impl LNURLpHandler {
     ) -> Result<Json<LNURLPayRequest>, ApplicationError> {
         let lnurlp = app_state
             .services
-            .lightning
+            .ln_address
             .generate_lnurlp(username)
             .await?;
         Ok(lnurlp.into())
@@ -45,7 +45,7 @@ impl LNURLpHandler {
     ) -> Result<Json<LNUrlpInvoiceResponse>, ApplicationError> {
         let invoice = app_state
             .services
-            .lightning
+            .ln_address
             .generate_lnurlp_invoice(username, query_params.amount, query_params.comment)
             .await?;
         Ok(Json(invoice.into()))

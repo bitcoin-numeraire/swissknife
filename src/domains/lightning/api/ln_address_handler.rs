@@ -10,15 +10,15 @@ use uuid::Uuid;
 use crate::{
     application::{dtos::RegisterLightningAddressRequest, errors::ApplicationError},
     domains::{
-        lightning::entities::{LightningAddress, LightningAddressFilter},
+        lightning::entities::{LnAddress, LnAddressFilter},
         users::entities::{AuthUser, Permission},
     },
     infra::app::AppState,
 };
 
-pub struct LightningAddressHandler;
+pub struct LnAddressHandler;
 
-impl LightningAddressHandler {
+impl LnAddressHandler {
     pub fn routes() -> Router<Arc<AppState>> {
         Router::new()
             .route("/", get(Self::list))
@@ -32,13 +32,13 @@ impl LightningAddressHandler {
         State(app_state): State<Arc<AppState>>,
         user: AuthUser,
         Json(payload): Json<RegisterLightningAddressRequest>,
-    ) -> Result<Json<LightningAddress>, ApplicationError> {
+    ) -> Result<Json<LnAddress>, ApplicationError> {
         user.check_permission(Permission::WriteLightningAddress)?;
 
         let lightning_address = app_state
             .services
-            .lightning
-            .register_address(payload.user_id.unwrap_or(user.sub), payload.username)
+            .ln_address
+            .register(payload.user_id.unwrap_or(user.sub), payload.username)
             .await?;
         Ok(Json(lightning_address.into()))
     }
@@ -47,28 +47,23 @@ impl LightningAddressHandler {
         State(app_state): State<Arc<AppState>>,
         user: AuthUser,
         Path(id): Path<Uuid>,
-    ) -> Result<Json<LightningAddress>, ApplicationError> {
+    ) -> Result<Json<LnAddress>, ApplicationError> {
         user.check_permission(Permission::ReadLightningAddress)?;
 
-        let lightning_address = app_state.services.lightning.get_address(id).await?;
+        let lightning_address = app_state.services.ln_address.get(id).await?;
         Ok(Json(lightning_address.into()))
     }
 
     async fn list(
         State(app_state): State<Arc<AppState>>,
         user: AuthUser,
-        Query(query_params): Query<LightningAddressFilter>,
-    ) -> Result<Json<Vec<LightningAddress>>, ApplicationError> {
+        Query(query_params): Query<LnAddressFilter>,
+    ) -> Result<Json<Vec<LnAddress>>, ApplicationError> {
         user.check_permission(Permission::ReadLightningAddress)?;
 
-        let lightning_addresses = app_state
-            .services
-            .lightning
-            .list_addresses(query_params)
-            .await?;
+        let lightning_addresses = app_state.services.ln_address.list(query_params).await?;
 
-        let response: Vec<LightningAddress> =
-            lightning_addresses.into_iter().map(Into::into).collect();
+        let response: Vec<LnAddress> = lightning_addresses.into_iter().map(Into::into).collect();
 
         Ok(response.into())
     }
@@ -80,21 +75,21 @@ impl LightningAddressHandler {
     ) -> Result<(), ApplicationError> {
         user.check_permission(Permission::WriteLightningAddress)?;
 
-        app_state.services.lightning.delete_address(id).await?;
+        app_state.services.ln_address.delete(id).await?;
         Ok(())
     }
 
     async fn delete_many(
         State(app_state): State<Arc<AppState>>,
         user: AuthUser,
-        Query(query_params): Query<LightningAddressFilter>,
+        Query(query_params): Query<LnAddressFilter>,
     ) -> Result<Json<u64>, ApplicationError> {
         user.check_permission(Permission::WriteLightningAddress)?;
 
         let n_deleted = app_state
             .services
-            .lightning
-            .delete_addresses(query_params)
+            .ln_address
+            .delete_many(query_params)
             .await?;
         Ok(n_deleted.into())
     }

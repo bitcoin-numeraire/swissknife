@@ -8,7 +8,7 @@ use crate::{
 };
 
 #[async_trait]
-pub trait InvoicesUseCases: Send + Sync {
+pub trait InvoiceUseCases: Send + Sync {
     async fn invoice(
         &self,
         user_id: String,

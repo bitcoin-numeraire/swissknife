@@ -37,16 +37,16 @@ pub struct Model {
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
     #[sea_orm(
-        belongs_to = "crate::domains::lightning::adapters::models::lightning_address::Entity",
+        belongs_to = "crate::domains::lightning::adapters::ln_address_model::Entity",
         from = "Column::LightningAddress",
-        to = "crate::domains::lightning::adapters::models::lightning_address::Column::Id",
+        to = "crate::domains::lightning::adapters::ln_address_model::Column::Id",
         on_update = "NoAction",
         on_delete = "SetNull"
     )]
     LightningAddress,
 }
 
-impl Related<crate::domains::lightning::adapters::models::lightning_address::Entity> for Entity {
+impl Related<crate::domains::lightning::adapters::ln_address_model::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::LightningAddress.def()
     }

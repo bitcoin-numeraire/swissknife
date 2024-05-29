@@ -1,21 +1,47 @@
 use async_trait::async_trait;
+
+use std::sync::Arc;
+
 use breez_sdk_core::{
     LspInformation, NodeState, Payment, ReverseSwapInfo, ServiceHealthCheckResponse,
 };
 use tracing::{debug, info, trace};
 
 use crate::{
-    application::errors::ApplicationError,
-    domains::{
-        lightning::services::LightningNodeUseCases,
-        users::entities::{AuthUser, Permission},
-    },
+    application::{entities::AppStore, errors::ApplicationError},
+    domains::users::entities::{AuthUser, Permission},
+    infra::lightning::LightningClient,
 };
 
-use super::LightningService;
+use super::LnNodeUseCases;
+
+const DEFAULT_INVOICE_EXPIRY: u32 = 3600;
+
+pub struct LnNodeService {
+    pub domain: String,
+    pub invoice_expiry: u32,
+    pub store: AppStore,
+    pub lightning_client: Arc<dyn LightningClient>,
+}
+
+impl LnNodeService {
+    pub fn new(
+        store: AppStore,
+        lightning_client: Arc<dyn LightningClient>,
+        domain: String,
+        invoice_expiry: Option<u32>,
+    ) -> Self {
+        LnNodeService {
+            store,
+            lightning_client,
+            domain,
+            invoice_expiry: invoice_expiry.unwrap_or(DEFAULT_INVOICE_EXPIRY),
+        }
+    }
+}
 
 #[async_trait]
-impl LightningNodeUseCases for LightningService {
+impl LnNodeUseCases for LnNodeService {
     async fn node_info(&self, user: AuthUser) -> Result<NodeState, ApplicationError> {
         trace!(user_id = user.sub, "Getting node info");
 

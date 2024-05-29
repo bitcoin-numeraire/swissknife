@@ -25,21 +25,21 @@ use super::PaymentsUseCases;
 const DEFAULT_INTERNAL_INVOICE_DESCRIPTION: &str = "Numeraire Swissknife Invoice";
 const DEFAULT_INTERNAL_PAYMENT_DESCRIPTION: &str = "Payment to Numeraire Swissknife";
 
-pub struct PaymentsService {
+pub struct PaymentService {
     domain: String,
     store: AppStore,
     lightning_client: Arc<dyn LightningClient>,
     fee_buffer: f64,
 }
 
-impl PaymentsService {
+impl PaymentService {
     pub fn new(
         store: AppStore,
         lightning_client: Arc<dyn LightningClient>,
         domain: String,
         fee_buffer: f64,
     ) -> Self {
-        PaymentsService {
+        PaymentService {
             store,
             lightning_client,
             domain,
@@ -48,7 +48,7 @@ impl PaymentsService {
     }
 }
 
-impl PaymentsService {
+impl PaymentService {
     pub(crate) fn validate_amount(amount_msat: Option<u64>) -> Result<u64, ApplicationError> {
         let amount = amount_msat.unwrap_or_default();
         if amount == 0 {
@@ -99,7 +99,7 @@ impl PaymentsService {
                     }
                     InvoiceStatus::PENDING => {
                         // Internal payment
-                        let txn = self.store.lightning.begin().await?;
+                        let txn = self.store.begin().await?;
 
                         let internal_payment = self
                             .insert_payment(
@@ -185,11 +185,7 @@ impl PaymentsService {
             match data.ln_address.clone() {
                 Some(ln_address) => {
                     let address = ln_address.split('@').next().unwrap();
-                    let address_opt = self
-                        .store
-                        .lightning
-                        .find_address_by_username(&address)
-                        .await?;
+                    let address_opt = self.store.ln_address.find_by_username(&address).await?;
 
                     match address_opt {
                         Some(retrieved_address) => {
@@ -203,7 +199,7 @@ impl PaymentsService {
                             // Internal payment
                             let curr_time = Utc::now();
 
-                            let txn = self.store.lightning.begin().await?;
+                            let txn = self.store.begin().await?;
                             self.store
                                 .invoice
                                 .insert(
@@ -296,7 +292,7 @@ impl PaymentsService {
         payment: Payment,
         fee_buffer: f64,
     ) -> Result<Payment, ApplicationError> {
-        let txn = self.store.lightning.begin().await?;
+        let txn = self.store.begin().await?;
 
         let balance = self
             .store
@@ -346,7 +342,7 @@ impl PaymentsService {
 }
 
 #[async_trait]
-impl PaymentsUseCases for PaymentsService {
+impl PaymentsUseCases for PaymentService {
     async fn get(&self, id: Uuid) -> Result<Payment, ApplicationError> {
         trace!(%id, "Fetching lightning payment");
 

@@ -12,20 +12,20 @@ use crate::{
     domains::payments::entities::{Payment, PaymentStatus},
 };
 
-use super::LightningEventsUseCases;
+use super::LnEventsUseCases;
 
-pub struct LightningEventsService {
+pub struct LnEventsService {
     store: AppStore,
 }
 
-impl LightningEventsService {
+impl LnEventsService {
     pub fn new(store: AppStore) -> Self {
-        LightningEventsService { store }
+        LnEventsService { store }
     }
 }
 
 #[async_trait]
-impl LightningEventsUseCases for LightningEventsService {
+impl LnEventsUseCases for LnEventsService {
     async fn process_incoming_payment(
         &self,
         payment: BreezPayment,

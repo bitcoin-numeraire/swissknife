@@ -37,7 +37,7 @@ impl InvoiceHandler {
 
         let lightning_address = app_state
             .services
-            .invoices
+            .invoice
             .invoice(
                 payload.user_id.unwrap_or(user.sub),
                 payload.amount_msat,
@@ -55,7 +55,7 @@ impl InvoiceHandler {
     ) -> Result<Json<Invoice>, ApplicationError> {
         user.check_permission(Permission::ReadLightningTransaction)?;
 
-        let lightning_address = app_state.services.invoices.get(id).await?;
+        let lightning_address = app_state.services.invoice.get(id).await?;
         Ok(Json(lightning_address.into()))
     }
 
@@ -66,7 +66,7 @@ impl InvoiceHandler {
     ) -> Result<Json<Vec<Invoice>>, ApplicationError> {
         user.check_permission(Permission::ReadLightningTransaction)?;
 
-        let lightning_invoices = app_state.services.invoices.list(query_params).await?;
+        let lightning_invoices = app_state.services.invoice.list(query_params).await?;
 
         let response: Vec<Invoice> = lightning_invoices.into_iter().map(Into::into).collect();
 
@@ -80,7 +80,7 @@ impl InvoiceHandler {
     ) -> Result<(), ApplicationError> {
         user.check_permission(Permission::WriteLightningTransaction)?;
 
-        app_state.services.invoices.delete(id).await?;
+        app_state.services.invoice.delete(id).await?;
         Ok(())
     }
 
@@ -91,11 +91,7 @@ impl InvoiceHandler {
     ) -> Result<Json<u64>, ApplicationError> {
         user.check_permission(Permission::WriteLightningTransaction)?;
 
-        let n_deleted = app_state
-            .services
-            .invoices
-            .delete_many(query_params)
-            .await?;
+        let n_deleted = app_state.services.invoice.delete_many(query_params).await?;
         Ok(n_deleted.into())
     }
 }

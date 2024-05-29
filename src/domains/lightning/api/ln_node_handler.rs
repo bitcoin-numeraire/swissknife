@@ -18,9 +18,9 @@ use crate::{
     infra::app::AppState,
 };
 
-pub struct LightningNodeHandler;
+pub struct LnNodeHandler;
 
-impl LightningNodeHandler {
+impl LnNodeHandler {
     pub fn routes() -> Router<Arc<AppState>> {
         Router::new()
             .route("/info", get(Self::node_info))
@@ -37,7 +37,7 @@ impl LightningNodeHandler {
         State(app_state): State<Arc<AppState>>,
         user: AuthUser,
     ) -> Result<Json<NodeState>, ApplicationError> {
-        let node_info = app_state.services.lightning.node_info(user).await?;
+        let node_info = app_state.services.ln_node.node_info(user).await?;
 
         Ok(node_info.into())
     }
@@ -46,7 +46,7 @@ impl LightningNodeHandler {
         State(app_state): State<Arc<AppState>>,
         user: AuthUser,
     ) -> Result<Json<LspInformation>, ApplicationError> {
-        let lsp_info = app_state.services.lightning.lsp_info(user).await?;
+        let lsp_info = app_state.services.ln_node.lsp_info(user).await?;
 
         Ok(lsp_info.into())
     }
@@ -55,11 +55,7 @@ impl LightningNodeHandler {
         State(app_state): State<Arc<AppState>>,
         user: AuthUser,
     ) -> Result<Json<Vec<Payment>>, ApplicationError> {
-        let payments = app_state
-            .services
-            .lightning
-            .list_node_payments(user)
-            .await?;
+        let payments = app_state.services.ln_node.list_node_payments(user).await?;
 
         Ok(payments.into())
     }
@@ -68,7 +64,7 @@ impl LightningNodeHandler {
         State(app_state): State<Arc<AppState>>,
         user: AuthUser,
     ) -> Result<Json<Vec<LspInformation>>, ApplicationError> {
-        let lsps = app_state.services.lightning.list_lsps(user).await?;
+        let lsps = app_state.services.ln_node.list_lsps(user).await?;
 
         Ok(lsps.into())
     }
@@ -77,11 +73,7 @@ impl LightningNodeHandler {
         State(app_state): State<Arc<AppState>>,
         user: AuthUser,
     ) -> Result<Json<Vec<String>>, ApplicationError> {
-        let tx_ids = app_state
-            .services
-            .lightning
-            .close_lsp_channels(user)
-            .await?;
+        let tx_ids = app_state.services.ln_node.close_lsp_channels(user).await?;
 
         Ok(tx_ids.into())
     }
@@ -94,7 +86,7 @@ impl LightningNodeHandler {
     ) -> Result<Json<ReverseSwapInfo>, ApplicationError> {
         let payment_info = app_state
             .services
-            .lightning
+            .ln_node
             .pay_onchain(
                 user,
                 payload.amount_msat,
@@ -113,7 +105,7 @@ impl LightningNodeHandler {
     ) -> Result<String, ApplicationError> {
         let txid = app_state
             .services
-            .lightning
+            .ln_node
             .redeem(user, payload.to_address, payload.feerate)
             .await?;
 
@@ -124,7 +116,7 @@ impl LightningNodeHandler {
         State(app_state): State<Arc<AppState>>,
         user: AuthUser,
     ) -> Result<Json<ServiceHealthCheckResponse>, ApplicationError> {
-        let health = app_state.services.lightning.health_check(user).await?;
+        let health = app_state.services.ln_node.health_check(user).await?;
 
         Ok(health.into())
     }
