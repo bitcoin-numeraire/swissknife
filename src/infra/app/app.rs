@@ -16,10 +16,9 @@ use crate::{
     application::errors::WebServerError,
     domains::{
         invoices::api::InvoiceHandler,
-        lightning::api::http::{
-            LNURLpHandler, LightningAddressHandler, LightningNodeHandler, WalletHandler,
-        },
+        lightning::api::http::{LNURLpHandler, LightningAddressHandler, LightningNodeHandler},
         payments::api::PaymentHandler,
+        users::api::WalletHandler,
     },
     infra::app::AppState,
 };

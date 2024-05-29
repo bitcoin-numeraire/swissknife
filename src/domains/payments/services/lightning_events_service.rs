@@ -36,7 +36,7 @@ impl LightningEventsUseCases for LightningEventsService {
         let invoice_option = self
             .store
             .invoice
-            .find_invoice_by_payment_hash(&payment_hash)
+            .find_by_payment_hash(&payment_hash)
             .await?;
 
         if let Some(mut invoice) = invoice_option {
@@ -46,7 +46,7 @@ impl LightningEventsUseCases for LightningEventsService {
             // Until this is fixed: https://github.com/breez/breez-sdk/issues/982
             invoice.amount_msat = Some(payment.amount_msat);
 
-            invoice = self.store.invoice.update_invoice(None, invoice).await?;
+            invoice = self.store.invoice.update(None, invoice).await?;
 
             info!(
                 id = invoice.id.to_string(),

@@ -1,6 +1,6 @@
 use sea_orm::FromQueryResult;
 
-use crate::domains::lightning::entities::UserBalance;
+use crate::domains::users::entities::UserBalance;
 
 #[derive(Debug, FromQueryResult)]
 pub struct UserBalanceModel {

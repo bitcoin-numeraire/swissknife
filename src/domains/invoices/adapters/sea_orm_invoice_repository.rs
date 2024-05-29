@@ -28,7 +28,7 @@ impl SeaOrmInvoiceRepository {
 
 #[async_trait]
 impl InvoiceRepository for SeaOrmInvoiceRepository {
-    async fn find_invoice(&self, id: Uuid) -> Result<Option<Invoice>, DatabaseError> {
+    async fn find(&self, id: Uuid) -> Result<Option<Invoice>, DatabaseError> {
         let model = Entity::find_by_id(id)
             .one(&self.db)
             .await
@@ -37,7 +37,7 @@ impl InvoiceRepository for SeaOrmInvoiceRepository {
         Ok(model.map(Into::into))
     }
 
-    async fn find_invoice_by_payment_hash(
+    async fn find_by_payment_hash(
         &self,
         payment_hash: &str,
     ) -> Result<Option<Invoice>, DatabaseError> {
@@ -50,7 +50,7 @@ impl InvoiceRepository for SeaOrmInvoiceRepository {
         Ok(model.map(Into::into))
     }
 
-    async fn find_invoices(&self, filter: InvoiceFilter) -> Result<Vec<Invoice>, DatabaseError> {
+    async fn find_many(&self, filter: InvoiceFilter) -> Result<Vec<Invoice>, DatabaseError> {
         let models = Entity::find()
             .apply_if(filter.user_id, |q, user| q.filter(Column::UserId.eq(user)))
             .apply_if(filter.id, |q, id| q.filter(Column::Id.eq(id)))
@@ -77,7 +77,7 @@ impl InvoiceRepository for SeaOrmInvoiceRepository {
         Ok(models.into_iter().map(Into::into).collect())
     }
 
-    async fn insert_invoice(
+    async fn insert(
         &self,
         txn: Option<&DatabaseTransaction>,
         invoice: Invoice,
@@ -117,7 +117,7 @@ impl InvoiceRepository for SeaOrmInvoiceRepository {
         Ok(model.into())
     }
 
-    async fn update_invoice(
+    async fn update(
         &self,
         txn: Option<&DatabaseTransaction>,
         invoice: Invoice,
@@ -140,7 +140,7 @@ impl InvoiceRepository for SeaOrmInvoiceRepository {
         Ok(model.into())
     }
 
-    async fn delete_invoices(&self, filter: InvoiceFilter) -> Result<u64, DatabaseError> {
+    async fn delete_many(&self, filter: InvoiceFilter) -> Result<u64, DatabaseError> {
         let result = Entity::delete_many()
             .apply_if(filter.user_id, |q, user| q.filter(Column::UserId.eq(user)))
             .apply_if(filter.id, |q, id| q.filter(Column::Id.eq(id)))

@@ -5,11 +5,11 @@ use crate::{
     },
     domains::{
         invoices::entities::InvoiceFilter,
-        lightning::{
+        payments::entities::PaymentFilter,
+        users::{
             entities::{UserBalance, Wallet},
             services::WalletUseCases,
         },
-        payments::entities::PaymentFilter,
     },
 };
 use async_trait::async_trait;
@@ -33,7 +33,7 @@ impl WalletUseCases for WalletService {
     async fn get_balance(&self, user_id: String) -> Result<UserBalance, ApplicationError> {
         trace!(user_id, "Fetching balance");
 
-        let balance = self.store.lightning.get_balance(None, &user_id).await?;
+        let balance = self.store.user.get_balance(None, &user_id).await?;
 
         debug!(user_id, "Balance fetched successfully");
         Ok(balance)
@@ -42,7 +42,7 @@ impl WalletUseCases for WalletService {
     async fn get(&self, user_id: String) -> Result<Wallet, ApplicationError> {
         trace!(user_id, "Fetching wallet");
 
-        let balance = self.store.lightning.get_balance(None, &user_id).await?;
+        let balance = self.store.user.get_balance(None, &user_id).await?;
         let payments = self
             .store
             .payment
@@ -58,7 +58,7 @@ impl WalletUseCases for WalletService {
         let invoices = self
             .store
             .invoice
-            .find_invoices(InvoiceFilter {
+            .find_many(InvoiceFilter {
                 user_id: Some(user_id.clone()),
                 pagination: PaginationFilter {
                     limit: Some(INVOICES_LIMIT),

@@ -61,7 +61,7 @@ impl LightningAddressesUseCases for LightningService {
         invoice.lightning_address = Some(lightning_address.id);
 
         // TODO: Get or add more information to make this a LNURLp invoice (like fetching a success action specific to the user)
-        let invoice = self.store.invoice.insert_invoice(None, invoice).await?;
+        let invoice = self.store.invoice.insert(None, invoice).await?;
 
         info!(username, "Lightning invoice generated successfully");
         Ok(invoice)

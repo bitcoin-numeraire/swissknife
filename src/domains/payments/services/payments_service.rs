@@ -78,7 +78,7 @@ impl PaymentsService {
             let invoice_opt = self
                 .store
                 .invoice
-                .find_invoice_by_payment_hash(&invoice.payment_hash)
+                .find_by_payment_hash(&invoice.payment_hash)
                 .await?;
             if let Some(mut retrieved_invoice) = invoice_opt {
                 if retrieved_invoice.user_id == user_id {
@@ -122,7 +122,7 @@ impl PaymentsService {
                         retrieved_invoice.payment_time = internal_payment.payment_time;
                         self.store
                             .invoice
-                            .update_invoice(Some(&txn), retrieved_invoice)
+                            .update(Some(&txn), retrieved_invoice)
                             .await?;
 
                         txn.commit()
@@ -206,7 +206,7 @@ impl PaymentsService {
                             let txn = self.store.lightning.begin().await?;
                             self.store
                                 .invoice
-                                .insert_invoice(
+                                .insert(
                                     Some(&txn),
                                     Invoice {
                                         user_id: retrieved_address.user_id,
@@ -300,7 +300,7 @@ impl PaymentsService {
 
         let balance = self
             .store
-            .lightning
+            .user
             .get_balance(Some(&txn), &payment.user_id)
             .await?
             .available_msat as f64;

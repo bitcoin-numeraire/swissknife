@@ -4,8 +4,9 @@ use crate::{
     application::dtos::AppConfig,
     domains::{
         invoices::services::{InvoicesService, InvoicesUseCases},
-        lightning::services::{LightningService, LightningUseCases, WalletService, WalletUseCases},
+        lightning::services::{LightningService, LightningUseCases},
         payments::services::{PaymentsService, PaymentsUseCases},
+        users::services::{WalletService, WalletUseCases},
     },
     infra::lightning::LightningClient,
 };

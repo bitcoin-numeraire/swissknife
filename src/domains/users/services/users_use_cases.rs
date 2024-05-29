@@ -2,7 +2,7 @@ use async_trait::async_trait;
 
 use crate::{
     application::errors::ApplicationError,
-    domains::lightning::entities::{UserBalance, Wallet},
+    domains::users::entities::{UserBalance, Wallet},
 };
 
 #[async_trait]

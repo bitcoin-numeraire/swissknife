@@ -14,9 +14,9 @@ use crate::{
     },
     domains::{
         invoices::entities::{Invoice, InvoiceFilter, InvoiceStatus},
-        lightning::entities::{LightningAddress, LightningAddressFilter, UserBalance, Wallet},
+        lightning::entities::{LightningAddress, LightningAddressFilter},
         payments::entities::{Payment, PaymentFilter, PaymentStatus},
-        users::entities::AuthUser,
+        users::entities::{AuthUser, UserBalance, Wallet},
     },
     infra::app::AppState,
 };
@@ -74,7 +74,7 @@ impl WalletHandler {
         let invoice = app_state
             .services
             .invoices
-            .generate_invoice(
+            .invoice(
                 user.sub,
                 payload.amount_msat,
                 payload.description,
@@ -161,11 +161,7 @@ impl WalletHandler {
         Query(mut query_params): Query<InvoiceFilter>,
     ) -> Result<Json<Vec<Invoice>>, ApplicationError> {
         query_params.user_id = Some(user.sub);
-        let invoices = app_state
-            .services
-            .invoices
-            .list_invoices(query_params)
-            .await?;
+        let invoices = app_state.services.invoices.list(query_params).await?;
 
         let response: Vec<Invoice> = invoices.into_iter().map(Into::into).collect();
 
@@ -180,7 +176,7 @@ impl WalletHandler {
         let invoices = app_state
             .services
             .invoices
-            .list_invoices(InvoiceFilter {
+            .list(InvoiceFilter {
                 user_id: Some(user.sub),
                 id: Some(id),
                 ..Default::default()
@@ -202,7 +198,7 @@ impl WalletHandler {
         let n_deleted = app_state
             .services
             .invoices
-            .delete_invoices(InvoiceFilter {
+            .delete_many(InvoiceFilter {
                 user_id: Some(user.sub),
                 status: Some(InvoiceStatus::EXPIRED),
                 ..Default::default()

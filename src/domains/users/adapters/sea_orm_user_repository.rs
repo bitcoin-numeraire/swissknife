@@ -1,14 +1,26 @@
 use async_trait::async_trait;
-use sea_orm::{ConnectionTrait, DatabaseTransaction, FromQueryResult, Statement};
+use sea_orm::{
+    ConnectionTrait, DatabaseConnection, DatabaseTransaction, FromQueryResult, Statement,
+};
 
-use crate::domains::lightning::adapters::models::user_balance::UserBalanceModel;
-use crate::domains::lightning::adapters::repository::WalletRepository;
-use crate::{application::errors::DatabaseError, domains::lightning::entities::UserBalance};
+use crate::domains::users::adapters::UserBalanceModel;
+use crate::{application::errors::DatabaseError, domains::users::entities::UserBalance};
 
-use super::SqlxStore;
+use super::UserRepository;
+
+#[derive(Clone)]
+pub struct SeaOrmUserRepository {
+    pub db: DatabaseConnection,
+}
+
+impl SeaOrmUserRepository {
+    pub fn new(db: DatabaseConnection) -> Self {
+        Self { db }
+    }
+}
 
 #[async_trait]
-impl WalletRepository for SqlxStore {
+impl UserRepository for SeaOrmUserRepository {
     async fn get_balance(
         &self,
         txn: Option<&DatabaseTransaction>,
