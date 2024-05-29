@@ -1,6 +1,6 @@
 mod payment_model;
+mod payment_repository;
 mod repository;
-mod sea_orm_payment_repository;
 
+pub use payment_repository::SeaOrmPaymentRepository;
 pub use repository::PaymentRepository;
-pub use sea_orm_payment_repository::SeaOrmPaymentRepository;

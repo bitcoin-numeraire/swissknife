@@ -4,14 +4,14 @@ use async_trait::async_trait;
 use breez_sdk_core::{BreezEvent, EventListener, PaymentStatus, PaymentType};
 use tracing::{trace, warn};
 
-use crate::domains::payments::services::PaymentsProcessorUseCases;
+use crate::domains::lightning::services::LnEventsUseCases;
 
 pub struct BreezListener {
-    pub payments_processor: Arc<dyn PaymentsProcessorUseCases>,
+    pub payments_processor: Arc<dyn LnEventsUseCases>,
 }
 
 impl BreezListener {
-    pub fn new(payments_processor: Arc<dyn PaymentsProcessorUseCases>) -> Self {
+    pub fn new(payments_processor: Arc<dyn LnEventsUseCases>) -> Self {
         Self { payments_processor }
     }
 }
@@ -42,8 +42,7 @@ impl EventListener for BreezListener {
 
                     let payments_processor = self.payments_processor.clone();
                     tokio::spawn(async move {
-                        if let Err(err) = payments_processor.process_incoming_payment(payment).await
-                        {
+                        if let Err(err) = payments_processor.incoming_payment(payment).await {
                             warn!(%err, "Failed to process incoming payment");
                         }
                     });
@@ -72,7 +71,7 @@ impl EventListener for BreezListener {
 
                 let payments_processor = self.payments_processor.clone();
                 tokio::spawn(async move {
-                    if let Err(err) = payments_processor.process_outgoing_payment(details).await {
+                    if let Err(err) = payments_processor.outgoing_payment(details).await {
                         warn!(%err, "Failed to process outgoing payment");
                     }
                 });
@@ -82,7 +81,7 @@ impl EventListener for BreezListener {
 
                 let payments_processor = self.payments_processor.clone();
                 tokio::spawn(async move {
-                    if let Err(err) = payments_processor.process_failed_payment(details).await {
+                    if let Err(err) = payments_processor.failed_payment(details).await {
                         warn!(%err, "Failed to process outgoing payment");
                     }
                 });

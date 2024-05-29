@@ -15,11 +15,10 @@ use tracing::{debug, error, info, trace};
 use crate::{
     application::errors::WebServerError,
     domains::{
-        lightning::api::http::{
-            InvoiceHandler, LNURLpHandler, LightningAddressHandler, LightningNodeHandler,
-            WalletHandler,
-        },
+        invoices::api::InvoiceHandler,
+        lightning::api::{LnAddressHandler, LnNodeHandler, LnURLpHandler},
         payments::api::PaymentHandler,
+        users::api::WalletHandler,
     },
     infra::app::AppState,
 };
@@ -33,15 +32,12 @@ impl App {
         trace!("Initializing app");
 
         let router = Router::new()
-            .nest("/.well-known/lnurlp", LNURLpHandler::well_known_route())
-            .nest("/api/lnurlp", LNURLpHandler::callback_route())
-            .nest(
-                "/api/lightning/addresses",
-                LightningAddressHandler::routes(),
-            )
-            .nest("/api/lightning/invoices", InvoiceHandler::routes())
+            .nest("/.well-known/lnurlp", LnURLpHandler::well_known_route())
+            .nest("/api/lnurlp", LnURLpHandler::callback_route())
+            .nest("/api/lightning/addresses", LnAddressHandler::routes())
+            .nest("/api/lightning/node", LnNodeHandler::routes())
+            .nest("/api/invoices", InvoiceHandler::routes())
             .nest("/api/payments", PaymentHandler::routes())
-            .nest("/api/lightning/node", LightningNodeHandler::routes())
             .nest("/api/wallet", WalletHandler::routes())
             .layer(TraceLayer::new_for_http())
             .layer(state.timeout_layer)

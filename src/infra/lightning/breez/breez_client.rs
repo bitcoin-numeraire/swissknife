@@ -17,8 +17,11 @@ use breez_sdk_core::{
 
 use crate::{
     application::errors::LightningError,
-    domains::{lightning::entities::Invoice, payments::entities::Payment},
-    infra::lightning::LightningClient,
+    domains::{
+        invoices::entities::Invoice, lightning::services::LnEventsUseCases,
+        payments::entities::Payment,
+    },
+    infra::lightning::LnClient,
 };
 
 use super::BreezListener;
@@ -44,7 +47,7 @@ pub struct BreezClient {
 impl BreezClient {
     pub async fn new(
         config: BreezClientConfig,
-        listener: Box<BreezListener>,
+        payments_processor: Arc<dyn LnEventsUseCases>,
     ) -> Result<Self, LightningError> {
         if config.log_in_file {
             BreezServices::init_logging(&config.working_dir, None)
@@ -72,13 +75,15 @@ impl BreezClient {
         let seed =
             Mnemonic::parse(config.seed).map_err(|e| LightningError::ParseSeed(e.to_string()))?;
 
+        let listener = BreezListener::new(payments_processor);
+
         let sdk = BreezServices::connect(
             ConnectRequest {
                 config: breez_config.clone(),
                 seed: seed.to_seed("").to_vec(),
                 restore_only: Some(config.restore_only),
             },
-            listener,
+            Box::new(listener),
         )
         .await
         .map_err(|e| LightningError::Connect(e.to_string()))?;
@@ -101,7 +106,7 @@ impl BreezClient {
 }
 
 #[async_trait]
-impl LightningClient for BreezClient {
+impl LnClient for BreezClient {
     async fn invoice(
         &self,
         amount_msat: u64,

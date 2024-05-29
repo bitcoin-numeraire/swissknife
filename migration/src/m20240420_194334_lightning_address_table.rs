@@ -14,7 +14,7 @@ impl MigrationTrait for Migration {
             RETURN NEW;
             END;
             $$ language 'plpgsql';
-            CREATE TABLE lightning_address (
+            CREATE TABLE ln_address (
                 id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
                 user_id varchar(255) unique NOT NULL,
                 username varchar(255) unique NOT NULL,
@@ -24,7 +24,7 @@ impl MigrationTrait for Migration {
                 deleted_at timestamptz
             );
             CREATE TRIGGER update_timestamp BEFORE
-            UPDATE ON lightning_address FOR EACH ROW EXECUTE PROCEDURE update_timestamp();",
+            UPDATE ON ln_address FOR EACH ROW EXECUTE PROCEDURE update_timestamp();",
         )
         .await?;
 
@@ -34,7 +34,7 @@ impl MigrationTrait for Migration {
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager
             .get_connection()
-            .execute_unprepared("DROP TABLE `lightning_address`")
+            .execute_unprepared("DROP TABLE `ln_address`")
             .await?;
 
         Ok(())

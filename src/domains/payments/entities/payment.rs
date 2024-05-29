@@ -10,7 +10,7 @@ use crate::application::entities::PaginationFilter;
 pub struct Payment {
     pub id: Uuid,
     pub user_id: String,
-    pub lightning_address: Option<String>,
+    pub ln_address: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub payment_hash: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]

@@ -1,6 +1,6 @@
-mod models;
+pub mod ln_address_model;
+mod ln_address_repository;
 mod repository;
-mod store;
 
-pub use repository::LightningRepository;
-pub use store::SqlxStore;
+pub use ln_address_repository::SeaOrmLnAddressRepository;
+pub use repository::LnAddressRepository;

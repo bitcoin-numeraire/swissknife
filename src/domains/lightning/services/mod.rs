@@ -1,9 +1,9 @@
-pub mod lightning;
-mod lightning_use_cases;
-pub mod wallet;
-mod wallet_use_cases;
+mod ln_address_service;
+mod ln_events_service;
+mod ln_node_service;
+mod ln_use_cases;
 
-pub use lightning::LightningService;
-pub use lightning_use_cases::*;
-pub use wallet::WalletService;
-pub use wallet_use_cases::WalletUseCases;
+pub use ln_address_service::LnAddressService;
+pub use ln_events_service::LnEventsService;
+pub use ln_node_service::LnNodeService;
+pub use ln_use_cases::*;

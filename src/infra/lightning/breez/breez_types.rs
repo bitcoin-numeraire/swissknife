@@ -5,7 +5,7 @@ use chrono::{TimeZone, Utc};
 use serde_bolt::bitcoin::hashes::hex::ToHex;
 
 use crate::domains::{
-    lightning::entities::{Invoice, InvoiceType, LightningInvoice},
+    invoices::entities::{Invoice, InvoiceType, LightningInvoice},
     payments::entities::{Payment, PaymentType},
 };
 

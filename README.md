@@ -16,10 +16,10 @@ The compatible providers are:
 
 - [x] [`Greenlight`](https://blockstream.com/lightning/greenlight/) (mainly used in conjunction with `Breez`)
 - [x] [`Breez SDK`](https://breez.technology/sdk/) (allowing switching between LSPs.). Please contact us to get your API key.
-- [] [`Phoenixd`](https://phoenix.acinq.co/server). (TODO)
-- [] [`LightSpark`](https://www.lightspark.com/) (TODO)
-- [] Direct [`Core Lightning`](https://corelightning.org/) integration. (WIP)
-- [] Direct [`LND`](https://github.com/lightningnetwork/lnd) Integration (TODO)
+- [ ] [`Phoenixd`](https://phoenix.acinq.co/server). (TODO)
+- [ ] [`LightSpark`](https://www.lightspark.com/) (TODO)
+- [ ] Direct [`Core Lightning`](https://corelightning.org/) integration. (WIP)
+- [ ] Direct [`LND`](https://github.com/lightningnetwork/lnd) Integration (TODO)
 
 ### Lightning Address
 
@@ -31,11 +31,11 @@ SwissKnife enables account and key management through its `Wallet` infrastructur
 
 The compatible HSMs are:
 
-- [] [`Azure Key Vault`](https://azure.microsoft.com/en-us/products/key-vault)
-- [] [`AWS KMS`](https://aws.amazon.com/kms/)
-- [] [`Hashicorp Vault`](https://www.vaultproject.io/) (with the use of a custom plugin)
-- [] Bare-metal HSMs (to be decided)
-- [] Cold storage hardware wallets by exporting and importing `PSBTs`
+- [ ] [`Azure Key Vault`](https://azure.microsoft.com/en-us/products/key-vault)
+- [ ] [`AWS KMS`](https://aws.amazon.com/kms/)
+- [ ] [`Hashicorp Vault`](https://www.vaultproject.io/) (with the use of a custom plugin)
+- [ ] Bare-metal HSMs (to be decided)
+- [ ] Cold storage hardware wallets by exporting and importing `PSBTs`
 
 ## RGB protocol and Taproot Assets
 
@@ -45,9 +45,9 @@ Numeraire SwissKnife enables any entity to become a smart contract issuer on the
 
 Multiple use cases are possible using RGB and Taproot Assets:
 
-- [] Asset tokenization and real-world assets (RGB-21/UDA, aka Unique Digital Assets)
-- [] Currencies and stablecoins (RGB-20/NIA, Non Inflatable Assets)
-- [] Collectible collections (RGB-25/CFA aka Collectible Fungible Assets)
+- [ ] Asset tokenization and real-world assets (RGB-21/UDA, aka Unique Digital Assets)
+- [ ] Currencies and stablecoins (RGB-20/NIA, Non Inflatable Assets)
+- [ ] Collectible collections (RGB-25/CFA aka Collectible Fungible Assets)
 
 ### Assets data storage and encryption
 
@@ -57,11 +57,11 @@ Numeraire SwissKnife allows for the encrypted storage of the smart contract meta
 
 Because RGB does not store the smart contract on-chain like Ethereum or other smart contract protocols. Contracts can be sent to other parties confidentially through other means. Numeraire SwissKnife allors contract propagation through a JSON-RPC proxy server implementation. With the following techologies to be implemented eventually:
 
-- [] `JSON-RPC proxy server`
-- [] `Filecoin`
-- [] `IPFS`
-- [] `Email`
-- [] `Taproot Assets Universe`
+- [ ] `JSON-RPC proxy server`
+- [ ] `Filecoin`
+- [ ] `IPFS`
+- [ ] `Email`
+- [ ] `Taproot Assets Universe`
 
 ## Authentication and RBAC
 
@@ -70,4 +70,4 @@ NumeraireSwissknife allows full authentication, account segregation and authoriz
 - [x] `JWKS server with automatic public key retrieval`
 - [x] `JWT token authentication`
 - [x] `RBAC per route`
-- [] `API keys authentication`
+- [ ] `API keys authentication`

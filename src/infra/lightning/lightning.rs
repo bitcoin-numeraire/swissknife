@@ -7,11 +7,11 @@ use uuid::Uuid;
 
 use crate::{
     application::errors::LightningError,
-    domains::{lightning::entities::Invoice, payments::entities::Payment},
+    domains::{invoices::entities::Invoice, payments::entities::Payment},
 };
 
 #[async_trait]
-pub trait LightningClient: Sync + Send {
+pub trait LnClient: Sync + Send {
     fn node_info(&self) -> Result<NodeState, LightningError>;
     async fn lsp_info(&self) -> Result<LspInformation, LightningError>;
     async fn list_payments(&self) -> Result<Vec<BreezPayment>, LightningError>;

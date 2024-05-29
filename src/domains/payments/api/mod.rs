@@ -1,2 +1,2 @@
-mod payment_http_handler;
-pub use payment_http_handler::PaymentHandler;
+mod payment_handler;
+pub use payment_handler::PaymentHandler;

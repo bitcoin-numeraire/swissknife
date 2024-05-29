@@ -10,7 +10,7 @@ pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
     pub id: Uuid,
     pub user_id: String,
-    pub lightning_address: Option<String>,
+    pub ln_address: Option<String>,
     pub payment_hash: Option<String>,
     pub error: Option<String>,
     pub amount_msat: i64,
@@ -36,7 +36,7 @@ impl From<Model> for Payment {
         Payment {
             id: model.id,
             user_id: model.user_id,
-            lightning_address: model.lightning_address,
+            ln_address: model.ln_address,
             payment_hash: model.payment_hash,
             error: model.error,
             amount_msat: model.amount_msat as u64,

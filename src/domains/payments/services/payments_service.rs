@@ -10,19 +10,14 @@ use uuid::Uuid;
 use crate::{
     application::{
         dtos::SendPaymentRequest,
+        entities::AppStore,
         errors::{ApplicationError, DataError, DatabaseError, LightningError},
     },
     domains::{
-        lightning::{
-            adapters::LightningRepository,
-            entities::{Invoice, InvoiceStatus, InvoiceType},
-        },
-        payments::{
-            adapters::PaymentRepository,
-            entities::{Payment, PaymentFilter, PaymentStatus, PaymentType},
-        },
+        invoices::entities::{Invoice, InvoiceStatus, InvoiceType},
+        payments::entities::{Payment, PaymentFilter, PaymentStatus, PaymentType},
     },
-    infra::lightning::LightningClient,
+    infra::lightning::LnClient,
 };
 
 use super::PaymentsUseCases;
@@ -30,33 +25,30 @@ use super::PaymentsUseCases;
 const DEFAULT_INTERNAL_INVOICE_DESCRIPTION: &str = "Numeraire Swissknife Invoice";
 const DEFAULT_INTERNAL_PAYMENT_DESCRIPTION: &str = "Payment to Numeraire Swissknife";
 
-pub struct PaymentsService {
+pub struct PaymentService {
     domain: String,
-    repo: Box<dyn PaymentRepository>,
-    lightning_repo: Box<dyn LightningRepository>,
-    lightning_client: Arc<dyn LightningClient>,
+    store: AppStore,
+    ln_client: Arc<dyn LnClient>,
     fee_buffer: f64,
 }
 
-impl PaymentsService {
+impl PaymentService {
     pub fn new(
-        repo: Box<dyn PaymentRepository>,
-        lightning_repo: Box<dyn LightningRepository>,
-        lightning_client: Arc<dyn LightningClient>,
+        store: AppStore,
+        ln_client: Arc<dyn LnClient>,
         domain: String,
         fee_buffer: f64,
     ) -> Self {
-        PaymentsService {
-            repo,
-            lightning_repo,
-            lightning_client,
+        PaymentService {
+            store,
+            ln_client,
             domain,
             fee_buffer,
         }
     }
 }
 
-impl PaymentsService {
+impl PaymentService {
     pub(crate) fn validate_amount(amount_msat: Option<u64>) -> Result<u64, ApplicationError> {
         let amount = amount_msat.unwrap_or_default();
         if amount == 0 {
@@ -84,8 +76,9 @@ impl PaymentsService {
         if let Some(amount) = specified_amount {
             // Check if internal payment
             let invoice_opt = self
-                .lightning_repo
-                .find_invoice_by_payment_hash(&invoice.payment_hash)
+                .store
+                .invoice
+                .find_by_payment_hash(&invoice.payment_hash)
                 .await?;
             if let Some(mut retrieved_invoice) = invoice_opt {
                 if retrieved_invoice.user_id == user_id {
@@ -106,7 +99,7 @@ impl PaymentsService {
                     }
                     InvoiceStatus::PENDING => {
                         // Internal payment
-                        let txn = self.lightning_repo.begin().await?;
+                        let txn = self.store.begin().await?;
 
                         let internal_payment = self
                             .insert_payment(
@@ -127,8 +120,9 @@ impl PaymentsService {
 
                         retrieved_invoice.fee_msat = Some(0);
                         retrieved_invoice.payment_time = internal_payment.payment_time;
-                        self.lightning_repo
-                            .update_invoice(Some(&txn), retrieved_invoice)
+                        self.store
+                            .invoice
+                            .update(Some(&txn), retrieved_invoice)
                             .await?;
 
                         txn.commit()
@@ -156,7 +150,7 @@ impl PaymentsService {
                 .await?;
 
             let result = self
-                .lightning_client
+                .ln_client
                 .send_payment(
                     invoice.bolt11.clone(),
                     if invoice.amount_msat.is_some() {
@@ -191,10 +185,7 @@ impl PaymentsService {
             match data.ln_address.clone() {
                 Some(ln_address) => {
                     let address = ln_address.split('@').next().unwrap();
-                    let address_opt = self
-                        .lightning_repo
-                        .find_address_by_username(&address)
-                        .await?;
+                    let address_opt = self.store.ln_address.find_by_username(&address).await?;
 
                     match address_opt {
                         Some(retrieved_address) => {
@@ -208,13 +199,14 @@ impl PaymentsService {
                             // Internal payment
                             let curr_time = Utc::now();
 
-                            let txn = self.lightning_repo.begin().await?;
-                            self.lightning_repo
-                                .insert_invoice(
+                            let txn = self.store.begin().await?;
+                            self.store
+                                .invoice
+                                .insert(
                                     Some(&txn),
                                     Invoice {
                                         user_id: retrieved_address.user_id,
-                                        lightning_address: Some(retrieved_address.id),
+                                        ln_address: Some(retrieved_address.id),
                                         network: Network::Bitcoin.to_string(),
                                         description: comment.clone().or(
                                             DEFAULT_INTERNAL_INVOICE_DESCRIPTION.to_string().into(),
@@ -242,7 +234,7 @@ impl PaymentsService {
                                         fee_msat: Some(0),
                                         payment_time: Some(Utc::now()),
                                         payment_type: PaymentType::INTERNAL,
-                                        lightning_address: Some(ln_address),
+                                        ln_address: Some(ln_address),
                                         ..Default::default()
                                     },
                                     0.0,
@@ -279,7 +271,7 @@ impl PaymentsService {
                     user_id: user_id.clone(),
                     amount_msat: amount,
                     status: PaymentStatus::PENDING,
-                    lightning_address: data.ln_address.clone(),
+                    ln_address: data.ln_address.clone(),
                     description: comment.clone(),
                     ..Default::default()
                 },
@@ -288,7 +280,7 @@ impl PaymentsService {
             .await?;
 
         let result = self
-            .lightning_client
+            .ln_client
             .lnurl_pay(data, amount, comment, pending_payment.id)
             .await;
 
@@ -300,10 +292,11 @@ impl PaymentsService {
         payment: Payment,
         fee_buffer: f64,
     ) -> Result<Payment, ApplicationError> {
-        let txn = self.lightning_repo.begin().await?;
+        let txn = self.store.begin().await?;
 
         let balance = self
-            .lightning_repo
+            .store
+            .user
             .get_balance(Some(&txn), &payment.user_id)
             .await?
             .available_msat as f64;
@@ -313,7 +306,7 @@ impl PaymentsService {
             return Err(DataError::InsufficientFunds(required_balance).into());
         }
 
-        let pending_payment = self.repo.insert(Some(&txn), payment).await?;
+        let pending_payment = self.store.payment.insert(Some(&txn), payment).await?;
 
         txn.commit()
             .await
@@ -335,13 +328,13 @@ impl PaymentsService {
                     Some(_) => PaymentStatus::FAILED,
                     None => PaymentStatus::SETTLED,
                 };
-                let payment: Payment = self.repo.update(payment).await?;
+                let payment: Payment = self.store.payment.update(payment).await?;
                 Ok(payment)
             }
             Err(error) => {
                 pending_payment.status = PaymentStatus::FAILED;
                 pending_payment.error = Some(error.to_string());
-                let payment: Payment = self.repo.update(pending_payment).await?;
+                let payment: Payment = self.store.payment.update(pending_payment).await?;
                 Ok(payment)
             }
         }
@@ -349,12 +342,13 @@ impl PaymentsService {
 }
 
 #[async_trait]
-impl PaymentsUseCases for PaymentsService {
+impl PaymentsUseCases for PaymentService {
     async fn get(&self, id: Uuid) -> Result<Payment, ApplicationError> {
         trace!(%id, "Fetching lightning payment");
 
         let lightning_payment = self
-            .repo
+            .store
+            .payment
             .find(id)
             .await?
             .ok_or_else(|| DataError::NotFound("Lightning payment not found.".to_string()))?;
@@ -369,7 +363,7 @@ impl PaymentsUseCases for PaymentsService {
     async fn list(&self, filter: PaymentFilter) -> Result<Vec<Payment>, ApplicationError> {
         trace!(?filter, "Listing lightning payments");
 
-        let lightning_payments = self.repo.find_many(filter.clone()).await?;
+        let lightning_payments = self.store.payment.find_many(filter.clone()).await?;
 
         debug!(?filter, "Lightning payments listed successfully");
         Ok(lightning_payments)
@@ -407,7 +401,8 @@ impl PaymentsUseCases for PaymentsService {
         debug!(%id, "Deleting lightning payment");
 
         let n_deleted = self
-            .repo
+            .store
+            .payment
             .delete_many(PaymentFilter {
                 id: Some(id),
                 ..Default::default()
@@ -425,7 +420,7 @@ impl PaymentsUseCases for PaymentsService {
     async fn delete_many(&self, filter: PaymentFilter) -> Result<u64, ApplicationError> {
         debug!(?filter, "Deleting lightning payments");
 
-        let n_deleted = self.repo.delete_many(filter.clone()).await?;
+        let n_deleted = self.store.payment.delete_many(filter.clone()).await?;
 
         info!(
             ?filter,
