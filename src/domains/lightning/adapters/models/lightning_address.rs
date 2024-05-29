@@ -21,11 +21,11 @@ pub struct Model {
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
-    #[sea_orm(has_many = "crate::domains::lightning::adapters::models::lightning_invoice::Entity")]
+    #[sea_orm(has_many = "crate::domains::invoices::adapters::InvoiceModel")]
     Invoice,
 }
 
-impl Related<crate::domains::lightning::adapters::models::lightning_invoice::Entity> for Entity {
+impl Related<crate::domains::invoices::adapters::InvoiceModel> for Entity {
     fn to() -> RelationDef {
         Relation::Invoice.def()
     }

@@ -1,31 +1,27 @@
 use crate::{
-    application::{entities::PaginationFilter, errors::ApplicationError},
+    application::{
+        entities::{AppStore, PaginationFilter},
+        errors::ApplicationError,
+    },
     domains::{
+        invoices::entities::InvoiceFilter,
         lightning::{
-            adapters::LightningRepository,
-            entities::{InvoiceFilter, UserBalance, Wallet},
+            entities::{UserBalance, Wallet},
             services::WalletUseCases,
         },
-        payments::{adapters::PaymentRepository, entities::PaymentFilter},
+        payments::entities::PaymentFilter,
     },
 };
 use async_trait::async_trait;
 use tracing::{debug, trace};
 
 pub struct WalletService {
-    pub lightning_repo: Box<dyn LightningRepository>,
-    pub payment_repo: Box<dyn PaymentRepository>,
+    store: AppStore,
 }
 
 impl WalletService {
-    pub fn new(
-        lightning_repo: Box<dyn LightningRepository>,
-        payment_repo: Box<dyn PaymentRepository>,
-    ) -> Self {
-        WalletService {
-            lightning_repo,
-            payment_repo,
-        }
+    pub fn new(store: AppStore) -> Self {
+        WalletService { store }
     }
 }
 
@@ -37,7 +33,7 @@ impl WalletUseCases for WalletService {
     async fn get_balance(&self, user_id: String) -> Result<UserBalance, ApplicationError> {
         trace!(user_id, "Fetching balance");
 
-        let balance = self.lightning_repo.get_balance(None, &user_id).await?;
+        let balance = self.store.lightning.get_balance(None, &user_id).await?;
 
         debug!(user_id, "Balance fetched successfully");
         Ok(balance)
@@ -46,9 +42,10 @@ impl WalletUseCases for WalletService {
     async fn get(&self, user_id: String) -> Result<Wallet, ApplicationError> {
         trace!(user_id, "Fetching wallet");
 
-        let balance = self.lightning_repo.get_balance(None, &user_id).await?;
+        let balance = self.store.lightning.get_balance(None, &user_id).await?;
         let payments = self
-            .payment_repo
+            .store
+            .payment
             .find_many(PaymentFilter {
                 user_id: Some(user_id.clone()),
                 pagination: PaginationFilter {
@@ -59,7 +56,8 @@ impl WalletUseCases for WalletService {
             })
             .await?;
         let invoices = self
-            .lightning_repo
+            .store
+            .invoice
             .find_invoices(InvoiceFilter {
                 user_id: Some(user_id.clone()),
                 pagination: PaginationFilter {
@@ -70,7 +68,8 @@ impl WalletUseCases for WalletService {
             })
             .await?;
         let address = self
-            .lightning_repo
+            .store
+            .lightning
             .find_address_by_user_id(&user_id)
             .await?;
 

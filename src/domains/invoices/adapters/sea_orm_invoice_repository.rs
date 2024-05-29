@@ -1,24 +1,33 @@
 use crate::{
     application::errors::DatabaseError,
-    domains::lightning::{
-        adapters::{
-            models::lightning_invoice::{ActiveModel, Column, Entity},
-            repository::InvoiceRepository,
-        },
-        entities::{Invoice, InvoiceFilter, InvoiceStatus, InvoiceType},
-    },
+    domains::invoices::entities::{Invoice, InvoiceFilter, InvoiceStatus, InvoiceType},
 };
 use async_trait::async_trait;
 use sea_orm::{
     sea_query::Expr, ActiveModelTrait, ActiveValue::Set, ColumnTrait, Condition,
-    DatabaseTransaction, EntityTrait, QueryFilter, QueryOrder, QuerySelect, QueryTrait,
+    DatabaseConnection, DatabaseTransaction, EntityTrait, QueryFilter, QueryOrder, QuerySelect,
+    QueryTrait,
 };
 use uuid::Uuid;
 
-use super::SqlxStore;
+use super::{
+    invoice_model::{ActiveModel, Column, Entity},
+    InvoiceRepository,
+};
+
+#[derive(Clone)]
+pub struct SeaOrmInvoiceRepository {
+    pub db: DatabaseConnection,
+}
+
+impl SeaOrmInvoiceRepository {
+    pub fn new(db: DatabaseConnection) -> Self {
+        Self { db }
+    }
+}
 
 #[async_trait]
-impl InvoiceRepository for SqlxStore {
+impl InvoiceRepository for SeaOrmInvoiceRepository {
     async fn find_invoice(&self, id: Uuid) -> Result<Option<Invoice>, DatabaseError> {
         let model = Entity::find_by_id(id)
             .one(&self.db)

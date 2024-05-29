@@ -36,6 +36,7 @@ impl LightningAddressHandler {
         user.check_permission(Permission::WriteLightningAddress)?;
 
         let lightning_address = app_state
+            .services
             .lightning
             .register_address(payload.user_id.unwrap_or(user.sub), payload.username)
             .await?;
@@ -49,7 +50,7 @@ impl LightningAddressHandler {
     ) -> Result<Json<LightningAddress>, ApplicationError> {
         user.check_permission(Permission::ReadLightningAddress)?;
 
-        let lightning_address = app_state.lightning.get_address(id).await?;
+        let lightning_address = app_state.services.lightning.get_address(id).await?;
         Ok(Json(lightning_address.into()))
     }
 
@@ -60,7 +61,11 @@ impl LightningAddressHandler {
     ) -> Result<Json<Vec<LightningAddress>>, ApplicationError> {
         user.check_permission(Permission::ReadLightningAddress)?;
 
-        let lightning_addresses = app_state.lightning.list_addresses(query_params).await?;
+        let lightning_addresses = app_state
+            .services
+            .lightning
+            .list_addresses(query_params)
+            .await?;
 
         let response: Vec<LightningAddress> =
             lightning_addresses.into_iter().map(Into::into).collect();
@@ -75,7 +80,7 @@ impl LightningAddressHandler {
     ) -> Result<(), ApplicationError> {
         user.check_permission(Permission::WriteLightningAddress)?;
 
-        app_state.lightning.delete_address(id).await?;
+        app_state.services.lightning.delete_address(id).await?;
         Ok(())
     }
 
@@ -86,7 +91,11 @@ impl LightningAddressHandler {
     ) -> Result<Json<u64>, ApplicationError> {
         user.check_permission(Permission::WriteLightningAddress)?;
 
-        let n_deleted = app_state.lightning.delete_addresses(query_params).await?;
+        let n_deleted = app_state
+            .services
+            .lightning
+            .delete_addresses(query_params)
+            .await?;
         Ok(n_deleted.into())
     }
 }

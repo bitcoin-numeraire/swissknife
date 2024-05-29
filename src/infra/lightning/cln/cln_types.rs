@@ -4,7 +4,7 @@ use serde_bolt::bitcoin::hashes::hex::ToHex;
 use std::str::FromStr;
 
 use super::cln::InvoiceResponse;
-use crate::domains::lightning::entities::{Invoice, InvoiceType, LightningInvoice};
+use crate::domains::invoices::entities::{Invoice, InvoiceType, LightningInvoice};
 
 impl Into<Invoice> for InvoiceResponse {
     fn into(self) -> Invoice {

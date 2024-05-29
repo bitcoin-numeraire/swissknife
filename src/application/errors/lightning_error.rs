@@ -2,9 +2,6 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum LightningError {
-    #[error("Missing lightning provider config: {0}")]
-    MissingLightningProviderConfig(String),
-
     #[error("Failed to initialize logging: {0}")]
     Logging(String),
 

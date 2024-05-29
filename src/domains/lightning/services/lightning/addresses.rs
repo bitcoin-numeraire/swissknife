@@ -5,9 +5,12 @@ use uuid::Uuid;
 
 use crate::{
     application::errors::{ApplicationError, DataError},
-    domains::lightning::{
-        entities::{Invoice, LNURLPayRequest, LightningAddress, LightningAddressFilter},
-        services::LightningAddressesUseCases,
+    domains::{
+        invoices::entities::Invoice,
+        lightning::{
+            entities::{LNURLPayRequest, LightningAddress, LightningAddressFilter},
+            services::LightningAddressesUseCases,
+        },
     },
 };
 
@@ -22,6 +25,7 @@ impl LightningAddressesUseCases for LightningService {
         debug!(username, "Generating LNURLp");
 
         self.store
+            .lightning
             .find_address_by_username(&username)
             .await?
             .ok_or_else(|| DataError::NotFound("Lightning address not found.".to_string()))?;
@@ -40,6 +44,7 @@ impl LightningAddressesUseCases for LightningService {
 
         let lightning_address = self
             .store
+            .lightning
             .find_address_by_username(&username)
             .await?
             .ok_or_else(|| DataError::NotFound("Lightning address not found.".to_string()))?;
@@ -56,7 +61,7 @@ impl LightningAddressesUseCases for LightningService {
         invoice.lightning_address = Some(lightning_address.id);
 
         // TODO: Get or add more information to make this a LNURLp invoice (like fetching a success action specific to the user)
-        let invoice = self.store.insert_invoice(None, invoice).await?;
+        let invoice = self.store.invoice.insert_invoice(None, invoice).await?;
 
         info!(username, "Lightning invoice generated successfully");
         Ok(invoice)
@@ -81,6 +86,7 @@ impl LightningAddressesUseCases for LightningService {
 
         if self
             .store
+            .lightning
             .find_address_by_user_id(&user_id)
             .await?
             .is_some()
@@ -90,6 +96,7 @@ impl LightningAddressesUseCases for LightningService {
 
         if self
             .store
+            .lightning
             .find_address_by_username(&username)
             .await?
             .is_some()
@@ -97,7 +104,11 @@ impl LightningAddressesUseCases for LightningService {
             return Err(DataError::Conflict("Duplicate username.".to_string()).into());
         }
 
-        let lightning_address = self.store.insert_address(&user_id, &username).await?;
+        let lightning_address = self
+            .store
+            .lightning
+            .insert_address(&user_id, &username)
+            .await?;
 
         info!(
             user_id,
@@ -111,6 +122,7 @@ impl LightningAddressesUseCases for LightningService {
 
         let lightning_address = self
             .store
+            .lightning
             .find_address(id)
             .await?
             .ok_or_else(|| DataError::NotFound("Lightning address not found.".to_string()))?;
@@ -127,7 +139,7 @@ impl LightningAddressesUseCases for LightningService {
     ) -> Result<Vec<LightningAddress>, ApplicationError> {
         trace!(?filter, "Listing lightning addresses");
 
-        let lightning_addresses = self.store.find_addresses(filter.clone()).await?;
+        let lightning_addresses = self.store.lightning.find_addresses(filter.clone()).await?;
 
         debug!(?filter, "Lightning addresses listed successfully");
         Ok(lightning_addresses)
@@ -138,6 +150,7 @@ impl LightningAddressesUseCases for LightningService {
 
         let n_deleted = self
             .store
+            .lightning
             .delete_addresses(LightningAddressFilter {
                 id: Some(id),
                 ..Default::default()
@@ -158,7 +171,11 @@ impl LightningAddressesUseCases for LightningService {
     ) -> Result<u64, ApplicationError> {
         debug!(?filter, "Deleting lightning addresses");
 
-        let n_deleted = self.store.delete_addresses(filter.clone()).await?;
+        let n_deleted = self
+            .store
+            .lightning
+            .delete_addresses(filter.clone())
+            .await?;
 
         info!(
             ?filter,

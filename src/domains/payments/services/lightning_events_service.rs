@@ -5,46 +5,37 @@ use tracing::{info, trace};
 use uuid::Uuid;
 
 use crate::{
-    application::errors::{ApplicationError, DataError},
-    domains::{
-        lightning::{adapters::LightningRepository, entities::Invoice},
-        payments::{
-            adapters::PaymentRepository,
-            entities::{Payment, PaymentStatus},
-        },
+    application::{
+        entities::AppStore,
+        errors::{ApplicationError, DataError},
     },
+    domains::payments::entities::{Payment, PaymentStatus},
 };
 
-use super::PaymentsProcessorUseCases;
+use super::LightningEventsUseCases;
 
-pub struct BreezPaymentsProcessor {
-    pub lightning_repo: Box<dyn LightningRepository>,
-    pub payment_repo: Box<dyn PaymentRepository>,
+pub struct LightningEventsService {
+    store: AppStore,
 }
 
-impl BreezPaymentsProcessor {
-    pub fn new(
-        lightning_repo: Box<dyn LightningRepository>,
-        payment_repo: Box<dyn PaymentRepository>,
-    ) -> Self {
-        BreezPaymentsProcessor {
-            lightning_repo,
-            payment_repo,
-        }
+impl LightningEventsService {
+    pub fn new(store: AppStore) -> Self {
+        LightningEventsService { store }
     }
 }
 
 #[async_trait]
-impl PaymentsProcessorUseCases for BreezPaymentsProcessor {
+impl LightningEventsUseCases for LightningEventsService {
     async fn process_incoming_payment(
         &self,
         payment: BreezPayment,
-    ) -> Result<Invoice, ApplicationError> {
+    ) -> Result<(), ApplicationError> {
         let payment_hash = payment.id;
         trace!(payment_hash, "Processing incoming lightning payment");
 
         let invoice_option = self
-            .lightning_repo
+            .store
+            .invoice
             .find_invoice_by_payment_hash(&payment_hash)
             .await?;
 
@@ -55,13 +46,13 @@ impl PaymentsProcessorUseCases for BreezPaymentsProcessor {
             // Until this is fixed: https://github.com/breez/breez-sdk/issues/982
             invoice.amount_msat = Some(payment.amount_msat);
 
-            invoice = self.lightning_repo.update_invoice(None, invoice).await?;
+            invoice = self.store.invoice.update_invoice(None, invoice).await?;
 
             info!(
-                payment_hash,
-                "Incoming Lightning payment processed successfully"
+                id = invoice.id.to_string(),
+                payment_hash, "Incoming Lightning payment processed successfully"
             );
-            return Ok(invoice);
+            return Ok(());
         }
 
         return Err(DataError::NotFound("Lightning invoice not found.".into()).into());
@@ -70,7 +61,7 @@ impl PaymentsProcessorUseCases for BreezPaymentsProcessor {
     async fn process_outgoing_payment(
         &self,
         payment_success: BreezPayment,
-    ) -> Result<Payment, ApplicationError> {
+    ) -> Result<(), ApplicationError> {
         let payment_id = match payment_success.details.clone() {
             PaymentDetails::Ln { data } => {
                 Uuid::parse_str(&data.label).map_err(|e| DataError::Validation(e.to_string()))
@@ -82,7 +73,7 @@ impl PaymentsProcessorUseCases for BreezPaymentsProcessor {
             "Processing outgoing lightning payment"
         );
 
-        let payment_option = self.payment_repo.find(payment_id).await?;
+        let payment_option = self.store.payment.find(payment_id).await?;
 
         if let Some(payment_retrieved) = payment_option {
             // We overwrite the payment with the new one at the correct status
@@ -90,14 +81,14 @@ impl PaymentsProcessorUseCases for BreezPaymentsProcessor {
             payment.id = payment_retrieved.id;
             payment.status = PaymentStatus::SETTLED;
 
-            let payment = self.payment_repo.update(payment).await?;
+            let payment = self.store.payment.update(payment).await?;
 
             info!(
                 %payment_id,
                 payment_status = %payment.status,
                 "Outgoing Lightning payment processed successfully"
             );
-            return Ok(payment);
+            return Ok(());
         }
 
         return Err(DataError::NotFound("Lightning payment not found.".into()).into());
@@ -106,7 +97,7 @@ impl PaymentsProcessorUseCases for BreezPaymentsProcessor {
     async fn process_failed_payment(
         &self,
         payment_failed: PaymentFailedData,
-    ) -> Result<Payment, ApplicationError> {
+    ) -> Result<(), ApplicationError> {
         let payment_id = match payment_failed.label {
             Some(label) => {
                 Uuid::parse_str(&label).map_err(|e| DataError::Validation(e.to_string()))
@@ -127,7 +118,7 @@ impl PaymentsProcessorUseCases for BreezPaymentsProcessor {
             }
         };
 
-        let payment_option = self.payment_repo.find(payment_id).await?;
+        let payment_option = self.store.payment.find(payment_id).await?;
 
         if let Some(mut payment) = payment_option {
             payment.status = PaymentStatus::FAILED;
@@ -135,14 +126,14 @@ impl PaymentsProcessorUseCases for BreezPaymentsProcessor {
             payment.error = Some(payment_failed.error);
             payment.payment_hash = Some(invoice.payment_hash);
 
-            payment = self.payment_repo.update(payment).await?;
+            payment = self.store.payment.update(payment).await?;
 
             info!(
                 %payment_id,
                 payment_status = %payment.status,
                 "Outgoing Lightning payment processed successfully"
             );
-            return Ok(payment);
+            return Ok(());
         }
 
         return Err(DataError::NotFound("Lightning payment not found.".into()).into());

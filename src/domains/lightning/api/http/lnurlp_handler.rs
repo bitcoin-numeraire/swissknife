@@ -30,7 +30,11 @@ impl LNURLpHandler {
         Path(username): Path<String>,
         State(app_state): State<Arc<AppState>>,
     ) -> Result<Json<LNURLPayRequest>, ApplicationError> {
-        let lnurlp = app_state.lightning.generate_lnurlp(username).await?;
+        let lnurlp = app_state
+            .services
+            .lightning
+            .generate_lnurlp(username)
+            .await?;
         Ok(lnurlp.into())
     }
 
@@ -40,6 +44,7 @@ impl LNURLpHandler {
         State(app_state): State<Arc<AppState>>,
     ) -> Result<Json<LNUrlpInvoiceResponse>, ApplicationError> {
         let invoice = app_state
+            .services
             .lightning
             .generate_lnurlp_invoice(username, query_params.amount, query_params.comment)
             .await?;

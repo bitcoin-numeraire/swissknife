@@ -14,7 +14,7 @@ use cln::node_client::NodeClient;
 
 use crate::{
     application::errors::LightningError,
-    domains::{lightning::entities::Invoice, payments::entities::Payment},
+    domains::{invoices::entities::Invoice, payments::entities::Payment},
     infra::lightning::LightningClient,
 };
 

@@ -5,7 +5,7 @@ use std::time::Duration;
 use chrono::Utc;
 use sea_orm::entity::prelude::*;
 
-use crate::domains::lightning::entities::{Invoice, InvoiceStatus, LightningInvoice};
+use crate::domains::invoices::entities::{Invoice, InvoiceStatus, LightningInvoice};
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
 #[sea_orm(table_name = "invoice")]
@@ -37,16 +37,16 @@ pub struct Model {
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
     #[sea_orm(
-        belongs_to = "super::lightning_address::Entity",
+        belongs_to = "crate::domains::lightning::adapters::models::lightning_address::Entity",
         from = "Column::LightningAddress",
-        to = "super::lightning_address::Column::Id",
+        to = "crate::domains::lightning::adapters::models::lightning_address::Column::Id",
         on_update = "NoAction",
         on_delete = "SetNull"
     )]
     LightningAddress,
 }
 
-impl Related<super::lightning_address::Entity> for Entity {
+impl Related<crate::domains::lightning::adapters::models::lightning_address::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::LightningAddress.def()
     }

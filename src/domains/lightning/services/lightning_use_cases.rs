@@ -7,27 +7,11 @@ use uuid::Uuid;
 use crate::{
     application::errors::ApplicationError,
     domains::{
-        lightning::entities::{
-            Invoice, InvoiceFilter, LNURLPayRequest, LightningAddress, LightningAddressFilter,
-        },
+        invoices::entities::Invoice,
+        lightning::entities::{LNURLPayRequest, LightningAddress, LightningAddressFilter},
         users::entities::AuthUser,
     },
 };
-
-#[async_trait]
-pub trait InvoicesUseCases {
-    async fn generate_invoice(
-        &self,
-        user_id: String,
-        amount: u64,
-        description: Option<String>,
-        expiry: Option<u32>,
-    ) -> Result<Invoice, ApplicationError>;
-    async fn get_invoice(&self, id: Uuid) -> Result<Invoice, ApplicationError>;
-    async fn list_invoices(&self, filter: InvoiceFilter) -> Result<Vec<Invoice>, ApplicationError>;
-    async fn delete_invoice(&self, id: Uuid) -> Result<(), ApplicationError>;
-    async fn delete_invoices(&self, filter: InvoiceFilter) -> Result<u64, ApplicationError>;
-}
 
 #[async_trait]
 pub trait LightningAddressesUseCases {
@@ -85,12 +69,12 @@ pub trait LightningNodeUseCases {
 }
 
 pub trait LightningUseCases:
-    InvoicesUseCases + LightningAddressesUseCases + LightningNodeUseCases + Send + Sync
+    LightningAddressesUseCases + LightningNodeUseCases + Send + Sync
 {
 }
 
 // Ensure that any type that implements the individual traits also implements the new trait.
 impl<T> LightningUseCases for T where
-    T: InvoicesUseCases + LightningAddressesUseCases + LightningNodeUseCases + Send + Sync
+    T: LightningAddressesUseCases + LightningNodeUseCases + Send + Sync
 {
 }

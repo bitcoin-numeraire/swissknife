@@ -4,14 +4,14 @@ use async_trait::async_trait;
 use breez_sdk_core::{BreezEvent, EventListener, PaymentStatus, PaymentType};
 use tracing::{trace, warn};
 
-use crate::domains::payments::services::PaymentsProcessorUseCases;
+use crate::domains::payments::services::LightningEventsUseCases;
 
 pub struct BreezListener {
-    pub payments_processor: Arc<dyn PaymentsProcessorUseCases>,
+    pub payments_processor: Arc<dyn LightningEventsUseCases>,
 }
 
 impl BreezListener {
-    pub fn new(payments_processor: Arc<dyn PaymentsProcessorUseCases>) -> Self {
+    pub fn new(payments_processor: Arc<dyn LightningEventsUseCases>) -> Self {
         Self { payments_processor }
     }
 }

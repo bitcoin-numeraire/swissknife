@@ -35,7 +35,7 @@ impl PaymentHandler {
     ) -> Result<Json<Payment>, ApplicationError> {
         user.check_permission(Permission::WriteLightningTransaction)?;
 
-        let payment = app_state.payments.pay(payload).await?;
+        let payment = app_state.services.payments.pay(payload).await?;
         Ok(Json(payment.into()))
     }
 
@@ -46,7 +46,7 @@ impl PaymentHandler {
     ) -> Result<Json<Payment>, ApplicationError> {
         user.check_permission(Permission::ReadLightningTransaction)?;
 
-        let lightning_address = app_state.payments.get(id).await?;
+        let lightning_address = app_state.services.payments.get(id).await?;
         Ok(Json(lightning_address.into()))
     }
 
@@ -57,7 +57,7 @@ impl PaymentHandler {
     ) -> Result<Json<Vec<Payment>>, ApplicationError> {
         user.check_permission(Permission::ReadLightningTransaction)?;
 
-        let lightning_payments = app_state.payments.list(query_params).await?;
+        let lightning_payments = app_state.services.payments.list(query_params).await?;
 
         let response: Vec<Payment> = lightning_payments.into_iter().map(Into::into).collect();
 
@@ -71,7 +71,7 @@ impl PaymentHandler {
     ) -> Result<(), ApplicationError> {
         user.check_permission(Permission::WriteLightningTransaction)?;
 
-        app_state.payments.delete(id).await?;
+        app_state.services.payments.delete(id).await?;
         Ok(())
     }
 
@@ -82,7 +82,11 @@ impl PaymentHandler {
     ) -> Result<Json<u64>, ApplicationError> {
         user.check_permission(Permission::WriteLightningTransaction)?;
 
-        let n_deleted = app_state.payments.delete_many(query_params).await?;
+        let n_deleted = app_state
+            .services
+            .payments
+            .delete_many(query_params)
+            .await?;
         Ok(n_deleted.into())
     }
 }

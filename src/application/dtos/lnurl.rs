@@ -1,7 +1,7 @@
 use serde::Deserialize;
 use serde::Serialize;
 
-use crate::domains::lightning::entities::Invoice;
+use crate::domains::invoices::entities::Invoice;
 
 #[derive(Deserialize)]
 pub struct LNUrlpInvoiceQueryParams {

@@ -10,7 +10,7 @@ use uuid::Uuid;
 use crate::{
     application::{dtos::NewInvoiceRequest, errors::ApplicationError},
     domains::{
-        lightning::entities::{Invoice, InvoiceFilter},
+        invoices::entities::{Invoice, InvoiceFilter},
         users::entities::{AuthUser, Permission},
     },
     infra::app::AppState,
@@ -36,7 +36,8 @@ impl InvoiceHandler {
         user.check_permission(Permission::WriteLightningTransaction)?;
 
         let lightning_address = app_state
-            .lightning
+            .services
+            .invoices
             .generate_invoice(
                 payload.user_id.unwrap_or(user.sub),
                 payload.amount_msat,
@@ -54,7 +55,7 @@ impl InvoiceHandler {
     ) -> Result<Json<Invoice>, ApplicationError> {
         user.check_permission(Permission::ReadLightningTransaction)?;
 
-        let lightning_address = app_state.lightning.get_invoice(id).await?;
+        let lightning_address = app_state.services.invoices.get_invoice(id).await?;
         Ok(Json(lightning_address.into()))
     }
 
@@ -65,7 +66,11 @@ impl InvoiceHandler {
     ) -> Result<Json<Vec<Invoice>>, ApplicationError> {
         user.check_permission(Permission::ReadLightningTransaction)?;
 
-        let lightning_invoices = app_state.lightning.list_invoices(query_params).await?;
+        let lightning_invoices = app_state
+            .services
+            .invoices
+            .list_invoices(query_params)
+            .await?;
 
         let response: Vec<Invoice> = lightning_invoices.into_iter().map(Into::into).collect();
 
@@ -79,7 +84,7 @@ impl InvoiceHandler {
     ) -> Result<(), ApplicationError> {
         user.check_permission(Permission::WriteLightningTransaction)?;
 
-        app_state.lightning.delete_invoice(id).await?;
+        app_state.services.invoices.delete_invoice(id).await?;
         Ok(())
     }
 
@@ -90,7 +95,11 @@ impl InvoiceHandler {
     ) -> Result<Json<u64>, ApplicationError> {
         user.check_permission(Permission::WriteLightningTransaction)?;
 
-        let n_deleted = app_state.lightning.delete_invoices(query_params).await?;
+        let n_deleted = app_state
+            .services
+            .invoices
+            .delete_invoices(query_params)
+            .await?;
         Ok(n_deleted.into())
     }
 }
