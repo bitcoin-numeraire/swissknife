@@ -14,7 +14,7 @@ pub struct AppConfig {
     pub domain: String,
     pub invoice_expiry: Option<u32>,
     pub fee_buffer: Option<f64>,
-    pub lightning_provider: LightningProvider,
+    pub ln_provider: LightningProvider,
     pub database: DatabaseConfig,
     pub breez_config: Option<BreezClientConfig>,
     pub cln_config: Option<ClnClientConfig>,

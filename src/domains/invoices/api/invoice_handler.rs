@@ -33,7 +33,7 @@ impl InvoiceHandler {
         user: AuthUser,
         Json(payload): Json<NewInvoiceRequest>,
     ) -> Result<Json<Invoice>, ApplicationError> {
-        user.check_permission(Permission::WriteLightningTransaction)?;
+        user.check_permission(Permission::WriteLnTransaction)?;
 
         let ln_address = app_state
             .services
@@ -53,7 +53,7 @@ impl InvoiceHandler {
         user: AuthUser,
         Path(id): Path<Uuid>,
     ) -> Result<Json<Invoice>, ApplicationError> {
-        user.check_permission(Permission::ReadLightningTransaction)?;
+        user.check_permission(Permission::ReadLnTransaction)?;
 
         let ln_address = app_state.services.invoice.get(id).await?;
         Ok(Json(ln_address.into()))
@@ -64,7 +64,7 @@ impl InvoiceHandler {
         user: AuthUser,
         Query(query_params): Query<InvoiceFilter>,
     ) -> Result<Json<Vec<Invoice>>, ApplicationError> {
-        user.check_permission(Permission::ReadLightningTransaction)?;
+        user.check_permission(Permission::ReadLnTransaction)?;
 
         let lightning_invoices = app_state.services.invoice.list(query_params).await?;
 
@@ -78,7 +78,7 @@ impl InvoiceHandler {
         user: AuthUser,
         Path(id): Path<Uuid>,
     ) -> Result<(), ApplicationError> {
-        user.check_permission(Permission::WriteLightningTransaction)?;
+        user.check_permission(Permission::WriteLnTransaction)?;
 
         app_state.services.invoice.delete(id).await?;
         Ok(())
@@ -89,7 +89,7 @@ impl InvoiceHandler {
         user: AuthUser,
         Query(query_params): Query<InvoiceFilter>,
     ) -> Result<Json<u64>, ApplicationError> {
-        user.check_permission(Permission::WriteLightningTransaction)?;
+        user.check_permission(Permission::WriteLnTransaction)?;
 
         let n_deleted = app_state.services.invoice.delete_many(query_params).await?;
         Ok(n_deleted.into())

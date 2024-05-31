@@ -60,10 +60,10 @@ pub async fn get_ln_client(
     config: AppConfig,
     store: AppStore,
 ) -> Result<Arc<dyn LnClient>, ApplicationError> {
-    match config.lightning_provider {
+    match config.ln_provider {
         LightningProvider::Breez => {
             let breez_config = config.breez_config.clone().ok_or_else(|| {
-                ConfigError::MissingLightningProviderConfig(config.lightning_provider.to_string())
+                ConfigError::MissingLightningProviderConfig(config.ln_provider.to_string())
             })?;
 
             let lightning_events: LnEventsService = LnEventsService::new(store);
@@ -78,7 +78,7 @@ pub async fn get_ln_client(
         }
         LightningProvider::Cln => {
             let cln_config = config.cln_config.clone().ok_or_else(|| {
-                ConfigError::MissingLightningProviderConfig(config.lightning_provider.to_string())
+                ConfigError::MissingLightningProviderConfig(config.ln_provider.to_string())
             })?;
 
             let client = ClnClient::new(cln_config.clone()).await?;

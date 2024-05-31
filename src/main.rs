@@ -17,7 +17,6 @@ use tracing::error;
 #[tokio::main]
 async fn main() {
     // Load .env file in development
-    // TODO: Remove this in production
     #[cfg(debug_assertions)]
     dotenv().ok();
 
@@ -25,7 +24,7 @@ async fn main() {
     let config = match load_config() {
         Ok(c) => c,
         Err(err) => {
-            error!(%err, "failed to load config");
+            println!("Failed to load config: {:?}", err);
             exit(1);
         }
     };

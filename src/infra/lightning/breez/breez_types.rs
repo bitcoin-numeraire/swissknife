@@ -1,29 +1,33 @@
 use std::time::Duration;
 
-use breez_sdk_core::{LNInvoice, Payment as BreezPayment};
+use breez_sdk_core::{LNInvoice, Network as BreezNetwork, Payment as BreezPayment};
 use chrono::{TimeZone, Utc};
 use serde_bolt::bitcoin::hashes::hex::ToHex;
 
-use crate::domains::{
-    invoices::entities::{Invoice, InvoiceType, LightningInvoice},
-    payments::entities::{Payment, PaymentType},
+use crate::{
+    application::entities::{Currency, Ledger, Network},
+    domains::{
+        invoices::entities::{Invoice, LnInvoice},
+        payments::entities::Payment,
+    },
 };
 
 impl Into<Invoice> for LNInvoice {
     fn into(self) -> Invoice {
         Invoice {
-            invoice_type: InvoiceType::LIGHTNING,
-            network: self.network.to_string(),
+            ledger: Ledger::LIGHTNING,
+            currency: Currency::BTC,
             description: self.description,
             amount_msat: self.amount_msat,
             timestamp: Utc.timestamp_opt(self.timestamp as i64, 0).unwrap(),
-            lightning: Some(LightningInvoice {
+            lightning: Some(LnInvoice {
                 bolt11: self.bolt11,
                 payee_pubkey: self.payee_pubkey,
                 payment_hash: self.payment_hash,
                 description_hash: self.description_hash,
                 payment_secret: self.payment_secret.to_hex(),
                 min_final_cltv_expiry_delta: self.min_final_cltv_expiry_delta,
+                network: self.network.into(),
                 expiry: Duration::from_secs(self.expiry),
                 expires_at: Utc
                     .timestamp_opt((self.timestamp + self.expiry) as i64, 0)
@@ -37,7 +41,8 @@ impl Into<Invoice> for LNInvoice {
 impl Into<Payment> for BreezPayment {
     fn into(self) -> Payment {
         Payment {
-            payment_type: PaymentType::LIGHTNING,
+            ledger: Ledger::LIGHTNING,
+            currency: Currency::BTC,
             payment_hash: Some(self.id),
             error: self.error,
             amount_msat: self.amount_msat,
@@ -46,6 +51,17 @@ impl Into<Payment> for BreezPayment {
             description: self.description,
             metadata: self.metadata,
             ..Default::default()
+        }
+    }
+}
+
+impl Into<Network> for BreezNetwork {
+    fn into(self) -> Network {
+        match self {
+            BreezNetwork::Bitcoin => Network::Bitcoin,
+            BreezNetwork::Regtest => Network::Regtest,
+            BreezNetwork::Signet => Network::Signet,
+            BreezNetwork::Testnet => Network::BitcoinTestnet,
         }
     }
 }

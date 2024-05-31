@@ -2,7 +2,7 @@
 invoice_expiry = 3600
 domain = "numeraire.tech"
 fee_buffer = 0.02
-lightning_provider = "breez"
+ln_provider = "breez"
 
 # Web server settings
 [web]

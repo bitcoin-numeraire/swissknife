@@ -33,7 +33,7 @@ impl LnAddressHandler {
         user: AuthUser,
         Json(payload): Json<RegisterLightningAddressRequest>,
     ) -> Result<Json<LnAddress>, ApplicationError> {
-        user.check_permission(Permission::WriteLightningAddress)?;
+        user.check_permission(Permission::WriteLnAddress)?;
 
         let ln_address = app_state
             .services
@@ -48,7 +48,7 @@ impl LnAddressHandler {
         user: AuthUser,
         Path(id): Path<Uuid>,
     ) -> Result<Json<LnAddress>, ApplicationError> {
-        user.check_permission(Permission::ReadLightningAddress)?;
+        user.check_permission(Permission::ReadLnAddress)?;
 
         let ln_address = app_state.services.ln_address.get(id).await?;
         Ok(Json(ln_address.into()))
@@ -59,7 +59,7 @@ impl LnAddressHandler {
         user: AuthUser,
         Query(query_params): Query<LnAddressFilter>,
     ) -> Result<Json<Vec<LnAddress>>, ApplicationError> {
-        user.check_permission(Permission::ReadLightningAddress)?;
+        user.check_permission(Permission::ReadLnAddress)?;
 
         let ln_addresses = app_state.services.ln_address.list(query_params).await?;
 
@@ -73,7 +73,7 @@ impl LnAddressHandler {
         user: AuthUser,
         Path(id): Path<Uuid>,
     ) -> Result<(), ApplicationError> {
-        user.check_permission(Permission::WriteLightningAddress)?;
+        user.check_permission(Permission::WriteLnAddress)?;
 
         app_state.services.ln_address.delete(id).await?;
         Ok(())
@@ -84,7 +84,7 @@ impl LnAddressHandler {
         user: AuthUser,
         Query(query_params): Query<LnAddressFilter>,
     ) -> Result<Json<u64>, ApplicationError> {
-        user.check_permission(Permission::WriteLightningAddress)?;
+        user.check_permission(Permission::WriteLnAddress)?;
 
         let n_deleted = app_state
             .services
