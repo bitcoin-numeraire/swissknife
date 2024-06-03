@@ -22,7 +22,6 @@ impl MigrationTrait for Migration {
                 bolt11 varchar,
                 ledger varchar(255) NOT NULL,
                 currency varchar(255) NOT NULL,
-                network varchar(255),
                 payee_pubkey varchar,
                 description varchar,
                 description_hash varchar,

@@ -5,7 +5,7 @@ use std::str::FromStr;
 
 use super::cln::InvoiceResponse;
 use crate::{
-    application::entities::{Currency, Ledger, Network},
+    application::entities::{Currency, Ledger},
     domains::invoices::entities::{Invoice, LnInvoice},
 };
 
@@ -20,7 +20,7 @@ impl Into<Invoice> for InvoiceResponse {
 
         Invoice {
             ledger: Ledger::LIGHTNING,
-            currency: Currency::BTC,
+            currency: invoice.currency().into(),
             amount_msat: invoice.amount_milli_satoshis(),
             timestamp: Utc
                 .timestamp_opt(
@@ -42,7 +42,6 @@ impl Into<Invoice> for InvoiceResponse {
                 },
                 payment_secret: self.payment_secret.to_hex(),
                 min_final_cltv_expiry_delta: invoice.min_final_cltv_expiry_delta(),
-                network: invoice.currency().into(),
                 expiry: invoice.expiry_time(),
                 expires_at: Utc
                     .timestamp_opt(
@@ -56,14 +55,14 @@ impl Into<Invoice> for InvoiceResponse {
     }
 }
 
-impl Into<Network> for LNInvoiceCurrency {
-    fn into(self) -> Network {
+impl Into<Currency> for LNInvoiceCurrency {
+    fn into(self) -> Currency {
         match self {
-            LNInvoiceCurrency::Bitcoin => Network::Bitcoin,
-            LNInvoiceCurrency::Regtest => Network::Regtest,
-            LNInvoiceCurrency::Signet => Network::Signet,
-            LNInvoiceCurrency::BitcoinTestnet => Network::BitcoinTestnet,
-            LNInvoiceCurrency::Simnet => Network::Simnet,
+            LNInvoiceCurrency::Bitcoin => Currency::Bitcoin,
+            LNInvoiceCurrency::Regtest => Currency::Regtest,
+            LNInvoiceCurrency::Signet => Currency::Signet,
+            LNInvoiceCurrency::BitcoinTestnet => Currency::BitcoinTestnet,
+            LNInvoiceCurrency::Simnet => Currency::Simnet,
         }
     }
 }

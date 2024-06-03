@@ -111,7 +111,7 @@ impl PaymentService {
                                     fee_msat: Some(0),
                                     payment_time: Some(Utc::now()),
                                     ledger: Ledger::INTERNAL,
-                                    currency: Currency::BTC,
+                                    currency: Currency::Bitcoin,
                                     ..Default::default()
                                 },
                                 0.0,
@@ -211,7 +211,7 @@ impl PaymentService {
                                         description: comment.clone().or(
                                             DEFAULT_INTERNAL_INVOICE_DESCRIPTION.to_string().into(),
                                         ),
-                                        currency: Currency::BTC,
+                                        currency: Currency::Bitcoin,
                                         amount_msat: Some(amount),
                                         timestamp: curr_time,
                                         status: InvoiceStatus::SETTLED,
@@ -234,7 +234,7 @@ impl PaymentService {
                                         fee_msat: Some(0),
                                         payment_time: Some(Utc::now()),
                                         ledger: Ledger::INTERNAL,
-                                        currency: Currency::BTC,
+                                        currency: Currency::Bitcoin,
                                         ln_address: Some(ln_address),
                                         ..Default::default()
                                     },

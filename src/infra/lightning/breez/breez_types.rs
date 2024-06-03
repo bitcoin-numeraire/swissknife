@@ -5,7 +5,7 @@ use chrono::{TimeZone, Utc};
 use serde_bolt::bitcoin::hashes::hex::ToHex;
 
 use crate::{
-    application::entities::{Currency, Ledger, Network},
+    application::entities::{Currency, Ledger},
     domains::{
         invoices::entities::{Invoice, LnInvoice},
         payments::entities::Payment,
@@ -16,7 +16,7 @@ impl Into<Invoice> for LNInvoice {
     fn into(self) -> Invoice {
         Invoice {
             ledger: Ledger::LIGHTNING,
-            currency: Currency::BTC,
+            currency: self.network.into(),
             description: self.description,
             amount_msat: self.amount_msat,
             timestamp: Utc.timestamp_opt(self.timestamp as i64, 0).unwrap(),
@@ -27,7 +27,6 @@ impl Into<Invoice> for LNInvoice {
                 description_hash: self.description_hash,
                 payment_secret: self.payment_secret.to_hex(),
                 min_final_cltv_expiry_delta: self.min_final_cltv_expiry_delta,
-                network: self.network.into(),
                 expiry: Duration::from_secs(self.expiry),
                 expires_at: Utc
                     .timestamp_opt((self.timestamp + self.expiry) as i64, 0)
@@ -42,7 +41,7 @@ impl Into<Payment> for BreezPayment {
     fn into(self) -> Payment {
         Payment {
             ledger: Ledger::LIGHTNING,
-            currency: Currency::BTC,
+            currency: Currency::Bitcoin,
             payment_hash: Some(self.id),
             error: self.error,
             amount_msat: self.amount_msat,
@@ -55,13 +54,13 @@ impl Into<Payment> for BreezPayment {
     }
 }
 
-impl Into<Network> for BreezNetwork {
-    fn into(self) -> Network {
+impl Into<Currency> for BreezNetwork {
+    fn into(self) -> Currency {
         match self {
-            BreezNetwork::Bitcoin => Network::Bitcoin,
-            BreezNetwork::Regtest => Network::Regtest,
-            BreezNetwork::Signet => Network::Signet,
-            BreezNetwork::Testnet => Network::BitcoinTestnet,
+            BreezNetwork::Bitcoin => Currency::Bitcoin,
+            BreezNetwork::Regtest => Currency::Regtest,
+            BreezNetwork::Signet => Currency::Signet,
+            BreezNetwork::Testnet => Currency::BitcoinTestnet,
         }
     }
 }

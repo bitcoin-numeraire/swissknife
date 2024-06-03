@@ -105,7 +105,6 @@ impl InvoiceRepository for SeaOrmInvoiceRepository {
                 Set((lightning.min_final_cltv_expiry_delta as i64).into());
             model.expiry = Set((lightning.expiry.as_secs() as i64).into());
             model.expires_at = Set(lightning.expires_at.into());
-            model.network = Set(lightning.network.to_string().into());
         }
 
         let result = match txn {

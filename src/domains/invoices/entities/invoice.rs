@@ -7,7 +7,6 @@ use serde_with::DurationSeconds;
 use strum_macros::{Display, EnumString};
 use uuid::Uuid;
 
-use crate::application::entities::Network;
 use crate::application::entities::{Currency, Ledger, PaginationFilter};
 
 #[serde_as]
@@ -47,7 +46,6 @@ pub struct LnInvoice {
     pub payee_pubkey: String,
     pub min_final_cltv_expiry_delta: u64,
     pub payment_secret: String,
-    pub network: Network,
     #[serde_as(as = "DurationSeconds<u64>")]
     pub expiry: Duration,
     pub expires_at: DateTime<Utc>,
