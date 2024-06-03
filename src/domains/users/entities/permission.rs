@@ -6,12 +6,12 @@ use crate::application::errors::AuthorizationError;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Permission {
-    ReadLightningAddress,
-    WriteLightningAddress,
-    ReadLightningTransaction,
-    WriteLightningTransaction,
-    ReadLightningNode,
-    WriteLightningNode,
+    ReadLnAddress,
+    WriteLnAddress,
+    ReadLnTransaction,
+    WriteLnTransaction,
+    ReadLnNode,
+    WriteLnNode,
 }
 
 impl FromStr for Permission {
@@ -19,12 +19,12 @@ impl FromStr for Permission {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "read:ln_address" => Ok(Permission::ReadLightningAddress),
-            "write:ln_address" => Ok(Permission::WriteLightningAddress),
-            "read:lightning_transaction" => Ok(Permission::ReadLightningTransaction),
-            "write:lightning_transacion" => Ok(Permission::WriteLightningTransaction),
-            "read:lightning_node" => Ok(Permission::ReadLightningNode),
-            "write:lightning_node" => Ok(Permission::WriteLightningNode),
+            "read:ln_address" => Ok(Permission::ReadLnAddress),
+            "write:ln_address" => Ok(Permission::WriteLnAddress),
+            "read:transaction" => Ok(Permission::ReadLnTransaction),
+            "write:transaction" => Ok(Permission::WriteLnTransaction),
+            "read:ln_node" => Ok(Permission::ReadLnNode),
+            "write:ln_node" => Ok(Permission::WriteLnNode),
             // ... handle other permissions ...
             _ => {
                 let err = AuthorizationError::ParsePermission(s.to_string());
@@ -38,12 +38,12 @@ impl FromStr for Permission {
 impl Permission {
     pub fn all_permissions() -> Vec<Self> {
         vec![
-            Permission::ReadLightningAddress,
-            Permission::WriteLightningAddress,
-            Permission::ReadLightningTransaction,
-            Permission::WriteLightningTransaction,
-            Permission::ReadLightningNode,
-            Permission::WriteLightningNode,
+            Permission::ReadLnAddress,
+            Permission::WriteLnAddress,
+            Permission::ReadLnTransaction,
+            Permission::WriteLnTransaction,
+            Permission::ReadLnNode,
+            Permission::WriteLnNode,
             // ... include all other permission variants ...
         ]
     }

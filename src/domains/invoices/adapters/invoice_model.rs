@@ -5,7 +5,7 @@ use std::time::Duration;
 use chrono::Utc;
 use sea_orm::entity::prelude::*;
 
-use crate::domains::invoices::entities::{Invoice, InvoiceStatus, LightningInvoice};
+use crate::domains::invoices::entities::{Invoice, InvoiceStatus, LnInvoice};
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
 #[sea_orm(table_name = "invoice")]
@@ -13,11 +13,11 @@ pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
     pub id: Uuid,
     pub user_id: String,
-    pub invoice_type: String,
+    pub currency: String,
+    pub ledger: String,
     pub payment_hash: Option<String>,
     pub ln_address: Option<Uuid>,
     pub bolt11: Option<String>,
-    pub network: String,
     pub payee_pubkey: Option<String>,
     pub description: Option<String>,
     pub description_hash: Option<String>,
@@ -64,8 +64,8 @@ impl From<Model> for Invoice {
             },
         };
 
-        let lightning = match model.invoice_type.as_str() {
-            "LIGHTNING" => Some(LightningInvoice {
+        let lightning = match model.ledger.as_str() {
+            "LIGHTNING" => Some(LnInvoice {
                 payment_hash: model.payment_hash.unwrap(),
                 bolt11: model.bolt11.unwrap(),
                 description_hash: model.description_hash,
@@ -80,13 +80,13 @@ impl From<Model> for Invoice {
 
         Invoice {
             id: model.id,
-            invoice_type: model.invoice_type.parse().unwrap(),
             user_id: model.user_id,
             ln_address: model.ln_address,
             description: model.description,
             amount_msat: model.amount_msat.map(|v| v as u64),
             timestamp: model.timestamp,
-            network: model.network,
+            currency: model.currency.parse().unwrap(),
+            ledger: model.ledger.parse().unwrap(),
             status,
             fee_msat: None,
             payment_time: model.payment_time,

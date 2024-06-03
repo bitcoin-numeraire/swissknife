@@ -1,10 +1,13 @@
 use chrono::{TimeZone, Utc};
-use lightning_invoice::{Bolt11Invoice, Bolt11InvoiceDescription};
+use lightning_invoice::{Bolt11Invoice, Bolt11InvoiceDescription, Currency as LNInvoiceCurrency};
 use serde_bolt::bitcoin::hashes::hex::ToHex;
 use std::str::FromStr;
 
 use super::cln::InvoiceResponse;
-use crate::domains::invoices::entities::{Invoice, InvoiceType, LightningInvoice};
+use crate::{
+    application::entities::{Currency, Ledger},
+    domains::invoices::entities::{Invoice, LnInvoice},
+};
 
 impl Into<Invoice> for InvoiceResponse {
     fn into(self) -> Invoice {
@@ -16,7 +19,8 @@ impl Into<Invoice> for InvoiceResponse {
         };
 
         Invoice {
-            invoice_type: InvoiceType::LIGHTNING,
+            ledger: Ledger::LIGHTNING,
+            currency: invoice.currency().into(),
             amount_msat: invoice.amount_milli_satoshis(),
             timestamp: Utc
                 .timestamp_opt(
@@ -24,12 +28,11 @@ impl Into<Invoice> for InvoiceResponse {
                     invoice.duration_since_epoch().subsec_nanos(),
                 )
                 .unwrap(),
-            network: invoice.network().to_string(),
             description: match invoice.description() {
                 Bolt11InvoiceDescription::Direct(msg) => Some(msg.to_string()),
                 Bolt11InvoiceDescription::Hash(_) => None,
             },
-            lightning: Some(LightningInvoice {
+            lightning: Some(LnInvoice {
                 bolt11: self.bolt11,
                 payment_hash: invoice.payment_hash().to_hex(),
                 payee_pubkey,
@@ -48,6 +51,18 @@ impl Into<Invoice> for InvoiceResponse {
                     .unwrap(),
             }),
             ..Default::default()
+        }
+    }
+}
+
+impl Into<Currency> for LNInvoiceCurrency {
+    fn into(self) -> Currency {
+        match self {
+            LNInvoiceCurrency::Bitcoin => Currency::Bitcoin,
+            LNInvoiceCurrency::Regtest => Currency::Regtest,
+            LNInvoiceCurrency::Signet => Currency::Signet,
+            LNInvoiceCurrency::BitcoinTestnet => Currency::BitcoinTestnet,
+            LNInvoiceCurrency::Simnet => Currency::Simnet,
         }
     }
 }

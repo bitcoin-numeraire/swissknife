@@ -33,7 +33,7 @@ impl PaymentHandler {
         user: AuthUser,
         Json(payload): Json<SendPaymentRequest>,
     ) -> Result<Json<Payment>, ApplicationError> {
-        user.check_permission(Permission::WriteLightningTransaction)?;
+        user.check_permission(Permission::WriteLnTransaction)?;
 
         let payment = app_state.services.payment.pay(payload).await?;
         Ok(Json(payment.into()))
@@ -44,7 +44,7 @@ impl PaymentHandler {
         user: AuthUser,
         Path(id): Path<Uuid>,
     ) -> Result<Json<Payment>, ApplicationError> {
-        user.check_permission(Permission::ReadLightningTransaction)?;
+        user.check_permission(Permission::ReadLnTransaction)?;
 
         let ln_address = app_state.services.payment.get(id).await?;
         Ok(Json(ln_address.into()))
@@ -55,7 +55,7 @@ impl PaymentHandler {
         user: AuthUser,
         Query(query_params): Query<PaymentFilter>,
     ) -> Result<Json<Vec<Payment>>, ApplicationError> {
-        user.check_permission(Permission::ReadLightningTransaction)?;
+        user.check_permission(Permission::ReadLnTransaction)?;
 
         let lightning_payments = app_state.services.payment.list(query_params).await?;
 
@@ -69,7 +69,7 @@ impl PaymentHandler {
         user: AuthUser,
         Path(id): Path<Uuid>,
     ) -> Result<(), ApplicationError> {
-        user.check_permission(Permission::WriteLightningTransaction)?;
+        user.check_permission(Permission::WriteLnTransaction)?;
 
         app_state.services.payment.delete(id).await?;
         Ok(())
@@ -80,7 +80,7 @@ impl PaymentHandler {
         user: AuthUser,
         Query(query_params): Query<PaymentFilter>,
     ) -> Result<Json<u64>, ApplicationError> {
-        user.check_permission(Permission::WriteLightningTransaction)?;
+        user.check_permission(Permission::WriteLnTransaction)?;
 
         let n_deleted = app_state.services.payment.delete_many(query_params).await?;
         Ok(n_deleted.into())

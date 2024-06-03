@@ -7,7 +7,7 @@ use serde_with::DurationSeconds;
 use strum_macros::{Display, EnumString};
 use uuid::Uuid;
 
-use crate::application::entities::PaginationFilter;
+use crate::application::entities::{Currency, Ledger, PaginationFilter};
 
 #[serde_as]
 #[derive(Clone, Debug, Default, Serialize)]
@@ -16,12 +16,12 @@ pub struct Invoice {
     pub user_id: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ln_address: Option<Uuid>,
-    pub network: String,
     pub description: Option<String>,
+    pub currency: Currency,
     pub amount_msat: Option<u64>,
     pub timestamp: DateTime<Utc>,
     pub status: InvoiceStatus,
-    pub invoice_type: InvoiceType,
+    pub ledger: Ledger,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub fee_msat: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -33,12 +33,12 @@ pub struct Invoice {
     pub updated_at: Option<DateTime<Utc>>,
     #[serde(flatten)]
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub lightning: Option<LightningInvoice>,
+    pub lightning: Option<LnInvoice>,
 }
 
 #[serde_as]
 #[derive(Clone, Debug, Default, Serialize)]
-pub struct LightningInvoice {
+pub struct LnInvoice {
     pub payment_hash: String,
     pub bolt11: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -73,14 +73,6 @@ pub enum InvoiceStatus {
     PENDING,
     SETTLED,
     EXPIRED,
-}
-
-#[derive(Clone, Debug, EnumString, Deserialize, Serialize, Display, PartialEq, Eq, Default)]
-pub enum InvoiceType {
-    #[default]
-    LIGHTNING,
-    INTERNAL,
-    ONCHAIN,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, Default)]

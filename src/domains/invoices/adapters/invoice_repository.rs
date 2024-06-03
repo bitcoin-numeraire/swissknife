@@ -1,6 +1,6 @@
 use crate::{
-    application::errors::DatabaseError,
-    domains::invoices::entities::{Invoice, InvoiceFilter, InvoiceStatus, InvoiceType},
+    application::{entities::Ledger, errors::DatabaseError},
+    domains::invoices::entities::{Invoice, InvoiceFilter, InvoiceStatus},
 };
 use async_trait::async_trait;
 use sea_orm::{
@@ -84,17 +84,17 @@ impl InvoiceRepository for SeaOrmInvoiceRepository {
     ) -> Result<Invoice, DatabaseError> {
         let mut model = ActiveModel {
             user_id: Set(invoice.user_id),
-            invoice_type: Set(invoice.invoice_type.to_string()),
             ln_address: Set(invoice.ln_address),
-            network: Set(invoice.network),
             description: Set(invoice.description),
             amount_msat: Set(invoice.amount_msat.map(|v| v as i64)),
             timestamp: Set(invoice.timestamp),
             label: Set(invoice.label),
+            ledger: Set(invoice.ledger.to_string()),
+            currency: Set(invoice.currency.to_string()),
             ..Default::default()
         };
 
-        if invoice.invoice_type == InvoiceType::LIGHTNING {
+        if invoice.ledger == Ledger::LIGHTNING {
             let lightning = invoice.lightning.unwrap();
             model.bolt11 = Set(lightning.bolt11.into());
             model.payee_pubkey = Set(lightning.payee_pubkey.into());

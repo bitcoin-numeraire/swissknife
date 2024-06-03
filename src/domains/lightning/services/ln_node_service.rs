@@ -30,7 +30,7 @@ impl LnNodeUseCases for LnNodeService {
     async fn info(&self, user: AuthUser) -> Result<NodeState, ApplicationError> {
         trace!(user_id = user.sub, "Getting node info");
 
-        user.check_permission(Permission::ReadLightningNode)?;
+        user.check_permission(Permission::ReadLnNode)?;
 
         // TODO: Implement entity for node info and not NodeState
         let node_info = self.ln_client.node_info()?;
@@ -42,7 +42,7 @@ impl LnNodeUseCases for LnNodeService {
     async fn lsp(&self, user: AuthUser) -> Result<LspInformation, ApplicationError> {
         trace!(user_id = user.sub, "Getting LSP info");
 
-        user.check_permission(Permission::ReadLightningNode)?;
+        user.check_permission(Permission::ReadLnNode)?;
 
         // TODO: Implement entity for LSP info and not LspInformation
         let lsp_info = self.ln_client.lsp_info().await?;
@@ -54,7 +54,7 @@ impl LnNodeUseCases for LnNodeService {
     async fn list_lsps(&self, user: AuthUser) -> Result<Vec<LspInformation>, ApplicationError> {
         trace!(user_id = user.sub, "Listing available LSPs");
 
-        user.check_permission(Permission::ReadLightningNode)?;
+        user.check_permission(Permission::ReadLnNode)?;
 
         // TODO: Implement entity for LSP info and not LspInformation
         let lsps = self.ln_client.list_lsps().await?;
@@ -66,7 +66,7 @@ impl LnNodeUseCases for LnNodeService {
     async fn list_payments(&self, user: AuthUser) -> Result<Vec<Payment>, ApplicationError> {
         trace!(user_id = user.sub, "Listing payments");
 
-        user.check_permission(Permission::ReadLightningNode)?;
+        user.check_permission(Permission::ReadLnNode)?;
 
         // TODO: Implement entity for payments
         let payments = self.ln_client.list_payments().await?;
@@ -78,7 +78,7 @@ impl LnNodeUseCases for LnNodeService {
     async fn close_lsp_channels(&self, user: AuthUser) -> Result<Vec<String>, ApplicationError> {
         debug!(user_id = user.sub, "Closing LSP channels");
 
-        user.check_permission(Permission::WriteLightningNode)?;
+        user.check_permission(Permission::WriteLnNode)?;
 
         let tx_ids = self.ln_client.close_lsp_channels().await?;
 
@@ -95,7 +95,7 @@ impl LnNodeUseCases for LnNodeService {
     ) -> Result<ReverseSwapInfo, ApplicationError> {
         debug!(user_id = user.sub, "Initiating on-chain payment");
 
-        user.check_permission(Permission::WriteLightningNode)?;
+        user.check_permission(Permission::WriteLnNode)?;
 
         let payment_info = self
             .ln_client
@@ -114,7 +114,7 @@ impl LnNodeUseCases for LnNodeService {
     ) -> Result<String, ApplicationError> {
         debug!(user_id = user.sub, "Initiating on-chain redemption");
 
-        user.check_permission(Permission::WriteLightningNode)?;
+        user.check_permission(Permission::WriteLnNode)?;
 
         let txid = self.ln_client.redeem_onchain(to_address, feerate).await?;
 
@@ -128,7 +128,7 @@ impl LnNodeUseCases for LnNodeService {
     ) -> Result<ServiceHealthCheckResponse, ApplicationError> {
         trace!(user_id = user.sub, "Checking health of lightning service");
 
-        user.check_permission(Permission::ReadLightningNode)?;
+        user.check_permission(Permission::ReadLnNode)?;
 
         let health = self.ln_client.health().await?;
 

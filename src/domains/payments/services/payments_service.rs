@@ -3,19 +3,18 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use breez_sdk_core::{parse, InputType, LNInvoice, LnUrlPayRequestData};
 use chrono::Utc;
-use serde_bolt::bitcoin::Network;
 use tracing::{debug, info, trace};
 use uuid::Uuid;
 
 use crate::{
     application::{
         dtos::SendPaymentRequest,
-        entities::AppStore,
+        entities::{AppStore, Currency, Ledger},
         errors::{ApplicationError, DataError, DatabaseError, LightningError},
     },
     domains::{
-        invoices::entities::{Invoice, InvoiceStatus, InvoiceType},
-        payments::entities::{Payment, PaymentFilter, PaymentStatus, PaymentType},
+        invoices::entities::{Invoice, InvoiceStatus},
+        payments::entities::{Payment, PaymentFilter, PaymentStatus},
     },
     infra::lightning::LnClient,
 };
@@ -111,7 +110,8 @@ impl PaymentService {
                                     description: invoice.description,
                                     fee_msat: Some(0),
                                     payment_time: Some(Utc::now()),
-                                    payment_type: PaymentType::INTERNAL,
+                                    ledger: Ledger::INTERNAL,
+                                    currency: Currency::Bitcoin,
                                     ..Default::default()
                                 },
                                 0.0,
@@ -207,14 +207,14 @@ impl PaymentService {
                                     Invoice {
                                         user_id: retrieved_address.user_id,
                                         ln_address: Some(retrieved_address.id),
-                                        network: Network::Bitcoin.to_string(),
+                                        ledger: Ledger::INTERNAL,
                                         description: comment.clone().or(
                                             DEFAULT_INTERNAL_INVOICE_DESCRIPTION.to_string().into(),
                                         ),
+                                        currency: Currency::Bitcoin,
                                         amount_msat: Some(amount),
                                         timestamp: curr_time,
                                         status: InvoiceStatus::SETTLED,
-                                        invoice_type: InvoiceType::INTERNAL,
                                         fee_msat: Some(0),
                                         payment_time: Some(curr_time),
                                         ..Default::default()
@@ -233,7 +233,8 @@ impl PaymentService {
                                         ),
                                         fee_msat: Some(0),
                                         payment_time: Some(Utc::now()),
-                                        payment_type: PaymentType::INTERNAL,
+                                        ledger: Ledger::INTERNAL,
+                                        currency: Currency::Bitcoin,
                                         ln_address: Some(ln_address),
                                         ..Default::default()
                                     },
