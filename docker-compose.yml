@@ -1,24 +1,4 @@
 services:
-  bitcoind:
-    image: registry.gitlab.com/hashbeam/docker/bitcoind:25.0
-    command: "-fallbackfee=0.0002"
-    volumes:
-      - bitcoin:/srv/app/.bitcoin
-
-  electrs:
-    image: registry.gitlab.com/hashbeam/docker/electrs:0.9.14
-    volumes:
-      - electrs:/srv/app/db
-    ports:
-      - 50001:50001
-    depends_on:
-      - bitcoind
-
-  proxy:
-    image: ghcr.io/rgb-tools/rgb-proxy-server:0.2.1
-    ports:
-      - 3030:3000
-
   postgres:
     image: postgres:15.5
     environment:
@@ -42,6 +22,8 @@ services:
       - "log_statement=all" # Log all statements
       - "-c"
       - "log_destination=stderr" # Send logs to stderr
+    networks:
+      - polar-network-1_default
 
   pgadmin:
     image: dpage/pgadmin4:8.5
@@ -56,10 +38,26 @@ services:
       - ./deps/pgadmin/servers.json:/servers.json
     depends_on:
       - postgres
+    networks:
+      - polar-network-1_default
+
+  lightningd:
+    image: elementsproject/lightningd:v23.11.2
+    environment:
+      LIGHTNINGD_NETWORK: "regtest"
+    ports:
+      - 3010:3010
+    volumes:
+      - lightningd:/root/.lightning
+      - ./deps/lightningd/regtest.conf:/root/.lightning/regtest/config
+    networks:
+      - polar-network-1_default
 
 volumes:
-  bitcoin:
-  electrs:
   db:
   pgadmin:
-  lightning:
+  lightningd:
+
+networks:
+  polar-network-1_default:
+    external: true

@@ -5,6 +5,9 @@ pub enum LightningError {
     #[error("Failed to initialize logging: {0}")]
     Logging(String),
 
+    #[error("Failed to parse config: {0}")]
+    ParseConfig(String),
+
     #[error("Failed to parse mnemonic seed: {0}")]
     ParseSeed(String),
 
@@ -13,6 +16,9 @@ pub enum LightningError {
 
     #[error("Failed to connect to lightning node or service: {0}")]
     Connect(String),
+
+    #[error("Failed to connect to websocket service: {0}")]
+    ConnectWebSocket(String),
 
     #[error("Failed to generate Lightning invoice: {0}")]
     Invoice(String),
@@ -49,6 +55,15 @@ pub enum LightningError {
 
     #[error("Failed to redeem on-chain: {0}")]
     RedeemOnChain(String),
+
+    #[error("Failed to send POST request to node: {0}")]
+    PostRequest(String),
+
+    #[error("Lightning Node returned with error: {0}")]
+    RequestFailureStatus(String),
+
+    #[error("Failed to parse responde body: {0}")]
+    ParseResponseBody(String),
 
     #[error("Failed to retrieve healthcheck: {0}")]
     HealthCheck(String),

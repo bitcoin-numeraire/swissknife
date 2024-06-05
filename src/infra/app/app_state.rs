@@ -10,7 +10,11 @@ use crate::{
     infra::{
         auth::{jwt::JWTAuthenticator, Authenticator},
         database::sea_orm::SeaORMClient,
-        lightning::{breez::BreezClient, cln::ClnClient, LnClient},
+        lightning::{
+            breez::BreezClient,
+            cln::{ClnGrpcClient, ClnRestClient},
+            LnClient,
+        },
     },
 };
 use humantime::parse_duration;
@@ -81,11 +85,25 @@ pub async fn get_ln_client(
                 ConfigError::MissingLightningProviderConfig(config.ln_provider.to_string())
             })?;
 
-            let client = ClnClient::new(cln_config.clone()).await?;
+            let client = ClnGrpcClient::new(cln_config.clone()).await?;
 
             info!(
                 endpoint = %cln_config.endpoint,
-                "Lightning provider: Core Lightning"
+                "Lightning provider: Core Lightning GRPC"
+            );
+
+            Ok(Arc::new(client))
+        }
+        LightningProvider::ClnRest => {
+            let cln_config = config.cln_rest_config.clone().ok_or_else(|| {
+                ConfigError::MissingLightningProviderConfig(config.ln_provider.to_string())
+            })?;
+
+            let client = ClnRestClient::new(cln_config.clone()).await?;
+
+            info!(
+                endpoint = %cln_config.endpoint,
+                "Lightning provider: Core Lightning Rest"
             );
 
             Ok(Arc::new(client))

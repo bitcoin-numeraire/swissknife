@@ -1,9 +1,10 @@
-use std::path::PathBuf;
+use std::{path::PathBuf, str::FromStr};
 
 use breez_sdk_core::{
     LnUrlPayRequestData, LspInformation, NodeState, Payment as BreezPayment, ReverseSwapInfo,
     ServiceHealthCheckResponse,
 };
+use lightning_invoice::Bolt11Invoice;
 use serde::Deserialize;
 use tokio::{fs, io};
 use tonic::transport::{Certificate, Channel, ClientTlsConfig, Identity};
@@ -34,11 +35,11 @@ const DEFAULT_CLIENT_CERT_FILENAME: &str = "client.pem";
 const DEFAULT_CLIENT_KEY_FILENAME: &str = "client-key.pem";
 const DEFAULT_CA_CRT_FILENAME: &str = "ca.pem";
 
-pub struct ClnClient {
+pub struct ClnGrpcClient {
     client: NodeClient<Channel>,
 }
 
-impl ClnClient {
+impl ClnGrpcClient {
     pub async fn new(config: ClnClientConfig) -> Result<Self, LightningError> {
         let (identity, ca_certificate) = Self::read_certificates(&config.certs_dir)
             .await
@@ -85,7 +86,7 @@ impl ClnClient {
 }
 
 #[async_trait]
-impl LnClient for ClnClient {
+impl LnClient for ClnGrpcClient {
     async fn invoice(
         &self,
         amount_msat: u64,
@@ -111,9 +112,10 @@ impl LnClient for ClnClient {
             .await
             .map_err(|e| LightningError::Invoice(e.to_string()))?;
 
-        // TODO: Add warnings from node if necessary for alerting
+        let bolt11 = Bolt11Invoice::from_str(&response.into_inner().bolt11)
+            .map_err(|e| LightningError::Invoice(e.to_string()))?;
 
-        let mut invoice: Invoice = response.into_inner().into();
+        let mut invoice: Invoice = bolt11.into();
         invoice.label = Some(label);
 
         Ok(invoice)
