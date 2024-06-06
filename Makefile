@@ -2,18 +2,12 @@ COMPOSE := docker compose -f docker-compose.yml
 EXPOSED_PORTS := 50001 50002
 DB_SERVICE := postgres
 PGADMIN_SERVICE := pgadmin
-LIGHTNINGD_SERVICE := lightningd
 
-.PHONY: up up-lightningd up-postgres up-pgadmin shutdown down generate-certs
+.PHONY: up up-postgres up-pgadmin shutdown down generate-certs
 
 up:
-	@$(MAKE) shutdown
-	@$(MAKE) up-lightningd
+	@$(MAKE) down
 	@$(MAKE) up-postgres
-
-up-lightningd:
-	@$(COMPOSE) up -d $(LIGHTNINGD_SERVICE)
-	@until $(COMPOSE) logs $(LIGHTNINGD_SERVICE) | grep 'lightningd: Server started'; do sleep 1; done
 
 up-postgres:
 	@$(COMPOSE) up -d $(DB_SERVICE)
@@ -39,5 +33,5 @@ generate-models:
 
 generate-certs:
 	@mkdir -p certs
-	@openssl genrsa -out certs/localhost_key.pem 2048
-	@openssl req -new -x509 -key certs/localhost_key.pem -out certs/localhost_cert.pem -days 365 -subj /CN=localhost
+	@openssl genrsa -out certs/client_key.pem 2048
+	@openssl req -new -x509 -key certs/client_key.pem -out certs/client_cert.pem -days 365 -subj /CN=localhost

@@ -47,7 +47,7 @@ pub struct BreezClient {
 impl BreezClient {
     pub async fn new(
         config: BreezClientConfig,
-        payments_processor: Arc<dyn LnEventsUseCases>,
+        ln_events: Arc<dyn LnEventsUseCases>,
     ) -> Result<Self, LightningError> {
         if config.log_in_file {
             BreezServices::init_logging(&config.working_dir, None)
@@ -75,7 +75,7 @@ impl BreezClient {
         let seed =
             Mnemonic::parse(config.seed).map_err(|e| LightningError::ParseSeed(e.to_string()))?;
 
-        let listener = BreezListener::new(payments_processor);
+        let listener = BreezListener::new(ln_events);
 
         let sdk = BreezServices::connect(
             ConnectRequest {

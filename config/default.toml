@@ -23,7 +23,7 @@ certs_dir = "certs/cln"
 endpoint = "http://localhost:3010/v1"
 connect_timeout = "5s"
 timeout = "30s"
-connection_verbose = true
+connection_verbose = false
 accept_invalid_certs = false
 ws_endpoint = "ws://localhost:3010"
 

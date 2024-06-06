@@ -1,4 +1,5 @@
 mod cln_grpc_client;
+mod cln_grpc_listener;
 mod cln_rest_client;
 mod cln_rest_types;
 mod cln_ws_client;

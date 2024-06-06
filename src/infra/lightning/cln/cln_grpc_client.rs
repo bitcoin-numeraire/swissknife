@@ -1,4 +1,4 @@
-use std::{path::PathBuf, str::FromStr};
+use std::{path::PathBuf, str::FromStr, sync::Arc, time::Duration};
 
 use breez_sdk_core::{
     LnUrlPayRequestData, LspInformation, NodeState, Payment as BreezPayment, ReverseSwapInfo,
@@ -15,11 +15,16 @@ use cln::node_client::NodeClient;
 
 use crate::{
     application::errors::LightningError,
-    domains::{invoices::entities::Invoice, payments::entities::Payment},
+    domains::{
+        invoices::entities::Invoice, lightning::services::LnEventsUseCases,
+        payments::entities::Payment,
+    },
     infra::lightning::LnClient,
 };
 
 use self::cln::{GetinfoRequest, InvoiceRequest};
+
+use super::cln_grpc_listener::ClnGrpcListener;
 
 pub mod cln {
     tonic::include_proto!("cln");
@@ -40,7 +45,10 @@ pub struct ClnGrpcClient {
 }
 
 impl ClnGrpcClient {
-    pub async fn new(config: ClnClientConfig) -> Result<Self, LightningError> {
+    pub async fn new(
+        config: ClnClientConfig,
+        ln_events: Arc<dyn LnEventsUseCases>,
+    ) -> Result<Self, LightningError> {
         let (identity, ca_certificate) = Self::read_certificates(&config.certs_dir)
             .await
             .map_err(|e| LightningError::ReadCertificates(e.to_string()))?;
@@ -50,10 +58,12 @@ impl ClnGrpcClient {
             .ca_certificate(ca_certificate)
             .domain_name("localhost"); // Use localhost if you are not sure about the domain name
 
-        let channel = Channel::from_shared(config.endpoint)
-            .unwrap()
+        let tls_config = Channel::from_shared(config.endpoint)
+            .map_err(|e| LightningError::ParseConfig(e.to_string()))?
             .tls_config(tls_config)
-            .map_err(|e| LightningError::Connect(e.to_string()))?
+            .map_err(|e| LightningError::ParseConfig(e.to_string()))?;
+
+        let channel = tls_config
             .connect()
             .await
             .map_err(|e| LightningError::Connect(e.to_string()))?;
@@ -63,6 +73,9 @@ impl ClnGrpcClient {
             .getinfo(GetinfoRequest {})
             .await
             .map_err(|e| LightningError::HealthCheck(e.to_string()))?;
+
+        let listener = ClnGrpcListener::new(ln_events, Duration::from_secs(5));
+        listener.listen_invoices(client.clone()).await?;
 
         Ok(Self { client })
     }

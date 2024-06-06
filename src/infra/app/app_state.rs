@@ -64,19 +64,20 @@ pub async fn get_ln_client(
     config: AppConfig,
     store: AppStore,
 ) -> Result<Arc<dyn LnClient>, ApplicationError> {
+    let ln_events = Arc::new(LnEventsService::new(store));
+
     match config.ln_provider {
         LightningProvider::Breez => {
             let breez_config = config.breez_config.clone().ok_or_else(|| {
                 ConfigError::MissingLightningProviderConfig(config.ln_provider.to_string())
             })?;
 
-            let lightning_events: LnEventsService = LnEventsService::new(store);
-            let client = BreezClient::new(breez_config.clone(), Arc::new(lightning_events)).await?;
-
             info!(
                 working_dir = %breez_config.working_dir,
                 "Lightning provider: Breez"
             );
+
+            let client = BreezClient::new(breez_config.clone(), ln_events).await?;
 
             Ok(Arc::new(client))
         }
@@ -85,12 +86,12 @@ pub async fn get_ln_client(
                 ConfigError::MissingLightningProviderConfig(config.ln_provider.to_string())
             })?;
 
-            let client = ClnGrpcClient::new(cln_config.clone()).await?;
-
             info!(
                 endpoint = %cln_config.endpoint,
                 "Lightning provider: Core Lightning GRPC"
             );
+
+            let client = ClnGrpcClient::new(cln_config.clone(), ln_events).await?;
 
             Ok(Arc::new(client))
         }
@@ -99,12 +100,12 @@ pub async fn get_ln_client(
                 ConfigError::MissingLightningProviderConfig(config.ln_provider.to_string())
             })?;
 
-            let client = ClnRestClient::new(cln_config.clone()).await?;
-
             info!(
                 endpoint = %cln_config.endpoint,
                 "Lightning provider: Core Lightning Rest"
             );
+
+            let client = ClnRestClient::new(cln_config.clone()).await?;
 
             Ok(Arc::new(client))
         }
