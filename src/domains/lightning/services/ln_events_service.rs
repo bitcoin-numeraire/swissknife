@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use breez_sdk_core::{Payment as BreezPayment, PaymentDetails, PaymentFailedData};
 use chrono::{TimeZone, Utc};
-use tracing::{info, trace};
+use tracing::{debug, info};
 use uuid::Uuid;
 
 use crate::{
@@ -32,7 +32,7 @@ impl LnEventsService {
 impl LnEventsUseCases for LnEventsService {
     // TODO: Remove this when we can simply listen to the latest events.
     async fn latest_settled_invoice(&self) -> Result<Option<Invoice>, ApplicationError> {
-        trace!("Fetching latest settled invoice...");
+        debug!("Fetching latest settled invoice...");
 
         let invoices = self
             .store
@@ -52,7 +52,7 @@ impl LnEventsUseCases for LnEventsService {
     }
 
     async fn invoice_paid(&self, event: LnInvoicePaidEvent) -> Result<(), ApplicationError> {
-        trace!(?event, "Processing incoming lightning payment...");
+        debug!(?event, "Processing incoming lightning payment...");
 
         let invoice_option = self
             .store
@@ -90,7 +90,7 @@ impl LnEventsUseCases for LnEventsService {
             }
             _ => Err(DataError::NotFound("Missing lightning payment details".into()).into()),
         }?;
-        trace!(
+        debug!(
             %payment_id,
             "Processing outgoing lightning payment"
         );
@@ -126,7 +126,7 @@ impl LnEventsUseCases for LnEventsService {
             }
             None => Err(DataError::NotFound("Missing lightning payment label".into()).into()),
         }?;
-        trace!(
+        debug!(
             %payment_id,
             "Processing outgoing failed lightning payment"
         );

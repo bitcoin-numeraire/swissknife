@@ -17,7 +17,7 @@ restore_only = true
 
 [cln_config]
 endpoint = "https://localhost:50051"
-certs_dir = "certs"
+certs_dir = "./deps/lightningd/data"
 
 [cln_rest_config]
 endpoint = "http://localhost:3010/v1"
