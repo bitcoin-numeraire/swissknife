@@ -6,10 +6,14 @@ use uuid::Uuid;
 
 use crate::{
     application::{
-        entities::AppStore,
+        entities::{AppStore, Ledger, PaginationFilter},
         errors::{ApplicationError, DataError},
     },
-    domains::payments::entities::{Payment, PaymentStatus},
+    domains::{
+        invoices::entities::{Invoice, InvoiceFilter, InvoiceStatus},
+        lightning::entities::LnInvoicePaidEvent,
+        payments::entities::{Payment, PaymentStatus},
+    },
 };
 
 use super::LnEventsUseCases;
@@ -26,31 +30,49 @@ impl LnEventsService {
 
 #[async_trait]
 impl LnEventsUseCases for LnEventsService {
-    async fn incoming_payment(
-        &self,
-        payment: BreezPayment,
-    ) -> Result<(), ApplicationError> {
-        let payment_hash = payment.id;
-        trace!(payment_hash, "Processing incoming lightning payment");
+    // TODO: Remove this when we can simply listen to the latest events.
+    async fn latest_settled_invoice(&self) -> Result<Option<Invoice>, ApplicationError> {
+        trace!("Fetching latest settled invoice...");
+
+        let invoices = self
+            .store
+            .invoice
+            .find_many(InvoiceFilter {
+                status: Some(InvoiceStatus::SETTLED),
+                ledger: Some(Ledger::LIGHTNING),
+                pagination: PaginationFilter {
+                    limit: Some(1),
+                    ..Default::default()
+                },
+                ..Default::default()
+            })
+            .await?;
+
+        Ok(invoices.into_iter().next())
+    }
+
+    async fn invoice_paid(&self, event: LnInvoicePaidEvent) -> Result<(), ApplicationError> {
+        trace!(?event, "Processing incoming lightning payment...");
 
         let invoice_option = self
             .store
             .invoice
-            .find_by_payment_hash(&payment_hash)
+            .find_by_payment_hash(&event.payment_hash)
             .await?;
 
         if let Some(mut invoice) = invoice_option {
-            invoice.fee_msat = Some(payment.fee_msat);
-            invoice.payment_time = Some(Utc.timestamp_opt(payment.payment_time, 0).unwrap());
-            // This is needed because the amount_msat is not always the same as the invoice amount because of fees and fees are not part of the event
-            // Until this is fixed: https://github.com/breez/breez-sdk/issues/982
-            invoice.amount_msat = Some(payment.amount_msat);
+            invoice.fee_msat = Some(event.fee_msat);
+            invoice.payment_time = Some(event.payment_time);
+
+            // TODO: Amount paid can actually be different from the amount of the invoice, might need a new field (amount_received_msat).
+            // we can just update the amount_msat field for now.
+            invoice.amount_msat = Some(event.amount_msat);
 
             invoice = self.store.invoice.update(None, invoice).await?;
 
             info!(
-                id = invoice.id.to_string(),
-                payment_hash, "Incoming Lightning payment processed successfully"
+                id = %invoice.id,
+                "Incoming Lightning payment processed successfully"
             );
             return Ok(());
         }

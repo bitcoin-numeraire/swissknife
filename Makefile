@@ -2,12 +2,18 @@ COMPOSE := docker compose -f docker-compose.yml
 EXPOSED_PORTS := 50001 50002
 DB_SERVICE := postgres
 PGADMIN_SERVICE := pgadmin
+LIGHTNINGD_SERVICE := lightningd
 
-.PHONY: up up-postgres up-pgadmin shutdown down generate-certs
+.PHONY: up up-lightningd up-postgres up-pgadmin shutdown down generate-certs
 
 up:
 	@$(MAKE) down
+	@$(MAKE) up-lightningd
 	@$(MAKE) up-postgres
+
+up-lightningd:
+	@$(COMPOSE) up -d $(LIGHTNINGD_SERVICE)
+	@until $(COMPOSE) logs $(LIGHTNINGD_SERVICE) | grep 'lightningd: Server started'; do sleep 1; done
 
 up-postgres:
 	@$(COMPOSE) up -d $(DB_SERVICE)

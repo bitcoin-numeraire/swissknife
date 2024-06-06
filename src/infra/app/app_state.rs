@@ -6,7 +6,7 @@ use crate::{
         entities::{AppServices, AppStore},
         errors::{ApplicationError, ConfigError, WebServerError},
     },
-    domains::lightning::services::LnEventsService,
+    domains::lightning::services::{LnEventsService, LnEventsUseCases},
     infra::{
         auth::{jwt::JWTAuthenticator, Authenticator},
         database::sea_orm::SeaORMClient,
@@ -47,7 +47,8 @@ impl AppState {
 
         // Adapters
         let store = AppStore::new_sea_orm(db_conn);
-        let ln_client = get_ln_client(config.clone(), store.clone()).await?;
+        let ln_events = LnEventsService::new(store.clone());
+        let ln_client = get_ln_client(config.clone(), Arc::new(ln_events)).await?;
 
         // Services
         let services = AppServices::new(config, store, ln_client);
@@ -62,10 +63,8 @@ impl AppState {
 
 pub async fn get_ln_client(
     config: AppConfig,
-    store: AppStore,
+    ln_events: Arc<dyn LnEventsUseCases>,
 ) -> Result<Arc<dyn LnClient>, ApplicationError> {
-    let ln_events = Arc::new(LnEventsService::new(store));
-
     match config.ln_provider {
         LightningProvider::Breez => {
             let breez_config = config.breez_config.clone().ok_or_else(|| {

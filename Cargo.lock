@@ -4180,6 +4180,7 @@ dependencies = [
  "chrono",
  "config",
  "dotenv",
+ "hex",
  "http 1.1.0",
  "humantime",
  "jsonwebtoken",

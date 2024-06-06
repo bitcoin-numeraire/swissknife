@@ -22,7 +22,7 @@ use crate::{
     infra::lightning::LnClient,
 };
 
-use self::cln::{GetinfoRequest, InvoiceRequest};
+use self::cln::InvoiceRequest;
 
 use super::cln_grpc_listener::ClnGrpcListener;
 
@@ -68,14 +68,13 @@ impl ClnGrpcClient {
             .await
             .map_err(|e| LightningError::Connect(e.to_string()))?;
 
-        let mut client = NodeClient::new(channel);
-        client
-            .getinfo(GetinfoRequest {})
-            .await
-            .map_err(|e| LightningError::HealthCheck(e.to_string()))?;
+        let client = NodeClient::new(channel);
 
         let listener = ClnGrpcListener::new(ln_events, Duration::from_secs(5));
-        listener.listen_invoices(client.clone()).await?;
+        listener
+            .listen_invoices(client.clone())
+            .await
+            .map_err(|e| LightningError::Connect(e.to_string()))?;
 
         Ok(Self { client })
     }

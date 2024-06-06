@@ -5,8 +5,8 @@ use crate::{
 use async_trait::async_trait;
 use sea_orm::{
     sea_query::Expr, ActiveModelTrait, ActiveValue::Set, ColumnTrait, Condition,
-    DatabaseConnection, DatabaseTransaction, EntityTrait, QueryFilter, QueryOrder, QuerySelect,
-    QueryTrait,
+    DatabaseConnection, DatabaseTransaction, EntityTrait, Order, QueryFilter, QueryOrder,
+    QuerySelect, QueryTrait,
 };
 use uuid::Uuid;
 
@@ -51,6 +51,8 @@ impl InvoiceRepository for SeaOrmInvoiceRepository {
     }
 
     async fn find_many(&self, filter: InvoiceFilter) -> Result<Vec<Invoice>, DatabaseError> {
+        let order_direction: Order = filter.order_direction.into();
+
         let models = Entity::find()
             .apply_if(filter.user_id, |q, user| q.filter(Column::UserId.eq(user)))
             .apply_if(filter.id, |q, id| q.filter(Column::Id.eq(id)))
@@ -67,7 +69,11 @@ impl InvoiceRepository for SeaOrmInvoiceRepository {
                         .add(Expr::col(Column::PaymentTime).is_null()),
                 ),
             })
-            .order_by_desc(Column::CreatedAt)
+            .apply_if(filter.ledger, |q, l| {
+                q.filter(Column::Ledger.eq(l.to_string()))
+            })
+            .order_by(Column::PaymentTime, order_direction.clone())
+            .order_by(Column::Timestamp, order_direction)
             .offset(filter.pagination.offset)
             .limit(filter.pagination.limit)
             .all(&self.db)
@@ -156,6 +162,9 @@ impl InvoiceRepository for SeaOrmInvoiceRepository {
                         .add(Expr::col(Column::ExpiresAt).lte(Expr::current_timestamp()))
                         .add(Expr::col(Column::PaymentTime).is_null()),
                 ),
+            })
+            .apply_if(filter.ledger, |q, l| {
+                q.filter(Column::Ledger.eq(l.to_string()))
             })
             .exec(&self.db)
             .await

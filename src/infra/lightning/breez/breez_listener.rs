@@ -42,7 +42,7 @@ impl EventListener for BreezListener {
 
                     let payments_processor = self.ln_events.clone();
                     tokio::spawn(async move {
-                        if let Err(err) = payments_processor.incoming_payment(payment).await {
+                        if let Err(err) = payments_processor.invoice_paid(payment.into()).await {
                             warn!(%err, "Failed to process incoming payment");
                         }
                     });

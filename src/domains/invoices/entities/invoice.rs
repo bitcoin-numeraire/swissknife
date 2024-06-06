@@ -7,6 +7,7 @@ use serde_with::DurationSeconds;
 use strum_macros::{Display, EnumString};
 use uuid::Uuid;
 
+use crate::application::entities::OrderDirection;
 use crate::application::entities::{Currency, Ledger, PaginationFilter};
 
 #[serde_as]
@@ -82,4 +83,7 @@ pub struct InvoiceFilter {
     pub id: Option<Uuid>,
     pub user_id: Option<String>,
     pub status: Option<InvoiceStatus>,
+    pub ledger: Option<Ledger>,
+    #[serde(default)]
+    pub order_direction: OrderDirection,
 }

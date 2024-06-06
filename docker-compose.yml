@@ -37,6 +37,23 @@ services:
     depends_on:
       - postgres
 
+  lightningd:
+    image: elementsproject/lightningd:v24.05
+    environment:
+      LIGHTNINGD_NETWORK: "regtest"
+    ports:
+      - 3010:3010
+      - 50051:50051
+    volumes:
+      - ./deps/lightningd/data:/root/.lightning/regtest
+      - ./deps/lightningd/regtest.conf:/root/.lightning/regtest/config
+    networks:
+      - polar-network-1_default
+
 volumes:
   db:
   pgadmin:
+
+networks:
+  polar-network-1_default:
+    external: true

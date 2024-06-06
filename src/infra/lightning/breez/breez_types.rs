@@ -8,6 +8,7 @@ use crate::{
     application::entities::{Currency, Ledger},
     domains::{
         invoices::entities::{Invoice, LnInvoice},
+        lightning::entities::LnInvoicePaidEvent,
         payments::entities::Payment,
     },
 };
@@ -61,6 +62,17 @@ impl Into<Currency> for BreezNetwork {
             BreezNetwork::Regtest => Currency::Regtest,
             BreezNetwork::Signet => Currency::Signet,
             BreezNetwork::Testnet => Currency::BitcoinTestnet,
+        }
+    }
+}
+
+impl Into<LnInvoicePaidEvent> for BreezPayment {
+    fn into(self) -> LnInvoicePaidEvent {
+        LnInvoicePaidEvent {
+            payment_hash: self.id,
+            amount_msat: self.amount_msat,
+            fee_msat: self.fee_msat,
+            payment_time: Utc.timestamp_opt(self.payment_time, 0).unwrap(),
         }
     }
 }

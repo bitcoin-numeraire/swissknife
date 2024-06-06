@@ -8,7 +8,8 @@ use uuid::Uuid;
 use crate::{
     application::errors::ApplicationError,
     domains::{
-        lightning::entities::{LnAddress, LnAddressFilter, LnURLPayRequest},
+        invoices::entities::Invoice,
+        lightning::entities::{LnAddress, LnAddressFilter, LnInvoicePaidEvent, LnURLPayRequest},
         users::entities::AuthUser,
     },
 };
@@ -55,7 +56,8 @@ pub trait LnNodeUseCases: Send + Sync {
 
 #[async_trait]
 pub trait LnEventsUseCases: Send + Sync {
-    async fn incoming_payment(&self, payment: BreezPayment) -> Result<(), ApplicationError>;
+    async fn latest_settled_invoice(&self) -> Result<Option<Invoice>, ApplicationError>;
+    async fn invoice_paid(&self, event: LnInvoicePaidEvent) -> Result<(), ApplicationError>;
     async fn outgoing_payment(&self, payment: BreezPayment) -> Result<(), ApplicationError>;
     async fn failed_payment(&self, payment: PaymentFailedData) -> Result<(), ApplicationError>;
 }
