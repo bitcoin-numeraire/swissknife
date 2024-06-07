@@ -4,7 +4,7 @@ use serde_json::Value;
 use strum_macros::{Display, EnumString};
 use uuid::Uuid;
 
-use crate::application::entities::{Currency, Ledger, PaginationFilter};
+use crate::application::entities::{Ledger, PaginationFilter};
 
 #[derive(Clone, Debug, Default, Serialize)]
 pub struct Payment {
@@ -18,7 +18,6 @@ pub struct Payment {
     pub amount_msat: u64,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub fee_msat: Option<u64>,
-    pub currency: Currency,
     pub ledger: Ledger,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub payment_time: Option<DateTime<Utc>>,

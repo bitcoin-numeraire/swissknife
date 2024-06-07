@@ -190,26 +190,6 @@ impl LnClient for BreezClient {
         Ok(response.payment.into())
     }
 
-    async fn send_spontaneous_payment(
-        &self,
-        node_id: String,
-        amount_msat: u64,
-        label: Uuid,
-    ) -> Result<Payment, LightningError> {
-        let response = self
-            .sdk
-            .send_spontaneous_payment(SendSpontaneousPaymentRequest {
-                node_id,
-                amount_msat,
-                extra_tlvs: None, // TODO: Add support for extra TLVs
-                label: Some(label.to_string()),
-            })
-            .await
-            .map_err(|e| LightningError::SendNodeIdPayment(e.to_string()))?;
-
-        Ok(response.payment.into())
-    }
-
     async fn lnurl_pay(
         &self,
         data: LnUrlPayRequestData,

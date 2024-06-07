@@ -18,7 +18,6 @@ pub struct Model {
     pub payment_time: Option<DateTimeUtc>,
     pub status: String,
     pub ledger: String,
-    pub currency: String,
     pub description: Option<String>,
     pub metadata: Option<String>,
     #[sea_orm(column_type = "JsonBinary", nullable)]
@@ -45,7 +44,6 @@ impl From<Model> for Payment {
             payment_time: model.payment_time,
             status: model.status.parse().unwrap(),
             ledger: model.ledger.parse().unwrap(),
-            currency: model.currency.parse().unwrap(),
             description: model.description,
             metadata: model.metadata,
             success_action: model.success_action,

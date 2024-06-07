@@ -151,15 +151,6 @@ impl LnClient for ClnRestClient {
         todo!();
     }
 
-    async fn send_spontaneous_payment(
-        &self,
-        node_id: String,
-        amount_msat: u64,
-        label: Uuid,
-    ) -> Result<Payment, LightningError> {
-        todo!();
-    }
-
     async fn lnurl_pay(
         &self,
         data: LnUrlPayRequestData,

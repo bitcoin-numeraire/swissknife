@@ -111,7 +111,6 @@ impl PaymentService {
                                     fee_msat: Some(0),
                                     payment_time: Some(Utc::now()),
                                     ledger: Ledger::INTERNAL,
-                                    currency: Currency::Bitcoin,
                                     ..Default::default()
                                 },
                                 0.0,
@@ -234,7 +233,6 @@ impl PaymentService {
                                         fee_msat: Some(0),
                                         payment_time: Some(Utc::now()),
                                         ledger: Ledger::INTERNAL,
-                                        currency: Currency::Bitcoin,
                                         ln_address: Some(ln_address),
                                         ..Default::default()
                                     },

@@ -31,12 +31,6 @@ pub trait LnClient: Sync + Send {
         amount_msat: Option<u64>,
         label: Uuid,
     ) -> Result<Payment, LightningError>;
-    async fn send_spontaneous_payment(
-        &self,
-        node_id: String,
-        amount_msat: u64,
-        label: Uuid,
-    ) -> Result<Payment, LightningError>;
     async fn lnurl_pay(
         &self,
         data: LnUrlPayRequestData,

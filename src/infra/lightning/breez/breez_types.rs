@@ -42,7 +42,6 @@ impl Into<Payment> for BreezPayment {
     fn into(self) -> Payment {
         Payment {
             ledger: Ledger::LIGHTNING,
-            currency: Currency::Bitcoin,
             payment_hash: Some(self.id),
             error: self.error,
             amount_msat: self.amount_msat,
