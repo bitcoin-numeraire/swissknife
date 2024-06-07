@@ -117,7 +117,6 @@ impl IntoResponse for LightningError {
         let (error_message, status) = match self {
             LightningError::SendBolt11Payment(_)
             | LightningError::SendLNURLPayment(_)
-            | LightningError::SendNodeIdPayment(_)
             | LightningError::Invoice(_)
             | LightningError::RequestFailureStatus(_) => {
                 warn!("{}", self);

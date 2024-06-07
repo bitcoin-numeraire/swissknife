@@ -11,8 +11,8 @@ use breez_sdk_core::{
     ListPaymentsRequest, LnUrlPayRequest, LnUrlPayRequestData, LnUrlPayResult, LspInformation,
     NodeConfig, NodeState, PayOnchainRequest, Payment as BreezPayment,
     PrepareOnchainPaymentRequest, PrepareRedeemOnchainFundsRequest, ReceivePaymentRequest,
-    RedeemOnchainFundsRequest, ReverseSwapInfo, SendPaymentRequest, SendSpontaneousPaymentRequest,
-    ServiceHealthCheckResponse, SwapAmountType,
+    RedeemOnchainFundsRequest, ReverseSwapInfo, SendPaymentRequest, ServiceHealthCheckResponse,
+    SwapAmountType,
 };
 
 use crate::{
