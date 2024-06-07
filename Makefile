@@ -30,6 +30,7 @@ down:
 shutdown:
 	@$(COMPOSE) down -v
 	@rm -rf storage/rgblib/*
+	@rm -rf deps/lightningd/data/*
 
 install-tools:
 	@cargo install sea-orm-cli

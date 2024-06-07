@@ -18,6 +18,9 @@ restore_only = true
 [cln_config]
 endpoint = "https://localhost:50051"
 certs_dir = "./deps/lightningd/data"
+maxfeepercent = 0.5
+payment_timeout = 60
+payment_exemptfee = 5000
 
 [cln_rest_config]
 endpoint = "http://localhost:3010/v1"
