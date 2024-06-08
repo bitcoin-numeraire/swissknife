@@ -38,14 +38,8 @@ pub enum LightningError {
     #[error("Failed to get list payments from Lightning node: {0}")]
     ListPayments(String),
 
-    #[error("Failed to send Bolt11 payment: {0}")]
-    SendBolt11Payment(String),
-
-    #[error("Failed to validate LNURL payment: {0}")]
-    ValidateLNURLPayment(String),
-
-    #[error("Failed to send LNURL payment: {0}")]
-    SendLNURLPayment(String),
+    #[error("Failed to send payment: {0}")]
+    Pay(String),
 
     #[error("Failed to retrieve payment by hash: {0}")]
     PaymentByHash(String),
@@ -58,15 +52,6 @@ pub enum LightningError {
 
     #[error("Failed to redeem on-chain: {0}")]
     RedeemOnChain(String),
-
-    #[error("Failed to send POST request to node: {0}")]
-    PostRequest(String),
-
-    #[error("Lightning Node returned with error: {0}")]
-    RequestFailureStatus(String),
-
-    #[error("Failed to parse responde body: {0}")]
-    ParseResponseBody(String),
 
     #[error("Failed to retrieve healthcheck: {0}")]
     HealthCheck(String),

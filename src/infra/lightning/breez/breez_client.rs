@@ -8,11 +8,10 @@ use async_trait::async_trait;
 use bip39::Mnemonic;
 use breez_sdk_core::{
     BreezServices, ConnectRequest, EnvironmentType, GreenlightCredentials, GreenlightNodeConfig,
-    ListPaymentsRequest, LnUrlPayRequest, LnUrlPayRequestData, LnUrlPayResult, LspInformation,
-    NodeConfig, NodeState, PayOnchainRequest, Payment as BreezPayment,
-    PrepareOnchainPaymentRequest, PrepareRedeemOnchainFundsRequest, ReceivePaymentRequest,
-    RedeemOnchainFundsRequest, ReverseSwapInfo, SendPaymentRequest, ServiceHealthCheckResponse,
-    SwapAmountType,
+    ListPaymentsRequest, LspInformation, NodeConfig, NodeState, PayOnchainRequest,
+    Payment as BreezPayment, PrepareOnchainPaymentRequest, PrepareRedeemOnchainFundsRequest,
+    ReceivePaymentRequest, RedeemOnchainFundsRequest, ReverseSwapInfo, SendPaymentRequest,
+    ServiceHealthCheckResponse, SwapAmountType,
 };
 
 use crate::{
@@ -171,7 +170,7 @@ impl LnClient for BreezClient {
         Ok(payments)
     }
 
-    async fn send_payment(
+    async fn pay(
         &self,
         bolt11: String,
         amount_msat: Option<u64>,
@@ -185,42 +184,9 @@ impl LnClient for BreezClient {
                 label: Some(label.to_string()),
             })
             .await
-            .map_err(|e| LightningError::SendBolt11Payment(e.to_string()))?;
+            .map_err(|e| LightningError::Pay(e.to_string()))?;
 
         Ok(response.payment.into())
-    }
-
-    async fn lnurl_pay(
-        &self,
-        data: LnUrlPayRequestData,
-        amount_msat: u64,
-        comment: Option<String>,
-        label: Uuid,
-    ) -> Result<Payment, LightningError> {
-        let result = self
-            .sdk
-            .lnurl_pay(LnUrlPayRequest {
-                data,
-                amount_msat,
-                comment,
-                payment_label: Some(label.to_string()),
-            })
-            .await
-            .map_err(|e| LightningError::SendLNURLPayment(e.to_string()))?;
-
-        match result {
-            LnUrlPayResult::EndpointSuccess { data } => {
-                let mut payment: Payment = data.payment.into();
-                payment.success_action = data.success_action;
-                Ok(payment)
-            }
-            LnUrlPayResult::EndpointError { data } => {
-                return Err(LightningError::SendLNURLPayment(data.reason))
-            }
-            LnUrlPayResult::PayError { data } => {
-                return Err(LightningError::SendLNURLPayment(data.reason))
-            }
-        }
     }
 
     async fn payment_by_hash(

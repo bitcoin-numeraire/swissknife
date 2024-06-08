@@ -14,6 +14,8 @@ pub struct Payment {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub payment_hash: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub payment_preimage: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
     pub amount_msat: u64,
     #[serde(skip_serializing_if = "Option::is_none")]

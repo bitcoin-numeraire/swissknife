@@ -8,22 +8,18 @@ use breez_sdk_core::{
 use lightning_invoice::Bolt11Invoice;
 use reqwest::Url;
 use serde_bolt::bitcoin::hashes::{sha256, Hash};
-use tracing::warn;
+use tracing::{trace, warn};
 
 use crate::domains::lightning::entities::LnUrlErrorData;
 
-pub async fn validate_lnurl_pay(
+pub(crate) async fn validate_lnurl_pay(
     user_amount_msat: u64,
     comment: &Option<String>,
     req: &LnUrlPayRequestData,
 ) -> Result<CallbackResponse> {
-    validate_user_input(
-        user_amount_msat,
-        comment,
-        req.min_sendable,
-        req.max_sendable,
-        req.comment_allowed,
-    )?;
+    trace!(?req, "Validating LNURL pay request");
+
+    validate_user_input(user_amount_msat, comment, req)?;
 
     let amount_msat = user_amount_msat.to_string();
     let mut url = Url::from_str(&req.callback)?;
@@ -58,31 +54,29 @@ pub async fn validate_lnurl_pay(
 fn validate_user_input(
     user_amount_msat: u64,
     comment: &Option<String>,
-    condition_min_amount_msat: u64,
-    condition_max_amount_msat: u64,
-    condition_max_comment_len: u16,
+    req: &LnUrlPayRequestData,
 ) -> Result<()> {
-    if user_amount_msat >= condition_min_amount_msat {
+    if user_amount_msat < req.min_sendable {
         return Err(anyhow!(format!(
-            "Amount is smaller than the minimum allowed: {}",
-            condition_min_amount_msat
+            "Amount is smaller than the minimum allowed: {} sats",
+            req.min_sendable_sats()
         )));
     }
 
-    if user_amount_msat <= condition_max_amount_msat {
+    if user_amount_msat > req.max_sendable {
         return Err(anyhow!(format!(
-            "Amount is bigger than the maximum allowed: {}",
-            condition_max_amount_msat
+            "Amount is bigger than the maximum allowed: {} sats",
+            req.max_sendable_sats()
         )));
     }
 
     match comment {
         None => Ok(()),
-        Some(msg) => match msg.len() <= condition_max_comment_len as usize {
+        Some(msg) => match msg.len() <= req.comment_allowed as usize {
             true => Ok(()),
             false => Err(anyhow!(format!(
                 "Comment is longer than the maximum allowed length: {}",
-                condition_max_comment_len
+                req.comment_allowed
             ))),
         },
     }
@@ -103,7 +97,10 @@ fn validate_invoice(user_amount_msat: u64, bolt11: &str) -> Result<()> {
     }
 }
 
-pub fn process_success_action(sa: SuccessAction, payment_preimage: &str) -> SuccessActionProcessed {
+pub(crate) fn process_success_action(
+    sa: SuccessAction,
+    payment_preimage: &str,
+) -> SuccessActionProcessed {
     match sa {
         // For AES, we decrypt the contents on the fly
         SuccessAction::Aes(data) => {

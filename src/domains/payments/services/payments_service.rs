@@ -1,8 +1,10 @@
-use std::sync::Arc;
+use std::{str::FromStr, sync::Arc};
 
 use async_trait::async_trait;
-use breez_sdk_core::{parse, InputType, LNInvoice, LnUrlPayRequestData};
+use breez_sdk_core::{parse, InputType, LNInvoice, LnUrlPayRequestData, SuccessAction};
 use chrono::Utc;
+use lightning_invoice::Bolt11Invoice;
+use serde_bolt::bitcoin::hashes::hex::ToHex;
 use tracing::{debug, info, trace};
 use uuid::Uuid;
 
@@ -19,7 +21,10 @@ use crate::{
     infra::lightning::LnClient,
 };
 
-use super::PaymentsUseCases;
+use super::{
+    lnurl::{process_success_action, validate_lnurl_pay},
+    PaymentsUseCases,
+};
 
 const DEFAULT_INTERNAL_INVOICE_DESCRIPTION: &str = "Numeraire Swissknife Invoice";
 const DEFAULT_INTERNAL_PAYMENT_DESCRIPTION: &str = "Payment to Numeraire Swissknife";
@@ -140,6 +145,7 @@ impl PaymentService {
                         user_id,
                         amount_msat: amount,
                         status: PaymentStatus::PENDING,
+                        ledger: Ledger::LIGHTNING,
                         payment_hash: Some(invoice.payment_hash),
                         description: invoice.description,
                         ..Default::default()
@@ -150,7 +156,7 @@ impl PaymentService {
 
             let result = self
                 .ln_client
-                .send_payment(
+                .pay(
                     invoice.bolt11.clone(),
                     if invoice.amount_msat.is_some() {
                         None
@@ -161,7 +167,8 @@ impl PaymentService {
                 )
                 .await;
 
-            self.handle_processed_payment(pending_payment, result).await
+            self.handle_processed_payment(pending_payment, result, None)
+                .await
         } else {
             Err(DataError::Validation(
                 "Amount must be defined for zero-amount invoices.".to_string(),
@@ -265,6 +272,10 @@ impl PaymentService {
         }
 
         // External payment
+        let cb = validate_lnurl_pay(amount, &comment, &req)
+            .await
+            .map_err(|e| DataError::Validation(e.to_string()))?;
+
         let pending_payment = self
             .insert_payment(
                 Payment {
@@ -273,18 +284,23 @@ impl PaymentService {
                     status: PaymentStatus::PENDING,
                     ln_address: req.ln_address.clone(),
                     description: comment.clone(),
+                    payment_hash: Some(
+                        Bolt11Invoice::from_str(&cb.pr)
+                            .unwrap()
+                            .payment_hash()
+                            .to_hex(),
+                    ),
+                    ledger: Ledger::LIGHTNING,
                     ..Default::default()
                 },
                 self.fee_buffer,
             )
             .await?;
 
-        let result = self
-            .ln_client
-            .lnurl_pay(req, amount, comment, pending_payment.id)
-            .await;
+        let result = self.ln_client.pay(cb.pr, None, pending_payment.id).await;
 
-        self.handle_processed_payment(pending_payment, result).await
+        self.handle_processed_payment(pending_payment, result, cb.success_action)
+            .await
     }
 
     async fn insert_payment(
@@ -319,21 +335,35 @@ impl PaymentService {
         &self,
         mut pending_payment: Payment,
         result: Result<Payment, LightningError>,
+        success_action: Option<SuccessAction>,
     ) -> Result<Payment, ApplicationError> {
-        let payment = match result {
+        match result {
             Ok(mut settled_payment) => {
                 settled_payment.id = pending_payment.id;
                 settled_payment.status = PaymentStatus::SETTLED;
-                self.store.payment.update(settled_payment).await?
+
+                let success_action = match success_action {
+                    Some(sa) => Some(process_success_action(
+                        sa,
+                        settled_payment.payment_preimage.as_ref().unwrap(),
+                    )),
+                    None => None,
+                };
+
+                settled_payment.success_action = success_action;
+
+                let payment = self.store.payment.update(settled_payment).await?;
+
+                Ok(payment)
             }
             Err(error) => {
                 pending_payment.status = PaymentStatus::FAILED;
                 pending_payment.error = Some(error.to_string());
-                self.store.payment.update(pending_payment).await?
-            }
-        };
+                self.store.payment.update(pending_payment).await?;
 
-        Ok(payment)
+                Err(error.into())
+            }
+        }
     }
 }
 

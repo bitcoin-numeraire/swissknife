@@ -90,6 +90,7 @@ impl PaymentRepository for SeaOrmPaymentRepository {
             fee_msat: Set(payment.fee_msat.map(|v| v as i64)),
             payment_time: Set(payment.payment_time),
             payment_hash: Set(payment.payment_hash),
+            payment_preimage: Set(payment.payment_preimage),
             error: Set(payment.error),
             amount_msat: Set(payment.amount_msat as i64),
             metadata: Set(payment.metadata),

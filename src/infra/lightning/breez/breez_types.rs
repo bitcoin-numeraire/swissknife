@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use breez_sdk_core::{LNInvoice, Network as BreezNetwork, Payment as BreezPayment};
+use breez_sdk_core::{LNInvoice, Network as BreezNetwork, Payment as BreezPayment, PaymentDetails};
 use chrono::{TimeZone, Utc};
 use serde_bolt::bitcoin::hashes::hex::ToHex;
 
@@ -43,6 +43,10 @@ impl Into<Payment> for BreezPayment {
         Payment {
             ledger: Ledger::LIGHTNING,
             payment_hash: Some(self.id),
+            payment_preimage: match self.details {
+                PaymentDetails::Ln { data } => Some(data.payment_preimage),
+                _ => None,
+            },
             error: self.error,
             amount_msat: self.amount_msat,
             fee_msat: Some(self.fee_msat),

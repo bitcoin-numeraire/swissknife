@@ -87,7 +87,7 @@ pub async fn get_ln_client(
 
             info!(
                 endpoint = %cln_config.endpoint,
-                "Lightning provider: Core Lightning GRPC"
+                "Lightning provider: Core Lightning gRPC"
             );
 
             let client = ClnGrpcClient::new(cln_config.clone(), ln_events).await?;
@@ -101,7 +101,7 @@ pub async fn get_ln_client(
 
             info!(
                 endpoint = %cln_config.endpoint,
-                "Lightning provider: Core Lightning Rest"
+                "Lightning provider: Core Lightning REST"
             );
 
             let client = ClnRestClient::new(cln_config.clone()).await?;

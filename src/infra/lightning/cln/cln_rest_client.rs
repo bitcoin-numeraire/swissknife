@@ -1,8 +1,7 @@
 use std::str::FromStr;
 
 use breez_sdk_core::{
-    LnUrlPayRequestData, LspInformation, NodeState, Payment as BreezPayment, ReverseSwapInfo,
-    ServiceHealthCheckResponse,
+    LspInformation, NodeState, Payment as BreezPayment, ReverseSwapInfo, ServiceHealthCheckResponse,
 };
 use humantime::parse_duration;
 use lightning_invoice::Bolt11Invoice;
@@ -21,7 +20,7 @@ use crate::{
     infra::lightning::LnClient,
 };
 
-use super::{cln_ws_client::ClnWsClient, InvoiceRequest, InvoiceResponse};
+use super::{cln_ws_client::ClnWsClient, InvoiceRequest, InvoiceResponse, PayRequest, PayResponse};
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct ClnRestClientConfig {
@@ -32,11 +31,17 @@ pub struct ClnRestClientConfig {
     pub timeout: String,
     pub accept_invalid_certs: bool,
     pub ws_endpoint: String,
+    pub maxfeepercent: Option<f64>,
+    pub payment_timeout: Option<u32>,
+    pub payment_exemptfee: Option<u64>,
 }
 
 pub struct ClnRestClient {
     client: Client,
     base_url: String,
+    maxfeepercent: Option<f64>,
+    payment_timeout: Option<u32>,
+    payment_exemptfee: Option<u64>,
 }
 
 const USER_AGENT: &str = "Numeraire Swissknife/1.0";
@@ -71,6 +76,9 @@ impl ClnRestClient {
         Ok(Self {
             client,
             base_url: config.endpoint,
+            maxfeepercent: config.maxfeepercent,
+            payment_timeout: config.payment_timeout,
+            payment_exemptfee: config.payment_exemptfee,
         })
     }
 
@@ -78,24 +86,16 @@ impl ClnRestClient {
         &self,
         endpoint: &str,
         payload: &impl Serialize,
-    ) -> Result<T, LightningError> {
+    ) -> anyhow::Result<T> {
         let response = self
             .client
             .post(format!("{}/{}", self.base_url, endpoint))
             .json(payload)
             .send()
-            .await
-            .map_err(|e| LightningError::PostRequest(e.to_string()))?;
+            .await?;
 
-        let response = response
-            .error_for_status()
-            .map_err(|e| LightningError::RequestFailureStatus(e.to_string()))?;
-
-        let result = response
-            .json::<T>()
-            .await
-            .map_err(|e| LightningError::ParseResponseBody(e.to_string()))?;
-
+        let response = response.error_for_status()?;
+        let result = response.json::<T>().await?;
         Ok(result)
     }
 }
@@ -109,7 +109,7 @@ impl LnClient for ClnRestClient {
         expiry: u32,
     ) -> Result<Invoice, LightningError> {
         let label = Uuid::new_v4();
-        let invoice: InvoiceResponse = self
+        let response: InvoiceResponse = self
             .post_request(
                 "invoice",
                 &InvoiceRequest {
@@ -119,9 +119,10 @@ impl LnClient for ClnRestClient {
                     amount_msat,
                 },
             )
-            .await?;
+            .await
+            .map_err(|e| LightningError::Invoice(e.to_string()))?;
 
-        let bolt11 = Bolt11Invoice::from_str(&invoice.bolt11)
+        let bolt11 = Bolt11Invoice::from_str(&response.bolt11)
             .map_err(|e| LightningError::Invoice(e.to_string()))?;
 
         let mut invoice: Invoice = bolt11.into();
@@ -142,23 +143,30 @@ impl LnClient for ClnRestClient {
         todo!();
     }
 
-    async fn send_payment(
+    async fn pay(
         &self,
         bolt11: String,
         amount_msat: Option<u64>,
         label: Uuid,
     ) -> Result<Payment, LightningError> {
-        todo!();
-    }
+        let response: PayResponse = self
+            .post_request(
+                "pay",
+                &PayRequest {
+                    bolt11,
+                    amount_msat,
+                    label: Some(label.to_string()),
+                    maxfeepercent: self.maxfeepercent,
+                    retry_for: self.payment_timeout,
+                    exemptfee: self.payment_exemptfee.clone(),
+                },
+            )
+            .await
+            .map_err(|e| LightningError::Pay(e.to_string()))?;
 
-    async fn lnurl_pay(
-        &self,
-        data: LnUrlPayRequestData,
-        amount_msat: u64,
-        comment: Option<String>,
-        label: Uuid,
-    ) -> Result<Payment, LightningError> {
-        todo!();
+        println!("{:?}", response);
+
+        Ok(response.into())
     }
 
     async fn payment_by_hash(

@@ -15,12 +15,16 @@ impl Into<Payment> for PayResponse {
             )),
         };
 
+        let seconds = self.created_at as i64;
+        let nanoseconds = ((self.created_at - seconds as f64) * 1e9) as u32;
+
         Payment {
             ledger: Ledger::LIGHTNING,
             payment_hash: Some(self.payment_hash.to_hex()),
+            payment_preimage: Some(self.payment_preimage.to_hex()),
             amount_msat: self.amount_sent_msat.clone().unwrap().msat,
             fee_msat: Some(self.amount_sent_msat.unwrap().msat - self.amount_msat.unwrap().msat),
-            payment_time: Some(Utc.timestamp_opt(self.created_at as i64, 0).unwrap()),
+            payment_time: Some(Utc.timestamp_opt(seconds, nanoseconds).unwrap()),
             error,
             ..Default::default()
         }
