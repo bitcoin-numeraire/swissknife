@@ -2,10 +2,11 @@ use std::{path::PathBuf, str::FromStr, sync::Arc, time::Duration};
 
 use breez_sdk_core::{
     LnUrlPayRequestData, LspInformation, NodeState, Payment as BreezPayment, ReverseSwapInfo,
-    ServiceHealthCheckResponse,
+    ServiceHealthCheckResponse, SuccessActionProcessed,
 };
 use lightning_invoice::Bolt11Invoice;
 use serde::Deserialize;
+use serde_bolt::bitcoin::hashes::hex::ToHex;
 use tokio::{fs, io};
 use tonic::transport::{Certificate, Channel, ClientTlsConfig, Identity};
 use uuid::Uuid;
@@ -16,8 +17,12 @@ use cln::{node_client::NodeClient, Amount, PayRequest};
 use crate::{
     application::errors::LightningError,
     domains::{
-        invoices::entities::Invoice, lightning::services::LnEventsUseCases,
-        payments::entities::Payment,
+        invoices::entities::Invoice,
+        lightning::services::LnEventsUseCases,
+        payments::{
+            entities::Payment,
+            services::{process_success_action, validate_lnurl_pay},
+        },
     },
     infra::lightning::LnClient,
 };
@@ -175,7 +180,7 @@ impl LnClient for ClnGrpcClient {
                 ..Default::default()
             })
             .await
-            .map_err(|e| LightningError::Invoice(e.to_string()))?
+            .map_err(|e| LightningError::SendBolt11Payment(e.to_string()))?
             .into_inner();
 
         Ok(response.into())
@@ -188,7 +193,37 @@ impl LnClient for ClnGrpcClient {
         comment: Option<String>,
         label: Uuid,
     ) -> Result<Payment, LightningError> {
-        todo!();
+        let cb = validate_lnurl_pay(amount_msat, &comment, &data)
+            .await
+            .map_err(|e| LightningError::ValidateLNURLPayment(e.to_string()))?;
+
+        let mut client: NodeClient<Channel> = self.client.clone();
+
+        let response = client
+            .pay(PayRequest {
+                bolt11: cb.pr,
+                label: Some(label.to_string()),
+                maxfeepercent: self.maxfeepercent,
+                retry_for: self.payment_timeout,
+                exemptfee: self.payment_exemptfee.clone(),
+                ..Default::default()
+            })
+            .await
+            .map_err(|e| LightningError::SendLNURLPayment(e.to_string()))?
+            .into_inner();
+
+        let success_action: Option<SuccessActionProcessed> = match cb.success_action {
+            Some(sa) => Some(process_success_action(
+                sa,
+                &response.payment_preimage.to_hex(),
+            )),
+            None => None,
+        };
+
+        let mut payment: Payment = response.into();
+        payment.success_action = success_action;
+
+        Ok(payment)
     }
 
     async fn payment_by_hash(

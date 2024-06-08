@@ -173,15 +173,15 @@ impl PaymentService {
     async fn send_lnurl_pay(
         &self,
         user_id: String,
-        data: LnUrlPayRequestData,
+        req: LnUrlPayRequestData,
         amount_msat: Option<u64>,
         comment: Option<String>,
     ) -> Result<Payment, ApplicationError> {
         let amount = Self::validate_amount(amount_msat)?;
 
         // Check if internal payment
-        if data.domain == self.domain {
-            match data.ln_address.clone() {
+        if req.domain == self.domain {
+            match req.ln_address.clone() {
                 Some(ln_address) => {
                     let address = ln_address.split('@').next().unwrap();
                     let address_opt = self.store.ln_address.find_by_username(&address).await?;
@@ -264,13 +264,14 @@ impl PaymentService {
             }
         }
 
+        // External payment
         let pending_payment = self
             .insert_payment(
                 Payment {
                     user_id: user_id.clone(),
                     amount_msat: amount,
                     status: PaymentStatus::PENDING,
-                    ln_address: data.ln_address.clone(),
+                    ln_address: req.ln_address.clone(),
                     description: comment.clone(),
                     ..Default::default()
                 },
@@ -280,7 +281,7 @@ impl PaymentService {
 
         let result = self
             .ln_client
-            .lnurl_pay(data, amount, comment, pending_payment.id)
+            .lnurl_pay(req, amount, comment, pending_payment.id)
             .await;
 
         self.handle_processed_payment(pending_payment, result).await
@@ -319,24 +320,20 @@ impl PaymentService {
         mut pending_payment: Payment,
         result: Result<Payment, LightningError>,
     ) -> Result<Payment, ApplicationError> {
-        match result {
-            Ok(mut payment) => {
-                payment.id = pending_payment.id;
-                payment.status = match payment.error {
-                    // There is a case where the payment fails but still has a payment_hash and a payment is returned instead of an error
-                    Some(_) => PaymentStatus::FAILED,
-                    None => PaymentStatus::SETTLED,
-                };
-                let payment: Payment = self.store.payment.update(payment).await?;
-                Ok(payment)
+        let payment = match result {
+            Ok(mut settled_payment) => {
+                settled_payment.id = pending_payment.id;
+                settled_payment.status = PaymentStatus::SETTLED;
+                self.store.payment.update(settled_payment).await?
             }
             Err(error) => {
                 pending_payment.status = PaymentStatus::FAILED;
                 pending_payment.error = Some(error.to_string());
-                let payment: Payment = self.store.payment.update(pending_payment).await?;
-                Ok(payment)
+                self.store.payment.update(pending_payment).await?
             }
-        }
+        };
+
+        Ok(payment)
     }
 }
 

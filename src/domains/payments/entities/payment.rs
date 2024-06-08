@@ -1,6 +1,6 @@
+use breez_sdk_core::SuccessActionProcessed;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 use strum_macros::{Display, EnumString};
 use uuid::Uuid;
 
@@ -27,7 +27,7 @@ pub struct Payment {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metadata: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub success_action: Option<Value>,
+    pub success_action: Option<SuccessActionProcessed>,
     pub created_at: DateTime<Utc>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub updated_at: Option<DateTime<Utc>>,

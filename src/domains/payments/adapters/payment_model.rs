@@ -46,7 +46,7 @@ impl From<Model> for Payment {
             ledger: model.ledger.parse().unwrap(),
             description: model.description,
             metadata: model.metadata,
-            success_action: model.success_action,
+            success_action: serde_json::from_value(model.success_action.unwrap_or_default()).ok(),
             created_at: model.created_at,
             updated_at: model.updated_at,
         }

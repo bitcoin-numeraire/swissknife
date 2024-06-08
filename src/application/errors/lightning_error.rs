@@ -41,6 +41,9 @@ pub enum LightningError {
     #[error("Failed to send Bolt11 payment: {0}")]
     SendBolt11Payment(String),
 
+    #[error("Failed to validate LNURL payment: {0}")]
+    ValidateLNURLPayment(String),
+
     #[error("Failed to send LNURL payment: {0}")]
     SendLNURLPayment(String),
 

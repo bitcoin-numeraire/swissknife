@@ -48,6 +48,7 @@ lightning-invoice = "0.31.0"
 http = "1.1.0"
 tungstenite = { version = "0.23.0", features = ["native-tls"] }
 hex = "0.4.3"
+anyhow = "1.0.86"
 
 [build-dependencies]
 tonic-build = "0.11.0"

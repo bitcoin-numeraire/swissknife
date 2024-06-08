@@ -210,22 +210,16 @@ impl LnClient for BreezClient {
 
         match result {
             LnUrlPayResult::EndpointSuccess { data } => {
-                let mut payment: Payment = data.payment.clone().into();
-                payment.success_action = data
-                    .success_action
-                    .and_then(|action| serde_json::to_value(action).ok());
-
+                let mut payment: Payment = data.payment.into();
+                payment.success_action = data.success_action;
                 Ok(payment)
             }
             LnUrlPayResult::EndpointError { data } => {
-                return Err(LightningError::SendLNURLPayment(data.reason));
+                return Err(LightningError::SendLNURLPayment(data.reason))
             }
-            LnUrlPayResult::PayError { data } => Ok(Payment {
-                payment_hash: Some(data.payment_hash),
-                error: Some(data.reason),
-                amount_msat,
-                ..Default::default()
-            }),
+            LnUrlPayResult::PayError { data } => {
+                return Err(LightningError::SendLNURLPayment(data.reason))
+            }
         }
     }
 

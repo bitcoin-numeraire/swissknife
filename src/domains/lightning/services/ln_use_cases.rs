@@ -9,14 +9,22 @@ use crate::{
     application::errors::ApplicationError,
     domains::{
         invoices::entities::Invoice,
-        lightning::entities::{LnAddress, LnAddressFilter, LnInvoicePaidEvent, LnURLPayRequest},
+        lightning::entities::{
+            LnAddress, LnAddressFilter, LnInvoicePaidEvent, LnURLPayRequest, LnUrlCallbackResponse,
+        },
         users::entities::AuthUser,
     },
 };
 
 #[async_trait]
-pub trait LnAddressesUseCases: Send + Sync {
+pub trait LnUrlUseCases: Send + Sync {
     async fn lnurlp(&self, username: String) -> Result<LnURLPayRequest, ApplicationError>;
+    async fn lnurlp_callback(
+        &self,
+        username: String,
+        amount: u64,
+        comment: Option<String>,
+    ) -> Result<LnUrlCallbackResponse, ApplicationError>;
     async fn register(
         &self,
         user_id: String,

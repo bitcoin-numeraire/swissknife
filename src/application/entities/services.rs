@@ -4,9 +4,7 @@ use crate::{
     application::dtos::AppConfig,
     domains::{
         invoices::services::{InvoiceService, InvoiceUseCases},
-        lightning::services::{
-            LnAddressService, LnAddressesUseCases, LnNodeService, LnNodeUseCases,
-        },
+        lightning::services::{LnNodeService, LnNodeUseCases, LnUrlService, LnUrlUseCases},
         payments::services::{PaymentService, PaymentsUseCases},
         users::services::{WalletService, WalletUseCases},
     },
@@ -19,7 +17,7 @@ pub struct AppServices {
     pub invoice: Box<dyn InvoiceUseCases>,
     pub payment: Box<dyn PaymentsUseCases>,
     pub wallet: Box<dyn WalletUseCases>,
-    pub ln_address: Box<dyn LnAddressesUseCases>,
+    pub lnurl: Box<dyn LnUrlUseCases>,
     pub ln_node: Box<dyn LnNodeUseCases>,
 }
 
@@ -34,10 +32,14 @@ impl AppServices {
         let invoices = InvoiceService::new(
             store.clone(),
             ln_client.clone(),
-            config.invoice_expiry,
-            config.domain.clone(),
+            config.invoice_expiry.clone(),
         );
-        let ln_address = LnAddressService::new(store.clone(), config.domain);
+        let lnurl = LnUrlService::new(
+            store.clone(),
+            ln_client.clone(),
+            config.invoice_expiry,
+            config.domain,
+        );
         let ln_node = LnNodeService::new(ln_client);
         let wallet = WalletService::new(store);
 
@@ -45,7 +47,7 @@ impl AppServices {
             invoice: Box::new(invoices),
             payment: Box::new(payments),
             wallet: Box::new(wallet),
-            ln_address: Box::new(ln_address),
+            lnurl: Box::new(lnurl),
             ln_node: Box::new(ln_node),
         }
     }
