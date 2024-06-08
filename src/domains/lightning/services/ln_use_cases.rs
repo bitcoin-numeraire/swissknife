@@ -8,14 +8,23 @@ use uuid::Uuid;
 use crate::{
     application::errors::ApplicationError,
     domains::{
-        lightning::entities::{LnAddress, LnAddressFilter, LnURLPayRequest},
+        invoices::entities::Invoice,
+        lightning::entities::{
+            LnAddress, LnAddressFilter, LnInvoicePaidEvent, LnURLPayRequest, LnUrlCallbackResponse,
+        },
         users::entities::AuthUser,
     },
 };
 
 #[async_trait]
-pub trait LnAddressesUseCases: Send + Sync {
+pub trait LnUrlUseCases: Send + Sync {
     async fn lnurlp(&self, username: String) -> Result<LnURLPayRequest, ApplicationError>;
+    async fn lnurlp_callback(
+        &self,
+        username: String,
+        amount: u64,
+        comment: Option<String>,
+    ) -> Result<LnUrlCallbackResponse, ApplicationError>;
     async fn register(
         &self,
         user_id: String,
@@ -55,7 +64,8 @@ pub trait LnNodeUseCases: Send + Sync {
 
 #[async_trait]
 pub trait LnEventsUseCases: Send + Sync {
-    async fn incoming_payment(&self, payment: BreezPayment) -> Result<(), ApplicationError>;
+    async fn latest_settled_invoice(&self) -> Result<Option<Invoice>, ApplicationError>;
+    async fn invoice_paid(&self, event: LnInvoicePaidEvent) -> Result<(), ApplicationError>;
     async fn outgoing_payment(&self, payment: BreezPayment) -> Result<(), ApplicationError>;
     async fn failed_payment(&self, payment: PaymentFailedData) -> Result<(), ApplicationError>;
 }

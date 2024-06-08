@@ -8,7 +8,7 @@ use axum::{
 
 use crate::{
     application::{dtos::LNUrlpInvoiceQueryParams, errors::ApplicationError},
-    domains::{invoices::entities::LnURLpInvoice, lightning::entities::LnURLPayRequest},
+    domains::lightning::entities::{LnURLPayRequest, LnUrlCallbackResponse},
     infra::app::AppState,
 };
 
@@ -20,26 +20,26 @@ impl LnURLpHandler {
     }
 
     pub fn callback_route() -> Router<Arc<AppState>> {
-        Router::new().route("/:username/callback", get(Self::invoice))
+        Router::new().route("/:username/callback", get(Self::callback))
     }
 
     async fn well_known_lnurlp(
         Path(username): Path<String>,
         State(app_state): State<Arc<AppState>>,
     ) -> Result<Json<LnURLPayRequest>, ApplicationError> {
-        let lnurlp = app_state.services.ln_address.lnurlp(username).await?;
+        let lnurlp = app_state.services.lnurl.lnurlp(username).await?;
         Ok(lnurlp.into())
     }
 
-    async fn invoice(
+    async fn callback(
         Path(username): Path<String>,
         Query(query_params): Query<LNUrlpInvoiceQueryParams>,
         State(app_state): State<Arc<AppState>>,
-    ) -> Result<Json<LnURLpInvoice>, ApplicationError> {
+    ) -> Result<Json<LnUrlCallbackResponse>, ApplicationError> {
         let invoice = app_state
             .services
-            .invoice
-            .invoice_lnurlp(username, query_params.amount, query_params.comment)
+            .lnurl
+            .lnurlp_callback(username, query_params.amount, query_params.comment)
             .await?;
         Ok(Json(invoice.into()))
     }

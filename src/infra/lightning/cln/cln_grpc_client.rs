@@ -1,24 +1,29 @@
-use std::path::PathBuf;
+use std::{path::PathBuf, str::FromStr, sync::Arc, time::Duration};
 
 use breez_sdk_core::{
-    LnUrlPayRequestData, LspInformation, NodeState, Payment as BreezPayment, ReverseSwapInfo,
-    ServiceHealthCheckResponse,
+    LspInformation, NodeState, Payment as BreezPayment, ReverseSwapInfo, ServiceHealthCheckResponse,
 };
+use lightning_invoice::Bolt11Invoice;
 use serde::Deserialize;
 use tokio::{fs, io};
 use tonic::transport::{Certificate, Channel, ClientTlsConfig, Identity};
 use uuid::Uuid;
 
 use async_trait::async_trait;
-use cln::node_client::NodeClient;
+use cln::{node_client::NodeClient, Amount, PayRequest};
 
 use crate::{
     application::errors::LightningError,
-    domains::{invoices::entities::Invoice, payments::entities::Payment},
+    domains::{
+        invoices::entities::Invoice, lightning::services::LnEventsUseCases,
+        payments::entities::Payment,
+    },
     infra::lightning::LnClient,
 };
 
-use self::cln::{GetinfoRequest, InvoiceRequest};
+use self::cln::InvoiceRequest;
+
+use super::cln_grpc_listener::ClnGrpcListener;
 
 pub mod cln {
     tonic::include_proto!("cln");
@@ -28,18 +33,27 @@ pub mod cln {
 pub struct ClnClientConfig {
     pub endpoint: String,
     pub certs_dir: String,
+    pub maxfeepercent: Option<f64>,
+    pub payment_timeout: Option<u32>,
+    pub payment_exemptfee: Option<u64>,
 }
 
 const DEFAULT_CLIENT_CERT_FILENAME: &str = "client.pem";
 const DEFAULT_CLIENT_KEY_FILENAME: &str = "client-key.pem";
 const DEFAULT_CA_CRT_FILENAME: &str = "ca.pem";
 
-pub struct ClnClient {
+pub struct ClnGrpcClient {
     client: NodeClient<Channel>,
+    maxfeepercent: Option<f64>,
+    payment_timeout: Option<u32>,
+    payment_exemptfee: Option<Amount>,
 }
 
-impl ClnClient {
-    pub async fn new(config: ClnClientConfig) -> Result<Self, LightningError> {
+impl ClnGrpcClient {
+    pub async fn new(
+        config: ClnClientConfig,
+        ln_events: Arc<dyn LnEventsUseCases>,
+    ) -> Result<Self, LightningError> {
         let (identity, ca_certificate) = Self::read_certificates(&config.certs_dir)
             .await
             .map_err(|e| LightningError::ReadCertificates(e.to_string()))?;
@@ -49,21 +63,30 @@ impl ClnClient {
             .ca_certificate(ca_certificate)
             .domain_name("localhost"); // Use localhost if you are not sure about the domain name
 
-        let channel = Channel::from_shared(config.endpoint)
-            .unwrap()
+        let tls_config = Channel::from_shared(config.endpoint)
+            .map_err(|e| LightningError::ParseConfig(e.to_string()))?
             .tls_config(tls_config)
-            .map_err(|e| LightningError::Connect(e.to_string()))?
+            .map_err(|e| LightningError::ParseConfig(e.to_string()))?;
+
+        let channel = tls_config
             .connect()
             .await
             .map_err(|e| LightningError::Connect(e.to_string()))?;
 
-        let mut client = NodeClient::new(channel);
-        client
-            .getinfo(GetinfoRequest {})
-            .await
-            .map_err(|e| LightningError::HealthCheck(e.to_string()))?;
+        let client = NodeClient::new(channel);
 
-        Ok(Self { client })
+        let listener = ClnGrpcListener::new(ln_events, Duration::from_secs(5));
+        listener
+            .listen_invoices(client.clone())
+            .await
+            .map_err(|e| LightningError::Connect(e.to_string()))?;
+
+        Ok(Self {
+            client,
+            maxfeepercent: config.maxfeepercent,
+            payment_timeout: config.payment_timeout,
+            payment_exemptfee: config.payment_exemptfee.map(|fee| Amount { msat: fee }),
+        })
     }
 
     async fn read_certificates(certs_dir: &str) -> io::Result<(Identity, Certificate)> {
@@ -85,14 +108,14 @@ impl ClnClient {
 }
 
 #[async_trait]
-impl LnClient for ClnClient {
+impl LnClient for ClnGrpcClient {
     async fn invoice(
         &self,
         amount_msat: u64,
         description: String,
         expiry: u32,
     ) -> Result<Invoice, LightningError> {
-        let mut client = self.client.clone();
+        let mut client: NodeClient<Channel> = self.client.clone();
 
         let label = Uuid::new_v4();
         let response = client
@@ -109,11 +132,12 @@ impl LnClient for ClnClient {
                 ..Default::default()
             })
             .await
+            .map_err(|e| LightningError::Invoice(e.message().to_string()))?;
+
+        let bolt11 = Bolt11Invoice::from_str(&response.into_inner().bolt11)
             .map_err(|e| LightningError::Invoice(e.to_string()))?;
 
-        // TODO: Add warnings from node if necessary for alerting
-
-        let mut invoice: Invoice = response.into_inner().into();
+        let mut invoice: Invoice = bolt11.into();
         invoice.label = Some(label);
 
         Ok(invoice)
@@ -131,32 +155,29 @@ impl LnClient for ClnClient {
         todo!();
     }
 
-    async fn send_payment(
+    async fn pay(
         &self,
         bolt11: String,
         amount_msat: Option<u64>,
         label: Uuid,
     ) -> Result<Payment, LightningError> {
-        todo!();
-    }
+        let mut client: NodeClient<Channel> = self.client.clone();
 
-    async fn send_spontaneous_payment(
-        &self,
-        node_id: String,
-        amount_msat: u64,
-        label: Uuid,
-    ) -> Result<Payment, LightningError> {
-        todo!();
-    }
+        let response = client
+            .pay(PayRequest {
+                bolt11,
+                amount_msat: amount_msat.map(|msat| cln::Amount { msat }),
+                label: Some(label.to_string()),
+                maxfeepercent: self.maxfeepercent,
+                retry_for: self.payment_timeout,
+                exemptfee: self.payment_exemptfee.clone(),
+                ..Default::default()
+            })
+            .await
+            .map_err(|e| LightningError::Pay(e.message().to_string()))?
+            .into_inner();
 
-    async fn lnurl_pay(
-        &self,
-        data: LnUrlPayRequestData,
-        amount_msat: u64,
-        comment: Option<String>,
-        label: Uuid,
-    ) -> Result<Payment, LightningError> {
-        todo!();
+        Ok(response.into())
     }
 
     async fn payment_by_hash(

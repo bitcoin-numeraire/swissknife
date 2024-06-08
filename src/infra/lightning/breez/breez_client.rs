@@ -8,10 +8,9 @@ use async_trait::async_trait;
 use bip39::Mnemonic;
 use breez_sdk_core::{
     BreezServices, ConnectRequest, EnvironmentType, GreenlightCredentials, GreenlightNodeConfig,
-    ListPaymentsRequest, LnUrlPayRequest, LnUrlPayRequestData, LnUrlPayResult, LspInformation,
-    NodeConfig, NodeState, PayOnchainRequest, Payment as BreezPayment,
-    PrepareOnchainPaymentRequest, PrepareRedeemOnchainFundsRequest, ReceivePaymentRequest,
-    RedeemOnchainFundsRequest, ReverseSwapInfo, SendPaymentRequest, SendSpontaneousPaymentRequest,
+    ListPaymentsRequest, LspInformation, NodeConfig, NodeState, PayOnchainRequest,
+    Payment as BreezPayment, PrepareOnchainPaymentRequest, PrepareRedeemOnchainFundsRequest,
+    ReceivePaymentRequest, RedeemOnchainFundsRequest, ReverseSwapInfo, SendPaymentRequest,
     ServiceHealthCheckResponse, SwapAmountType,
 };
 
@@ -47,7 +46,7 @@ pub struct BreezClient {
 impl BreezClient {
     pub async fn new(
         config: BreezClientConfig,
-        payments_processor: Arc<dyn LnEventsUseCases>,
+        ln_events: Arc<dyn LnEventsUseCases>,
     ) -> Result<Self, LightningError> {
         if config.log_in_file {
             BreezServices::init_logging(&config.working_dir, None)
@@ -75,7 +74,7 @@ impl BreezClient {
         let seed =
             Mnemonic::parse(config.seed).map_err(|e| LightningError::ParseSeed(e.to_string()))?;
 
-        let listener = BreezListener::new(payments_processor);
+        let listener = BreezListener::new(ln_events);
 
         let sdk = BreezServices::connect(
             ConnectRequest {
@@ -171,7 +170,7 @@ impl LnClient for BreezClient {
         Ok(payments)
     }
 
-    async fn send_payment(
+    async fn pay(
         &self,
         bolt11: String,
         amount_msat: Option<u64>,
@@ -185,68 +184,9 @@ impl LnClient for BreezClient {
                 label: Some(label.to_string()),
             })
             .await
-            .map_err(|e| LightningError::SendBolt11Payment(e.to_string()))?;
+            .map_err(|e| LightningError::Pay(e.to_string()))?;
 
         Ok(response.payment.into())
-    }
-
-    async fn send_spontaneous_payment(
-        &self,
-        node_id: String,
-        amount_msat: u64,
-        label: Uuid,
-    ) -> Result<Payment, LightningError> {
-        let response = self
-            .sdk
-            .send_spontaneous_payment(SendSpontaneousPaymentRequest {
-                node_id,
-                amount_msat,
-                extra_tlvs: None, // TODO: Add support for extra TLVs
-                label: Some(label.to_string()),
-            })
-            .await
-            .map_err(|e| LightningError::SendNodeIdPayment(e.to_string()))?;
-
-        Ok(response.payment.into())
-    }
-
-    async fn lnurl_pay(
-        &self,
-        data: LnUrlPayRequestData,
-        amount_msat: u64,
-        comment: Option<String>,
-        label: Uuid,
-    ) -> Result<Payment, LightningError> {
-        let result = self
-            .sdk
-            .lnurl_pay(LnUrlPayRequest {
-                data,
-                amount_msat,
-                comment,
-                payment_label: Some(label.to_string()),
-            })
-            .await
-            .map_err(|e| LightningError::SendLNURLPayment(e.to_string()))?;
-
-        match result {
-            LnUrlPayResult::EndpointSuccess { data } => {
-                let mut payment: Payment = data.payment.clone().into();
-                payment.success_action = data
-                    .success_action
-                    .and_then(|action| serde_json::to_value(action).ok());
-
-                Ok(payment)
-            }
-            LnUrlPayResult::EndpointError { data } => {
-                return Err(LightningError::SendLNURLPayment(data.reason));
-            }
-            LnUrlPayResult::PayError { data } => Ok(Payment {
-                payment_hash: Some(data.payment_hash),
-                error: Some(data.reason),
-                amount_msat,
-                ..Default::default()
-            }),
-        }
     }
 
     async fn payment_by_hash(

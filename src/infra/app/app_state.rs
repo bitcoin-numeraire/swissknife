@@ -6,11 +6,15 @@ use crate::{
         entities::{AppServices, AppStore},
         errors::{ApplicationError, ConfigError, WebServerError},
     },
-    domains::lightning::services::LnEventsService,
+    domains::lightning::services::{LnEventsService, LnEventsUseCases},
     infra::{
         auth::{jwt::JWTAuthenticator, Authenticator},
         database::sea_orm::SeaORMClient,
-        lightning::{breez::BreezClient, cln::ClnClient, LnClient},
+        lightning::{
+            breez::BreezClient,
+            cln::{ClnGrpcClient, ClnRestClient},
+            LnClient,
+        },
     },
 };
 use humantime::parse_duration;
@@ -43,7 +47,8 @@ impl AppState {
 
         // Adapters
         let store = AppStore::new_sea_orm(db_conn);
-        let ln_client = get_ln_client(config.clone(), store.clone()).await?;
+        let ln_events = LnEventsService::new(store.clone());
+        let ln_client = get_ln_client(config.clone(), Arc::new(ln_events)).await?;
 
         // Services
         let services = AppServices::new(config, store, ln_client);
@@ -58,7 +63,7 @@ impl AppState {
 
 pub async fn get_ln_client(
     config: AppConfig,
-    store: AppStore,
+    ln_events: Arc<dyn LnEventsUseCases>,
 ) -> Result<Arc<dyn LnClient>, ApplicationError> {
     match config.ln_provider {
         LightningProvider::Breez => {
@@ -66,13 +71,12 @@ pub async fn get_ln_client(
                 ConfigError::MissingLightningProviderConfig(config.ln_provider.to_string())
             })?;
 
-            let lightning_events: LnEventsService = LnEventsService::new(store);
-            let client = BreezClient::new(breez_config.clone(), Arc::new(lightning_events)).await?;
-
             info!(
                 working_dir = %breez_config.working_dir,
                 "Lightning provider: Breez"
             );
+
+            let client = BreezClient::new(breez_config.clone(), ln_events).await?;
 
             Ok(Arc::new(client))
         }
@@ -81,12 +85,26 @@ pub async fn get_ln_client(
                 ConfigError::MissingLightningProviderConfig(config.ln_provider.to_string())
             })?;
 
-            let client = ClnClient::new(cln_config.clone()).await?;
+            info!(
+                endpoint = %cln_config.endpoint,
+                "Lightning provider: Core Lightning gRPC"
+            );
+
+            let client = ClnGrpcClient::new(cln_config.clone(), ln_events).await?;
+
+            Ok(Arc::new(client))
+        }
+        LightningProvider::ClnRest => {
+            let cln_config = config.cln_rest_config.clone().ok_or_else(|| {
+                ConfigError::MissingLightningProviderConfig(config.ln_provider.to_string())
+            })?;
 
             info!(
                 endpoint = %cln_config.endpoint,
-                "Lightning provider: Core Lightning"
+                "Lightning provider: Core Lightning REST"
             );
+
+            let client = ClnRestClient::new(cln_config.clone()).await?;
 
             Ok(Arc::new(client))
         }

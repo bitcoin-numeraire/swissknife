@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use breez_sdk_core::{LNInvoice, Network as BreezNetwork, Payment as BreezPayment};
+use breez_sdk_core::{LNInvoice, Network as BreezNetwork, Payment as BreezPayment, PaymentDetails};
 use chrono::{TimeZone, Utc};
 use serde_bolt::bitcoin::hashes::hex::ToHex;
 
@@ -8,6 +8,7 @@ use crate::{
     application::entities::{Currency, Ledger},
     domains::{
         invoices::entities::{Invoice, LnInvoice},
+        lightning::entities::LnInvoicePaidEvent,
         payments::entities::Payment,
     },
 };
@@ -41,8 +42,11 @@ impl Into<Payment> for BreezPayment {
     fn into(self) -> Payment {
         Payment {
             ledger: Ledger::LIGHTNING,
-            currency: Currency::Bitcoin,
             payment_hash: Some(self.id),
+            payment_preimage: match self.details {
+                PaymentDetails::Ln { data } => Some(data.payment_preimage),
+                _ => None,
+            },
             error: self.error,
             amount_msat: self.amount_msat,
             fee_msat: Some(self.fee_msat),
@@ -61,6 +65,17 @@ impl Into<Currency> for BreezNetwork {
             BreezNetwork::Regtest => Currency::Regtest,
             BreezNetwork::Signet => Currency::Signet,
             BreezNetwork::Testnet => Currency::BitcoinTestnet,
+        }
+    }
+}
+
+impl Into<LnInvoicePaidEvent> for BreezPayment {
+    fn into(self) -> LnInvoicePaidEvent {
+        LnInvoicePaidEvent {
+            payment_hash: self.id,
+            amount_msat: self.amount_msat,
+            fee_msat: self.fee_msat,
+            payment_time: Utc.timestamp_opt(self.payment_time, 0).unwrap(),
         }
     }
 }

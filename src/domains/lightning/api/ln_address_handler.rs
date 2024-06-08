@@ -37,7 +37,7 @@ impl LnAddressHandler {
 
         let ln_address = app_state
             .services
-            .ln_address
+            .lnurl
             .register(payload.user_id.unwrap_or(user.sub), payload.username)
             .await?;
         Ok(Json(ln_address.into()))
@@ -50,7 +50,7 @@ impl LnAddressHandler {
     ) -> Result<Json<LnAddress>, ApplicationError> {
         user.check_permission(Permission::ReadLnAddress)?;
 
-        let ln_address = app_state.services.ln_address.get(id).await?;
+        let ln_address = app_state.services.lnurl.get(id).await?;
         Ok(Json(ln_address.into()))
     }
 
@@ -61,7 +61,7 @@ impl LnAddressHandler {
     ) -> Result<Json<Vec<LnAddress>>, ApplicationError> {
         user.check_permission(Permission::ReadLnAddress)?;
 
-        let ln_addresses = app_state.services.ln_address.list(query_params).await?;
+        let ln_addresses = app_state.services.lnurl.list(query_params).await?;
 
         let response: Vec<LnAddress> = ln_addresses.into_iter().map(Into::into).collect();
 
@@ -75,7 +75,7 @@ impl LnAddressHandler {
     ) -> Result<(), ApplicationError> {
         user.check_permission(Permission::WriteLnAddress)?;
 
-        app_state.services.ln_address.delete(id).await?;
+        app_state.services.lnurl.delete(id).await?;
         Ok(())
     }
 
@@ -86,11 +86,7 @@ impl LnAddressHandler {
     ) -> Result<Json<u64>, ApplicationError> {
         user.check_permission(Permission::WriteLnAddress)?;
 
-        let n_deleted = app_state
-            .services
-            .ln_address
-            .delete_many(query_params)
-            .await?;
+        let n_deleted = app_state.services.lnurl.delete_many(query_params).await?;
         Ok(n_deleted.into())
     }
 }

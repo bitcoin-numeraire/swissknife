@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use sea_orm::{
     ActiveModelTrait, ActiveValue::Set, ColumnTrait, DatabaseConnection, DatabaseTransaction,
-    EntityTrait, QueryFilter, QueryOrder, QuerySelect, QueryTrait, Unchanged,
+    EntityTrait, QueryFilter, QueryOrder, QuerySelect, QueryTrait,
 };
 use uuid::Uuid;
 
@@ -65,7 +65,6 @@ impl PaymentRepository for SeaOrmPaymentRepository {
             amount_msat: Set(payment.amount_msat as i64),
             status: Set(payment.status.to_string()),
             ledger: Set(payment.ledger.to_string()),
-            currency: Set(payment.currency.to_string()),
             fee_msat: Set(payment.fee_msat.map(|v| v as i64)),
             payment_time: Set(payment.payment_time),
             payment_hash: Set(payment.payment_hash),
@@ -85,27 +84,21 @@ impl PaymentRepository for SeaOrmPaymentRepository {
     }
 
     async fn update(&self, payment: Payment) -> Result<Payment, DatabaseError> {
-        let mut model = ActiveModel {
+        let model = ActiveModel {
             id: Set(payment.id),
             status: Set(payment.status.to_string()),
             fee_msat: Set(payment.fee_msat.map(|v| v as i64)),
             payment_time: Set(payment.payment_time),
             payment_hash: Set(payment.payment_hash),
+            payment_preimage: Set(payment.payment_preimage),
             error: Set(payment.error),
             amount_msat: Set(payment.amount_msat as i64),
             metadata: Set(payment.metadata),
+            success_action: Set(payment
+                .success_action
+                .and_then(|action| serde_json::to_value(action).ok())),
             ..Default::default()
         };
-
-        // TODO: Remove when event contains success_action or when we retrieve payments by querying the API after queue implementation
-        match payment.success_action {
-            Some(_) => {
-                model.success_action = Set(payment.success_action);
-            }
-            None => {
-                model.success_action = Unchanged(payment.success_action);
-            }
-        }
 
         let model = model
             .update(&self.db)

@@ -1,3 +1,4 @@
+mod lnurl;
 mod payments_service;
 mod payments_use_cases;
 

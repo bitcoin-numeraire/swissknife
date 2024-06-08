@@ -7,6 +7,7 @@ use serde_with::DurationSeconds;
 use strum_macros::{Display, EnumString};
 use uuid::Uuid;
 
+use crate::application::entities::OrderDirection;
 use crate::application::entities::{Currency, Ledger, PaginationFilter};
 
 #[serde_as]
@@ -51,22 +52,6 @@ pub struct LnInvoice {
     pub expires_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct LnURLpInvoice {
-    pub pr: String,                            // bech32-serialized lightning invoice
-    pub success_action: Option<SuccessAction>, // An optional action to be executed after successfully paying an invoice
-    pub disposable: Option<bool>, // An optional flag to let a wallet know whether to persist the link from step 1, if null should be interpreted as true
-    pub routes: Vec<String>, // array with payment routes, should be left empty if no routes are to be provided
-}
-
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct SuccessAction {
-    pub tag: String,             // action type (url, message, aes, ...)
-    pub message: Option<String>, // rest of fields depends on tag value
-}
-
 #[derive(Clone, Debug, EnumString, Deserialize, Serialize, Display, PartialEq, Eq, Default)]
 pub enum InvoiceStatus {
     #[default]
@@ -82,4 +67,7 @@ pub struct InvoiceFilter {
     pub id: Option<Uuid>,
     pub user_id: Option<String>,
     pub status: Option<InvoiceStatus>,
+    pub ledger: Option<Ledger>,
+    #[serde(default)]
+    pub order_direction: OrderDirection,
 }

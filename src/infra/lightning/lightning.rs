@@ -1,7 +1,6 @@
 use async_trait::async_trait;
 use breez_sdk_core::{
-    LnUrlPayRequestData, LspInformation, NodeState, Payment as BreezPayment, ReverseSwapInfo,
-    ServiceHealthCheckResponse,
+    LspInformation, NodeState, Payment as BreezPayment, ReverseSwapInfo, ServiceHealthCheckResponse,
 };
 use uuid::Uuid;
 
@@ -25,23 +24,10 @@ pub trait LnClient: Sync + Send {
         &self,
         payment_hash: String,
     ) -> Result<Option<BreezPayment>, LightningError>;
-    async fn send_payment(
+    async fn pay(
         &self,
         bolt11: String,
         amount_msat: Option<u64>,
-        label: Uuid,
-    ) -> Result<Payment, LightningError>;
-    async fn send_spontaneous_payment(
-        &self,
-        node_id: String,
-        amount_msat: u64,
-        label: Uuid,
-    ) -> Result<Payment, LightningError>;
-    async fn lnurl_pay(
-        &self,
-        data: LnUrlPayRequestData,
-        amount_msat: u64,
-        comment: Option<String>,
         label: Uuid,
     ) -> Result<Payment, LightningError>;
     async fn health(&self) -> Result<ServiceHealthCheckResponse, LightningError>;

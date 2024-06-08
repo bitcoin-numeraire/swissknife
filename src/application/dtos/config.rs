@@ -5,7 +5,10 @@ use crate::infra::{
     auth::AuthConfig,
     axum::AxumServerConfig,
     database::DatabaseConfig,
-    lightning::{breez::BreezClientConfig, cln::ClnClientConfig},
+    lightning::{
+        breez::BreezClientConfig,
+        cln::{ClnClientConfig, ClnRestClientConfig},
+    },
     logging::tracing::TracingLoggerConfig,
 };
 
@@ -18,6 +21,7 @@ pub struct AppConfig {
     pub database: DatabaseConfig,
     pub breez_config: Option<BreezClientConfig>,
     pub cln_config: Option<ClnClientConfig>,
+    pub cln_rest_config: Option<ClnRestClientConfig>,
     pub web: AxumServerConfig,
     pub logging: TracingLoggerConfig,
     pub auth: AuthConfig,
@@ -30,4 +34,5 @@ pub enum LightningProvider {
     #[default]
     Breez,
     Cln,
+    ClnRest,
 }

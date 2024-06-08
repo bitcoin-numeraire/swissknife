@@ -91,7 +91,7 @@ impl WalletHandler {
     ) -> Result<Json<LnAddress>, ApplicationError> {
         let ln_addresses = app_state
             .services
-            .ln_address
+            .lnurl
             .list(LnAddressFilter {
                 user_id: Some(user.sub),
                 ..Default::default()
@@ -113,7 +113,7 @@ impl WalletHandler {
     ) -> Result<Json<LnAddress>, ApplicationError> {
         let ln_address = app_state
             .services
-            .ln_address
+            .lnurl
             .register(user.sub, payload.username)
             .await?;
         Ok(Json(ln_address.into()))
