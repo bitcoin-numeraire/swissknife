@@ -1,14 +1,15 @@
 use std::{sync::Arc, time::Duration};
 
 use ::hex::decode;
+use anyhow::{anyhow, Result};
 use chrono::{TimeZone, Utc};
 use serde_bolt::bitcoin::hashes::hex::ToHex;
 use tokio::time::sleep;
-use tonic::transport::Channel;
+use tonic::{transport::Channel, Code};
 use tracing::{debug, error, info, trace, warn};
 
 use crate::{
-    application::errors::{ApplicationError, LightningError},
+    application::errors::ApplicationError,
     domains::lightning::{entities::LnInvoicePaidEvent, services::LnEventsUseCases},
     infra::lightning::cln::cln::{
         waitanyinvoice_response::WaitanyinvoiceStatus, ListinvoicesRequest,
@@ -31,16 +32,9 @@ impl ClnGrpcListener {
         }
     }
 
-    pub async fn listen_invoices(
-        self,
-        mut client: NodeClient<Channel>,
-    ) -> Result<(), LightningError> {
+    pub async fn listen_invoices(self, mut client: NodeClient<Channel>) -> Result<()> {
         // Temporary. get the latest settled invoice payment_hash as starting point for event listening
-        let last_settled_invoice = self
-            .ln_events
-            .latest_settled_invoice()
-            .await
-            .map_err(|e| LightningError::Listener(e.to_string()))?;
+        let last_settled_invoice = self.ln_events.latest_settled_invoice().await?;
 
         let mut lastpay_index = match last_settled_invoice {
             Some(invoice) => {
@@ -55,8 +49,7 @@ impl ClnGrpcListener {
                         payment_hash: decode(payment_hash).ok(),
                         ..Default::default()
                     })
-                    .await
-                    .map_err(|e| LightningError::ListInvoices(e.to_string()))?
+                    .await?
                     .into_inner()
                     .invoices;
 
@@ -113,10 +106,23 @@ impl ClnGrpcListener {
                         }
                     }
                 }
-                Err(err) => {
-                    error!(?err, "Error waiting for invoice. Retrying...");
-                    sleep(self.retry_delay).await;
-                }
+                Err(err) => match err.code() {
+                    Code::Aborted
+                    | Code::Cancelled
+                    | Code::DeadlineExceeded
+                    | Code::Internal
+                    | Code::FailedPrecondition
+                    | Code::Unavailable => {
+                        error!(
+                            err = err.message(),
+                            "Error waiting for invoice. Retrying..."
+                        );
+                        sleep(Duration::from_secs(5)).await;
+                    }
+                    _ => {
+                        return Err(anyhow!(err.to_string()));
+                    }
+                },
             }
         }
     }

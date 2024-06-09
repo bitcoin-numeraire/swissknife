@@ -23,9 +23,6 @@ pub enum LightningError {
     #[error("Failed to generate Lightning invoice: {0}")]
     Invoice(String),
 
-    #[error("Failed to list invoices: {0}")]
-    ListInvoices(String),
-
     #[error("Failed to get Lightning node info: {0}")]
     NodeInfo(String),
 

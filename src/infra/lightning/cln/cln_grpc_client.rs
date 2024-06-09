@@ -112,7 +112,7 @@ impl LnClient for ClnGrpcClient {
             .clone()
             .listen_invoices(self.client.clone())
             .await
-            .map_err(|e| LightningError::Connect(e.to_string()))
+            .map_err(|e| LightningError::Listener(e.to_string()))
     }
 
     async fn invoice(
