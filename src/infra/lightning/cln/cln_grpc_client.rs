@@ -36,6 +36,7 @@ pub struct ClnClientConfig {
     pub maxfeepercent: Option<f64>,
     pub payment_timeout: Option<u32>,
     pub payment_exemptfee: Option<u64>,
+    pub retry_delay: Option<Duration>,
 }
 
 const DEFAULT_CLIENT_CERT_FILENAME: &str = "client.pem";
@@ -76,7 +77,10 @@ impl ClnGrpcClient {
 
         let client = NodeClient::new(channel);
 
-        let listener = ClnGrpcListener::new(ln_events, Duration::from_secs(5));
+        let listener = ClnGrpcListener::new(
+            ln_events,
+            config.retry_delay.unwrap_or(Duration::from_secs(5)),
+        );
 
         Ok(Self {
             client,

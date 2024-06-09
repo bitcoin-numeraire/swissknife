@@ -1,4 +1,4 @@
-use std::str::FromStr;
+use std::{str::FromStr, time::Duration};
 
 use breez_sdk_core::{
     LspInformation, NodeState, Payment as BreezPayment, ReverseSwapInfo, ServiceHealthCheckResponse,
@@ -34,6 +34,7 @@ pub struct ClnRestClientConfig {
     pub maxfeepercent: Option<f64>,
     pub payment_timeout: Option<u32>,
     pub payment_exemptfee: Option<u64>,
+    pub retry_delay: Option<Duration>,
 }
 
 pub struct ClnRestClient {
@@ -71,7 +72,12 @@ impl ClnRestClient {
             .build()
             .map_err(|e| LightningError::ParseConfig(e.to_string()))?;
 
-        let ws_client = ClnWsClient::new(config.clone()).await?;
+        let ws_client = ClnWsClient::new(
+            config.ws_endpoint,
+            config.rune,
+            config.retry_delay.unwrap_or(Duration::from_secs(5)),
+        )
+        .await?;
 
         Ok(Self {
             client,

@@ -11,22 +11,27 @@ use tracing::{debug, error, warn};
 
 use crate::application::errors::LightningError;
 
-use super::ClnRestClientConfig;
-
 pub struct ClnWsClient {
     client: ClientRequestBuilder,
+    retry_delay: Duration,
 }
 
 impl ClnWsClient {
-    pub async fn new(config: ClnRestClientConfig) -> Result<Self, LightningError> {
-        let uri = config
-            .ws_endpoint
+    pub async fn new(
+        endpoint: String,
+        rune: String,
+        retry_delay: Duration,
+    ) -> Result<Self, LightningError> {
+        let uri = endpoint
             .parse::<Uri>()
             .map_err(|e| LightningError::ParseConfig(e.to_string()))?;
 
-        let client = ClientRequestBuilder::new(uri).with_header("rune", config.rune.clone());
+        let client = ClientRequestBuilder::new(uri).with_header("rune", rune);
 
-        Ok(Self { client })
+        Ok(Self {
+            client,
+            retry_delay,
+        })
     }
 
     pub async fn listen(&self) -> Result<()> {
@@ -45,7 +50,7 @@ impl ClnWsClient {
                             }
                             Ok(Message::Close(frame)) => {
                                 error!(?frame, "Received close message retrying in 5 seconds");
-                                sleep(Duration::from_secs(5)).await;
+                                sleep(self.retry_delay).await;
                                 break;
                             }
                             Ok(msg) => {
@@ -73,7 +78,7 @@ impl ClnWsClient {
                             ?err,
                             "Failed to connect to WebSocket server, retrying in 5 seconds"
                         );
-                        sleep(Duration::from_secs(5)).await;
+                        sleep(self.retry_delay).await;
                     }
                 },
             }
