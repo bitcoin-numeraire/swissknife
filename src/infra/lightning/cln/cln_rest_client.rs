@@ -42,6 +42,7 @@ pub struct ClnRestClient {
     maxfeepercent: Option<f64>,
     payment_timeout: Option<u32>,
     payment_exemptfee: Option<u64>,
+    ws_client: ClnWsClient,
 }
 
 const USER_AGENT: &str = "Numeraire Swissknife/1.0";
@@ -70,8 +71,7 @@ impl ClnRestClient {
             .build()
             .map_err(|e| LightningError::ParseConfig(e.to_string()))?;
 
-        let ws_client = ClnWsClient::new(config.clone())?;
-        ws_client.listen();
+        let ws_client = ClnWsClient::new(config.clone()).await?;
 
         Ok(Self {
             client,
@@ -79,6 +79,7 @@ impl ClnRestClient {
             maxfeepercent: config.maxfeepercent,
             payment_timeout: config.payment_timeout,
             payment_exemptfee: config.payment_exemptfee,
+            ws_client,
         })
     }
 
@@ -102,6 +103,13 @@ impl ClnRestClient {
 
 #[async_trait]
 impl LnClient for ClnRestClient {
+    async fn listen_events(&self) -> Result<(), LightningError> {
+        self.ws_client
+            .listen()
+            .await
+            .map_err(|e| LightningError::Listener(e.to_string()))
+    }
+
     async fn invoice(
         &self,
         amount_msat: u64,

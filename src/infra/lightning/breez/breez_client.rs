@@ -106,6 +106,11 @@ impl BreezClient {
 
 #[async_trait]
 impl LnClient for BreezClient {
+    async fn listen_events(&self) -> Result<(), LightningError> {
+        std::future::pending::<()>().await;
+        Ok(())
+    }
+
     async fn invoice(
         &self,
         amount_msat: u64,

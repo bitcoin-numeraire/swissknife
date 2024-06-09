@@ -17,8 +17,8 @@ pub enum LightningError {
     #[error("Failed to connect to lightning node or service: {0}")]
     Connect(String),
 
-    #[error("Failed to connect to websocket service: {0}")]
-    ConnectWebSocket(String),
+    #[error("Lightning event listener failure: {0}")]
+    Listener(String),
 
     #[error("Failed to generate Lightning invoice: {0}")]
     Invoice(String),

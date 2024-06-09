@@ -47,6 +47,7 @@ pub struct ClnGrpcClient {
     maxfeepercent: Option<f64>,
     payment_timeout: Option<u32>,
     payment_exemptfee: Option<Amount>,
+    listener: ClnGrpcListener,
 }
 
 impl ClnGrpcClient {
@@ -76,16 +77,13 @@ impl ClnGrpcClient {
         let client = NodeClient::new(channel);
 
         let listener = ClnGrpcListener::new(ln_events, Duration::from_secs(5));
-        listener
-            .listen_invoices(client.clone())
-            .await
-            .map_err(|e| LightningError::Connect(e.to_string()))?;
 
         Ok(Self {
             client,
             maxfeepercent: config.maxfeepercent,
             payment_timeout: config.payment_timeout,
             payment_exemptfee: config.payment_exemptfee.map(|fee| Amount { msat: fee }),
+            listener,
         })
     }
 
@@ -109,6 +107,14 @@ impl ClnGrpcClient {
 
 #[async_trait]
 impl LnClient for ClnGrpcClient {
+    async fn listen_events(&self) -> Result<(), LightningError> {
+        self.listener
+            .clone()
+            .listen_invoices(self.client.clone())
+            .await
+            .map_err(|e| LightningError::Connect(e.to_string()))
+    }
+
     async fn invoice(
         &self,
         amount_msat: u64,
