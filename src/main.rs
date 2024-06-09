@@ -3,11 +3,12 @@ mod domains;
 mod infra;
 
 use std::process::exit;
+use std::sync::Arc;
 
 #[cfg(debug_assertions)]
 use dotenv::dotenv;
+use infra::app::start;
 
-use crate::infra::app::App;
 use crate::infra::app::AppState;
 use crate::infra::config::config_rs::load_config;
 use crate::infra::logging::tracing::setup_tracing;
@@ -38,9 +39,8 @@ async fn main() {
         }
     };
 
-    let app = App::new(app_state);
-    if let Err(err) = app.start(&config.web.addr).await {
-        error!(%err, "failed to start API server");
+    if let Err(err) = start(Arc::new(app_state), &config.web.addr).await {
+        error!(%err, "failed to start app");
         exit(1);
     }
 }

@@ -24,6 +24,7 @@ use tracing::{info, warn};
 pub struct AppState {
     pub jwt_authenticator: Option<Arc<dyn Authenticator>>,
     pub services: AppServices,
+    pub ln_client: Arc<dyn LnClient>,
     pub timeout_layer: TimeoutLayer,
 }
 
@@ -51,17 +52,18 @@ impl AppState {
         let ln_client = get_ln_client(config.clone(), Arc::new(ln_events)).await?;
 
         // Services
-        let services = AppServices::new(config, store, ln_client);
+        let services = AppServices::new(config, store, ln_client.clone());
 
         Ok(Self {
             jwt_authenticator,
             services,
+            ln_client,
             timeout_layer,
         })
     }
 }
 
-pub async fn get_ln_client(
+async fn get_ln_client(
     config: AppConfig,
     ln_events: Arc<dyn LnEventsUseCases>,
 ) -> Result<Arc<dyn LnClient>, ApplicationError> {
@@ -101,6 +103,7 @@ pub async fn get_ln_client(
 
             info!(
                 endpoint = %cln_config.endpoint,
+                ws_endpoint = %cln_config.ws_endpoint,
                 "Lightning provider: Core Lightning REST"
             );
 

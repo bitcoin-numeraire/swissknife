@@ -1,125 +1,87 @@
-use crate::application::errors::LightningError;
-use http::HeaderValue;
-use std::net::TcpStream;
+use anyhow::{anyhow, Result};
+use axum::http::Uri;
+use futures_util::StreamExt;
 use std::time::Duration;
-use tokio::task;
-use tokio::time;
-use tracing::warn;
-use tracing::{debug, error, info};
-use tungstenite::{client::IntoClientRequest, connect, stream::MaybeTlsStream, Message, WebSocket};
+use tokio::time::sleep;
+use tokio_tungstenite::{
+    connect_async,
+    tungstenite::{error::Error, ClientRequestBuilder, Message},
+};
+use tracing::{debug, error, warn};
 
-use super::ClnRestClientConfig;
+use crate::application::errors::LightningError;
 
 pub struct ClnWsClient {
-    config: ClnRestClientConfig,
-    socket: Option<WebSocket<MaybeTlsStream<TcpStream>>>,
+    client: ClientRequestBuilder,
+    retry_delay: Duration,
 }
 
 impl ClnWsClient {
-    pub fn new(config: ClnRestClientConfig) -> Result<Self, LightningError> {
-        let socket = Self::connect(&config)?;
+    pub async fn new(
+        endpoint: String,
+        rune: String,
+        retry_delay: Duration,
+    ) -> Result<Self, LightningError> {
+        let uri = endpoint
+            .parse::<Uri>()
+            .map_err(|e| LightningError::ParseConfig(e.to_string()))?;
+
+        let client = ClientRequestBuilder::new(uri).with_header("rune", rune);
+
         Ok(Self {
-            config,
-            socket: Some(socket),
+            client,
+            retry_delay,
         })
     }
 
-    fn connect(
-        config: &ClnRestClientConfig,
-    ) -> Result<WebSocket<MaybeTlsStream<TcpStream>>, LightningError> {
-        let mut req = config
-            .ws_endpoint
-            .clone()
-            .into_client_request()
-            .map_err(|e| LightningError::ParseConfig(e.to_string()))?;
+    pub async fn listen(&self) -> Result<()> {
+        loop {
+            match connect_async(self.client.clone()).await {
+                Ok((mut socket, response)) => {
+                    debug!(?response, "Connected to WebSocket server");
 
-        req.headers_mut().insert(
-            "rune",
-            HeaderValue::from_str(&config.rune)
-                .map_err(|e| LightningError::ParseConfig(e.to_string()))?,
-        );
-
-        let (socket, response) =
-            connect(req).map_err(|e| LightningError::ConnectWebSocket(e.to_string()))?;
-
-        debug!(?response, "Connected to WebSocket server");
-
-        Ok(socket)
-    }
-
-    pub fn listen(mut self) {
-        task::spawn(async move {
-            loop {
-                if self.socket.is_none() {
-                    match self.reconnect().await {
-                        Ok(_) => info!("Reconnected to WebSocket"),
-                        Err(e) => {
-                            error!(?e, "Reconnection failed");
-                            time::sleep(Duration::from_secs(5)).await;
-                            continue;
-                        }
-                    }
-                }
-
-                if let Some(socket) = &mut self.socket {
-                    match socket.read() {
-                        Ok(msg) => match msg {
-                            Message::Text(text) => {
+                    while let Some(msg) = socket.next().await {
+                        match msg {
+                            Ok(Message::Text(text)) => {
                                 println!("Received: {}", text);
                             }
-                            Message::Binary(bin) => {
+                            Ok(Message::Binary(bin)) => {
                                 println!("Received binary: {:?}", bin);
                             }
-                            Message::Close(frame) => {
-                                error!(?frame, "Received close message");
-                                self.socket = None;
+                            Ok(Message::Close(frame)) => {
+                                error!(?frame, "Received close message retrying in 5 seconds");
+                                sleep(self.retry_delay).await;
+                                break;
                             }
-                            _ => {
+                            Ok(msg) => {
                                 warn!(?msg, "Received other message type");
                             }
-                        },
-                        Err(err) => {
-                            error!(?err, "Failed to read message");
-                            self.socket = None;
+                            Err(err) => {
+                                error!(?err, "Failed to read message");
+                                break;
+                            }
                         }
                     }
                 }
-            }
-        });
-    }
-
-    async fn reconnect(&mut self) -> Result<(), LightningError> {
-        self.socket = None;
-        let mut attempts = 0;
-        let max_attempts = 5;
-        let delay = Duration::from_secs(5);
-
-        while attempts < max_attempts {
-            attempts += 1;
-            match Self::connect(&self.config) {
-                Ok(new_socket) => {
-                    self.socket = Some(new_socket);
-                    return Ok(());
-                }
-                Err(err) => {
-                    error!(
-                        ?err,
-                        "Reconnection attempt {}/{} failed. Retrying in {} seconds...",
-                        attempts,
-                        max_attempts,
-                        delay.as_secs()
-                    );
-                    time::sleep(delay).await;
-                }
+                Err(err) => match err {
+                    Error::Tls(e) => {
+                        return Err(anyhow!(e.to_string()));
+                    }
+                    Error::Io(e) => {
+                        return Err(anyhow!(e.to_string()));
+                    }
+                    Error::Protocol(e) => {
+                        return Err(anyhow!(e.to_string()));
+                    }
+                    _ => {
+                        error!(
+                            ?err,
+                            "Failed to connect to WebSocket server, retrying in 5 seconds"
+                        );
+                        sleep(self.retry_delay).await;
+                    }
+                },
             }
         }
-
-        error!(
-            "Failed to reconnect after {} attempts. Giving up.",
-            max_attempts
-        );
-        Err(LightningError::ConnectWebSocket(
-            "Failed to reconnect".to_string(),
-        ))
     }
 }

@@ -4181,8 +4181,8 @@ dependencies = [
  "chrono",
  "config",
  "dotenv",
+ "futures-util",
  "hex",
- "http 1.1.0",
  "humantime",
  "jsonwebtoken",
  "lightning-invoice 0.31.0",
@@ -4198,12 +4198,12 @@ dependencies = [
  "strum_macros 0.26.3",
  "thiserror",
  "tokio",
+ "tokio-tungstenite",
  "tonic 0.11.0",
  "tonic-build 0.11.0",
  "tower-http",
  "tracing",
  "tracing-subscriber",
- "tungstenite",
  "uuid",
 ]
 
@@ -4493,6 +4493,20 @@ dependencies = [
  "futures-core",
  "pin-project-lite",
  "tokio",
+]
+
+[[package]]
+name = "tokio-tungstenite"
+version = "0.23.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "becd34a233e7e31a3dbf7c7241b38320f57393dcae8e7324b0167d21b8e320b0"
+dependencies = [
+ "futures-util",
+ "log",
+ "native-tls",
+ "tokio",
+ "tokio-native-tls",
+ "tungstenite",
 ]
 
 [[package]]
