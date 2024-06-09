@@ -2,8 +2,7 @@ use std::time::Duration;
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use serde_with::serde_as;
-use serde_with::DurationSeconds;
+use serde_with::{serde_as, DurationSeconds};
 use strum_macros::{Display, EnumString};
 use uuid::Uuid;
 

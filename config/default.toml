@@ -1,5 +1,5 @@
 # App config
-invoice_expiry = 3600
+invoice_expiry = "1h"
 domain = "numeraire.tech"
 fee_buffer = 0.02
 ln_provider = "breez"
@@ -19,9 +19,9 @@ restore_only = true
 endpoint = "https://localhost:50051"
 certs_dir = "./deps/lightningd/data"
 maxfeepercent = 0.5
-payment_timeout = 60
+payment_timeout = "60s"
 payment_exemptfee = 5000
-retry_delay = 5
+retry_delay = "5s"
 
 [cln_rest_config]
 endpoint = "http://localhost:3010/v1"
@@ -31,9 +31,9 @@ connection_verbose = true
 accept_invalid_certs = false
 ws_endpoint = "ws://localhost:3010"
 maxfeepercent = 0.5
-payment_timeout = 60
+payment_timeout = "60s"
 payment_exemptfee = 5000
-retry_delay = 5
+retry_delay = "5s"
 
 # RGB settings
 [rgb]
@@ -61,7 +61,7 @@ enabled = false
 domain = "domain.auth0.com"
 audience = "https://swissknife.numeraire.tech/api/v1"
 jwks_refresh_interval = "1h"
-leeway = 60
+leeway = "60s"
 
 [database]
 max_lifetime = "30m"

@@ -1,6 +1,8 @@
-use std::env;
+use std::{env, time::Duration};
 
 use config::{Config, Environment, File};
+use humantime::parse_duration;
+use serde::{Deserialize, Deserializer};
 
 use crate::application::{dtos::AppConfig, errors::ConfigError};
 
@@ -28,4 +30,12 @@ pub fn load_config() -> Result<AppConfig, ConfigError> {
         .map_err(|e| ConfigError::Load(e.to_string()))?;
 
     Ok(settings)
+}
+
+pub fn deserialize_duration<'de, D>(deserializer: D) -> Result<Duration, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let s = String::deserialize(deserializer)?;
+    parse_duration(&s).map_err(serde::de::Error::custom)
 }

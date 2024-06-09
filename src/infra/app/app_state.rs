@@ -4,7 +4,7 @@ use crate::{
     application::{
         dtos::{AppConfig, LightningProvider},
         entities::{AppServices, AppStore},
-        errors::{ApplicationError, ConfigError, WebServerError},
+        errors::{ApplicationError, ConfigError},
     },
     domains::lightning::services::{LnEventsService, LnEventsUseCases},
     infra::{
@@ -17,7 +17,6 @@ use crate::{
         },
     },
 };
-use humantime::parse_duration;
 use tower_http::timeout::TimeoutLayer;
 use tracing::{info, warn};
 
@@ -30,11 +29,8 @@ pub struct AppState {
 
 impl AppState {
     pub async fn new(config: AppConfig) -> Result<Self, ApplicationError> {
-        let timeout_request = parse_duration(&config.web.request_timeout)
-            .map_err(|e: humantime::DurationError| WebServerError::ParseConfig(e.to_string()))?;
-
         // Infra
-        let timeout_layer = TimeoutLayer::new(timeout_request);
+        let timeout_layer = TimeoutLayer::new(config.web.request_timeout);
         let db_conn = SeaORMClient::connect(config.database.clone()).await?;
         let jwt_authenticator = if config.auth.enabled {
             Some(

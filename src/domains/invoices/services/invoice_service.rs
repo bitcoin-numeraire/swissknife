@@ -16,7 +16,6 @@ use crate::infra::lightning::LnClient;
 
 use super::InvoiceUseCases;
 
-const DEFAULT_INVOICE_EXPIRY: u32 = 3600 * 24;
 const DEFAULT_INVOICE_DESCRIPTION: &str = "Numeraire Swissknife Invoice";
 
 pub struct InvoiceService {
@@ -26,11 +25,11 @@ pub struct InvoiceService {
 }
 
 impl InvoiceService {
-    pub fn new(store: AppStore, ln_client: Arc<dyn LnClient>, invoice_expiry: Option<u32>) -> Self {
+    pub fn new(store: AppStore, ln_client: Arc<dyn LnClient>, invoice_expiry: u32) -> Self {
         InvoiceService {
             store,
             ln_client,
-            invoice_expiry: invoice_expiry.unwrap_or(DEFAULT_INVOICE_EXPIRY),
+            invoice_expiry,
         }
     }
 }

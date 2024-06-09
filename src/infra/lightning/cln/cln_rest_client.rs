@@ -3,7 +3,6 @@ use std::{str::FromStr, time::Duration};
 use breez_sdk_core::{
     LspInformation, NodeState, Payment as BreezPayment, ReverseSwapInfo, ServiceHealthCheckResponse,
 };
-use humantime::parse_duration;
 use lightning_invoice::Bolt11Invoice;
 use reqwest::{
     header::{HeaderMap, HeaderValue},
@@ -17,7 +16,7 @@ use async_trait::async_trait;
 use crate::{
     application::errors::LightningError,
     domains::{invoices::entities::Invoice, payments::entities::Payment},
-    infra::lightning::LnClient,
+    infra::{config::config_rs::deserialize_duration, lightning::LnClient},
 };
 
 use super::{cln_ws_client::ClnWsClient, InvoiceRequest, InvoiceResponse, PayRequest, PayResponse};
@@ -26,22 +25,26 @@ use super::{cln_ws_client::ClnWsClient, InvoiceRequest, InvoiceResponse, PayRequ
 pub struct ClnRestClientConfig {
     pub endpoint: String,
     pub rune: String,
-    pub connect_timeout: String,
+    #[serde(deserialize_with = "deserialize_duration")]
+    pub connect_timeout: Duration,
     pub connection_verbose: bool,
-    pub timeout: String,
+    #[serde(deserialize_with = "deserialize_duration")]
+    pub timeout: Duration,
     pub accept_invalid_certs: bool,
     pub ws_endpoint: String,
     pub maxfeepercent: Option<f64>,
-    pub payment_timeout: Option<u32>,
+    #[serde(deserialize_with = "deserialize_duration")]
+    pub payment_timeout: Duration,
     pub payment_exemptfee: Option<u64>,
-    pub retry_delay: Option<Duration>,
+    #[serde(deserialize_with = "deserialize_duration")]
+    pub retry_delay: Duration,
 }
 
 pub struct ClnRestClient {
     client: Client,
     base_url: String,
     maxfeepercent: Option<f64>,
-    payment_timeout: Option<u32>,
+    retry_for: Option<u32>,
     payment_exemptfee: Option<u64>,
     ws_client: ClnWsClient,
 }
@@ -50,12 +53,6 @@ const USER_AGENT: &str = "Numeraire Swissknife/1.0";
 
 impl ClnRestClient {
     pub async fn new(config: ClnRestClientConfig) -> Result<Self, LightningError> {
-        let connect_timeout = parse_duration(&config.connect_timeout)
-            .map_err(|e| LightningError::ParseConfig(e.to_string()))?;
-
-        let timeout = parse_duration(&config.connect_timeout)
-            .map_err(|e| LightningError::ParseConfig(e.to_string()))?;
-
         let mut headers = HeaderMap::new();
         let mut rune_header = HeaderValue::from_str(&config.rune)
             .map_err(|e| LightningError::ParseConfig(e.to_string()))?;
@@ -64,26 +61,22 @@ impl ClnRestClient {
 
         let client = Client::builder()
             .user_agent(USER_AGENT)
-            .connect_timeout(connect_timeout)
-            .timeout(timeout)
+            .connect_timeout(config.connect_timeout)
+            .timeout(config.timeout)
             .connection_verbose(config.connection_verbose)
             .default_headers(headers)
             .danger_accept_invalid_certs(config.accept_invalid_certs)
             .build()
             .map_err(|e| LightningError::ParseConfig(e.to_string()))?;
 
-        let ws_client = ClnWsClient::new(
-            config.ws_endpoint,
-            config.rune,
-            config.retry_delay.unwrap_or(Duration::from_secs(5)),
-        )
-        .await?;
+        let ws_client =
+            ClnWsClient::new(config.ws_endpoint, config.rune, config.retry_delay).await?;
 
         Ok(Self {
             client,
             base_url: config.endpoint,
             maxfeepercent: config.maxfeepercent,
-            payment_timeout: config.payment_timeout,
+            retry_for: Some(config.payment_timeout.as_secs() as u32),
             payment_exemptfee: config.payment_exemptfee,
             ws_client,
         })
@@ -171,7 +164,7 @@ impl LnClient for ClnRestClient {
                     amount_msat,
                     label: Some(label.to_string()),
                     maxfeepercent: self.maxfeepercent,
-                    retry_for: self.payment_timeout,
+                    retry_for: self.retry_for,
                     exemptfee: self.payment_exemptfee.clone(),
                 },
             )

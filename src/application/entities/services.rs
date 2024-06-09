@@ -32,12 +32,12 @@ impl AppServices {
         let invoices = InvoiceService::new(
             store.clone(),
             ln_client.clone(),
-            config.invoice_expiry.clone(),
+            config.invoice_expiry.as_secs() as u32,
         );
         let lnurl = LnUrlService::new(
             store.clone(),
             ln_client.clone(),
-            config.invoice_expiry,
+            config.invoice_expiry.as_secs() as u32,
             config.domain,
         );
         let ln_node = LnNodeService::new(ln_client);
