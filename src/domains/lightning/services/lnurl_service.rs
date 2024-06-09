@@ -21,7 +21,6 @@ use super::LnUrlUseCases;
 
 const MIN_USERNAME_LENGTH: usize = 1;
 const MAX_USERNAME_LENGTH: usize = 64;
-const DEFAULT_INVOICE_EXPIRY: u32 = 3600;
 
 pub struct LnUrlService {
     domain: String,
@@ -34,13 +33,13 @@ impl LnUrlService {
     pub fn new(
         store: AppStore,
         ln_client: Arc<dyn LnClient>,
-        invoice_expiry: Option<u32>,
+        invoice_expiry: u32,
         domain: String,
     ) -> Self {
         LnUrlService {
             store,
             ln_client,
-            invoice_expiry: invoice_expiry.unwrap_or(DEFAULT_INVOICE_EXPIRY),
+            invoice_expiry,
             domain,
         }
     }

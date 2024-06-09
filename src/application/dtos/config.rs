@@ -1,9 +1,12 @@
+use std::time::Duration;
+
 use serde::Deserialize;
 use strum_macros::{Display, EnumString};
 
 use crate::infra::{
     auth::AuthConfig,
     axum::AxumServerConfig,
+    config::config_rs::deserialize_duration,
     database::DatabaseConfig,
     lightning::{
         breez::BreezClientConfig,
@@ -15,7 +18,8 @@ use crate::infra::{
 #[derive(Debug, Deserialize, Clone)]
 pub struct AppConfig {
     pub domain: String,
-    pub invoice_expiry: Option<u32>,
+    #[serde(deserialize_with = "deserialize_duration")]
+    pub invoice_expiry: Duration,
     pub fee_buffer: Option<f64>,
     pub ln_provider: LightningProvider,
     pub database: DatabaseConfig,

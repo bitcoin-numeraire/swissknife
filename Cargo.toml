@@ -26,7 +26,6 @@ tracing-subscriber = { version = "0.3.18", features = ["json", "env-filter"] }
 axum-extra = { version = "0.9.0", features = ["typed-header"] }
 jsonwebtoken = "9.2.0"
 reqwest = "=0.11.20"
-humantime = "2.1.0"
 uuid = { version = "1.6.1", features = ["v4", "serde"] }
 chrono = "0.4.31"
 thiserror = "1.0.56"
@@ -49,6 +48,7 @@ hex = "0.4.3"
 anyhow = "1.0.86"
 tokio-tungstenite = { version = "0.23.0", features = ["native-tls"] }
 futures-util = "0.3.30"
+humantime = "2.1.0"
 
 [build-dependencies]
 tonic-build = "0.11.0"

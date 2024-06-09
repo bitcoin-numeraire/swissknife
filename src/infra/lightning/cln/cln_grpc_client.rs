@@ -18,7 +18,7 @@ use crate::{
         invoices::entities::Invoice, lightning::services::LnEventsUseCases,
         payments::entities::Payment,
     },
-    infra::lightning::LnClient,
+    infra::{config::config_rs::deserialize_duration, lightning::LnClient},
 };
 
 use self::cln::InvoiceRequest;
@@ -34,9 +34,11 @@ pub struct ClnClientConfig {
     pub endpoint: String,
     pub certs_dir: String,
     pub maxfeepercent: Option<f64>,
-    pub payment_timeout: Option<u32>,
+    #[serde(deserialize_with = "deserialize_duration")]
+    pub payment_timeout: Duration,
     pub payment_exemptfee: Option<u64>,
-    pub retry_delay: Option<Duration>,
+    #[serde(deserialize_with = "deserialize_duration")]
+    pub retry_delay: Duration,
 }
 
 const DEFAULT_CLIENT_CERT_FILENAME: &str = "client.pem";
@@ -46,7 +48,7 @@ const DEFAULT_CA_CRT_FILENAME: &str = "ca.pem";
 pub struct ClnGrpcClient {
     client: NodeClient<Channel>,
     maxfeepercent: Option<f64>,
-    payment_timeout: Option<u32>,
+    retry_for: Option<u32>,
     payment_exemptfee: Option<Amount>,
     listener: ClnGrpcListener,
 }
@@ -77,15 +79,12 @@ impl ClnGrpcClient {
 
         let client = NodeClient::new(channel);
 
-        let listener = ClnGrpcListener::new(
-            ln_events,
-            config.retry_delay.unwrap_or(Duration::from_secs(5)),
-        );
+        let listener = ClnGrpcListener::new(ln_events, config.retry_delay);
 
         Ok(Self {
             client,
             maxfeepercent: config.maxfeepercent,
-            payment_timeout: config.payment_timeout,
+            retry_for: Some(config.payment_timeout.as_secs() as u32),
             payment_exemptfee: config.payment_exemptfee.map(|fee| Amount { msat: fee }),
             listener,
         })
@@ -179,7 +178,7 @@ impl LnClient for ClnGrpcClient {
                 amount_msat: amount_msat.map(|msat| cln::Amount { msat }),
                 label: Some(label.to_string()),
                 maxfeepercent: self.maxfeepercent,
-                retry_for: self.payment_timeout,
+                retry_for: self.retry_for,
                 exemptfee: self.payment_exemptfee.clone(),
                 ..Default::default()
             })
