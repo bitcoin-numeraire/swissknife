@@ -12,7 +12,7 @@ use tokio::{
     task::{spawn, JoinHandle},
 };
 use tower_http::{cors::CorsLayer, trace::TraceLayer};
-use tracing::{debug, error, info};
+use tracing::{error, info};
 
 use crate::{
     application::errors::WebServerError,
@@ -98,8 +98,6 @@ async fn shutdown_signal() {
         if let Err(err) = ctrl_c().await {
             error!(%err, "Failed to install Ctrl+C handler");
         }
-
-        debug!("Received Ctrl+C");
     };
 
     #[cfg(unix)]
