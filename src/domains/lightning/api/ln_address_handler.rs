@@ -1,10 +1,11 @@
 use std::sync::Arc;
 
 use axum::{
-    extract::{Path, Query, State},
+    extract::{Path, State},
     routing::{delete, get, post},
     Json, Router,
 };
+use axum_extra::extract::Query;
 use uuid::Uuid;
 
 use crate::{
