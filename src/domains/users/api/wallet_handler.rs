@@ -142,7 +142,7 @@ impl WalletHandler {
             .payment
             .list(PaymentFilter {
                 user_id: Some(user.sub),
-                id: Some(id),
+                ids: Some(vec![id]),
                 ..Default::default()
             })
             .await?;
@@ -178,7 +178,7 @@ impl WalletHandler {
             .invoice
             .list(InvoiceFilter {
                 user_id: Some(user.sub),
-                id: Some(id),
+                ids: Some(vec![id]),
                 ..Default::default()
             })
             .await?;

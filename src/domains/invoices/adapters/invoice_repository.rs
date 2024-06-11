@@ -55,7 +55,7 @@ impl InvoiceRepository for SeaOrmInvoiceRepository {
 
         let models = Entity::find()
             .apply_if(filter.user_id, |q, user| q.filter(Column::UserId.eq(user)))
-            .apply_if(filter.id, |q, id| q.filter(Column::Id.eq(id)))
+            .apply_if(filter.ids, |q, ids| q.filter(Column::Id.is_in(ids)))
             .apply_if(filter.status, |q, s| match s {
                 InvoiceStatus::PENDING => q.filter(
                     Condition::all()
@@ -149,7 +149,7 @@ impl InvoiceRepository for SeaOrmInvoiceRepository {
     async fn delete_many(&self, filter: InvoiceFilter) -> Result<u64, DatabaseError> {
         let result = Entity::delete_many()
             .apply_if(filter.user_id, |q, user| q.filter(Column::UserId.eq(user)))
-            .apply_if(filter.id, |q, id| q.filter(Column::Id.eq(id)))
+            .apply_if(filter.ids, |q, ids| q.filter(Column::Id.is_in(ids)))
             .apply_if(filter.status, |q, status| match status {
                 InvoiceStatus::PENDING => q.filter(
                     Condition::all()

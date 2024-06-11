@@ -40,7 +40,7 @@ impl PaymentRepository for SeaOrmPaymentRepository {
     async fn find_many(&self, filter: PaymentFilter) -> Result<Vec<Payment>, DatabaseError> {
         let models = Entity::find()
             .apply_if(filter.user_id, |q, user| q.filter(Column::UserId.eq(user)))
-            .apply_if(filter.id, |q, id| q.filter(Column::Id.eq(id)))
+            .apply_if(filter.ids, |q, ids| q.filter(Column::Id.is_in(ids)))
             .apply_if(filter.status, |q, s| {
                 q.filter(Column::Status.eq(s.to_string()))
             })
@@ -111,7 +111,7 @@ impl PaymentRepository for SeaOrmPaymentRepository {
     async fn delete_many(&self, filter: PaymentFilter) -> Result<u64, DatabaseError> {
         let result = Entity::delete_many()
             .apply_if(filter.user_id, |q, user| q.filter(Column::UserId.eq(user)))
-            .apply_if(filter.id, |q, id| q.filter(Column::Id.eq(id)))
+            .apply_if(filter.ids, |q, ids| q.filter(Column::Id.is_in(ids)))
             .apply_if(filter.status, |q, s| {
                 q.filter(Column::Status.eq(s.to_string()))
             })

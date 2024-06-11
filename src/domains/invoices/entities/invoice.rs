@@ -63,7 +63,7 @@ pub enum InvoiceStatus {
 pub struct InvoiceFilter {
     #[serde(flatten)]
     pub pagination: PaginationFilter,
-    pub id: Option<Uuid>,
+    pub ids: Option<Vec<Uuid>>,
     pub user_id: Option<String>,
     pub status: Option<InvoiceStatus>,
     pub ledger: Option<Ledger>,
