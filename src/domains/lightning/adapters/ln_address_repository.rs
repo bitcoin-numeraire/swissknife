@@ -59,7 +59,7 @@ impl LnAddressRepository for SeaOrmLnAddressRepository {
             .apply_if(filter.username, |q, username| {
                 q.filter(Column::Username.eq(username))
             })
-            .apply_if(filter.id, |q, id| q.filter(Column::Id.eq(id)))
+            .apply_if(filter.ids, |q, ids| q.filter(Column::Id.is_in(ids)))
             .order_by_desc(Column::CreatedAt)
             .offset(filter.pagination.offset)
             .limit(filter.pagination.limit)
@@ -88,7 +88,7 @@ impl LnAddressRepository for SeaOrmLnAddressRepository {
     async fn delete_many(&self, filter: LnAddressFilter) -> Result<u64, DatabaseError> {
         let result = Entity::delete_many()
             .apply_if(filter.user_id, |q, user| q.filter(Column::UserId.eq(user)))
-            .apply_if(filter.id, |q, id| q.filter(Column::Id.eq(id)))
+            .apply_if(filter.ids, |q, ids| q.filter(Column::Id.is_in(ids)))
             .apply_if(filter.username, |q, username| {
                 q.filter(Column::Username.eq(username))
             })

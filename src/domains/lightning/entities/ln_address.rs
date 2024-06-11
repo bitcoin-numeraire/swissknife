@@ -21,7 +21,7 @@ pub struct LnAddress {
 pub struct LnAddressFilter {
     #[serde(flatten)]
     pub pagination: PaginationFilter,
-    pub id: Option<Uuid>,
+    pub ids: Option<Vec<Uuid>>,
     pub user_id: Option<String>,
     pub username: Option<String>,
 }

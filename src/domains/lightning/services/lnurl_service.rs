@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{sync::Arc, vec};
 
 use async_trait::async_trait;
 use breez_sdk_core::{MessageSuccessActionData, SuccessActionProcessed};
@@ -202,7 +202,7 @@ impl LnUrlUseCases for LnUrlService {
             .store
             .ln_address
             .delete_many(LnAddressFilter {
-                id: Some(id),
+                ids: Some(vec![id]),
                 ..Default::default()
             })
             .await?;
