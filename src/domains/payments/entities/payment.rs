@@ -47,7 +47,7 @@ pub enum PaymentStatus {
 pub struct PaymentFilter {
     #[serde(flatten)]
     pub pagination: PaginationFilter,
-    pub id: Option<Uuid>,
+    pub ids: Option<Vec<Uuid>>,
     pub user_id: Option<String>,
     pub status: Option<PaymentStatus>,
 }

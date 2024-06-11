@@ -430,7 +430,7 @@ impl PaymentsUseCases for PaymentService {
             .store
             .payment
             .delete_many(PaymentFilter {
-                id: Some(id),
+                ids: Some(vec![id]),
                 ..Default::default()
             })
             .await?;

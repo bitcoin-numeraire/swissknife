@@ -100,7 +100,7 @@ impl InvoiceUseCases for InvoiceService {
             .store
             .invoice
             .delete_many(InvoiceFilter {
-                id: Some(id),
+                ids: Some(vec![id]),
                 ..Default::default()
             })
             .await?;
