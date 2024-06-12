@@ -2,7 +2,6 @@ use async_trait::async_trait;
 use breez_sdk_core::{
     LspInformation, NodeState, Payment as BreezPayment, ReverseSwapInfo, ServiceHealthCheckResponse,
 };
-use uuid::Uuid;
 
 use crate::{
     application::errors::LightningError,
@@ -11,7 +10,7 @@ use crate::{
 
 #[async_trait]
 pub trait LnClient: Sync + Send {
-    async fn listen_events(&self) -> Result<(), LightningError>;
+    async fn disconnect(&self) -> Result<(), LightningError>;
     fn node_info(&self) -> Result<NodeState, LightningError>;
     async fn lsp_info(&self) -> Result<LspInformation, LightningError>;
     async fn list_payments(&self) -> Result<Vec<BreezPayment>, LightningError>;
@@ -29,7 +28,6 @@ pub trait LnClient: Sync + Send {
         &self,
         bolt11: String,
         amount_msat: Option<u64>,
-        label: Uuid,
     ) -> Result<Payment, LightningError>;
     async fn health(&self) -> Result<ServiceHealthCheckResponse, LightningError>;
     async fn list_lsps(&self) -> Result<Vec<LspInformation>, LightningError>;

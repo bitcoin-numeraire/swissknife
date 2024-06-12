@@ -1,4 +1,4 @@
-use std::{str::FromStr, time::Duration};
+use std::{str::FromStr, sync::Arc, time::Duration};
 
 use breez_sdk_core::{
     LspInformation, NodeState, Payment as BreezPayment, ReverseSwapInfo, ServiceHealthCheckResponse,
@@ -8,6 +8,7 @@ use reqwest::{
     header::{HeaderMap, HeaderValue},
     Client,
 };
+use rust_socketio::asynchronous::Client as WsClient;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -15,11 +16,17 @@ use async_trait::async_trait;
 
 use crate::{
     application::errors::LightningError,
-    domains::{invoices::entities::Invoice, payments::entities::Payment},
+    domains::{
+        invoices::entities::Invoice, lightning::services::LnEventsUseCases,
+        payments::entities::Payment,
+    },
     infra::{config::config_rs::deserialize_duration, lightning::LnClient},
 };
 
-use super::{cln_ws_client::ClnWsClient, InvoiceRequest, InvoiceResponse, PayRequest, PayResponse};
+use super::{
+    cln_websocket_client::connect_websocket, InvoiceRequest, InvoiceResponse, PayRequest,
+    PayResponse,
+};
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct ClnRestClientConfig {
@@ -31,13 +38,12 @@ pub struct ClnRestClientConfig {
     #[serde(deserialize_with = "deserialize_duration")]
     pub timeout: Duration,
     pub accept_invalid_certs: bool,
-    pub ws_endpoint: String,
     pub maxfeepercent: Option<f64>,
     #[serde(deserialize_with = "deserialize_duration")]
     pub payment_timeout: Duration,
     pub payment_exemptfee: Option<u64>,
-    #[serde(deserialize_with = "deserialize_duration")]
-    pub retry_delay: Duration,
+    pub ws_min_reconnect_delay_delay: u64,
+    pub ws_max_reconnect_delay_delay: u64,
 }
 
 pub struct ClnRestClient {
@@ -46,13 +52,16 @@ pub struct ClnRestClient {
     maxfeepercent: Option<f64>,
     retry_for: Option<u32>,
     payment_exemptfee: Option<u64>,
-    ws_client: ClnWsClient,
+    ws_client: WsClient,
 }
 
 const USER_AGENT: &str = "Numeraire Swissknife/1.0";
 
 impl ClnRestClient {
-    pub async fn new(config: ClnRestClientConfig) -> Result<Self, LightningError> {
+    pub async fn new(
+        config: ClnRestClientConfig,
+        ln_events: Arc<dyn LnEventsUseCases>,
+    ) -> Result<Self, LightningError> {
         let mut headers = HeaderMap::new();
         let mut rune_header = HeaderValue::from_str(&config.rune)
             .map_err(|e| LightningError::ParseConfig(e.to_string()))?;
@@ -69,8 +78,7 @@ impl ClnRestClient {
             .build()
             .map_err(|e| LightningError::ParseConfig(e.to_string()))?;
 
-        let ws_client =
-            ClnWsClient::new(config.ws_endpoint, config.rune, config.retry_delay).await?;
+        let ws_client = connect_websocket(&config, ln_events).await?;
 
         Ok(Self {
             client,
@@ -89,7 +97,7 @@ impl ClnRestClient {
     ) -> anyhow::Result<T> {
         let response = self
             .client
-            .post(format!("{}/{}", self.base_url, endpoint))
+            .post(format!("{}/v1/{}", self.base_url, endpoint))
             .json(payload)
             .send()
             .await?;
@@ -102,11 +110,11 @@ impl ClnRestClient {
 
 #[async_trait]
 impl LnClient for ClnRestClient {
-    async fn listen_events(&self) -> Result<(), LightningError> {
+    async fn disconnect(&self) -> Result<(), LightningError> {
         self.ws_client
-            .listen()
+            .disconnect()
             .await
-            .map_err(|e| LightningError::Listener(e.to_string()))
+            .map_err(|e| LightningError::Disconnect(e.to_string()))
     }
 
     async fn invoice(
@@ -115,14 +123,13 @@ impl LnClient for ClnRestClient {
         description: String,
         expiry: u32,
     ) -> Result<Invoice, LightningError> {
-        let label = Uuid::new_v4();
         let response: InvoiceResponse = self
             .post_request(
                 "invoice",
                 &InvoiceRequest {
                     description,
                     expiry: expiry as u64,
-                    label,
+                    label: Uuid::new_v4(),
                     amount_msat,
                 },
             )
@@ -132,10 +139,7 @@ impl LnClient for ClnRestClient {
         let bolt11 = Bolt11Invoice::from_str(&response.bolt11)
             .map_err(|e| LightningError::Invoice(e.to_string()))?;
 
-        let mut invoice: Invoice = bolt11.into();
-        invoice.label = Some(label);
-
-        Ok(invoice)
+        Ok(bolt11.into())
     }
 
     fn node_info(&self) -> Result<NodeState, LightningError> {
@@ -154,7 +158,6 @@ impl LnClient for ClnRestClient {
         &self,
         bolt11: String,
         amount_msat: Option<u64>,
-        label: Uuid,
     ) -> Result<Payment, LightningError> {
         let response: PayResponse = self
             .post_request(
@@ -162,7 +165,7 @@ impl LnClient for ClnRestClient {
                 &PayRequest {
                     bolt11,
                     amount_msat,
-                    label: Some(label.to_string()),
+                    label: Some(Uuid::new_v4().to_string()),
                     maxfeepercent: self.maxfeepercent,
                     retry_for: self.retry_for,
                     exemptfee: self.payment_exemptfee.clone(),
@@ -170,8 +173,6 @@ impl LnClient for ClnRestClient {
             )
             .await
             .map_err(|e| LightningError::Pay(e.to_string()))?;
-
-        println!("{:?}", response);
 
         Ok(response.into())
     }

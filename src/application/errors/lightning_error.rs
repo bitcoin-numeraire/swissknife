@@ -14,8 +14,14 @@ pub enum LightningError {
     #[error("Failed to read certificates: {0}")]
     ReadCertificates(String),
 
-    #[error("Failed to connect to lightning node or service: {0}")]
+    #[error("Failed to connect to Lightning node: {0}")]
     Connect(String),
+
+    #[error("Failed to connect to Lightning node websocket server: {0}")]
+    ConnectWebsocket(String),
+
+    #[error("Failed to disconnect from Lightning node: {0}")]
+    Disconnect(String),
 
     #[error("Lightning event listener failure: {0}")]
     Listener(String),

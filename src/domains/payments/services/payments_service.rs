@@ -163,7 +163,6 @@ impl PaymentService {
                     } else {
                         Some(amount)
                     },
-                    pending_payment.id,
                 )
                 .await;
 
@@ -297,7 +296,7 @@ impl PaymentService {
             )
             .await?;
 
-        let result = self.ln_client.pay(cb.pr, None, pending_payment.id).await;
+        let result = self.ln_client.pay(cb.pr, None).await;
 
         self.handle_processed_payment(pending_payment, result, cb.success_action)
             .await

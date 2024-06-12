@@ -8,7 +8,6 @@ LIGHTNINGD_SERVICE := lightningd
 
 up:
 	@$(MAKE) down
-	@$(MAKE) up-lightningd
 	@$(MAKE) up-postgres
 
 up-lightningd:

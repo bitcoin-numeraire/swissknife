@@ -32,7 +32,6 @@ impl MigrationTrait for Migration {
                 min_final_cltv_expiry_delta bigint,
                 fee_msat bigint,
                 payment_time timestamptz,
-                label uuid,
                 created_at timestamptz NOT NULL DEFAULT current_timestamp,
                 updated_at timestamptz,
                 expires_at timestamptz,

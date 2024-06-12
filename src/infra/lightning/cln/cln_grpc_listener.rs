@@ -18,112 +18,98 @@ use crate::{
 
 use super::cln::{node_client::NodeClient, WaitanyinvoiceRequest, WaitanyinvoiceResponse};
 
-#[derive(Clone)]
-pub struct ClnGrpcListener {
+pub async fn listen_invoices(
+    mut client: NodeClient<Channel>,
     ln_events: Arc<dyn LnEventsUseCases>,
     retry_delay: Duration,
-}
+) -> Result<()> {
+    // Temporary. get the latest settled invoice payment_hash as starting point for event listening
+    let last_settled_invoice = ln_events.latest_settled_invoice().await?;
 
-impl ClnGrpcListener {
-    pub fn new(ln_events: Arc<dyn LnEventsUseCases>, retry_delay: Duration) -> Self {
-        Self {
-            ln_events,
-            retry_delay,
-        }
-    }
+    let mut lastpay_index = match last_settled_invoice {
+        Some(invoice) => {
+            let payment_hash = invoice.lightning.unwrap().payment_hash;
+            debug!(
+                %payment_hash,
+                "Fetching latest settled invoice from node..."
+            );
 
-    pub async fn listen_invoices(self, mut client: NodeClient<Channel>) -> Result<()> {
-        // Temporary. get the latest settled invoice payment_hash as starting point for event listening
-        let last_settled_invoice = self.ln_events.latest_settled_invoice().await?;
-
-        let mut lastpay_index = match last_settled_invoice {
-            Some(invoice) => {
-                let payment_hash = invoice.lightning.unwrap().payment_hash;
-                debug!(
-                    %payment_hash,
-                    "Fetching latest settled invoice from node..."
-                );
-
-                let invoices = client
-                    .list_invoices(ListinvoicesRequest {
-                        payment_hash: decode(payment_hash).ok(),
-                        ..Default::default()
-                    })
-                    .await?
-                    .into_inner()
-                    .invoices;
-
-                invoices
-                    .into_iter()
-                    .next()
-                    .map(|invoice| invoice.pay_index())
-            }
-            None => Some(0),
-        };
-
-        loop {
-            trace!(lastpay_index, "Waiting for new invoice...");
-
-            match client
-                .wait_any_invoice(WaitanyinvoiceRequest {
-                    lastpay_index,
-                    timeout: None,
+            let invoices = client
+                .list_invoices(ListinvoicesRequest {
+                    payment_hash: decode(payment_hash).ok(),
+                    ..Default::default()
                 })
-                .await
-            {
-                Ok(response) => {
-                    let invoice = response.into_inner();
+                .await?
+                .into_inner()
+                .invoices;
 
-                    match invoice.status() {
-                        WaitanyinvoiceStatus::Paid => {
-                            trace!("New InvoicePaid event received");
+            invoices
+                .into_iter()
+                .next()
+                .map(|invoice| invoice.pay_index())
+        }
+        None => Some(0),
+    };
 
-                            let ln_events = self.ln_events.clone();
-                            let event: LnInvoicePaidEvent = invoice.clone().into();
+    loop {
+        trace!(lastpay_index, "Waiting for new invoice...");
 
-                            loop {
-                                match ln_events.invoice_paid(event.clone()).await {
-                                    Ok(_) => break,
-                                    Err(err) => match err {
-                                        ApplicationError::Database(db_err) => {
-                                            error!(%db_err, "Database error, retrying...");
-                                            sleep(self.retry_delay).await;
-                                        }
-                                        _ => {
-                                            warn!(%err, "Failed to process incoming payment");
-                                            break;
-                                        }
-                                    },
-                                }
+        match client
+            .wait_any_invoice(WaitanyinvoiceRequest {
+                lastpay_index,
+                timeout: None,
+            })
+            .await
+        {
+            Ok(response) => {
+                let invoice = response.into_inner();
+
+                match invoice.status() {
+                    WaitanyinvoiceStatus::Paid => {
+                        trace!("New InvoicePaid event received");
+
+                        loop {
+                            match ln_events.invoice_paid(invoice.clone().into()).await {
+                                Ok(_) => break,
+                                Err(err) => match err {
+                                    ApplicationError::Database(db_err) => {
+                                        error!(%db_err, "Database error, retrying...");
+                                        sleep(retry_delay).await;
+                                    }
+                                    _ => {
+                                        warn!(%err, "Failed to process incoming payment");
+                                        break;
+                                    }
+                                },
                             }
-                            lastpay_index = invoice.pay_index;
                         }
-                        WaitanyinvoiceStatus::Expired => {
-                            info!(
-                                payment_hash = invoice.payment_hash.to_hex(),
-                                "New InvoiceExpired event received"
-                            );
-                        }
+                        lastpay_index = invoice.pay_index;
+                    }
+                    WaitanyinvoiceStatus::Expired => {
+                        info!(
+                            payment_hash = invoice.payment_hash.to_hex(),
+                            "New InvoiceExpired event received"
+                        );
                     }
                 }
-                Err(err) => match err.code() {
-                    Code::Aborted
-                    | Code::Cancelled
-                    | Code::DeadlineExceeded
-                    | Code::Internal
-                    | Code::FailedPrecondition
-                    | Code::Unavailable => {
-                        error!(
-                            err = err.message(),
-                            "Error waiting for invoice. Retrying..."
-                        );
-                        sleep(Duration::from_secs(5)).await;
-                    }
-                    _ => {
-                        return Err(anyhow!(err.to_string()));
-                    }
-                },
             }
+            Err(err) => match err.code() {
+                Code::Aborted
+                | Code::Cancelled
+                | Code::DeadlineExceeded
+                | Code::Internal
+                | Code::FailedPrecondition
+                | Code::Unavailable => {
+                    error!(
+                        err = err.message(),
+                        "Error waiting for invoice. Retrying..."
+                    );
+                    sleep(retry_delay).await;
+                }
+                _ => {
+                    return Err(anyhow!(err.to_string()));
+                }
+            },
         }
     }
 }
