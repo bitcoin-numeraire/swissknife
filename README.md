@@ -1,6 +1,6 @@
 # Numeraire Bitcoin SwissKnife
 
-Numeraire's Bitcoin SwissKnife is a wallet application and transaction orhcestrator enabling easy integration of Bitcoin, the Lightning network and smart contract protocols (RGB, Taproot Assets) to any entity or organization that wishes to do so without handling the complexity of the above technologies.
+Numeraire's Bitcoin SwissKnife is a wallet and transaction orchestrator enabling easy integration of Bitcoin, the Lightning network and smart contract protocols (RGB, Taproot Assets) to any entity or organization that wishes to do so without handling the complexity of the above technologies.
 
 ## Features
 
