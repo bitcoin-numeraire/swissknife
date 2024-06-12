@@ -1,6 +1,8 @@
 use std::time::Duration;
 
-use breez_sdk_core::{LNInvoice, Network as BreezNetwork, Payment as BreezPayment, PaymentDetails};
+use breez_sdk_core::{
+    LNInvoice, Network as BreezNetwork, Payment as BreezPayment, PaymentDetails, PaymentFailedData,
+};
 use chrono::{TimeZone, Utc};
 use serde_bolt::bitcoin::hashes::hex::ToHex;
 
@@ -8,7 +10,7 @@ use crate::{
     application::entities::{Currency, Ledger},
     domains::{
         invoices::entities::{Invoice, LnInvoice},
-        lightning::entities::LnInvoicePaidEvent,
+        lightning::entities::{LnInvoicePaidEvent, LnPayFailureEvent, LnPaySuccessEvent},
         payments::entities::Payment,
     },
 };
@@ -76,6 +78,30 @@ impl Into<LnInvoicePaidEvent> for BreezPayment {
             amount_msat: self.amount_msat,
             fee_msat: self.fee_msat,
             payment_time: Utc.timestamp_opt(self.payment_time, 0).unwrap(),
+        }
+    }
+}
+
+impl Into<LnPaySuccessEvent> for BreezPayment {
+    fn into(self) -> LnPaySuccessEvent {
+        LnPaySuccessEvent {
+            amount_msat: self.amount_msat,
+            fees_msat: self.fee_msat,
+            payment_hash: self.id,
+            payment_preimage: match self.details {
+                PaymentDetails::Ln { data } => data.payment_preimage,
+                _ => String::new(),
+            },
+            payment_time: Utc.timestamp_opt(self.payment_time as i64, 0).unwrap(),
+        }
+    }
+}
+
+impl Into<LnPayFailureEvent> for PaymentFailedData {
+    fn into(self) -> LnPayFailureEvent {
+        LnPayFailureEvent {
+            reason: self.error,
+            payment_hash: self.invoice.unwrap().payment_hash,
         }
     }
 }

@@ -37,6 +37,19 @@ impl PaymentRepository for SeaOrmPaymentRepository {
         Ok(model.map(Into::into))
     }
 
+    async fn find_by_payment_hash(
+        &self,
+        payment_hash: &str,
+    ) -> Result<Option<Payment>, DatabaseError> {
+        let model = Entity::find()
+            .filter(Column::PaymentHash.eq(payment_hash))
+            .one(&self.db)
+            .await
+            .map_err(|e| DatabaseError::FindOne(e.to_string()))?;
+
+        Ok(model.map(Into::into))
+    }
+
     async fn find_many(&self, filter: PaymentFilter) -> Result<Vec<Payment>, DatabaseError> {
         let models = Entity::find()
             .apply_if(filter.user_id, |q, user| q.filter(Column::UserId.eq(user)))

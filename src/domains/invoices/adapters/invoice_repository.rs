@@ -94,7 +94,6 @@ impl InvoiceRepository for SeaOrmInvoiceRepository {
             description: Set(invoice.description),
             amount_msat: Set(invoice.amount_msat.map(|v| v as i64)),
             timestamp: Set(invoice.timestamp),
-            label: Set(invoice.label),
             ledger: Set(invoice.ledger.to_string()),
             currency: Set(invoice.currency.to_string()),
             ..Default::default()

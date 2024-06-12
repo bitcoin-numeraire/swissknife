@@ -23,7 +23,7 @@ use crate::{
 
 use self::cln::InvoiceRequest;
 
-use super::cln_grpc_listener::ClnGrpcListener;
+use super::cln_grpc_listener::listen_invoices;
 
 pub mod cln {
     tonic::include_proto!("cln");
@@ -50,7 +50,6 @@ pub struct ClnGrpcClient {
     maxfeepercent: Option<f64>,
     retry_for: Option<u32>,
     payment_exemptfee: Option<Amount>,
-    listener: ClnGrpcListener,
 }
 
 impl ClnGrpcClient {
@@ -67,26 +66,27 @@ impl ClnGrpcClient {
             .ca_certificate(ca_certificate)
             .domain_name("localhost"); // Use localhost if you are not sure about the domain name
 
-        let tls_config = Channel::from_shared(config.endpoint)
+        let endpoint = Channel::from_shared(config.endpoint)
             .map_err(|e| LightningError::ParseConfig(e.to_string()))?
             .tls_config(tls_config)
             .map_err(|e| LightningError::ParseConfig(e.to_string()))?;
 
-        let channel = tls_config
+        let channel = endpoint
             .connect()
             .await
             .map_err(|e| LightningError::Connect(e.to_string()))?;
 
         let client = NodeClient::new(channel);
 
-        let listener = ClnGrpcListener::new(ln_events, config.retry_delay);
+        listen_invoices(client.clone(), ln_events, config.retry_delay)
+            .await
+            .map_err(|e| LightningError::Listener(e.to_string()))?;
 
         Ok(Self {
             client,
             maxfeepercent: config.maxfeepercent,
             retry_for: Some(config.payment_timeout.as_secs() as u32),
             payment_exemptfee: config.payment_exemptfee.map(|fee| Amount { msat: fee }),
-            listener,
         })
     }
 
@@ -110,12 +110,8 @@ impl ClnGrpcClient {
 
 #[async_trait]
 impl LnClient for ClnGrpcClient {
-    async fn listen_events(&self) -> Result<(), LightningError> {
-        self.listener
-            .clone()
-            .listen_invoices(self.client.clone())
-            .await
-            .map_err(|e| LightningError::Listener(e.to_string()))
+    async fn disconnect(&self) -> Result<(), LightningError> {
+        Ok(())
     }
 
     async fn invoice(
@@ -126,12 +122,11 @@ impl LnClient for ClnGrpcClient {
     ) -> Result<Invoice, LightningError> {
         let mut client: NodeClient<Channel> = self.client.clone();
 
-        let label = Uuid::new_v4();
         let response = client
             .invoice(InvoiceRequest {
                 description,
                 expiry: Some(expiry as u64),
-                label: label.to_string(),
+                label: Uuid::new_v4().to_string(),
                 deschashonly: Some(false),
                 amount_msat: Some(cln::AmountOrAny {
                     value: Some(cln::amount_or_any::Value::Amount(cln::Amount {
@@ -146,10 +141,7 @@ impl LnClient for ClnGrpcClient {
         let bolt11 = Bolt11Invoice::from_str(&response.into_inner().bolt11)
             .map_err(|e| LightningError::Invoice(e.to_string()))?;
 
-        let mut invoice: Invoice = bolt11.into();
-        invoice.label = Some(label);
-
-        Ok(invoice)
+        Ok(bolt11.into())
     }
 
     fn node_info(&self) -> Result<NodeState, LightningError> {
@@ -168,7 +160,6 @@ impl LnClient for ClnGrpcClient {
         &self,
         bolt11: String,
         amount_msat: Option<u64>,
-        label: Uuid,
     ) -> Result<Payment, LightningError> {
         let mut client: NodeClient<Channel> = self.client.clone();
 
@@ -176,7 +167,7 @@ impl LnClient for ClnGrpcClient {
             .pay(PayRequest {
                 bolt11,
                 amount_msat: amount_msat.map(|msat| cln::Amount { msat }),
-                label: Some(label.to_string()),
+                label: Some(Uuid::new_v4().to_string()),
                 maxfeepercent: self.maxfeepercent,
                 retry_for: self.retry_for,
                 exemptfee: self.payment_exemptfee.clone(),

@@ -1,7 +1,6 @@
 use async_trait::async_trait;
 use breez_sdk_core::{
-    LspInformation, NodeState, Payment as BreezPayment, PaymentFailedData, ReverseSwapInfo,
-    ServiceHealthCheckResponse,
+    LspInformation, NodeState, Payment as BreezPayment, ReverseSwapInfo, ServiceHealthCheckResponse,
 };
 use uuid::Uuid;
 
@@ -10,7 +9,8 @@ use crate::{
     domains::{
         invoices::entities::Invoice,
         lightning::entities::{
-            LnAddress, LnAddressFilter, LnInvoicePaidEvent, LnURLPayRequest, LnUrlCallbackResponse,
+            LnAddress, LnAddressFilter, LnInvoicePaidEvent, LnPayFailureEvent, LnPaySuccessEvent,
+            LnURLPayRequest, LnUrlCallbackResponse,
         },
         users::entities::AuthUser,
     },
@@ -66,6 +66,6 @@ pub trait LnNodeUseCases: Send + Sync {
 pub trait LnEventsUseCases: Send + Sync {
     async fn latest_settled_invoice(&self) -> Result<Option<Invoice>, ApplicationError>;
     async fn invoice_paid(&self, event: LnInvoicePaidEvent) -> Result<(), ApplicationError>;
-    async fn outgoing_payment(&self, payment: BreezPayment) -> Result<(), ApplicationError>;
-    async fn failed_payment(&self, payment: PaymentFailedData) -> Result<(), ApplicationError>;
+    async fn outgoing_payment(&self, event: LnPaySuccessEvent) -> Result<(), ApplicationError>;
+    async fn failed_payment(&self, event: LnPayFailureEvent) -> Result<(), ApplicationError>;
 }

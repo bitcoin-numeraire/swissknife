@@ -99,11 +99,10 @@ async fn get_ln_client(
 
             info!(
                 endpoint = %cln_config.endpoint,
-                ws_endpoint = %cln_config.ws_endpoint,
                 "Lightning provider: Core Lightning REST"
             );
 
-            let client = ClnRestClient::new(cln_config.clone()).await?;
+            let client = ClnRestClient::new(cln_config.clone(), ln_events).await?;
 
             Ok(Arc::new(client))
         }

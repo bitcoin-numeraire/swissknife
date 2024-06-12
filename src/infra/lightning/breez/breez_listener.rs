@@ -40,9 +40,9 @@ impl EventListener for BreezListener {
                         return;
                     }
 
-                    let payments_processor = self.ln_events.clone();
+                    let ln_events = self.ln_events.clone();
                     tokio::spawn(async move {
-                        if let Err(err) = payments_processor.invoice_paid(payment.into()).await {
+                        if let Err(err) = ln_events.invoice_paid(payment.into()).await {
                             warn!(%err, "Failed to process incoming payment");
                         }
                     });
@@ -69,9 +69,9 @@ impl EventListener for BreezListener {
                     return;
                 }
 
-                let payments_processor = self.ln_events.clone();
+                let ln_events = self.ln_events.clone();
                 tokio::spawn(async move {
-                    if let Err(err) = payments_processor.outgoing_payment(details).await {
+                    if let Err(err) = ln_events.outgoing_payment(details.into()).await {
                         warn!(%err, "Failed to process outgoing payment");
                     }
                 });
@@ -79,9 +79,9 @@ impl EventListener for BreezListener {
             BreezEvent::PaymentFailed { details } => {
                 trace!("New PaymentFailed event received");
 
-                let payments_processor = self.ln_events.clone();
+                let ln_events = self.ln_events.clone();
                 tokio::spawn(async move {
-                    if let Err(err) = payments_processor.failed_payment(details).await {
+                    if let Err(err) = ln_events.failed_payment(details.into()).await {
                         warn!(%err, "Failed to process outgoing payment");
                     }
                 });

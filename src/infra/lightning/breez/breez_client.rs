@@ -106,9 +106,11 @@ impl BreezClient {
 
 #[async_trait]
 impl LnClient for BreezClient {
-    async fn listen_events(&self) -> Result<(), LightningError> {
-        std::future::pending::<()>().await;
-        Ok(())
+    async fn disconnect(&self) -> Result<(), LightningError> {
+        self.sdk
+            .disconnect()
+            .await
+            .map_err(|e| LightningError::Disconnect(e.to_string()))
     }
 
     async fn invoice(
@@ -179,14 +181,13 @@ impl LnClient for BreezClient {
         &self,
         bolt11: String,
         amount_msat: Option<u64>,
-        label: Uuid,
     ) -> Result<Payment, LightningError> {
         let response = self
             .sdk
             .send_payment(SendPaymentRequest {
                 bolt11,
                 amount_msat,
-                label: Some(label.to_string()),
+                label: Some(Uuid::new_v4().to_string()),
             })
             .await
             .map_err(|e| LightningError::Pay(e.to_string()))?;

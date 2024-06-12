@@ -1,8 +1,5 @@
 use async_trait::async_trait;
-use breez_sdk_core::{Payment as BreezPayment, PaymentDetails, PaymentFailedData};
-use chrono::{TimeZone, Utc};
 use tracing::{debug, info};
-use uuid::Uuid;
 
 use crate::{
     application::{
@@ -11,8 +8,8 @@ use crate::{
     },
     domains::{
         invoices::entities::{Invoice, InvoiceFilter, InvoiceStatus},
-        lightning::entities::LnInvoicePaidEvent,
-        payments::entities::{Payment, PaymentStatus},
+        lightning::entities::{LnInvoicePaidEvent, LnPayFailureEvent, LnPaySuccessEvent},
+        payments::entities::PaymentStatus,
     },
 };
 
@@ -52,7 +49,7 @@ impl LnEventsUseCases for LnEventsService {
     }
 
     async fn invoice_paid(&self, event: LnInvoicePaidEvent) -> Result<(), ApplicationError> {
-        debug!(?event, "Processing incoming lightning payment...");
+        debug!(?event, "Processing incoming Lightning payment...");
 
         let invoice_option = self
             .store
@@ -80,33 +77,34 @@ impl LnEventsUseCases for LnEventsService {
         return Err(DataError::NotFound("Lightning invoice not found.".into()).into());
     }
 
-    async fn outgoing_payment(
-        &self,
-        payment_success: BreezPayment,
-    ) -> Result<(), ApplicationError> {
-        let payment_id = match payment_success.details.clone() {
-            PaymentDetails::Ln { data } => {
-                Uuid::parse_str(&data.label).map_err(|e| DataError::Validation(e.to_string()))
+    async fn outgoing_payment(&self, event: LnPaySuccessEvent) -> Result<(), ApplicationError> {
+        debug!(?event, "Processing outgoing Lightning payment...");
+
+        let payment_option = self
+            .store
+            .payment
+            .find_by_payment_hash(&event.payment_hash)
+            .await?;
+
+        if let Some(mut payment_retrieved) = payment_option {
+            if payment_retrieved.status == PaymentStatus::SETTLED {
+                debug!(
+                    id = %payment_retrieved.id,
+                    "Lightning payment already settled"
+                );
+                return Ok(());
             }
-            _ => Err(DataError::NotFound("Missing lightning payment details".into()).into()),
-        }?;
-        debug!(
-            %payment_id,
-            "Processing outgoing lightning payment"
-        );
 
-        let payment_option = self.store.payment.find(payment_id).await?;
+            payment_retrieved.status = PaymentStatus::SETTLED;
+            payment_retrieved.payment_time = Some(event.payment_time);
+            payment_retrieved.payment_preimage = Some(event.payment_preimage);
+            payment_retrieved.amount_msat = event.amount_msat;
+            payment_retrieved.fee_msat = Some(event.fees_msat);
 
-        if let Some(payment_retrieved) = payment_option {
-            // We overwrite the payment with the new one at the correct status
-            let mut payment: Payment = payment_success.clone().into();
-            payment.id = payment_retrieved.id;
-            payment.status = PaymentStatus::SETTLED;
-
-            let payment = self.store.payment.update(payment).await?;
+            let payment = self.store.payment.update(payment_retrieved).await?;
 
             info!(
-                %payment_id,
+                id = %payment.id,
                 payment_status = %payment.status,
                 "Outgoing Lightning payment processed successfully"
             );
@@ -116,42 +114,31 @@ impl LnEventsUseCases for LnEventsService {
         return Err(DataError::NotFound("Lightning payment not found.".into()).into());
     }
 
-    async fn failed_payment(
-        &self,
-        payment_failed: PaymentFailedData,
-    ) -> Result<(), ApplicationError> {
-        let payment_id = match payment_failed.label {
-            Some(label) => {
-                Uuid::parse_str(&label).map_err(|e| DataError::Validation(e.to_string()))
-            }
-            None => Err(DataError::NotFound("Missing lightning payment label".into()).into()),
-        }?;
-        debug!(
-            %payment_id,
-            "Processing outgoing failed lightning payment"
-        );
+    async fn failed_payment(&self, event: LnPayFailureEvent) -> Result<(), ApplicationError> {
+        debug!(?event, "Processing failed outgoing Lightning payment");
 
-        let invoice = match payment_failed.invoice {
-            Some(invoice) => invoice,
-            None => {
-                return Err(
-                    DataError::Validation("Failed payment is missing an Invoice.".into()).into(),
+        let payment_option = self
+            .store
+            .payment
+            .find_by_payment_hash(&event.payment_hash)
+            .await?;
+
+        if let Some(mut payment_retrieved) = payment_option {
+            if payment_retrieved.status == PaymentStatus::FAILED {
+                debug!(
+                    id = %payment_retrieved.id,
+                    "Lightning payment already failed"
                 );
+                return Ok(());
             }
-        };
 
-        let payment_option = self.store.payment.find(payment_id).await?;
+            payment_retrieved.status = PaymentStatus::FAILED;
+            payment_retrieved.error = Some(event.reason);
 
-        if let Some(mut payment) = payment_option {
-            payment.status = PaymentStatus::FAILED;
-            payment.payment_time = Some(Utc.timestamp_opt(invoice.timestamp as i64, 0).unwrap());
-            payment.error = Some(payment_failed.error);
-            payment.payment_hash = Some(invoice.payment_hash);
-
-            payment = self.store.payment.update(payment).await?;
+            let payment = self.store.payment.update(payment_retrieved).await?;
 
             info!(
-                %payment_id,
+                id = %payment.id,
                 payment_status = %payment.status,
                 "Outgoing Lightning payment processed successfully"
             );
