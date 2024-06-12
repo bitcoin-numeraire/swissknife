@@ -2,72 +2,66 @@
 
 Numeraire's Bitcoin SwissKnife is a wallet application and transaction orhcestrator enabling easy integration of Bitcoin, the Lightning network and smart contract protocols (RGB, Taproot Assets) to any entity or organization that wishes to do so without handling the complexity of the above technologies.
 
+## Features
+
+- [x] [`Lightning Network`](https://github.com/lnurl/luds). Send and receive payments on Clearnet and Tor.
+- [x] [`LNURL`](https://github.com/lnurl/luds). Support for the LNURL protocol.
+- [x] [`Lightning Address`](https://lightningaddress.com/). Deploy your own Lightning Address infrastructure. Like an email address, anyone can use Lightning addresses (`username@your.domain`) to send and receive Lightning payments.
+- [ ] [`Nostr`](https://github.com/nostr-protocol/nips/blob/master/57.md). Zap support through Lightning Address. (TODO).
+- [x] Generate invoices.
+- [x] Account segregation. Support any amount of users.
+- [x] Internal ledger for instant payments on the same SwissKnife instance.
+- [x] Public and Admin REST API.
+- [ ] Frequent contacts. (TODO)
+- [ ] Notifications via webhooks. (TODO)
+- [x] `JWKS server with automatic public key retrieval
+- [x] `JWT` token authentication` (tested with Auth0).
+- [x] `RBAC`. Fine grained authorization per route.
+- [ ] API keys authentication. (TODO)
+- [x] Horizontal scaling.
+- [x] Data availability through pagination and advanced search.
+- [ ] [RGB](https://rgb.tech/) Smart contracts. (WIP)
+- [ ] [Taproot Assets](https://docs.lightning.engineering/the-lightning-network/taproot-assets). (TODO)
+
+Numeraire SwissKnife ships with a [Dashboard (for admin and users)](https://github.com/bitcoin-numeraire/swissknife-dashboard).
+
 ## Lightning Integration
 
-Numeraire SwissKnife allows Lightning integration via well-known providers in a custodial or non-custodial manner.
+Numeraire SwissKnife allows direct Lightning Network integration, supporting the most used node implementations and well-known providers:
 
-- Avoid the complexity of running your own node and managing liquidity by connecting to a liquidity provider ([`Breez LSPs`](https://breez.technology/lsp/), [`Phoenix`](https://phoenix.acinq.co/server)) and an Infrastructure as a Service provider ([`Greenlight`](https://blockstream.com/lightning/greenlight/)).
-- Choose to run your own node by integrating with [`LND`](https://github.com/lightningnetwork/lnd) or [`Core Lightning`](https://corelightning.org/) node. In which case you are responsible for liquidity management but keep full control of the whole infrastructure.
-- Avoid all complexities by choosing a custodial provider ([`LightSpark`](https://www.lightspark.com/)).
+- [x] [`Core Lightning`](https://corelightning.org/):
+  - Non-custodial
+  - Run your own node
+  - Manage your own liquidity.
+- [ ] Direct [`LND`](https://github.com/lightningnetwork/lnd) (TODO):
+  - Non-custodial
+  - Run your own node
+  - Manage your own liquidity.
+- [x] [`Greenlight`](https://blockstream.com/lightning/greenlight/):
+  - Non-custodial
+  - Automatic node management.
+  - Manage your own liquidity.
+- [x] [`Breez`](https://breez.technology/sdk/):
+  - Non-custodial
+  - Automatic node management.
+  - Automatic liquidity management via LSPs (user can switch LSPs)
+- [ ] [`Phoenixd`](https://phoenix.acinq.co/server). (TODO):
+  - Non-custodial
+  - Automatic node management.
+  - Automatic liquidity management via ACINQ.
+- [ ] [`LightSpark`](https://www.lightspark.com/). (TODO):
+  - Custodial
+  - Automatic node management.
+  - Automatic liquidity management via ACINQ.
 
-### Providers
+# Deployment
 
-The compatible providers are:
+Numeraire SwissKnife can be built from source (see Contributing), Docker images and Helm charts will come when the first alpha version is out.
 
-- [x] [`Greenlight`](https://blockstream.com/lightning/greenlight/) (mainly used in conjunction with `Breez`)
-- [x] [`Breez SDK`](https://breez.technology/sdk/) (allowing switching between LSPs.). Please contact us to get your API key.
-- [ ] [`Phoenixd`](https://phoenix.acinq.co/server). (TODO)
-- [ ] [`LightSpark`](https://www.lightspark.com/) (TODO)
-- [ ] Direct [`Core Lightning`](https://corelightning.org/) integration. (WIP)
-- [ ] Direct [`LND`](https://github.com/lightningnetwork/lnd) Integration (TODO)
+Default configuration is defined in `config/default.toml`. SwissKnife supports `.toml`, `yaml` and `json` config files. The order of applied configuration is the following:
 
-### Lightning Address
+1. ENV vars. Defined given the names of the config values in `default.toml`, adding the prefix `SWISSKNIFE`. Overriding all sensitive values with ENV vars is recommended.
+2. any file under `config` corresponding to the `RUN_MODE` (`development` by default). Such as `development.toml|yaml|json` or `production.toml|yaml|json``
+3. The `default.toml|yaml|json` file.
 
-Numeraire SwissKnife allows any entity or organization to create its own Lightning Address infrastructure. Like an email provider, any company can deploy Lightning Addresses (`username@your.domain`) to send and receive Lightning payments.
-
-## Account and Key management (WIP)
-
-SwissKnife enables account and key management through its `Wallet` infrastructure. By securing private keys in secure HSMs, Numeraire SwissKnife is able to completely isolate the private keys from the outside world, enabling cryptographic operations to be done in isolation. No private keys are ever stored outside of a secure, specialised HSM server or hardware wallet.
-
-The compatible HSMs are:
-
-- [ ] [`Azure Key Vault`](https://azure.microsoft.com/en-us/products/key-vault)
-- [ ] [`AWS KMS`](https://aws.amazon.com/kms/)
-- [ ] [`Hashicorp Vault`](https://www.vaultproject.io/) (with the use of a custom plugin)
-- [ ] Bare-metal HSMs (to be decided)
-- [ ] Cold storage hardware wallets by exporting and importing `PSBTs`
-
-## RGB protocol and Taproot Assets
-
-### Assets issuance
-
-Numeraire SwissKnife enables any entity to become a smart contract issuer on the RGB and Taproot Assets protocols by deploying smart contracts on the Bitcoin Blockchain (Lightning integration to come).
-
-Multiple use cases are possible using RGB and Taproot Assets:
-
-- [ ] Asset tokenization and real-world assets (RGB-21/UDA, aka Unique Digital Assets)
-- [ ] Currencies and stablecoins (RGB-20/NIA, Non Inflatable Assets)
-- [ ] Collectible collections (RGB-25/CFA aka Collectible Fungible Assets)
-
-### Assets data storage and encryption
-
-Numeraire SwissKnife allows for the encrypted storage of the smart contract metadata. Tokenized assets such as art NFTs or contract terms can be stored, retrieved and distributed using Swissknife's API.
-
-### Contract propagation
-
-Because RGB does not store the smart contract on-chain like Ethereum or other smart contract protocols. Contracts can be sent to other parties confidentially through other means. Numeraire SwissKnife allors contract propagation through a JSON-RPC proxy server implementation. With the following techologies to be implemented eventually:
-
-- [ ] `JSON-RPC proxy server`
-- [ ] `Filecoin`
-- [ ] `IPFS`
-- [ ] `Email`
-- [ ] `Taproot Assets Universe`
-
-## Authentication and RBAC
-
-NumeraireSwissknife allows full authentication, account segregation and authorization:
-
-- [x] `JWKS server with automatic public key retrieval`
-- [x] `JWT token authentication`
-- [x] `RBAC per route`
-- [ ] `API keys authentication`
+Inspect the `.env.example` file for and generate your own `.env` for sensitive config values.

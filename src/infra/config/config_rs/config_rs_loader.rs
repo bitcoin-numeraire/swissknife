@@ -16,7 +16,7 @@ pub fn load_config() -> Result<AppConfig, ConfigError> {
 
     let settings = Config::builder()
         .add_source(
-            File::with_name(&format!("{}/{}", CONFIG_PATH, DEFAULT_FILENAME)).required(false),
+            File::with_name(&format!("{}/{}", CONFIG_PATH, DEFAULT_FILENAME)).required(true),
         )
         .add_source(File::with_name(&format!("{}/{}", CONFIG_PATH, run_mode)).required(false))
         .add_source(
