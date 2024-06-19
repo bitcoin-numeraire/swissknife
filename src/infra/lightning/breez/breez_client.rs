@@ -8,10 +8,10 @@ use async_trait::async_trait;
 use bip39::Mnemonic;
 use breez_sdk_core::{
     BreezServices, ConnectRequest, EnvironmentType, GreenlightCredentials, GreenlightNodeConfig,
-    ListPaymentsRequest, LspInformation, NodeConfig, NodeState, PayOnchainRequest,
-    Payment as BreezPayment, PrepareOnchainPaymentRequest, PrepareRedeemOnchainFundsRequest,
-    ReceivePaymentRequest, RedeemOnchainFundsRequest, ReverseSwapInfo, SendPaymentRequest,
-    ServiceHealthCheckResponse, SwapAmountType,
+    LspInformation, NodeConfig, NodeState, PayOnchainRequest, PrepareOnchainPaymentRequest,
+    PrepareRedeemOnchainFundsRequest, ReceivePaymentRequest, RedeemOnchainFundsRequest,
+    ReverseSwapInfo, SendPaymentRequest, ServiceHealthCheckResponse, SignMessageRequest,
+    SwapAmountType,
 };
 
 use crate::{
@@ -102,6 +102,102 @@ impl BreezClient {
 
         Ok((client_key, client_crt))
     }
+
+    pub fn node_info(&self) -> Result<NodeState, LightningError> {
+        let node_info = self
+            .sdk
+            .node_info()
+            .map_err(|e: breez_sdk_core::error::SdkError| {
+                LightningError::NodeInfo(e.to_string())
+            })?;
+
+        Ok(node_info)
+    }
+
+    pub async fn lsp_info(&self) -> Result<LspInformation, LightningError> {
+        let lsp_info = self
+            .sdk
+            .lsp_info()
+            .await
+            .map_err(|e| LightningError::LSPInfo(e.to_string()))?;
+
+        Ok(lsp_info)
+    }
+
+    pub async fn list_lsps(&self) -> Result<Vec<LspInformation>, LightningError> {
+        let response = self
+            .sdk
+            .list_lsps()
+            .await
+            .map_err(|e| LightningError::ListLSPs(e.to_string()))?;
+
+        Ok(response)
+    }
+
+    pub async fn close_lsp_channels(&self) -> Result<Vec<String>, LightningError> {
+        let tx_ids = self
+            .sdk
+            .close_lsp_channels()
+            .await
+            .map_err(|e| LightningError::CloseLSPChannels(e.to_string()))?;
+
+        Ok(tx_ids)
+    }
+
+    pub async fn redeem_onchain(
+        &self,
+        to_address: String,
+        feerate: u32,
+    ) -> Result<String, LightningError> {
+        let prepare_res = self
+            .sdk
+            .prepare_redeem_onchain_funds(PrepareRedeemOnchainFundsRequest {
+                to_address: to_address.clone(),
+                sat_per_vbyte: feerate,
+            })
+            .await
+            .map_err(|e| LightningError::RedeemOnChain(e.to_string()))?;
+
+        info!(
+            "Fees: {} sats, Weight: {} sats",
+            prepare_res.tx_fee_sat, prepare_res.tx_weight,
+        );
+
+        let response = self
+            .sdk
+            .redeem_onchain_funds(RedeemOnchainFundsRequest {
+                to_address,
+                sat_per_vbyte: feerate,
+            })
+            .await
+            .map_err(|e| LightningError::RedeemOnChain(e.to_string()))?;
+
+        Ok(response.txid.to_hex())
+    }
+
+    pub async fn connect_lsp(&self, lsp_id: String) -> Result<(), LightningError> {
+        self.sdk
+            .connect_lsp(lsp_id)
+            .await
+            .map_err(|e| LightningError::ConnectLSP(e.to_string()))
+    }
+
+    pub async fn sign_message(&self, message: String) -> Result<String, LightningError> {
+        let response = self
+            .sdk
+            .sign_message(SignMessageRequest { message })
+            .await
+            .map_err(|e| LightningError::ConnectLSP(e.to_string()))?;
+
+        Ok(response.signature)
+    }
+
+    pub async fn sync(&self) -> Result<(), LightningError> {
+        self.sdk
+            .sync()
+            .await
+            .map_err(|e| LightningError::Sync(e.to_string()))
+    }
 }
 
 #[async_trait]
@@ -134,49 +230,6 @@ impl LnClient for BreezClient {
         Ok(response.ln_invoice.into())
     }
 
-    fn node_info(&self) -> Result<NodeState, LightningError> {
-        let node_info = self
-            .sdk
-            .node_info()
-            .map_err(|e: breez_sdk_core::error::SdkError| {
-                LightningError::NodeInfo(e.to_string())
-            })?;
-
-        Ok(node_info)
-    }
-
-    async fn lsp_info(&self) -> Result<LspInformation, LightningError> {
-        let lsp_info = self
-            .sdk
-            .lsp_info()
-            .await
-            .map_err(|e| LightningError::LSPInfo(e.to_string()))?;
-
-        Ok(lsp_info)
-    }
-
-    async fn list_lsps(&self) -> Result<Vec<LspInformation>, LightningError> {
-        let response = self
-            .sdk
-            .list_lsps()
-            .await
-            .map_err(|e| LightningError::ListLSPs(e.to_string()))?;
-
-        Ok(response)
-    }
-
-    async fn list_payments(&self) -> Result<Vec<BreezPayment>, LightningError> {
-        let payments = self
-            .sdk
-            .list_payments(ListPaymentsRequest {
-                ..Default::default()
-            })
-            .await
-            .map_err(|e| LightningError::ListPayments(e.to_string()))?;
-
-        Ok(payments)
-    }
-
     async fn pay(
         &self,
         bolt11: String,
@@ -193,29 +246,6 @@ impl LnClient for BreezClient {
             .map_err(|e| LightningError::Pay(e.to_string()))?;
 
         Ok(response.payment.into())
-    }
-
-    async fn payment_by_hash(
-        &self,
-        payment_hash: String,
-    ) -> Result<Option<BreezPayment>, LightningError> {
-        let response = self
-            .sdk
-            .payment_by_hash(payment_hash)
-            .await
-            .map_err(|e| LightningError::PaymentByHash(e.to_string()))?;
-
-        Ok(response)
-    }
-
-    async fn close_lsp_channels(&self) -> Result<Vec<String>, LightningError> {
-        let tx_ids = self
-            .sdk
-            .close_lsp_channels()
-            .await
-            .map_err(|e| LightningError::CloseLSPChannels(e.to_string()))?;
-
-        Ok(tx_ids)
     }
 
     async fn pay_onchain(
@@ -260,37 +290,6 @@ impl LnClient for BreezClient {
             .map_err(|e| LightningError::PayOnChain(e.to_string()))?;
 
         Ok(response.reverse_swap_info)
-    }
-
-    async fn redeem_onchain(
-        &self,
-        to_address: String,
-        feerate: u32,
-    ) -> Result<String, LightningError> {
-        let prepare_res = self
-            .sdk
-            .prepare_redeem_onchain_funds(PrepareRedeemOnchainFundsRequest {
-                to_address: to_address.clone(),
-                sat_per_vbyte: feerate,
-            })
-            .await
-            .map_err(|e| LightningError::RedeemOnChain(e.to_string()))?;
-
-        info!(
-            "Fees: {} sats, Weight: {} sats",
-            prepare_res.tx_fee_sat, prepare_res.tx_weight,
-        );
-
-        let response = self
-            .sdk
-            .redeem_onchain_funds(RedeemOnchainFundsRequest {
-                to_address,
-                sat_per_vbyte: feerate,
-            })
-            .await
-            .map_err(|e| LightningError::RedeemOnChain(e.to_string()))?;
-
-        Ok(response.txid.to_hex())
     }
 
     async fn health(&self) -> Result<ServiceHealthCheckResponse, LightningError> {

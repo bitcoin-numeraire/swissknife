@@ -38,14 +38,8 @@ pub enum LightningError {
     #[error("Failed to list LSPs: {0}")]
     ListLSPs(String),
 
-    #[error("Failed to get list payments from Lightning node: {0}")]
-    ListPayments(String),
-
     #[error("Failed to send payment: {0}")]
     Pay(String),
-
-    #[error("Failed to retrieve payment by hash: {0}")]
-    PaymentByHash(String),
 
     #[error("Failed to close LSP channels: {0}")]
     CloseLSPChannels(String),
@@ -56,6 +50,12 @@ pub enum LightningError {
     #[error("Failed to redeem on-chain: {0}")]
     RedeemOnChain(String),
 
+    #[error("Failed to connect to LSP: {0}")]
+    ConnectLSP(String),
+
     #[error("Failed to retrieve healthcheck: {0}")]
     HealthCheck(String),
+
+    #[error("Failed to sync node: {0}")]
+    Sync(String),
 }

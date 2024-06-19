@@ -1,14 +1,18 @@
 use std::sync::Arc;
 
 use crate::{
-    application::dtos::AppConfig,
+    application::{dtos::AppConfig, errors::ConfigError},
     domains::{
         invoices::services::{InvoiceService, InvoiceUseCases},
-        lightning::services::{LnNodeService, LnNodeUseCases, LnUrlService, LnUrlUseCases},
+        lightning::services::{LnUrlService, LnUrlUseCases},
         payments::services::{PaymentService, PaymentsUseCases},
         users::services::{WalletService, WalletUseCases},
     },
-    infra::lightning::LnClient,
+    infra::lightning::{
+        breez::BreezClient,
+        cln::{ClnGrpcClient, ClnRestClient},
+        LnClient,
+    },
 };
 
 use super::AppStore;
@@ -18,7 +22,6 @@ pub struct AppServices {
     pub payment: Box<dyn PaymentsUseCases>,
     pub wallet: Box<dyn WalletUseCases>,
     pub lnurl: Box<dyn LnUrlUseCases>,
-    pub ln_node: Box<dyn LnNodeUseCases>,
 }
 
 impl AppServices {
@@ -40,7 +43,6 @@ impl AppServices {
             config.invoice_expiry.as_secs() as u32,
             config.domain,
         );
-        let ln_node = LnNodeService::new(ln_client);
         let wallet = WalletService::new(store);
 
         AppServices {
@@ -48,7 +50,33 @@ impl AppServices {
             payment: Box::new(payments),
             wallet: Box::new(wallet),
             lnurl: Box::new(lnurl),
-            ln_node: Box::new(ln_node),
+        }
+    }
+}
+
+#[derive(Clone)]
+pub enum LnNodeClient {
+    Breez(Arc<BreezClient>),
+    ClnGrpc(Arc<ClnGrpcClient>),
+    ClnRest(Arc<ClnRestClient>),
+}
+
+impl LnNodeClient {
+    pub fn as_breez_client(&self) -> Result<&BreezClient, ConfigError> {
+        if let LnNodeClient::Breez(client) = self {
+            Ok(client)
+        } else {
+            Err(ConfigError::InvalidLightningProvider("Breez".to_string()))
+        }
+    }
+
+    pub fn as_cln_client(&self) -> Result<&ClnGrpcClient, ConfigError> {
+        if let LnNodeClient::ClnGrpc(client) = self {
+            Ok(client)
+        } else {
+            Err(ConfigError::InvalidLightningProvider(
+                "CoreLightning".to_string(),
+            ))
         }
     }
 }

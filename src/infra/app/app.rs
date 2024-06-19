@@ -7,10 +7,10 @@ use tower_http::{cors::CorsLayer, trace::TraceLayer};
 use tracing::info;
 
 use crate::{
-    application::errors::WebServerError,
+    application::{entities::LnNodeClient, errors::WebServerError},
     domains::{
         invoices::api::InvoiceHandler,
-        lightning::api::{LnAddressHandler, LnNodeHandler, LnURLpHandler},
+        lightning::api::{BreezNodeHandler, ClnNodeHandler, LnAddressHandler, LnURLpHandler},
         payments::api::PaymentHandler,
         users::api::WalletHandler,
     },
@@ -27,7 +27,14 @@ impl App {
             .nest("/.well-known/lnurlp", LnURLpHandler::well_known_route())
             .nest("/api/lnurlp", LnURLpHandler::callback_route())
             .nest("/api/lightning/addresses", LnAddressHandler::routes())
-            .nest("/api/lightning/node", LnNodeHandler::routes())
+            .nest(
+                "/api/lightning/node",
+                match state.ln_node_client {
+                    LnNodeClient::Breez(_) => BreezNodeHandler::routes(),
+                    LnNodeClient::ClnGrpc(_) => ClnNodeHandler::routes(),
+                    LnNodeClient::ClnRest(_) => ClnNodeHandler::routes(),
+                },
+            )
             .nest("/api/invoices", InvoiceHandler::routes())
             .nest("/api/payments", PaymentHandler::routes())
             .nest("/api/wallet", WalletHandler::routes())

@@ -1,8 +1,6 @@
 use std::{str::FromStr, sync::Arc, time::Duration};
 
-use breez_sdk_core::{
-    LspInformation, NodeState, Payment as BreezPayment, ReverseSwapInfo, ServiceHealthCheckResponse,
-};
+use breez_sdk_core::{ReverseSwapInfo, ServiceHealthCheckResponse};
 use lightning_invoice::Bolt11Invoice;
 use reqwest::{
     header::{HeaderMap, HeaderValue},
@@ -142,18 +140,6 @@ impl LnClient for ClnRestClient {
         Ok(bolt11.into())
     }
 
-    fn node_info(&self) -> Result<NodeState, LightningError> {
-        todo!();
-    }
-
-    async fn lsp_info(&self) -> Result<LspInformation, LightningError> {
-        todo!();
-    }
-
-    async fn list_payments(&self) -> Result<Vec<BreezPayment>, LightningError> {
-        todo!();
-    }
-
     async fn pay(
         &self,
         bolt11: String,
@@ -177,22 +163,7 @@ impl LnClient for ClnRestClient {
         Ok(response.into())
     }
 
-    async fn payment_by_hash(
-        &self,
-        payment_hash: String,
-    ) -> Result<Option<BreezPayment>, LightningError> {
-        todo!();
-    }
-
     async fn health(&self) -> Result<ServiceHealthCheckResponse, LightningError> {
-        todo!();
-    }
-
-    async fn list_lsps(&self) -> Result<Vec<LspInformation>, LightningError> {
-        todo!();
-    }
-
-    async fn close_lsp_channels(&self) -> Result<Vec<String>, LightningError> {
         todo!();
     }
 
@@ -202,14 +173,6 @@ impl LnClient for ClnRestClient {
         recipient_address: String,
         feerate: u32,
     ) -> Result<ReverseSwapInfo, LightningError> {
-        todo!();
-    }
-
-    async fn redeem_onchain(
-        &self,
-        to_address: String,
-        feerate: u32,
-    ) -> Result<String, LightningError> {
         todo!();
     }
 }

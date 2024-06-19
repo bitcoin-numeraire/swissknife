@@ -46,3 +46,13 @@ pub struct ProcessEventRequest {
 pub struct EventDataRequest {
     pub payment_hash: String,
 }
+
+#[derive(Debug, Deserialize)]
+pub struct ConnectLSPRequest {
+    pub lsp_id: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct SignMessageRequest {
+    pub message: String,
+}
