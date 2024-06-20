@@ -32,6 +32,7 @@ impl BreezNodeHandler {
             .route("/redeem", post(Self::redeem))
             .route("/sign-message", post(Self::sign_message))
             .route("/sync", post(Self::sync))
+            .route("/backup", post(Self::backup))
             .route("/health", get(Self::health_check))
     }
 
@@ -153,6 +154,18 @@ impl BreezNodeHandler {
 
         let client = app_state.ln_node_client.as_breez_client()?;
         client.sync().await?;
+
+        Ok(())
+    }
+
+    async fn backup(
+        State(app_state): State<Arc<AppState>>,
+        user: AuthUser,
+    ) -> Result<(), ApplicationError> {
+        user.check_permission(Permission::WriteLnNode)?;
+
+        let client = app_state.ln_node_client.as_breez_client()?;
+        client.backup().await?;
 
         Ok(())
     }

@@ -58,4 +58,10 @@ pub enum LightningError {
 
     #[error("Failed to sync node: {0}")]
     Sync(String),
+
+    #[error("Failed to backup node state: {0}")]
+    Backup(String),
+
+    #[error("Failed to sign message: {0}")]
+    SignMessage(String),
 }

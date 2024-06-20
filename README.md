@@ -33,7 +33,7 @@ Numeraire SwissKnife allows direct Lightning Network integration, supporting the
   - Non-custodial
   - Run your own node
   - Manage your own liquidity.
-- [ ] Direct [`LND`](https://github.com/lightningnetwork/lnd) (TODO):
+- [ ] [`LND`](https://github.com/lightningnetwork/lnd) (TODO):
   - Non-custodial
   - Run your own node
   - Manage your own liquidity.

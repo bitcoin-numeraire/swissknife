@@ -187,7 +187,7 @@ impl BreezClient {
             .sdk
             .sign_message(SignMessageRequest { message })
             .await
-            .map_err(|e| LightningError::ConnectLSP(e.to_string()))?;
+            .map_err(|e| LightningError::SignMessage(e.to_string()))?;
 
         Ok(response.signature)
     }
@@ -197,6 +197,13 @@ impl BreezClient {
             .sync()
             .await
             .map_err(|e| LightningError::Sync(e.to_string()))
+    }
+
+    pub async fn backup(&self) -> Result<(), LightningError> {
+        self.sdk
+            .backup()
+            .await
+            .map_err(|e| LightningError::Backup(e.to_string()))
     }
 }
 
