@@ -115,7 +115,12 @@ impl IntoResponse for DataError {
 impl IntoResponse for LightningError {
     fn into_response(self) -> Response {
         let (error_message, status) = match self {
-            LightningError::Pay(_) | LightningError::Invoice(_) => {
+            LightningError::Pay(_)
+            | LightningError::Invoice(_)
+            | LightningError::ConnectLSP(_)
+            | LightningError::SignMessage(_)
+            | LightningError::CheckMessage(_)
+            | LightningError::RedeemOnChain(_) => {
                 warn!("{}", self);
                 (self.to_string(), StatusCode::UNPROCESSABLE_ENTITY)
             }

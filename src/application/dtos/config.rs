@@ -37,6 +37,6 @@ pub struct AppConfig {
 pub enum LightningProvider {
     #[default]
     Breez,
-    Cln,
+    ClnGrpc,
     ClnRest,
 }

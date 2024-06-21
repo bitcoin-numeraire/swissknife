@@ -86,9 +86,7 @@ impl EventListener for BreezListener {
                     }
                 });
             }
-            _ => {
-                trace!(event = ?e, "New event received");
-            }
+            _ => {}
         }
     }
 }
