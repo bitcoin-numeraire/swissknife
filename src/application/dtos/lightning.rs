@@ -56,3 +56,10 @@ pub struct ConnectLSPRequest {
 pub struct SignMessageRequest {
     pub message: String,
 }
+
+#[derive(Debug, Deserialize)]
+pub struct CheckMessageRequest {
+    pub message: String,
+    pub signature: String,
+    pub pubkey: String,
+}

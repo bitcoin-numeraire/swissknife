@@ -64,4 +64,7 @@ pub enum LightningError {
 
     #[error("Failed to sign message: {0}")]
     SignMessage(String),
+
+    #[error("Failed to check message signature: {0}")]
+    CheckMessage(String),
 }

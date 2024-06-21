@@ -7,11 +7,11 @@ use uuid::Uuid;
 use async_trait::async_trait;
 use bip39::Mnemonic;
 use breez_sdk_core::{
-    BreezServices, ConnectRequest, EnvironmentType, GreenlightCredentials, GreenlightNodeConfig,
-    LspInformation, NodeConfig, NodeState, PayOnchainRequest, PrepareOnchainPaymentRequest,
-    PrepareRedeemOnchainFundsRequest, ReceivePaymentRequest, RedeemOnchainFundsRequest,
-    ReverseSwapInfo, SendPaymentRequest, ServiceHealthCheckResponse, SignMessageRequest,
-    SwapAmountType,
+    BreezServices, CheckMessageRequest, ConnectRequest, EnvironmentType, GreenlightCredentials,
+    GreenlightNodeConfig, LspInformation, NodeConfig, NodeState, PayOnchainRequest,
+    PrepareOnchainPaymentRequest, PrepareRedeemOnchainFundsRequest, ReceivePaymentRequest,
+    RedeemOnchainFundsRequest, ReverseSwapInfo, SendPaymentRequest, ServiceHealthCheckResponse,
+    SignMessageRequest, StaticBackupRequest, SwapAmountType,
 };
 
 use crate::{
@@ -40,6 +40,7 @@ const DEFAULT_CLIENT_KEY_FILENAME: &str = "client-key.pem";
 
 pub struct BreezClient {
     api_key: String,
+    working_dir: String,
     sdk: Arc<BreezServices>,
 }
 
@@ -69,7 +70,7 @@ impl BreezClient {
                 },
             },
         );
-        breez_config.working_dir = config.working_dir;
+        breez_config.working_dir = config.working_dir.clone();
 
         let seed =
             Mnemonic::parse(config.seed).map_err(|e| LightningError::ParseSeed(e.to_string()))?;
@@ -88,7 +89,8 @@ impl BreezClient {
         .map_err(|e| LightningError::Connect(e.to_string()))?;
 
         Ok(Self {
-            api_key: config.api_key.clone(),
+            api_key: config.api_key,
+            working_dir: config.working_dir,
             sdk,
         })
     }
@@ -192,6 +194,25 @@ impl BreezClient {
         Ok(response.signature)
     }
 
+    pub async fn check_message(
+        &self,
+        message: String,
+        pubkey: String,
+        signature: String,
+    ) -> Result<bool, LightningError> {
+        let response = self
+            .sdk
+            .check_message(CheckMessageRequest {
+                message,
+                pubkey,
+                signature,
+            })
+            .await
+            .map_err(|e| LightningError::CheckMessage(e.to_string()))?;
+
+        Ok(response.is_valid)
+    }
+
     pub async fn sync(&self) -> Result<(), LightningError> {
         self.sdk
             .sync()
@@ -199,11 +220,22 @@ impl BreezClient {
             .map_err(|e| LightningError::Sync(e.to_string()))
     }
 
-    pub async fn backup(&self) -> Result<(), LightningError> {
-        self.sdk
-            .backup()
-            .await
-            .map_err(|e| LightningError::Backup(e.to_string()))
+    pub fn backup(&self) -> Result<Option<Vec<String>>, LightningError> {
+        let status = self
+            .sdk
+            .backup_status()
+            .map_err(|e| LightningError::Backup(e.to_string()))?;
+
+        if !status.backed_up {
+            return Ok(None);
+        }
+
+        let response = BreezServices::static_backup(StaticBackupRequest {
+            working_dir: self.working_dir.clone(),
+        })
+        .map_err(|e| LightningError::Backup(e.to_string()))?;
+
+        Ok(response.backup)
     }
 }
 

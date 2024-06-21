@@ -1,7 +1,10 @@
 use std::sync::Arc;
 
 use axum::{
+    body::Body,
     extract::State,
+    http::header,
+    response::{IntoResponse, Response},
     routing::{get, post},
     Json, Router,
 };
@@ -10,9 +13,10 @@ use breez_sdk_core::{LspInformation, NodeState, ReverseSwapInfo, ServiceHealthCh
 use crate::{
     application::{
         dtos::{
-            ConnectLSPRequest, RedeemOnchainRequest, SendOnchainPaymentRequest, SignMessageRequest,
+            CheckMessageRequest, ConnectLSPRequest, RedeemOnchainRequest,
+            SendOnchainPaymentRequest, SignMessageRequest,
         },
-        errors::ApplicationError,
+        errors::{ApplicationError, LightningError},
     },
     domains::users::entities::{AuthUser, Permission},
     infra::{app::AppState, lightning::LnClient},
@@ -31,8 +35,9 @@ impl BreezNodeHandler {
             .route("/swap", post(Self::swap))
             .route("/redeem", post(Self::redeem))
             .route("/sign-message", post(Self::sign_message))
+            .route("/check-message", post(Self::check_message))
             .route("/sync", post(Self::sync))
-            .route("/backup", post(Self::backup))
+            .route("/backup", get(Self::backup))
             .route("/health", get(Self::health_check))
     }
 
@@ -43,7 +48,6 @@ impl BreezNodeHandler {
         user.check_permission(Permission::ReadLnNode)?;
 
         let client = app_state.ln_node_client.as_breez_client()?;
-
         let node_info = client.node_info()?;
 
         Ok(node_info.into())
@@ -146,6 +150,21 @@ impl BreezNodeHandler {
         Ok(signature)
     }
 
+    async fn check_message(
+        State(app_state): State<Arc<AppState>>,
+        user: AuthUser,
+        Json(payload): Json<CheckMessageRequest>,
+    ) -> Result<String, ApplicationError> {
+        user.check_permission(Permission::WriteLnNode)?;
+
+        let client = app_state.ln_node_client.as_breez_client()?;
+        let is_valid = client
+            .check_message(payload.message, payload.pubkey, payload.signature)
+            .await?;
+
+        Ok(is_valid.to_string())
+    }
+
     async fn sync(
         State(app_state): State<Arc<AppState>>,
         user: AuthUser,
@@ -161,13 +180,29 @@ impl BreezNodeHandler {
     async fn backup(
         State(app_state): State<Arc<AppState>>,
         user: AuthUser,
-    ) -> Result<(), ApplicationError> {
-        user.check_permission(Permission::WriteLnNode)?;
+    ) -> Result<Response, ApplicationError> {
+        user.check_permission(Permission::ReadLnNode)?;
 
         let client = app_state.ln_node_client.as_breez_client()?;
-        client.backup().await?;
+        let data = client.backup()?;
 
-        Ok(())
+        return match data {
+            Some(data) => {
+                let filename = "channels_backup.txt";
+                let body = Body::from(data.join("\n").into_bytes());
+
+                let headers = [
+                    (header::CONTENT_TYPE, "text/plain"),
+                    (
+                        header::CONTENT_DISPOSITION,
+                        &format!("attachment; filename=\"{}\"", filename),
+                    ),
+                ];
+
+                Ok((headers, body).into_response())
+            }
+            None => Err(LightningError::Backup("No backup data found".to_string()))?,
+        };
     }
 
     async fn health_check(

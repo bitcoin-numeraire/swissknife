@@ -118,7 +118,9 @@ impl IntoResponse for LightningError {
             LightningError::Pay(_)
             | LightningError::Invoice(_)
             | LightningError::ConnectLSP(_)
-            | LightningError::SignMessage(_) => {
+            | LightningError::SignMessage(_)
+            | LightningError::CheckMessage(_)
+            | LightningError::RedeemOnChain(_) => {
                 warn!("{}", self);
                 (self.to_string(), StatusCode::UNPROCESSABLE_ENTITY)
             }
