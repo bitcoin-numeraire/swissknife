@@ -112,7 +112,7 @@ async fn get_ln_client(
 async fn get_authenticator(config: AppConfig) -> Result<Arc<dyn Authenticator>, ApplicationError> {
     match config.auth_provider {
         AuthProvider::Bypass => {
-            warn!("Auth provider: Disabled. All requests will be accepted as superuser");
+            warn!("Auth provider: Bypass. All requests will be accepted as superuser");
 
             let authenticator = BypassAuthenticator::new();
             Ok(Arc::new(authenticator))

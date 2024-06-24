@@ -18,6 +18,9 @@ use crate::infra::{
 #[derive(Debug, Deserialize, Clone)]
 pub struct AppConfig {
     pub domain: String,
+    pub auth_provider: AuthProvider,
+    pub oauth2: Option<OAuth2Config>,
+    pub jwt: Option<JwtConfig>,
     #[serde(deserialize_with = "deserialize_duration")]
     pub invoice_expiry: Duration,
     pub fee_buffer: Option<f64>,
@@ -28,9 +31,6 @@ pub struct AppConfig {
     pub cln_rest_config: Option<ClnRestClientConfig>,
     pub web: AxumServerConfig,
     pub logging: TracingLoggerConfig,
-    pub auth_provider: AuthProvider,
-    pub oauth2: Option<OAuth2Config>,
-    pub jwt: Option<JwtConfig>,
 }
 
 #[derive(Clone, Debug, Deserialize, EnumString, Display, PartialEq, Eq, Default)]

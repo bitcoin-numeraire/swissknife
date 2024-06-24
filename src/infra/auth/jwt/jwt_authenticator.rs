@@ -13,7 +13,7 @@ pub struct JwtConfig {
     username: String,
     password: String,
     #[serde(deserialize_with = "deserialize_duration")]
-    token_expiration: Duration,
+    token_expiry: Duration,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -28,13 +28,13 @@ struct Claims {
 
 #[derive(Clone, Debug)]
 pub struct JwtAuthenticator {
-    token_expiration: Duration,
+    token_expiry: Duration,
 }
 
 impl JwtAuthenticator {
     pub async fn new(config: JwtConfig) -> Result<Self, AuthenticationError> {
         Ok(Self {
-            token_expiration: config.token_expiration,
+            token_expiry: config.token_expiry,
         })
     }
 }
