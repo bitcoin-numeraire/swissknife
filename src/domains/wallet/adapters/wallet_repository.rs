@@ -3,24 +3,25 @@ use sea_orm::{
     ConnectionTrait, DatabaseConnection, DatabaseTransaction, FromQueryResult, Statement,
 };
 
-use crate::domains::users::adapters::UserBalanceModel;
-use crate::{application::errors::DatabaseError, domains::users::entities::UserBalance};
+use crate::application::errors::DatabaseError;
+use crate::domains::wallet::entities::UserBalance;
 
-use super::UserRepository;
+use super::user_balance_model::UserBalanceModel;
+use super::WalletRepository;
 
 #[derive(Clone)]
-pub struct SeaOrmUserRepository {
+pub struct SeaOrmWalletRepository {
     pub db: DatabaseConnection,
 }
 
-impl SeaOrmUserRepository {
+impl SeaOrmWalletRepository {
     pub fn new(db: DatabaseConnection) -> Self {
         Self { db }
     }
 }
 
 #[async_trait]
-impl UserRepository for SeaOrmUserRepository {
+impl WalletRepository for SeaOrmWalletRepository {
     async fn get_balance(
         &self,
         txn: Option<&DatabaseTransaction>,

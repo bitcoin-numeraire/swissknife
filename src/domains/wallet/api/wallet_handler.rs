@@ -16,7 +16,8 @@ use crate::{
         invoices::entities::{Invoice, InvoiceFilter, InvoiceStatus},
         lightning::entities::{LnAddress, LnAddressFilter},
         payments::entities::{Payment, PaymentFilter, PaymentStatus},
-        users::entities::{AuthUser, UserBalance, Wallet},
+        users::entities::AuthUser,
+        wallet::entities::{UserBalance, Wallet},
     },
     infra::app::AppState,
 };

@@ -12,7 +12,7 @@ use crate::{
         invoices::api::InvoiceHandler,
         lightning::api::{BreezNodeHandler, ClnNodeHandler, LnAddressHandler, LnURLpHandler},
         payments::api::PaymentHandler,
-        users::api::WalletHandler,
+        wallet::api::WalletHandler,
     },
     infra::app::AppState,
 };

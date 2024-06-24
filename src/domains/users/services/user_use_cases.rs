@@ -1,12 +1,9 @@
 use async_trait::async_trait;
 
-use crate::{
-    application::errors::ApplicationError,
-    domains::users::entities::{UserBalance, Wallet},
-};
+use crate::{application::errors::ApplicationError, domains::users::entities::AuthUser};
 
 #[async_trait]
-pub trait WalletUseCases: Send + Sync {
-    async fn get_balance(&self, user: String) -> Result<UserBalance, ApplicationError>;
-    async fn get(&self, user_id: String) -> Result<Wallet, ApplicationError>;
+pub trait UserUseCases: Send + Sync {
+    async fn login(&self, password: String) -> Result<String, ApplicationError>;
+    async fn authenticate_jwt(&self, token: String) -> Result<AuthUser, ApplicationError>;
 }

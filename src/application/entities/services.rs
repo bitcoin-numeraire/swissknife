@@ -6,7 +6,7 @@ use crate::{
         invoices::services::{InvoiceService, InvoiceUseCases},
         lightning::services::{LnUrlService, LnUrlUseCases},
         payments::services::{PaymentService, PaymentsUseCases},
-        users::services::{WalletService, WalletUseCases},
+        wallet::services::{WalletService, WalletUseCases},
     },
     infra::lightning::{
         breez::BreezClient,
