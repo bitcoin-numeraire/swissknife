@@ -20,6 +20,13 @@ impl IntoResponse for ApplicationError {
             ApplicationError::Authorization(error) => error.into_response(),
             ApplicationError::Data(error) => error.into_response(),
             ApplicationError::Lightning(error) => error.into_response(),
+            ApplicationError::UnsupportedOperation(_) => {
+                debug!("{}", self);
+
+                let status = StatusCode::METHOD_NOT_ALLOWED;
+                let body = generate_body(status, self.to_string().as_str());
+                (status, body).into_response()
+            }
             _ => {
                 error!("{}", self);
 
@@ -37,7 +44,6 @@ impl IntoResponse for AuthorizationError {
             AuthorizationError::MissingPermission(_) => {
                 "Access denied due to insufficient permissions"
             }
-            _ => "Access denied",
         };
 
         warn!("{}", self);
@@ -51,6 +57,7 @@ impl IntoResponse for AuthorizationError {
 impl IntoResponse for AuthenticationError {
     fn into_response(self) -> Response {
         let (error_message, header_message) = match self {
+            AuthenticationError::InvalidCredentials => ("invalid credentials", ""),
             AuthenticationError::MissingBearerToken(_) => (
                 "Missing authentication token",
                 "Bearer realm=\"swissknife\", error=\"invalid_request\"",

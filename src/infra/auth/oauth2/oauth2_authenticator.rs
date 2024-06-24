@@ -34,7 +34,7 @@ struct Claims {
     iat: usize, // Optional. Issued at (as UTC timestamp)
     iss: String, // Optional. Issuer
     sub: String, // Optional. Subject (whom token refers to)
-    permissions: Option<Vec<String>>,
+    permissions: Vec<Permission>,
 }
 
 #[derive(Clone, Debug)]
@@ -85,6 +85,10 @@ impl OAuth2Authenticator {
 
 #[async_trait]
 impl Authenticator for OAuth2Authenticator {
+    fn generate_jwt_token(&self, _: &str) -> Result<String, AuthenticationError> {
+        Err(AuthenticationError::UnsupportedOperation)
+    }
+
     async fn authenticate(&self, token: &str) -> Result<AuthUser, AuthenticationError> {
         // Access the JWKs and clone the data
         let jwks = self.jwks.read().await.clone();
@@ -107,19 +111,9 @@ impl Authenticator for OAuth2Authenticator {
                     let decoded_token = decode::<Claims>(token, &decoding_key, &self.validation)
                         .map_err(|e| AuthenticationError::DecodeJWT(e.to_string()))?;
 
-                    trace!(decoded_token = ?decoded_token, "JWT Token decoded successfully");
-
-                    let permissions = match decoded_token.claims.permissions {
-                        Some(perms) => perms
-                            .into_iter()
-                            .filter_map(|p| p.parse::<Permission>().ok())
-                            .collect(),
-                        None => vec![],
-                    };
-
                     Ok(AuthUser {
                         sub: decoded_token.claims.sub,
-                        permissions,
+                        permissions: decoded_token.claims.permissions,
                     })
                 }
                 _ => unreachable!("Only RSA algorithm is supported as JWK. should be unreachable"),

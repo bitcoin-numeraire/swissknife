@@ -65,7 +65,7 @@ leeway = "60s"
 [jwt]
 username = "admin"
 password = "change_me"
-token_expiry = "12h"
+token_expiry = "1h"
 
 [database]
 max_lifetime = "30m"

@@ -81,14 +81,4 @@ impl LnNodeClient {
             Err(ConfigError::InvalidLightningProvider("Breez".to_string()))
         }
     }
-
-    pub fn as_cln_client(&self) -> Result<&ClnGrpcClient, ConfigError> {
-        if let LnNodeClient::ClnGrpc(client) = self {
-            Ok(client)
-        } else {
-            Err(ConfigError::InvalidLightningProvider(
-                "CoreLightning".to_string(),
-            ))
-        }
-    }
 }

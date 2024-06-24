@@ -10,8 +10,9 @@ use crate::{
     application::{entities::LnNodeClient, errors::WebServerError},
     domains::{
         invoices::api::InvoiceHandler,
-        lightning::api::{BreezNodeHandler, ClnNodeHandler, LnAddressHandler, LnURLpHandler},
+        lightning::api::{BreezNodeHandler, LnAddressHandler, LnURLpHandler},
         payments::api::PaymentHandler,
+        users::api::UserHandler,
         wallet::api::WalletHandler,
     },
     infra::app::AppState,
@@ -27,17 +28,19 @@ impl App {
             .nest("/.well-known/lnurlp", LnURLpHandler::well_known_route())
             .nest("/api/lnurlp", LnURLpHandler::callback_route())
             .nest("/api/lightning/addresses", LnAddressHandler::routes())
-            .nest(
-                "/api/lightning/node",
-                match state.ln_node_client {
-                    LnNodeClient::Breez(_) => BreezNodeHandler::routes(),
-                    LnNodeClient::ClnGrpc(_) => ClnNodeHandler::routes(),
-                    LnNodeClient::ClnRest(_) => ClnNodeHandler::routes(),
-                },
-            )
             .nest("/api/invoices", InvoiceHandler::routes())
             .nest("/api/payments", PaymentHandler::routes())
             .nest("/api/wallet", WalletHandler::routes())
+            .nest("/api/users", UserHandler::routes());
+
+        let router = match state.ln_node_client {
+            LnNodeClient::Breez(_) => {
+                router.nest("/api/lightning/node", BreezNodeHandler::routes())
+            }
+            _ => router,
+        };
+
+        let router = router
             .layer(TraceLayer::new_for_http())
             .layer(state.timeout_layer)
             .layer(CorsLayer::permissive())

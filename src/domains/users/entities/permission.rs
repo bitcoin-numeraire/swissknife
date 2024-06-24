@@ -1,38 +1,22 @@
-use std::str::FromStr;
+use serde::{Deserialize, Serialize};
+use strum_macros::{Display, EnumString, VariantNames};
 
-use tracing::warn;
-
-use crate::application::errors::AuthorizationError;
-
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(
+    Clone, Debug, PartialEq, Eq, Hash, EnumString, Display, VariantNames, Serialize, Deserialize,
+)]
 pub enum Permission {
+    #[serde(rename = "read:ln_address")]
     ReadLnAddress,
+    #[serde(rename = "write:ln_address")]
     WriteLnAddress,
+    #[serde(rename = "read:transaction")]
     ReadLnTransaction,
+    #[serde(rename = "write:transaction")]
     WriteLnTransaction,
+    #[serde(rename = "read:ln_node")]
     ReadLnNode,
+    #[serde(rename = "write:ln_node")]
     WriteLnNode,
-}
-
-impl FromStr for Permission {
-    type Err = AuthorizationError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "read:ln_address" => Ok(Permission::ReadLnAddress),
-            "write:ln_address" => Ok(Permission::WriteLnAddress),
-            "read:transaction" => Ok(Permission::ReadLnTransaction),
-            "write:transaction" => Ok(Permission::WriteLnTransaction),
-            "read:ln_node" => Ok(Permission::ReadLnNode),
-            "write:ln_node" => Ok(Permission::WriteLnNode),
-            // ... handle other permissions ...
-            _ => {
-                let err = AuthorizationError::ParsePermission(s.to_string());
-                warn!("{}", err.to_string());
-                Err(err)
-            }
-        }
-    }
 }
 
 impl Permission {
@@ -44,7 +28,6 @@ impl Permission {
             Permission::WriteLnTransaction,
             Permission::ReadLnNode,
             Permission::WriteLnNode,
-            // ... include all other permission variants ...
         ]
     }
 }

@@ -16,6 +16,10 @@ const USERNAME: &str = "superuser";
 
 #[async_trait]
 impl Authenticator for BypassAuthenticator {
+    fn generate_jwt_token(&self, _: &str) -> Result<String, AuthenticationError> {
+        Err(AuthenticationError::UnsupportedOperation)
+    }
+
     async fn authenticate(&self, _: &str) -> Result<AuthUser, AuthenticationError> {
         Ok(AuthUser {
             sub: USERNAME.to_string(),

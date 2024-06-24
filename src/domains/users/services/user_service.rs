@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use std::sync::Arc;
 
-use tracing::trace;
+use tracing::{debug, trace};
 
 use crate::{
     application::{dtos::AuthProvider, errors::ApplicationError},
@@ -28,7 +28,20 @@ impl UserService {
 #[async_trait]
 impl UserUseCases for UserService {
     fn login(&self, password: String) -> Result<String, ApplicationError> {
-        Ok("".to_string())
+        trace!("Start login");
+
+        match self.provider {
+            AuthProvider::Jwt => {
+                let token = self.jwt_authenticator.generate_jwt_token(&password)?;
+
+                debug!(%token, "User logged in successfully");
+                Ok(token)
+            }
+            _ => Err(ApplicationError::UnsupportedOperation(format!(
+                "login for {} provider",
+                self.provider
+            ))),
+        }
     }
 
     async fn authenticate_jwt(&self, token: &str) -> Result<AuthUser, ApplicationError> {

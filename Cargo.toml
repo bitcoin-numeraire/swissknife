@@ -50,6 +50,7 @@ tokio-tungstenite = { version = "0.23.0", features = ["native-tls"] }
 futures-util = "0.3.30"
 humantime = "2.1.0"
 rust_socketio = { version = "0.6.0", features = ["async"] }
+bcrypt = "0.15.1"
 
 [build-dependencies]
 tonic-build = "0.11.0"
