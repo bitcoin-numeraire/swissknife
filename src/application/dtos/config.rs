@@ -4,7 +4,7 @@ use serde::Deserialize;
 use strum_macros::{Display, EnumString};
 
 use crate::infra::{
-    auth::AuthConfig,
+    auth::{jwt::JwtConfig, oauth2::OAuth2Config},
     axum::AxumServerConfig,
     config::config_rs::deserialize_duration,
     database::DatabaseConfig,
@@ -28,7 +28,9 @@ pub struct AppConfig {
     pub cln_rest_config: Option<ClnRestClientConfig>,
     pub web: AxumServerConfig,
     pub logging: TracingLoggerConfig,
-    pub auth: AuthConfig,
+    pub auth_provider: AuthProvider,
+    pub oauth2: Option<OAuth2Config>,
+    pub jwt: Option<JwtConfig>,
 }
 
 #[derive(Clone, Debug, Deserialize, EnumString, Display, PartialEq, Eq, Default)]
@@ -39,4 +41,14 @@ pub enum LightningProvider {
     Breez,
     ClnGrpc,
     ClnRest,
+}
+
+#[derive(Clone, Debug, Deserialize, EnumString, Display, PartialEq, Eq, Default)]
+#[serde(rename_all = "lowercase")]
+#[strum(serialize_all = "lowercase")]
+pub enum AuthProvider {
+    Bypass,
+    #[default]
+    Jwt,
+    OAuth2,
 }

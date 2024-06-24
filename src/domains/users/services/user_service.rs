@@ -1,7 +1,42 @@
-pub struct UserService {}
+use async_trait::async_trait;
+use std::sync::Arc;
+
+use tracing::trace;
+
+use crate::{
+    application::{dtos::AuthProvider, errors::ApplicationError},
+    domains::users::entities::AuthUser,
+    infra::auth::Authenticator,
+};
+
+use super::UserUseCases;
+
+pub struct UserService {
+    provider: AuthProvider,
+    jwt_authenticator: Arc<dyn Authenticator>,
+}
 
 impl UserService {
-    pub fn new() -> Self {
-        UserService {}
+    pub fn new(provider: AuthProvider, jwt_authenticator: Arc<dyn Authenticator>) -> Self {
+        UserService {
+            provider,
+            jwt_authenticator,
+        }
+    }
+}
+
+#[async_trait]
+impl UserUseCases for UserService {
+    fn login(&self, password: String) -> Result<String, ApplicationError> {
+        Ok("".to_string())
+    }
+
+    async fn authenticate_jwt(&self, token: &str) -> Result<AuthUser, ApplicationError> {
+        trace!(%token, "Start JWT authentication");
+
+        let user = self.jwt_authenticator.authenticate(token).await?;
+
+        trace!(user = ?user, "JWT authentication successful");
+        Ok(user)
     }
 }
