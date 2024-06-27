@@ -13,14 +13,14 @@ use super::UserUseCases;
 
 pub struct UserService {
     provider: AuthProvider,
-    jwt_authenticator: Arc<dyn Authenticator>,
+    authenticator: Arc<dyn Authenticator>,
 }
 
 impl UserService {
-    pub fn new(provider: AuthProvider, jwt_authenticator: Arc<dyn Authenticator>) -> Self {
+    pub fn new(provider: AuthProvider, authenticator: Arc<dyn Authenticator>) -> Self {
         UserService {
             provider,
-            jwt_authenticator,
+            authenticator,
         }
     }
 }
@@ -32,7 +32,7 @@ impl UserUseCases for UserService {
 
         match self.provider {
             AuthProvider::Jwt => {
-                let token = self.jwt_authenticator.generate_jwt_token(&password)?;
+                let token = self.authenticator.generate_jwt_token(&password)?;
 
                 debug!(%token, "User logged in successfully");
                 Ok(token)
@@ -44,12 +44,16 @@ impl UserUseCases for UserService {
         }
     }
 
-    async fn authenticate_jwt(&self, token: &str) -> Result<AuthUser, ApplicationError> {
+    async fn authenticate(&self, token: &str) -> Result<AuthUser, ApplicationError> {
         trace!(%token, "Start JWT authentication");
 
-        let user = self.jwt_authenticator.authenticate(token).await?;
+        let user = self.authenticator.authenticate(token).await?;
 
         trace!(user = ?user, "JWT authentication successful");
         Ok(user)
+    }
+
+    fn provider(&self) -> AuthProvider {
+        self.provider.clone()
     }
 }

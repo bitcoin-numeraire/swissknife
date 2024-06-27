@@ -8,7 +8,10 @@ use axum_extra::{
 };
 
 use crate::{
-    application::errors::{ApplicationError, AuthenticationError},
+    application::{
+        dtos::AuthProvider,
+        errors::{ApplicationError, AuthenticationError},
+    },
     domains::users::entities::AuthUser,
     infra::app::AppState,
 };
@@ -21,13 +24,20 @@ impl FromRequestParts<Arc<AppState>> for AuthUser {
         parts: &mut Parts,
         state: &Arc<AppState>,
     ) -> Result<Self, Self::Rejection> {
-        // Extract the token from the Authorization header
-        let TypedHeader(Authorization(bearer)) = parts
-            .extract::<TypedHeader<Authorization<Bearer>>>()
-            .await
-            .map_err(|e| AuthenticationError::MissingBearerToken(e.to_string()))?;
+        let credentials = match state.services.user.provider() {
+            AuthProvider::Bypass => "".to_string(),
+            _ => {
+                // Extract the token from the Authorization header
+                let TypedHeader(Authorization(bearer)) = parts
+                    .extract::<TypedHeader<Authorization<Bearer>>>()
+                    .await
+                    .map_err(|e| AuthenticationError::MissingBearerToken(e.to_string()))?;
 
-        let user = state.services.user.authenticate_jwt(bearer.token()).await?;
+                bearer.token().to_string()
+            }
+        };
+
+        let user = state.services.user.authenticate(&credentials).await?;
 
         Ok(user)
     }
