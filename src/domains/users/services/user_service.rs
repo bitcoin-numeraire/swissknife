@@ -1,80 +1,59 @@
-use crate::{
-    application::{
-        entities::{AppStore, PaginationFilter},
-        errors::ApplicationError,
-    },
-    domains::{
-        invoices::entities::InvoiceFilter,
-        payments::entities::PaymentFilter,
-        users::{
-            entities::{UserBalance, Wallet},
-            services::WalletUseCases,
-        },
-    },
-};
 use async_trait::async_trait;
+use std::sync::Arc;
+
 use tracing::{debug, trace};
 
-pub struct WalletService {
-    store: AppStore,
+use crate::{
+    application::{dtos::AuthProvider, errors::ApplicationError},
+    domains::users::entities::AuthUser,
+    infra::auth::Authenticator,
+};
+
+use super::UserUseCases;
+
+pub struct UserService {
+    provider: AuthProvider,
+    authenticator: Arc<dyn Authenticator>,
 }
 
-impl WalletService {
-    pub fn new(store: AppStore) -> Self {
-        WalletService { store }
+impl UserService {
+    pub fn new(provider: AuthProvider, authenticator: Arc<dyn Authenticator>) -> Self {
+        UserService {
+            provider,
+            authenticator,
+        }
     }
 }
-
-const PAYMENTS_LIMIT: u64 = 10;
-const INVOICES_LIMIT: u64 = 10;
 
 #[async_trait]
-impl WalletUseCases for WalletService {
-    async fn get_balance(&self, user_id: String) -> Result<UserBalance, ApplicationError> {
-        trace!(user_id, "Fetching balance");
+impl UserUseCases for UserService {
+    fn sign_in(&self, password: String) -> Result<String, ApplicationError> {
+        trace!("Start login");
 
-        let balance = self.store.user.get_balance(None, &user_id).await?;
+        match self.provider {
+            AuthProvider::Jwt => {
+                let token = self.authenticator.generate_jwt_token(&password)?;
 
-        debug!(user_id, "Balance fetched successfully");
-        Ok(balance)
+                debug!(%token, "User logged in successfully");
+                Ok(token)
+            }
+            _ => Err(ApplicationError::UnsupportedOperation(format!(
+                "login for {} provider",
+                self.provider
+            ))),
+        }
     }
 
-    async fn get(&self, user_id: String) -> Result<Wallet, ApplicationError> {
-        trace!(user_id, "Fetching wallet");
+    async fn authenticate(&self, token: &str) -> Result<AuthUser, ApplicationError> {
+        trace!(%token, "Start JWT authentication");
 
-        let balance = self.store.user.get_balance(None, &user_id).await?;
-        let payments = self
-            .store
-            .payment
-            .find_many(PaymentFilter {
-                user_id: Some(user_id.clone()),
-                pagination: PaginationFilter {
-                    limit: Some(PAYMENTS_LIMIT),
-                    ..Default::default()
-                },
-                ..Default::default()
-            })
-            .await?;
-        let invoices = self
-            .store
-            .invoice
-            .find_many(InvoiceFilter {
-                user_id: Some(user_id.clone()),
-                pagination: PaginationFilter {
-                    limit: Some(INVOICES_LIMIT),
-                    ..Default::default()
-                },
-                ..Default::default()
-            })
-            .await?;
-        let ln_address = self.store.ln_address.find_by_user_id(&user_id).await?;
+        let user = self.authenticator.authenticate(token).await?;
 
-        debug!(user_id, "wallet fetched successfully");
-        Ok(Wallet {
-            user_balance: balance,
-            payments,
-            invoices,
-            ln_address,
-        })
+        trace!(user = ?user, "JWT authentication successful");
+        Ok(user)
+    }
+
+    fn provider(&self) -> AuthProvider {
+        self.provider.clone()
     }
 }

@@ -6,7 +6,4 @@ use crate::domains::users::entities::Permission;
 pub enum AuthorizationError {
     #[error("Missing required permission: {0:?}")]
     MissingPermission(Permission),
-
-    #[error("Failed to parse permission: {0}")]
-    ParsePermission(String),
 }

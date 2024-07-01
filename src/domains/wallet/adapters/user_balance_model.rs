@@ -1,9 +1,9 @@
 use sea_orm::FromQueryResult;
 
-use crate::domains::users::entities::UserBalance;
+use crate::domains::wallet::entities::UserBalance;
 
 #[derive(Debug, FromQueryResult)]
-pub struct UserBalanceModel {
+pub(crate) struct UserBalanceModel {
     pub received_msat: i64,
     pub sent_msat: i64,
     pub fees_paid_msat: i64,

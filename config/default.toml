@@ -3,6 +3,7 @@ invoice_expiry = "1h"
 domain = "numeraire.tech"
 fee_buffer = 0.02
 ln_provider = "breez"
+auth_provider = "jwt"
 
 # Web server settings
 [web]
@@ -55,14 +56,16 @@ level = "info"
 filter = "swissknife=info"
 file = false
 
-[auth]
-# If set to true, the server will require authentication
-enabled = false
-[auth.jwt]
+[oauth2]
 domain = "domain.auth0.com"
 audience = "https://swissknife.numeraire.tech/api/v1"
 jwks_refresh_interval = "1h"
 leeway = "60s"
+
+[jwt]
+username = "admin"
+password = "change_me"
+token_expiry = "1h"
 
 [database]
 max_lifetime = "30m"

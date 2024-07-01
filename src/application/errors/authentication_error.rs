@@ -22,4 +22,16 @@ pub enum AuthenticationError {
 
     #[error("Missing Bearer token for authentication: {0}")]
     MissingBearerToken(String),
+
+    #[error("Failed to generate hash from given password: {0}")]
+    Hash(String),
+
+    #[error("Failed to encode JWT token: {0}")]
+    EncodeJWT(String),
+
+    #[error("Invalid credentials")]
+    InvalidCredentials,
+
+    #[error("Unsupported operation")]
+    UnsupportedOperation,
 }

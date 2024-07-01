@@ -8,7 +8,7 @@ use crate::{
         invoices::adapters::{InvoiceRepository, SeaOrmInvoiceRepository},
         lightning::adapters::{LnAddressRepository, SeaOrmLnAddressRepository},
         payments::adapters::{PaymentRepository, SeaOrmPaymentRepository},
-        users::adapters::{SeaOrmUserRepository, UserRepository},
+        wallet::adapters::{SeaOrmWalletRepository, WalletRepository},
     },
 };
 
@@ -18,7 +18,7 @@ pub struct AppStore {
     pub ln_address: Arc<dyn LnAddressRepository>,
     pub payment: Arc<dyn PaymentRepository>,
     pub invoice: Arc<dyn InvoiceRepository>,
-    pub user: Arc<dyn UserRepository>,
+    pub wallet: Arc<dyn WalletRepository>,
 }
 
 impl AppStore {
@@ -26,14 +26,14 @@ impl AppStore {
         let ln_address_repo = SeaOrmLnAddressRepository::new(db_conn.clone());
         let payment_repo = SeaOrmPaymentRepository::new(db_conn.clone());
         let invoice_repo = SeaOrmInvoiceRepository::new(db_conn.clone());
-        let user_repo = SeaOrmUserRepository::new(db_conn.clone());
+        let wallet_repo = SeaOrmWalletRepository::new(db_conn.clone());
 
         AppStore {
             db_conn,
             ln_address: Arc::new(ln_address_repo),
             payment: Arc::new(payment_repo),
             invoice: Arc::new(invoice_repo),
-            user: Arc::new(user_repo),
+            wallet: Arc::new(wallet_repo),
         }
     }
 }

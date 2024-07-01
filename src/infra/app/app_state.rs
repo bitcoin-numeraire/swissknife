@@ -2,13 +2,16 @@ use std::sync::Arc;
 
 use crate::{
     application::{
-        dtos::{AppConfig, LightningProvider},
+        dtos::{AppConfig, AuthProvider, LightningProvider},
         entities::{AppServices, AppStore, LnNodeClient},
         errors::{ApplicationError, ConfigError},
     },
     domains::lightning::services::{LnEventsService, LnEventsUseCases},
     infra::{
-        auth::{jwt::JWTAuthenticator, Authenticator},
+        auth::{
+            bypass::BypassAuthenticator, jwt::JwtAuthenticator, oauth2::OAuth2Authenticator,
+            Authenticator,
+        },
         database::sea_orm::SeaORMClient,
         lightning::{
             breez::BreezClient,
@@ -21,7 +24,6 @@ use tower_http::timeout::TimeoutLayer;
 use tracing::{info, warn};
 
 pub struct AppState {
-    pub jwt_authenticator: Option<Arc<dyn Authenticator>>,
     pub services: AppServices,
     pub ln_client: Arc<dyn LnClient>,
     pub ln_node_client: LnNodeClient,
@@ -33,15 +35,7 @@ impl AppState {
         // Infra
         let timeout_layer = TimeoutLayer::new(config.web.request_timeout);
         let db_conn = SeaORMClient::connect(config.database.clone()).await?;
-        let jwt_authenticator = if config.auth.enabled {
-            Some(
-                Arc::new(JWTAuthenticator::new(config.auth.jwt.clone()).await?)
-                    as Arc<dyn Authenticator>,
-            )
-        } else {
-            warn!("Authentication disabled, all requests will be accepted as superuser");
-            None
-        };
+        let authenticator = get_authenticator(config.clone()).await?;
 
         // Adapters
         let store = AppStore::new_sea_orm(db_conn);
@@ -54,10 +48,9 @@ impl AppState {
         };
 
         // Services
-        let services = AppServices::new(config, store, ln_client.clone());
+        let services = AppServices::new(config, store, ln_client.clone(), authenticator);
 
         Ok(Self {
-            jwt_authenticator,
             services,
             ln_client,
             ln_node_client,
@@ -112,6 +105,43 @@ async fn get_ln_client(
             let client = ClnRestClient::new(cln_config.clone(), ln_events).await?;
 
             Ok(LnNodeClient::ClnRest(Arc::new(client)))
+        }
+    }
+}
+
+async fn get_authenticator(config: AppConfig) -> Result<Arc<dyn Authenticator>, ApplicationError> {
+    match config.auth_provider {
+        AuthProvider::Bypass => {
+            warn!("Auth provider: Bypass. All requests will be accepted as superuser");
+
+            let authenticator = BypassAuthenticator::new();
+            Ok(Arc::new(authenticator))
+        }
+        AuthProvider::OAuth2 => {
+            let oauth2_config = config.oauth2.clone().ok_or_else(|| {
+                ConfigError::MissingAuthProviderConfig(config.auth_provider.to_string())
+            })?;
+
+            info!(
+                config = ?oauth2_config,
+                "Auth provider: OAuth2"
+            );
+
+            let authenticator = OAuth2Authenticator::new(oauth2_config.clone()).await?;
+            Ok(Arc::new(authenticator))
+        }
+        AuthProvider::Jwt => {
+            let jwt_config = config.jwt.clone().ok_or_else(|| {
+                ConfigError::MissingAuthProviderConfig(config.auth_provider.to_string())
+            })?;
+
+            info!(
+                config = ?jwt_config,
+                "Auth provider: Local JWT"
+            );
+
+            let authenticator = JwtAuthenticator::new(jwt_config.clone()).await?;
+            Ok(Arc::new(authenticator))
         }
     }
 }

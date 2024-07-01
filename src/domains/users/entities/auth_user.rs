@@ -8,15 +8,6 @@ pub struct AuthUser {
     pub permissions: Vec<Permission>,
 }
 
-impl Default for AuthUser {
-    fn default() -> Self {
-        Self {
-            sub: "superuser".to_string(),
-            permissions: Permission::all_permissions(),
-        }
-    }
-}
-
 impl AuthUser {
     pub fn has_permission(&self, permission: Permission) -> bool {
         self.permissions.contains(&permission)

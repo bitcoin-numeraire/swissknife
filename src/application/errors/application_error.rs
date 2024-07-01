@@ -27,4 +27,7 @@ pub enum ApplicationError {
 
     #[error("Data Error: {0}")]
     Data(#[from] DataError),
+
+    #[error("Unsupported operation: {0}")]
+    UnsupportedOperation(String),
 }

@@ -6,12 +6,16 @@ use crate::{
         invoices::services::{InvoiceService, InvoiceUseCases},
         lightning::services::{LnUrlService, LnUrlUseCases},
         payments::services::{PaymentService, PaymentsUseCases},
-        users::services::{WalletService, WalletUseCases},
+        users::services::{UserService, UserUseCases},
+        wallet::services::{WalletService, WalletUseCases},
     },
-    infra::lightning::{
-        breez::BreezClient,
-        cln::{ClnGrpcClient, ClnRestClient},
-        LnClient,
+    infra::{
+        auth::Authenticator,
+        lightning::{
+            breez::BreezClient,
+            cln::{ClnGrpcClient, ClnRestClient},
+            LnClient,
+        },
     },
 };
 
@@ -22,10 +26,16 @@ pub struct AppServices {
     pub payment: Box<dyn PaymentsUseCases>,
     pub wallet: Box<dyn WalletUseCases>,
     pub lnurl: Box<dyn LnUrlUseCases>,
+    pub user: Box<dyn UserUseCases>,
 }
 
 impl AppServices {
-    pub fn new(config: AppConfig, store: AppStore, ln_client: Arc<dyn LnClient>) -> Self {
+    pub fn new(
+        config: AppConfig,
+        store: AppStore,
+        ln_client: Arc<dyn LnClient>,
+        authenticator: Arc<dyn Authenticator>,
+    ) -> Self {
         let payments = PaymentService::new(
             store.clone(),
             ln_client.clone(),
@@ -44,12 +54,14 @@ impl AppServices {
             config.domain,
         );
         let wallet = WalletService::new(store);
+        let user = UserService::new(config.auth_provider, authenticator);
 
         AppServices {
             invoice: Box::new(invoices),
             payment: Box::new(payments),
             wallet: Box::new(wallet),
             lnurl: Box::new(lnurl),
+            user: Box::new(user),
         }
     }
 }
@@ -67,16 +79,6 @@ impl LnNodeClient {
             Ok(client)
         } else {
             Err(ConfigError::InvalidLightningProvider("Breez".to_string()))
-        }
-    }
-
-    pub fn as_cln_client(&self) -> Result<&ClnGrpcClient, ConfigError> {
-        if let LnNodeClient::ClnGrpc(client) = self {
-            Ok(client)
-        } else {
-            Err(ConfigError::InvalidLightningProvider(
-                "CoreLightning".to_string(),
-            ))
         }
     }
 }

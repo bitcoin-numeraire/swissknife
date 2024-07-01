@@ -311,7 +311,7 @@ impl PaymentService {
 
         let balance = self
             .store
-            .user
+            .wallet
             .get_balance(Some(&txn), &payment.user_id)
             .await?
             .available_msat as f64;

@@ -6,41 +6,39 @@ use axum_extra::{
     headers::{authorization::Bearer, Authorization},
     TypedHeader,
 };
-use tracing::{debug, trace};
 
 use crate::{
-    application::errors::AuthenticationError, domains::users::entities::AuthUser,
+    application::{
+        dtos::AuthProvider,
+        errors::{ApplicationError, AuthenticationError},
+    },
+    domains::users::entities::AuthUser,
     infra::app::AppState,
 };
 
 #[async_trait]
 impl FromRequestParts<Arc<AppState>> for AuthUser {
-    type Rejection = AuthenticationError;
+    type Rejection = ApplicationError;
 
     async fn from_request_parts(
         parts: &mut Parts,
         state: &Arc<AppState>,
     ) -> Result<Self, Self::Rejection> {
-        trace!("Start authentication");
+        let credentials = match state.services.user.provider() {
+            AuthProvider::Bypass => "".to_string(),
+            _ => {
+                // Extract the token from the Authorization header
+                let TypedHeader(Authorization(bearer)) = parts
+                    .extract::<TypedHeader<Authorization<Bearer>>>()
+                    .await
+                    .map_err(|e| AuthenticationError::MissingBearerToken(e.to_string()))?;
 
-        if state.jwt_authenticator.is_none() {
-            return Ok(AuthUser::default());
-        }
+                bearer.token().to_string()
+            }
+        };
 
-        let jwt_authenticator = state.jwt_authenticator.as_ref().unwrap();
+        let user = state.services.user.authenticate(&credentials).await?;
 
-        // Extract the token from the Authorization header
-        let TypedHeader(Authorization(bearer)) = parts
-            .extract::<TypedHeader<Authorization<Bearer>>>()
-            .await
-            .map_err(|e| AuthenticationError::MissingBearerToken(e.to_string()))?;
-
-        // Decode the user data
-        trace!(token = bearer.token(), "Start JWT validation");
-
-        let user = jwt_authenticator.authenticate(bearer.token()).await?;
-
-        debug!(user = ?user, "Authentication successful");
         Ok(user)
     }
 }
