@@ -57,7 +57,7 @@ impl IntoResponse for AuthorizationError {
 impl IntoResponse for AuthenticationError {
     fn into_response(self) -> Response {
         let (error_message, header_message) = match self {
-            AuthenticationError::InvalidCredentials => ("invalid credentials", ""),
+            AuthenticationError::InvalidCredentials => ("Invalid credentials", ""),
             AuthenticationError::MissingBearerToken(_) => (
                 "Missing authentication token",
                 "Bearer realm=\"swissknife\", error=\"invalid_request\"",

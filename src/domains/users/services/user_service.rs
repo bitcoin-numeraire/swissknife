@@ -27,7 +27,7 @@ impl UserService {
 
 #[async_trait]
 impl UserUseCases for UserService {
-    fn login(&self, password: String) -> Result<String, ApplicationError> {
+    fn sign_in(&self, password: String) -> Result<String, ApplicationError> {
         trace!("Start login");
 
         match self.provider {
