@@ -63,8 +63,8 @@ impl BreezClient {
             NodeConfig::Greenlight {
                 config: GreenlightNodeConfig {
                     partner_credentials: Some(GreenlightCredentials {
-                        device_cert: client_crt,
-                        device_key: client_key,
+                        developer_cert: client_crt,
+                        developer_key: client_key,
                     }),
                     invite_code: None,
                 },

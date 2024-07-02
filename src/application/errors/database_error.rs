@@ -5,6 +5,9 @@ pub enum DatabaseError {
     #[error("Failed to connect to database: {0}")]
     Connect(String),
 
+    #[error("Failed to execute migrations: {0}")]
+    Migrations(String),
+
     #[error("Failed to find resource: {0}")]
     FindOne(String),
 
