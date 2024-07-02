@@ -25,7 +25,7 @@ payment_exemptfee = 5000
 retry_delay = "5s"
 
 [cln_rest_config]
-endpoint = "http://localhost:3010/v1"
+endpoint = "http://localhost:3010"
 connect_timeout = "5s"
 timeout = "30s"
 connection_verbose = true

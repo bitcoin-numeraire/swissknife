@@ -64,7 +64,7 @@ impl From<Model> for Invoice {
         };
 
         let lightning = match model.ledger.as_str() {
-            "LIGHTNING" => Some(LnInvoice {
+            "Lightning" => Some(LnInvoice {
                 payment_hash: model.payment_hash.unwrap(),
                 bolt11: model.bolt11.unwrap(),
                 description_hash: model.description_hash,

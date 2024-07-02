@@ -1,12 +1,12 @@
 domain: "swissknife"
-ln_provider: breez
+ln_provider: clnrest
 auth_provider: bypass
 
 logging:
   format: compact
   ansi: true
-  level: trace
-  filter: swissknife=trace
+  level: debug
+  filter: swissknife=debug
 
 oauth2:
   domain: "dev-z3xohtidpayxvzid.us.auth0.com"
@@ -16,7 +16,7 @@ web:
   request_timeout: 180s
 
 cln_rest_config:
-  endpoint: "http://127.0.0.1:8184"
+  endpoint: "http://127.0.0.1:8182"
 
 cln_config:
   endpoint: "https://127.0.0.1:11004"

@@ -62,3 +62,8 @@ impl From<PayResponse> for Payment {
         }
     }
 }
+
+#[derive(Debug, Deserialize)]
+pub struct ErrorResponse {
+    pub message: String,
+}
