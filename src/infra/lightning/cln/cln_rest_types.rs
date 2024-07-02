@@ -15,15 +15,6 @@ pub struct InvoiceRequest {
 #[derive(Debug, Deserialize)]
 pub struct InvoiceResponse {
     pub bolt11: String,
-    pub payment_hash: String,
-    pub payment_secret: String,
-    pub expires_at: u64,
-    pub warning_capacity: Option<String>,
-    pub warning_offline: Option<String>,
-    pub warning_deadends: Option<String>,
-    pub warning_private_unused: Option<String>,
-    pub warning_mpp: Option<String>,
-    pub created_index: Option<u64>,
 }
 
 #[derive(Debug, Serialize)]
@@ -41,12 +32,9 @@ pub struct PayResponse {
     pub payment_preimage: String,
     pub payment_hash: String,
     pub created_at: f64,
-    pub parts: u32,
     pub amount_msat: u64,
     pub amount_sent_msat: u64,
     pub status: String,
-    pub destination: Option<String>,
-    pub warning_partial_completion: Option<String>,
 }
 
 impl Into<Payment> for PayResponse {

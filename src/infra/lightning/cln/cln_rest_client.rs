@@ -169,9 +169,9 @@ impl LnClient for ClnRestClient {
 
     async fn pay_onchain(
         &self,
-        amount_sat: u64,
-        recipient_address: String,
-        feerate: u32,
+        _amount_sat: u64,
+        _recipient_address: String,
+        _feerate: u32,
     ) -> Result<ReverseSwapInfo, LightningError> {
         todo!();
     }
