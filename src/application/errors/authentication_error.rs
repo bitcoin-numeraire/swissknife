@@ -3,7 +3,7 @@ use thiserror::Error;
 #[derive(Debug, Error)]
 pub enum AuthenticationError {
     #[error("Failed to fetch JWKS: {0}")]
-    JWKS(String),
+    Jwks(String),
 
     #[error("Failed to decode JWT header: {0}")]
     DecodeJWTHeader(String),

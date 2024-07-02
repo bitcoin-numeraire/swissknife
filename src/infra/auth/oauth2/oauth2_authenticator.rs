@@ -49,7 +49,7 @@ impl OAuth2Authenticator {
 
         let initial_jwks = Self::fetch_jwks(&jwks_uri)
             .await
-            .map_err(|e| AuthenticationError::JWKS(e.to_string()))?;
+            .map_err(|e| AuthenticationError::Jwks(e.to_string()))?;
 
         let jwks = Arc::new(RwLock::new(initial_jwks));
         let jwks_clone = Arc::clone(&jwks);
@@ -79,7 +79,8 @@ impl OAuth2Authenticator {
     }
 
     async fn fetch_jwks(jwks_uri: &str) -> Result<JwkSet, reqwest::Error> {
-        Ok(reqwest::get(jwks_uri).await?.json().await?)
+        let jwks = reqwest::get(jwks_uri).await?.json().await?;
+        Ok(jwks)
     }
 }
 

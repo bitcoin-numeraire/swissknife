@@ -37,17 +37,6 @@ pub struct RegisterLightningAddressRequest {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct ProcessEventRequest {
-    pub template: String,
-    pub data: EventDataRequest,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct EventDataRequest {
-    pub payment_hash: String,
-}
-
-#[derive(Debug, Deserialize)]
 pub struct ConnectLSPRequest {
     pub lsp_id: String,
 }

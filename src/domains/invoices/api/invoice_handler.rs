@@ -36,7 +36,7 @@ impl InvoiceHandler {
     ) -> Result<Json<Invoice>, ApplicationError> {
         user.check_permission(Permission::WriteLnTransaction)?;
 
-        let ln_address = app_state
+        let invoice = app_state
             .services
             .invoice
             .invoice(
@@ -46,7 +46,7 @@ impl InvoiceHandler {
                 payload.expiry,
             )
             .await?;
-        Ok(Json(ln_address.into()))
+        Ok(invoice.into())
     }
 
     async fn get(
@@ -56,8 +56,8 @@ impl InvoiceHandler {
     ) -> Result<Json<Invoice>, ApplicationError> {
         user.check_permission(Permission::ReadLnTransaction)?;
 
-        let ln_address = app_state.services.invoice.get(id).await?;
-        Ok(Json(ln_address.into()))
+        let invoice = app_state.services.invoice.get(id).await?;
+        Ok(invoice.into())
     }
 
     async fn list(

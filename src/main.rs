@@ -13,8 +13,8 @@ use tokio::signal::unix::SignalKind;
 use tracing::debug;
 use tracing::info;
 
-use crate::infra::app::App;
 use crate::infra::app::AppState;
+use crate::infra::app::Server;
 use crate::infra::config::config_rs::load_config;
 use crate::infra::logging::tracing::setup_tracing;
 
@@ -44,7 +44,7 @@ async fn main() {
         }
     };
 
-    let app = App::new(app_state.clone());
+    let app = Server::new(app_state.clone());
     if let Err(err) = app
         .start(&config.web.addr, shutdown_signal(app_state.clone()))
         .await

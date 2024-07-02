@@ -56,10 +56,10 @@ impl ActiveModelBehavior for ActiveModel {}
 impl From<Model> for Invoice {
     fn from(model: Model) -> Self {
         let status = match model.payment_time {
-            Some(_) => InvoiceStatus::SETTLED,
+            Some(_) => InvoiceStatus::Settled,
             None => match model.expires_at {
-                Some(expires_at) if Utc::now() > expires_at => InvoiceStatus::EXPIRED,
-                _ => InvoiceStatus::PENDING,
+                Some(expires_at) if Utc::now() > expires_at => InvoiceStatus::Expired,
+                _ => InvoiceStatus::Pending,
             },
         };
 

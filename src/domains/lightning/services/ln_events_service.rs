@@ -35,8 +35,8 @@ impl LnEventsUseCases for LnEventsService {
             .store
             .invoice
             .find_many(InvoiceFilter {
-                status: Some(InvoiceStatus::SETTLED),
-                ledger: Some(Ledger::LIGHTNING),
+                status: Some(InvoiceStatus::Settled),
+                ledger: Some(Ledger::Lightning),
                 pagination: PaginationFilter {
                     limit: Some(1),
                     ..Default::default()
@@ -87,7 +87,7 @@ impl LnEventsUseCases for LnEventsService {
             .await?;
 
         if let Some(mut payment_retrieved) = payment_option {
-            if payment_retrieved.status == PaymentStatus::SETTLED {
+            if payment_retrieved.status == PaymentStatus::Settled {
                 debug!(
                     id = %payment_retrieved.id,
                     "Lightning payment already settled"
@@ -95,7 +95,7 @@ impl LnEventsUseCases for LnEventsService {
                 return Ok(());
             }
 
-            payment_retrieved.status = PaymentStatus::SETTLED;
+            payment_retrieved.status = PaymentStatus::Settled;
             payment_retrieved.payment_time = Some(event.payment_time);
             payment_retrieved.payment_preimage = Some(event.payment_preimage);
             payment_retrieved.amount_msat = event.amount_msat;
@@ -124,7 +124,7 @@ impl LnEventsUseCases for LnEventsService {
             .await?;
 
         if let Some(mut payment_retrieved) = payment_option {
-            if payment_retrieved.status == PaymentStatus::FAILED {
+            if payment_retrieved.status == PaymentStatus::Failed {
                 debug!(
                     id = %payment_retrieved.id,
                     "Lightning payment already failed"
@@ -132,7 +132,7 @@ impl LnEventsUseCases for LnEventsService {
                 return Ok(());
             }
 
-            payment_retrieved.status = PaymentStatus::FAILED;
+            payment_retrieved.status = PaymentStatus::Failed;
             payment_retrieved.error = Some(event.reason);
 
             let payment = self.store.payment.update(payment_retrieved).await?;

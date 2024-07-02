@@ -52,9 +52,9 @@ pub struct LnInvoice {
 #[derive(Clone, Debug, EnumString, Deserialize, Serialize, Display, PartialEq, Eq, Default)]
 pub enum InvoiceStatus {
     #[default]
-    PENDING,
-    SETTLED,
-    EXPIRED,
+    Pending,
+    Settled,
+    Expired,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, Default)]

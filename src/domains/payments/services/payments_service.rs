@@ -92,16 +92,16 @@ impl PaymentService {
                 }
 
                 match retrieved_invoice.status {
-                    InvoiceStatus::SETTLED => {
+                    InvoiceStatus::Settled => {
                         return Err(DataError::Validation(
                             "Invoice has already been paid.".to_string(),
                         )
                         .into());
                     }
-                    InvoiceStatus::EXPIRED => {
+                    InvoiceStatus::Expired => {
                         return Err(DataError::Validation("Invoice is expired.".to_string()).into());
                     }
-                    InvoiceStatus::PENDING => {
+                    InvoiceStatus::Pending => {
                         // Internal payment
                         let txn = self.store.begin().await?;
 
@@ -110,12 +110,12 @@ impl PaymentService {
                                 Payment {
                                     user_id,
                                     amount_msat: amount,
-                                    status: PaymentStatus::SETTLED,
+                                    status: PaymentStatus::Settled,
                                     payment_hash: Some(invoice.payment_hash),
                                     description: invoice.description,
                                     fee_msat: Some(0),
                                     payment_time: Some(Utc::now()),
-                                    ledger: Ledger::INTERNAL,
+                                    ledger: Ledger::Internal,
                                     ..Default::default()
                                 },
                                 0.0,
@@ -144,8 +144,8 @@ impl PaymentService {
                     Payment {
                         user_id,
                         amount_msat: amount,
-                        status: PaymentStatus::PENDING,
-                        ledger: Ledger::LIGHTNING,
+                        status: PaymentStatus::Pending,
+                        ledger: Ledger::Lightning,
                         payment_hash: Some(invoice.payment_hash),
                         description: invoice.description,
                         ..Default::default()
@@ -190,7 +190,7 @@ impl PaymentService {
             match req.ln_address.clone() {
                 Some(ln_address) => {
                     let address = ln_address.split('@').next().unwrap();
-                    let address_opt = self.store.ln_address.find_by_username(&address).await?;
+                    let address_opt = self.store.ln_address.find_by_username(address).await?;
 
                     match address_opt {
                         Some(retrieved_address) => {
@@ -212,14 +212,14 @@ impl PaymentService {
                                     Invoice {
                                         user_id: retrieved_address.user_id,
                                         ln_address: Some(retrieved_address.id),
-                                        ledger: Ledger::INTERNAL,
+                                        ledger: Ledger::Internal,
                                         description: comment.clone().or(
                                             DEFAULT_INTERNAL_INVOICE_DESCRIPTION.to_string().into(),
                                         ),
                                         currency: Currency::Bitcoin,
                                         amount_msat: Some(amount),
                                         timestamp: curr_time,
-                                        status: InvoiceStatus::SETTLED,
+                                        status: InvoiceStatus::Settled,
                                         fee_msat: Some(0),
                                         payment_time: Some(curr_time),
                                         ..Default::default()
@@ -232,13 +232,13 @@ impl PaymentService {
                                     Payment {
                                         user_id,
                                         amount_msat: amount,
-                                        status: PaymentStatus::SETTLED,
+                                        status: PaymentStatus::Settled,
                                         description: comment.or(
                                             DEFAULT_INTERNAL_PAYMENT_DESCRIPTION.to_string().into(),
                                         ),
                                         fee_msat: Some(0),
                                         payment_time: Some(Utc::now()),
-                                        ledger: Ledger::INTERNAL,
+                                        ledger: Ledger::Internal,
                                         ln_address: Some(ln_address),
                                         ..Default::default()
                                     },
@@ -280,7 +280,7 @@ impl PaymentService {
                 Payment {
                     user_id: user_id.clone(),
                     amount_msat: amount,
-                    status: PaymentStatus::PENDING,
+                    status: PaymentStatus::Pending,
                     ln_address: req.ln_address.clone(),
                     description: comment.clone(),
                     payment_hash: Some(
@@ -289,7 +289,7 @@ impl PaymentService {
                             .payment_hash()
                             .to_hex(),
                     ),
-                    ledger: Ledger::LIGHTNING,
+                    ledger: Ledger::Lightning,
                     ..Default::default()
                 },
                 self.fee_buffer,
@@ -327,7 +327,7 @@ impl PaymentService {
             .await
             .map_err(|e| DatabaseError::Transaction(e.to_string()))?;
 
-        return Ok(pending_payment);
+        Ok(pending_payment)
     }
 
     async fn handle_processed_payment(
@@ -339,7 +339,7 @@ impl PaymentService {
         match result {
             Ok(mut settled_payment) => {
                 settled_payment.id = pending_payment.id;
-                settled_payment.status = PaymentStatus::SETTLED;
+                settled_payment.status = PaymentStatus::Settled;
 
                 let success_action = match success_action {
                     Some(sa) => Some(process_success_action(
@@ -356,7 +356,7 @@ impl PaymentService {
                 Ok(payment)
             }
             Err(error) => {
-                pending_payment.status = PaymentStatus::FAILED;
+                pending_payment.status = PaymentStatus::Failed;
                 pending_payment.error = Some(error.to_string());
                 self.store.payment.update(pending_payment).await?;
 

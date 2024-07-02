@@ -41,7 +41,7 @@ impl LnAddressHandler {
             .lnurl
             .register(payload.user_id.unwrap_or(user.sub), payload.username)
             .await?;
-        Ok(Json(ln_address.into()))
+        Ok(ln_address.into())
     }
 
     async fn get(
@@ -52,7 +52,7 @@ impl LnAddressHandler {
         user.check_permission(Permission::ReadLnAddress)?;
 
         let ln_address = app_state.services.lnurl.get(id).await?;
-        Ok(Json(ln_address.into()))
+        Ok(ln_address.into())
     }
 
     async fn list(

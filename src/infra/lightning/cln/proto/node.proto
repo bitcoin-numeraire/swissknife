@@ -14,6 +14,7 @@ service Node {
 	rpc SendPay(SendpayRequest) returns (SendpayResponse) {}
 	rpc ListChannels(ListchannelsRequest) returns (ListchannelsResponse) {}
 	rpc AddGossip(AddgossipRequest) returns (AddgossipResponse) {}
+	rpc AddPsbtOutput(AddpsbtoutputRequest) returns (AddpsbtoutputResponse) {}
 	rpc AutoCleanInvoice(AutocleaninvoiceRequest) returns (AutocleaninvoiceResponse) {}
 	rpc AutoCleanOnce(AutocleanonceRequest) returns (AutocleanonceResponse) {}
 	rpc AutoCleanStatus(AutocleanstatusRequest) returns (AutocleanstatusResponse) {}
@@ -26,12 +27,20 @@ service Node {
 	rpc CreateOnion(CreateonionRequest) returns (CreateonionResponse) {}
 	rpc DelDatastore(DeldatastoreRequest) returns (DeldatastoreResponse) {}
 	rpc DelInvoice(DelinvoiceRequest) returns (DelinvoiceResponse) {}
+	rpc DevForgetChannel(DevforgetchannelRequest) returns (DevforgetchannelResponse) {}
+	rpc EmergencyRecover(EmergencyrecoverRequest) returns (EmergencyrecoverResponse) {}
+	rpc Recover(RecoverRequest) returns (RecoverResponse) {}
+	rpc RecoverChannel(RecoverchannelRequest) returns (RecoverchannelResponse) {}
 	rpc Invoice(InvoiceRequest) returns (InvoiceResponse) {}
+	rpc CreateInvoiceRequest(InvoicerequestRequest) returns (InvoicerequestResponse) {}
+	rpc DisableInvoiceRequest(DisableinvoicerequestRequest) returns (DisableinvoicerequestResponse) {}
+	rpc ListInvoiceRequests(ListinvoicerequestsRequest) returns (ListinvoicerequestsResponse) {}
 	rpc ListDatastore(ListdatastoreRequest) returns (ListdatastoreResponse) {}
 	rpc ListInvoices(ListinvoicesRequest) returns (ListinvoicesResponse) {}
 	rpc SendOnion(SendonionRequest) returns (SendonionResponse) {}
 	rpc ListSendPays(ListsendpaysRequest) returns (ListsendpaysResponse) {}
 	rpc ListTransactions(ListtransactionsRequest) returns (ListtransactionsResponse) {}
+	rpc MakeSecret(MakesecretRequest) returns (MakesecretResponse) {}
 	rpc Pay(PayRequest) returns (PayResponse) {}
 	rpc ListNodes(ListnodesRequest) returns (ListnodesResponse) {}
 	rpc WaitAnyInvoice(WaitanyinvoiceRequest) returns (WaitanyinvoiceResponse) {}
@@ -62,12 +71,14 @@ service Node {
 	rpc FundChannel(FundchannelRequest) returns (FundchannelResponse) {}
 	rpc FundChannel_Start(Fundchannel_startRequest) returns (Fundchannel_startResponse) {}
 	rpc GetLog(GetlogRequest) returns (GetlogResponse) {}
+	rpc FunderUpdate(FunderupdateRequest) returns (FunderupdateResponse) {}
 	rpc GetRoute(GetrouteRequest) returns (GetrouteResponse) {}
 	rpc ListForwards(ListforwardsRequest) returns (ListforwardsResponse) {}
 	rpc ListOffers(ListoffersRequest) returns (ListoffersResponse) {}
 	rpc ListPays(ListpaysRequest) returns (ListpaysResponse) {}
 	rpc ListHtlcs(ListhtlcsRequest) returns (ListhtlcsResponse) {}
 	rpc MultiFundChannel(MultifundchannelRequest) returns (MultifundchannelResponse) {}
+	rpc MultiWithdraw(MultiwithdrawRequest) returns (MultiwithdrawResponse) {}
 	rpc Offer(OfferRequest) returns (OfferResponse) {}
 	rpc OpenChannel_Abort(Openchannel_abortRequest) returns (Openchannel_abortResponse) {}
 	rpc OpenChannel_Bump(Openchannel_bumpRequest) returns (Openchannel_bumpResponse) {}
@@ -75,13 +86,28 @@ service Node {
 	rpc OpenChannel_Signed(Openchannel_signedRequest) returns (Openchannel_signedResponse) {}
 	rpc OpenChannel_Update(Openchannel_updateRequest) returns (Openchannel_updateResponse) {}
 	rpc Ping(PingRequest) returns (PingResponse) {}
+	rpc Plugin(PluginRequest) returns (PluginResponse) {}
+	rpc RenePayStatus(RenepaystatusRequest) returns (RenepaystatusResponse) {}
+	rpc RenePay(RenepayRequest) returns (RenepayResponse) {}
+	rpc ReserveInputs(ReserveinputsRequest) returns (ReserveinputsResponse) {}
 	rpc SendCustomMsg(SendcustommsgRequest) returns (SendcustommsgResponse) {}
+	rpc SendInvoice(SendinvoiceRequest) returns (SendinvoiceResponse) {}
+	rpc SendOnionMessage(SendonionmessageRequest) returns (SendonionmessageResponse) {}
 	rpc SetChannel(SetchannelRequest) returns (SetchannelResponse) {}
+	rpc SetConfig(SetconfigRequest) returns (SetconfigResponse) {}
+	rpc SetPsbtVersion(SetpsbtversionRequest) returns (SetpsbtversionResponse) {}
 	rpc SignInvoice(SigninvoiceRequest) returns (SigninvoiceResponse) {}
 	rpc SignMessage(SignmessageRequest) returns (SignmessageResponse) {}
+	rpc Splice_Init(Splice_initRequest) returns (Splice_initResponse) {}
+	rpc Splice_Signed(Splice_signedRequest) returns (Splice_signedResponse) {}
+	rpc Splice_Update(Splice_updateRequest) returns (Splice_updateResponse) {}
+	rpc UnreserveInputs(UnreserveinputsRequest) returns (UnreserveinputsResponse) {}
+	rpc UpgradeWallet(UpgradewalletRequest) returns (UpgradewalletResponse) {}
 	rpc WaitBlockHeight(WaitblockheightRequest) returns (WaitblockheightResponse) {}
 	rpc Wait(WaitRequest) returns (WaitResponse) {}
+	rpc ListConfigs(ListconfigsRequest) returns (ListconfigsResponse) {}
 	rpc Stop(StopRequest) returns (StopResponse) {}
+	rpc Help(HelpRequest) returns (HelpResponse) {}
 	rpc PreApproveKeysend(PreapprovekeysendRequest) returns (PreapprovekeysendResponse) {}
 	rpc PreApproveInvoice(PreapproveinvoiceRequest) returns (PreapproveinvoiceResponse) {}
 	rpc StaticBackup(StaticbackupRequest) returns (StaticbackupResponse) {}
@@ -91,6 +117,16 @@ service Node {
 	rpc BkprListAccountEvents(BkprlistaccounteventsRequest) returns (BkprlistaccounteventsResponse) {}
 	rpc BkprListBalances(BkprlistbalancesRequest) returns (BkprlistbalancesResponse) {}
 	rpc BkprListIncome(BkprlistincomeRequest) returns (BkprlistincomeResponse) {}
+	rpc BlacklistRune(BlacklistruneRequest) returns (BlacklistruneResponse) {}
+	rpc CheckRune(CheckruneRequest) returns (CheckruneResponse) {}
+	rpc CreateRune(CreateruneRequest) returns (CreateruneResponse) {}
+	rpc ShowRunes(ShowrunesRequest) returns (ShowrunesResponse) {}
+
+	rpc SubscribeBlockAdded(StreamBlockAddedRequest) returns (stream BlockAddedNotification) {}
+	rpc SubscribeChannelOpenFailed(StreamChannelOpenFailedRequest) returns (stream ChannelOpenFailedNotification) {}
+	rpc SubscribeChannelOpened(StreamChannelOpenedRequest) returns (stream ChannelOpenedNotification) {}
+	rpc SubscribeConnect(StreamConnectRequest) returns (stream PeerConnectNotification) {}
+	rpc SubscribeCustomMsg(StreamCustomMsgRequest) returns (stream CustomMsgNotification) {}
 }
 
 message GetinfoRequest {
@@ -161,6 +197,7 @@ message ListpeersRequest {
 		DEBUG = 1;
 		INFO = 2;
 		UNUSUAL = 3;
+		TRACE = 4;
 	}
 	optional bytes id = 1;
 	optional ListpeersLevel level = 2;
@@ -190,6 +227,7 @@ message ListpeersPeersLog {
 		DEBUG = 4;
 		IO_IN = 5;
 		IO_OUT = 6;
+		TRACE = 7;
 	}
 	ListpeersPeersLogType item_type = 1;
 	optional uint32 num_skipped = 2;
@@ -321,6 +359,19 @@ message AddgossipRequest {
 }
 
 message AddgossipResponse {
+}
+
+message AddpsbtoutputRequest {
+	Amount satoshi = 1;
+	optional uint32 locktime = 2;
+	optional string initialpsbt = 3;
+	optional string destination = 4;
+}
+
+message AddpsbtoutputResponse {
+	string psbt = 1;
+	uint32 estimated_added_weight = 2;
+	uint32 outnum = 3;
 }
 
 message AutocleaninvoiceRequest {
@@ -533,8 +584,8 @@ message CreateinvoiceResponse {
 }
 
 message CreateinvoicePaid_outpoint {
-	optional bytes txid = 1;
-	optional uint32 outnum = 2;
+	bytes txid = 1;
+	uint32 outnum = 2;
 }
 
 message DatastoreRequest {
@@ -565,12 +616,12 @@ message DatastoreusageRequest {
 }
 
 message DatastoreusageResponse {
-	optional DatastoreusageDatastoreusage datastoreusage = 1;
+	DatastoreusageDatastoreusage datastoreusage = 1;
 }
 
 message DatastoreusageDatastoreusage {
-	optional string key = 1;
-	optional uint64 total_bytes = 2;
+	string key = 1;
+	uint64 total_bytes = 2;
 }
 
 message CreateonionRequest {
@@ -639,6 +690,46 @@ message DelinvoiceResponse {
 	optional bytes payment_preimage = 17;
 }
 
+message DevforgetchannelRequest {
+	bytes id = 1;
+	optional string short_channel_id = 2;
+	optional bytes channel_id = 3;
+	optional bool force = 4;
+}
+
+message DevforgetchannelResponse {
+	bool forced = 1;
+	bool funding_unspent = 2;
+	bytes funding_txid = 3;
+}
+
+message EmergencyrecoverRequest {
+}
+
+message EmergencyrecoverResponse {
+	repeated bytes stubs = 1;
+}
+
+message RecoverRequest {
+	string hsmsecret = 1;
+}
+
+message RecoverResponse {
+	// Recover.result
+	enum RecoverResult {
+		RECOVERY_RESTART_IN_PROGRESS = 0;
+	}
+	optional RecoverResult result = 1;
+}
+
+message RecoverchannelRequest {
+	repeated bytes scb = 1;
+}
+
+message RecoverchannelResponse {
+	repeated string stubs = 1;
+}
+
 message InvoiceRequest {
 	string description = 2;
 	string label = 3;
@@ -646,6 +737,7 @@ message InvoiceRequest {
 	optional bytes preimage = 5;
 	optional uint32 cltv = 6;
 	optional uint64 expiry = 7;
+	repeated string exposeprivatechannels = 8;
 	optional bool deschashonly = 9;
 	AmountOrAny amount_msat = 10;
 }
@@ -661,6 +753,55 @@ message InvoiceResponse {
 	optional string warning_private_unused = 8;
 	optional string warning_mpp = 9;
 	optional uint64 created_index = 10;
+}
+
+message InvoicerequestRequest {
+	Amount amount = 1;
+	string description = 2;
+	optional string issuer = 3;
+	optional string label = 4;
+	optional uint64 absolute_expiry = 5;
+	optional bool single_use = 6;
+}
+
+message InvoicerequestResponse {
+	bytes invreq_id = 1;
+	bool active = 2;
+	bool single_use = 3;
+	string bolt12 = 4;
+	bool used = 5;
+	optional string label = 6;
+}
+
+message DisableinvoicerequestRequest {
+	string invreq_id = 1;
+}
+
+message DisableinvoicerequestResponse {
+	bytes invreq_id = 1;
+	bool active = 2;
+	bool single_use = 3;
+	string bolt12 = 4;
+	bool used = 5;
+	optional string label = 6;
+}
+
+message ListinvoicerequestsRequest {
+	optional string invreq_id = 1;
+	optional bool active_only = 2;
+}
+
+message ListinvoicerequestsResponse {
+	repeated ListinvoicerequestsInvoicerequests invoicerequests = 1;
+}
+
+message ListinvoicerequestsInvoicerequests {
+	bytes invreq_id = 1;
+	bool active = 2;
+	bool single_use = 3;
+	string bolt12 = 4;
+	bool used = 5;
+	optional string label = 6;
 }
 
 message ListdatastoreRequest {
@@ -724,8 +865,8 @@ message ListinvoicesInvoices {
 }
 
 message ListinvoicesInvoicesPaid_outpoint {
-	optional bytes txid = 1;
-	optional uint32 outnum = 2;
+	bytes txid = 1;
+	uint32 outnum = 2;
 }
 
 message SendonionRequest {
@@ -853,6 +994,15 @@ message ListtransactionsTransactionsOutputs {
 	Amount amount_msat = 6;
 }
 
+message MakesecretRequest {
+	optional bytes hex = 1;
+	optional string string = 2;
+}
+
+message MakesecretResponse {
+	bytes secret = 1;
+}
+
 message PayRequest {
 	string bolt11 = 1;
 	optional string label = 3;
@@ -957,8 +1107,8 @@ message WaitanyinvoiceResponse {
 }
 
 message WaitanyinvoicePaid_outpoint {
-	optional bytes txid = 1;
-	optional uint32 outnum = 2;
+	bytes txid = 1;
+	uint32 outnum = 2;
 }
 
 message WaitinvoiceRequest {
@@ -989,8 +1139,8 @@ message WaitinvoiceResponse {
 }
 
 message WaitinvoicePaid_outpoint {
-	optional bytes txid = 1;
-	optional uint32 outnum = 2;
+	bytes txid = 1;
+	uint32 outnum = 2;
 }
 
 message WaitsendpayRequest {
@@ -1217,9 +1367,9 @@ message ListpeerchannelsChannels {
 		DUALOPEND_OPEN_COMMITTED = 12;
 		DUALOPEND_OPEN_COMMIT_READY = 13;
 	}
-	optional bytes peer_id = 1;
-	optional bool peer_connected = 2;
-	optional ListpeerchannelsChannelsState state = 3;
+	bytes peer_id = 1;
+	bool peer_connected = 2;
+	ListpeerchannelsChannelsState state = 3;
 	optional bytes scratch_txid = 4;
 	optional ListpeerchannelsChannelsFeerate feerate = 6;
 	optional string owner = 7;
@@ -1234,7 +1384,7 @@ message ListpeerchannelsChannels {
 	repeated ListpeerchannelsChannelsInflight inflight = 16;
 	optional bytes close_to = 17;
 	optional bool private = 18;
-	optional ChannelSide opener = 19;
+	ChannelSide opener = 19;
 	optional ChannelSide closer = 20;
 	optional ListpeerchannelsChannelsFunding funding = 22;
 	optional Amount to_us_msat = 23;
@@ -1277,45 +1427,45 @@ message ListpeerchannelsChannels {
 }
 
 message ListpeerchannelsChannelsUpdates {
-	optional ListpeerchannelsChannelsUpdatesLocal local = 1;
+	ListpeerchannelsChannelsUpdatesLocal local = 1;
 	optional ListpeerchannelsChannelsUpdatesRemote remote = 2;
 }
 
 message ListpeerchannelsChannelsUpdatesLocal {
-	optional Amount htlc_minimum_msat = 1;
-	optional Amount htlc_maximum_msat = 2;
-	optional uint32 cltv_expiry_delta = 3;
-	optional Amount fee_base_msat = 4;
-	optional uint32 fee_proportional_millionths = 5;
+	Amount htlc_minimum_msat = 1;
+	Amount htlc_maximum_msat = 2;
+	uint32 cltv_expiry_delta = 3;
+	Amount fee_base_msat = 4;
+	uint32 fee_proportional_millionths = 5;
 }
 
 message ListpeerchannelsChannelsUpdatesRemote {
-	optional Amount htlc_minimum_msat = 1;
-	optional Amount htlc_maximum_msat = 2;
-	optional uint32 cltv_expiry_delta = 3;
-	optional Amount fee_base_msat = 4;
-	optional uint32 fee_proportional_millionths = 5;
+	Amount htlc_minimum_msat = 1;
+	Amount htlc_maximum_msat = 2;
+	uint32 cltv_expiry_delta = 3;
+	Amount fee_base_msat = 4;
+	uint32 fee_proportional_millionths = 5;
 }
 
 message ListpeerchannelsChannelsFeerate {
-	optional uint32 perkw = 1;
-	optional uint32 perkb = 2;
+	uint32 perkw = 1;
+	uint32 perkb = 2;
 }
 
 message ListpeerchannelsChannelsInflight {
-	optional bytes funding_txid = 1;
-	optional uint32 funding_outnum = 2;
-	optional string feerate = 3;
-	optional Amount total_funding_msat = 4;
-	optional Amount our_funding_msat = 5;
+	bytes funding_txid = 1;
+	uint32 funding_outnum = 2;
+	string feerate = 3;
+	Amount total_funding_msat = 4;
+	Amount our_funding_msat = 5;
 	optional bytes scratch_txid = 6;
 	optional sint64 splice_amount = 7;
 }
 
 message ListpeerchannelsChannelsFunding {
 	optional Amount pushed_msat = 1;
-	optional Amount local_funds_msat = 2;
-	optional Amount remote_funds_msat = 3;
+	Amount local_funds_msat = 2;
+	Amount remote_funds_msat = 3;
 	optional Amount fee_paid_msat = 4;
 	optional Amount fee_rcvd_msat = 5;
 }
@@ -1331,14 +1481,14 @@ message ListpeerchannelsChannelsHtlcs {
 		IN = 0;
 		OUT = 1;
 	}
-	optional ListpeerchannelsChannelsHtlcsDirection direction = 1;
-	optional uint64 id = 2;
-	optional Amount amount_msat = 3;
-	optional uint32 expiry = 4;
-	optional bytes payment_hash = 5;
+	ListpeerchannelsChannelsHtlcsDirection direction = 1;
+	uint64 id = 2;
+	Amount amount_msat = 3;
+	uint32 expiry = 4;
+	bytes payment_hash = 5;
 	optional bool local_trimmed = 6;
 	optional string status = 7;
-	optional HtlcState state = 8;
+	HtlcState state = 8;
 }
 
 message ListclosedchannelsRequest {
@@ -1411,6 +1561,7 @@ message DecodepayResponse {
 	optional bytes payment_metadata = 13;
 	repeated DecodepayFallbacks fallbacks = 14;
 	repeated DecodepayExtra extra = 16;
+	optional DecodeRoutehintList routes = 17;
 }
 
 message DecodepayFallbacks {
@@ -1521,11 +1672,14 @@ message DecodeResponse {
 	optional Amount amount_msat = 79;
 	optional string description = 80;
 	optional bytes features = 81;
+	optional DecodeRoutehintList routes = 82;
 }
 
 message DecodeOffer_paths {
-	bytes first_node_id = 1;
+	optional bytes first_node_id = 1;
 	bytes blinding = 2;
+	optional uint32 first_scid_dir = 4;
+	optional string first_scid = 5;
 }
 
 message DecodeOffer_recurrencePaywindow {
@@ -1679,9 +1833,9 @@ message FeeratesPerkb {
 }
 
 message FeeratesPerkbEstimates {
-	optional uint32 blockcount = 1;
-	optional uint32 feerate = 2;
-	optional uint32 smoothed_feerate = 3;
+	uint32 blockcount = 1;
+	uint32 feerate = 2;
+	uint32 smoothed_feerate = 3;
 }
 
 message FeeratesPerkw {
@@ -1699,9 +1853,9 @@ message FeeratesPerkw {
 }
 
 message FeeratesPerkwEstimates {
-	optional uint32 blockcount = 1;
-	optional uint32 feerate = 2;
-	optional uint32 smoothed_feerate = 3;
+	uint32 blockcount = 1;
+	uint32 feerate = 2;
+	uint32 smoothed_feerate = 3;
 }
 
 message FeeratesOnchain_fee_estimates {
@@ -1829,6 +1983,7 @@ message GetlogRequest {
 		INFO = 2;
 		DEBUG = 3;
 		IO = 4;
+		TRACE = 5;
 	}
 	optional GetlogLevel level = 1;
 }
@@ -1850,6 +2005,7 @@ message GetlogLog {
 		DEBUG = 4;
 		IO_IN = 5;
 		IO_OUT = 6;
+		TRACE = 7;
 	}
 	GetlogLogType item_type = 1;
 	optional uint32 num_skipped = 2;
@@ -1858,6 +2014,57 @@ message GetlogLog {
 	optional string log = 5;
 	optional bytes node_id = 6;
 	optional bytes data = 7;
+}
+
+message FunderupdateRequest {
+	// FunderUpdate.policy
+	enum FunderupdatePolicy {
+		MATCH = 0;
+		AVAILABLE = 1;
+		FIXED = 2;
+	}
+	optional FunderupdatePolicy policy = 1;
+	optional Amount policy_mod = 2;
+	optional bool leases_only = 3;
+	optional Amount min_their_funding_msat = 4;
+	optional Amount max_their_funding_msat = 5;
+	optional Amount per_channel_min_msat = 6;
+	optional Amount per_channel_max_msat = 7;
+	optional Amount reserve_tank_msat = 8;
+	optional uint32 fuzz_percent = 9;
+	optional uint32 fund_probability = 10;
+	optional Amount lease_fee_base_msat = 11;
+	optional uint32 lease_fee_basis = 12;
+	optional uint32 funding_weight = 13;
+	optional Amount channel_fee_max_base_msat = 14;
+	optional uint32 channel_fee_max_proportional_thousandths = 15;
+	optional bytes compact_lease = 16;
+}
+
+message FunderupdateResponse {
+	// FunderUpdate.policy
+	enum FunderupdatePolicy {
+		MATCH = 0;
+		AVAILABLE = 1;
+		FIXED = 2;
+	}
+	string summary = 1;
+	FunderupdatePolicy policy = 2;
+	uint32 policy_mod = 3;
+	bool leases_only = 4;
+	Amount min_their_funding_msat = 5;
+	Amount max_their_funding_msat = 6;
+	Amount per_channel_min_msat = 7;
+	Amount per_channel_max_msat = 8;
+	Amount reserve_tank_msat = 9;
+	uint32 fuzz_percent = 10;
+	uint32 fund_probability = 11;
+	optional Amount lease_fee_base_msat = 12;
+	optional uint32 lease_fee_basis = 13;
+	optional uint32 funding_weight = 14;
+	optional Amount channel_fee_max_base_msat = 15;
+	optional uint32 channel_fee_max_proportional_thousandths = 16;
+	optional bytes compact_lease = 17;
 }
 
 message GetrouteRequest {
@@ -2082,6 +2289,18 @@ message MultifundchannelFailedError {
 	string message = 2;
 }
 
+message MultiwithdrawRequest {
+	repeated OutputDesc outputs = 1;
+	optional Feerate feerate = 2;
+	optional uint32 minconf = 3;
+	repeated Outpoint utxos = 4;
+}
+
+message MultiwithdrawResponse {
+	bytes tx = 1;
+	bytes txid = 2;
+}
+
 message OfferRequest {
 	string amount = 1;
 	string description = 2;
@@ -2205,6 +2424,99 @@ message PingResponse {
 	uint32 totlen = 1;
 }
 
+message PluginRequest {
+	PluginSubcommand subcommand = 1;
+	optional string plugin = 2;
+	optional string directory = 3;
+	repeated string options = 4;
+}
+
+message PluginResponse {
+	PluginSubcommand command = 1;
+	repeated PluginPlugins plugins = 2;
+	optional string result = 3;
+}
+
+message PluginPlugins {
+	string name = 1;
+	bool active = 2;
+	bool dynamic = 3;
+}
+
+message RenepaystatusRequest {
+	optional string invstring = 1;
+}
+
+message RenepaystatusResponse {
+	repeated RenepaystatusPaystatus paystatus = 1;
+}
+
+message RenepaystatusPaystatus {
+	// RenePayStatus.paystatus[].status
+	enum RenepaystatusPaystatusStatus {
+		COMPLETE = 0;
+		PENDING = 1;
+		FAILED = 2;
+	}
+	string bolt11 = 1;
+	optional bytes payment_preimage = 2;
+	bytes payment_hash = 3;
+	double created_at = 4;
+	uint32 groupid = 5;
+	optional uint32 parts = 6;
+	Amount amount_msat = 7;
+	optional Amount amount_sent_msat = 8;
+	RenepaystatusPaystatusStatus status = 9;
+	optional bytes destination = 10;
+	repeated string notes = 11;
+}
+
+message RenepayRequest {
+	string invstring = 1;
+	optional Amount amount_msat = 2;
+	optional Amount maxfee = 3;
+	optional uint32 maxdelay = 4;
+	optional uint32 retry_for = 5;
+	optional string description = 6;
+	optional string label = 7;
+	optional bool dev_use_shadow = 8;
+}
+
+message RenepayResponse {
+	// RenePay.status
+	enum RenepayStatus {
+		COMPLETE = 0;
+		PENDING = 1;
+		FAILED = 2;
+	}
+	bytes payment_preimage = 1;
+	bytes payment_hash = 2;
+	double created_at = 3;
+	uint32 parts = 4;
+	Amount amount_msat = 5;
+	Amount amount_sent_msat = 6;
+	RenepayStatus status = 7;
+	optional bytes destination = 8;
+}
+
+message ReserveinputsRequest {
+	string psbt = 1;
+	optional bool exclusive = 2;
+	optional uint32 reserve = 3;
+}
+
+message ReserveinputsResponse {
+	repeated ReserveinputsReservations reservations = 1;
+}
+
+message ReserveinputsReservations {
+	bytes txid = 1;
+	uint32 vout = 2;
+	bool was_reserved = 3;
+	bool reserved = 4;
+	uint32 reserved_to_block = 5;
+}
+
 message SendcustommsgRequest {
 	bytes node_id = 1;
 	bytes msg = 2;
@@ -2212,6 +2524,50 @@ message SendcustommsgRequest {
 
 message SendcustommsgResponse {
 	string status = 1;
+}
+
+message SendinvoiceRequest {
+	string invreq = 1;
+	string label = 2;
+	optional Amount amount_msat = 3;
+	optional uint32 timeout = 4;
+	optional uint64 quantity = 5;
+}
+
+message SendinvoiceResponse {
+	// SendInvoice.status
+	enum SendinvoiceStatus {
+		UNPAID = 0;
+		PAID = 1;
+		EXPIRED = 2;
+	}
+	string label = 1;
+	string description = 2;
+	bytes payment_hash = 3;
+	SendinvoiceStatus status = 4;
+	uint64 expires_at = 5;
+	optional Amount amount_msat = 6;
+	optional string bolt12 = 7;
+	optional uint64 created_index = 8;
+	optional uint64 updated_index = 9;
+	optional uint64 pay_index = 10;
+	optional Amount amount_received_msat = 11;
+	optional uint64 paid_at = 12;
+	optional bytes payment_preimage = 13;
+}
+
+message SendonionmessageRequest {
+	bytes first_id = 1;
+	bytes blinding = 2;
+	repeated SendonionmessageHops hops = 3;
+}
+
+message SendonionmessageResponse {
+}
+
+message SendonionmessageHops {
+	bytes node = 1;
+	uint32 tlv = 2;
 }
 
 message SetchannelRequest {
@@ -2241,6 +2597,36 @@ message SetchannelChannels {
 	optional bool ignore_fee_limits = 10;
 }
 
+message SetconfigRequest {
+	string config = 1;
+	optional string val = 2;
+}
+
+message SetconfigResponse {
+	SetconfigConfig config = 1;
+}
+
+message SetconfigConfig {
+	string config = 1;
+	string source = 2;
+	optional string plugin = 3;
+	bool dynamic = 4;
+	optional bool set = 5;
+	optional string value_str = 6;
+	optional Amount value_msat = 7;
+	optional sint64 value_int = 8;
+	optional bool value_bool = 9;
+}
+
+message SetpsbtversionRequest {
+	string psbt = 1;
+	uint32 version = 2;
+}
+
+message SetpsbtversionResponse {
+	string psbt = 1;
+}
+
 message SigninvoiceRequest {
 	string invstring = 1;
 }
@@ -2257,6 +2643,68 @@ message SignmessageResponse {
 	bytes signature = 1;
 	bytes recid = 2;
 	string zbase = 3;
+}
+
+message Splice_initRequest {
+	bytes channel_id = 1;
+	sint64 relative_amount = 2;
+	optional string initialpsbt = 3;
+	optional uint32 feerate_per_kw = 4;
+	optional bool force_feerate = 5;
+}
+
+message Splice_initResponse {
+	string psbt = 1;
+}
+
+message Splice_signedRequest {
+	bytes channel_id = 1;
+	string psbt = 2;
+	optional bool sign_first = 3;
+}
+
+message Splice_signedResponse {
+	bytes tx = 1;
+	bytes txid = 2;
+}
+
+message Splice_updateRequest {
+	bytes channel_id = 1;
+	string psbt = 2;
+}
+
+message Splice_updateResponse {
+	string psbt = 1;
+	bool commitments_secured = 2;
+}
+
+message UnreserveinputsRequest {
+	string psbt = 1;
+	optional uint32 reserve = 2;
+}
+
+message UnreserveinputsResponse {
+	repeated UnreserveinputsReservations reservations = 1;
+}
+
+message UnreserveinputsReservations {
+	bytes txid = 1;
+	uint32 vout = 2;
+	bool was_reserved = 3;
+	bool reserved = 4;
+	optional uint32 reserved_to_block = 5;
+}
+
+message UpgradewalletRequest {
+	optional Feerate feerate = 1;
+	optional bool reservedok = 2;
+}
+
+message UpgradewalletResponse {
+	optional uint64 upgraded_outs = 1;
+	optional string psbt = 2;
+	optional bytes tx = 3;
+	optional bytes txid = 4;
 }
 
 message WaitblockheightRequest {
@@ -2327,6 +2775,536 @@ message WaitDetails {
 	optional string out_channel = 12;
 }
 
+message ListconfigsRequest {
+	optional string config = 1;
+}
+
+message ListconfigsResponse {
+	optional ListconfigsConfigs configs = 1;
+	repeated ListconfigsPlugins plugins = 3;
+	repeated ListconfigsImportantplugins important_plugins = 4;
+	optional string conf = 5;
+	optional string lightning_dir = 6;
+	optional string network = 7;
+	optional bool allow_deprecated_apis = 8;
+	optional string rpc_file = 9;
+	repeated string disable_plugin = 10;
+	optional string bookkeeper_dir = 11;
+	optional string bookkeeper_db = 12;
+	optional bool always_use_proxy = 13;
+	optional bool daemon = 14;
+	optional string wallet = 15;
+	optional bool large_channels = 16;
+	optional bool experimental_dual_fund = 17;
+	optional bool experimental_splicing = 18;
+	optional bool experimental_onion_messages = 19;
+	optional bool experimental_offers = 20;
+	optional bool experimental_shutdown_wrong_funding = 21;
+	optional bool experimental_peer_storage = 22;
+	optional bool experimental_quiesce = 23;
+	optional bool experimental_upgrade_protocol = 24;
+	optional bool invoices_onchain_fallback = 25;
+	optional bool database_upgrade = 26;
+	optional bytes rgb = 27;
+	optional string alias = 28;
+	optional string pid_file = 29;
+	optional bool ignore_fee_limits = 30;
+	optional uint32 watchtime_blocks = 31;
+	optional uint32 max_locktime_blocks = 32;
+	optional uint32 funding_confirms = 33;
+	optional uint32 cltv_delta = 34;
+	optional uint32 cltv_final = 35;
+	optional uint32 commit_time = 36;
+	optional uint32 fee_base = 37;
+	optional sint64 rescan = 38;
+	optional uint32 fee_per_satoshi = 39;
+	optional uint32 max_concurrent_htlcs = 40;
+	optional Amount htlc_minimum_msat = 41;
+	optional Amount htlc_maximum_msat = 42;
+	optional Amount max_dust_htlc_exposure_msat = 43;
+	optional uint64 min_capacity_sat = 44;
+	optional string addr = 45;
+	optional string announce_addr = 46;
+	optional string bind_addr = 47;
+	optional bool offline = 48;
+	optional bool autolisten = 49;
+	optional string proxy = 50;
+	optional bool disable_dns = 51;
+	optional string announce_addr_discovered = 52;
+	optional sint64 announce_addr_discovered_port = 53;
+	optional bool encrypted_hsm = 54;
+	optional string rpc_file_mode = 55;
+	optional string log_level = 56;
+	optional string log_prefix = 57;
+	optional string log_file = 58;
+	optional bool log_timestamps = 59;
+	optional string force_feerates = 60;
+	optional string subdaemon = 61;
+	optional bool fetchinvoice_noconnect = 62;
+	optional string accept_htlc_tlv_types = 63;
+	optional string tor_service_password = 64;
+	optional bool dev_allowdustreserve = 65;
+	optional bool announce_addr_dns = 66;
+	optional bool require_confirmed_inputs = 67;
+	optional bool developer = 68;
+	optional uint64 commit_fee = 69;
+	optional Amount min_emergency_msat = 70;
+	optional uint32 commit_feerate_offset = 71;
+}
+
+message ListconfigsConfigs {
+	optional ListconfigsConfigsConf conf = 1;
+	optional ListconfigsConfigsDeveloper developer = 2;
+	optional ListconfigsConfigsClearplugins clear_plugins = 3;
+	optional ListconfigsConfigsDisablempp disable_mpp = 4;
+	optional ListconfigsConfigsMainnet mainnet = 5;
+	optional ListconfigsConfigsRegtest regtest = 6;
+	optional ListconfigsConfigsSignet signet = 7;
+	optional ListconfigsConfigsTestnet testnet = 8;
+	optional ListconfigsConfigsImportantplugin important_plugin = 9;
+	optional ListconfigsConfigsPlugin plugin = 10;
+	optional ListconfigsConfigsPlugindir plugin_dir = 11;
+	optional ListconfigsConfigsLightningdir lightning_dir = 12;
+	optional ListconfigsConfigsNetwork network = 13;
+	optional ListconfigsConfigsAllowdeprecatedapis allow_deprecated_apis = 14;
+	optional ListconfigsConfigsRpcfile rpc_file = 15;
+	optional ListconfigsConfigsDisableplugin disable_plugin = 16;
+	optional ListconfigsConfigsAlwaysuseproxy always_use_proxy = 17;
+	optional ListconfigsConfigsDaemon daemon = 18;
+	optional ListconfigsConfigsWallet wallet = 19;
+	optional ListconfigsConfigsLargechannels large_channels = 20;
+	optional ListconfigsConfigsExperimentaldualfund experimental_dual_fund = 21;
+	optional ListconfigsConfigsExperimentalsplicing experimental_splicing = 22;
+	optional ListconfigsConfigsExperimentalonionmessages experimental_onion_messages = 23;
+	optional ListconfigsConfigsExperimentaloffers experimental_offers = 24;
+	optional ListconfigsConfigsExperimentalshutdownwrongfunding experimental_shutdown_wrong_funding = 25;
+	optional ListconfigsConfigsExperimentalpeerstorage experimental_peer_storage = 26;
+	optional ListconfigsConfigsExperimentalanchors experimental_anchors = 27;
+	optional ListconfigsConfigsDatabaseupgrade database_upgrade = 28;
+	optional ListconfigsConfigsRgb rgb = 29;
+	optional ListconfigsConfigsAlias alias = 30;
+	optional ListconfigsConfigsPidfile pid_file = 31;
+	optional ListconfigsConfigsIgnorefeelimits ignore_fee_limits = 32;
+	optional ListconfigsConfigsWatchtimeblocks watchtime_blocks = 33;
+	optional ListconfigsConfigsMaxlocktimeblocks max_locktime_blocks = 34;
+	optional ListconfigsConfigsFundingconfirms funding_confirms = 35;
+	optional ListconfigsConfigsCltvdelta cltv_delta = 36;
+	optional ListconfigsConfigsCltvfinal cltv_final = 37;
+	optional ListconfigsConfigsCommittime commit_time = 38;
+	optional ListconfigsConfigsFeebase fee_base = 39;
+	optional ListconfigsConfigsRescan rescan = 40;
+	optional ListconfigsConfigsFeepersatoshi fee_per_satoshi = 41;
+	optional ListconfigsConfigsMaxconcurrenthtlcs max_concurrent_htlcs = 42;
+	optional ListconfigsConfigsHtlcminimummsat htlc_minimum_msat = 43;
+	optional ListconfigsConfigsHtlcmaximummsat htlc_maximum_msat = 44;
+	optional ListconfigsConfigsMaxdusthtlcexposuremsat max_dust_htlc_exposure_msat = 45;
+	optional ListconfigsConfigsMincapacitysat min_capacity_sat = 46;
+	optional ListconfigsConfigsAddr addr = 47;
+	optional ListconfigsConfigsAnnounceaddr announce_addr = 48;
+	optional ListconfigsConfigsBindaddr bind_addr = 49;
+	optional ListconfigsConfigsOffline offline = 50;
+	optional ListconfigsConfigsAutolisten autolisten = 51;
+	optional ListconfigsConfigsProxy proxy = 52;
+	optional ListconfigsConfigsDisabledns disable_dns = 53;
+	optional ListconfigsConfigsAnnounceaddrdiscovered announce_addr_discovered = 54;
+	optional ListconfigsConfigsAnnounceaddrdiscoveredport announce_addr_discovered_port = 55;
+	optional ListconfigsConfigsEncryptedhsm encrypted_hsm = 56;
+	optional ListconfigsConfigsRpcfilemode rpc_file_mode = 57;
+	optional ListconfigsConfigsLoglevel log_level = 58;
+	optional ListconfigsConfigsLogprefix log_prefix = 59;
+	optional ListconfigsConfigsLogfile log_file = 60;
+	optional ListconfigsConfigsLogtimestamps log_timestamps = 61;
+	optional ListconfigsConfigsForcefeerates force_feerates = 62;
+	optional ListconfigsConfigsSubdaemon subdaemon = 63;
+	optional ListconfigsConfigsFetchinvoicenoconnect fetchinvoice_noconnect = 64;
+	optional ListconfigsConfigsAccepthtlctlvtypes accept_htlc_tlv_types = 65;
+	optional ListconfigsConfigsTorservicepassword tor_service_password = 66;
+	optional ListconfigsConfigsAnnounceaddrdns announce_addr_dns = 67;
+	optional ListconfigsConfigsRequireconfirmedinputs require_confirmed_inputs = 68;
+	optional ListconfigsConfigsCommitfee commit_fee = 69;
+	optional ListconfigsConfigsCommitfeerateoffset commit_feerate_offset = 70;
+}
+
+message ListconfigsConfigsConf {
+	// ListConfigs.configs.conf.source
+	enum ListconfigsConfigsConfSource {
+		CMDLINE = 0;
+	}
+	string value_str = 1;
+	ListconfigsConfigsConfSource source = 2;
+}
+
+message ListconfigsConfigsDeveloper {
+	bool set = 1;
+	string source = 2;
+}
+
+message ListconfigsConfigsClearplugins {
+	bool set = 1;
+	string source = 2;
+}
+
+message ListconfigsConfigsDisablempp {
+	bool set = 1;
+	string source = 2;
+	optional string plugin = 3;
+}
+
+message ListconfigsConfigsMainnet {
+	bool set = 1;
+	string source = 2;
+}
+
+message ListconfigsConfigsRegtest {
+	bool set = 1;
+	string source = 2;
+}
+
+message ListconfigsConfigsSignet {
+	bool set = 1;
+	string source = 2;
+}
+
+message ListconfigsConfigsTestnet {
+	bool set = 1;
+	string source = 2;
+}
+
+message ListconfigsConfigsImportantplugin {
+	repeated string values_str = 1;
+	repeated string sources = 2;
+}
+
+message ListconfigsConfigsPlugin {
+	repeated string values_str = 1;
+	repeated string sources = 2;
+}
+
+message ListconfigsConfigsPlugindir {
+	repeated string values_str = 1;
+	repeated string sources = 2;
+}
+
+message ListconfigsConfigsLightningdir {
+	string value_str = 1;
+	string source = 2;
+}
+
+message ListconfigsConfigsNetwork {
+	string value_str = 1;
+	string source = 2;
+}
+
+message ListconfigsConfigsAllowdeprecatedapis {
+	bool value_bool = 1;
+	string source = 2;
+}
+
+message ListconfigsConfigsRpcfile {
+	string value_str = 1;
+	string source = 2;
+}
+
+message ListconfigsConfigsDisableplugin {
+	repeated string values_str = 1;
+	repeated string sources = 2;
+}
+
+message ListconfigsConfigsAlwaysuseproxy {
+	bool value_bool = 1;
+	string source = 2;
+}
+
+message ListconfigsConfigsDaemon {
+	bool set = 1;
+	string source = 2;
+}
+
+message ListconfigsConfigsWallet {
+	string value_str = 1;
+	string source = 2;
+}
+
+message ListconfigsConfigsLargechannels {
+	bool set = 1;
+	string source = 2;
+}
+
+message ListconfigsConfigsExperimentaldualfund {
+	bool set = 1;
+	string source = 2;
+}
+
+message ListconfigsConfigsExperimentalsplicing {
+	bool set = 1;
+	string source = 2;
+}
+
+message ListconfigsConfigsExperimentalonionmessages {
+	bool set = 1;
+	string source = 2;
+}
+
+message ListconfigsConfigsExperimentaloffers {
+	bool set = 1;
+	string source = 2;
+}
+
+message ListconfigsConfigsExperimentalshutdownwrongfunding {
+	bool set = 1;
+	string source = 2;
+}
+
+message ListconfigsConfigsExperimentalpeerstorage {
+	bool set = 1;
+	string source = 2;
+}
+
+message ListconfigsConfigsExperimentalanchors {
+	bool set = 1;
+	string source = 2;
+}
+
+message ListconfigsConfigsDatabaseupgrade {
+	bool value_bool = 1;
+	string source = 2;
+}
+
+message ListconfigsConfigsRgb {
+	bytes value_str = 1;
+	string source = 2;
+}
+
+message ListconfigsConfigsAlias {
+	string value_str = 1;
+	string source = 2;
+}
+
+message ListconfigsConfigsPidfile {
+	string value_str = 1;
+	string source = 2;
+}
+
+message ListconfigsConfigsIgnorefeelimits {
+	bool value_bool = 1;
+	string source = 2;
+}
+
+message ListconfigsConfigsWatchtimeblocks {
+	uint32 value_int = 1;
+	string source = 2;
+}
+
+message ListconfigsConfigsMaxlocktimeblocks {
+	uint32 value_int = 1;
+	string source = 2;
+}
+
+message ListconfigsConfigsFundingconfirms {
+	uint32 value_int = 1;
+	string source = 2;
+}
+
+message ListconfigsConfigsCltvdelta {
+	uint32 value_int = 1;
+	string source = 2;
+}
+
+message ListconfigsConfigsCltvfinal {
+	uint32 value_int = 1;
+	string source = 2;
+}
+
+message ListconfigsConfigsCommittime {
+	uint32 value_int = 1;
+	string source = 2;
+}
+
+message ListconfigsConfigsFeebase {
+	uint32 value_int = 1;
+	string source = 2;
+}
+
+message ListconfigsConfigsRescan {
+	sint64 value_int = 1;
+	string source = 2;
+}
+
+message ListconfigsConfigsFeepersatoshi {
+	uint32 value_int = 1;
+	string source = 2;
+}
+
+message ListconfigsConfigsMaxconcurrenthtlcs {
+	uint32 value_int = 1;
+	string source = 2;
+}
+
+message ListconfigsConfigsHtlcminimummsat {
+	Amount value_msat = 1;
+	string source = 2;
+}
+
+message ListconfigsConfigsHtlcmaximummsat {
+	Amount value_msat = 1;
+	string source = 2;
+}
+
+message ListconfigsConfigsMaxdusthtlcexposuremsat {
+	Amount value_msat = 1;
+	string source = 2;
+}
+
+message ListconfigsConfigsMincapacitysat {
+	uint64 value_int = 1;
+	string source = 2;
+	optional bool dynamic = 3;
+}
+
+message ListconfigsConfigsAddr {
+	repeated string values_str = 1;
+	repeated string sources = 2;
+}
+
+message ListconfigsConfigsAnnounceaddr {
+	repeated string values_str = 1;
+	repeated string sources = 2;
+}
+
+message ListconfigsConfigsBindaddr {
+	repeated string values_str = 1;
+	repeated string sources = 2;
+}
+
+message ListconfigsConfigsOffline {
+	bool set = 1;
+	string source = 2;
+}
+
+message ListconfigsConfigsAutolisten {
+	bool value_bool = 1;
+	string source = 2;
+}
+
+message ListconfigsConfigsProxy {
+	string value_str = 1;
+	string source = 2;
+}
+
+message ListconfigsConfigsDisabledns {
+	bool set = 1;
+	string source = 2;
+}
+
+message ListconfigsConfigsAnnounceaddrdiscovered {
+	// ListConfigs.configs.announce-addr-discovered.value_str
+	enum ListconfigsConfigsAnnounceaddrdiscoveredValue_str {
+		TRUE = 0;
+		FALSE = 1;
+		AUTO = 2;
+	}
+	ListconfigsConfigsAnnounceaddrdiscoveredValue_str value_str = 1;
+	string source = 2;
+}
+
+message ListconfigsConfigsAnnounceaddrdiscoveredport {
+	uint32 value_int = 1;
+	string source = 2;
+}
+
+message ListconfigsConfigsEncryptedhsm {
+	bool set = 1;
+	string source = 2;
+}
+
+message ListconfigsConfigsRpcfilemode {
+	string value_str = 1;
+	string source = 2;
+}
+
+message ListconfigsConfigsLoglevel {
+	string value_str = 1;
+	string source = 2;
+}
+
+message ListconfigsConfigsLogprefix {
+	string value_str = 1;
+	string source = 2;
+}
+
+message ListconfigsConfigsLogfile {
+	repeated string values_str = 1;
+	repeated string sources = 2;
+}
+
+message ListconfigsConfigsLogtimestamps {
+	bool value_bool = 1;
+	string source = 2;
+}
+
+message ListconfigsConfigsForcefeerates {
+	string value_str = 1;
+	string source = 2;
+}
+
+message ListconfigsConfigsSubdaemon {
+	repeated string values_str = 1;
+	repeated string sources = 2;
+}
+
+message ListconfigsConfigsFetchinvoicenoconnect {
+	bool set = 1;
+	string source = 2;
+}
+
+message ListconfigsConfigsAccepthtlctlvtypes {
+	string value_str = 1;
+	string source = 2;
+}
+
+message ListconfigsConfigsTorservicepassword {
+	string value_str = 1;
+	string source = 2;
+}
+
+message ListconfigsConfigsAnnounceaddrdns {
+	bool value_bool = 1;
+	string source = 2;
+}
+
+message ListconfigsConfigsRequireconfirmedinputs {
+	bool value_bool = 1;
+	string source = 2;
+}
+
+message ListconfigsConfigsCommitfee {
+	uint64 value_int = 1;
+	string source = 2;
+}
+
+message ListconfigsConfigsCommitfeerateoffset {
+	uint32 value_int = 1;
+	string source = 2;
+}
+
+message ListconfigsPlugins {
+	string path = 1;
+	string name = 2;
+	optional ListconfigsPluginsOptions options = 3;
+}
+
+message ListconfigsPluginsOptions {
+}
+
+message ListconfigsImportantplugins {
+	string path = 1;
+	string name = 2;
+	optional ListconfigsImportantpluginsOptions options = 3;
+}
+
+message ListconfigsImportantpluginsOptions {
+}
+
 message StopRequest {
 }
 
@@ -2338,17 +3316,37 @@ message StopResponse {
 	optional StopResult result = 1;
 }
 
+message HelpRequest {
+	optional string command = 1;
+}
+
+message HelpResponse {
+	// Help.format-hint
+	enum HelpFormathint {
+		SIMPLE = 0;
+	}
+	repeated HelpHelp help = 1;
+	optional HelpFormathint format_hint = 2;
+}
+
+message HelpHelp {
+	string command = 1;
+	string category = 2;
+	string description = 3;
+	string verbose = 4;
+}
+
 message PreapprovekeysendRequest {
-	optional bytes destination = 1;
-	optional bytes payment_hash = 2;
-	optional Amount amount_msat = 3;
+	bytes destination = 1;
+	bytes payment_hash = 2;
+	Amount amount_msat = 3;
 }
 
 message PreapprovekeysendResponse {
 }
 
 message PreapproveinvoiceRequest {
-	optional string bolt11 = 1;
+	string bolt11 = 1;
 }
 
 message PreapproveinvoiceResponse {
@@ -2520,4 +3518,133 @@ message BkprlistincomeIncome_events {
 	optional string outpoint = 8;
 	optional bytes txid = 9;
 	optional bytes payment_id = 10;
+}
+
+message BlacklistruneRequest {
+	optional uint64 start = 1;
+	optional uint64 end = 2;
+}
+
+message BlacklistruneResponse {
+	repeated BlacklistruneBlacklist blacklist = 1;
+}
+
+message BlacklistruneBlacklist {
+	uint64 start = 1;
+	uint64 end = 2;
+}
+
+message CheckruneRequest {
+	string rune = 1;
+	optional string nodeid = 2;
+	optional string method = 3;
+	repeated string params = 4;
+}
+
+message CheckruneResponse {
+	bool valid = 1;
+}
+
+message CreateruneRequest {
+	optional string rune = 1;
+	repeated string restrictions = 2;
+}
+
+message CreateruneResponse {
+	string rune = 1;
+	string unique_id = 2;
+	optional string warning_unrestricted_rune = 3;
+}
+
+message ShowrunesRequest {
+	optional string rune = 1;
+}
+
+message ShowrunesResponse {
+	repeated ShowrunesRunes runes = 1;
+}
+
+message ShowrunesRunes {
+	string rune = 1;
+	string unique_id = 2;
+	repeated ShowrunesRunesRestrictions restrictions = 3;
+	string restrictions_as_english = 4;
+	optional bool stored = 5;
+	optional bool blacklisted = 6;
+	optional double last_used = 7;
+	optional bool our_rune = 8;
+}
+
+message ShowrunesRunesRestrictions {
+	repeated ShowrunesRunesRestrictionsAlternatives alternatives = 1;
+	string english = 2;
+}
+
+message ShowrunesRunesRestrictionsAlternatives {
+	string fieldname = 1;
+	string value = 2;
+	string condition = 3;
+	string english = 4;
+}
+
+message StreamBlockAddedRequest {
+}
+
+message BlockAddedNotification {
+	bytes hash = 1;
+	uint32 height = 2;
+}
+
+message StreamChannelOpenFailedRequest {
+}
+
+message ChannelOpenFailedNotification {
+	bytes channel_id = 1;
+}
+
+message StreamChannelOpenedRequest {
+}
+
+message ChannelOpenedNotification {
+	optional bytes id = 1;
+	Amount funding_msat = 2;
+	bytes funding_txid = 3;
+	bool channel_ready = 4;
+}
+
+message StreamConnectRequest {
+}
+
+message PeerConnectNotification {
+	// connect.direction
+	enum PeerConnectDirection {
+		IN = 0;
+		OUT = 1;
+	}
+	bytes id = 1;
+	PeerConnectDirection direction = 2;
+	PeerConnectAddress address = 3;
+}
+
+message PeerConnectAddress {
+	// connect.address.type
+	enum PeerConnectAddressType {
+		LOCAL_SOCKET = 0;
+		IPV4 = 1;
+		IPV6 = 2;
+		TORV2 = 3;
+		TORV3 = 4;
+	}
+	PeerConnectAddressType item_type = 1;
+	optional string socket = 2;
+	optional string address = 3;
+	optional uint32 port = 4;
+}
+
+message StreamCustomMsgRequest {
+}
+
+message CustomMsgNotification {
+	bytes peer_id = 1;
+	bytes payload = 2;
 }

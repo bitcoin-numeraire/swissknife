@@ -1,6 +1,6 @@
 pub mod breez;
 pub mod cln;
-mod lightning;
+mod ln_client;
 mod types;
 
-pub use lightning::*;
+pub use ln_client::*;

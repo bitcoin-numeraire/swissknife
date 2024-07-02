@@ -4,9 +4,9 @@ use strum_macros::{Display, EnumString};
 #[derive(Clone, Debug, EnumString, Deserialize, Serialize, Display, PartialEq, Eq, Default)]
 pub enum Ledger {
     #[default]
-    LIGHTNING,
-    INTERNAL,
-    ONCHAIN,
+    Lightning,
+    Internal,
+    Onchain,
 }
 
 #[derive(Clone, Debug, EnumString, Deserialize, Serialize, Display, PartialEq, Eq, Default)]

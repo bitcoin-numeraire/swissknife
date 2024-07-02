@@ -186,7 +186,7 @@ impl BreezNodeHandler {
         let client = app_state.ln_node_client.as_breez_client()?;
         let data = client.backup()?;
 
-        return match data {
+        match data {
             Some(data) => {
                 let filename = "channels_backup.txt";
                 let body = Body::from(data.join("\n").into_bytes());
@@ -202,7 +202,7 @@ impl BreezNodeHandler {
                 Ok((headers, body).into_response())
             }
             None => Err(LightningError::Backup("No backup data found".to_string()))?,
-        };
+        }
     }
 
     async fn health_check(
