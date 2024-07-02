@@ -9,7 +9,6 @@ target
 certs
 deps
 storage
-target
 .dockerignore
 .git
 .gitignore

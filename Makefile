@@ -2,6 +2,7 @@ COMPOSE := docker compose -f docker-compose.yml
 DB_SERVICE := postgres
 PGADMIN_SERVICE := pgadmin
 LIGHTNINGD_SERVICE := lightningd
+SWISSKNIFE_SERVICE := swissknife
 IMAGE_NAME := swissknife:latest
 
 .PHONY: up up-lightningd up-postgres up-pgadmin shutdown down generate-certs build-docker run-docker
@@ -9,6 +10,10 @@ IMAGE_NAME := swissknife:latest
 up:
 	@$(MAKE) down
 	@$(MAKE) up-postgres
+
+up-swissknife:
+	@$(COMPOSE) up -d $(SWISSKNIFE_SERVICE)
+	@until $(COMPOSE) logs $(SWISSKNIFE_SERVICE) | grep 'Listening on'; do sleep 1; done
 
 up-lightningd:
 	@$(COMPOSE) up -d $(LIGHTNINGD_SERVICE)
@@ -58,5 +63,5 @@ deps-outdated:
 lint:
 	@cargo clippy
 
-lint-fix:
+fmt:
 	@cargo fmt
