@@ -18,11 +18,11 @@ use crate::{
     infra::app::AppState,
 };
 
-pub struct App {
+pub struct Server {
     router: Router,
 }
 
-impl App {
+impl Server {
     pub fn new(state: Arc<AppState>) -> Self {
         let router = Router::new()
             .nest("/.well-known/lnurlp", LnURLpHandler::well_known_route())

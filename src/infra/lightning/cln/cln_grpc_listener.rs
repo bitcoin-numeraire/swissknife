@@ -114,13 +114,13 @@ pub async fn listen_invoices(
     }
 }
 
-impl Into<LnInvoicePaidEvent> for WaitanyinvoiceResponse {
-    fn into(self) -> LnInvoicePaidEvent {
+impl From<WaitanyinvoiceResponse> for LnInvoicePaidEvent {
+    fn from(val: WaitanyinvoiceResponse) -> Self {
         LnInvoicePaidEvent {
-            payment_hash: self.payment_hash.to_hex(),
-            amount_msat: self.amount_received_msat.as_ref().unwrap().msat,
+            payment_hash: val.payment_hash.to_hex(),
+            amount_msat: val.amount_received_msat.as_ref().unwrap().msat,
             fee_msat: 0,
-            payment_time: Utc.timestamp_opt(self.paid_at() as i64, 0).unwrap(),
+            payment_time: Utc.timestamp_opt(val.paid_at() as i64, 0).unwrap(),
         }
     }
 }

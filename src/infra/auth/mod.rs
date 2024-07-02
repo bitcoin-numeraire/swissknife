@@ -1,6 +1,6 @@
-mod auth;
+mod authenticator;
 pub mod bypass;
 pub mod jwt;
 pub mod oauth2;
 
-pub use auth::Authenticator;
+pub use authenticator::*;

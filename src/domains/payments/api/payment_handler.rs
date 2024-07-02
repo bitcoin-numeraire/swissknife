@@ -37,7 +37,7 @@ impl PaymentHandler {
         user.check_permission(Permission::WriteLnTransaction)?;
 
         let payment = app_state.services.payment.pay(payload).await?;
-        Ok(Json(payment.into()))
+        Ok(payment.into())
     }
 
     async fn get(
@@ -47,8 +47,8 @@ impl PaymentHandler {
     ) -> Result<Json<Payment>, ApplicationError> {
         user.check_permission(Permission::ReadLnTransaction)?;
 
-        let ln_address = app_state.services.payment.get(id).await?;
-        Ok(Json(ln_address.into()))
+        let payment = app_state.services.payment.get(id).await?;
+        Ok(payment.into())
     }
 
     async fn list(
@@ -58,9 +58,9 @@ impl PaymentHandler {
     ) -> Result<Json<Vec<Payment>>, ApplicationError> {
         user.check_permission(Permission::ReadLnTransaction)?;
 
-        let lightning_payments = app_state.services.payment.list(query_params).await?;
+        let payments = app_state.services.payment.list(query_params).await?;
 
-        let response: Vec<Payment> = lightning_payments.into_iter().map(Into::into).collect();
+        let response: Vec<Payment> = payments.into_iter().map(Into::into).collect();
 
         Ok(response.into())
     }

@@ -32,8 +32,8 @@ impl WalletRepository for SeaOrmWalletRepository {
             r#"
             WITH sent AS (
                 SELECT
-                    SUM(amount_msat) FILTER (WHERE status IN ('SETTLED', 'PENDING')) AS sent_msat,
-                    SUM(COALESCE(fee_msat, 0)) FILTER (WHERE status = 'SETTLED') AS fees_paid_msat
+                    SUM(amount_msat) FILTER (WHERE status IN ('Settled', 'Pending')) AS sent_msat,
+                    SUM(COALESCE(fee_msat, 0)) FILTER (WHERE status = 'Settled') AS fees_paid_msat
                 FROM payment
                 WHERE user_id = $1
             ),

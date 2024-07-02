@@ -46,7 +46,7 @@ impl WalletHandler {
         user: AuthUser,
     ) -> Result<Json<Wallet>, ApplicationError> {
         let wallet = app_state.services.wallet.get(user.sub).await?;
-        Ok(Json(wallet.into()))
+        Ok(wallet.into())
     }
 
     async fn pay(
@@ -56,7 +56,7 @@ impl WalletHandler {
     ) -> Result<Json<Payment>, ApplicationError> {
         payload.user_id = Some(user.sub);
         let payment = app_state.services.payment.pay(payload).await?;
-        Ok(Json(payment.into()))
+        Ok(payment.into())
     }
 
     async fn get_balance(
@@ -83,7 +83,7 @@ impl WalletHandler {
             )
             .await?;
 
-        Ok(Json(invoice.into()))
+        Ok(invoice.into())
     }
 
     async fn get_address(
@@ -104,7 +104,7 @@ impl WalletHandler {
             .cloned()
             .ok_or_else(|| DataError::NotFound("Lightning address not found.".to_string()))?;
 
-        Ok(Json(ln_address.into()))
+        Ok(ln_address.into())
     }
 
     async fn register_address(
@@ -117,7 +117,7 @@ impl WalletHandler {
             .lnurl
             .register(user.sub, payload.username)
             .await?;
-        Ok(Json(ln_address.into()))
+        Ok(ln_address.into())
     }
 
     async fn list_payments(
@@ -153,7 +153,7 @@ impl WalletHandler {
             .cloned()
             .ok_or_else(|| DataError::NotFound("Lightning payment not found.".to_string()))?;
 
-        Ok(Json(lightning_payment.into()))
+        Ok(lightning_payment.into())
     }
 
     async fn list_invoices(
@@ -189,7 +189,7 @@ impl WalletHandler {
             .cloned()
             .ok_or_else(|| DataError::NotFound("Lightning invoice not found.".to_string()))?;
 
-        Ok(Json(lightning_invoice.into()))
+        Ok(lightning_invoice.into())
     }
 
     async fn delete_expired_invoices(
@@ -201,7 +201,7 @@ impl WalletHandler {
             .invoice
             .delete_many(InvoiceFilter {
                 user_id: Some(user.sub),
-                status: Some(InvoiceStatus::EXPIRED),
+                status: Some(InvoiceStatus::Expired),
                 ..Default::default()
             })
             .await?;
@@ -217,7 +217,7 @@ impl WalletHandler {
             .payment
             .delete_many(PaymentFilter {
                 user_id: Some(user.sub),
-                status: Some(PaymentStatus::FAILED),
+                status: Some(PaymentStatus::Failed),
                 ..Default::default()
             })
             .await?;

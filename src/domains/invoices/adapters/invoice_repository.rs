@@ -57,13 +57,13 @@ impl InvoiceRepository for SeaOrmInvoiceRepository {
             .apply_if(filter.user_id, |q, user| q.filter(Column::UserId.eq(user)))
             .apply_if(filter.ids, |q, ids| q.filter(Column::Id.is_in(ids)))
             .apply_if(filter.status, |q, s| match s {
-                InvoiceStatus::PENDING => q.filter(
+                InvoiceStatus::Pending => q.filter(
                     Condition::all()
                         .add(Expr::col(Column::ExpiresAt).gt(Expr::current_timestamp()))
                         .add(Expr::col(Column::PaymentTime).is_null()),
                 ),
-                InvoiceStatus::SETTLED => q.filter(Expr::col(Column::PaymentTime).is_not_null()),
-                InvoiceStatus::EXPIRED => q.filter(
+                InvoiceStatus::Settled => q.filter(Expr::col(Column::PaymentTime).is_not_null()),
+                InvoiceStatus::Expired => q.filter(
                     Condition::all()
                         .add(Expr::col(Column::ExpiresAt).lte(Expr::current_timestamp()))
                         .add(Expr::col(Column::PaymentTime).is_null()),
@@ -99,7 +99,7 @@ impl InvoiceRepository for SeaOrmInvoiceRepository {
             ..Default::default()
         };
 
-        if invoice.ledger == Ledger::LIGHTNING {
+        if invoice.ledger == Ledger::Lightning {
             let lightning = invoice.lightning.unwrap();
             model.bolt11 = Set(lightning.bolt11.into());
             model.payee_pubkey = Set(lightning.payee_pubkey.into());
@@ -150,13 +150,13 @@ impl InvoiceRepository for SeaOrmInvoiceRepository {
             .apply_if(filter.user_id, |q, user| q.filter(Column::UserId.eq(user)))
             .apply_if(filter.ids, |q, ids| q.filter(Column::Id.is_in(ids)))
             .apply_if(filter.status, |q, status| match status {
-                InvoiceStatus::PENDING => q.filter(
+                InvoiceStatus::Pending => q.filter(
                     Condition::all()
                         .add(Expr::col(Column::ExpiresAt).gt(Expr::current_timestamp()))
                         .add(Expr::col(Column::PaymentTime).is_null()),
                 ),
-                InvoiceStatus::SETTLED => q.filter(Expr::col(Column::PaymentTime).is_not_null()),
-                InvoiceStatus::EXPIRED => q.filter(
+                InvoiceStatus::Settled => q.filter(Expr::col(Column::PaymentTime).is_not_null()),
+                InvoiceStatus::Expired => q.filter(
                     Condition::all()
                         .add(Expr::col(Column::ExpiresAt).lte(Expr::current_timestamp()))
                         .add(Expr::col(Column::PaymentTime).is_null()),

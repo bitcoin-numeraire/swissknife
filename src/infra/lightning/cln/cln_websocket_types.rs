@@ -37,34 +37,34 @@ pub struct SendPayFailureData {
     pub status: String,
 }
 
-impl Into<LnInvoicePaidEvent> for CoinMovement {
-    fn into(self) -> LnInvoicePaidEvent {
+impl From<CoinMovement> for LnInvoicePaidEvent {
+    fn from(val: CoinMovement) -> Self {
         LnInvoicePaidEvent {
-            payment_hash: self.payment_hash,
-            amount_msat: self.credit_msat,
+            payment_hash: val.payment_hash,
+            amount_msat: val.credit_msat,
             fee_msat: 0,
-            payment_time: Utc.timestamp_opt(self.timestamp as i64, 0).unwrap(),
+            payment_time: Utc.timestamp_opt(val.timestamp as i64, 0).unwrap(),
         }
     }
 }
 
-impl Into<LnPaySuccessEvent> for SendPaySuccess {
-    fn into(self) -> LnPaySuccessEvent {
+impl From<SendPaySuccess> for LnPaySuccessEvent {
+    fn from(val: SendPaySuccess) -> Self {
         LnPaySuccessEvent {
-            amount_msat: self.amount_msat,
-            fees_msat: self.amount_sent_msat - self.amount_msat,
-            payment_hash: self.payment_hash,
-            payment_preimage: self.payment_preimage,
-            payment_time: Utc.timestamp_opt(self.completed_at as i64, 0).unwrap(),
+            amount_msat: val.amount_msat,
+            fees_msat: val.amount_sent_msat - val.amount_msat,
+            payment_hash: val.payment_hash,
+            payment_preimage: val.payment_preimage,
+            payment_time: Utc.timestamp_opt(val.completed_at as i64, 0).unwrap(),
         }
     }
 }
 
-impl Into<LnPayFailureEvent> for SendPayFailure {
-    fn into(self) -> LnPayFailureEvent {
+impl From<SendPayFailure> for LnPayFailureEvent {
+    fn from(val: SendPayFailure) -> Self {
         LnPayFailureEvent {
-            reason: self.message,
-            payment_hash: self.data.payment_hash,
+            reason: val.message,
+            payment_hash: val.data.payment_hash,
         }
     }
 }

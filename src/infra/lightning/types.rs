@@ -7,50 +7,50 @@ use crate::{
     domains::invoices::entities::{Invoice, LnInvoice},
 };
 
-impl Into<Invoice> for Bolt11Invoice {
-    fn into(self) -> Invoice {
-        let payee_pubkey: String = match self.payee_pub_key() {
+impl From<Bolt11Invoice> for Invoice {
+    fn from(val: Bolt11Invoice) -> Self {
+        let payee_pubkey: String = match val.payee_pub_key() {
             Some(key) => key.to_hex(),
-            None => self.recover_payee_pub_key().to_hex(),
+            None => val.recover_payee_pub_key().to_hex(),
         };
 
         let timestamp = Utc
             .timestamp_opt(
-                self.duration_since_epoch().as_secs() as i64,
-                self.duration_since_epoch().subsec_nanos(),
+                val.duration_since_epoch().as_secs() as i64,
+                val.duration_since_epoch().subsec_nanos(),
             )
             .unwrap();
 
         Invoice {
-            ledger: Ledger::LIGHTNING,
-            currency: self.currency().into(),
-            amount_msat: self.amount_milli_satoshis(),
+            ledger: Ledger::Lightning,
+            currency: val.currency().into(),
+            amount_msat: val.amount_milli_satoshis(),
             timestamp,
-            description: match self.description() {
+            description: match val.description() {
                 Bolt11InvoiceDescription::Direct(msg) => Some(msg.to_string()),
                 Bolt11InvoiceDescription::Hash(_) => None,
             },
             lightning: Some(LnInvoice {
-                bolt11: self.to_string(),
-                payment_hash: self.payment_hash().to_hex(),
+                bolt11: val.to_string(),
+                payment_hash: val.payment_hash().to_hex(),
                 payee_pubkey,
-                description_hash: match self.description() {
+                description_hash: match val.description() {
                     Bolt11InvoiceDescription::Direct(_) => None,
                     Bolt11InvoiceDescription::Hash(h) => Some(h.0.to_string()),
                 },
-                payment_secret: self.payment_secret().0.to_hex(),
-                min_final_cltv_expiry_delta: self.min_final_cltv_expiry_delta(),
-                expiry: self.expiry_time(),
-                expires_at: timestamp + self.expiry_time(),
+                payment_secret: val.payment_secret().0.to_hex(),
+                min_final_cltv_expiry_delta: val.min_final_cltv_expiry_delta(),
+                expiry: val.expiry_time(),
+                expires_at: timestamp + val.expiry_time(),
             }),
             ..Default::default()
         }
     }
 }
 
-impl Into<Currency> for LNInvoiceCurrency {
-    fn into(self) -> Currency {
-        match self {
+impl From<LNInvoiceCurrency> for Currency {
+    fn from(val: LNInvoiceCurrency) -> Self {
+        match val {
             LNInvoiceCurrency::Bitcoin => Currency::Bitcoin,
             LNInvoiceCurrency::Regtest => Currency::Regtest,
             LNInvoiceCurrency::Signet => Currency::Signet,

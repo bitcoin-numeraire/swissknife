@@ -154,7 +154,7 @@ impl LnClient for ClnRestClient {
                     label: Some(Uuid::new_v4().to_string()),
                     maxfeepercent: self.maxfeepercent,
                     retry_for: self.retry_for,
-                    exemptfee: self.payment_exemptfee.clone(),
+                    exemptfee: self.payment_exemptfee,
                 },
             )
             .await

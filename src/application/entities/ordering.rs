@@ -9,9 +9,9 @@ pub enum OrderDirection {
     Asc,
 }
 
-impl Into<Order> for OrderDirection {
-    fn into(self) -> Order {
-        match self {
+impl From<OrderDirection> for Order {
+    fn from(val: OrderDirection) -> Self {
+        match val {
             OrderDirection::Asc => Order::Asc,
             OrderDirection::Desc => Order::Desc,
         }

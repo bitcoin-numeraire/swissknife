@@ -53,7 +53,7 @@ impl InvoiceUseCases for InvoiceService {
                 expiry.unwrap_or(self.invoice_expiry),
             )
             .await?;
-        invoice.user_id = user_id.clone();
+        invoice.user_id.clone_from(&user_id);
 
         let invoice = self.store.invoice.insert(None, invoice).await?;
 

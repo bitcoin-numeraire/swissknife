@@ -37,25 +37,25 @@ pub struct PayResponse {
     pub status: String,
 }
 
-impl Into<Payment> for PayResponse {
-    fn into(self) -> Payment {
-        let error = match self.status.as_str() {
+impl From<PayResponse> for Payment {
+    fn from(val: PayResponse) -> Self {
+        let error = match val.status.as_str() {
             "complete" => None,
             _ => Some(format!(
                 "Unexpected error. Payment returned successfully but with status {}",
-                self.status
+                val.status
             )),
         };
 
-        let seconds = self.created_at as i64;
-        let nanoseconds = ((self.created_at - seconds as f64) * 1e9) as u32;
+        let seconds = val.created_at as i64;
+        let nanoseconds = ((val.created_at - seconds as f64) * 1e9) as u32;
 
         Payment {
-            ledger: Ledger::LIGHTNING,
-            payment_hash: Some(self.payment_hash),
-            payment_preimage: Some(self.payment_preimage),
-            amount_msat: self.amount_sent_msat,
-            fee_msat: Some(self.amount_sent_msat - self.amount_msat),
+            ledger: Ledger::Lightning,
+            payment_hash: Some(val.payment_hash),
+            payment_preimage: Some(val.payment_preimage),
+            amount_msat: val.amount_sent_msat,
+            fee_msat: Some(val.amount_sent_msat - val.amount_msat),
             payment_time: Some(Utc.timestamp_opt(seconds, nanoseconds).unwrap()),
             error,
             ..Default::default()

@@ -70,7 +70,7 @@ impl BreezClient {
                 },
             },
         );
-        breez_config.working_dir = config.working_dir.clone();
+        breez_config.working_dir.clone_from(&config.working_dir);
 
         let seed =
             Mnemonic::parse(config.seed).map_err(|e| LightningError::ParseSeed(e.to_string()))?;

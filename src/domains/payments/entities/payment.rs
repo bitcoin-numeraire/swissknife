@@ -38,9 +38,9 @@ pub struct Payment {
 #[derive(Clone, Debug, EnumString, Display, Deserialize, Serialize, PartialEq, Eq, Default)]
 pub enum PaymentStatus {
     #[default]
-    PENDING,
-    SETTLED,
-    FAILED,
+    Pending,
+    Settled,
+    Failed,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, Default)]

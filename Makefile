@@ -59,4 +59,4 @@ lint:
 	@cargo clippy
 
 lint-fix:
-	@cargo fix
+	@cargo fmt

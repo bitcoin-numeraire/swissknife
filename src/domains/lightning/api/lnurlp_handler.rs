@@ -36,11 +36,11 @@ impl LnURLpHandler {
         Query(query_params): Query<LNUrlpInvoiceQueryParams>,
         State(app_state): State<Arc<AppState>>,
     ) -> Result<Json<LnUrlCallbackResponse>, ApplicationError> {
-        let invoice = app_state
+        let callback = app_state
             .services
             .lnurl
             .lnurlp_callback(username, query_params.amount, query_params.comment)
             .await?;
-        Ok(Json(invoice.into()))
+        Ok(callback.into())
     }
 }
