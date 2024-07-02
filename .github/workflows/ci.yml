@@ -32,7 +32,6 @@ jobs:
       - run: make fmt
 
   test:
-    needs: lint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
