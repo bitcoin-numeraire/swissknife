@@ -331,6 +331,19 @@ impl LnClient for BreezClient {
         Ok(response.reverse_swap_info)
     }
 
+    async fn invoice_by_hash(
+        &self,
+        payment_hash: String,
+    ) -> Result<Option<Invoice>, LightningError> {
+        let response = self
+            .sdk
+            .payment_by_hash(payment_hash)
+            .await
+            .map_err(|e| LightningError::InvoiceByHash(e.to_string()))?;
+
+        Ok(response.map(Into::into))
+    }
+
     async fn health(&self) -> Result<ServiceHealthCheckResponse, LightningError> {
         let response = BreezServices::service_health_check(self.api_key.clone())
             .await

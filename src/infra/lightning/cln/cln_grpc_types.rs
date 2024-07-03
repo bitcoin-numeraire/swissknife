@@ -1,9 +1,20 @@
 use chrono::{TimeZone, Utc};
+use lightning_invoice::Bolt11Invoice;
 use serde_bolt::bitcoin::hashes::hex::ToHex;
+use std::str::FromStr;
 
-use crate::{application::entities::Ledger, domains::payments::entities::Payment};
+use crate::{
+    application::entities::Ledger,
+    domains::{
+        invoices::entities::{Invoice, InvoiceStatus},
+        payments::entities::Payment,
+    },
+};
 
-use super::cln::{pay_response::PayStatus, PayResponse};
+use super::cln::{
+    listinvoices_invoices::ListinvoicesInvoicesStatus, pay_response::PayStatus,
+    ListinvoicesInvoices, PayResponse,
+};
 
 impl From<PayResponse> for Payment {
     fn from(val: PayResponse) -> Self {
@@ -28,5 +39,29 @@ impl From<PayResponse> for Payment {
             error,
             ..Default::default()
         }
+    }
+}
+
+impl From<ListinvoicesInvoices> for Invoice {
+    fn from(val: ListinvoicesInvoices) -> Self {
+        let bolt11_str = val.bolt11.clone().unwrap();
+        let bolt11 = Bolt11Invoice::from_str(&bolt11_str).unwrap();
+        let mut invoice: Invoice = bolt11.into();
+
+        match val.status() {
+            ListinvoicesInvoicesStatus::Paid => {
+                invoice.status = InvoiceStatus::Settled;
+                invoice.payment_time = Some(Utc.timestamp_opt(val.paid_at() as i64, 0).unwrap());
+                invoice.amount_msat = Some(val.amount_received_msat.unwrap().msat);
+            }
+            ListinvoicesInvoicesStatus::Unpaid => {
+                invoice.status = InvoiceStatus::Pending;
+            }
+            ListinvoicesInvoicesStatus::Expired => {
+                invoice.status = InvoiceStatus::Expired;
+            }
+        };
+
+        invoice
     }
 }

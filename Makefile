@@ -5,7 +5,10 @@ LIGHTNINGD_SERVICE := lightningd
 SWISSKNIFE_SERVICE := swissknife
 IMAGE_NAME := swissknife:latest
 
-.PHONY: up up-lightningd up-postgres up-pgadmin shutdown down generate-certs build-docker run-docker
+.PHONY: watch up up-lightningd up-postgres up-pgadmin shutdown down generate-certs build-docker run-docker lint fmt deps-upgrade deps-outdated
+
+watch:
+	@cargo watch -x run
 
 up:
 	@$(MAKE) down
@@ -36,6 +39,7 @@ shutdown:
 	@rm -rf deps/lightningd/data/*
 
 install-tools:
+	@cargo install cargo-watch
 	@cargo install sea-orm-cli
 	@cargo install cargo-edit
 	@cargo install cargo-outdated

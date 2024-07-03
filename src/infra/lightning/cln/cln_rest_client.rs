@@ -22,8 +22,8 @@ use crate::{
 };
 
 use super::{
-    cln_websocket_client::connect_websocket, InvoiceRequest, InvoiceResponse, PayRequest,
-    PayResponse,
+    cln_websocket_client::connect_websocket, ErrorResponse, InvoiceRequest, InvoiceResponse,
+    ListInvoicesRequest, ListInvoicesResponse, PayRequest, PayResponse,
 };
 
 #[derive(Clone, Debug, Deserialize)]
@@ -100,7 +100,16 @@ impl ClnRestClient {
             .send()
             .await?;
 
-        let response = response.error_for_status()?;
+        let status = response.status();
+        if status.is_client_error() || status.is_server_error() {
+            let error_text = response.text().await?;
+            if let Ok(error_response) = serde_json::from_str::<ErrorResponse>(&error_text) {
+                return Err(anyhow::anyhow!(error_response.message));
+            } else {
+                return Err(anyhow::anyhow!(error_text));
+            }
+        }
+
         let result = response.json::<T>().await?;
         Ok(result)
     }
@@ -161,6 +170,26 @@ impl LnClient for ClnRestClient {
             .map_err(|e| LightningError::Pay(e.to_string()))?;
 
         Ok(response.into())
+    }
+
+    async fn invoice_by_hash(
+        &self,
+        payment_hash: String,
+    ) -> Result<Option<Invoice>, LightningError> {
+        let response: ListInvoicesResponse = self
+            .post_request(
+                "listinvoices",
+                &ListInvoicesRequest {
+                    payment_hash: Some(payment_hash),
+                },
+            )
+            .await
+            .map_err(|e| LightningError::InvoiceByHash(e.to_string()))?;
+
+        match response.invoices.into_iter().next() {
+            Some(invoice) => Ok(Some(invoice.into())),
+            None => Ok(None),
+        }
     }
 
     async fn health(&self) -> Result<ServiceHealthCheckResponse, LightningError> {

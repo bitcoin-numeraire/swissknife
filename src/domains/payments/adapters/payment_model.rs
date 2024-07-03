@@ -32,6 +32,8 @@ pub enum Relation {}
 
 impl ActiveModelBehavior for ActiveModel {}
 
+const ASSERTION_MSG: &str = "should parse successfully by assertion";
+
 impl From<Model> for Payment {
     fn from(model: Model) -> Self {
         Payment {
@@ -44,8 +46,8 @@ impl From<Model> for Payment {
             amount_msat: model.amount_msat as u64,
             fee_msat: model.fee_msat.map(|v| v as u64),
             payment_time: model.payment_time,
-            status: model.status.parse().unwrap(),
-            ledger: model.ledger.parse().unwrap(),
+            status: model.status.parse().expect(ASSERTION_MSG),
+            ledger: model.ledger.parse().expect(ASSERTION_MSG),
             description: model.description,
             metadata: model.metadata,
             success_action: serde_json::from_value(model.success_action.unwrap_or_default()).ok(),

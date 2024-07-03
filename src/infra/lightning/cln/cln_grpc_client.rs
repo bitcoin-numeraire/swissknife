@@ -1,6 +1,7 @@
 use std::{path::PathBuf, str::FromStr, sync::Arc, time::Duration};
 
 use breez_sdk_core::{ReverseSwapInfo, ServiceHealthCheckResponse};
+use hex::decode;
 use lightning_invoice::Bolt11Invoice;
 use serde::Deserialize;
 use tokio::{fs, io};
@@ -8,7 +9,7 @@ use tonic::transport::{Certificate, Channel, ClientTlsConfig, Identity};
 use uuid::Uuid;
 
 use async_trait::async_trait;
-use cln::{node_client::NodeClient, Amount, PayRequest};
+use cln::{node_client::NodeClient, Amount, ListinvoicesRequest, PayRequest};
 
 use crate::{
     application::errors::LightningError,
@@ -164,6 +165,27 @@ impl LnClient for ClnGrpcClient {
             .into_inner();
 
         Ok(response.into())
+    }
+
+    async fn invoice_by_hash(
+        &self,
+        payment_hash: String,
+    ) -> Result<Option<Invoice>, LightningError> {
+        let mut client: NodeClient<Channel> = self.client.clone();
+
+        let response = client
+            .list_invoices(ListinvoicesRequest {
+                payment_hash: decode(payment_hash).ok(),
+                ..Default::default()
+            })
+            .await
+            .map_err(|e| LightningError::InvoiceByHash(e.message().to_string()))?
+            .into_inner();
+
+        match response.invoices.into_iter().next() {
+            Some(invoice) => Ok(Some(invoice.into())),
+            None => Ok(None),
+        }
     }
 
     async fn health(&self) -> Result<ServiceHealthCheckResponse, LightningError> {

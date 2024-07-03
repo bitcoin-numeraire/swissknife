@@ -8,7 +8,7 @@ use crate::domains::lightning::entities::{
 #[derive(Debug, Deserialize)]
 pub struct CoinMovement {
     pub credit_msat: u64,
-    pub payment_hash: String,
+    pub payment_hash: Option<String>,
     pub timestamp: u64,
     #[serde(rename = "type")]
     pub movement_type: String,
@@ -40,7 +40,9 @@ pub struct SendPayFailureData {
 impl From<CoinMovement> for LnInvoicePaidEvent {
     fn from(val: CoinMovement) -> Self {
         LnInvoicePaidEvent {
-            payment_hash: val.payment_hash,
+            payment_hash: val
+                .payment_hash
+                .expect("payment_hash should exist for given coin_movement"),
             amount_msat: val.credit_msat,
             fee_msat: 0,
             payment_time: Utc.timestamp_opt(val.timestamp as i64, 0).unwrap(),

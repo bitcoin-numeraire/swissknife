@@ -100,7 +100,9 @@ impl InvoiceRepository for SeaOrmInvoiceRepository {
         };
 
         if invoice.ledger == Ledger::Lightning {
-            let lightning = invoice.lightning.unwrap();
+            let lightning = invoice
+                .lightning
+                .expect("should exist for ledger Lightning");
             model.bolt11 = Set(lightning.bolt11.into());
             model.payee_pubkey = Set(lightning.payee_pubkey.into());
             model.payment_hash = Set(lightning.payment_hash.into());
@@ -132,6 +134,7 @@ impl InvoiceRepository for SeaOrmInvoiceRepository {
             fee_msat: Set(invoice.fee_msat.map(|v| v as i64)),
             payment_time: Set(invoice.payment_time),
             description: Set(invoice.description),
+            amount_msat: Set(invoice.amount_msat.map(|v| v as i64)),
             ..Default::default()
         };
 
