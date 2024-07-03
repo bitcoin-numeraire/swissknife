@@ -68,7 +68,7 @@ impl From<BreezPayment> for Invoice {
             description: val.description,
             amount_msat: Some(val.amount_msat),
             fee_msat: Some(val.fee_msat),
-            payment_time: Some(Utc.timestamp_opt(val.payment_time as i64, 0).unwrap()),
+            payment_time: Some(Utc.timestamp_opt(val.payment_time, 0).unwrap()),
             status: val.status.into(),
             ..Default::default()
         }

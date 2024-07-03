@@ -1,5 +1,5 @@
 domain: "swissknife"
-ln_provider: clnrest
+ln_provider: breez
 auth_provider: bypass
 
 logging:

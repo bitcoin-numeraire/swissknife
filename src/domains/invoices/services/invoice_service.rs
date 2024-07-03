@@ -63,17 +63,12 @@ impl InvoiceUseCases for InvoiceService {
             .await?;
         invoice.user_id.clone_from(&user_id);
 
-        println!("Invoice in use case: {:?}", invoice);
-
         let invoice = self.store.invoice.insert(None, invoice).await?;
-
-        println!("Invoice in use case after save: {:?}", invoice);
 
         info!(
             id = invoice.id.to_string(),
             "Lightning invoice generated successfully"
         );
-
         Ok(invoice)
     }
 
