@@ -12,6 +12,7 @@ use crate::{
         invoices::api::InvoiceHandler,
         lightning::api::{BreezNodeHandler, LnAddressHandler, LnURLpHandler},
         payments::api::PaymentHandler,
+        system::api::SystemHandler,
         users::api::UserHandler,
         wallet::api::WalletHandler,
     },
@@ -25,6 +26,7 @@ pub struct Server {
 impl Server {
     pub fn new(state: Arc<AppState>) -> Self {
         let router = Router::new()
+            .nest("/api/system", SystemHandler::routes())
             .nest("/.well-known/lnurlp", LnURLpHandler::well_known_route())
             .nest("/api/lnurlp", LnURLpHandler::callback_route())
             .nest("/api/lightning/addresses", LnAddressHandler::routes())

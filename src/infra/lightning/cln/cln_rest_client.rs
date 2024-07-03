@@ -1,6 +1,6 @@
 use std::{str::FromStr, sync::Arc, time::Duration};
 
-use breez_sdk_core::{ReverseSwapInfo, ServiceHealthCheckResponse};
+use breez_sdk_core::ReverseSwapInfo;
 use lightning_invoice::Bolt11Invoice;
 use reqwest::{
     header::{HeaderMap, HeaderValue},
@@ -16,7 +16,7 @@ use crate::{
     application::errors::LightningError,
     domains::{
         invoices::entities::Invoice, lightning::services::LnEventsUseCases,
-        payments::entities::Payment,
+        payments::entities::Payment, system::entities::HealthStatus,
     },
     infra::{config::config_rs::deserialize_duration, lightning::LnClient},
 };
@@ -192,16 +192,16 @@ impl LnClient for ClnRestClient {
         }
     }
 
-    async fn health(&self) -> Result<ServiceHealthCheckResponse, LightningError> {
-        todo!();
-    }
-
     async fn pay_onchain(
         &self,
         _amount_sat: u64,
         _recipient_address: String,
         _feerate: u32,
     ) -> Result<ReverseSwapInfo, LightningError> {
+        todo!();
+    }
+
+    async fn health(&self) -> Result<HealthStatus, LightningError> {
         todo!();
     }
 }

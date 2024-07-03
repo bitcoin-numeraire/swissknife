@@ -1,9 +1,11 @@
 use async_trait::async_trait;
-use breez_sdk_core::{ReverseSwapInfo, ServiceHealthCheckResponse};
+use breez_sdk_core::ReverseSwapInfo;
 
 use crate::{
     application::errors::LightningError,
-    domains::{invoices::entities::Invoice, payments::entities::Payment},
+    domains::{
+        invoices::entities::Invoice, payments::entities::Payment, system::entities::HealthStatus,
+    },
 };
 
 #[async_trait]
@@ -30,5 +32,5 @@ pub trait LnClient: Sync + Send {
         &self,
         payment_hash: String,
     ) -> Result<Option<Invoice>, LightningError>;
-    async fn health(&self) -> Result<ServiceHealthCheckResponse, LightningError>;
+    async fn health(&self) -> Result<HealthStatus, LightningError>;
 }

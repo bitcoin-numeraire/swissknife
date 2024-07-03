@@ -8,7 +8,7 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
-use breez_sdk_core::{LspInformation, NodeState, ReverseSwapInfo, ServiceHealthCheckResponse};
+use breez_sdk_core::{LspInformation, NodeState, ReverseSwapInfo};
 
 use crate::{
     application::{
@@ -38,7 +38,6 @@ impl BreezNodeHandler {
             .route("/check-message", post(Self::check_message))
             .route("/sync", post(Self::sync))
             .route("/backup", get(Self::backup))
-            .route("/health", get(Self::health_check))
     }
 
     async fn node_info(
@@ -203,17 +202,5 @@ impl BreezNodeHandler {
             }
             None => Err(LightningError::Backup("No backup data found".to_string()))?,
         }
-    }
-
-    async fn health_check(
-        State(app_state): State<Arc<AppState>>,
-        user: AuthUser,
-    ) -> Result<Json<ServiceHealthCheckResponse>, ApplicationError> {
-        user.check_permission(Permission::ReadLnNode)?;
-
-        let client = app_state.ln_node_client.as_breez_client()?;
-        let health = client.health().await?;
-
-        Ok(health.into())
     }
 }

@@ -45,4 +45,11 @@ impl AppStore {
             .await
             .map_err(|e| DatabaseError::Transaction(e.to_string()))
     }
+
+    pub async fn ping(&self) -> Result<(), DatabaseError> {
+        self.db_conn
+            .ping()
+            .await
+            .map_err(|e| DatabaseError::Ping(e.to_string()))
+    }
 }
