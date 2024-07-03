@@ -20,4 +20,5 @@ pub trait InvoiceUseCases: Send + Sync {
     async fn list(&self, filter: InvoiceFilter) -> Result<Vec<Invoice>, ApplicationError>;
     async fn delete(&self, id: Uuid) -> Result<(), ApplicationError>;
     async fn delete_many(&self, filter: InvoiceFilter) -> Result<u64, ApplicationError>;
+    async fn sync(&self) -> Result<u32, ApplicationError>;
 }

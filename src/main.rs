@@ -44,6 +44,11 @@ async fn main() {
         }
     };
 
+    if let Err(err) = app_state.services.invoice.sync().await {
+        error!(%err, "failed to sync invoices");
+        exit(1);
+    }
+
     let app = Server::new(app_state.clone());
     if let Err(err) = app
         .start(&config.web.addr, shutdown_signal(app_state.clone()))

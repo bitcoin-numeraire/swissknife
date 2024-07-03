@@ -1,8 +1,16 @@
 use chrono::{TimeZone, Utc};
+use lightning_invoice::Bolt11Invoice;
 use serde::{Deserialize, Serialize};
+use std::str::FromStr;
 use uuid::Uuid;
 
-use crate::{application::entities::Ledger, domains::payments::entities::Payment};
+use crate::{
+    application::entities::Ledger,
+    domains::{
+        invoices::entities::{Invoice, InvoiceStatus},
+        payments::entities::Payment,
+    },
+};
 
 #[derive(Debug, Serialize)]
 pub struct InvoiceRequest {
@@ -37,6 +45,24 @@ pub struct PayResponse {
     pub status: String,
 }
 
+#[derive(Debug, Serialize)]
+pub struct ListInvoicesRequest {
+    pub payment_hash: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ListInvoicesResponse {
+    pub invoices: Vec<ListInvoicesInvoice>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ListInvoicesInvoice {
+    bolt11: Option<String>,
+    status: String,
+    paid_at: Option<u64>,
+    amount_received_msat: Option<u64>,
+}
+
 impl From<PayResponse> for Payment {
     fn from(val: PayResponse) -> Self {
         let error = match val.status.as_str() {
@@ -60,6 +86,32 @@ impl From<PayResponse> for Payment {
             error,
             ..Default::default()
         }
+    }
+}
+
+impl From<ListInvoicesInvoice> for Invoice {
+    fn from(val: ListInvoicesInvoice) -> Self {
+        let bolt11_str = val.bolt11.clone().unwrap();
+        let bolt11 = Bolt11Invoice::from_str(&bolt11_str).unwrap();
+        let mut invoice: Invoice = bolt11.into();
+
+        match val.status.as_str() {
+            "paid" => {
+                invoice.status = InvoiceStatus::Settled;
+                invoice.payment_time =
+                    Some(Utc.timestamp_opt(val.paid_at.unwrap() as i64, 0).unwrap());
+                invoice.amount_msat = val.amount_received_msat;
+            }
+            "unpaid" => {
+                invoice.status = InvoiceStatus::Pending;
+            }
+            "expired" => {
+                invoice.status = InvoiceStatus::Expired;
+            }
+            _ => {}
+        };
+
+        invoice
     }
 }
 

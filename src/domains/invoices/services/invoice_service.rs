@@ -4,10 +4,11 @@ use uuid::Uuid;
 
 use crate::{
     application::{
-        entities::AppStore,
+        dtos::LightningProvider,
+        entities::{AppStore, Ledger},
         errors::{ApplicationError, DataError},
     },
-    domains::invoices::entities::{Invoice, InvoiceFilter},
+    domains::invoices::entities::{Invoice, InvoiceFilter, InvoiceStatus},
 };
 
 use std::sync::Arc;
@@ -22,14 +23,21 @@ pub struct InvoiceService {
     store: AppStore,
     ln_client: Arc<dyn LnClient>,
     invoice_expiry: u32,
+    ln_provider: LightningProvider,
 }
 
 impl InvoiceService {
-    pub fn new(store: AppStore, ln_client: Arc<dyn LnClient>, invoice_expiry: u32) -> Self {
+    pub fn new(
+        store: AppStore,
+        ln_client: Arc<dyn LnClient>,
+        invoice_expiry: u32,
+        ln_provider: LightningProvider,
+    ) -> Self {
         InvoiceService {
             store,
             ln_client,
             invoice_expiry,
+            ln_provider,
         }
     }
 }
@@ -127,5 +135,68 @@ impl InvoiceUseCases for InvoiceService {
             n_deleted, "Lightning invoices deleted successfully"
         );
         Ok(n_deleted)
+    }
+
+    // TODO: Move to Lightning node
+    async fn sync(&self) -> Result<u32, ApplicationError> {
+        trace!(ln_provider = %self.ln_provider, "Syncing invoices...");
+
+        if self.ln_provider != LightningProvider::ClnRest {
+            debug!("Lightning provider does not need initial syncing");
+            return Ok(0);
+        }
+
+        let mut n_synced = 0;
+
+        let pending_invoices = self
+            .store
+            .invoice
+            .find_many(InvoiceFilter {
+                status: Some(InvoiceStatus::Pending),
+                ledger: Some(Ledger::Lightning),
+                ..Default::default()
+            })
+            .await?;
+
+        // We have to also check the expired invoices because they can become expired while the app is down and the payment received
+        // Ideally the expired invoices should be cleaned, not to have too many to sync on startup
+        let expired_invoices = self
+            .store
+            .invoice
+            .find_many(InvoiceFilter {
+                status: Some(InvoiceStatus::Expired),
+                ledger: Some(Ledger::Lightning),
+                ..Default::default()
+            })
+            .await?;
+
+        let invoices = pending_invoices
+            .into_iter()
+            .chain(expired_invoices.into_iter());
+
+        for invoice in invoices {
+            let payment_hash = invoice
+                .lightning
+                .as_ref()
+                .expect("Invoice should have a lightning field")
+                .payment_hash
+                .clone();
+
+            if let Some(node_invoice) = self.ln_client.invoice_by_hash(payment_hash).await? {
+                if node_invoice.status == InvoiceStatus::Settled {
+                    let mut updated_invoice = invoice.clone();
+
+                    updated_invoice.status = node_invoice.status;
+                    updated_invoice.payment_time = node_invoice.payment_time;
+                    updated_invoice.amount_msat = node_invoice.amount_msat;
+
+                    self.store.invoice.update(None, updated_invoice).await?;
+                    n_synced += 1;
+                }
+            }
+        }
+
+        info!(%n_synced, "Invoices synced successfully");
+        Ok(n_synced)
     }
 }

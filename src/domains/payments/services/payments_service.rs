@@ -189,7 +189,10 @@ impl PaymentService {
         if req.domain == self.domain {
             match req.ln_address.clone() {
                 Some(ln_address) => {
-                    let address = ln_address.split('@').next().unwrap();
+                    let address = ln_address
+                        .split('@')
+                        .next()
+                        .expect("should not fail or malformed LN address");
                     let address_opt = self.store.ln_address.find_by_username(address).await?;
 
                     match address_opt {
@@ -285,7 +288,7 @@ impl PaymentService {
                     description: comment.clone(),
                     payment_hash: Some(
                         Bolt11Invoice::from_str(&cb.pr)
-                            .unwrap()
+                            .expect("should not fail or malformed callback")
                             .payment_hash()
                             .to_hex(),
                     ),
@@ -403,12 +406,21 @@ impl PaymentsUseCases for PaymentService {
 
         let payment = match input_type {
             InputType::Bolt11 { invoice } => {
-                self.send_bolt11(req.user_id.unwrap(), invoice, req.amount_msat)
-                    .await
+                self.send_bolt11(
+                    req.user_id.expect("user_id cannot be empty"),
+                    invoice,
+                    req.amount_msat,
+                )
+                .await
             }
             InputType::LnUrlPay { data } => {
-                self.send_lnurl_pay(req.user_id.unwrap(), data, req.amount_msat, req.comment)
-                    .await
+                self.send_lnurl_pay(
+                    req.user_id.expect("user_id cannot be empty"),
+                    data,
+                    req.amount_msat,
+                    req.comment,
+                )
+                .await
             }
             InputType::LnUrlError { data } => Err(DataError::Validation(data.reason).into()),
             _ => Err(DataError::Validation("Unsupported payment input".to_string()).into()),

@@ -23,7 +23,7 @@ use crate::{
 
 use super::{
     cln_websocket_client::connect_websocket, ErrorResponse, InvoiceRequest, InvoiceResponse,
-    PayRequest, PayResponse,
+    ListInvoicesRequest, ListInvoicesResponse, PayRequest, PayResponse,
 };
 
 #[derive(Clone, Debug, Deserialize)]
@@ -170,6 +170,26 @@ impl LnClient for ClnRestClient {
             .map_err(|e| LightningError::Pay(e.to_string()))?;
 
         Ok(response.into())
+    }
+
+    async fn invoice_by_hash(
+        &self,
+        payment_hash: String,
+    ) -> Result<Option<Invoice>, LightningError> {
+        let response: ListInvoicesResponse = self
+            .post_request(
+                "listinvoices",
+                &ListInvoicesRequest {
+                    payment_hash: Some(payment_hash),
+                },
+            )
+            .await
+            .map_err(|e| LightningError::InvoiceByHash(e.to_string()))?;
+
+        match response.invoices.into_iter().next() {
+            Some(invoice) => Ok(Some(invoice.into())),
+            None => Ok(None),
+        }
     }
 
     async fn health(&self) -> Result<ServiceHealthCheckResponse, LightningError> {

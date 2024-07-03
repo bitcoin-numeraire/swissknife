@@ -53,6 +53,8 @@ impl Related<crate::domains::lightning::adapters::ln_address_model::Entity> for 
 
 impl ActiveModelBehavior for ActiveModel {}
 
+const ASSERTION_MSG: &str = "should parse successfully by assertion";
+
 impl From<Model> for Invoice {
     fn from(model: Model) -> Self {
         let status = match model.payment_time {
@@ -65,14 +67,15 @@ impl From<Model> for Invoice {
 
         let lightning = match model.ledger.as_str() {
             "Lightning" => Some(LnInvoice {
-                payment_hash: model.payment_hash.unwrap(),
-                bolt11: model.bolt11.unwrap(),
+                payment_hash: model.payment_hash.expect(ASSERTION_MSG),
+                bolt11: model.bolt11.expect(ASSERTION_MSG),
                 description_hash: model.description_hash,
-                payee_pubkey: model.payee_pubkey.unwrap(),
-                min_final_cltv_expiry_delta: model.min_final_cltv_expiry_delta.unwrap() as u64,
-                payment_secret: model.payment_secret.unwrap(),
-                expiry: Duration::from_secs(model.expiry.unwrap() as u64),
-                expires_at: model.expires_at.unwrap(),
+                payee_pubkey: model.payee_pubkey.expect(ASSERTION_MSG),
+                min_final_cltv_expiry_delta: model.min_final_cltv_expiry_delta.expect(ASSERTION_MSG)
+                    as u64,
+                payment_secret: model.payment_secret.expect(ASSERTION_MSG),
+                expiry: Duration::from_secs(model.expiry.expect(ASSERTION_MSG) as u64),
+                expires_at: model.expires_at.expect(ASSERTION_MSG),
             }),
             _ => None,
         };
@@ -84,8 +87,8 @@ impl From<Model> for Invoice {
             description: model.description,
             amount_msat: model.amount_msat.map(|v| v as u64),
             timestamp: model.timestamp,
-            currency: model.currency.parse().unwrap(),
-            ledger: model.ledger.parse().unwrap(),
+            currency: model.currency.parse().expect(ASSERTION_MSG),
+            ledger: model.ledger.parse().expect(ASSERTION_MSG),
             status,
             fee_msat: None,
             payment_time: model.payment_time,

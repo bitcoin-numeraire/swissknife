@@ -46,6 +46,7 @@ impl AppServices {
             store.clone(),
             ln_client.clone(),
             config.invoice_expiry.as_secs() as u32,
+            config.ln_provider,
         );
         let lnurl = LnUrlService::new(
             store.clone(),

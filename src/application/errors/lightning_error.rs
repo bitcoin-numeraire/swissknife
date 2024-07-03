@@ -41,6 +41,9 @@ pub enum LightningError {
     #[error("Failed to send payment: {0}")]
     Pay(String),
 
+    #[error("Failed to get invoice by hash: {0}")]
+    InvoiceByHash(String),
+
     #[error("Failed to close LSP channels: {0}")]
     CloseLSPChannels(String),
 

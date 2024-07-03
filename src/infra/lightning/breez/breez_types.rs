@@ -2,6 +2,7 @@ use std::time::Duration;
 
 use breez_sdk_core::{
     LNInvoice, Network as BreezNetwork, Payment as BreezPayment, PaymentDetails, PaymentFailedData,
+    PaymentStatus,
 };
 use chrono::{TimeZone, Utc};
 use serde_bolt::bitcoin::hashes::hex::ToHex;
@@ -9,7 +10,7 @@ use serde_bolt::bitcoin::hashes::hex::ToHex;
 use crate::{
     application::entities::{Currency, Ledger},
     domains::{
-        invoices::entities::{Invoice, LnInvoice},
+        invoices::entities::{Invoice, InvoiceStatus, LnInvoice},
         lightning::entities::{LnInvoicePaidEvent, LnPayFailureEvent, LnPaySuccessEvent},
         payments::entities::Payment,
     },
@@ -60,6 +61,20 @@ impl From<BreezPayment> for Payment {
     }
 }
 
+impl From<BreezPayment> for Invoice {
+    fn from(val: BreezPayment) -> Self {
+        Invoice {
+            ledger: Ledger::Lightning,
+            description: val.description,
+            amount_msat: Some(val.amount_msat),
+            fee_msat: Some(val.fee_msat),
+            payment_time: Some(Utc.timestamp_opt(val.payment_time as i64, 0).unwrap()),
+            status: val.status.into(),
+            ..Default::default()
+        }
+    }
+}
+
 impl From<BreezNetwork> for Currency {
     fn from(val: BreezNetwork) -> Self {
         match val {
@@ -67,6 +82,16 @@ impl From<BreezNetwork> for Currency {
             BreezNetwork::Regtest => Currency::Regtest,
             BreezNetwork::Signet => Currency::Signet,
             BreezNetwork::Testnet => Currency::BitcoinTestnet,
+        }
+    }
+}
+
+impl From<PaymentStatus> for InvoiceStatus {
+    fn from(val: PaymentStatus) -> Self {
+        match val {
+            PaymentStatus::Pending => InvoiceStatus::Pending,
+            PaymentStatus::Complete => InvoiceStatus::Settled,
+            PaymentStatus::Failed => InvoiceStatus::Expired,
         }
     }
 }

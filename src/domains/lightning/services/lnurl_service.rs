@@ -66,7 +66,7 @@ impl LnUrlUseCases for LnUrlService {
                 format!("{}@{}", username, self.domain),
             ],
         ])
-        .unwrap();
+        .expect("should not fail as a constant");
 
         let lnurlp = LnURLPayRequest {
             callback: format!("https://{}/api/lnurlp/{}/callback", self.domain, username),
@@ -110,7 +110,10 @@ impl LnUrlUseCases for LnUrlService {
         // TODO: Get or add more information to make this a LNURLp invoice (like fetching a success action specific to the user)
         let invoice = self.store.invoice.insert(None, invoice).await?;
         let lnurlp_invoice = LnUrlCallbackResponse {
-            pr: invoice.lightning.unwrap().bolt11,
+            pr: invoice
+                .lightning
+                .expect("should exist for ledger Lightning")
+                .bolt11,
             success_action: Some(SuccessActionProcessed::Message {
                 data: MessageSuccessActionData {
                     message: "Thanks for the sats!".to_string(),
@@ -136,7 +139,8 @@ impl LnUrlUseCases for LnUrlService {
         }
 
         // Regex validation for allowed characters
-        let email_username_re = Regex::new(r"^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+$").unwrap(); // Can't fail by assertion
+        let email_username_re = Regex::new(r"^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+$")
+            .expect("should not fail as a constant");
         if !email_username_re.is_match(&username) {
             return Err(DataError::Validation("Invalid username format.".to_string()).into());
         }
