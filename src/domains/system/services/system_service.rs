@@ -31,20 +31,15 @@ impl SystemUseCases for SystemService {
             .ping()
             .await
             .map(|_| HealthStatus::Operational)
-            .unwrap_or_else(|e| {
-                error!("Database health check failed: {:?}", e);
+            .unwrap_or_else(|err| {
+                error!(%err, "Database health check failed");
                 HealthStatus::Unavailable
             });
 
-        let ln_provider = self
-            .ln_client
-            .health()
-            .await
-            .map(|status| status)
-            .unwrap_or_else(|e| {
-                error!("Lightning provider health check failed: {:?}", e);
-                HealthStatus::Unavailable
-            });
+        let ln_provider = self.ln_client.health().await.unwrap_or_else(|err| {
+            error!(%err, "Lightning provider health check failed");
+            HealthStatus::Unavailable
+        });
 
         HealthCheck {
             database,
