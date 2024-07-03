@@ -10,15 +10,15 @@ use breez_sdk_core::{
     BreezServices, CheckMessageRequest, ConnectRequest, EnvironmentType, GreenlightCredentials,
     GreenlightNodeConfig, LspInformation, NodeConfig, NodeState, PayOnchainRequest,
     PrepareOnchainPaymentRequest, PrepareRedeemOnchainFundsRequest, ReceivePaymentRequest,
-    RedeemOnchainFundsRequest, ReverseSwapInfo, SendPaymentRequest, ServiceHealthCheckResponse,
-    SignMessageRequest, StaticBackupRequest, SwapAmountType,
+    RedeemOnchainFundsRequest, ReverseSwapInfo, SendPaymentRequest, SignMessageRequest,
+    StaticBackupRequest, SwapAmountType,
 };
 
 use crate::{
     application::errors::LightningError,
     domains::{
         invoices::entities::Invoice, lightning::services::LnEventsUseCases,
-        payments::entities::Payment,
+        payments::entities::Payment, system::entities::HealthStatus,
     },
     infra::lightning::LnClient,
 };
@@ -344,11 +344,11 @@ impl LnClient for BreezClient {
         Ok(response.map(Into::into))
     }
 
-    async fn health(&self) -> Result<ServiceHealthCheckResponse, LightningError> {
+    async fn health(&self) -> Result<HealthStatus, LightningError> {
         let response = BreezServices::service_health_check(self.api_key.clone())
             .await
             .map_err(|e| LightningError::HealthCheck(e.to_string()))?;
 
-        Ok(response)
+        Ok(response.status.into())
     }
 }

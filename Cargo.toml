@@ -8,6 +8,7 @@ license = "MIT"
 description = "Numeraire SwissKnife enables easy integration of Bitcoin, Lightning and smart contract protocols."
 repository = "https://github.com/bitcoin-numeraire/swissknife"
 homepage = "https://numeraire.tech"
+build = "build.rs"
 
 [dependencies]
 async-trait = "0.1.80"
@@ -54,3 +55,4 @@ migration = { path = "migration" }
 
 [build-dependencies]
 tonic-build = "0.11.0"
+chrono = "0.4.38"

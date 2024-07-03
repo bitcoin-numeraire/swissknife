@@ -6,6 +6,7 @@ use crate::{
         invoices::services::{InvoiceService, InvoiceUseCases},
         lightning::services::{LnUrlService, LnUrlUseCases},
         payments::services::{PaymentService, PaymentsUseCases},
+        system::services::{SystemService, SystemUseCases},
         users::services::{UserService, UserUseCases},
         wallet::services::{WalletService, WalletUseCases},
     },
@@ -27,6 +28,7 @@ pub struct AppServices {
     pub wallet: Box<dyn WalletUseCases>,
     pub lnurl: Box<dyn LnUrlUseCases>,
     pub user: Box<dyn UserUseCases>,
+    pub system: Box<dyn SystemUseCases>,
 }
 
 impl AppServices {
@@ -54,8 +56,9 @@ impl AppServices {
             config.invoice_expiry.as_secs() as u32,
             config.domain,
         );
-        let wallet = WalletService::new(store);
+        let wallet = WalletService::new(store.clone());
         let user = UserService::new(config.auth_provider, authenticator);
+        let system = SystemService::new(store, ln_client);
 
         AppServices {
             invoice: Box::new(invoices),
@@ -63,6 +66,7 @@ impl AppServices {
             wallet: Box::new(wallet),
             lnurl: Box::new(lnurl),
             user: Box::new(user),
+            system: Box::new(system),
         }
     }
 }

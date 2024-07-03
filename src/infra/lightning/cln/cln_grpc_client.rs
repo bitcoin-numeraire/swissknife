@@ -1,6 +1,6 @@
 use std::{path::PathBuf, str::FromStr, sync::Arc, time::Duration};
 
-use breez_sdk_core::{ReverseSwapInfo, ServiceHealthCheckResponse};
+use breez_sdk_core::ReverseSwapInfo;
 use hex::decode;
 use lightning_invoice::Bolt11Invoice;
 use serde::Deserialize;
@@ -15,7 +15,7 @@ use crate::{
     application::errors::LightningError,
     domains::{
         invoices::entities::Invoice, lightning::services::LnEventsUseCases,
-        payments::entities::Payment,
+        payments::entities::Payment, system::entities::HealthStatus,
     },
     infra::{config::config_rs::deserialize_duration, lightning::LnClient},
 };
@@ -188,7 +188,7 @@ impl LnClient for ClnGrpcClient {
         }
     }
 
-    async fn health(&self) -> Result<ServiceHealthCheckResponse, LightningError> {
+    async fn health(&self) -> Result<HealthStatus, LightningError> {
         todo!();
     }
 

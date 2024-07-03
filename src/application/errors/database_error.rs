@@ -28,4 +28,7 @@ pub enum DatabaseError {
 
     #[error("Failed to perform transaction operation: {0}")]
     Transaction(String),
+
+    #[error("Failed to ping DB: {0}")]
+    Ping(String),
 }

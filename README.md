@@ -14,11 +14,10 @@ Numeraire's Bitcoin SwissKnife is a wallet and transaction orchestrator enabling
 - [x] Public and Admin REST API.
 - [ ] Frequent contacts. (TODO)
 - [ ] Notifications via webhooks. (TODO)
-- [x] `JWKS server with automatic public key retrieval
+- [x] `JWKS` with automatic public key retrieval
 - [x] `JWT` token authentication` (tested with Auth0).
 - [x] `RBAC`. Fine grained authorization per route.
 - [ ] API keys authentication. (TODO)
-- [x] Horizontal scaling.
 - [x] Data availability through pagination and advanced search.
 - [ ] [RGB](https://rgb.tech/) Smart contracts. (WIP)
 - [ ] [Taproot Assets](https://docs.lightning.engineering/the-lightning-network/taproot-assets). (TODO)

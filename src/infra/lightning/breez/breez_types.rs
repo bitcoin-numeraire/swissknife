@@ -1,8 +1,8 @@
 use std::time::Duration;
 
 use breez_sdk_core::{
-    LNInvoice, Network as BreezNetwork, Payment as BreezPayment, PaymentDetails, PaymentFailedData,
-    PaymentStatus,
+    HealthCheckStatus, LNInvoice, Network as BreezNetwork, Payment as BreezPayment, PaymentDetails,
+    PaymentFailedData, PaymentStatus,
 };
 use chrono::{TimeZone, Utc};
 use serde_bolt::bitcoin::hashes::hex::ToHex;
@@ -13,6 +13,7 @@ use crate::{
         invoices::entities::{Invoice, InvoiceStatus, LnInvoice},
         lightning::entities::{LnInvoicePaidEvent, LnPayFailureEvent, LnPaySuccessEvent},
         payments::entities::Payment,
+        system::entities::HealthStatus,
     },
 };
 
@@ -127,6 +128,16 @@ impl From<PaymentFailedData> for LnPayFailureEvent {
         LnPayFailureEvent {
             reason: val.error,
             payment_hash: val.invoice.unwrap().payment_hash,
+        }
+    }
+}
+
+impl From<HealthCheckStatus> for HealthStatus {
+    fn from(val: HealthCheckStatus) -> Self {
+        match val {
+            HealthCheckStatus::Operational => HealthStatus::Operational,
+            HealthCheckStatus::ServiceDisruption => HealthStatus::Unavailable,
+            HealthCheckStatus::Maintenance => HealthStatus::Maintenance,
         }
     }
 }
