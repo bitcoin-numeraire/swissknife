@@ -1,5 +1,8 @@
 use crate::{
-    application::dtos::ErrorResponse,
+    application::{
+        dtos::ErrorResponse,
+        entities::{OrderDirection, PaginationFilter},
+    },
     domains::{
         invoices::api::InvoiceHandler,
         lightning::api::{BreezNodeHandler, LnAddressHandler, LnURLpHandler},
@@ -23,7 +26,7 @@ use utoipa::{
         title = "Numeraire SwissKnife REST API",
         description = "This API is available to anyone with a Numeraire account",
     ),
-    components(responses(ErrorResponse)),
+    components(schemas(PaginationFilter, OrderDirection), responses(ErrorResponse)),
     modifiers(&SecurityAddon),
 )]
 struct ApiDoc;

@@ -116,6 +116,7 @@ async fn get_one(
     path = "",
     tag = "Invoices",
     context_path = CONTEXT_PATH,
+    params(InvoiceFilter),
     responses(
         (status = 200, description = "Success", body = Vec<Invoice>),
         (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
@@ -127,11 +128,11 @@ async fn get_one(
 async fn list(
     State(app_state): State<Arc<AppState>>,
     user: AuthUser,
-    Query(query_params): Query<InvoiceFilter>,
+    Query(filter): Query<InvoiceFilter>,
 ) -> Result<Json<Vec<Invoice>>, ApplicationError> {
     user.check_permission(Permission::ReadLnTransaction)?;
 
-    let lightning_invoices = app_state.services.invoice.list(query_params).await?;
+    let lightning_invoices = app_state.services.invoice.list(filter).await?;
 
     let response: Vec<Invoice> = lightning_invoices.into_iter().map(Into::into).collect();
 
@@ -173,6 +174,7 @@ async fn delete_one(
     path = "",
     tag = "Invoices",
     context_path = CONTEXT_PATH,
+    params(InvoiceFilter),
     responses(
         (status = 200, description = "Success", body = Json<u64>),
         (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),

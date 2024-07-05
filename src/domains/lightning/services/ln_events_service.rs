@@ -3,7 +3,7 @@ use tracing::{debug, info};
 
 use crate::{
     application::{
-        entities::{AppStore, Ledger, PaginationFilter},
+        entities::{AppStore, Ledger},
         errors::{ApplicationError, DataError},
     },
     domains::{
@@ -37,10 +37,7 @@ impl LnEventsUseCases for LnEventsService {
             .find_many(InvoiceFilter {
                 status: Some(InvoiceStatus::Settled),
                 ledger: Some(Ledger::Lightning),
-                pagination: PaginationFilter {
-                    limit: Some(1),
-                    ..Default::default()
-                },
+                limit: Some(1),
                 ..Default::default()
             })
             .await?;

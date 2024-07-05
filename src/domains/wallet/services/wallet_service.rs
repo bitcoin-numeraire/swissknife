@@ -59,10 +59,7 @@ impl WalletUseCases for WalletService {
             .invoice
             .find_many(InvoiceFilter {
                 user_id: Some(user_id.clone()),
-                pagination: PaginationFilter {
-                    limit: Some(INVOICES_LIMIT),
-                    ..Default::default()
-                },
+                limit: Some(INVOICES_LIMIT),
                 ..Default::default()
             })
             .await?;

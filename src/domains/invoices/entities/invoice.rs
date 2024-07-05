@@ -2,15 +2,13 @@ use std::time::Duration;
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use serde_with::{serde_as, DurationSeconds};
+use serde_with::{serde_as, DisplayFromStr, DurationSeconds};
 use strum_macros::{Display, EnumString};
-use utoipa::ToSchema;
+use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
 
 use crate::application::entities::OrderDirection;
-use crate::application::entities::{Currency, Ledger, PaginationFilter};
-
-/// Invoice
+use crate::application::entities::{Currency, Ledger};
 
 #[serde_as]
 #[derive(Clone, Debug, Default, Serialize, ToSchema)]
@@ -45,13 +43,13 @@ pub struct Invoice {
     #[serde(skip_serializing_if = "Option::is_none")]
     /// Date of update in database
     pub updated_at: Option<DateTime<Utc>>,
+
     #[serde(flatten)]
     #[serde(skip_serializing_if = "Option::is_none")]
     /// Lightning details of the invoice
     pub lightning: Option<LnInvoice>,
 }
 
-/// Lightning Invoice
 #[serde_as]
 #[derive(Clone, Debug, Default, Serialize, ToSchema)]
 pub struct LnInvoice {
@@ -72,6 +70,7 @@ pub struct LnInvoice {
     pub payee_pubkey: String,
 
     /// The minimum number of blocks the final hop in the route should wait before allowing the payment to be claimed. This is a security measure to ensure that the payment can be settled properly
+    #[schema(example = 10)]
     pub min_final_cltv_expiry_delta: u64,
 
     /// A secret value included in the payment request to mitigate certain types of attacks. The payment secret must be provided by the payer when making the payment
@@ -80,7 +79,9 @@ pub struct LnInvoice {
 
     /// Duration of expiry in seconds since creation
     #[serde_as(as = "DurationSeconds<u64>")]
+    #[schema(example = 3600)]
     pub expiry: Duration,
+
     /// Date of expiry
     pub expires_at: DateTime<Utc>,
 }
@@ -95,14 +96,24 @@ pub enum InvoiceStatus {
     Expired,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize, Default, ToSchema)]
+#[serde_as]
+#[derive(Clone, Debug, Deserialize, Serialize, Default, IntoParams)]
 pub struct InvoiceFilter {
-    #[serde(flatten)]
-    pub pagination: PaginationFilter,
+    /// Total amount of results to return
+    #[serde_as(as = "Option<DisplayFromStr>")]
+    pub limit: Option<u64>,
+    /// Offset where to start returning results
+    #[serde_as(as = "Option<DisplayFromStr>")]
+    pub offset: Option<u64>,
+    /// List of IDs
     pub ids: Option<Vec<Uuid>>,
+    /// User ID. Automatically populated with your user ID
     pub user_id: Option<String>,
+    /// Status
     pub status: Option<InvoiceStatus>,
+    /// Ledger
     pub ledger: Option<Ledger>,
     #[serde(default)]
+    /// Direction of the ordering of results
     pub order_direction: OrderDirection,
 }

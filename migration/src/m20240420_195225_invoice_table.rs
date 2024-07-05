@@ -35,7 +35,7 @@ impl MigrationTrait for Migration {
                 created_at timestamptz NOT NULL DEFAULT current_timestamp,
                 updated_at timestamptz,
                 expires_at timestamptz,
-                CONSTRAINT fk_ln_address FOREIGN KEY (ln_address)
+                CONSTRAINT fk_ln_address FOREIGN KEY (ln_address_id)
                 REFERENCES ln_address (id)
                 ON DELETE SET NULL
             );

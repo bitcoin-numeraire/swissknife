@@ -74,8 +74,8 @@ impl InvoiceRepository for SeaOrmInvoiceRepository {
             })
             .order_by(Column::PaymentTime, order_direction.clone())
             .order_by(Column::Timestamp, order_direction)
-            .offset(filter.pagination.offset)
-            .limit(filter.pagination.limit)
+            .offset(filter.offset)
+            .limit(filter.limit)
             .all(&self.db)
             .await
             .map_err(|e| DatabaseError::FindMany(e.to_string()))?;

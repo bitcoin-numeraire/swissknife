@@ -1,8 +1,11 @@
 use sea_orm::Order;
 use serde::{Deserialize, Serialize};
 use strum_macros::{Display, EnumString};
+use utoipa::ToSchema;
 
-#[derive(Clone, Debug, EnumString, Deserialize, Serialize, Display, PartialEq, Eq, Default)]
+#[derive(
+    Clone, Debug, EnumString, Deserialize, Serialize, Display, PartialEq, Eq, Default, ToSchema,
+)]
 pub enum OrderDirection {
     #[default]
     Desc,
