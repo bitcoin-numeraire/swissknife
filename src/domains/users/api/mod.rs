@@ -1,4 +1,4 @@
+mod auth_handler;
 mod auth_middleware;
-mod user_handler;
 
-pub use user_handler::UserHandler;
+pub use auth_handler::*;

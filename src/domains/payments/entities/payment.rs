@@ -2,11 +2,12 @@ use breez_sdk_core::SuccessActionProcessed;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use strum_macros::{Display, EnumString};
+use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::application::entities::{Ledger, PaginationFilter};
 
-#[derive(Clone, Debug, Default, Serialize)]
+#[derive(Clone, Debug, Default, Serialize, ToSchema)]
 pub struct Payment {
     pub id: Uuid,
     pub user_id: String,
@@ -35,7 +36,9 @@ pub struct Payment {
     pub updated_at: Option<DateTime<Utc>>,
 }
 
-#[derive(Clone, Debug, EnumString, Display, Deserialize, Serialize, PartialEq, Eq, Default)]
+#[derive(
+    Clone, Debug, EnumString, Display, Deserialize, Serialize, PartialEq, Eq, Default, ToSchema,
+)]
 pub enum PaymentStatus {
     #[default]
     Pending,
@@ -43,7 +46,7 @@ pub enum PaymentStatus {
     Failed,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize, Default)]
+#[derive(Clone, Debug, Deserialize, Serialize, Default, ToSchema)]
 pub struct PaymentFilter {
     #[serde(flatten)]
     pub pagination: PaginationFilter,

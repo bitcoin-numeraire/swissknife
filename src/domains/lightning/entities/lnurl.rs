@@ -1,8 +1,9 @@
 use breez_sdk_core::SuccessActionProcessed;
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
 /// See <https://github.com/lnurl/luds/blob/luds/06.md>
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct LnURLPayRequest {
     pub callback: String,
@@ -18,7 +19,7 @@ pub struct LnUrlErrorData {
     pub reason: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct LnUrlCallbackResponse {
     pub pr: String, // bech32-serialized lightning invoice

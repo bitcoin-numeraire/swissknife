@@ -1,10 +1,11 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::application::entities::PaginationFilter;
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, ToSchema)]
 pub struct LnAddress {
     pub id: Uuid,
     pub user_id: String,
@@ -17,7 +18,7 @@ pub struct LnAddress {
     pub deleted_at: Option<DateTime<Utc>>,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize, Default)]
+#[derive(Clone, Debug, Deserialize, Serialize, Default, ToSchema)]
 pub struct LnAddressFilter {
     #[serde(flatten)]
     pub pagination: PaginationFilter,

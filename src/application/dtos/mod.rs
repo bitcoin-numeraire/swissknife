@@ -1,9 +1,15 @@
+mod auth;
 mod config;
+mod error;
+mod invoices;
 mod lightning;
 mod lnurl;
-mod user;
+mod payments;
 
+pub use auth::*;
 pub use config::*;
+pub use error::*;
+pub use invoices::*;
 pub use lightning::*;
 pub use lnurl::*;
-pub use user::*;
+pub use payments::*;

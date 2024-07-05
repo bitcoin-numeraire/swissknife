@@ -1,11 +1,12 @@
 use thiserror::Error;
+use utoipa::ToSchema;
 
 use super::{
     AuthenticationError, AuthorizationError, ConfigError, DataError, DatabaseError, LightningError,
     WebServerError,
 };
 
-#[derive(Debug, Error)]
+#[derive(Debug, Error, ToSchema)]
 pub enum ApplicationError {
     #[error(transparent)]
     Config(#[from] ConfigError),

@@ -52,6 +52,8 @@ humantime = "2.1.0"
 rust_socketio = { version = "0.6.0", features = ["async"] }
 bcrypt = "0.15.1"
 migration = { path = "migration" }
+utoipa = { version = "4.2.3", features = ["axum_extras", "chrono", "uuid"] }
+utoipa-scalar = { version = "0.1.0", features = ["axum"] }
 
 [build-dependencies]
 tonic-build = "0.11.0"

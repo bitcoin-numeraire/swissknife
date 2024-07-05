@@ -105,7 +105,7 @@ impl LnUrlUseCases for LnUrlService {
             )
             .await?;
         invoice.user_id.clone_from(&ln_address.user_id);
-        invoice.ln_address = Some(ln_address.id);
+        invoice.ln_address_id = Some(ln_address.id);
 
         // TODO: Get or add more information to make this a LNURLp invoice (like fetching a success action specific to the user)
         let invoice = self.store.invoice.insert(None, invoice).await?;

@@ -1,10 +1,11 @@
 use serde::Serialize;
+use utoipa::ToSchema;
 
 use crate::domains::{
     invoices::entities::Invoice, lightning::entities::LnAddress, payments::entities::Payment,
 };
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct Wallet {
     pub user_balance: UserBalance,
     pub payments: Vec<Payment>,
@@ -12,7 +13,7 @@ pub struct Wallet {
     pub ln_address: Option<LnAddress>,
 }
 
-#[derive(Debug, Clone, Serialize, Default)]
+#[derive(Debug, Clone, Serialize, Default, ToSchema)]
 pub struct UserBalance {
     pub received_msat: u64,
     pub sent_msat: u64,

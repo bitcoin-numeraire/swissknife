@@ -18,7 +18,7 @@ impl MigrationTrait for Migration {
                 id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
                 user_id varchar(255) NOT NULL,
                 payment_hash varchar(255),
-                ln_address uuid,
+                ln_address_id uuid,
                 bolt11 varchar,
                 ledger varchar(255) NOT NULL,
                 currency varchar(255) NOT NULL,

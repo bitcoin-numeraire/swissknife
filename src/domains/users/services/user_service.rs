@@ -38,7 +38,7 @@ impl UserUseCases for UserService {
                 Ok(token)
             }
             _ => Err(ApplicationError::UnsupportedOperation(format!(
-                "login for {} provider",
+                "Sign in not allowed (not needed) for {} provider",
                 self.provider
             ))),
         }
