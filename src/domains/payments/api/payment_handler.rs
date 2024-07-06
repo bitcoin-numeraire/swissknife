@@ -10,17 +10,32 @@ use utoipa::OpenApi;
 use uuid::Uuid;
 
 use crate::{
-    application::{dtos::SendPaymentRequest, errors::ApplicationError},
+    application::{
+        docs::{
+            BAD_REQUEST_EXAMPLE, FORBIDDEN_EXAMPLE, INTERNAL_EXAMPLE, NOT_FOUND_EXAMPLE,
+            UNAUTHORIZED_EXAMPLE, UNPROCESSABLE_EXAMPLE,
+        },
+        dtos::SendPaymentRequest,
+        errors::ApplicationError,
+    },
     domains::{
-        payments::entities::{Payment, PaymentFilter},
+        payments::entities::{Payment, PaymentFilter, PaymentStatus},
         users::entities::{AuthUser, Permission},
     },
     infra::app::AppState,
 };
 
 #[derive(OpenApi)]
-#[openapi(paths(pay), components(schemas(Payment)))]
+#[openapi(
+    paths(pay, get_one, list, delete_one, delete_many),
+    components(schemas(Payment, SendPaymentRequest, PaymentStatus)),
+    tags(
+        (name = "Payments", description = "Payment management endpoints. Require authorization.")
+    ),
+    security(("jwt" = ["read:transactions", "write:transactions"]))
+)]
 pub struct PaymentHandler;
+pub const CONTEXT_PATH: &str = "/api/payments";
 
 pub fn router() -> Router<Arc<AppState>> {
     Router::new()
@@ -31,11 +46,22 @@ pub fn router() -> Router<Arc<AppState>> {
         .route("/", delete(delete_many))
 }
 
+/// Send a payment
+///
+/// Pay for a LN invoice, LNURL, LN Address, On-chain or internally to an other user on the same instance. Returns the payment details.
 #[utoipa::path(
     post,
-    path = "/",
+    path = "",
+    tag = "Payments",
+    context_path = CONTEXT_PATH,
+    request_body = SendPaymentRequest,
     responses(
-        (status = 200, description = "Send a payment")
+        (status = 200, description = "Payment Sent", body = Payment),
+        (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
+        (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
+        (status = 403, description = "Forbidden", body = ErrorResponse, example = json!(FORBIDDEN_EXAMPLE)),
+        (status = 422, description = "Unprocessable Entity", body = ErrorResponse, example = json!(UNPROCESSABLE_EXAMPLE)),
+        (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
     )
 )]
 async fn pay(
@@ -49,6 +75,23 @@ async fn pay(
     Ok(payment.into())
 }
 
+/// Find a payment
+///
+/// Returns the payment by its ID.
+#[utoipa::path(
+    get,
+    path = "/{id}",
+    tag = "Payments",
+    context_path = CONTEXT_PATH,
+    responses(
+        (status = 200, description = "Found", body = Payment),
+        (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
+        (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
+        (status = 403, description = "Forbidden", body = ErrorResponse, example = json!(FORBIDDEN_EXAMPLE)),
+        (status = 404, description = "Not Found", body = ErrorResponse, example = json!(NOT_FOUND_EXAMPLE)),
+        (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
+    )
+)]
 async fn get_one(
     State(app_state): State<Arc<AppState>>,
     user: AuthUser,
@@ -60,6 +103,23 @@ async fn get_one(
     Ok(payment.into())
 }
 
+/// List payments
+///
+/// Returns all the payments given a filter
+#[utoipa::path(
+    get,
+    path = "",
+    tag = "Payments",
+    context_path = CONTEXT_PATH,
+    params(PaymentFilter),
+    responses(
+        (status = 200, description = "Success", body = Vec<Payment>),
+        (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
+        (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
+        (status = 403, description = "Forbidden", body = ErrorResponse, example = json!(FORBIDDEN_EXAMPLE)),
+        (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
+    )
+)]
 async fn list(
     State(app_state): State<Arc<AppState>>,
     user: AuthUser,
@@ -74,6 +134,23 @@ async fn list(
     Ok(response.into())
 }
 
+/// Delete a payment
+///
+/// Deletes a payment by ID. Returns an empty body. Deleting a payment has an effect on the user balance
+#[utoipa::path(
+    delete,
+    path = "/{id}",
+    tag = "Payments",
+    context_path = CONTEXT_PATH,
+    responses(
+        (status = 200, description = "Deleted"),
+        (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
+        (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
+        (status = 403, description = "Forbidden", body = ErrorResponse, example = json!(FORBIDDEN_EXAMPLE)),
+        (status = 404, description = "Not Found", body = ErrorResponse, example = json!(NOT_FOUND_EXAMPLE)),
+        (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
+    )
+)]
 async fn delete_one(
     State(app_state): State<Arc<AppState>>,
     user: AuthUser,
@@ -85,6 +162,23 @@ async fn delete_one(
     Ok(())
 }
 
+/// Delete payments
+///
+/// Deletes all the payments given a filter. Returns the number of deleted payments. Deleting a payment has an effect on the user balance
+#[utoipa::path(
+    delete,
+    path = "",
+    tag = "Payments",
+    context_path = CONTEXT_PATH,
+    params(PaymentFilter),
+    responses(
+        (status = 200, description = "Success", body = u64),
+        (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
+        (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
+        (status = 403, description = "Forbidden", body = ErrorResponse, example = json!(FORBIDDEN_EXAMPLE)),
+        (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
+    )
+)]
 async fn delete_many(
     State(app_state): State<Arc<AppState>>,
     user: AuthUser,

@@ -33,7 +33,7 @@ pub struct Invoice {
     /// Ledger
     pub ledger: Ledger,
     #[serde(skip_serializing_if = "Option::is_none")]
-    /// Fee paid. Populated when a new channel is opened to receive the funds.
+    /// Fees paid. Populated when a new channel is opened to receive the funds.
     pub fee_msat: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     /// Payment time

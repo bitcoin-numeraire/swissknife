@@ -11,9 +11,11 @@ use uuid::Uuid;
 
 use crate::{
     application::{
-        docs::{BAD_REQUEST_EXAMPLE, FORBIDDEN_EXAMPLE, NOT_FOUND_EXAMPLE, UNAUTHORIZED_EXAMPLE},
+        docs::{
+            BAD_REQUEST_EXAMPLE, FORBIDDEN_EXAMPLE, INTERNAL_EXAMPLE, NOT_FOUND_EXAMPLE,
+            UNAUTHORIZED_EXAMPLE,
+        },
         dtos::NewInvoiceRequest,
-        entities::{Currency, Ledger},
         errors::ApplicationError,
     },
     domains::{
@@ -26,7 +28,7 @@ use crate::{
 #[derive(OpenApi)]
 #[openapi(
     paths(generate, list, get_one, delete_one, delete_many),
-    components(schemas(Invoice, NewInvoiceRequest, InvoiceStatus, Ledger, Currency, LnInvoice)),
+    components(schemas(Invoice, NewInvoiceRequest, InvoiceStatus, LnInvoice)),
     tags(
         (name = "Invoices", description = "Invoice management endpoints. Require authorization.")
     ),
@@ -57,7 +59,8 @@ pub fn router() -> Router<Arc<AppState>> {
         (status = 200, description = "Invoice Created", body = Invoice),
         (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
         (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
-        (status = 403, description = "Forbidden", body = ErrorResponse, example = json!(FORBIDDEN_EXAMPLE))
+        (status = 403, description = "Forbidden", body = ErrorResponse, example = json!(FORBIDDEN_EXAMPLE)),
+        (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
     )
 )]
 async fn generate(
@@ -88,13 +91,13 @@ async fn generate(
     path = "/{id}",
     tag = "Invoices",
     context_path = CONTEXT_PATH,
-    request_body = NewInvoiceRequest,
     responses(
         (status = 200, description = "Found", body = Invoice),
         (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
         (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
         (status = 403, description = "Forbidden", body = ErrorResponse, example = json!(FORBIDDEN_EXAMPLE)),
-        (status = 404, description = "Not Found", body = ErrorResponse, example = json!(NOT_FOUND_EXAMPLE))
+        (status = 404, description = "Not Found", body = ErrorResponse, example = json!(NOT_FOUND_EXAMPLE)),
+        (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
     )
 )]
 async fn get_one(
@@ -122,7 +125,7 @@ async fn get_one(
         (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
         (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
         (status = 403, description = "Forbidden", body = ErrorResponse, example = json!(FORBIDDEN_EXAMPLE)),
-        (status = 404, description = "Not Found", body = ErrorResponse, example = json!(NOT_FOUND_EXAMPLE))
+        (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
     )
 )]
 async fn list(
@@ -141,7 +144,7 @@ async fn list(
 
 /// Delete an invoice
 ///
-/// Deletes an invoice by ID. Returns an empty body
+/// Deletes an invoice by ID. Returns an empty body. Deleting an invoice has an effect on the user balance
 #[utoipa::path(
     delete,
     path = "/{id}",
@@ -152,7 +155,8 @@ async fn list(
         (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
         (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
         (status = 403, description = "Forbidden", body = ErrorResponse, example = json!(FORBIDDEN_EXAMPLE)),
-        (status = 404, description = "Not Found", body = ErrorResponse, example = json!(NOT_FOUND_EXAMPLE))
+        (status = 404, description = "Not Found", body = ErrorResponse, example = json!(NOT_FOUND_EXAMPLE)),
+        (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
     )
 )]
 async fn delete_one(
@@ -168,7 +172,7 @@ async fn delete_one(
 
 /// Delete invoices
 ///
-/// Deletes all the invoices given a filter. Returns the number of deleted invoices
+/// Deletes all the invoices given a filter. Returns the number of deleted invoices. Deleting an invoice has an effect on the user balance
 #[utoipa::path(
     delete,
     path = "",
@@ -176,11 +180,11 @@ async fn delete_one(
     context_path = CONTEXT_PATH,
     params(InvoiceFilter),
     responses(
-        (status = 200, description = "Success", body = Json<u64>),
+        (status = 200, description = "Success", body = u64),
         (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
         (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
         (status = 403, description = "Forbidden", body = ErrorResponse, example = json!(FORBIDDEN_EXAMPLE)),
-        (status = 404, description = "Not Found", body = ErrorResponse, example = json!(NOT_FOUND_EXAMPLE))
+        (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
     )
 )]
 async fn delete_many(

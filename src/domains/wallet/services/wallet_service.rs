@@ -1,8 +1,5 @@
 use crate::{
-    application::{
-        entities::{AppStore, PaginationFilter},
-        errors::ApplicationError,
-    },
+    application::{entities::AppStore, errors::ApplicationError},
     domains::{
         invoices::entities::InvoiceFilter,
         payments::entities::PaymentFilter,
@@ -47,10 +44,7 @@ impl WalletUseCases for WalletService {
             .payment
             .find_many(PaymentFilter {
                 user_id: Some(user_id.clone()),
-                pagination: PaginationFilter {
-                    limit: Some(PAYMENTS_LIMIT),
-                    ..Default::default()
-                },
+                limit: Some(PAYMENTS_LIMIT),
                 ..Default::default()
             })
             .await?;

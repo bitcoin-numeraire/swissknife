@@ -1,7 +1,7 @@
 use crate::{
     application::{
         dtos::ErrorResponse,
-        entities::{OrderDirection, PaginationFilter},
+        entities::{Currency, Ledger, OrderDirection},
     },
     domains::{
         invoices::api::InvoiceHandler,
@@ -26,14 +26,13 @@ use utoipa::{
         title = "Numeraire SwissKnife REST API",
         description = "This API is available to anyone with a Numeraire account",
     ),
-    components(schemas(PaginationFilter, OrderDirection), responses(ErrorResponse)),
+    components(schemas(OrderDirection, Ledger, Currency), responses(ErrorResponse)),
     modifiers(&SecurityAddon),
 )]
 struct ApiDoc;
 
 pub fn merged_openapi() -> OpenApi {
     let mut openapi = ApiDoc::openapi();
-    openapi.merge(SystemHandler::openapi());
     openapi.merge(AuthHandler::openapi());
     openapi.merge(WalletHandler::openapi());
     openapi.merge(InvoiceHandler::openapi());
@@ -41,6 +40,7 @@ pub fn merged_openapi() -> OpenApi {
     openapi.merge(LnAddressHandler::openapi());
     openapi.merge(LnURLpHandler::openapi());
     openapi.merge(BreezNodeHandler::openapi());
+    openapi.merge(SystemHandler::openapi());
     openapi
 }
 
@@ -76,6 +76,20 @@ pub const UNSUPPORTED_EXAMPLE: &str = r#"
 {
     "status": "405 Method Not Allowed",
     "reason": "Sign in not allowed (not needed) for oauth2 provider"
+}
+"#;
+
+pub const UNPROCESSABLE_EXAMPLE: &str = r#"
+{
+    "status": "422 Unprocessable Entity",
+    "reason": "Validation failed: ..."
+}
+"#;
+
+pub const INTERNAL_EXAMPLE: &str = r#"
+{
+    "status": "500 Internal Server Error",
+    "reason": "Internal server error, Please contact your administrator or try later"
 }
 "#;
 

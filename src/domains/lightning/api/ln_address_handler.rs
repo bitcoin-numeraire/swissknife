@@ -10,7 +10,14 @@ use utoipa::OpenApi;
 use uuid::Uuid;
 
 use crate::{
-    application::{dtos::RegisterLightningAddressRequest, errors::ApplicationError},
+    application::{
+        docs::{
+            BAD_REQUEST_EXAMPLE, FORBIDDEN_EXAMPLE, INTERNAL_EXAMPLE, NOT_FOUND_EXAMPLE,
+            UNAUTHORIZED_EXAMPLE, UNPROCESSABLE_EXAMPLE,
+        },
+        dtos::RegisterLightningAddressRequest,
+        errors::ApplicationError,
+    },
     domains::{
         lightning::entities::{LnAddress, LnAddressFilter},
         users::entities::{AuthUser, Permission},
@@ -19,8 +26,16 @@ use crate::{
 };
 
 #[derive(OpenApi)]
-#[openapi(paths(register), components(schemas(LnAddress)))]
+#[openapi(
+    paths(register, get_one, list, delete_one, delete_many),
+    components(schemas(LnAddress, RegisterLightningAddressRequest)),
+    tags(
+        (name = "Lightning Addresses", description = "LN Address management endpoints. Require authorization.")
+    ),
+    security(("jwt" = ["read:ln_address", "write:ln_address"]))
+)]
 pub struct LnAddressHandler;
+pub const CONTEXT_PATH: &str = "/api/lightning/addresses";
 
 pub fn ln_address_router() -> Router<Arc<AppState>> {
     Router::new()
@@ -31,11 +46,22 @@ pub fn ln_address_router() -> Router<Arc<AppState>> {
         .route("/", delete(delete_many))
 }
 
+/// Register a new LN Address
+///
+/// Registers an address. Returns the address details. LN Addresses are ready to receive funds through the LNURL protocol upon registration.
 #[utoipa::path(
     post,
-    path = "/",
+    path = "",
+    tag = "Lightning Addresses",
+    context_path = CONTEXT_PATH,
+    request_body = RegisterLightningAddressRequest,
     responses(
-        (status = 200, description = "Register new Lightning Address")
+        (status = 200, description = "LN Address Registered", body = LnAddress),
+        (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
+        (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
+        (status = 403, description = "Forbidden", body = ErrorResponse, example = json!(FORBIDDEN_EXAMPLE)),
+        (status = 422, description = "Unprocessable Entity", body = ErrorResponse, example = json!(UNPROCESSABLE_EXAMPLE)),
+        (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
     )
 )]
 async fn register(
@@ -53,6 +79,23 @@ async fn register(
     Ok(ln_address.into())
 }
 
+/// Find a LN Address
+///
+/// Returns the address by its ID.
+#[utoipa::path(
+    get,
+    path = "/{id}",
+    tag = "Lightning Addresses",
+    context_path = CONTEXT_PATH,
+    responses(
+        (status = 200, description = "Found", body = LnAddress),
+        (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
+        (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
+        (status = 403, description = "Forbidden", body = ErrorResponse, example = json!(FORBIDDEN_EXAMPLE)),
+        (status = 404, description = "Not Found", body = ErrorResponse, example = json!(NOT_FOUND_EXAMPLE)),
+        (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
+    )
+)]
 async fn get_one(
     State(app_state): State<Arc<AppState>>,
     user: AuthUser,
@@ -64,6 +107,23 @@ async fn get_one(
     Ok(ln_address.into())
 }
 
+/// List LN Addresses
+///
+/// Returns all the addresses given a filter
+#[utoipa::path(
+    get,
+    path = "",
+    tag = "Lightning Addresses",
+    context_path = CONTEXT_PATH,
+    params(LnAddressFilter),
+    responses(
+        (status = 200, description = "Success", body = Vec<LnAddress>),
+        (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
+        (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
+        (status = 403, description = "Forbidden", body = ErrorResponse, example = json!(FORBIDDEN_EXAMPLE)),
+        (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
+    )
+)]
 async fn list(
     State(app_state): State<Arc<AppState>>,
     user: AuthUser,
@@ -78,6 +138,23 @@ async fn list(
     Ok(response.into())
 }
 
+/// Delete a LN Address
+///
+/// Deletes an address by ID. Returns an empty body
+#[utoipa::path(
+    delete,
+    path = "/{id}",
+    tag = "Lightning Addresses",
+    context_path = CONTEXT_PATH,
+    responses(
+        (status = 200, description = "Deleted"),
+        (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
+        (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
+        (status = 403, description = "Forbidden", body = ErrorResponse, example = json!(FORBIDDEN_EXAMPLE)),
+        (status = 404, description = "Not Found", body = ErrorResponse, example = json!(NOT_FOUND_EXAMPLE)),
+        (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
+    )
+)]
 async fn delete_one(
     State(app_state): State<Arc<AppState>>,
     user: AuthUser,
@@ -89,6 +166,23 @@ async fn delete_one(
     Ok(())
 }
 
+/// Delete LN Addresses
+///
+/// Deletes all the addresses given a filter. Returns the number of deleted addresses
+#[utoipa::path(
+    delete,
+    path = "",
+    tag = "Lightning Addresses",
+    context_path = CONTEXT_PATH,
+    params(LnAddressFilter),
+    responses(
+        (status = 200, description = "Success", body = u64),
+        (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
+        (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
+        (status = 403, description = "Forbidden", body = ErrorResponse, example = json!(FORBIDDEN_EXAMPLE)),
+        (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
+    )
+)]
 async fn delete_many(
     State(app_state): State<Arc<AppState>>,
     user: AuthUser,

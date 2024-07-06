@@ -5,6 +5,7 @@ use utoipa::ToSchema;
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct SignInRequest {
     /// User password
+    #[schema(example = "password_from_config_file")]
     pub password: String,
 }
 

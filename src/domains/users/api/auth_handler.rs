@@ -5,7 +5,7 @@ use utoipa::OpenApi;
 
 use crate::{
     application::{
-        docs::{BAD_REQUEST_EXAMPLE, UNSUPPORTED_EXAMPLE},
+        docs::{BAD_REQUEST_EXAMPLE, UNAUTHORIZED_EXAMPLE, UNSUPPORTED_EXAMPLE},
         dtos::{SignInRequest, SignInResponse},
         errors::ApplicationError,
     },
@@ -39,6 +39,7 @@ pub fn auth_router() -> Router<Arc<AppState>> {
     responses(
         (status = 200, description = "Token Created", body = SignInResponse),
         (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
+        (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
         (status = 405, description = "Unsupported", body = ErrorResponse, example = json!(UNSUPPORTED_EXAMPLE))
     )
 )]
