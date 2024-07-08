@@ -173,7 +173,7 @@ async fn delete_one(
 
 /// Delete invoices
 ///
-/// Deletes all the invoices given a filter. Returns the number of deleted invoices. Deleting an invoice has an effect on the user balance
+/// Deletes all the invoices given a filter. Returns the number of deleted invoices. Deleting an invoice can have an effect on the user balance
 #[utoipa::path(
     delete,
     path = "",

@@ -164,7 +164,7 @@ async fn delete_one(
 
 /// Delete payments
 ///
-/// Deletes all the payments given a filter. Returns the number of deleted payments. Deleting a payment has an effect on the user balance
+/// Deletes all the payments given a filter. Returns the number of deleted payments. Deleting a payment can have an effect on the user balance
 #[utoipa::path(
     delete,
     path = "",

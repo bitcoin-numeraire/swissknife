@@ -24,7 +24,7 @@ use utoipa::{
 #[openapi(
     info(
         title = "Numeraire SwissKnife REST API",
-        description = "This API is available to anyone with a Numeraire account",
+        description = "This API is available to anyone with a Numeraire account. The `Wallet` endpoints are the main access point for most users.",
     ),
     components(schemas(OrderDirection, Ledger, Currency), responses(ErrorResponse)),
     modifiers(&SecurityAddon),
