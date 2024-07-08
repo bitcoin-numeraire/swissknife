@@ -20,8 +20,7 @@ impl MigrationTrait for Migration {
                 username varchar(255) unique NOT NULL,
                 active boolean NOT NULL DEFAULT true,
                 created_at timestamptz NOT NULL DEFAULT current_timestamp,
-                updated_at timestamptz,
-                deleted_at timestamptz
+                updated_at timestamptz
             );
             CREATE TRIGGER update_timestamp BEFORE
             UPDATE ON ln_address FOR EACH ROW EXECUTE PROCEDURE update_timestamp();",

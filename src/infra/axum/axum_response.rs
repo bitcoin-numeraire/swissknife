@@ -3,11 +3,13 @@ use axum::{
     response::{IntoResponse, Response},
     Json,
 };
-use serde_json::{json, Value};
 use tracing::{debug, error, warn};
 
-use crate::application::errors::{
-    ApplicationError, AuthenticationError, AuthorizationError, DataError, LightningError,
+use crate::application::{
+    dtos::ErrorResponse,
+    errors::{
+        ApplicationError, AuthenticationError, AuthorizationError, DataError, LightningError,
+    },
 };
 
 const INTERNAL_SERVER_ERROR_MSG: &str =
@@ -24,14 +26,14 @@ impl IntoResponse for ApplicationError {
                 debug!("{}", self);
 
                 let status = StatusCode::METHOD_NOT_ALLOWED;
-                let body = generate_body(status, self.to_string().as_str());
+                let body = generate_body(status, self.to_string());
                 (status, body).into_response()
             }
             _ => {
                 error!("{}", self);
 
                 let status = StatusCode::INTERNAL_SERVER_ERROR;
-                let body = generate_body(status, INTERNAL_SERVER_ERROR_MSG);
+                let body = generate_body(status, INTERNAL_SERVER_ERROR_MSG.to_string());
                 (status, body).into_response()
             } // Add additional cases as needed
         }
@@ -49,7 +51,7 @@ impl IntoResponse for AuthorizationError {
         warn!("{}", self);
 
         let status = StatusCode::FORBIDDEN;
-        let body = generate_body(status, error_message);
+        let body = generate_body(status, error_message.to_string());
         (status, body).into_response()
     }
 }
@@ -79,7 +81,7 @@ impl IntoResponse for AuthenticationError {
         warn!("{}", self);
 
         let status = StatusCode::UNAUTHORIZED;
-        let body = generate_body(status, error_message);
+        let body = generate_body(status, error_message.to_string());
         let mut response = (status, body).into_response();
 
         // Add WWW-Authenticate header if needed
@@ -114,7 +116,7 @@ impl IntoResponse for DataError {
             }
         };
 
-        let body = generate_body(status, error_message.as_str());
+        let body = generate_body(status, error_message);
         (status, body).into_response()
     }
 }
@@ -140,14 +142,15 @@ impl IntoResponse for LightningError {
             }
         };
 
-        let body = generate_body(status, error_message.as_str());
+        let body = generate_body(status, error_message);
         (status, body).into_response()
     }
 }
 
-fn generate_body(status: StatusCode, reason: &str) -> Json<Value> {
-    Json(json!({
-        "status": status.as_str(),
-        "reason": reason,
-    }))
+fn generate_body(status: StatusCode, reason: String) -> Json<ErrorResponse> {
+    ErrorResponse {
+        status: format!("{}", status),
+        reason,
+    }
+    .into()
 }

@@ -74,8 +74,8 @@ impl InvoiceRepository for SeaOrmInvoiceRepository {
             })
             .order_by(Column::PaymentTime, order_direction.clone())
             .order_by(Column::Timestamp, order_direction)
-            .offset(filter.pagination.offset)
-            .limit(filter.pagination.limit)
+            .offset(filter.offset)
+            .limit(filter.limit)
             .all(&self.db)
             .await
             .map_err(|e| DatabaseError::FindMany(e.to_string()))?;
@@ -90,7 +90,7 @@ impl InvoiceRepository for SeaOrmInvoiceRepository {
     ) -> Result<Invoice, DatabaseError> {
         let mut model = ActiveModel {
             user_id: Set(invoice.user_id),
-            ln_address: Set(invoice.ln_address),
+            ln_address_id: Set(invoice.ln_address_id),
             description: Set(invoice.description),
             amount_msat: Set(invoice.amount_msat.map(|v| v as i64)),
             timestamp: Set(invoice.timestamp),

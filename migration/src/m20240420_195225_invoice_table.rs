@@ -18,7 +18,7 @@ impl MigrationTrait for Migration {
                 id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
                 user_id varchar(255) NOT NULL,
                 payment_hash varchar(255),
-                ln_address uuid,
+                ln_address_id uuid,
                 bolt11 varchar,
                 ledger varchar(255) NOT NULL,
                 currency varchar(255) NOT NULL,
@@ -35,7 +35,7 @@ impl MigrationTrait for Migration {
                 created_at timestamptz NOT NULL DEFAULT current_timestamp,
                 updated_at timestamptz,
                 expires_at timestamptz,
-                CONSTRAINT fk_ln_address FOREIGN KEY (ln_address)
+                CONSTRAINT fk_ln_address FOREIGN KEY (ln_address_id)
                 REFERENCES ln_address (id)
                 ON DELETE SET NULL
             );

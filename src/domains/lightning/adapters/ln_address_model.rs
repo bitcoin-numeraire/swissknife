@@ -16,7 +16,6 @@ pub struct Model {
     pub active: bool,
     pub created_at: DateTimeUtc,
     pub updated_at: Option<DateTimeUtc>,
-    pub deleted_at: Option<DateTimeUtc>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
@@ -42,7 +41,6 @@ impl From<Model> for LnAddress {
             active: model.active,
             created_at: model.created_at,
             updated_at: model.updated_at,
-            deleted_at: model.deleted_at,
         }
     }
 }

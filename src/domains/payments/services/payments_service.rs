@@ -214,7 +214,7 @@ impl PaymentService {
                                     Some(&txn),
                                     Invoice {
                                         user_id: retrieved_address.user_id,
-                                        ln_address: Some(retrieved_address.id),
+                                        ln_address_id: Some(retrieved_address.id),
                                         ledger: Ledger::Internal,
                                         description: comment.clone().or(
                                             DEFAULT_INTERNAL_INVOICE_DESCRIPTION.to_string().into(),

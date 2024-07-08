@@ -61,8 +61,8 @@ impl LnAddressRepository for SeaOrmLnAddressRepository {
             })
             .apply_if(filter.ids, |q, ids| q.filter(Column::Id.is_in(ids)))
             .order_by_desc(Column::CreatedAt)
-            .offset(filter.pagination.offset)
-            .limit(filter.pagination.limit)
+            .offset(filter.offset)
+            .limit(filter.limit)
             .all(&self.db)
             .await
             .map_err(|e| DatabaseError::FindMany(e.to_string()))?;
