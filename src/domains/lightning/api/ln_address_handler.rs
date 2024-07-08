@@ -15,7 +15,7 @@ use crate::{
             BAD_REQUEST_EXAMPLE, FORBIDDEN_EXAMPLE, INTERNAL_EXAMPLE, NOT_FOUND_EXAMPLE,
             UNAUTHORIZED_EXAMPLE, UNPROCESSABLE_EXAMPLE,
         },
-        dtos::RegisterLightningAddressRequest,
+        dtos::RegisterLnAddressRequest,
         errors::ApplicationError,
     },
     domains::{
@@ -28,9 +28,9 @@ use crate::{
 #[derive(OpenApi)]
 #[openapi(
     paths(register, get_one, list, delete_one, delete_many),
-    components(schemas(LnAddress, RegisterLightningAddressRequest)),
+    components(schemas(LnAddress, RegisterLnAddressRequest)),
     tags(
-        (name = "Lightning Addresses", description = "LN Address management endpoints. Require authorization.")
+        (name = "Lightning Addresses", description = "LN Address management endpoints as defined in the [protocol specification](https://lightningaddress.com/). Require authorization.")
     ),
     security(("jwt" = ["read:ln_address", "write:ln_address"]))
 )]
@@ -54,7 +54,7 @@ pub fn ln_address_router() -> Router<Arc<AppState>> {
     path = "",
     tag = "Lightning Addresses",
     context_path = CONTEXT_PATH,
-    request_body = RegisterLightningAddressRequest,
+    request_body = RegisterLnAddressRequest,
     responses(
         (status = 200, description = "LN Address Registered", body = LnAddress),
         (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
@@ -67,7 +67,7 @@ pub fn ln_address_router() -> Router<Arc<AppState>> {
 async fn register(
     State(app_state): State<Arc<AppState>>,
     user: AuthUser,
-    Json(payload): Json<RegisterLightningAddressRequest>,
+    Json(payload): Json<RegisterLnAddressRequest>,
 ) -> Result<Json<LnAddress>, ApplicationError> {
     user.check_permission(Permission::WriteLnAddress)?;
 

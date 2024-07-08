@@ -10,7 +10,7 @@ use uuid::Uuid;
 
 use crate::{
     application::{
-        dtos::{NewInvoiceRequest, RegisterLightningAddressRequest, SendPaymentRequest},
+        dtos::{NewInvoiceRequest, RegisterLnAddressRequest, SendPaymentRequest},
         errors::{ApplicationError, DataError},
     },
     domains::{
@@ -119,7 +119,7 @@ async fn get_address(
 async fn register_address(
     State(app_state): State<Arc<AppState>>,
     user: AuthUser,
-    Json(payload): Json<RegisterLightningAddressRequest>,
+    Json(payload): Json<RegisterLnAddressRequest>,
 ) -> Result<Json<LnAddress>, ApplicationError> {
     let ln_address = app_state
         .services
