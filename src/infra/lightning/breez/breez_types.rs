@@ -100,10 +100,11 @@ impl From<PaymentStatus> for InvoiceStatus {
 impl From<BreezPayment> for LnInvoicePaidEvent {
     fn from(val: BreezPayment) -> Self {
         LnInvoicePaidEvent {
-            payment_hash: val.id,
-            amount_msat: val.amount_msat,
+            payment_hash: Some(val.id), // We use the payment_hash because the label cannot be set for invoices on Breez
+            amount_received_msat: val.amount_msat,
             fee_msat: val.fee_msat,
             payment_time: Utc.timestamp_opt(val.payment_time, 0).unwrap(),
+            id: None,
         }
     }
 }

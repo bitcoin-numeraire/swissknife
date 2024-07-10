@@ -86,10 +86,12 @@ impl InvoiceRepository for SeaOrmInvoiceRepository {
         invoice: Invoice,
     ) -> Result<Invoice, DatabaseError> {
         let mut model = ActiveModel {
+            id: Set(invoice.id),
             user_id: Set(invoice.user_id),
             ln_address_id: Set(invoice.ln_address_id),
             description: Set(invoice.description),
             amount_msat: Set(invoice.amount_msat.map(|v| v as i64)),
+            amount_received_msat: Set(invoice.amount_received_msat.map(|v| v as i64)),
             timestamp: Set(invoice.timestamp),
             ledger: Set(invoice.ledger.to_string()),
             currency: Set(invoice.currency.to_string()),
@@ -131,7 +133,7 @@ impl InvoiceRepository for SeaOrmInvoiceRepository {
             fee_msat: Set(invoice.fee_msat.map(|v| v as i64)),
             payment_time: Set(invoice.payment_time),
             description: Set(invoice.description),
-            amount_msat: Set(invoice.amount_msat.map(|v| v as i64)),
+            amount_received_msat: Set(invoice.amount_received_msat.map(|v| v as i64)),
             ..Default::default()
         };
 

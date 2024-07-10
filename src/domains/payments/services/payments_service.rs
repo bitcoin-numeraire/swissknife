@@ -124,6 +124,7 @@ impl PaymentService {
 
                         retrieved_invoice.fee_msat = Some(0);
                         retrieved_invoice.payment_time = internal_payment.payment_time;
+                        retrieved_invoice.amount_received_msat = Some(amount);
                         self.store
                             .invoice
                             .update(Some(&txn), retrieved_invoice)
@@ -221,6 +222,7 @@ impl PaymentService {
                                         ),
                                         currency: Currency::Bitcoin,
                                         amount_msat: Some(amount),
+                                        amount_received_msat: Some(amount),
                                         timestamp: curr_time,
                                         status: InvoiceStatus::Settled,
                                         fee_msat: Some(0),

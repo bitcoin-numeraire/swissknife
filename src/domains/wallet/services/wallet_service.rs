@@ -21,9 +21,6 @@ impl WalletService {
     }
 }
 
-const PAYMENTS_LIMIT: u64 = 10;
-const INVOICES_LIMIT: u64 = 10;
-
 #[async_trait]
 impl WalletUseCases for WalletService {
     async fn get_balance(&self, user_id: String) -> Result<UserBalance, ApplicationError> {
@@ -44,7 +41,6 @@ impl WalletUseCases for WalletService {
             .payment
             .find_many(PaymentFilter {
                 user_id: Some(user_id.clone()),
-                limit: Some(PAYMENTS_LIMIT),
                 ..Default::default()
             })
             .await?;
@@ -53,7 +49,6 @@ impl WalletUseCases for WalletService {
             .invoice
             .find_many(InvoiceFilter {
                 user_id: Some(user_id.clone()),
-                limit: Some(INVOICES_LIMIT),
                 ..Default::default()
             })
             .await?;

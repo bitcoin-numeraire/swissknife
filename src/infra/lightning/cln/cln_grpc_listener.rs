@@ -2,7 +2,6 @@ use std::{sync::Arc, time::Duration};
 
 use ::hex::decode;
 use anyhow::{anyhow, Result};
-use chrono::{TimeZone, Utc};
 use serde_bolt::bitcoin::hashes::hex::ToHex;
 use tokio::time::sleep;
 use tonic::{transport::Channel, Code};
@@ -10,13 +9,13 @@ use tracing::{debug, error, info, trace, warn};
 
 use crate::{
     application::errors::ApplicationError,
-    domains::lightning::{entities::LnInvoicePaidEvent, services::LnEventsUseCases},
+    domains::lightning::services::LnEventsUseCases,
     infra::lightning::cln::cln::{
         waitanyinvoice_response::WaitanyinvoiceStatus, ListinvoicesRequest,
     },
 };
 
-use super::cln::{node_client::NodeClient, WaitanyinvoiceRequest, WaitanyinvoiceResponse};
+use super::cln::{node_client::NodeClient, WaitanyinvoiceRequest};
 
 pub async fn listen_invoices(
     mut client: NodeClient<Channel>,
@@ -110,17 +109,6 @@ pub async fn listen_invoices(
                     return Err(anyhow!(err.to_string()));
                 }
             },
-        }
-    }
-}
-
-impl From<WaitanyinvoiceResponse> for LnInvoicePaidEvent {
-    fn from(val: WaitanyinvoiceResponse) -> Self {
-        LnInvoicePaidEvent {
-            payment_hash: val.payment_hash.to_hex(),
-            amount_msat: val.amount_received_msat.as_ref().unwrap().msat,
-            fee_msat: 0,
-            payment_time: Utc.timestamp_opt(val.paid_at() as i64, 0).unwrap(),
         }
     }
 }

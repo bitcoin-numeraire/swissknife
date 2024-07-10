@@ -1,9 +1,11 @@
 use chrono::{DateTime, Utc};
+use uuid::Uuid;
 
 #[derive(Debug, Clone)]
 pub struct LnInvoicePaidEvent {
-    pub payment_hash: String,
-    pub amount_msat: u64,
+    pub id: Option<Uuid>,
+    pub payment_hash: Option<String>,
+    pub amount_received_msat: u64,
     pub fee_msat: u64,
     pub payment_time: DateTime<Utc>,
 }

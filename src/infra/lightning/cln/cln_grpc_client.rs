@@ -128,11 +128,12 @@ impl LnClient for ClnGrpcClient {
     ) -> Result<Invoice, LightningError> {
         let mut client: NodeClient<Channel> = self.client.clone();
 
+        let label = Uuid::new_v4();
         let response = client
             .invoice(InvoiceRequest {
                 description,
                 expiry: Some(expiry as u64),
-                label: Uuid::new_v4().to_string(),
+                label: label.to_string(),
                 deschashonly: Some(false),
                 amount_msat: Some(cln::AmountOrAny {
                     value: Some(cln::amount_or_any::Value::Amount(cln::Amount {
@@ -147,7 +148,10 @@ impl LnClient for ClnGrpcClient {
         let bolt11 = Bolt11Invoice::from_str(&response.into_inner().bolt11)
             .map_err(|e| LightningError::Invoice(e.to_string()))?;
 
-        Ok(bolt11.into())
+        let mut invoice: Invoice = bolt11.into();
+        invoice.id = label;
+
+        Ok(invoice)
     }
 
     async fn pay(

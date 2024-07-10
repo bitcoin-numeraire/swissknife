@@ -48,11 +48,13 @@ impl LnEventsUseCases for LnEventsService {
     async fn invoice_paid(&self, event: LnInvoicePaidEvent) -> Result<(), ApplicationError> {
         debug!(?event, "Processing incoming Lightning payment...");
 
-        let invoice_option = self
-            .store
-            .invoice
-            .find_by_payment_hash(&event.payment_hash)
-            .await?;
+        let invoice_option = if let Some(ref hash) = event.payment_hash {
+            self.store.invoice.find_by_payment_hash(hash).await?
+        } else if let Some(id) = event.id {
+            self.store.invoice.find(id).await?
+        } else {
+            None
+        };
 
         if let Some(mut invoice) = invoice_option {
             invoice.fee_msat = Some(event.fee_msat);
@@ -60,7 +62,7 @@ impl LnEventsUseCases for LnEventsService {
 
             // TODO: Amount paid can actually be different from the amount of the invoice, might need a new field (amount_received_msat).
             // we can just update the amount_msat field for now.
-            invoice.amount_msat = Some(event.amount_msat);
+            invoice.amount_received_msat = Some(event.amount_received_msat);
 
             invoice = self.store.invoice.update(None, invoice).await?;
 

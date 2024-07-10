@@ -1,18 +1,15 @@
 use chrono::{TimeZone, Utc};
 use serde::Deserialize;
+use uuid::Uuid;
 
 use crate::domains::lightning::entities::{
     LnInvoicePaidEvent, LnPayFailureEvent, LnPaySuccessEvent,
 };
 
 #[derive(Debug, Deserialize)]
-pub struct CoinMovement {
-    pub credit_msat: u64,
-    pub payment_hash: Option<String>,
-    pub timestamp: u64,
-    #[serde(rename = "type")]
-    pub movement_type: String,
-    pub tags: Vec<String>,
+pub struct InvoicePayment {
+    pub label: Uuid,
+    pub msat: u64,
 }
 
 #[derive(Debug, Deserialize)]
@@ -37,15 +34,14 @@ pub struct SendPayFailureData {
     pub status: String,
 }
 
-impl From<CoinMovement> for LnInvoicePaidEvent {
-    fn from(val: CoinMovement) -> Self {
+impl From<InvoicePayment> for LnInvoicePaidEvent {
+    fn from(val: InvoicePayment) -> Self {
         LnInvoicePaidEvent {
-            payment_hash: val
-                .payment_hash
-                .expect("payment_hash should exist for given coin_movement"),
-            amount_msat: val.credit_msat,
+            id: Some(val.label),
+            payment_hash: None,
+            amount_received_msat: val.msat,
             fee_msat: 0,
-            payment_time: Utc.timestamp_opt(val.timestamp as i64, 0).unwrap(),
+            payment_time: Utc::now(),
         }
     }
 }

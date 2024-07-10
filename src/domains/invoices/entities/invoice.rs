@@ -18,6 +18,7 @@ pub struct Invoice {
     pub description: Option<String>,
     pub currency: Currency,
     pub amount_msat: Option<u64>,
+    pub amount_received_msat: Option<u64>,
     pub timestamp: DateTime<Utc>,
     pub status: InvoiceStatus,
     pub ledger: Ledger,

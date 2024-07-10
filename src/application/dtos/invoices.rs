@@ -37,8 +37,10 @@ pub struct InvoiceResponse {
     pub description: Option<String>,
     /// Currency. Different networks use different currencies such as testnet
     pub currency: Currency,
-    /// Amount in millisatoshis.
+    /// Amount requested in millisatoshis.
     pub amount_msat: Option<u64>,
+    /// Amount received in millisatoshis.
+    pub amount_received_msat: Option<u64>,
     /// Date of creation on the LN node
     pub timestamp: DateTime<Utc>,
     /// Status
@@ -107,6 +109,7 @@ impl From<Invoice> for InvoiceResponse {
             description: invoice.description,
             currency: invoice.currency,
             amount_msat: invoice.amount_msat,
+            amount_received_msat: invoice.amount_received_msat,
             timestamp: invoice.timestamp,
             status: invoice.status,
             ledger: invoice.ledger,

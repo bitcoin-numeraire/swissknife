@@ -10,7 +10,7 @@ use tracing::{debug, error, warn};
 use crate::{
     application::errors::LightningError,
     domains::lightning::services::LnEventsUseCases,
-    infra::lightning::cln::cln_websocket_types::{CoinMovement, SendPayFailure, SendPaySuccess},
+    infra::lightning::cln::cln_websocket_types::{InvoicePayment, SendPayFailure, SendPaySuccess},
 };
 
 use super::ClnRestClientConfig;
@@ -69,27 +69,17 @@ fn on_message(
         match payload {
             Payload::Text(values) => {
                 for value in values {
-                    if let Some(event) = value.get("coin_movement") {
-                        match serde_json::from_value::<CoinMovement>(event.clone()) {
-                            Ok(coin_movement) if coin_movement.movement_type == "channel_mvt" => {
-                                // It is not an invoice event, ignore
-                                if !coin_movement.tags.iter().any(|e| e == "invoice") {
-                                    continue;
-                                }
-
-                                // It is not a credit event, ignore
-                                if coin_movement.credit_msat == 0 {
-                                    continue;
-                                }
-
-                                if let Err(err) = ln_events.invoice_paid(coin_movement.into()).await
+                    if let Some(event) = value.get("invoice_payment") {
+                        match serde_json::from_value::<InvoicePayment>(event.clone()) {
+                            Ok(invoice_payment) => {
+                                if let Err(err) =
+                                    ln_events.invoice_paid(invoice_payment.into()).await
                                 {
                                     warn!(%err, "Failed to process incoming payment");
                                 }
                             }
-                            Ok(_) => {}
                             Err(err) => {
-                                error!(?err, "Failed to parse coin_movement event");
+                                warn!(?err, "Failed to parse invoice_payment event. Most likely an external payment");
                             }
                         }
                     }

@@ -130,13 +130,15 @@ impl LnClient for ClnRestClient {
         description: String,
         expiry: u32,
     ) -> Result<Invoice, LightningError> {
+        let label = Uuid::new_v4();
+
         let response: InvoiceResponse = self
             .post_request(
                 "invoice",
                 &InvoiceRequest {
                     description,
                     expiry: expiry as u64,
-                    label: Uuid::new_v4(),
+                    label,
                     amount_msat,
                 },
             )
@@ -146,7 +148,10 @@ impl LnClient for ClnRestClient {
         let bolt11 = Bolt11Invoice::from_str(&response.bolt11)
             .map_err(|e| LightningError::Invoice(e.to_string()))?;
 
-        Ok(bolt11.into())
+        let mut invoice: Invoice = bolt11.into();
+        invoice.id = label;
+
+        Ok(invoice)
     }
 
     async fn pay(
