@@ -10,10 +10,10 @@ use utoipa::OpenApi;
 use crate::{
     application::{
         docs::{BAD_REQUEST_EXAMPLE, INTERNAL_EXAMPLE, NOT_FOUND_EXAMPLE, UNPROCESSABLE_EXAMPLE},
-        dtos::LNUrlpInvoiceQueryParams,
+        dtos::{LNUrlpInvoiceQueryParams, LnUrlCallbackResponse},
         errors::ApplicationError,
     },
-    domains::lightning::entities::{LnURLPayRequest, LnUrlCallbackResponse},
+    domains::lightning::entities::LnURLPayRequest,
     infra::app::AppState,
 };
 
@@ -84,5 +84,5 @@ async fn callback(
         .lnurl
         .lnurlp_callback(username, query_params.amount, query_params.comment)
         .await?;
-    Ok(callback.into())
+    Ok(Json(callback.into()))
 }

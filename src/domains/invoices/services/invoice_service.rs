@@ -51,7 +51,7 @@ impl InvoiceUseCases for InvoiceService {
         description: Option<String>,
         expiry: Option<u32>,
     ) -> Result<Invoice, ApplicationError> {
-        debug!(%user_id, "Generating lightning invoice");
+        debug!(%user_id, "Generating invoice");
 
         let mut invoice = self
             .ln_client
@@ -67,7 +67,7 @@ impl InvoiceUseCases for InvoiceService {
 
         info!(
             id = invoice.id.to_string(),
-            "Lightning invoice generated successfully"
+            "Invoice generated successfully"
         );
         Ok(invoice)
     }
@@ -75,7 +75,7 @@ impl InvoiceUseCases for InvoiceService {
     async fn get(&self, id: Uuid) -> Result<Invoice, ApplicationError> {
         trace!(
             %id,
-            "Fetching lightning invoice"
+            "Fetching invoice"
         );
 
         let lightning_invoice = self
@@ -86,22 +86,22 @@ impl InvoiceUseCases for InvoiceService {
             .ok_or_else(|| DataError::NotFound("Lightning invoice not found.".to_string()))?;
 
         debug!(
-            %id, "Lightning invoice fetched successfully"
+            %id, "Invoice fetched successfully"
         );
         Ok(lightning_invoice)
     }
 
     async fn list(&self, filter: InvoiceFilter) -> Result<Vec<Invoice>, ApplicationError> {
-        trace!(?filter, "Listing lightning invoices");
+        trace!(?filter, "Listing invoices");
 
         let lightning_invoices = self.store.invoice.find_many(filter.clone()).await?;
 
-        debug!(?filter, "Lightning invoices listed successfully");
+        debug!(?filter, "Invoices listed successfully");
         Ok(lightning_invoices)
     }
 
     async fn delete(&self, id: Uuid) -> Result<(), ApplicationError> {
-        debug!(%id, "Deleting lightning invoice");
+        debug!(%id, "Deleting invoice");
 
         let n_deleted = self
             .store
@@ -113,22 +113,19 @@ impl InvoiceUseCases for InvoiceService {
             .await?;
 
         if n_deleted == 0 {
-            return Err(DataError::NotFound("Lightning invoice not found.".to_string()).into());
+            return Err(DataError::NotFound("Invoice not found.".to_string()).into());
         }
 
-        info!(%id, "Lightning invoice deleted successfully");
+        info!(%id, "Invoice deleted successfully");
         Ok(())
     }
 
     async fn delete_many(&self, filter: InvoiceFilter) -> Result<u64, ApplicationError> {
-        debug!(?filter, "Deleting lightning invoices");
+        debug!(?filter, "Deleting invoices");
 
         let n_deleted = self.store.invoice.delete_many(filter.clone()).await?;
 
-        info!(
-            ?filter,
-            n_deleted, "Lightning invoices deleted successfully"
-        );
+        info!(?filter, n_deleted, "Invoices deleted successfully");
         Ok(n_deleted)
     }
 
@@ -171,7 +168,7 @@ impl InvoiceUseCases for InvoiceService {
 
         for invoice in invoices {
             let payment_hash = invoice
-                .lightning
+                .ln_invoice
                 .as_ref()
                 .expect("Invoice should have a lightning field")
                 .payment_hash

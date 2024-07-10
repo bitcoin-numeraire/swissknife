@@ -15,11 +15,11 @@ use crate::{
             BAD_REQUEST_EXAMPLE, FORBIDDEN_EXAMPLE, INTERNAL_EXAMPLE, NOT_FOUND_EXAMPLE,
             UNAUTHORIZED_EXAMPLE, UNPROCESSABLE_EXAMPLE,
         },
-        dtos::NewInvoiceRequest,
+        dtos::{InvoiceResponse, LnInvoiceResponse, NewInvoiceRequest},
         errors::ApplicationError,
     },
     domains::{
-        invoices::entities::{Invoice, InvoiceFilter, InvoiceStatus, LnInvoice},
+        invoices::entities::{InvoiceFilter, InvoiceStatus},
         users::entities::{AuthUser, Permission},
     },
     infra::app::AppState,
@@ -27,8 +27,8 @@ use crate::{
 
 #[derive(OpenApi)]
 #[openapi(
-    paths(generate, list, get_one, delete_one, delete_many),
-    components(schemas(Invoice, NewInvoiceRequest, InvoiceStatus, LnInvoice)),
+    paths(generate_invoice, list_invoices, get_invoice, delete_invoice, delete_invoices),
+    components(schemas(InvoiceResponse, NewInvoiceRequest, InvoiceStatus, LnInvoiceResponse)),
     tags(
         (name = "Invoices", description = "Invoice management endpoints. Require authorization.")
     ),
@@ -39,11 +39,11 @@ pub const CONTEXT_PATH: &str = "/api/invoices";
 
 pub fn router() -> Router<Arc<AppState>> {
     Router::new()
-        .route("/", post(generate))
-        .route("/", get(list))
-        .route("/:id", get(get_one))
-        .route("/:id", delete(delete_one))
-        .route("/", delete(delete_many))
+        .route("/", post(generate_invoice))
+        .route("/", get(list_invoices))
+        .route("/:id", get(get_invoice))
+        .route("/:id", delete(delete_invoice))
+        .route("/", delete(delete_invoices))
 }
 
 /// Generate a new invoice
@@ -56,7 +56,7 @@ pub fn router() -> Router<Arc<AppState>> {
     context_path = CONTEXT_PATH,
     request_body = NewInvoiceRequest,
     responses(
-        (status = 200, description = "Invoice Created", body = Invoice),
+        (status = 200, description = "Invoice Created", body = InvoiceResponse),
         (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
         (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
         (status = 403, description = "Forbidden", body = ErrorResponse, example = json!(FORBIDDEN_EXAMPLE)),
@@ -64,11 +64,11 @@ pub fn router() -> Router<Arc<AppState>> {
         (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
     )
 )]
-async fn generate(
+async fn generate_invoice(
     State(app_state): State<Arc<AppState>>,
     user: AuthUser,
     Json(payload): Json<NewInvoiceRequest>,
-) -> Result<Json<Invoice>, ApplicationError> {
+) -> Result<Json<InvoiceResponse>, ApplicationError> {
     user.check_permission(Permission::WriteLnTransaction)?;
 
     let invoice = app_state
@@ -81,7 +81,7 @@ async fn generate(
             payload.expiry,
         )
         .await?;
-    Ok(invoice.into())
+    Ok(Json(invoice.into()))
 }
 
 /// Find an invoice
@@ -93,7 +93,7 @@ async fn generate(
     tag = "Invoices",
     context_path = CONTEXT_PATH,
     responses(
-        (status = 200, description = "Found", body = Invoice),
+        (status = 200, description = "Found", body = InvoiceResponse),
         (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
         (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
         (status = 403, description = "Forbidden", body = ErrorResponse, example = json!(FORBIDDEN_EXAMPLE)),
@@ -101,15 +101,15 @@ async fn generate(
         (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
     )
 )]
-async fn get_one(
+async fn get_invoice(
     State(app_state): State<Arc<AppState>>,
     user: AuthUser,
     Path(id): Path<Uuid>,
-) -> Result<Json<Invoice>, ApplicationError> {
+) -> Result<Json<InvoiceResponse>, ApplicationError> {
     user.check_permission(Permission::ReadLnTransaction)?;
 
     let invoice = app_state.services.invoice.get(id).await?;
-    Ok(invoice.into())
+    Ok(Json(invoice.into()))
 }
 
 /// List invoices
@@ -122,23 +122,23 @@ async fn get_one(
     context_path = CONTEXT_PATH,
     params(InvoiceFilter),
     responses(
-        (status = 200, description = "Success", body = Vec<Invoice>),
+        (status = 200, description = "Success", body = Vec<InvoiceResponse>),
         (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
         (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
         (status = 403, description = "Forbidden", body = ErrorResponse, example = json!(FORBIDDEN_EXAMPLE)),
         (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
     )
 )]
-async fn list(
+async fn list_invoices(
     State(app_state): State<Arc<AppState>>,
     user: AuthUser,
     Query(filter): Query<InvoiceFilter>,
-) -> Result<Json<Vec<Invoice>>, ApplicationError> {
+) -> Result<Json<Vec<InvoiceResponse>>, ApplicationError> {
     user.check_permission(Permission::ReadLnTransaction)?;
 
     let lightning_invoices = app_state.services.invoice.list(filter).await?;
 
-    let response: Vec<Invoice> = lightning_invoices.into_iter().map(Into::into).collect();
+    let response: Vec<InvoiceResponse> = lightning_invoices.into_iter().map(Into::into).collect();
 
     Ok(response.into())
 }
@@ -160,7 +160,7 @@ async fn list(
         (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
     )
 )]
-async fn delete_one(
+async fn delete_invoice(
     State(app_state): State<Arc<AppState>>,
     user: AuthUser,
     Path(id): Path<Uuid>,
@@ -188,7 +188,7 @@ async fn delete_one(
         (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
     )
 )]
-async fn delete_many(
+async fn delete_invoices(
     State(app_state): State<Arc<AppState>>,
     user: AuthUser,
     Query(query_params): Query<InvoiceFilter>,

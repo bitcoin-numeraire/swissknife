@@ -65,7 +65,7 @@ impl From<Model> for Invoice {
             },
         };
 
-        let lightning = match model.ledger.as_str() {
+        let ln_invoice = match model.ledger.as_str() {
             "Lightning" => Some(LnInvoice {
                 payment_hash: model.payment_hash.expect(ASSERTION_MSG),
                 bolt11: model.bolt11.expect(ASSERTION_MSG),
@@ -94,7 +94,7 @@ impl From<Model> for Invoice {
             payment_time: model.payment_time,
             created_at: model.created_at,
             updated_at: model.updated_at,
-            lightning,
+            ln_invoice,
         }
     }
 }

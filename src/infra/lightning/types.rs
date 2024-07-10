@@ -30,7 +30,7 @@ impl From<Bolt11Invoice> for Invoice {
                 Bolt11InvoiceDescription::Direct(msg) => Some(msg.to_string()),
                 Bolt11InvoiceDescription::Hash(_) => None,
             },
-            lightning: Some(LnInvoice {
+            ln_invoice: Some(LnInvoice {
                 bolt11: val.to_string(),
                 payment_hash: val.payment_hash().to_hex(),
                 payee_pubkey,

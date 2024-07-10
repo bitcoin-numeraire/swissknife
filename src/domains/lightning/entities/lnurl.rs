@@ -37,16 +37,10 @@ pub struct LnUrlErrorData {
     pub reason: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct LnUrlCallbackResponse {
-    /// bech32-serialized Lightning invoice
-    #[schema(example = "lnbcrt1m1png24kasp5...")]
+#[derive(Debug)]
+pub struct LnUrlCallback {
     pub pr: String,
-    /// An optional action to be executed after successfully paying an invoice
     pub success_action: Option<SuccessActionProcessed>,
-    /// An optional flag to let a wallet know whether to persist the link from step 1, if null should be interpreted as true
     pub disposable: Option<bool>,
-    /// array with payment routes, should be left empty if no routes are to be provided
     pub routes: Vec<String>,
 }

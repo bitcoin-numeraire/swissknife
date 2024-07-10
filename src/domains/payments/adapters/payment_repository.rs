@@ -57,7 +57,10 @@ impl PaymentRepository for SeaOrmPaymentRepository {
             .apply_if(filter.status, |q, s| {
                 q.filter(Column::Status.eq(s.to_string()))
             })
-            .order_by_desc(Column::CreatedAt)
+            .apply_if(filter.ledger, |q, l| {
+                q.filter(Column::Ledger.eq(l.to_string()))
+            })
+            .order_by(Column::CreatedAt, filter.order_direction.into())
             .offset(filter.offset)
             .limit(filter.limit)
             .all(&self.db)

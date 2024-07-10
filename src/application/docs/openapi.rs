@@ -26,7 +26,7 @@ use utoipa::{
         title = "Numeraire SwissKnife REST API",
         description = "This API is available to anyone with a Numeraire account. The `Wallet` endpoints are the main access point for most users.",
     ),
-    components(schemas(OrderDirection, Ledger, Currency), responses(ErrorResponse)),
+    components(schemas(OrderDirection, Ledger, Currency, ErrorResponse), responses(ErrorResponse)),
     modifiers(&SecurityAddon),
 )]
 struct ApiDoc;

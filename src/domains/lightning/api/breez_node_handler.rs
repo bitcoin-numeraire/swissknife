@@ -31,7 +31,7 @@ use crate::{
 #[derive(OpenApi)]
 #[openapi(
     paths(node_info, lsp_info, list_lsps, close_lsp_channels, connect_lsp, swap, redeem, sign_message, check_message, sync, backup),
-    components(schemas(ConnectLSPRequest, SendOnchainPaymentRequest, RedeemOnchainRequest, SignMessageRequest, CheckMessageRequest, SignMessageResponse, CheckMessageResponse)),
+    components(schemas(ConnectLSPRequest, SendOnchainPaymentRequest, RedeemOnchainRequest, RedeemOnchainResponse, SignMessageRequest, CheckMessageRequest, SignMessageResponse, CheckMessageResponse)),
     tags(
         (name = "Lightning Node", description = "LN Node management endpoints. Currently only available for `breez` Lightning provider. Require authorization.")
     ),
@@ -64,7 +64,7 @@ pub fn breez_node_router() -> Router<Arc<AppState>> {
     tag = "Lightning Node",
     context_path = CONTEXT_PATH,
     responses(
-        (status = 200, description = "Found", body = NodeState),
+        (status = 200, description = "Found", body = Value),
         (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
         (status = 403, description = "Forbidden", body = ErrorResponse, example = json!(FORBIDDEN_EXAMPLE)),
         (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
@@ -91,7 +91,7 @@ async fn node_info(
     tag = "Lightning Node",
     context_path = CONTEXT_PATH,
     responses(
-        (status = 200, description = "Found", body = LspInformation),
+        (status = 200, description = "Found", body = Value),
         (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
         (status = 403, description = "Forbidden", body = ErrorResponse, example = json!(FORBIDDEN_EXAMPLE)),
         (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
@@ -118,7 +118,7 @@ async fn lsp_info(
     tag = "Lightning Node",
     context_path = CONTEXT_PATH,
     responses(
-        (status = 200, description = "Success", body = Vec<LspInformation>),
+        (status = 200, description = "Success", body = Vec<Value>),
         (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
         (status = 403, description = "Forbidden", body = ErrorResponse, example = json!(FORBIDDEN_EXAMPLE)),
         (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
@@ -204,7 +204,7 @@ async fn connect_lsp(
     context_path = CONTEXT_PATH,
     request_body = SendOnchainPaymentRequest,
     responses(
-        (status = 200, description = "Swap Success", body = ReverseSwapInfo),
+        (status = 200, description = "Swap Success", body = Value),
         (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
         (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
         (status = 403, description = "Forbidden", body = ErrorResponse, example = json!(FORBIDDEN_EXAMPLE)),

@@ -28,7 +28,7 @@ pub async fn listen_invoices(
 
     let mut lastpay_index = match last_settled_invoice {
         Some(invoice) => {
-            let payment_hash = invoice.lightning.unwrap().payment_hash;
+            let payment_hash = invoice.ln_invoice.unwrap().payment_hash;
             debug!(
                 %payment_hash,
                 "Fetching latest settled invoice from node..."

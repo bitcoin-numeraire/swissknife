@@ -256,16 +256,15 @@ impl PaymentService {
                             return Ok(internal_payment);
                         }
                         None => {
-                            return Err(DataError::NotFound(
-                                "Lightning address not found.".to_string(),
-                            )
-                            .into());
+                            return Err(
+                                DataError::NotFound("LN Address not found.".to_string()).into()
+                            );
                         }
                     }
                 }
                 None => {
                     return Err(DataError::Validation(
-                        "Invalid LNURL, Lighting address must be defined for internal payments."
+                        "Invalid LNURL, LN Address must be defined for internal payments."
                             .to_string(),
                     )
                     .into());
@@ -372,28 +371,28 @@ impl PaymentService {
 #[async_trait]
 impl PaymentsUseCases for PaymentService {
     async fn get(&self, id: Uuid) -> Result<Payment, ApplicationError> {
-        trace!(%id, "Fetching lightning payment");
+        trace!(%id, "Fetching payment");
 
         let lightning_payment = self
             .store
             .payment
             .find(id)
             .await?
-            .ok_or_else(|| DataError::NotFound("Lightning payment not found.".to_string()))?;
+            .ok_or_else(|| DataError::NotFound("Payment not found.".to_string()))?;
 
         debug!(
             %id,
-            "Lightning payment fetched successfully"
+            "Payment fetched successfully"
         );
         Ok(lightning_payment)
     }
 
     async fn list(&self, filter: PaymentFilter) -> Result<Vec<Payment>, ApplicationError> {
-        trace!(?filter, "Listing lightning payments");
+        trace!(?filter, "Listing payments");
 
         let lightning_payments = self.store.payment.find_many(filter.clone()).await?;
 
-        debug!(?filter, "Lightning payments listed successfully");
+        debug!(?filter, "Payments listed successfully");
         Ok(lightning_payments)
     }
 
@@ -435,7 +434,7 @@ impl PaymentsUseCases for PaymentService {
     }
 
     async fn delete(&self, id: Uuid) -> Result<(), ApplicationError> {
-        debug!(%id, "Deleting lightning payment");
+        debug!(%id, "Deleting payment");
 
         let n_deleted = self
             .store
@@ -447,22 +446,19 @@ impl PaymentsUseCases for PaymentService {
             .await?;
 
         if n_deleted == 0 {
-            return Err(DataError::NotFound("Lightning payment not found.".to_string()).into());
+            return Err(DataError::NotFound("Payment not found.".to_string()).into());
         }
 
-        info!(%id, "Lightning payments deleted successfully");
+        info!(%id, "Payments deleted successfully");
         Ok(())
     }
 
     async fn delete_many(&self, filter: PaymentFilter) -> Result<u64, ApplicationError> {
-        debug!(?filter, "Deleting lightning payments");
+        debug!(?filter, "Deleting payments");
 
         let n_deleted = self.store.payment.delete_many(filter.clone()).await?;
 
-        info!(
-            ?filter,
-            n_deleted, "Lightning payments deleted successfully"
-        );
+        info!(?filter, n_deleted, "Payments deleted successfully");
         Ok(n_deleted)
     }
 }
