@@ -7,9 +7,9 @@ use utoipa::ToSchema;
     Clone, Debug, EnumString, Deserialize, Serialize, Display, PartialEq, Eq, Default, ToSchema,
 )]
 pub enum OrderDirection {
+    Asc,
     #[default]
     Desc,
-    Asc,
 }
 
 impl From<OrderDirection> for Order {

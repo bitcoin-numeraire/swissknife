@@ -11,9 +11,7 @@ use crate::{
         entities::AppStore,
         errors::{ApplicationError, DataError},
     },
-    domains::lightning::entities::{
-        LnAddress, LnAddressFilter, LnURLPayRequest, LnUrlCallbackResponse,
-    },
+    domains::lightning::entities::{LnAddress, LnAddressFilter, LnURLPayRequest, LnUrlCallback},
     infra::lightning::LnClient,
 };
 
@@ -86,7 +84,7 @@ impl LnUrlUseCases for LnUrlService {
         username: String,
         amount: u64,
         comment: Option<String>,
-    ) -> Result<LnUrlCallbackResponse, ApplicationError> {
+    ) -> Result<LnUrlCallback, ApplicationError> {
         debug!(username, amount, comment, "Generating LNURLp invoice");
 
         let ln_address = self
@@ -109,9 +107,9 @@ impl LnUrlUseCases for LnUrlService {
 
         // TODO: Get or add more information to make this a LNURLp invoice (like fetching a success action specific to the user)
         let invoice = self.store.invoice.insert(None, invoice).await?;
-        let lnurlp_invoice = LnUrlCallbackResponse {
+        let lnurlp_invoice = LnUrlCallback {
             pr: invoice
-                .lightning
+                .ln_invoice
                 .expect("should exist for ledger Lightning")
                 .bolt11,
             success_action: Some(SuccessActionProcessed::Message {

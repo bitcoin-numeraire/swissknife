@@ -5,8 +5,8 @@ use crate::{
 use async_trait::async_trait;
 use sea_orm::{
     sea_query::Expr, ActiveModelTrait, ActiveValue::Set, ColumnTrait, Condition,
-    DatabaseConnection, DatabaseTransaction, EntityTrait, Order, QueryFilter, QueryOrder,
-    QuerySelect, QueryTrait,
+    DatabaseConnection, DatabaseTransaction, EntityTrait, QueryFilter, QueryOrder, QuerySelect,
+    QueryTrait,
 };
 use uuid::Uuid;
 
@@ -51,8 +51,6 @@ impl InvoiceRepository for SeaOrmInvoiceRepository {
     }
 
     async fn find_many(&self, filter: InvoiceFilter) -> Result<Vec<Invoice>, DatabaseError> {
-        let order_direction: Order = filter.order_direction.into();
-
         let models = Entity::find()
             .apply_if(filter.user_id, |q, user| q.filter(Column::UserId.eq(user)))
             .apply_if(filter.ids, |q, ids| q.filter(Column::Id.is_in(ids)))
@@ -72,8 +70,7 @@ impl InvoiceRepository for SeaOrmInvoiceRepository {
             .apply_if(filter.ledger, |q, l| {
                 q.filter(Column::Ledger.eq(l.to_string()))
             })
-            .order_by(Column::PaymentTime, order_direction.clone())
-            .order_by(Column::Timestamp, order_direction)
+            .order_by(Column::Timestamp, filter.order_direction.into())
             .offset(filter.offset)
             .limit(filter.limit)
             .all(&self.db)
@@ -100,18 +97,18 @@ impl InvoiceRepository for SeaOrmInvoiceRepository {
         };
 
         if invoice.ledger == Ledger::Lightning {
-            let lightning = invoice
-                .lightning
+            let ln_invoice = invoice
+                .ln_invoice
                 .expect("should exist for ledger Lightning");
-            model.bolt11 = Set(lightning.bolt11.into());
-            model.payee_pubkey = Set(lightning.payee_pubkey.into());
-            model.payment_hash = Set(lightning.payment_hash.into());
-            model.description_hash = Set(lightning.description_hash);
-            model.payment_secret = Set(lightning.payment_secret.into());
+            model.bolt11 = Set(ln_invoice.bolt11.into());
+            model.payee_pubkey = Set(ln_invoice.payee_pubkey.into());
+            model.payment_hash = Set(ln_invoice.payment_hash.into());
+            model.description_hash = Set(ln_invoice.description_hash);
+            model.payment_secret = Set(ln_invoice.payment_secret.into());
             model.min_final_cltv_expiry_delta =
-                Set((lightning.min_final_cltv_expiry_delta as i64).into());
-            model.expiry = Set((lightning.expiry.as_secs() as i64).into());
-            model.expires_at = Set(lightning.expires_at.into());
+                Set((ln_invoice.min_final_cltv_expiry_delta as i64).into());
+            model.expiry = Set((ln_invoice.expiry.as_secs() as i64).into());
+            model.expires_at = Set(ln_invoice.expires_at.into());
         }
 
         let result = match txn {

@@ -1,4 +1,4 @@
-use std::{path::PathBuf, str::FromStr, sync::Arc, time::Duration};
+use std::{path::PathBuf, process, str::FromStr, sync::Arc, time::Duration};
 
 use breez_sdk_core::ReverseSwapInfo;
 use hex::decode;
@@ -77,9 +77,16 @@ impl ClnGrpcClient {
 
         let client = NodeClient::new(channel);
 
-        listen_invoices(client.clone(), ln_events, config.retry_delay)
-            .await
-            .map_err(|e| LightningError::Listener(e.to_string()))?;
+        let listener_client = client.clone();
+        tokio::spawn(async move {
+            if let Err(err) = listen_invoices(listener_client, ln_events, config.retry_delay)
+                .await
+                .map_err(|e| LightningError::Listener(e.to_string()))
+            {
+                tracing::error!(%err, "Event listener failed");
+                process::exit(1);
+            }
+        });
 
         Ok(Self {
             client,

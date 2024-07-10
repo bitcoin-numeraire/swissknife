@@ -8,7 +8,7 @@ use crate::{
         invoices::entities::Invoice,
         lightning::entities::{
             LnAddress, LnAddressFilter, LnInvoicePaidEvent, LnPayFailureEvent, LnPaySuccessEvent,
-            LnURLPayRequest, LnUrlCallbackResponse,
+            LnURLPayRequest, LnUrlCallback,
         },
     },
 };
@@ -21,7 +21,7 @@ pub trait LnUrlUseCases: Send + Sync {
         username: String,
         amount: u64,
         comment: Option<String>,
-    ) -> Result<LnUrlCallbackResponse, ApplicationError>;
+    ) -> Result<LnUrlCallback, ApplicationError>;
     async fn register(
         &self,
         user_id: String,

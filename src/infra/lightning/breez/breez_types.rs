@@ -25,7 +25,7 @@ impl From<LNInvoice> for Invoice {
             description: val.description,
             amount_msat: val.amount_msat,
             timestamp: Utc.timestamp_opt(val.timestamp as i64, 0).unwrap(),
-            lightning: Some(LnInvoice {
+            ln_invoice: Some(LnInvoice {
                 bolt11: val.bolt11,
                 payee_pubkey: val.payee_pubkey,
                 payment_hash: val.payment_hash,

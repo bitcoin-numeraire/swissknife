@@ -14,23 +14,27 @@ use crate::{
             BAD_REQUEST_EXAMPLE, INTERNAL_EXAMPLE, NOT_FOUND_EXAMPLE, UNAUTHORIZED_EXAMPLE,
             UNPROCESSABLE_EXAMPLE,
         },
-        dtos::{NewInvoiceRequest, RegisterLnAddressRequest, SendPaymentRequest},
+        dtos::{
+            InvoiceResponse, NewInvoiceRequest, PaymentResponse, RegisterLnAddressRequest,
+            SendPaymentRequest, WalletResponse,
+        },
         errors::{ApplicationError, DataError},
     },
     domains::{
-        invoices::entities::{Invoice, InvoiceFilter, InvoiceStatus},
+        invoices::entities::{InvoiceFilter, InvoiceStatus},
         lightning::entities::{LnAddress, LnAddressFilter},
-        payments::entities::{Payment, PaymentFilter, PaymentStatus},
+        payments::entities::{PaymentFilter, PaymentStatus},
         users::entities::AuthUser,
-        wallet::entities::{UserBalance, Wallet},
+        wallet::entities::UserBalance,
     },
     infra::app::AppState,
 };
 
 #[derive(OpenApi)]
 #[openapi(
-    paths(get_wallet, get_balance, get_address, register_address, pay, list_payments, get_payment, delete_failed_payments, list_invoices, get_invoice, new_invoice, delete_expired_invoices),
-    components(schemas(Wallet, UserBalance)),
+    paths(get_wallet, get_wallet_balance, get_wallet_address, register_wallet_address, wallet_pay, list_wallet_payments,
+        get_wallet_payment, delete_failed_payments, list_wallet_invoices, get_wallet_invoice, new_wallet_invoice, delete_expired_invoices),
+    components(schemas(WalletResponse, UserBalance)),
     tags(
         (name = "Wallet", description = "Wallet endpoints. Available to any authenticated user.")
     ),
@@ -41,16 +45,16 @@ pub const CONTEXT_PATH: &str = "/api/wallet";
 pub fn router() -> Router<Arc<AppState>> {
     Router::new()
         .route("/", get(get_wallet))
-        .route("/balance", get(get_balance))
-        .route("/lightning-address", get(get_address))
-        .route("/lightning-address", post(register_address))
-        .route("/payments", post(pay))
-        .route("/payments", get(list_payments))
-        .route("/payments/:id", get(get_payment))
+        .route("/balance", get(get_wallet_balance))
+        .route("/lightning-address", get(get_wallet_address))
+        .route("/lightning-address", post(register_wallet_address))
+        .route("/payments", post(wallet_pay))
+        .route("/payments", get(list_wallet_payments))
+        .route("/payments/:id", get(get_wallet_payment))
         .route("/payments", delete(delete_failed_payments))
-        .route("/invoices", get(list_invoices))
-        .route("/invoices/:id", get(get_invoice))
-        .route("/invoices", post(new_invoice))
+        .route("/invoices", get(list_wallet_invoices))
+        .route("/invoices/:id", get(get_wallet_invoice))
+        .route("/invoices", post(new_wallet_invoice))
         .route("/invoices", delete(delete_expired_invoices))
 }
 
@@ -63,7 +67,7 @@ pub fn router() -> Router<Arc<AppState>> {
     tag = "Wallet",
     context_path = CONTEXT_PATH,
     responses(
-        (status = 200, description = "Found", body = Wallet),
+        (status = 200, description = "Found", body = WalletResponse),
         (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
         (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
     )
@@ -71,9 +75,9 @@ pub fn router() -> Router<Arc<AppState>> {
 async fn get_wallet(
     State(app_state): State<Arc<AppState>>,
     user: AuthUser,
-) -> Result<Json<Wallet>, ApplicationError> {
+) -> Result<Json<WalletResponse>, ApplicationError> {
     let wallet = app_state.services.wallet.get(user.sub).await?;
-    Ok(wallet.into())
+    Ok(Json(wallet.into()))
 }
 
 /// Send a payment
@@ -86,21 +90,21 @@ async fn get_wallet(
     context_path = CONTEXT_PATH,
     request_body = SendPaymentRequest,
     responses(
-        (status = 200, description = "Payment Sent", body = Payment),
+        (status = 200, description = "Payment Sent", body = PaymentResponse),
         (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
         (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
         (status = 422, description = "Unprocessable Entity", body = ErrorResponse, example = json!(UNPROCESSABLE_EXAMPLE)),
         (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
     )
 )]
-async fn pay(
+async fn wallet_pay(
     State(app_state): State<Arc<AppState>>,
     user: AuthUser,
     Json(mut payload): Json<SendPaymentRequest>,
-) -> Result<Json<Payment>, ApplicationError> {
+) -> Result<Json<PaymentResponse>, ApplicationError> {
     payload.user_id = Some(user.sub);
     let payment = app_state.services.payment.pay(payload).await?;
-    Ok(payment.into())
+    Ok(Json(payment.into()))
 }
 
 /// Gets the user balance
@@ -117,7 +121,7 @@ async fn pay(
         (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
     )
 )]
-async fn get_balance(
+async fn get_wallet_balance(
     State(app_state): State<Arc<AppState>>,
     user: AuthUser,
 ) -> Result<Json<UserBalance>, ApplicationError> {
@@ -135,18 +139,18 @@ async fn get_balance(
     context_path = CONTEXT_PATH,
     request_body = NewInvoiceRequest,
     responses(
-        (status = 200, description = "Invoice Created", body = Invoice),
+        (status = 200, description = "Invoice Created", body = InvoiceResponse),
         (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
         (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
         (status = 422, description = "Unprocessable Entity", body = ErrorResponse, example = json!(UNPROCESSABLE_EXAMPLE)),
         (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
     )
 )]
-async fn new_invoice(
+async fn new_wallet_invoice(
     State(app_state): State<Arc<AppState>>,
     user: AuthUser,
     Json(payload): Json<NewInvoiceRequest>,
-) -> Result<Json<Invoice>, ApplicationError> {
+) -> Result<Json<InvoiceResponse>, ApplicationError> {
     let invoice = app_state
         .services
         .invoice
@@ -158,7 +162,7 @@ async fn new_invoice(
         )
         .await?;
 
-    Ok(invoice.into())
+    Ok(Json(invoice.into()))
 }
 
 /// Get your LN Address
@@ -176,7 +180,7 @@ async fn new_invoice(
         (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
     )
 )]
-async fn get_address(
+async fn get_wallet_address(
     State(app_state): State<Arc<AppState>>,
     user: AuthUser,
 ) -> Result<Json<LnAddress>, ApplicationError> {
@@ -214,7 +218,7 @@ async fn get_address(
         (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
     )
 )]
-async fn register_address(
+async fn register_wallet_address(
     State(app_state): State<Arc<AppState>>,
     user: AuthUser,
     Json(payload): Json<RegisterLnAddressRequest>,
@@ -237,21 +241,21 @@ async fn register_address(
     context_path = CONTEXT_PATH,
     params(PaymentFilter),
     responses(
-        (status = 200, description = "Success", body = Vec<Payment>),
+        (status = 200, description = "Success", body = Vec<PaymentResponse>),
         (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
         (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
         (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
     )
 )]
-async fn list_payments(
+async fn list_wallet_payments(
     State(app_state): State<Arc<AppState>>,
     user: AuthUser,
     Query(mut query_params): Query<PaymentFilter>,
-) -> Result<Json<Vec<Payment>>, ApplicationError> {
+) -> Result<Json<Vec<PaymentResponse>>, ApplicationError> {
     query_params.user_id = Some(user.sub);
     let payments = app_state.services.payment.list(query_params).await?;
 
-    let response: Vec<Payment> = payments.into_iter().map(Into::into).collect();
+    let response: Vec<PaymentResponse> = payments.into_iter().map(Into::into).collect();
 
     Ok(response.into())
 }
@@ -265,18 +269,18 @@ async fn list_payments(
     tag = "Wallet",
     context_path = CONTEXT_PATH,
     responses(
-        (status = 200, description = "Found", body = Payment),
+        (status = 200, description = "Found", body = PaymentResponse),
         (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
         (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
         (status = 404, description = "Not Found", body = ErrorResponse, example = json!(NOT_FOUND_EXAMPLE)),
         (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
     )
 )]
-async fn get_payment(
+async fn get_wallet_payment(
     State(app_state): State<Arc<AppState>>,
     user: AuthUser,
     Path(id): Path<Uuid>,
-) -> Result<Json<Payment>, ApplicationError> {
+) -> Result<Json<PaymentResponse>, ApplicationError> {
     let payments = app_state
         .services
         .payment
@@ -292,7 +296,7 @@ async fn get_payment(
         .cloned()
         .ok_or_else(|| DataError::NotFound("Payment not found.".to_string()))?;
 
-    Ok(payment.into())
+    Ok(Json(payment.into()))
 }
 
 /// List invoices
@@ -305,21 +309,21 @@ async fn get_payment(
     context_path = CONTEXT_PATH,
     params(InvoiceFilter),
     responses(
-        (status = 200, description = "Success", body = Vec<Invoice>),
+        (status = 200, description = "Success", body = Vec<InvoiceResponse>),
         (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
         (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
         (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
     )
 )]
-async fn list_invoices(
+async fn list_wallet_invoices(
     State(app_state): State<Arc<AppState>>,
     user: AuthUser,
     Query(mut query_params): Query<InvoiceFilter>,
-) -> Result<Json<Vec<Invoice>>, ApplicationError> {
+) -> Result<Json<Vec<InvoiceResponse>>, ApplicationError> {
     query_params.user_id = Some(user.sub);
     let invoices = app_state.services.invoice.list(query_params).await?;
 
-    let response: Vec<Invoice> = invoices.into_iter().map(Into::into).collect();
+    let response: Vec<InvoiceResponse> = invoices.into_iter().map(Into::into).collect();
 
     Ok(response.into())
 }
@@ -333,18 +337,18 @@ async fn list_invoices(
     tag = "Wallet",
     context_path = CONTEXT_PATH,
     responses(
-        (status = 200, description = "Found", body = Invoice),
+        (status = 200, description = "Found", body = InvoiceResponse),
         (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
         (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
         (status = 404, description = "Not Found", body = ErrorResponse, example = json!(NOT_FOUND_EXAMPLE)),
         (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
     )
 )]
-async fn get_invoice(
+async fn get_wallet_invoice(
     State(app_state): State<Arc<AppState>>,
     user: AuthUser,
     Path(id): Path<Uuid>,
-) -> Result<Json<Invoice>, ApplicationError> {
+) -> Result<Json<InvoiceResponse>, ApplicationError> {
     let invoices = app_state
         .services
         .invoice
@@ -360,7 +364,7 @@ async fn get_invoice(
         .cloned()
         .ok_or_else(|| DataError::NotFound("Invoice not found.".to_string()))?;
 
-    Ok(invoice.into())
+    Ok(Json(invoice.into()))
 }
 
 /// Delete expired invoices

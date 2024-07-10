@@ -27,7 +27,7 @@ use crate::{
 
 #[derive(OpenApi)]
 #[openapi(
-    paths(register, get_one, list, delete_one, delete_many),
+    paths(register_address, get_address, list_addresses, delete_address, delete_addresses),
     components(schemas(LnAddress, RegisterLnAddressRequest)),
     tags(
         (name = "Lightning Addresses", description = "LN Address management endpoints as defined in the [protocol specification](https://lightningaddress.com/). Require authorization.")
@@ -39,11 +39,11 @@ pub const CONTEXT_PATH: &str = "/api/lightning/addresses";
 
 pub fn ln_address_router() -> Router<Arc<AppState>> {
     Router::new()
-        .route("/", get(list))
-        .route("/", post(register))
-        .route("/:id", get(get_one))
-        .route("/:id", delete(delete_one))
-        .route("/", delete(delete_many))
+        .route("/", get(list_addresses))
+        .route("/", post(register_address))
+        .route("/:id", get(get_address))
+        .route("/:id", delete(delete_address))
+        .route("/", delete(delete_addresses))
 }
 
 /// Register a new LN Address
@@ -64,7 +64,7 @@ pub fn ln_address_router() -> Router<Arc<AppState>> {
         (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
     )
 )]
-async fn register(
+async fn register_address(
     State(app_state): State<Arc<AppState>>,
     user: AuthUser,
     Json(payload): Json<RegisterLnAddressRequest>,
@@ -96,7 +96,7 @@ async fn register(
         (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
     )
 )]
-async fn get_one(
+async fn get_address(
     State(app_state): State<Arc<AppState>>,
     user: AuthUser,
     Path(id): Path<Uuid>,
@@ -124,7 +124,7 @@ async fn get_one(
         (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
     )
 )]
-async fn list(
+async fn list_addresses(
     State(app_state): State<Arc<AppState>>,
     user: AuthUser,
     Query(query_params): Query<LnAddressFilter>,
@@ -155,7 +155,7 @@ async fn list(
         (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
     )
 )]
-async fn delete_one(
+async fn delete_address(
     State(app_state): State<Arc<AppState>>,
     user: AuthUser,
     Path(id): Path<Uuid>,
@@ -183,7 +183,7 @@ async fn delete_one(
         (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
     )
 )]
-async fn delete_many(
+async fn delete_addresses(
     State(app_state): State<Arc<AppState>>,
     user: AuthUser,
     Query(query_params): Query<LnAddressFilter>,

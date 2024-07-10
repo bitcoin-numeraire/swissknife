@@ -1,6 +1,6 @@
 domain: "numeraire.tech"
-ln_provider: breez
-auth_provider: bypass
+ln_provider: clngrpc
+auth_provider: jwt
 
 logging:
   format: compact
@@ -19,5 +19,5 @@ cln_rest_config:
   endpoint: "http://127.0.0.1:8182"
 
 cln_config:
-  endpoint: "https://127.0.0.1:11004"
-  certs_dir: "/Users/darioanongbavarela/.polar/networks/2/volumes/c-lightning/dave/lightningd/regtest"
+  endpoint: "https://127.0.0.1:11002"
+  certs_dir: "/Users/darioanongbavarela/.polar/networks/1/volumes/c-lightning/bob/lightningd/regtest"
