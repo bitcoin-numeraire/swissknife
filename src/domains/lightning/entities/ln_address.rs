@@ -4,6 +4,8 @@ use serde_with::{serde_as, DisplayFromStr};
 use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
 
+use crate::application::entities::OrderDirection;
+
 /// Lightning Address
 #[derive(Clone, Debug, Serialize, ToSchema)]
 pub struct LnAddress {
@@ -35,6 +37,11 @@ pub struct LnAddressFilter {
     pub ids: Option<Vec<Uuid>>,
     /// User ID. Automatically populated with your user ID
     pub user_id: Option<String>,
-    /// Status
+    /// Username
     pub username: Option<String>,
+    /// Active
+    pub active: Option<bool>,
+    /// Direction of the ordering of results
+    #[serde(default)]
+    pub order_direction: OrderDirection,
 }

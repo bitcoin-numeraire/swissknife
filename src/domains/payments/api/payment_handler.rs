@@ -128,7 +128,6 @@ async fn list_payments(
     user.check_permission(Permission::ReadLnTransaction)?;
 
     let payments = app_state.services.payment.list(query_params).await?;
-
     let response: Vec<PaymentResponse> = payments.into_iter().map(Into::into).collect();
 
     Ok(response.into())
