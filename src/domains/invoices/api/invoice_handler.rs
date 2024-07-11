@@ -32,7 +32,6 @@ use crate::{
     tags(
         (name = "Invoices", description = "Invoice management endpoints. Require authorization.")
     ),
-    security(("jwt" = ["read:transactions", "write:transactions"]))
 )]
 pub struct InvoiceHandler;
 pub const CONTEXT_PATH: &str = "/api/invoices";
