@@ -31,8 +31,7 @@ use crate::{
     components(schemas(LnAddress, RegisterLnAddressRequest)),
     tags(
         (name = "Lightning Addresses", description = "LN Address management endpoints as defined in the [protocol specification](https://lightningaddress.com/). Require authorization.")
-    ),
-    security(("jwt" = ["read:ln_address", "write:ln_address"]))
+    )
 )]
 pub struct LnAddressHandler;
 pub const CONTEXT_PATH: &str = "/api/lightning/addresses";

@@ -28,6 +28,7 @@ use utoipa::{
     ),
     components(schemas(OrderDirection, Ledger, Currency, ErrorResponse), responses(ErrorResponse)),
     modifiers(&SecurityAddon),
+    security(("jwt" = []))
 )]
 struct ApiDoc;
 

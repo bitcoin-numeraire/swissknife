@@ -34,8 +34,7 @@ use crate::{
     components(schemas(ConnectLSPRequest, SendOnchainPaymentRequest, RedeemOnchainRequest, RedeemOnchainResponse, SignMessageRequest, CheckMessageRequest, SignMessageResponse, CheckMessageResponse)),
     tags(
         (name = "Lightning Node", description = "LN Node management endpoints. Currently only available for `breez` Lightning provider. Require authorization.")
-    ),
-    security(("jwt" = ["read:ln_node", "write:ln_node"]))
+    )
 )]
 pub struct BreezNodeHandler;
 pub const CONTEXT_PATH: &str = "/api/lightning/node";

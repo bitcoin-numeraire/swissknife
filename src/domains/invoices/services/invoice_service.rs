@@ -66,7 +66,7 @@ impl InvoiceUseCases for InvoiceService {
         let invoice = self.store.invoice.insert(None, invoice).await?;
 
         info!(
-            id = invoice.id.to_string(),
+            id = %invoice.id,
             "Invoice generated successfully"
         );
         Ok(invoice)

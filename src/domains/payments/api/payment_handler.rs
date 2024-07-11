@@ -31,8 +31,7 @@ use crate::{
     components(schemas(PaymentResponse, SendPaymentRequest, PaymentStatus)),
     tags(
         (name = "Payments", description = "Payment management endpoints. Require authorization.")
-    ),
-    security(("jwt" = ["read:transactions", "write:transactions"]))
+    )
 )]
 pub struct PaymentHandler;
 pub const CONTEXT_PATH: &str = "/api/payments";
@@ -128,7 +127,6 @@ async fn list_payments(
     user.check_permission(Permission::ReadLnTransaction)?;
 
     let payments = app_state.services.payment.list(query_params).await?;
-
     let response: Vec<PaymentResponse> = payments.into_iter().map(Into::into).collect();
 
     Ok(response.into())

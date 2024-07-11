@@ -32,7 +32,6 @@ use crate::{
     tags(
         (name = "Invoices", description = "Invoice management endpoints. Require authorization.")
     ),
-    security(("jwt" = ["read:transactions", "write:transactions"]))
 )]
 pub struct InvoiceHandler;
 pub const CONTEXT_PATH: &str = "/api/invoices";
@@ -136,9 +135,8 @@ async fn list_invoices(
 ) -> Result<Json<Vec<InvoiceResponse>>, ApplicationError> {
     user.check_permission(Permission::ReadLnTransaction)?;
 
-    let lightning_invoices = app_state.services.invoice.list(filter).await?;
-
-    let response: Vec<InvoiceResponse> = lightning_invoices.into_iter().map(Into::into).collect();
+    let invoices = app_state.services.invoice.list(filter).await?;
+    let response: Vec<InvoiceResponse> = invoices.into_iter().map(Into::into).collect();
 
     Ok(response.into())
 }
