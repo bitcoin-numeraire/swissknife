@@ -25,7 +25,7 @@ use crate::{
         lightning::entities::{LnAddress, LnAddressFilter},
         payments::entities::{PaymentFilter, PaymentStatus},
         users::entities::AuthUser,
-        wallet::entities::UserBalance,
+        wallet::entities::{Contact, UserBalance},
     },
     infra::app::AppState,
 };
@@ -33,8 +33,10 @@ use crate::{
 #[derive(OpenApi)]
 #[openapi(
     paths(get_wallet, get_wallet_balance, get_wallet_address, register_wallet_address, wallet_pay, list_wallet_payments,
-        get_wallet_payment, delete_failed_payments, list_wallet_invoices, get_wallet_invoice, new_wallet_invoice, delete_expired_invoices),
-    components(schemas(WalletResponse, UserBalance)),
+        get_wallet_payment, delete_failed_payments, list_wallet_invoices, get_wallet_invoice, new_wallet_invoice, delete_expired_invoices,
+        list_contacts
+    ),
+    components(schemas(WalletResponse, UserBalance, Contact)),
     tags(
         (name = "Wallet", description = "Wallet endpoints. Available to any authenticated user.")
     ),
@@ -55,6 +57,7 @@ pub fn router() -> Router<Arc<AppState>> {
         .route("/invoices", get(list_wallet_invoices))
         .route("/invoices/:id", get(get_wallet_invoice))
         .route("/invoices", post(new_wallet_invoice))
+        .route("/contacts", get(list_contacts))
         .route("/invoices", delete(delete_expired_invoices))
 }
 
@@ -365,6 +368,29 @@ async fn get_wallet_invoice(
         .ok_or_else(|| DataError::NotFound("Invoice not found.".to_string()))?;
 
     Ok(Json(invoice.into()))
+}
+
+/// List contacts
+///
+/// Returns all the contacts
+#[utoipa::path(
+    get,
+    path = "/contacts",
+    tag = "Wallet",
+    context_path = CONTEXT_PATH,
+    responses(
+        (status = 200, description = "Success", body = Vec<Contact>),
+        (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
+        (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
+        (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
+    )
+)]
+async fn list_contacts(
+    State(app_state): State<Arc<AppState>>,
+    user: AuthUser,
+) -> Result<Json<Vec<Contact>>, ApplicationError> {
+    let contacts = app_state.services.wallet.list_contacts(user.sub).await?;
+    Ok(contacts.into())
 }
 
 /// Delete expired invoices

@@ -26,8 +26,8 @@ use super::{
     PaymentsUseCases,
 };
 
-const DEFAULT_INTERNAL_INVOICE_DESCRIPTION: &str = "Numeraire Swissknife Invoice";
-const DEFAULT_INTERNAL_PAYMENT_DESCRIPTION: &str = "Payment to Numeraire Swissknife";
+const DEFAULT_INTERNAL_INVOICE_DESCRIPTION: &str = "Numeraire Invoice";
+const DEFAULT_INTERNAL_PAYMENT_DESCRIPTION: &str = "Payment to Numeraire";
 
 pub struct PaymentService {
     domain: String,
@@ -199,6 +199,7 @@ impl PaymentService {
                         retrieved_invoice.fee_msat = Some(0);
                         retrieved_invoice.payment_time = internal_payment.payment_time;
                         retrieved_invoice.amount_received_msat = Some(amount);
+                        retrieved_invoice.ledger = Ledger::Internal;
                         self.store
                             .invoice
                             .update(Some(&txn), retrieved_invoice)

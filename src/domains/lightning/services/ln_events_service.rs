@@ -7,7 +7,7 @@ use crate::{
         errors::{ApplicationError, DataError},
     },
     domains::{
-        invoices::entities::{Invoice, InvoiceFilter, InvoiceStatus},
+        invoices::entities::{Invoice, InvoiceFilter, InvoiceOrderBy, InvoiceStatus},
         lightning::entities::{LnInvoicePaidEvent, LnPayFailureEvent, LnPaySuccessEvent},
         payments::entities::PaymentStatus,
     },
@@ -38,6 +38,7 @@ impl LnEventsUseCases for LnEventsService {
                 status: Some(InvoiceStatus::Settled),
                 ledger: Some(Ledger::Lightning),
                 limit: Some(1),
+                order_by: InvoiceOrderBy::PaymentTime,
                 ..Default::default()
             })
             .await?;

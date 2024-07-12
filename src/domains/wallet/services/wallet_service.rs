@@ -3,7 +3,7 @@ use crate::{
     domains::{
         invoices::entities::InvoiceFilter,
         payments::entities::PaymentFilter,
-        wallet::entities::{UserBalance, Wallet},
+        wallet::entities::{Contact, UserBalance, Wallet},
     },
 };
 use async_trait::async_trait;
@@ -67,5 +67,14 @@ impl WalletUseCases for WalletService {
             ln_address,
             contacts,
         })
+    }
+
+    async fn list_contacts(&self, user_id: String) -> Result<Vec<Contact>, ApplicationError> {
+        trace!("Fetching contacts");
+
+        let contacts = self.store.payment.find_contacts(&user_id).await?;
+
+        debug!("Contacts fetched successfully");
+        Ok(contacts)
     }
 }

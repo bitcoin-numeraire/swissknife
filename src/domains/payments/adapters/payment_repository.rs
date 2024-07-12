@@ -142,15 +142,15 @@ impl PaymentRepository for SeaOrmPaymentRepository {
         Ok(result.rows_affected)
     }
 
-    /// A contact is a LN address that has been used in a successful payment
     async fn find_contacts(&self, user: &str) -> Result<Vec<Contact>, DatabaseError> {
         let models = Entity::find()
             .filter(Column::UserId.eq(user))
             .filter(Column::LnAddress.is_not_null())
             .filter(Column::Status.eq(PaymentStatus::Settled.to_string()))
             .select_only()
-            .distinct()
             .column(Column::LnAddress)
+            .column_as(Column::PaymentTime.min(), "contact_since")
+            .group_by(Column::LnAddress)
             .order_by_asc(Column::LnAddress)
             .into_model::<ContactModel>()
             .all(&self.db)

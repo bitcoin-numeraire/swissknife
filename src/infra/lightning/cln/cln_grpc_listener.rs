@@ -1,6 +1,5 @@
 use std::{sync::Arc, time::Duration};
 
-use ::hex::decode;
 use anyhow::{anyhow, Result};
 use serde_bolt::bitcoin::hashes::hex::ToHex;
 use tokio::time::sleep;
@@ -27,15 +26,14 @@ pub async fn listen_invoices(
 
     let mut lastpay_index = match last_settled_invoice {
         Some(invoice) => {
-            let payment_hash = invoice.ln_invoice.unwrap().payment_hash;
             debug!(
-                %payment_hash,
+                id = %invoice.id,
                 "Fetching latest settled invoice from node..."
             );
 
             let invoices = client
                 .list_invoices(ListinvoicesRequest {
-                    payment_hash: decode(payment_hash).ok(),
+                    label: Some(invoice.id.into()),
                     ..Default::default()
                 })
                 .await?
