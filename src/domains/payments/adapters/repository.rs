@@ -4,7 +4,10 @@ use uuid::Uuid;
 
 use crate::{
     application::errors::DatabaseError,
-    domains::payments::entities::{Payment, PaymentFilter},
+    domains::{
+        payments::entities::{Payment, PaymentFilter},
+        wallet::entities::Contact,
+    },
 };
 
 #[async_trait]
@@ -22,4 +25,5 @@ pub trait PaymentRepository: Send + Sync {
     ) -> Result<Payment, DatabaseError>;
     async fn update(&self, payment: Payment) -> Result<Payment, DatabaseError>;
     async fn delete_many(&self, filter: PaymentFilter) -> Result<u64, DatabaseError>;
+    async fn find_contacts(&self, user: &str) -> Result<Vec<Contact>, DatabaseError>;
 }

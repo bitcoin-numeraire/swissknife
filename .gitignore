@@ -19,8 +19,8 @@ target/
 
 # Env
 .env
-config/development.yaml
-config/production.yaml
+config/development.yml
+config/production.yml
 
 # Certificates
 certs/

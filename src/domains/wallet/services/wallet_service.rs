@@ -36,6 +36,7 @@ impl WalletUseCases for WalletService {
         trace!(user_id, "Fetching wallet");
 
         let balance = self.store.wallet.get_balance(None, &user_id).await?;
+
         let payments = self
             .store
             .payment
@@ -44,6 +45,7 @@ impl WalletUseCases for WalletService {
                 ..Default::default()
             })
             .await?;
+
         let invoices = self
             .store
             .invoice
@@ -52,7 +54,10 @@ impl WalletUseCases for WalletService {
                 ..Default::default()
             })
             .await?;
+
         let ln_address = self.store.ln_address.find_by_user_id(&user_id).await?;
+
+        let contacts = self.store.payment.find_contacts(&user_id).await?;
 
         debug!(user_id, "wallet fetched successfully");
         Ok(Wallet {
@@ -60,6 +65,7 @@ impl WalletUseCases for WalletService {
             payments,
             invoices,
             ln_address,
+            contacts,
         })
     }
 }

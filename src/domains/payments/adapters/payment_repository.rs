@@ -7,10 +7,14 @@ use uuid::Uuid;
 
 use crate::{
     application::errors::DatabaseError,
-    domains::payments::entities::{Payment, PaymentFilter},
+    domains::{
+        payments::entities::{Payment, PaymentFilter, PaymentStatus},
+        wallet::entities::Contact,
+    },
 };
 
 use super::{
+    contact_model::ContactModel,
     payment_model::{ActiveModel, Column, Entity},
     PaymentRepository,
 };
@@ -136,5 +140,24 @@ impl PaymentRepository for SeaOrmPaymentRepository {
             .map_err(|e| DatabaseError::Delete(e.to_string()))?;
 
         Ok(result.rows_affected)
+    }
+
+    /// A contact is a LN address that has been used in a successful payment
+    async fn find_contacts(&self, user: &str) -> Result<Vec<Contact>, DatabaseError> {
+        let models = Entity::find()
+            .filter(Column::UserId.eq(user))
+            .filter(Column::LnAddress.is_not_null())
+            .filter(Column::Status.eq(PaymentStatus::Settled.to_string()))
+            .select_only()
+            .distinct()
+            .column(Column::LnAddress)
+            .order_by_asc(Column::LnAddress)
+            .into_model::<ContactModel>()
+            .all(&self.db)
+            .await
+            .map_err(|e| DatabaseError::FindMany(e.to_string()))?;
+
+        let response: Vec<Contact> = models.into_iter().map(Into::into).collect();
+        Ok(response)
     }
 }

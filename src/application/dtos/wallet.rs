@@ -3,7 +3,7 @@ use utoipa::ToSchema;
 
 use crate::domains::{
     lightning::entities::LnAddress,
-    wallet::entities::{UserBalance, Wallet},
+    wallet::entities::{Contact, UserBalance, Wallet},
 };
 
 use super::{InvoiceResponse, PaymentResponse};
@@ -18,6 +18,8 @@ pub struct WalletResponse {
     pub invoices: Vec<InvoiceResponse>,
     /// Lightning Address
     pub ln_address: Option<LnAddress>,
+    /// List of contacts
+    pub contacts: Vec<Contact>,
 }
 
 impl From<Wallet> for WalletResponse {
@@ -27,6 +29,7 @@ impl From<Wallet> for WalletResponse {
             payments: wallet.payments.into_iter().map(Into::into).collect(),
             invoices: wallet.invoices.into_iter().map(Into::into).collect(),
             ln_address: wallet.ln_address,
+            contacts: wallet.contacts,
         }
     }
 }

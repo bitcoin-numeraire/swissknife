@@ -1,12 +1,15 @@
-domain: "numeraire.tech"
+domain: numeraire.tech
 ln_provider: clngrpc
-auth_provider: jwt
+auth_provider: bypass
 
 logging:
   format: compact
   ansi: true
-  level: debug
-  filter: swissknife=debug
+  level: trace
+  filter: swissknife=trace
+
+jwt:
+  username: superuser
 
 oauth2:
   domain: "dev-z3xohtidpayxvzid.us.auth0.com"
