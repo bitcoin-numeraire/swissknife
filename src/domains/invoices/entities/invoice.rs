@@ -68,7 +68,18 @@ pub struct InvoiceFilter {
     pub status: Option<InvoiceStatus>,
     /// Ledger
     pub ledger: Option<Ledger>,
+    /// Order by
+    #[serde(default)]
+    pub order_by: InvoiceOrderBy,
     /// Direction of the ordering of results
     #[serde(default)]
     pub order_direction: OrderDirection,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq, Default, ToSchema)]
+pub enum InvoiceOrderBy {
+    #[default]
+    CreatedAt,
+    PaymentTime,
+    UpdatedAt,
 }

@@ -19,7 +19,7 @@ use crate::{
         errors::ApplicationError,
     },
     domains::{
-        invoices::entities::{InvoiceFilter, InvoiceStatus},
+        invoices::entities::{InvoiceFilter, InvoiceOrderBy, InvoiceStatus},
         users::entities::{AuthUser, Permission},
     },
     infra::app::AppState,
@@ -28,7 +28,7 @@ use crate::{
 #[derive(OpenApi)]
 #[openapi(
     paths(generate_invoice, list_invoices, get_invoice, delete_invoice, delete_invoices),
-    components(schemas(InvoiceResponse, NewInvoiceRequest, InvoiceStatus, LnInvoiceResponse)),
+    components(schemas(InvoiceResponse, NewInvoiceRequest, InvoiceStatus, LnInvoiceResponse, InvoiceOrderBy)),
     tags(
         (name = "Invoices", description = "Invoice management endpoints. Require authorization.")
     ),

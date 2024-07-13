@@ -1,3 +1,4 @@
+mod contact_model;
 mod payment_model;
 mod payment_repository;
 mod repository;

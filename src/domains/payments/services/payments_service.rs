@@ -26,8 +26,8 @@ use super::{
     PaymentsUseCases,
 };
 
-const DEFAULT_INTERNAL_INVOICE_DESCRIPTION: &str = "Numeraire Swissknife Invoice";
-const DEFAULT_INTERNAL_PAYMENT_DESCRIPTION: &str = "Payment to Numeraire Swissknife";
+const DEFAULT_INTERNAL_INVOICE_DESCRIPTION: &str = "Numeraire Invoice";
+const DEFAULT_INTERNAL_PAYMENT_DESCRIPTION: &str = "Payment to Numeraire";
 
 pub struct PaymentService {
     domain: String,
@@ -62,6 +62,80 @@ impl PaymentService {
         }
 
         Ok(amount)
+    }
+
+    async fn send_internal(&self, req: SendPaymentRequest) -> Result<Payment, ApplicationError> {
+        let amount = Self::validate_amount(req.amount_msat)?;
+
+        let (username, _) = req
+            .input
+            .split_once('@')
+            .expect("should not fail or malformed LN address");
+
+        let address_opt = self.store.ln_address.find_by_username(username).await?;
+        match address_opt {
+            Some(retrieved_address) => {
+                let user_id = req.user_id.expect("user_id cannot be empty");
+
+                if retrieved_address.user_id == user_id {
+                    return Err(DataError::Validation("Cannot pay to yourself.".to_string()).into());
+                }
+
+                let curr_time = Utc::now();
+
+                let txn = self.store.begin().await?;
+                self.store
+                    .invoice
+                    .insert(
+                        Some(&txn),
+                        Invoice {
+                            id: Uuid::new_v4(),
+                            user_id: retrieved_address.user_id,
+                            ln_address_id: Some(retrieved_address.id),
+                            ledger: Ledger::Internal,
+                            description: req
+                                .comment
+                                .clone()
+                                .or(DEFAULT_INTERNAL_INVOICE_DESCRIPTION.to_string().into()),
+                            currency: Currency::Bitcoin,
+                            amount_msat: Some(amount),
+                            amount_received_msat: Some(amount),
+                            timestamp: curr_time,
+                            status: InvoiceStatus::Settled,
+                            fee_msat: Some(0),
+                            payment_time: Some(curr_time),
+                            ..Default::default()
+                        },
+                    )
+                    .await?;
+
+                let internal_payment = self
+                    .insert_payment(
+                        Payment {
+                            user_id,
+                            amount_msat: amount,
+                            status: PaymentStatus::Settled,
+                            description: req
+                                .comment
+                                .or(DEFAULT_INTERNAL_PAYMENT_DESCRIPTION.to_string().into()),
+                            fee_msat: Some(0),
+                            payment_time: Some(curr_time),
+                            ledger: Ledger::Internal,
+                            ln_address: Some(req.input),
+                            ..Default::default()
+                        },
+                        0.0,
+                    )
+                    .await?;
+
+                txn.commit()
+                    .await
+                    .map_err(|e| DatabaseError::Transaction(e.to_string()))?;
+
+                Ok(internal_payment)
+            }
+            None => Err(DataError::NotFound("Recipient not found.".to_string()).into()),
+        }
     }
 
     async fn send_bolt11(
@@ -125,6 +199,7 @@ impl PaymentService {
                         retrieved_invoice.fee_msat = Some(0);
                         retrieved_invoice.payment_time = internal_payment.payment_time;
                         retrieved_invoice.amount_received_msat = Some(amount);
+                        retrieved_invoice.ledger = Ledger::Internal;
                         self.store
                             .invoice
                             .update(Some(&txn), retrieved_invoice)
@@ -186,95 +261,6 @@ impl PaymentService {
     ) -> Result<Payment, ApplicationError> {
         let amount = Self::validate_amount(amount_msat)?;
 
-        // Check if internal payment
-        if req.domain == self.domain {
-            match req.ln_address.clone() {
-                Some(ln_address) => {
-                    let address = ln_address
-                        .split('@')
-                        .next()
-                        .expect("should not fail or malformed LN address");
-                    let address_opt = self.store.ln_address.find_by_username(address).await?;
-
-                    match address_opt {
-                        Some(retrieved_address) => {
-                            if retrieved_address.user_id == user_id {
-                                return Err(DataError::Validation(
-                                    "Cannot pay to own lightning address.".to_string(),
-                                )
-                                .into());
-                            }
-
-                            // Internal payment
-                            let curr_time = Utc::now();
-
-                            let txn = self.store.begin().await?;
-                            self.store
-                                .invoice
-                                .insert(
-                                    Some(&txn),
-                                    Invoice {
-                                        user_id: retrieved_address.user_id,
-                                        ln_address_id: Some(retrieved_address.id),
-                                        ledger: Ledger::Internal,
-                                        description: comment.clone().or(
-                                            DEFAULT_INTERNAL_INVOICE_DESCRIPTION.to_string().into(),
-                                        ),
-                                        currency: Currency::Bitcoin,
-                                        amount_msat: Some(amount),
-                                        amount_received_msat: Some(amount),
-                                        timestamp: curr_time,
-                                        status: InvoiceStatus::Settled,
-                                        fee_msat: Some(0),
-                                        payment_time: Some(curr_time),
-                                        ..Default::default()
-                                    },
-                                )
-                                .await?;
-
-                            let internal_payment = self
-                                .insert_payment(
-                                    Payment {
-                                        user_id,
-                                        amount_msat: amount,
-                                        status: PaymentStatus::Settled,
-                                        description: comment.or(
-                                            DEFAULT_INTERNAL_PAYMENT_DESCRIPTION.to_string().into(),
-                                        ),
-                                        fee_msat: Some(0),
-                                        payment_time: Some(Utc::now()),
-                                        ledger: Ledger::Internal,
-                                        ln_address: Some(ln_address),
-                                        ..Default::default()
-                                    },
-                                    0.0,
-                                )
-                                .await?;
-
-                            txn.commit()
-                                .await
-                                .map_err(|e| DatabaseError::Transaction(e.to_string()))?;
-
-                            return Ok(internal_payment);
-                        }
-                        None => {
-                            return Err(
-                                DataError::NotFound("LN Address not found.".to_string()).into()
-                            );
-                        }
-                    }
-                }
-                None => {
-                    return Err(DataError::Validation(
-                        "Invalid LNURL, LN Address must be defined for internal payments."
-                            .to_string(),
-                    )
-                    .into());
-                }
-            }
-        }
-
-        // External payment
         let cb = validate_lnurl_pay(amount, &comment, &req)
             .await
             .map_err(|e| DataError::Validation(e.to_string()))?;
@@ -368,6 +354,13 @@ impl PaymentService {
             }
         }
     }
+
+    fn is_internal_payment(&self, input: &str) -> bool {
+        if let Some((_, input_domain)) = input.split_once('@') {
+            return input_domain == self.domain;
+        }
+        false
+    }
 }
 
 #[async_trait]
@@ -401,30 +394,34 @@ impl PaymentsUseCases for PaymentService {
     async fn pay(&self, req: SendPaymentRequest) -> Result<Payment, ApplicationError> {
         debug!(?req, "Sending payment");
 
-        let input_type = parse(&req.input)
-            .await
-            .map_err(|e| DataError::Validation(e.to_string()))?;
+        let payment = if self.is_internal_payment(&req.input) {
+            self.send_internal(req).await
+        } else {
+            let input_type = parse(&req.input)
+                .await
+                .map_err(|err| DataError::Validation(err.to_string()))?;
 
-        let payment = match input_type {
-            InputType::Bolt11 { invoice } => {
-                self.send_bolt11(
-                    req.user_id.expect("user_id cannot be empty"),
-                    invoice,
-                    req.amount_msat,
-                )
-                .await
+            match input_type {
+                InputType::Bolt11 { invoice } => {
+                    self.send_bolt11(
+                        req.user_id.expect("user_id cannot be empty"),
+                        invoice,
+                        req.amount_msat,
+                    )
+                    .await
+                }
+                InputType::LnUrlPay { data } => {
+                    self.send_lnurl_pay(
+                        req.user_id.expect("user_id cannot be empty"),
+                        data,
+                        req.amount_msat,
+                        req.comment,
+                    )
+                    .await
+                }
+                InputType::LnUrlError { data } => Err(DataError::Validation(data.reason).into()),
+                _ => Err(DataError::Validation("Unsupported payment input".to_string()).into()),
             }
-            InputType::LnUrlPay { data } => {
-                self.send_lnurl_pay(
-                    req.user_id.expect("user_id cannot be empty"),
-                    data,
-                    req.amount_msat,
-                    req.comment,
-                )
-                .await
-            }
-            InputType::LnUrlError { data } => Err(DataError::Validation(data.reason).into()),
-            _ => Err(DataError::Validation("Unsupported payment input".to_string()).into()),
         }?;
 
         info!(

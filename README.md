@@ -21,6 +21,7 @@ Numeraire's Bitcoin SwissKnife is a wallet and transaction orchestrator enabling
 - [x] Data availability through pagination and advanced search.
 - [ ] [RGB](https://rgb.tech/) Smart contracts. (WIP)
 - [ ] [Taproot Assets](https://docs.lightning.engineering/the-lightning-network/taproot-assets). (TODO)
+- [ ] BOLT12 (offers) (TODO)
 
 Numeraire SwissKnife ships with a [Dashboard (for admin and users)](https://github.com/bitcoin-numeraire/swissknife-dashboard).
 

@@ -1,6 +1,6 @@
 use crate::{
     application::{entities::Ledger, errors::DatabaseError},
-    domains::invoices::entities::{Invoice, InvoiceFilter, InvoiceStatus},
+    domains::invoices::entities::{Invoice, InvoiceFilter, InvoiceOrderBy, InvoiceStatus},
 };
 use async_trait::async_trait;
 use sea_orm::{
@@ -51,6 +51,12 @@ impl InvoiceRepository for SeaOrmInvoiceRepository {
     }
 
     async fn find_many(&self, filter: InvoiceFilter) -> Result<Vec<Invoice>, DatabaseError> {
+        let order_by_column = match filter.order_by {
+            InvoiceOrderBy::CreatedAt => Column::CreatedAt,
+            InvoiceOrderBy::PaymentTime => Column::PaymentTime,
+            InvoiceOrderBy::UpdatedAt => Column::UpdatedAt,
+        };
+
         let models = Entity::find()
             .apply_if(filter.user_id, |q, user| q.filter(Column::UserId.eq(user)))
             .apply_if(filter.ids, |q, ids| q.filter(Column::Id.is_in(ids)))
@@ -70,7 +76,7 @@ impl InvoiceRepository for SeaOrmInvoiceRepository {
             .apply_if(filter.ledger, |q, l| {
                 q.filter(Column::Ledger.eq(l.to_string()))
             })
-            .order_by(Column::CreatedAt, filter.order_direction.into())
+            .order_by(order_by_column, filter.order_direction.into())
             .offset(filter.offset)
             .limit(filter.limit)
             .all(&self.db)
@@ -93,6 +99,7 @@ impl InvoiceRepository for SeaOrmInvoiceRepository {
             amount_msat: Set(invoice.amount_msat.map(|v| v as i64)),
             amount_received_msat: Set(invoice.amount_received_msat.map(|v| v as i64)),
             timestamp: Set(invoice.timestamp),
+            payment_time: Set(invoice.payment_time),
             ledger: Set(invoice.ledger.to_string()),
             currency: Set(invoice.currency.to_string()),
             ..Default::default()

@@ -5,12 +5,15 @@ use crate::domains::{
     invoices::entities::Invoice, lightning::entities::LnAddress, payments::entities::Payment,
 };
 
+use super::Contact;
+
 #[derive(Debug, Clone)]
 pub struct Wallet {
     pub user_balance: UserBalance,
     pub payments: Vec<Payment>,
     pub invoices: Vec<Invoice>,
     pub ln_address: Option<LnAddress>,
+    pub contacts: Vec<Contact>,
 }
 
 #[derive(Debug, Clone, Serialize, Default, ToSchema)]
