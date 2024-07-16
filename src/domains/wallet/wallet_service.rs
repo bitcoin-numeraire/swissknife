@@ -1,15 +1,12 @@
-use crate::{
-    application::{
-        entities::AppStore,
-        errors::{ApplicationError, DataError},
-    },
-    domains::{invoice::InvoiceFilter, payment::PaymentFilter},
+use crate::application::{
+    entities::AppStore,
+    errors::{ApplicationError, DataError},
 };
 use async_trait::async_trait;
 use tracing::{debug, trace};
 use uuid::Uuid;
 
-use super::{Contact, UserBalance, Wallet, WalletUseCases};
+use super::{Balance, Contact, Wallet, WalletUseCases};
 
 pub struct WalletService {
     store: AppStore,
@@ -23,7 +20,7 @@ impl WalletService {
 
 #[async_trait]
 impl WalletUseCases for WalletService {
-    async fn get_balance(&self, id: Uuid) -> Result<UserBalance, ApplicationError> {
+    async fn get_balance(&self, id: Uuid) -> Result<Balance, ApplicationError> {
         trace!(%id, "Fetching balance");
 
         let balance = self.store.wallet.get_balance(None, id).await?;
@@ -35,34 +32,12 @@ impl WalletUseCases for WalletService {
     async fn get(&self, id: Uuid) -> Result<Wallet, ApplicationError> {
         trace!(%id, "Fetching wallet");
 
-        let mut wallet = self
+        let wallet = self
             .store
             .wallet
-            .find_by_user_id(id)
+            .find(id)
             .await?
             .ok_or_else(|| DataError::NotFound("Wallet not found.".to_string()))?;
-
-        wallet.user_balance = self.store.wallet.get_balance(None, id).await?;
-
-        wallet.payments = self
-            .store
-            .payment
-            .find_many(PaymentFilter {
-                wallet_id: Some(id.clone()),
-                ..Default::default()
-            })
-            .await?;
-
-        wallet.invoices = self
-            .store
-            .invoice
-            .find_many(InvoiceFilter {
-                wallet_id: Some(id.clone()),
-                ..Default::default()
-            })
-            .await?;
-
-        wallet.contacts = self.store.payment.find_contacts(id).await?;
 
         debug!(%id, "wallet fetched successfully");
         Ok(wallet)
@@ -71,7 +46,7 @@ impl WalletUseCases for WalletService {
     async fn list_contacts(&self, id: Uuid) -> Result<Vec<Contact>, ApplicationError> {
         trace!(%id, "Fetching contacts");
 
-        let contacts = self.store.payment.find_contacts(id).await?;
+        let contacts = self.store.wallet.find_contacts(id).await?;
 
         debug!(%id, "Contacts fetched successfully");
         Ok(contacts)

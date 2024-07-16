@@ -29,7 +29,7 @@ use crate::{
     infra::app::AppState,
 };
 
-use super::{Contact, UserBalance};
+use super::{Contact, Balance};
 
 #[derive(OpenApi)]
 #[openapi(
@@ -37,7 +37,7 @@ use super::{Contact, UserBalance};
         get_wallet_payment, delete_failed_payments, list_wallet_invoices, get_wallet_invoice, new_wallet_invoice, delete_expired_invoices,
         list_contacts
     ),
-    components(schemas(WalletResponse, UserBalance, Contact)),
+    components(schemas(WalletResponse, Balance, Contact)),
     tags(
         (name = "Wallet", description = "Wallet endpoints. Available to any authenticated user.")
     ),
@@ -137,7 +137,7 @@ async fn wallet_pay(
 async fn get_wallet_balance(
     State(app_state): State<Arc<AppState>>,
     user: Account,
-) -> Result<Json<UserBalance>, ApplicationError> {
+) -> Result<Json<Balance>, ApplicationError> {
     let balance = app_state
         .services
         .wallet

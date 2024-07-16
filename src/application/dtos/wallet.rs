@@ -5,7 +5,7 @@ use uuid::Uuid;
 
 use crate::{
     application::entities::Currency,
-    domains::wallet::{Contact, UserBalance, Wallet},
+    domains::wallet::{Balance, Contact, Wallet},
 };
 
 use super::{InvoiceResponse, PaymentResponse};
@@ -19,7 +19,7 @@ pub struct WalletResponse {
     /// Currency
     pub currency: Currency,
     /// User Balance
-    pub user_balance: UserBalance,
+    pub balance: Balance,
     /// List of payments
     pub payments: Vec<PaymentResponse>,
     /// Lit of Invoices
@@ -39,7 +39,7 @@ impl From<Wallet> for WalletResponse {
             id: wallet.id,
             user_id: wallet.user_id,
             currency: wallet.currency,
-            user_balance: wallet.user_balance,
+            balance: wallet.balance,
             payments: wallet.payments.into_iter().map(Into::into).collect(),
             invoices: wallet.invoices.into_iter().map(Into::into).collect(),
             contacts: wallet.contacts,

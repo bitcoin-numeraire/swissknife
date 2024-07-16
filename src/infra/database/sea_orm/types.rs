@@ -7,13 +7,13 @@ use crate::domains::{
     ln_address::LnAddress,
     payment::Payment,
     user::Account,
-    wallet::{Contact, UserBalance, Wallet},
+    wallet::{Balance, Contact, Wallet},
 };
 
 use super::models::{
-    account::Model as AccountModel, contact::ContactModel, invoice::Model as InvoiceModel,
-    ln_address::Model as LnAddressModel, payment::Model as PaymentModel,
-    user_balance::UserBalanceModel, wallet::Model as WalletModel,
+    account::Model as AccountModel, balance::BalanceModel, contact::ContactModel,
+    invoice::Model as InvoiceModel, ln_address::Model as LnAddressModel,
+    payment::Model as PaymentModel, wallet::Model as WalletModel,
 };
 
 const ASSERTION_MSG: &str = "should parse successfully by assertion";
@@ -107,9 +107,9 @@ impl From<LnAddressModel> for LnAddress {
     }
 }
 
-impl From<UserBalanceModel> for UserBalance {
-    fn from(model: UserBalanceModel) -> Self {
-        UserBalance {
+impl From<BalanceModel> for Balance {
+    fn from(model: BalanceModel) -> Self {
+        Balance {
             received_msat: model.received_msat as u64,
             sent_msat: model.sent_msat as u64,
             fees_paid_msat: model.fees_paid_msat as u64,

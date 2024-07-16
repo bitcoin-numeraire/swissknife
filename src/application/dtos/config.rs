@@ -27,7 +27,7 @@ pub struct AppConfig {
     pub ln_provider: LightningProvider,
     pub database: SeaOrmConfig,
     pub breez_config: Option<BreezClientConfig>,
-    pub cln_config: Option<ClnClientConfig>,
+    pub cln_grpc_config: Option<ClnClientConfig>,
     pub cln_rest_config: Option<ClnRestClientConfig>,
     pub web: AxumServerConfig,
     pub logging: TracingLoggerConfig,

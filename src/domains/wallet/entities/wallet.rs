@@ -15,7 +15,7 @@ pub struct Wallet {
     pub id: Uuid,
     pub user_id: Uuid,
     pub currency: Currency,
-    pub user_balance: UserBalance,
+    pub balance: Balance,
     pub payments: Vec<Payment>,
     pub invoices: Vec<Invoice>,
     pub contacts: Vec<Contact>,
@@ -24,7 +24,7 @@ pub struct Wallet {
 }
 
 #[derive(Debug, Clone, Serialize, Default, ToSchema)]
-pub struct UserBalance {
+pub struct Balance {
     /// Total amount received
     #[schema(example = 1000000000)]
     pub received_msat: u64,

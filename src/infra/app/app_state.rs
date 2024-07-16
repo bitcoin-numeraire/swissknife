@@ -79,7 +79,7 @@ async fn get_ln_client(
             Ok(LnNodeClient::Breez(Arc::new(client)))
         }
         LightningProvider::ClnGrpc => {
-            let cln_config = config.cln_config.clone().ok_or_else(|| {
+            let cln_config = config.cln_grpc_config.clone().ok_or_else(|| {
                 ConfigError::MissingLightningProviderConfig(config.ln_provider.to_string())
             })?;
 

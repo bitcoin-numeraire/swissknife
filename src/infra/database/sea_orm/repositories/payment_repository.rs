@@ -7,14 +7,8 @@ use uuid::Uuid;
 
 use crate::{
     application::errors::DatabaseError,
-    domains::{
-        payment::{Payment, PaymentFilter, PaymentRepository, PaymentStatus},
-        wallet::Contact,
-    },
-    infra::database::sea_orm::models::{
-        contact::ContactModel,
-        payment::{ActiveModel, Column, Entity},
-    },
+    domains::payment::{Payment, PaymentFilter, PaymentRepository},
+    infra::database::sea_orm::models::payment::{ActiveModel, Column, Entity},
 };
 
 #[derive(Clone)]
@@ -142,24 +136,5 @@ impl PaymentRepository for SeaOrmPaymentRepository {
             .map_err(|e| DatabaseError::Delete(e.to_string()))?;
 
         Ok(result.rows_affected)
-    }
-
-    async fn find_contacts(&self, wallet_id: Uuid) -> Result<Vec<Contact>, DatabaseError> {
-        let models = Entity::find()
-            .filter(Column::WalletId.eq(wallet_id))
-            .filter(Column::LnAddress.is_not_null())
-            .filter(Column::Status.eq(PaymentStatus::Settled.to_string()))
-            .select_only()
-            .column(Column::LnAddress)
-            .column_as(Column::PaymentTime.min(), "contact_since")
-            .group_by(Column::LnAddress)
-            .order_by_asc(Column::LnAddress)
-            .into_model::<ContactModel>()
-            .all(&self.db)
-            .await
-            .map_err(|e| DatabaseError::FindMany(e.to_string()))?;
-
-        let response: Vec<Contact> = models.into_iter().map(Into::into).collect();
-        Ok(response)
     }
 }

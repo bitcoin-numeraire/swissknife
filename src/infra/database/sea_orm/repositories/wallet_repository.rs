@@ -1,15 +1,22 @@
 use async_trait::async_trait;
 use sea_orm::{
     ActiveModelTrait, ActiveValue::Set, ColumnTrait, ConnectionTrait, DatabaseConnection,
-    DatabaseTransaction, EntityTrait, FromQueryResult, QueryFilter, Statement,
+    DatabaseTransaction, EntityTrait, FromQueryResult, ModelTrait, QueryFilter, QueryOrder,
+    QuerySelect, Statement,
 };
 use uuid::Uuid;
 
 use crate::{
     application::{entities::Currency, errors::DatabaseError},
-    domains::wallet::{UserBalance, Wallet, WalletRepository},
+    domains::{
+        payment::PaymentStatus,
+        wallet::{Balance, Contact, Wallet, WalletRepository},
+    },
     infra::database::sea_orm::models::{
-        user_balance::UserBalanceModel,
+        balance::BalanceModel,
+        contact::ContactModel,
+        payment::Column as PaymentColumn,
+        prelude::{Invoice, Payment},
         wallet::{ActiveModel, Column, Entity},
     },
 };
@@ -27,6 +34,39 @@ impl SeaOrmWalletRepository {
 
 #[async_trait]
 impl WalletRepository for SeaOrmWalletRepository {
+    async fn find(&self, id: Uuid) -> Result<Option<Wallet>, DatabaseError> {
+        let model_opt = Entity::find_by_id(id)
+            .one(&self.db)
+            .await
+            .map_err(|e| DatabaseError::FindOne(e.to_string()))?;
+
+        match model_opt {
+            Some(model) => {
+                let balance = self.get_balance(None, id).await?;
+                let payments = model
+                    .find_related(Payment)
+                    .all(&self.db)
+                    .await
+                    .map_err(|e| DatabaseError::FindRelated(e.to_string()))?;
+                let invoices = model
+                    .find_related(Invoice)
+                    .all(&self.db)
+                    .await
+                    .map_err(|e| DatabaseError::FindRelated(e.to_string()))?;
+                let contacts = self.find_contacts(id).await?;
+
+                let mut wallet: Wallet = model.into();
+                wallet.balance = balance.into();
+                wallet.payments = payments.into_iter().map(Into::into).collect();
+                wallet.invoices = invoices.into_iter().map(Into::into).collect();
+                wallet.contacts = contacts;
+
+                return Ok(Some(wallet));
+            }
+            None => return Ok(None),
+        };
+    }
+
     async fn find_by_user_id(&self, user_id: Uuid) -> Result<Option<Wallet>, DatabaseError> {
         let model = Entity::find()
             .filter(Column::UserId.eq(user_id))
@@ -56,8 +96,8 @@ impl WalletRepository for SeaOrmWalletRepository {
         &self,
         txn: Option<&DatabaseTransaction>,
         id: Uuid,
-    ) -> Result<UserBalance, DatabaseError> {
-        let query = UserBalanceModel::find_by_statement(Statement::from_sql_and_values(
+    ) -> Result<Balance, DatabaseError> {
+        let query = BalanceModel::find_by_statement(Statement::from_sql_and_values(
             self.db.get_database_backend(),
             r#"
             WITH sent AS (
@@ -90,7 +130,26 @@ impl WalletRepository for SeaOrmWalletRepository {
 
         match result {
             Some(model) => Ok(model.into()),
-            None => Ok(UserBalance::default()),
+            None => Ok(Balance::default()),
         }
+    }
+
+    async fn find_contacts(&self, wallet_id: Uuid) -> Result<Vec<Contact>, DatabaseError> {
+        let models = Payment::find()
+            .filter(PaymentColumn::WalletId.eq(wallet_id))
+            .filter(PaymentColumn::LnAddress.is_not_null())
+            .filter(PaymentColumn::Status.eq(PaymentStatus::Settled.to_string()))
+            .select_only()
+            .column(PaymentColumn::LnAddress)
+            .column_as(PaymentColumn::PaymentTime.min(), "contact_since")
+            .group_by(PaymentColumn::LnAddress)
+            .order_by_asc(PaymentColumn::LnAddress)
+            .into_model::<ContactModel>()
+            .all(&self.db)
+            .await
+            .map_err(|e| DatabaseError::FindMany(e.to_string()))?;
+
+        let response: Vec<Contact> = models.into_iter().map(Into::into).collect();
+        Ok(response)
     }
 }

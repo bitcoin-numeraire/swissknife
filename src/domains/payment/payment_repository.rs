@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use sea_orm::DatabaseTransaction;
 use uuid::Uuid;
 
-use crate::{application::errors::DatabaseError, domains::wallet::Contact};
+use crate::application::errors::DatabaseError;
 
 use super::{Payment, PaymentFilter};
 
@@ -21,5 +21,4 @@ pub trait PaymentRepository: Send + Sync {
     ) -> Result<Payment, DatabaseError>;
     async fn update(&self, payment: Payment) -> Result<Payment, DatabaseError>;
     async fn delete_many(&self, filter: PaymentFilter) -> Result<u64, DatabaseError>;
-    async fn find_contacts(&self, wallet_id: Uuid) -> Result<Vec<Contact>, DatabaseError>;
 }
