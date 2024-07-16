@@ -4,7 +4,7 @@ use serde_bolt::bitcoin::hashes::hex::ToHex;
 
 use crate::{
     application::entities::{Currency, Ledger},
-    domains::invoices::entities::{Invoice, LnInvoice},
+    domains::invoice::{Invoice, LnInvoice},
 };
 
 impl From<Bolt11Invoice> for Invoice {
@@ -23,7 +23,6 @@ impl From<Bolt11Invoice> for Invoice {
 
         Invoice {
             ledger: Ledger::Lightning,
-            currency: val.currency().into(),
             amount_msat: val.amount_milli_satoshis(),
             timestamp,
             description: match val.description() {

@@ -9,7 +9,7 @@ use tracing::{debug, error, warn};
 
 use crate::{
     application::errors::LightningError,
-    domains::lightning::services::LnEventsUseCases,
+    domains::ln_node::LnEventsUseCases,
     infra::lightning::cln::cln_websocket_types::{InvoicePayment, SendPayFailure, SendPaySuccess},
 };
 

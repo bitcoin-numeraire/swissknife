@@ -8,7 +8,7 @@ use uuid::Uuid;
 
 use crate::{
     application::entities::{Currency, Ledger},
-    domains::invoices::entities::{Invoice, InvoiceStatus, LnInvoice},
+    domains::invoice::{Invoice, InvoiceStatus, LnInvoice},
 };
 
 /// New Invoice Request
@@ -104,7 +104,7 @@ impl From<Invoice> for InvoiceResponse {
     fn from(invoice: Invoice) -> Self {
         InvoiceResponse {
             id: invoice.id,
-            user_id: invoice.user_id,
+            user_id: invoice.wallet_id,
             ln_address_id: invoice.ln_address_id,
             description: invoice.description,
             currency: invoice.currency,

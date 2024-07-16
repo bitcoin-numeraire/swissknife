@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use breez_sdk_core::{BreezEvent, EventListener, PaymentStatus, PaymentType};
 use tracing::{trace, warn};
 
-use crate::domains::lightning::services::LnEventsUseCases;
+use crate::domains::ln_node::LnEventsUseCases;
 
 pub struct BreezListener {
     pub ln_events: Arc<dyn LnEventsUseCases>,

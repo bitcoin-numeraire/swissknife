@@ -5,7 +5,7 @@ LIGHTNINGD_SERVICE := lightningd
 SWISSKNIFE_SERVICE := swissknife
 IMAGE_NAME := swissknife:latest
 
-.PHONY: watch up up-lightningd up-postgres up-pgadmin shutdown down generate-certs build-docker run-docker lint fmt deps-upgrade deps-outdated
+.PHONY: watch up up-lightningd up-postgres up-pgadmin shutdown down generate-certs build-docker run-docker lint fmt deps-upgrade deps-outdated install-tools generate-models new-migration
 
 watch:
 	@cargo watch -x run
@@ -45,7 +45,7 @@ install-tools:
 	@cargo install cargo-outdated
 
 generate-models:
-	@sea-orm-cli generate entity --output-dir models --verbose 
+	@sea-orm-cli generate entity --output-dir src/infra/database/sea_orm/models --verbose 
 
 generate-certs:
 	@mkdir -p certs
@@ -69,3 +69,6 @@ lint:
 
 fmt:
 	@cargo fmt
+
+new-migration:
+	@sea-orm-cli migrate generate $(name)

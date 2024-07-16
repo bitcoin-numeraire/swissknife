@@ -1,9 +1,9 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use crate::application::errors::AuthenticationError;
-use crate::domains::users::entities::Permission;
-use crate::{domains::users::entities::AuthUser, infra::auth::Authenticator};
+use crate::domains::user::AuthUser;
+use crate::infra::auth::Authenticator;
+use crate::{application::errors::AuthenticationError, domains::user::Permission};
 use async_trait::async_trait;
 use jsonwebtoken::{
     decode, decode_header,

@@ -1,9 +1,7 @@
 use serde::Serialize;
 use utoipa::ToSchema;
 
-use crate::domains::{
-    invoices::entities::Invoice, lightning::entities::LnAddress, payments::entities::Payment,
-};
+use crate::domains::{invoice::Invoice, ln_address::LnAddress, payment::Payment};
 
 use super::Contact;
 

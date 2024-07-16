@@ -6,7 +6,7 @@ use uuid::Uuid;
 
 use crate::{
     application::entities::Ledger,
-    domains::payments::entities::{Payment, PaymentStatus},
+    domains::payment::{Payment, PaymentStatus},
 };
 
 /// Send Payment Request
@@ -98,7 +98,7 @@ impl From<Payment> for PaymentResponse {
     fn from(payment: Payment) -> Self {
         PaymentResponse {
             id: payment.id,
-            user_id: payment.user_id,
+            user_id: payment.wallet_id,
             ln_address: payment.ln_address,
             payment_hash: payment.payment_hash,
             payment_preimage: payment.payment_preimage,

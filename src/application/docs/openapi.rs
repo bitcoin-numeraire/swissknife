@@ -4,12 +4,9 @@ use crate::{
         entities::{Currency, Ledger, OrderDirection},
     },
     domains::{
-        invoices::api::InvoiceHandler,
-        lightning::api::{BreezNodeHandler, LnAddressHandler, LnURLpHandler},
-        payments::api::PaymentHandler,
-        system::api::SystemHandler,
-        users::api::AuthHandler,
-        wallet::api::WalletHandler,
+        invoice::InvoiceHandler, ln_address::LnAddressHandler, ln_node::BreezNodeHandler,
+        lnurl::LnURLHandler, payment::PaymentHandler, system::SystemHandler, user::AuthHandler,
+        wallet::WalletHandler,
     },
 };
 use utoipa::{
@@ -39,7 +36,7 @@ pub fn merged_openapi() -> OpenApi {
     openapi.merge(InvoiceHandler::openapi());
     openapi.merge(PaymentHandler::openapi());
     openapi.merge(LnAddressHandler::openapi());
-    openapi.merge(LnURLpHandler::openapi());
+    openapi.merge(LnURLHandler::openapi());
     openapi.merge(BreezNodeHandler::openapi());
     openapi.merge(SystemHandler::openapi());
     openapi

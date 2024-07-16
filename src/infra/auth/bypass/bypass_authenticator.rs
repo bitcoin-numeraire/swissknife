@@ -1,6 +1,6 @@
 use crate::application::errors::AuthenticationError;
-use crate::domains::users::entities::Permission;
-use crate::{domains::users::entities::AuthUser, infra::auth::Authenticator};
+use crate::domains::user::{AuthUser, Permission};
+use crate::infra::auth::Authenticator;
 use async_trait::async_trait;
 
 #[derive(Clone, Debug)]

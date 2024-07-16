@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 
-use crate::{application::errors::AuthenticationError, domains::users::entities::AuthUser};
+use crate::{application::errors::AuthenticationError, domains::user::AuthUser};
 
 #[async_trait]
 pub trait Authenticator: Send + Sync {

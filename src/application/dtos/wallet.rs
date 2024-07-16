@@ -2,8 +2,8 @@ use serde::Serialize;
 use utoipa::ToSchema;
 
 use crate::domains::{
-    lightning::entities::LnAddress,
-    wallet::entities::{Contact, UserBalance, Wallet},
+    ln_address::LnAddress,
+    wallet::{Contact, UserBalance, Wallet},
 };
 
 use super::{InvoiceResponse, PaymentResponse};

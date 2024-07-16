@@ -17,8 +17,7 @@ use breez_sdk_core::{
 use crate::{
     application::errors::LightningError,
     domains::{
-        invoices::entities::Invoice, lightning::services::LnEventsUseCases,
-        payments::entities::Payment, system::entities::HealthStatus,
+        invoice::Invoice, ln_node::LnEventsUseCases, payment::Payment, system::HealthStatus,
     },
     infra::lightning::LnClient,
 };

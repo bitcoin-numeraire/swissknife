@@ -10,10 +10,10 @@ use serde_bolt::bitcoin::hashes::hex::ToHex;
 use crate::{
     application::entities::{Currency, Ledger},
     domains::{
-        invoices::entities::{Invoice, InvoiceStatus, LnInvoice},
-        lightning::entities::{LnInvoicePaidEvent, LnPayFailureEvent, LnPaySuccessEvent},
-        payments::entities::Payment,
-        system::entities::HealthStatus,
+        invoice::{Invoice, InvoiceStatus, LnInvoice},
+        ln_node::{LnInvoicePaidEvent, LnPayFailureEvent, LnPaySuccessEvent},
+        payment::Payment,
+        system::HealthStatus,
     },
 };
 
@@ -21,7 +21,6 @@ impl From<LNInvoice> for Invoice {
     fn from(val: LNInvoice) -> Self {
         Invoice {
             ledger: Ledger::Lightning,
-            currency: val.network.into(),
             description: val.description,
             amount_msat: val.amount_msat,
             timestamp: Utc.timestamp_opt(val.timestamp as i64, 0).unwrap(),

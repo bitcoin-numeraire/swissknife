@@ -9,7 +9,7 @@ use utoipa_scalar::{Scalar, Servable as ScalarServable};
 
 use crate::{
     application::{docs::merged_openapi, entities::LnNodeClient, errors::WebServerError},
-    domains::{invoices, lightning, payments, system, users, wallet},
+    domains::{invoice, ln_address, ln_node, lnurl, payment, system, user, wallet},
     infra::app::AppState,
 };
 
@@ -20,22 +20,19 @@ pub struct Server {
 impl Server {
     pub fn new(state: Arc<AppState>) -> Self {
         let router = Router::new()
-            .nest("/api/system", system::api::router())
-            .nest("/.well-known/lnurlp", lightning::api::well_known_router())
-            .nest("/api/lnurlp", lightning::api::callback_router())
-            .nest(
-                "/api/lightning/addresses",
-                lightning::api::ln_address_router(),
-            )
-            .nest("/api/invoices", invoices::api::router())
-            .nest("/api/payments", payments::api::router())
-            .nest("/api/wallet", wallet::api::router())
-            .nest("/api/auth", users::api::auth_router())
+            .nest("/api/system", system::router())
+            .nest("/.well-known/lnurlp", lnurl::well_known_router())
+            .nest("/api/lnurlp", lnurl::callback_router())
+            .nest("/api/lightning/addresses", ln_address::router())
+            .nest("/api/invoices", invoice::router())
+            .nest("/api/payments", payment::router())
+            .nest("/api/wallet", wallet::router())
+            .nest("/api/auth", user::auth_router())
             .merge(Scalar::with_url("/docs", merged_openapi()));
 
         let router = match state.ln_node_client {
             LnNodeClient::Breez(_) => {
-                router.nest("/api/lightning/node", lightning::api::breez_node_router())
+                router.nest("/api/lightning/node", ln_node::breez_node_router())
             }
             _ => router,
         };

@@ -7,8 +7,8 @@ use uuid::Uuid;
 use crate::{
     application::entities::Ledger,
     domains::{
-        invoices::entities::{Invoice, InvoiceStatus},
-        payments::entities::Payment,
+        invoice::{Invoice, InvoiceStatus},
+        payment::Payment,
     },
 };
 

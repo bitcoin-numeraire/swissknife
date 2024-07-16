@@ -6,7 +6,7 @@ use crate::{
         entities::{AppServices, AppStore, LnNodeClient},
         errors::{ApplicationError, ConfigError},
     },
-    domains::lightning::services::{LnEventsService, LnEventsUseCases},
+    domains::ln_node::{LnEventsService, LnEventsUseCases},
     infra::{
         auth::{
             bypass::BypassAuthenticator, jwt::JwtAuthenticator, oauth2::OAuth2Authenticator,

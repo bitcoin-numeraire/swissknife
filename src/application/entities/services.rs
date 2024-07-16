@@ -3,12 +3,13 @@ use std::sync::Arc;
 use crate::{
     application::{dtos::AppConfig, errors::ConfigError},
     domains::{
-        invoices::services::{InvoiceService, InvoiceUseCases},
-        lightning::services::{LnUrlService, LnUrlUseCases},
-        payments::services::{PaymentService, PaymentsUseCases},
-        system::services::{SystemService, SystemUseCases},
-        users::services::{UserService, UserUseCases},
-        wallet::services::{WalletService, WalletUseCases},
+        invoice::{InvoiceService, InvoiceUseCases},
+        ln_address::{LnAddressService, LnAddressUseCases},
+        lnurl::{LnUrlService, LnUrlUseCases},
+        payment::{PaymentService, PaymentsUseCases},
+        system::{SystemService, SystemUseCases},
+        user::{UserService, UserUseCases},
+        wallet::{WalletService, WalletUseCases},
     },
     infra::{
         auth::Authenticator,
@@ -27,6 +28,7 @@ pub struct AppServices {
     pub payment: Box<dyn PaymentsUseCases>,
     pub wallet: Box<dyn WalletUseCases>,
     pub lnurl: Box<dyn LnUrlUseCases>,
+    pub ln_address: Box<dyn LnAddressUseCases>,
     pub user: Box<dyn UserUseCases>,
     pub system: Box<dyn SystemUseCases>,
 }
@@ -56,6 +58,7 @@ impl AppServices {
             config.invoice_expiry.as_secs() as u32,
             config.domain,
         );
+        let ln_address = LnAddressService::new(store.clone());
         let wallet = WalletService::new(store.clone());
         let user = UserService::new(config.auth_provider, authenticator);
         let system = SystemService::new(store, ln_client);
@@ -65,6 +68,7 @@ impl AppServices {
             payment: Box::new(payments),
             wallet: Box::new(wallet),
             lnurl: Box::new(lnurl),
+            ln_address: Box::new(store.ln_address),
             user: Box::new(user),
             system: Box::new(system),
         }
