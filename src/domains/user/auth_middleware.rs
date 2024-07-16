@@ -15,17 +15,17 @@ use crate::{
     infra::app::AppState,
 };
 
-use super::AuthUser;
+use super::Account;
 
 #[async_trait]
-impl FromRequestParts<Arc<AppState>> for AuthUser {
+impl FromRequestParts<Arc<AppState>> for Account {
     type Rejection = ApplicationError;
 
     async fn from_request_parts(
         parts: &mut Parts,
         state: &Arc<AppState>,
     ) -> Result<Self, Self::Rejection> {
-        let credentials = match state.services.user.provider() {
+        let credentials = match state.services.auth.provider() {
             AuthProvider::Bypass => "".to_string(),
             _ => {
                 // Extract the token from the Authorization header
@@ -38,7 +38,7 @@ impl FromRequestParts<Arc<AppState>> for AuthUser {
             }
         };
 
-        let user = state.services.user.authenticate(&credentials).await?;
+        let user = state.services.auth.authenticate(&credentials).await?;
 
         Ok(user)
     }

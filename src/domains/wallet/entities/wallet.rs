@@ -1,17 +1,26 @@
+use chrono::{DateTime, Utc};
 use serde::Serialize;
 use utoipa::ToSchema;
+use uuid::Uuid;
 
-use crate::domains::{invoice::Invoice, ln_address::LnAddress, payment::Payment};
+use crate::{
+    application::entities::Currency,
+    domains::{invoice::Invoice, payment::Payment},
+};
 
 use super::Contact;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct Wallet {
+    pub id: Uuid,
+    pub user_id: Uuid,
+    pub currency: Currency,
     pub user_balance: UserBalance,
     pub payments: Vec<Payment>,
     pub invoices: Vec<Invoice>,
-    pub ln_address: Option<LnAddress>,
     pub contacts: Vec<Contact>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: Option<DateTime<Utc>>,
 }
 
 #[derive(Debug, Clone, Serialize, Default, ToSchema)]

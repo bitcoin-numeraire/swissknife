@@ -10,7 +10,7 @@ use super::{Invoice, InvoiceFilter};
 pub trait InvoiceUseCases: Send + Sync {
     async fn invoice(
         &self,
-        user_id: String,
+        wallet_id: Uuid,
         amount: u64,
         description: Option<String>,
         expiry: Option<u32>,

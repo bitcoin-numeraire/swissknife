@@ -1,14 +1,24 @@
-use crate::application::errors::AuthorizationError;
+use chrono::{DateTime, Utc};
+use uuid::Uuid;
+
+use crate::{
+    application::errors::AuthorizationError,
+    domains::{ln_address::LnAddress, wallet::Wallet},
+};
 
 use super::permission::Permission;
 
-#[derive(Clone, Debug)]
-pub struct AuthUser {
-    pub sub: String,
+#[derive(Clone, Debug, Default)]
+pub struct Account {
+    pub id: Uuid,
+    pub wallet: Wallet,
+    pub ln_address: Option<LnAddress>,
     pub permissions: Vec<Permission>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: Option<DateTime<Utc>>,
 }
 
-impl AuthUser {
+impl Account {
     pub fn has_permission(&self, permission: Permission) -> bool {
         self.permissions.contains(&permission)
     }

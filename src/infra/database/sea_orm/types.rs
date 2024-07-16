@@ -6,13 +6,14 @@ use crate::domains::{
     invoice::{Invoice, InvoiceStatus, LnInvoice},
     ln_address::LnAddress,
     payment::Payment,
-    wallet::{Contact, UserBalance},
+    user::Account,
+    wallet::{Contact, UserBalance, Wallet},
 };
 
-use super::models::ln_address::Model as LnAddressModel;
-use super::models::payment::Model as PaymentModel;
 use super::models::{
-    contact::ContactModel, invoice::Model as InvoiceModel, user_balance::UserBalanceModel,
+    account::Model as AccountModel, contact::ContactModel, invoice::Model as InvoiceModel,
+    ln_address::Model as LnAddressModel, payment::Model as PaymentModel,
+    user_balance::UserBalanceModel, wallet::Model as WalletModel,
 };
 
 const ASSERTION_MSG: &str = "should parse successfully by assertion";
@@ -113,6 +114,30 @@ impl From<UserBalanceModel> for UserBalance {
             sent_msat: model.sent_msat as u64,
             fees_paid_msat: model.fees_paid_msat as u64,
             available_msat: model.received_msat - (model.sent_msat + model.fees_paid_msat),
+        }
+    }
+}
+
+impl From<AccountModel> for Account {
+    fn from(model: AccountModel) -> Self {
+        Account {
+            id: model.id,
+            created_at: model.created_at,
+            updated_at: model.updated_at,
+            ..Default::default()
+        }
+    }
+}
+
+impl From<WalletModel> for Wallet {
+    fn from(model: WalletModel) -> Self {
+        Wallet {
+            id: model.id,
+            user_id: model.user_id,
+            currency: model.currency.parse().expect(ASSERTION_MSG),
+            created_at: model.created_at,
+            updated_at: model.updated_at,
+            ..Default::default()
         }
     }
 }

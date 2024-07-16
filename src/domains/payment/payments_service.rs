@@ -10,8 +10,7 @@ use uuid::Uuid;
 
 use crate::{
     application::{
-        dtos::SendPaymentRequest,
-        entities::{AppStore, Currency, Ledger},
+        entities::{AppStore, Ledger},
         errors::{ApplicationError, DataError, DatabaseError, LightningError},
     },
     domains::{
@@ -61,20 +60,30 @@ impl PaymentService {
         Ok(amount)
     }
 
-    async fn send_internal(&self, req: SendPaymentRequest) -> Result<Payment, ApplicationError> {
-        let amount = Self::validate_amount(req.amount_msat)?;
+    async fn send_internal(
+        &self,
+        input: String,
+        amount_msat: Option<u64>,
+        comment: Option<String>,
+        wallet_id: Uuid,
+    ) -> Result<Payment, ApplicationError> {
+        let amount = Self::validate_amount(amount_msat)?;
 
-        let (username, _) = req
-            .input
+        let (username, _) = input
             .split_once('@')
             .expect("should not fail or malformed LN address");
 
         let address_opt = self.store.ln_address.find_by_username(username).await?;
         match address_opt {
             Some(retrieved_address) => {
-                let user_id = req.user_id.expect("user_id cannot be empty");
+                let recipient_wallet = self
+                    .store
+                    .wallet
+                    .find_by_user_id(retrieved_address.user_id)
+                    .await?
+                    .expect("must exist if address exists");
 
-                if retrieved_address.user_id == user_id {
+                if recipient_wallet.id == wallet_id {
                     return Err(DataError::Validation("Cannot pay to yourself.".to_string()).into());
                 }
 
@@ -87,14 +96,12 @@ impl PaymentService {
                         Some(&txn),
                         Invoice {
                             id: Uuid::new_v4(),
-                            wallet_id: retrieved_address.user_id,
+                            wallet_id: recipient_wallet.id,
                             ln_address_id: Some(retrieved_address.id),
                             ledger: Ledger::Internal,
-                            description: req
-                                .comment
+                            description: comment
                                 .clone()
                                 .or(DEFAULT_INTERNAL_INVOICE_DESCRIPTION.to_string().into()),
-                            currency: Currency::Bitcoin,
                             amount_msat: Some(amount),
                             amount_received_msat: Some(amount),
                             timestamp: curr_time,
@@ -109,16 +116,15 @@ impl PaymentService {
                 let internal_payment = self
                     .insert_payment(
                         Payment {
-                            wallet_id: user_id,
+                            wallet_id,
                             amount_msat: amount,
                             status: PaymentStatus::Settled,
-                            description: req
-                                .comment
+                            description: comment
                                 .or(DEFAULT_INTERNAL_PAYMENT_DESCRIPTION.to_string().into()),
                             fee_msat: Some(0),
                             payment_time: Some(curr_time),
                             ledger: Ledger::Internal,
-                            ln_address: Some(req.input),
+                            ln_address: Some(input),
                             ..Default::default()
                         },
                         0.0,
@@ -137,9 +143,10 @@ impl PaymentService {
 
     async fn send_bolt11(
         &self,
-        user_id: String,
         invoice: LNInvoice,
         amount_msat: Option<u64>,
+        comment: Option<String>,
+        wallet_id: Uuid,
     ) -> Result<Payment, ApplicationError> {
         let specified_amount = invoice.amount_msat.or(amount_msat);
         if specified_amount == Some(0) {
@@ -156,7 +163,7 @@ impl PaymentService {
                 .find_by_payment_hash(&invoice.payment_hash)
                 .await?;
             if let Some(mut retrieved_invoice) = invoice_opt {
-                if retrieved_invoice.wallet_id == user_id {
+                if retrieved_invoice.wallet_id == wallet_id {
                     return Err(
                         DataError::Validation("Cannot pay for own invoice.".to_string()).into(),
                     );
@@ -179,7 +186,7 @@ impl PaymentService {
                         let internal_payment = self
                             .insert_payment(
                                 Payment {
-                                    wallet_id: user_id,
+                                    wallet_id,
                                     amount_msat: amount,
                                     status: PaymentStatus::Settled,
                                     payment_hash: Some(invoice.payment_hash),
@@ -215,12 +222,12 @@ impl PaymentService {
             let pending_payment = self
                 .insert_payment(
                     Payment {
-                        wallet_id: user_id,
+                        wallet_id,
                         amount_msat: amount,
                         status: PaymentStatus::Pending,
                         ledger: Ledger::Lightning,
                         payment_hash: Some(invoice.payment_hash),
-                        description: invoice.description,
+                        description: comment,
                         ..Default::default()
                     },
                     self.fee_buffer,
@@ -251,24 +258,24 @@ impl PaymentService {
 
     async fn send_lnurl_pay(
         &self,
-        user_id: String,
-        req: LnUrlPayRequestData,
+        data: LnUrlPayRequestData,
         amount_msat: Option<u64>,
         comment: Option<String>,
+        wallet_id: Uuid,
     ) -> Result<Payment, ApplicationError> {
         let amount = Self::validate_amount(amount_msat)?;
 
-        let cb = validate_lnurl_pay(amount, &comment, &req)
+        let cb = validate_lnurl_pay(amount, &comment, &data)
             .await
             .map_err(|e| DataError::Validation(e.to_string()))?;
 
         let pending_payment = self
             .insert_payment(
                 Payment {
-                    wallet_id: user_id.clone(),
+                    wallet_id,
                     amount_msat: amount,
                     status: PaymentStatus::Pending,
-                    ln_address: req.ln_address.clone(),
+                    ln_address: data.ln_address.clone(),
                     description: comment.clone(),
                     payment_hash: Some(
                         Bolt11Invoice::from_str(&cb.pr)
@@ -299,7 +306,7 @@ impl PaymentService {
         let balance = self
             .store
             .wallet
-            .get_balance(Some(&txn), &payment.wallet_id)
+            .get_balance(Some(&txn), payment.wallet_id)
             .await?
             .available_msat as f64;
 
@@ -365,67 +372,58 @@ impl PaymentsUseCases for PaymentService {
     async fn get(&self, id: Uuid) -> Result<Payment, ApplicationError> {
         trace!(%id, "Fetching payment");
 
-        let lightning_payment = self
+        let payment = self
             .store
             .payment
             .find(id)
             .await?
             .ok_or_else(|| DataError::NotFound("Payment not found.".to_string()))?;
 
-        debug!(
-            %id,
-            "Payment fetched successfully"
-        );
-        Ok(lightning_payment)
+        debug!(%id,"Payment fetched successfully");
+        Ok(payment)
     }
 
     async fn list(&self, filter: PaymentFilter) -> Result<Vec<Payment>, ApplicationError> {
         trace!(?filter, "Listing payments");
 
-        let lightning_payments = self.store.payment.find_many(filter.clone()).await?;
+        let payments = self.store.payment.find_many(filter.clone()).await?;
 
         debug!(?filter, "Payments listed successfully");
-        Ok(lightning_payments)
+        Ok(payments)
     }
 
-    async fn pay(&self, req: SendPaymentRequest) -> Result<Payment, ApplicationError> {
-        debug!(?req, "Sending payment");
+    async fn pay(
+        &self,
+        input: String,
+        amount_msat: Option<u64>,
+        comment: Option<String>,
+        wallet_id: Uuid,
+    ) -> Result<Payment, ApplicationError> {
+        debug!(%input, %wallet_id, "Sending payment");
 
-        let payment = if self.is_internal_payment(&req.input) {
-            self.send_internal(req).await
+        let payment = if self.is_internal_payment(&input) {
+            self.send_internal(input, amount_msat, comment, wallet_id)
+                .await
         } else {
-            let input_type = parse(&req.input)
+            let input_type = parse(&input)
                 .await
                 .map_err(|err| DataError::Validation(err.to_string()))?;
 
             match input_type {
                 InputType::Bolt11 { invoice } => {
-                    self.send_bolt11(
-                        req.user_id.expect("user_id cannot be empty"),
-                        invoice,
-                        req.amount_msat,
-                    )
-                    .await
+                    self.send_bolt11(invoice, amount_msat, comment, wallet_id)
+                        .await
                 }
                 InputType::LnUrlPay { data } => {
-                    self.send_lnurl_pay(
-                        req.user_id.expect("user_id cannot be empty"),
-                        data,
-                        req.amount_msat,
-                        req.comment,
-                    )
-                    .await
+                    self.send_lnurl_pay(data, amount_msat, comment, wallet_id)
+                        .await
                 }
                 InputType::LnUrlError { data } => Err(DataError::Validation(data.reason).into()),
                 _ => Err(DataError::Validation("Unsupported payment input".to_string()).into()),
             }
         }?;
 
-        info!(
-            id = payment.id.to_string(),
-            "Payment processed successfully"
-        );
-
+        info!(id = %payment.id, "Payment processed successfully");
         Ok(payment)
     }
 

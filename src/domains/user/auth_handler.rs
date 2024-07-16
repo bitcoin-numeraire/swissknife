@@ -47,6 +47,6 @@ async fn sign_in(
     State(app_state): State<Arc<AppState>>,
     Json(payload): Json<SignInRequest>,
 ) -> Result<Json<SignInResponse>, ApplicationError> {
-    let token = app_state.services.user.sign_in(payload.password)?;
+    let token = app_state.services.auth.sign_in(payload.password)?;
     Ok(SignInResponse { token }.into())
 }

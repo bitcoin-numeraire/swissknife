@@ -1,5 +1,7 @@
-mod auth_user;
+mod account;
+mod auth;
 mod permission;
 
-pub use auth_user::AuthUser;
+pub use account::Account;
+pub use auth::AuthClaims;
 pub use permission::Permission;

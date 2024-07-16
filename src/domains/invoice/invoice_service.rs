@@ -43,12 +43,12 @@ impl InvoiceService {
 impl InvoiceUseCases for InvoiceService {
     async fn invoice(
         &self,
-        user_id: String,
+        wallet_id: Uuid,
         amount: u64,
         description: Option<String>,
         expiry: Option<u32>,
     ) -> Result<Invoice, ApplicationError> {
-        debug!(%user_id, "Generating invoice");
+        debug!(%wallet_id, "Generating invoice");
 
         let mut invoice = self
             .ln_client
@@ -58,7 +58,7 @@ impl InvoiceUseCases for InvoiceService {
                 expiry.unwrap_or(self.invoice_expiry),
             )
             .await?;
-        invoice.wallet_id.clone_from(&user_id);
+        invoice.wallet_id.clone_from(&wallet_id);
 
         let invoice = self.store.invoice.insert(None, invoice).await?;
 

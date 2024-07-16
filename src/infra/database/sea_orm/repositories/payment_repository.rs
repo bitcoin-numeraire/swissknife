@@ -144,9 +144,9 @@ impl PaymentRepository for SeaOrmPaymentRepository {
         Ok(result.rows_affected)
     }
 
-    async fn find_contacts(&self, wallet: &str) -> Result<Vec<Contact>, DatabaseError> {
+    async fn find_contacts(&self, wallet_id: Uuid) -> Result<Vec<Contact>, DatabaseError> {
         let models = Entity::find()
-            .filter(Column::WalletId.eq(wallet))
+            .filter(Column::WalletId.eq(wallet_id))
             .filter(Column::LnAddress.is_not_null())
             .filter(Column::Status.eq(PaymentStatus::Settled.to_string()))
             .select_only()

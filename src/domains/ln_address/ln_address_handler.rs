@@ -18,7 +18,7 @@ use crate::{
         dtos::RegisterLnAddressRequest,
         errors::ApplicationError,
     },
-    domains::user::{AuthUser, Permission},
+    domains::user::{Permission, Account},
     infra::app::AppState,
 };
 
@@ -64,7 +64,7 @@ pub fn router() -> Router<Arc<AppState>> {
 )]
 async fn register_address(
     State(app_state): State<Arc<AppState>>,
-    user: AuthUser,
+    user: Account,
     Json(payload): Json<RegisterLnAddressRequest>,
 ) -> Result<Json<LnAddress>, ApplicationError> {
     user.check_permission(Permission::WriteLnAddress)?;
@@ -72,7 +72,7 @@ async fn register_address(
     let ln_address = app_state
         .services
         .ln_address
-        .register(payload.user_id.unwrap_or(user.sub), payload.username)
+        .register(payload.user_id.unwrap_or(user.id), payload.username)
         .await?;
     Ok(ln_address.into())
 }
@@ -96,7 +96,7 @@ async fn register_address(
 )]
 async fn get_address(
     State(app_state): State<Arc<AppState>>,
-    user: AuthUser,
+    user: Account,
     Path(id): Path<Uuid>,
 ) -> Result<Json<LnAddress>, ApplicationError> {
     user.check_permission(Permission::ReadLnAddress)?;
@@ -124,7 +124,7 @@ async fn get_address(
 )]
 async fn list_addresses(
     State(app_state): State<Arc<AppState>>,
-    user: AuthUser,
+    user: Account,
     Query(query_params): Query<LnAddressFilter>,
 ) -> Result<Json<Vec<LnAddress>>, ApplicationError> {
     user.check_permission(Permission::ReadLnAddress)?;
@@ -155,7 +155,7 @@ async fn list_addresses(
 )]
 async fn delete_address(
     State(app_state): State<Arc<AppState>>,
-    user: AuthUser,
+    user: Account,
     Path(id): Path<Uuid>,
 ) -> Result<(), ApplicationError> {
     user.check_permission(Permission::WriteLnAddress)?;
@@ -183,7 +183,7 @@ async fn delete_address(
 )]
 async fn delete_addresses(
     State(app_state): State<Arc<AppState>>,
-    user: AuthUser,
+    user: Account,
     Query(query_params): Query<LnAddressFilter>,
 ) -> Result<Json<u64>, ApplicationError> {
     user.check_permission(Permission::WriteLnAddress)?;

@@ -10,10 +10,10 @@ use crate::{
 };
 
 /// Send Payment Request
-#[derive(Debug, Deserialize, ToSchema)]
+#[derive(Debug, Deserialize, Clone, ToSchema)]
 pub struct SendPaymentRequest {
-    /// User ID. Will be populated with your own ID by default
-    pub user_id: Option<String>,
+    /// Wallet ID. Will be populated with your own ID by default
+    pub wallet_id: Option<Uuid>,
 
     /// Recipient. Can be a Bolt11 invoice, LNURL or LN Address. Keysend and On-chain payments not yet supported
     #[schema(example = "hello@numeraire.tech")]
@@ -45,8 +45,8 @@ pub struct SendOnchainPaymentRequest {
 pub struct PaymentResponse {
     /// Internal ID
     pub id: Uuid,
-    /// User ID
-    pub user_id: String,
+    /// Wallet ID
+    pub wallet_id: Uuid,
 
     /// Lightning Address. Populated when sending to a LN Address
     #[schema(example = "hello@numeraire.tech")]
@@ -98,7 +98,7 @@ impl From<Payment> for PaymentResponse {
     fn from(payment: Payment) -> Self {
         PaymentResponse {
             id: payment.id,
-            user_id: payment.wallet_id,
+            wallet_id: payment.wallet_id,
             ln_address: payment.ln_address,
             payment_hash: payment.payment_hash,
             payment_preimage: payment.payment_preimage,

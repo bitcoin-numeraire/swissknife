@@ -1,10 +1,12 @@
+mod account_repository;
 mod auth_handler;
 mod auth_middleware;
+mod auth_service;
 mod entities;
-mod user_service;
 mod user_use_cases;
 
+pub use account_repository::*;
 pub use auth_handler::*;
+pub use auth_service::*;
 pub use entities::*;
-pub use user_service::*;
 pub use user_use_cases::*;

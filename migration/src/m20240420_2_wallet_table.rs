@@ -10,7 +10,7 @@ impl MigrationTrait for Migration {
             r#"
             CREATE TABLE wallet (
                 id UUID PRIMARY KEY DEFAULT gen_random_UUID(),
-                user_id UUID NOT NULL,
+                user_id UUID UNIQUE NOT NULL,
                 currency VARCHAR(255) NOT NULL,
                 created_at TIMESTAMPTZ NOT NULL DEFAULT current_timestamp,
                 updated_at TIMESTAMPTZ,

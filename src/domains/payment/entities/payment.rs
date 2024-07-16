@@ -49,8 +49,8 @@ pub struct PaymentFilter {
     pub offset: Option<u64>,
     /// List of IDs
     pub ids: Option<Vec<Uuid>>,
-    /// User ID. Automatically populated with your user ID
-    pub wallet_id: Option<String>,
+    /// Wallet ID. Automatically populated with your ID
+    pub wallet_id: Option<Uuid>,
     /// Status
     pub status: Option<PaymentStatus>,
     /// Ledger

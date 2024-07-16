@@ -6,11 +6,11 @@ use crate::{
     application::errors::DatabaseError,
     domains::{
         invoice::InvoiceRepository, ln_address::LnAddressRepository, payment::PaymentRepository,
-        wallet::WalletRepository,
+        user::AccountRepository, wallet::WalletRepository,
     },
     infra::database::sea_orm::{
-        SeaOrmInvoiceRepository, SeaOrmLnAddressRepository, SeaOrmPaymentRepository,
-        SeaOrmWalletRepository,
+        SeaOrmAccountRepository, SeaOrmInvoiceRepository, SeaOrmLnAddressRepository,
+        SeaOrmPaymentRepository, SeaOrmWalletRepository,
     },
 };
 
@@ -21,6 +21,7 @@ pub struct AppStore {
     pub payment: Arc<dyn PaymentRepository>,
     pub invoice: Arc<dyn InvoiceRepository>,
     pub wallet: Arc<dyn WalletRepository>,
+    pub account: Arc<dyn AccountRepository>,
 }
 
 impl AppStore {
@@ -29,6 +30,7 @@ impl AppStore {
         let payment_repo = SeaOrmPaymentRepository::new(db_conn.clone());
         let invoice_repo = SeaOrmInvoiceRepository::new(db_conn.clone());
         let wallet_repo = SeaOrmWalletRepository::new(db_conn.clone());
+        let account_repo = SeaOrmAccountRepository::new(db_conn.clone());
 
         AppStore {
             db_conn,
@@ -36,6 +38,7 @@ impl AppStore {
             payment: Arc::new(payment_repo),
             invoice: Arc::new(invoice_repo),
             wallet: Arc::new(wallet_repo),
+            account: Arc::new(account_repo),
         }
     }
 }

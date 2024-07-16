@@ -9,15 +9,15 @@ pub struct Model {
     pub id: Uuid,
     #[sea_orm(unique)]
     pub sub: String,
-    pub created_at: DateTimeWithTimeZone,
-    pub updated_at: Option<DateTimeWithTimeZone>,
+    pub created_at: DateTimeUtc,
+    pub updated_at: Option<DateTimeUtc>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
     #[sea_orm(has_one = "super::ln_address::Entity")]
     LnAddress,
-    #[sea_orm(has_many = "super::wallet::Entity")]
+    #[sea_orm(has_one = "super::wallet::Entity")]
     Wallet,
 }
 

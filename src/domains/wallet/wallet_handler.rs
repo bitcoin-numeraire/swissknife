@@ -24,7 +24,7 @@ use crate::{
         invoice::{InvoiceFilter, InvoiceStatus},
         ln_address::{LnAddress, LnAddressFilter},
         payment::{PaymentFilter, PaymentStatus},
-        user::AuthUser,
+        user::Account,
     },
     infra::app::AppState,
 };
@@ -78,9 +78,9 @@ pub fn router() -> Router<Arc<AppState>> {
 )]
 async fn get_wallet(
     State(app_state): State<Arc<AppState>>,
-    user: AuthUser,
+    user: Account,
 ) -> Result<Json<WalletResponse>, ApplicationError> {
-    let wallet = app_state.services.wallet.get(user.sub).await?;
+    let wallet = app_state.services.wallet.get(user.wallet.id).await?;
     Ok(Json(wallet.into()))
 }
 
@@ -103,11 +103,20 @@ async fn get_wallet(
 )]
 async fn wallet_pay(
     State(app_state): State<Arc<AppState>>,
-    user: AuthUser,
-    Json(mut payload): Json<SendPaymentRequest>,
+    user: Account,
+    Json(payload): Json<SendPaymentRequest>,
 ) -> Result<Json<PaymentResponse>, ApplicationError> {
-    payload.user_id = Some(user.sub);
-    let payment = app_state.services.payment.pay(payload).await?;
+    let payment = app_state
+        .services
+        .payment
+        .pay(
+            payload.input,
+            payload.amount_msat,
+            payload.comment,
+            user.wallet.id,
+        )
+        .await?;
+
     Ok(Json(payment.into()))
 }
 
@@ -127,9 +136,13 @@ async fn wallet_pay(
 )]
 async fn get_wallet_balance(
     State(app_state): State<Arc<AppState>>,
-    user: AuthUser,
+    user: Account,
 ) -> Result<Json<UserBalance>, ApplicationError> {
-    let balance = app_state.services.wallet.get_balance(user.sub).await?;
+    let balance = app_state
+        .services
+        .wallet
+        .get_balance(user.wallet.id)
+        .await?;
     Ok(balance.into())
 }
 
@@ -152,14 +165,14 @@ async fn get_wallet_balance(
 )]
 async fn new_wallet_invoice(
     State(app_state): State<Arc<AppState>>,
-    user: AuthUser,
+    user: Account,
     Json(payload): Json<NewInvoiceRequest>,
 ) -> Result<Json<InvoiceResponse>, ApplicationError> {
     let invoice = app_state
         .services
         .invoice
         .invoice(
-            user.sub,
+            user.wallet.id,
             payload.amount_msat,
             payload.description,
             payload.expiry,
@@ -186,13 +199,13 @@ async fn new_wallet_invoice(
 )]
 async fn get_wallet_address(
     State(app_state): State<Arc<AppState>>,
-    user: AuthUser,
+    user: Account,
 ) -> Result<Json<LnAddress>, ApplicationError> {
     let ln_addresses = app_state
         .services
         .ln_address
         .list(LnAddressFilter {
-            user_id: Some(user.sub),
+            user_id: Some(user.id),
             ..Default::default()
         })
         .await?;
@@ -224,13 +237,13 @@ async fn get_wallet_address(
 )]
 async fn register_wallet_address(
     State(app_state): State<Arc<AppState>>,
-    user: AuthUser,
+    user: Account,
     Json(payload): Json<RegisterLnAddressRequest>,
 ) -> Result<Json<LnAddress>, ApplicationError> {
     let ln_address = app_state
         .services
         .ln_address
-        .register(user.sub, payload.username)
+        .register(user.id, payload.username)
         .await?;
     Ok(ln_address.into())
 }
@@ -253,10 +266,10 @@ async fn register_wallet_address(
 )]
 async fn list_wallet_payments(
     State(app_state): State<Arc<AppState>>,
-    user: AuthUser,
+    user: Account,
     Query(mut query_params): Query<PaymentFilter>,
 ) -> Result<Json<Vec<PaymentResponse>>, ApplicationError> {
-    query_params.wallet_id = Some(user.sub);
+    query_params.wallet_id = Some(user.wallet.id);
     let payments = app_state.services.payment.list(query_params).await?;
 
     let response: Vec<PaymentResponse> = payments.into_iter().map(Into::into).collect();
@@ -282,14 +295,14 @@ async fn list_wallet_payments(
 )]
 async fn get_wallet_payment(
     State(app_state): State<Arc<AppState>>,
-    user: AuthUser,
+    user: Account,
     Path(id): Path<Uuid>,
 ) -> Result<Json<PaymentResponse>, ApplicationError> {
     let payments = app_state
         .services
         .payment
         .list(PaymentFilter {
-            wallet_id: Some(user.sub),
+            wallet_id: Some(user.wallet.id),
             ids: Some(vec![id]),
             ..Default::default()
         })
@@ -321,10 +334,10 @@ async fn get_wallet_payment(
 )]
 async fn list_wallet_invoices(
     State(app_state): State<Arc<AppState>>,
-    user: AuthUser,
+    user: Account,
     Query(mut query_params): Query<InvoiceFilter>,
 ) -> Result<Json<Vec<InvoiceResponse>>, ApplicationError> {
-    query_params.wallet_id = Some(user.sub);
+    query_params.wallet_id = Some(user.wallet.id);
     let invoices = app_state.services.invoice.list(query_params).await?;
 
     let response: Vec<InvoiceResponse> = invoices.into_iter().map(Into::into).collect();
@@ -350,14 +363,14 @@ async fn list_wallet_invoices(
 )]
 async fn get_wallet_invoice(
     State(app_state): State<Arc<AppState>>,
-    user: AuthUser,
+    user: Account,
     Path(id): Path<Uuid>,
 ) -> Result<Json<InvoiceResponse>, ApplicationError> {
     let invoices = app_state
         .services
         .invoice
         .list(InvoiceFilter {
-            wallet_id: Some(user.sub),
+            wallet_id: Some(user.wallet.id),
             ids: Some(vec![id]),
             ..Default::default()
         })
@@ -388,9 +401,9 @@ async fn get_wallet_invoice(
 )]
 async fn list_contacts(
     State(app_state): State<Arc<AppState>>,
-    user: AuthUser,
+    user: Account,
 ) -> Result<Json<Vec<Contact>>, ApplicationError> {
-    let contacts = app_state.services.wallet.list_contacts(user.sub).await?;
+    let contacts = app_state.services.wallet.list_contacts(user.id).await?;
     Ok(contacts.into())
 }
 
@@ -410,13 +423,13 @@ async fn list_contacts(
 )]
 async fn delete_expired_invoices(
     State(app_state): State<Arc<AppState>>,
-    user: AuthUser,
+    user: Account,
 ) -> Result<Json<u64>, ApplicationError> {
     let n_deleted = app_state
         .services
         .invoice
         .delete_many(InvoiceFilter {
-            wallet_id: Some(user.sub),
+            wallet_id: Some(user.wallet.id),
             status: Some(InvoiceStatus::Expired),
             ..Default::default()
         })
@@ -440,13 +453,13 @@ async fn delete_expired_invoices(
 )]
 async fn delete_failed_payments(
     State(app_state): State<Arc<AppState>>,
-    user: AuthUser,
+    user: Account,
 ) -> Result<Json<u64>, ApplicationError> {
     let n_deleted = app_state
         .services
         .payment
         .delete_many(PaymentFilter {
-            wallet_id: Some(user.sub),
+            wallet_id: Some(user.wallet.id),
             status: Some(PaymentStatus::Failed),
             ..Default::default()
         })

@@ -1,9 +1,13 @@
 use crate::{
-    application::{entities::AppStore, errors::ApplicationError},
+    application::{
+        entities::AppStore,
+        errors::{ApplicationError, DataError},
+    },
     domains::{invoice::InvoiceFilter, payment::PaymentFilter},
 };
 use async_trait::async_trait;
 use tracing::{debug, trace};
+use uuid::Uuid;
 
 use super::{Contact, UserBalance, Wallet, WalletUseCases};
 
@@ -19,58 +23,57 @@ impl WalletService {
 
 #[async_trait]
 impl WalletUseCases for WalletService {
-    async fn get_balance(&self, user_id: String) -> Result<UserBalance, ApplicationError> {
-        trace!(user_id, "Fetching balance");
+    async fn get_balance(&self, id: Uuid) -> Result<UserBalance, ApplicationError> {
+        trace!(%id, "Fetching balance");
 
-        let balance = self.store.wallet.get_balance(None, &user_id).await?;
+        let balance = self.store.wallet.get_balance(None, id).await?;
 
-        debug!(user_id, "Balance fetched successfully");
+        debug!(%id, "Balance fetched successfully");
         Ok(balance)
     }
 
-    async fn get(&self, user_id: String) -> Result<Wallet, ApplicationError> {
-        trace!(user_id, "Fetching wallet");
+    async fn get(&self, id: Uuid) -> Result<Wallet, ApplicationError> {
+        trace!(%id, "Fetching wallet");
 
-        let balance = self.store.wallet.get_balance(None, &user_id).await?;
+        let mut wallet = self
+            .store
+            .wallet
+            .find_by_user_id(id)
+            .await?
+            .ok_or_else(|| DataError::NotFound("Wallet not found.".to_string()))?;
 
-        let payments = self
+        wallet.user_balance = self.store.wallet.get_balance(None, id).await?;
+
+        wallet.payments = self
             .store
             .payment
             .find_many(PaymentFilter {
-                wallet_id: Some(user_id.clone()),
+                wallet_id: Some(id.clone()),
                 ..Default::default()
             })
             .await?;
 
-        let invoices = self
+        wallet.invoices = self
             .store
             .invoice
             .find_many(InvoiceFilter {
-                wallet_id: Some(user_id.clone()),
+                wallet_id: Some(id.clone()),
                 ..Default::default()
             })
             .await?;
 
-        let ln_address = self.store.ln_address.find_by_user_id(&user_id).await?;
+        wallet.contacts = self.store.payment.find_contacts(id).await?;
 
-        let contacts = self.store.payment.find_contacts(&user_id).await?;
-
-        debug!(user_id, "wallet fetched successfully");
-        Ok(Wallet {
-            user_balance: balance,
-            payments,
-            invoices,
-            ln_address,
-            contacts,
-        })
+        debug!(%id, "wallet fetched successfully");
+        Ok(wallet)
     }
 
-    async fn list_contacts(&self, user_id: String) -> Result<Vec<Contact>, ApplicationError> {
-        trace!("Fetching contacts");
+    async fn list_contacts(&self, id: Uuid) -> Result<Vec<Contact>, ApplicationError> {
+        trace!(%id, "Fetching contacts");
 
-        let contacts = self.store.payment.find_contacts(&user_id).await?;
+        let contacts = self.store.payment.find_contacts(id).await?;
 
-        debug!("Contacts fetched successfully");
+        debug!(%id, "Contacts fetched successfully");
         Ok(contacts)
     }
 }

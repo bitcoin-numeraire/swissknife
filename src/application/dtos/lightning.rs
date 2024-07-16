@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
+use uuid::Uuid;
 
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct RedeemOnchainRequest {
@@ -21,7 +22,7 @@ pub struct RedeemOnchainResponse {
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct RegisterLnAddressRequest {
     /// User ID. Will be populated with your own ID by default
-    pub user_id: Option<String>,
+    pub user_id: Option<Uuid>,
     /// Username such as `username@domain`
     pub username: String,
 }

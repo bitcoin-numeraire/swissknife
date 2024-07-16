@@ -14,9 +14,6 @@ use crate::{
 
 use super::{LnURLPayRequest, LnUrlCallback, LnUrlUseCases};
 
-const MIN_USERNAME_LENGTH: usize = 1;
-const MAX_USERNAME_LENGTH: usize = 64;
-
 pub struct LnUrlService {
     domain: String,
     store: AppStore,

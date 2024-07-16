@@ -7,7 +7,7 @@ use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::{
-    application::entities::{Currency, Ledger},
+    application::entities::Ledger,
     domains::invoice::{Invoice, InvoiceStatus, LnInvoice},
 };
 
@@ -15,7 +15,7 @@ use crate::{
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct NewInvoiceRequest {
     /// User ID. Will be populated with your own ID by default
-    pub user_id: Option<String>,
+    pub wallet_id: Option<Uuid>,
     /// Amount in millisatoshis
     pub amount_msat: u64,
     /// Description of the invoice. Visible by the payer
@@ -28,15 +28,13 @@ pub struct NewInvoiceRequest {
 pub struct InvoiceResponse {
     /// Internal ID
     pub id: Uuid,
-    /// User ID
-    pub user_id: String,
+    /// Wallet ID
+    pub wallet_id: Uuid,
     /// Lightning Address. Populated when invoice is generated as part of the LNURL protocol
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ln_address_id: Option<Uuid>,
     /// Description
     pub description: Option<String>,
-    /// Currency. Different networks use different currencies such as testnet
-    pub currency: Currency,
     /// Amount requested in millisatoshis.
     pub amount_msat: Option<u64>,
     /// Amount received in millisatoshis.
@@ -104,10 +102,9 @@ impl From<Invoice> for InvoiceResponse {
     fn from(invoice: Invoice) -> Self {
         InvoiceResponse {
             id: invoice.id,
-            user_id: invoice.wallet_id,
+            wallet_id: invoice.wallet_id,
             ln_address_id: invoice.ln_address_id,
             description: invoice.description,
-            currency: invoice.currency,
             amount_msat: invoice.amount_msat,
             amount_received_msat: invoice.amount_received_msat,
             timestamp: invoice.timestamp,
