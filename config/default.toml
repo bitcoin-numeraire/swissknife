@@ -1,6 +1,7 @@
 # App
 invoice_expiry = "1h"
 domain = "numeraire.tech"
+host = "https://swissknife.numeraire.tech"
 fee_buffer = 0.02
 ln_provider = "breez"
 auth_provider = "jwt"

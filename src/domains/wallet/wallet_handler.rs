@@ -43,7 +43,7 @@ use super::{Balance, Contact};
     ),
 )]
 pub struct WalletHandler;
-pub const CONTEXT_PATH: &str = "/api/wallet";
+pub const CONTEXT_PATH: &str = "/v1/wallet";
 
 pub fn router() -> Router<Arc<AppState>> {
     Router::new()
@@ -130,7 +130,7 @@ async fn wallet_pay(
     tag = "Wallet",
     context_path = CONTEXT_PATH,
     responses(
-        (status = 200, description = "Found", body = UserBalance),
+        (status = 200, description = "Found", body = Balance),
         (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
         (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
     )

@@ -16,7 +16,7 @@ use super::{HealthCheck, HealthStatus, VersionInfo};
     )
 )]
 pub struct SystemHandler;
-pub const CONTEXT_PATH: &str = "/api/system";
+pub const CONTEXT_PATH: &str = "/v1/system";
 
 pub fn router() -> Router<Arc<AppState>> {
     Router::new()

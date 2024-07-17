@@ -65,7 +65,7 @@ async fn well_known_lnurlp(
     get,
     path = "/{username}/callback",
     tag = "LNURL",
-    context_path = "/api/lnurlp",
+    context_path = "/lnurlp",
     params(LNUrlpInvoiceQueryParams),
     responses(
         (status = 200, description = "Found", body = LnUrlCallbackResponse),

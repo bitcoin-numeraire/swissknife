@@ -21,7 +21,7 @@ use crate::{
     )
 )]
 pub struct AuthHandler;
-pub const CONTEXT_PATH: &str = "/api/auth";
+pub const CONTEXT_PATH: &str = "/v1/auth";
 
 pub fn auth_router() -> Router<Arc<AppState>> {
     Router::new().route("/sign-in", post(sign_in))

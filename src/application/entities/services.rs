@@ -57,6 +57,7 @@ impl AppServices {
             ln_client.clone(),
             config.invoice_expiry.as_secs() as u32,
             config.domain,
+            config.host,
         );
         let ln_address = LnAddressService::new(store.clone());
         let wallet = WalletService::new(store.clone());

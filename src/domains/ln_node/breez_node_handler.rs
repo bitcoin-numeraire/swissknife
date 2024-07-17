@@ -37,7 +37,7 @@ use crate::{
     )
 )]
 pub struct BreezNodeHandler;
-pub const CONTEXT_PATH: &str = "/api/lightning/node";
+pub const CONTEXT_PATH: &str = "/v1/lightning-node";
 
 pub fn breez_node_router() -> Router<Arc<AppState>> {
     Router::new()

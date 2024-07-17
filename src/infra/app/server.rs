@@ -20,19 +20,19 @@ pub struct Server {
 impl Server {
     pub fn new(state: Arc<AppState>) -> Self {
         let router = Router::new()
-            .nest("/api/v1/system", system::router())
+            .nest("/v1/system", system::router())
             .nest("/.well-known/lnurlp", lnurl::well_known_router())
-            .nest("/api/v1/lnurlp", lnurl::callback_router())
-            .nest("/api/v1/lightning/addresses", ln_address::router())
-            .nest("/api/v1/invoices", invoice::router())
-            .nest("/api/v1/payments", payment::router())
-            .nest("/api/v1/wallet", wallet::router())
-            .nest("/api/v1/auth", user::auth_router())
+            .nest("/lnurlp", lnurl::callback_router())
+            .nest("/v1/invoices", invoice::router())
+            .nest("/v1/payments", payment::router())
+            .nest("/v1/wallet", wallet::router())
+            .nest("/v1/auth", user::auth_router())
+            .nest("/v1/lightning-addresses", ln_address::router())
             .merge(Scalar::with_url("/docs", merged_openapi()));
 
         let router = match state.ln_node_client {
             LnNodeClient::Breez(_) => {
-                router.nest("/api/v1/lightning/node", ln_node::breez_node_router())
+                router.nest("/v1/lightning-node", ln_node::breez_node_router())
             }
             _ => router,
         };

@@ -33,7 +33,7 @@ use super::{InvoiceFilter, InvoiceOrderBy, InvoiceStatus};
     ),
 )]
 pub struct InvoiceHandler;
-pub const CONTEXT_PATH: &str = "/api/invoices";
+pub const CONTEXT_PATH: &str = "/v1/invoices";
 
 pub fn router() -> Router<Arc<AppState>> {
     Router::new()

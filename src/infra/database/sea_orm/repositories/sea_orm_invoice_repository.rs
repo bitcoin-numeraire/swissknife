@@ -99,6 +99,7 @@ impl InvoiceRepository for SeaOrmInvoiceRepository {
             timestamp: Set(invoice.timestamp),
             payment_time: Set(invoice.payment_time),
             ledger: Set(invoice.ledger.to_string()),
+            currency: Set(invoice.currency.to_string()),
             ..Default::default()
         };
 
@@ -138,6 +139,7 @@ impl InvoiceRepository for SeaOrmInvoiceRepository {
             payment_time: Set(invoice.payment_time),
             description: Set(invoice.description),
             amount_received_msat: Set(invoice.amount_received_msat.map(|v| v as i64)),
+            ledger: Set(invoice.ledger.to_string()),
             ..Default::default()
         };
 

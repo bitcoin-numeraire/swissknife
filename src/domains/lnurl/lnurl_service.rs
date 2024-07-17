@@ -16,6 +16,7 @@ use super::{LnURLPayRequest, LnUrlCallback, LnUrlUseCases};
 
 pub struct LnUrlService {
     domain: String,
+    host: String,
     store: AppStore,
     invoice_expiry: u32,
     ln_client: Arc<dyn LnClient>,
@@ -27,12 +28,14 @@ impl LnUrlService {
         ln_client: Arc<dyn LnClient>,
         invoice_expiry: u32,
         domain: String,
+        host: String,
     ) -> Self {
         LnUrlService {
             store,
             ln_client,
             invoice_expiry,
             domain,
+            host,
         }
     }
 }
@@ -61,7 +64,7 @@ impl LnUrlUseCases for LnUrlService {
         .expect("should not fail as a constant");
 
         let lnurlp = LnURLPayRequest {
-            callback: format!("https://{}/api/lnurlp/{}/callback", self.domain, username),
+            callback: format!("{}/lnurlp/{}/callback", self.host, username),
             max_sendable: 1000000000,
             min_sendable: 1000,
             metadata,

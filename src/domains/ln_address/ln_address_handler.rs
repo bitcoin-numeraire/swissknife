@@ -33,7 +33,7 @@ use super::{LnAddress, LnAddressFilter};
     )
 )]
 pub struct LnAddressHandler;
-pub const CONTEXT_PATH: &str = "/api/lightning/addresses";
+pub const CONTEXT_PATH: &str = "/v1/lightning-addresses";
 
 pub fn router() -> Router<Arc<AppState>> {
     Router::new()

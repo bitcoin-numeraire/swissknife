@@ -33,7 +33,7 @@ use super::{PaymentFilter, PaymentStatus};
     )
 )]
 pub struct PaymentHandler;
-pub const CONTEXT_PATH: &str = "/api/payments";
+pub const CONTEXT_PATH: &str = "/v1/payments";
 
 pub fn router() -> Router<Arc<AppState>> {
     Router::new()
