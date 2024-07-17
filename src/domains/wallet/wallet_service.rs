@@ -34,6 +34,15 @@ impl WalletUseCases for WalletService {
         Ok(wallet)
     }
 
+    async fn list(&self) -> Result<Vec<Wallet>, ApplicationError> {
+        trace!("Listing wallets");
+
+        let wallets = self.store.wallet.find_many().await?;
+
+        debug!("Wallets listed successfully");
+        Ok(wallets)
+    }
+
     async fn get_balance(&self, id: Uuid) -> Result<Balance, ApplicationError> {
         trace!(%id, "Fetching balance");
 

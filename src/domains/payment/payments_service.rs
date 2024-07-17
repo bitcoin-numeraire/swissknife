@@ -334,10 +334,10 @@ impl PaymentService {
                 settled_payment.status = PaymentStatus::Settled;
 
                 let success_action = match success_action {
-                    Some(sa) => Some(process_success_action(
+                    Some(sa) => process_success_action(
                         sa,
                         settled_payment.payment_preimage.as_ref().unwrap(),
-                    )),
+                    ),
                     None => None,
                 };
 

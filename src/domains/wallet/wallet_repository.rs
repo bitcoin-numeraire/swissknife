@@ -10,6 +10,7 @@ use super::{Balance, Contact, Wallet};
 pub trait WalletRepository: Send + Sync {
     async fn find(&self, id: Uuid) -> Result<Option<Wallet>, DatabaseError>;
     async fn find_by_user_id(&self, user_id: &str) -> Result<Option<Wallet>, DatabaseError>;
+    async fn find_many(&self) -> Result<Vec<Wallet>, DatabaseError>;
     async fn insert(&self, user_id: &str) -> Result<Wallet, DatabaseError>;
     async fn get_balance(
         &self,

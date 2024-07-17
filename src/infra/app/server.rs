@@ -25,7 +25,8 @@ impl Server {
             .nest("/lnurlp", lnurl::callback_router())
             .nest("/v1/invoices", invoice::router())
             .nest("/v1/payments", payment::router())
-            .nest("/v1/wallet", wallet::router())
+            .nest("/v1/me", wallet::user_router())
+            .nest("/v1/wallets", wallet::router())
             .nest("/v1/auth", user::auth_router())
             .nest("/v1/lightning-addresses", ln_address::router())
             .merge(Scalar::with_url("/docs", merged_openapi()));

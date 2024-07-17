@@ -62,39 +62,31 @@ impl InvoiceUseCases for InvoiceService {
 
         let invoice = self.store.invoice.insert(None, invoice).await?;
 
-        info!(
-            id = %invoice.id,
-            "Invoice generated successfully"
-        );
+        info!(id = %invoice.id, "Invoice generated successfully");
         Ok(invoice)
     }
 
     async fn get(&self, id: Uuid) -> Result<Invoice, ApplicationError> {
-        trace!(
-            %id,
-            "Fetching invoice"
-        );
+        trace!(%id, "Fetching invoice");
 
-        let lightning_invoice = self
+        let invoice = self
             .store
             .invoice
             .find(id)
             .await?
-            .ok_or_else(|| DataError::NotFound("Lightning invoice not found.".to_string()))?;
+            .ok_or_else(|| DataError::NotFound("Invoice not found.".to_string()))?;
 
-        debug!(
-            %id, "Invoice fetched successfully"
-        );
-        Ok(lightning_invoice)
+        debug!(%id, "Invoice fetched successfully");
+        Ok(invoice)
     }
 
     async fn list(&self, filter: InvoiceFilter) -> Result<Vec<Invoice>, ApplicationError> {
         trace!(?filter, "Listing invoices");
 
-        let lightning_invoices = self.store.invoice.find_many(filter.clone()).await?;
+        let invoices = self.store.invoice.find_many(filter.clone()).await?;
 
         debug!(?filter, "Invoices listed successfully");
-        Ok(lightning_invoices)
+        Ok(invoices)
     }
 
     async fn delete(&self, id: Uuid) -> Result<(), ApplicationError> {

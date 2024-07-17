@@ -1,12 +1,14 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::{
     application::entities::{Currency, Ledger},
-    domains::payment::{Payment, PaymentStatus},
+    domains::{
+        lnurl::LnUrlSuccessAction,
+        payment::{Payment, PaymentStatus},
+    },
 };
 
 /// Send Payment Request
@@ -97,7 +99,7 @@ pub struct PaymentResponse {
 
     /// Success Action. Populated when sending to a LNURL or LN Address
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub success_action: Option<Value>,
+    pub success_action: Option<LnUrlSuccessAction>,
 
     /// Date of creation in database
     pub created_at: DateTime<Utc>,
@@ -124,9 +126,7 @@ impl From<Payment> for PaymentResponse {
             status: payment.status,
             description: payment.description,
             metadata: payment.metadata,
-            success_action: payment
-                .success_action
-                .map(|sa| serde_json::to_value(sa).unwrap_or(Value::Null)),
+            success_action: payment.success_action,
             created_at: payment.created_at,
             updated_at: payment.updated_at,
         }

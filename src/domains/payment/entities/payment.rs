@@ -1,4 +1,3 @@
-use breez_sdk_core::SuccessActionProcessed;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
@@ -6,7 +5,10 @@ use strum_macros::{Display, EnumString};
 use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
 
-use crate::application::entities::{Currency, Ledger, OrderDirection};
+use crate::{
+    application::entities::{Currency, Ledger, OrderDirection},
+    domains::lnurl::LnUrlSuccessAction,
+};
 
 #[derive(Clone, Debug, Default)]
 pub struct Payment {
@@ -24,7 +26,7 @@ pub struct Payment {
     pub status: PaymentStatus,
     pub description: Option<String>,
     pub metadata: Option<String>,
-    pub success_action: Option<SuccessActionProcessed>,
+    pub success_action: Option<LnUrlSuccessAction>,
     pub created_at: DateTime<Utc>,
     pub updated_at: Option<DateTime<Utc>>,
 }

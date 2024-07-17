@@ -18,7 +18,10 @@ use crate::{
         dtos::{PaymentResponse, SendPaymentRequest},
         errors::ApplicationError,
     },
-    domains::user::{Permission, User},
+    domains::{
+        lnurl::LnUrlSuccessAction,
+        user::{Permission, User},
+    },
     infra::app::AppState,
 };
 
@@ -27,7 +30,7 @@ use super::{PaymentFilter, PaymentStatus};
 #[derive(OpenApi)]
 #[openapi(
     paths(pay, get_payment, list_payments, delete_payment, delete_payments),
-    components(schemas(PaymentResponse, SendPaymentRequest, PaymentStatus)),
+    components(schemas(PaymentResponse, SendPaymentRequest, PaymentStatus, LnUrlSuccessAction)),
     tags(
         (name = "Payments", description = "Payment management endpoints. Require `read:transaction` or `write:transaction` permissions.")
     )

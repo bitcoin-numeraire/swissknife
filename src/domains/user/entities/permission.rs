@@ -5,6 +5,10 @@ use strum_macros::{Display, EnumString, VariantNames};
     Clone, Debug, PartialEq, Eq, Hash, EnumString, Display, VariantNames, Serialize, Deserialize,
 )]
 pub enum Permission {
+    #[serde(rename = "read:wallet")]
+    ReadWallet,
+    #[serde(rename = "write:wallet")]
+    WriteWallet,
     #[serde(rename = "read:ln_address")]
     ReadLnAddress,
     #[serde(rename = "write:ln_address")]
@@ -22,6 +26,8 @@ pub enum Permission {
 impl Permission {
     pub fn all_permissions() -> Vec<Self> {
         vec![
+            Permission::ReadWallet,
+            Permission::WriteWallet,
             Permission::ReadLnAddress,
             Permission::WriteLnAddress,
             Permission::ReadLnTransaction,

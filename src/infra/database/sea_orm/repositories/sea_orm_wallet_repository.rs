@@ -83,6 +83,24 @@ impl WalletRepository for SeaOrmWalletRepository {
         Ok(model.map(Into::into))
     }
 
+    async fn find_many(&self) -> Result<Vec<Wallet>, DatabaseError> {
+        let models = Entity::find()
+            .find_also_related(LnAddress)
+            .order_by_desc(Column::CreatedAt)
+            .all(&self.db)
+            .await
+            .map_err(|e| DatabaseError::FindMany(e.to_string()))?;
+
+        Ok(models
+            .into_iter()
+            .map(|(wallet_model, ln_address_model)| {
+                let mut wallet: Wallet = wallet_model.into();
+                wallet.ln_address = ln_address_model.map(Into::into);
+                wallet
+            })
+            .collect())
+    }
+
     async fn insert(&self, user_id: &str) -> Result<Wallet, DatabaseError> {
         let model = ActiveModel {
             user_id: Set(user_id.to_string()),
