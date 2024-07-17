@@ -29,7 +29,7 @@ use super::{PaymentFilter, PaymentStatus};
     paths(pay, get_payment, list_payments, delete_payment, delete_payments),
     components(schemas(PaymentResponse, SendPaymentRequest, PaymentStatus)),
     tags(
-        (name = "Payments", description = "Payment management endpoints. Require authorization.")
+        (name = "Payments", description = "Payment management endpoints. Require `read:transaction` or `write:transaction` permissions.")
     )
 )]
 pub struct PaymentHandler;

@@ -58,8 +58,8 @@ pub fn router() -> Router<Arc<AppState>> {
         .route("/invoices", get(list_wallet_invoices))
         .route("/invoices/:id", get(get_wallet_invoice))
         .route("/invoices", post(new_wallet_invoice))
-        .route("/contacts", get(list_contacts))
         .route("/invoices", delete(delete_expired_invoices))
+        .route("/contacts", get(list_contacts))
 }
 
 /// Gets the user wallet
@@ -73,6 +73,7 @@ pub fn router() -> Router<Arc<AppState>> {
     responses(
         (status = 200, description = "Found", body = WalletResponse),
         (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
+        (status = 404, description = "Not Found", body = ErrorResponse, example = json!(NOT_FOUND_EXAMPLE)),
         (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
     )
 )]
@@ -120,9 +121,9 @@ async fn wallet_pay(
     Ok(Json(payment.into()))
 }
 
-/// Gets the user balance
+/// Gets the wallet balance
 ///
-/// Returns the user balance.
+/// Returns the wallet balance.
 #[utoipa::path(
     get,
     path = "/balance",

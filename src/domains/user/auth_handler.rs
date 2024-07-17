@@ -29,7 +29,7 @@ pub fn auth_router() -> Router<Arc<AppState>> {
 
 /// Sign In
 ///
-/// Returns a JWT token to be used for authentication. The JWT token contains authentication and permissions. Sign in is only required for `JWT` Auth provider.
+/// Returns a JWT token to be used for authentication. The JWT token contains authentication and permissions. Sign in is only available for `JWT` Auth provider.
 #[utoipa::path(
     post,
     path = "/sign-in",

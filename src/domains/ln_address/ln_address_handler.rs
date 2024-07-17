@@ -29,7 +29,7 @@ use super::{LnAddress, LnAddressFilter};
     paths(register_address, get_address, list_addresses, delete_address, delete_addresses),
     components(schemas(LnAddress, RegisterLnAddressRequest)),
     tags(
-        (name = "Lightning Addresses", description = "LN Address management endpoints as defined in the [protocol specification](https://lightningaddress.com/). Require authorization.")
+        (name = "Lightning Addresses", description = "LN Address management endpoints as defined in the [protocol specification](https://lightningaddress.com/). Require `read:ln_address` or `write:ln_address` permissions.")
     )
 )]
 pub struct LnAddressHandler;

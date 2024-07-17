@@ -29,7 +29,7 @@ use super::{InvoiceFilter, InvoiceOrderBy, InvoiceStatus};
     paths(generate_invoice, list_invoices, get_invoice, delete_invoice, delete_invoices),
     components(schemas(InvoiceResponse, NewInvoiceRequest, InvoiceStatus, LnInvoiceResponse, InvoiceOrderBy)),
     tags(
-        (name = "Invoices", description = "Invoice management endpoints. Require authorization.")
+        (name = "Invoices", description = "Invoice management endpoints. Require `read:transaction` or `write:transaction` permissions.")
     ),
 )]
 pub struct InvoiceHandler;

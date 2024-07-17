@@ -24,7 +24,7 @@ use crate::{
         },
         errors::{ApplicationError, LightningError},
     },
-    domains::user::{User, Permission},
+    domains::user::{Permission, User},
     infra::{app::AppState, lightning::LnClient},
 };
 
@@ -33,7 +33,7 @@ use crate::{
     paths(node_info, lsp_info, list_lsps, close_lsp_channels, connect_lsp, swap, redeem, sign_message, check_message, sync, backup),
     components(schemas(ConnectLSPRequest, SendOnchainPaymentRequest, RedeemOnchainRequest, RedeemOnchainResponse, SignMessageRequest, CheckMessageRequest, SignMessageResponse, CheckMessageResponse)),
     tags(
-        (name = "Lightning Node", description = "LN Node management endpoints. Currently only available for `breez` Lightning provider. Require authorization.")
+        (name = "Lightning Node", description = "LN Node management endpoints. Currently only available for `breez` Lightning provider. Require `read:ln_node` or `write:ln_node` permissions.")
     )
 )]
 pub struct BreezNodeHandler;
@@ -338,10 +338,7 @@ async fn check_message(
         (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
     )
 )]
-async fn sync(
-    State(app_state): State<Arc<AppState>>,
-    user: User,
-) -> Result<(), ApplicationError> {
+async fn sync(State(app_state): State<Arc<AppState>>, user: User) -> Result<(), ApplicationError> {
     user.check_permission(Permission::WriteLnNode)?;
 
     let client = app_state.ln_node_client.as_breez_client()?;

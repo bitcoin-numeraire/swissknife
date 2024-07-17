@@ -23,7 +23,7 @@ use super::LnURLPayRequest;
     paths(well_known_lnurlp, callback),
     components(schemas(LnURLPayRequest, LnUrlCallbackResponse)),
     tags(
-        (name = "LNURL", description = "LNURL endpoints as defined in the [protocol specification](https://github.com/lnurl/luds). Allows any active Lightning Address to receive payments")
+        (name = "LNURL", description = "Public LNURL endpoints as defined in the [protocol specification](https://github.com/lnurl/luds). Allows any active Lightning Address to receive payments")
     ),
 )]
 pub struct LnURLHandler;
