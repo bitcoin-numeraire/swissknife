@@ -30,10 +30,10 @@ impl LnAddressService {
 impl LnAddressUseCases for LnAddressService {
     async fn register(
         &self,
-        user_id: Uuid,
+        wallet_id: Uuid,
         username: String,
     ) -> Result<LnAddress, ApplicationError> {
-        debug!(%user_id, username, "Registering lightning address");
+        debug!(%wallet_id, username, "Registering lightning address");
 
         if username.len() < MIN_USERNAME_LENGTH || username.len() > MAX_USERNAME_LENGTH {
             return Err(DataError::Validation("Invalid username length.".to_string()).into());
@@ -49,7 +49,7 @@ impl LnAddressUseCases for LnAddressService {
         if self
             .store
             .ln_address
-            .find_by_user_id(user_id)
+            .find_by_wallet_id(wallet_id)
             .await?
             .is_some()
         {
@@ -66,10 +66,10 @@ impl LnAddressUseCases for LnAddressService {
             return Err(DataError::Conflict("Duplicate username.".to_string()).into());
         }
 
-        let ln_address = self.store.ln_address.insert(user_id, &username).await?;
+        let ln_address = self.store.ln_address.insert(wallet_id, &username).await?;
 
         info!(
-            %user_id,
+            %wallet_id,
             username, "Lightning address registered successfully"
         );
         Ok(ln_address)

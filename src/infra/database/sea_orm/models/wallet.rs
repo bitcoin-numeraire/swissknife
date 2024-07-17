@@ -7,37 +7,31 @@ use sea_orm::entity::prelude::*;
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
     pub id: Uuid,
-    pub user_id: Uuid,
-    pub currency: String,
+    #[sea_orm(unique)]
+    pub user_id: String,
     pub created_at: DateTimeUtc,
     pub updated_at: Option<DateTimeUtc>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
-    #[sea_orm(
-        belongs_to = "super::account::Entity",
-        from = "Column::UserId",
-        to = "super::account::Column::Id",
-        on_update = "NoAction",
-        on_delete = "Cascade"
-    )]
-    Account,
     #[sea_orm(has_many = "super::invoice::Entity")]
     Invoice,
+    #[sea_orm(has_one = "super::ln_address::Entity")]
+    LnAddress,
     #[sea_orm(has_many = "super::payment::Entity")]
     Payment,
-}
-
-impl Related<super::account::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::Account.def()
-    }
 }
 
 impl Related<super::invoice::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::Invoice.def()
+    }
+}
+
+impl Related<super::ln_address::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::LnAddress.def()
     }
 }
 

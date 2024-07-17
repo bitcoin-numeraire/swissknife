@@ -21,8 +21,8 @@ pub struct RedeemOnchainResponse {
 
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct RegisterLnAddressRequest {
-    /// User ID. Will be populated with your own ID by default
-    pub user_id: Option<Uuid>,
+    /// Wallet ID. Will be populated with your own ID by default
+    pub wallet_id: Option<Uuid>,
     /// Username such as `username@domain`
     pub username: String,
 }

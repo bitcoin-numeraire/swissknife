@@ -11,8 +11,8 @@ use crate::application::entities::OrderDirection;
 pub struct LnAddress {
     /// Internal ID
     pub id: Uuid,
-    /// User ID
-    pub user_id: Uuid,
+    /// Wallet ID
+    pub wallet_id: Uuid,
     /// Username
     pub username: String,
     /// Active status. Inactive addresses cannot receive funds
@@ -35,8 +35,8 @@ pub struct LnAddressFilter {
     pub offset: Option<u64>,
     /// List of IDs
     pub ids: Option<Vec<Uuid>>,
-    /// User ID. Automatically populated with your user ID
-    pub user_id: Option<Uuid>,
+    /// wallet ID. Automatically populated with your ID
+    pub wallet_id: Option<Uuid>,
     /// Username
     pub username: Option<String>,
     /// Active

@@ -3,18 +3,15 @@ use serde::Serialize;
 use utoipa::ToSchema;
 use uuid::Uuid;
 
-use crate::{
-    application::entities::Currency,
-    domains::{invoice::Invoice, payment::Payment},
-};
+use crate::domains::{invoice::Invoice, ln_address::LnAddress, payment::Payment};
 
 use super::Contact;
 
 #[derive(Debug, Clone, Default)]
 pub struct Wallet {
     pub id: Uuid,
-    pub user_id: Uuid,
-    pub currency: Currency,
+    pub user_id: String,
+    pub ln_address: Option<LnAddress>,
     pub balance: Balance,
     pub payments: Vec<Payment>,
     pub invoices: Vec<Invoice>,

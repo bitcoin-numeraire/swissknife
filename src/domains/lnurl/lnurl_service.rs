@@ -96,7 +96,7 @@ impl LnUrlUseCases for LnUrlService {
                 self.invoice_expiry,
             )
             .await?;
-        invoice.wallet_id.clone_from(&ln_address.user_id);
+        invoice.wallet_id.clone_from(&ln_address.wallet_id);
         invoice.ln_address_id = Some(ln_address.id);
 
         // TODO: Get or add more information to make this a LNURLp invoice (like fetching a success action specific to the user)

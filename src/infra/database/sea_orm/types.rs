@@ -6,14 +6,13 @@ use crate::domains::{
     invoice::{Invoice, InvoiceStatus, LnInvoice},
     ln_address::LnAddress,
     payment::Payment,
-    user::Account,
     wallet::{Balance, Contact, Wallet},
 };
 
 use super::models::{
-    account::Model as AccountModel, balance::BalanceModel, contact::ContactModel,
-    invoice::Model as InvoiceModel, ln_address::Model as LnAddressModel,
-    payment::Model as PaymentModel, wallet::Model as WalletModel,
+    balance::BalanceModel, contact::ContactModel, invoice::Model as InvoiceModel,
+    ln_address::Model as LnAddressModel, payment::Model as PaymentModel,
+    wallet::Model as WalletModel,
 };
 
 const ASSERTION_MSG: &str = "should parse successfully by assertion";
@@ -52,6 +51,7 @@ impl From<InvoiceModel> for Invoice {
             amount_received_msat: model.amount_received_msat.map(|v| v as u64),
             timestamp: model.timestamp.into(),
             ledger: model.ledger.parse().expect(ASSERTION_MSG),
+            currency: model.currency.parse().expect(ASSERTION_MSG),
             status,
             fee_msat: None,
             payment_time: model.payment_time.into(),
@@ -76,6 +76,7 @@ impl From<PaymentModel> for Payment {
             payment_time: model.payment_time,
             status: model.status.parse().expect(ASSERTION_MSG),
             ledger: model.ledger.parse().expect(ASSERTION_MSG),
+            currency: model.currency.parse().expect(ASSERTION_MSG),
             description: model.description,
             metadata: model.metadata,
             success_action: serde_json::from_value(model.success_action.unwrap_or_default()).ok(),
@@ -98,7 +99,7 @@ impl From<LnAddressModel> for LnAddress {
     fn from(model: LnAddressModel) -> Self {
         LnAddress {
             id: model.id,
-            user_id: model.user_id,
+            wallet_id: model.wallet_id,
             username: model.username,
             active: model.active,
             created_at: model.created_at,
@@ -117,24 +118,11 @@ impl From<BalanceModel> for Balance {
         }
     }
 }
-
-impl From<AccountModel> for Account {
-    fn from(model: AccountModel) -> Self {
-        Account {
-            id: model.id,
-            created_at: model.created_at,
-            updated_at: model.updated_at,
-            ..Default::default()
-        }
-    }
-}
-
 impl From<WalletModel> for Wallet {
     fn from(model: WalletModel) -> Self {
         Wallet {
             id: model.id,
             user_id: model.user_id,
-            currency: model.currency.parse().expect(ASSERTION_MSG),
             created_at: model.created_at,
             updated_at: model.updated_at,
             ..Default::default()

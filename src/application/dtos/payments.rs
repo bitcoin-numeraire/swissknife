@@ -5,7 +5,7 @@ use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::{
-    application::entities::Ledger,
+    application::entities::{Currency, Ledger},
     domains::payment::{Payment, PaymentStatus},
 };
 
@@ -45,6 +45,7 @@ pub struct SendOnchainPaymentRequest {
 pub struct PaymentResponse {
     /// Internal ID
     pub id: Uuid,
+
     /// Wallet ID
     pub wallet_id: Uuid,
 
@@ -68,27 +69,39 @@ pub struct PaymentResponse {
 
     /// Amount in millisatoshis.
     pub amount_msat: u64,
+
     #[serde(skip_serializing_if = "Option::is_none")]
     /// Fees paid. Populated when a new channel is opened to receive the funds
     pub fee_msat: Option<u64>,
+
+    /// Currency
+    pub currency: Currency,
+
     /// Ledger
     pub ledger: Ledger,
+
     /// Payment time
     #[serde(skip_serializing_if = "Option::is_none")]
     pub payment_time: Option<DateTime<Utc>>,
+
     /// Status
     pub status: PaymentStatus,
+
     /// Description
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
+
     /// Metadata
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metadata: Option<String>,
+
     /// Success Action. Populated when sending to a LNURL or LN Address
     #[serde(skip_serializing_if = "Option::is_none")]
     pub success_action: Option<Value>,
+
     /// Date of creation in database
     pub created_at: DateTime<Utc>,
+
     /// Date of update in database
     #[serde(skip_serializing_if = "Option::is_none")]
     pub updated_at: Option<DateTime<Utc>>,
@@ -106,6 +119,7 @@ impl From<Payment> for PaymentResponse {
             amount_msat: payment.amount_msat,
             fee_msat: payment.fee_msat,
             ledger: payment.ledger,
+            currency: payment.currency,
             payment_time: payment.payment_time,
             status: payment.status,
             description: payment.description,

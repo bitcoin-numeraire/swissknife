@@ -20,6 +20,7 @@ impl MigrationTrait for Migration {
                 description_hash VARCHAR,
                 amount_msat BIGINT,
                 amount_received_msat BIGINT,
+                currency VARCHAR(255) NOT NULL,
                 payment_secret VARCHAR,
                 timestamp TIMESTAMPTZ NOT NULL,
                 expiry BIGINT,

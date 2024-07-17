@@ -4,15 +4,11 @@ use std::sync::Arc;
 use tracing::{debug, info, trace};
 
 use crate::{
-    application::{
-        dtos::AuthProvider,
-        entities::{AppStore, Currency},
-        errors::ApplicationError,
-    },
+    application::{dtos::AuthProvider, entities::AppStore, errors::ApplicationError},
     infra::auth::Authenticator,
 };
 
-use super::{Account, AuthUseCases};
+use super::{AuthUseCases, User};
 
 pub struct AuthService {
     provider: AuthProvider,
@@ -53,31 +49,28 @@ impl AuthUseCases for AuthService {
         }
     }
 
-    async fn authenticate(&self, token: &str) -> Result<Account, ApplicationError> {
+    async fn authenticate(&self, token: &str) -> Result<User, ApplicationError> {
         trace!(%token, "Start JWT authentication");
 
         let claims = self.authenticator.decode(token).await?;
         trace!(?claims, "Token decoded successfully");
 
-        let user_opt = self.store.account.find_by_sub(&claims.sub).await?;
+        let wallet_opt = self.store.wallet.find_by_user_id(&claims.sub).await?;
 
-        let mut user = match user_opt {
+        let wallet = match wallet_opt {
             Some(user) => user,
             None => {
-                let mut new_user = self.store.account.insert(&claims.sub).await?;
-                let wallet = self
-                    .store
-                    .wallet
-                    .insert(new_user.id, Currency::Bitcoin)
-                    .await?;
+                let wallet = self.store.wallet.insert(&claims.sub).await?;
 
-                new_user.wallet = wallet;
-
-                info!(user_id = %new_user.id, "New user created successfully on first login");
-                new_user
+                info!(wallet_id = %wallet.id, user_id = %wallet.user_id, "New user created successfully on first login");
+                wallet
             }
         };
-        user.permissions = claims.permissions;
+
+        let user = User {
+            wallet_id: wallet.id,
+            permissions: claims.permissions,
+        };
 
         trace!(?user, "Authentication successful");
         Ok(user)

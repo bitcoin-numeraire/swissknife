@@ -10,12 +10,12 @@ impl MigrationTrait for Migration {
             r#"
             CREATE TABLE ln_address (
                 id UUID PRIMARY KEY DEFAULT gen_random_UUID(),
-                user_id UUID UNIQUE NOT NULL,
+                wallet_id UUID UNIQUE NOT NULL,
                 username VARCHAR(255) UNIQUE NOT NULL,
                 active boolean NOT NULL DEFAULT true,
                 created_at TIMESTAMPTZ NOT NULL DEFAULT current_timestamp,
                 updated_at TIMESTAMPTZ,
-                CONSTRAINT fk_user FOREIGN KEY (user_id) REFERENCES account (id) ON DELETE CASCADE
+                CONSTRAINT fk_user FOREIGN KEY (wallet_id) REFERENCES wallet (id) ON DELETE CASCADE
             );
 
             CREATE OR REPLACE FUNCTION update_timestamp() RETURNS TRIGGER AS $$

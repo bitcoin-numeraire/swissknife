@@ -7,7 +7,7 @@ use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::{
-    application::entities::Ledger,
+    application::entities::{Currency, Ledger},
     domains::invoice::{Invoice, InvoiceStatus, LnInvoice},
 };
 
@@ -30,9 +30,11 @@ pub struct InvoiceResponse {
     pub id: Uuid,
     /// Wallet ID
     pub wallet_id: Uuid,
+
     /// Lightning Address. Populated when invoice is generated as part of the LNURL protocol
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ln_address_id: Option<Uuid>,
+
     /// Description
     pub description: Option<String>,
     /// Amount requested in millisatoshis.
@@ -45,20 +47,26 @@ pub struct InvoiceResponse {
     pub status: InvoiceStatus,
     /// Ledger
     pub ledger: Ledger,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    /// Currency
+    pub currency: Currency,
+
     /// Fees paid. Populated when a new channel is opened to receive the funds.
-    pub fee_msat: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub fee_msat: Option<u64>,
+
     /// Payment time
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub payment_time: Option<DateTime<Utc>>,
+
     /// Date of creation in database
     pub created_at: DateTime<Utc>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+
     /// Date of update in database
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub updated_at: Option<DateTime<Utc>>,
 
-    #[serde(skip_serializing_if = "Option::is_none")]
     /// Lightning details of the invoice
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub ln_invoice: Option<LnInvoiceResponse>,
 }
 
@@ -110,6 +118,7 @@ impl From<Invoice> for InvoiceResponse {
             timestamp: invoice.timestamp,
             status: invoice.status,
             ledger: invoice.ledger,
+            currency: invoice.currency,
             fee_msat: invoice.fee_msat,
             payment_time: invoice.payment_time,
             created_at: invoice.created_at,

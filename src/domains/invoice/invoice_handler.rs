@@ -18,7 +18,7 @@ use crate::{
         dtos::{InvoiceResponse, LnInvoiceResponse, NewInvoiceRequest},
         errors::ApplicationError,
     },
-    domains::user::{Account, Permission},
+    domains::user::{Permission, User},
     infra::app::AppState,
 };
 
@@ -64,7 +64,7 @@ pub fn router() -> Router<Arc<AppState>> {
 )]
 async fn generate_invoice(
     State(app_state): State<Arc<AppState>>,
-    user: Account,
+    user: User,
     Json(payload): Json<NewInvoiceRequest>,
 ) -> Result<Json<InvoiceResponse>, ApplicationError> {
     user.check_permission(Permission::WriteLnTransaction)?;
@@ -73,7 +73,7 @@ async fn generate_invoice(
         .services
         .invoice
         .invoice(
-            payload.wallet_id.unwrap_or(user.wallet.id),
+            payload.wallet_id.unwrap_or(user.wallet_id),
             payload.amount_msat,
             payload.description,
             payload.expiry,
@@ -101,7 +101,7 @@ async fn generate_invoice(
 )]
 async fn get_invoice(
     State(app_state): State<Arc<AppState>>,
-    user: Account,
+    user: User,
     Path(id): Path<Uuid>,
 ) -> Result<Json<InvoiceResponse>, ApplicationError> {
     user.check_permission(Permission::ReadLnTransaction)?;
@@ -129,7 +129,7 @@ async fn get_invoice(
 )]
 async fn list_invoices(
     State(app_state): State<Arc<AppState>>,
-    user: Account,
+    user: User,
     Query(filter): Query<InvoiceFilter>,
 ) -> Result<Json<Vec<InvoiceResponse>>, ApplicationError> {
     user.check_permission(Permission::ReadLnTransaction)?;
@@ -159,7 +159,7 @@ async fn list_invoices(
 )]
 async fn delete_invoice(
     State(app_state): State<Arc<AppState>>,
-    user: Account,
+    user: User,
     Path(id): Path<Uuid>,
 ) -> Result<(), ApplicationError> {
     user.check_permission(Permission::WriteLnTransaction)?;
@@ -187,7 +187,7 @@ async fn delete_invoice(
 )]
 async fn delete_invoices(
     State(app_state): State<Arc<AppState>>,
-    user: Account,
+    user: User,
     Query(query_params): Query<InvoiceFilter>,
 ) -> Result<Json<u64>, ApplicationError> {
     user.check_permission(Permission::WriteLnTransaction)?;

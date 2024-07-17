@@ -7,7 +7,7 @@ use sea_orm::{
 use uuid::Uuid;
 
 use crate::{
-    application::{entities::Currency, errors::DatabaseError},
+    application::errors::DatabaseError,
     domains::{
         payment::PaymentStatus,
         wallet::{Balance, Contact, Wallet, WalletRepository},
@@ -16,7 +16,7 @@ use crate::{
         balance::BalanceModel,
         contact::ContactModel,
         payment::Column as PaymentColumn,
-        prelude::{Invoice, Payment},
+        prelude::{Invoice, LnAddress, Payment},
         wallet::{ActiveModel, Column, Entity},
     },
 };
@@ -53,12 +53,18 @@ impl WalletRepository for SeaOrmWalletRepository {
                     .all(&self.db)
                     .await
                     .map_err(|e| DatabaseError::FindRelated(e.to_string()))?;
+                let ln_address = model
+                    .find_related(LnAddress)
+                    .one(&self.db)
+                    .await
+                    .map_err(|e| DatabaseError::FindRelated(e.to_string()))?;
                 let contacts = self.find_contacts(id).await?;
 
                 let mut wallet: Wallet = model.into();
                 wallet.balance = balance.into();
                 wallet.payments = payments.into_iter().map(Into::into).collect();
                 wallet.invoices = invoices.into_iter().map(Into::into).collect();
+                wallet.ln_address = ln_address.map(Into::into);
                 wallet.contacts = contacts;
 
                 return Ok(Some(wallet));
@@ -67,7 +73,7 @@ impl WalletRepository for SeaOrmWalletRepository {
         };
     }
 
-    async fn find_by_user_id(&self, user_id: Uuid) -> Result<Option<Wallet>, DatabaseError> {
+    async fn find_by_user_id(&self, user_id: &str) -> Result<Option<Wallet>, DatabaseError> {
         let model = Entity::find()
             .filter(Column::UserId.eq(user_id))
             .one(&self.db)
@@ -77,10 +83,9 @@ impl WalletRepository for SeaOrmWalletRepository {
         Ok(model.map(Into::into))
     }
 
-    async fn insert(&self, user_id: Uuid, currency: Currency) -> Result<Wallet, DatabaseError> {
+    async fn insert(&self, user_id: &str) -> Result<Wallet, DatabaseError> {
         let model = ActiveModel {
-            user_id: Set(user_id),
-            currency: Set(currency.to_string()),
+            user_id: Set(user_id.to_string()),
             ..Default::default()
         };
 
@@ -134,9 +139,9 @@ impl WalletRepository for SeaOrmWalletRepository {
         }
     }
 
-    async fn find_contacts(&self, wallet_id: Uuid) -> Result<Vec<Contact>, DatabaseError> {
+    async fn find_contacts(&self, id: Uuid) -> Result<Vec<Contact>, DatabaseError> {
         let models = Payment::find()
-            .filter(PaymentColumn::WalletId.eq(wallet_id))
+            .filter(PaymentColumn::WalletId.eq(id))
             .filter(PaymentColumn::LnAddress.is_not_null())
             .filter(PaymentColumn::Status.eq(PaymentStatus::Settled.to_string()))
             .select_only()

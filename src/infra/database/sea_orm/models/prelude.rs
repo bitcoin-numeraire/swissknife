@@ -3,4 +3,3 @@
 pub use super::invoice::Entity as Invoice;
 pub use super::ln_address::Entity as LnAddress;
 pub use super::payment::Entity as Payment;
-pub use super::wallet::Entity as Wallet;

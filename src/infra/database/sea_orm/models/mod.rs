@@ -2,7 +2,6 @@
 
 pub mod prelude;
 
-pub mod account;
 pub mod balance;
 pub mod contact;
 pub mod invoice;

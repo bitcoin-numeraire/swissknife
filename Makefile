@@ -72,3 +72,9 @@ fmt:
 
 new-migration:
 	@sea-orm-cli migrate generate $(name)
+
+run-migrations:
+	@sea-orm-cli migrate up
+
+fresh-migrations:
+	@sea-orm-cli migrate fresh 

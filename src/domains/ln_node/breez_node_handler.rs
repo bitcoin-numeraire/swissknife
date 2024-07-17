@@ -24,7 +24,7 @@ use crate::{
         },
         errors::{ApplicationError, LightningError},
     },
-    domains::user::{Account, Permission},
+    domains::user::{User, Permission},
     infra::{app::AppState, lightning::LnClient},
 };
 
@@ -71,7 +71,7 @@ pub fn breez_node_router() -> Router<Arc<AppState>> {
 )]
 async fn node_info(
     State(app_state): State<Arc<AppState>>,
-    user: Account,
+    user: User,
 ) -> Result<Json<NodeState>, ApplicationError> {
     user.check_permission(Permission::ReadLnNode)?;
 
@@ -98,7 +98,7 @@ async fn node_info(
 )]
 async fn lsp_info(
     State(app_state): State<Arc<AppState>>,
-    user: Account,
+    user: User,
 ) -> Result<Json<LspInformation>, ApplicationError> {
     user.check_permission(Permission::ReadLnNode)?;
 
@@ -125,7 +125,7 @@ async fn lsp_info(
 )]
 async fn list_lsps(
     State(app_state): State<Arc<AppState>>,
-    user: Account,
+    user: User,
 ) -> Result<Json<Vec<LspInformation>>, ApplicationError> {
     user.check_permission(Permission::ReadLnNode)?;
 
@@ -152,7 +152,7 @@ async fn list_lsps(
 )]
 async fn close_lsp_channels(
     State(app_state): State<Arc<AppState>>,
-    user: Account,
+    user: User,
 ) -> Result<Json<Vec<String>>, ApplicationError> {
     user.check_permission(Permission::WriteLnNode)?;
 
@@ -182,7 +182,7 @@ async fn close_lsp_channels(
 )]
 async fn connect_lsp(
     State(app_state): State<Arc<AppState>>,
-    user: Account,
+    user: User,
     Json(payload): Json<ConnectLSPRequest>,
 ) -> Result<(), ApplicationError> {
     user.check_permission(Permission::WriteLnNode)?;
@@ -212,7 +212,7 @@ async fn connect_lsp(
 )]
 async fn swap(
     State(app_state): State<Arc<AppState>>,
-    user: Account,
+    user: User,
     Json(payload): Json<SendOnchainPaymentRequest>,
 ) -> Result<Json<ReverseSwapInfo>, ApplicationError> {
     user.check_permission(Permission::WriteLnNode)?;
@@ -248,7 +248,7 @@ async fn swap(
 )]
 async fn redeem(
     State(app_state): State<Arc<AppState>>,
-    user: Account,
+    user: User,
     Json(payload): Json<RedeemOnchainRequest>,
 ) -> Result<Json<RedeemOnchainResponse>, ApplicationError> {
     user.check_permission(Permission::WriteLnNode)?;
@@ -280,7 +280,7 @@ async fn redeem(
 )]
 async fn sign_message(
     State(app_state): State<Arc<AppState>>,
-    user: Account,
+    user: User,
     Json(payload): Json<SignMessageRequest>,
 ) -> Result<Json<SignMessageResponse>, ApplicationError> {
     user.check_permission(Permission::WriteLnNode)?;
@@ -310,7 +310,7 @@ async fn sign_message(
 )]
 async fn check_message(
     State(app_state): State<Arc<AppState>>,
-    user: Account,
+    user: User,
     Json(payload): Json<CheckMessageRequest>,
 ) -> Result<Json<CheckMessageResponse>, ApplicationError> {
     user.check_permission(Permission::WriteLnNode)?;
@@ -340,7 +340,7 @@ async fn check_message(
 )]
 async fn sync(
     State(app_state): State<Arc<AppState>>,
-    user: Account,
+    user: User,
 ) -> Result<(), ApplicationError> {
     user.check_permission(Permission::WriteLnNode)?;
 
@@ -367,7 +367,7 @@ async fn sync(
 )]
 async fn backup(
     State(app_state): State<Arc<AppState>>,
-    user: Account,
+    user: User,
 ) -> Result<Response, ApplicationError> {
     user.check_permission(Permission::ReadLnNode)?;
 

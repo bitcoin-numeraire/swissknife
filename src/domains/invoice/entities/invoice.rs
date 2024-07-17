@@ -7,8 +7,7 @@ use strum_macros::{Display, EnumString};
 use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
 
-use crate::application::entities::Ledger;
-use crate::application::entities::OrderDirection;
+use crate::application::entities::{Currency, Ledger, OrderDirection};
 
 #[derive(Clone, Debug, Default)]
 pub struct Invoice {
@@ -21,6 +20,7 @@ pub struct Invoice {
     pub timestamp: DateTime<Utc>,
     pub status: InvoiceStatus,
     pub ledger: Ledger,
+    pub currency: Currency,
     pub fee_msat: Option<u64>,
     pub payment_time: Option<DateTime<Utc>>,
     pub created_at: DateTime<Utc>,

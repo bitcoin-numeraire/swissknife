@@ -3,9 +3,9 @@ use serde::Serialize;
 use utoipa::ToSchema;
 use uuid::Uuid;
 
-use crate::{
-    application::entities::Currency,
-    domains::wallet::{Balance, Contact, Wallet},
+use crate::domains::{
+    ln_address::LnAddress,
+    wallet::{Balance, Contact, Wallet},
 };
 
 use super::{InvoiceResponse, PaymentResponse};
@@ -14,10 +14,10 @@ use super::{InvoiceResponse, PaymentResponse};
 pub struct WalletResponse {
     /// Internal ID
     pub id: Uuid,
-    /// User ID
-    pub user_id: Uuid,
-    /// Currency
-    pub currency: Currency,
+    /// User ID. Populated from the Authentication method,  such as JWT subject
+    pub user_id: String,
+    /// Lightning Address
+    pub ln_address: Option<LnAddress>,
     /// User Balance
     pub balance: Balance,
     /// List of payments
@@ -38,7 +38,7 @@ impl From<Wallet> for WalletResponse {
         WalletResponse {
             id: wallet.id,
             user_id: wallet.user_id,
-            currency: wallet.currency,
+            ln_address: wallet.ln_address,
             balance: wallet.balance,
             payments: wallet.payments.into_iter().map(Into::into).collect(),
             invoices: wallet.invoices.into_iter().map(Into::into).collect(),

@@ -8,7 +8,7 @@ pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
     pub id: Uuid,
     #[sea_orm(unique)]
-    pub user_id: Uuid,
+    pub wallet_id: Uuid,
     #[sea_orm(unique)]
     pub username: String,
     pub active: bool,
@@ -18,27 +18,27 @@ pub struct Model {
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
+    #[sea_orm(has_many = "super::invoice::Entity")]
+    Invoice,
     #[sea_orm(
-        belongs_to = "super::account::Entity",
-        from = "Column::UserId",
-        to = "super::account::Column::Id",
+        belongs_to = "super::wallet::Entity",
+        from = "Column::WalletId",
+        to = "super::wallet::Column::Id",
         on_update = "NoAction",
         on_delete = "Cascade"
     )]
-    Account,
-    #[sea_orm(has_many = "super::invoice::Entity")]
-    Invoice,
-}
-
-impl Related<super::account::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::Account.def()
-    }
+    Wallet,
 }
 
 impl Related<super::invoice::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::Invoice.def()
+    }
+}
+
+impl Related<super::wallet::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::Wallet.def()
     }
 }
 

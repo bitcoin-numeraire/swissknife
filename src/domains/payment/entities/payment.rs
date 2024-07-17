@@ -6,7 +6,7 @@ use strum_macros::{Display, EnumString};
 use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
 
-use crate::application::entities::{Ledger, OrderDirection};
+use crate::application::entities::{Currency, Ledger, OrderDirection};
 
 #[derive(Clone, Debug, Default)]
 pub struct Payment {
@@ -19,6 +19,7 @@ pub struct Payment {
     pub amount_msat: u64,
     pub fee_msat: Option<u64>,
     pub ledger: Ledger,
+    pub currency: Currency,
     pub payment_time: Option<DateTime<Utc>>,
     pub status: PaymentStatus,
     pub description: Option<String>,

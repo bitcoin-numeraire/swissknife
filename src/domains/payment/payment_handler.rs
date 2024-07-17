@@ -18,7 +18,7 @@ use crate::{
         dtos::{PaymentResponse, SendPaymentRequest},
         errors::ApplicationError,
     },
-    domains::user::{Account, Permission},
+    domains::user::{Permission, User},
     infra::app::AppState,
 };
 
@@ -64,7 +64,7 @@ pub fn router() -> Router<Arc<AppState>> {
 )]
 async fn pay(
     State(app_state): State<Arc<AppState>>,
-    user: Account,
+    user: User,
     Json(payload): Json<SendPaymentRequest>,
 ) -> Result<Json<PaymentResponse>, ApplicationError> {
     user.check_permission(Permission::WriteLnTransaction)?;
@@ -76,7 +76,7 @@ async fn pay(
             payload.input,
             payload.amount_msat,
             payload.comment,
-            payload.wallet_id.unwrap_or(user.wallet.id),
+            payload.wallet_id.unwrap_or(user.wallet_id),
         )
         .await?;
 
@@ -102,7 +102,7 @@ async fn pay(
 )]
 async fn get_payment(
     State(app_state): State<Arc<AppState>>,
-    user: Account,
+    user: User,
     Path(id): Path<Uuid>,
 ) -> Result<Json<PaymentResponse>, ApplicationError> {
     user.check_permission(Permission::ReadLnTransaction)?;
@@ -130,7 +130,7 @@ async fn get_payment(
 )]
 async fn list_payments(
     State(app_state): State<Arc<AppState>>,
-    user: Account,
+    user: User,
     Query(query_params): Query<PaymentFilter>,
 ) -> Result<Json<Vec<PaymentResponse>>, ApplicationError> {
     user.check_permission(Permission::ReadLnTransaction)?;
@@ -160,7 +160,7 @@ async fn list_payments(
 )]
 async fn delete_payment(
     State(app_state): State<Arc<AppState>>,
-    user: Account,
+    user: User,
     Path(id): Path<Uuid>,
 ) -> Result<(), ApplicationError> {
     user.check_permission(Permission::WriteLnTransaction)?;
@@ -188,7 +188,7 @@ async fn delete_payment(
 )]
 async fn delete_payments(
     State(app_state): State<Arc<AppState>>,
-    user: Account,
+    user: User,
     Query(query_params): Query<PaymentFilter>,
 ) -> Result<Json<u64>, ApplicationError> {
     user.check_permission(Permission::WriteLnTransaction)?;

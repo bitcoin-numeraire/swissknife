@@ -15,10 +15,10 @@ use crate::{
     infra::app::AppState,
 };
 
-use super::Account;
+use super::User;
 
 #[async_trait]
-impl FromRequestParts<Arc<AppState>> for Account {
+impl FromRequestParts<Arc<AppState>> for User {
     type Rejection = ApplicationError;
 
     async fn from_request_parts(

@@ -20,6 +20,7 @@ impl MigrationTrait for Migration {
                 payment_time TIMESTAMPTZ,
                 status VARCHAR NOT NULL,
                 ledger VARCHAR(255) NOT NULL,
+                currency VARCHAR(255) NOT NULL,
                 description VARCHAR,
                 metadata VARCHAR,
                 success_action JSONB,

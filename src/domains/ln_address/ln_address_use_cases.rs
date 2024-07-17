@@ -10,7 +10,7 @@ use super::{LnAddress, LnAddressFilter};
 pub trait LnAddressUseCases: Send + Sync {
     async fn register(
         &self,
-        user_id: Uuid,
+        wallet_id: Uuid,
         username: String,
     ) -> Result<LnAddress, ApplicationError>;
     async fn get(&self, id: Uuid) -> Result<LnAddress, ApplicationError>;

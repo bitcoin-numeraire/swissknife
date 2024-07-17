@@ -10,7 +10,7 @@ use uuid::Uuid;
 
 use crate::{
     application::{
-        entities::{AppStore, Ledger},
+        entities::{AppStore, Currency, Ledger},
         errors::{ApplicationError, DataError, DatabaseError, LightningError},
     },
     domains::{
@@ -76,14 +76,7 @@ impl PaymentService {
         let address_opt = self.store.ln_address.find_by_username(username).await?;
         match address_opt {
             Some(retrieved_address) => {
-                let recipient_wallet = self
-                    .store
-                    .wallet
-                    .find_by_user_id(retrieved_address.user_id)
-                    .await?
-                    .expect("must exist if address exists");
-
-                if recipient_wallet.id == wallet_id {
+                if retrieved_address.wallet_id == wallet_id {
                     return Err(DataError::Validation("Cannot pay to yourself.".to_string()).into());
                 }
 
@@ -96,9 +89,10 @@ impl PaymentService {
                         Some(&txn),
                         Invoice {
                             id: Uuid::new_v4(),
-                            wallet_id: recipient_wallet.id,
+                            wallet_id: retrieved_address.wallet_id,
                             ln_address_id: Some(retrieved_address.id),
                             ledger: Ledger::Internal,
+                            currency: Currency::Bitcoin,
                             description: comment
                                 .clone()
                                 .or(DEFAULT_INTERNAL_INVOICE_DESCRIPTION.to_string().into()),
@@ -124,6 +118,7 @@ impl PaymentService {
                             fee_msat: Some(0),
                             payment_time: Some(curr_time),
                             ledger: Ledger::Internal,
+                            currency: Currency::Bitcoin,
                             ln_address: Some(input),
                             ..Default::default()
                         },
@@ -194,6 +189,7 @@ impl PaymentService {
                                     fee_msat: Some(0),
                                     payment_time: Some(Utc::now()),
                                     ledger: Ledger::Internal,
+                                    currency: invoice.network.into(),
                                     ..Default::default()
                                 },
                                 0.0,
@@ -226,6 +222,7 @@ impl PaymentService {
                         amount_msat: amount,
                         status: PaymentStatus::Pending,
                         ledger: Ledger::Lightning,
+                        currency: invoice.network.into(),
                         payment_hash: Some(invoice.payment_hash),
                         description: comment,
                         ..Default::default()
@@ -284,6 +281,7 @@ impl PaymentService {
                             .to_hex(),
                     ),
                     ledger: Ledger::Lightning,
+                    currency: Currency::Bitcoin,
                     ..Default::default()
                 },
                 self.fee_buffer,
