@@ -8,14 +8,14 @@ use uuid::Uuid;
 
 use crate::{
     application::entities::{Currency, Ledger},
-    domains::invoices::entities::{Invoice, InvoiceStatus, LnInvoice},
+    domains::invoice::{Invoice, InvoiceStatus, LnInvoice},
 };
 
 /// New Invoice Request
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct NewInvoiceRequest {
     /// User ID. Will be populated with your own ID by default
-    pub user_id: Option<String>,
+    pub wallet_id: Option<Uuid>,
     /// Amount in millisatoshis
     pub amount_msat: u64,
     /// Description of the invoice. Visible by the payer
@@ -28,15 +28,15 @@ pub struct NewInvoiceRequest {
 pub struct InvoiceResponse {
     /// Internal ID
     pub id: Uuid,
-    /// User ID
-    pub user_id: String,
+    /// Wallet ID
+    pub wallet_id: Uuid,
+
     /// Lightning Address. Populated when invoice is generated as part of the LNURL protocol
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ln_address_id: Option<Uuid>,
+
     /// Description
     pub description: Option<String>,
-    /// Currency. Different networks use different currencies such as testnet
-    pub currency: Currency,
     /// Amount requested in millisatoshis.
     pub amount_msat: Option<u64>,
     /// Amount received in millisatoshis.
@@ -47,20 +47,26 @@ pub struct InvoiceResponse {
     pub status: InvoiceStatus,
     /// Ledger
     pub ledger: Ledger,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    /// Currency
+    pub currency: Currency,
+
     /// Fees paid. Populated when a new channel is opened to receive the funds.
-    pub fee_msat: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub fee_msat: Option<u64>,
+
     /// Payment time
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub payment_time: Option<DateTime<Utc>>,
+
     /// Date of creation in database
     pub created_at: DateTime<Utc>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+
     /// Date of update in database
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub updated_at: Option<DateTime<Utc>>,
 
-    #[serde(skip_serializing_if = "Option::is_none")]
     /// Lightning details of the invoice
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub ln_invoice: Option<LnInvoiceResponse>,
 }
 
@@ -104,15 +110,15 @@ impl From<Invoice> for InvoiceResponse {
     fn from(invoice: Invoice) -> Self {
         InvoiceResponse {
             id: invoice.id,
-            user_id: invoice.user_id,
+            wallet_id: invoice.wallet_id,
             ln_address_id: invoice.ln_address_id,
             description: invoice.description,
-            currency: invoice.currency,
             amount_msat: invoice.amount_msat,
             amount_received_msat: invoice.amount_received_msat,
             timestamp: invoice.timestamp,
             status: invoice.status,
             ledger: invoice.ledger,
+            currency: invoice.currency,
             fee_msat: invoice.fee_msat,
             payment_time: invoice.payment_time,
             created_at: invoice.created_at,

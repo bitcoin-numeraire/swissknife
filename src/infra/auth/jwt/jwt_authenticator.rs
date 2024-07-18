@@ -1,8 +1,8 @@
 use std::time::Duration;
 
-use crate::application::errors::AuthenticationError;
-use crate::domains::users::entities::Permission;
-use crate::{domains::users::entities::AuthUser, infra::auth::Authenticator};
+use crate::domains::user::AuthClaims;
+use crate::infra::auth::Authenticator;
+use crate::{application::errors::AuthenticationError, domains::user::Permission};
 use async_trait::async_trait;
 
 use bcrypt::{hash, verify, DEFAULT_COST};
@@ -53,7 +53,7 @@ impl JwtAuthenticator {
 
 #[async_trait]
 impl Authenticator for JwtAuthenticator {
-    fn generate_jwt_token(&self, password: &str) -> Result<String, AuthenticationError> {
+    fn generate(&self, password: &str) -> Result<String, AuthenticationError> {
         if !verify(password, &self.password_hash)
             .map_err(|e| AuthenticationError::Hash(e.to_string()))?
         {
@@ -76,11 +76,11 @@ impl Authenticator for JwtAuthenticator {
         Ok(token)
     }
 
-    async fn authenticate(&self, token: &str) -> Result<AuthUser, AuthenticationError> {
+    async fn decode(&self, token: &str) -> Result<AuthClaims, AuthenticationError> {
         let token_data = decode::<Claims>(token, &self.decoding_key, &Validation::default())
             .map_err(|e| AuthenticationError::DecodeJWT(e.to_string()))?;
 
-        Ok(AuthUser {
+        Ok(AuthClaims {
             sub: token_data.claims.sub,
             permissions: token_data.claims.permissions,
         })

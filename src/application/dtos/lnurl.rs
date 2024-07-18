@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use utoipa::{IntoParams, ToSchema};
 
-use crate::domains::lightning::entities::LnUrlCallback;
+use crate::domains::lnurl::LnUrlCallback;
 
 #[derive(Debug, Deserialize, IntoParams)]
 pub struct LNUrlpInvoiceQueryParams {

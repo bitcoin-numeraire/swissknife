@@ -3,12 +3,13 @@ use std::sync::Arc;
 use crate::{
     application::{dtos::AppConfig, errors::ConfigError},
     domains::{
-        invoices::services::{InvoiceService, InvoiceUseCases},
-        lightning::services::{LnUrlService, LnUrlUseCases},
-        payments::services::{PaymentService, PaymentsUseCases},
-        system::services::{SystemService, SystemUseCases},
-        users::services::{UserService, UserUseCases},
-        wallet::services::{WalletService, WalletUseCases},
+        invoice::{InvoiceService, InvoiceUseCases},
+        ln_address::{LnAddressService, LnAddressUseCases},
+        lnurl::{LnUrlService, LnUrlUseCases},
+        payment::{PaymentService, PaymentsUseCases},
+        system::{SystemService, SystemUseCases},
+        user::{AuthService, AuthUseCases},
+        wallet::{WalletService, WalletUseCases},
     },
     infra::{
         auth::Authenticator,
@@ -27,7 +28,8 @@ pub struct AppServices {
     pub payment: Box<dyn PaymentsUseCases>,
     pub wallet: Box<dyn WalletUseCases>,
     pub lnurl: Box<dyn LnUrlUseCases>,
-    pub user: Box<dyn UserUseCases>,
+    pub ln_address: Box<dyn LnAddressUseCases>,
+    pub auth: Box<dyn AuthUseCases>,
     pub system: Box<dyn SystemUseCases>,
 }
 
@@ -55,9 +57,11 @@ impl AppServices {
             ln_client.clone(),
             config.invoice_expiry.as_secs() as u32,
             config.domain,
+            config.host,
         );
+        let ln_address = LnAddressService::new(store.clone());
         let wallet = WalletService::new(store.clone());
-        let user = UserService::new(config.auth_provider, authenticator);
+        let auth = AuthService::new(config.auth_provider, authenticator, store.clone());
         let system = SystemService::new(store, ln_client);
 
         AppServices {
@@ -65,7 +69,8 @@ impl AppServices {
             payment: Box::new(payments),
             wallet: Box::new(wallet),
             lnurl: Box::new(lnurl),
-            user: Box::new(user),
+            ln_address: Box::new(ln_address),
+            auth: Box::new(auth),
             system: Box::new(system),
         }
     }

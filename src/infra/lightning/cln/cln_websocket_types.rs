@@ -2,9 +2,7 @@ use chrono::{TimeZone, Utc};
 use serde::Deserialize;
 use uuid::Uuid;
 
-use crate::domains::lightning::entities::{
-    LnInvoicePaidEvent, LnPayFailureEvent, LnPaySuccessEvent,
-};
+use crate::domains::ln_node::{LnInvoicePaidEvent, LnPayFailureEvent, LnPaySuccessEvent};
 
 #[derive(Debug, Deserialize)]
 pub struct InvoicePayment {

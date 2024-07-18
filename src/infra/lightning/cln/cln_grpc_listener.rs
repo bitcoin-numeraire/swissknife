@@ -8,7 +8,7 @@ use tracing::{debug, error, info, trace, warn};
 
 use crate::{
     application::errors::ApplicationError,
-    domains::lightning::services::LnEventsUseCases,
+    domains::ln_node::LnEventsUseCases,
     infra::lightning::cln::cln::{
         waitanyinvoice_response::WaitanyinvoiceStatus, ListinvoicesRequest,
     },

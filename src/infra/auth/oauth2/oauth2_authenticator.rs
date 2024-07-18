@@ -1,9 +1,9 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use crate::application::errors::AuthenticationError;
-use crate::domains::users::entities::Permission;
-use crate::{domains::users::entities::AuthUser, infra::auth::Authenticator};
+use crate::domains::user::AuthClaims;
+use crate::infra::auth::Authenticator;
+use crate::{application::errors::AuthenticationError, domains::user::Permission};
 use async_trait::async_trait;
 use jsonwebtoken::{
     decode, decode_header,
@@ -86,11 +86,11 @@ impl OAuth2Authenticator {
 
 #[async_trait]
 impl Authenticator for OAuth2Authenticator {
-    fn generate_jwt_token(&self, _: &str) -> Result<String, AuthenticationError> {
+    fn generate(&self, _: &str) -> Result<String, AuthenticationError> {
         Err(AuthenticationError::UnsupportedOperation)
     }
 
-    async fn authenticate(&self, token: &str) -> Result<AuthUser, AuthenticationError> {
+    async fn decode(&self, token: &str) -> Result<AuthClaims, AuthenticationError> {
         // Access the JWKs and clone the data
         let jwks = self.jwks.read().await.clone();
 
@@ -112,7 +112,7 @@ impl Authenticator for OAuth2Authenticator {
                     let decoded_token = decode::<Claims>(token, &decoding_key, &self.validation)
                         .map_err(|e| AuthenticationError::DecodeJWT(e.to_string()))?;
 
-                    Ok(AuthUser {
+                    Ok(AuthClaims {
                         sub: decoded_token.claims.sub,
                         permissions: decoded_token.claims.permissions,
                     })

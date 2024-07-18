@@ -4,12 +4,14 @@ use crate::{
         entities::{Currency, Ledger, OrderDirection},
     },
     domains::{
-        invoices::api::InvoiceHandler,
-        lightning::api::{BreezNodeHandler, LnAddressHandler, LnURLpHandler},
-        payments::api::PaymentHandler,
-        system::api::SystemHandler,
-        users::api::AuthHandler,
-        wallet::api::WalletHandler,
+        invoice::InvoiceHandler,
+        ln_address::LnAddressHandler,
+        ln_node::BreezNodeHandler,
+        lnurl::LnURLHandler,
+        payment::PaymentHandler,
+        system::SystemHandler,
+        user::AuthHandler,
+        wallet::{UserWalletHandler, WalletHandler},
     },
 };
 use utoipa::{
@@ -24,7 +26,7 @@ use utoipa::{
 #[openapi(
     info(
         title = "Numeraire SwissKnife REST API",
-        description = "This API is available to anyone with a Numeraire account. The `Wallet` endpoints are the main access point for most users.",
+        description = "This API is available to anyone with a Numeraire account. The `User Wallet` (`/me`) endpoints are the main access point for users.",
     ),
     components(schemas(OrderDirection, Ledger, Currency, ErrorResponse), responses(ErrorResponse)),
     modifiers(&SecurityAddon),
@@ -35,11 +37,12 @@ struct ApiDoc;
 pub fn merged_openapi() -> OpenApi {
     let mut openapi = ApiDoc::openapi();
     openapi.merge(AuthHandler::openapi());
+    openapi.merge(UserWalletHandler::openapi());
     openapi.merge(WalletHandler::openapi());
     openapi.merge(InvoiceHandler::openapi());
     openapi.merge(PaymentHandler::openapi());
     openapi.merge(LnAddressHandler::openapi());
-    openapi.merge(LnURLpHandler::openapi());
+    openapi.merge(LnURLHandler::openapi());
     openapi.merge(BreezNodeHandler::openapi());
     openapi.merge(SystemHandler::openapi());
     openapi

@@ -7,7 +7,7 @@ use crate::infra::{
     auth::{jwt::JwtConfig, oauth2::OAuth2Config},
     axum::AxumServerConfig,
     config::config_rs::deserialize_duration,
-    database::DatabaseConfig,
+    database::sea_orm::SeaOrmConfig,
     lightning::{
         breez::BreezClientConfig,
         cln::{ClnClientConfig, ClnRestClientConfig},
@@ -18,6 +18,7 @@ use crate::infra::{
 #[derive(Debug, Deserialize, Clone)]
 pub struct AppConfig {
     pub domain: String,
+    pub host: String,
     pub auth_provider: AuthProvider,
     pub oauth2: Option<OAuth2Config>,
     pub jwt: Option<JwtConfig>,
@@ -25,9 +26,9 @@ pub struct AppConfig {
     pub invoice_expiry: Duration,
     pub fee_buffer: Option<f64>,
     pub ln_provider: LightningProvider,
-    pub database: DatabaseConfig,
+    pub database: SeaOrmConfig,
     pub breez_config: Option<BreezClientConfig>,
-    pub cln_config: Option<ClnClientConfig>,
+    pub cln_grpc_config: Option<ClnClientConfig>,
     pub cln_rest_config: Option<ClnRestClientConfig>,
     pub web: AxumServerConfig,
     pub logging: TracingLoggerConfig,

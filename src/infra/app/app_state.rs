@@ -6,7 +6,7 @@ use crate::{
         entities::{AppServices, AppStore, LnNodeClient},
         errors::{ApplicationError, ConfigError},
     },
-    domains::lightning::services::{LnEventsService, LnEventsUseCases},
+    domains::ln_node::{LnEventsService, LnEventsUseCases},
     infra::{
         auth::{
             bypass::BypassAuthenticator, jwt::JwtAuthenticator, oauth2::OAuth2Authenticator,
@@ -79,7 +79,7 @@ async fn get_ln_client(
             Ok(LnNodeClient::Breez(Arc::new(client)))
         }
         LightningProvider::ClnGrpc => {
-            let cln_config = config.cln_config.clone().ok_or_else(|| {
+            let cln_config = config.cln_grpc_config.clone().ok_or_else(|| {
                 ConfigError::MissingLightningProviderConfig(config.ln_provider.to_string())
             })?;
 

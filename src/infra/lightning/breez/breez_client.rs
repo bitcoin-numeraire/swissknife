@@ -17,8 +17,7 @@ use breez_sdk_core::{
 use crate::{
     application::errors::LightningError,
     domains::{
-        invoices::entities::Invoice, lightning::services::LnEventsUseCases,
-        payments::entities::Payment, system::entities::HealthStatus,
+        invoice::Invoice, ln_node::LnEventsUseCases, payment::Payment, system::HealthStatus,
     },
     infra::lightning::LnClient,
 };
@@ -266,7 +265,10 @@ impl LnClient for BreezClient {
             .await
             .map_err(|e| LightningError::Invoice(e.to_string()))?;
 
-        Ok(response.ln_invoice.into())
+        let mut invoice: Invoice = response.ln_invoice.into();
+        invoice.id = Uuid::new_v4();
+
+        Ok(invoice)
     }
 
     async fn pay(

@@ -1,6 +1,6 @@
 use crate::application::errors::AuthenticationError;
-use crate::domains::users::entities::Permission;
-use crate::{domains::users::entities::AuthUser, infra::auth::Authenticator};
+use crate::domains::user::{AuthClaims, Permission};
+use crate::infra::auth::Authenticator;
 use async_trait::async_trait;
 
 #[derive(Clone, Debug)]
@@ -12,17 +12,17 @@ impl BypassAuthenticator {
     }
 }
 
-const USERNAME: &str = "superuser";
+const SUB: &str = "superuser";
 
 #[async_trait]
 impl Authenticator for BypassAuthenticator {
-    fn generate_jwt_token(&self, _: &str) -> Result<String, AuthenticationError> {
+    fn generate(&self, _: &str) -> Result<String, AuthenticationError> {
         Err(AuthenticationError::UnsupportedOperation)
     }
 
-    async fn authenticate(&self, _: &str) -> Result<AuthUser, AuthenticationError> {
-        Ok(AuthUser {
-            sub: USERNAME.to_string(),
+    async fn decode(&self, _: &str) -> Result<AuthClaims, AuthenticationError> {
+        Ok(AuthClaims {
+            sub: SUB.to_string(),
             permissions: Permission::all_permissions(),
         })
     }

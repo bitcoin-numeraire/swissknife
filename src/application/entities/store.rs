@@ -5,10 +5,12 @@ use sea_orm::{DatabaseConnection, DatabaseTransaction, TransactionTrait};
 use crate::{
     application::errors::DatabaseError,
     domains::{
-        invoices::adapters::{InvoiceRepository, SeaOrmInvoiceRepository},
-        lightning::adapters::{LnAddressRepository, SeaOrmLnAddressRepository},
-        payments::adapters::{PaymentRepository, SeaOrmPaymentRepository},
-        wallet::adapters::{SeaOrmWalletRepository, WalletRepository},
+        invoice::InvoiceRepository, ln_address::LnAddressRepository, payment::PaymentRepository,
+        wallet::WalletRepository,
+    },
+    infra::database::sea_orm::{
+        SeaOrmInvoiceRepository, SeaOrmLnAddressRepository, SeaOrmPaymentRepository,
+        SeaOrmWalletRepository,
     },
 };
 

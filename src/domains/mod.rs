@@ -1,6 +1,8 @@
-pub mod invoices;
-pub mod lightning;
-pub mod payments;
+pub mod invoice;
+pub mod ln_address;
+pub mod ln_node;
+pub mod lnurl;
+pub mod payment;
 pub mod system;
-pub mod users;
+pub mod user;
 pub mod wallet;

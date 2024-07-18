@@ -15,8 +15,7 @@ use async_trait::async_trait;
 use crate::{
     application::errors::LightningError,
     domains::{
-        invoices::entities::Invoice, lightning::services::LnEventsUseCases,
-        payments::entities::Payment, system::entities::HealthStatus,
+        invoice::Invoice, ln_node::LnEventsUseCases, payment::Payment, system::HealthStatus,
     },
     infra::{config::config_rs::deserialize_duration, lightning::LnClient},
 };

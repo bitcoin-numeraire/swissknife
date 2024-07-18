@@ -6,9 +6,9 @@ use std::str::FromStr;
 use crate::{
     application::entities::Ledger,
     domains::{
-        invoices::entities::{Invoice, InvoiceStatus},
-        lightning::entities::LnInvoicePaidEvent,
-        payments::entities::Payment,
+        invoice::{Invoice, InvoiceStatus},
+        ln_node::LnInvoicePaidEvent,
+        payment::Payment,
     },
 };
 

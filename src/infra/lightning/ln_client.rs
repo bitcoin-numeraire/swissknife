@@ -3,9 +3,7 @@ use breez_sdk_core::ReverseSwapInfo;
 
 use crate::{
     application::errors::LightningError,
-    domains::{
-        invoices::entities::Invoice, payments::entities::Payment, system::entities::HealthStatus,
-    },
+    domains::{invoice::Invoice, payment::Payment, system::HealthStatus},
 };
 
 #[async_trait]
