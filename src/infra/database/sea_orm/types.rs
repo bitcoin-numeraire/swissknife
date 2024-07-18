@@ -49,14 +49,14 @@ impl From<InvoiceModel> for Invoice {
             description: model.description,
             amount_msat: model.amount_msat.map(|v| v as u64),
             amount_received_msat: model.amount_received_msat.map(|v| v as u64),
-            timestamp: model.timestamp.into(),
+            timestamp: model.timestamp,
             ledger: model.ledger.parse().expect(ASSERTION_MSG),
             currency: model.currency.parse().expect(ASSERTION_MSG),
             status,
             fee_msat: None,
-            payment_time: model.payment_time.into(),
-            created_at: model.created_at.into(),
-            updated_at: model.updated_at.into(),
+            payment_time: model.payment_time,
+            created_at: model.created_at,
+            updated_at: model.updated_at,
             ln_invoice,
         }
     }

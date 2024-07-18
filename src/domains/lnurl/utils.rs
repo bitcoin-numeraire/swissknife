@@ -126,7 +126,7 @@ pub fn process_success_action(
                 }
                 Err(err) => {
                     warn!(%err, payment_preimage, "Invalid payment preimage");
-                    return None;
+                    None
                 }
             }
         }

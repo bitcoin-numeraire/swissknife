@@ -62,7 +62,7 @@ impl WalletRepository for SeaOrmWalletRepository {
                 let contacts = self.find_contacts(id).await?;
 
                 let mut wallet: Wallet = model.into();
-                wallet.balance = balance.into();
+                wallet.balance = balance;
                 wallet.payments = payments.into_iter().map(Into::into).collect();
                 wallet.invoices = invoices.into_iter().map(Into::into).collect();
                 wallet.ln_address = ln_address.map(Into::into);
