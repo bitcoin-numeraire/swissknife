@@ -6,13 +6,13 @@ use crate::domains::{
     invoice::{Invoice, InvoiceStatus, LnInvoice},
     ln_address::LnAddress,
     payment::Payment,
-    wallet::{Balance, Contact, Wallet},
+    wallet::{Balance, Contact, Wallet, WalletOverview},
 };
 
 use super::models::{
     balance::BalanceModel, contact::ContactModel, invoice::Model as InvoiceModel,
     ln_address::Model as LnAddressModel, payment::Model as PaymentModel,
-    wallet::Model as WalletModel,
+    wallet::Model as WalletModel, wallet_overview::WalletOverviewModel,
 };
 
 const ASSERTION_MSG: &str = "should parse successfully by assertion";
@@ -126,6 +126,28 @@ impl From<WalletModel> for Wallet {
             created_at: model.created_at,
             updated_at: model.updated_at,
             ..Default::default()
+        }
+    }
+}
+
+impl From<WalletOverviewModel> for WalletOverview {
+    fn from(model: WalletOverviewModel) -> Self {
+        WalletOverview {
+            id: model.id,
+            user_id: model.user_id,
+            ln_address_id: model.ln_address_id,
+            ln_address_username: model.ln_address_username,
+            balance: Balance {
+                received_msat: model.received_msat as u64,
+                sent_msat: model.sent_msat as u64,
+                fees_paid_msat: model.fees_paid_msat as u64,
+                available_msat: model.received_msat - (model.sent_msat + model.fees_paid_msat),
+            },
+            n_payments: model.n_payments as u32,
+            n_invoices: model.n_invoices as u32,
+            n_contacts: model.n_contacts as u32,
+            created_at: model.created_at,
+            updated_at: model.updated_at,
         }
     }
 }

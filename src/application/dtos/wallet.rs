@@ -1,5 +1,5 @@
 use chrono::{DateTime, Utc};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
 
@@ -9,6 +9,13 @@ use crate::domains::{
 };
 
 use super::{InvoiceResponse, PaymentResponse};
+
+/// Register Wallet Request
+#[derive(Debug, Deserialize, Clone, ToSchema)]
+pub struct RegisterWalletRequest {
+    /// User ID. Should ideally be registered in your Auth provider.
+    pub user_id: String,
+}
 
 #[derive(Serialize, ToSchema)]
 pub struct WalletResponse {

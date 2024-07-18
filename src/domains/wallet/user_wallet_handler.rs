@@ -33,7 +33,7 @@ use super::{Balance, Contact};
 
 #[derive(OpenApi)]
 #[openapi(
-    paths(get_wallet, get_wallet_balance, get_wallet_address, register_wallet_address, wallet_pay, list_wallet_payments,
+    paths(get_user_wallet, get_wallet_balance, get_wallet_address, register_wallet_address, wallet_pay, list_wallet_payments,
         get_wallet_payment, delete_failed_payments, list_wallet_invoices, get_wallet_invoice, new_wallet_invoice, delete_expired_invoices,
         list_contacts
     ),
@@ -47,7 +47,7 @@ pub const CONTEXT_PATH: &str = "/v1/me";
 
 pub fn user_router() -> Router<Arc<AppState>> {
     Router::new()
-        .route("/", get(get_wallet))
+        .route("/", get(get_user_wallet))
         .route("/balance", get(get_wallet_balance))
         .route("/lightning-address", get(get_wallet_address))
         .route("/lightning-address", post(register_wallet_address))
@@ -77,7 +77,7 @@ pub fn user_router() -> Router<Arc<AppState>> {
         (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
     )
 )]
-async fn get_wallet(
+async fn get_user_wallet(
     State(app_state): State<Arc<AppState>>,
     user: User,
 ) -> Result<Json<WalletResponse>, ApplicationError> {
