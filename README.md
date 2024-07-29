@@ -10,46 +10,41 @@
 
 # SwissKnife
 
-#### Numeraire SwissKnife is a wallet and transaction orchestrator enabling easy integration of Bitcoin, Lightning, Nostr and smart contract protocols (RGB, Taproot Assets) to any entity that wishes so without the complexities of above technologies.
+#### Numeraire SwissKnife is a wallet and transaction orchestrator enabling easy integration of Bitcoin, Lightning, Nostr and smart contract protocols to any entity that wishes so without the complexities of above technologies.
 
-[![GitHub stars](https://img.shields.io/github/stars/SeaQL/sea-orm.svg?style=social&label=Star&maxAge=1)](https://github.com/SeaQL/sea-orm/stargazers/)
+[![GitHub stars](https://img.shields.io/github/stars/bitcoin-numeraire/swissknife.svg?style=social&label=Star&maxAge=1)](https://github.com/bitcoin-numeraire/swissknife/stargazers)
 If you like what we do, consider starring, sharing and contributing!
-
-## Getting Started
-
-- [Documentation](https:/www.numeraire.tech/docs)
-- [Website](https://www.numeraire.tech/)
 
 ## Features
 
-- [`Lightning Network`](https://github.com/lnurl/luds). Send and receive payments on Clearnet and Tor.
-- [`LNURL`](https://github.com/lnurl/luds). Support for the LNURL protocol.
-- [`Lightning Address`](https://lightningaddress.com/). Deploy your own Lightning Address infrastructure. Like an email address, anyone can use Lightning addresses (`username@your.domain`) to send and receive Lightning payments.
+- [`Lightning Network`](https://github.com/lnurl/luds). Send and receive payments.
+- [`LNURL`](https://github.com/lnurl/luds) support.
+- [`Lightning Address`](https://lightningaddress.com/). Deploy your own Lightning Address infrastructure. Like email, anyone can use identifiers (`username@your.domain`) to send and receive payments.
 - Generate invoices.
 - Account segregation. Support any amount of users.
 - Internal ledger for instant payments on the same SwissKnife instance.
-- Public and Admin REST API.
+- REST API.
 - Frequent contacts.
 - `JWKS` with automatic public key retrieval
 - `JWT` token authentication` (tested with Auth0, Supabase).
 - `RBAC`. Fine grained authorization per route.
 - Data availability through pagination and advanced search.
 
-Numeraire SwissKnife ships with a [Dashboard (for admin and users)](https://github.com/bitcoin-numeraire/swissknife-dashboard).
+Numeraire SwissKnife ships with a [Dashboard](https://github.com/bitcoin-numeraire/swissknife-dashboard).
 
 ## Lightning Providers
 
 SwissKnife allows direct Lightning integration, supporting the most used node implementations and well-known providers:
 
-- [x] [`Core Lightning`](https://corelightning.org/):
+- [`Core Lightning`](https://corelightning.org/):
   - Non-custodial
   - Run your own node
   - Manage your own liquidity.
-- [x] [`Greenlight`](https://blockstream.com/lightning/greenlight/):
+- [`Greenlight`](https://blockstream.com/lightning/greenlight/):
   - Non-custodial
   - Automatic node management.
   - Manage your own liquidity.
-- [x] [`Breez`](https://breez.technology/sdk/):
+- [`Breez`](https://breez.technology/sdk/):
   - Non-custodial
   - Automatic node management.
   - Automatic liquidity management via LSPs (user can switch LSPs)
@@ -74,28 +69,34 @@ Inspect the `.env.example` file for and generate your own `.env` for sensitive c
 
 ## Work In Progress (WIP)
 
-- [ ] [`Nostr`](https://github.com/nostr-protocol/nips/blob/master/57.md). NIP-5 and Zap support through Lightning Address. .
-- [ ] Webhooks.
-- [ ] API keys authentication.
-- [x] [RGB](https://rgb.tech/) Smart contracts.
-- [ ] [Taproot Assets](https://docs.lightning.engineering/the-lightning-network/taproot-assets).
+#### Features
+
+- [ ] [`Nostr`](https://github.com/nostr-protocol/nips/blob/master/57.md). NIP-5 and Zap support through Lightning Address
+- [ ] Webhooks
+- [ ] API keys authentication
 - [ ] BOLT12 (offers)
 - [ ] Notifications (Email, SMS by Twilio)
 - [ ] Documentation website
 - [ ] Dockerhub images
 - [ ] Desktop applications
 - [ ] Helm Charts
-- [ ] [`Phoenixd`](https://phoenix.acinq.co/server). :
+
+#### Lightning providers
+
+- [ ] [`Phoenixd`](https://phoenix.acinq.co/server)
   - Non-custodial
-  - Automatic node management.
+  - Automatic node management
   - Automatic liquidity management via ACINQ.
-- [ ] [`LightSpark`](https://www.lightspark.com/). :
+- [ ] [`LightSpark`](https://www.lightspark.com/)
   - Custodial
-  - Automatic node management.
-  - Automatic liquidity management via ACINQ.
-  - [ ] [`LND`](https://github.com/lightningnetwork/lnd) :
+  - Automatic node management
+  - Automatic liquidity management via Lightspark
+- [ ] [`LND`](https://github.com/lightningnetwork/lnd)
   - Non-custodial
   - Run your own node
-  - Manage your own liquidity.
+  - Manage your own liquidity
 
-Numeraire SwissKnife ships with a [Dashboard (for admin and users)](https://github.com/bitcoin-numeraire/swissknife-dashboard).
+#### Smart contracts
+
+- [x] [RGB](https://rgb.tech/) Smart contracts
+- [ ] [Taproot Assets](https://docs.lightning.engineering/the-lightning-network/taproot-assets).
