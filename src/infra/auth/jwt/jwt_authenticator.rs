@@ -17,6 +17,7 @@ pub struct JwtConfig {
     password: String,
     #[serde(deserialize_with = "deserialize_duration")]
     token_expiry: Duration,
+    secret: String,
 }
 
 #[derive(Clone)]
@@ -45,8 +46,8 @@ impl JwtAuthenticator {
             username: config.username,
             password_hash,
             token_expiry: config.token_expiry,
-            encoding_key: EncodingKey::from_secret(config.password.as_ref()),
-            decoding_key: DecodingKey::from_secret(config.password.as_ref()),
+            encoding_key: EncodingKey::from_secret(config.secret.as_ref()),
+            decoding_key: DecodingKey::from_secret(config.secret.as_ref()),
         })
     }
 }

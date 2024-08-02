@@ -61,6 +61,7 @@ leeway = "60s"
 username = "admin"
 password = "change_me"
 token_expiry = "1h"
+secret = "change_me_too"
 
 # Database
 [database]
