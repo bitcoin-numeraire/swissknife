@@ -1,6 +1,6 @@
 <div align="center">
 
-  <img src="https://numeraire.fra1.digitaloceanspaces.com/LOGO_FULL_PNG_color_dark_634b18ed4c.png" style="max-height:200px"/>
+  <img src="https://numeraire.fra1.digitaloceanspaces.com/LOGO_FULL_PNG_color_dark_634b18ed4c.png" height="200"/>
 
   <h1>SwissKnife</h1>
 
