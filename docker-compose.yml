@@ -51,7 +51,7 @@ services:
     ports:
       - "3000:3000"
     volumes:
-      - ./config/development.yml:/config/development.yml
+      - ./config/development.toml:/config/development.toml
       - ./certs/greenlight:/certs/greenlight
       - ./storage/breez:/storage/breez
 
