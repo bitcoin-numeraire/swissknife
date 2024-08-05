@@ -1,5 +1,5 @@
 # App
-invoice_expiry = "1h"
+invoice_expiry = "12h"
 domain = "numeraire.tech"
 host = "https://swissknife.numeraire.tech"
 fee_buffer = 0.02
@@ -17,6 +17,8 @@ working_dir = "storage/breez"
 certs_dir = "certs/greenlight"
 log_in_file = false
 restore_only = true
+api_key = "CHANGE_ME"
+seed = "CHANGE_ME"
 
 # Core Lightning provider
 [cln_grpc_config]
@@ -29,6 +31,7 @@ retry_delay = "5s"
 
 [cln_rest_config]
 endpoint = "http://localhost:3010"
+rune = "CHANGE_ME"
 connect_timeout = "5s"
 timeout = "30s"
 connection_verbose = true
@@ -59,9 +62,9 @@ leeway = "60s"
 
 [jwt]
 username = "admin"
-password = "change_me"
+password = "CHANGE_ME"
 token_expiry = "1h"
-secret = "change_me_too"
+secret = "CHANGE_ME"
 
 # Database
 [database]

@@ -38,20 +38,21 @@ services:
       - postgres
 
   swissknife:
-    image: swissknife:latest
+    image: registry.digitalocean.com/swissknife/swissknife:latest
     environment:
-      RUN_MODE: ${RUN_MODE:-production}
       SWISSKNIFE_DATABASE__URL: ${SWISSKNIFE_DATABASE__URL:-postgres://postgres:postgres@postgres/numeraire}
       SWISSKNIFE_BREEZ_CONFIG__API_KEY: ${SWISSKNIFE_BREEZ_CONFIG__API_KEY:-}
       SWISSKNIFE_BREEZ_CONFIG__SEED: ${SWISSKNIFE_BREEZ_CONFIG__SEED:-}
       SWISSKNIFE_CLN_REST_CONFIG__RUNE: ${SWISSKNIFE_CLN_REST_CONFIG__RUNE:-}
       SWISSKNIFE_JWT__PASSWORD: ${SWISSKNIFE_JWT__PASSWORD:-}
+      SWISSKNIFE_JWT__SECRET: ${SWISSKNIFE_JWT__SECRET:-}
     depends_on:
       - postgres
     ports:
       - "3000:3000"
     volumes:
-      - ./config/development.yml:/config/development.yml
+      - ./config/development.toml:/config/development.toml
+      - ./config/production.toml:/config/production.toml
       - ./certs/greenlight:/certs/greenlight
       - ./storage/breez:/storage/breez
 

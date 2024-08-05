@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use futures_util::{future::BoxFuture, FutureExt};
+use native_tls::TlsConnector;
 use rust_socketio::{
     asynchronous::{Client, ClientBuilder},
     Payload,
@@ -19,7 +20,7 @@ pub async fn connect_websocket(
     config: &ClnRestClientConfig,
     ln_events: Arc<dyn LnEventsUseCases>,
 ) -> Result<Client, LightningError> {
-    let client = ClientBuilder::new(config.endpoint.clone())
+    let mut client_builder = ClientBuilder::new(config.endpoint.clone())
         .reconnect_on_disconnect(true)
         .opening_header("rune", config.rune.clone())
         .reconnect_delay(
@@ -31,7 +32,18 @@ pub async fn connect_websocket(
         .on("error", on_error)
         .on("message", {
             move |payload, socket: Client| on_message(ln_events.clone(), payload, socket)
-        })
+        });
+
+    if config.accept_invalid_certs {
+        let tls_connector = TlsConnector::builder()
+            .danger_accept_invalid_certs(true)
+            .build()
+            .expect("Found illegal configuration");
+
+        client_builder = client_builder.tls_config(tls_connector);
+    }
+
+    let client = client_builder
         .connect()
         .await
         .map_err(|e| LightningError::ConnectWebsocket(e.to_string()))?;

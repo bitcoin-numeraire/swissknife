@@ -107,7 +107,7 @@ impl ClnGrpcClient {
         let ca_cert = fs::read(ca_path).await?;
 
         let identity = Identity::from_pem(client_crt, client_key);
-        let ca_certificate: Certificate = Certificate::from_pem(ca_cert);
+        let ca_certificate = Certificate::from_pem(ca_cert);
 
         Ok((identity, ca_certificate))
     }
