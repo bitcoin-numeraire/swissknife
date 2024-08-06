@@ -1,11 +1,7 @@
 <div align="center">
-
-  <img src="https://numeraire.fra1.digitaloceanspaces.com/LOGO_FULL_PNG_color_dark_634b18ed4c.png" height="200"/>
-
+  <img src="https://numeraire.fra1.cdn.digitaloceanspaces.com/development/LOGO_FULL_PNG_color_dark_9d58514132.png" height="200"/>
   <h1>SwissKnife</h1>
-
-  <h3>A self-custodial wallet & transaction orchestrator for Lightning Nostr, and smart contract protocols on Bitcoin</h3>
-
+  <h3>A self-custodial wallet & transaction orchestrator for Lightning, Nostr and Smart contract protocols on Bitcoin</h3>
 </div>
 
 # SwissKnife
