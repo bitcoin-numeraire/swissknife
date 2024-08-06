@@ -9,7 +9,7 @@ use tonic::transport::{Certificate, Channel, ClientTlsConfig, Identity};
 use uuid::Uuid;
 
 use async_trait::async_trait;
-use cln::{node_client::NodeClient, Amount, ListinvoicesRequest, PayRequest};
+use cln::{node_client::NodeClient, Amount, GetinfoRequest, ListinvoicesRequest, PayRequest};
 
 use crate::{
     application::errors::LightningError,
@@ -125,7 +125,7 @@ impl LnClient for ClnGrpcClient {
         description: String,
         expiry: u32,
     ) -> Result<Invoice, LightningError> {
-        let mut client: NodeClient<Channel> = self.client.clone();
+        let mut client = self.client.clone();
 
         let label = Uuid::new_v4();
         let response = client
@@ -158,7 +158,7 @@ impl LnClient for ClnGrpcClient {
         bolt11: String,
         amount_msat: Option<u64>,
     ) -> Result<Payment, LightningError> {
-        let mut client: NodeClient<Channel> = self.client.clone();
+        let mut client = self.client.clone();
 
         let response = client
             .pay(PayRequest {
@@ -181,7 +181,7 @@ impl LnClient for ClnGrpcClient {
         &self,
         payment_hash: String,
     ) -> Result<Option<Invoice>, LightningError> {
-        let mut client: NodeClient<Channel> = self.client.clone();
+        let mut client = self.client.clone();
 
         let response = client
             .list_invoices(ListinvoicesRequest {
@@ -199,7 +199,14 @@ impl LnClient for ClnGrpcClient {
     }
 
     async fn health(&self) -> Result<HealthStatus, LightningError> {
-        todo!();
+        let mut client = self.client.clone();
+
+        client
+            .getinfo(GetinfoRequest {})
+            .await
+            .map_err(|e| LightningError::HealthCheck(e.message().to_string()))?;
+
+        Ok(HealthStatus::Operational)
     }
 
     async fn pay_onchain(

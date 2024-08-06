@@ -1,11 +1,12 @@
-use std::sync::Arc;
+use std::{path::PathBuf, sync::Arc};
 
 use futures_util::{future::BoxFuture, FutureExt};
-use native_tls::TlsConnector;
+use native_tls::{Certificate, TlsConnector};
 use rust_socketio::{
     asynchronous::{Client, ClientBuilder},
     Payload,
 };
+use tokio::fs;
 use tracing::{debug, error, warn};
 
 use crate::{
@@ -34,11 +35,22 @@ pub async fn connect_websocket(
             move |payload, socket: Client| on_message(ln_events.clone(), payload, socket)
         });
 
+    if let Some(ca_cert_path) = &config.ca_cert_path {
+        let ca_certificate = read_ca(ca_cert_path)
+            .await
+            .map_err(|e| LightningError::ReadCertificates(e.to_string()))?;
+        let tls_connector = TlsConnector::builder()
+            .add_root_certificate(ca_certificate)
+            .build()
+            .map_err(|e| LightningError::TLSConfig(e.to_string()))?;
+        client_builder = client_builder.tls_config(tls_connector);
+    }
+
     if config.accept_invalid_certs {
         let tls_connector = TlsConnector::builder()
             .danger_accept_invalid_certs(true)
             .build()
-            .expect("Found illegal configuration");
+            .map_err(|e| LightningError::TLSConfig(e.to_string()))?;
 
         client_builder = client_builder.tls_config(tls_connector);
     }
@@ -49,6 +61,13 @@ pub async fn connect_websocket(
         .map_err(|e| LightningError::ConnectWebsocket(e.to_string()))?;
 
     Ok(client)
+}
+
+async fn read_ca(path: &str) -> anyhow::Result<Certificate> {
+    let ca_file = fs::read(PathBuf::from(path)).await?;
+    let ca_certificate = Certificate::from_pem(&ca_file)?;
+
+    Ok(ca_certificate)
 }
 
 fn on_open(_: Payload, _: Client) -> BoxFuture<'static, ()> {

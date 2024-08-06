@@ -55,6 +55,12 @@ pub struct ListInvoicesResponse {
     pub invoices: Vec<ListInvoicesInvoice>,
 }
 
+#[derive(Debug, Serialize)]
+pub struct GetinfoRequest {}
+
+#[derive(Debug, Deserialize)]
+pub struct GetinfoResponse {}
+
 #[derive(Debug, Deserialize)]
 pub struct ListInvoicesInvoice {
     bolt11: Option<String>,

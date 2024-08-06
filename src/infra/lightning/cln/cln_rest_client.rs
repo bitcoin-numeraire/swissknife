@@ -1,13 +1,14 @@
-use std::{str::FromStr, sync::Arc, time::Duration};
+use std::{path::PathBuf, str::FromStr, sync::Arc, time::Duration};
 
 use breez_sdk_core::ReverseSwapInfo;
 use lightning_invoice::Bolt11Invoice;
 use reqwest::{
     header::{HeaderMap, HeaderValue},
-    Client,
+    Certificate, Client,
 };
 use rust_socketio::asynchronous::Client as WsClient;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use tokio::fs;
 use uuid::Uuid;
 
 use async_trait::async_trait;
@@ -21,8 +22,9 @@ use crate::{
 };
 
 use super::{
-    cln_websocket_client::connect_websocket, ErrorResponse, InvoiceRequest, InvoiceResponse,
-    ListInvoicesRequest, ListInvoicesResponse, PayRequest, PayResponse,
+    cln_websocket_client::connect_websocket, ErrorResponse, GetinfoRequest, GetinfoResponse,
+    InvoiceRequest, InvoiceResponse, ListInvoicesRequest, ListInvoicesResponse, PayRequest,
+    PayResponse,
 };
 
 #[derive(Clone, Debug, Deserialize)]
@@ -41,6 +43,7 @@ pub struct ClnRestClientConfig {
     pub payment_exemptfee: Option<u64>,
     pub ws_min_reconnect_delay_delay: u64,
     pub ws_max_reconnect_delay_delay: u64,
+    pub ca_cert_path: Option<String>,
 }
 
 pub struct ClnRestClient {
@@ -65,13 +68,22 @@ impl ClnRestClient {
         rune_header.set_sensitive(true);
         headers.insert("Rune", rune_header);
 
-        let client = Client::builder()
+        let mut client_builder = Client::builder()
             .user_agent(USER_AGENT)
             .connect_timeout(config.connect_timeout)
             .timeout(config.timeout)
             .connection_verbose(config.connection_verbose)
             .default_headers(headers)
-            .danger_accept_invalid_certs(config.accept_invalid_certs)
+            .danger_accept_invalid_certs(config.accept_invalid_certs);
+
+        if let Some(ca_cert_path) = &config.ca_cert_path {
+            let ca_certificate = Self::read_ca(ca_cert_path)
+                .await
+                .map_err(|e| LightningError::ReadCertificates(e.to_string()))?;
+            client_builder = client_builder.add_root_certificate(ca_certificate);
+        }
+
+        let client = client_builder
             .build()
             .map_err(|e| LightningError::ParseConfig(e.to_string()))?;
 
@@ -85,6 +97,13 @@ impl ClnRestClient {
             payment_exemptfee: config.payment_exemptfee,
             ws_client,
         })
+    }
+
+    async fn read_ca(path: &str) -> anyhow::Result<Certificate> {
+        let ca_file = fs::read(PathBuf::from(path)).await?;
+        let ca_certificate = Certificate::from_pem(&ca_file)?;
+
+        Ok(ca_certificate)
     }
 
     async fn post_request<T: DeserializeOwned>(
@@ -206,6 +225,10 @@ impl LnClient for ClnRestClient {
     }
 
     async fn health(&self) -> Result<HealthStatus, LightningError> {
-        todo!();
+        self.post_request::<GetinfoResponse>("getinfo", &GetinfoRequest {})
+            .await
+            .map_err(|e| LightningError::HealthCheck(e.to_string()))?;
+
+        Ok(HealthStatus::Operational)
     }
 }
