@@ -14,6 +14,9 @@ pub enum LightningError {
     #[error("Failed to read certificates: {0}")]
     ReadCertificates(String),
 
+    #[error("Failed to parse TLS config: {0}")]
+    TLSConfig(String),
+
     #[error("Failed to connect to Lightning node: {0}")]
     Connect(String),
 

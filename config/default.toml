@@ -23,7 +23,7 @@ seed = "CHANGE_ME"
 # Core Lightning provider
 [cln_grpc_config]
 endpoint = "https://localhost:50051"
-certs_dir = "./deps/lightningd/data"
+certs_dir = "certs/lightningd"
 maxfeepercent = 0.5
 payment_timeout = "60s"
 payment_exemptfee = 5000

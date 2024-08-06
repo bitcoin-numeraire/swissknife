@@ -50,14 +50,20 @@ async fn readiness_check() -> impl IntoResponse {
     tag = "System",
     context_path = CONTEXT_PATH,
     responses(
-        (status = 200, description = "OK", body = HealthCheck)
+        (status = 200, description = "OK", body = HealthCheck),
+        (status = 503, description = "Service Unavailable", body = HealthCheck)
     )
 )]
-async fn health_check(
-    State(app_state): State<Arc<AppState>>,
-) -> Result<Json<HealthCheck>, ApplicationError> {
+async fn health_check(State(app_state): State<Arc<AppState>>) -> impl IntoResponse {
     let health_check = app_state.services.system.health_check().await;
-    Ok(health_check.into())
+
+    let status_code = if health_check.is_healthy {
+        StatusCode::OK
+    } else {
+        StatusCode::SERVICE_UNAVAILABLE
+    };
+
+    (status_code, Json(health_check))
 }
 
 /// Version Information

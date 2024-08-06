@@ -37,10 +37,7 @@ impl SystemUseCases for SystemService {
             HealthStatus::Unavailable
         });
 
-        HealthCheck {
-            database,
-            ln_provider,
-        }
+        HealthCheck::new(database, ln_provider)
     }
 
     fn version(&self) -> VersionInfo {
