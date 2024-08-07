@@ -13,6 +13,10 @@ use crate::{
 
 use super::{LnURLPayRequest, LnUrlCallback, LnUrlSuccessAction, LnUrlUseCases};
 
+const MIN_SENDABLE: u64 = 1000;
+const MAX_SENDABLE: u64 = 250000000;
+const COMMENT_ALLOWED: u16 = 255;
+
 pub struct LnUrlService {
     domain: String,
     host: String,
@@ -66,10 +70,10 @@ impl LnUrlUseCases for LnUrlService {
 
         let lnurlp = LnURLPayRequest {
             callback: format!("{}/lnurlp/{}/callback", self.host, username),
-            max_sendable: 1000000000,
-            min_sendable: 1000,
+            max_sendable: MAX_SENDABLE,
+            min_sendable: MIN_SENDABLE,
             metadata: self.metadata(&username),
-            comment_allowed: 255,
+            comment_allowed: COMMENT_ALLOWED,
             tag: "payRequest".to_string(),
         };
 
