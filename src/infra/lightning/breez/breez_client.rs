@@ -252,13 +252,14 @@ impl LnClient for BreezClient {
         amount_msat: u64,
         description: String,
         expiry: u32,
+        deschashonly: bool,
     ) -> Result<Invoice, LightningError> {
         let response = self
             .sdk
             .receive_payment(ReceivePaymentRequest {
                 amount_msat,
                 description,
-                use_description_hash: Some(false),
+                use_description_hash: Some(deschashonly),
                 expiry: Some(expiry),
                 ..Default::default()
             })

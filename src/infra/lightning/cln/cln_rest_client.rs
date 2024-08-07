@@ -147,6 +147,7 @@ impl LnClient for ClnRestClient {
         amount_msat: u64,
         description: String,
         expiry: u32,
+        deschashonly: bool,
     ) -> Result<Invoice, LightningError> {
         let label = Uuid::new_v4();
 
@@ -158,6 +159,7 @@ impl LnClient for ClnRestClient {
                     expiry: expiry as u64,
                     label,
                     amount_msat,
+                    deschashonly: Some(deschashonly),
                 },
             )
             .await

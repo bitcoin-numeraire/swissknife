@@ -56,6 +56,7 @@ impl InvoiceUseCases for InvoiceService {
                 amount,
                 description.unwrap_or(DEFAULT_INVOICE_DESCRIPTION.to_string()),
                 expiry.unwrap_or(self.invoice_expiry),
+                false,
             )
             .await?;
         invoice.wallet_id.clone_from(&wallet_id);

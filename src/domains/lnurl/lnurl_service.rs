@@ -1,7 +1,6 @@
 use std::{sync::Arc, vec};
 
 use async_trait::async_trait;
-use breez_sdk_core::{MessageSuccessActionData, SuccessActionProcessed};
 use tracing::{debug, info};
 
 use crate::{
@@ -12,7 +11,11 @@ use crate::{
     infra::lightning::LnClient,
 };
 
-use super::{LnURLPayRequest, LnUrlCallback, LnUrlUseCases};
+use super::{LnURLPayRequest, LnUrlCallback, LnUrlSuccessAction, LnUrlUseCases};
+
+const MIN_SENDABLE: u64 = 1000;
+const MAX_SENDABLE: u64 = 250000000;
+const COMMENT_ALLOWED: u16 = 255;
 
 pub struct LnUrlService {
     domain: String,
@@ -38,6 +41,20 @@ impl LnUrlService {
             host,
         }
     }
+
+    fn metadata(&self, username: &str) -> String {
+        serde_json::to_string(&[
+            [
+                "text/identifier".to_string(),
+                format!("{}@{}", username, self.domain),
+            ],
+            [
+                "text/plain".to_string(),
+                format!("{} never refuses sats", username),
+            ],
+        ])
+        .expect("should not fail as a constant")
+    }
 }
 
 #[async_trait]
@@ -51,24 +68,12 @@ impl LnUrlUseCases for LnUrlService {
             .await?
             .ok_or_else(|| DataError::NotFound("Lightning address not found.".to_string()))?;
 
-        let metadata = serde_json::to_string(&[
-            [
-                "text/plain".to_string(),
-                format!("{} never refuses sats", username),
-            ],
-            [
-                "text/identifier".to_string(),
-                format!("{}@{}", username, self.domain),
-            ],
-        ])
-        .expect("should not fail as a constant");
-
         let lnurlp = LnURLPayRequest {
             callback: format!("{}/lnurlp/{}/callback", self.host, username),
-            max_sendable: 1000000000,
-            min_sendable: 1000,
-            metadata,
-            comment_allowed: 255,
+            max_sendable: MAX_SENDABLE,
+            min_sendable: MIN_SENDABLE,
+            metadata: self.metadata(&username),
+            comment_allowed: COMMENT_ALLOWED,
             tag: "payRequest".to_string(),
         };
 
@@ -93,14 +98,12 @@ impl LnUrlUseCases for LnUrlService {
 
         let mut invoice = self
             .ln_client
-            .invoice(
-                amount,
-                comment.unwrap_or(format!("Payment to {}@{}", username, self.domain)),
-                self.invoice_expiry,
-            )
+            .invoice(amount, self.metadata(&username), self.invoice_expiry, true)
             .await?;
         invoice.wallet_id.clone_from(&ln_address.wallet_id);
         invoice.ln_address_id = Some(ln_address.id);
+        invoice.description =
+            Some(comment.unwrap_or(format!("Payment to {}@{}", username, self.domain)));
 
         // TODO: Get or add more information to make this a LNURLp invoice (like fetching a success action specific to the user)
         let invoice = self.store.invoice.insert(None, invoice).await?;
@@ -109,10 +112,10 @@ impl LnUrlUseCases for LnUrlService {
                 .ln_invoice
                 .expect("should exist for ledger Lightning")
                 .bolt11,
-            success_action: Some(SuccessActionProcessed::Message {
-                data: MessageSuccessActionData {
-                    message: "Thanks for the sats!".to_string(),
-                },
+            success_action: Some(LnUrlSuccessAction {
+                tag: "message".to_string(),
+                message: Some("Thanks for the sats!".to_string()),
+                ..Default::default()
             }),
             disposable: None,
             routes: vec![],
