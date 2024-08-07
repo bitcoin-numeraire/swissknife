@@ -124,6 +124,7 @@ impl LnClient for ClnGrpcClient {
         amount_msat: u64,
         description: String,
         expiry: u32,
+        deschashonly: bool,
     ) -> Result<Invoice, LightningError> {
         let mut client = self.client.clone();
 
@@ -133,7 +134,7 @@ impl LnClient for ClnGrpcClient {
                 description,
                 expiry: Some(expiry as u64),
                 label: label.to_string(),
-                deschashonly: Some(false),
+                deschashonly: Some(deschashonly),
                 amount_msat: Some(cln::AmountOrAny {
                     value: Some(cln::amount_or_any::Value::Amount(cln::Amount {
                         msat: amount_msat,

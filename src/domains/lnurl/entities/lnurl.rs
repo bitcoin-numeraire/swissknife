@@ -1,4 +1,3 @@
-use breez_sdk_core::SuccessActionProcessed;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -40,7 +39,7 @@ pub struct LnUrlErrorData {
 #[derive(Debug)]
 pub struct LnUrlCallback {
     pub pr: String,
-    pub success_action: Option<SuccessActionProcessed>,
+    pub success_action: Option<LnUrlSuccessAction>,
     pub disposable: Option<bool>,
     pub routes: Vec<String>,
 }

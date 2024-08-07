@@ -18,6 +18,7 @@ pub struct InvoiceRequest {
     pub label: Uuid,
     pub expiry: u64,
     pub amount_msat: u64,
+    pub deschashonly: Option<bool>,
 }
 
 #[derive(Debug, Deserialize)]

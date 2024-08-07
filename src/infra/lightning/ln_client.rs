@@ -14,6 +14,7 @@ pub trait LnClient: Sync + Send {
         amount_msat: u64,
         description: String,
         expiry: u32,
+        deschashonly: bool,
     ) -> Result<Invoice, LightningError>;
     async fn pay(
         &self,
