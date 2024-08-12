@@ -37,6 +37,7 @@ pub struct ClnRestClientConfig {
     #[serde(deserialize_with = "deserialize_duration")]
     pub timeout: Duration,
     pub accept_invalid_certs: bool,
+    pub accept_invalid_hostnames: bool,
     pub maxfeepercent: Option<f64>,
     #[serde(deserialize_with = "deserialize_duration")]
     pub payment_timeout: Duration,
@@ -80,7 +81,9 @@ impl ClnRestClient {
             let ca_certificate = Self::read_ca(ca_cert_path)
                 .await
                 .map_err(|e| LightningError::ReadCertificates(e.to_string()))?;
-            client_builder = client_builder.add_root_certificate(ca_certificate);
+            client_builder = client_builder
+                .add_root_certificate(ca_certificate)
+                .danger_accept_invalid_hostnames(config.accept_invalid_hostnames);
         }
 
         let client = client_builder
