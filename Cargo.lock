@@ -5014,7 +5014,7 @@ dependencies = [
  "native-tls",
  "prost 0.12.6",
  "regex",
- "reqwest 0.11.20",
+ "reqwest 0.12.5",
  "rust_socketio",
  "sea-orm",
  "serde",

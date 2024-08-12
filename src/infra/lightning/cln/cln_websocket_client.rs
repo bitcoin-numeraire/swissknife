@@ -41,9 +41,10 @@ pub async fn connect_websocket(
             .map_err(|e| LightningError::ReadCertificates(e.to_string()))?;
         let tls_connector = TlsConnector::builder()
             .add_root_certificate(ca_certificate)
+            .danger_accept_invalid_hostnames(config.accept_invalid_hostnames)
             .build()
             .map_err(|e| LightningError::TLSConfig(e.to_string()))?;
-        client_builder = client_builder.tls_config(tls_connector);
+        client_builder = client_builder.tls_config(tls_connector.clone());
     }
 
     if config.accept_invalid_certs {

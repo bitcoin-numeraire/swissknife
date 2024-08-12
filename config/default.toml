@@ -36,6 +36,7 @@ connect_timeout = "5s"
 timeout = "30s"
 connection_verbose = true
 accept_invalid_certs = false
+accept_invalid_hostnames = false
 maxfeepercent = 0.5
 payment_timeout = "60s"
 payment_exemptfee = 5000
