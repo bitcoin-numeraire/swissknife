@@ -31,17 +31,19 @@ impl LnAddressUseCases for LnAddressService {
     async fn register(
         &self,
         wallet_id: Uuid,
-        username: String,
+        mut username: String,
     ) -> Result<LnAddress, ApplicationError> {
         debug!(%wallet_id, username, "Registering lightning address");
+
+        username = username.to_lowercase();
 
         if username.len() < MIN_USERNAME_LENGTH || username.len() > MAX_USERNAME_LENGTH {
             return Err(DataError::Validation("Invalid username length.".to_string()).into());
         }
 
         // Regex validation for allowed characters
-        let email_username_re = Regex::new(r"^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+$")
-            .expect("should not fail as a constant");
+        let email_username_re =
+            Regex::new(r"^[a-z0-9.!#$%&'*+/=?^_`{|}~-]+$").expect("should not fail as a constant");
         if !email_username_re.is_match(&username) {
             return Err(DataError::Validation("Invalid username format.".to_string()).into());
         }
