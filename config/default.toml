@@ -1,7 +1,7 @@
 # App
 invoice_expiry = "12h"
 domain = "numeraire.tech"
-host = "https://swissknife.numeraire.tech"
+host = "https://api.numeraire.tech"
 fee_buffer = 0.02
 ln_provider = "breez"
 auth_provider = "jwt"
@@ -33,7 +33,7 @@ retry_delay = "5s"
 endpoint = "http://localhost:3010"
 rune = "CHANGE_ME"
 connect_timeout = "5s"
-timeout = "30s"
+timeout = "90s"
 connection_verbose = true
 accept_invalid_certs = false
 accept_invalid_hostnames = false

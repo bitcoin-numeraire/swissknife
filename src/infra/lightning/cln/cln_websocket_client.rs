@@ -122,6 +122,7 @@ fn on_message(
                                 if sendpay_success.status != "complete" {
                                     warn!(
                                         payment_hash = sendpay_success.payment_hash,
+                                        status = sendpay_success.status,
                                         "Invalid payment status. Expected Complete."
                                     );
                                     return;
@@ -145,9 +146,11 @@ fn on_message(
                                 if sendpay_failure.data.status != "failed" {
                                     warn!(
                                         payment_hash = sendpay_failure.data.payment_hash,
+                                        status = sendpay_failure.data.status,
                                         "Invalid payment status. Expected Failed."
                                     );
-                                    return;
+                                    // We must accept the payment as failed until this is fixed: https://github.com/ElementsProject/lightning/issues/7561
+                                    // return;
                                 }
 
                                 if let Err(err) =
