@@ -42,7 +42,9 @@ pub async fn validate_lnurl_pay(
         match sa {
             SuccessAction::Aes(data) => data.validate()?,
             SuccessAction::Message(data) => data.validate()?,
-            SuccessAction::Url(data) => data.validate(req)?,
+            SuccessAction::Url(data) => {
+                data.validate(req, false)?;
+            }
         }
     }
 
