@@ -11,7 +11,7 @@
 [![GitHub stars](https://img.shields.io/github/stars/bitcoin-numeraire/swissknife.svg?style=social&label=Star&maxAge=1)](https://github.com/bitcoin-numeraire/swissknife/stargazers)
 If you like what we do, consider starring, sharing and contributing!
 
-> Check the documentation [here](https://docs.numeraire.techswissknife).
+> Check the documentation [here](https://docs.numeraire.tech/swissknife).
 
 ## Features
 
