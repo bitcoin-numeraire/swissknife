@@ -11,6 +11,8 @@
 [![GitHub stars](https://img.shields.io/github/stars/bitcoin-numeraire/swissknife.svg?style=social&label=Star&maxAge=1)](https://github.com/bitcoin-numeraire/swissknife/stargazers)
 If you like what we do, consider starring, sharing and contributing!
 
+> Check the documentation [here](https://docs.numeraire.techswissknife).
+
 ## Features
 
 - [`Lightning Network`](https://github.com/lnurl/luds). Send and receive payments.
@@ -45,23 +47,9 @@ SwissKnife allows direct Lightning integration, supporting the most used node im
   - Automatic node management.
   - Automatic liquidity management via LSPs (user can switch LSPs)
 
-## Deployment
+## Documentation
 
-> Documentation website coming soon
-
-### Build from source
-
-SwissKnife can be built from source (see Contributing), Docker images and Helm charts will come when the first alpha version is out.
-
-### Config
-
-Default configuration is defined in `config/default.toml`. SwissKnife supports `.toml`, `yaml` and `json` config files. The order of applied configuration is the following:
-
-1. ENV vars. Defined given the names of the config values in `default.toml`, adding the prefix `SWISSKNIFE`. Overriding all sensitive values with ENV vars is recommended.
-2. any file under `config` corresponding to the `RUN_MODE` (`development` by default). Such as `development.toml|yaml|json` or `production.toml|yaml|json``
-3. The `default.toml|yaml|json` file.
-
-Inspect the `.env.example` file for and generate your own `.env` for sensitive config values.
+Extended documentation is available [here](https://docs.numeraire.tech/swissknife)
 
 ## Work In Progress (WIP)
 
