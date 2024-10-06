@@ -1,6 +1,5 @@
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
-use uuid::Uuid;
 
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct RedeemOnchainRequest {
@@ -17,14 +16,6 @@ pub struct RedeemOnchainResponse {
     /// Transaction ID
     #[schema(example = "ceb662f7e470e6...")]
     pub txid: String,
-}
-
-#[derive(Debug, Deserialize, ToSchema)]
-pub struct RegisterLnAddressRequest {
-    /// Wallet ID. Will be populated with your own ID by default
-    pub wallet_id: Option<Uuid>,
-    /// Username such as `username@domain`
-    pub username: String,
 }
 
 #[derive(Debug, Deserialize, ToSchema)]

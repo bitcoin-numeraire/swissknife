@@ -1,17 +1,16 @@
 use std::sync::Arc;
 
-use axum::Router;
+use crate::{
+    application::{docs::merged_openapi, entities::LnNodeClient, errors::WebServerError},
+    domains::{invoice, ln_address, ln_node, lnurl, nostr, payment, system, user, wallet},
+    infra::app::AppState,
+};
+use axum::{routing::get, Router};
 use std::future::Future;
 use tokio::net::TcpListener;
 use tower_http::{cors::CorsLayer, trace::TraceLayer};
 use tracing::info;
 use utoipa_scalar::{Scalar, Servable as ScalarServable};
-
-use crate::{
-    application::{docs::merged_openapi, entities::LnNodeClient, errors::WebServerError},
-    domains::{invoice, ln_address, ln_node, lnurl, payment, system, user, wallet},
-    infra::app::AppState,
-};
 
 pub struct Server {
     router: Router,
@@ -20,9 +19,9 @@ pub struct Server {
 impl Server {
     pub fn new(state: Arc<AppState>) -> Self {
         let router = Router::new()
+            .nest("/.well-known", Self::well_known_router())
             .nest("/v1/system", system::router())
-            .nest("/.well-known/lnurlp", lnurl::well_known_router())
-            .nest("/lnurlp", lnurl::callback_router())
+            .nest("/lnurlp", lnurl::router())
             .nest("/v1/invoices", invoice::router())
             .nest("/v1/payments", payment::router())
             .nest("/v1/me", wallet::user_router())
@@ -64,5 +63,11 @@ impl Server {
             .map_err(|e| WebServerError::Serve(e.to_string()))?;
 
         Ok(())
+    }
+
+    fn well_known_router() -> Router<Arc<AppState>> {
+        Router::new()
+            .route("/lnurlp/:username", get(lnurl::well_known))
+            .route("/nostr.json", get(nostr::well_known))
     }
 }

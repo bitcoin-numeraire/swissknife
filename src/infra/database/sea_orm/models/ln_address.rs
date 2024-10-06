@@ -12,6 +12,8 @@ pub struct Model {
     #[sea_orm(unique)]
     pub username: String,
     pub active: bool,
+    pub allows_nostr: bool,
+    pub nostr_pubkey: Option<String>,
     pub created_at: DateTimeUtc,
     pub updated_at: Option<DateTimeUtc>,
 }

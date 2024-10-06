@@ -62,7 +62,8 @@ impl LnUrlUseCases for LnUrlService {
     async fn lnurlp(&self, username: String) -> Result<LnURLPayRequest, ApplicationError> {
         debug!(username, "Generating LNURLp");
 
-        self.store
+        let ln_address = self
+            .store
             .ln_address
             .find_by_username(&username)
             .await?
@@ -75,6 +76,8 @@ impl LnUrlUseCases for LnUrlService {
             metadata: self.metadata(&username),
             comment_allowed: COMMENT_ALLOWED,
             tag: "payRequest".to_string(),
+            allows_nostr: ln_address.allows_nostr,
+            nostr_pubkey: ln_address.nostr_pubkey,
         };
 
         info!(username, "LNURLp returned successfully");

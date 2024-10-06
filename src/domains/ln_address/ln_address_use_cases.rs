@@ -1,5 +1,6 @@
 use async_trait::async_trait;
 
+use nostr_sdk::PublicKey;
 use uuid::Uuid;
 
 use crate::application::errors::ApplicationError;
@@ -12,6 +13,8 @@ pub trait LnAddressUseCases: Send + Sync {
         &self,
         wallet_id: Uuid,
         username: String,
+        allows_nostr: bool,
+        nostr_pubkey: Option<PublicKey>,
     ) -> Result<LnAddress, ApplicationError>;
     async fn get(&self, id: Uuid) -> Result<LnAddress, ApplicationError>;
     async fn list(&self, filter: LnAddressFilter) -> Result<Vec<LnAddress>, ApplicationError>;

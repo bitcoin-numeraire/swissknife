@@ -2,6 +2,7 @@ pub mod invoice;
 pub mod ln_address;
 pub mod ln_node;
 pub mod lnurl;
+pub mod nostr;
 pub mod payment;
 pub mod system;
 pub mod user;
