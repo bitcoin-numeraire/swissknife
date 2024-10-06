@@ -4,6 +4,7 @@ mod m20240420_1_wallet_table;
 mod m20240420_2_ln_address_table;
 mod m20240420_3_invoice_table;
 mod m20240420_4_payment_table;
+mod m20241005_120705_ln_address_nostr;
 
 pub struct Migrator;
 
@@ -15,6 +16,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20240420_2_ln_address_table::Migration),
             Box::new(m20240420_3_invoice_table::Migration),
             Box::new(m20240420_4_payment_table::Migration),
+            Box::new(m20241005_120705_ln_address_nostr::Migration),
         ]
     }
 }

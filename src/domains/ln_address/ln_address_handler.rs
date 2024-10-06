@@ -75,6 +75,8 @@ async fn register_address(
         .register(
             payload.wallet_id.unwrap_or(user.wallet_id),
             payload.username,
+            payload.allows_nostr,
+            payload.nostr_pubkey,
         )
         .await?;
     Ok(ln_address.into())

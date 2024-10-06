@@ -6,6 +6,7 @@ use crate::{
         invoice::{InvoiceService, InvoiceUseCases},
         ln_address::{LnAddressService, LnAddressUseCases},
         lnurl::{LnUrlService, LnUrlUseCases},
+        nostr::{NostrService, NostrUseCases},
         payment::{PaymentService, PaymentsUseCases},
         system::{SystemService, SystemUseCases},
         user::{AuthService, AuthUseCases},
@@ -31,6 +32,7 @@ pub struct AppServices {
     pub ln_address: Box<dyn LnAddressUseCases>,
     pub auth: Box<dyn AuthUseCases>,
     pub system: Box<dyn SystemUseCases>,
+    pub nostr: Box<dyn NostrUseCases>,
 }
 
 impl AppServices {
@@ -62,7 +64,8 @@ impl AppServices {
         let ln_address = LnAddressService::new(store.clone());
         let wallet = WalletService::new(store.clone());
         let auth = AuthService::new(config.auth_provider, authenticator, store.clone());
-        let system = SystemService::new(store, ln_client);
+        let system = SystemService::new(store.clone(), ln_client);
+        let nostr = NostrService::new(store);
 
         AppServices {
             invoice: Box::new(invoices),
@@ -72,6 +75,7 @@ impl AppServices {
             ln_address: Box::new(ln_address),
             auth: Box::new(auth),
             system: Box::new(system),
+            nostr: Box::new(nostr),
         }
     }
 }

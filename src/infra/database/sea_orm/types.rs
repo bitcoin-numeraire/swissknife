@@ -102,6 +102,8 @@ impl From<LnAddressModel> for LnAddress {
             wallet_id: model.wallet_id,
             username: model.username,
             active: model.active,
+            allows_nostr: model.allows_nostr,
+            nostr_pubkey: model.nostr_pubkey.map(|k| k.parse().expect(ASSERTION_MSG)),
             created_at: model.created_at,
             updated_at: model.updated_at,
         }

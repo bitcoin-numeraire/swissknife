@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use nostr_sdk::PublicKey;
 use regex::Regex;
 use tracing::{debug, info, trace};
 use uuid::Uuid;
@@ -32,6 +33,8 @@ impl LnAddressUseCases for LnAddressService {
         &self,
         wallet_id: Uuid,
         mut username: String,
+        allows_nostr: bool,
+        nostr_pubkey: Option<PublicKey>,
     ) -> Result<LnAddress, ApplicationError> {
         debug!(%wallet_id, username, "Registering lightning address");
 
@@ -41,7 +44,7 @@ impl LnAddressUseCases for LnAddressService {
             return Err(DataError::Validation("Invalid username length.".to_string()).into());
         }
 
-        // Regex validation for allowed characters
+        // Regex validation for allowed characters in username
         let email_username_re =
             Regex::new(r"^[a-z0-9.!#$%&'*+/=?^_`{|}~-]+$").expect("should not fail as a constant");
         if !email_username_re.is_match(&username) {
@@ -68,7 +71,11 @@ impl LnAddressUseCases for LnAddressService {
             return Err(DataError::Conflict("Duplicate username.".to_string()).into());
         }
 
-        let ln_address = self.store.ln_address.insert(wallet_id, &username).await?;
+        let ln_address = self
+            .store
+            .ln_address
+            .insert(wallet_id, &username, allows_nostr, nostr_pubkey)
+            .await?;
 
         info!(
             %wallet_id,

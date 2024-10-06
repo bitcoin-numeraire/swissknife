@@ -244,7 +244,12 @@ async fn register_wallet_address(
     let ln_address = app_state
         .services
         .ln_address
-        .register(user.wallet_id, payload.username)
+        .register(
+            user.wallet_id,
+            payload.username,
+            payload.allows_nostr,
+            payload.nostr_pubkey,
+        )
         .await?;
     Ok(ln_address.into())
 }

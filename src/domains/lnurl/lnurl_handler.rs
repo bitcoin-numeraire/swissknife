@@ -20,7 +20,7 @@ use super::LnURLPayRequest;
 
 #[derive(OpenApi)]
 #[openapi(
-    paths(well_known_lnurlp, callback),
+    paths(well_known, callback),
     components(schemas(LnURLPayRequest, LnUrlCallbackResponse)),
     tags(
         (name = "LNURL", description = "Public LNURL endpoints as defined in the [protocol specification](https://github.com/lnurl/luds). Allows any active Lightning Address to receive payments")
@@ -28,11 +28,7 @@ use super::LnURLPayRequest;
 )]
 pub struct LnURLHandler;
 
-pub fn well_known_router() -> Router<Arc<AppState>> {
-    Router::new().route("/:username", get(well_known_lnurlp))
-}
-
-pub fn callback_router() -> Router<Arc<AppState>> {
+pub fn router() -> Router<Arc<AppState>> {
     Router::new().route("/:username/callback", get(callback))
 }
 
@@ -50,7 +46,7 @@ pub fn callback_router() -> Router<Arc<AppState>> {
         (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
     )
 )]
-async fn well_known_lnurlp(
+pub async fn well_known(
     Path(username): Path<String>,
     State(app_state): State<Arc<AppState>>,
 ) -> Result<Json<LnURLPayRequest>, ApplicationError> {

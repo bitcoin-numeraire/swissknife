@@ -1,3 +1,4 @@
+use nostr_sdk::PublicKey;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -29,6 +30,13 @@ pub struct LnURLPayRequest {
     /// Type of LNURL
     #[schema(example = "payRequest")]
     pub tag: String,
+
+    /// Nostr enabled
+    pub allows_nostr: bool,
+
+    /// Nostr public key
+    #[schema(example = "npub1m8pwckdf3...")]
+    pub nostr_pubkey: Option<PublicKey>,
 }
 
 #[derive(Deserialize, Debug, Serialize)]

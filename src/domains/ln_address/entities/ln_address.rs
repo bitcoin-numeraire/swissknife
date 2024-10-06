@@ -1,4 +1,5 @@
 use chrono::{DateTime, Utc};
+use nostr_sdk::PublicKey;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 use utoipa::{IntoParams, ToSchema};
@@ -17,6 +18,12 @@ pub struct LnAddress {
     pub username: String,
     /// Active status. Inactive addresses cannot receive funds
     pub active: bool,
+    /// Nostr enabled
+    pub allows_nostr: bool,
+    /// Nostr Public key
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(example = "npub1m8pwckdf3...")]
+    pub nostr_pubkey: Option<PublicKey>,
     /// Date of creation in database
     pub created_at: DateTime<Utc>,
     #[serde(skip_serializing_if = "Option::is_none")]
