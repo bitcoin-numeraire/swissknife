@@ -7,6 +7,7 @@ use utoipa::{IntoParams, ToSchema};
 #[derive(Debug, Deserialize, IntoParams)]
 pub struct NostrNIP05QueryParams {
     /// Username to query
+    #[serde(default)]
     pub name: String,
 }
 
