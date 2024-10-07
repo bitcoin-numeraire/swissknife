@@ -283,6 +283,7 @@ impl LnClient for BreezClient {
                 bolt11,
                 amount_msat,
                 label: Some(Uuid::new_v4().to_string()),
+                use_trampoline: false,
             })
             .await
             .map_err(|e| LightningError::Pay(e.to_string()))?;
