@@ -64,7 +64,7 @@ pub fn user_router() -> Router<Arc<AppState>> {
         .route("/contacts", get(list_contacts))
 }
 
-/// Gets the user wallet
+/// Get wallet
 ///
 /// Returns the user wallet.
 #[utoipa::path(
@@ -87,7 +87,7 @@ async fn get_user_wallet(
     Ok(Json(wallet.into()))
 }
 
-/// Send a payment
+/// Send payment
 ///
 /// Pay for a LN invoice, LNURL, LN Address, On-chain or internally to an other user on the same instance. Returns the payment details.
 #[utoipa::path(
@@ -123,7 +123,7 @@ async fn wallet_pay(
     Ok(Json(payment.into()))
 }
 
-/// Gets the wallet balance
+/// Get wallet balance
 ///
 /// Returns the wallet balance.
 #[utoipa::path(
@@ -185,7 +185,7 @@ async fn new_wallet_invoice(
     Ok(Json(invoice.into()))
 }
 
-/// Get your LN Address
+/// Get LN Address
 ///
 /// Returns the registered address
 #[utoipa::path(
@@ -221,7 +221,7 @@ async fn get_wallet_address(
     Ok(ln_address.into())
 }
 
-/// Register a new LN Address
+/// Register LN Address
 ///
 /// Registers an address. Returns the address details. LN Addresses are ready to receive funds through the LNURL protocol upon registration.
 #[utoipa::path(
@@ -256,7 +256,7 @@ async fn register_wallet_address(
     Ok(ln_address.into())
 }
 
-/// Updates the user's LN Address
+/// Update LN Address
 ///
 /// Updates the address. Returns the address details.
 #[utoipa::path(
@@ -302,7 +302,7 @@ async fn update_wallet_address(
     Ok(ln_address.into())
 }
 
-/// Deletes the user's LN Address
+/// Delete LN Address
 ///
 /// Deletes an address. Returns an empty body. Once the address is deleted, it will no longer be able to receive funds and its username can be claimed by another user.
 #[utoipa::path(
