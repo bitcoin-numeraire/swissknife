@@ -5,9 +5,9 @@ use crate::{
 };
 use async_trait::async_trait;
 use sea_orm::{
-    sea_query::Expr, ActiveModelTrait, ActiveValue::Set, ColumnTrait, Condition,
-    DatabaseConnection, DatabaseTransaction, EntityTrait, QueryFilter, QueryOrder, QuerySelect,
-    QueryTrait,
+    sea_query::Expr, ActiveModelTrait, ColumnTrait, Condition, DatabaseConnection,
+    DatabaseTransaction, EntityTrait, QueryFilter, QueryOrder, QuerySelect, QueryTrait, Set,
+    Unchanged,
 };
 use uuid::Uuid;
 
@@ -134,7 +134,7 @@ impl InvoiceRepository for SeaOrmInvoiceRepository {
         invoice: Invoice,
     ) -> Result<Invoice, DatabaseError> {
         let model = ActiveModel {
-            id: Set(invoice.id),
+            id: Unchanged(invoice.id),
             fee_msat: Set(invoice.fee_msat.map(|v| v as i64)),
             payment_time: Set(invoice.payment_time),
             description: Set(invoice.description),

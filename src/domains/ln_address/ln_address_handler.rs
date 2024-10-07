@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use axum::{
     extract::{Path, State},
-    routing::{delete, get, post},
+    routing::{delete, get, post, put},
     Json, Router,
 };
 use axum_extra::extract::Query;
@@ -15,7 +15,7 @@ use crate::{
             BAD_REQUEST_EXAMPLE, FORBIDDEN_EXAMPLE, INTERNAL_EXAMPLE, NOT_FOUND_EXAMPLE,
             UNAUTHORIZED_EXAMPLE, UNPROCESSABLE_EXAMPLE,
         },
-        dtos::RegisterLnAddressRequest,
+        dtos::{RegisterLnAddressRequest, UpdateLnAddressRequest},
         errors::ApplicationError,
     },
     domains::user::{Permission, User},
@@ -26,7 +26,7 @@ use super::{LnAddress, LnAddressFilter};
 
 #[derive(OpenApi)]
 #[openapi(
-    paths(register_address, get_address, list_addresses, delete_address, delete_addresses),
+    paths(register_address, get_address, list_addresses, update_address, delete_address, delete_addresses),
     components(schemas(LnAddress, RegisterLnAddressRequest)),
     tags(
         (name = "Lightning Addresses", description = "LN Address management endpoints as defined in the [protocol specification](https://lightningaddress.com/). Require `read:ln_address` or `write:ln_address` permissions.")
@@ -40,6 +40,7 @@ pub fn router() -> Router<Arc<AppState>> {
         .route("/", get(list_addresses))
         .route("/", post(register_address))
         .route("/:id", get(get_address))
+        .route("/:id", put(update_address))
         .route("/:id", delete(delete_address))
         .route("/", delete(delete_addresses))
 }
@@ -139,6 +140,37 @@ async fn list_addresses(
     let response: Vec<LnAddress> = ln_addresses.into_iter().map(Into::into).collect();
 
     Ok(response.into())
+}
+
+/// Update a LN Address
+///
+/// Updates an address. Returns the address details.
+#[utoipa::path(
+    put,
+    path = "/{id}",
+    tag = "Lightning Addresses",
+    context_path = CONTEXT_PATH,
+    request_body = UpdateLnAddressRequest,
+    responses(
+        (status = 200, description = "LN Address Updated", body = LnAddress),
+        (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
+        (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
+        (status = 403, description = "Forbidden", body = ErrorResponse, example = json!(FORBIDDEN_EXAMPLE)),
+        (status = 404, description = "Not Found", body = ErrorResponse, example = json!(NOT_FOUND_EXAMPLE)),
+        (status = 422, description = "Unprocessable Entity", body = ErrorResponse, example = json!(UNPROCESSABLE_EXAMPLE)),
+        (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
+    )
+)]
+async fn update_address(
+    State(app_state): State<Arc<AppState>>,
+    user: User,
+    Path(id): Path<Uuid>,
+    Json(payload): Json<UpdateLnAddressRequest>,
+) -> Result<Json<LnAddress>, ApplicationError> {
+    user.check_permission(Permission::WriteLnAddress)?;
+
+    let ln_address = app_state.services.ln_address.update(id, payload).await?;
+    Ok(ln_address.into())
 }
 
 /// Delete a LN Address

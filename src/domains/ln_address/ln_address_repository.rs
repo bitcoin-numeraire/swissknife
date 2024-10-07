@@ -20,5 +20,6 @@ pub trait LnAddressRepository: Send + Sync {
         allows_nostr: bool,
         nostr_pubkey: Option<PublicKey>,
     ) -> Result<LnAddress, DatabaseError>;
+    async fn update(&self, ln_address: LnAddress) -> Result<LnAddress, DatabaseError>;
     async fn delete_many(&self, filter: LnAddressFilter) -> Result<u64, DatabaseError>;
 }
