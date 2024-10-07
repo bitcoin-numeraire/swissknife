@@ -11,25 +11,25 @@ homepage = "https://numeraire.tech"
 build = "build.rs"
 
 [dependencies]
-async-trait = "0.1.81"
-axum = "0.7.5"
-axum-extra = { version = "0.9.3", features = ["typed-header", "query"] }
-serde = { version = "1.0.208", features = ["derive"] }
-serde_json = "1.0.125"
-serde_bolt = "=0.3.4"
-serde_with = "3.9.0"
-tokio = { version = "1.39", features = ["full"] }
-breez-sdk-core = { git = "https://github.com/breez/breez-sdk", tag = "0.5.2" }
+async-trait = "0.1.83"
+axum = "0.7.7"
+axum-extra = { version = "0.9.4", features = ["typed-header", "query"] }
+serde = { version = "1.0.210", features = ["derive"] }
+serde_json = "1.0.128"
+serde_bolt = "0.3.5"
+serde_with = "3.11.0"
+tokio = { version = "1.40", features = ["full"] }
+breez-sdk-core = { git = "https://github.com/breez/breez-sdk", tag = "0.6.1" }
 bip39 = { version = "*", features = ["rand_core"] }
 config = { version = "0.13.4", features = ["yaml", "json", "toml"] }
 dotenv = "0.15.0"
 tracing = "0.1.40"
 tracing-subscriber = { version = "0.3.18", features = ["json", "env-filter"] }
 jsonwebtoken = "9.3.0"
-reqwest = { version = "0.12.7", features = ["json"] }
+reqwest = { version = "0.12.8", features = ["json"] }
 uuid = { version = "1.10.0", features = ["v4", "serde"] }
 chrono = "0.4.38"
-thiserror = "1.0.63"
+thiserror = "1.0.64"
 tower-http = { version = "0.5", features = ["timeout", "trace", "cors"] }
 regex = "1"
 sea-orm = { version = "0.12", features = [
@@ -46,8 +46,8 @@ tonic = { version = "0.11.0", features = ["tls"] }
 prost = "0.12.6"
 lightning-invoice = "0.31.0"
 hex = "0.4.3"
-anyhow = "1.0.86"
-futures-util = "0.3.30"
+anyhow = "1.0.89"
+futures-util = "0.3.31"
 humantime = "2.1.0"
 rust_socketio = { version = "0.6.0", features = ["async"] }
 bcrypt = "0.15.1"
