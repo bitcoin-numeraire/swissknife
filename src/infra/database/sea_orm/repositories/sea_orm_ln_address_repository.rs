@@ -1,9 +1,8 @@
 use async_trait::async_trait;
 use nostr_sdk::PublicKey;
-use sea_orm::ActiveValue::Set;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, QueryOrder,
-    QuerySelect, QueryTrait,
+    QuerySelect, QueryTrait, Set, Unchanged,
 };
 use uuid::Uuid;
 
@@ -93,6 +92,25 @@ impl LnAddressRepository for SeaOrmLnAddressRepository {
             .insert(&self.db)
             .await
             .map_err(|e| DatabaseError::Insert(e.to_string()))?;
+
+        Ok(model.into())
+    }
+
+    async fn update(&self, ln_address: LnAddress) -> Result<LnAddress, DatabaseError> {
+        let model = ActiveModel {
+            id: Unchanged(ln_address.id),
+            wallet_id: Unchanged(ln_address.wallet_id),
+            username: Set(ln_address.username),
+            allows_nostr: Set(ln_address.allows_nostr),
+            nostr_pubkey: Set(ln_address.nostr_pubkey.map(|k| k.to_hex())),
+            active: Set(ln_address.active),
+            ..Default::default()
+        };
+
+        let model = model
+            .update(&self.db)
+            .await
+            .map_err(|e| DatabaseError::Update(e.to_string()))?;
 
         Ok(model.into())
     }

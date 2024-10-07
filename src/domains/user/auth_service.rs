@@ -58,7 +58,7 @@ impl AuthUseCases for AuthService {
         let wallet_opt = self.store.wallet.find_by_user_id(&claims.sub).await?;
 
         let wallet = match wallet_opt {
-            Some(user) => user,
+            Some(wallet) => wallet,
             None => {
                 let wallet = self.store.wallet.insert(&claims.sub).await?;
 

@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use sea_orm::{
-    ActiveModelTrait, ActiveValue::Set, ColumnTrait, DatabaseConnection, DatabaseTransaction,
-    EntityTrait, QueryFilter, QueryOrder, QuerySelect, QueryTrait,
+    ActiveModelTrait, ColumnTrait, DatabaseConnection, DatabaseTransaction, EntityTrait,
+    QueryFilter, QueryOrder, QuerySelect, QueryTrait, Set, Unchanged,
 };
 use uuid::Uuid;
 
@@ -100,7 +100,7 @@ impl PaymentRepository for SeaOrmPaymentRepository {
 
     async fn update(&self, payment: Payment) -> Result<Payment, DatabaseError> {
         let model = ActiveModel {
-            id: Set(payment.id),
+            id: Unchanged(payment.id),
             status: Set(payment.status.to_string()),
             fee_msat: Set(payment.fee_msat.map(|v| v as i64)),
             payment_time: Set(payment.payment_time),

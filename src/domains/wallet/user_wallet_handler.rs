@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use axum::{
     extract::{Path, Query, State},
-    routing::{delete, get, post},
+    routing::{delete, get, post, put},
     Json, Router,
 };
 use utoipa::OpenApi;
@@ -16,7 +16,7 @@ use crate::{
         },
         dtos::{
             InvoiceResponse, NewInvoiceRequest, PaymentResponse, RegisterLnAddressRequest,
-            SendPaymentRequest, WalletResponse,
+            SendPaymentRequest, UpdateLnAddressRequest, WalletResponse,
         },
         errors::{ApplicationError, DataError},
     },
@@ -33,7 +33,7 @@ use super::{Balance, Contact};
 
 #[derive(OpenApi)]
 #[openapi(
-    paths(get_user_wallet, get_wallet_balance, get_wallet_address, register_wallet_address, wallet_pay, list_wallet_payments,
+    paths(get_user_wallet, get_wallet_balance, get_wallet_address, register_wallet_address, update_wallet_address, delete_wallet_address, wallet_pay, list_wallet_payments,
         get_wallet_payment, delete_failed_payments, list_wallet_invoices, get_wallet_invoice, new_wallet_invoice, delete_expired_invoices,
         list_contacts
     ),
@@ -51,6 +51,8 @@ pub fn user_router() -> Router<Arc<AppState>> {
         .route("/balance", get(get_wallet_balance))
         .route("/lightning-address", get(get_wallet_address))
         .route("/lightning-address", post(register_wallet_address))
+        .route("/lightning-address", put(update_wallet_address))
+        .route("/lightning-address", delete(delete_wallet_address))
         .route("/payments", post(wallet_pay))
         .route("/payments", get(list_wallet_payments))
         .route("/payments/:id", get(get_wallet_payment))
@@ -62,7 +64,7 @@ pub fn user_router() -> Router<Arc<AppState>> {
         .route("/contacts", get(list_contacts))
 }
 
-/// Gets the user wallet
+/// Get wallet
 ///
 /// Returns the user wallet.
 #[utoipa::path(
@@ -85,7 +87,7 @@ async fn get_user_wallet(
     Ok(Json(wallet.into()))
 }
 
-/// Send a payment
+/// Send payment
 ///
 /// Pay for a LN invoice, LNURL, LN Address, On-chain or internally to an other user on the same instance. Returns the payment details.
 #[utoipa::path(
@@ -121,7 +123,7 @@ async fn wallet_pay(
     Ok(Json(payment.into()))
 }
 
-/// Gets the wallet balance
+/// Get wallet balance
 ///
 /// Returns the wallet balance.
 #[utoipa::path(
@@ -183,7 +185,7 @@ async fn new_wallet_invoice(
     Ok(Json(invoice.into()))
 }
 
-/// Get your LN Address
+/// Get LN Address
 ///
 /// Returns the registered address
 #[utoipa::path(
@@ -219,7 +221,7 @@ async fn get_wallet_address(
     Ok(ln_address.into())
 }
 
-/// Register a new LN Address
+/// Register LN Address
 ///
 /// Registers an address. Returns the address details. LN Addresses are ready to receive funds through the LNURL protocol upon registration.
 #[utoipa::path(
@@ -252,6 +254,88 @@ async fn register_wallet_address(
         )
         .await?;
     Ok(ln_address.into())
+}
+
+/// Update LN Address
+///
+/// Updates the address. Returns the address details.
+#[utoipa::path(
+    put,
+    path = "/lightning-address",
+    tag = "User Wallet",
+    context_path = CONTEXT_PATH,
+    request_body = UpdateLnAddressRequest,
+    responses(
+        (status = 200, description = "LN Address Updated", body = LnAddress),
+        (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
+        (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
+        (status = 422, description = "Unprocessable Entity", body = ErrorResponse, example = json!(UNPROCESSABLE_EXAMPLE)),
+        (status = 404, description = "Not Found", body = ErrorResponse, example = json!(NOT_FOUND_EXAMPLE)),
+        (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
+    )
+)]
+async fn update_wallet_address(
+    State(app_state): State<Arc<AppState>>,
+    user: User,
+    Json(payload): Json<UpdateLnAddressRequest>,
+) -> Result<Json<LnAddress>, ApplicationError> {
+    let ln_addresses = app_state
+        .services
+        .ln_address
+        .list(LnAddressFilter {
+            wallet_id: Some(user.wallet_id),
+            ..Default::default()
+        })
+        .await?;
+
+    let ln_address = ln_addresses
+        .first()
+        .cloned()
+        .ok_or_else(|| DataError::NotFound("LN Address not found.".to_string()))?;
+
+    let ln_address = app_state
+        .services
+        .ln_address
+        .update(ln_address.id, payload)
+        .await?;
+
+    Ok(ln_address.into())
+}
+
+/// Delete LN Address
+///
+/// Deletes an address. Returns an empty body. Once the address is deleted, it will no longer be able to receive funds and its username can be claimed by another user.
+#[utoipa::path(
+    delete,
+    path = "/lightning-address",
+    tag = "User Wallet",
+    context_path = CONTEXT_PATH,
+    responses(
+        (status = 200, description = "Deleted"),
+        (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
+        (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
+        (status = 404, description = "Not Found", body = ErrorResponse, example = json!(NOT_FOUND_EXAMPLE)),
+        (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
+    )
+)]
+async fn delete_wallet_address(
+    State(app_state): State<Arc<AppState>>,
+    user: User,
+) -> Result<(), ApplicationError> {
+    let n_deleted = app_state
+        .services
+        .ln_address
+        .delete_many(LnAddressFilter {
+            wallet_id: Some(user.wallet_id),
+            ..Default::default()
+        })
+        .await?;
+
+    if n_deleted == 0 {
+        return Err(DataError::NotFound("Lightning address not found.".to_string()).into());
+    }
+
+    Ok(())
 }
 
 /// List payments

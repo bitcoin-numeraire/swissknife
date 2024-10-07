@@ -6,6 +6,7 @@ use uuid::Uuid;
 
 use crate::{
     application::{
+        dtos::UpdateLnAddressRequest,
         entities::AppStore,
         errors::{ApplicationError, DataError},
     },
@@ -39,17 +40,7 @@ impl LnAddressUseCases for LnAddressService {
         debug!(%wallet_id, username, "Registering lightning address");
 
         username = username.to_lowercase();
-
-        if username.len() < MIN_USERNAME_LENGTH || username.len() > MAX_USERNAME_LENGTH {
-            return Err(DataError::Validation("Invalid username length.".to_string()).into());
-        }
-
-        // Regex validation for allowed characters in username
-        let email_username_re =
-            Regex::new(r"^[a-z0-9.!#$%&'*+/=?^_`{|}~-]+$").expect("should not fail as a constant");
-        if !email_username_re.is_match(&username) {
-            return Err(DataError::Validation("Invalid username format.".to_string()).into());
-        }
+        validate_username(username.as_str())?;
 
         if self
             .store
@@ -109,6 +100,58 @@ impl LnAddressUseCases for LnAddressService {
         Ok(ln_addresses)
     }
 
+    async fn update(
+        &self,
+        id: Uuid,
+        request: UpdateLnAddressRequest,
+    ) -> Result<LnAddress, ApplicationError> {
+        debug!(%id, ?request, "Updating lightning address");
+
+        let mut ln_address = self
+            .store
+            .ln_address
+            .find(id)
+            .await?
+            .ok_or_else(|| DataError::NotFound("Lightning address not found.".to_string()))?;
+
+        if let Some(mut username) = request.username {
+            username = username.to_lowercase();
+
+            if username != ln_address.username {
+                validate_username(username.as_str())?;
+
+                if self
+                    .store
+                    .ln_address
+                    .find_by_username(&username)
+                    .await?
+                    .is_some()
+                {
+                    return Err(DataError::Conflict("Duplicate username.".to_string()).into());
+                }
+
+                ln_address.username = username;
+            }
+        }
+
+        if let Some(active) = request.active {
+            ln_address.active = active;
+        }
+
+        if let Some(allows_nostr) = request.allows_nostr {
+            ln_address.allows_nostr = allows_nostr;
+        }
+
+        if let Some(nostr_pubkey) = request.nostr_pubkey {
+            ln_address.nostr_pubkey = Some(nostr_pubkey);
+        }
+
+        let ln_address = self.store.ln_address.update(ln_address).await?;
+
+        info!(%id, "Lightning address updated successfully");
+        Ok(ln_address)
+    }
+
     async fn delete(&self, id: Uuid) -> Result<(), ApplicationError> {
         debug!(%id, "Deleting lightning address");
 
@@ -140,4 +183,23 @@ impl LnAddressUseCases for LnAddressService {
         );
         Ok(n_deleted)
     }
+}
+
+fn validate_username(username: &str) -> Result<(), DataError> {
+    if username.len() < MIN_USERNAME_LENGTH || username.len() > MAX_USERNAME_LENGTH {
+        return Err(DataError::Validation(
+            "Invalid username length.".to_string(),
+        ));
+    }
+
+    // Regex validation for allowed characters in username
+    let email_username_re =
+        Regex::new(r"^[a-z0-9.!#$%&'*+/=?^_`{|}~-]+$").expect("should not fail as a constant");
+    if !email_username_re.is_match(username) {
+        return Err(DataError::Validation(
+            "Invalid username format.".to_string(),
+        ));
+    }
+
+    Ok(())
 }
