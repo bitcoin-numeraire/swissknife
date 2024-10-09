@@ -12,16 +12,15 @@ pub struct NostrNIP05QueryParams {
 }
 
 #[derive(Debug, Serialize, ToSchema)]
-#[serde(rename_all = "camelCase")]
 pub struct NostrNIP05Response {
     /// Found names
-    pub names: HashMap<String, PublicKey>,
+    pub names: HashMap<String, String>,
 }
 
 impl NostrNIP05Response {
     pub fn new(name: String, pubkey: PublicKey) -> Self {
         let mut names = HashMap::new();
-        names.insert(name, pubkey);
+        names.insert(name, pubkey.to_string());
         Self { names }
     }
 }

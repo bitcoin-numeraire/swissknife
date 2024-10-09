@@ -27,7 +27,7 @@ use super::{LnAddress, LnAddressFilter};
 #[derive(OpenApi)]
 #[openapi(
     paths(register_address, get_address, list_addresses, update_address, delete_address, delete_addresses),
-    components(schemas(LnAddress, RegisterLnAddressRequest)),
+    components(schemas(LnAddress, RegisterLnAddressRequest, UpdateLnAddressRequest)),
     tags(
         (name = "Lightning Addresses", description = "LN Address management endpoints as defined in the [protocol specification](https://lightningaddress.com/). Require `read:ln_address` or `write:ln_address` permissions.")
     )

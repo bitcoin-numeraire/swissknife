@@ -22,7 +22,7 @@ pub struct LnAddress {
     pub allows_nostr: bool,
     /// Nostr Public key
     #[serde(skip_serializing_if = "Option::is_none")]
-    #[schema(example = "npub1m8pwckdf3...")]
+    #[schema(value_type = Option<String>, example = "d9c2ec59a98c...")]
     pub nostr_pubkey: Option<PublicKey>,
     /// Date of creation in database
     pub created_at: DateTime<Utc>,
