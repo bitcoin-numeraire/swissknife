@@ -35,7 +35,7 @@ pub struct LnURLPayRequest {
     pub allows_nostr: bool,
 
     /// Nostr public key
-    #[schema(example = "npub1m8pwckdf3...")]
+    #[schema(value_type = Option<String>, example = "d9c2ec59a98c...")]
     pub nostr_pubkey: Option<PublicKey>,
 }
 
