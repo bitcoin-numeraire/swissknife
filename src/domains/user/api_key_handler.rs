@@ -25,10 +25,10 @@ use super::{ApiKeyFilter, Permission, User};
 
 #[derive(OpenApi)]
 #[openapi(
-    paths(create_api_key),
-    components(schemas(CreateApiKeyRequest, ApiKeyResponse)),
+    paths(create_api_key, get_api_key, list_api_keys, revoke_api_key, revoke_api_keys),
+    components(schemas(CreateApiKeyRequest, ApiKeyResponse, Permission)),
     tags(
-        (name = "API Keys", description = "API Key Management. Require `read:api_key` or `write:api_key` permissions."),
+        (name = "API Keys", description = "API Key Management. Require `read:api_key` or `write:api_key` permissions. "),
     )
 )]
 pub struct ApiKeyHandler;
@@ -45,7 +45,7 @@ pub fn api_key_router() -> Router<Arc<AppState>> {
 
 /// Generate a new API Key
 ///
-/// Returns the generated API Key for the given user.
+/// Returns the generated API Key for the given user. Users can create API keys with permissions as a subset of his current permissions.
 #[utoipa::path(
     post,
     path = "",

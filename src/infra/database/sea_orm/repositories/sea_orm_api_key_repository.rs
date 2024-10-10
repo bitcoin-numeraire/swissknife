@@ -63,7 +63,6 @@ impl ApiKeyRepository for SeaOrmApiKeyRepository {
 
     async fn insert(&self, api_key: ApiKey) -> Result<ApiKey, DatabaseError> {
         let model = ActiveModel {
-            id: Set(api_key.id),
             user_id: Set(api_key.user_id),
             key_hash: Set(api_key.key_hash),
             permissions: Set(api_key.permissions.iter().map(|p| p.to_string()).collect()),
