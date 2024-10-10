@@ -6,6 +6,7 @@ use super::permission::Permission;
 
 #[derive(Clone, Debug, Default)]
 pub struct User {
+    pub id: String,
     pub wallet_id: Uuid,
     pub permissions: Vec<Permission>,
 }

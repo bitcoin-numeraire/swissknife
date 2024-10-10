@@ -57,9 +57,9 @@ pub fn user_router() -> Router<Arc<AppState>> {
         .route("/payments", get(list_wallet_payments))
         .route("/payments/:id", get(get_wallet_payment))
         .route("/payments", delete(delete_failed_payments))
+        .route("/invoices", post(new_wallet_invoice))
         .route("/invoices", get(list_wallet_invoices))
         .route("/invoices/:id", get(get_wallet_invoice))
-        .route("/invoices", post(new_wallet_invoice))
         .route("/invoices", delete(delete_expired_invoices))
         .route("/contacts", get(list_contacts))
 }

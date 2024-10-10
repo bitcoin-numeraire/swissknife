@@ -21,6 +21,10 @@ pub enum Permission {
     ReadLnNode,
     #[serde(rename = "write:ln_node")]
     WriteLnNode,
+    #[serde(rename = "read:api_key")]
+    ReadApiKey,
+    #[serde(rename = "write:api_key")]
+    WriteApiKey,
 }
 
 impl Permission {
@@ -34,6 +38,8 @@ impl Permission {
             Permission::WriteLnTransaction,
             Permission::ReadLnNode,
             Permission::WriteLnNode,
+            Permission::ReadApiKey,
+            Permission::WriteApiKey,
         ]
     }
 }

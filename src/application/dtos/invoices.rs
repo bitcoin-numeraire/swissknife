@@ -12,7 +12,7 @@ use crate::{
 };
 
 /// New Invoice Request
-#[derive(Debug, Deserialize, ToSchema)]
+#[derive(Deserialize, ToSchema)]
 pub struct NewInvoiceRequest {
     /// User ID. Will be populated with your own ID by default
     pub wallet_id: Option<Uuid>,

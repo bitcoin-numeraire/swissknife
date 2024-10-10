@@ -3,39 +3,29 @@
 use sea_orm::entity::prelude::*;
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
-#[sea_orm(table_name = "ln_address")]
+#[sea_orm(table_name = "api_key")]
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
     pub id: Uuid,
-    #[sea_orm(unique)]
-    pub wallet_id: Uuid,
-    #[sea_orm(unique)]
-    pub username: String,
-    pub active: bool,
+    pub user_id: String,
+    pub key_hash: Vec<u8>,
+    pub permissions: Vec<String>,
     pub created_at: DateTimeUtc,
-    pub updated_at: Option<DateTimeUtc>,
-    pub allows_nostr: bool,
-    pub nostr_pubkey: Option<String>,
+    pub expires_at: Option<DateTimeUtc>,
+    #[sea_orm(column_type = "Text", nullable)]
+    pub description: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
-    #[sea_orm(has_many = "super::invoice::Entity")]
-    Invoice,
     #[sea_orm(
         belongs_to = "super::wallet::Entity",
-        from = "Column::WalletId",
-        to = "super::wallet::Column::Id",
+        from = "Column::UserId",
+        to = "super::wallet::Column::UserId",
         on_update = "NoAction",
         on_delete = "Cascade"
     )]
     Wallet,
-}
-
-impl Related<super::invoice::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::Invoice.def()
-    }
 }
 
 impl Related<super::wallet::Entity> for Entity {

@@ -9,7 +9,7 @@ use crate::{
         nostr::{NostrService, NostrUseCases},
         payment::{PaymentService, PaymentsUseCases},
         system::{SystemService, SystemUseCases},
-        user::{AuthService, AuthUseCases},
+        user::{ApiKeyService, ApiKeyUseCases, AuthService, AuthUseCases},
         wallet::{WalletService, WalletUseCases},
     },
     infra::{
@@ -33,6 +33,7 @@ pub struct AppServices {
     pub auth: Box<dyn AuthUseCases>,
     pub system: Box<dyn SystemUseCases>,
     pub nostr: Box<dyn NostrUseCases>,
+    pub api_key: Box<dyn ApiKeyUseCases>,
 }
 
 impl AppServices {
@@ -65,7 +66,8 @@ impl AppServices {
         let wallet = WalletService::new(store.clone());
         let auth = AuthService::new(config.auth_provider, authenticator, store.clone());
         let system = SystemService::new(store.clone(), ln_client);
-        let nostr = NostrService::new(store);
+        let nostr = NostrService::new(store.clone());
+        let api_key = ApiKeyService::new(store);
 
         AppServices {
             invoice: Box::new(invoices),
@@ -76,6 +78,7 @@ impl AppServices {
             auth: Box::new(auth),
             system: Box::new(system),
             nostr: Box::new(nostr),
+            api_key: Box::new(api_key),
         }
     }
 }

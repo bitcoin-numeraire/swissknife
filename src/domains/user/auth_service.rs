@@ -68,6 +68,7 @@ impl AuthUseCases for AuthService {
         };
 
         let user = User {
+            id: claims.sub,
             wallet_id: wallet.id,
             permissions: claims.permissions,
         };

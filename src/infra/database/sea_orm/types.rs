@@ -6,13 +6,15 @@ use crate::domains::{
     invoice::{Invoice, InvoiceStatus, LnInvoice},
     ln_address::LnAddress,
     payment::Payment,
+    user::ApiKey,
     wallet::{Balance, Contact, Wallet, WalletOverview},
 };
 
 use super::models::{
-    balance::BalanceModel, contact::ContactModel, invoice::Model as InvoiceModel,
-    ln_address::Model as LnAddressModel, payment::Model as PaymentModel,
-    wallet::Model as WalletModel, wallet_overview::WalletOverviewModel,
+    api_key::Model as ApiKeyModel, balance::BalanceModel, contact::ContactModel,
+    invoice::Model as InvoiceModel, ln_address::Model as LnAddressModel,
+    payment::Model as PaymentModel, wallet::Model as WalletModel,
+    wallet_overview::WalletOverviewModel,
 };
 
 const ASSERTION_MSG: &str = "should parse successfully by assertion";
@@ -150,6 +152,25 @@ impl From<WalletOverviewModel> for WalletOverview {
             n_contacts: model.n_contacts as u32,
             created_at: model.created_at,
             updated_at: model.updated_at,
+        }
+    }
+}
+
+impl From<ApiKeyModel> for ApiKey {
+    fn from(model: ApiKeyModel) -> Self {
+        ApiKey {
+            id: model.id,
+            user_id: model.user_id,
+            key: None,
+            key_hash: model.key_hash,
+            permissions: model
+                .permissions
+                .into_iter()
+                .map(|p| p.parse().expect(ASSERTION_MSG))
+                .collect(),
+            description: model.description,
+            created_at: model.created_at,
+            expires_at: model.expires_at,
         }
     }
 }
