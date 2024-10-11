@@ -11,7 +11,7 @@ use crate::{
         nostr::NostrHandler,
         payment::PaymentHandler,
         system::SystemHandler,
-        user::AuthHandler,
+        user::{ApiKeyHandler, AuthHandler},
         wallet::{UserWalletHandler, WalletHandler},
     },
 };
@@ -37,6 +37,7 @@ struct ApiDoc;
 
 pub fn merged_openapi() -> OpenApi {
     let mut openapi = ApiDoc::openapi();
+
     openapi.merge(AuthHandler::openapi());
     openapi.merge(UserWalletHandler::openapi());
     openapi.merge(WalletHandler::openapi());
@@ -47,6 +48,8 @@ pub fn merged_openapi() -> OpenApi {
     openapi.merge(NostrHandler::openapi());
     openapi.merge(BreezNodeHandler::openapi());
     openapi.merge(SystemHandler::openapi());
+    openapi.merge(ApiKeyHandler::openapi());
+
     openapi
 }
 

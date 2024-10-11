@@ -20,8 +20,8 @@ pub enum AuthenticationError {
     #[error("No matching JWK found for the given kid")]
     MissingJWK,
 
-    #[error("Missing Bearer token for authentication: {0}")]
-    MissingBearerToken(String),
+    #[error("Missing Authorization header")]
+    MissingAuthorizationHeader,
 
     #[error("Failed to generate hash from given password: {0}")]
     Hash(String),

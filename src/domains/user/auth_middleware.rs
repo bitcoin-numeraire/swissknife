@@ -6,12 +6,10 @@ use axum_extra::{
     headers::{authorization::Bearer, Authorization},
     TypedHeader,
 };
+use base64::{prelude::BASE64_STANDARD, Engine};
 
 use crate::{
-    application::{
-        dtos::AuthProvider,
-        errors::{ApplicationError, AuthenticationError},
-    },
+    application::errors::{ApplicationError, AuthenticationError},
     infra::app::AppState,
 };
 
@@ -25,21 +23,28 @@ impl FromRequestParts<Arc<AppState>> for User {
         parts: &mut Parts,
         state: &Arc<AppState>,
     ) -> Result<Self, Self::Rejection> {
-        let credentials = match state.services.auth.provider() {
-            AuthProvider::Bypass => "".to_string(),
-            _ => {
-                // Extract the token from the Authorization header
-                let TypedHeader(Authorization(bearer)) = parts
-                    .extract::<TypedHeader<Authorization<Bearer>>>()
-                    .await
-                    .map_err(|e| AuthenticationError::MissingBearerToken(e.to_string()))?;
+        // Try to extract the Authorization header as Bearer token
+        if let Ok(TypedHeader(Authorization(bearer))) =
+            parts.extract::<TypedHeader<Authorization<Bearer>>>().await
+        {
+            let user = state.services.auth.authenticate_jwt(bearer.token()).await?;
+            Ok(user)
+        }
+        // Try to extract the Api-Key header
+        else if let Some(value) = parts.headers.get("api-key") {
+            let value_str = value
+                .to_str()
+                .map_err(|_| AuthenticationError::InvalidCredentials)?;
+            let api_key = BASE64_STANDARD
+                .decode(value_str)
+                .map_err(|_| AuthenticationError::InvalidCredentials)?;
 
-                bearer.token().to_string()
-            }
-        };
-
-        let user = state.services.auth.authenticate(&credentials).await?;
-
-        Ok(user)
+            let user = state.services.auth.authenticate_api_key(api_key).await?;
+            Ok(user)
+        }
+        // If no Authorization header is present, return an error
+        else {
+            Err(AuthenticationError::MissingAuthorizationHeader.into())
+        }
     }
 }

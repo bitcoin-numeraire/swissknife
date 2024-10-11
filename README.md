@@ -18,6 +18,7 @@ If you like what we do, consider starring, sharing and contributing!
 - [`Lightning Network`](https://github.com/lnurl/luds). Send and receive payments.
 - [`LNURL`](https://github.com/lnurl/luds) support.
 - [`Lightning Address`](https://lightningaddress.com/). Deploy your own Lightning Address infrastructure. Like email, anyone can use identifiers (`username@your.domain`) to send and receive payments.
+- [`Nostr`](https://github.com/nostr-protocol/nips/blob/master/05.md). NIP-05 and Zap support through your Lightning Address.
 - Generate invoices.
 - Account segregation. Support any amount of users.
 - Internal ledger for instant payments on the same SwissKnife instance.
@@ -55,12 +56,10 @@ Extended documentation is available [here](https://docs.numeraire.tech/swissknif
 
 #### Features
 
-- [ ] [`Nostr`](https://github.com/nostr-protocol/nips/blob/master/57.md). NIP-5 and Zap support through Lightning Address
 - [ ] Webhooks
-- [ ] API keys authentication
+- [x] API keys authentication
 - [ ] BOLT12 (offers)
 - [ ] Notifications (Email, SMS by Twilio)
-- [ ] Documentation website
 - [ ] Dockerhub images
 - [ ] Desktop applications
 - [ ] Helm Charts

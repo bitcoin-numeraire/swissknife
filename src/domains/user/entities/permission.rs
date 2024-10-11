@@ -1,8 +1,19 @@
 use serde::{Deserialize, Serialize};
 use strum_macros::{Display, EnumString, VariantNames};
+use utoipa::ToSchema;
 
 #[derive(
-    Clone, Debug, PartialEq, Eq, Hash, EnumString, Display, VariantNames, Serialize, Deserialize,
+    Clone,
+    Debug,
+    PartialEq,
+    Eq,
+    Hash,
+    EnumString,
+    Display,
+    VariantNames,
+    Serialize,
+    Deserialize,
+    ToSchema,
 )]
 pub enum Permission {
     #[serde(rename = "read:wallet")]
@@ -21,6 +32,10 @@ pub enum Permission {
     ReadLnNode,
     #[serde(rename = "write:ln_node")]
     WriteLnNode,
+    #[serde(rename = "read:api_key")]
+    ReadApiKey,
+    #[serde(rename = "write:api_key")]
+    WriteApiKey,
 }
 
 impl Permission {
@@ -34,6 +49,8 @@ impl Permission {
             Permission::WriteLnTransaction,
             Permission::ReadLnNode,
             Permission::WriteLnNode,
+            Permission::ReadApiKey,
+            Permission::WriteApiKey,
         ]
     }
 }

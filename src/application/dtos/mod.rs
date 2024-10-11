@@ -1,3 +1,4 @@
+mod api_key;
 mod auth;
 mod config;
 mod error;
@@ -9,6 +10,7 @@ mod nostr;
 mod payments;
 mod wallet;
 
+pub use api_key::*;
 pub use auth::*;
 pub use config::*;
 pub use error::*;

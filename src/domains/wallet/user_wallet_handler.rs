@@ -15,8 +15,9 @@ use crate::{
             UNPROCESSABLE_EXAMPLE,
         },
         dtos::{
-            InvoiceResponse, NewInvoiceRequest, PaymentResponse, RegisterLnAddressRequest,
-            SendPaymentRequest, UpdateLnAddressRequest, WalletResponse,
+            ApiKeyResponse, CreateApiKeyRequest, InvoiceResponse, NewInvoiceRequest,
+            PaymentResponse, RegisterLnAddressRequest, SendPaymentRequest, UpdateLnAddressRequest,
+            WalletResponse,
         },
         errors::{ApplicationError, DataError},
     },
@@ -24,7 +25,7 @@ use crate::{
         invoice::{InvoiceFilter, InvoiceStatus},
         ln_address::{LnAddress, LnAddressFilter},
         payment::{PaymentFilter, PaymentStatus},
-        user::User,
+        user::{ApiKeyFilter, User},
     },
     infra::app::AppState,
 };
@@ -33,9 +34,14 @@ use super::{Balance, Contact};
 
 #[derive(OpenApi)]
 #[openapi(
-    paths(get_user_wallet, get_wallet_balance, get_wallet_address, register_wallet_address, update_wallet_address, delete_wallet_address, wallet_pay, list_wallet_payments,
-        get_wallet_payment, delete_failed_payments, list_wallet_invoices, get_wallet_invoice, new_wallet_invoice, delete_expired_invoices,
-        list_contacts
+    paths(
+        get_user_wallet,
+        get_wallet_balance,
+        get_wallet_address, register_wallet_address, update_wallet_address, delete_wallet_address,
+        wallet_pay, list_wallet_payments, get_wallet_payment, delete_failed_payments, list_wallet_invoices,
+        get_wallet_invoice, new_wallet_invoice, delete_expired_invoices,
+        list_contacts,
+        create_wallet_api_key, list_wallet_api_keys, get_wallet_api_key, revoke_wallet_api_key, revoke_wallet_api_keys
     ),
     components(schemas(WalletResponse, Balance, Contact)),
     tags(
@@ -57,11 +63,16 @@ pub fn user_router() -> Router<Arc<AppState>> {
         .route("/payments", get(list_wallet_payments))
         .route("/payments/:id", get(get_wallet_payment))
         .route("/payments", delete(delete_failed_payments))
+        .route("/invoices", post(new_wallet_invoice))
         .route("/invoices", get(list_wallet_invoices))
         .route("/invoices/:id", get(get_wallet_invoice))
-        .route("/invoices", post(new_wallet_invoice))
         .route("/invoices", delete(delete_expired_invoices))
         .route("/contacts", get(list_contacts))
+        .route("/api-keys", post(create_wallet_api_key))
+        .route("/api-keys", get(list_wallet_api_keys))
+        .route("/api-keys/:id", get(get_wallet_api_key))
+        .route("/api-keys/:id", delete(revoke_wallet_api_key))
+        .route("/api-keys", delete(revoke_wallet_api_keys))
 }
 
 /// Get wallet
@@ -559,4 +570,162 @@ async fn delete_failed_payments(
         })
         .await?;
     Ok(n_deleted.into())
+}
+
+/// Generate a new API Key
+///
+/// Returns the generated API Key for the given user. Users can create API keys with permissions as a subset of his current permissions.
+#[utoipa::path(
+    post,
+    path = "/api-keys",
+    tag = "User Wallet",
+    context_path = CONTEXT_PATH,
+    request_body = CreateApiKeyRequest,
+    responses(
+        (status = 200, description = "API Key Created", body = ApiKeyResponse),
+        (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
+        (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
+        (status = 422, description = "Unprocessable Entity", body = ErrorResponse, example = json!(UNPROCESSABLE_EXAMPLE)),
+        (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
+    )
+)]
+async fn create_wallet_api_key(
+    State(app_state): State<Arc<AppState>>,
+    user: User,
+    Json(mut payload): Json<CreateApiKeyRequest>,
+) -> Result<Json<ApiKeyResponse>, ApplicationError> {
+    payload.user_id = Some(user.id.clone());
+    let api_key = app_state.services.api_key.generate(user, payload).await?;
+    Ok(Json(api_key.into()))
+}
+
+/// Find an API Key
+///
+/// Returns the API Key by its ID.
+#[utoipa::path(
+    get,
+    path = "/api-keys/{id}",
+    tag = "User Wallet",
+    context_path = CONTEXT_PATH,
+    responses(
+        (status = 200, description = "Found", body = ApiKeyResponse),
+        (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
+        (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
+        (status = 404, description = "Not Found", body = ErrorResponse, example = json!(NOT_FOUND_EXAMPLE)),
+        (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
+    )
+)]
+async fn get_wallet_api_key(
+    State(app_state): State<Arc<AppState>>,
+    user: User,
+    Path(id): Path<Uuid>,
+) -> Result<Json<ApiKeyResponse>, ApplicationError> {
+    let api_keys = app_state
+        .services
+        .api_key
+        .list(ApiKeyFilter {
+            user_id: Some(user.id),
+            ids: Some(vec![id]),
+            ..Default::default()
+        })
+        .await?;
+
+    let api_key = api_keys
+        .first()
+        .cloned()
+        .ok_or_else(|| DataError::NotFound("API Key not found.".to_string()))?;
+
+    Ok(Json(api_key.into()))
+}
+
+/// List API Keys
+///
+/// Returns all the API Keys given a filter
+#[utoipa::path(
+    get,
+    path = "/api-keys",
+    tag = "User Wallet",
+    context_path = CONTEXT_PATH,
+    params(ApiKeyFilter),
+    responses(
+        (status = 200, description = "Success", body = Vec<ApiKeyResponse>),
+        (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
+        (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
+        (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
+    )
+)]
+async fn list_wallet_api_keys(
+    State(app_state): State<Arc<AppState>>,
+    user: User,
+    Query(mut filter): Query<ApiKeyFilter>,
+) -> Result<Json<Vec<ApiKeyResponse>>, ApplicationError> {
+    filter.user_id = Some(user.id);
+    let api_keys = app_state.services.api_key.list(filter).await?;
+    let response: Vec<ApiKeyResponse> = api_keys.into_iter().map(Into::into).collect();
+
+    Ok(response.into())
+}
+
+/// Revoke an API Key
+///
+/// Revokes an API Key by ID. Returns an empty body.
+#[utoipa::path(
+    delete,
+    path = "/api-keys/{id}",
+    tag = "User Wallet",
+    context_path = CONTEXT_PATH,
+    responses(
+        (status = 200, description = "Revoked"),
+        (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
+        (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
+        (status = 404, description = "Not Found", body = ErrorResponse, example = json!(NOT_FOUND_EXAMPLE)),
+        (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
+    )
+)]
+async fn revoke_wallet_api_key(
+    State(app_state): State<Arc<AppState>>,
+    user: User,
+    Path(id): Path<Uuid>,
+) -> Result<(), ApplicationError> {
+    let n_revoked = app_state
+        .services
+        .api_key
+        .revoke_many(ApiKeyFilter {
+            user_id: Some(user.id),
+            ids: Some(vec![id]),
+            ..Default::default()
+        })
+        .await?;
+
+    if n_revoked == 0 {
+        return Err(DataError::NotFound("API Key not found.".to_string()).into());
+    }
+
+    Ok(())
+}
+
+/// Revoke API Keys
+///
+/// Revokes all the API Keys given a filter. Returns the number of revoked keys.
+#[utoipa::path(
+    delete,
+    path = "/api-keys",
+    tag = "User Wallet",
+    context_path = CONTEXT_PATH,
+    params(ApiKeyFilter),
+    responses(
+        (status = 200, description = "Success", body = u64),
+        (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
+        (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
+        (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
+    )
+)]
+async fn revoke_wallet_api_keys(
+    State(app_state): State<Arc<AppState>>,
+    user: User,
+    Query(mut filter): Query<ApiKeyFilter>,
+) -> Result<Json<u64>, ApplicationError> {
+    filter.user_id = Some(user.id);
+    let n_revoked = app_state.services.api_key.revoke_many(filter).await?;
+    Ok(n_revoked.into())
 }

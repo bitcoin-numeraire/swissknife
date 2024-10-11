@@ -2,7 +2,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use crate::domains::user::AuthClaims;
-use crate::infra::auth::Authenticator;
+use crate::infra::jwt::JWTAuthenticator;
 use crate::{application::errors::AuthenticationError, domains::user::Permission};
 use async_trait::async_trait;
 use jsonwebtoken::{
@@ -85,7 +85,7 @@ impl OAuth2Authenticator {
 }
 
 #[async_trait]
-impl Authenticator for OAuth2Authenticator {
+impl JWTAuthenticator for OAuth2Authenticator {
     fn generate(&self, _: &str) -> Result<String, AuthenticationError> {
         Err(AuthenticationError::UnsupportedOperation)
     }
