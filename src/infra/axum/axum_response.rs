@@ -3,7 +3,7 @@ use axum::{
     response::{IntoResponse, Response},
     Json,
 };
-use tracing::{debug, error, warn};
+use tracing::{debug, error, trace, warn};
 
 use crate::application::{
     dtos::ErrorResponse,
@@ -111,6 +111,10 @@ impl IntoResponse for DataError {
                 error!("{}", self);
                 (self.to_string(), StatusCode::INTERNAL_SERVER_ERROR)
             }
+            DataError::Malformed(_) => {
+                trace!("{}", self);
+                (self.to_string(), StatusCode::BAD_REQUEST)
+            }
         };
 
         let body = generate_body(status, error_message);
@@ -146,7 +150,7 @@ impl IntoResponse for LightningError {
 
 fn generate_body(status: StatusCode, reason: String) -> Json<ErrorResponse> {
     ErrorResponse {
-        status: format!("{}", status),
+        status: status.to_string(),
         reason,
     }
     .into()

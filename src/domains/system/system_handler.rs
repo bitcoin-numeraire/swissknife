@@ -1,9 +1,12 @@
 use std::sync::Arc;
 
-use axum::{extract::State, http::StatusCode, response::IntoResponse, routing::get, Json, Router};
+use axum::{extract::State, http::StatusCode, response::IntoResponse, routing::get, Router};
 use utoipa::OpenApi;
 
-use crate::{application::errors::ApplicationError, infra::app::AppState};
+use crate::{
+    application::errors::ApplicationError,
+    infra::{app::AppState, axum::Json},
+};
 
 use super::{HealthCheck, HealthStatus, VersionInfo};
 

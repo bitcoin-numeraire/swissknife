@@ -1,9 +1,9 @@
 use std::sync::Arc;
 
 use axum::{
-    extract::{Path, State},
+    extract::State,
     routing::{delete, get, post},
-    Json, Router,
+    Router,
 };
 use axum_extra::extract::Query;
 use utoipa::OpenApi;
@@ -18,7 +18,10 @@ use crate::{
         dtos::{ApiKeyResponse, CreateApiKeyRequest},
         errors::ApplicationError,
     },
-    infra::app::AppState,
+    infra::{
+        app::AppState,
+        axum::{Json, Path},
+    },
 };
 
 use super::{ApiKeyFilter, Permission, User};

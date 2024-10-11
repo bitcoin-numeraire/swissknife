@@ -1,10 +1,6 @@
 use std::sync::Arc;
 
-use axum::{
-    extract::{Path, Query, State},
-    routing::get,
-    Json, Router,
-};
+use axum::{extract::State, routing::get, Router};
 use utoipa::OpenApi;
 
 use crate::{
@@ -13,7 +9,10 @@ use crate::{
         dtos::{LNUrlpInvoiceQueryParams, LnUrlCallbackResponse},
         errors::ApplicationError,
     },
-    infra::app::AppState,
+    infra::{
+        app::AppState,
+        axum::{Json, Path, Query},
+    },
 };
 
 use super::LnURLPayRequest;

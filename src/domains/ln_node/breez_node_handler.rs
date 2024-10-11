@@ -6,7 +6,7 @@ use axum::{
     http::header,
     response::{IntoResponse, Response},
     routing::{get, post},
-    Json, Router,
+    Router,
 };
 use breez_sdk_core::{LspInformation, NodeState, ReverseSwapInfo};
 use utoipa::OpenApi;
@@ -25,7 +25,7 @@ use crate::{
         errors::{ApplicationError, LightningError},
     },
     domains::user::{Permission, User},
-    infra::{app::AppState, lightning::LnClient},
+    infra::{app::AppState, axum::Json, lightning::LnClient},
 };
 
 #[derive(OpenApi)]

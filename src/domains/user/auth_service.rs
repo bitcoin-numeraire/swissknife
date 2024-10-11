@@ -36,12 +36,12 @@ impl AuthUseCases for AuthService {
 
         let token = self.jwt_authenticator.generate(&password)?;
 
-        debug!(%token, "User logged in successfully");
+        debug!("User logged in successfully");
         Ok(token)
     }
 
     async fn authenticate_jwt(&self, token: &str) -> Result<User, ApplicationError> {
-        trace!(%token, "Start JWT authentication");
+        trace!("Start JWT authentication");
 
         let claims = self.jwt_authenticator.decode(token).await?;
 
