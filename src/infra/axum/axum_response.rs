@@ -22,13 +22,6 @@ impl IntoResponse for ApplicationError {
             ApplicationError::Authorization(error) => error.into_response(),
             ApplicationError::Data(error) => error.into_response(),
             ApplicationError::Lightning(error) => error.into_response(),
-            ApplicationError::UnsupportedOperation(_) => {
-                debug!("{}", self);
-
-                let status = StatusCode::METHOD_NOT_ALLOWED;
-                let body = generate_body(status, self.to_string());
-                (status, body).into_response()
-            }
             _ => {
                 error!("{}", self);
 
@@ -60,7 +53,7 @@ impl IntoResponse for AuthenticationError {
     fn into_response(self) -> Response {
         let (error_message, header_message) = match self {
             AuthenticationError::InvalidCredentials => ("Invalid credentials", ""),
-            AuthenticationError::MissingBearerToken(_) => (
+            AuthenticationError::MissingAuthorizationHeader => (
                 "Missing authentication token",
                 "Bearer realm=\"swissknife\", error=\"invalid_request\"",
             ),
@@ -113,6 +106,10 @@ impl IntoResponse for DataError {
             DataError::Validation(_) | DataError::InsufficientFunds(_) => {
                 warn!("{}", self);
                 (self.to_string(), StatusCode::UNPROCESSABLE_ENTITY)
+            }
+            DataError::Inconsistency(_) => {
+                error!("{}", self);
+                (self.to_string(), StatusCode::INTERNAL_SERVER_ERROR)
             }
         };
 

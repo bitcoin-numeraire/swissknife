@@ -32,13 +32,8 @@ impl ApiKeyRepository for SeaOrmApiKeyRepository {
         Ok(model.map(Into::into))
     }
 
-    async fn find_by_key_hash(
-        &self,
-        user_id: &str,
-        key_hash: Vec<u8>,
-    ) -> Result<Option<ApiKey>, DatabaseError> {
+    async fn find_by_key_hash(&self, key_hash: Vec<u8>) -> Result<Option<ApiKey>, DatabaseError> {
         let model = Entity::find()
-            .filter(Column::UserId.eq(user_id))
             .filter(Column::KeyHash.eq(key_hash))
             .one(&self.db)
             .await

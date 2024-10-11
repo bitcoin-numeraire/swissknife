@@ -4,10 +4,10 @@ use serde::Deserialize;
 use strum_macros::{Display, EnumString};
 
 use crate::infra::{
-    auth::{jwt::JwtConfig, oauth2::OAuth2Config},
     axum::AxumServerConfig,
     config::config_rs::deserialize_duration,
     database::sea_orm::SeaOrmConfig,
+    jwt::{local::JwtConfig, oauth2::OAuth2Config},
     lightning::{
         breez::BreezClientConfig,
         cln::{ClnClientConfig, ClnRestClientConfig},
@@ -48,7 +48,6 @@ pub enum LightningProvider {
 #[serde(rename_all = "lowercase")]
 #[strum(serialize_all = "lowercase")]
 pub enum AuthProvider {
-    Bypass,
     #[default]
     Jwt,
     OAuth2,

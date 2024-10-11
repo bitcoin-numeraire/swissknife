@@ -13,7 +13,7 @@ use crate::{
         wallet::{WalletService, WalletUseCases},
     },
     infra::{
-        auth::Authenticator,
+        jwt::JWTAuthenticator,
         lightning::{
             breez::BreezClient,
             cln::{ClnGrpcClient, ClnRestClient},
@@ -41,7 +41,7 @@ impl AppServices {
         config: AppConfig,
         store: AppStore,
         ln_client: Arc<dyn LnClient>,
-        authenticator: Arc<dyn Authenticator>,
+        jwt_authenticator: Arc<dyn JWTAuthenticator>,
     ) -> Self {
         let payments = PaymentService::new(
             store.clone(),
@@ -64,7 +64,7 @@ impl AppServices {
         );
         let ln_address = LnAddressService::new(store.clone());
         let wallet = WalletService::new(store.clone());
-        let auth = AuthService::new(config.auth_provider, authenticator, store.clone());
+        let auth = AuthService::new(jwt_authenticator, store.clone());
         let system = SystemService::new(store.clone(), ln_client);
         let nostr = NostrService::new(store.clone());
         let api_key = ApiKeyService::new(store);

@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use crate::domains::user::AuthClaims;
-use crate::infra::auth::Authenticator;
+use crate::infra::jwt::JWTAuthenticator;
 use crate::{application::errors::AuthenticationError, domains::user::Permission};
 use async_trait::async_trait;
 
@@ -21,7 +21,7 @@ pub struct JwtConfig {
 }
 
 #[derive(Clone)]
-pub struct JwtAuthenticator {
+pub struct LocalAuthenticator {
     username: String,
     password_hash: String,
     token_expiry: Duration,
@@ -37,7 +37,7 @@ struct Claims {
     permissions: Vec<Permission>,
 }
 
-impl JwtAuthenticator {
+impl LocalAuthenticator {
     pub async fn new(config: JwtConfig) -> Result<Self, AuthenticationError> {
         let password_hash = hash(&config.password, DEFAULT_COST)
             .map_err(|e| AuthenticationError::Hash(e.to_string()))?;
@@ -53,7 +53,7 @@ impl JwtAuthenticator {
 }
 
 #[async_trait]
-impl Authenticator for JwtAuthenticator {
+impl JWTAuthenticator for LocalAuthenticator {
     fn generate(&self, password: &str) -> Result<String, AuthenticationError> {
         if !verify(password, &self.password_hash)
             .map_err(|e| AuthenticationError::Hash(e.to_string()))?

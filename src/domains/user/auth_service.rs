@@ -1,30 +1,29 @@
-use async_trait::async_trait;
 use std::sync::Arc;
+
+use async_trait::async_trait;
+use serde_bolt::bitcoin::hashes::{sha256, Hash};
 
 use tracing::{debug, info, trace};
 
 use crate::{
-    application::{dtos::AuthProvider, entities::AppStore, errors::ApplicationError},
-    infra::auth::Authenticator,
+    application::{
+        entities::AppStore,
+        errors::{ApplicationError, AuthenticationError, DataError},
+    },
+    infra::jwt::JWTAuthenticator,
 };
 
 use super::{AuthUseCases, User};
 
 pub struct AuthService {
-    provider: AuthProvider,
-    authenticator: Arc<dyn Authenticator>,
+    jwt_authenticator: Arc<dyn JWTAuthenticator>,
     store: AppStore,
 }
 
 impl AuthService {
-    pub fn new(
-        provider: AuthProvider,
-        authenticator: Arc<dyn Authenticator>,
-        store: AppStore,
-    ) -> Self {
+    pub fn new(jwt_authenticator: Arc<dyn JWTAuthenticator>, store: AppStore) -> Self {
         AuthService {
-            provider,
-            authenticator,
+            jwt_authenticator,
             store,
         }
     }
@@ -35,25 +34,16 @@ impl AuthUseCases for AuthService {
     fn sign_in(&self, password: String) -> Result<String, ApplicationError> {
         trace!("Start login");
 
-        match self.provider {
-            AuthProvider::Jwt => {
-                let token = self.authenticator.generate(&password)?;
+        let token = self.jwt_authenticator.generate(&password)?;
 
-                debug!(%token, "User logged in successfully");
-                Ok(token)
-            }
-            _ => Err(ApplicationError::UnsupportedOperation(format!(
-                "Sign in not allowed (not needed) for {} provider",
-                self.provider
-            ))),
-        }
+        debug!(%token, "User logged in successfully");
+        Ok(token)
     }
 
-    async fn authenticate(&self, token: &str) -> Result<User, ApplicationError> {
+    async fn authenticate_jwt(&self, token: &str) -> Result<User, ApplicationError> {
         trace!(%token, "Start JWT authentication");
 
-        let claims = self.authenticator.decode(token).await?;
-        trace!(?claims, "Token decoded successfully");
+        let claims = self.jwt_authenticator.decode(token).await?;
 
         let wallet_opt = self.store.wallet.find_by_user_id(&claims.sub).await?;
 
@@ -77,7 +67,38 @@ impl AuthUseCases for AuthService {
         Ok(user)
     }
 
-    fn provider(&self) -> AuthProvider {
-        self.provider.clone()
+    async fn authenticate_api_key(&self, token: Vec<u8>) -> Result<User, ApplicationError> {
+        trace!("Start API Key authentication");
+
+        let key_hash = sha256::Hash::hash(&token).to_vec();
+        let api_key_opt = self.store.api_key.find_by_key_hash(key_hash).await?;
+
+        let api_key = match api_key_opt {
+            Some(api_key) => api_key,
+            None => {
+                return Err(AuthenticationError::InvalidCredentials.into());
+            }
+        };
+
+        let wallet_opt = self.store.wallet.find_by_user_id(&api_key.user_id).await?;
+
+        let wallet = match wallet_opt {
+            Some(wallet) => wallet,
+            None => {
+                return Err(DataError::Inconsistency(
+                    "Existing API key without wallet".to_string(),
+                )
+                .into());
+            }
+        };
+
+        let user = User {
+            id: wallet.user_id,
+            wallet_id: wallet.id,
+            permissions: api_key.permissions,
+        };
+
+        trace!(?user, "Authentication successful");
+        Ok(user)
     }
 }

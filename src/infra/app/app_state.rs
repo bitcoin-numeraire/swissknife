@@ -8,11 +8,8 @@ use crate::{
     },
     domains::ln_node::{LnEventsService, LnEventsUseCases},
     infra::{
-        auth::{
-            bypass::BypassAuthenticator, jwt::JwtAuthenticator, oauth2::OAuth2Authenticator,
-            Authenticator,
-        },
         database::sea_orm::SeaORMClient,
+        jwt::{local::LocalAuthenticator, oauth2::OAuth2Authenticator, JWTAuthenticator},
         lightning::{
             breez::BreezClient,
             cln::{ClnGrpcClient, ClnRestClient},
@@ -21,7 +18,7 @@ use crate::{
     },
 };
 use tower_http::timeout::TimeoutLayer;
-use tracing::{info, warn};
+use tracing::info;
 
 pub struct AppState {
     pub services: AppServices,
@@ -35,7 +32,7 @@ impl AppState {
         // Infra
         let timeout_layer = TimeoutLayer::new(config.web.request_timeout);
         let db_conn = SeaORMClient::connect(config.database.clone()).await?;
-        let authenticator = get_authenticator(config.clone()).await?;
+        let jwt_authenticator = get_authenticator(config.clone()).await?;
 
         // Adapters
         let store = AppStore::new_sea_orm(db_conn);
@@ -48,7 +45,7 @@ impl AppState {
         };
 
         // Services
-        let services = AppServices::new(config, store, ln_client.clone(), authenticator);
+        let services = AppServices::new(config, store, ln_client.clone(), jwt_authenticator);
 
         Ok(Self {
             services,
@@ -109,14 +106,10 @@ async fn get_ln_client(
     }
 }
 
-async fn get_authenticator(config: AppConfig) -> Result<Arc<dyn Authenticator>, ApplicationError> {
+async fn get_authenticator(
+    config: AppConfig,
+) -> Result<Arc<dyn JWTAuthenticator>, ApplicationError> {
     match config.auth_provider {
-        AuthProvider::Bypass => {
-            warn!("Auth provider: Bypass. All requests will be accepted as superuser");
-
-            let authenticator = BypassAuthenticator::new();
-            Ok(Arc::new(authenticator))
-        }
         AuthProvider::OAuth2 => {
             let oauth2_config = config.oauth2.clone().ok_or_else(|| {
                 ConfigError::MissingAuthProviderConfig(config.auth_provider.to_string())
@@ -140,7 +133,7 @@ async fn get_authenticator(config: AppConfig) -> Result<Arc<dyn Authenticator>, 
                 "Auth provider: Local JWT"
             );
 
-            let authenticator = JwtAuthenticator::new(jwt_config.clone()).await?;
+            let authenticator = LocalAuthenticator::new(jwt_config.clone()).await?;
             Ok(Arc::new(authenticator))
         }
     }
