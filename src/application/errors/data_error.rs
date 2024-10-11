@@ -8,6 +8,9 @@ pub enum DataError {
     #[error("Not Found: {0}")]
     NotFound(String),
 
+    #[error("Malformed: {0}")]
+    Malformed(String),
+
     #[error("Validation failed: {0}")]
     Validation(String),
 
