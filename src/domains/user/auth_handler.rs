@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use axum::{extract::State, routing::post, Json, Router};
+use axum::{extract::State, routing::post, Router};
 use utoipa::OpenApi;
 
 use crate::{
@@ -9,7 +9,7 @@ use crate::{
         dtos::{SignInRequest, SignInResponse},
         errors::ApplicationError,
     },
-    infra::app::AppState,
+    infra::{app::AppState, axum::Json},
 };
 
 #[derive(OpenApi)]

@@ -1,9 +1,9 @@
 use std::sync::Arc;
 
 use axum::{
-    extract::{Path, Query, State},
+    extract::State,
     routing::{delete, get, post, put},
-    Json, Router,
+    Router,
 };
 use utoipa::OpenApi;
 use uuid::Uuid;
@@ -27,7 +27,10 @@ use crate::{
         payment::{PaymentFilter, PaymentStatus},
         user::{ApiKeyFilter, User},
     },
-    infra::app::AppState,
+    infra::{
+        app::AppState,
+        axum::{Json, Path, Query},
+    },
 };
 
 use super::{Balance, Contact};

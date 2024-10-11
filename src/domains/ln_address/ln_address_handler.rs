@@ -1,9 +1,9 @@
 use std::sync::Arc;
 
 use axum::{
-    extract::{Path, State},
+    extract::State,
     routing::{delete, get, post, put},
-    Json, Router,
+    Router,
 };
 use axum_extra::extract::Query;
 use utoipa::OpenApi;
@@ -19,7 +19,10 @@ use crate::{
         errors::ApplicationError,
     },
     domains::user::{Permission, User},
-    infra::app::AppState,
+    infra::{
+        app::AppState,
+        axum::{Json, Path},
+    },
 };
 
 use super::{LnAddress, LnAddressFilter};

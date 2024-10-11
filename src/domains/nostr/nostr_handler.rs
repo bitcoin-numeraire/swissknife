@@ -1,9 +1,6 @@
 use std::sync::Arc;
 
-use axum::{
-    extract::{Query, State},
-    Json,
-};
+use axum::extract::State;
 use utoipa::OpenApi;
 
 use crate::{
@@ -12,7 +9,10 @@ use crate::{
         dtos::{NostrNIP05QueryParams, NostrNIP05Response},
         errors::ApplicationError,
     },
-    infra::app::AppState,
+    infra::{
+        app::AppState,
+        axum::{Json, Query},
+    },
 };
 
 #[derive(OpenApi)]
