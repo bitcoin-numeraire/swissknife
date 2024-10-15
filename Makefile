@@ -59,7 +59,7 @@ run-docker:
 	@docker run -p 5000:5000 $(IMAGE_NAME)
 
 deps-upgrade:
-	@cargo upgrade
+	@cargo upgrade --verbose
 
 deps-outdated:
 	@cargo outdated

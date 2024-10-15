@@ -1,6 +1,6 @@
 [package]
 name = "swissknife"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2021"
 authors = ["Dario Anongba Varela <dario.varela@numeraire.tech>"]
 rust-version = "1.79"
@@ -19,9 +19,9 @@ serde_json = "1.0.128"
 serde_bolt = "0.3.5"
 serde_with = "3.11.0"
 tokio = { version = "1.40", features = ["full"] }
-breez-sdk-core = { git = "https://github.com/breez/breez-sdk", tag = "0.6.1" }
+breez-sdk-core = { git = "https://github.com/breez/breez-sdk", tag = "0.6.2" }
 bip39 = { version = "*", features = ["rand_core"] }
-config = { version = "0.13.4", features = ["yaml", "json", "toml"] }
+config = { version = "0.14.0", features = ["yaml", "json", "toml"] }
 dotenv = "0.15.0"
 tracing = "0.1.40"
 tracing-subscriber = { version = "0.3.18", features = ["json", "env-filter"] }
@@ -30,7 +30,7 @@ reqwest = { version = "0.12.8", features = ["json"] }
 uuid = { version = "1.10.0", features = ["v4", "serde"] }
 chrono = "0.4.38"
 thiserror = "1.0.64"
-tower-http = { version = "0.5", features = ["timeout", "trace", "cors"] }
+tower-http = { version = "0.6.1", features = ["timeout", "trace", "cors"] }
 regex = "1"
 sea-orm = { version = "0.12", features = [
     "sqlx-postgres",
@@ -42,9 +42,9 @@ sea-orm = { version = "0.12", features = [
 ] }
 strum = "0.26"
 strum_macros = "0.26"
-tonic = { version = "0.11.0", features = ["tls"] }
-prost = "0.12.6"
-lightning-invoice = "0.31.0"
+tonic = { version = "0.12.3", features = ["tls"] }
+prost = "0.13.3"
+lightning-invoice = "0.32.0"
 hex = "0.4.3"
 anyhow = "1.0.89"
 futures-util = "0.3.31"
@@ -60,5 +60,5 @@ rand = "0.8.5"
 base64 = "0.22.1"
 
 [build-dependencies]
-tonic-build = "0.11.0"
+tonic-build = "0.12.3"
 chrono = "0.4.38"

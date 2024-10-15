@@ -84,7 +84,7 @@ fn validate_user_input(
 }
 
 fn validate_invoice(user_amount_msat: u64, bolt11: &str) -> Result<()> {
-    let invoice = Bolt11Invoice::from_str(bolt11)?;
+    let invoice = Bolt11Invoice::from_str(bolt11).map_err(|e| anyhow!(e.to_string()))?;
 
     match invoice.amount_milli_satoshis() {
         None => Err(anyhow!("Missing amount from invoice".to_string(),)),
