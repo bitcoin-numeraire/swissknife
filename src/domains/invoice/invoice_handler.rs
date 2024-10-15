@@ -14,7 +14,7 @@ use crate::{
             BAD_REQUEST_EXAMPLE, FORBIDDEN_EXAMPLE, INTERNAL_EXAMPLE, NOT_FOUND_EXAMPLE,
             UNAUTHORIZED_EXAMPLE, UNPROCESSABLE_EXAMPLE,
         },
-        dtos::{InvoiceResponse, LnInvoiceResponse, NewInvoiceRequest},
+        dtos::{ErrorResponse, InvoiceResponse, LnInvoiceResponse, NewInvoiceRequest},
         errors::ApplicationError,
     },
     domains::user::{Permission, User},

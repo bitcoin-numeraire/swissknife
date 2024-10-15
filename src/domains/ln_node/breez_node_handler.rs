@@ -18,9 +18,9 @@ use crate::{
             UNAUTHORIZED_EXAMPLE,
         },
         dtos::{
-            CheckMessageRequest, CheckMessageResponse, ConnectLSPRequest, RedeemOnchainRequest,
-            RedeemOnchainResponse, SendOnchainPaymentRequest, SignMessageRequest,
-            SignMessageResponse,
+            CheckMessageRequest, CheckMessageResponse, ConnectLSPRequest, ErrorResponse,
+            RedeemOnchainRequest, RedeemOnchainResponse, SendOnchainPaymentRequest,
+            SignMessageRequest, SignMessageResponse,
         },
         errors::{ApplicationError, LightningError},
     },

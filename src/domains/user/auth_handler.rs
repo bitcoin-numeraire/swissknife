@@ -6,7 +6,7 @@ use utoipa::OpenApi;
 use crate::{
     application::{
         docs::{BAD_REQUEST_EXAMPLE, UNAUTHORIZED_EXAMPLE, UNSUPPORTED_EXAMPLE},
-        dtos::{SignInRequest, SignInResponse},
+        dtos::{ErrorResponse, SignInRequest, SignInResponse},
         errors::ApplicationError,
     },
     infra::{app::AppState, axum::Json},

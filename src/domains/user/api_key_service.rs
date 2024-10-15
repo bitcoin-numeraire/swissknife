@@ -66,6 +66,7 @@ impl ApiKeyUseCases for ApiKeyService {
 
         let api_key = ApiKey {
             user_id: request.user_id.expect("user_id should be defined"),
+            name: request.name,
             key_hash,
             permissions: request.permissions.clone(),
             expires_at,

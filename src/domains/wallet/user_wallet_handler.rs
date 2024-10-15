@@ -15,7 +15,7 @@ use crate::{
             UNPROCESSABLE_EXAMPLE,
         },
         dtos::{
-            ApiKeyResponse, CreateApiKeyRequest, InvoiceResponse, NewInvoiceRequest,
+            ApiKeyResponse, CreateApiKeyRequest, ErrorResponse, InvoiceResponse, NewInvoiceRequest,
             PaymentResponse, RegisterLnAddressRequest, SendPaymentRequest, UpdateLnAddressRequest,
             WalletResponse,
         },

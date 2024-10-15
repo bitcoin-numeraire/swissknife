@@ -13,6 +13,7 @@ impl MigrationTrait for Migration {
             CREATE TABLE api_key (
                 id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                 user_id VARCHAR(255) NOT NULL,
+                name VARCHAR(255) NOT NULL,
                 key_hash BYTEA UNIQUE NOT NULL,
                 permissions TEXT[] NOT NULL,
                 created_at TIMESTAMPTZ NOT NULL DEFAULT current_timestamp,

@@ -6,7 +6,7 @@ use utoipa::OpenApi;
 use crate::{
     application::{
         docs::{BAD_REQUEST_EXAMPLE, INTERNAL_EXAMPLE, NOT_FOUND_EXAMPLE, UNPROCESSABLE_EXAMPLE},
-        dtos::{LNUrlpInvoiceQueryParams, LnUrlCallbackResponse},
+        dtos::{ErrorResponse, LNUrlpInvoiceQueryParams, LnUrlCallbackResponse},
         errors::ApplicationError,
     },
     infra::{

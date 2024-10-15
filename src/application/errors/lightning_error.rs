@@ -1,6 +1,7 @@
 use thiserror::Error;
+use utoipa::ToSchema;
 
-#[derive(Debug, Error)]
+#[derive(Debug, Error, ToSchema)]
 pub enum LightningError {
     #[error("Failed to initialize logging: {0}")]
     Logging(String),

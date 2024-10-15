@@ -1,6 +1,7 @@
 use thiserror::Error;
+use utoipa::ToSchema;
 
-#[derive(Debug, Error)]
+#[derive(Debug, Error, ToSchema)]
 pub enum DataError {
     #[error("Conflict: {0}")]
     Conflict(String),

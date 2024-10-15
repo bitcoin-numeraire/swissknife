@@ -161,6 +161,7 @@ impl From<ApiKeyModel> for ApiKey {
         ApiKey {
             id: model.id,
             user_id: model.user_id,
+            name: model.name,
             key: None,
             key_hash: model.key_hash,
             permissions: model
