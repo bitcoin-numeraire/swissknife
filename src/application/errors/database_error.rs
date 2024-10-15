@@ -1,6 +1,7 @@
 use thiserror::Error;
+use utoipa::ToSchema;
 
-#[derive(Debug, Error)]
+#[derive(Debug, Error, ToSchema)]
 pub enum DatabaseError {
     #[error("Failed to connect to database: {0}")]
     Connect(String),

@@ -5,8 +5,8 @@ use crate::{
 };
 use async_trait::async_trait;
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, QueryOrder,
-    QuerySelect, QueryTrait, Set,
+    sea_query::Expr, ActiveModelTrait, ColumnTrait, Condition, DatabaseConnection, EntityTrait,
+    QueryFilter, QueryOrder, QuerySelect, QueryTrait, Set,
 };
 use uuid::Uuid;
 
@@ -35,6 +35,11 @@ impl ApiKeyRepository for SeaOrmApiKeyRepository {
     async fn find_by_key_hash(&self, key_hash: Vec<u8>) -> Result<Option<ApiKey>, DatabaseError> {
         let model = Entity::find()
             .filter(Column::KeyHash.eq(key_hash))
+            .filter(
+                Condition::any()
+                    .add(Expr::col(Column::ExpiresAt).gt(Expr::current_timestamp()))
+                    .add(Expr::col(Column::ExpiresAt).is_null()),
+            )
             .one(&self.db)
             .await
             .map_err(|e| DatabaseError::FindOne(e.to_string()))?;
@@ -59,6 +64,7 @@ impl ApiKeyRepository for SeaOrmApiKeyRepository {
     async fn insert(&self, api_key: ApiKey) -> Result<ApiKey, DatabaseError> {
         let model = ActiveModel {
             user_id: Set(api_key.user_id),
+            name: Set(api_key.name),
             key_hash: Set(api_key.key_hash),
             permissions: Set(api_key.permissions.iter().map(|p| p.to_string()).collect()),
             description: Set(api_key.description),

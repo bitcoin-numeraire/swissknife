@@ -15,7 +15,7 @@ use crate::{
             BAD_REQUEST_EXAMPLE, FORBIDDEN_EXAMPLE, INTERNAL_EXAMPLE, NOT_FOUND_EXAMPLE,
             UNAUTHORIZED_EXAMPLE, UNPROCESSABLE_EXAMPLE,
         },
-        dtos::{RegisterWalletRequest, WalletResponse},
+        dtos::{ErrorResponse, RegisterWalletRequest, WalletResponse},
         errors::ApplicationError,
     },
     domains::user::{Permission, User},

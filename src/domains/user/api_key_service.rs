@@ -61,11 +61,12 @@ impl ApiKeyUseCases for ApiKeyService {
         // Generate a new API key
         let mut bytes = [0u8; 32];
         OsRng.fill_bytes(&mut bytes);
-        let api_key_plain = BASE64_STANDARD.encode(&bytes);
+        let api_key_plain = BASE64_STANDARD.encode(bytes);
         let key_hash = sha256::Hash::hash(&bytes).to_vec();
 
         let api_key = ApiKey {
             user_id: request.user_id.expect("user_id should be defined"),
+            name: request.name,
             key_hash,
             permissions: request.permissions.clone(),
             expires_at,

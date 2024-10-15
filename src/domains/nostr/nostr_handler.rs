@@ -6,7 +6,7 @@ use utoipa::OpenApi;
 use crate::{
     application::{
         docs::{INTERNAL_EXAMPLE, NOT_FOUND_EXAMPLE},
-        dtos::{NostrNIP05QueryParams, NostrNIP05Response},
+        dtos::{ErrorResponse, NostrNIP05QueryParams, NostrNIP05Response},
         errors::ApplicationError,
     },
     infra::{
@@ -17,7 +17,7 @@ use crate::{
 
 #[derive(OpenApi)]
 #[openapi(
-    paths(well_known),
+    paths(well_known_nostr),
     components(schemas(NostrNIP05Response)),
     tags(
         (name = "Nostr", description = "Public Nostr endpoints as defined in the [protocol specification](https://github.com/nostr-protocol/nips). Allows any Nostr client to identify a user's public keys")
@@ -40,7 +40,7 @@ pub struct NostrHandler;
         (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
     )
 )]
-pub async fn well_known(
+pub async fn well_known_nostr(
     Query(query_params): Query<NostrNIP05QueryParams>,
     State(app_state): State<Arc<AppState>>,
 ) -> Result<Json<NostrNIP05Response>, ApplicationError> {

@@ -12,6 +12,7 @@ use super::Permission;
 pub struct ApiKey {
     pub id: Uuid,
     pub user_id: String,
+    pub name: String,
     pub key: Option<String>,
     pub key_hash: Vec<u8>,
     pub permissions: Vec<Permission>,

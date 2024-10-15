@@ -15,7 +15,7 @@ use crate::{
             BAD_REQUEST_EXAMPLE, FORBIDDEN_EXAMPLE, INTERNAL_EXAMPLE, NOT_FOUND_EXAMPLE,
             UNAUTHORIZED_EXAMPLE, UNPROCESSABLE_EXAMPLE,
         },
-        dtos::{PaymentResponse, SendPaymentRequest},
+        dtos::{ErrorResponse, PaymentResponse, SendPaymentRequest},
         errors::ApplicationError,
     },
     domains::{
