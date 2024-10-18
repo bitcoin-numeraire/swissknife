@@ -13,6 +13,7 @@ use crate::{
         lightning::{
             breez::BreezClient,
             cln::{ClnGrpcClient, ClnRestClient},
+            lnd::LndGrpcClient,
             LnClient,
         },
     },
@@ -42,6 +43,7 @@ impl AppState {
             LnNodeClient::Breez(client) => client as Arc<dyn LnClient>,
             LnNodeClient::ClnGrpc(client) => client as Arc<dyn LnClient>,
             LnNodeClient::ClnRest(client) => client as Arc<dyn LnClient>,
+            LnNodeClient::Lnd(client) => client as Arc<dyn LnClient>,
         };
 
         // Services
@@ -80,10 +82,7 @@ async fn get_ln_client(
                 ConfigError::MissingLightningProviderConfig(config.ln_provider.to_string())
             })?;
 
-            info!(
-                endpoint = %cln_config.endpoint,
-                "Lightning provider: Core Lightning gRPC"
-            );
+            info!(config = ?cln_config, "Lightning provider: Core Lightning gRPC");
 
             let client = ClnGrpcClient::new(cln_config.clone(), ln_events).await?;
 
@@ -94,14 +93,22 @@ async fn get_ln_client(
                 ConfigError::MissingLightningProviderConfig(config.ln_provider.to_string())
             })?;
 
-            info!(
-                endpoint = %cln_config.endpoint,
-                "Lightning provider: Core Lightning REST"
-            );
+            info!(endpoint = %cln_config.endpoint, "Lightning provider: Core Lightning REST");
 
             let client = ClnRestClient::new(cln_config.clone(), ln_events).await?;
 
             Ok(LnNodeClient::ClnRest(Arc::new(client)))
+        }
+        LightningProvider::Lnd => {
+            let lnd_config = config.lnd_config.clone().ok_or_else(|| {
+                ConfigError::MissingLightningProviderConfig(config.ln_provider.to_string())
+            })?;
+
+            info!(config = ?lnd_config, "Lightning provider: LND gRPC");
+
+            let client = LndGrpcClient::new(lnd_config.clone(), ln_events).await?;
+
+            Ok(LnNodeClient::Lnd(Arc::new(client)))
         }
     }
 }

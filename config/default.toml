@@ -22,7 +22,7 @@ seed = "CHANGE_ME"
 
 # Core Lightning provider
 [cln_grpc_config]
-endpoint = "https://localhost:50051"
+endpoint = "https://localhost:11002"
 certs_dir = "certs/lightningd"
 maxfeepercent = 0.5
 payment_timeout = "60s"
@@ -42,6 +42,16 @@ payment_timeout = "60s"
 payment_exemptfee = 5000
 ws_min_reconnect_delay_delay = 1
 ws_max_reconnect_delay_delay = 30
+
+# LND Lightning provider
+[lnd_config]
+endpoint = "https://localhost:1001"
+tls_cert_path = "certs/lnd/tls.cert"
+macaroon_path = "certs/lnd/admin.macaroon"
+maxfeepercent = 0.5
+payment_timeout = "60s"
+payment_exemptfee = 5000
+retry_delay = "5s"
 
 # Logging
 [logging]

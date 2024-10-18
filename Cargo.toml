@@ -52,12 +52,13 @@ humantime = "2.1.0"
 rust_socketio = { version = "0.6.0", features = ["async"] }
 bcrypt = "0.15.1"
 migration = { path = "migration" }
-utoipa = { version = "5.0.0", features = ["axum_extras", "chrono", "uuid"] }
+utoipa = { version = "5.1.1", features = ["axum_extras", "chrono", "uuid"] }
 utoipa-scalar = { version = "0.2.0", features = ["axum"] }
 native-tls = "0.2.12"
 nostr-sdk = "0.35.0"
 rand = "0.8.5"
 base64 = "0.22.1"
+rustls = "0.23.15"
 
 [build-dependencies]
 tonic-build = "0.12.3"
