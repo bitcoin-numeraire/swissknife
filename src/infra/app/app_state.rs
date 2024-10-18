@@ -13,7 +13,7 @@ use crate::{
         lightning::{
             breez::BreezClient,
             cln::{ClnGrpcClient, ClnRestClient},
-            lnd::LndGrpcClient,
+            lnd::LndRestClient,
             LnClient,
         },
     },
@@ -106,7 +106,7 @@ async fn get_ln_client(
 
             info!(config = ?lnd_config, "Lightning provider: LND gRPC");
 
-            let client = LndGrpcClient::new(lnd_config.clone(), ln_events).await?;
+            let client = LndRestClient::new(lnd_config.clone(), ln_events).await?;
 
             Ok(LnNodeClient::Lnd(Arc::new(client)))
         }

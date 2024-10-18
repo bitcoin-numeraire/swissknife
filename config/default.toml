@@ -45,13 +45,19 @@ ws_max_reconnect_delay_delay = 30
 
 # LND Lightning provider
 [lnd_config]
-endpoint = "https://localhost:1001"
-tls_cert_path = "certs/lnd/tls.cert"
+endpoint = "https://localhost:8080"
 macaroon_path = "certs/lnd/admin.macaroon"
+ca_cert_path = "certs/lnd/tls.cert"
+connect_timeout = "5s"
+timeout = "90s"
+connection_verbose = true
+accept_invalid_certs = false
+accept_invalid_hostnames = false
 maxfeepercent = 0.5
 payment_timeout = "60s"
 payment_exemptfee = 5000
-retry_delay = "5s"
+ws_min_reconnect_delay_delay = 1
+ws_max_reconnect_delay_delay = 30
 
 # Logging
 [logging]

@@ -5,14 +5,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .protoc_arg("--experimental_allow_proto3_optional")
         .build_server(false)
         .compile_protos(
-            &[
-                "src/infra/lightning/cln/proto/node.proto",
-                "src/infra/lightning/lnd/proto/lightning.proto",
-            ],
-            &[
-                "src/infra/lightning/cln/proto",
-                "src/infra/lightning/lnd/proto",
-            ],
+            &["src/infra/lightning/cln/proto/node.proto"],
+            &["src/infra/lightning/cln/proto"],
         )?;
     println!(
         "cargo:info=Generated files from proto at {:?}",
