@@ -54,7 +54,7 @@ pub struct LndRestClient {
     maxfeepercent: Option<f64>,
     retry_for: Option<u32>,
     payment_exemptfee: Option<u64>,
-    //ws_client: WsClient,
+    ws_client: WsClient,
 }
 
 const USER_AGENT: &str = "Numeraire Swissknife/1.0";
@@ -95,7 +95,7 @@ impl LndRestClient {
             .build()
             .map_err(|e| LightningError::ParseConfig(e.to_string()))?;
 
-        //let ws_client = connect_websocket(&config, macaroon, ln_events).await?;
+        let ws_client = connect_websocket(&config, macaroon, ln_events).await?;
 
         Ok(Self {
             client,
@@ -103,7 +103,7 @@ impl LndRestClient {
             maxfeepercent: config.maxfeepercent,
             retry_for: Some(config.payment_timeout.as_secs() as u32),
             payment_exemptfee: config.payment_exemptfee,
-            // ws_client,
+            ws_client,
         })
     }
 
@@ -137,12 +137,10 @@ impl LndRestClient {
 #[async_trait]
 impl LnClient for LndRestClient {
     async fn disconnect(&self) -> Result<(), LightningError> {
-        /*self.ws_client
-        .disconnect()
-        .await
-        .map_err(|e| LightningError::Disconnect(e.to_string()))
-        */
-        Ok(())
+        self.ws_client
+            .disconnect()
+            .await
+            .map_err(|e| LightningError::Disconnect(e.to_string()))
     }
 
     async fn invoice(

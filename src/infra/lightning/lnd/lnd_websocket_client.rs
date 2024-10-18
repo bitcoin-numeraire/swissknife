@@ -22,19 +22,20 @@ pub async fn connect_websocket(
     macaroon: String,
     ln_events: Arc<dyn LnEventsUseCases>,
 ) -> Result<Client, LightningError> {
-    let mut client_builder = ClientBuilder::new(config.endpoint.clone())
-        .reconnect_on_disconnect(true)
-        .opening_header("Grpc-Metadata-Macaroon", macaroon)
-        .reconnect_delay(
-            config.ws_min_reconnect_delay_delay,
-            config.ws_max_reconnect_delay_delay,
-        )
-        .on("open", on_open)
-        .on("close", on_close)
-        .on("error", on_error)
-        .on("message", {
-            move |payload, socket: Client| on_message(ln_events.clone(), payload, socket)
-        });
+    let mut client_builder =
+        ClientBuilder::new("wss://127.0.0.1:8081/v1/transactions/subscribe?method=GET")
+            .reconnect_on_disconnect(true)
+            .opening_header("Grpc-Metadata-Macaroon", macaroon)
+            .reconnect_delay(
+                config.ws_min_reconnect_delay_delay,
+                config.ws_max_reconnect_delay_delay,
+            )
+            .on("open", on_open)
+            .on("close", on_close)
+            .on("error", on_error)
+            .on("message", {
+                move |payload, socket: Client| on_message(ln_events.clone(), payload, socket)
+            });
 
     if let Some(ca_cert_path) = &config.ca_cert_path {
         let ca_certificate = read_ca(ca_cert_path)
