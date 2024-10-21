@@ -5757,6 +5757,7 @@ dependencies = [
  "bcrypt",
  "bip39",
  "breez-sdk-core",
+ "bytes",
  "chrono",
  "config",
  "dotenv",

@@ -53,9 +53,8 @@ timeout = "90s"
 connection_verbose = true
 accept_invalid_certs = false
 accept_invalid_hostnames = false
-maxfeepercent = 0.5
 payment_timeout = "60s"
-payment_exemptfee = 5000
+fee_limit_msat = 25000
 ws_min_reconnect_delay = "1s"
 ws_max_reconnect_delay = "30s"
 

@@ -1,6 +1,9 @@
 use std::{path::PathBuf, process, sync::Arc, time::Duration};
 
+use anyhow::anyhow;
 use breez_sdk_core::ReverseSwapInfo;
+use bytes::Bytes;
+use futures_util::{Stream, StreamExt};
 use reqwest::{
     header::{HeaderMap, HeaderValue},
     Certificate, Client, Response,
@@ -31,10 +34,9 @@ pub struct LndRestClientConfig {
     pub timeout: Duration,
     pub accept_invalid_certs: bool,
     pub accept_invalid_hostnames: bool,
-    pub maxfeepercent: Option<f64>,
+    pub fee_limit_msat: u64,
     #[serde(deserialize_with = "deserialize_duration")]
     pub payment_timeout: Duration,
-    pub payment_exemptfee: Option<u64>,
     #[serde(deserialize_with = "deserialize_duration")]
     pub ws_min_reconnect_delay: Duration,
     #[serde(deserialize_with = "deserialize_duration")]
@@ -46,9 +48,8 @@ pub struct LndRestClientConfig {
 pub struct LndRestClient {
     client: Client,
     base_url: String,
-    maxfeepercent: Option<f64>,
-    retry_for: Option<u32>,
-    payment_exemptfee: Option<u64>,
+    fee_limit_msat: u64,
+    retry_for: u32,
 }
 
 const USER_AGENT: &str = "Numeraire Swissknife/1.0";
@@ -100,9 +101,8 @@ impl LndRestClient {
         Ok(Self {
             client,
             base_url: config.host,
-            maxfeepercent: config.maxfeepercent,
-            retry_for: Some(config.payment_timeout.as_secs() as u32),
-            payment_exemptfee: config.payment_exemptfee,
+            fee_limit_msat: config.fee_limit_msat,
+            retry_for: config.payment_timeout.as_secs() as u32,
         })
     }
 
@@ -120,41 +120,59 @@ impl LndRestClient {
         Ok(macaroon_header)
     }
 
-    async fn post_request<T: DeserializeOwned>(
+    async fn post_request_stream(
         &self,
         endpoint: &str,
         payload: &impl Serialize,
-    ) -> anyhow::Result<T> {
-        let response = self
-            .client
-            .post(format!("https://{}/v1/{}", self.base_url, endpoint))
-            .json(payload)
-            .send()
-            .await?;
+    ) -> anyhow::Result<impl Stream<Item = Result<Bytes, reqwest::Error>>> {
+        let url = format!("https://{}/{}", self.base_url, endpoint);
+        let mut request = self.client.post(url);
+        request = request.json(payload);
 
-        Self::handle_response(response).await
+        let response = request.send().await?;
+        let response = Self::check_response_status(response).await?;
+
+        Ok(response.bytes_stream())
     }
 
-    async fn get_request<T: DeserializeOwned>(&self, endpoint: &str) -> anyhow::Result<T> {
-        let response = self
-            .client
-            .get(format!("https://{}/v1/{}", self.base_url, endpoint))
-            .send()
-            .await?;
-
-        Self::handle_response(response).await
-    }
-
-    async fn handle_response<T: DeserializeOwned>(response: Response) -> anyhow::Result<T> {
+    async fn check_response_status(response: Response) -> anyhow::Result<Response> {
         let status = response.status();
         if status.is_client_error() || status.is_server_error() {
             let error_text = response.text().await?;
             if let Ok(error_response) = serde_json::from_str::<ErrorResponse>(&error_text) {
-                return Err(anyhow::anyhow!(error_response.message));
+                return Err(anyhow!(error_response.message));
             } else {
-                return Err(anyhow::anyhow!(error_text));
+                return Err(anyhow!(error_text));
             }
         }
+
+        Ok(response)
+    }
+
+    async fn post_request<T>(&self, endpoint: &str, payload: &impl Serialize) -> anyhow::Result<T>
+    where
+        T: DeserializeOwned,
+    {
+        let url = format!("https://{}/{}", self.base_url, endpoint);
+        let mut request = self.client.post(url);
+        request = request.json(payload);
+
+        let response = request.send().await?;
+        let response = Self::check_response_status(response).await?;
+
+        let result = response.json::<T>().await?;
+        Ok(result)
+    }
+
+    async fn get_request<T>(&self, endpoint: &str) -> anyhow::Result<T>
+    where
+        T: DeserializeOwned,
+    {
+        let url = format!("https://{}/{}", self.base_url, endpoint);
+        let request = self.client.get(url);
+
+        let response = request.send().await?;
+        let response = Self::check_response_status(response).await?;
 
         let result = response.json::<T>().await?;
         Ok(result)
@@ -175,7 +193,7 @@ impl LnClient for LndRestClient {
         expiry: u32,
         deschashonly: bool,
     ) -> Result<Invoice, LightningError> {
-        let mut request = InvoiceRequest {
+        let mut payload = InvoiceRequest {
             memo: description.clone(),
             expiry: expiry as u64,
             value_msat: amount_msat,
@@ -183,11 +201,11 @@ impl LnClient for LndRestClient {
         };
 
         if deschashonly {
-            request.description_hash = sha256::Hash::hash(&description.as_bytes()).to_string();
+            payload.description_hash = sha256::Hash::hash(&description.as_bytes()).to_string();
         }
 
         let response: AddInvoiceResponse = self
-            .post_request("invoices", &request)
+            .post_request("v1/invoices", &payload)
             .await
             .map_err(|e| LightningError::Invoice(e.to_string()))?;
 
@@ -202,22 +220,56 @@ impl LnClient for LndRestClient {
         bolt11: String,
         amount_msat: Option<u64>,
     ) -> Result<Payment, LightningError> {
-        let response: PayResponse = self
-            .post_request(
-                "pay",
-                &PayRequest {
-                    bolt11,
-                    amount_msat,
-                    label: Some(Uuid::new_v4().to_string()),
-                    maxfeepercent: self.maxfeepercent,
-                    retry_for: self.retry_for,
-                    exemptfee: self.payment_exemptfee,
-                },
-            )
+        let payload = PayRequest {
+            payment_request: bolt11,
+            amt_msat: amount_msat,
+            fee_limit_msat: self.fee_limit_msat,
+            timeout_seconds: self.retry_for,
+            no_inflight_updates: true,
+        };
+
+        let mut stream = self
+            .post_request_stream("v2/router/send", &payload)
             .await
             .map_err(|e| LightningError::Pay(e.to_string()))?;
 
-        Ok(response.into())
+        while let Some(item) = stream.next().await {
+            match item {
+                Ok(bytes) => {
+                    let message = serde_json::from_slice::<StreamPayResponse>(&bytes)
+                        .map_err(|e| LightningError::ParseResponse(e.to_string()))?;
+
+                    if let Some(response) = message.result {
+                        match response.status.as_str() {
+                            "SUCCEEDED" => {
+                                return Ok(response.into());
+                            }
+                            "FAILED" => {
+                                return Err(LightningError::Pay(
+                                    response.failure_reason.to_string(),
+                                ));
+                            }
+                            _ => {
+                                // Continue listening to the stream
+                            }
+                        }
+                    } else if let Some(error) = message.error {
+                        return Err(LightningError::Pay(error.message));
+                    } else {
+                        return Err(LightningError::ParseResponse(
+                            "Missing result or error field.".to_string(),
+                        ));
+                    }
+                }
+                Err(e) => {
+                    return Err(LightningError::ParseResponse(e.to_string()));
+                }
+            }
+        }
+
+        Err(LightningError::Pay(
+            "Payment did not return a final state.".to_string(),
+        ))
     }
 
     async fn invoice_by_hash(
@@ -225,7 +277,7 @@ impl LnClient for LndRestClient {
         payment_hash: String,
     ) -> Result<Option<Invoice>, LightningError> {
         let result = self
-            .get_request::<InvoiceResponse>(&format!("invoice/{}", payment_hash))
+            .get_request::<InvoiceResponse>(&format!("v1/invoice/{}", payment_hash))
             .await;
 
         match result {
@@ -250,7 +302,7 @@ impl LnClient for LndRestClient {
     }
 
     async fn health(&self) -> Result<HealthStatus, LightningError> {
-        self.get_request::<GetinfoResponse>("getinfo")
+        self.get_request::<GetinfoResponse>("v1/getinfo")
             .await
             .map_err(|e| LightningError::HealthCheck(e.to_string()))?;
 

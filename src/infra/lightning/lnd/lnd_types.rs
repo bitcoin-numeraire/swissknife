@@ -42,22 +42,32 @@ pub struct InvoiceResponse {
 
 #[derive(Debug, Serialize)]
 pub struct PayRequest {
-    pub bolt11: String,
-    pub label: Option<String>,
-    pub maxfeepercent: Option<f64>,
-    pub retry_for: Option<u32>,
-    pub exemptfee: Option<u64>,
-    pub amount_msat: Option<u64>,
+    pub payment_request: String,
+    pub fee_limit_msat: u64,
+    pub amt_msat: Option<u64>,
+    pub timeout_seconds: u32,
+    pub no_inflight_updates: bool,
 }
 
+#[derive(Deserialize)]
+pub struct StreamPayResponse {
+    pub result: Option<PayResponse>,
+    pub error: Option<ErrorResponse>,
+}
+
+#[serde_as]
 #[derive(Debug, Deserialize)]
 pub struct PayResponse {
     pub payment_preimage: String,
     pub payment_hash: String,
-    pub created_at: f64,
-    pub amount_msat: u64,
-    pub amount_sent_msat: u64,
+    #[serde_as(as = "DisplayFromStr")]
+    pub value_msat: u64,
+    #[serde_as(as = "DisplayFromStr")]
+    pub creation_time_ns: i64,
+    #[serde_as(as = "DisplayFromStr")]
+    pub fee_msat: u64,
     pub status: String,
+    pub failure_reason: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -65,25 +75,13 @@ pub struct GetinfoResponse {}
 
 impl From<PayResponse> for Payment {
     fn from(val: PayResponse) -> Self {
-        let error = match val.status.as_str() {
-            "complete" => None,
-            _ => Some(format!(
-                "Unexpected error. Payment returned successfully but with status {}",
-                val.status
-            )),
-        };
-
-        let seconds = val.created_at as i64;
-        let nanoseconds = ((val.created_at - seconds as f64) * 1e9) as u32;
-
         Payment {
             ledger: Ledger::Lightning,
             payment_hash: Some(val.payment_hash),
             payment_preimage: Some(val.payment_preimage),
-            amount_msat: val.amount_sent_msat,
-            fee_msat: Some(val.amount_sent_msat - val.amount_msat),
-            payment_time: Some(Utc.timestamp_opt(seconds, nanoseconds).unwrap()),
-            error,
+            amount_msat: val.value_msat,
+            fee_msat: Some(val.fee_msat),
+            payment_time: Some(Utc.timestamp_nanos(val.creation_time_ns)),
             ..Default::default()
         }
     }
@@ -125,16 +123,16 @@ impl From<InvoiceResponse> for LnInvoicePaidEvent {
     fn from(val: InvoiceResponse) -> Self {
         LnInvoicePaidEvent {
             id: None,
-            payment_hash: Some(hex::encode(
-                BASE64_STANDARD
-                    .decode(val.r_hash)
-                    .expect("should be valid base64"),
-            )),
+            payment_hash: Some(hex_from_base64(&val.r_hash)),
             amount_received_msat: val.amt_paid_msat,
             fee_msat: 0,
             payment_time: Utc.timestamp_opt(val.settle_date, 0).unwrap(),
         }
     }
+}
+
+fn hex_from_base64(s: &str) -> String {
+    hex::encode(BASE64_STANDARD.decode(s).expect("should be valid base64"))
 }
 
 #[derive(Debug, Deserialize)]
