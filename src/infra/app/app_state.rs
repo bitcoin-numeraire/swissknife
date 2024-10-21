@@ -104,7 +104,7 @@ async fn get_ln_client(
                 ConfigError::MissingLightningProviderConfig(config.ln_provider.to_string())
             })?;
 
-            info!(config = ?lnd_config, "Lightning provider: LND gRPC");
+            info!(config = ?lnd_config, "Lightning provider: LND");
 
             let client = LndRestClient::new(lnd_config.clone(), ln_events).await?;
 

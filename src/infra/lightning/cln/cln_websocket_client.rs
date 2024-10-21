@@ -25,8 +25,8 @@ pub async fn connect_websocket(
         .reconnect_on_disconnect(true)
         .opening_header("rune", config.rune.clone())
         .reconnect_delay(
-            config.ws_min_reconnect_delay_delay,
-            config.ws_max_reconnect_delay_delay,
+            config.ws_min_reconnect_delay.as_secs(),
+            config.ws_max_reconnect_delay.as_secs(),
         )
         .on("open", on_open)
         .on("close", on_close)

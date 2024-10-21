@@ -1,18 +1,14 @@
-use std::{path::PathBuf, str::FromStr, sync::Arc, time::Duration};
+use std::{path::PathBuf, process, sync::Arc, time::Duration};
 
 use breez_sdk_core::ReverseSwapInfo;
-use lightning_invoice::Bolt11Invoice;
 use reqwest::{
     header::{HeaderMap, HeaderValue},
-    Certificate, Client,
+    Certificate, Client, Response,
 };
-use rust_socketio::asynchronous::Client as WsClient;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_bolt::bitcoin::hashes::{sha256, Hash};
 use tokio::fs;
 use uuid::Uuid;
-
-use async_trait::async_trait;
 
 use crate::{
     application::errors::LightningError,
@@ -21,16 +17,13 @@ use crate::{
     },
     infra::{config::config_rs::deserialize_duration, lightning::LnClient},
 };
+use async_trait::async_trait;
 
-use super::{
-    lnd_websocket_client::connect_websocket, ErrorResponse, GetinfoRequest, GetinfoResponse,
-    InvoiceRequest, InvoiceResponse, ListInvoicesRequest, ListInvoicesResponse, PayRequest,
-    PayResponse,
-};
+use super::{lnd_types::*, lnd_websocket_client::listen_invoices};
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct LndRestClientConfig {
-    pub endpoint: String,
+    pub host: String,
     #[serde(deserialize_with = "deserialize_duration")]
     pub connect_timeout: Duration,
     pub connection_verbose: bool,
@@ -42,8 +35,10 @@ pub struct LndRestClientConfig {
     #[serde(deserialize_with = "deserialize_duration")]
     pub payment_timeout: Duration,
     pub payment_exemptfee: Option<u64>,
-    pub ws_min_reconnect_delay_delay: u64,
-    pub ws_max_reconnect_delay_delay: u64,
+    #[serde(deserialize_with = "deserialize_duration")]
+    pub ws_min_reconnect_delay: Duration,
+    #[serde(deserialize_with = "deserialize_duration")]
+    pub ws_max_reconnect_delay: Duration,
     pub ca_cert_path: Option<String>,
     pub macaroon_path: String,
 }
@@ -54,7 +49,6 @@ pub struct LndRestClient {
     maxfeepercent: Option<f64>,
     retry_for: Option<u32>,
     payment_exemptfee: Option<u64>,
-    ws_client: WsClient,
 }
 
 const USER_AGENT: &str = "Numeraire Swissknife/1.0";
@@ -64,7 +58,7 @@ impl LndRestClient {
         config: LndRestClientConfig,
         ln_events: Arc<dyn LnEventsUseCases>,
     ) -> Result<Self, LightningError> {
-        let macaroon = read_macaroon(&config.macaroon_path)
+        let macaroon = Self::read_macaroon(&config.macaroon_path)
             .await
             .map_err(|e| LightningError::ParseConfig(e.to_string()))?;
 
@@ -83,7 +77,7 @@ impl LndRestClient {
             .danger_accept_invalid_certs(config.accept_invalid_certs);
 
         if let Some(ca_cert_path) = &config.ca_cert_path {
-            let ca_certificate = read_ca(ca_cert_path)
+            let ca_certificate = Self::read_ca(ca_cert_path)
                 .await
                 .map_err(|e| LightningError::ReadCertificates(e.to_string()))?;
             client_builder = client_builder
@@ -95,16 +89,35 @@ impl LndRestClient {
             .build()
             .map_err(|e| LightningError::ParseConfig(e.to_string()))?;
 
-        let ws_client = connect_websocket(&config, macaroon, ln_events).await?;
+        let config_clone = config.clone();
+        tokio::spawn(async move {
+            if let Err(err) = listen_invoices(config_clone, macaroon, ln_events).await {
+                tracing::error!(%err);
+                process::exit(1);
+            }
+        });
 
         Ok(Self {
             client,
-            base_url: config.endpoint,
+            base_url: config.host,
             maxfeepercent: config.maxfeepercent,
             retry_for: Some(config.payment_timeout.as_secs() as u32),
             payment_exemptfee: config.payment_exemptfee,
-            ws_client,
         })
+    }
+
+    async fn read_ca(path: &str) -> anyhow::Result<Certificate> {
+        let ca_file = fs::read(PathBuf::from(path)).await?;
+        let ca_certificate = Certificate::from_pem(&ca_file)?;
+
+        Ok(ca_certificate)
+    }
+
+    async fn read_macaroon(path: &str) -> anyhow::Result<String> {
+        let macaroon_file = fs::read(PathBuf::from(path)).await?;
+        let macaroon_header = hex::encode(macaroon_file);
+
+        Ok(macaroon_header)
     }
 
     async fn post_request<T: DeserializeOwned>(
@@ -114,11 +127,25 @@ impl LndRestClient {
     ) -> anyhow::Result<T> {
         let response = self
             .client
-            .post(format!("{}/v1/{}", self.base_url, endpoint))
+            .post(format!("https://{}/v1/{}", self.base_url, endpoint))
             .json(payload)
             .send()
             .await?;
 
+        Self::handle_response(response).await
+    }
+
+    async fn get_request<T: DeserializeOwned>(&self, endpoint: &str) -> anyhow::Result<T> {
+        let response = self
+            .client
+            .get(format!("https://{}/v1/{}", self.base_url, endpoint))
+            .send()
+            .await?;
+
+        Self::handle_response(response).await
+    }
+
+    async fn handle_response<T: DeserializeOwned>(response: Response) -> anyhow::Result<T> {
         let status = response.status();
         if status.is_client_error() || status.is_server_error() {
             let error_text = response.text().await?;
@@ -137,10 +164,8 @@ impl LndRestClient {
 #[async_trait]
 impl LnClient for LndRestClient {
     async fn disconnect(&self) -> Result<(), LightningError> {
-        self.ws_client
-            .disconnect()
-            .await
-            .map_err(|e| LightningError::Disconnect(e.to_string()))
+        // TODO: Implement shutdown signal
+        Ok(())
     }
 
     async fn invoice(
@@ -161,17 +186,12 @@ impl LnClient for LndRestClient {
             request.description_hash = sha256::Hash::hash(&description.as_bytes()).to_string();
         }
 
-        let response: InvoiceResponse = self
+        let response: AddInvoiceResponse = self
             .post_request("invoices", &request)
             .await
             .map_err(|e| LightningError::Invoice(e.to_string()))?;
 
-        println!("response: {:?}", response);
-
-        let bolt11 = Bolt11Invoice::from_str(&response.payment_request)
-            .map_err(|e| LightningError::Invoice(e.to_string()))?;
-
-        let mut invoice: Invoice = bolt11.into();
+        let mut invoice: Invoice = response.into();
         invoice.id = Uuid::new_v4();
 
         Ok(invoice)
@@ -204,19 +224,19 @@ impl LnClient for LndRestClient {
         &self,
         payment_hash: String,
     ) -> Result<Option<Invoice>, LightningError> {
-        let response: ListInvoicesResponse = self
-            .post_request(
-                "listinvoices",
-                &ListInvoicesRequest {
-                    payment_hash: Some(payment_hash),
-                },
-            )
-            .await
-            .map_err(|e| LightningError::InvoiceByHash(e.to_string()))?;
+        let result = self
+            .get_request::<InvoiceResponse>(&format!("invoice/{}", payment_hash))
+            .await;
 
-        match response.invoices.into_iter().next() {
-            Some(invoice) => Ok(Some(invoice.into())),
-            None => Ok(None),
+        match result {
+            Ok(response) => Ok(Some(response.into())),
+            Err(e) => {
+                if e.to_string().contains("Not Found") {
+                    Ok(None)
+                } else {
+                    Err(LightningError::InvoiceByHash(e.to_string()))
+                }
+            }
         }
     }
 
@@ -230,24 +250,10 @@ impl LnClient for LndRestClient {
     }
 
     async fn health(&self) -> Result<HealthStatus, LightningError> {
-        self.post_request::<GetinfoResponse>("getinfo", &GetinfoRequest {})
+        self.get_request::<GetinfoResponse>("getinfo")
             .await
             .map_err(|e| LightningError::HealthCheck(e.to_string()))?;
 
         Ok(HealthStatus::Operational)
     }
-}
-
-async fn read_ca(path: &str) -> anyhow::Result<Certificate> {
-    let ca_file = fs::read(PathBuf::from(path)).await?;
-    let ca_certificate = Certificate::from_pem(&ca_file)?;
-
-    Ok(ca_certificate)
-}
-
-async fn read_macaroon(path: &str) -> anyhow::Result<String> {
-    let macaroon_file = fs::read(PathBuf::from(path)).await?;
-    let macaroon_header = hex::encode(macaroon_file);
-
-    Ok(macaroon_header)
 }

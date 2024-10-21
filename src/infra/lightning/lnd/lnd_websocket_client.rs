@@ -1,42 +1,80 @@
-use std::{path::PathBuf, sync::Arc};
+use std::str::FromStr;
+use std::{cmp::min, path::PathBuf, sync::Arc};
 
-use futures_util::{future::BoxFuture, FutureExt};
+use futures_util::StreamExt;
+use http::Uri;
 use native_tls::{Certificate, TlsConnector};
-use rust_socketio::{
-    asynchronous::{Client, ClientBuilder},
-    Payload,
+use serde_json::Value;
+use tokio::net::TcpStream;
+use tokio::{fs, time::sleep};
+use tokio_tungstenite::tungstenite::ClientRequestBuilder;
+use tokio_tungstenite::{
+    connect_async_tls_with_config, Connector, MaybeTlsStream, WebSocketStream,
 };
-use tokio::fs;
 use tracing::{debug, error, warn};
 
-use crate::{
-    application::errors::LightningError,
-    domains::ln_node::LnEventsUseCases,
-    infra::lightning::lnd::lnd_websocket_types::{InvoicePayment, SendPayFailure, SendPaySuccess},
-};
+use crate::infra::lightning::lnd::lnd_types::InvoiceResponse;
+use crate::{application::errors::LightningError, domains::ln_node::LnEventsUseCases};
 
 use super::LndRestClientConfig;
 
-pub async fn connect_websocket(
-    config: &LndRestClientConfig,
+pub async fn listen_invoices(
+    config: LndRestClientConfig,
     macaroon: String,
     ln_events: Arc<dyn LnEventsUseCases>,
-) -> Result<Client, LightningError> {
-    let mut client_builder =
-        ClientBuilder::new("wss://127.0.0.1:8081/v1/transactions/subscribe?method=GET")
-            .reconnect_on_disconnect(true)
-            .opening_header("Grpc-Metadata-Macaroon", macaroon)
-            .reconnect_delay(
-                config.ws_min_reconnect_delay_delay,
-                config.ws_max_reconnect_delay_delay,
-            )
-            .on("open", on_open)
-            .on("close", on_close)
-            .on("error", on_error)
-            .on("message", {
-                move |payload, socket: Client| on_message(ln_events.clone(), payload, socket)
-            });
+) -> Result<(), LightningError> {
+    let max_reconnect_delay = config.ws_max_reconnect_delay;
+    let mut reconnect_delay = config.ws_min_reconnect_delay;
 
+    loop {
+        let result = connect_and_handle(&macaroon, &config, ln_events.clone()).await;
+
+        if let Err(err) = result {
+            match err {
+                LightningError::ParseConfig(msg)
+                | LightningError::ConnectWebsocket(msg)
+                | LightningError::TLSConfig(msg)
+                | LightningError::ReadCertificates(msg) => {
+                    return Err(LightningError::Listener(msg));
+                }
+                _ => {
+                    error!(%err, "WebSocket connection error");
+                    sleep(reconnect_delay).await;
+                    reconnect_delay = min(reconnect_delay * 2, max_reconnect_delay);
+                }
+            }
+        }
+    }
+}
+
+async fn connect_and_handle(
+    macaroon: &str,
+    config: &LndRestClientConfig,
+    ln_events: Arc<dyn LnEventsUseCases>,
+) -> Result<(), LightningError> {
+    let invoices_endpoint = format!("wss://{}/v1/invoices/subscribe", config.host);
+    let uri = Uri::from_str(&invoices_endpoint)
+        .map_err(|e| LightningError::ParseConfig(e.to_string()))?;
+    let builder = ClientRequestBuilder::new(uri).with_header("Grpc-Metadata-Macaroon", macaroon);
+
+    let tls_connector = create_tls_connector(config).await?;
+
+    let (ws_stream, _) = connect_async_tls_with_config(builder, None, false, tls_connector)
+        .await
+        .map_err(|e| LightningError::ConnectWebsocket(e.to_string()))?;
+
+    debug!("Connected to LND WebSocket server");
+
+    handle_messages(ws_stream, ln_events).await;
+
+    debug!("Disconnected from LND WebSocket server");
+
+    Ok(())
+}
+
+async fn create_tls_connector(
+    config: &LndRestClientConfig,
+) -> Result<Option<Connector>, LightningError> {
     if let Some(ca_cert_path) = &config.ca_cert_path {
         let ca_certificate = read_ca(ca_cert_path)
             .await
@@ -46,133 +84,67 @@ pub async fn connect_websocket(
             .danger_accept_invalid_hostnames(config.accept_invalid_hostnames)
             .build()
             .map_err(|e| LightningError::TLSConfig(e.to_string()))?;
-        client_builder = client_builder.tls_config(tls_connector.clone());
-    }
-
-    if config.accept_invalid_certs {
+        Ok(Some(Connector::NativeTls(tls_connector)))
+    } else if config.accept_invalid_certs || config.accept_invalid_hostnames {
         let tls_connector = TlsConnector::builder()
-            .danger_accept_invalid_certs(true)
+            .danger_accept_invalid_hostnames(config.accept_invalid_hostnames)
             .build()
             .map_err(|e| LightningError::TLSConfig(e.to_string()))?;
-
-        client_builder = client_builder.tls_config(tls_connector);
+        Ok(Some(Connector::NativeTls(tls_connector)))
+    } else {
+        Ok(None)
     }
-
-    let client = client_builder
-        .connect()
-        .await
-        .map_err(|e| LightningError::ConnectWebsocket(e.to_string()))?;
-
-    Ok(client)
 }
 
 async fn read_ca(path: &str) -> anyhow::Result<Certificate> {
     let ca_file = fs::read(PathBuf::from(path)).await?;
     let ca_certificate = Certificate::from_pem(&ca_file)?;
-
     Ok(ca_certificate)
 }
 
-fn on_open(_: Payload, _: Client) -> BoxFuture<'static, ()> {
-    async move {
-        debug!("Connected to Core Lightning websocket server");
-    }
-    .boxed()
-}
-
-fn on_close(_: Payload, _: Client) -> BoxFuture<'static, ()> {
-    async move {
-        debug!("Disconnected from Core Lightning websocket server");
-    }
-    .boxed()
-}
-
-fn on_error(err: Payload, _: Client) -> BoxFuture<'static, ()> {
-    async move {
-        error!(?err, "Error from Core Lightning websocket server ");
-    }
-    .boxed()
-}
-
-fn on_message(
+async fn handle_messages(
+    mut ws_stream: WebSocketStream<MaybeTlsStream<TcpStream>>,
     ln_events: Arc<dyn LnEventsUseCases>,
-    payload: Payload,
-    _: Client,
-) -> BoxFuture<'static, ()> {
-    async move {
-        match payload {
-            Payload::Text(values) => {
-                for value in values {
-                    if let Some(event) = value.get("invoice_payment") {
-                        match serde_json::from_value::<InvoicePayment>(event.clone()) {
-                            Ok(invoice_payment) => {
-                                if let Err(err) =
-                                    ln_events.invoice_paid(invoice_payment.into()).await
-                                {
-                                    warn!(%err, "Failed to process incoming payment");
-                                }
-                            }
-                            Err(err) => {
-                                warn!(?err, "Failed to parse invoice_payment event. Most likely an external payment");
-                            }
-                        }
+) {
+    while let Some(message) = ws_stream.next().await {
+        match message {
+            Ok(msg) => {
+                if msg.is_text() {
+                    let text = msg.into_text().unwrap();
+                    if let Err(e) = process_message(&text, ln_events.clone()).await {
+                        error!(%e, "Failed to process message");
                     }
-
-                    if let Some(event) = value.get("sendpay_success") {
-                        match serde_json::from_value::<SendPaySuccess>(event.clone()) {
-                            Ok(sendpay_success) => {
-                                if sendpay_success.status != "complete" {
-                                    warn!(
-                                        payment_hash = sendpay_success.payment_hash,
-                                        status = sendpay_success.status,
-                                        "Invalid payment status. Expected Complete."
-                                    );
-                                    return;
-                                }
-
-                                if let Err(err) =
-                                    ln_events.outgoing_payment(sendpay_success.into()).await
-                                {
-                                    warn!(%err, "Failed to process outgoing payment");
-                                }
-                            }
-                            Err(err) => {
-                                error!(?err, "Failed to parse sendpay_success event");
-                            }
-                        }
-                    }
-
-                    if let Some(event) = value.get("sendpay_failure") {
-                        match serde_json::from_value::<SendPayFailure>(event.clone()) {
-                            Ok(sendpay_failure) => {
-                                if sendpay_failure.data.status != "failed" {
-                                    warn!(
-                                        payment_hash = sendpay_failure.data.payment_hash,
-                                        status = sendpay_failure.data.status,
-                                        "Invalid payment status. Expected Failed."
-                                    );
-                                    // We must accept the payment as failed until this is fixed: https://github.com/ElementsProject/lightning/issues/7561
-                                    // return;
-                                }
-
-                                if let Err(err) =
-                                    ln_events.failed_payment(sendpay_failure.into()).await
-                                {
-                                    warn!(%err, "Failed to process failed outgoing payment");
-                                }
-                            }
-                            Err(err) => {
-                                error!(?err, "Failed to parse sendpay_failure event");
-                            }
-                        }
-                    }
+                } else if msg.is_close() {
+                    debug!("WebSocket closed");
+                    break;
                 }
             }
-            _ => error!(
-                ?payload,
-                "Non supported payload type from Core Lightning websocket server"
-            ),
+            Err(err) => {
+                error!(%err, "Error receiving message");
+                break;
+            }
         }
     }
-    .boxed()
+}
+
+async fn process_message(text: &str, ln_events: Arc<dyn LnEventsUseCases>) -> anyhow::Result<()> {
+    let value: Value = serde_json::from_str(text)?;
+
+    if let Some(event) = value.get("result") {
+        match serde_json::from_value::<InvoiceResponse>(event.clone()) {
+            Ok(invoice) => match invoice.state.as_str() {
+                "SETTLED" => {
+                    if let Err(err) = ln_events.invoice_paid(invoice.into()).await {
+                        warn!(%err, "Failed to process incoming payment");
+                    }
+                }
+                _ => {}
+            },
+            Err(err) => {
+                error!(%err, "Failed to parse SubscribeInvoices event");
+            }
+        }
+    }
+
+    Ok(())
 }
