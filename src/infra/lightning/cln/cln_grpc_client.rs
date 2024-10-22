@@ -168,7 +168,7 @@ impl LnClient for ClnGrpcClient {
                 label: Some(Uuid::new_v4().to_string()),
                 maxfeepercent: self.maxfeepercent,
                 retry_for: self.retry_for,
-                exemptfee: self.payment_exemptfee.clone(),
+                exemptfee: self.payment_exemptfee,
                 ..Default::default()
             })
             .await

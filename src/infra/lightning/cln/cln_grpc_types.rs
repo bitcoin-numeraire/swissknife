@@ -34,7 +34,7 @@ impl From<PayResponse> for Payment {
             ledger: Ledger::Lightning,
             payment_hash: Some(val.payment_hash.to_hex()),
             payment_preimage: Some(val.payment_preimage.to_hex()),
-            amount_msat: val.amount_sent_msat.clone().unwrap().msat,
+            amount_msat: val.amount_sent_msat.unwrap().msat,
             fee_msat: Some(val.amount_sent_msat.unwrap().msat - val.amount_msat.unwrap().msat),
             payment_time: Some(Utc.timestamp_opt(seconds, nanoseconds).unwrap()),
             error,

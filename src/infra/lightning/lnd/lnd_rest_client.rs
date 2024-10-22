@@ -201,7 +201,7 @@ impl LnClient for LndRestClient {
         };
 
         if deschashonly {
-            payload.description_hash = sha256::Hash::hash(&description.as_bytes()).to_string();
+            payload.description_hash = sha256::Hash::hash(description.as_bytes()).to_string();
         }
 
         let response: AddInvoiceResponse = self

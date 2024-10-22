@@ -132,14 +132,13 @@ async fn process_message(text: &str, ln_events: Arc<dyn LnEventsUseCases>) -> an
 
     if let Some(event) = value.get("result") {
         match serde_json::from_value::<InvoiceResponse>(event.clone()) {
-            Ok(invoice) => match invoice.state.as_str() {
-                "SETTLED" => {
+            Ok(invoice) => {
+                if invoice.state.as_str() == "SETTLED" {
                     if let Err(err) = ln_events.invoice_paid(invoice.into()).await {
                         warn!(%err, "Failed to process incoming payment");
                     }
                 }
-                _ => {}
-            },
+            }
             Err(err) => {
                 error!(%err, "Failed to parse SubscribeInvoices event");
             }
