@@ -28,6 +28,7 @@ If you like what we do, consider starring, sharing and contributing!
 - `JWT` token authentication` (tested with Auth0, Supabase).
 - `RBAC`. Fine grained authorization per route.
 - Data availability through pagination and advanced search.
+- API keys authentication
 
 Numeraire SwissKnife ships with a [Dashboard](https://github.com/bitcoin-numeraire/swissknife-dashboard).
 
@@ -47,6 +48,10 @@ SwissKnife allows direct Lightning integration, supporting the most used node im
   - Non-custodial
   - Automatic node management.
   - Automatic liquidity management via LSPs (user can switch LSPs)
+- [`LND`](https://github.com/lightningnetwork/lnd)
+  - Non-custodial
+  - Run your own node
+  - Manage your own liquidity
 
 ## Documentation
 
@@ -57,10 +62,9 @@ Extended documentation is available [here](https://docs.numeraire.tech/swissknif
 #### Features
 
 - [ ] Webhooks
-- [x] API keys authentication
 - [ ] BOLT12 (offers)
 - [ ] Notifications (Email, SMS by Twilio)
-- [ ] Dockerhub images
+- [x] Dockerhub images
 - [ ] Desktop applications
 - [ ] Helm Charts
 
@@ -74,10 +78,6 @@ Extended documentation is available [here](https://docs.numeraire.tech/swissknif
   - Custodial
   - Automatic node management
   - Automatic liquidity management via Lightspark
-- [ ] [`LND`](https://github.com/lightningnetwork/lnd)
-  - Non-custodial
-  - Run your own node
-  - Manage your own liquidity
 
 #### Smart contracts
 
