@@ -52,6 +52,7 @@ pub struct PaymentResponse {
     pub wallet_id: Uuid,
 
     /// Lightning Address. Populated when sending to a LN Address
+    #[serde(skip_serializing_if = "Option::is_none")]
     #[schema(example = "hello@numeraire.tech")]
     pub ln_address: Option<String>,
 

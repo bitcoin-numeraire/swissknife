@@ -17,6 +17,7 @@ use crate::{
         lightning::{
             breez::BreezClient,
             cln::{ClnGrpcClient, ClnRestClient},
+            lnd::LndRestClient,
             LnClient,
         },
     },
@@ -88,6 +89,7 @@ pub enum LnNodeClient {
     Breez(Arc<BreezClient>),
     ClnGrpc(Arc<ClnGrpcClient>),
     ClnRest(Arc<ClnRestClient>),
+    Lnd(Arc<LndRestClient>),
 }
 
 impl LnNodeClient {

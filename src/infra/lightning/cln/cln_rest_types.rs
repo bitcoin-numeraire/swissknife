@@ -107,7 +107,7 @@ impl From<ListInvoicesInvoice> for Invoice {
                 invoice.status = InvoiceStatus::Settled;
                 invoice.payment_time =
                     Some(Utc.timestamp_opt(val.paid_at.unwrap() as i64, 0).unwrap());
-                invoice.amount_msat = val.amount_received_msat;
+                invoice.amount_received_msat = val.amount_received_msat;
             }
             "unpaid" => {
                 invoice.status = InvoiceStatus::Pending;

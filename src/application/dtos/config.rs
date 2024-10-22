@@ -11,6 +11,7 @@ use crate::infra::{
     lightning::{
         breez::BreezClientConfig,
         cln::{ClnClientConfig, ClnRestClientConfig},
+        lnd::LndRestClientConfig,
     },
     logging::tracing::TracingLoggerConfig,
 };
@@ -30,6 +31,7 @@ pub struct AppConfig {
     pub breez_config: Option<BreezClientConfig>,
     pub cln_grpc_config: Option<ClnClientConfig>,
     pub cln_rest_config: Option<ClnRestClientConfig>,
+    pub lnd_config: Option<LndRestClientConfig>,
     pub web: AxumServerConfig,
     pub logging: TracingLoggerConfig,
 }
@@ -42,6 +44,7 @@ pub enum LightningProvider {
     Breez,
     ClnGrpc,
     ClnRest,
+    Lnd,
 }
 
 #[derive(Clone, Debug, Deserialize, EnumString, Display, PartialEq, Eq, Default)]

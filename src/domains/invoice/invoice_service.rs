@@ -123,7 +123,9 @@ impl InvoiceUseCases for InvoiceService {
     async fn sync(&self) -> Result<u32, ApplicationError> {
         trace!(ln_provider = %self.ln_provider, "Syncing invoices...");
 
-        if self.ln_provider != LightningProvider::ClnRest {
+        if self.ln_provider != LightningProvider::ClnRest
+            && self.ln_provider != LightningProvider::Lnd
+        {
             debug!("Lightning provider does not need initial syncing");
             return Ok(0);
         }
@@ -170,7 +172,7 @@ impl InvoiceUseCases for InvoiceService {
 
                     updated_invoice.status = node_invoice.status;
                     updated_invoice.payment_time = node_invoice.payment_time;
-                    updated_invoice.amount_msat = node_invoice.amount_msat;
+                    updated_invoice.amount_received_msat = node_invoice.amount_received_msat;
 
                     self.store.invoice.update(None, updated_invoice).await?;
                     n_synced += 1;

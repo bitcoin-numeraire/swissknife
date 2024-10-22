@@ -59,9 +59,6 @@ impl LnEventsUseCases for LnEventsService {
         if let Some(mut invoice) = invoice_option {
             invoice.fee_msat = Some(event.fee_msat);
             invoice.payment_time = Some(event.payment_time);
-
-            // TODO: Amount paid can actually be different from the amount of the invoice, might need a new field (amount_received_msat).
-            // we can just update the amount_msat field for now.
             invoice.amount_received_msat = Some(event.amount_received_msat);
 
             invoice = self.store.invoice.update(None, invoice).await?;

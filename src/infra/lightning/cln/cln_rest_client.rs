@@ -42,8 +42,10 @@ pub struct ClnRestClientConfig {
     #[serde(deserialize_with = "deserialize_duration")]
     pub payment_timeout: Duration,
     pub payment_exemptfee: Option<u64>,
-    pub ws_min_reconnect_delay_delay: u64,
-    pub ws_max_reconnect_delay_delay: u64,
+    #[serde(deserialize_with = "deserialize_duration")]
+    pub ws_min_reconnect_delay: Duration,
+    #[serde(deserialize_with = "deserialize_duration")]
+    pub ws_max_reconnect_delay: Duration,
     pub ca_cert_path: Option<String>,
 }
 
