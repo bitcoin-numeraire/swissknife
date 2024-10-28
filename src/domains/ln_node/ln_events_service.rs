@@ -48,13 +48,11 @@ impl LnEventsUseCases for LnEventsService {
     async fn invoice_paid(&self, event: LnInvoicePaidEvent) -> Result<(), ApplicationError> {
         debug!(?event, "Processing incoming Lightning payment...");
 
-        let invoice_option = if let Some(ref hash) = event.payment_hash {
-            self.store.invoice.find_by_payment_hash(hash).await?
-        } else if let Some(id) = event.id {
-            self.store.invoice.find(id).await?
-        } else {
-            None
-        };
+        let invoice_option = self
+            .store
+            .invoice
+            .find_by_payment_hash(&event.payment_hash)
+            .await?;
 
         if let Some(mut invoice) = invoice_option {
             invoice.fee_msat = Some(event.fee_msat);

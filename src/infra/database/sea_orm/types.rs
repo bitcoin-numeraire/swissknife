@@ -164,11 +164,7 @@ impl From<ApiKeyModel> for ApiKey {
             name: model.name,
             key: None,
             key_hash: model.key_hash,
-            permissions: model
-                .permissions
-                .into_iter()
-                .map(|p| p.parse().expect(ASSERTION_MSG))
-                .collect(),
+            permissions: serde_json::from_value(model.permissions).expect(ASSERTION_MSG),
             description: model.description,
             created_at: model.created_at,
             expires_at: model.expires_at,

@@ -1,4 +1,9 @@
-use sea_orm_migration::prelude::*;
+use sea_orm_migration::{
+    prelude::*,
+    schema::{boolean, string_len_null},
+};
+
+use crate::m20240420_2_ln_address_table::LnAddress;
 
 #[derive(DeriveMigrationName)]
 pub struct Migration;
@@ -7,13 +12,20 @@ pub struct Migration;
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager
-            .get_connection()
-            .execute_unprepared(
-                r#"
-                ALTER TABLE ln_address
-                ADD COLUMN allows_nostr BOOLEAN NOT NULL DEFAULT false,
-                ADD COLUMN nostr_pubkey VARCHAR(255);
-                "#,
+            .alter_table(
+                Table::alter()
+                    .table(LnAddress::Table)
+                    .add_column(boolean(LnAddress::AllowsNostr).default(false))
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .alter_table(
+                Table::alter()
+                    .table(LnAddress::Table)
+                    .add_column(string_len_null(LnAddress::NostrPubkey, 255))
+                    .to_owned(),
             )
             .await?;
 
@@ -22,13 +34,20 @@ impl MigrationTrait for Migration {
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager
-            .get_connection()
-            .execute_unprepared(
-                r#"
-                ALTER TABLE ln_address
-                DROP COLUMN allows_nostr,
-                DROP COLUMN nostr_pubkey;
-                "#,
+            .alter_table(
+                Table::alter()
+                    .table(LnAddress::Table)
+                    .drop_column(LnAddress::AllowsNostr)
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .alter_table(
+                Table::alter()
+                    .table(LnAddress::Table)
+                    .drop_column(LnAddress::NostrPubkey)
+                    .to_owned(),
             )
             .await?;
 

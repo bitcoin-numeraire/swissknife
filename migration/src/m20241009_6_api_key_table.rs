@@ -1,4 +1,6 @@
-use sea_orm_migration::prelude::*;
+use sea_orm_migration::{prelude::*, schema::*};
+
+use crate::m20240420_1_wallet_table::Wallet;
 
 #[derive(DeriveMigrationName)]
 pub struct Migration;
@@ -7,33 +9,51 @@ pub struct Migration;
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager
-            .get_connection()
-            .execute_unprepared(
-                r#"
-            CREATE TABLE api_key (
-                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-                user_id VARCHAR(255) NOT NULL,
-                name VARCHAR(255) NOT NULL,
-                key_hash BYTEA UNIQUE NOT NULL,
-                permissions TEXT[] NOT NULL,
-                created_at TIMESTAMPTZ NOT NULL DEFAULT current_timestamp,
-                expires_at TIMESTAMPTZ,
-                description TEXT,
-                FOREIGN KEY (user_id) REFERENCES wallet(user_id) ON DELETE CASCADE
-            );
-            "#,
+            .create_table(
+                Table::create()
+                    .table(ApiKey::Table)
+                    .if_not_exists()
+                    .col(uuid(ApiKey::Id).primary_key())
+                    .col(string_len(ApiKey::UserId, 255))
+                    .col(string_len(ApiKey::Name, 255))
+                    .col(binary_len_uniq(ApiKey::KeyHash, 32))
+                    .col(json(ApiKey::Permissions))
+                    .col(text_null(ApiKey::Description))
+                    .col(timestamp(ApiKey::CreatedAt).default(Expr::current_timestamp()))
+                    .col(timestamp_null(ApiKey::ExpiresAt))
+                    .foreign_key(
+                        ForeignKey::create()
+                            .from(ApiKey::Table, ApiKey::UserId)
+                            .to(Wallet::Table, Wallet::UserId)
+                            .on_delete(ForeignKeyAction::Cascade),
+                    )
+                    .to_owned(),
             )
-            .await?;
-
-        Ok(())
+            .await
     }
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager
-            .get_connection()
-            .execute_unprepared("DROP TABLE api_key")
+            .drop_table(Table::drop().table(ApiKey::Table).to_owned())
+            .await?;
+
+        manager
+            .drop_foreign_key(ForeignKey::drop().table(ApiKey::Table).to_owned())
             .await?;
 
         Ok(())
     }
+}
+
+#[derive(DeriveIden)]
+pub(crate) enum ApiKey {
+    Table,
+    Id,
+    UserId,
+    Name,
+    KeyHash,
+    Permissions,
+    Description,
+    CreatedAt,
+    ExpiresAt,
 }

@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use chrono::Utc;
 use nostr_sdk::PublicKey;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, QueryOrder,
@@ -80,6 +81,7 @@ impl LnAddressRepository for SeaOrmLnAddressRepository {
         nostr_pubkey: Option<PublicKey>,
     ) -> Result<LnAddress, DatabaseError> {
         let model = ActiveModel {
+            id: Set(Uuid::new_v4()),
             wallet_id: Set(wallet_id),
             username: Set(username.to_owned()),
             allows_nostr: Set(allows_nostr),
@@ -104,6 +106,7 @@ impl LnAddressRepository for SeaOrmLnAddressRepository {
             allows_nostr: Set(ln_address.allows_nostr),
             nostr_pubkey: Set(ln_address.nostr_pubkey.map(|k| k.to_hex())),
             active: Set(ln_address.active),
+            updated_at: Set(Some(Utc::now())),
             ..Default::default()
         };
 

@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use chrono::Utc;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, DatabaseConnection, DatabaseTransaction, EntityTrait,
     QueryFilter, QueryOrder, QuerySelect, QueryTrait, Set, Unchanged,
@@ -74,6 +75,7 @@ impl PaymentRepository for SeaOrmPaymentRepository {
         payment: Payment,
     ) -> Result<Payment, DatabaseError> {
         let model = ActiveModel {
+            id: Set(Uuid::new_v4()),
             wallet_id: Set(payment.wallet_id),
             ln_address: Set(payment.ln_address),
             amount_msat: Set(payment.amount_msat as i64),
@@ -112,6 +114,7 @@ impl PaymentRepository for SeaOrmPaymentRepository {
             success_action: Set(payment
                 .success_action
                 .and_then(|action| serde_json::to_value(action).ok())),
+            updated_at: Set(Some(Utc::now())),
             ..Default::default()
         };
 
