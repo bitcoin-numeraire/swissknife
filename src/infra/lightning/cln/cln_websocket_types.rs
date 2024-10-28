@@ -1,12 +1,11 @@
+use crate::domains::ln_node::{LnInvoicePaidEvent, LnPayFailureEvent, LnPaySuccessEvent};
 use chrono::{TimeZone, Utc};
 use serde::Deserialize;
-use uuid::Uuid;
-
-use crate::domains::ln_node::{LnInvoicePaidEvent, LnPayFailureEvent, LnPaySuccessEvent};
+use serde_bolt::bitcoin::hashes::hex::ToHex;
 
 #[derive(Debug, Deserialize)]
 pub struct InvoicePayment {
-    pub label: Uuid,
+    pub preimage: String,
     pub msat: u64,
 }
 
@@ -34,9 +33,13 @@ pub struct SendPayFailureData {
 
 impl From<InvoicePayment> for LnInvoicePaidEvent {
     fn from(val: InvoicePayment) -> Self {
+        let preimage = hex::decode(val.preimage.clone()).expect("should be hex string");
+
+        let payment_hash = preimage.to_hex();
+        println!("payment_hash: {}", payment_hash);
+        println!("preimage: {}", val.preimage);
         LnInvoicePaidEvent {
-            id: Some(val.label),
-            payment_hash: None,
+            payment_hash,
             amount_received_msat: val.msat,
             fee_msat: 0,
             payment_time: Utc::now(),

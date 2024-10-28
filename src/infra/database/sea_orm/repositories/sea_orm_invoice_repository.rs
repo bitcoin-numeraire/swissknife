@@ -4,6 +4,7 @@ use crate::{
     infra::database::sea_orm::models::invoice::{ActiveModel, Column, Entity},
 };
 use async_trait::async_trait;
+use chrono::Utc;
 use sea_orm::{
     sea_query::Expr, ActiveModelTrait, ColumnTrait, Condition, DatabaseConnection,
     DatabaseTransaction, EntityTrait, QueryFilter, QueryOrder, QuerySelect, QueryTrait, Set,
@@ -90,7 +91,7 @@ impl InvoiceRepository for SeaOrmInvoiceRepository {
         invoice: Invoice,
     ) -> Result<Invoice, DatabaseError> {
         let mut model = ActiveModel {
-            id: Set(invoice.id),
+            id: Set(Uuid::new_v4()),
             wallet_id: Set(invoice.wallet_id),
             ln_address_id: Set(invoice.ln_address_id),
             description: Set(invoice.description),
@@ -140,6 +141,7 @@ impl InvoiceRepository for SeaOrmInvoiceRepository {
             description: Set(invoice.description),
             amount_received_msat: Set(invoice.amount_received_msat.map(|v| v as i64)),
             ledger: Set(invoice.ledger.to_string()),
+            updated_at: Set(Some(Utc::now())),
             ..Default::default()
         };
 

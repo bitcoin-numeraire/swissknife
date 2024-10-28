@@ -70,8 +70,7 @@ impl From<ListinvoicesInvoices> for Invoice {
 impl From<WaitanyinvoiceResponse> for LnInvoicePaidEvent {
     fn from(val: WaitanyinvoiceResponse) -> Self {
         LnInvoicePaidEvent {
-            id: None,
-            payment_hash: Some(val.payment_hash.to_hex()),
+            payment_hash: val.payment_hash.to_hex(),
             amount_received_msat: val.amount_received_msat.as_ref().unwrap().msat,
             fee_msat: 0,
             payment_time: Utc.timestamp_opt(val.paid_at() as i64, 0).unwrap(),

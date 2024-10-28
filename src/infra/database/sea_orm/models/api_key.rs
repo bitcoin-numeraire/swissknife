@@ -9,13 +9,13 @@ pub struct Model {
     pub id: Uuid,
     pub user_id: String,
     pub name: String,
-    #[sea_orm(column_type = "VarBinary(32)", unique)]
+    #[sea_orm(column_type = "Binary(32)", unique)]
     pub key_hash: Vec<u8>,
-    pub permissions: Vec<String>,
-    pub created_at: DateTimeUtc,
-    pub expires_at: Option<DateTimeUtc>,
+    pub permissions: Json,
     #[sea_orm(column_type = "Text", nullable)]
     pub description: Option<String>,
+    pub created_at: DateTimeUtc,
+    pub expires_at: Option<DateTimeUtc>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

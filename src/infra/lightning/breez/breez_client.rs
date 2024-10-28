@@ -266,10 +266,7 @@ impl LnClient for BreezClient {
             .await
             .map_err(|e| LightningError::Invoice(e.to_string()))?;
 
-        let mut invoice: Invoice = response.ln_invoice.into();
-        invoice.id = Uuid::new_v4();
-
-        Ok(invoice)
+        Ok(response.ln_invoice.into())
     }
 
     async fn pay(

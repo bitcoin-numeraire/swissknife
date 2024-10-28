@@ -19,7 +19,7 @@ use crate::{
     },
 };
 use tower_http::timeout::TimeoutLayer;
-use tracing::info;
+use tracing::{debug, info};
 
 pub struct AppState {
     pub services: AppServices,
@@ -30,6 +30,11 @@ pub struct AppState {
 
 impl AppState {
     pub async fn new(config: AppConfig) -> Result<Self, ApplicationError> {
+        info!(
+            "Numeraire SwissKnife version: {}",
+            env!("CARGO_PKG_VERSION")
+        );
+
         // Infra
         let timeout_layer = TimeoutLayer::new(config.web.request_timeout);
         let db_conn = SeaORMClient::connect(config.database.clone()).await?;
@@ -68,7 +73,7 @@ async fn get_ln_client(
                 ConfigError::MissingLightningProviderConfig(config.ln_provider.to_string())
             })?;
 
-            info!(
+            debug!(
                 working_dir = %breez_config.working_dir,
                 "Lightning provider: Breez"
             );
@@ -82,7 +87,7 @@ async fn get_ln_client(
                 ConfigError::MissingLightningProviderConfig(config.ln_provider.to_string())
             })?;
 
-            info!(config = ?cln_config, "Lightning provider: Core Lightning gRPC");
+            debug!(config = ?cln_config, "Lightning provider: Core Lightning gRPC");
 
             let client = ClnGrpcClient::new(cln_config.clone(), ln_events).await?;
 
@@ -93,7 +98,7 @@ async fn get_ln_client(
                 ConfigError::MissingLightningProviderConfig(config.ln_provider.to_string())
             })?;
 
-            info!(endpoint = %cln_config.endpoint, "Lightning provider: Core Lightning REST");
+            debug!(endpoint = %cln_config.endpoint, "Lightning provider: Core Lightning REST");
 
             let client = ClnRestClient::new(cln_config.clone(), ln_events).await?;
 
@@ -104,7 +109,7 @@ async fn get_ln_client(
                 ConfigError::MissingLightningProviderConfig(config.ln_provider.to_string())
             })?;
 
-            info!(config = ?lnd_config, "Lightning provider: LND");
+            debug!(config = ?lnd_config, "Lightning provider: LND");
 
             let client = LndRestClient::new(lnd_config.clone(), ln_events).await?;
 
@@ -122,7 +127,7 @@ async fn get_authenticator(
                 ConfigError::MissingAuthProviderConfig(config.auth_provider.to_string())
             })?;
 
-            info!(
+            debug!(
                 config = ?oauth2_config,
                 "Auth provider: OAuth2"
             );
@@ -135,7 +140,7 @@ async fn get_authenticator(
                 ConfigError::MissingAuthProviderConfig(config.auth_provider.to_string())
             })?;
 
-            info!(
+            debug!(
                 config = ?jwt_config,
                 "Auth provider: Local JWT"
             );

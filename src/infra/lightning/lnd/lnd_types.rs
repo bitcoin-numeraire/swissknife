@@ -122,8 +122,7 @@ impl From<InvoiceResponse> for Invoice {
 impl From<InvoiceResponse> for LnInvoicePaidEvent {
     fn from(val: InvoiceResponse) -> Self {
         LnInvoicePaidEvent {
-            id: None,
-            payment_hash: Some(hex_from_base64(&val.r_hash)),
+            payment_hash: hex_from_base64(&val.r_hash),
             amount_received_msat: val.amt_paid_msat,
             fee_msat: 0,
             payment_time: Utc.timestamp_opt(val.settle_date, 0).unwrap(),

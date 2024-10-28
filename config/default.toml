@@ -31,6 +31,7 @@ retry_delay = "5s"
 
 [cln_rest_config]
 endpoint = "http://localhost:3010"
+ca_cert_path = "certs/lightningd/ca.cert"
 rune = "CHANGE_ME"
 connect_timeout = "5s"
 timeout = "90s"
@@ -84,6 +85,7 @@ secret = "CHANGE_ME"
 
 # Database
 [database]
+url = "sqlite://storage/swissknife.db?mode=rwc"
 max_lifetime = "30m"
 idle_timeout = "5m"
 max_connections = 10
@@ -91,11 +93,3 @@ min_connections = 0
 acquire_timeout = "5s"
 connect_timeout = "30s"
 sqlx_logging = true
-
-# RGB
-[rgb]
-data_dir = "storage/rgblib"
-media_dir = "storage/media"
-electrum_url = "localhost:50001"
-proxy_server_url = "rpc://localhost:3030/json-rpc"
-min_confirmations = 3

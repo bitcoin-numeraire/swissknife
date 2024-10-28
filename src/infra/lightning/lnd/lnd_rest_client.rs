@@ -11,7 +11,6 @@ use reqwest::{
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_bolt::bitcoin::hashes::{sha256, Hash};
 use tokio::fs;
-use uuid::Uuid;
 
 use crate::{
     application::errors::LightningError,
@@ -209,10 +208,7 @@ impl LnClient for LndRestClient {
             .await
             .map_err(|e| LightningError::Invoice(e.to_string()))?;
 
-        let mut invoice: Invoice = response.into();
-        invoice.id = Uuid::new_v4();
-
-        Ok(invoice)
+        Ok(response.into())
     }
 
     async fn pay(

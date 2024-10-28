@@ -172,6 +172,7 @@ impl WalletRepository for SeaOrmWalletRepository {
 
     async fn insert(&self, user_id: &str) -> Result<Wallet, DatabaseError> {
         let model = ActiveModel {
+            id: Set(Uuid::new_v4()),
             user_id: Set(user_id.to_string()),
             ..Default::default()
         };
