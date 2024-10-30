@@ -1,0 +1,60 @@
+# Node modules directory
+node_modules
+node_modules/
+
+# Dependency directories
+bower_components
+jspm_packages
+
+# Log files
+*.log
+npm-debug.log*
+
+# Next.js build output
+.next
+out
+dist
+
+# Production build
+/build
+
+# Miscellaneous
+.DS_Store
+*.pem
+*.pid
+*.seed
+*.pid.lock
+
+# dotenv environment variables file
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Editor directories and files
+.vscode
+.idea
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# OS-specific files
+Thumbs.db
+Desktop.ini
+
+# Coverage directory used by tools like istanbul
+coverage
+coverage/
+
+# Git directories and files
+.git
+.gitignore
+.gitattributes
+
+# Docker files
+Dockerfile
+docker-compose.yml
+
+# Build scripts and configurations
+scripts/
