@@ -1,0 +1,421 @@
+{
+  "overview": "Aperçu",
+  "administration": "Administration",
+  "admin": "Admin",
+  "wallet": "Portefeuille",
+  "node": "Nœud",
+  "lightning_address": "Adresse LN",
+  "nostr_address": "Adresse Nostr",
+  "lightning_addresses": "Adresses LN",
+  "invoices": "Factures",
+  "invoice": "Facture",
+  "payments": "Paiements",
+  "payment": "Paiement",
+  "wallets": "Portefeuilles",
+  "dashboard": "Tableau de bord",
+  "contacts": "Contacts",
+  "settings": "Paramètres",
+  "api_keys": "Clés API",
+  "new": "Nouveau",
+  "node_management": "Gestion des nœuds",
+  "coming_soon": "Bientôt disponible!",
+  "copied_to_clipboard": "Copié dans le presse-papiers",
+  "download": "Télécharger",
+  "print": "Imprimer",
+  "delete": "Supprimer",
+  "clean": "Nettoyer",
+  "cancel": "Annuler",
+  "close": "Fermer",
+  "save": "Enregistrer",
+  "edit": "Modifier",
+  "copy": "Copier",
+  "details": "Détails",
+  "share": "Partager",
+  "done": "Terminé",
+  "register": "Enregistrer",
+  "confirm_delete_title": "Supprimer",
+  "confirm_delete_content": "Es-tu sûr de vouloir supprimer {{count}} éléments?",
+  "confirm_delete": "Es-tu sûr de vouloir supprimer?",
+  "status": "Statut :",
+  "date": "Date",
+  "date_filter": "Date :",
+  "keyword": "Mot-clé :",
+  "view": "Voir",
+  "export": "Exporter",
+  "start_date": "Date de début",
+  "end_date": "Date de fin",
+  "end_date_error": "La date de fin doit être ultérieure à la date de début",
+  "send": "Envoyer",
+  "request": "Requête",
+  "view_all": "Voir tous",
+  "sign_in": {
+    "sign_in_to_your_account": "Connecte-toi à ton compte",
+    "password": "Mot de passe",
+    "sign_in": "Se connecter",
+    "sign_in_loading": "Connexion..."
+  },
+  "not_found": {
+    "page_not_found_title": "Désolé, page non trouvée!",
+    "page_not_found_description": "Désolé, nous n'avons pas trouvé la page que tu recherches. Peut-être as-tu mal saisi l'URL ? Assure-toi de vérifier ton orthographe.",
+    "go_to_home": "Aller à l'accueil"
+  },
+  "ln_address_details": {
+    "copy": "Copier l'adresse LN",
+    "username": "Nom d'utilisateur",
+    "domain": "Domaine",
+    "creation_date": "Date de création",
+    "update_date": "Date de mise à jour",
+    "belongs_to": "Appartient à",
+    "active": "Active",
+    "nostr_visible": "Visible sur Nostr",
+    "deactivated": "Désactivée",
+    "nostr_deactivated": "Nostr désactivé"
+  },
+  "nostr_details": {
+    "nostr_pubkey": "Clé publique Nostr",
+    "register_button": "Enregistrer clé Nostr",
+    "alert": "Lier votre adresse Lightning ({{lnAddress}}) à votre clé publique Nostr permet aux gens de vous trouver facilement sur Nostr. Cela vous permet également d’être vérifié et d’obtenir une coche (NIP-05)."
+  },
+  "ln_address_list": {
+    "username": "Nom d'utilisateur",
+    "wallet": "Portefeuille",
+    "nostr_pubkey": "Clé publique Nostr",
+    "created": "Créé",
+    "updated": "MàJ",
+    "status": "Statut",
+    "allows_nostr": "Statut Nostr",
+    "delete_success": "Adresse supprimée avec succès",
+    "delete_multiple_success": "{{count}} adresses supprimées avec succès",
+    "tabs": {
+      "total": "Total",
+      "active": "Activées",
+      "inactive": "Désactivées",
+      "addresses": "adresses"
+    }
+  },
+  "ln_address_table_row": {
+    "active": "Actif",
+    "inactive": "Inactif"
+  },
+  "ln_address_table_toolbar": {
+    "search_placeholder": "Rechercher ID, Portefeuille ou Nom d'utilisateur"
+  },
+  "wallet_view": {
+    "total_balance": "Solde total",
+    "balance_tooltip": "Somme des soldes de tous les portefeuilles",
+    "income": "Revenus",
+    "income_tooltip": "Revenus totaux",
+    "expenses": "Dépenses",
+    "expenses_tooltip": "Dépenses totales",
+    "quick_transfer": "Transfert rapide",
+    "receive_bitcoin": "Recevoir du Bitcoin",
+    "contacts": "Contacts"
+  },
+  "wallet_contacts": {
+    "subheader": "Tu as {{count}} contacts",
+    "view_all": "Voir tout",
+    "quick_transfer": "Transfert rapide"
+  },
+  "current_balance": {
+    "current_balance": "Solde actuel",
+    "fees_paid": "Frais payés",
+    "fiat_amount": "Montant en fiat",
+    "refresh": "Actualiser"
+  },
+  "wallet_list": {
+    "user": "Utilisateur",
+    "ln_address": "Addresse LN",
+    "balance": "Montant",
+    "invoices": "Factures",
+    "payments": "Paiements",
+    "contacts": "Contacts",
+    "created": "Créé",
+    "delete_success": "Portefeuille supprimé avec succès",
+    "delete_multiple_success": "{{count}} portefeuilles supprimés avec succès"
+  },
+  "wallet_table_row": {
+    "new_payment": "Nouveau paiement",
+    "new_invoice": "Nouvelle facture",
+    "copy_ln_address": "Copier l'adresse LN",
+    "send_to_ln_address": "Envoyer à l'adresse LN"
+  },
+  "wallet_toolbar": {
+    "search_placeholder": "Rechercher ID, Utilisateur ou Adresse LN"
+  },
+  "transaction_list": {
+    "description": "Description",
+    "wallet": "Portefeuille",
+    "created": "Créé",
+    "expires": "Expire",
+    "settled": "Réglé",
+    "amount": "Montant",
+    "type": "Type",
+    "status": "Statut",
+    "tabs": {
+      "total": "Total",
+      "paid": "Payés",
+      "pending": "En attente",
+      "expired": "Expirées",
+      "failed": "Échoués",
+      "invoices_suffix": "factures",
+      "payments_suffix": "paiements"
+    },
+    "delete_success": "Transaction supprimée avec succès",
+    "delete_error": "Erreur lors de la suppression de la transaction",
+    "transaction_deleted": "Transaction supprimée avec succès",
+    "transactions_deleted": "{{count}} transactions supprimées avec succès"
+  },
+  "invoice_list": {
+    "clean_expired_invoices": "Nettoyer les factures expirées"
+  },
+  "payment_list": {
+    "clean_failed_payments": "Nettoyer les paiements échoués"
+  },
+  "transaction_details": {
+    "creation_date": "Date de création",
+    "settlement_date": "Date de règlement",
+    "description": "Description",
+    "ledger": "Registre",
+    "currency": "Devise",
+    "settled": "Réglé",
+    "pending": "En attente",
+    "expired": "Expiré",
+    "failed": "Échoué",
+    "lightning": "Lightning",
+    "internal": "Interne",
+    "payment_hash": "Hash de paiement"
+  },
+  "invoice_details": {
+    "amount_requested": "Montant demandé",
+    "amount_received": "Montant reçu",
+    "channel_opening_fees": "Frais",
+    "is_lnurl": "LNURL?",
+    "expiration_date": "Date d'expiration",
+    "min_final_cltv_delta": "Delta CLTV final minimum",
+    "bolt11": "Bolt11",
+    "payment_secret": "Secret de paiement",
+    "payee_pubkey": "Clé publique du bénéficiaire",
+    "invoice_from": "Facture de"
+  },
+  "payment_details": {
+    "amount_sent": "Montant envoyé",
+    "fees": "Frais",
+    "total_amount": "Montant total",
+    "lightning_address": "Adresse Lightning",
+    "success_action": "Action réussie",
+    "message": "Message",
+    "success_description": "Description",
+    "payment_preimage": "Préimage du paiement",
+    "error_message": "Message d'erreur",
+    "payment_from": "Paiement de"
+  },
+  "recent_transactions": {
+    "title": "Transactions récentes",
+    "subheader": "Dernières {{count}} transactions",
+    "clean_failed_expired": "Nettoyer les transactions échouées et expirées",
+    "empty_description": "Description vide"
+  },
+  "transaction_filters": {
+    "ledger": "Registre :",
+    "status": "Statut :",
+    "date": "Date :",
+    "keyword": "Mot-clé :"
+  },
+  "transaction_table_toolbar": {
+    "search_placeholder": "Description, portefeuille ou addresse LN"
+  },
+  "transaction_toolbar": {
+    "copy_details": "Copier les détails",
+    "delete_invoice_success": "Facture supprimée avec succès : {{id}}",
+    "delete_payment_success": "Paiement supprimé avec succès : {{id}}"
+  },
+  "clean_transactions_button": {
+    "invoices_deleted_success": "{{count}} factures supprimées avec succès",
+    "payments_deleted_success": "{{count}} paiements supprimés avec succès",
+    "clean_transactions": "Nettoyer les transactions"
+  },
+  "confirm_payment_dialog": {
+    "title": "Transférer à",
+    "success_message": "envoyé avec succès à",
+    "message_from_recipient": "Message du destinataire",
+    "confirm_send": "Confirmer & Envoyer",
+    "write_message_placeholder": "Message pour le destinataire",
+    "bolt11_transfer": "Transfert Bolt11",
+    "internal_transfer": "Transfert interne",
+    "lnurl_transfer": "Transfert LNURL",
+    "lightning_transfer": "Transfert Lightning"
+  },
+  "new_invoice": {
+    "generate_invoice": "Générer facture",
+    "insert_amount": "Insérer le montant",
+    "add_note": "Ajouter une note",
+    "receive": "Recevoir",
+    "btc_exchange_rate": "1 BTC = {{rate}}"
+  },
+  "new_payment": {
+    "send_payment": "Envoyer Paiement",
+    "recent": "Récents",
+    "recipient": "Destinataire",
+    "recipient_placeholder": "Facture, Adresse Lightning ou LNURL",
+    "your_balance": "Ton solde",
+    "transfer": "Transférer",
+    "scan_qr": "Scanner QR"
+  },
+  "register_wallet": {
+    "title": "Nouveau portefeuille",
+    "success_wallet_registration": "Portefeuille enregistré avec succès"
+  },
+  "register_ln_address": {
+    "title": "Nouvelle Adresse Lightning",
+    "register_lightning_address_welcome": "Il semble que tu n'aies pas encore enregistré une adresse Lightning. C'est facile et cela ne prend que quelques secondes.",
+    "missing_lightning_address_nostr": "Tu dois d'abord enregistrer une adresse Lightning avant de pouvoir lier ton compte Nostr.",
+    "success_lightning_address_registration": "Adresse Lightning enregistrée avec succès"
+  },
+  "breez_node_view": {
+    "node": "Nœud",
+    "admin": "Admin",
+    "node_management": "Gestion des nœuds",
+    "total_balance": "Solde total",
+    "total_balance_tooltip": "Somme des soldes Lightning et on-chain",
+    "total_received": "Total reçu",
+    "total_received_tooltip": "Somme de toutes les factures réglées",
+    "total_sent": "Total envoyé",
+    "total_sent_tooltip": "Somme de tous les paiements réglés",
+    "current_balance": "Solde actuel",
+    "registered_ln_addresses": "{{count}} enregistrées",
+    "available_lsps": "LSPs disponibles",
+    "lsp_table_labels": {
+      "details": "Détails",
+      "id": "ID",
+      "host": "Hôte",
+      "base_fee": "Frais de base",
+      "fee_rate": "Taux de frais",
+      "timelock_delta": "Délai Timelock",
+      "min_htlc": "Min HTLC",
+      "status": "Statut"
+    }
+  },
+  "node_view": {
+    "heading": "Nœud Lightning",
+    "admin": "Admin",
+    "node_management": "Gestion des nœuds",
+    "volume": "Volume",
+    "volume_tooltip": "Somme des montants des transactions Lightning et on-chain",
+    "received": "Reçu",
+    "received_tooltip": "Somme de toutes les factures réglées",
+    "sent": "Envoyé",
+    "sent_tooltip": "Somme de tous les paiements réglés",
+    "registered_ln_addresses": "{{count}} enregistrées"
+  },
+  "node_current_balance": {
+    "sync_node": "Synchroniser le nœud",
+    "download_backup": "Télécharger le backup des channels",
+    "redeem_onchain_funds": "Récupérer des fonds on-chain",
+    "max_receivable": "Recevable max",
+    "channels_balance": "Solde des channels",
+    "inbound_liquidity": "Liquidité entrante",
+    "onchain_balance": "Solde on-chain",
+    "pending_onchain_balance": "Solde on-chain en attente",
+    "redeem_dialog": {
+      "title": "Récupérer des fonds on-chain",
+      "description": "Récupérer <b>{{amount}}</b> fonds on-chain à une adresse de ton choix.",
+      "address_label": "Adresse",
+      "fee_rate_label": "Taux de frais (sat/vB)",
+      "transaction_id": "Merci de copier l'ID de transaction suivant. Tu en auras besoin pour suivre tes fonds jusqu'à la fin du processus de récupération.",
+      "redeem_button": "Récupérer"
+    }
+  },
+  "latest_ln_addresses": {
+    "card_title": "Dernières addresses LN"
+  },
+  "lsp_list": {
+    "title": "LSPs disponibles",
+    "subheader": "Liste des fournisseurs de services Lightning disponibles",
+    "copy_pubkey": "Copier la clé publique",
+    "copy_host": "Copier l'hôte",
+    "connect": "Se connecter",
+    "close_channels": "Fermer les channels",
+    "active": "Actif",
+    "inactive": "Inactif",
+    "confirm_connect": {
+      "title": "Se connecter",
+      "content": "Es-tu sûr de vouloir te connecter à {{name}}?",
+      "connect_button": "Se connecter"
+    },
+    "confirm_close_channels": {
+      "title": "Fermer les channels",
+      "content": "Es-tu sûr de vouloir fermer tous les channels avec {{name}}? Les fonds seront retournés à ton portefeuille on-chain, et tu pourras les récupérer après la fin du processus de fermeture.",
+      "close_button": "Fermer les channels"
+    },
+    "closing_dialog": {
+      "title": "Transactions de fermeture",
+      "content": "Merci de copier les identifiants de transaction suivants. Tu en auras besoin pour suivre tes fonds jusqu'à la fin du processus de fermeture."
+    }
+  },
+  "sign_message": {
+    "title": "Signer le message",
+    "message_label": "Message à signer",
+    "sign_button": "Signer",
+    "signature_dialog_title": "Signature"
+  },
+  "verify_message": {
+    "title": "Vérifier le message",
+    "message_label": "Message",
+    "signature_label": "Signature",
+    "pubkey_label": "Clé publique du nœud",
+    "verify_button": "Vérifier",
+    "verification_success": "Vérification réussie.",
+    "verification_failed": "Échec de la vérification. Le message n'appartient pas au nœud pour la signature donnée."
+  },
+  "settings_view": {
+    "manage_account": "Gérer ton compte"
+  },
+  "settings_ln_address": {
+    "update_failed": "Échec de mise à jour de l'adresse LN",
+    "update_success": "Adresse LN mise à jour avec succès",
+    "delete_failed": "Échec de la suppression de l'adresse LN",
+    "delete_success": "Adresse LN supprimée avec succès",
+    "delete_button": "Supprimer l'adresse LN",
+    "active": "Active",
+    "nostr_visible": "Visible sur Nostr",
+    "username": "Nom d'utilisateur",
+    "nostr_pubkey": "Clé publique Nostr",
+    "alert": "Changer ton nom d'utilisateur le libérera pour qu'un autre utilisateur puisse le réclamer. Tu cesseras de recevoir des paiements à partir de cette adresse après le changement.",
+    "save": "Enregistrer"
+  },
+  "settings_api_key": {
+    "title": "Jetons d'accès personnel",
+    "description": "Générez des jetons avec des permissions personnalisées pour améliorer la sécurité de votre accès API. Les jetons que vous avez générés vous permettent d'accéder à l'API REST. Ces jetons fonctionnent comme un nom d'utilisateur et un mot de passe combinés pour l'authentification API.",
+    "alert": "Sauvegardez vos jetons et gardez-les en sécurité, ne les partagez pas publiquement. Les permissions des jetons ne peuvent plus être modifiées. Pour effectuer des changements, veuillez créer un nouveau jeton et supprimer l'ancien.",
+    "revoke": "Révoquer",
+    "revoke_success": "Clé API révoquée avec succès",
+    "generate_success": "Jeton API généré avec succès",
+    "generate_failed": "Échec de la génération du jeton API",
+    "confirm_revoke": "Êtes-vous sûr de vouloir révoquer ce jeton API ?",
+    "new_dialog_title": "Générer un nouveau jeton API"
+  },
+  "create_api_key_form": {
+    "create_success": "Jeton API créé avec succès",
+    "create_button": "Générer un jeton",
+    "name": "Nom du jeton",
+    "expiration": "Expiration",
+    "description": "Description",
+    "key": "Clé secrète",
+    "no_permissions": "Ce jeton API peut accéder aux endpoints du portefeuille utilisateur.",
+    "copy": "Copier le jeton",
+    "key_display_message": "Sauvegardez votre jeton et gardez-le en sécurité, ne le partagez pas publiquement. Ce jeton ne sera plus jamais affiché."
+  },
+  "api_key_list": {
+    "user": "Utilisateur",
+    "name": "Nom",
+    "scopes": "Permissions",
+    "description": "Description",
+    "created": "Créé",
+    "expires": "Expire",
+    "delete_success": "Clé API supprimée avec succès",
+    "delete_multiple_success": "{{count}} clés API supprimées avec succès",
+    "search_placeholder": "Rechercher ID, Utilisateur ou Nom",
+    "never": "Jamais",
+    "user_wallet_permission": "read:user_wallet"
+  }
+}

@@ -1,0 +1,419 @@
+{
+  "overview": "Overview",
+  "administration": "Administration",
+  "admin": "Admin",
+  "wallet": "Wallet",
+  "node": "Node",
+  "lightning_address": "LN Address",
+  "nostr_address": "Nostr Address",
+  "lightning_addresses": "LN Addresses",
+  "invoices": "Invoices",
+  "invoice": "Invoice",
+  "payments": "Payments",
+  "payment": "Payment",
+  "wallets": "Wallets",
+  "dashboard": "Dashboard",
+  "contacts": "Contacts",
+  "settings": "Settings",
+  "api_keys": "API Keys",
+  "new": "New",
+  "node_management": "Node Management",
+  "coming_soon": "Coming soon!",
+  "copied_to_clipboard": "Copied to clipboard",
+  "download": "Download",
+  "print": "Print",
+  "delete": "Delete",
+  "clean": "Clean",
+  "cancel": "Cancel",
+  "close": "Close",
+  "save": "Save",
+  "edit": "Edit",
+  "copy": "Copy",
+  "details": "Details",
+  "share": "Share",
+  "done": "Done",
+  "register": "Register",
+  "confirm_delete_title": "Delete",
+  "confirm_delete_content": "Are you sure want to delete {{count}} items?",
+  "confirm_delete": "Are you sure want to delete?",
+  "status": "Status:",
+  "date": "Date",
+  "date_filter": "Date:",
+  "keyword": "Keyword:",
+  "view": "View",
+  "export": "Export",
+  "start_date": "Start date",
+  "end_date": "End date",
+  "end_date_error": "End date must be later than start date",
+  "send": "Send",
+  "request": "Request",
+  "important": "Important",
+  "view_all": "View All",
+  "sign_in": {
+    "sign_in_to_your_account": "Sign in to your account",
+    "password": "Password",
+    "sign_in": "Sign in",
+    "sign_in_loading": "Sign in..."
+  },
+  "not_found": {
+    "page_not_found_title": "Sorry, page not found!",
+    "page_not_found_description": "Sorry, we couldn’t find the page you’re looking for. Perhaps you’ve mistyped the URL? Be sure to check your spelling.",
+    "go_to_home": "Go to home"
+  },
+  "ln_address_details": {
+    "copy": "Copy LN Address",
+    "username": "Username",
+    "domain": "Domain",
+    "creation_date": "Creation Date",
+    "update_date": "Update Date",
+    "belongs_to": "Belongs to",
+    "active": "Active",
+    "nostr_visible": "Visible on Nostr",
+    "deactivated": "Deactivated",
+    "nostr_deactivated": "Nostr deactivated"
+  },
+  "nostr_details": {
+    "nostr_pubkey": "Nostr public key",
+    "register_button": "Register Nostr key",
+    "alert": "Linking your Lightning Address ({{lnAddress}}) to your Nostr public key allow people to easily find you on Nostr. This also allows you to get verified and get a checkmark (NIP-05)."
+  },
+  "ln_address_list": {
+    "username": "Username",
+    "wallet": "Wallet",
+    "nostr_pubkey": "Nostr pubkey",
+    "created": "Created",
+    "updated": "Updated",
+    "status": "Status",
+    "allows_nostr": "Nostr status",
+    "delete_success": "Address deleted successfully",
+    "delete_multiple_success": "{{count}} addresses deleted successfully",
+    "tabs": {
+      "total": "Total",
+      "active": "Active",
+      "inactive": "Inactive",
+      "addresses": "addresses"
+    }
+  },
+  "ln_address_table_row": {
+    "active": "Active",
+    "inactive": "Inactive"
+  },
+  "ln_address_table_toolbar": {
+    "search_placeholder": "Search id, wallet or username"
+  },
+  "wallet_view": {
+    "total_balance": "Total balance",
+    "balance_tooltip": "Sum of balances of all wallets",
+    "income": "Income",
+    "income_tooltip": "Total income",
+    "expenses": "Expenses",
+    "expenses_tooltip": "Total expenses",
+    "quick_transfer": "Quick Transfer",
+    "receive_bitcoin": "Receive Bitcoin",
+    "contacts": "Contacts"
+  },
+  "wallet_contacts": {
+    "subheader": "You have {{count}} contacts",
+    "view_all": "View All",
+    "quick_transfer": "Quick Transfer"
+  },
+  "current_balance": {
+    "current_balance": "Current Balance",
+    "fees_paid": "Fees paid",
+    "fiat_amount": "Fiat amount",
+    "refresh": "Refresh"
+  },
+  "wallet_list": {
+    "user": "User",
+    "ln_address": "LN Address",
+    "balance": "Balance",
+    "invoices": "Invoices",
+    "payments": "Payments",
+    "contacts": "Contacts",
+    "created": "Created",
+    "updated": "Updated",
+    "delete_success": "Wallet deleted successfully",
+    "delete_multiple_success": "{{count}} wallets deleted successfully"
+  },
+  "wallet_table_row": {
+    "new_payment": "New Payment",
+    "new_invoice": "New Invoice",
+    "copy_ln_address": "Copy LN Address",
+    "send_to_ln_address": "Send to LN Address"
+  },
+  "wallet_toolbar": {
+    "search_placeholder": "Search ID, User or LN Address"
+  },
+  "transaction_list": {
+    "description": "Description",
+    "wallet": "Wallet",
+    "created": "Created",
+    "expires": "Expires",
+    "settled": "Settled",
+    "amount": "Amount",
+    "type": "Type",
+    "status": "Status",
+    "tabs": {
+      "total": "Total",
+      "paid": "Paid",
+      "pending": "Pending",
+      "expired": "Expired",
+      "failed": "Failed",
+      "invoices_suffix": "invoices",
+      "payments_suffix": "payments"
+    },
+    "delete_success": "Transaction deleted successfully",
+    "delete_error": "Error deleting transaction",
+    "transaction_deleted": "Transaction deleted successfully",
+    "transactions_deleted": "{{count}} transactions deleted successfully"
+  },
+  "invoice_list": {
+    "clean_expired_invoices": "Clean expired invoices"
+  },
+  "payment_list": {
+    "clean_failed_payments": "Clean failed payments"
+  },
+  "transaction_details": {
+    "creation_date": "Creation Date",
+    "settlement_date": "Settlement Date",
+    "description": "Description",
+    "ledger": "Ledger",
+    "currency": "Currency",
+    "settled": "Settled",
+    "pending": "Pending",
+    "expired": "Expired",
+    "failed": "Failed",
+    "lightning": "Lightning",
+    "internal": "Internal",
+    "payment_hash": "Payment Hash"
+  },
+  "invoice_details": {
+    "amount_requested": "Amount requested",
+    "amount_received": "Amount received",
+    "fees": "Fees",
+    "is_lnurl": "Is LNURL?",
+    "expiration_date": "Expiration Date",
+    "min_final_cltv_delta": "Min final CLTV delta",
+    "bolt11": "Bolt11",
+    "payment_secret": "Payment Secret",
+    "payee_pubkey": "Payee public key",
+    "invoice_from": "Invoice From"
+  },
+  "payment_details": {
+    "amount_sent": "Amount sent",
+    "fees": "Fees",
+    "total_amount": "Total Amount",
+    "lightning_address": "Lightning Address",
+    "success_action": "Success action",
+    "message": "Message",
+    "success_description": "Description",
+    "payment_preimage": "Payment Preimage",
+    "error_message": "Error message",
+    "payment_from": "Payment From"
+  },
+  "recent_transactions": {
+    "title": "Recent Transactions",
+    "subheader": "Last {{count}} transactions",
+    "clean_failed_expired": "Clean failed and expired transactions",
+    "empty_description": "Empty description"
+  },
+  "transaction_filters": {
+    "ledger": "Ledger:",
+    "status": "Status:",
+    "date": "Date:",
+    "keyword": "Keyword:"
+  },
+  "transaction_table_toolbar": {
+    "search_placeholder": "ID, wallet or LN Address"
+  },
+  "transaction_toolbar": {
+    "copy_details": "Copy details",
+    "delete_invoice_success": "Invoice deleted successfully: {{id}}",
+    "delete_payment_success": "Payment deleted successfully: {{id}}"
+  },
+  "clean_transactions_button": {
+    "invoices_deleted_success": "{{count}} invoices deleted successfully",
+    "payments_deleted_success": "{{count}} payments deleted successfully",
+    "clean_transactions": "Clean Transactions"
+  },
+  "confirm_payment_dialog": {
+    "title": "Transfer to",
+    "success_message": "sent successfully to",
+    "message_from_recipient": "Message from recipient",
+    "confirm_send": "Confirm & Send",
+    "write_message_placeholder": "Write a message for the recipient",
+    "bolt11_transfer": "Bolt11 Transfer",
+    "internal_transfer": "Internal Transfer",
+    "lnurl_transfer": "LNURL Transfer",
+    "lightning_transfer": "Lightning Transfer"
+  },
+  "new_invoice": {
+    "generate_invoice": "Generate Invoice",
+    "insert_amount": "Insert amount",
+    "add_note": "Add note",
+    "receive": "Receive",
+    "btc_exchange_rate": "1 BTC = {{rate}}"
+  },
+  "new_payment": {
+    "send_payment": "Send Payment",
+    "recent": "Recent",
+    "recipient": "Recipient",
+    "recipient_placeholder": "Invoice, Lightning Address or LNURL",
+    "your_balance": "Your balance",
+    "transfer": "Transfer",
+    "scan_qr": "Scan QR"
+  },
+  "register_wallet": {
+    "title": "Register New Wallet",
+    "success_wallet_registration": "Wallet registered successfully"
+  },
+  "register_ln_address": {
+    "title": "Register New Lightning Address",
+    "register_lightning_address_welcome": "It looks like you haven't registered a Lightning Address yet. by doing so, people will be able to send you Bitcoin instantly, as easily as sending an email.",
+    "missing_lightning_address_nostr": "You first need to register a Lightning Address before you can link it to your Nostr account.",
+    "success_lightning_address_registration": "Lightning Address registered successfully"
+  },
+  "breez_node_view": {
+    "node": "Node",
+    "total_balance": "Total balance",
+    "total_balance_tooltip": "Sum of Lightning and on-chain balances",
+    "total_received": "Total Received",
+    "total_received_tooltip": "Sum of all settled invoices",
+    "total_sent": "Total Sent",
+    "total_sent_tooltip": "Sum of all settled payments",
+    "current_balance": "Current Balance",
+    "registered_ln_addresses": "{{count}} registered",
+    "available_lsps": "Available LSPs",
+    "lsp_table_labels": {
+      "details": "Details",
+      "id": "ID",
+      "host": "Host",
+      "base_fee": "Base fee",
+      "fee_rate": "Fee rate",
+      "timelock_delta": "Timelock Delta",
+      "min_htlc": "Min HTLC",
+      "status": "Status"
+    }
+  },
+  "node_view": {
+    "heading": "Lightning Node",
+    "volume": "Volume",
+    "volume_tooltip": "Sum of Lightning and on-chain transaction amounts",
+    "received": "Received",
+    "received_tooltip": "Sum of all settled invoices",
+    "sent": "Sent",
+    "sent_tooltip": "Sum of all settled payments",
+    "registered_ln_addresses": "{{count}} registered"
+  },
+  "node_current_balance": {
+    "sync_node": "Sync node",
+    "download_backup": "Download Channels Backup",
+    "redeem_onchain_funds": "Redeem on-chain Funds",
+    "max_receivable": "Max receivable",
+    "channels_balance": "Channels balance",
+    "inbound_liquidity": "Inbound liquidity",
+    "onchain_balance": "On-chain balance",
+    "pending_onchain_balance": "Pending On-chain balance",
+    "redeem_dialog": {
+      "title": "Redeem Onchain Funds",
+      "description": "Redeem <b>{{amount}}</b> onchain funds to an address of your choice.",
+      "address_label": "Address",
+      "fee_rate_label": "Fee Rate (sat/vB)",
+      "transaction_id": "Please copy the following transaction ID. You will need it to keep track of your funds until the redeem process is completed.",
+      "redeem_button": "Redeem"
+    }
+  },
+  "latest_ln_addresses": {
+    "card_title": "Latest LN Addresses"
+  },
+  "lsp_list": {
+    "title": "Available LSPs",
+    "subheader": "List of available Lightning Service Providers",
+    "copy_pubkey": "Copy Pubkey",
+    "copy_host": "Copy Host",
+    "connect": "Connect",
+    "close_channels": "Close Channels",
+    "active": "Active",
+    "inactive": "Inactive",
+    "confirm_connect": {
+      "title": "Connect",
+      "content": "Are you sure you want to connect to {{name}}?",
+      "connect_button": "Connect"
+    },
+    "confirm_close_channels": {
+      "title": "Close Channels",
+      "content": "Are you sure you want to close all channels with {{name}}? Funds will be returned to your on-chain wallet, and you will be able to redeem them after the closing process is completed.",
+      "close_button": "Close Channels"
+    },
+    "closing_dialog": {
+      "title": "Closing transactions",
+      "content": "Please copy the following transaction IDs. You will need them to keep track of your funds until the closing process is completed."
+    }
+  },
+  "sign_message": {
+    "title": "Sign Message",
+    "message_label": "Message to Sign",
+    "sign_button": "Sign",
+    "signature_dialog_title": "Signature"
+  },
+  "verify_message": {
+    "title": "Verify Message",
+    "message_label": "Message",
+    "signature_label": "Signature",
+    "pubkey_label": "Node Public Key",
+    "verify_button": "Verify",
+    "verification_success": "Verification succeeded.",
+    "verification_failed": "Verification failed. The message does not belong to the node for the given signature."
+  },
+  "settings_view": {
+    "manage_account": "Manage your account"
+  },
+  "settings_ln_address": {
+    "update_failed": "Failed to update LN Address",
+    "update_success": "LN Address updated successfully",
+    "delete_failed": "Failed to delete LN Address",
+    "delete_success": "LN Address deleted successfully",
+    "delete_button": "Delete LN Address",
+    "active": "Active",
+    "nostr_visible": "Visible on Nostr",
+    "username": "Username",
+    "nostr_pubkey": "Nostr pubkey",
+    "alert": "Changing your username will free it for any other user to claim. You will cease receiving payments from that address after the change.",
+    "save": "Save changes"
+  },
+  "settings_api_key": {
+    "title": "Personal access tokens",
+    "description": "Generate tokens with custom scopes to enhance the security of your API access. Tokens you have generated allow you to access the REST API. These tokens function like a combined name and password for API authentication.",
+    "alert": "Save your tokens and keep them secure, do not share them publicly or expose them in code repositories. Token scopes can no longer be edited. To make changes, please create a new token and delete the previous one.",
+    "revoke": "Revoke",
+    "revoke_success": "API key revoked successfully",
+    "generate_success": "API token generated successfully",
+    "generate_failed": "Failed to generate API token",
+    "confirm_revoke": "Are you sure you want to revoke this API token?",
+    "new_dialog_title": "Generate a new API token"
+  },
+  "create_api_key_form": {
+    "create_success": "API token created successfully",
+    "create_button": "Generate token",
+    "name": "Token name",
+    "expiration": "Expiration",
+    "description": "Description",
+    "key": "Secret key",
+    "no_permissions": "This API token can access User Wallet endpoints.",
+    "copy": "Copy token",
+    "key_display_message": "Save your token and keep it secure, do not share it publicly or expose it in code repositories. This token will never be displayed anymore."
+  },
+  "api_key_list": {
+    "user": "User",
+    "name": "Name",
+    "scopes": "Scopes",
+    "description": "Description",
+    "created": "Created",
+    "expires": "Expires",
+    "delete_success": "API key deleted successfully",
+    "delete_multiple_success": "{{count}} API keys deleted successfully",
+    "search_placeholder": "Search ID, User or Name",
+    "never": "Never",
+    "user_wallet_permission": "read:user_wallet"
+  }
+}
