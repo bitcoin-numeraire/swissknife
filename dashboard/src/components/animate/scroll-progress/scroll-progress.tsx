@@ -18,7 +18,7 @@ export interface ScrollProgressProps extends BoxProps {
 export function ScrollProgress({ size, variant, progress, thickness = 3.6, color = 'primary', sx, ...other }: ScrollProgressProps) {
   const scaleX = useSpring(progress, { stiffness: 100, damping: 30, restDelta: 0.001 });
 
-  const progressSize = variant === 'circular' ? size ?? 64 : size ?? 3;
+  const progressSize = variant === 'circular' ? (size ?? 64) : (size ?? 3);
 
   const renderCircular = (
     <Box
