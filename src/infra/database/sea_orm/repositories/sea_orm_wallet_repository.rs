@@ -1,8 +1,8 @@
 use async_trait::async_trait;
 use sea_orm::{
     ActiveModelTrait, ActiveValue::Set, ColumnTrait, ConnectionTrait, DatabaseConnection,
-    DatabaseTransaction, EntityTrait, FromQueryResult, ModelTrait, QueryFilter, QueryOrder,
-    QuerySelect, QueryTrait, Statement,
+    DatabaseTransaction, EntityTrait, FromQueryResult, ModelTrait, PaginatorTrait, QueryFilter,
+    QueryOrder, QuerySelect, QueryTrait, Statement,
 };
 use uuid::Uuid;
 
@@ -255,5 +255,14 @@ impl WalletRepository for SeaOrmWalletRepository {
             .map_err(|e| DatabaseError::Delete(e.to_string()))?;
 
         Ok(result.rows_affected)
+    }
+
+    async fn count(&self) -> Result<u64, DatabaseError> {
+        let count = Entity::find()
+            .count(&self.db)
+            .await
+            .map_err(|e| DatabaseError::Count(e.to_string()))?;
+
+        Ok(count)
     }
 }

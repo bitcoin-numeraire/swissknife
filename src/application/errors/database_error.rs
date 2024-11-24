@@ -30,6 +30,9 @@ pub enum DatabaseError {
     #[error("Failed to delete resource: {0}")]
     Delete(String),
 
+    #[error("Failed to count resource: {0}")]
+    Count(String),
+
     #[error("Failed to perform transaction operation: {0}")]
     Transaction(String),
 
