@@ -1,5 +1,7 @@
 import type { ApiKeyResponse } from 'src/lib/swissknife';
 
+import { useBoolean, usePopover } from 'minimal-shared/hooks';
+
 import { LoadingButton } from '@mui/lab';
 import MenuItem from '@mui/material/MenuItem';
 import TableRow from '@mui/material/TableRow';
@@ -10,8 +12,6 @@ import Typography from '@mui/material/Typography';
 import ListItemText from '@mui/material/ListItemText';
 import { Stack, Avatar, Tooltip, MenuList, Collapse } from '@mui/material';
 
-import { useBoolean } from 'src/hooks/use-boolean';
-
 import { fDate, fTime } from 'src/utils/format-time';
 import { truncateText } from 'src/utils/format-string';
 
@@ -20,7 +20,7 @@ import { useTranslate } from 'src/locales';
 import { Label } from 'src/components/label';
 import { Iconify } from 'src/components/iconify';
 import { ConfirmDialog } from 'src/components/custom-dialog';
-import { usePopover, CustomPopover } from 'src/components/custom-popover';
+import { CustomPopover } from 'src/components/custom-popover';
 
 // ----------------------------------------------------------------------
 
@@ -84,8 +84,14 @@ export function ApiKeyTableRow({ row, selected, onSelectRow, onDeleteRow }: Prop
         </TableCell>
 
         <TableCell>
-          <IconButton size="small" color={collapsible.value ? 'inherit' : 'default'} onClick={collapsible.onToggle}>
-            <Iconify icon={collapsible.value ? 'eva:arrow-ios-upward-fill' : 'eva:arrow-ios-downward-fill'} />
+          <IconButton
+            size="small"
+            color={collapsible.value ? 'inherit' : 'default'}
+            onClick={collapsible.onToggle}
+          >
+            <Iconify
+              icon={collapsible.value ? 'eva:arrow-ios-upward-fill' : 'eva:arrow-ios-downward-fill'}
+            />
           </IconButton>
         </TableCell>
 
@@ -132,8 +138,8 @@ export function ApiKeyTableRow({ row, selected, onSelectRow, onDeleteRow }: Prop
             <Stack direction="row" spacing={0.5} sx={{ my: 2, flexWrap: 'wrap' }}>
               <Label color="secondary">{t('api_key_list.user_wallet_permission')}</Label>
 
-              {permissions.map((permission) => (
-                <Label>{permission}</Label>
+              {permissions.map((permission, i) => (
+                <Label key={i}>{permission}</Label>
               ))}
             </Stack>
           </Collapse>

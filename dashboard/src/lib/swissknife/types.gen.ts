@@ -79,7 +79,7 @@ export type CheckMessageResponse = {
   is_valid: boolean;
 };
 
-export type ConnectLSPRequest = {
+export type ConnectLspRequest = {
   /**
    * LSP ID
    */
@@ -330,7 +330,7 @@ export type LnInvoiceResponse = {
   payment_secret: string;
 };
 
-export type LnURLPayRequest = {
+export type LnUrlPayRequest = {
   /**
    * Nostr enabled
    */
@@ -425,7 +425,7 @@ export type NewInvoiceRequest = {
   wallet_id?: string | null;
 };
 
-export type NostrNIP05Response = {
+export type NostrNip05Response = {
   /**
    * Found names
    */
@@ -530,16 +530,16 @@ export type Permission =
   | 'write:api_key';
 
 export const Permission = {
-  READ_WALLET: 'read:wallet',
-  WRITE_WALLET: 'write:wallet',
-  READ_LN_ADDRESS: 'read:ln_address',
-  WRITE_LN_ADDRESS: 'write:ln_address',
-  READ_TRANSACTION: 'read:transaction',
-  WRITE_TRANSACTION: 'write:transaction',
-  READ_LN_NODE: 'read:ln_node',
-  WRITE_LN_NODE: 'write:ln_node',
-  READ_API_KEY: 'read:api_key',
-  WRITE_API_KEY: 'write:api_key',
+  'READ:WALLET': 'read:wallet',
+  'WRITE:WALLET': 'write:wallet',
+  'READ:LN_ADDRESS': 'read:ln_address',
+  'WRITE:LN_ADDRESS': 'write:ln_address',
+  'READ:TRANSACTION': 'read:transaction',
+  'WRITE:TRANSACTION': 'write:transaction',
+  'READ:LN_NODE': 'read:ln_node',
+  'WRITE:LN_NODE': 'write:ln_node',
+  'READ:API_KEY': 'read:api_key',
+  'WRITE:API_KEY': 'write:api_key',
 } as const;
 
 export type RedeemOnchainRequest = {
@@ -630,6 +630,16 @@ export type SendPaymentRequest = {
 };
 
 /**
+ * App setup info
+ */
+export type SetupInfo = {
+  /**
+   * Whether the app is setup
+   */
+  complete: boolean;
+};
+
+/**
  * Sign In Request
  */
 export type SignInRequest = {
@@ -696,6 +706,10 @@ export type VersionInfo = {
   version: string;
 };
 
+export type WalletLnAddressResponse = {
+  ln_address?: null | LnAddress;
+};
+
 export type WalletOverview = {
   /**
    * User Balance
@@ -709,14 +723,7 @@ export type WalletOverview = {
    * Internal ID
    */
   id: string;
-  /**
-   * Lightning Address ID
-   */
-  ln_address_id?: string | null;
-  /**
-   * Lightning Address Username
-   */
-  ln_address_username?: string | null;
+  ln_address?: null | LnAddress;
   /**
    * Number of contacts
    */
@@ -776,29 +783,72 @@ export type WalletResponse = {
 };
 
 export type WellKnownData = {
+  body?: never;
   path: {
     username: string;
   };
+  query?: never;
+  url: '/.well-known/lnurlp/{username}';
 };
 
-export type WellKnownResponse = LnURLPayRequest;
+export type WellKnownErrors = {
+  /**
+   * Not Found
+   */
+  404: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
 
-export type WellKnownError = ErrorResponse;
+export type WellKnownError = WellKnownErrors[keyof WellKnownErrors];
+
+export type WellKnownResponses = {
+  /**
+   * Found
+   */
+  200: LnUrlPayRequest;
+};
+
+export type WellKnownResponse = WellKnownResponses[keyof WellKnownResponses];
 
 export type WellKnownNostrData = {
+  body?: never;
+  path?: never;
   query?: {
     /**
      * Username to query
      */
     name?: string;
   };
+  url: '/.well-known/nostr.json';
 };
 
-export type WellKnownNostrResponse = NostrNIP05Response;
+export type WellKnownNostrErrors = {
+  /**
+   * Not Found
+   */
+  404: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
 
-export type WellKnownNostrError = ErrorResponse;
+export type WellKnownNostrError = WellKnownNostrErrors[keyof WellKnownNostrErrors];
+
+export type WellKnownNostrResponses = {
+  /**
+   * Found
+   */
+  200: NostrNip05Response;
+};
+
+export type WellKnownNostrResponse = WellKnownNostrResponses[keyof WellKnownNostrResponses];
 
 export type CallbackData = {
+  body?: never;
   path: {
     username: string;
   };
@@ -812,18 +862,43 @@ export type CallbackData = {
      */
     comment?: string | null;
   };
+  url: '/lnurlp/{username}/callback';
 };
 
-export type CallbackResponse = LnUrlCallbackResponse;
+export type CallbackErrors = {
+  /**
+   * Bad Request
+   */
+  400: ErrorResponse;
+  /**
+   * Not Found
+   */
+  404: ErrorResponse;
+  /**
+   * Unprocessable Entity
+   */
+  422: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
 
-export type CallbackError = ErrorResponse;
+export type CallbackError = CallbackErrors[keyof CallbackErrors];
 
-export type ListApiKeysData = {
+export type CallbackResponses = {
+  /**
+   * Found
+   */
+  200: LnUrlCallbackResponse;
+};
+
+export type CallbackResponse = CallbackResponses[keyof CallbackResponses];
+
+export type RevokeApiKeysData = {
+  body?: never;
+  path?: never;
   query?: {
-    /**
-     * List of IDs
-     */
-    ids?: Array<string> | null;
     /**
      * Total amount of results to return
      */
@@ -833,95 +908,271 @@ export type ListApiKeysData = {
      */
     offset?: number | null;
     /**
-     * Direction of the ordering of results
+     * List of IDs
      */
-    order_direction?: OrderDirection;
+    ids?: Array<string> | null;
     /**
      * User ID. Automatically populated with your ID
      */
     user_id?: string | null;
+    /**
+     * Direction of the ordering of results
+     */
+    order_direction?: OrderDirection;
   };
+  url: '/v1/api-keys';
 };
 
-export type ListApiKeysResponse = Array<ApiKeyResponse>;
+export type RevokeApiKeysErrors = {
+  /**
+   * Bad Request
+   */
+  400: ErrorResponse;
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Forbidden
+   */
+  403: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
 
-export type ListApiKeysError = ErrorResponse;
+export type RevokeApiKeysError = RevokeApiKeysErrors[keyof RevokeApiKeysErrors];
+
+export type RevokeApiKeysResponses = {
+  /**
+   * Success
+   */
+  200: number;
+};
+
+export type RevokeApiKeysResponse = RevokeApiKeysResponses[keyof RevokeApiKeysResponses];
+
+export type ListApiKeysData = {
+  body?: never;
+  path?: never;
+  query?: {
+    /**
+     * Total amount of results to return
+     */
+    limit?: number | null;
+    /**
+     * Offset where to start returning results
+     */
+    offset?: number | null;
+    /**
+     * List of IDs
+     */
+    ids?: Array<string> | null;
+    /**
+     * User ID. Automatically populated with your ID
+     */
+    user_id?: string | null;
+    /**
+     * Direction of the ordering of results
+     */
+    order_direction?: OrderDirection;
+  };
+  url: '/v1/api-keys';
+};
+
+export type ListApiKeysErrors = {
+  /**
+   * Bad Request
+   */
+  400: ErrorResponse;
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Forbidden
+   */
+  403: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
+
+export type ListApiKeysError = ListApiKeysErrors[keyof ListApiKeysErrors];
+
+export type ListApiKeysResponses = {
+  /**
+   * Success
+   */
+  200: Array<ApiKeyResponse>;
+};
+
+export type ListApiKeysResponse = ListApiKeysResponses[keyof ListApiKeysResponses];
 
 export type CreateApiKeyData = {
   body: CreateApiKeyRequest;
+  path?: never;
+  query?: never;
+  url: '/v1/api-keys';
 };
 
-export type CreateApiKeyResponse = ApiKeyResponse;
-
-export type CreateApiKeyError = ErrorResponse;
-
-export type RevokeApiKeysData = {
-  query?: {
-    /**
-     * List of IDs
-     */
-    ids?: Array<string> | null;
-    /**
-     * Total amount of results to return
-     */
-    limit?: number | null;
-    /**
-     * Offset where to start returning results
-     */
-    offset?: number | null;
-    /**
-     * Direction of the ordering of results
-     */
-    order_direction?: OrderDirection;
-    /**
-     * User ID. Automatically populated with your ID
-     */
-    user_id?: string | null;
-  };
+export type CreateApiKeyErrors = {
+  /**
+   * Bad Request
+   */
+  400: ErrorResponse;
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Forbidden
+   */
+  403: ErrorResponse;
+  /**
+   * Unprocessable Entity
+   */
+  422: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
 };
 
-export type RevokeApiKeysResponse = number;
+export type CreateApiKeyError = CreateApiKeyErrors[keyof CreateApiKeyErrors];
 
-export type RevokeApiKeysError = ErrorResponse;
-
-export type GetApiKeyData = {
-  path: {
-    id: string;
-  };
+export type CreateApiKeyResponses = {
+  /**
+   * API Key Created
+   */
+  200: ApiKeyResponse;
 };
 
-export type GetApiKeyResponse = ApiKeyResponse;
-
-export type GetApiKeyError = ErrorResponse;
+export type CreateApiKeyResponse = CreateApiKeyResponses[keyof CreateApiKeyResponses];
 
 export type RevokeApiKeyData = {
+  body?: never;
   path: {
     id: string;
   };
+  query?: never;
+  url: '/v1/api-keys/{id}';
 };
 
-export type RevokeApiKeyResponse = unknown;
+export type RevokeApiKeyErrors = {
+  /**
+   * Bad Request
+   */
+  400: ErrorResponse;
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Forbidden
+   */
+  403: ErrorResponse;
+  /**
+   * Not Found
+   */
+  404: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
 
-export type RevokeApiKeyError = ErrorResponse;
+export type RevokeApiKeyError = RevokeApiKeyErrors[keyof RevokeApiKeyErrors];
+
+export type RevokeApiKeyResponses = {
+  /**
+   * Revoked
+   */
+  200: unknown;
+};
+
+export type GetApiKeyData = {
+  body?: never;
+  path: {
+    id: string;
+  };
+  query?: never;
+  url: '/v1/api-keys/{id}';
+};
+
+export type GetApiKeyErrors = {
+  /**
+   * Bad Request
+   */
+  400: ErrorResponse;
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Forbidden
+   */
+  403: ErrorResponse;
+  /**
+   * Not Found
+   */
+  404: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
+
+export type GetApiKeyError = GetApiKeyErrors[keyof GetApiKeyErrors];
+
+export type GetApiKeyResponses = {
+  /**
+   * Found
+   */
+  200: ApiKeyResponse;
+};
+
+export type GetApiKeyResponse = GetApiKeyResponses[keyof GetApiKeyResponses];
 
 export type SignInData = {
   body: SignInRequest;
+  path?: never;
+  query?: never;
+  url: '/v1/auth/sign-in';
 };
 
-export type SignInResponse2 = SignInResponse;
+export type SignInErrors = {
+  /**
+   * Bad Request
+   */
+  400: ErrorResponse;
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Unsupported
+   */
+  405: ErrorResponse;
+};
 
-export type SignInError = ErrorResponse;
+export type SignInError = SignInErrors[keyof SignInErrors];
 
-export type ListInvoicesData = {
+export type SignInResponses = {
+  /**
+   * Token Created
+   */
+  200: SignInResponse;
+};
+
+export type SignInResponse2 = SignInResponses[keyof SignInResponses];
+
+export type DeleteInvoicesData = {
+  body?: never;
+  path?: never;
   query?: {
-    /**
-     * List of IDs
-     */
-    ids?: Array<string> | null;
-    /**
-     * Ledger
-     */
-    ledger?: null | Ledger;
     /**
      * Total amount of results to return
      */
@@ -931,6 +1182,22 @@ export type ListInvoicesData = {
      */
     offset?: number | null;
     /**
+     * List of IDs
+     */
+    ids?: Array<string> | null;
+    /**
+     * Wallet ID. Automatically populated with your ID
+     */
+    wallet_id?: string | null;
+    /**
+     * Status
+     */
+    status?: null | InvoiceStatus;
+    /**
+     * Ledger
+     */
+    ledger?: null | Ledger;
+    /**
      * Order by
      */
     order_by?: InvoiceOrderBy;
@@ -938,100 +1205,239 @@ export type ListInvoicesData = {
      * Direction of the ordering of results
      */
     order_direction?: OrderDirection;
+  };
+  url: '/v1/invoices';
+};
+
+export type DeleteInvoicesErrors = {
+  /**
+   * Bad Request
+   */
+  400: ErrorResponse;
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Forbidden
+   */
+  403: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
+
+export type DeleteInvoicesError = DeleteInvoicesErrors[keyof DeleteInvoicesErrors];
+
+export type DeleteInvoicesResponses = {
+  /**
+   * Success
+   */
+  200: number;
+};
+
+export type DeleteInvoicesResponse = DeleteInvoicesResponses[keyof DeleteInvoicesResponses];
+
+export type ListInvoicesData = {
+  body?: never;
+  path?: never;
+  query?: {
+    /**
+     * Total amount of results to return
+     */
+    limit?: number | null;
+    /**
+     * Offset where to start returning results
+     */
+    offset?: number | null;
+    /**
+     * List of IDs
+     */
+    ids?: Array<string> | null;
+    /**
+     * Wallet ID. Automatically populated with your ID
+     */
+    wallet_id?: string | null;
     /**
      * Status
      */
     status?: null | InvoiceStatus;
     /**
-     * Wallet ID. Automatically populated with your ID
+     * Ledger
      */
-    wallet_id?: string | null;
+    ledger?: null | Ledger;
+    /**
+     * Order by
+     */
+    order_by?: InvoiceOrderBy;
+    /**
+     * Direction of the ordering of results
+     */
+    order_direction?: OrderDirection;
   };
+  url: '/v1/invoices';
 };
 
-export type ListInvoicesResponse = Array<InvoiceResponse>;
+export type ListInvoicesErrors = {
+  /**
+   * Bad Request
+   */
+  400: ErrorResponse;
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Forbidden
+   */
+  403: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
 
-export type ListInvoicesError = ErrorResponse;
+export type ListInvoicesError = ListInvoicesErrors[keyof ListInvoicesErrors];
+
+export type ListInvoicesResponses = {
+  /**
+   * Success
+   */
+  200: Array<InvoiceResponse>;
+};
+
+export type ListInvoicesResponse = ListInvoicesResponses[keyof ListInvoicesResponses];
 
 export type GenerateInvoiceData = {
   body: NewInvoiceRequest;
+  path?: never;
+  query?: never;
+  url: '/v1/invoices';
 };
 
-export type GenerateInvoiceResponse = InvoiceResponse;
-
-export type GenerateInvoiceError = ErrorResponse;
-
-export type DeleteInvoicesData = {
-  query?: {
-    /**
-     * List of IDs
-     */
-    ids?: Array<string> | null;
-    /**
-     * Ledger
-     */
-    ledger?: null | Ledger;
-    /**
-     * Total amount of results to return
-     */
-    limit?: number | null;
-    /**
-     * Offset where to start returning results
-     */
-    offset?: number | null;
-    /**
-     * Order by
-     */
-    order_by?: InvoiceOrderBy;
-    /**
-     * Direction of the ordering of results
-     */
-    order_direction?: OrderDirection;
-    /**
-     * Status
-     */
-    status?: null | InvoiceStatus;
-    /**
-     * Wallet ID. Automatically populated with your ID
-     */
-    wallet_id?: string | null;
-  };
+export type GenerateInvoiceErrors = {
+  /**
+   * Bad Request
+   */
+  400: ErrorResponse;
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Forbidden
+   */
+  403: ErrorResponse;
+  /**
+   * Unprocessable Entity
+   */
+  422: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
 };
 
-export type DeleteInvoicesResponse = number;
+export type GenerateInvoiceError = GenerateInvoiceErrors[keyof GenerateInvoiceErrors];
 
-export type DeleteInvoicesError = ErrorResponse;
-
-export type GetInvoiceData = {
-  path: {
-    id: string;
-  };
+export type GenerateInvoiceResponses = {
+  /**
+   * Invoice Created
+   */
+  200: InvoiceResponse;
 };
 
-export type GetInvoiceResponse = InvoiceResponse;
-
-export type GetInvoiceError = ErrorResponse;
+export type GenerateInvoiceResponse = GenerateInvoiceResponses[keyof GenerateInvoiceResponses];
 
 export type DeleteInvoiceData = {
+  body?: never;
   path: {
     id: string;
   };
+  query?: never;
+  url: '/v1/invoices/{id}';
 };
 
-export type DeleteInvoiceResponse = unknown;
+export type DeleteInvoiceErrors = {
+  /**
+   * Bad Request
+   */
+  400: ErrorResponse;
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Forbidden
+   */
+  403: ErrorResponse;
+  /**
+   * Not Found
+   */
+  404: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
 
-export type DeleteInvoiceError = ErrorResponse;
+export type DeleteInvoiceError = DeleteInvoiceErrors[keyof DeleteInvoiceErrors];
 
-export type ListAddressesData = {
+export type DeleteInvoiceResponses = {
+  /**
+   * Deleted
+   */
+  200: unknown;
+};
+
+export type GetInvoiceData = {
+  body?: never;
+  path: {
+    id: string;
+  };
+  query?: never;
+  url: '/v1/invoices/{id}';
+};
+
+export type GetInvoiceErrors = {
+  /**
+   * Bad Request
+   */
+  400: ErrorResponse;
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Forbidden
+   */
+  403: ErrorResponse;
+  /**
+   * Not Found
+   */
+  404: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
+
+export type GetInvoiceError = GetInvoiceErrors[keyof GetInvoiceErrors];
+
+export type GetInvoiceResponses = {
+  /**
+   * Found
+   */
+  200: InvoiceResponse;
+};
+
+export type GetInvoiceResponse = GetInvoiceResponses[keyof GetInvoiceResponses];
+
+export type DeleteAddressesData = {
+  body?: never;
+  path?: never;
   query?: {
-    /**
-     * Active
-     */
-    active?: boolean | null;
-    /**
-     * List of IDs
-     */
-    ids?: Array<string> | null;
     /**
      * Total amount of results to return
      */
@@ -1041,174 +1447,711 @@ export type ListAddressesData = {
      */
     offset?: number | null;
     /**
-     * Direction of the ordering of results
+     * List of IDs
      */
-    order_direction?: OrderDirection;
+    ids?: Array<string> | null;
+    /**
+     * wallet ID. Automatically populated with your ID
+     */
+    wallet_id?: string | null;
     /**
      * Username
      */
     username?: string | null;
     /**
+     * Active
+     */
+    active?: boolean | null;
+    /**
+     * Direction of the ordering of results
+     */
+    order_direction?: OrderDirection;
+  };
+  url: '/v1/lightning-addresses';
+};
+
+export type DeleteAddressesErrors = {
+  /**
+   * Bad Request
+   */
+  400: ErrorResponse;
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Forbidden
+   */
+  403: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
+
+export type DeleteAddressesError = DeleteAddressesErrors[keyof DeleteAddressesErrors];
+
+export type DeleteAddressesResponses = {
+  /**
+   * Success
+   */
+  200: number;
+};
+
+export type DeleteAddressesResponse = DeleteAddressesResponses[keyof DeleteAddressesResponses];
+
+export type ListAddressesData = {
+  body?: never;
+  path?: never;
+  query?: {
+    /**
+     * Total amount of results to return
+     */
+    limit?: number | null;
+    /**
+     * Offset where to start returning results
+     */
+    offset?: number | null;
+    /**
+     * List of IDs
+     */
+    ids?: Array<string> | null;
+    /**
      * wallet ID. Automatically populated with your ID
      */
     wallet_id?: string | null;
+    /**
+     * Username
+     */
+    username?: string | null;
+    /**
+     * Active
+     */
+    active?: boolean | null;
+    /**
+     * Direction of the ordering of results
+     */
+    order_direction?: OrderDirection;
   };
+  url: '/v1/lightning-addresses';
 };
 
-export type ListAddressesResponse = Array<LnAddress>;
+export type ListAddressesErrors = {
+  /**
+   * Bad Request
+   */
+  400: ErrorResponse;
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Forbidden
+   */
+  403: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
 
-export type ListAddressesError = ErrorResponse;
+export type ListAddressesError = ListAddressesErrors[keyof ListAddressesErrors];
+
+export type ListAddressesResponses = {
+  /**
+   * Success
+   */
+  200: Array<LnAddress>;
+};
+
+export type ListAddressesResponse = ListAddressesResponses[keyof ListAddressesResponses];
 
 export type RegisterAddressData = {
   body: RegisterLnAddressRequest;
+  path?: never;
+  query?: never;
+  url: '/v1/lightning-addresses';
 };
 
-export type RegisterAddressResponse = LnAddress;
-
-export type RegisterAddressError = ErrorResponse;
-
-export type DeleteAddressesData = {
-  query?: {
-    /**
-     * Active
-     */
-    active?: boolean | null;
-    /**
-     * List of IDs
-     */
-    ids?: Array<string> | null;
-    /**
-     * Total amount of results to return
-     */
-    limit?: number | null;
-    /**
-     * Offset where to start returning results
-     */
-    offset?: number | null;
-    /**
-     * Direction of the ordering of results
-     */
-    order_direction?: OrderDirection;
-    /**
-     * Username
-     */
-    username?: string | null;
-    /**
-     * wallet ID. Automatically populated with your ID
-     */
-    wallet_id?: string | null;
-  };
+export type RegisterAddressErrors = {
+  /**
+   * Bad Request
+   */
+  400: ErrorResponse;
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Forbidden
+   */
+  403: ErrorResponse;
+  /**
+   * Unprocessable Entity
+   */
+  422: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
 };
 
-export type DeleteAddressesResponse = number;
+export type RegisterAddressError = RegisterAddressErrors[keyof RegisterAddressErrors];
 
-export type DeleteAddressesError = ErrorResponse;
+export type RegisterAddressResponses = {
+  /**
+   * LN Address Registered
+   */
+  200: LnAddress;
+};
 
-export type GetAddressData = {
+export type RegisterAddressResponse = RegisterAddressResponses[keyof RegisterAddressResponses];
+
+export type DeleteAddressData = {
+  body?: never;
   path: {
     id: string;
   };
+  query?: never;
+  url: '/v1/lightning-addresses/{id}';
 };
 
-export type GetAddressResponse = LnAddress;
+export type DeleteAddressErrors = {
+  /**
+   * Bad Request
+   */
+  400: ErrorResponse;
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Forbidden
+   */
+  403: ErrorResponse;
+  /**
+   * Not Found
+   */
+  404: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
 
-export type GetAddressError = ErrorResponse;
+export type DeleteAddressError = DeleteAddressErrors[keyof DeleteAddressErrors];
+
+export type DeleteAddressResponses = {
+  /**
+   * Deleted
+   */
+  200: unknown;
+};
+
+export type GetAddressData = {
+  body?: never;
+  path: {
+    id: string;
+  };
+  query?: never;
+  url: '/v1/lightning-addresses/{id}';
+};
+
+export type GetAddressErrors = {
+  /**
+   * Bad Request
+   */
+  400: ErrorResponse;
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Forbidden
+   */
+  403: ErrorResponse;
+  /**
+   * Not Found
+   */
+  404: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
+
+export type GetAddressError = GetAddressErrors[keyof GetAddressErrors];
+
+export type GetAddressResponses = {
+  /**
+   * Found
+   */
+  200: LnAddress;
+};
+
+export type GetAddressResponse = GetAddressResponses[keyof GetAddressResponses];
 
 export type UpdateAddressData = {
   body: UpdateLnAddressRequest;
   path: {
     id: string;
   };
+  query?: never;
+  url: '/v1/lightning-addresses/{id}';
 };
 
-export type UpdateAddressResponse = LnAddress;
-
-export type UpdateAddressError = ErrorResponse;
-
-export type DeleteAddressData = {
-  path: {
-    id: string;
-  };
+export type UpdateAddressErrors = {
+  /**
+   * Bad Request
+   */
+  400: ErrorResponse;
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Forbidden
+   */
+  403: ErrorResponse;
+  /**
+   * Not Found
+   */
+  404: ErrorResponse;
+  /**
+   * Unprocessable Entity
+   */
+  422: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
 };
 
-export type DeleteAddressResponse = unknown;
+export type UpdateAddressError = UpdateAddressErrors[keyof UpdateAddressErrors];
 
-export type DeleteAddressError = ErrorResponse;
+export type UpdateAddressResponses = {
+  /**
+   * LN Address Updated
+   */
+  200: LnAddress;
+};
 
-export type BackupResponse = unknown;
+export type UpdateAddressResponse = UpdateAddressResponses[keyof UpdateAddressResponses];
 
-export type BackupError = ErrorResponse;
+export type BackupData = {
+  body?: never;
+  path?: never;
+  query?: never;
+  url: '/v1/lightning-node/backup';
+};
+
+export type BackupErrors = {
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Forbidden
+   */
+  403: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
+
+export type BackupError = BackupErrors[keyof BackupErrors];
+
+export type BackupResponses = {
+  /**
+   * Backup Downloaded
+   */
+  200: Blob | File;
+};
+
+export type BackupResponse = BackupResponses[keyof BackupResponses];
 
 export type CheckMessageData = {
   body: CheckMessageRequest;
+  path?: never;
+  query?: never;
+  url: '/v1/lightning-node/check-message';
 };
 
-export type CheckMessageResponse2 = CheckMessageResponse;
+export type CheckMessageErrors = {
+  /**
+   * Bad Request
+   */
+  400: ErrorResponse;
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Forbidden
+   */
+  403: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
 
-export type CheckMessageError = ErrorResponse;
+export type CheckMessageError = CheckMessageErrors[keyof CheckMessageErrors];
 
-export type CloseLspChannelsResponse = Array<string>;
+export type CheckMessageResponses = {
+  /**
+   * Message Verified
+   */
+  200: CheckMessageResponse;
+};
 
-export type CloseLspChannelsError = ErrorResponse;
+export type CheckMessageResponse2 = CheckMessageResponses[keyof CheckMessageResponses];
+
+export type CloseLspChannelsData = {
+  body?: never;
+  path?: never;
+  query?: never;
+  url: '/v1/lightning-node/close-channels';
+};
+
+export type CloseLspChannelsErrors = {
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Forbidden
+   */
+  403: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
+
+export type CloseLspChannelsError = CloseLspChannelsErrors[keyof CloseLspChannelsErrors];
+
+export type CloseLspChannelsResponses = {
+  /**
+   * Channels Closed
+   */
+  200: Array<string>;
+};
+
+export type CloseLspChannelsResponse = CloseLspChannelsResponses[keyof CloseLspChannelsResponses];
 
 export type ConnectLspData = {
-  body: ConnectLSPRequest;
+  body: ConnectLspRequest;
+  path?: never;
+  query?: never;
+  url: '/v1/lightning-node/connect-lsp';
 };
 
-export type ConnectLspResponse = unknown;
+export type ConnectLspErrors = {
+  /**
+   * Bad Request
+   */
+  400: ErrorResponse;
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Forbidden
+   */
+  403: ErrorResponse;
+  /**
+   * Not Found
+   */
+  404: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
 
-export type ConnectLspError = ErrorResponse;
+export type ConnectLspError = ConnectLspErrors[keyof ConnectLspErrors];
 
-export type NodeInfoResponse = unknown;
+export type ConnectLspResponses = {
+  /**
+   * LSP Connected
+   */
+  200: unknown;
+};
 
-export type NodeInfoError = ErrorResponse;
+export type NodeInfoData = {
+  body?: never;
+  path?: never;
+  query?: never;
+  url: '/v1/lightning-node/info';
+};
 
-export type LspInfoResponse = unknown;
+export type NodeInfoErrors = {
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Forbidden
+   */
+  403: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
 
-export type LspInfoError = ErrorResponse;
+export type NodeInfoError = NodeInfoErrors[keyof NodeInfoErrors];
 
-export type ListLspsResponse = Array<unknown>;
+export type NodeInfoResponses = {
+  /**
+   * Found
+   */
+  200: unknown;
+};
 
-export type ListLspsError = ErrorResponse;
+export type LspInfoData = {
+  body?: never;
+  path?: never;
+  query?: never;
+  url: '/v1/lightning-node/lsp-info';
+};
+
+export type LspInfoErrors = {
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Forbidden
+   */
+  403: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
+
+export type LspInfoError = LspInfoErrors[keyof LspInfoErrors];
+
+export type LspInfoResponses = {
+  /**
+   * Found
+   */
+  200: unknown;
+};
+
+export type ListLspsData = {
+  body?: never;
+  path?: never;
+  query?: never;
+  url: '/v1/lightning-node/lsps';
+};
+
+export type ListLspsErrors = {
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Forbidden
+   */
+  403: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
+
+export type ListLspsError = ListLspsErrors[keyof ListLspsErrors];
+
+export type ListLspsResponses = {
+  /**
+   * Success
+   */
+  200: Array<unknown>;
+};
+
+export type ListLspsResponse = ListLspsResponses[keyof ListLspsResponses];
 
 export type RedeemData = {
   body: RedeemOnchainRequest;
+  path?: never;
+  query?: never;
+  url: '/v1/lightning-node/redeem';
 };
 
-export type RedeemResponse = RedeemOnchainResponse;
+export type RedeemErrors = {
+  /**
+   * Bad Request
+   */
+  400: ErrorResponse;
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Forbidden
+   */
+  403: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
 
-export type RedeemError = ErrorResponse;
+export type RedeemError = RedeemErrors[keyof RedeemErrors];
+
+export type RedeemResponses = {
+  /**
+   * Redeem Success
+   */
+  200: RedeemOnchainResponse;
+};
+
+export type RedeemResponse = RedeemResponses[keyof RedeemResponses];
 
 export type SignMessageData = {
   body: SignMessageRequest;
+  path?: never;
+  query?: never;
+  url: '/v1/lightning-node/sign-message';
 };
 
-export type SignMessageResponse2 = SignMessageResponse;
+export type SignMessageErrors = {
+  /**
+   * Bad Request
+   */
+  400: ErrorResponse;
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Forbidden
+   */
+  403: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
 
-export type SignMessageError = ErrorResponse;
+export type SignMessageError = SignMessageErrors[keyof SignMessageErrors];
+
+export type SignMessageResponses = {
+  /**
+   * Message Signed
+   */
+  200: SignMessageResponse;
+};
+
+export type SignMessageResponse2 = SignMessageResponses[keyof SignMessageResponses];
 
 export type SwapData = {
   body: SendOnchainPaymentRequest;
+  path?: never;
+  query?: never;
+  url: '/v1/lightning-node/swap';
 };
 
-export type SwapResponse = unknown;
+export type SwapErrors = {
+  /**
+   * Bad Request
+   */
+  400: ErrorResponse;
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Forbidden
+   */
+  403: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
 
-export type SwapError = ErrorResponse;
+export type SwapError = SwapErrors[keyof SwapErrors];
 
-export type SyncResponse = unknown;
+export type SwapResponses = {
+  /**
+   * Swap Success
+   */
+  200: unknown;
+};
 
-export type SyncError = ErrorResponse;
+export type SyncData = {
+  body?: never;
+  path?: never;
+  query?: never;
+  url: '/v1/lightning-node/sync';
+};
 
-export type GetUserWalletResponse = WalletResponse;
+export type SyncErrors = {
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Forbidden
+   */
+  403: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
 
-export type GetUserWalletError = ErrorResponse;
+export type SyncError = SyncErrors[keyof SyncErrors];
 
-export type ListWalletApiKeysData = {
+export type SyncResponses = {
+  /**
+   * Node Synced
+   */
+  200: unknown;
+};
+
+export type GetUserWalletData = {
+  body?: never;
+  path?: never;
+  query?: never;
+  url: '/v1/me';
+};
+
+export type GetUserWalletErrors = {
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Not Found
+   */
+  404: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
+
+export type GetUserWalletError = GetUserWalletErrors[keyof GetUserWalletErrors];
+
+export type GetUserWalletResponses = {
+  /**
+   * Found
+   */
+  200: WalletResponse;
+};
+
+export type GetUserWalletResponse = GetUserWalletResponses[keyof GetUserWalletResponses];
+
+export type RevokeWalletApiKeysData = {
+  body?: never;
+  path?: never;
   query?: {
-    /**
-     * List of IDs
-     */
-    ids?: Array<string> | null;
     /**
      * Total amount of results to return
      */
@@ -1218,34 +2161,314 @@ export type ListWalletApiKeysData = {
      */
     offset?: number | null;
     /**
-     * Direction of the ordering of results
+     * List of IDs
      */
-    order_direction?: OrderDirection;
+    ids?: Array<string> | null;
     /**
      * User ID. Automatically populated with your ID
      */
     user_id?: string | null;
+    /**
+     * Direction of the ordering of results
+     */
+    order_direction?: OrderDirection;
   };
+  url: '/v1/me/api-keys';
 };
 
-export type ListWalletApiKeysResponse = Array<ApiKeyResponse>;
+export type RevokeWalletApiKeysErrors = {
+  /**
+   * Bad Request
+   */
+  400: ErrorResponse;
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
 
-export type ListWalletApiKeysError = ErrorResponse;
+export type RevokeWalletApiKeysError = RevokeWalletApiKeysErrors[keyof RevokeWalletApiKeysErrors];
+
+export type RevokeWalletApiKeysResponses = {
+  /**
+   * Success
+   */
+  200: number;
+};
+
+export type RevokeWalletApiKeysResponse =
+  RevokeWalletApiKeysResponses[keyof RevokeWalletApiKeysResponses];
+
+export type ListWalletApiKeysData = {
+  body?: never;
+  path?: never;
+  query?: {
+    /**
+     * Total amount of results to return
+     */
+    limit?: number | null;
+    /**
+     * Offset where to start returning results
+     */
+    offset?: number | null;
+    /**
+     * List of IDs
+     */
+    ids?: Array<string> | null;
+    /**
+     * User ID. Automatically populated with your ID
+     */
+    user_id?: string | null;
+    /**
+     * Direction of the ordering of results
+     */
+    order_direction?: OrderDirection;
+  };
+  url: '/v1/me/api-keys';
+};
+
+export type ListWalletApiKeysErrors = {
+  /**
+   * Bad Request
+   */
+  400: ErrorResponse;
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
+
+export type ListWalletApiKeysError = ListWalletApiKeysErrors[keyof ListWalletApiKeysErrors];
+
+export type ListWalletApiKeysResponses = {
+  /**
+   * Success
+   */
+  200: Array<ApiKeyResponse>;
+};
+
+export type ListWalletApiKeysResponse =
+  ListWalletApiKeysResponses[keyof ListWalletApiKeysResponses];
 
 export type CreateWalletApiKeyData = {
   body: CreateApiKeyRequest;
+  path?: never;
+  query?: never;
+  url: '/v1/me/api-keys';
 };
 
-export type CreateWalletApiKeyResponse = ApiKeyResponse;
+export type CreateWalletApiKeyErrors = {
+  /**
+   * Bad Request
+   */
+  400: ErrorResponse;
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Unprocessable Entity
+   */
+  422: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
 
-export type CreateWalletApiKeyError = ErrorResponse;
+export type CreateWalletApiKeyError = CreateWalletApiKeyErrors[keyof CreateWalletApiKeyErrors];
 
-export type RevokeWalletApiKeysData = {
+export type CreateWalletApiKeyResponses = {
+  /**
+   * API Key Created
+   */
+  200: ApiKeyResponse;
+};
+
+export type CreateWalletApiKeyResponse =
+  CreateWalletApiKeyResponses[keyof CreateWalletApiKeyResponses];
+
+export type RevokeWalletApiKeyData = {
+  body?: never;
+  path: {
+    id: string;
+  };
+  query?: never;
+  url: '/v1/me/api-keys/{id}';
+};
+
+export type RevokeWalletApiKeyErrors = {
+  /**
+   * Bad Request
+   */
+  400: ErrorResponse;
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Not Found
+   */
+  404: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
+
+export type RevokeWalletApiKeyError = RevokeWalletApiKeyErrors[keyof RevokeWalletApiKeyErrors];
+
+export type RevokeWalletApiKeyResponses = {
+  /**
+   * Revoked
+   */
+  200: unknown;
+};
+
+export type GetWalletApiKeyData = {
+  body?: never;
+  path: {
+    id: string;
+  };
+  query?: never;
+  url: '/v1/me/api-keys/{id}';
+};
+
+export type GetWalletApiKeyErrors = {
+  /**
+   * Bad Request
+   */
+  400: ErrorResponse;
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Not Found
+   */
+  404: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
+
+export type GetWalletApiKeyError = GetWalletApiKeyErrors[keyof GetWalletApiKeyErrors];
+
+export type GetWalletApiKeyResponses = {
+  /**
+   * Found
+   */
+  200: ApiKeyResponse;
+};
+
+export type GetWalletApiKeyResponse = GetWalletApiKeyResponses[keyof GetWalletApiKeyResponses];
+
+export type GetWalletBalanceData = {
+  body?: never;
+  path?: never;
+  query?: never;
+  url: '/v1/me/balance';
+};
+
+export type GetWalletBalanceErrors = {
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
+
+export type GetWalletBalanceError = GetWalletBalanceErrors[keyof GetWalletBalanceErrors];
+
+export type GetWalletBalanceResponses = {
+  /**
+   * Found
+   */
+  200: Balance;
+};
+
+export type GetWalletBalanceResponse = GetWalletBalanceResponses[keyof GetWalletBalanceResponses];
+
+export type ListContactsData = {
+  body?: never;
+  path?: never;
+  query?: never;
+  url: '/v1/me/contacts';
+};
+
+export type ListContactsErrors = {
+  /**
+   * Bad Request
+   */
+  400: ErrorResponse;
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
+
+export type ListContactsError = ListContactsErrors[keyof ListContactsErrors];
+
+export type ListContactsResponses = {
+  /**
+   * Success
+   */
+  200: Array<Contact>;
+};
+
+export type ListContactsResponse = ListContactsResponses[keyof ListContactsResponses];
+
+export type DeleteExpiredInvoicesData = {
+  body?: never;
+  path?: never;
+  query?: never;
+  url: '/v1/me/invoices';
+};
+
+export type DeleteExpiredInvoicesErrors = {
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
+
+export type DeleteExpiredInvoicesError =
+  DeleteExpiredInvoicesErrors[keyof DeleteExpiredInvoicesErrors];
+
+export type DeleteExpiredInvoicesResponses = {
+  /**
+   * Success
+   */
+  200: number;
+};
+
+export type DeleteExpiredInvoicesResponse =
+  DeleteExpiredInvoicesResponses[keyof DeleteExpiredInvoicesResponses];
+
+export type ListWalletInvoicesData = {
+  body?: never;
+  path?: never;
   query?: {
-    /**
-     * List of IDs
-     */
-    ids?: Array<string> | null;
     /**
      * Total amount of results to return
      */
@@ -1255,66 +2478,21 @@ export type RevokeWalletApiKeysData = {
      */
     offset?: number | null;
     /**
-     * Direction of the ordering of results
-     */
-    order_direction?: OrderDirection;
-    /**
-     * User ID. Automatically populated with your ID
-     */
-    user_id?: string | null;
-  };
-};
-
-export type RevokeWalletApiKeysResponse = number;
-
-export type RevokeWalletApiKeysError = ErrorResponse;
-
-export type GetWalletApiKeyData = {
-  path: {
-    id: string;
-  };
-};
-
-export type GetWalletApiKeyResponse = ApiKeyResponse;
-
-export type GetWalletApiKeyError = ErrorResponse;
-
-export type RevokeWalletApiKeyData = {
-  path: {
-    id: string;
-  };
-};
-
-export type RevokeWalletApiKeyResponse = unknown;
-
-export type RevokeWalletApiKeyError = ErrorResponse;
-
-export type GetWalletBalanceResponse = Balance;
-
-export type GetWalletBalanceError = ErrorResponse;
-
-export type ListContactsResponse = Array<Contact>;
-
-export type ListContactsError = ErrorResponse;
-
-export type ListWalletInvoicesData = {
-  query?: {
-    /**
      * List of IDs
      */
     ids?: Array<string> | null;
+    /**
+     * Wallet ID. Automatically populated with your ID
+     */
+    wallet_id?: string | null;
+    /**
+     * Status
+     */
+    status?: null | InvoiceStatus;
     /**
      * Ledger
      */
     ledger?: null | Ledger;
-    /**
-     * Total amount of results to return
-     */
-    limit?: number | null;
-    /**
-     * Offset where to start returning results
-     */
-    offset?: number | null;
     /**
      * Order by
      */
@@ -1323,77 +2501,297 @@ export type ListWalletInvoicesData = {
      * Direction of the ordering of results
      */
     order_direction?: OrderDirection;
-    /**
-     * Status
-     */
-    status?: null | InvoiceStatus;
-    /**
-     * Wallet ID. Automatically populated with your ID
-     */
-    wallet_id?: string | null;
   };
+  url: '/v1/me/invoices';
 };
 
-export type ListWalletInvoicesResponse = Array<InvoiceResponse>;
+export type ListWalletInvoicesErrors = {
+  /**
+   * Bad Request
+   */
+  400: ErrorResponse;
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
 
-export type ListWalletInvoicesError = ErrorResponse;
+export type ListWalletInvoicesError = ListWalletInvoicesErrors[keyof ListWalletInvoicesErrors];
+
+export type ListWalletInvoicesResponses = {
+  /**
+   * Success
+   */
+  200: Array<InvoiceResponse>;
+};
+
+export type ListWalletInvoicesResponse =
+  ListWalletInvoicesResponses[keyof ListWalletInvoicesResponses];
 
 export type NewWalletInvoiceData = {
   body: NewInvoiceRequest;
+  path?: never;
+  query?: never;
+  url: '/v1/me/invoices';
 };
 
-export type NewWalletInvoiceResponse = InvoiceResponse;
+export type NewWalletInvoiceErrors = {
+  /**
+   * Bad Request
+   */
+  400: ErrorResponse;
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Unprocessable Entity
+   */
+  422: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
 
-export type NewWalletInvoiceError = ErrorResponse;
+export type NewWalletInvoiceError = NewWalletInvoiceErrors[keyof NewWalletInvoiceErrors];
 
-export type DeleteExpiredInvoicesResponse = number;
+export type NewWalletInvoiceResponses = {
+  /**
+   * Invoice Created
+   */
+  200: InvoiceResponse;
+};
 
-export type DeleteExpiredInvoicesError = ErrorResponse;
+export type NewWalletInvoiceResponse = NewWalletInvoiceResponses[keyof NewWalletInvoiceResponses];
 
 export type GetWalletInvoiceData = {
+  body?: never;
   path: {
     id: string;
   };
+  query?: never;
+  url: '/v1/me/invoices/{id}';
 };
 
-export type GetWalletInvoiceResponse = InvoiceResponse;
-
-export type GetWalletInvoiceError = ErrorResponse;
-
-export type GetWalletAddressResponse = LnAddress;
-
-export type GetWalletAddressError = ErrorResponse;
-
-export type UpdateWalletAddressData = {
-  body: UpdateLnAddressRequest;
+export type GetWalletInvoiceErrors = {
+  /**
+   * Bad Request
+   */
+  400: ErrorResponse;
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Not Found
+   */
+  404: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
 };
 
-export type UpdateWalletAddressResponse = LnAddress;
+export type GetWalletInvoiceError = GetWalletInvoiceErrors[keyof GetWalletInvoiceErrors];
 
-export type UpdateWalletAddressError = ErrorResponse;
+export type GetWalletInvoiceResponses = {
+  /**
+   * Found
+   */
+  200: InvoiceResponse;
+};
+
+export type GetWalletInvoiceResponse = GetWalletInvoiceResponses[keyof GetWalletInvoiceResponses];
+
+export type DeleteWalletAddressData = {
+  body?: never;
+  path?: never;
+  query?: never;
+  url: '/v1/me/lightning-address';
+};
+
+export type DeleteWalletAddressErrors = {
+  /**
+   * Bad Request
+   */
+  400: ErrorResponse;
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Not Found
+   */
+  404: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
+
+export type DeleteWalletAddressError = DeleteWalletAddressErrors[keyof DeleteWalletAddressErrors];
+
+export type DeleteWalletAddressResponses = {
+  /**
+   * Deleted
+   */
+  200: unknown;
+};
+
+export type GetWalletAddressData = {
+  body?: never;
+  path?: never;
+  query?: never;
+  url: '/v1/me/lightning-address';
+};
+
+export type GetWalletAddressErrors = {
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Not Found
+   */
+  404: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
+
+export type GetWalletAddressError = GetWalletAddressErrors[keyof GetWalletAddressErrors];
+
+export type GetWalletAddressResponses = {
+  /**
+   * Found
+   */
+  200: WalletLnAddressResponse;
+};
+
+export type GetWalletAddressResponse = GetWalletAddressResponses[keyof GetWalletAddressResponses];
 
 export type RegisterWalletAddressData = {
   body: RegisterLnAddressRequest;
+  path?: never;
+  query?: never;
+  url: '/v1/me/lightning-address';
 };
 
-export type RegisterWalletAddressResponse = LnAddress;
+export type RegisterWalletAddressErrors = {
+  /**
+   * Bad Request
+   */
+  400: ErrorResponse;
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Unprocessable Entity
+   */
+  422: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
 
-export type RegisterWalletAddressError = ErrorResponse;
+export type RegisterWalletAddressError =
+  RegisterWalletAddressErrors[keyof RegisterWalletAddressErrors];
 
-export type DeleteWalletAddressResponse = unknown;
+export type RegisterWalletAddressResponses = {
+  /**
+   * LN Address Registered
+   */
+  200: LnAddress;
+};
 
-export type DeleteWalletAddressError = ErrorResponse;
+export type RegisterWalletAddressResponse =
+  RegisterWalletAddressResponses[keyof RegisterWalletAddressResponses];
+
+export type UpdateWalletAddressData = {
+  body: UpdateLnAddressRequest;
+  path?: never;
+  query?: never;
+  url: '/v1/me/lightning-address';
+};
+
+export type UpdateWalletAddressErrors = {
+  /**
+   * Bad Request
+   */
+  400: ErrorResponse;
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Not Found
+   */
+  404: ErrorResponse;
+  /**
+   * Unprocessable Entity
+   */
+  422: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
+
+export type UpdateWalletAddressError = UpdateWalletAddressErrors[keyof UpdateWalletAddressErrors];
+
+export type UpdateWalletAddressResponses = {
+  /**
+   * LN Address Updated
+   */
+  200: LnAddress;
+};
+
+export type UpdateWalletAddressResponse =
+  UpdateWalletAddressResponses[keyof UpdateWalletAddressResponses];
+
+export type DeleteFailedPaymentsData = {
+  body?: never;
+  path?: never;
+  query?: never;
+  url: '/v1/me/payments';
+};
+
+export type DeleteFailedPaymentsErrors = {
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
+
+export type DeleteFailedPaymentsError =
+  DeleteFailedPaymentsErrors[keyof DeleteFailedPaymentsErrors];
+
+export type DeleteFailedPaymentsResponses = {
+  /**
+   * Success
+   */
+  200: number;
+};
+
+export type DeleteFailedPaymentsResponse =
+  DeleteFailedPaymentsResponses[keyof DeleteFailedPaymentsResponses];
 
 export type ListWalletPaymentsData = {
+  body?: never;
+  path?: never;
   query?: {
-    /**
-     * List of IDs
-     */
-    ids?: Array<string> | null;
-    /**
-     * Ledger
-     */
-    ledger?: null | Ledger;
     /**
      * Total amount of results to return
      */
@@ -1403,56 +2801,136 @@ export type ListWalletPaymentsData = {
      */
     offset?: number | null;
     /**
-     * Direction of the ordering of results
+     * List of IDs
      */
-    order_direction?: OrderDirection;
+    ids?: Array<string> | null;
+    /**
+     * Wallet ID. Automatically populated with your ID
+     */
+    wallet_id?: string | null;
     /**
      * Status
      */
     status?: null | PaymentStatus;
     /**
-     * Wallet ID. Automatically populated with your ID
+     * Ledger
      */
-    wallet_id?: string | null;
+    ledger?: null | Ledger;
+    /**
+     * Direction of the ordering of results
+     */
+    order_direction?: OrderDirection;
   };
+  url: '/v1/me/payments';
 };
 
-export type ListWalletPaymentsResponse = Array<PaymentResponse>;
+export type ListWalletPaymentsErrors = {
+  /**
+   * Bad Request
+   */
+  400: ErrorResponse;
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
 
-export type ListWalletPaymentsError = ErrorResponse;
+export type ListWalletPaymentsError = ListWalletPaymentsErrors[keyof ListWalletPaymentsErrors];
+
+export type ListWalletPaymentsResponses = {
+  /**
+   * Success
+   */
+  200: Array<PaymentResponse>;
+};
+
+export type ListWalletPaymentsResponse =
+  ListWalletPaymentsResponses[keyof ListWalletPaymentsResponses];
 
 export type WalletPayData = {
   body: SendPaymentRequest;
+  path?: never;
+  query?: never;
+  url: '/v1/me/payments';
 };
 
-export type WalletPayResponse = PaymentResponse;
+export type WalletPayErrors = {
+  /**
+   * Bad Request
+   */
+  400: ErrorResponse;
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Unprocessable Entity
+   */
+  422: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
 
-export type WalletPayError = ErrorResponse;
+export type WalletPayError = WalletPayErrors[keyof WalletPayErrors];
 
-export type DeleteFailedPaymentsResponse = number;
+export type WalletPayResponses = {
+  /**
+   * Payment Sent
+   */
+  200: PaymentResponse;
+};
 
-export type DeleteFailedPaymentsError = ErrorResponse;
+export type WalletPayResponse = WalletPayResponses[keyof WalletPayResponses];
 
 export type GetWalletPaymentData = {
+  body?: never;
   path: {
     id: string;
   };
+  query?: never;
+  url: '/v1/me/payments/{id}';
 };
 
-export type GetWalletPaymentResponse = PaymentResponse;
+export type GetWalletPaymentErrors = {
+  /**
+   * Bad Request
+   */
+  400: ErrorResponse;
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Not Found
+   */
+  404: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
 
-export type GetWalletPaymentError = ErrorResponse;
+export type GetWalletPaymentError = GetWalletPaymentErrors[keyof GetWalletPaymentErrors];
 
-export type ListPaymentsData = {
+export type GetWalletPaymentResponses = {
+  /**
+   * Found
+   */
+  200: PaymentResponse;
+};
+
+export type GetWalletPaymentResponse = GetWalletPaymentResponses[keyof GetWalletPaymentResponses];
+
+export type DeletePaymentsData = {
+  body?: never;
+  path?: never;
   query?: {
-    /**
-     * List of IDs
-     */
-    ids?: Array<string> | null;
-    /**
-     * Ledger
-     */
-    ledger?: null | Ledger;
     /**
      * Total amount of results to return
      */
@@ -1462,119 +2940,334 @@ export type ListPaymentsData = {
      */
     offset?: number | null;
     /**
-     * Direction of the ordering of results
+     * List of IDs
      */
-    order_direction?: OrderDirection;
+    ids?: Array<string> | null;
+    /**
+     * Wallet ID. Automatically populated with your ID
+     */
+    wallet_id?: string | null;
     /**
      * Status
      */
     status?: null | PaymentStatus;
     /**
+     * Ledger
+     */
+    ledger?: null | Ledger;
+    /**
+     * Direction of the ordering of results
+     */
+    order_direction?: OrderDirection;
+  };
+  url: '/v1/payments';
+};
+
+export type DeletePaymentsErrors = {
+  /**
+   * Bad Request
+   */
+  400: ErrorResponse;
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Forbidden
+   */
+  403: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
+
+export type DeletePaymentsError = DeletePaymentsErrors[keyof DeletePaymentsErrors];
+
+export type DeletePaymentsResponses = {
+  /**
+   * Success
+   */
+  200: number;
+};
+
+export type DeletePaymentsResponse = DeletePaymentsResponses[keyof DeletePaymentsResponses];
+
+export type ListPaymentsData = {
+  body?: never;
+  path?: never;
+  query?: {
+    /**
+     * Total amount of results to return
+     */
+    limit?: number | null;
+    /**
+     * Offset where to start returning results
+     */
+    offset?: number | null;
+    /**
+     * List of IDs
+     */
+    ids?: Array<string> | null;
+    /**
      * Wallet ID. Automatically populated with your ID
      */
     wallet_id?: string | null;
+    /**
+     * Status
+     */
+    status?: null | PaymentStatus;
+    /**
+     * Ledger
+     */
+    ledger?: null | Ledger;
+    /**
+     * Direction of the ordering of results
+     */
+    order_direction?: OrderDirection;
   };
+  url: '/v1/payments';
 };
 
-export type ListPaymentsResponse = Array<PaymentResponse>;
+export type ListPaymentsErrors = {
+  /**
+   * Bad Request
+   */
+  400: ErrorResponse;
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Forbidden
+   */
+  403: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
 
-export type ListPaymentsError = ErrorResponse;
+export type ListPaymentsError = ListPaymentsErrors[keyof ListPaymentsErrors];
+
+export type ListPaymentsResponses = {
+  /**
+   * Success
+   */
+  200: Array<PaymentResponse>;
+};
+
+export type ListPaymentsResponse = ListPaymentsResponses[keyof ListPaymentsResponses];
 
 export type PayData = {
   body: SendPaymentRequest;
+  path?: never;
+  query?: never;
+  url: '/v1/payments';
 };
 
-export type PayResponse = PaymentResponse;
-
-export type PayError = ErrorResponse;
-
-export type DeletePaymentsData = {
-  query?: {
-    /**
-     * List of IDs
-     */
-    ids?: Array<string> | null;
-    /**
-     * Ledger
-     */
-    ledger?: null | Ledger;
-    /**
-     * Total amount of results to return
-     */
-    limit?: number | null;
-    /**
-     * Offset where to start returning results
-     */
-    offset?: number | null;
-    /**
-     * Direction of the ordering of results
-     */
-    order_direction?: OrderDirection;
-    /**
-     * Status
-     */
-    status?: null | PaymentStatus;
-    /**
-     * Wallet ID. Automatically populated with your ID
-     */
-    wallet_id?: string | null;
-  };
+export type PayErrors = {
+  /**
+   * Bad Request
+   */
+  400: ErrorResponse;
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Forbidden
+   */
+  403: ErrorResponse;
+  /**
+   * Unprocessable Entity
+   */
+  422: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
 };
 
-export type DeletePaymentsResponse = number;
+export type PayError = PayErrors[keyof PayErrors];
 
-export type DeletePaymentsError = ErrorResponse;
-
-export type GetPaymentData = {
-  path: {
-    id: string;
-  };
+export type PayResponses = {
+  /**
+   * Payment Sent
+   */
+  200: PaymentResponse;
 };
 
-export type GetPaymentResponse = PaymentResponse;
-
-export type GetPaymentError = ErrorResponse;
+export type PayResponse = PayResponses[keyof PayResponses];
 
 export type DeletePaymentData = {
+  body?: never;
   path: {
     id: string;
   };
+  query?: never;
+  url: '/v1/payments/{id}';
 };
 
-export type DeletePaymentResponse = unknown;
-
-export type DeletePaymentError = ErrorResponse;
-
-export type HealthCheckResponse = HealthCheck;
-
-export type HealthCheckError = HealthCheck;
-
-export type ReadinessCheckResponse = unknown;
-
-export type ReadinessCheckError = unknown;
-
-export type VersionCheckResponse = VersionInfo;
-
-export type VersionCheckError = unknown;
-
-export type ListWalletsResponse = Array<WalletResponse>;
-
-export type ListWalletsError = ErrorResponse;
-
-export type RegisterWalletData = {
-  body: RegisterWalletRequest;
+export type DeletePaymentErrors = {
+  /**
+   * Bad Request
+   */
+  400: ErrorResponse;
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Forbidden
+   */
+  403: ErrorResponse;
+  /**
+   * Not Found
+   */
+  404: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
 };
 
-export type RegisterWalletResponse = WalletResponse;
+export type DeletePaymentError = DeletePaymentErrors[keyof DeletePaymentErrors];
 
-export type RegisterWalletError = ErrorResponse;
+export type DeletePaymentResponses = {
+  /**
+   * Deleted
+   */
+  200: unknown;
+};
+
+export type GetPaymentData = {
+  body?: never;
+  path: {
+    id: string;
+  };
+  query?: never;
+  url: '/v1/payments/{id}';
+};
+
+export type GetPaymentErrors = {
+  /**
+   * Bad Request
+   */
+  400: ErrorResponse;
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Forbidden
+   */
+  403: ErrorResponse;
+  /**
+   * Not Found
+   */
+  404: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
+
+export type GetPaymentError = GetPaymentErrors[keyof GetPaymentErrors];
+
+export type GetPaymentResponses = {
+  /**
+   * Found
+   */
+  200: PaymentResponse;
+};
+
+export type GetPaymentResponse = GetPaymentResponses[keyof GetPaymentResponses];
+
+export type HealthCheckData = {
+  body?: never;
+  path?: never;
+  query?: never;
+  url: '/v1/system/health';
+};
+
+export type HealthCheckErrors = {
+  /**
+   * Service Unavailable
+   */
+  503: HealthCheck;
+};
+
+export type HealthCheckError = HealthCheckErrors[keyof HealthCheckErrors];
+
+export type HealthCheckResponses = {
+  /**
+   * OK
+   */
+  200: HealthCheck;
+};
+
+export type HealthCheckResponse = HealthCheckResponses[keyof HealthCheckResponses];
+
+export type ReadinessCheckData = {
+  body?: never;
+  path?: never;
+  query?: never;
+  url: '/v1/system/ready';
+};
+
+export type ReadinessCheckResponses = {
+  /**
+   * OK
+   */
+  200: unknown;
+};
+
+export type SetupCheckData = {
+  body?: never;
+  path?: never;
+  query?: never;
+  url: '/v1/system/setup';
+};
+
+export type SetupCheckErrors = {
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
+
+export type SetupCheckError = SetupCheckErrors[keyof SetupCheckErrors];
+
+export type SetupCheckResponses = {
+  /**
+   * OK
+   */
+  200: SetupInfo;
+};
+
+export type SetupCheckResponse = SetupCheckResponses[keyof SetupCheckResponses];
+
+export type VersionCheckData = {
+  body?: never;
+  path?: never;
+  query?: never;
+  url: '/v1/system/version';
+};
+
+export type VersionCheckResponses = {
+  /**
+   * OK
+   */
+  200: VersionInfo;
+};
+
+export type VersionCheckResponse = VersionCheckResponses[keyof VersionCheckResponses];
 
 export type DeleteWalletsData = {
+  body?: never;
+  path?: never;
   query?: {
-    /**
-     * List of IDs
-     */
-    ids?: Array<string> | null;
     /**
      * Total amount of results to return
      */
@@ -1584,376 +3277,247 @@ export type DeleteWalletsData = {
      */
     offset?: number | null;
     /**
-     * Direction of the ordering of results
+     * List of IDs
      */
-    order_direction?: OrderDirection;
+    ids?: Array<string> | null;
     /**
      * User ID. Automatically populated with your ID
      */
     user_id?: string | null;
+    /**
+     * Direction of the ordering of results
+     */
+    order_direction?: OrderDirection;
   };
+  url: '/v1/wallets';
 };
 
-export type DeleteWalletsResponse = number;
-
-export type DeleteWalletsError = ErrorResponse;
-
-export type ListWalletOverviewsResponse = Array<WalletOverview>;
-
-export type ListWalletOverviewsError = ErrorResponse;
-
-export type GetWalletData = {
-  path: {
-    id: string;
-  };
+export type DeleteWalletsErrors = {
+  /**
+   * Bad Request
+   */
+  400: ErrorResponse;
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Forbidden
+   */
+  403: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
 };
 
-export type GetWalletResponse = WalletResponse;
+export type DeleteWalletsError = DeleteWalletsErrors[keyof DeleteWalletsErrors];
 
-export type GetWalletError = ErrorResponse;
+export type DeleteWalletsResponses = {
+  /**
+   * Success
+   */
+  200: number;
+};
+
+export type DeleteWalletsResponse = DeleteWalletsResponses[keyof DeleteWalletsResponses];
+
+export type ListWalletsData = {
+  body?: never;
+  path?: never;
+  query?: never;
+  url: '/v1/wallets';
+};
+
+export type ListWalletsErrors = {
+  /**
+   * Bad Request
+   */
+  400: ErrorResponse;
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Forbidden
+   */
+  403: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
+
+export type ListWalletsError = ListWalletsErrors[keyof ListWalletsErrors];
+
+export type ListWalletsResponses = {
+  /**
+   * Success
+   */
+  200: Array<WalletResponse>;
+};
+
+export type ListWalletsResponse = ListWalletsResponses[keyof ListWalletsResponses];
+
+export type RegisterWalletData = {
+  body: RegisterWalletRequest;
+  path?: never;
+  query?: never;
+  url: '/v1/wallets';
+};
+
+export type RegisterWalletErrors = {
+  /**
+   * Bad Request
+   */
+  400: ErrorResponse;
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Forbidden
+   */
+  403: ErrorResponse;
+  /**
+   * Unprocessable Entity
+   */
+  422: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
+
+export type RegisterWalletError = RegisterWalletErrors[keyof RegisterWalletErrors];
+
+export type RegisterWalletResponses = {
+  /**
+   * Wallet Created
+   */
+  200: WalletResponse;
+};
+
+export type RegisterWalletResponse = RegisterWalletResponses[keyof RegisterWalletResponses];
+
+export type ListWalletOverviewsData = {
+  body?: never;
+  path?: never;
+  query?: never;
+  url: '/v1/wallets/overviews';
+};
+
+export type ListWalletOverviewsErrors = {
+  /**
+   * Bad Request
+   */
+  400: ErrorResponse;
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Forbidden
+   */
+  403: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
+
+export type ListWalletOverviewsError = ListWalletOverviewsErrors[keyof ListWalletOverviewsErrors];
+
+export type ListWalletOverviewsResponses = {
+  /**
+   * Success
+   */
+  200: Array<WalletOverview>;
+};
+
+export type ListWalletOverviewsResponse =
+  ListWalletOverviewsResponses[keyof ListWalletOverviewsResponses];
 
 export type DeleteWalletData = {
+  body?: never;
   path: {
     id: string;
   };
+  query?: never;
+  url: '/v1/wallets/{id}';
 };
 
-export type DeleteWalletResponse = unknown;
-
-export type DeleteWalletError = ErrorResponse;
-
-export type ListApiKeysResponseTransformer = (data: any) => Promise<ListApiKeysResponse>;
-
-export type ApiKeyResponseModelResponseTransformer = (data: any) => ApiKeyResponse;
-
-export const ApiKeyResponseModelResponseTransformer: ApiKeyResponseModelResponseTransformer = (data) => {
-  if (data?.created_at) {
-    data.created_at = new Date(data.created_at);
-  }
-  if (data?.expires_at) {
-    data.expires_at = new Date(data.expires_at);
-  }
-  return data;
+export type DeleteWalletErrors = {
+  /**
+   * Bad Request
+   */
+  400: ErrorResponse;
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Forbidden
+   */
+  403: ErrorResponse;
+  /**
+   * Not Found
+   */
+  404: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
 };
 
-export const ListApiKeysResponseTransformer: ListApiKeysResponseTransformer = async (data) => {
-  if (Array.isArray(data)) {
-    data.forEach(ApiKeyResponseModelResponseTransformer);
-  }
-  return data;
+export type DeleteWalletError = DeleteWalletErrors[keyof DeleteWalletErrors];
+
+export type DeleteWalletResponses = {
+  /**
+   * Deleted
+   */
+  200: unknown;
 };
 
-export type CreateApiKeyResponseTransformer = (data: any) => Promise<CreateApiKeyResponse>;
-
-export const CreateApiKeyResponseTransformer: CreateApiKeyResponseTransformer = async (data) => {
-  ApiKeyResponseModelResponseTransformer(data);
-  return data;
+export type GetWalletData = {
+  body?: never;
+  path: {
+    id: string;
+  };
+  query?: never;
+  url: '/v1/wallets/{id}';
 };
 
-export type GetApiKeyResponseTransformer = (data: any) => Promise<GetApiKeyResponse>;
-
-export const GetApiKeyResponseTransformer: GetApiKeyResponseTransformer = async (data) => {
-  ApiKeyResponseModelResponseTransformer(data);
-  return data;
+export type GetWalletErrors = {
+  /**
+   * Bad Request
+   */
+  400: ErrorResponse;
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Forbidden
+   */
+  403: ErrorResponse;
+  /**
+   * Not Found
+   */
+  404: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
 };
 
-export type ListInvoicesResponseTransformer = (data: any) => Promise<ListInvoicesResponse>;
+export type GetWalletError = GetWalletErrors[keyof GetWalletErrors];
 
-export type InvoiceResponseModelResponseTransformer = (data: any) => InvoiceResponse;
-
-export const InvoiceResponseModelResponseTransformer: InvoiceResponseModelResponseTransformer = (data) => {
-  if (data?.created_at) {
-    data.created_at = new Date(data.created_at);
-  }
-  if (data?.payment_time) {
-    data.payment_time = new Date(data.payment_time);
-  }
-  if (data?.timestamp) {
-    data.timestamp = new Date(data.timestamp);
-  }
-  if (data?.updated_at) {
-    data.updated_at = new Date(data.updated_at);
-  }
-  return data;
+export type GetWalletResponses = {
+  /**
+   * Found
+   */
+  200: WalletResponse;
 };
 
-export const ListInvoicesResponseTransformer: ListInvoicesResponseTransformer = async (data) => {
-  if (Array.isArray(data)) {
-    data.forEach(InvoiceResponseModelResponseTransformer);
-  }
-  return data;
-};
-
-export type GenerateInvoiceResponseTransformer = (data: any) => Promise<GenerateInvoiceResponse>;
-
-export const GenerateInvoiceResponseTransformer: GenerateInvoiceResponseTransformer = async (data) => {
-  InvoiceResponseModelResponseTransformer(data);
-  return data;
-};
-
-export type GetInvoiceResponseTransformer = (data: any) => Promise<GetInvoiceResponse>;
-
-export const GetInvoiceResponseTransformer: GetInvoiceResponseTransformer = async (data) => {
-  InvoiceResponseModelResponseTransformer(data);
-  return data;
-};
-
-export type ListAddressesResponseTransformer = (data: any) => Promise<ListAddressesResponse>;
-
-export type LnAddressModelResponseTransformer = (data: any) => LnAddress;
-
-export const LnAddressModelResponseTransformer: LnAddressModelResponseTransformer = (data) => {
-  if (data?.created_at) {
-    data.created_at = new Date(data.created_at);
-  }
-  if (data?.updated_at) {
-    data.updated_at = new Date(data.updated_at);
-  }
-  return data;
-};
-
-export const ListAddressesResponseTransformer: ListAddressesResponseTransformer = async (data) => {
-  if (Array.isArray(data)) {
-    data.forEach(LnAddressModelResponseTransformer);
-  }
-  return data;
-};
-
-export type RegisterAddressResponseTransformer = (data: any) => Promise<RegisterAddressResponse>;
-
-export const RegisterAddressResponseTransformer: RegisterAddressResponseTransformer = async (data) => {
-  LnAddressModelResponseTransformer(data);
-  return data;
-};
-
-export type GetAddressResponseTransformer = (data: any) => Promise<GetAddressResponse>;
-
-export const GetAddressResponseTransformer: GetAddressResponseTransformer = async (data) => {
-  LnAddressModelResponseTransformer(data);
-  return data;
-};
-
-export type UpdateAddressResponseTransformer = (data: any) => Promise<UpdateAddressResponse>;
-
-export const UpdateAddressResponseTransformer: UpdateAddressResponseTransformer = async (data) => {
-  LnAddressModelResponseTransformer(data);
-  return data;
-};
-
-export type GetUserWalletResponseTransformer = (data: any) => Promise<GetUserWalletResponse>;
-
-export type WalletResponseModelResponseTransformer = (data: any) => WalletResponse;
-
-export type ContactModelResponseTransformer = (data: any) => Contact;
-
-export const ContactModelResponseTransformer: ContactModelResponseTransformer = (data) => {
-  if (data?.contact_since) {
-    data.contact_since = new Date(data.contact_since);
-  }
-  return data;
-};
-
-export type PaymentResponseModelResponseTransformer = (data: any) => PaymentResponse;
-
-export const PaymentResponseModelResponseTransformer: PaymentResponseModelResponseTransformer = (data) => {
-  if (data?.created_at) {
-    data.created_at = new Date(data.created_at);
-  }
-  if (data?.payment_time) {
-    data.payment_time = new Date(data.payment_time);
-  }
-  if (data?.updated_at) {
-    data.updated_at = new Date(data.updated_at);
-  }
-  return data;
-};
-
-export const WalletResponseModelResponseTransformer: WalletResponseModelResponseTransformer = (data) => {
-  if (Array.isArray(data?.contacts)) {
-    data.contacts.forEach(ContactModelResponseTransformer);
-  }
-  if (data?.created_at) {
-    data.created_at = new Date(data.created_at);
-  }
-  if (Array.isArray(data?.invoices)) {
-    data.invoices.forEach(InvoiceResponseModelResponseTransformer);
-  }
-  if (Array.isArray(data?.payments)) {
-    data.payments.forEach(PaymentResponseModelResponseTransformer);
-  }
-  if (data?.updated_at) {
-    data.updated_at = new Date(data.updated_at);
-  }
-  return data;
-};
-
-export const GetUserWalletResponseTransformer: GetUserWalletResponseTransformer = async (data) => {
-  WalletResponseModelResponseTransformer(data);
-  return data;
-};
-
-export type ListWalletApiKeysResponseTransformer = (data: any) => Promise<ListWalletApiKeysResponse>;
-
-export const ListWalletApiKeysResponseTransformer: ListWalletApiKeysResponseTransformer = async (data) => {
-  if (Array.isArray(data)) {
-    data.forEach(ApiKeyResponseModelResponseTransformer);
-  }
-  return data;
-};
-
-export type CreateWalletApiKeyResponseTransformer = (data: any) => Promise<CreateWalletApiKeyResponse>;
-
-export const CreateWalletApiKeyResponseTransformer: CreateWalletApiKeyResponseTransformer = async (data) => {
-  ApiKeyResponseModelResponseTransformer(data);
-  return data;
-};
-
-export type GetWalletApiKeyResponseTransformer = (data: any) => Promise<GetWalletApiKeyResponse>;
-
-export const GetWalletApiKeyResponseTransformer: GetWalletApiKeyResponseTransformer = async (data) => {
-  ApiKeyResponseModelResponseTransformer(data);
-  return data;
-};
-
-export type ListContactsResponseTransformer = (data: any) => Promise<ListContactsResponse>;
-
-export const ListContactsResponseTransformer: ListContactsResponseTransformer = async (data) => {
-  if (Array.isArray(data)) {
-    data.forEach(ContactModelResponseTransformer);
-  }
-  return data;
-};
-
-export type ListWalletInvoicesResponseTransformer = (data: any) => Promise<ListWalletInvoicesResponse>;
-
-export const ListWalletInvoicesResponseTransformer: ListWalletInvoicesResponseTransformer = async (data) => {
-  if (Array.isArray(data)) {
-    data.forEach(InvoiceResponseModelResponseTransformer);
-  }
-  return data;
-};
-
-export type NewWalletInvoiceResponseTransformer = (data: any) => Promise<NewWalletInvoiceResponse>;
-
-export const NewWalletInvoiceResponseTransformer: NewWalletInvoiceResponseTransformer = async (data) => {
-  InvoiceResponseModelResponseTransformer(data);
-  return data;
-};
-
-export type GetWalletInvoiceResponseTransformer = (data: any) => Promise<GetWalletInvoiceResponse>;
-
-export const GetWalletInvoiceResponseTransformer: GetWalletInvoiceResponseTransformer = async (data) => {
-  InvoiceResponseModelResponseTransformer(data);
-  return data;
-};
-
-export type GetWalletAddressResponseTransformer = (data: any) => Promise<GetWalletAddressResponse>;
-
-export const GetWalletAddressResponseTransformer: GetWalletAddressResponseTransformer = async (data) => {
-  LnAddressModelResponseTransformer(data);
-  return data;
-};
-
-export type UpdateWalletAddressResponseTransformer = (data: any) => Promise<UpdateWalletAddressResponse>;
-
-export const UpdateWalletAddressResponseTransformer: UpdateWalletAddressResponseTransformer = async (data) => {
-  LnAddressModelResponseTransformer(data);
-  return data;
-};
-
-export type RegisterWalletAddressResponseTransformer = (data: any) => Promise<RegisterWalletAddressResponse>;
-
-export const RegisterWalletAddressResponseTransformer: RegisterWalletAddressResponseTransformer = async (data) => {
-  LnAddressModelResponseTransformer(data);
-  return data;
-};
-
-export type ListWalletPaymentsResponseTransformer = (data: any) => Promise<ListWalletPaymentsResponse>;
-
-export const ListWalletPaymentsResponseTransformer: ListWalletPaymentsResponseTransformer = async (data) => {
-  if (Array.isArray(data)) {
-    data.forEach(PaymentResponseModelResponseTransformer);
-  }
-  return data;
-};
-
-export type WalletPayResponseTransformer = (data: any) => Promise<WalletPayResponse>;
-
-export const WalletPayResponseTransformer: WalletPayResponseTransformer = async (data) => {
-  PaymentResponseModelResponseTransformer(data);
-  return data;
-};
-
-export type GetWalletPaymentResponseTransformer = (data: any) => Promise<GetWalletPaymentResponse>;
-
-export const GetWalletPaymentResponseTransformer: GetWalletPaymentResponseTransformer = async (data) => {
-  PaymentResponseModelResponseTransformer(data);
-  return data;
-};
-
-export type ListPaymentsResponseTransformer = (data: any) => Promise<ListPaymentsResponse>;
-
-export const ListPaymentsResponseTransformer: ListPaymentsResponseTransformer = async (data) => {
-  if (Array.isArray(data)) {
-    data.forEach(PaymentResponseModelResponseTransformer);
-  }
-  return data;
-};
-
-export type PayResponseTransformer = (data: any) => Promise<PayResponse>;
-
-export const PayResponseTransformer: PayResponseTransformer = async (data) => {
-  PaymentResponseModelResponseTransformer(data);
-  return data;
-};
-
-export type GetPaymentResponseTransformer = (data: any) => Promise<GetPaymentResponse>;
-
-export const GetPaymentResponseTransformer: GetPaymentResponseTransformer = async (data) => {
-  PaymentResponseModelResponseTransformer(data);
-  return data;
-};
-
-export type ListWalletsResponseTransformer = (data: any) => Promise<ListWalletsResponse>;
-
-export const ListWalletsResponseTransformer: ListWalletsResponseTransformer = async (data) => {
-  if (Array.isArray(data)) {
-    data.forEach(WalletResponseModelResponseTransformer);
-  }
-  return data;
-};
-
-export type RegisterWalletResponseTransformer = (data: any) => Promise<RegisterWalletResponse>;
-
-export const RegisterWalletResponseTransformer: RegisterWalletResponseTransformer = async (data) => {
-  WalletResponseModelResponseTransformer(data);
-  return data;
-};
-
-export type ListWalletOverviewsResponseTransformer = (data: any) => Promise<ListWalletOverviewsResponse>;
-
-export type WalletOverviewModelResponseTransformer = (data: any) => WalletOverview;
-
-export const WalletOverviewModelResponseTransformer: WalletOverviewModelResponseTransformer = (data) => {
-  if (data?.created_at) {
-    data.created_at = new Date(data.created_at);
-  }
-  if (data?.updated_at) {
-    data.updated_at = new Date(data.updated_at);
-  }
-  return data;
-};
-
-export const ListWalletOverviewsResponseTransformer: ListWalletOverviewsResponseTransformer = async (data) => {
-  if (Array.isArray(data)) {
-    data.forEach(WalletOverviewModelResponseTransformer);
-  }
-  return data;
-};
-
-export type GetWalletResponseTransformer = (data: any) => Promise<GetWalletResponse>;
-
-export const GetWalletResponseTransformer: GetWalletResponseTransformer = async (data) => {
-  WalletResponseModelResponseTransformer(data);
-  return data;
-};
+export type GetWalletResponse = GetWalletResponses[keyof GetWalletResponses];

@@ -30,10 +30,8 @@ pub struct WalletOverview {
     pub id: Uuid,
     /// User ID. Populated from the Authentication method,  such as JWT subject
     pub user_id: String,
-    /// Lightning Address ID
-    pub ln_address_id: Option<Uuid>,
-    /// Lightning Address Username
-    pub ln_address_username: Option<String>,
+    /// Lightning Address
+    pub ln_address: Option<LnAddress>,
     /// User Balance
     pub balance: Balance,
     /// Number of payments

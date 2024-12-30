@@ -1,10 +1,10 @@
 import { appTitle } from 'src/utils/format-string';
 
-import { CONFIG } from 'src/config-global';
+import { CONFIG } from 'src/global-config';
 
-import { JwtSignInView } from 'src/sections/auth/jwt';
-import { Auth0SignInView } from 'src/sections/auth/auth0';
-import { SupabaseSignInView } from 'src/sections/auth/supabase';
+import { JwtSignInView } from 'src/auth/view/jwt';
+import { Auth0SignInView } from 'src/auth/view/auth0';
+import { SupabaseSignInView } from 'src/auth/view/supabase';
 
 // ----------------------------------------------------------------------
 

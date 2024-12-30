@@ -2,11 +2,7 @@ export * from './utils';
 
 export * from './use-table';
 
-export type * from './types';
-
 export * from './table-no-data';
-
-export * from './table-skeleton';
 
 export * from './table-empty-rows';
 

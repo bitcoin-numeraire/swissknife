@@ -14,7 +14,15 @@ type Props = CardProps &
     subheader?: string;
   };
 
-export function NewInvoiceCard({ onSuccess, title, subheader, lnAddress, fiatPrices, sx, ...other }: Props) {
+export function NewInvoiceCard({
+  onSuccess,
+  title,
+  subheader,
+  lnAddress,
+  fiatPrices,
+  sx,
+  ...other
+}: Props) {
   return (
     <Card {...other}>
       <CardHeader title={title} subheader={subheader} />

@@ -1,19 +1,37 @@
-import type { Theme as BaseTheme } from '@mui/material/styles/createTheme';
-import type { CssVarsTheme, CssVarsThemeOptions } from '@mui/material/styles';
-import type { TypographyOptions } from '@mui/material/styles/createTypography';
+import type { DefaultColorScheme } from '@mui/material/styles/createThemeWithVars';
+import type {
+  Shadows,
+  Direction,
+  ColorSystemOptions,
+  CssVarsThemeOptions,
+  ThemeOptions as MuiThemeOptions,
+} from '@mui/material/styles';
+
+import type { CustomShadows } from './core/custom-shadows';
 
 // ----------------------------------------------------------------------
 
-export type Theme = Omit<BaseTheme, 'palette' | 'applyStyles'> & CssVarsTheme;
+/**
+ * Theme options
+ * Extended type that includes additional properties for color schemes and CSS variables.
+ *
+ * @see https://github.com/mui/material-ui/blob/master/packages/mui-material/src/styles/createTheme.ts
+ */
 
-export type ThemeUpdateOptions = Omit<CssVarsThemeOptions, 'typography'> & {
-  typography?: TypographyOptions;
+export type ThemeColorScheme = DefaultColorScheme;
+export type ThemeDirection = Direction;
+export type ThemeCssVariables = Pick<
+  CssVarsThemeOptions,
+  'colorSchemeSelector' | 'disableCssColorScheme' | 'cssVarPrefix' | 'shouldSkipGeneratingVar'
+>;
+
+type ColorSchemeOptionsExtended = ColorSystemOptions & {
+  shadows?: Shadows;
+  customShadows?: CustomShadows;
 };
 
-export type ThemeComponents = CssVarsThemeOptions['components'];
-
-export type ThemeColorScheme = 'light' | 'dark';
-
-export type ThemeDirection = 'ltr' | 'rtl';
-
-export type ThemeLocaleComponents = { components: ThemeComponents };
+export type ThemeOptions = Omit<MuiThemeOptions, 'components'> &
+  Pick<CssVarsThemeOptions, 'defaultColorScheme' | 'components'> & {
+    colorSchemes?: Record<ThemeColorScheme, ColorSchemeOptionsExtended>;
+    cssVariables?: ThemeCssVariables;
+  };

@@ -1,75 +1,114 @@
+import type { BoxProps } from '@mui/material/Box';
+import type { SliderProps } from '@mui/material/Slider';
+
+import { setFont } from 'minimal-shared/utils';
+
 import Box from '@mui/material/Box';
-import ButtonBase from '@mui/material/ButtonBase';
+import Slider, { sliderClasses } from '@mui/material/Slider';
 
-import { CONFIG } from 'src/config-global';
-import { setFont, varAlpha, stylesMode } from 'src/theme/styles';
+import { CONFIG } from 'src/global-config';
 
-import { Block } from './styles';
+import { OptionButton } from './styles';
 import { SvgColor } from '../../svg-color';
+
+import type { SettingsState } from '../types';
 
 // ----------------------------------------------------------------------
 
-type Props = {
-  value: string;
+export type FontFamilyOptionsProps = BoxProps & {
   options: string[];
-  onClickOption: (newValue: string) => void;
+  value: SettingsState['fontFamily'];
+  onChangeOption: (newOption: string) => void;
 };
 
-export function FontOptions({ value, options, onClickOption }: Props) {
+export function FontFamilyOptions({
+  sx,
+  value,
+  options,
+  onChangeOption,
+  ...other
+}: FontFamilyOptionsProps) {
   return (
-    <Block title="Font">
-      <Box component="ul" gap={1.5} display="grid" gridTemplateColumns="repeat(2, 1fr)">
-        {options.map((option) => {
-          const selected = value === option;
+    <Box
+      sx={[
+        () => ({
+          gap: 1.5,
+          display: 'grid',
+          gridTemplateColumns: 'repeat(2, 1fr)',
+        }),
+        ...(Array.isArray(sx) ? sx : [sx]),
+      ]}
+      {...other}
+    >
+      {options.map((option) => {
+        const selected = value === option;
 
-          return (
-            <Box component="li" key={option} sx={{ display: 'inline-flex' }}>
-              <ButtonBase
-                disableRipple
-                onClick={() => onClickOption(option)}
-                sx={{
-                  py: 2,
-                  width: 1,
-                  gap: 0.75,
-                  borderWidth: 1,
-                  borderRadius: 1.5,
-                  borderStyle: 'solid',
-                  display: 'inline-flex',
-                  flexDirection: 'column',
-                  borderColor: 'transparent',
-                  fontFamily: setFont(option),
-                  fontWeight: 'fontWeightMedium',
-                  fontSize: (theme) => theme.typography.pxToRem(12),
-                  color: (theme) => theme.vars.palette.text.disabled,
-                  ...(selected && {
-                    color: (theme) => theme.vars.palette.text.primary,
-                    borderColor: (theme) => varAlpha(theme.vars.palette.grey['500Channel'], 0.08),
-                    boxShadow: (theme) => `-8px 8px 20px -4px ${varAlpha(theme.vars.palette.grey['500Channel'], 0.12)}`,
-                    [stylesMode.dark]: {
-                      boxShadow: (theme) => `-8px 8px 20px -4px ${varAlpha(theme.vars.palette.common.blackChannel, 0.12)}`,
-                    },
-                  }),
-                }}
-              >
-                <SvgColor
-                  src={`${CONFIG.site.basePath}/assets/icons/setting/ic-font.svg`}
-                  sx={{
-                    width: 28,
-                    height: 28,
-                    color: 'currentColor',
-                    ...(selected && {
-                      background: (theme) =>
-                        `linear-gradient(135deg, ${theme.vars.palette.primary.light}, ${theme.vars.palette.primary.main})`,
-                    }),
-                  }}
-                />
+        return (
+          <OptionButton
+            key={option}
+            selected={selected}
+            onClick={() => onChangeOption(option)}
+            sx={(theme) => ({
+              py: 2,
+              gap: 0.75,
+              flexDirection: 'column',
+              fontFamily: setFont(option),
+              fontSize: theme.typography.pxToRem(12),
+            })}
+          >
+            <SvgColor
+              src={`${CONFIG.assetsDir}/assets/icons/settings/ic-font.svg`}
+              sx={{ width: 28, height: 28, color: 'currentColor' }}
+            />
 
-                {option}
-              </ButtonBase>
-            </Box>
-          );
-        })}
-      </Box>
-    </Block>
+            {option.endsWith('Variable') ? option.replace(' Variable', '') : option}
+          </OptionButton>
+        );
+      })}
+    </Box>
+  );
+}
+
+// ----------------------------------------------------------------------
+
+export type FontSizeOptionsProps = SliderProps & {
+  options: [number, number];
+  value: SettingsState['fontSize'];
+  onChangeOption: (newOption: number) => void;
+};
+
+export function FontSizeOptions({
+  sx,
+  value,
+  options,
+  onChangeOption,
+  ...other
+}: FontSizeOptionsProps) {
+  return (
+    <Slider
+      marks
+      step={1}
+      size="small"
+      valueLabelDisplay="on"
+      aria-label="Change font size"
+      valueLabelFormat={(val) => `${val}px`}
+      value={value}
+      min={options[0]}
+      max={options[1]}
+      onChange={(event: Event, newOption: number | number[]) => onChangeOption(newOption as number)}
+      sx={[
+        (theme) => ({
+          [`& .${sliderClasses.rail}`]: {
+            height: 12,
+          },
+          [`& .${sliderClasses.track}`]: {
+            height: 12,
+            background: `linear-gradient(135deg, ${theme.vars.palette.primary.light}, ${theme.vars.palette.primary.dark})`,
+          },
+        }),
+        ...(Array.isArray(sx) ? sx : [sx]),
+      ]}
+      {...other}
+    />
   );
 }

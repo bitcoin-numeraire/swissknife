@@ -3,7 +3,8 @@ import type { InputProps } from '@mui/material/Input';
 import type { LnAddress, NewInvoiceRequest } from 'src/lib/swissknife';
 
 import { useForm } from 'react-hook-form';
-import { ajvResolver } from '@hookform/resolvers/ajv';
+import { useBoolean } from 'minimal-shared/hooks';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { useState, useEffect, useCallback } from 'react';
 
 import Box from '@mui/material/Box';
@@ -13,23 +14,22 @@ import Button from '@mui/material/Button';
 import Typography from '@mui/material/Typography';
 import Input, { inputClasses } from '@mui/material/Input';
 
-import { useBoolean } from 'src/hooks/use-boolean';
-
-import { ajvOptions } from 'src/utils/ajv';
 import { satsToFiat } from 'src/utils/fiat';
 import { displayLnAddress } from 'src/utils/lnurl';
 import { fCurrency } from 'src/utils/format-number';
+import { handleActionError } from 'src/utils/errors';
 
 import { useTranslate } from 'src/locales';
-import { generateInvoice, newWalletInvoice, NewInvoiceRequestSchema } from 'src/lib/swissknife';
+import { zNewInvoiceRequest } from 'src/lib/swissknife/zod.gen';
+import { generateInvoice, newWalletInvoice } from 'src/lib/swissknife';
 
-import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
 import { Form } from 'src/components/hook-form/form-provider';
-import { RHFSlider, RHFTextField, RHFWalletSelect } from 'src/components/hook-form';
+import { RHFSlider, RHFTextField } from 'src/components/hook-form';
 
 import { QRDialog } from '../qr';
 import { useSettingsContext } from '../settings';
+import { WalletSelectDropdown } from '../wallet';
 
 // ----------------------------------------------------------------------
 
@@ -46,22 +46,25 @@ export type NewInvoiceFormProps = {
   walletId?: string;
 };
 
-// @ts-ignore
-const resolver = ajvResolver(NewInvoiceRequestSchema, ajvOptions);
-
-export function NewInvoiceForm({ fiatPrices, isAdmin, walletId, lnAddress, onSuccess }: NewInvoiceFormProps) {
+export function NewInvoiceForm({
+  fiatPrices,
+  isAdmin,
+  walletId,
+  lnAddress,
+  onSuccess,
+}: NewInvoiceFormProps) {
   const { t } = useTranslate();
   const [autoWidth, setAutoWidth] = useState(24);
   const [qrValue, setQrValue] = useState('');
   const confirm = useBoolean();
-  const { currency } = useSettingsContext();
+  const { state } = useSettingsContext();
+  const { currency } = state;
 
   const methods = useForm({
-    resolver,
+    resolver: zodResolver(zNewInvoiceRequest),
     defaultValues: {
       amount_msat: MIN_AMOUNT,
-      description: '',
-      wallet: null,
+      wallet_id: walletId ?? null,
     },
   });
 
@@ -70,11 +73,10 @@ export function NewInvoiceForm({ fiatPrices, isAdmin, walletId, lnAddress, onSuc
     setValue,
     handleSubmit,
     reset,
-    formState: { isSubmitting },
+    formState: { isSubmitting, isValid },
   } = methods;
 
   const amount = watch('amount_msat');
-  const wallet = watch('wallet');
 
   const handleAutoWidth = useCallback(() => {
     const getNumberLength = amount.toString().length;
@@ -107,13 +109,12 @@ export function NewInvoiceForm({ fiatPrices, isAdmin, walletId, lnAddress, onSuc
     }
   }, [amount, setValue]);
 
-  const onSubmit = async (body: any) => {
+  const onSubmit = async (body: NewInvoiceRequest) => {
     try {
       let invoice;
       const reqBody: NewInvoiceRequest = {
+        ...body,
         amount_msat: body.amount_msat * 1000,
-        description: body.description || undefined,
-        wallet_id: walletId || body.wallet?.id,
       };
 
       if (isAdmin) {
@@ -129,7 +130,7 @@ export function NewInvoiceForm({ fiatPrices, isAdmin, walletId, lnAddress, onSuc
       reset();
       onSuccess?.();
     } catch (error) {
-      toast.error(error.reason);
+      handleActionError(error);
     }
   };
 
@@ -141,18 +142,36 @@ export function NewInvoiceForm({ fiatPrices, isAdmin, walletId, lnAddress, onSuc
             {t('new_invoice.insert_amount')}
           </Typography>
 
-          <InputAmount amount={amount} onBlur={handleBlur} autoWidth={autoWidth} onChange={handleChangeAmount} />
+          <InputAmount
+            amount={amount}
+            onBlur={handleBlur}
+            autoWidth={autoWidth}
+            onChange={handleChangeAmount}
+          />
 
-          <RHFSlider name="amount_msat" min={MIN_AMOUNT} max={MAX_AMOUNT} onChange={handleChangeSlider} onBlur={handleBlur} />
+          <RHFSlider
+            name="amount_msat"
+            min={MIN_AMOUNT}
+            max={MAX_AMOUNT}
+            onChange={handleChangeSlider}
+            onBlur={handleBlur}
+          />
 
           <Stack direction="row" alignItems="center" sx={{ typography: 'subtitle2' }}>
             <Box component="span" sx={{ flexGrow: 1 }}>
-              {t('new_invoice.btc_exchange_rate', { rate: fCurrency(fiatPrices[currency], { currency }) })}
+              {t('new_invoice.btc_exchange_rate', {
+                rate: fCurrency(fiatPrices[currency], { currency }),
+              })}
             </Box>
             {fCurrency(satsToFiat(amount, fiatPrices, currency), { currency })}
           </Stack>
 
-          <RHFTextField variant="outlined" fullWidth name="description" label={t('new_invoice.add_note')} />
+          <RHFTextField
+            variant="outlined"
+            fullWidth
+            name="description"
+            label={t('new_invoice.add_note')}
+          />
 
           {walletId ? (
             <RHFTextField
@@ -164,7 +183,7 @@ export function NewInvoiceForm({ fiatPrices, isAdmin, walletId, lnAddress, onSuc
               inputProps={{ readOnly: true }}
             />
           ) : (
-            isAdmin && <RHFWalletSelect />
+            isAdmin && <WalletSelectDropdown />
           )}
 
           <Stack direction="row" spacing={2}>
@@ -173,11 +192,12 @@ export function NewInvoiceForm({ fiatPrices, isAdmin, walletId, lnAddress, onSuc
               size="large"
               color="inherit"
               variant="contained"
-              disabled={!amount || isSubmitting || (isAdmin && !walletId && !wallet)}
+              disabled={!isValid}
               sx={{ flex: 1 }}
               loading={isSubmitting}
             >
-              {t('new_invoice.receive')} <Iconify width={16} icon="eva:flash-fill" sx={{ color: '#FF9900', ml: 0.5 }} />
+              {t('new_invoice.receive')}{' '}
+              <Iconify width={16} icon="eva:flash-fill" sx={{ color: '#FF9900', ml: 0.5 }} />
             </LoadingButton>
 
             {lnAddress && (

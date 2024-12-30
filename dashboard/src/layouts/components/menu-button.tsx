@@ -5,8 +5,6 @@ import IconButton from '@mui/material/IconButton';
 
 // ----------------------------------------------------------------------
 
-export type MenuButtonProps = IconButtonProps;
-
 export function MenuButton({ sx, ...other }: IconButtonProps) {
   return (
     <IconButton sx={sx} {...other}>

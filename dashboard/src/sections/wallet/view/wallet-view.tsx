@@ -6,10 +6,14 @@ import { mutate } from 'swr';
 import { useMemo } from 'react';
 
 import Box from '@mui/material/Box';
-import Grid from '@mui/material/Unstable_Grid2';
+import Grid from '@mui/material/Grid2';
 
 import { shouldFail } from 'src/utils/errors';
-import { getCumulativeSeries, getPercentageChange, mergeAndSortTransactions } from 'src/utils/transactions';
+import {
+  getCumulativeSeries,
+  getPercentageChange,
+  mergeAndSortTransactions,
+} from 'src/utils/transactions';
 
 import { useTranslate } from 'src/locales';
 import { endpointKeys } from 'src/actions/keys';
@@ -37,11 +41,23 @@ export function WalletView() {
   const data = [wallet, fiatPrices];
   const isLoading = [walletLoading, fiatPricesLoading];
 
-  const incomeSeries = useMemo(() => getCumulativeSeries(wallet?.invoices || []), [wallet?.invoices]);
-  const expensesSeries = useMemo(() => getCumulativeSeries(wallet?.payments || []), [wallet?.payments]);
+  const incomeSeries = useMemo(
+    () => getCumulativeSeries(wallet?.invoices || []),
+    [wallet?.invoices]
+  );
+  const expensesSeries = useMemo(
+    () => getCumulativeSeries(wallet?.payments || []),
+    [wallet?.payments]
+  );
 
-  const percentageChangeIncome = useMemo(() => getPercentageChange(wallet?.invoices || []), [wallet?.invoices]);
-  const percentageChangeExpenses = useMemo(() => getPercentageChange(wallet?.payments || []), [wallet?.payments]);
+  const percentageChangeIncome = useMemo(
+    () => getPercentageChange(wallet?.invoices || []),
+    [wallet?.invoices]
+  );
+  const percentageChangeExpenses = useMemo(
+    () => getPercentageChange(wallet?.payments || []),
+    [wallet?.payments]
+  );
 
   const allTransactions = useMemo(
     () => mergeAndSortTransactions(wallet?.invoices || [], wallet?.payments || []),
@@ -58,7 +74,7 @@ export function WalletView() {
         <ErrorView errors={errors} isLoading={isLoading} data={data} />
       ) : (
         <Grid container spacing={3}>
-          <Grid xs={12} md={7} lg={8}>
+          <Grid size={{ xs: 12, md: 7, lg: 8 }}>
             <Box sx={{ gap: 3, display: 'flex', flexDirection: 'column' }}>
               <BalanceOverview
                 contacts={contacts}
@@ -90,7 +106,7 @@ export function WalletView() {
             </Box>
           </Grid>
 
-          <Grid xs={12} md={5} lg={4}>
+          <Grid size={{ xs: 12, md: 5, lg: 4 }}>
             <Box sx={{ gap: 3, display: 'flex', flexDirection: 'column' }}>
               <CurrentBalance wallet={wallet!} fiatPrices={fiatPrices!} />
               <NewPaymentCard
@@ -106,7 +122,11 @@ export function WalletView() {
                 fiatPrices={fiatPrices!}
                 onSuccess={() => mutate(endpointKeys.userWallet.get)}
               />
-              <Contacts title={t('wallet_view.contacts')} list={contacts} fiatPrices={fiatPrices!} />
+              <Contacts
+                title={t('wallet_view.contacts')}
+                list={contacts}
+                fiatPrices={fiatPrices!}
+              />
             </Box>
           </Grid>
         </Grid>

@@ -1,8 +1,8 @@
 use async_trait::async_trait;
 use sea_orm::{
-    ActiveModelTrait, ActiveValue::Set, ColumnTrait, ConnectionTrait, DatabaseConnection,
-    DatabaseTransaction, EntityTrait, FromQueryResult, ModelTrait, QueryFilter, QueryOrder,
-    QuerySelect, QueryTrait, Statement,
+    sea_query::Expr, ActiveModelTrait, ActiveValue::Set, ColumnTrait, DatabaseConnection,
+    DatabaseTransaction, EntityTrait, ModelTrait, PaginatorTrait, QueryFilter, QueryOrder,
+    QuerySelect, QueryTrait,
 };
 use uuid::Uuid;
 
@@ -13,8 +13,9 @@ use crate::{
         wallet::{Balance, Contact, Wallet, WalletFilter, WalletOverview, WalletRepository},
     },
     infra::database::sea_orm::models::{
-        balance::BalanceModel,
         contact::ContactModel,
+        invoice::Column as InvoiceColumn,
+        ln_address::Model as LnAddressModel,
         payment::Column as PaymentColumn,
         prelude::{Invoice, LnAddress, Payment},
         wallet::{ActiveModel, Column, Entity},
@@ -99,75 +100,38 @@ impl WalletRepository for SeaOrmWalletRepository {
     }
 
     async fn find_many_overview(&self) -> Result<Vec<WalletOverview>, DatabaseError> {
-        let models = WalletOverviewModel::find_by_statement(Statement::from_sql_and_values(
-            self.db.get_database_backend(),
-            r#"
-                WITH wallet_balances AS (
-                    WITH sent AS (
-                        SELECT
-                            wallet_id,
-                            SUM(amount_msat) FILTER (WHERE status IN ('Settled', 'Pending')) AS sent_msat,
-                            SUM(COALESCE(fee_msat, 0)) FILTER (WHERE status = 'Settled') AS fees_paid_msat
-                        FROM payment
-                        GROUP BY wallet_id
-                    ),
-                    received AS (
-                        SELECT
-                            wallet_id,
-                            SUM(amount_received_msat) AS received_msat
-                        FROM invoice
-                        GROUP BY wallet_id
-                    )
-                    SELECT
-                        w.id AS wallet_id,
-                        COALESCE(received.received_msat, 0)::BIGINT AS received_msat,
-                        COALESCE(sent.sent_msat, 0)::BIGINT AS sent_msat,
-                        COALESCE(sent.fees_paid_msat, 0)::BIGINT AS fees_paid_msat
-                    FROM wallet w
-                    LEFT JOIN received ON w.id = received.wallet_id
-                    LEFT JOIN sent ON w.id = sent.wallet_id
-                ),
-                payment_counts AS (
-                    SELECT wallet_id, COUNT(*) AS n_payments
-                    FROM payment
-                    GROUP BY wallet_id
-                ),
-                invoice_counts AS (
-                    SELECT wallet_id, COUNT(*) AS n_invoices
-                    FROM invoice
-                    GROUP BY wallet_id
-                ),
-                contact_counts AS (
-                    SELECT wallet_id, COUNT(DISTINCT ln_address) AS n_contacts
-                    FROM payment
-                    WHERE ln_address IS NOT NULL AND status = 'Settled'
-                    GROUP BY wallet_id
-                )
-                SELECT
-                    w.id,
-                    w.user_id,
-                    w.created_at,
-                    w.updated_at,
-                    COALESCE(wb.received_msat, 0)::BIGINT AS received_msat,
-                    COALESCE(wb.sent_msat, 0)::BIGINT AS sent_msat,
-                    COALESCE(wb.fees_paid_msat, 0)::BIGINT AS fees_paid_msat,
-                    COALESCE(pc.n_payments, 0) AS n_payments,
-                    COALESCE(ic.n_invoices, 0) AS n_invoices,
-                    COALESCE(cc.n_contacts, 0) AS n_contacts,
-                    la.id AS ln_address_id,
-                    la.username AS ln_address_username
-                FROM wallet w
-                LEFT JOIN wallet_balances wb ON w.id = wb.wallet_id
-                LEFT JOIN payment_counts pc ON w.id = pc.wallet_id
-                LEFT JOIN invoice_counts ic ON w.id = ic.wallet_id
-                LEFT JOIN contact_counts cc ON w.id = cc.wallet_id
-                LEFT JOIN ln_address la ON w.id = la.wallet_id
-                ORDER BY w.created_at DESC
-                "#,
-            [],
-        )).all(&self.db).await.map_err(|e| DatabaseError::FindByStatement(e.to_string()))?;
+        let wallet_q = Entity::find()
+            .left_join(Payment)
+            .left_join(Invoice)
+            .column_as(InvoiceColumn::AmountReceivedMsat.sum(), "received_msat")
+            .column_as(PaymentColumn::AmountMsat.sum(), "sent_msat")
+            .column_as(PaymentColumn::FeeMsat.sum(), "fees_paid_msat")
+            .column_as(PaymentColumn::Id.count(), "n_payments")
+            .column_as(InvoiceColumn::Id.count(), "n_invoices")
+            .column_as(
+                Expr::col(PaymentColumn::LnAddress).count_distinct(),
+                "n_contacts",
+            )
+            .group_by(Column::Id)
+            .group_by(Column::UserId)
+            .group_by(Column::CreatedAt)
+            .group_by(Column::UpdatedAt)
+            .find_also_related(LnAddress);
 
-        Ok(models.into_iter().map(Into::into).collect())
+        let results = wallet_q
+            .into_model::<WalletOverviewModel, LnAddressModel>()
+            .all(&self.db)
+            .await
+            .map_err(|e| DatabaseError::FindMany(e.to_string()))?;
+
+        Ok(results
+            .into_iter()
+            .map(|(wallet_model, ln_address_model)| {
+                let mut overview: WalletOverview = wallet_model.into();
+                overview.ln_address = ln_address_model.map(Into::into);
+                overview
+            })
+            .collect())
     }
 
     async fn insert(&self, user_id: &str) -> Result<Wallet, DatabaseError> {
@@ -190,41 +154,41 @@ impl WalletRepository for SeaOrmWalletRepository {
         txn: Option<&DatabaseTransaction>,
         id: Uuid,
     ) -> Result<Balance, DatabaseError> {
-        let query = BalanceModel::find_by_statement(Statement::from_sql_and_values(
-            self.db.get_database_backend(),
-            r#"
-            WITH sent AS (
-                SELECT
-                    SUM(amount_msat) FILTER (WHERE status IN ('Settled', 'Pending')) AS sent_msat,
-                    SUM(COALESCE(fee_msat, 0)) FILTER (WHERE status = 'Settled') AS fees_paid_msat
-                FROM payment
-                WHERE wallet_id = $1
-            ),
-            received AS (
-                SELECT SUM(amount_received_msat) AS received_msat
-                FROM invoice
-                WHERE wallet_id = $1
-            )
-            SELECT
-                COALESCE(received.received_msat, 0)::BIGINT AS received_msat,
-                COALESCE(sent.sent_msat, 0)::BIGINT AS sent_msat,
-                COALESCE(sent.fees_paid_msat, 0)::BIGINT AS fees_paid_msat
-            FROM received, sent;
-            "#,
-            [id.into()],
-        ));
+        let received = Invoice::find()
+            .filter(InvoiceColumn::WalletId.eq(id))
+            .select_only()
+            .column_as(InvoiceColumn::AmountReceivedMsat.sum(), "received_msat")
+            .into_tuple::<Option<i64>>();
 
-        let result = match txn {
-            Some(txn) => query.one(txn).await,
-            None => query.one(&self.db).await,
+        let sent = Payment::find()
+            .filter(PaymentColumn::WalletId.eq(id))
+            .filter(PaymentColumn::Status.is_in([
+                PaymentStatus::Settled.to_string(),
+                PaymentStatus::Pending.to_string(),
+            ]))
+            .select_only()
+            .column_as(PaymentColumn::AmountMsat.sum(), "sent_msat")
+            .column_as(PaymentColumn::FeeMsat.sum(), "fees_paid_msat")
+            .into_tuple::<(Option<i64>, Option<i64>)>();
+
+        let (received_res, sent_res) = match txn {
+            Some(txn) => (received.one(txn).await, sent.one(txn).await),
+            None => (received.one(&self.db).await, sent.one(&self.db).await),
         };
 
-        let result = result.map_err(|e| DatabaseError::FindByStatement(e.to_string()))?;
+        let received = received_res
+            .map_err(|e| DatabaseError::FindOne(e.to_string()))?
+            .unwrap_or(None);
 
-        match result {
-            Some(model) => Ok(model.into()),
-            None => Ok(Balance::default()),
-        }
+        let (sent_msat, fees_paid_msat) = sent_res
+            .map_err(|e| DatabaseError::FindOne(e.to_string()))?
+            .unwrap_or((None, None));
+
+        Ok(Balance::new(
+            received.unwrap_or_default(),
+            sent_msat.unwrap_or_default(),
+            fees_paid_msat.unwrap_or_default(),
+        ))
     }
 
     async fn find_contacts(&self, id: Uuid) -> Result<Vec<Contact>, DatabaseError> {
@@ -255,5 +219,14 @@ impl WalletRepository for SeaOrmWalletRepository {
             .map_err(|e| DatabaseError::Delete(e.to_string()))?;
 
         Ok(result.rows_affected)
+    }
+
+    async fn count(&self) -> Result<u64, DatabaseError> {
+        let count = Entity::find()
+            .count(&self.db)
+            .await
+            .map_err(|e| DatabaseError::Count(e.to_string()))?;
+
+        Ok(count)
     }
 }

@@ -1,13 +1,16 @@
 import type { ITransaction } from 'src/types/transaction';
 import type { InvoiceResponse, PaymentResponse } from 'src/lib/swissknife';
 
-import { TransactionType } from 'src/types/transaction';
+import { sumBy } from 'es-toolkit';
 
-import { sumBy } from './helper';
+import { TransactionType } from 'src/types/transaction';
 
 export const LEDGERS = ['Lightning', 'Internal', 'Onchain'];
 
-export function mergeAndSortTransactions(invoices: InvoiceResponse[], payments: PaymentResponse[]): ITransaction[] {
+export function mergeAndSortTransactions(
+  invoices: InvoiceResponse[],
+  payments: PaymentResponse[]
+): ITransaction[] {
   const invoicesWithType = invoices.map((invoice) => ({
     ...invoice,
     transaction_type: TransactionType.INVOICE,
@@ -38,11 +41,20 @@ export function getPercentageChange(transactions: ITransaction[]): number {
   );
 
   const previousMonthTransactions = transactions.filter(
-    (tx) => tx.created_at >= previousMonthStart && tx.created_at < previousMonthEnd && tx.status === 'Settled'
+    (tx) =>
+      tx.created_at >= previousMonthStart &&
+      tx.created_at < previousMonthEnd &&
+      tx.status === 'Settled'
   );
 
-  const currentMonthTotal = currentMonthTransactions.reduce((sum, tx) => sum + (tx.amount_msat || 0), 0);
-  const previousMonthTotal = previousMonthTransactions.reduce((sum, tx) => sum + (tx.amount_msat || 0), 0);
+  const currentMonthTotal = currentMonthTransactions.reduce(
+    (sum, tx) => sum + (tx.amount_msat || 0),
+    0
+  );
+  const previousMonthTotal = previousMonthTransactions.reduce(
+    (sum, tx) => sum + (tx.amount_msat || 0),
+    0
+  );
 
   if (previousMonthTotal === 0) {
     return currentMonthTotal === 0 ? 0 : 100;

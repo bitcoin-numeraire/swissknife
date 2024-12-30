@@ -1,6 +1,6 @@
 import type { Theme, SxProps } from '@mui/material';
 import type { StackProps } from '@mui/material/Stack';
-import type { UseSetStateReturn } from 'src/hooks/use-set-state';
+import type { UseSetStateReturn } from 'minimal-shared/hooks';
 import type { ILnAddressTableFilters } from 'src/types/ln-address';
 
 import { useCallback } from 'react';
@@ -41,12 +41,24 @@ export function LnAddressTableFiltersResult({ filters, totalResults, onResetPage
   }, [filters, onResetPage]);
 
   return (
-    <FiltersResult totalResults={totalResults} onReset={filters.onResetState} sx={sx}>
+    <FiltersResult totalResults={totalResults} onReset={() => filters.resetState()} sx={sx}>
       <FiltersBlock label={t('status')} isShow={filters.state.status !== 'all'}>
-        <Chip {...chipProps} label={filters.state.status} onDelete={handleRemoveStatus} sx={{ textTransform: 'capitalize' }} />
+        <Chip
+          {...chipProps}
+          label={filters.state.status}
+          onDelete={handleRemoveStatus}
+          sx={{ textTransform: 'capitalize' }}
+        />
       </FiltersBlock>
-      <FiltersBlock label={t('date_filter')} isShow={Boolean(filters.state.startDate && filters.state.endDate)}>
-        <Chip {...chipProps} label={fDateRangeShortLabel(filters.state.startDate, filters.state.endDate)} onDelete={handleRemoveDate} />
+      <FiltersBlock
+        label={t('date_filter')}
+        isShow={Boolean(filters.state.startDate && filters.state.endDate)}
+      >
+        <Chip
+          {...chipProps}
+          label={fDateRangeShortLabel(filters.state.startDate, filters.state.endDate)}
+          onDelete={handleRemoveDate}
+        />
       </FiltersBlock>
       <FiltersBlock label={t('keyword')} isShow={!!filters.state.name}>
         <Chip {...chipProps} label={filters.state.name} onDelete={handleRemoveKeyword} />

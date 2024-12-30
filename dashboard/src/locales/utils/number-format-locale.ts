@@ -1,7 +1,7 @@
 import i18next from 'i18next';
 
 import { allLangs } from '../all-langs';
-import { fallbackLng } from '../config-locales';
+import { fallbackLng } from '../locales-config';
 
 // ----------------------------------------------------------------------
 

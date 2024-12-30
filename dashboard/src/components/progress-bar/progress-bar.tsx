@@ -11,35 +11,39 @@ import { useRouter, usePathname, useSearchParams } from 'src/routes/hooks';
 
 type PushStateInput = [data: any, unused: string, url?: string | URL | null | undefined];
 
+/**
+ * Handles anchor click events to start the progress bar if the target URL is different from the current URL.
+ * @param event - The mouse event triggered by clicking an anchor element.
+ */
+const handleAnchorClick = (event: MouseEvent) => {
+  const targetUrl = (event.currentTarget as HTMLAnchorElement).href;
+  const currentUrl = window.location.href;
+
+  if (targetUrl !== currentUrl) {
+    NProgress.start();
+  }
+};
+
+/**
+ * Handles DOM mutations to add click event listeners to anchor elements.
+ */
+const handleMutation = () => {
+  const anchorElements: NodeListOf<HTMLAnchorElement> = document.querySelectorAll('a[href]');
+
+  const filteredAnchors = Array.from(anchorElements).filter((element) => {
+    const rel = element.getAttribute('rel');
+    const href = element.getAttribute('href');
+    const target = element.getAttribute('target');
+
+    return href?.startsWith('/') && target !== '_blank' && rel !== 'noopener';
+  });
+
+  filteredAnchors.forEach((anchor) => anchor.addEventListener('click', handleAnchorClick));
+};
+
 export function ProgressBar() {
   useEffect(() => {
     NProgress.configure({ showSpinner: false });
-
-    const handleAnchorClick = (event: MouseEvent) => {
-      const targetUrl = (event.currentTarget as HTMLAnchorElement).href;
-
-      const currentUrl = window.location.href;
-
-      if (targetUrl !== currentUrl) {
-        NProgress.start();
-      }
-    };
-
-    const handleMutation = () => {
-      const anchorElements: NodeListOf<HTMLAnchorElement> = document.querySelectorAll('a[href]');
-
-      const filteredAnchors = Array.from(anchorElements).filter((element) => {
-        const rel = element.getAttribute('rel');
-
-        const href = element.getAttribute('href');
-
-        const target = element.getAttribute('target');
-
-        return href?.startsWith('/') && target !== '_blank' && rel !== 'noopener';
-      });
-
-      filteredAnchors.forEach((anchor) => anchor.addEventListener('click', handleAnchorClick));
-    };
 
     const mutationObserver = new MutationObserver(handleMutation);
 
@@ -51,7 +55,14 @@ export function ProgressBar() {
         return target.apply(thisArg, argArray);
       },
     });
-  });
+
+    // Cleanup function to remove event listeners and observer
+    return () => {
+      mutationObserver.disconnect();
+      const anchorElements: NodeListOf<HTMLAnchorElement> = document.querySelectorAll('a[href]');
+      anchorElements.forEach((anchor) => anchor.removeEventListener('click', handleAnchorClick));
+    };
+  }, []);
 
   return (
     <Suspense fallback={null}>
@@ -63,10 +74,8 @@ export function ProgressBar() {
 // ----------------------------------------------------------------------
 
 function NProgressDone() {
-  const pathname = usePathname();
-
   const router = useRouter();
-
+  const pathname = usePathname();
   const searchParams = useSearchParams();
 
   useEffect(() => {

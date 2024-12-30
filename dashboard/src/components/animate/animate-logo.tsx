@@ -1,35 +1,31 @@
-import type { BoxProps } from '@mui/material/Box';
+import type { Theme, SxProps } from '@mui/material/styles';
 
 import { m } from 'framer-motion';
+import { forwardRef } from 'react';
+import { varAlpha } from 'minimal-shared/utils';
 
-import Box from '@mui/material/Box';
-
-import { varAlpha } from 'src/theme/styles';
+import { styled } from '@mui/material/styles';
 
 import { Logo } from '../logo';
 
+import type { LogoProps } from '../logo';
+
 // ----------------------------------------------------------------------
 
-export type AnimateLogoProps = BoxProps & {
+export type AnimateLogoProps = React.ComponentProps<'div'> & {
+  sx?: SxProps<Theme>;
   logo?: React.ReactNode;
+  slotProps?: {
+    logo?: LogoProps;
+  };
 };
 
-export function AnimateLogo1({ logo, sx, ...other }: AnimateLogoProps) {
+export const AnimateLogoZoom = forwardRef<HTMLDivElement, AnimateLogoProps>((props, ref) => {
+  const { logo, slotProps, sx, ...other } = props;
+
   return (
-    <Box
-      sx={{
-        width: 120,
-        height: 120,
-        alignItems: 'center',
-        position: 'relative',
-        display: 'inline-flex',
-        justifyContent: 'center',
-        ...sx,
-      }}
-      {...other}
-    >
-      <Box
-        component={m.div}
+    <LogoZoomRoot ref={ref} sx={sx} {...other}>
+      <m.span
         animate={{ scale: [1, 0.9, 0.9, 1, 1], opacity: [1, 0.48, 0.48, 1, 1] }}
         transition={{
           duration: 2,
@@ -37,13 +33,23 @@ export function AnimateLogo1({ logo, sx, ...other }: AnimateLogoProps) {
           repeat: Infinity,
           ease: 'easeInOut',
         }}
-        sx={{ display: 'inline-flex' }}
       >
-        {logo ?? <Logo disableLink width={64} height={64} />}
-      </Box>
+        {logo ?? (
+          <Logo
+            isSingle
+            disabled
+            {...slotProps?.logo}
+            sx={[
+              { width: 64, height: 64 },
+              ...(Array.isArray(slotProps?.logo?.sx)
+                ? (slotProps?.logo?.sx ?? [])
+                : [slotProps?.logo?.sx]),
+            ]}
+          />
+        )}
+      </m.span>
 
-      <Box
-        component={m.div}
+      <LogoZoomPrimaryOutline
         animate={{
           scale: [1.6, 1, 1, 1.6, 1.6],
           rotate: [270, 0, 0, 270, 270],
@@ -51,16 +57,9 @@ export function AnimateLogo1({ logo, sx, ...other }: AnimateLogoProps) {
           borderRadius: ['25%', '25%', '50%', '50%', '25%'],
         }}
         transition={{ ease: 'linear', duration: 3.2, repeat: Infinity }}
-        sx={{
-          position: 'absolute',
-          width: 'calc(100% - 20px)',
-          height: 'calc(100% - 20px)',
-          border: (theme) => `solid 3px ${varAlpha(theme.vars.palette.primary.darkChannel, 0.24)}`,
-        }}
       />
 
-      <Box
-        component={m.div}
+      <LogoZoomSecondaryOutline
         animate={{
           scale: [1, 1.2, 1.2, 1, 1],
           rotate: [0, 270, 270, 0, 0],
@@ -68,56 +67,80 @@ export function AnimateLogo1({ logo, sx, ...other }: AnimateLogoProps) {
           borderRadius: ['25%', '25%', '50%', '50%', '25%'],
         }}
         transition={{ ease: 'linear', duration: 3.2, repeat: Infinity }}
-        sx={{
-          width: 1,
-          height: 1,
-          position: 'absolute',
-          border: (theme) => `solid 8px ${varAlpha(theme.vars.palette.primary.darkChannel, 0.24)}`,
-        }}
       />
-    </Box>
+    </LogoZoomRoot>
   );
-}
+});
+
+const LogoZoomRoot = styled('div')(() => ({
+  width: 120,
+  height: 120,
+  alignItems: 'center',
+  position: 'relative',
+  display: 'inline-flex',
+  justifyContent: 'center',
+}));
+
+const LogoZoomPrimaryOutline = styled(m.span)(({ theme }) => ({
+  position: 'absolute',
+  width: 'calc(100% - 20px)',
+  height: 'calc(100% - 20px)',
+  border: `solid 3px ${varAlpha(theme.vars.palette.primary.darkChannel, 0.24)}`,
+}));
+
+const LogoZoomSecondaryOutline = styled(m.span)(({ theme }) => ({
+  width: '100%',
+  height: '100%',
+  position: 'absolute',
+  border: `solid 8px ${varAlpha(theme.vars.palette.primary.darkChannel, 0.24)}`,
+}));
 
 // ----------------------------------------------------------------------
 
-export function AnimateLogo2({ logo, sx, ...other }: AnimateLogoProps) {
-  return (
-    <Box
-      alignItems="center"
-      justifyContent="center"
-      sx={{
-        width: 96,
-        height: 96,
-        position: 'relative',
-        alignItems: 'center',
-        display: 'inline-flex',
-        justifyContent: 'center',
-        ...sx,
-      }}
-      {...other}
-    >
-      {logo ?? <Logo sx={{ zIndex: 9 }} />}
+export const AnimateLogoRotate = forwardRef<HTMLDivElement, AnimateLogoProps>((props, ref) => {
+  const { logo, sx, slotProps, ...other } = props;
 
-      <Box
-        component={m.div}
+  return (
+    <LogoRotateRoot ref={ref} sx={sx} {...other}>
+      {logo ?? (
+        <Logo
+          isSingle
+          {...slotProps?.logo}
+          sx={[
+            { zIndex: 9, width: 40, height: 40 },
+            ...(Array.isArray(slotProps?.logo?.sx)
+              ? (slotProps?.logo?.sx ?? [])
+              : [slotProps?.logo?.sx]),
+          ]}
+        />
+      )}
+
+      <LogoRotateBackground
         animate={{ rotate: 360 }}
         transition={{ duration: 10, ease: 'linear', repeat: Infinity }}
-        sx={{
-          width: 1,
-          height: 1,
-          opacity: 0.16,
-          borderRadius: '50%',
-          position: 'absolute',
-          transition: (theme) =>
-            theme.transitions.create(['opacity'], {
-              easing: theme.transitions.easing.easeInOut,
-              duration: theme.transitions.duration.shorter,
-            }),
-          background: (theme) =>
-            `linear-gradient(135deg, ${varAlpha(theme.vars.palette.primary.mainChannel, 0)} 50%, ${theme.vars.palette.primary.main} 100%)`,
-        }}
       />
-    </Box>
+    </LogoRotateRoot>
   );
-}
+});
+
+const LogoRotateRoot = styled('div')(() => ({
+  width: 96,
+  height: 96,
+  alignItems: 'center',
+  position: 'relative',
+  display: 'inline-flex',
+  justifyContent: 'center',
+}));
+
+const LogoRotateBackground = styled(m.span)(({ theme }) => ({
+  width: '100%',
+  height: '100%',
+  opacity: 0.16,
+  borderRadius: '50%',
+  position: 'absolute',
+  backgroundImage: `linear-gradient(135deg, transparent 50%, ${theme.vars.palette.primary.main} 100%)`,
+  transition: theme.transitions.create(['opacity'], {
+    easing: theme.transitions.easing.easeInOut,
+    duration: theme.transitions.duration.shorter,
+  }),
+}));

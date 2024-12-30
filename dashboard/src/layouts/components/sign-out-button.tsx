@@ -1,5 +1,4 @@
 import type { ButtonProps } from '@mui/material/Button';
-import type { Theme, SxProps } from '@mui/material/styles';
 
 import { useCallback } from 'react';
 import { useAuth0 } from '@auth0/auth0-react';
@@ -8,7 +7,7 @@ import Button from '@mui/material/Button';
 
 import { useRouter } from 'src/routes/hooks';
 
-import { CONFIG } from 'src/config-global';
+import { CONFIG } from 'src/global-config';
 
 import { toast } from 'src/components/snackbar';
 
@@ -21,11 +20,10 @@ import { signOut as supabaseSignOut } from 'src/auth/context/supabase/action';
 const signOut = (CONFIG.auth.method === 'supabase' && supabaseSignOut) || jwtSignOut;
 
 type Props = ButtonProps & {
-  sx?: SxProps<Theme>;
-  onClose: () => void;
+  onClose?: () => void;
 };
 
-export function SignOutButton({ onClose, ...other }: Props) {
+export function SignOutButton({ onClose, sx, ...other }: Props) {
   const router = useRouter();
 
   const { checkUserSession } = useAuthContext();
@@ -37,7 +35,7 @@ export function SignOutButton({ onClose, ...other }: Props) {
       await signOut();
       await checkUserSession?.();
 
-      onClose();
+      onClose?.();
       router.refresh();
     } catch (error) {
       console.error(error);
@@ -47,7 +45,7 @@ export function SignOutButton({ onClose, ...other }: Props) {
 
   const handleLogoutAuth0 = useCallback(async () => {
     try {
-      await signOutAuth0({ logoutParams: { returnTo: window.location.origin } });
+      await signOutAuth0();
 
       onClose?.();
       router.refresh();
@@ -64,6 +62,7 @@ export function SignOutButton({ onClose, ...other }: Props) {
       size="large"
       color="error"
       onClick={CONFIG.auth.method === 'auth0' ? handleLogoutAuth0 : handleLogout}
+      sx={sx}
       {...other}
     >
       Logout

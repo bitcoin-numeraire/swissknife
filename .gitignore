@@ -27,4 +27,4 @@ certs/
 
 # Local storage files
 storage/*
-deps/lightningd/data
+deps/lightningd

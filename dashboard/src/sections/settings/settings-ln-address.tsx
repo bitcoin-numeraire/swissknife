@@ -1,31 +1,29 @@
 import { mutate } from 'swr';
 import { useForm } from 'react-hook-form';
 import { QRCode } from 'react-qrcode-logo';
-import { ajvResolver } from '@hookform/resolvers/ajv';
+import { useBoolean } from 'minimal-shared/hooks';
+import { zodResolver } from '@hookform/resolvers/zod';
 
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
 import Stack from '@mui/material/Stack';
 import Button from '@mui/material/Button';
-import Grid from '@mui/material/Unstable_Grid2';
 import LoadingButton from '@mui/lab/LoadingButton';
-import { Alert, Typography, InputAdornment } from '@mui/material';
-
-import { useBoolean } from 'src/hooks/use-boolean';
+import { Alert, Grid2, Typography, InputAdornment } from '@mui/material';
 
 import { npub } from 'src/utils/nostr';
-import { ajvOptions } from 'src/utils/ajv';
 import { displayLnAddress } from 'src/utils/lnurl';
+import { handleActionError } from 'src/utils/errors';
 
-import { CONFIG } from 'src/config-global';
+import { CONFIG } from 'src/global-config';
 import { useTranslate } from 'src/locales';
 import { endpointKeys } from 'src/actions/keys';
+import { zUpdateLnAddressRequest } from 'src/lib/swissknife/zod.gen';
 import {
   type LnAddress,
   updateWalletAddress,
   deleteWalletAddress,
   type UpdateLnAddressRequest,
-  UpdateLnAddressRequestSchema,
 } from 'src/lib/swissknife';
 
 import { toast } from 'src/components/snackbar';
@@ -37,9 +35,6 @@ import { ConfirmDialog } from 'src/components/custom-dialog';
 type Props = {
   lnAddress: LnAddress;
 };
-
-// @ts-ignore
-const resolver = ajvResolver(UpdateLnAddressRequestSchema, ajvOptions);
 
 export function SettingsLnAddress({ lnAddress }: Props) {
   const { t } = useTranslate();
@@ -55,7 +50,7 @@ export function SettingsLnAddress({ lnAddress }: Props) {
 
   const methods = useForm({
     mode: 'all',
-    resolver,
+    resolver: zodResolver(zUpdateLnAddressRequest),
     defaultValues,
   });
 
@@ -66,7 +61,9 @@ export function SettingsLnAddress({ lnAddress }: Props) {
 
   const onSubmit = async (data: UpdateLnAddressRequest) => {
     // Map empty strings to undefined
-    const body = Object.fromEntries(Object.entries(data).map(([key, value]) => [key, value === '' ? undefined : value]));
+    const body = Object.fromEntries(
+      Object.entries(data).map(([key, value]) => [key, value === '' ? undefined : value])
+    );
 
     try {
       await updateWalletAddress({ body });
@@ -74,7 +71,7 @@ export function SettingsLnAddress({ lnAddress }: Props) {
       toast.success(t('settings_ln_address.update_success'));
       mutate(endpointKeys.userWallet.lnAddress.get);
     } catch (error) {
-      toast.error(error.reason);
+      handleActionError(error);
     }
   };
 
@@ -87,7 +84,7 @@ export function SettingsLnAddress({ lnAddress }: Props) {
       toast.success(t('settings_ln_address.delete_success'));
       mutate(endpointKeys.userWallet.lnAddress.get);
     } catch (error) {
-      toast.error(error.reason);
+      handleActionError(error);
     } finally {
       isDeleting.onFalse();
     }
@@ -95,8 +92,8 @@ export function SettingsLnAddress({ lnAddress }: Props) {
 
   return (
     <Form methods={methods} onSubmit={handleSubmit(onSubmit)}>
-      <Grid container spacing={3}>
-        <Grid xs={12} md={4}>
+      <Grid2 container spacing={3}>
+        <Grid2 size={{ xs: 12, md: 4 }}>
           <Card
             sx={{
               pt: 5,
@@ -126,23 +123,37 @@ export function SettingsLnAddress({ lnAddress }: Props) {
               <Typography variant="subtitle1">{displayLnAddress(lnAddress!.username)}</Typography>
             </Box>
 
-            <Field.Switch name="active" labelPlacement="start" label={t('settings_ln_address.active')} sx={{ mt: 2 }} />
-            <Field.Switch name="allows_nostr" labelPlacement="start" label={t('settings_ln_address.nostr_visible')} />
+            <Field.Switch
+              name="active"
+              labelPlacement="start"
+              label={t('settings_ln_address.active')}
+              sx={{ mt: 2 }}
+            />
+            <Field.Switch
+              name="allows_nostr"
+              labelPlacement="start"
+              label={t('settings_ln_address.nostr_visible')}
+            />
 
             <Button variant="soft" color="error" sx={{ mt: 3 }} onClick={confirm.onTrue}>
               {t('settings_ln_address.delete_button')}
             </Button>
           </Card>
-        </Grid>
+        </Grid2>
 
-        <Grid xs={12} md={8}>
+        <Grid2 size={{ xs: 12, md: 8 }}>
           <Card sx={{ p: { xs: 1, sm: 3 } }}>
-            <Box rowGap={3} columnGap={2} display="grid" gridTemplateColumns={{ xs: 'repeat(1, 1fr)', sm: 'repeat(2, 1fr)' }}>
+            <Box
+              rowGap={3}
+              columnGap={2}
+              display="grid"
+              gridTemplateColumns={{ xs: 'repeat(1, 1fr)', sm: 'repeat(2, 1fr)' }}
+            >
               <Field.Text
                 name="username"
                 label={t('settings_ln_address.username')}
                 InputProps={{
-                  endAdornment: <InputAdornment position="end">@{CONFIG.site.domain}</InputAdornment>,
+                  endAdornment: <InputAdornment position="end">@{CONFIG.domain}</InputAdornment>,
                 }}
               />
               <Field.Text
@@ -162,8 +173,8 @@ export function SettingsLnAddress({ lnAddress }: Props) {
               </LoadingButton>
             </Stack>
           </Card>
-        </Grid>
-      </Grid>
+        </Grid2>
+      </Grid2>
 
       <ConfirmDialog
         open={confirm.value}
@@ -171,7 +182,12 @@ export function SettingsLnAddress({ lnAddress }: Props) {
         title={t('delete')}
         content={t('confirm_delete')}
         action={
-          <LoadingButton variant="contained" color="error" onClick={onDelete} loading={isDeleting.value}>
+          <LoadingButton
+            variant="contained"
+            color="error"
+            onClick={onDelete}
+            loading={isDeleting.value}
+          >
             {t('delete')}
           </LoadingButton>
         }

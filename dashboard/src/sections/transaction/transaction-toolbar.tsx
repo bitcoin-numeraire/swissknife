@@ -10,6 +10,8 @@ import IconButton from '@mui/material/IconButton';
 import { paths } from 'src/routes/paths';
 import { useRouter } from 'src/routes/hooks';
 
+import { handleActionError } from 'src/utils/errors';
+
 import { useTranslate } from 'src/locales';
 import { deleteInvoice, deletePayment } from 'src/lib/swissknife';
 
@@ -47,14 +49,19 @@ export function TransactionToolbar({ transaction, transactionType, isAdmin }: Pr
           router.push(paths.admin.payments);
         }
       } catch (error) {
-        toast.error(error.reason);
+        handleActionError(error);
       }
     },
     [router, transactionType, t]
   );
 
   return (
-    <Stack spacing={3} direction={{ xs: 'column', sm: 'row' }} alignItems={{ xs: 'flex-end', sm: 'center' }} sx={{ mb: { xs: 3, md: 5 } }}>
+    <Stack
+      spacing={3}
+      direction={{ xs: 'column', sm: 'row' }}
+      alignItems={{ xs: 'flex-end', sm: 'center' }}
+      sx={{ mb: { xs: 3, md: 5 } }}
+    >
       <Stack direction="row" spacing={1} flexGrow={1} sx={{ width: 1 }}>
         {transactionType === TransactionType.INVOICE && (
           <CopyButton

@@ -3,14 +3,13 @@
 import type { TFunction } from 'i18next';
 
 import { mutate } from 'swr';
+import { useBoolean } from 'minimal-shared/hooks';
 
 import Stack from '@mui/material/Stack';
 import Button from '@mui/material/Button';
 import { useTheme } from '@mui/material/styles';
 
 import { paths } from 'src/routes/paths';
-
-import { useBoolean } from 'src/hooks/use-boolean';
 
 import { shouldFail } from 'src/utils/errors';
 
@@ -63,7 +62,7 @@ export function AdminInvoiceListView() {
 
   return (
     <DashboardContent>
-      <RoleBasedGuard permissions={[Permission.READ_TRANSACTION]} hasContent>
+      <RoleBasedGuard permissions={[Permission['READ:TRANSACTION']]} hasContent>
         {failed ? (
           <ErrorView errors={errors} isLoading={isLoading} data={data} />
         ) : (
@@ -80,7 +79,11 @@ export function AdminInvoiceListView() {
               ]}
               action={
                 <Stack direction="row" spacing={1}>
-                  <Button onClick={newInvoice.onTrue} variant="contained" startIcon={<Iconify icon="mingcute:add-line" />}>
+                  <Button
+                    onClick={newInvoice.onTrue}
+                    variant="contained"
+                    startIcon={<Iconify icon="mingcute:add-line" />}
+                  >
                     {t('new')}
                   </Button>
                 </Stack>

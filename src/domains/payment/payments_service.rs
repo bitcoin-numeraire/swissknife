@@ -68,6 +68,7 @@ impl PaymentService {
         wallet_id: Uuid,
     ) -> Result<Payment, ApplicationError> {
         let amount = Self::validate_amount(amount_msat)?;
+        debug!(%wallet_id, %amount, ledger="Internal", "Sending internal payment");
 
         let (username, _) = input
             .split_once('@')
@@ -85,26 +86,23 @@ impl PaymentService {
                 let txn = self.store.begin().await?;
                 self.store
                     .invoice
-                    .insert(
-                        Some(&txn),
-                        Invoice {
-                            id: Uuid::new_v4(),
-                            wallet_id: retrieved_address.wallet_id,
-                            ln_address_id: Some(retrieved_address.id),
-                            ledger: Ledger::Internal,
-                            currency: Currency::Bitcoin,
-                            description: comment
-                                .clone()
-                                .or(DEFAULT_INTERNAL_INVOICE_DESCRIPTION.to_string().into()),
-                            amount_msat: Some(amount),
-                            amount_received_msat: Some(amount),
-                            timestamp: curr_time,
-                            status: InvoiceStatus::Settled,
-                            fee_msat: Some(0),
-                            payment_time: Some(curr_time),
-                            ..Default::default()
-                        },
-                    )
+                    .insert(Invoice {
+                        id: Uuid::new_v4(),
+                        wallet_id: retrieved_address.wallet_id,
+                        ln_address_id: Some(retrieved_address.id),
+                        ledger: Ledger::Internal,
+                        currency: Currency::Bitcoin,
+                        description: comment
+                            .clone()
+                            .or(DEFAULT_INTERNAL_INVOICE_DESCRIPTION.to_string().into()),
+                        amount_msat: Some(amount),
+                        amount_received_msat: Some(amount),
+                        timestamp: curr_time,
+                        status: InvoiceStatus::Settled,
+                        fee_msat: Some(0),
+                        payment_time: Some(curr_time),
+                        ..Default::default()
+                    })
                     .await?;
 
                 let internal_payment = self
@@ -176,7 +174,7 @@ impl PaymentService {
                     }
                     InvoiceStatus::Pending => {
                         // Internal payment
-                        let txn = self.store.begin().await?;
+                        debug!(%wallet_id, %amount, ledger="Internal", "Sending bolt11 payment");
 
                         let internal_payment = self
                             .insert_payment(
@@ -200,14 +198,7 @@ impl PaymentService {
                         retrieved_invoice.payment_time = internal_payment.payment_time;
                         retrieved_invoice.amount_received_msat = Some(amount);
                         retrieved_invoice.ledger = Ledger::Internal;
-                        self.store
-                            .invoice
-                            .update(Some(&txn), retrieved_invoice)
-                            .await?;
-
-                        txn.commit()
-                            .await
-                            .map_err(|e| DatabaseError::Transaction(e.to_string()))?;
+                        self.store.invoice.update(retrieved_invoice).await?;
 
                         return Ok(internal_payment);
                     }
@@ -215,6 +206,8 @@ impl PaymentService {
             }
 
             // External  payment
+            debug!(%wallet_id, %amount, ledger="Lightning", "Sending bolt11 payment");
+
             let pending_payment = self
                 .insert_payment(
                     Payment {
@@ -261,6 +254,7 @@ impl PaymentService {
         wallet_id: Uuid,
     ) -> Result<Payment, ApplicationError> {
         let amount = Self::validate_amount(amount_msat)?;
+        debug!(%wallet_id, %amount, ledger="Lightning", "Sending LNURL payment");
 
         let cb = validate_lnurl_pay(amount, &comment, &data)
             .await
@@ -397,7 +391,7 @@ impl PaymentsUseCases for PaymentService {
         comment: Option<String>,
         wallet_id: Uuid,
     ) -> Result<Payment, ApplicationError> {
-        debug!(%input, %wallet_id, "Sending payment");
+        debug!(%input, %wallet_id, "Received pay request");
 
         let payment = if self.is_internal_payment(&input) {
             self.send_internal(input, amount_msat, comment, wallet_id)

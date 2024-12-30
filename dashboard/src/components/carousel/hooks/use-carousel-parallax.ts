@@ -2,6 +2,8 @@ import type { EmblaEventType, EmblaCarouselType } from 'embla-carousel';
 
 import { useRef, useEffect, useCallback } from 'react';
 
+import { carouselClasses } from '../classes';
+
 import type { CarouselOptions } from '../types';
 
 // ----------------------------------------------------------------------
@@ -14,7 +16,11 @@ export function useParallax(mainApi?: EmblaCarouselType, parallax?: CarouselOpti
   const TWEEN_FACTOR_BASE = typeof parallax === 'number' ? parallax : 0.24;
 
   const setTweenNodes = useCallback((_mainApi: EmblaCarouselType): void => {
-    tweenNodes.current = _mainApi.slideNodes().map((slideNode) => slideNode.querySelector('.slide__parallax__layer') as HTMLElement);
+    tweenNodes.current = _mainApi
+      .slideNodes()
+      .map(
+        (slideNode) => slideNode.querySelector(`.${carouselClasses.slide.parallax}`) as HTMLElement
+      );
   }, []);
 
   const setTweenFactor = useCallback(
@@ -76,7 +82,11 @@ export function useParallax(mainApi?: EmblaCarouselType, parallax?: CarouselOpti
     setTweenFactor(mainApi);
     tweenParallax(mainApi);
 
-    mainApi.on('reInit', setTweenNodes).on('reInit', setTweenFactor).on('reInit', tweenParallax).on('scroll', tweenParallax);
+    mainApi
+      .on('reInit', setTweenNodes)
+      .on('reInit', setTweenFactor)
+      .on('reInit', tweenParallax)
+      .on('scroll', tweenParallax);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mainApi, tweenParallax]);
 

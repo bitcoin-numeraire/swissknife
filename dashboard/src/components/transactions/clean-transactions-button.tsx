@@ -1,8 +1,10 @@
 import type { LoadingButtonProps } from '@mui/lab';
 
+import { useBoolean } from 'minimal-shared/hooks';
+
 import { LoadingButton } from '@mui/lab';
 
-import { useBoolean } from 'src/hooks/use-boolean';
+import { handleActionError } from 'src/utils/errors';
 
 import { useTranslate } from 'src/locales';
 import { deleteFailedPayments, deleteExpiredInvoices } from 'src/lib/swissknife';
@@ -20,7 +22,12 @@ interface Props {
   transactionType?: TransactionType;
 }
 
-export function CleanTransactionsButton({ onSuccess, buttonProps, transactionType, children }: Props) {
+export function CleanTransactionsButton({
+  onSuccess,
+  buttonProps,
+  transactionType,
+  children,
+}: Props) {
   const { t } = useTranslate();
   const isDeleting = useBoolean();
 
@@ -42,16 +49,20 @@ export function CleanTransactionsButton({ onSuccess, buttonProps, transactionTyp
       }
 
       if (nInvoicesDeleted > 0) {
-        toast.success(t('clean_transactions_button.invoices_deleted_success', { count: nInvoicesDeleted }));
+        toast.success(
+          t('clean_transactions_button.invoices_deleted_success', { count: nInvoicesDeleted })
+        );
         onSuccess();
       }
 
       if (nPaymentsDeleted > 0) {
-        toast.success(t('clean_transactions_button.payments_deleted_success', { count: nPaymentsDeleted }));
+        toast.success(
+          t('clean_transactions_button.payments_deleted_success', { count: nPaymentsDeleted })
+        );
         onSuccess();
       }
     } catch (error) {
-      toast.error(error.reason);
+      handleActionError(error);
     } finally {
       isDeleting.onFalse();
     }
@@ -59,7 +70,7 @@ export function CleanTransactionsButton({ onSuccess, buttonProps, transactionTyp
 
   return (
     <LoadingButton loading={isDeleting.value} onClick={handleCleanTransactions} {...buttonProps}>
-      {children || t('clean_transactions_button.clean_transactions')}{' '}
+      {children || t('clean_transactions_button.clean_transactions')}
     </LoadingButton>
   );
 }

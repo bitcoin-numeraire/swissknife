@@ -5,7 +5,7 @@ import type { PaymentResponse, SendPaymentRequest } from 'src/lib/swissknife';
 
 import { m } from 'framer-motion';
 import { useForm } from 'react-hook-form';
-import { ajvResolver } from '@hookform/resolvers/ajv';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { useState, useEffect, useCallback } from 'react';
 
 import Box from '@mui/material/Box';
@@ -22,23 +22,23 @@ import ListItemText from '@mui/material/ListItemText';
 import DialogActions from '@mui/material/DialogActions';
 import Input, { inputClasses } from '@mui/material/Input';
 
-import { ajvOptions } from 'src/utils/ajv';
 import { satsToFiat } from 'src/utils/fiat';
 import { fCurrency } from 'src/utils/format-number';
+import { handleActionError } from 'src/utils/errors';
 import { truncateText } from 'src/utils/format-string';
 
-import { maxLine } from 'src/theme/styles';
-import { CONFIG } from 'src/config-global';
+import { CONFIG } from 'src/global-config';
 import { useTranslate } from 'src/locales';
-import { pay, walletPay, SendPaymentRequestSchema } from 'src/lib/swissknife';
+import { pay, walletPay } from 'src/lib/swissknife';
+import { zSendPaymentRequest } from 'src/lib/swissknife/zod.gen';
 
-import { toast } from 'src/components/snackbar';
 import { SatsWithIcon } from 'src/components/bitcoin';
+import { RHFTextField } from 'src/components/hook-form';
 import { Form } from 'src/components/hook-form/form-provider';
 import { varBounce, MotionContainer } from 'src/components/animate';
-import { RHFTextField, RHFWalletSelect } from 'src/components/hook-form';
 
 import { useSettingsContext } from '../settings';
+import { WalletSelectDropdown } from '../wallet';
 
 // ----------------------------------------------------------------------
 
@@ -57,9 +57,6 @@ type ConfirmPaymentDialogProps = DialogProps & {
   walletId?: string;
 };
 
-// @ts-ignore
-const resolver = ajvResolver(SendPaymentRequestSchema, ajvOptions);
-
 export function ConfirmPaymentDialog({
   open,
   input,
@@ -74,14 +71,14 @@ export function ConfirmPaymentDialog({
 
   const [autoWidth, setAutoWidth] = useState(24);
   const [payment, setPayment] = useState<PaymentResponse | undefined>(undefined);
-  const { currency } = useSettingsContext();
+  const { state } = useSettingsContext();
 
   const methods = useForm({
-    resolver,
+    resolver: zodResolver(zSendPaymentRequest),
     defaultValues: {
       amount_msat: MIN_AMOUNT,
       comment: '',
-      wallet: null,
+      wallet: walletId || null,
       input,
     },
   });
@@ -90,21 +87,18 @@ export function ConfirmPaymentDialog({
     watch,
     handleSubmit,
     setValue,
-    formState: { isSubmitting },
+    formState: { isSubmitting, isValid },
     reset,
   } = methods;
 
   const amount = watch('amount_msat');
-  const wallet = watch('wallet');
 
-  const onSubmit = async (body: any) => {
+  const onSubmit = async (body: SendPaymentRequest) => {
     try {
       let paymentResponse;
       const reqBody: SendPaymentRequest = {
-        wallet_id: walletId || body.wallet?.id,
+        ...body,
         amount_msat: body.amount_msat! * 1000,
-        comment: body.comment || undefined,
-        input: body.input,
       };
 
       if (isAdmin) {
@@ -119,7 +113,7 @@ export function ConfirmPaymentDialog({
       setPayment(paymentResponse);
       onSuccess?.();
     } catch (error) {
-      toast.error(error.reason);
+      handleActionError(error);
     }
   };
 
@@ -181,7 +175,7 @@ export function ConfirmPaymentDialog({
     if (bolt11) {
       return t('confirm_payment_dialog.bolt11_transfer');
     }
-    if (input.includes(CONFIG.site.domain)) {
+    if (input.includes(CONFIG.domain)) {
       return t('confirm_payment_dialog.internal_transfer');
     }
     if (input.toLowerCase().startsWith('lnurl')) {
@@ -202,7 +196,7 @@ export function ConfirmPaymentDialog({
                 component={m.img}
                 src="/assets/icons/payments/success.png"
                 alt="payment success"
-                variants={varBounce().in}
+                variants={varBounce('in')}
                 maxWidth={250}
                 margin="auto"
               />
@@ -236,13 +230,27 @@ export function ConfirmPaymentDialog({
                 {input?.charAt(0).toUpperCase()}
               </Avatar>
               <ListItemText
-                primary={<Typography sx={{ ...maxLine({ line: 1 }) }}>{truncateText(input, 30)}</Typography>}
+                primary={
+                  <Typography
+                    sx={[
+                      (theme) => ({
+                        ...theme.mixins.maxLine({ line: 1 }),
+                      }),
+                    ]}
+                  >
+                    {truncateText(input, 30)}
+                  </Typography>
+                }
                 secondary={invoiceType()}
               />
             </Stack>
 
             <Stack direction="row" alignItems="center" spacing={2}>
-              <Typography sx={{ flexGrow: 0 }}>{fCurrency(satsToFiat(amount!, fiatPrices, currency), { currency })}</Typography>
+              <Typography sx={{ flexGrow: 0 }}>
+                {fCurrency(satsToFiat(amount!, fiatPrices, state.currency), {
+                  currency: state.currency,
+                })}
+              </Typography>
 
               <InputAmount
                 onBlur={handleBlur}
@@ -263,7 +271,7 @@ export function ConfirmPaymentDialog({
               rows={3}
               placeholder={t('confirm_payment_dialog.write_message_placeholder')}
               disabled={isSubmitting}
-              inputProps={{ readOnly: !!bolt11 }}
+              slotProps={{ htmlInput: { readOnly: !!bolt11 } }}
             />
 
             {walletId ? (
@@ -276,7 +284,7 @@ export function ConfirmPaymentDialog({
                 inputProps={{ readOnly: true }}
               />
             ) : (
-              isAdmin && <RHFWalletSelect />
+              isAdmin && <WalletSelectDropdown />
             )}
           </Stack>
 
@@ -286,7 +294,7 @@ export function ConfirmPaymentDialog({
               type="submit"
               loading={isSubmitting}
               variant="contained"
-              disabled={!amount || isSubmitting || (isAdmin && !walletId && !wallet)}
+              disabled={!isValid}
             >
               {t('confirm_payment_dialog.confirm_send')}
             </LoadingButton>
@@ -304,7 +312,15 @@ type InputAmountProps = InputProps & {
   amount: number | number[];
 };
 
-function InputAmount({ autoWidth, amount, disabled, onBlur, onChange, sx, ...other }: InputAmountProps) {
+function InputAmount({
+  autoWidth,
+  amount,
+  disabled,
+  onBlur,
+  onChange,
+  sx,
+  ...other
+}: InputAmountProps) {
   return (
     <Stack direction="row" justifyContent="center" spacing={1} sx={sx}>
       <Typography variant="h5">

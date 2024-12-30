@@ -1,42 +1,64 @@
 import type { ChipProps } from '@mui/material/Chip';
 import type { Theme, SxProps } from '@mui/material/styles';
 
-import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
+import { styled } from '@mui/material/styles';
 
 import { Iconify } from 'src/components/iconify';
 
 // ----------------------------------------------------------------------
 
-export const chipProps: ChipProps = {
-  size: 'small',
-  variant: 'soft',
-};
+export const chipProps: ChipProps = { size: 'small', variant: 'soft' };
 
-type FiltersResultProps = {
+export type FiltersResultProps = React.ComponentProps<'div'> & {
   totalResults: number;
-  onReset: () => void;
+  onReset?: () => void;
   sx?: SxProps<Theme>;
-  children: React.ReactNode;
 };
 
-export function FiltersResult({ totalResults, onReset, sx, children }: FiltersResultProps) {
+export function FiltersResult({
+  sx,
+  onReset,
+  children,
+  totalResults,
+  ...other
+}: FiltersResultProps) {
   return (
-    <Box sx={sx}>
-      <Box sx={{ mb: 1.5, typography: 'body2' }}>
+    <ResultRoot sx={sx} {...other}>
+      <ResultLabel>
         <strong>{totalResults}</strong>
-        <Box component="span" sx={{ color: 'text.secondary', ml: 0.25 }}>
-          results found
-        </Box>
-      </Box>
+        <span> results found</span>
+      </ResultLabel>
 
-      <Box flexGrow={1} gap={1} display="flex" flexWrap="wrap" alignItems="center">
+      <ResultContent>
         {children}
 
-        <Button color="error" onClick={onReset} startIcon={<Iconify icon="solar:trash-bin-trash-bold" />}>
+        <Button
+          color="error"
+          onClick={onReset}
+          startIcon={<Iconify icon="solar:trash-bin-trash-bold" />}
+        >
           Clear
         </Button>
-      </Box>
-    </Box>
+      </ResultContent>
+    </ResultRoot>
   );
 }
+
+// ----------------------------------------------------------------------
+
+const ResultRoot = styled('div')``;
+
+const ResultLabel = styled('div')(({ theme }) => ({
+  ...theme.typography.body2,
+  marginBottom: theme.spacing(1.5),
+  '& span': { color: theme.vars.palette.text.secondary },
+}));
+
+const ResultContent = styled('div')(({ theme }) => ({
+  flexGrow: 1,
+  display: 'flex',
+  flexWrap: 'wrap',
+  alignItems: 'center',
+  gap: theme.spacing(1),
+}));

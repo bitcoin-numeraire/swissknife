@@ -1,4 +1,4 @@
-import { CONFIG } from 'src/config-global';
+import { CONFIG } from 'src/global-config';
 import { DashboardLayout } from 'src/layouts/dashboard';
 
 import { AuthGuard } from 'src/auth/guard';

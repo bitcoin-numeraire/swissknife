@@ -2,14 +2,13 @@ import type { DialogProps } from '@mui/material/Dialog';
 
 import { useCallback } from 'react';
 import { QRCode } from 'react-qrcode-logo';
+import { useCopyToClipboard } from 'minimal-shared/hooks';
 
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
 import DialogActions from '@mui/material/DialogActions';
-
-import { useCopyToClipboard } from 'src/hooks/use-copy-to-clipboard';
 
 import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';

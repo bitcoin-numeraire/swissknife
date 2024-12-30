@@ -18,9 +18,6 @@ pub enum DatabaseError {
     #[error("Failed to find related resources: {0}")]
     FindRelated(String),
 
-    #[error("Failed to find resource by statement: {0}")]
-    FindByStatement(String),
-
     #[error("Failed to save resource: {0}")]
     Insert(String),
 
@@ -29,6 +26,9 @@ pub enum DatabaseError {
 
     #[error("Failed to delete resource: {0}")]
     Delete(String),
+
+    #[error("Failed to count resource: {0}")]
+    Count(String),
 
     #[error("Failed to perform transaction operation: {0}")]
     Transaction(String),

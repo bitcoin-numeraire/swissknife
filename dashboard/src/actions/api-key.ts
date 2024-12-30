@@ -1,5 +1,3 @@
-import type { ListApiKeysResponse } from 'src/lib/swissknife';
-
 import useSWR from 'swr';
 import { useMemo } from 'react';
 
@@ -9,14 +7,7 @@ import { endpointKeys } from './keys';
 
 // ----------------------------------------------------------------------
 
-type IListApiKeys = {
-  apiKeys?: ListApiKeysResponse;
-  apiKeysLoading: boolean;
-  apiKeysError?: any;
-  apiKeysValidating: boolean;
-};
-
-export function useListApiKeys(): IListApiKeys {
+export function useListApiKeys() {
   const fetcher = async () => {
     const { data, error } = await listApiKeys();
     if (error) {

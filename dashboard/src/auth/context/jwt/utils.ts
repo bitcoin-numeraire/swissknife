@@ -4,7 +4,7 @@ import { paths } from 'src/routes/paths';
 
 import { client } from 'src/lib/swissknife';
 
-import { STORAGE_KEY } from './constant';
+import { JWT_STORAGE_KEY } from './constant';
 
 // ----------------------------------------------------------------------
 
@@ -33,7 +33,7 @@ export function isValidToken(accessToken: string) {
 
 export async function setSession(accessToken: string) {
   try {
-    sessionStorage.setItem(STORAGE_KEY, accessToken);
+    sessionStorage.setItem(JWT_STORAGE_KEY, accessToken);
 
     client.interceptors.request.use((request, _) => {
       request.headers.set('Authorization', `Bearer ${accessToken}`);
@@ -42,7 +42,7 @@ export async function setSession(accessToken: string) {
 
     client.interceptors.error.use((error, response) => {
       if (response.status === 401) {
-        sessionStorage.removeItem(STORAGE_KEY);
+        sessionStorage.removeItem(JWT_STORAGE_KEY);
         window.location.href = paths.auth.jwt.signIn;
       }
 

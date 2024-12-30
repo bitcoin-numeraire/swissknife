@@ -4,6 +4,7 @@ import type { IFiatPrices } from 'src/types/bitcoin';
 
 import { mutate } from 'swr';
 import { useState } from 'react';
+import { useBoolean } from 'minimal-shared/hooks';
 
 import Card from '@mui/material/Card';
 import Stack from '@mui/material/Stack';
@@ -15,8 +16,6 @@ import CardHeader from '@mui/material/CardHeader';
 import ListItemText from '@mui/material/ListItemText';
 
 import { paths } from 'src/routes/paths';
-
-import { useBoolean } from 'src/hooks/use-boolean';
 
 import { fFromNow } from 'src/utils/format-time';
 
@@ -73,7 +72,10 @@ export function Contacts({ title, fiatPrices, list, ...other }: Props) {
               {contact.ln_address.charAt(0).toUpperCase()}
             </Avatar>
 
-            <ListItemText primary={contact.ln_address} secondary={fFromNow(contact.contact_since)} />
+            <ListItemText
+              primary={contact.ln_address}
+              secondary={fFromNow(contact.contact_since)}
+            />
 
             <Tooltip title={t('wallet_contacts.quick_transfer')}>
               <IconButton onClick={() => handleClick(contact.ln_address)}>

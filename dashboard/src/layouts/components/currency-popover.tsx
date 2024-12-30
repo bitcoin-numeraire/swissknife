@@ -5,15 +5,16 @@ import type { IconButtonProps } from '@mui/material/IconButton';
 
 import { m } from 'framer-motion';
 import { useCallback } from 'react';
+import { usePopover } from 'minimal-shared/hooks';
 
 import MenuList from '@mui/material/MenuList';
 import MenuItem from '@mui/material/MenuItem';
 import IconButton from '@mui/material/IconButton';
 
 import { Label } from 'src/components/label';
-import { varHover } from 'src/components/animate';
 import { useSettingsContext } from 'src/components/settings';
-import { usePopover, CustomPopover } from 'src/components/custom-popover';
+import { CustomPopover } from 'src/components/custom-popover';
+import { varTap, varHover, transitionTap } from 'src/components/animate';
 
 // ----------------------------------------------------------------------
 
@@ -22,28 +23,54 @@ export type CurrencyPopoverProps = IconButtonProps & {
 };
 
 export function CurrencyPopover({ data = [], sx, ...other }: CurrencyPopoverProps) {
-  const popover = usePopover();
-  const { currency, onUpdateField } = useSettingsContext();
+  const { open, anchorEl, onClose, onOpen } = usePopover();
+  const { state, setState } = useSettingsContext();
+  const { currency } = state;
 
   const handleChangeCurrency = useCallback(
     (newCurr: CurrencyValue) => {
       if (newCurr !== currency) {
-        onUpdateField('currency', newCurr);
+        setState({ currency: newCurr });
       }
-      popover.onClose();
+      onClose();
     },
-    [popover, currency, onUpdateField]
+    [setState, onClose, currency]
+  );
+
+  const renderMenuList = () => (
+    <CustomPopover open={open} anchorEl={anchorEl} onClose={onClose}>
+      <MenuList sx={{ width: 160, minHeight: 72 }}>
+        {data?.map((option) => (
+          <MenuItem
+            key={option}
+            selected={option === currency}
+            onClick={() => handleChangeCurrency(option)}
+          >
+            {option}
+          </MenuItem>
+        ))}
+      </MenuList>
+    </CustomPopover>
   );
 
   return (
     <>
       <IconButton
         component={m.button}
-        whileTap="tap"
-        whileHover="hover"
-        variants={varHover(1.05)}
-        onClick={popover.onOpen}
-        sx={{ p: 0, ...sx }}
+        whileTap={varTap(0.96)}
+        whileHover={varHover(1.04)}
+        transition={transitionTap()}
+        aria-label="Currencies button"
+        onClick={onOpen}
+        sx={[
+          (theme) => ({
+            p: 0,
+            width: 40,
+            height: 40,
+            ...(open && { bgcolor: theme.vars.palette.action.selected }),
+          }),
+          ...(Array.isArray(sx) ? sx : [sx]),
+        ]}
         {...other}
       >
         <Label color="default" variant="filled" sx={{ p: 1, cursor: 'pointer' }}>
@@ -51,15 +78,7 @@ export function CurrencyPopover({ data = [], sx, ...other }: CurrencyPopoverProp
         </Label>
       </IconButton>
 
-      <CustomPopover open={popover.open} anchorEl={popover.anchorEl} onClose={popover.onClose}>
-        <MenuList sx={{ width: 'auto' }}>
-          {data?.map((option) => (
-            <MenuItem key={option} selected={option === currency} onClick={() => handleChangeCurrency(option)}>
-              {option}
-            </MenuItem>
-          ))}
-        </MenuList>
-      </CustomPopover>
+      {renderMenuList()}
     </>
   );
 }

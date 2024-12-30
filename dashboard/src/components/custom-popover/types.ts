@@ -1,3 +1,4 @@
+import type { PaperProps } from '@mui/material/Paper';
 import type { PopoverProps } from '@mui/material/Popover';
 import type { Theme, SxProps } from '@mui/material/styles';
 
@@ -23,16 +24,9 @@ export type PopoverArrow = {
     | 'right-bottom';
 };
 
-export type UsePopoverReturn = {
-  open: PopoverProps['open'];
-  anchorEl: PopoverProps['anchorEl'];
-  onClose: () => void;
-  onOpen: (event: React.MouseEvent<HTMLElement>) => void;
-  setAnchorEl: React.Dispatch<React.SetStateAction<PopoverProps['anchorEl']>>;
-};
-
 export type CustomPopoverProps = PopoverProps & {
   slotProps?: PopoverProps['slotProps'] & {
     arrow?: PopoverArrow;
+    paper?: PaperProps;
   };
 };

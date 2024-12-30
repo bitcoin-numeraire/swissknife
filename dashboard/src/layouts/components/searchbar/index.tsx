@@ -1,27 +1,25 @@
 'use client';
 
 import type { BoxProps } from '@mui/material/Box';
+import type { Breakpoint } from '@mui/material/styles';
 import type { NavSectionProps } from 'src/components/nav-section';
 
-import { useState, useCallback } from 'react';
 import parse from 'autosuggest-highlight/parse';
 import match from 'autosuggest-highlight/match';
+import { varAlpha } from 'minimal-shared/utils';
+import { useBoolean } from 'minimal-shared/hooks';
+import { useState, useEffect, useCallback } from 'react';
 
 import Box from '@mui/material/Box';
 import SvgIcon from '@mui/material/SvgIcon';
-import InputBase from '@mui/material/InputBase';
+import MenuList from '@mui/material/MenuList';
 import { useTheme } from '@mui/material/styles';
 import IconButton from '@mui/material/IconButton';
+import useMediaQuery from '@mui/material/useMediaQuery';
 import InputAdornment from '@mui/material/InputAdornment';
 import Dialog, { dialogClasses } from '@mui/material/Dialog';
-
-import { useRouter } from 'src/routes/hooks';
-import { isExternalLink } from 'src/routes/utils';
-
-import { useBoolean } from 'src/hooks/use-boolean';
-import { useEventListener } from 'src/hooks/use-event-listener';
-
-import { varAlpha } from 'src/theme/styles';
+import MenuItem, { menuItemClasses } from '@mui/material/MenuItem';
+import InputBase, { inputBaseClasses } from '@mui/material/InputBase';
 
 import { Label } from 'src/components/label';
 import { Iconify } from 'src/components/iconify';
@@ -31,7 +29,7 @@ import { SearchNotFound } from 'src/components/search-not-found';
 import { useAuthContext } from 'src/auth/hooks';
 
 import { ResultItem } from './result-item';
-import { groupItems, applyFilter, getAllItems } from './utils';
+import { applyFilter, flattenNavSections } from './utils';
 
 // ----------------------------------------------------------------------
 
@@ -39,92 +37,87 @@ export type SearchbarProps = BoxProps & {
   data?: NavSectionProps['data'];
 };
 
+const breakpoint: Breakpoint = 'sm';
+
 export function Searchbar({ data: navItems = [], sx, ...other }: SearchbarProps) {
   const theme = useTheme();
+  const smUp = useMediaQuery(theme.breakpoints.up(breakpoint));
   const { user } = useAuthContext();
 
-  const router = useRouter();
-
-  const search = useBoolean();
-
+  const { value: open, onFalse: onClose, onTrue: onOpen, onToggle } = useBoolean();
   const [searchQuery, setSearchQuery] = useState('');
 
   const handleClose = useCallback(() => {
-    search.onFalse();
+    onClose();
     setSearchQuery('');
-  }, [search]);
+  }, [onClose]);
 
-  const handleKeyDown = (event: KeyboardEvent) => {
-    if (event.key === 'k' && event.metaKey) {
-      search.onToggle();
-      setSearchQuery('');
-    }
-  };
-
-  useEventListener('keydown', handleKeyDown);
-
-  const handleClick = useCallback(
-    (path: string) => {
-      if (isExternalLink(path)) {
-        window.open(path);
-      } else {
-        router.push(path);
+  const handleKeyDown = useCallback(
+    (event: KeyboardEvent) => {
+      if (event.metaKey && event.key.toLowerCase() === 'k') {
+        onToggle();
+        setSearchQuery('');
       }
-      handleClose();
     },
-    [handleClose, router]
+    [onToggle]
   );
+
+  useEffect(() => {
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [handleKeyDown]);
 
   const handleSearch = useCallback((event: React.ChangeEvent<HTMLTextAreaElement>) => {
     setSearchQuery(event.target.value);
   }, []);
 
+  const formattedNavItems = flattenNavSections(navItems, user?.permissions);
+
   const dataFiltered = applyFilter({
-    inputData: getAllItems({ data: navItems, permissions: user?.permissions }),
+    inputData: formattedNavItems,
     query: searchQuery,
   });
 
   const notFound = searchQuery && !dataFiltered.length;
 
-  const renderItems = () => {
-    const dataGroups = groupItems(dataFiltered);
-
-    return Object.keys(dataGroups)
-      .sort((a, b) => -b.localeCompare(a))
-      .map((group, index) => (
-        <Box component="ul" key={`${group}-${index}`}>
-          {dataGroups[group].map((item) => {
-            const { title, path } = item;
-
-            const partsTitle = parse(title, match(title, searchQuery));
-
-            const partsPath = parse(path, match(path, searchQuery));
-
-            return (
-              <Box component="li" key={`${title}${path}`} sx={{ display: 'flex' }}>
-                <ResultItem path={partsPath} title={partsTitle} groupLabel={searchQuery && group} onClickItem={() => handleClick(path)} />
-              </Box>
-            );
-          })}
-        </Box>
-      ));
-  };
-
-  const renderButton = (
+  const renderButton = () => (
     <Box
-      display="flex"
-      alignItems="center"
-      onClick={search.onTrue}
-      sx={{
-        pr: { sm: 1 },
-        borderRadius: { sm: 1.5 },
-        cursor: { sm: 'pointer' },
-        bgcolor: { sm: varAlpha(theme.vars.palette.grey['500Channel'], 0.08) },
-        ...sx,
-      }}
+      onClick={onOpen}
+      sx={[
+        {
+          display: 'flex',
+          alignItems: 'center',
+          [theme.breakpoints.up(breakpoint)]: {
+            pr: 1,
+            borderRadius: 1.5,
+            cursor: 'pointer',
+            bgcolor: varAlpha(theme.vars.palette.grey['500Channel'], 0.08),
+            transition: theme.transitions.create('background-color', {
+              easing: theme.transitions.easing.easeInOut,
+              duration: theme.transitions.duration.shortest,
+            }),
+            '&:hover': {
+              bgcolor: varAlpha(theme.vars.palette.grey['500Channel'], 0.16),
+            },
+          },
+        },
+        ...(Array.isArray(sx) ? sx : [sx]),
+      ]}
       {...other}
     >
-      <IconButton disableRipple>
+      <Box
+        component={smUp ? 'span' : IconButton}
+        sx={{
+          [theme.breakpoints.up(breakpoint)]: {
+            p: 1,
+            display: 'inline-flex',
+            color: 'action.active',
+          },
+        }}
+      >
         {/* https://icon-sets.iconify.design/eva/search-fill/ */}
         <SvgIcon sx={{ width: 20, height: 20 }}>
           <path
@@ -132,15 +125,16 @@ export function Searchbar({ data: navItems = [], sx, ...other }: SearchbarProps)
             d="m20.71 19.29l-3.4-3.39A7.92 7.92 0 0 0 19 11a8 8 0 1 0-8 8a7.92 7.92 0 0 0 4.9-1.69l3.39 3.4a1 1 0 0 0 1.42 0a1 1 0 0 0 0-1.42M5 11a6 6 0 1 1 6 6a6 6 0 0 1-6-6"
           />
         </SvgIcon>
-      </IconButton>
+      </Box>
 
       <Label
         sx={{
-          fontSize: 12,
           color: 'grey.800',
+          cursor: 'inherit',
           bgcolor: 'common.white',
-          boxShadow: theme.customShadows.z1,
-          display: { xs: 'none', sm: 'inline-flex' },
+          fontSize: theme.typography.pxToRem(12),
+          boxShadow: theme.vars.customShadows.z1,
+          display: { xs: 'none', [breakpoint]: 'inline-flex' },
         }}
       >
         ⌘K
@@ -148,41 +142,78 @@ export function Searchbar({ data: navItems = [], sx, ...other }: SearchbarProps)
     </Box>
   );
 
+  const renderList = () => (
+    <MenuList
+      disablePadding
+      sx={{
+        [`& .${menuItemClasses.root}`]: {
+          p: 0,
+          mb: 0,
+          '&:hover': { bgcolor: 'transparent' },
+        },
+      }}
+    >
+      {dataFiltered.map((item) => {
+        const partsTitle = parse(item.title, match(item.title, searchQuery));
+        const partsPath = parse(item.path, match(item.path, searchQuery));
+
+        return (
+          <MenuItem disableRipple key={`${item.title}${item.path}`}>
+            <ResultItem
+              path={partsPath}
+              title={partsTitle}
+              href={item.path}
+              labels={item.group.split('.')}
+              onClick={handleClose}
+            />
+          </MenuItem>
+        );
+      })}
+    </MenuList>
+  );
+
   return (
     <>
-      {renderButton}
+      {renderButton()}
 
       <Dialog
         fullWidth
-        disableRestoreFocus
+        closeAfterTransition
         maxWidth="sm"
-        open={search.value}
+        open={open}
         onClose={handleClose}
-        transitionDuration={{ enter: theme.transitions.duration.shortest, exit: 0 }}
-        PaperProps={{ sx: { mt: 15, overflow: 'unset' } }}
-        sx={{ [`& .${dialogClasses.container}`]: { alignItems: 'flex-start' } }}
+        transitionDuration={{ enter: theme.transitions.duration.shortest, exit: 100 }}
+        sx={[
+          {
+            [`& .${dialogClasses.paper}`]: { mt: 15, overflow: 'unset' },
+            [`& .${dialogClasses.container}`]: { alignItems: 'flex-start' },
+          },
+        ]}
       >
-        <Box sx={{ p: 3, borderBottom: `solid 1px ${theme.vars.palette.divider}` }}>
-          <InputBase
-            fullWidth
-            autoFocus
-            placeholder="Search..."
-            value={searchQuery}
-            onChange={handleSearch}
-            startAdornment={
-              <InputAdornment position="start">
-                <Iconify icon="eva:search-fill" width={24} sx={{ color: 'text.disabled' }} />
-              </InputAdornment>
-            }
-            endAdornment={<Label sx={{ letterSpacing: 1, color: 'text.secondary' }}>esc</Label>}
-            inputProps={{ sx: { typography: 'h6' } }}
-          />
-        </Box>
+        <InputBase
+          fullWidth
+          autoFocus={open}
+          placeholder="Search..."
+          value={searchQuery}
+          onChange={handleSearch}
+          startAdornment={
+            <InputAdornment position="start">
+              <Iconify icon="eva:search-fill" width={24} sx={{ color: 'text.disabled' }} />
+            </InputAdornment>
+          }
+          endAdornment={<Label sx={{ letterSpacing: 1, color: 'text.secondary' }}>esc</Label>}
+          inputProps={{ id: 'search-input' }}
+          sx={{
+            p: 3,
+            borderBottom: `solid 1px ${theme.vars.palette.divider}`,
+            [`& .${inputBaseClasses.input}`]: { typography: 'h6' },
+          }}
+        />
 
         {notFound ? (
-          <SearchNotFound query={searchQuery} sx={{ py: 15 }} />
+          <SearchNotFound query={searchQuery} sx={{ py: 15, px: 2.5 }} />
         ) : (
-          <Scrollbar sx={{ px: 3, pb: 3, pt: 2, height: 400 }}>{renderItems()}</Scrollbar>
+          <Scrollbar sx={{ p: 2.5, height: 400 }}>{renderList()}</Scrollbar>
         )}
       </Dialog>
     </>

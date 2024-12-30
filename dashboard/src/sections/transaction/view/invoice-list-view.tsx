@@ -5,6 +5,7 @@ import type { Theme } from '@mui/material/styles';
 import type { LabelColor } from 'src/components/label';
 
 import { mutate } from 'swr';
+import { useBoolean } from 'minimal-shared/hooks';
 
 import Stack from '@mui/material/Stack';
 import Button from '@mui/material/Button';
@@ -12,8 +13,6 @@ import { Box, Tooltip } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 
 import { paths } from 'src/routes/paths';
-
-import { useBoolean } from 'src/hooks/use-boolean';
 
 import { shouldFail } from 'src/utils/errors';
 
@@ -91,7 +90,7 @@ export function InvoiceListView() {
   const theme = useTheme();
   const newInvoice = useBoolean();
 
-  const { invoices, invoicesLoading, invoicesError } = useListWalletInvoices();
+  const { invoices, invoicesLoading, invoicesError, invoicesMutate } = useListWalletInvoices();
   const { fiatPrices, fiatPricesLoading, fiatPricesError } = useFetchFiatPrices();
 
   const errors = [invoicesError, fiatPricesError];
@@ -124,7 +123,7 @@ export function InvoiceListView() {
                 <Tooltip title={t('invoice_list.clean_expired_invoices')} placement="top" arrow>
                   <Box>
                     <CleanTransactionsButton
-                      onSuccess={() => mutate(endpointKeys.userWallet.invoices.list)}
+                      onSuccess={invoicesMutate}
                       buttonProps={{
                         color: 'error',
                         variant: 'contained',
@@ -137,7 +136,11 @@ export function InvoiceListView() {
                     </CleanTransactionsButton>
                   </Box>
                 </Tooltip>
-                <Button onClick={newInvoice.onTrue} variant="contained" startIcon={<Iconify icon="mingcute:add-line" />}>
+                <Button
+                  onClick={newInvoice.onTrue}
+                  variant="contained"
+                  startIcon={<Iconify icon="mingcute:add-line" />}
+                >
                   {t('new')}
                 </Button>
               </Stack>

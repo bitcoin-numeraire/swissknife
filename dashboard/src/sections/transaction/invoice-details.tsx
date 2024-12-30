@@ -42,7 +42,10 @@ export function InvoiceDetails({ invoice, isAdmin }: Props) {
       <Grid item xs={12} md={4} sm={6}>
         <Title>{t('invoice_details.amount_received')}</Title>
         {invoice.status === 'Settled' && (
-          <SatsWithIcon amountMSats={(invoice.amount_received_msat || 0) - (invoice.fee_msat || 0)} color="text.secondary" />
+          <SatsWithIcon
+            amountMSats={(invoice.amount_received_msat || 0) - (invoice.fee_msat || 0)}
+            color="text.secondary"
+          />
         )}
       </Grid>
       <Grid item xs={12} md={4} sm={6}>
@@ -97,7 +100,9 @@ export function InvoiceDetails({ invoice, isAdmin }: Props) {
       {invoice.ln_invoice && (
         <Grid item xs={12} md={4} sm={6}>
           <Title>{t('invoice_details.min_final_cltv_delta')}</Title>
-          <Typography color="textSecondary">{invoice.ln_invoice?.min_final_cltv_expiry_delta}</Typography>
+          <Typography color="textSecondary">
+            {invoice.ln_invoice?.min_final_cltv_expiry_delta}
+          </Typography>
         </Grid>
       )}
 
@@ -163,8 +168,14 @@ export function InvoiceDetails({ invoice, isAdmin }: Props) {
 
   return (
     <>
-      <TransactionToolbar transaction={invoice} transactionType={TransactionType.INVOICE} isAdmin={isAdmin} />
-      <Card sx={{ pt: 5, px: { xs: 2, sm: 5, md: 8 }, maxWidth: { xs: '100%', md: '80%' }, mx: 'auto' }}>
+      <TransactionToolbar
+        transaction={invoice}
+        transactionType={TransactionType.INVOICE}
+        isAdmin={isAdmin}
+      />
+      <Card
+        sx={{ pt: 5, px: { xs: 2, sm: 5, md: 8 }, maxWidth: { xs: '100%', md: '80%' }, mx: 'auto' }}
+      >
         <Box
           rowGap={5}
           display="grid"
@@ -186,14 +197,18 @@ export function InvoiceDetails({ invoice, isAdmin }: Props) {
                   (invoice.status === 'Expired' && 'error') ||
                   'default'
                 }
-                mr={1}
+                sx={{ mr: 1 }}
               >
                 {invoice.status}
               </Label>
 
               <Label
                 variant="soft"
-                color={(invoice.ledger === 'Lightning' && 'secondary') || (invoice.ledger === 'Internal' && 'primary') || 'default'}
+                color={
+                  (invoice.ledger === 'Lightning' && 'secondary') ||
+                  (invoice.ledger === 'Internal' && 'primary') ||
+                  'default'
+                }
               >
                 {invoice.ledger}
               </Label>

@@ -1,8 +1,7 @@
 import { useCallback } from 'react';
+import { useCopyToClipboard } from 'minimal-shared/hooks';
 
 import { Tooltip, IconButton } from '@mui/material';
-
-import { useCopyToClipboard } from 'src/hooks/use-copy-to-clipboard';
 
 import { useTranslate } from 'src/locales';
 

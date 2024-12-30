@@ -4,10 +4,15 @@ import type { AppState } from '@auth0/auth0-react';
 import type { DecodedToken } from 'src/auth/types';
 
 import { jwtDecode } from 'jwt-decode';
-import { useAuth0, Auth0Provider } from '@auth0/auth0-react';
 import { useMemo, useState, useEffect, useCallback } from 'react';
+import {
+  useAuth0,
+  Auth0Provider,
+  AuthenticationError,
+  MissingRefreshTokenError,
+} from '@auth0/auth0-react';
 
-import { CONFIG } from 'src/config-global';
+import { CONFIG } from 'src/global-config';
 import { client } from 'src/lib/swissknife';
 
 import { AuthContext } from '../auth-context';
@@ -46,7 +51,8 @@ export function AuthProvider({ children }: Props) {
 // ----------------------------------------------------------------------
 
 function AuthProviderContainer({ children }: Props) {
-  const { user, isLoading, isAuthenticated, getAccessTokenSilently, loginWithRedirect, logout } = useAuth0();
+  const { user, isLoading, isAuthenticated, getAccessTokenSilently, loginWithRedirect, logout } =
+    useAuth0();
   const { audience } = CONFIG.auth0;
 
   const [accessToken, setAccessToken] = useState<string | null>(null);
@@ -54,40 +60,35 @@ function AuthProviderContainer({ children }: Props) {
 
   const getAccessToken = useCallback(async () => {
     try {
-      if (isAuthenticated) {
-        const token = await getAccessTokenSilently({ authorizationParams: { audience } });
+      const token = await getAccessTokenSilently({ authorizationParams: { audience } });
+      setAccessToken(token);
+      setPermissions(jwtDecode<DecodedToken>(token).permissions || []);
 
-        setAccessToken(token);
-        setPermissions(jwtDecode<DecodedToken>(token).permissions || []);
-
-        client.interceptors.request.use(async (request) => {
-          try {
-            const t = await getAccessTokenSilently({ authorizationParams: { audience } });
-            request.headers.set('Authorization', `Bearer ${t}`);
-          } catch (e) {
-            console.error('Token expired or missing, redirecting to login');
-            loginWithRedirect();
-          }
-
-          return request;
-        });
-      } else {
-        setAccessToken(null);
-        setPermissions([]);
-      }
-    } catch (e) {
-      console.error('Failed to get token:', e);
+      client.interceptors.request.use(async (request) => {
+        try {
+          const t = await getAccessTokenSilently({ authorizationParams: { audience } });
+          request.headers.set('Authorization', `Bearer ${t}`);
+        } catch (err: unknown) {
+          console.error('Token expired or missing, redirecting to login', err);
+          loginWithRedirect();
+        }
+        return request;
+      });
+    } catch (err: unknown) {
+      console.error('Failed to get token:', err);
 
       setAccessToken(null);
       setPermissions([]);
 
-      if (e.error === 'missing_refresh_token' || e.error === 'invalid_grant') {
+      if (err instanceof MissingRefreshTokenError) {
+        loginWithRedirect();
+      } else if (err instanceof AuthenticationError && err.error === 'invalid_grant') {
         loginWithRedirect();
       } else {
         logout();
       }
     }
-  }, [getAccessTokenSilently, isAuthenticated, audience, loginWithRedirect, logout]);
+  }, [getAccessTokenSilently, audience, loginWithRedirect, logout]);
 
   useEffect(() => {
     getAccessToken();

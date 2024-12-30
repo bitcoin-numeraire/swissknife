@@ -1,47 +1,51 @@
-import type { BoxProps } from '@mui/material/Box';
+import { lazy, Suspense, forwardRef } from 'react';
+import { useIsClient } from 'minimal-shared/hooks';
+import { mergeClasses } from 'minimal-shared/utils';
 
-import dynamic from 'next/dynamic';
+import { styled } from '@mui/material/styles';
 
-import Box from '@mui/material/Box';
+import { chartClasses } from './classes';
+import { ChartLoading } from './components';
 
-import { withLoadingProps } from 'src/utils/with-loading-props';
-
-import { ChartLoading } from './chart-loading';
-
-import type { ChartProps, ChartBaseProps, ChartLoadingProps } from './types';
+import type { ChartProps } from './types';
 
 // ----------------------------------------------------------------------
 
-type WithLoadingProps = ChartBaseProps & {
-  loading?: ChartLoadingProps;
-};
-
-const ApexChart = withLoadingProps<WithLoadingProps>((props) =>
-  dynamic(() => import('react-apexcharts').then((mod) => mod.default), {
-    ssr: false,
-    loading: () => {
-      const { loading, type } = props();
-
-      return loading?.disabled ? null : <ChartLoading type={type} sx={loading?.sx} />;
-    },
-  })
+const LazyChart = lazy(() =>
+  import('react-apexcharts').then((module) => ({ default: module.default }))
 );
 
-export function Chart({ sx, type, series, height, options, loadingProps, width = '100%', ...other }: BoxProps & ChartProps) {
+export const Chart = forwardRef<HTMLDivElement, ChartProps>((props, ref) => {
+  const { type, series, options, slotProps, className, sx, ...other } = props;
+
+  const isClient = useIsClient();
+
+  const renderFallback = () => <ChartLoading type={type} sx={slotProps?.loading} />;
+
   return (
-    <Box
+    <ChartRoot
+      ref={ref}
       dir="ltr"
-      sx={{
-        width,
-        height,
-        flexShrink: 0,
-        borderRadius: 1.5,
-        position: 'relative',
-        ...sx,
-      }}
+      className={mergeClasses([chartClasses.root, className])}
+      sx={sx}
       {...other}
     >
-      <ApexChart type={type} series={series} options={options} width="100%" height="100%" loading={loadingProps} />
-    </Box>
+      {isClient ? (
+        <Suspense fallback={renderFallback()}>
+          <LazyChart type={type} series={series} options={options} width="100%" height="100%" />
+        </Suspense>
+      ) : (
+        renderFallback()
+      )}
+    </ChartRoot>
   );
-}
+});
+
+// ----------------------------------------------------------------------
+
+const ChartRoot = styled('div')(({ theme }) => ({
+  width: '100%',
+  flexShrink: 0,
+  position: 'relative',
+  borderRadius: theme.shape.borderRadius * 1.5,
+}));

@@ -4,6 +4,7 @@ use crate::{
     infra::database::sea_orm::models::api_key::{ActiveModel, Column, Entity},
 };
 use async_trait::async_trait;
+use chrono::Utc;
 use sea_orm::{
     sea_query::Expr, ActiveModelTrait, ColumnTrait, Condition, DatabaseConnection, EntityTrait,
     QueryFilter, QueryOrder, QuerySelect, QueryTrait, Set,
@@ -37,7 +38,7 @@ impl ApiKeyRepository for SeaOrmApiKeyRepository {
             .filter(Column::KeyHash.eq(key_hash))
             .filter(
                 Condition::any()
-                    .add(Expr::col(Column::ExpiresAt).gt(Expr::current_timestamp()))
+                    .add(Expr::col(Column::ExpiresAt).gt(Utc::now()))
                     .add(Expr::col(Column::ExpiresAt).is_null()),
             )
             .one(&self.db)
@@ -62,12 +63,15 @@ impl ApiKeyRepository for SeaOrmApiKeyRepository {
     }
 
     async fn insert(&self, api_key: ApiKey) -> Result<ApiKey, DatabaseError> {
+        let permissions_json = serde_json::to_value(&api_key.permissions)
+            .map_err(|e| DatabaseError::Insert(e.to_string()))?;
+
         let model = ActiveModel {
             id: Set(Uuid::new_v4()),
             user_id: Set(api_key.user_id),
             name: Set(api_key.name),
             key_hash: Set(api_key.key_hash),
-            permissions: Set(api_key.permissions.iter().map(|p| p.to_string()).collect()),
+            permissions: Set(permissions_json),
             description: Set(api_key.description),
             expires_at: Set(api_key.expires_at),
             ..Default::default()

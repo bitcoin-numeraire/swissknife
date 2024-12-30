@@ -22,13 +22,20 @@ export function TablePaginationCustom({
   ...other
 }: TablePaginationCustomProps) {
   return (
-    <Box sx={{ position: 'relative', ...sx }}>
-      <TablePagination rowsPerPageOptions={rowsPerPageOptions} component="div" {...other} sx={{ borderTopColor: 'transparent' }} />
+    <Box sx={[{ position: 'relative' }, ...(Array.isArray(sx) ? sx : [sx])]}>
+      <TablePagination
+        rowsPerPageOptions={rowsPerPageOptions}
+        component="div"
+        {...other}
+        sx={{ borderTopColor: 'transparent' }}
+      />
 
       {onChangeDense && (
         <FormControlLabel
           label="Dense"
-          control={<Switch name="dense" checked={dense} onChange={onChangeDense} />}
+          control={
+            <Switch checked={dense} onChange={onChangeDense} inputProps={{ id: 'dense-switch' }} />
+          }
           sx={{
             pl: 2,
             py: 1.5,

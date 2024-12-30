@@ -7,7 +7,10 @@ import type { CarouselOptions, UseCarouselThumbsReturn } from '../types';
 
 // ----------------------------------------------------------------------
 
-export function useThumbs(mainApi?: EmblaCarouselType, options?: Partial<CarouselOptions>): UseCarouselThumbsReturn {
+export function useThumbs(
+  mainApi?: EmblaCarouselType,
+  options?: Partial<CarouselOptions>
+): UseCarouselThumbsReturn {
   const [thumbsRef, thumbsApi] = useEmblaCarousel({
     containScroll: 'keepSnaps',
     dragFree: true,

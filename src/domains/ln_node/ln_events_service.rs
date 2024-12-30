@@ -59,7 +59,7 @@ impl LnEventsUseCases for LnEventsService {
             invoice.payment_time = Some(event.payment_time);
             invoice.amount_received_msat = Some(event.amount_received_msat);
 
-            invoice = self.store.invoice.update(None, invoice).await?;
+            invoice = self.store.invoice.update(invoice).await?;
 
             info!(
                 id = %invoice.id,

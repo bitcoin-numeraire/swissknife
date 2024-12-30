@@ -17,7 +17,6 @@ export function useCarouselDots(mainApi?: EmblaCarouselType): UseCarouselDotsRet
     (index: number) => {
       if (!mainApi) return;
       mainApi.scrollTo(index);
-      setSelectedIndex(index);
     },
     [mainApi]
   );

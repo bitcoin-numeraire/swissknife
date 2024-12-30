@@ -2,10 +2,10 @@ import type { AlertProps } from '@mui/material/Alert';
 import type { SvgIconProps } from '@mui/material/SvgIcon';
 import type { Theme, CSSObject, Components } from '@mui/material/styles';
 
+import { varAlpha } from 'minimal-shared/utils';
+
 import SvgIcon from '@mui/material/SvgIcon';
 import { alertClasses } from '@mui/material/Alert';
-
-import { varAlpha, stylesMode } from '../../styles';
 
 // ----------------------------------------------------------------------
 
@@ -64,9 +64,9 @@ const AlertErrorIcon = (props: SvgIconProps) => (
 
 const COLORS = ['info', 'success', 'warning', 'error'] as const;
 
-type ColorType = (typeof COLORS)[number];
+type PaletteColor = (typeof COLORS)[number];
 
-function styleColors(ownerState: AlertProps, styles: (val: ColorType) => CSSObject) {
+function styleColors(ownerState: AlertProps, styles: (val: PaletteColor) => CSSObject) {
   const outputStyle = COLORS.reduce((acc, color) => {
     if (ownerState.severity === color) {
       acc = styles(color);
@@ -105,13 +105,15 @@ const MuiAlert: Components<Theme>['MuiAlert'] = {
         colors: styleColors(ownerState, (color) => ({
           color: theme.vars.palette[color].darker,
           backgroundColor: theme.vars.palette[color].lighter,
-          [stylesMode.dark]: {
+          ...theme.applyStyles('dark', {
             color: theme.vars.palette[color].lighter,
             backgroundColor: theme.vars.palette[color].darker,
-          },
+          }),
           [`& .${alertClasses.icon}`]: {
             color: theme.vars.palette[color].main,
-            [stylesMode.dark]: { color: theme.vars.palette[color].light },
+            ...theme.applyStyles('dark', {
+              color: theme.vars.palette[color].light,
+            }),
           },
         })),
       };
@@ -139,7 +141,9 @@ const MuiAlert: Components<Theme>['MuiAlert'] = {
           backgroundColor: varAlpha(theme.vars.palette[color].mainChannel, 0.08),
           color: theme.vars.palette[color].dark,
           border: `solid 1px ${varAlpha(theme.vars.palette[color].mainChannel, 0.16)}`,
-          [stylesMode.dark]: { color: theme.vars.palette[color].light },
+          ...theme.applyStyles('dark', {
+            color: theme.vars.palette[color].light,
+          }),
           [`& .${alertClasses.icon}`]: { color: theme.vars.palette[color].main },
         })),
       };

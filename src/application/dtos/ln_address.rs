@@ -1,7 +1,15 @@
 use nostr_sdk::PublicKey;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
+
+use crate::domains::ln_address::LnAddress;
+
+#[derive(Debug, Serialize, ToSchema)]
+pub struct WalletLnAddressResponse {
+    /// Wallet LN address. Empty if not found
+    pub ln_address: Option<LnAddress>,
+}
 
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct RegisterLnAddressRequest {

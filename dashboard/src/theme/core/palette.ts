@@ -1,98 +1,106 @@
 import type { ColorSystemOptions } from '@mui/material/styles';
+import type { Channels, PaletteColor } from '@mui/material/styles/createPalette';
 
-import COLORS from './colors.json';
-import { varAlpha, createPaletteChannel } from '../styles';
+import { varAlpha, createPaletteChannel } from 'minimal-shared/utils';
 
-// ----------------------------------------------------------------------
+import { themeConfig } from '../theme-config';
 
-declare module '@mui/material/styles/createPalette' {
-  interface CommonColors {
-    whiteChannel: string;
-    blackChannel: string;
-  }
-  interface TypeText {
-    disabledChannel: string;
-  }
-  interface TypeBackground {
-    neutral: string;
-    neutralChannel: string;
-  }
-  interface SimplePaletteColorOptions {
-    lighter: string;
-    darker: string;
-    lighterChannel: string;
-    darkerChannel: string;
-  }
-  interface PaletteColor {
-    lighter: string;
-    darker: string;
-    lighterChannel: string;
-    darkerChannel: string;
-  }
-}
-
-declare module '@mui/material/styles' {
-  interface ThemeVars {
-    transitions: Theme['transitions'];
-  }
-}
-
-declare module '@mui/material' {
-  interface Color {
-    ['50Channel']: string;
-    ['100Channel']: string;
-    ['200Channel']: string;
-    ['300Channel']: string;
-    ['400Channel']: string;
-    ['500Channel']: string;
-    ['600Channel']: string;
-    ['700Channel']: string;
-    ['800Channel']: string;
-    ['900Channel']: string;
-  }
-}
-
-export type ColorType = 'primary' | 'secondary' | 'info' | 'success' | 'warning' | 'error';
+import type { ThemeColorScheme } from '../types';
 
 // ----------------------------------------------------------------------
 
-// Grey
-export const grey = createPaletteChannel(COLORS.grey);
+/**
+ * TypeScript (type definition and extension)
+ * @to {@link file://./../extend-theme-types.d.ts}
+ */
 
-// Primary
-export const primary = createPaletteChannel(COLORS.primary);
+// Keys for the palette colors
+export type PaletteColorKey = 'primary' | 'secondary' | 'info' | 'success' | 'warning' | 'error';
 
-// Secondary
-export const secondary = createPaletteChannel(COLORS.secondary);
+// Palette color without additional channels
+export type PaletteColorNoChannels = Omit<PaletteColor, 'lighterChannel' | 'darkerChannel'>;
 
-// Info
-export const info = createPaletteChannel(COLORS.info);
+// Palette color with additional channels
+export type PaletteColorWithChannels = PaletteColor & Channels;
 
-// Success
-export const success = createPaletteChannel(COLORS.success);
+// Extended common colors
+export type CommonColorsExtend = {
+  whiteChannel: string;
+  blackChannel: string;
+};
 
-// Warning
-export const warning = createPaletteChannel(COLORS.warning);
+// Extended text colors
+export type TypeTextExtend = {
+  disabledChannel: string;
+};
 
-// Error
-export const error = createPaletteChannel(COLORS.error);
+// Extended background colors
+export type TypeBackgroundExtend = {
+  neutral: string;
+  neutralChannel: string;
+};
 
-// Common
-export const common = createPaletteChannel(COLORS.common);
+// Extended palette colors
+export type PaletteColorExtend = {
+  lighter: string;
+  darker: string;
+  lighterChannel: string;
+  darkerChannel: string;
+};
 
-// Text
+// Extended grey channels
+export type GreyExtend = {
+  '50Channel': string;
+  '100Channel': string;
+  '200Channel': string;
+  '300Channel': string;
+  '400Channel': string;
+  '500Channel': string;
+  '600Channel': string;
+  '700Channel': string;
+  '800Channel': string;
+  '900Channel': string;
+};
+
+// ----------------------------------------------------------------------
+
+// Primary color
+export const primary = createPaletteChannel(themeConfig.palette.primary);
+
+// Secondary color
+export const secondary = createPaletteChannel(themeConfig.palette.secondary);
+
+// Info color
+export const info = createPaletteChannel(themeConfig.palette.info);
+
+// Success color
+export const success = createPaletteChannel(themeConfig.palette.success);
+
+// Warning color
+export const warning = createPaletteChannel(themeConfig.palette.warning);
+
+// Error color
+export const error = createPaletteChannel(themeConfig.palette.error);
+
+// Common color
+export const common = createPaletteChannel(themeConfig.palette.common);
+
+// Grey color
+export const grey = createPaletteChannel(themeConfig.palette.grey);
+
+// Text color
 export const text = {
   light: createPaletteChannel({ primary: grey[800], secondary: grey[600], disabled: grey[500] }),
   dark: createPaletteChannel({ primary: '#FFFFFF', secondary: grey[300], disabled: grey[500] }),
 };
 
-// Background
+// Background color
 export const background = {
   light: createPaletteChannel({ paper: '#FFFFFF', default: '#FFFFFF', neutral: grey[200] }),
   dark: createPaletteChannel({ paper: grey[800], default: grey[900], neutral: grey[700] }),
 };
 
-// Action
+// Base action color
 export const baseAction = {
   hover: varAlpha(grey['500Channel'], 0.08),
   selected: varAlpha(grey['500Channel'], 0.16),
@@ -103,14 +111,15 @@ export const baseAction = {
   disabledOpacity: 0.48,
 };
 
+// Action color
 export const action = {
   light: { ...baseAction, active: grey[600] },
   dark: { ...baseAction, active: grey[500] },
 };
 
-/*
- * Base palette
- */
+// ----------------------------------------------------------------------
+
+// Base palette
 export const basePalette = {
   primary,
   secondary,
@@ -118,29 +127,22 @@ export const basePalette = {
   success,
   warning,
   error,
-  grey,
   common,
+  grey,
   divider: varAlpha(grey['500Channel'], 0.2),
-  action,
 };
 
-export const lightPalette = {
-  ...basePalette,
-  text: text.light,
-  background: background.light,
-  action: action.light,
-};
-
-export const darkPalette = {
-  ...basePalette,
-  text: text.dark,
-  background: background.dark,
-  action: action.dark,
-};
-
-// ----------------------------------------------------------------------
-
-export const colorSchemes: Partial<Record<'dark' | 'light', ColorSystemOptions>> = {
-  light: { palette: lightPalette },
-  dark: { palette: darkPalette },
+export const palette: Record<ThemeColorScheme, ColorSystemOptions['palette']> = {
+  light: {
+    ...basePalette,
+    text: text.light,
+    background: background.light,
+    action: action.light,
+  },
+  dark: {
+    ...basePalette,
+    text: text.dark,
+    background: background.dark,
+    action: action.dark,
+  },
 };

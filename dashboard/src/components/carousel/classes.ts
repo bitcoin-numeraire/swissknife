@@ -1,27 +1,40 @@
+import { createClasses } from 'src/theme/create-classes';
+
 // ----------------------------------------------------------------------
 
 export const carouselClasses = {
-  root: 'mnl__carousel__root',
-  container: 'mnl__carousel__container',
-  // dot
-  dots: 'mnl__carousel__dots',
-  dot: 'mnl__carousel__dot',
-  // arrow
-  arrows: 'mnl__carousel__arrows',
-  arrowsLabel: 'mnl__carousel__arrows_label',
-  arrowPrev: 'mnl__carousel__btn--prev',
-  arrowNext: 'mnl__carousel__btn--next',
-  arrowSvg: 'mnl__carousel__btn__svg',
+  root: createClasses('carousel__root'),
+  container: createClasses('carousel__container'),
+  // dots
+  dots: {
+    root: createClasses('carousel__dots__root'),
+    item: createClasses('carousel__dot__item'),
+    itemSelected: createClasses('carousel__dot__selected'),
+  },
+  // arrows
+  arrows: {
+    root: createClasses('carousel__arrows__root'),
+    label: createClasses('carousel__arrows__label'),
+    prev: createClasses('carousel__arrow__prev'),
+    next: createClasses('carousel__arrow__next'),
+    svg: createClasses('carousel__arrows__svg'),
+  },
   // slide
-  slide: 'mnl__carousel__slide',
-  slideContent: 'mnl__carousel__slide__content',
-  // thumb
-  thumbs: 'mnl__carousel__thumbs',
-  thumb: 'mnl__carousel__thumb',
-  thumbContainer: 'mnl__carousel__thumbs__container',
-  thumbImage: 'mnl__carousel__thumb__image',
+  slide: {
+    root: createClasses('carousel__slide__root'),
+    content: createClasses('carousel__slide__content'),
+    parallax: createClasses('carousel__slide__content__parallax'),
+  },
+  // thumbs
+  thumbs: {
+    root: createClasses('carousel__thumbs__root'),
+    container: createClasses('carousel__thumbs__container'),
+    item: createClasses('carousel__thumb__item'),
+    image: createClasses('carousel__thumb__item__image'),
+  },
   // progress
-  progress: 'mnl__carousel__progress',
-  progressBar: 'mnl__carousel__progress__bar',
-  state: { selected: 'state--selected', disabled: 'state--disabled' },
+  progress: {
+    root: createClasses('carousel__progress__root'),
+    bar: createClasses('carousel__progress__bar'),
+  },
 };

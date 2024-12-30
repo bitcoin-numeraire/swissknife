@@ -1,28 +1,40 @@
-import type { BackgroundType } from '../types';
+import type { Variants, Transition, TargetAndTransition } from 'framer-motion';
 
 // ----------------------------------------------------------------------
 
-export const varBgColor = (props?: BackgroundType) => {
-  const colors = props?.colors || ['#19dcea', '#b22cff'];
-  const duration = props?.duration || 5;
-  const ease = props?.ease || 'linear';
+type Direction = 'top' | 'bottom' | 'left' | 'right';
 
-  return { animate: { background: colors, transition: { duration, ease } } };
-};
+export const varBgColor = (colors: string[], options?: TargetAndTransition): Variants => ({
+  animate: {
+    background: colors,
+    ...options,
+    transition: {
+      duration: 5,
+      ease: 'linear',
+      repeat: Infinity,
+      repeatType: 'reverse',
+      ...options?.transition,
+    },
+  },
+});
 
 // ----------------------------------------------------------------------
 
-export const varBgKenburns = (props?: BackgroundType) => {
-  const duration = props?.duration || 5;
-  const ease = props?.ease || 'easeOut';
+export const varBgKenburns = (direction: Direction, options?: TargetAndTransition): Variants => {
+  const transition: Transition = {
+    duration: 5,
+    ease: 'easeOut',
+    ...options?.transition,
+  };
 
-  return {
+  const variants: Record<Direction, Variants> = {
     top: {
       animate: {
         scale: [1, 1.25],
         y: [0, -15],
         transformOrigin: ['50% 16%', '50% top'],
-        transition: { duration, ease },
+        ...options,
+        transition,
       },
     },
     bottom: {
@@ -30,7 +42,8 @@ export const varBgKenburns = (props?: BackgroundType) => {
         scale: [1, 1.25],
         y: [0, 15],
         transformOrigin: ['50% 84%', '50% bottom'],
-        transition: { duration, ease },
+        ...options,
+        transition,
       },
     },
     left: {
@@ -39,7 +52,8 @@ export const varBgKenburns = (props?: BackgroundType) => {
         x: [0, 20],
         y: [0, 15],
         transformOrigin: ['16% 50%', '0% left'],
-        transition: { duration, ease },
+        ...options,
+        transition,
       },
     },
     right: {
@@ -48,36 +62,49 @@ export const varBgKenburns = (props?: BackgroundType) => {
         x: [0, -20],
         y: [0, -15],
         transformOrigin: ['84% 50%', '0% right'],
-        transition: { duration, ease },
+        ...options,
+        transition,
       },
     },
   };
+
+  return variants[direction];
 };
 
 // ----------------------------------------------------------------------
 
-export const varBgPan = (props?: BackgroundType) => {
-  const colors = props?.colors || ['#ee7752', '#e73c7e', '#23a6d5', '#23d5ab'];
-  const duration = props?.duration || 5;
-  const ease = props?.ease || 'linear';
+export const varBgPan = (
+  direction: Direction,
+  colors: string[],
+  options?: TargetAndTransition
+): Variants => {
+  const gradient = (deg: number) => `linear-gradient(${deg}deg, ${colors.join(', ')})`;
 
-  const gradient = (deg: number) => `linear-gradient(${deg}deg, ${colors})`;
+  const transition: Transition = {
+    duration: 5,
+    ease: 'linear',
+    repeat: Infinity,
+    repeatType: 'reverse',
+    ...options?.transition,
+  };
 
-  return {
+  const variants: Record<Direction, Variants> = {
     top: {
       animate: {
         backgroundImage: [gradient(0), gradient(0)],
         backgroundPosition: ['center 99%', 'center 1%'],
         backgroundSize: ['100% 600%', '100% 600%'],
-        transition: { duration, ease },
+        ...options,
+        transition,
       },
     },
     right: {
       animate: {
-        backgroundPosition: ['1% center', '99% center'],
         backgroundImage: [gradient(270), gradient(270)],
+        backgroundPosition: ['1% center', '99% center'],
         backgroundSize: ['600% 100%', '600% 100%'],
-        transition: { duration, ease },
+        ...options,
+        transition,
       },
     },
     bottom: {
@@ -85,7 +112,8 @@ export const varBgPan = (props?: BackgroundType) => {
         backgroundImage: [gradient(0), gradient(0)],
         backgroundPosition: ['center 1%', 'center 99%'],
         backgroundSize: ['100% 600%', '100% 600%'],
-        transition: { duration, ease },
+        ...options,
+        transition,
       },
     },
     left: {
@@ -93,8 +121,11 @@ export const varBgPan = (props?: BackgroundType) => {
         backgroundPosition: ['99% center', '1% center'],
         backgroundImage: [gradient(270), gradient(270)],
         backgroundSize: ['600% 100%', '600% 100%'],
-        transition: { duration, ease },
+        ...options,
+        transition,
       },
     },
   };
+
+  return variants[direction];
 };

@@ -6,9 +6,8 @@ use crate::{
 use async_trait::async_trait;
 use chrono::Utc;
 use sea_orm::{
-    sea_query::Expr, ActiveModelTrait, ColumnTrait, Condition, DatabaseConnection,
-    DatabaseTransaction, EntityTrait, QueryFilter, QueryOrder, QuerySelect, QueryTrait, Set,
-    Unchanged,
+    sea_query::Expr, ActiveModelTrait, ColumnTrait, Condition, DatabaseConnection, EntityTrait,
+    QueryFilter, QueryOrder, QuerySelect, QueryTrait, Set, Unchanged,
 };
 use uuid::Uuid;
 
@@ -62,13 +61,13 @@ impl InvoiceRepository for SeaOrmInvoiceRepository {
             .apply_if(filter.status, |q, s| match s {
                 InvoiceStatus::Pending => q.filter(
                     Condition::all()
-                        .add(Expr::col(Column::ExpiresAt).gt(Expr::current_timestamp()))
+                        .add(Expr::col(Column::ExpiresAt).gt(Utc::now()))
                         .add(Expr::col(Column::PaymentTime).is_null()),
                 ),
                 InvoiceStatus::Settled => q.filter(Expr::col(Column::PaymentTime).is_not_null()),
                 InvoiceStatus::Expired => q.filter(
                     Condition::all()
-                        .add(Expr::col(Column::ExpiresAt).lte(Expr::current_timestamp()))
+                        .add(Expr::col(Column::ExpiresAt).lte(Utc::now()))
                         .add(Expr::col(Column::PaymentTime).is_null()),
                 ),
             })
@@ -85,11 +84,7 @@ impl InvoiceRepository for SeaOrmInvoiceRepository {
         Ok(models.into_iter().map(Into::into).collect())
     }
 
-    async fn insert(
-        &self,
-        txn: Option<&DatabaseTransaction>,
-        invoice: Invoice,
-    ) -> Result<Invoice, DatabaseError> {
+    async fn insert(&self, invoice: Invoice) -> Result<Invoice, DatabaseError> {
         let mut model = ActiveModel {
             id: Set(Uuid::new_v4()),
             wallet_id: Set(invoice.wallet_id),
@@ -116,24 +111,18 @@ impl InvoiceRepository for SeaOrmInvoiceRepository {
             model.min_final_cltv_expiry_delta =
                 Set((ln_invoice.min_final_cltv_expiry_delta as i64).into());
             model.expiry = Set((ln_invoice.expiry.as_secs() as i64).into());
-            model.expires_at = Set(ln_invoice.expires_at.into());
+            model.expires_at = Set(Some(ln_invoice.expires_at));
         }
 
-        let result = match txn {
-            Some(txn) => model.insert(txn).await,
-            None => model.insert(&self.db).await,
-        };
+        let result = model
+            .insert(&self.db)
+            .await
+            .map_err(|e| DatabaseError::Insert(e.to_string()))?;
 
-        let model = result.map_err(|e| DatabaseError::Insert(e.to_string()))?;
-
-        Ok(model.into())
+        Ok(result.into())
     }
 
-    async fn update(
-        &self,
-        txn: Option<&DatabaseTransaction>,
-        invoice: Invoice,
-    ) -> Result<Invoice, DatabaseError> {
+    async fn update(&self, invoice: Invoice) -> Result<Invoice, DatabaseError> {
         let model = ActiveModel {
             id: Unchanged(invoice.id),
             fee_msat: Set(invoice.fee_msat.map(|v| v as i64)),
@@ -145,14 +134,12 @@ impl InvoiceRepository for SeaOrmInvoiceRepository {
             ..Default::default()
         };
 
-        let result = match txn {
-            Some(txn) => model.update(txn).await,
-            None => model.update(&self.db).await,
-        };
+        let result = model
+            .update(&self.db)
+            .await
+            .map_err(|e| DatabaseError::Update(e.to_string()))?;
 
-        let model = result.map_err(|e| DatabaseError::Update(e.to_string()))?;
-
-        Ok(model.into())
+        Ok(result.into())
     }
 
     async fn delete_many(&self, filter: InvoiceFilter) -> Result<u64, DatabaseError> {
@@ -164,13 +151,13 @@ impl InvoiceRepository for SeaOrmInvoiceRepository {
             .apply_if(filter.status, |q, status| match status {
                 InvoiceStatus::Pending => q.filter(
                     Condition::all()
-                        .add(Expr::col(Column::ExpiresAt).gt(Expr::current_timestamp()))
+                        .add(Expr::col(Column::ExpiresAt).gt(Utc::now()))
                         .add(Expr::col(Column::PaymentTime).is_null()),
                 ),
                 InvoiceStatus::Settled => q.filter(Expr::col(Column::PaymentTime).is_not_null()),
                 InvoiceStatus::Expired => q.filter(
                     Condition::all()
-                        .add(Expr::col(Column::ExpiresAt).lte(Expr::current_timestamp()))
+                        .add(Expr::col(Column::ExpiresAt).lte(Utc::now()))
                         .add(Expr::col(Column::PaymentTime).is_null()),
                 ),
             })

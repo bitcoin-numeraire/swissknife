@@ -1,24 +1,28 @@
 import type { Theme, Components, ComponentsVariants } from '@mui/material/styles';
 
-import { paginationItemClasses } from '@mui/material/PaginationItem';
+import { varAlpha } from 'minimal-shared/utils';
 
-import { varAlpha, stylesMode } from '../../styles';
+import { paginationItemClasses } from '@mui/material/PaginationItem';
 
 // ----------------------------------------------------------------------
 
-// NEW VARIANT
-declare module '@mui/material/Pagination' {
-  interface PaginationPropsVariantOverrides {
-    soft: true;
-  }
+/**
+ * TypeScript (type definition and extension)
+ * @to {@link file://./../../extend-theme-types.d.ts}
+ */
 
-  interface PaginationPropsColorOverrides {
-    info: true;
-    success: true;
-    warning: true;
-    error: true;
-  }
-}
+export type PaginationExtendVariant = {
+  soft: true;
+};
+
+export type PaginationExtendColor = {
+  info: true;
+  success: true;
+  warning: true;
+  error: true;
+};
+
+// ----------------------------------------------------------------------
 
 const COLORS = ['primary', 'secondary', 'info', 'success', 'warning', 'error'] as const;
 
@@ -26,7 +30,8 @@ const COLORS = ['primary', 'secondary', 'info', 'success', 'warning', 'error'] a
 
 const softVariant: Record<string, ComponentsVariants<Theme>['MuiPagination']> = {
   colors: COLORS.map((color) => ({
-    props: ({ ownerState }) => !ownerState.disabled && ownerState.variant === 'soft' && ownerState.color === color,
+    props: ({ ownerState }) =>
+      !ownerState.disabled && ownerState.variant === 'soft' && ownerState.color === color,
     style: ({ theme }) => ({
       [`& .${paginationItemClasses.root}`]: {
         [`&.${paginationItemClasses.selected}`]: {
@@ -34,7 +39,9 @@ const softVariant: Record<string, ComponentsVariants<Theme>['MuiPagination']> = 
           color: theme.vars.palette[color].dark,
           backgroundColor: varAlpha(theme.vars.palette[color].mainChannel, 0.08),
           '&:hover': { backgroundColor: varAlpha(theme.vars.palette[color].mainChannel, 0.16) },
-          [stylesMode.dark]: { color: theme.vars.palette[color].light },
+          ...theme.applyStyles('dark', {
+            color: theme.vars.palette[color].light,
+          }),
         },
       },
     }),
@@ -59,19 +66,17 @@ const softVariant: Record<string, ComponentsVariants<Theme>['MuiPagination']> = 
 
 const MuiPagination: Components<Theme>['MuiPagination'] = {
   /** **************************************
-   * VARIANTS
-   *************************************** */
-  variants: [
-    /**
-     * @variant soft
-     */
-    ...[...softVariant.standardColor!, ...softVariant.colors!],
-  ],
-
-  /** **************************************
    * STYLE
    *************************************** */
   styleOverrides: {
+    root: {
+      variants: [
+        // @variant soft
+        softVariant.standardColor,
+        softVariant.colors,
+      ].flat(),
+    },
+
     /**
      * @variant text
      */
@@ -83,10 +88,10 @@ const MuiPagination: Components<Theme>['MuiPagination'] = {
             color: theme.vars.palette.common.white,
             backgroundColor: theme.vars.palette.text.primary,
             '&:hover': { backgroundColor: theme.vars.palette.grey[700] },
-            [stylesMode.dark]: {
+            ...theme.applyStyles('dark', {
               color: theme.vars.palette.grey[800],
               '&:hover': { backgroundColor: theme.vars.palette.grey[100] },
-            },
+            }),
           }),
         },
       },

@@ -1,9 +1,9 @@
 import type { IDatePickerControl } from 'src/types/common';
 import type { SelectChangeEvent } from '@mui/material/Select';
-import type { UseSetStateReturn } from 'src/hooks/use-set-state';
 import type { ITransactionTableFilters } from 'src/types/transaction';
 
 import { useCallback } from 'react';
+import { usePopover, type UseSetStateReturn } from 'minimal-shared/hooks';
 
 import Stack from '@mui/material/Stack';
 import { MenuList } from '@mui/material';
@@ -23,7 +23,7 @@ import { useTranslate } from 'src/locales';
 
 import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
-import { usePopover, CustomPopover } from 'src/components/custom-popover';
+import { CustomPopover } from 'src/components/custom-popover';
 
 // ----------------------------------------------------------------------
 
@@ -34,7 +34,12 @@ type Props = {
   invoiceLedgerOptions: string[];
 };
 
-export function TransactionTableToolbar({ filters, onResetPage, dateError, invoiceLedgerOptions }: Props) {
+export function TransactionTableToolbar({
+  filters,
+  onResetPage,
+  dateError,
+  invoiceLedgerOptions,
+}: Props) {
   const { t } = useTranslate();
   const popover = usePopover();
 
@@ -48,7 +53,8 @@ export function TransactionTableToolbar({ filters, onResetPage, dateError, invoi
 
   const handleFilterLedger = useCallback(
     (event: SelectChangeEvent<string[]>) => {
-      const newValue = typeof event.target.value === 'string' ? event.target.value.split(',') : event.target.value;
+      const newValue =
+        typeof event.target.value === 'string' ? event.target.value.split(',') : event.target.value;
 
       onResetPage();
       filters.setState({ ledger: newValue });
@@ -105,7 +111,11 @@ export function TransactionTableToolbar({ filters, onResetPage, dateError, invoi
           >
             {invoiceLedgerOptions.map((option) => (
               <MenuItem key={option} value={option} sx={{ textTransform: 'capitalize' }}>
-                <Checkbox disableRipple size="small" checked={filters.state.ledger.includes(option)} />
+                <Checkbox
+                  disableRipple
+                  size="small"
+                  checked={filters.state.ledger.includes(option)}
+                />
                 {option.toLowerCase()}
               </MenuItem>
             ))}

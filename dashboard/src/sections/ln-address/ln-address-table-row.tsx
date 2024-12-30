@@ -1,5 +1,7 @@
 import type { LnAddress } from 'src/lib/swissknife';
 
+import { useBoolean, usePopover } from 'minimal-shared/hooks';
+
 import Link from '@mui/material/Link';
 import { LoadingButton } from '@mui/lab';
 import MenuItem from '@mui/material/MenuItem';
@@ -14,8 +16,6 @@ import { Avatar, Divider, MenuList } from '@mui/material';
 import { paths } from 'src/routes/paths';
 import { useRouter } from 'src/routes/hooks';
 
-import { useBoolean } from 'src/hooks/use-boolean';
-
 import { npub } from 'src/utils/nostr';
 import { displayLnAddress } from 'src/utils/lnurl';
 import { fDate, fTime } from 'src/utils/format-time';
@@ -27,7 +27,7 @@ import { Label } from 'src/components/label';
 import { Iconify } from 'src/components/iconify';
 import { CopyMenuItem } from 'src/components/copy';
 import { ConfirmDialog } from 'src/components/custom-dialog';
-import { usePopover, CustomPopover } from 'src/components/custom-popover';
+import { CustomPopover } from 'src/components/custom-popover';
 
 // ----------------------------------------------------------------------
 
@@ -40,7 +40,8 @@ type Props = {
 
 export function LnAddressTableRow({ row, selected, onSelectRow, onDeleteRow }: Props) {
   const { t } = useTranslate();
-  const { id, wallet_id, username, created_at, updated_at, active, nostr_pubkey, allows_nostr } = row;
+  const { id, wallet_id, username, created_at, updated_at, active, nostr_pubkey, allows_nostr } =
+    row;
 
   const router = useRouter();
   const popover = usePopover();
@@ -67,7 +68,12 @@ export function LnAddressTableRow({ row, selected, onSelectRow, onDeleteRow }: P
               </Typography>
             }
             secondary={
-              <Link noWrap variant="body2" href={paths.admin.lnAddress(id)} sx={{ color: 'text.disabled', cursor: 'pointer' }}>
+              <Link
+                noWrap
+                variant="body2"
+                href={paths.admin.lnAddress(id)}
+                sx={{ color: 'text.disabled', cursor: 'pointer' }}
+              >
                 {truncateText(id, 15)}
               </Link>
             }

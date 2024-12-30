@@ -27,7 +27,7 @@ export function NostrDetailsView() {
   const errors = [lnAddressError];
   const isLoading = [lnAddressLoading];
 
-  const failed = shouldFail(errors, [], isLoading);
+  const failed = shouldFail(errors, [lnAddress], isLoading);
 
   return (
     <DashboardContent>
@@ -51,13 +51,19 @@ export function NostrDetailsView() {
             }}
           />
 
-          {lnAddress ? (
-            <NostrDetails lnAddress={lnAddress} />
+          {lnAddress?.ln_address ? (
+            <NostrDetails lnAddress={lnAddress.ln_address} />
           ) : (
             <Welcome
               description={t('register_ln_address.missing_lightning_address_nostr')}
-              img={<img src="/assets/icons/bitcoin/ic-bitcoin-lightning.svg" alt="Lightning logo" />}
-              action={<RegisterLnAddressForm onSuccess={() => mutate(endpointKeys.userWallet.lnAddress.get)} />}
+              img={
+                <img src="/assets/icons/bitcoin/ic-bitcoin-lightning.svg" alt="Lightning logo" />
+              }
+              action={
+                <RegisterLnAddressForm
+                  onSuccess={() => mutate(endpointKeys.userWallet.lnAddress.get)}
+                />
+              }
             />
           )}
         </>

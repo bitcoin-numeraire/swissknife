@@ -1,169 +1,269 @@
 'use client';
 
 import type { BoxProps } from '@mui/material/Box';
-import type { Easing, RepeatType } from 'framer-motion';
+import type { Theme, SxProps, CSSObject } from '@mui/material/styles';
 
-import { m } from 'framer-motion';
-import { useRef, useState, useEffect } from 'react';
+import { mergeClasses } from 'minimal-shared/utils';
+import { useRef, useState, useEffect, forwardRef } from 'react';
+import {
+  m,
+  useTransform,
+  useMotionValue,
+  useAnimationFrame,
+  useMotionTemplate,
+} from 'framer-motion';
 
 import Box from '@mui/material/Box';
+import { useTheme } from '@mui/material/styles';
 
-import { borderGradient } from 'src/theme/styles';
+import { createClasses } from 'src/theme/create-classes';
 
 // ----------------------------------------------------------------------
 
-/**
- * Source:
- * https://gradientborder.framer.website/
- */
+const animateBorderClasses = {
+  root: createClasses('border__animation__root'),
+  primaryBorder: createClasses('border__animation__primary'),
+  secondaryBorder: createClasses('border__animation__secondary'),
+  svgWrapper: createClasses('border__animation__svg__wrapper'),
+  movingShape: createClasses('border__animation__moving__shape'),
+};
 
-export type AnimateBorderProps = BoxProps & {
-  animate?: {
-    outline?: string;
-    color?: string | string[];
-    width?: string; // width `2px` | `2px 4px 0 0` (as padding)
-    angle?: number; // angle: min: 0, max: 360, step: 1
-    loop?: boolean;
-    length?: number; // length: min: 1, max: 100, step: 1
-    distance?: number; // distance: min: 1, max: 100, step: 1
-    ease?: Easing;
-    delay?: number;
-    duration?: number; // duration: min: 1, max: 20, step: 1
-    repeatType?: RepeatType; // repeatType: ["loop", "reverse", "mirror"
-    disable?: boolean; // disable animate
-    disableDoubleline?: boolean; // show 1 line
+type BorderStyleProps = {
+  width?: string;
+  size?: number;
+  sx?: SxProps<Theme>;
+};
+
+type AnimateBorderProps = BoxProps & {
+  duration?: number;
+  slotProps?: {
+    primaryBorder?: BorderStyleProps;
+    secondaryBorder?: BorderStyleProps;
+    outlineColor?: string | ((theme: Theme) => string);
+    svgSettings?: {
+      rx?: string;
+      ry?: string;
+    };
   };
 };
 
-export function AnimateBorder({ animate, sx }: AnimateBorderProps) {
+export function AnimateBorder({
+  sx,
+  children,
+  duration,
+  slotProps,
+  className,
+  ...other
+}: AnimateBorderProps) {
+  const theme = useTheme();
+
   const rootRef = useRef<HTMLDivElement | null>(null);
 
-  const animateRef = useRef<HTMLDivElement | null>(null);
+  const primaryBorderRef = useRef<HTMLSpanElement | null>(null);
 
-  const [aspectRatio, setAspectRatio] = useState(1);
+  const [isHidden, setIsHidden] = useState(false);
 
-  const [animateStyle, setAnimateStyle] = useState<React.CSSProperties | null>(null);
-
-  const values = {
-    disable: animate?.disable,
-    delay: animate?.delay ?? 0,
-    loop: animate?.loop ?? true,
-    angle: animate?.angle ?? 315,
-    length: animate?.length ?? 40,
-    width: animate?.width ?? '2px',
-    color: animate?.color ?? '#000',
-    ease: animate?.ease ?? 'linear',
-    duration: animate?.duration ?? 8,
-    distance: animate?.distance ?? 20,
-    repeatType: animate?.repeatType ?? 'loop',
-    disableDoubleline: animate?.disableDoubleline,
-    outline: animate?.outline ?? `135deg, rgba(0,0,0,0.08), rgba(0,0,0,0.08)`,
-  };
+  const secondaryBorderStyles = useComputedElementStyles(theme, primaryBorderRef);
 
   useEffect(() => {
-    if (!values.disable) {
+    const handleVisibility = () => {
       if (rootRef.current) {
-        const { width, height } = rootRef.current.getBoundingClientRect();
-
-        setAspectRatio(width / height);
+        const displayStyle = getComputedStyle(rootRef.current).display;
+        setIsHidden(displayStyle === 'none');
       }
+    };
 
-      if (!values.disableDoubleline && animateRef.current) {
-        const style = getComputedStyle(animateRef.current);
+    handleVisibility();
 
-        setAnimateStyle({
-          paddingLeft: style.paddingLeft,
-          paddingRight: style.paddingRight,
-          paddingBottom: style.paddingBottom,
-          paddingTop: style.paddingTop,
-          borderTopLeftRadius: style.borderTopLeftRadius,
-          borderTopRightRadius: style.borderTopRightRadius,
-          borderBottomLeftRadius: style.borderBottomLeftRadius,
-          borderBottomRightRadius: style.borderBottomRightRadius,
-        });
-      }
-    }
-  }, [values.disable, values.disableDoubleline]);
+    window.addEventListener('resize', handleVisibility);
 
-  const background = (color: string) => {
-    const degs = [-55, 35, 125, 215, 305];
+    return () => {
+      window.removeEventListener('resize', handleVisibility);
+    };
+  }, []);
 
-    const end = `transparent ${values.angle - (2 + values.length!)}deg, ${color}  ${values.angle}deg, transparent ${values.angle + values.length}deg`;
+  const outlineColor =
+    typeof slotProps?.outlineColor === 'function'
+      ? slotProps?.outlineColor(theme)
+      : slotProps?.outlineColor;
 
-    return [
-      `conic-gradient(from ${degs[0]}deg at ${values.distance! / aspectRatio}% ${values.distance}% , ${end})`,
-      `conic-gradient(from ${degs[1]}deg at ${100 - values.distance! / aspectRatio}% ${values.distance}% , ${end})`,
-      `conic-gradient(from ${degs[2]}deg at ${100 - values.distance / aspectRatio}% ${100 - values.distance}% , ${end})`,
-      `conic-gradient(from ${degs[3]}deg at ${values.distance / aspectRatio}% ${100 - values.distance}% , ${end})`,
-      `conic-gradient(from ${degs[4]}deg at ${values.distance / aspectRatio}% ${values.distance}% , ${end})`,
-    ];
+  const borderProps = {
+    duration,
+    isHidden,
+    rx: slotProps?.svgSettings?.rx,
+    ry: slotProps?.svgSettings?.ry,
   };
 
-  const transition = {
-    ease: values.ease,
-    delay: values.delay,
-    duration: values.duration,
-    repeatType: values.repeatType,
-    repeat: values.loop ? Infinity : 1,
-    times:
-      aspectRatio > 1
-        ? [0, 0.25 + 0.25 / aspectRatio, 0.5, 0.75 + 0.25 / aspectRatio, 1]
-        : [0, aspectRatio * 0.25, 0.5, 0.5 + aspectRatio * 0.25, 1],
-  };
+  const renderPrimaryBorder = () => (
+    <MovingBorder
+      {...borderProps}
+      ref={primaryBorderRef}
+      size={slotProps?.primaryBorder?.size}
+      sx={[
+        {
+          ...theme.mixins.borderGradient({ padding: slotProps?.primaryBorder?.width }),
+        },
+        ...(Array.isArray(slotProps?.primaryBorder?.sx)
+          ? (slotProps?.primaryBorder?.sx ?? [])
+          : [slotProps?.primaryBorder?.sx]),
+      ]}
+    />
+  );
+
+  const renderSecondaryBorder = () =>
+    slotProps?.secondaryBorder && (
+      <MovingBorder
+        {...borderProps}
+        size={slotProps?.secondaryBorder?.size ?? slotProps?.primaryBorder?.size}
+        sx={[
+          {
+            ...theme.mixins.borderGradient({
+              padding: slotProps?.secondaryBorder?.width ?? secondaryBorderStyles.padding,
+            }),
+            borderRadius: secondaryBorderStyles.borderRadius,
+            transform: 'scale(-1, -1)',
+          },
+          ...(Array.isArray(slotProps?.secondaryBorder?.sx)
+            ? (slotProps?.secondaryBorder?.sx ?? [])
+            : [slotProps?.secondaryBorder?.sx]),
+        ]}
+      />
+    );
 
   return (
     <Box
+      dir="ltr"
       ref={rootRef}
-      sx={{
-        minWidth: 40,
-        minHeight: 40,
-        position: 'relative',
-        borderRadius: 'inherit',
-        '&::before': {
-          ...borderGradient({ color: values.outline, padding: values.width }),
+      className={mergeClasses([animateBorderClasses.root, className])}
+      sx={[
+        {
+          minWidth: 40,
+          minHeight: 40,
+          overflow: 'hidden',
+          position: 'relative',
+          width: 'fit-content',
+          '&::before': theme.mixins.borderGradient({
+            color: outlineColor,
+            padding: slotProps?.primaryBorder?.width,
+          }),
+          ...(!!children && {
+            minWidth: 'unset',
+            minHeight: 'unset',
+          }),
         },
-        ...sx,
-      }}
+        ...(Array.isArray(sx) ? sx : [sx]),
+      ]}
+      {...other}
     >
-      <Box
-        ref={animateRef}
-        component={m.span}
-        transition={transition}
-        animate={
-          !values.disable
-            ? {
-                background: background(typeof values.color === 'string' ? values.color : values.color[0]),
-              }
-            : undefined
-        }
-        sx={{
-          ...borderGradient({ padding: values.width }),
-        }}
-      />
-
-      {!values.disable && !values.disableDoubleline && (
-        <Box
-          component={m.span}
-          transition={transition}
-          animate={{
-            background: background(typeof values.color === 'string' ? values.color : values.color[1]),
-          }}
-          sx={{
-            ...borderGradient(),
-            transform: 'scale(-1)',
-            ...(animateStyle && {
-              paddingTop: animateStyle?.paddingBottom,
-              paddingBottom: animateStyle?.paddingTop,
-              paddingLeft: animateStyle?.paddingRight,
-              paddingRight: animateStyle?.paddingLeft,
-              borderTopLeftRadius: animateStyle?.borderBottomRightRadius,
-              borderTopRightRadius: animateStyle?.borderBottomLeftRadius,
-              borderBottomLeftRadius: animateStyle?.borderTopRightRadius,
-              borderBottomRightRadius: animateStyle?.borderTopLeftRadius,
-            }),
-          }}
-        />
-      )}
+      {renderPrimaryBorder()}
+      {renderSecondaryBorder()}
+      {children}
     </Box>
   );
+}
+
+// ----------------------------------------------------------------------
+
+type MovingBorderProps = BoxProps<'span'> & {
+  rx?: string;
+  ry?: string;
+  duration?: number;
+  isHidden?: boolean;
+  size?: BorderStyleProps['size'];
+};
+
+const MovingBorder = forwardRef<HTMLSpanElement, MovingBorderProps>((props, ref) => {
+  const { sx, rx = '30%', ry = '30%', size, duration = 8, isHidden, ...other } = props;
+
+  const svgRectRef = useRef<SVGRectElement | null>(null);
+  const progress = useMotionValue<number>(0);
+
+  const updateAnimationFrame = (time: number) => {
+    if (!svgRectRef.current) return;
+    try {
+      const pathLength = svgRectRef.current.getTotalLength();
+      const pixelsPerMs = pathLength / (duration * 1000);
+      progress.set((time * pixelsPerMs) % pathLength);
+    } catch {
+      return;
+    }
+  };
+
+  const calculateTransform = (val: number) => {
+    if (!svgRectRef.current) return { x: 0, y: 0 };
+    try {
+      const point = svgRectRef.current.getPointAtLength(val);
+      return point ? { x: point.x, y: point.y } : { x: 0, y: 0 };
+    } catch {
+      return { x: 0, y: 0 };
+    }
+  };
+
+  useAnimationFrame((time) => (!isHidden ? updateAnimationFrame(time) : undefined));
+
+  const x = useTransform(progress, (val) => calculateTransform(val).x);
+  const y = useTransform(progress, (val) => calculateTransform(val).y);
+  const transform = useMotionTemplate`translateX(${x}px) translateY(${y}px) translateX(-50%) translateY(-50%)`;
+
+  return (
+    <Box
+      component="span"
+      ref={ref}
+      sx={[{ textAlign: 'initial' }, ...(Array.isArray(sx) ? sx : [sx])]}
+      {...other}
+    >
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        preserveAspectRatio="none"
+        width="100%"
+        height="100%"
+        className={animateBorderClasses.svgWrapper}
+        style={{ position: 'absolute' }}
+      >
+        <rect ref={svgRectRef} fill="none" width="100%" height="100%" rx={rx} ry={ry} />
+      </svg>
+
+      <Box
+        component={m.span}
+        style={{ transform }}
+        className={animateBorderClasses.movingShape}
+        sx={{
+          width: size,
+          height: size,
+          filter: 'blur(8px)',
+          position: 'absolute',
+          background: `radial-gradient(currentColor 40%, transparent 80%)`,
+        }}
+      />
+    </Box>
+  );
+});
+
+// ----------------------------------------------------------------------
+
+function useComputedElementStyles(theme: Theme, ref: React.RefObject<HTMLSpanElement>) {
+  const [computedStyles, setComputedStyles] = useState<CSSObject | null>(null);
+
+  const isRtl = theme.direction === 'rtl';
+
+  useEffect(() => {
+    if (ref.current) {
+      const style = getComputedStyle(ref.current);
+      setComputedStyles({
+        paddingTop: style.paddingBottom,
+        paddingBottom: style.paddingTop,
+        paddingLeft: isRtl ? style.paddingLeft : style.paddingRight,
+        paddingRight: isRtl ? style.paddingRight : style.paddingLeft,
+        borderTopLeftRadius: isRtl ? style.borderBottomLeftRadius : style.borderBottomRightRadius,
+        borderTopRightRadius: isRtl ? style.borderBottomRightRadius : style.borderBottomLeftRadius,
+        borderBottomLeftRadius: isRtl ? style.borderTopLeftRadius : style.borderTopRightRadius,
+        borderBottomRightRadius: isRtl ? style.borderTopRightRadius : style.borderTopLeftRadius,
+      });
+    }
+  }, [ref, isRtl]);
+
+  return {
+    padding: `${computedStyles?.paddingTop} ${computedStyles?.paddingRight} ${computedStyles?.paddingBottom} ${computedStyles?.paddingLeft}`,
+    borderRadius: `${computedStyles?.borderTopLeftRadius} ${computedStyles?.borderTopRightRadius} ${computedStyles?.borderBottomRightRadius} ${computedStyles?.borderBottomLeftRadius}`,
+  };
 }

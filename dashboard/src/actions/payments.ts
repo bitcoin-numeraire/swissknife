@@ -1,5 +1,3 @@
-import type { PaymentResponse, ListPaymentsResponse } from 'src/lib/swissknife';
-
 import useSWR from 'swr';
 import { useMemo } from 'react';
 
@@ -9,14 +7,7 @@ import { endpointKeys } from './keys';
 
 // ----------------------------------------------------------------------
 
-interface IGetPayments {
-  payments?: ListPaymentsResponse;
-  paymentsLoading: boolean;
-  paymentsError?: any;
-  paymentsValidating: boolean;
-}
-
-export function useListPayments(limit?: number, offset?: number): IGetPayments {
+export function useListPayments(limit?: number, offset?: number) {
   const fetcher = async () => {
     const { data, error } = await listPayments({ query: { limit, offset } });
     if (error) {
@@ -39,14 +30,7 @@ export function useListPayments(limit?: number, offset?: number): IGetPayments {
   );
 }
 
-interface IGetPayment {
-  payment?: PaymentResponse;
-  paymentLoading: boolean;
-  paymentError?: any;
-  paymentValidating: boolean;
-}
-
-export function useGetPayment(id: string): IGetPayment {
+export function useGetPayment(id: string) {
   const fetcher = async () => {
     const { data, error } = await getPayment({ path: { id } });
     if (error) {

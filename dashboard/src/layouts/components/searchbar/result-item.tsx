@@ -1,61 +1,82 @@
+import type { ListItemButtonProps } from '@mui/material/ListItemButton';
+
+import { varAlpha, isExternalLink } from 'minimal-shared/utils';
+
 import Box from '@mui/material/Box';
 import ListItemText from '@mui/material/ListItemText';
 import ListItemButton from '@mui/material/ListItemButton';
 
-import { useTranslate } from 'src/locales';
-import { varAlpha } from 'src/theme/styles';
+import { RouterLink } from 'src/routes/components';
 
 import { Label } from 'src/components/label';
 
 // ----------------------------------------------------------------------
 
-type Props = {
-  title: {
-    text: string;
-    highlight: boolean;
-  }[];
-  path: {
-    text: string;
-    highlight: boolean;
-  }[];
-  groupLabel: string;
-  onClickItem: () => void;
+type Props = Omit<ListItemButtonProps, 'title'> & {
+  href: string;
+  labels: string[];
+  title: { text: string; highlight: boolean }[];
+  path: { text: string; highlight: boolean }[];
 };
 
-export function ResultItem({ title, path, groupLabel, onClickItem }: Props) {
-  const { t } = useTranslate();
+export function ResultItem({ title, path, labels, href, sx, ...other }: Props) {
+  const linkProps = isExternalLink(href)
+    ? { target: '_blank', rel: 'noopener noreferrer', href, component: 'a' }
+    : { component: RouterLink, href };
 
   return (
     <ListItemButton
-      onClick={onClickItem}
-      sx={{
-        borderWidth: 1,
-        borderStyle: 'dashed',
-        borderColor: 'transparent',
-        borderBottomColor: (theme) => theme.vars.palette.divider,
-        '&:hover': {
-          borderRadius: 1,
-          borderColor: (theme) => theme.vars.palette.primary.main,
-          backgroundColor: (theme) => varAlpha(theme.vars.palette.primary.mainChannel, theme.vars.palette.action.hoverOpacity),
-        },
-      }}
+      {...linkProps}
+      disableRipple
+      sx={[
+        (theme) => ({
+          borderWidth: 1,
+          borderStyle: 'dashed',
+          borderColor: 'transparent',
+          borderBottomColor: theme.vars.palette.divider,
+          '&:hover': {
+            borderRadius: 1,
+            borderColor: theme.vars.palette.primary.main,
+            backgroundColor: varAlpha(
+              theme.vars.palette.primary.mainChannel,
+              theme.vars.palette.action.hoverOpacity
+            ),
+          },
+        }),
+        ...(Array.isArray(sx) ? sx : [sx]),
+      ]}
+      {...other}
     >
       <ListItemText
         primaryTypographyProps={{ typography: 'subtitle2', sx: { textTransform: 'capitalize' } }}
         secondaryTypographyProps={{ typography: 'caption', noWrap: true }}
         primary={title.map((part, index) => (
-          <Box key={index} component="span" sx={{ color: part.highlight ? 'primary.main' : 'text.primary' }}>
-            {t(part.text)}
+          <Box
+            key={index}
+            component="span"
+            sx={{ color: part.highlight ? 'primary.main' : 'text.primary' }}
+          >
+            {part.text}
           </Box>
         ))}
         secondary={path.map((part, index) => (
-          <Box key={index} component="span" sx={{ color: part.highlight ? 'primary.main' : 'text.secondary' }}>
+          <Box
+            key={index}
+            component="span"
+            sx={{ color: part.highlight ? 'primary.main' : 'text.secondary' }}
+          >
             {part.text}
           </Box>
         ))}
       />
 
-      {groupLabel && <Label color="info">{groupLabel}</Label>}
+      <Box sx={{ gap: 0.75, display: 'flex' }}>
+        {[...labels].reverse().map((label, index) => (
+          <Label key={label} color="default">
+            {label}
+          </Label>
+        ))}
+      </Box>
     </ListItemButton>
   );
 }

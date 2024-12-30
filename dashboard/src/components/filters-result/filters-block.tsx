@@ -1,47 +1,49 @@
 import type { Theme, SxProps } from '@mui/material/styles';
 
-import Box from '@mui/material/Box';
+import { styled } from '@mui/material/styles';
 
 // ----------------------------------------------------------------------
 
-export type FilterBlockProps = {
+export type FilterBlockProps = React.ComponentProps<'div'> & {
   label: string;
   isShow: boolean;
   sx?: SxProps<Theme>;
   children: React.ReactNode;
 };
 
-export function FiltersBlock({ label, children, isShow, sx }: FilterBlockProps) {
+export function FiltersBlock({ label, children, isShow, sx, ...other }: FilterBlockProps) {
   if (!isShow) {
     return null;
   }
 
   return (
-    <Box
-      gap={1}
-      display="flex"
-      sx={{
-        p: 1,
-        borderRadius: 1,
-        overflow: 'hidden',
-        border: (theme) => `dashed 1px ${theme.vars.palette.divider}`,
-        ...sx,
-      }}
-    >
-      <Box
-        component="span"
-        sx={{
-          height: 24,
-          lineHeight: '24px',
-          fontSize: (theme) => theme.typography.subtitle2.fontSize,
-          fontWeight: (theme) => theme.typography.subtitle2.fontWeight,
-        }}
-      >
-        {label}
-      </Box>
-      <Box gap={1} display="flex" flexWrap="wrap">
-        {children}
-      </Box>
-    </Box>
+    <BlockRoot sx={sx} {...other}>
+      <BlockLabel>{label}</BlockLabel>
+      <BlockContent>{children}</BlockContent>
+    </BlockRoot>
   );
 }
+
+// ----------------------------------------------------------------------
+
+const BlockRoot = styled('div')(({ theme }) => ({
+  display: 'flex',
+  overflow: 'hidden',
+  gap: theme.spacing(1),
+  padding: theme.spacing(1),
+  borderRadius: theme.shape.borderRadius,
+  border: `dashed 1px ${theme.vars.palette.divider}`,
+}));
+
+const BlockLabel = styled('span')(({ theme }) => ({
+  height: 24,
+  lineHeight: '24px',
+  fontSize: theme.typography.subtitle2.fontSize,
+  fontWeight: theme.typography.subtitle2.fontWeight,
+}));
+
+const BlockContent = styled('div')(({ theme }) => ({
+  display: 'flex',
+  flexWrap: 'wrap',
+  gap: theme.spacing(1),
+}));

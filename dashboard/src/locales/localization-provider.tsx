@@ -1,5 +1,3 @@
-/* eslint-disable perfectionist/sort-imports */
-
 'use client';
 
 import 'dayjs/locale/en';

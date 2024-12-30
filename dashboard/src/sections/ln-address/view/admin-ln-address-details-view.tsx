@@ -35,7 +35,7 @@ export function AdminLnAddressDetailsView({ id }: Props) {
 
   return (
     <DashboardContent>
-      <RoleBasedGuard permissions={[Permission.READ_LN_ADDRESS]} hasContent>
+      <RoleBasedGuard permissions={[Permission['READ:LN_ADDRESS']]} hasContent>
         {failed ? (
           <ErrorView errors={errors} isLoading={isLoading} data={data} />
         ) : (

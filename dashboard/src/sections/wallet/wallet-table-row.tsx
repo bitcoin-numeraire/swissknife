@@ -2,6 +2,7 @@ import type { IFiatPrices } from 'src/types/bitcoin';
 import type { WalletOverview } from 'src/lib/swissknife';
 
 import { useState } from 'react';
+import { useBoolean, usePopover } from 'minimal-shared/hooks';
 
 import { LoadingButton } from '@mui/lab';
 import MenuItem from '@mui/material/MenuItem';
@@ -15,8 +16,6 @@ import { Link, Avatar, Divider, MenuList } from '@mui/material';
 
 import { paths } from 'src/routes/paths';
 
-import { useBoolean } from 'src/hooks/use-boolean';
-
 import { displayLnAddress } from 'src/utils/lnurl';
 import { fDate, fTime } from 'src/utils/format-time';
 import { truncateText } from 'src/utils/format-string';
@@ -27,8 +26,12 @@ import { Iconify } from 'src/components/iconify';
 import { CopyMenuItem } from 'src/components/copy';
 import { SatsWithIcon } from 'src/components/bitcoin';
 import { ConfirmDialog } from 'src/components/custom-dialog';
-import { usePopover, CustomPopover } from 'src/components/custom-popover';
-import { NewInvoiceDialog, NewPaymentDialog, ConfirmPaymentDialog } from 'src/components/transactions';
+import { CustomPopover } from 'src/components/custom-popover';
+import {
+  NewInvoiceDialog,
+  NewPaymentDialog,
+  ConfirmPaymentDialog,
+} from 'src/components/transactions';
 
 // ----------------------------------------------------------------------
 
@@ -41,7 +44,7 @@ type Props = {
 };
 
 export function WalletTableRow({ row, selected, onSelectRow, onDeleteRow, fiatPrices }: Props) {
-  const { id, user_id, ln_address_id, ln_address_username, n_contacts, n_invoices, n_payments, balance, created_at } = row;
+  const { id, user_id, ln_address, n_contacts, n_invoices, n_payments, balance, created_at } = row;
 
   const { t } = useTranslate();
   const popover = usePopover();
@@ -52,8 +55,8 @@ export function WalletTableRow({ row, selected, onSelectRow, onDeleteRow, fiatPr
   const sendTo = useBoolean();
   const [input, setInput] = useState('');
 
-  const handleClickSendTo = (ln_address: string) => {
-    setInput(displayLnAddress(ln_address));
+  const handleClickSendTo = (val: string) => {
+    setInput(displayLnAddress(val));
     sendTo.onTrue();
   };
 
@@ -90,22 +93,22 @@ export function WalletTableRow({ row, selected, onSelectRow, onDeleteRow, fiatPr
         </TableCell>
 
         <TableCell>
-          {ln_address_id ? (
+          {ln_address ? (
             <ListItemText
               disableTypography
               primary={
                 <Typography variant="body2" noWrap>
-                  {ln_address_username}
+                  {ln_address.username}
                 </Typography>
               }
               secondary={
                 <Link
                   noWrap
                   variant="body2"
-                  href={paths.admin.lnAddress(ln_address_id || '')}
+                  href={paths.admin.lnAddress(ln_address.id || '')}
                   sx={{ color: 'text.disabled', cursor: 'pointer' }}
                 >
-                  {truncateText(ln_address_id, 15)}
+                  {truncateText(ln_address.id, 15)}
                 </Link>
               }
             />
@@ -183,10 +186,13 @@ export function WalletTableRow({ row, selected, onSelectRow, onDeleteRow, fiatPr
             {t('wallet_table_row.new_invoice')}
           </MenuItem>
 
-          {ln_address_username && (
+          {ln_address && (
             <>
-              <CopyMenuItem title={t('wallet_table_row.copy_ln_address')} value={displayLnAddress(ln_address_username)} />
-              <MenuItem onClick={() => handleClickSendTo(ln_address_username)}>
+              <CopyMenuItem
+                title={t('wallet_table_row.copy_ln_address')}
+                value={displayLnAddress(ln_address.username)}
+              />
+              <MenuItem onClick={() => handleClickSendTo(ln_address.username)}>
                 <Iconify icon="eva:flash-fill" />
                 {t('wallet_table_row.send_to_ln_address')}
               </MenuItem>
@@ -217,9 +223,20 @@ export function WalletTableRow({ row, selected, onSelectRow, onDeleteRow, fiatPr
         onClose={newPayment.onFalse}
       />
 
-      <NewInvoiceDialog isAdmin walletId={id} fiatPrices={fiatPrices!} open={newInvoice.value} onClose={newInvoice.onFalse} />
+      <NewInvoiceDialog
+        isAdmin
+        walletId={id}
+        fiatPrices={fiatPrices!}
+        open={newInvoice.value}
+        onClose={newInvoice.onFalse}
+      />
 
-      <ConfirmPaymentDialog input={input} open={sendTo.value} onClose={handleCloseSendTo} fiatPrices={fiatPrices} />
+      <ConfirmPaymentDialog
+        input={input}
+        open={sendTo.value}
+        onClose={handleCloseSendTo}
+        fiatPrices={fiatPrices}
+      />
 
       <ConfirmDialog
         open={confirm.value}

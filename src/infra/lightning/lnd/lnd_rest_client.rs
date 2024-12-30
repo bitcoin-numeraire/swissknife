@@ -2,8 +2,7 @@ use std::{path::PathBuf, process, sync::Arc, time::Duration};
 
 use anyhow::anyhow;
 use breez_sdk_core::ReverseSwapInfo;
-use bytes::Bytes;
-use futures_util::{Stream, StreamExt};
+use futures_util::StreamExt;
 use reqwest::{
     header::{HeaderMap, HeaderValue},
     Certificate, Client, Response,
@@ -119,11 +118,14 @@ impl LndRestClient {
         Ok(macaroon_header)
     }
 
-    async fn post_request_stream(
+    async fn post_request_buffered<T>(
         &self,
         endpoint: &str,
         payload: &impl Serialize,
-    ) -> anyhow::Result<impl Stream<Item = Result<Bytes, reqwest::Error>>> {
+    ) -> anyhow::Result<T>
+    where
+        T: DeserializeOwned,
+    {
         let url = format!("https://{}/{}", self.base_url, endpoint);
         let mut request = self.client.post(url);
         request = request.json(payload);
@@ -131,7 +133,17 @@ impl LndRestClient {
         let response = request.send().await?;
         let response = Self::check_response_status(response).await?;
 
-        Ok(response.bytes_stream())
+        // Buffer the stream
+        let mut buffer = Vec::new();
+        let mut stream = response.bytes_stream();
+
+        while let Some(chunk) = stream.next().await {
+            buffer.extend_from_slice(&chunk?);
+        }
+
+        // Deserialize the full response from the buffered data
+        let result = serde_json::from_slice::<T>(&buffer)?;
+        Ok(result)
     }
 
     async fn check_response_status(response: Response) -> anyhow::Result<Response> {
@@ -224,48 +236,27 @@ impl LnClient for LndRestClient {
             no_inflight_updates: true,
         };
 
-        let mut stream = self
-            .post_request_stream("v2/router/send", &payload)
+        let response: StreamPayResponse = self
+            .post_request_buffered("v2/router/send", &payload)
             .await
             .map_err(|e| LightningError::Pay(e.to_string()))?;
 
-        while let Some(item) = stream.next().await {
-            match item {
-                Ok(bytes) => {
-                    let message = serde_json::from_slice::<StreamPayResponse>(&bytes)
-                        .map_err(|e| LightningError::ParseResponse(e.to_string()))?;
-
-                    if let Some(response) = message.result {
-                        match response.status.as_str() {
-                            "SUCCEEDED" => {
-                                return Ok(response.into());
-                            }
-                            "FAILED" => {
-                                return Err(LightningError::Pay(
-                                    response.failure_reason.to_string(),
-                                ));
-                            }
-                            _ => {
-                                // Continue listening to the stream
-                            }
-                        }
-                    } else if let Some(error) = message.error {
-                        return Err(LightningError::Pay(error.message));
-                    } else {
-                        return Err(LightningError::ParseResponse(
-                            "Missing result or error field.".to_string(),
-                        ));
-                    }
-                }
-                Err(e) => {
-                    return Err(LightningError::ParseResponse(e.to_string()));
-                }
+        if let Some(result) = response.result {
+            match result.status.as_str() {
+                "SUCCEEDED" => Ok(result.into()),
+                "FAILED" => Err(LightningError::Pay(result.failure_reason.to_string())),
+                _ => Err(LightningError::UnexpectedStreamPayload(format!(
+                    "Unexpected status {}",
+                    result.status
+                ))),
             }
+        } else if let Some(error) = response.error {
+            Err(LightningError::Pay(error.message))
+        } else {
+            Err(LightningError::UnexpectedStreamPayload(
+                "Missing result or error field.".to_string(),
+            ))
         }
-
-        Err(LightningError::Pay(
-            "Payment did not return a final state.".to_string(),
-        ))
     }
 
     async fn invoice_by_hash(
@@ -278,11 +269,11 @@ impl LnClient for LndRestClient {
 
         match result {
             Ok(response) => Ok(Some(response.into())),
-            Err(e) => {
-                if e.to_string().contains("Not Found") {
+            Err(err) => {
+                if err.to_string().contains("there are no existing invoices") {
                     Ok(None)
                 } else {
-                    Err(LightningError::InvoiceByHash(e.to_string()))
+                    Err(LightningError::InvoiceByHash(err.to_string()))
                 }
             }
         }

@@ -61,7 +61,7 @@ impl InvoiceUseCases for InvoiceService {
             .await?;
         invoice.wallet_id.clone_from(&wallet_id);
 
-        let invoice = self.store.invoice.insert(None, invoice).await?;
+        let invoice = self.store.invoice.insert(invoice).await?;
 
         info!(id = %invoice.id, "Invoice generated successfully");
         Ok(invoice)
@@ -174,7 +174,7 @@ impl InvoiceUseCases for InvoiceService {
                     updated_invoice.payment_time = node_invoice.payment_time;
                     updated_invoice.amount_received_msat = node_invoice.amount_received_msat;
 
-                    self.store.invoice.update(None, updated_invoice).await?;
+                    self.store.invoice.update(updated_invoice).await?;
                     n_synced += 1;
                 }
             }

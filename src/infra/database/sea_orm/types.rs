@@ -11,10 +11,9 @@ use crate::domains::{
 };
 
 use super::models::{
-    api_key::Model as ApiKeyModel, balance::BalanceModel, contact::ContactModel,
-    invoice::Model as InvoiceModel, ln_address::Model as LnAddressModel,
-    payment::Model as PaymentModel, wallet::Model as WalletModel,
-    wallet_overview::WalletOverviewModel,
+    api_key::Model as ApiKeyModel, contact::ContactModel, invoice::Model as InvoiceModel,
+    ln_address::Model as LnAddressModel, payment::Model as PaymentModel,
+    wallet::Model as WalletModel, wallet_overview::WalletOverviewModel,
 };
 
 const ASSERTION_MSG: &str = "should parse successfully by assertion";
@@ -112,16 +111,6 @@ impl From<LnAddressModel> for LnAddress {
     }
 }
 
-impl From<BalanceModel> for Balance {
-    fn from(model: BalanceModel) -> Self {
-        Balance {
-            received_msat: model.received_msat as u64,
-            sent_msat: model.sent_msat as u64,
-            fees_paid_msat: model.fees_paid_msat as u64,
-            available_msat: model.received_msat - (model.sent_msat + model.fees_paid_msat),
-        }
-    }
-}
 impl From<WalletModel> for Wallet {
     fn from(model: WalletModel) -> Self {
         Wallet {
@@ -136,16 +125,19 @@ impl From<WalletModel> for Wallet {
 
 impl From<WalletOverviewModel> for WalletOverview {
     fn from(model: WalletOverviewModel) -> Self {
+        let received_msat = model.received_msat.unwrap_or(0);
+        let sent_msat = model.sent_msat.unwrap_or(0);
+        let fees_paid_msat = model.fees_paid_msat.unwrap_or(0);
+
         WalletOverview {
             id: model.id,
             user_id: model.user_id,
-            ln_address_id: model.ln_address_id,
-            ln_address_username: model.ln_address_username,
+            ln_address: None,
             balance: Balance {
-                received_msat: model.received_msat as u64,
-                sent_msat: model.sent_msat as u64,
-                fees_paid_msat: model.fees_paid_msat as u64,
-                available_msat: model.received_msat - (model.sent_msat + model.fees_paid_msat),
+                received_msat: received_msat as u64,
+                sent_msat: sent_msat as u64,
+                fees_paid_msat: fees_paid_msat as u64,
+                available_msat: received_msat - (sent_msat + fees_paid_msat),
             },
             n_payments: model.n_payments as u32,
             n_invoices: model.n_invoices as u32,

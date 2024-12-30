@@ -11,7 +11,6 @@ export enum TransactionType {
   PAYMENT = 'PAYMENT',
 }
 
-export type ITransactionTableFilterValue = string | string[] | Date | null;
 export type ITransactionTableFilters = {
   name: string;
   ledger: string[];

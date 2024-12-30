@@ -4,6 +4,7 @@ import type { IBreezLSP } from 'src/types/breez-node';
 import Link from 'next/link';
 import { mutate } from 'swr';
 import { useState, useCallback } from 'react';
+import { useBoolean, usePopover } from 'minimal-shared/hooks';
 
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
@@ -18,10 +19,19 @@ import IconButton from '@mui/material/IconButton';
 import CardHeader from '@mui/material/CardHeader';
 import ListItemText from '@mui/material/ListItemText';
 import TableContainer from '@mui/material/TableContainer';
-import { Button, Dialog, Divider, MenuList, Typography, DialogTitle, DialogActions, DialogContent, Link as MuiLink } from '@mui/material';
+import {
+  Button,
+  Dialog,
+  Divider,
+  MenuList,
+  Typography,
+  DialogTitle,
+  DialogActions,
+  DialogContent,
+  Link as MuiLink,
+} from '@mui/material';
 
-import { useBoolean } from 'src/hooks/use-boolean';
-
+import { handleActionError } from 'src/utils/errors';
 import { truncateText } from 'src/utils/format-string';
 
 import { useTranslate } from 'src/locales';
@@ -36,7 +46,7 @@ import { Scrollbar } from 'src/components/scrollbar';
 import { SatsWithIcon } from 'src/components/bitcoin';
 import { TableHeadCustom } from 'src/components/table';
 import { ConfirmDialog } from 'src/components/custom-dialog';
-import { usePopover, CustomPopover } from 'src/components/custom-popover';
+import { CustomPopover } from 'src/components/custom-popover';
 
 // ----------------------------------------------------------------------
 
@@ -56,7 +66,7 @@ export function LSPList({ title, subheader, currentLSP, tableLabels, tableData, 
       <TableContainer sx={{ overflow: 'unset' }}>
         <Scrollbar>
           <Table sx={{ minWidth: 720 }}>
-            <TableHeadCustom headLabel={tableLabels} />
+            <TableHeadCustom headCells={tableLabels} />
 
             <TableBody>
               {tableData.map((row) => (
@@ -97,7 +107,7 @@ function LSPRow({ row, currentLSP }: LSPRowProps) {
 
     const { error } = await connectLsp({ body: { lsp_id: id } });
     if (error) {
-      toast.error(error.reason);
+      handleActionError(error);
       isConnecting.onFalse();
       return;
     }
@@ -114,7 +124,7 @@ function LSPRow({ row, currentLSP }: LSPRowProps) {
     const { error, data } = await closeLspChannels();
 
     if (error) {
-      toast.error(error.reason);
+      handleActionError(error);
       isClosingChannels.onFalse();
       return;
     }
@@ -157,7 +167,13 @@ function LSPRow({ row, currentLSP }: LSPRowProps) {
               </Typography>
             }
             secondary={
-              <MuiLink noWrap variant="body2" href={mempoolHref} target="_blank" sx={{ color: 'text.disabled', cursor: 'pointer' }}>
+              <MuiLink
+                noWrap
+                variant="body2"
+                href={mempoolHref}
+                target="_blank"
+                sx={{ color: 'text.disabled', cursor: 'pointer' }}
+              >
                 {truncateText(pubkey, 15)}
               </MuiLink>
             }
@@ -203,7 +219,12 @@ function LSPRow({ row, currentLSP }: LSPRowProps) {
 
       <CustomPopover open={popover.open} anchorEl={popover.anchorEl} onClose={popover.onClose}>
         <MenuList>
-          <Link href={mempoolHref} passHref target="blank" style={{ textDecoration: 'none', color: 'inherit' }}>
+          <Link
+            href={mempoolHref}
+            passHref
+            target="blank"
+            style={{ textDecoration: 'none', color: 'inherit' }}
+          >
             <MenuItem>
               <Iconify icon="eva:eye-fill" />
               {t('details')}
@@ -255,7 +276,12 @@ function LSPRow({ row, currentLSP }: LSPRowProps) {
         title={t('lsp_list.confirm_connect.title')}
         content={t('lsp_list.confirm_connect.content', { name })}
         action={
-          <LoadingButton variant="contained" color="warning" onClick={handleConnect} loading={isConnecting.value}>
+          <LoadingButton
+            variant="contained"
+            color="warning"
+            onClick={handleConnect}
+            loading={isConnecting.value}
+          >
             {t('lsp_list.confirm_connect.connect_button')}
           </LoadingButton>
         }
@@ -267,7 +293,12 @@ function LSPRow({ row, currentLSP }: LSPRowProps) {
         title={t('lsp_list.confirm_close_channels.title')}
         content={t('lsp_list.confirm_close_channels.content', { name })}
         action={
-          <LoadingButton variant="contained" color="error" onClick={handleCloseChannels} loading={isClosingChannels.value}>
+          <LoadingButton
+            variant="contained"
+            color="error"
+            onClick={handleCloseChannels}
+            loading={isClosingChannels.value}
+          >
             {t('lsp_list.confirm_close_channels.close_button')}
           </LoadingButton>
         }
@@ -281,7 +312,12 @@ function LSPRow({ row, currentLSP }: LSPRowProps) {
           <br />
           {txids.map((txid) => (
             <Typography key={txid} variant="body2">
-              <MuiLink key={txid} fontWeight="bold" href={`https://mempool.space/tx/${txid}`} target="_blank">
+              <MuiLink
+                key={txid}
+                fontWeight="bold"
+                href={`https://mempool.space/tx/${txid}`}
+                target="_blank"
+              >
                 - {txid}
               </MuiLink>
             </Typography>

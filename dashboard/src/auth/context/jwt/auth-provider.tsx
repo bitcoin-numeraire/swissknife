@@ -1,11 +1,10 @@
 'use client';
 
 import { jwtDecode } from 'jwt-decode';
+import { useSetState } from 'minimal-shared/hooks';
 import { useMemo, useEffect, useCallback } from 'react';
 
-import { useSetState } from 'src/hooks/use-set-state';
-
-import { STORAGE_KEY } from './constant';
+import { JWT_STORAGE_KEY } from './constant';
 import { AuthContext } from '../auth-context';
 import { setSession, isValidToken } from './utils';
 
@@ -25,7 +24,7 @@ export function AuthProvider({ children }: Props) {
 
   const checkUserSession = useCallback(async () => {
     try {
-      const accessToken = sessionStorage.getItem(STORAGE_KEY);
+      const accessToken = sessionStorage.getItem(JWT_STORAGE_KEY);
 
       if (accessToken && isValidToken(accessToken)) {
         setSession(accessToken);

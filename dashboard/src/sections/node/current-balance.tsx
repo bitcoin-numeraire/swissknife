@@ -3,15 +3,26 @@ import type { IBreezNodeInfo } from 'src/types/breez-node';
 
 import { mutate } from 'swr';
 import { useState, useCallback } from 'react';
+import { useBoolean, usePopover } from 'minimal-shared/hooks';
 
 import Card from '@mui/material/Card';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
-import { Link, Button, Dialog, MenuList, MenuItem, TextField, IconButton, DialogTitle, DialogActions, DialogContent } from '@mui/material';
-
-import { useBoolean } from 'src/hooks/use-boolean';
+import {
+  Link,
+  Button,
+  Dialog,
+  MenuList,
+  MenuItem,
+  TextField,
+  IconButton,
+  DialogTitle,
+  DialogActions,
+  DialogContent,
+} from '@mui/material';
 
 import { fSats } from 'src/utils/format-number';
+import { handleActionError } from 'src/utils/errors';
 
 import { useTranslate } from 'src/locales';
 import { endpointKeys } from 'src/actions/keys';
@@ -20,7 +31,7 @@ import { sync, backup, redeem } from 'src/lib/swissknife';
 import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
 import { SatsWithIcon } from 'src/components/bitcoin';
-import { usePopover, CustomPopover } from 'src/components/custom-popover';
+import { CustomPopover } from 'src/components/custom-popover';
 
 // ----------------------------------------------------------------------
 
@@ -68,7 +79,7 @@ export function CurrentBalance({ title, nodeInfo, sx, ...other }: Props) {
       mutate(endpointKeys.lightning.node.info);
       popover.onClose();
     } catch (error) {
-      toast.error(error.reason);
+      handleActionError(error);
     } finally {
       isSyncing.onFalse();
     }
@@ -90,7 +101,7 @@ export function CurrentBalance({ title, nodeInfo, sx, ...other }: Props) {
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
     } catch (error) {
-      toast.error(error.reason);
+      handleActionError(error);
     } finally {
       isBackingUp.onFalse();
     }
@@ -106,7 +117,7 @@ export function CurrentBalance({ title, nodeInfo, sx, ...other }: Props) {
         setRedeemTxid(data!.txid);
         mutate(endpointKeys.lightning.node.info);
       } catch (error) {
-        toast.error(error.reason);
+        handleActionError(error);
       } finally {
         isRedeeming.onFalse();
       }
@@ -183,7 +194,9 @@ export function CurrentBalance({ title, nodeInfo, sx, ...other }: Props) {
         {redeemTxid === '' ? (
           <DialogContent>
             <Typography sx={{ mb: 3 }}>
-              {t('node_current_balance.redeem_dialog.description', { amount: fSats(onchain_balance_msat / 1000) })}
+              {t('node_current_balance.redeem_dialog.description', {
+                amount: fSats(onchain_balance_msat / 1000),
+              })}
             </Typography>
 
             <TextField
@@ -211,7 +224,11 @@ export function CurrentBalance({ title, nodeInfo, sx, ...other }: Props) {
             {t('node_current_balance.redeem_dialog.transaction_id')}
             <br />
             <Typography variant="body2">
-              <Link fontWeight="bold" href={`https://mempool.space/tx/${redeemTxid}`} target="_blank">
+              <Link
+                fontWeight="bold"
+                href={`https://mempool.space/tx/${redeemTxid}`}
+                target="_blank"
+              >
                 - {redeemTxid}
               </Link>
             </Typography>
@@ -224,7 +241,11 @@ export function CurrentBalance({ title, nodeInfo, sx, ...other }: Props) {
               <Button onClick={confirmRedeem.onFalse} variant="outlined" color="inherit">
                 {t('cancel')}
               </Button>
-              <Button onClick={handleRedeem} variant="contained" disabled={!toAddress || !feeRate || isRedeeming.value}>
+              <Button
+                onClick={handleRedeem}
+                variant="contained"
+                disabled={!toAddress || !feeRate || isRedeeming.value}
+              >
                 {t('node_current_balance.redeem_dialog.redeem_button')}
               </Button>
             </>

@@ -1,75 +1,96 @@
-import Box from '@mui/material/Box';
-import Link from '@mui/material/Link';
-import Stack from '@mui/material/Stack';
-import Typography from '@mui/material/Typography';
+import type { Theme, SxProps } from '@mui/material/styles';
+import type { BreadcrumbsProps } from '@mui/material/Breadcrumbs';
+
 import Breadcrumbs from '@mui/material/Breadcrumbs';
 
+import { BackLink } from './back-link';
+import { MoreLinks } from './more-links';
 import { BreadcrumbsLink } from './breadcrumb-link';
+import {
+  BreadcrumbsRoot,
+  BreadcrumbsHeading,
+  BreadcrumbsContent,
+  BreadcrumbsContainer,
+  BreadcrumbsSeparator,
+} from './styles';
 
-import type { CustomBreadcrumbsProps } from './types';
-
-// ----------------------------------------------------------------------
-
-export function CustomBreadcrumbs({ links, action, heading, moreLink, icon, activeLast, slotProps, sx, ...other }: CustomBreadcrumbsProps) {
-  const lastLink = links[links.length - 1].name;
-
-  const renderHeading = (
-    <Typography variant="h4" sx={{ mb: 2, ...slotProps?.heading }}>
-      {heading} {icon}
-    </Typography>
-  );
-
-  const renderLinks = (
-    <Breadcrumbs separator={<Separator />} sx={slotProps?.breadcrumbs} {...other}>
-      {links.map((link, index) => (
-        <BreadcrumbsLink key={link.name ?? index} link={link} activeLast={activeLast} disabled={link.name === lastLink} />
-      ))}
-    </Breadcrumbs>
-  );
-
-  const renderAction = <Box sx={{ flexShrink: 0, ...slotProps?.action }}> {action} </Box>;
-
-  const renderMoreLink = (
-    <Box component="ul">
-      {moreLink?.map((href) => (
-        <Box key={href} component="li" sx={{ display: 'flex' }}>
-          <Link href={href} variant="body2" target="_blank" rel="noopener" sx={slotProps?.moreLink}>
-            {href}
-          </Link>
-        </Box>
-      ))}
-    </Box>
-  );
-
-  return (
-    <Stack spacing={2} sx={sx}>
-      <Stack direction="row" alignItems="center">
-        <Box sx={{ flexGrow: 1 }}>
-          {heading && renderHeading}
-
-          {!!links.length && renderLinks}
-        </Box>
-
-        {action && renderAction}
-      </Stack>
-
-      {!!moreLink && renderMoreLink}
-    </Stack>
-  );
-}
+import type { MoreLinksProps } from './more-links';
+import type { BreadcrumbsLinkProps } from './breadcrumb-link';
 
 // ----------------------------------------------------------------------
 
-function Separator() {
+export type CustomBreadcrumbsSlotProps = {
+  breadcrumbs: BreadcrumbsProps;
+  moreLinks: Omit<MoreLinksProps, 'links'>;
+  heading: React.ComponentProps<typeof BreadcrumbsHeading>;
+  content: React.ComponentProps<typeof BreadcrumbsContent>;
+  container: React.ComponentProps<typeof BreadcrumbsContainer>;
+};
+
+export type CustomBreadcrumbsSlots = {
+  breadcrumbs?: React.ReactNode;
+};
+
+export type CustomBreadcrumbsProps = React.ComponentProps<'div'> & {
+  sx?: SxProps<Theme>;
+  heading?: string;
+  activeLast?: boolean;
+  backHref?: string;
+  action?: React.ReactNode;
+  links?: BreadcrumbsLinkProps[];
+  moreLinks?: MoreLinksProps['links'];
+  slots?: CustomBreadcrumbsSlots;
+  slotProps?: Partial<CustomBreadcrumbsSlotProps>;
+};
+
+export function CustomBreadcrumbs({
+  sx,
+  action,
+  backHref,
+  heading,
+  slots = {},
+  links = [],
+  moreLinks = [],
+  slotProps = {},
+  activeLast = false,
+  ...other
+}: CustomBreadcrumbsProps) {
+  const lastLink = links[links.length - 1]?.name;
+
+  const renderHeading = () => (
+    <BreadcrumbsHeading {...slotProps?.heading}>
+      {backHref ? <BackLink href={backHref} label={heading} /> : heading}
+    </BreadcrumbsHeading>
+  );
+
+  const renderLinks = () =>
+    slots?.breadcrumbs ?? (
+      <Breadcrumbs separator={<BreadcrumbsSeparator />} {...slotProps?.breadcrumbs}>
+        {links.map((link, index) => (
+          <BreadcrumbsLink
+            key={link.name ?? index}
+            icon={link.icon}
+            href={link.href}
+            name={link.name}
+            disabled={link.name === lastLink && !activeLast}
+          />
+        ))}
+      </Breadcrumbs>
+    );
+
+  const renderMoreLinks = () => <MoreLinks links={moreLinks} {...slotProps?.moreLinks} />;
+
   return (
-    <Box
-      component="span"
-      sx={{
-        width: 4,
-        height: 4,
-        borderRadius: '50%',
-        bgcolor: 'text.disabled',
-      }}
-    />
+    <BreadcrumbsRoot sx={sx} {...other}>
+      <BreadcrumbsContainer {...slotProps?.container}>
+        <BreadcrumbsContent {...slotProps?.content}>
+          {(heading || backHref) && renderHeading()}
+          {(!!links.length || slots?.breadcrumbs) && renderLinks()}
+        </BreadcrumbsContent>
+        {action}
+      </BreadcrumbsContainer>
+
+      {!!moreLinks?.length && renderMoreLinks()}
+    </BreadcrumbsRoot>
   );
 }

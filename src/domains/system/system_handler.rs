@@ -4,16 +4,16 @@ use axum::{extract::State, http::StatusCode, response::IntoResponse, routing::ge
 use utoipa::OpenApi;
 
 use crate::{
-    application::errors::ApplicationError,
+    application::{docs::INTERNAL_EXAMPLE, dtos::ErrorResponse, errors::ApplicationError},
     infra::{app::AppState, axum::Json},
 };
 
-use super::{HealthCheck, HealthStatus, VersionInfo};
+use super::{HealthCheck, HealthStatus, SetupInfo, VersionInfo};
 
 #[derive(OpenApi)]
 #[openapi(
-    paths(readiness_check, health_check, version_check),
-    components(schemas(HealthCheck, HealthStatus, VersionInfo)),
+    paths(readiness_check, health_check, version_check, setup_check),
+    components(schemas(HealthCheck, HealthStatus, VersionInfo, SetupInfo)),
     tags(
         (name = "System", description = "System related endpoints")
     )
@@ -26,6 +26,7 @@ pub fn router() -> Router<Arc<AppState>> {
         .route("/health", get(health_check))
         .route("/ready", get(readiness_check))
         .route("/version", get(version_check))
+        .route("/setup", get(setup_check))
 }
 
 /// Readiness Check
@@ -79,11 +80,29 @@ async fn health_check(State(app_state): State<Arc<AppState>>) -> impl IntoRespon
     context_path = CONTEXT_PATH,
     responses(
         (status = 200, description = "OK", body = VersionInfo)
+
     )
 )]
-async fn version_check(
+async fn version_check(State(app_state): State<Arc<AppState>>) -> Json<VersionInfo> {
+    app_state.services.system.version().into()
+}
+
+/// Setup Status Check
+///
+/// Returns whether the application setup is complete.
+#[utoipa::path(
+    get,
+    path = "/setup",
+    tag = "System",
+    context_path = CONTEXT_PATH,
+    responses(
+        (status = 200, description = "OK", body = SetupInfo),
+        (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
+    )
+)]
+async fn setup_check(
     State(app_state): State<Arc<AppState>>,
-) -> Result<Json<VersionInfo>, ApplicationError> {
-    let version = app_state.services.system.version();
-    Ok(version.into())
+) -> Result<Json<SetupInfo>, ApplicationError> {
+    let info = app_state.services.system.setup_check().await?;
+    Ok(info.into())
 }

@@ -1,9 +1,9 @@
-import type { ColorType } from 'src/theme/core';
 import type { Contact } from 'src/lib/swissknife';
 import type { CardProps } from '@mui/material/Card';
 import type { IFiatPrices } from 'src/types/bitcoin';
 
 import { mutate } from 'swr';
+import { useTabs, useBoolean } from 'minimal-shared/hooks';
 
 import Box from '@mui/material/Box';
 import Tab from '@mui/material/Tab';
@@ -11,9 +11,6 @@ import Card from '@mui/material/Card';
 import Button from '@mui/material/Button';
 import Tooltip from '@mui/material/Tooltip';
 import { useTheme } from '@mui/material/styles';
-
-import { useTabs } from 'src/hooks/use-tabs';
-import { useBoolean } from 'src/hooks/use-boolean';
 
 import { fSats, fPercent } from 'src/utils/format-number';
 
@@ -46,7 +43,7 @@ type TabProps = {
   tooltipTitle: string;
   percent: number;
   total: number;
-  color: ColorType;
+  color: string;
   series: ApexAxisChartSeries;
 };
 
@@ -68,14 +65,25 @@ export function BalanceOverview({
   const newInvoice = useBoolean();
   const newPayment = useBoolean();
 
+  const chartColors =
+    tabs.value === 'income' ? [theme.palette.success.main] : [theme.palette.error.main];
+
   const chartOptions = useChart({
-    colors: tabs.value === 'income' ? [theme.palette[income.color].main] : [theme.palette[expenses.color].main],
+    colors: chartColors,
     xaxis: {
       type: 'datetime',
-      labels: { style: { colors: theme.palette.grey[400] }, trim: true, hideOverlappingLabels: true, datetimeUTC: false },
+      labels: {
+        style: { colors: theme.palette.grey[400] },
+        trim: true,
+        hideOverlappingLabels: true,
+        datetimeUTC: false,
+      },
     },
     yaxis: {
-      labels: { style: { colors: theme.palette.grey[400] }, formatter: (value: number) => fSats(value) },
+      labels: {
+        style: { colors: theme.palette.grey[400] },
+        formatter: (value: number) => fSats(value),
+      },
     },
     stroke: { width: 3 },
     tooltip: {
@@ -119,10 +127,20 @@ export function BalanceOverview({
 
   const renderActions = (
     <Box sx={{ gap: 1, display: 'flex' }}>
-      <Button onClick={newPayment.onTrue} variant="soft" size="small" startIcon={<Iconify width={16} icon="eva:arrow-upward-fill" />}>
+      <Button
+        onClick={newPayment.onTrue}
+        variant="soft"
+        size="small"
+        startIcon={<Iconify width={16} icon="eva:arrow-upward-fill" />}
+      >
         {t('send')}
       </Button>
-      <Button onClick={newInvoice.onTrue} variant="soft" size="small" startIcon={<Iconify width={16} icon="eva:arrow-downward-fill" />}>
+      <Button
+        onClick={newInvoice.onTrue}
+        variant="soft"
+        size="small"
+        startIcon={<Iconify width={16} icon="eva:arrow-downward-fill" />}
+      >
         {t('request')}
       </Button>
     </Box>
@@ -168,7 +186,11 @@ export function BalanceOverview({
               >
                 <Iconify
                   width={24}
-                  icon={tab.value === 'expenses' ? 'eva:diagonal-arrow-right-up-fill' : 'eva:diagonal-arrow-left-down-fill'}
+                  icon={
+                    tab.value === 'expenses'
+                      ? 'eva:diagonal-arrow-right-up-fill'
+                      : 'eva:diagonal-arrow-left-down-fill'
+                  }
                 />
               </Box>
 
@@ -198,7 +220,11 @@ export function BalanceOverview({
                 startIcon={
                   <Iconify
                     width={24}
-                    icon={tab.percent < 0 ? 'solar:double-alt-arrow-down-bold-duotone' : 'solar:double-alt-arrow-up-bold-duotone'}
+                    icon={
+                      tab.percent < 0
+                        ? 'solar:double-alt-arrow-down-bold-duotone'
+                        : 'solar:double-alt-arrow-up-bold-duotone'
+                    }
                   />
                 }
                 sx={{ top: 8, right: 8, position: { md: 'absolute' } }}
@@ -229,7 +255,12 @@ export function BalanceOverview({
 
       {renderTabs}
 
-      <Chart type="line" series={tabs.value === 'income' ? income.series : expenses.series} options={chartOptions} height={270} />
+      <Chart
+        type="line"
+        series={tabs.value === 'income' ? income.series : expenses.series}
+        options={chartOptions}
+        sx={{ height: 270 }}
+      />
 
       <NewInvoiceDialog
         fiatPrices={fiatPrices}

@@ -4,10 +4,10 @@ import type { IconButtonProps } from '@mui/material/IconButton';
 
 import { m } from 'framer-motion';
 import { useState, useCallback } from 'react';
+import { useBoolean } from 'minimal-shared/hooks';
 
 import Tab from '@mui/material/Tab';
 import Box from '@mui/material/Box';
-import Stack from '@mui/material/Stack';
 import Badge from '@mui/material/Badge';
 import Drawer from '@mui/material/Drawer';
 import Button from '@mui/material/Button';
@@ -16,13 +16,11 @@ import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import IconButton from '@mui/material/IconButton';
 
-import { useBoolean } from 'src/hooks/use-boolean';
-
 import { Label } from 'src/components/label';
 import { Iconify } from 'src/components/iconify';
-import { varHover } from 'src/components/animate';
 import { Scrollbar } from 'src/components/scrollbar';
 import { CustomTabs } from 'src/components/custom-tabs';
+import { varTap, varHover, transitionTap } from 'src/components/animate';
 
 import { NotificationItem } from './notification-item';
 
@@ -39,11 +37,11 @@ const TABS = [
 // ----------------------------------------------------------------------
 
 export type NotificationsDrawerProps = IconButtonProps & {
-  data?: NotificationItemProps[];
+  data?: NotificationItemProps['notification'][];
 };
 
 export function NotificationsDrawer({ data = [], sx, ...other }: NotificationsDrawerProps) {
-  const drawer = useBoolean();
+  const { value: open, onFalse: onClose, onTrue: onOpen } = useBoolean();
 
   const [currentTab, setCurrentTab] = useState('all');
 
@@ -59,8 +57,17 @@ export function NotificationsDrawer({ data = [], sx, ...other }: NotificationsDr
     setNotifications(notifications.map((notification) => ({ ...notification, isUnRead: false })));
   };
 
-  const renderHead = (
-    <Stack direction="row" alignItems="center" sx={{ py: 2, pl: 2.5, pr: 1, minHeight: 68 }}>
+  const renderHead = () => (
+    <Box
+      sx={{
+        py: 2,
+        pr: 1,
+        pl: 2.5,
+        minHeight: 68,
+        display: 'flex',
+        alignItems: 'center',
+      }}
+    >
       <Typography variant="h6" sx={{ flexGrow: 1 }}>
         Notifications
       </Typography>
@@ -73,17 +80,17 @@ export function NotificationsDrawer({ data = [], sx, ...other }: NotificationsDr
         </Tooltip>
       )}
 
-      <IconButton onClick={drawer.onFalse} sx={{ display: { xs: 'inline-flex', sm: 'none' } }}>
+      <IconButton onClick={onClose} sx={{ display: { xs: 'inline-flex', sm: 'none' } }}>
         <Iconify icon="mingcute:close-line" />
       </IconButton>
 
       <IconButton>
         <Iconify icon="solar:settings-bold-duotone" />
       </IconButton>
-    </Stack>
+    </Box>
   );
 
-  const renderTabs = (
+  const renderTabs = () => (
     <CustomTabs variant="fullWidth" value={currentTab} onChange={handleChangeTab}>
       {TABS.map((tab) => (
         <Tab
@@ -94,7 +101,11 @@ export function NotificationsDrawer({ data = [], sx, ...other }: NotificationsDr
           icon={
             <Label
               variant={((tab.value === 'all' || tab.value === currentTab) && 'filled') || 'soft'}
-              color={(tab.value === 'unread' && 'info') || (tab.value === 'archived' && 'success') || 'default'}
+              color={
+                (tab.value === 'unread' && 'info') ||
+                (tab.value === 'archived' && 'success') ||
+                'default'
+              }
             >
               {tab.count}
             </Label>
@@ -104,7 +115,7 @@ export function NotificationsDrawer({ data = [], sx, ...other }: NotificationsDr
     </CustomTabs>
   );
 
-  const renderList = (
+  const renderList = () => (
     <Scrollbar>
       <Box component="ul">
         {notifications?.map((notification) => (
@@ -120,10 +131,11 @@ export function NotificationsDrawer({ data = [], sx, ...other }: NotificationsDr
     <>
       <IconButton
         component={m.button}
-        whileTap="tap"
-        whileHover="hover"
-        variants={varHover(1.05)}
-        onClick={drawer.onTrue}
+        whileTap={varTap(0.96)}
+        whileHover={varHover(1.04)}
+        transition={transitionTap()}
+        aria-label="Notifications button"
+        onClick={onOpen}
         sx={sx}
         {...other}
       >
@@ -144,17 +156,15 @@ export function NotificationsDrawer({ data = [], sx, ...other }: NotificationsDr
       </IconButton>
 
       <Drawer
-        open={drawer.value}
-        onClose={drawer.onFalse}
+        open={open}
+        onClose={onClose}
         anchor="right"
         slotProps={{ backdrop: { invisible: true } }}
         PaperProps={{ sx: { width: 1, maxWidth: 420 } }}
       >
-        {renderHead}
-
-        {renderTabs}
-
-        {renderList}
+        {renderHead()}
+        {renderTabs()}
+        {renderList()}
 
         <Box sx={{ p: 1 }}>
           <Button fullWidth size="large">

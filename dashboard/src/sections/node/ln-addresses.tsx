@@ -52,7 +52,10 @@ export function LnAddresses({ subheader, list, ...other }: Props) {
               {address.username.charAt(0).toUpperCase()}
             </Avatar>
 
-            <ListItemText primary={address.username} secondary={truncateText(address.wallet_id, 15)} />
+            <ListItemText
+              primary={address.username}
+              secondary={truncateText(address.wallet_id, 15)}
+            />
 
             <Tooltip title={t('details')}>
               <IconButton href={paths.admin.lnAddress(address.id)}>

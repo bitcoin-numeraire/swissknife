@@ -5,6 +5,8 @@ import type { IDetectedBarcode } from '@yudiel/react-qr-scanner';
 
 import { decode } from 'light-bolt11-decoder';
 import { useState, useCallback } from 'react';
+import { varAlpha } from 'minimal-shared/utils';
+import { useBoolean } from 'minimal-shared/hooks';
 import { Scanner } from '@yudiel/react-qr-scanner';
 
 import Box from '@mui/material/Box';
@@ -13,17 +15,13 @@ import Button from '@mui/material/Button';
 import Avatar from '@mui/material/Avatar';
 import Dialog from '@mui/material/Dialog';
 import Tooltip from '@mui/material/Tooltip';
-import { useTheme } from '@mui/material/styles';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import DialogActions from '@mui/material/DialogActions';
 
 import { paths } from 'src/routes/paths';
 
-import { useBoolean } from 'src/hooks/use-boolean';
-
 import { useTranslate } from 'src/locales';
-import { varAlpha, stylesMode } from 'src/theme/styles';
 
 import { Iconify } from 'src/components/iconify';
 import { SatsWithIcon } from 'src/components/bitcoin';
@@ -42,9 +40,15 @@ export type NewPaymentFormProps = {
   walletId?: string;
 };
 
-export function NewPaymentForm({ balance, fiatPrices, isAdmin, walletId, contacts, onSuccess }: NewPaymentFormProps) {
+export function NewPaymentForm({
+  balance,
+  fiatPrices,
+  isAdmin,
+  walletId,
+  contacts,
+  onSuccess,
+}: NewPaymentFormProps) {
   const { t } = useTranslate();
-  const theme = useTheme();
   const [input, setInput] = useState('');
   const [bolt11, setBolt11] = useState(undefined);
   const confirm = useBoolean();
@@ -67,7 +71,7 @@ export function NewPaymentForm({ balance, fiatPrices, isAdmin, walletId, contact
       try {
         const decodedBolt11 = decode(input);
         setBolt11(decodedBolt11);
-      } catch (_) {
+      } catch {
         setBolt11(undefined);
       }
       confirm.onTrue();
@@ -115,26 +119,15 @@ export function NewPaymentForm({ balance, fiatPrices, isAdmin, walletId, contact
             <CarouselArrowFloatButtons
               {...carousel.arrows}
               options={carousel.options}
-              slotProps={{
-                prevBtn: {
-                  svgSize: 14,
-                  sx: {
-                    p: 0.5,
-                    borderRadius: '50%',
-                    bgcolor: varAlpha(theme.vars.palette.text.primaryChannel, 0.48),
-                    '&:hover': { bgcolor: theme.vars.palette.text.primary },
-                  },
-                },
-                nextBtn: {
-                  svgSize: 14,
-                  sx: {
-                    p: 0.5,
-                    borderRadius: '50%',
-                    bgcolor: varAlpha(theme.vars.palette.text.primaryChannel, 0.48),
-                    '&:hover': { bgcolor: theme.vars.palette.text.primary },
-                  },
-                },
-              }}
+              slotProps={{ prevBtn: { svgSize: 14 }, nextBtn: { svgSize: 14 } }}
+              sx={[
+                (theme) => ({
+                  p: 0.5,
+                  borderRadius: '50%',
+                  bgcolor: varAlpha(theme.vars.palette.text.primaryChannel, 0.48),
+                  '&:hover': { bgcolor: theme.vars.palette.text.primary },
+                }),
+              ]}
             />
 
             <Carousel carousel={carousel} sx={{ py: 5 }}>
@@ -143,20 +136,22 @@ export function NewPaymentForm({ balance, fiatPrices, isAdmin, walletId, contact
                   <Avatar
                     alt={contact.ln_address}
                     onClick={() => handlerClickDot(index)}
-                    sx={{
-                      mx: 'auto',
-                      opacity: 0.48,
-                      cursor: 'pointer',
-                      transition: theme.transitions.create('all'),
-                      ...(index === carousel.dots.selectedIndex && {
-                        opacity: 1,
-                        transform: 'scale(1.25)',
-                        boxShadow: `-4px 12px 24px 0 ${varAlpha(theme.vars.palette.common.blackChannel, 0.12)}`,
-                        [stylesMode.dark]: {
-                          boxShadow: `-4px 12px 24px 0 ${varAlpha(theme.vars.palette.common.blackChannel, 0.24)}`,
-                        },
+                    sx={[
+                      (theme) => ({
+                        mx: 'auto',
+                        opacity: 0.48,
+                        cursor: 'pointer',
+                        transition: theme.transitions.create(['all']),
+                        ...(index === carousel.dots.selectedIndex && {
+                          opacity: 1,
+                          transform: 'scale(1.25)',
+                          boxShadow: `-4px 12px 24px 0 ${varAlpha(theme.vars.palette.common.blackChannel, 0.12)}`,
+                          ...theme.applyStyles('dark', {
+                            boxShadow: `-4px 12px 24px 0 ${varAlpha(theme.vars.palette.common.blackChannel, 0.24)}`,
+                          }),
+                        }),
                       }),
-                    }}
+                    ]}
                   >
                     {contact.ln_address?.charAt(0).toUpperCase()}
                   </Avatar>
@@ -190,12 +185,27 @@ export function NewPaymentForm({ balance, fiatPrices, isAdmin, walletId, contact
         )}
 
         <Stack direction="row" spacing={2}>
-          <Button size="large" color="inherit" variant="contained" disabled={input.length < 5} onClick={handleConfirm} sx={{ flex: 1 }}>
-            {t('new_payment.transfer')} <Iconify width={16} icon="eva:flash-fill" sx={{ color: '#FF9900', ml: 0.5 }} />
+          <Button
+            size="large"
+            color="inherit"
+            variant="contained"
+            disabled={input.length < 5}
+            onClick={handleConfirm}
+            sx={{ flex: 1 }}
+          >
+            {t('new_payment.transfer')}
+            <Iconify width={16} icon="eva:flash-fill" sx={{ color: '#FF9900', ml: 0.5 }} />
           </Button>
 
-          <Button size="large" color="inherit" variant="contained" onClick={scanQR.onTrue} sx={{ flex: 1 }}>
-            {t('new_payment.scan_qr')} <Iconify width={16} icon="solar:qr-code-bold" sx={{ ml: 0.5 }} />
+          <Button
+            size="large"
+            color="inherit"
+            variant="contained"
+            onClick={scanQR.onTrue}
+            sx={{ flex: 1 }}
+          >
+            {t('new_payment.scan_qr')}{' '}
+            <Iconify width={16} icon="solar:qr-code-bold" sx={{ ml: 0.5 }} />
           </Button>
         </Stack>
       </Stack>

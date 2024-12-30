@@ -3,12 +3,11 @@
 import type { TFunction } from 'i18next';
 
 import { mutate } from 'swr';
+import { useBoolean } from 'minimal-shared/hooks';
 
 import { Stack, Button, useTheme } from '@mui/material';
 
 import { paths } from 'src/routes/paths';
-
-import { useBoolean } from 'src/hooks/use-boolean';
 
 import { shouldFail } from 'src/utils/errors';
 
@@ -59,7 +58,7 @@ export function AdminPaymentListView() {
 
   return (
     <DashboardContent>
-      <RoleBasedGuard permissions={[Permission.READ_TRANSACTION]} hasContent>
+      <RoleBasedGuard permissions={[Permission['READ:TRANSACTION']]} hasContent>
         {failed ? (
           <ErrorView errors={errors} isLoading={isLoading} data={data} />
         ) : (
@@ -76,7 +75,11 @@ export function AdminPaymentListView() {
               ]}
               action={
                 <Stack direction="row" spacing={1}>
-                  <Button onClick={newPayment.onTrue} variant="contained" startIcon={<Iconify icon="mingcute:add-line" />}>
+                  <Button
+                    onClick={newPayment.onTrue}
+                    variant="contained"
+                    startIcon={<Iconify icon="mingcute:add-line" />}
+                  >
                     {t('new')}
                   </Button>
                 </Stack>

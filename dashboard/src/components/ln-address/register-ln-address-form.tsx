@@ -1,20 +1,23 @@
 import type { RegisterLnAddressRequest } from 'src/lib/swissknife';
 
 import { useForm } from 'react-hook-form';
-import { ajvResolver } from '@hookform/resolvers/ajv';
+import { zodResolver } from '@hookform/resolvers/zod';
 
 import { Stack } from '@mui/material';
 import { LoadingButton } from '@mui/lab';
 import InputAdornment from '@mui/material/InputAdornment';
 
-import { ajvOptions } from 'src/utils/ajv';
+import { handleActionError } from 'src/utils/errors';
 
-import { CONFIG } from 'src/config-global';
+import { CONFIG } from 'src/global-config';
 import { useTranslate } from 'src/locales';
-import { registerAddress, registerWalletAddress, RegisterLnAddressRequestSchema } from 'src/lib/swissknife';
+import { zRegisterLnAddressRequest } from 'src/lib/swissknife/zod.gen';
+import { registerAddress, registerWalletAddress } from 'src/lib/swissknife';
 
 import { toast } from 'src/components/snackbar';
-import { Form, RHFTextField, RHFWalletSelect } from 'src/components/hook-form';
+import { Form, RHFTextField } from 'src/components/hook-form';
+
+import { WalletSelectDropdown } from '../wallet';
 
 // ----------------------------------------------------------------------
 
@@ -23,47 +26,35 @@ type Props = {
   isAdmin?: boolean;
 };
 
-// @ts-ignore
-const resolver = ajvResolver(RegisterLnAddressRequestSchema, ajvOptions);
-
 export function RegisterLnAddressForm({ onSuccess, isAdmin }: Props) {
   const { t } = useTranslate();
 
   const methods = useForm({
-    resolver,
+    resolver: zodResolver(zRegisterLnAddressRequest),
     defaultValues: {
       username: '',
-      wallet: null,
+      wallet_id: null,
     },
   });
 
   const {
     reset,
     handleSubmit,
-    formState: { isSubmitting },
-    watch,
+    formState: { isSubmitting, isValid },
   } = methods;
 
-  const username = watch('username');
-  const wallet = watch('wallet');
-
-  const onSubmit = async (body: any) => {
-    const submissionData: RegisterLnAddressRequest = {
-      ...body,
-      wallet_id: body.wallet?.id,
-    };
-
+  const onSubmit = async (body: RegisterLnAddressRequest) => {
     try {
       if (isAdmin) {
-        await registerAddress({ body: submissionData });
+        await registerAddress({ body });
       } else {
-        await registerWalletAddress({ body: submissionData });
+        await registerWalletAddress({ body });
       }
       toast.success(t('register_ln_address.success_lightning_address_registration'));
       reset();
       onSuccess();
     } catch (error) {
-      toast.error(error.reason);
+      handleActionError(error);
     }
   };
 
@@ -79,11 +70,11 @@ export function RegisterLnAddressForm({ onSuccess, isAdmin }: Props) {
             methods.setValue('username', value, { shouldValidate: true });
           }}
           InputProps={{
-            endAdornment: <InputAdornment position="end">@{CONFIG.site.domain}</InputAdornment>,
+            endAdornment: <InputAdornment position="end">@{CONFIG.domain}</InputAdornment>,
           }}
         />
 
-        {isAdmin && <RHFWalletSelect />}
+        {isAdmin && <WalletSelectDropdown />}
 
         <LoadingButton
           type="submit"
@@ -91,7 +82,7 @@ export function RegisterLnAddressForm({ onSuccess, isAdmin }: Props) {
           color="inherit"
           size="large"
           loading={isSubmitting}
-          disabled={!username || isSubmitting || (isAdmin && !wallet)}
+          disabled={!isValid}
         >
           {t('register')}
         </LoadingButton>

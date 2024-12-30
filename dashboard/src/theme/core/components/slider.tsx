@@ -1,16 +1,19 @@
 import type { Theme, Components } from '@mui/material/styles';
 
-import { sliderClasses } from '@mui/material/Slider';
+import { varAlpha } from 'minimal-shared/utils';
 
-import { varAlpha, stylesMode } from '../../styles';
+import { sliderClasses } from '@mui/material/Slider';
 
 // ----------------------------------------------------------------------
 
-declare module '@mui/material/Slider' {
-  interface SliderPropsColorOverrides {
-    inherit: true;
-  }
-}
+/**
+ * TypeScript (type definition and extension)
+ * @to {@link file://./../../extend-theme-types.d.ts}
+ */
+
+export type SliderExtendColor = {
+  inherit: true;
+};
 
 // ----------------------------------------------------------------------
 
@@ -27,46 +30,41 @@ const MuiSlider: Components<Theme>['MuiSlider'] = {
   defaultProps: { size: 'small' },
 
   /** **************************************
-   * VARIANTS
-   *************************************** */
-  variants: [
-    /**
-     * @color inherit
-     */
-    {
-      props: ({ ownerState }) => ownerState.color === 'inherit',
-      style: ({ theme }) => ({
-        [`& .${sliderClasses.markActive}`]: {
-          [stylesMode.dark]: {
-            backgroundColor: varAlpha(theme.vars.palette.grey['800Channel'], 0.48),
-          },
-        },
-      }),
-    },
-    /**
-     * @state disabled
-     */
-    {
-      props: ({ ownerState }) => !!ownerState.disabled,
-      style: ({ theme }) => ({
-        [`&.${sliderClasses.disabled}`]: {
-          color: varAlpha(theme.vars.palette.grey['500Channel'], theme.vars.palette.action.disabledOpacity),
-        },
-      }),
-    },
-  ],
-
-  /** **************************************
    * STYLE
    *************************************** */
   styleOverrides: {
     root: ({ theme }) => ({
+      variants: [
+        /** @color inherit */
+        {
+          props: ({ ownerState }) => ownerState.color === 'inherit',
+          style: () => ({
+            [`& .${sliderClasses.markActive}`]: {
+              ...theme.applyStyles('dark', {
+                backgroundColor: varAlpha(theme.vars.palette.grey['800Channel'], 0.48),
+              }),
+            },
+          }),
+        },
+        /** @state disabled */
+        {
+          props: ({ ownerState }) => !!ownerState.disabled,
+          style: () => ({
+            [`&.${sliderClasses.disabled}`]: {
+              color: varAlpha(
+                theme.vars.palette.grey['500Channel'],
+                theme.vars.palette.action.disabledOpacity
+              ),
+            },
+          }),
+        },
+      ],
       [`& .${sliderClasses.thumb}`]: {
         borderWidth: 1,
         borderStyle: 'solid',
         width: SIZE.thumb.medium,
         height: SIZE.thumb.medium,
-        boxShadow: theme.customShadows.z1,
+        boxShadow: theme.vars.customShadows.z1,
         color: theme.vars.palette.common.white,
         borderColor: varAlpha(theme.vars.palette.grey['500Channel'], 0.08),
         '&::before': {
@@ -74,8 +72,10 @@ const MuiSlider: Components<Theme>['MuiSlider'] = {
           boxShadow: 'none',
           width: 'calc(100% - 4px)',
           height: 'calc(100% - 4px)',
-          backgroundImage: `linear-gradient(180deg, ${theme.vars.palette.grey[500]} 0%, ${varAlpha(theme.vars.palette.grey['500Channel'], 0)} 100%)`,
-          [stylesMode.dark]: { opacity: 0.8 },
+          backgroundImage: `linear-gradient(180deg, ${theme.vars.palette.grey[500]}, transparent)`,
+          ...theme.applyStyles('dark', {
+            opacity: 0.8,
+          }),
         },
       },
     }),
@@ -85,11 +85,14 @@ const MuiSlider: Components<Theme>['MuiSlider'] = {
       backgroundColor: theme.vars.palette.grey[500],
     }),
     track: { height: SIZE.rail.medium },
-    mark: ({ theme }) => ({
+    mark: ({ style, theme }) => ({
       width: 1,
       height: SIZE.mark.medium,
       backgroundColor: varAlpha(theme.vars.palette.grey['500Channel'], 0.48),
+      // start mark
       '&[data-index="0"]': { display: 'none' },
+      // end mark
+      ...(style?.left === '100%' && { display: 'none' }),
     }),
     markActive: ({ theme }) => ({
       backgroundColor: varAlpha(theme.vars.palette.common.whiteChannel, 0.64),
@@ -101,7 +104,9 @@ const MuiSlider: Components<Theme>['MuiSlider'] = {
     valueLabel: ({ theme }) => ({
       borderRadius: 8,
       backgroundColor: theme.vars.palette.grey[800],
-      [stylesMode.dark]: { backgroundColor: theme.vars.palette.grey[700] },
+      ...theme.applyStyles('dark', {
+        backgroundColor: theme.vars.palette.grey[700],
+      }),
     }),
     sizeSmall: {
       [`& .${sliderClasses.thumb}`]: { width: SIZE.thumb.small, height: SIZE.thumb.small },
@@ -114,6 +119,4 @@ const MuiSlider: Components<Theme>['MuiSlider'] = {
 
 // ----------------------------------------------------------------------
 
-export const slider = {
-  MuiSlider,
-};
+export const slider = { MuiSlider };

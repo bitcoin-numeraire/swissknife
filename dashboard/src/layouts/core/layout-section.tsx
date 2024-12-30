@@ -2,14 +2,17 @@
 
 import type { Theme, SxProps, CSSObject } from '@mui/material/styles';
 
-import Box from '@mui/material/Box';
+import { mergeClasses } from 'minimal-shared/utils';
+
+import { styled } from '@mui/material/styles';
 import GlobalStyles from '@mui/material/GlobalStyles';
 
-import { layoutClasses } from '../classes';
+import { layoutClasses } from './classes';
+import { layoutSectionVars } from './css-vars';
 
 // ----------------------------------------------------------------------
 
-export type LayoutSectionProps = {
+export type LayoutSectionProps = React.ComponentProps<'div'> & {
   sx?: SxProps<Theme>;
   cssVars?: CSSObject;
   children?: React.ReactNode;
@@ -18,36 +21,38 @@ export type LayoutSectionProps = {
   sidebarSection?: React.ReactNode;
 };
 
-export function LayoutSection({ sx, cssVars, children, footerSection, headerSection, sidebarSection }: LayoutSectionProps) {
+export function LayoutSection({
+  sx,
+  cssVars,
+  children,
+  footerSection,
+  headerSection,
+  sidebarSection,
+  className,
+  ...other
+}: LayoutSectionProps) {
   const inputGlobalStyles = (
-    <GlobalStyles
-      styles={{
-        body: {
-          '--layout-nav-zIndex': 1101,
-          '--layout-nav-mobile-width': '320px',
-          '--layout-header-blur': '8px',
-          '--layout-header-zIndex': 1100,
-          '--layout-header-mobile-height': '64px',
-          '--layout-header-desktop-height': '72px',
-          ...cssVars,
-        },
-      }}
-    />
+    <GlobalStyles styles={(theme) => ({ body: { ...layoutSectionVars(theme), ...cssVars } })} />
   );
 
   return (
     <>
       {inputGlobalStyles}
 
-      <Box id="root__layout" className={layoutClasses.root} sx={sx}>
+      <LayoutRoot
+        id="root__layout"
+        className={mergeClasses([layoutClasses.root, className])}
+        sx={sx}
+        {...other}
+      >
         {sidebarSection ? (
           <>
             {sidebarSection}
-            <Box display="flex" flex="1 1 auto" flexDirection="column" className={layoutClasses.hasSidebar}>
+            <LayoutSidebarContainer className={layoutClasses.sidebarContainer}>
               {headerSection}
               {children}
               {footerSection}
-            </Box>
+            </LayoutSidebarContainer>
           </>
         ) : (
           <>
@@ -56,7 +61,17 @@ export function LayoutSection({ sx, cssVars, children, footerSection, headerSect
             {footerSection}
           </>
         )}
-      </Box>
+      </LayoutRoot>
     </>
   );
 }
+
+// ----------------------------------------------------------------------
+
+const LayoutRoot = styled('div')``;
+
+const LayoutSidebarContainer = styled('div')(() => ({
+  display: 'flex',
+  flex: '1 1 auto',
+  flexDirection: 'column',
+}));

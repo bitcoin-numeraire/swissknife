@@ -46,6 +46,10 @@ export const paths = {
   },
   // EXTERNAL
   external: {
-    numeraire: { home: 'https://numeraire.tech', contact: 'https://numeraire.tech/contact' },
+    numeraire: {
+      home: 'https://numeraire.tech',
+      contact: 'https://numeraire.tech/contact',
+      docs: 'https://docs.numeraire.tech',
+    },
   },
 };

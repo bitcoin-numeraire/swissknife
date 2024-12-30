@@ -1,22 +1,23 @@
-'use client';
-
 import type { IconButtonProps } from '@mui/material/IconButton';
 
 import Badge from '@mui/material/Badge';
 import SvgIcon from '@mui/material/SvgIcon';
 import IconButton from '@mui/material/IconButton';
 
-import { useSettingsContext } from 'src/components/settings/context';
+import { useSettingsContext } from 'src/components/settings';
 
 // ----------------------------------------------------------------------
 
-export type SettingsButtonProps = IconButtonProps;
-
-export function SettingsButton({ sx, ...other }: SettingsButtonProps) {
+export function SettingsButton({ sx, ...other }: IconButtonProps) {
   const settings = useSettingsContext();
 
   return (
-    <IconButton aria-label="settings" onClick={settings.onToggleDrawer} sx={{ p: 0, width: 40, height: 40, ...sx }} {...other}>
+    <IconButton
+      aria-label="Settings button"
+      onClick={settings.onToggleDrawer}
+      sx={[{ p: 0, width: 40, height: 40 }, ...(Array.isArray(sx) ? sx : [sx])]}
+      {...other}
+    >
       <Badge color="error" variant="dot" invisible={!settings.canReset}>
         <SvgIcon>
           {/* https://yesicon.app/solar/pallete-2-bold-duotone */}
