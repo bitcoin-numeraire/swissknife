@@ -1,5 +1,6 @@
-import type { Theme, SxProps } from '@mui/material/styles';
+import type { ButtonBaseProps } from '@mui/material/ButtonBase';
 import type { UseEmblaCarouselType } from 'embla-carousel-react';
+import type { Theme, SxProps, Breakpoint } from '@mui/material/styles';
 import type { EmblaOptionsType, EmblaCarouselType } from 'embla-carousel';
 
 // ----------------------------------------------------------------------
@@ -14,23 +15,6 @@ export type UseCarouselDotsReturn = {
   onClickDot: (index: number) => void;
 };
 
-export type CarouselDotButtonsProps = Omit<UseCarouselDotsReturn, 'dotCount'> & {
-  gap?: number;
-  sx?: SxProps<Theme>;
-  fallback?: boolean;
-  fallbackCount?: number;
-  variant?: 'circular' | 'rounded' | 'number';
-  slotProps?: {
-    dot?: {
-      size?: number;
-      sx?: SxProps<Theme>;
-      selected?: SxProps<Theme>;
-    };
-  };
-};
-
-// ----------------------------------------------------------------------
-
 /**
  * Prev & Next Buttons
  */
@@ -41,28 +25,28 @@ export type UseCarouselArrowsReturn = {
   onClickNext: () => void;
 };
 
-export type CarouselArrowButtonProps = {
+export type CarouselArrowButtonProps = ButtonBaseProps & {
   svgSize?: number;
   variant: 'prev' | 'next';
   svgIcon?: React.ReactNode;
   options?: CarouselArrowButtonsProps['options'];
 };
 
-export type CarouselArrowButtonsProps = UseCarouselArrowsReturn & {
-  totalSlides?: number;
-  selectedIndex?: number;
-  options?: Partial<CarouselOptions>;
-  slotProps?: {
-    prevBtn?: Pick<CarouselArrowButtonProps, 'svgIcon' | 'svgSize'> & {
-      sx?: SxProps<Theme>;
-    };
-    nextBtn?: Pick<CarouselArrowButtonProps, 'svgIcon' | 'svgSize'> & {
-      sx?: SxProps<Theme>;
+export type CarouselArrowButtonsProps = React.ComponentProps<'div'> &
+  UseCarouselArrowsReturn & {
+    sx?: SxProps<Theme>;
+    totalSlides?: number;
+    selectedIndex?: number;
+    options?: Partial<CarouselOptions>;
+    slotProps?: {
+      prevBtn?: Pick<CarouselArrowButtonProps, 'svgIcon' | 'svgSize'> & {
+        sx?: SxProps<Theme>;
+      };
+      nextBtn?: Pick<CarouselArrowButtonProps, 'svgIcon' | 'svgSize'> & {
+        sx?: SxProps<Theme>;
+      };
     };
   };
-};
-
-// ----------------------------------------------------------------------
 
 /**
  * Thumbs
@@ -74,23 +58,6 @@ export type UseCarouselThumbsReturn = {
   onClickThumb: (index: number) => void;
 };
 
-export type CarouselThumbProps = {
-  src: string;
-  index: number;
-  selected: boolean;
-};
-
-export type CarouselThumbsProps = {
-  options?: Partial<CarouselOptions>;
-  slotProps?: {
-    slide?: SxProps<Theme>;
-    container?: SxProps<Theme>;
-    disableMask?: boolean;
-  };
-};
-
-// ----------------------------------------------------------------------
-
 /**
  * Progress
  */
@@ -98,29 +65,13 @@ export type UseCarouselProgressReturn = {
   value: number;
 };
 
-export type CarouselProgressBarProps = UseCarouselProgressReturn;
-
-// ----------------------------------------------------------------------
-
-/**
- * Autoplay
- */
-export type UseCarouselAutoPlayReturn = {
-  isPlaying: boolean;
-  onTogglePlay: () => void;
-  onClickAutoplay: (callback: () => void) => void;
-};
-
-// ----------------------------------------------------------------------
-
 /**
  * Slide
  */
-export type CarouselSlideProps = {
+export type CarouselSlideProps = React.ComponentProps<'li'> & {
   options?: Partial<CarouselOptions>;
+  sx?: SxProps<Theme>;
 };
-
-// ----------------------------------------------------------------------
 
 /**
  * Carousel
@@ -128,7 +79,7 @@ export type CarouselSlideProps = {
 export type CarouselBaseOptions = EmblaOptionsType & {
   slideSpacing?: string;
   parallax?: boolean | number;
-  slidesToShow?: string | number | { [key: string]: string | number };
+  slidesToShow?: string | number | Partial<Record<Breakpoint, string | number>>;
 };
 
 export type CarouselOptions = CarouselBaseOptions & {
@@ -145,16 +96,13 @@ export type UseCarouselReturn = {
   mainApi?: EmblaCarouselType;
   thumbs: UseCarouselThumbsReturn;
   dots: UseCarouselDotsReturn;
-  autoplay: UseCarouselAutoPlayReturn;
   progress: UseCarouselProgressReturn;
-  autoScroll: UseCarouselAutoPlayReturn;
   arrows: UseCarouselArrowsReturn;
 };
 
-export type CarouselProps = {
-  carousel: UseCarouselReturn;
-  children: React.ReactNode;
+export type CarouselProps = React.ComponentProps<'div'> & {
   sx?: SxProps<Theme>;
+  carousel: UseCarouselReturn;
   slotProps?: {
     container?: SxProps<Theme>;
     slide?: SxProps<Theme>;

@@ -7,101 +7,106 @@ import ListItemText from '@mui/material/ListItemText';
 import ListItemAvatar from '@mui/material/ListItemAvatar';
 import ListItemButton from '@mui/material/ListItemButton';
 
-import { fFromNow } from 'src/utils/format-time';
+import { fToNow } from 'src/utils/format-time';
 
-import { CONFIG } from 'src/config-global';
+import { CONFIG } from 'src/global-config';
 
 import { Label } from 'src/components/label';
-import { FileThumbnail } from 'src/components/file-thumbnail';
 
 // ----------------------------------------------------------------------
 
 export type NotificationItemProps = {
-  id: string;
-  type: string;
-  title: string;
-  category: string;
-  isUnRead: boolean;
-  avatarUrl: string | null;
-  createdAt: string | number | null;
+  notification: {
+    id: string;
+    type: string;
+    title: string;
+    category: string;
+    isUnRead: boolean;
+    avatarUrl: string | null;
+    createdAt: string | number | null;
+  };
 };
 
-export function NotificationItem({ notification }: { notification: NotificationItemProps }) {
-  const renderAvatar = (
+export function NotificationItem({ notification }: NotificationItemProps) {
+  const renderAvatar = () => (
     <ListItemAvatar>
       {notification.avatarUrl ? (
         <Avatar src={notification.avatarUrl} sx={{ bgcolor: 'background.neutral' }} />
       ) : (
-        <Stack
-          alignItems="center"
-          justifyContent="center"
-          sx={{ width: 40, height: 40, borderRadius: '50%', bgcolor: 'background.neutral' }}
+        <Box
+          sx={{
+            width: 40,
+            height: 40,
+            display: 'flex',
+            borderRadius: '50%',
+            alignItems: 'center',
+            justifyContent: 'center',
+            bgcolor: 'background.neutral',
+          }}
         >
           <Box
             component="img"
-            src={`${CONFIG.site.basePath}/assets/icons/notification/${(notification.type === 'order' && 'ic-order') || (notification.type === 'chat' && 'ic-chat') || (notification.type === 'mail' && 'ic-mail') || (notification.type === 'delivery' && 'ic-delivery')}.svg`}
+            src={`${CONFIG.assetsDir}/assets/icons/notification/${(notification.type === 'order' && 'ic-order') || (notification.type === 'chat' && 'ic-chat') || (notification.type === 'mail' && 'ic-mail') || (notification.type === 'delivery' && 'ic-delivery')}.svg`}
             sx={{ width: 24, height: 24 }}
           />
-        </Stack>
+        </Box>
       )}
     </ListItemAvatar>
   );
 
-  const renderText = (
+  const renderText = () => (
     <ListItemText
       disableTypography
       primary={reader(notification.title)}
       secondary={
         <Stack
-          direction="row"
-          alignItems="center"
-          sx={{ typography: 'caption', color: 'text.disabled' }}
           divider={
             <Box
-              sx={{
-                width: 2,
-                height: 2,
-                bgcolor: 'currentColor',
-                mx: 0.5,
-                borderRadius: '50%',
-              }}
+              sx={{ mx: 0.5, width: 2, height: 2, borderRadius: '50%', bgcolor: 'currentColor' }}
             />
           }
+          sx={{
+            alignItems: 'center',
+            flexDirection: 'row',
+            typography: 'caption',
+            color: 'text.disabled',
+          }}
         >
-          {fFromNow(notification.createdAt)}
+          {fToNow(notification.createdAt)}
           {notification.category}
         </Stack>
       }
     />
   );
 
-  const renderUnReadBadge = notification.isUnRead && (
-    <Box
-      sx={{
-        top: 26,
-        width: 8,
-        height: 8,
-        right: 20,
-        borderRadius: '50%',
-        bgcolor: 'info.main',
-        position: 'absolute',
-      }}
-    />
-  );
+  const renderUnReadBadge = () =>
+    notification.isUnRead && (
+      <Box
+        sx={{
+          top: 26,
+          width: 8,
+          height: 8,
+          right: 20,
+          borderRadius: '50%',
+          bgcolor: 'info.main',
+          position: 'absolute',
+        }}
+      />
+    );
 
-  const friendAction = (
-    <Stack spacing={1} direction="row" sx={{ mt: 1.5 }}>
+  const renderFriendAction = () => (
+    <Box sx={{ gap: 1, mt: 1.5, display: 'flex' }}>
       <Button size="small" variant="contained">
         Accept
       </Button>
       <Button size="small" variant="outlined">
         Decline
       </Button>
-    </Stack>
+    </Box>
   );
 
-  const projectAction = (
-    <Stack alignItems="flex-start">
+  const renderProjectAction = () => (
+    <>
       <Box
         sx={{
           p: 1.5,
@@ -111,30 +116,38 @@ export function NotificationItem({ notification }: { notification: NotificationI
           bgcolor: 'background.neutral',
         }}
       >
-        {reader(`<p><strong>@Jaydon Frankie</strong> feedback by asking questions or just leave a note of appreciation.</p>`)}
+        {reader(
+          `<p><strong>@Jaydon Frankie</strong> feedback by asking questions or just leave a note of appreciation.</p>`
+        )}
       </Box>
 
-      <Button size="small" variant="contained">
+      <Button size="small" variant="contained" sx={{ alignSelf: 'flex-start' }}>
         Reply
       </Button>
-    </Stack>
+    </>
   );
 
-  const fileAction = (
-    <Stack
-      spacing={1}
-      direction="row"
+  const renderFileAction = () => (
+    <Box
       sx={{
         pl: 1,
+        gap: 1,
         p: 1.5,
         mt: 1.5,
+        display: 'flex',
         borderRadius: 1.5,
         bgcolor: 'background.neutral',
       }}
     >
-      <FileThumbnail file="http://localhost:8080/httpsdesign-suriname-2015.mp3" />
-
-      <Stack spacing={1} direction={{ xs: 'column', sm: 'row' }} flexGrow={1} sx={{ minWidth: 0 }}>
+      <Box
+        sx={{
+          gap: 1,
+          flexGrow: 1,
+          minWidth: 0,
+          display: 'flex',
+          flexDirection: { xs: 'column', sm: 'row' },
+        }}
+      >
         <ListItemText
           disableTypography
           primary={
@@ -144,9 +157,6 @@ export function NotificationItem({ notification }: { notification: NotificationI
           }
           secondary={
             <Stack
-              direction="row"
-              alignItems="center"
-              sx={{ typography: 'caption', color: 'text.disabled' }}
               divider={
                 <Box
                   sx={{
@@ -158,6 +168,12 @@ export function NotificationItem({ notification }: { notification: NotificationI
                   }}
                 />
               }
+              sx={{
+                alignItems: 'center',
+                typography: 'caption',
+                color: 'text.disabled',
+                flexDirection: 'row',
+              }}
             >
               <span>2.3 GB</span>
               <span>30 min ago</span>
@@ -168,12 +184,19 @@ export function NotificationItem({ notification }: { notification: NotificationI
         <Button size="small" variant="outlined">
           Download
         </Button>
-      </Stack>
-    </Stack>
+      </Box>
+    </Box>
   );
 
-  const tagsAction = (
-    <Stack direction="row" spacing={0.75} flexWrap="wrap" sx={{ mt: 1.5 }}>
+  const renderTagsAction = () => (
+    <Box
+      sx={{
+        mt: 1.5,
+        gap: 0.75,
+        display: 'flex',
+        flexWrap: 'wrap',
+      }}
+    >
       <Label variant="outlined" color="info">
         Design
       </Label>
@@ -181,41 +204,42 @@ export function NotificationItem({ notification }: { notification: NotificationI
         Dashboard
       </Label>
       <Label variant="outlined">Design system</Label>
-    </Stack>
+    </Box>
   );
 
-  const paymentAction = (
-    <Stack direction="row" spacing={1} sx={{ mt: 1.5 }}>
+  const renderPaymentAction = () => (
+    <Box sx={{ gap: 1, mt: 1.5, display: 'flex' }}>
       <Button size="small" variant="contained">
         Pay
       </Button>
       <Button size="small" variant="outlined">
         Decline
       </Button>
-    </Stack>
+    </Box>
   );
 
   return (
     <ListItemButton
       disableRipple
-      sx={{
-        p: 2.5,
-        alignItems: 'flex-start',
-        borderBottom: (theme) => `dashed 1px ${theme.vars.palette.divider}`,
-      }}
+      sx={[
+        (theme) => ({
+          p: 2.5,
+          alignItems: 'flex-start',
+          borderBottom: `dashed 1px ${theme.vars.palette.divider}`,
+        }),
+      ]}
     >
-      {renderUnReadBadge}
+      {renderUnReadBadge()}
+      {renderAvatar()}
 
-      {renderAvatar}
-
-      <Stack sx={{ flexGrow: 1 }}>
-        {renderText}
-        {notification.type === 'friend' && friendAction}
-        {notification.type === 'project' && projectAction}
-        {notification.type === 'file' && fileAction}
-        {notification.type === 'tags' && tagsAction}
-        {notification.type === 'payment' && paymentAction}
-      </Stack>
+      <Box sx={{ flex: '1 1 auto' }}>
+        {renderText()}
+        {notification.type === 'friend' && renderFriendAction()}
+        {notification.type === 'project' && renderProjectAction()}
+        {notification.type === 'file' && renderFileAction()}
+        {notification.type === 'tags' && renderTagsAction()}
+        {notification.type === 'payment' && renderPaymentAction()}
+      </Box>
     </ListItemButton>
   );
 }
@@ -226,12 +250,14 @@ function reader(data: string) {
   return (
     <Box
       dangerouslySetInnerHTML={{ __html: data }}
-      sx={{
-        mb: 0.5,
-        '& p': { typography: 'body2', m: 0 },
-        '& a': { color: 'inherit', textDecoration: 'none' },
-        '& strong': { typography: 'subtitle2' },
-      }}
+      sx={[
+        () => ({
+          mb: 0.5,
+          '& p': { typography: 'body2', m: 0 },
+          '& a': { color: 'inherit', textDecoration: 'none' },
+          '& strong': { typography: 'subtitle2' },
+        }),
+      ]}
     />
   );
 }

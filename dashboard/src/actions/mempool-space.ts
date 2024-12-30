@@ -3,24 +3,20 @@ import type { IFiatPrices } from 'src/types/bitcoin';
 import useSWR from 'swr';
 import { useMemo } from 'react';
 
-import { CONFIG } from 'src/config-global';
+import { CONFIG } from 'src/global-config';
 
 import { endpointKeys } from './keys';
 
-interface IGetFiatPrices {
-  fiatPrices?: IFiatPrices;
-  fiatPricesLoading: boolean;
-  fiatPricesError: any;
-  fiatPricesValidating: boolean;
-}
-
-export function useFetchFiatPrices(): IGetFiatPrices {
+export function useFetchFiatPrices() {
   const fetcher = async (): Promise<IFiatPrices> => {
-    const data = await fetch(`${CONFIG.site.mempoolSpace}/prices`);
+    const data = await fetch(`${CONFIG.mempoolSpace}/prices`);
     return data.json();
   };
 
-  const { data, isLoading, error, isValidating } = useSWR(endpointKeys.mempoolSpace.prices, fetcher);
+  const { data, isLoading, error, isValidating } = useSWR(
+    endpointKeys.mempoolSpace.prices,
+    fetcher
+  );
 
   return useMemo(
     () => ({

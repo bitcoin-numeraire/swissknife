@@ -1,15 +1,16 @@
 import type { RegisterWalletRequest } from 'src/lib/swissknife';
 
 import { useForm } from 'react-hook-form';
-import { ajvResolver } from '@hookform/resolvers/ajv';
+import { zodResolver } from '@hookform/resolvers/zod';
 
 import { Stack } from '@mui/material';
 import { LoadingButton } from '@mui/lab';
 
-import { ajvOptions } from 'src/utils/ajv';
+import { handleActionError } from 'src/utils/errors';
 
 import { useTranslate } from 'src/locales';
-import { registerWallet, RegisterWalletRequestSchema } from 'src/lib/swissknife';
+import { registerWallet } from 'src/lib/swissknife';
+import { zRegisterWalletRequest } from 'src/lib/swissknife/zod.gen';
 
 import { toast } from 'src/components/snackbar';
 import { Form, RHFTextField } from 'src/components/hook-form';
@@ -20,14 +21,11 @@ export type NewWalletFormProps = {
   onSuccess: VoidFunction;
 };
 
-// @ts-ignore
-const resolver = ajvResolver(RegisterWalletRequestSchema, ajvOptions);
-
 export function RegisterWalletForm({ onSuccess }: NewWalletFormProps) {
   const { t } = useTranslate();
 
   const methods = useForm({
-    resolver,
+    resolver: zodResolver(zRegisterWalletRequest),
     defaultValues: {
       user_id: '',
     },
@@ -49,7 +47,7 @@ export function RegisterWalletForm({ onSuccess }: NewWalletFormProps) {
       reset();
       onSuccess();
     } catch (error) {
-      toast.error(error.reason);
+      handleActionError(error);
     }
   };
 

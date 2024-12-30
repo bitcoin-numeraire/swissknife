@@ -1,17 +1,22 @@
 import { mutate } from 'swr';
 import { useForm } from 'react-hook-form';
-import { ajvResolver } from '@hookform/resolvers/ajv';
+import { zodResolver } from '@hookform/resolvers/zod';
 
 import LoadingButton from '@mui/lab/LoadingButton';
 import { Card, Alert, Stack } from '@mui/material';
 
 import { npub } from 'src/utils/nostr';
-import { ajvOptions } from 'src/utils/ajv';
 import { displayLnAddress } from 'src/utils/lnurl';
+import { handleActionError } from 'src/utils/errors';
 
 import { useTranslate } from 'src/locales';
 import { endpointKeys } from 'src/actions/keys';
-import { type LnAddress, updateWalletAddress, type UpdateLnAddressRequest, UpdateLnAddressRequestSchema } from 'src/lib/swissknife';
+import { zUpdateLnAddressRequest } from 'src/lib/swissknife/zod.gen';
+import {
+  type LnAddress,
+  updateWalletAddress,
+  type UpdateLnAddressRequest,
+} from 'src/lib/swissknife';
 
 import { toast } from 'src/components/snackbar';
 import { Form, RHFSwitch, RHFTextField } from 'src/components/hook-form';
@@ -21,9 +26,6 @@ import { Form, RHFSwitch, RHFTextField } from 'src/components/hook-form';
 type Props = {
   lnAddress: LnAddress;
 };
-
-// @ts-ignore
-const resolver = ajvResolver(UpdateLnAddressRequestSchema, ajvOptions);
 
 export function NostrDetails({ lnAddress }: Props) {
   const { t } = useTranslate();
@@ -35,7 +37,7 @@ export function NostrDetails({ lnAddress }: Props) {
 
   const methods = useForm({
     mode: 'all',
-    resolver,
+    resolver: zodResolver(zUpdateLnAddressRequest),
     defaultValues,
   });
 
@@ -59,7 +61,7 @@ export function NostrDetails({ lnAddress }: Props) {
       toast.success('Nostr Address updated successfully');
       mutate(endpointKeys.userWallet.lnAddress.get);
     } catch (error) {
-      toast.error(error.reason);
+      handleActionError(error);
     }
   };
 

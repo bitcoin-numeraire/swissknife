@@ -1,117 +1,126 @@
+import type { Theme, SxProps } from '@mui/material/styles';
 import type { TypographyProps } from '@mui/material/Typography';
 import type { Variants, UseInViewOptions } from 'framer-motion';
 
-import { useRef, useEffect } from 'react';
+import { useRef, useMemo, useEffect } from 'react';
+import { mergeClasses } from 'minimal-shared/utils';
 import { m, useInView, useAnimation } from 'framer-motion';
 
-import Box from '@mui/material/Box';
+import { styled } from '@mui/material/styles';
 import Typography from '@mui/material/Typography';
+
+import { createClasses } from 'src/theme/create-classes';
 
 import { varFade, varContainer } from './variants';
 
 // ----------------------------------------------------------------------
 
 export const animateTextClasses = {
-  root: 'animate-text-root',
-  lines: 'animate-text-lines',
-  line: 'animate-text-line',
-  word: 'animate-text-word',
-  char: 'animate-text-char',
-  space: 'animate-text-space',
+  root: createClasses('animate__text__root'),
+  lines: createClasses('animate__text__lines'),
+  line: createClasses('animate__text__line'),
+  word: createClasses('animate__text__word'),
+  char: createClasses('animate__text__char'),
+  space: createClasses('animate__text__space'),
   srOnly: 'sr-only',
-  dataIndex: '[data-columns="3"]',
+};
+
+const srOnlyStyles: SxProps<Theme> = {
+  p: 0,
+  width: '1px',
+  height: '1px',
+  margin: '-1px',
+  borderWidth: 0,
+  overflow: 'hidden',
+  position: 'absolute',
+  whiteSpace: 'nowrap',
+  clip: 'rect(0, 0, 0, 0)',
 };
 
 export type AnimateTextProps = TypographyProps & {
   variants?: Variants;
-  repeatDelay?: number;
-  text: string | string[];
+  repeatDelayMs?: number;
+  textContent: string | string[];
   once?: UseInViewOptions['once'];
   amount?: UseInViewOptions['amount'];
 };
 
 export function AnimateText({
   sx,
-  text,
   variants,
+  className,
+  textContent,
   once = true,
   amount = 1 / 3,
   component = 'p',
-  repeatDelay = 500, // 1000 = 1s
+  repeatDelayMs = 100, // 1000 = 1s
   ...other
 }: AnimateTextProps) {
-  const ref = useRef(null);
+  const textRef = useRef(null);
 
-  const controls = useAnimation();
+  const animationControls = useAnimation();
 
-  const textArray = Array.isArray(text) ? text : [text];
+  const textArray = useMemo(
+    () => (Array.isArray(textContent) ? textContent : [textContent]),
+    [textContent]
+  );
 
-  const isInView = useInView(ref, { once, amount });
+  const isInView = useInView(textRef, { once, amount });
 
   useEffect(() => {
     let timeout: NodeJS.Timeout;
 
-    const show = () => {
-      if (repeatDelay) {
+    const triggerAnimation = () => {
+      if (repeatDelayMs) {
         timeout = setTimeout(async () => {
-          await controls.start('initial');
-          controls.start('animate');
-        }, repeatDelay);
+          await animationControls.start('initial');
+          animationControls.start('animate');
+        }, repeatDelayMs);
       } else {
-        controls.start('animate');
+        animationControls.start('animate');
       }
     };
 
     if (isInView) {
-      show();
+      triggerAnimation();
     } else {
-      controls.start('initial');
+      animationControls.start('initial');
     }
 
     return () => clearTimeout(timeout);
-  }, [controls, isInView, repeatDelay]);
+  }, [animationControls, isInView, repeatDelayMs]);
 
   return (
     <Typography
       component={component}
-      className={animateTextClasses.root}
-      sx={{
-        p: 0,
-        m: 0,
-        /**
-         * Utilities for improving accessibility with screen readers.
-         * https://v1.tailwindcss.com/docs/screen-readers
-         */
-        [`& .${animateTextClasses.srOnly}`]: {
+      className={mergeClasses([animateTextClasses.root, className])}
+      sx={[
+        {
           p: 0,
-          width: '1px',
-          height: '1px',
-          margin: '-1px',
-          borderWidth: 0,
-          overflow: 'hidden',
-          position: 'absolute',
-          whiteSpace: 'nowrap',
-          clip: 'rect(0, 0, 0, 0)',
+          m: 0,
+          /**
+           * Utilities for improving accessibility with screen readers.
+           * https://v1.tailwindcss.com/docs/screen-readers
+           */
+          [`& .${animateTextClasses.srOnly}`]: srOnlyStyles,
         },
-        ...sx,
-      }}
+        ...(Array.isArray(sx) ? sx : [sx]),
+      ]}
       {...other}
     >
       <span className={animateTextClasses.srOnly}>{textArray.join(' ')}</span>
 
-      <Box
-        component={m.span}
-        ref={ref}
+      <AnimatedTextContainer
+        ref={textRef}
         initial="initial"
-        animate={controls}
+        animate={animationControls}
         exit="exit"
         variants={varContainer()}
         aria-hidden
         className={animateTextClasses.lines}
       >
-        {textArray.map((line, lineIndex) => (
-          <Box
-            component="span"
+        {textArray?.map((line, lineIndex) => (
+          <TextLine
             key={`${line}-${lineIndex}`}
             data-index={lineIndex}
             className={animateTextClasses.line}
@@ -121,37 +130,45 @@ export function AnimateText({
               const lastWordInline = line.split(' ')[line.split(' ').length - 1];
 
               return (
-                <Box
-                  component="span"
+                <TextWord
                   key={`${word}-${wordIndex}`}
                   data-index={wordIndex}
                   className={animateTextClasses.word}
                   sx={{ display: 'inline-block' }}
                 >
                   {word.split('').map((char, charIndex) => (
-                    <Box
-                      component={m.span}
+                    <AnimatedTextChar
                       key={`${char}-${charIndex}`}
-                      variants={variants ?? varFade().in}
+                      variants={variants ?? varFade('in')}
                       data-index={charIndex}
                       className={animateTextClasses.char}
                       sx={{ display: 'inline-block' }}
                     >
                       {char}
-                    </Box>
+                    </AnimatedTextChar>
                   ))}
 
                   {lastWordInline !== word && (
-                    <Box component="span" className={animateTextClasses.space} sx={{ display: 'inline-block' }}>
+                    <TextWord className={animateTextClasses.space} sx={{ display: 'inline-block' }}>
                       &nbsp;
-                    </Box>
+                    </TextWord>
                   )}
-                </Box>
+                </TextWord>
               );
             })}
-          </Box>
+          </TextLine>
         ))}
-      </Box>
+      </AnimatedTextContainer>
     </Typography>
   );
 }
+
+// ----------------------------------------------------------------------
+
+const TextLine = styled('span')``;
+
+const TextWord = styled('span')``;
+
+const AnimatedTextContainer = styled(m.span)``;
+
+const AnimatedTextChar = styled(m.span)``;

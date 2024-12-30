@@ -3,6 +3,7 @@ import type { IFiatPrices } from 'src/types/bitcoin';
 import type { WalletResponse } from 'src/lib/swissknife';
 
 import { mutate } from 'swr';
+import { useBoolean, usePopover } from 'minimal-shared/hooks';
 
 import Box from '@mui/material/Box';
 import { Typography } from '@mui/material';
@@ -10,20 +11,18 @@ import MenuList from '@mui/material/MenuList';
 import MenuItem from '@mui/material/MenuItem';
 import IconButton from '@mui/material/IconButton';
 
-import { useBoolean } from 'src/hooks/use-boolean';
-
 import { satsToFiat } from 'src/utils/fiat';
 import { displayLnAddress } from 'src/utils/lnurl';
 import { fCurrency } from 'src/utils/format-number';
 
-import { CONFIG } from 'src/config-global';
+import { CONFIG } from 'src/global-config';
 import { useTranslate } from 'src/locales';
 import { endpointKeys } from 'src/actions/keys';
 
 import { Iconify } from 'src/components/iconify';
 import { SatsWithIcon } from 'src/components/bitcoin';
 import { useSettingsContext } from 'src/components/settings';
-import { usePopover, CustomPopover } from 'src/components/custom-popover';
+import { CustomPopover } from 'src/components/custom-popover';
 
 // ----------------------------------------------------------------------
 
@@ -37,7 +36,7 @@ export function CurrentBalance({ wallet, fiatPrices, sx, ...other }: Props) {
   const { balance, ln_address } = wallet;
   const popover = usePopover();
   const displayAmount = useBoolean();
-  const { currency } = useSettingsContext();
+  const { state } = useSettingsContext();
 
   return (
     <Box
@@ -47,7 +46,7 @@ export function CurrentBalance({ wallet, fiatPrices, sx, ...other }: Props) {
         backgroundSize: 'cover',
         backgroundPosition: 'center',
         backgroundRepeat: 'no-repeat',
-        backgroundImage: `url('${CONFIG.site.basePath}/assets/background/background-4.jpg')`,
+        backgroundImage: `url('${CONFIG.assetsDir}/assets/background/background-4.jpg')`,
         color: 'common.white',
         ...sx,
       }}
@@ -70,10 +69,16 @@ export function CurrentBalance({ wallet, fiatPrices, sx, ...other }: Props) {
         </IconButton>
 
         <div>
-          <Box sx={{ mb: 1.5, typography: 'subtitle2', opacity: 0.7 }}>{t('current_balance.current_balance')}</Box>
+          <Box sx={{ mb: 1.5, typography: 'subtitle2', opacity: 0.7 }}>
+            {t('current_balance.current_balance')}
+          </Box>
           <Box sx={{ gap: 1, display: 'flex', alignItems: 'center', mb: 3 }}>
             <Box component="span" sx={{ typography: 'h4' }}>
-              {displayAmount.value ? '********' : <SatsWithIcon amountMSats={balance.available_msat} variant="inherit" />}
+              {displayAmount.value ? (
+                '********'
+              ) : (
+                <SatsWithIcon amountMSats={balance.available_msat} variant="inherit" />
+              )}
             </Box>
 
             <IconButton color="inherit" onClick={displayAmount.onToggle} sx={{ opacity: 0.7 }}>
@@ -109,12 +114,20 @@ export function CurrentBalance({ wallet, fiatPrices, sx, ...other }: Props) {
 
         <Box sx={{ gap: 5, display: 'flex', typography: 'body1' }}>
           <div>
-            <Box sx={{ mb: 1, opacity: 0.7, typography: 'caption' }}>{t('current_balance.fees_paid')}</Box>
+            <Box sx={{ mb: 1, opacity: 0.7, typography: 'caption' }}>
+              {t('current_balance.fees_paid')}
+            </Box>
             <SatsWithIcon amountMSats={balance.fees_paid_msat} />
           </div>
           <div>
-            <Box sx={{ mb: 1, opacity: 0.7, typography: 'caption' }}>{t('current_balance.fiat_amount')}</Box>
-            <Typography>{fCurrency(satsToFiat(balance.available_msat / 1000, fiatPrices, currency), { currency })}</Typography>
+            <Box sx={{ mb: 1, opacity: 0.7, typography: 'caption' }}>
+              {t('current_balance.fiat_amount')}
+            </Box>
+            <Typography>
+              {fCurrency(satsToFiat(balance.available_msat / 1000, fiatPrices, state.currency), {
+                currency: state.currency,
+              })}
+            </Typography>
           </div>
         </Box>
       </Box>

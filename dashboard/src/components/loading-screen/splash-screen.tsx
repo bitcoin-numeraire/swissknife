@@ -1,40 +1,26 @@
 'use client';
 
-import type { BoxProps } from '@mui/material/Box';
+import type { Theme, SxProps } from '@mui/material/styles';
 
-import Box from '@mui/material/Box';
 import Portal from '@mui/material/Portal';
+import { styled } from '@mui/material/styles';
 
-import { AnimateLogo1 } from 'src/components/animate';
+import { AnimateLogoZoom } from 'src/components/animate';
 
 // ----------------------------------------------------------------------
 
-type Props = BoxProps & {
+export type SplashScreenProps = React.ComponentProps<'div'> & {
   portal?: boolean;
+  sx?: SxProps<Theme>;
 };
 
-export function SplashScreen({ portal = true, sx, ...other }: Props) {
+export function SplashScreen({ portal = true, sx, ...other }: SplashScreenProps) {
   const content = (
-    <Box sx={{ overflow: 'hidden' }}>
-      <Box
-        sx={{
-          right: 0,
-          width: 1,
-          bottom: 0,
-          height: 1,
-          zIndex: 9998,
-          display: 'flex',
-          position: 'fixed',
-          alignItems: 'center',
-          justifyContent: 'center',
-          bgcolor: 'background.default',
-          ...sx,
-        }}
-        {...other}
-      >
-        <AnimateLogo1 />
-      </Box>
-    </Box>
+    <div style={{ overflow: 'hidden' }}>
+      <LoadingContent sx={sx} {...other}>
+        <AnimateLogoZoom />
+      </LoadingContent>
+    </div>
   );
 
   if (portal) {
@@ -43,3 +29,18 @@ export function SplashScreen({ portal = true, sx, ...other }: Props) {
 
   return content;
 }
+
+// ----------------------------------------------------------------------
+
+const LoadingContent = styled('div')(({ theme }) => ({
+  right: 0,
+  bottom: 0,
+  zIndex: 9998,
+  width: '100%',
+  height: '100%',
+  display: 'flex',
+  position: 'fixed',
+  alignItems: 'center',
+  justifyContent: 'center',
+  backgroundColor: theme.vars.palette.background.default,
+}));

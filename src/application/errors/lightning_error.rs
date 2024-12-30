@@ -45,8 +45,8 @@ pub enum LightningError {
     #[error("Failed to send payment: {0}")]
     Pay(String),
 
-    #[error("Failed to parse response: {0}")]
-    ParseResponse(String),
+    #[error("Unexpected stream payload: {0}")]
+    UnexpectedStreamPayload(String),
 
     #[error("Failed to get invoice by hash: {0}")]
     InvoiceByHash(String),

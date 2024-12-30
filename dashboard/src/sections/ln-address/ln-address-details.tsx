@@ -16,10 +16,11 @@ import { useRouter } from 'src/routes/hooks';
 
 import { npub } from 'src/utils/nostr';
 import { fDate, fTime } from 'src/utils/format-time';
+import { handleActionError } from 'src/utils/errors';
 import { truncateText } from 'src/utils/format-string';
 import { encodeLNURL, displayLnAddress } from 'src/utils/lnurl';
 
-import { CONFIG } from 'src/config-global';
+import { CONFIG } from 'src/global-config';
 import { useTranslate } from 'src/locales';
 import { endpointKeys } from 'src/actions/keys';
 import { deleteAddress, deleteWalletAddress } from 'src/lib/swissknife';
@@ -58,7 +59,7 @@ export function LnAddressDetails({ lnAddress, isAdmin }: Props) {
 
         mutate(endpointKeys.userWallet.lnAddress.get);
       } catch (error) {
-        toast.error(error.reason);
+        handleActionError(error);
       } finally {
         toast.success(`Lightning address deleted successfully: ${id}`);
       }
@@ -74,7 +75,7 @@ export function LnAddressDetails({ lnAddress, isAdmin }: Props) {
       </Grid>
       <Grid item xs={12} sm={6}>
         <Title>{t('ln_address_details.domain')}</Title>
-        <Typography color="textSecondary">{CONFIG.site.domain}</Typography>
+        <Typography color="textSecondary">{CONFIG.domain}</Typography>
       </Grid>
 
       <Grid item xs={12}>
@@ -162,7 +163,9 @@ export function LnAddressDetails({ lnAddress, isAdmin }: Props) {
         </Stack>
       </Stack>
 
-      <Card sx={{ pt: 5, px: { xs: 2, sm: 5, md: 8 }, maxWidth: { xs: '100%', md: '80%' }, mx: 'auto' }}>
+      <Card
+        sx={{ pt: 5, px: { xs: 2, sm: 5, md: 8 }, maxWidth: { xs: '100%', md: '80%' }, mx: 'auto' }}
+      >
         <Box
           rowGap={5}
           display="grid"
@@ -177,10 +180,14 @@ export function LnAddressDetails({ lnAddress, isAdmin }: Props) {
           <Stack spacing={1} alignItems={{ xs: 'flex-start', md: 'flex-end' }}>
             <Stack direction="row" spacing={1}>
               <Label variant="soft" color={lnAddress.active ? 'success' : 'error'}>
-                {lnAddress.active ? t('ln_address_details.active') : t('ln_address_details.deactivated')}
+                {lnAddress.active
+                  ? t('ln_address_details.active')
+                  : t('ln_address_details.deactivated')}
               </Label>
               <Label variant="soft" color={lnAddress.active ? 'success' : 'error'}>
-                {lnAddress.allows_nostr ? t('ln_address_details.nostr_visible') : t('ln_address_details.nostr_deactivated')}
+                {lnAddress.allows_nostr
+                  ? t('ln_address_details.nostr_visible')
+                  : t('ln_address_details.nostr_deactivated')}
               </Label>
             </Stack>
 

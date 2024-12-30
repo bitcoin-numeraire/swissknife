@@ -1,11 +1,10 @@
 'use client';
 
 import { mutate } from 'swr';
+import { useTabs } from 'minimal-shared/hooks';
 
 import Tab from '@mui/material/Tab';
 import Tabs from '@mui/material/Tabs';
-
-import { useTabs } from 'src/hooks/use-tabs';
 
 import { shouldFail } from 'src/utils/errors';
 
@@ -26,8 +25,16 @@ import { SettingsLnAddress } from '../settings-ln-address';
 // ----------------------------------------------------------------------
 
 const TABS = [
-  { value: 'lnaddress', label: 'Lightning Address', icon: <Iconify icon="solar:bolt-bold-duotone" width={24} /> },
-  { value: 'apikeys', label: 'API Keys', icon: <Iconify icon="solar:code-bold-duotone" width={24} /> },
+  {
+    value: 'lnaddress',
+    label: 'Lightning Address',
+    icon: <Iconify icon="solar:bolt-bold-duotone" width={24} />,
+  },
+  {
+    value: 'apikeys',
+    label: 'API Keys',
+    icon: <Iconify icon="solar:code-bold-duotone" width={24} />,
+  },
 ];
 
 // ----------------------------------------------------------------------
@@ -41,7 +48,7 @@ export function SettingsView() {
 
   const errors = [lnAddressError, apiKeysError];
   const isLoading = [lnAddressLoading, apiKeysLoading];
-  const data = [apiKeys];
+  const data = [apiKeys, lnAddress];
 
   const failed = shouldFail(errors, data, isLoading);
 
@@ -68,13 +75,19 @@ export function SettingsView() {
           </Tabs>
 
           {tabs.value === 'lnaddress' &&
-            (lnAddress ? (
-              <SettingsLnAddress lnAddress={lnAddress} />
+            (lnAddress?.ln_address ? (
+              <SettingsLnAddress lnAddress={lnAddress.ln_address} />
             ) : (
               <Welcome
                 description={t('register_ln_address.register_lightning_address_welcome')}
-                img={<img src="/assets/icons/bitcoin/ic-bitcoin-lightning.svg" alt="Lightning logo" />}
-                action={<RegisterLnAddressForm onSuccess={() => mutate(endpointKeys.userWallet.lnAddress.get)} />}
+                img={
+                  <img src="/assets/icons/bitcoin/ic-bitcoin-lightning.svg" alt="Lightning logo" />
+                }
+                action={
+                  <RegisterLnAddressForm
+                    onSuccess={() => mutate(endpointKeys.userWallet.lnAddress.get)}
+                  />
+                }
               />
             ))}
 

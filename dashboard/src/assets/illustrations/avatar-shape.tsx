@@ -1,21 +1,28 @@
-import type { BoxProps } from '@mui/material/Box';
+import type { SvgIconProps } from '@mui/material/SvgIcon';
 
-import { memo } from 'react';
+import { memo, forwardRef } from 'react';
 
-import Box from '@mui/material/Box';
+import SvgIcon from '@mui/material/SvgIcon';
 
 // ----------------------------------------------------------------------
 
-function AvatarShape({ sx, ...other }: BoxProps) {
+const AvatarShape = forwardRef<SVGSVGElement, SvgIconProps>((props, ref) => {
+  const { sx, ...other } = props;
+
   return (
-    <Box
-      component="svg"
-      width={144}
-      height={62}
+    <SvgIcon
+      ref={ref}
       fill="none"
       viewBox="0 0 144 62"
       xmlns="http://www.w3.org/2000/svg"
-      sx={{ color: 'background.paper', ...sx }}
+      sx={[
+        () => ({
+          width: 144,
+          height: 62,
+          color: 'background.paper',
+        }),
+        ...(Array.isArray(sx) ? sx : [sx]),
+      ]}
       {...other}
     >
       <path
@@ -23,8 +30,8 @@ function AvatarShape({ sx, ...other }: BoxProps) {
         fill="currentColor"
         fillRule="evenodd"
       />
-    </Box>
+    </SvgIcon>
   );
-}
+});
 
 export default memo(AvatarShape);

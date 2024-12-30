@@ -2,7 +2,7 @@
 
 import { endpointKeys } from 'src/actions/keys';
 
-import { STORAGE_KEY } from './constant';
+import { JWT_STORAGE_KEY } from './constant';
 
 // ----------------------------------------------------------------------
 
@@ -16,7 +16,12 @@ export type SignUpParams = {
 /** **************************************
  * Sign up
  *************************************** */
-export const signUp = async ({ email, password, firstName, lastName }: SignUpParams): Promise<void> => {
+export const signUp = async ({
+  email,
+  password,
+  firstName,
+  lastName,
+}: SignUpParams): Promise<void> => {
   const res = await fetch(endpointKeys.auth.signUp, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -29,12 +34,12 @@ export const signUp = async ({ email, password, firstName, lastName }: SignUpPar
     throw new Error('Access token not found in response');
   }
 
-  sessionStorage.setItem(STORAGE_KEY, accessToken);
+  sessionStorage.setItem(JWT_STORAGE_KEY, accessToken);
 };
 
 /** **************************************
  * Sign out
  *************************************** */
 export const signOut = async (): Promise<void> => {
-  sessionStorage.removeItem(STORAGE_KEY);
+  sessionStorage.removeItem(JWT_STORAGE_KEY);
 };

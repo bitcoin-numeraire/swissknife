@@ -1,103 +1,76 @@
-import type { NavSectionProps, NavItemBaseProps } from 'src/components/nav-section';
-
-import { flattenArray } from 'src/utils/helper';
+import type { NavSectionProps } from 'src/components/nav-section';
 
 import { hasAllPermissions } from 'src/auth/permissions';
 
 // ----------------------------------------------------------------------
 
-type ItemProps = {
-  group: string;
+type NavItem = {
   title: string;
   path: string;
+  children?: NavItem[];
+  permissions?: string[];
 };
 
-export function getAllItems({ data, permissions = [] }: { data: NavSectionProps['data']; permissions: string[] }) {
-  const reduceItems = data.map((list) => handleLoop(list.items, list.subheader)).flat();
+type OutputItem = {
+  title: string;
+  path: string;
+  group: string;
+};
 
-  const items = flattenArray(reduceItems)
-    .filter((option) => !option.permissions || hasAllPermissions(option.permissions, permissions))
-    .map((option) => {
-      const group = splitPath(reduceItems, option.path);
+function filterByPermissions(items: NavItem[], userPermissions: string[]): NavItem[] {
+  return items
+    .filter((item) => !item.permissions || hasAllPermissions(item.permissions, userPermissions))
+    .map((item) => ({
+      ...item,
+      children: item.children ? filterByPermissions(item.children, userPermissions) : undefined,
+    }));
+}
 
-      return {
-        group: group && group.length > 1 ? group[0] : option.subheader,
-        title: option.title,
-        path: option.path,
-      };
+const flattenNavItems = (navItems: NavItem[], parentGroup?: string): OutputItem[] => {
+  let flattenedItems: OutputItem[] = [];
+
+  navItems.forEach((navItem) => {
+    const currentGroup = parentGroup ? `${parentGroup}-${navItem.title}` : navItem.title;
+    const groupArray = currentGroup.split('-');
+
+    flattenedItems.push({
+      title: navItem.title,
+      path: navItem.path,
+      group: groupArray.length > 2 ? `${groupArray[0]}.${groupArray[1]}` : groupArray[0],
     });
 
-  return items;
+    if (navItem.children) {
+      flattenedItems = flattenedItems.concat(flattenNavItems(navItem.children, currentGroup));
+    }
+  });
+  return flattenedItems;
+};
+
+export function flattenNavSections(
+  navSections: NavSectionProps['data'],
+  userPermissions: string[] = []
+): OutputItem[] {
+  const filteredSections = navSections.map((navSection) => ({
+    ...navSection,
+    items: filterByPermissions(navSection.items as NavItem[], userPermissions),
+  }));
+
+  return filteredSections.flatMap((navSection) =>
+    flattenNavItems(navSection.items as NavItem[], navSection.subheader)
+  );
 }
 
 // ----------------------------------------------------------------------
 
 type ApplyFilterProps = {
-  inputData: ItemProps[];
   query: string;
+  inputData: OutputItem[];
 };
 
-export function applyFilter({ inputData, query }: ApplyFilterProps) {
-  if (query) {
-    inputData = inputData.filter(
-      (item) => item.title.toLowerCase().indexOf(query.toLowerCase()) !== -1 || item.path.toLowerCase().indexOf(query.toLowerCase()) !== -1
-    );
-  }
+export function applyFilter({ inputData, query }: ApplyFilterProps): OutputItem[] {
+  if (!query) return inputData;
 
-  return inputData;
-}
-
-// ----------------------------------------------------------------------
-
-export function splitPath(array: NavItemBaseProps[], key: string) {
-  let stack = array.map((item) => ({ path: [item.title], currItem: item }));
-
-  while (stack.length) {
-    const { path, currItem } = stack.pop() as {
-      path: string[];
-      currItem: NavItemBaseProps;
-    };
-
-    if (currItem.path === key) {
-      return path;
-    }
-
-    if (currItem.children?.length) {
-      stack = stack.concat(
-        currItem.children.map((item: NavItemBaseProps) => ({
-          path: path.concat(item.title),
-          currItem: item,
-        }))
-      );
-    }
-  }
-  return null;
-}
-
-// ----------------------------------------------------------------------
-
-export function handleLoop(array: any, subheader?: string) {
-  return array?.map((list: any) => ({
-    subheader,
-    ...list,
-    ...(list.children && { children: handleLoop(list.children, subheader) }),
-  }));
-}
-
-// ----------------------------------------------------------------------
-
-type GroupsProps = {
-  [key: string]: ItemProps[];
-};
-
-export function groupItems(array: ItemProps[]) {
-  const group = array.reduce((groups: GroupsProps, item) => {
-    groups[item.group] = groups[item.group] || [];
-
-    groups[item.group].push(item);
-
-    return groups;
-  }, {});
-
-  return group;
+  return inputData.filter(({ title, path, group }) =>
+    [title, path, group].some((field) => field?.toLowerCase().includes(query.toLowerCase()))
+  );
 }

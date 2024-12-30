@@ -21,18 +21,18 @@ import { LnAddressDetails } from '../ln-address-details';
 // ----------------------------------------------------------------------
 
 export function LnAddressDetailsView() {
-  const { lnAddress, lnAddressLoading, lnAddressError } = useGetWalletLnAddress();
   const { t } = useTranslate();
+  const { lnAddress, lnAddressLoading, lnAddressError } = useGetWalletLnAddress();
 
   const errors = [lnAddressError];
-  const isLoading = [lnAddressLoading];
+  const loading = [lnAddressLoading];
 
-  const failed = shouldFail(errors, [], isLoading);
+  const failed = shouldFail(errors, [lnAddress], loading);
 
   return (
     <DashboardContent>
       {failed ? (
-        <ErrorView errors={errors} isLoading={isLoading} />
+        <ErrorView errors={errors} isLoading={loading} />
       ) : (
         <>
           <CustomBreadcrumbs
@@ -51,13 +51,19 @@ export function LnAddressDetailsView() {
             }}
           />
 
-          {lnAddress ? (
-            <LnAddressDetails lnAddress={lnAddress} />
+          {lnAddress!.ln_address ? (
+            <LnAddressDetails lnAddress={lnAddress!.ln_address} />
           ) : (
             <Welcome
               description={t('register_ln_address.register_lightning_address_welcome')}
-              img={<img src="/assets/icons/bitcoin/ic-bitcoin-lightning.svg" alt="Lightning logo" />}
-              action={<RegisterLnAddressForm onSuccess={() => mutate(endpointKeys.userWallet.lnAddress.get)} />}
+              img={
+                <img src="/assets/icons/bitcoin/ic-bitcoin-lightning.svg" alt="Lightning logo" />
+              }
+              action={
+                <RegisterLnAddressForm
+                  onSuccess={() => mutate(endpointKeys.userWallet.lnAddress.get)}
+                />
+              }
             />
           )}
         </>

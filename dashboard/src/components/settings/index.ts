@@ -2,6 +2,6 @@ export * from './drawer';
 
 export * from './context';
 
-export type * from './types';
+export * from './settings-config';
 
-export * from './config-settings';
+export type * from './types';

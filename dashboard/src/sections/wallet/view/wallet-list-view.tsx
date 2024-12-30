@@ -3,11 +3,10 @@
 import type { TFunction } from 'i18next';
 
 import { mutate } from 'swr';
+import { useBoolean } from 'minimal-shared/hooks';
 
 import Stack from '@mui/material/Stack';
 import Button from '@mui/material/Button';
-
-import { useBoolean } from 'src/hooks/use-boolean';
 
 import { shouldFail } from 'src/utils/errors';
 
@@ -20,8 +19,8 @@ import { useFetchFiatPrices } from 'src/actions/mempool-space';
 
 import { Iconify } from 'src/components/iconify';
 import { ErrorView } from 'src/components/error/error-view';
+import { RegisterWalletDialog } from 'src/components/wallet';
 import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';
-import { RegisterWalletDialog } from 'src/components/wallet/register-wallet-dialog';
 
 import { RoleBasedGuard } from 'src/auth/guard';
 
@@ -46,7 +45,8 @@ export function WalletListView() {
   const newWallet = useBoolean();
   const { t } = useTranslate();
 
-  const { walletOverviews, walletOverviewsLoading, walletOverviewsError } = useListWalletOverviews();
+  const { walletOverviews, walletOverviewsLoading, walletOverviewsError } =
+    useListWalletOverviews();
   const { fiatPrices, fiatPricesLoading, fiatPricesError } = useFetchFiatPrices();
 
   const errors = [walletOverviewsError, fiatPricesError];
@@ -57,7 +57,7 @@ export function WalletListView() {
 
   return (
     <DashboardContent>
-      <RoleBasedGuard permissions={[Permission.READ_WALLET]} hasContent>
+      <RoleBasedGuard permissions={[Permission['READ:WALLET']]} hasContent>
         {failed ? (
           <ErrorView errors={errors} isLoading={isLoading} data={data} />
         ) : (
@@ -74,7 +74,11 @@ export function WalletListView() {
               ]}
               action={
                 <Stack direction="row" spacing={1}>
-                  <Button onClick={newWallet.onTrue} variant="contained" startIcon={<Iconify icon="mingcute:add-line" />}>
+                  <Button
+                    onClick={newWallet.onTrue}
+                    variant="contained"
+                    startIcon={<Iconify icon="mingcute:add-line" />}
+                  >
                     {t('new')}
                   </Button>
                 </Stack>

@@ -1,12 +1,12 @@
 import type { ChipProps } from '@mui/material/Chip';
 import type { SelectProps } from '@mui/material/Select';
-import type { Theme, SxProps } from '@mui/material/styles';
 import type { CheckboxProps } from '@mui/material/Checkbox';
 import type { TextFieldProps } from '@mui/material/TextField';
 import type { InputLabelProps } from '@mui/material/InputLabel';
 import type { FormControlProps } from '@mui/material/FormControl';
 import type { FormHelperTextProps } from '@mui/material/FormHelperText';
 
+import { merge } from 'es-toolkit';
 import { Controller, useFormContext } from 'react-hook-form';
 
 import Box from '@mui/material/Box';
@@ -17,23 +17,41 @@ import Checkbox from '@mui/material/Checkbox';
 import TextField from '@mui/material/TextField';
 import InputLabel from '@mui/material/InputLabel';
 import FormControl from '@mui/material/FormControl';
-import FormHelperText from '@mui/material/FormHelperText';
+
+import { HelperText } from './help-text';
 
 // ----------------------------------------------------------------------
 
 type RHFSelectProps = TextFieldProps & {
   name: string;
-  native?: boolean;
   children: React.ReactNode;
-  slotProps?: {
-    paper?: SxProps<Theme>;
-  };
 };
 
-export function RHFSelect({ name, native, children, slotProps, helperText, inputProps, InputLabelProps, ...other }: RHFSelectProps) {
+export function RHFSelect({
+  name,
+  children,
+  helperText,
+  slotProps = {},
+  ...other
+}: RHFSelectProps) {
   const { control } = useFormContext();
 
-  const labelId = `${name}-select-label`;
+  const labelId = `${name}-select`;
+
+  const baseSlotProps: TextFieldProps['slotProps'] = {
+    select: {
+      sx: { textTransform: 'capitalize' },
+      MenuProps: {
+        slotProps: {
+          paper: {
+            sx: [{ maxHeight: 220 }],
+          },
+        },
+      },
+    },
+    htmlInput: { id: labelId },
+    inputLabel: { htmlFor: labelId },
+  };
 
   return (
     <Controller
@@ -44,15 +62,9 @@ export function RHFSelect({ name, native, children, slotProps, helperText, input
           {...field}
           select
           fullWidth
-          SelectProps={{
-            native,
-            MenuProps: { PaperProps: { sx: { maxHeight: 220, ...slotProps?.paper } } },
-            sx: { textTransform: 'capitalize' },
-          }}
-          InputLabelProps={{ htmlFor: labelId, ...InputLabelProps }}
-          inputProps={{ id: labelId, ...inputProps }}
           error={!!error}
-          helperText={error ? error?.message : helperText}
+          helperText={error?.message ?? helperText}
+          slotProps={merge(baseSlotProps, slotProps)}
           {...other}
         >
           {children}
@@ -71,16 +83,13 @@ type RHFMultiSelectProps = FormControlProps & {
   checkbox?: boolean;
   placeholder?: string;
   helperText?: React.ReactNode;
-  options: {
-    label: string;
-    value: string;
-  }[];
+  options: { label: string; value: string }[];
   slotProps?: {
     chip?: ChipProps;
-    select: SelectProps;
+    select?: SelectProps;
     checkbox?: CheckboxProps;
     inputLabel?: InputLabelProps;
-    formHelperText?: FormHelperTextProps;
+    helperText?: FormHelperTextProps;
   };
 };
 
@@ -97,63 +106,88 @@ export function RHFMultiSelect({
 }: RHFMultiSelectProps) {
   const { control } = useFormContext();
 
-  const labelId = `${name}-select-label`;
+  const labelId = `${name}-multi-select`;
 
   return (
     <Controller
       name={name}
       control={control}
-      render={({ field, fieldState: { error } }) => (
-        <FormControl error={!!error} {...other}>
-          {label && (
-            <InputLabel htmlFor={labelId} {...slotProps?.inputLabel}>
-              {label}
-            </InputLabel>
-          )}
+      render={({ field, fieldState: { error } }) => {
+        const renderLabel = () => (
+          <InputLabel htmlFor={labelId} {...slotProps?.inputLabel}>
+            {label}
+          </InputLabel>
+        );
 
-          <Select
-            {...field}
-            multiple
-            displayEmpty={!!placeholder}
-            label={label}
-            renderValue={(selected) => {
-              const selectedItems = options.filter((item) => (selected as string[]).includes(item.value));
+        const renderOptions = () =>
+          options.map((option) => (
+            <MenuItem key={option.value} value={option.value}>
+              {checkbox && (
+                <Checkbox
+                  size="small"
+                  disableRipple
+                  checked={field.value.includes(option.value)}
+                  {...slotProps?.checkbox}
+                />
+              )}
 
-              if (!selectedItems.length && placeholder) {
-                return <Box sx={{ color: 'text.disabled' }}>{placeholder}</Box>;
-              }
+              {option.label}
+            </MenuItem>
+          ));
 
-              if (chip) {
-                return (
-                  <Box sx={{ gap: 0.5, display: 'flex', flexWrap: 'wrap' }}>
-                    {selectedItems.map((item) => (
-                      <Chip key={item.value} size="small" variant="soft" label={item.label} {...slotProps?.chip} />
-                    ))}
-                  </Box>
+        return (
+          <FormControl error={!!error} {...other}>
+            {label && renderLabel()}
+
+            <Select
+              {...field}
+              multiple
+              displayEmpty={!!placeholder}
+              label={label}
+              renderValue={(selected) => {
+                const selectedItems = options.filter((item) =>
+                  (selected as string[]).includes(item.value)
                 );
-              }
 
-              return selectedItems.map((item) => item.label).join(', ');
-            }}
-            {...slotProps?.select}
-            inputProps={{ id: labelId, ...slotProps?.select?.inputProps }}
-          >
-            {options.map((option) => (
-              <MenuItem key={option.value} value={option.value}>
-                {checkbox && <Checkbox size="small" disableRipple checked={field.value.includes(option.value)} {...slotProps?.checkbox} />}
+                if (!selectedItems.length && placeholder) {
+                  return <Box sx={{ color: 'text.disabled' }}>{placeholder}</Box>;
+                }
 
-                {option.label}
-              </MenuItem>
-            ))}
-          </Select>
+                if (chip) {
+                  return (
+                    <Box sx={{ gap: 0.5, display: 'flex', flexWrap: 'wrap' }}>
+                      {selectedItems.map((item) => (
+                        <Chip
+                          key={item.value}
+                          size="small"
+                          variant="soft"
+                          label={item.label}
+                          {...slotProps?.chip}
+                        />
+                      ))}
+                    </Box>
+                  );
+                }
 
-          {(!!error || helperText) && (
-            <FormHelperText error={!!error} {...slotProps?.formHelperText}>
-              {error ? error?.message : helperText}
-            </FormHelperText>
-          )}
-        </FormControl>
-      )}
+                return selectedItems.map((item) => item.label).join(', ');
+              }}
+              {...slotProps?.select}
+              inputProps={{
+                id: labelId,
+                ...slotProps?.select?.inputProps,
+              }}
+            >
+              {renderOptions()}
+            </Select>
+
+            <HelperText
+              {...slotProps?.helperText}
+              errorMessage={error?.message}
+              helperText={helperText}
+            />
+          </FormControl>
+        );
+      }}
     />
   );
 }

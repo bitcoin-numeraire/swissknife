@@ -1,5 +1,6 @@
 import { mutate } from 'swr';
 import { useCallback } from 'react';
+import { useBoolean, usePopover } from 'minimal-shared/hooks';
 
 import Table from '@mui/material/Table';
 import Stack from '@mui/material/Stack';
@@ -10,13 +11,16 @@ import TableBody from '@mui/material/TableBody';
 import Typography from '@mui/material/Typography';
 import { Card, Alert, Button, MenuList, MenuItem, Collapse, IconButton } from '@mui/material';
 
-import { useBoolean } from 'src/hooks/use-boolean';
-
 import { fFromNow } from 'src/utils/format-time';
+import { handleActionError } from 'src/utils/errors';
 
 import { useTranslate } from 'src/locales';
 import { endpointKeys } from 'src/actions/keys';
-import { revokeWalletApiKey, type ApiKeyResponse, type ListWalletApiKeysResponse } from 'src/lib/swissknife';
+import {
+  revokeWalletApiKey,
+  type ApiKeyResponse,
+  type ListWalletApiKeysResponse,
+} from 'src/lib/swissknife';
 
 import { Label } from 'src/components/label';
 import { toast } from 'src/components/snackbar';
@@ -25,7 +29,7 @@ import { Scrollbar } from 'src/components/scrollbar';
 import { TableHeadCustom } from 'src/components/table';
 import { CreateApiKeyDialog } from 'src/components/api-key';
 import { ConfirmDialog } from 'src/components/custom-dialog';
-import { usePopover, CustomPopover } from 'src/components/custom-popover';
+import { CustomPopover } from 'src/components/custom-popover';
 
 // ----------------------------------------------------------------------
 
@@ -51,7 +55,11 @@ export function SettingsApiKey({ apiKeys }: Props) {
       <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 3 }}>
         <Typography variant="h5">{t('settings_api_key.title')}</Typography>
 
-        <Button onClick={newApiKey.onTrue} variant="contained" startIcon={<Iconify icon="mingcute:add-line" />}>
+        <Button
+          onClick={newApiKey.onTrue}
+          variant="contained"
+          startIcon={<Iconify icon="mingcute:add-line" />}
+        >
           {t('new')}
         </Button>
       </Stack>
@@ -68,7 +76,7 @@ export function SettingsApiKey({ apiKeys }: Props) {
 
       <Scrollbar>
         <Table sx={{ minWidth: 800 }}>
-          <TableHeadCustom headLabel={TABLE_HEAD} />
+          <TableHeadCustom headCells={TABLE_HEAD} />
 
           <TableBody>
             {apiKeys.map((row) => (
@@ -112,7 +120,7 @@ function CollapsibleTableRow({ row }: CollapsibleTableRowProps) {
       toast.success(t('settings_api_key.revoke_success'));
       mutate(endpointKeys.userWallet.apiKeys.list);
     } catch (error) {
-      toast.error(error.reason);
+      handleActionError(error);
     } finally {
       isDeleting.onFalse();
       confirm.onFalse();
@@ -123,8 +131,14 @@ function CollapsibleTableRow({ row }: CollapsibleTableRowProps) {
     <>
       <TableRow sx={{ '& > *': { borderBottom: 'unset' } }}>
         <TableCell>
-          <IconButton size="small" color={collapsible.value ? 'inherit' : 'default'} onClick={collapsible.onToggle}>
-            <Iconify icon={collapsible.value ? 'eva:arrow-ios-upward-fill' : 'eva:arrow-ios-downward-fill'} />
+          <IconButton
+            size="small"
+            color={collapsible.value ? 'inherit' : 'default'}
+            onClick={collapsible.onToggle}
+          >
+            <Iconify
+              icon={collapsible.value ? 'eva:arrow-ios-upward-fill' : 'eva:arrow-ios-downward-fill'}
+            />
           </IconButton>
         </TableCell>
         <TableCell>
@@ -180,7 +194,12 @@ function CollapsibleTableRow({ row }: CollapsibleTableRowProps) {
         title={t('settings_api_key.revoke')}
         content={t('settings_api_key.confirm_revoke')}
         action={
-          <LoadingButton variant="contained" color="error" onClick={handleDeleteRow} loading={isDeleting.value}>
+          <LoadingButton
+            variant="contained"
+            color="error"
+            onClick={handleDeleteRow}
+            loading={isDeleting.value}
+          >
             {t('settings_api_key.revoke')}
           </LoadingButton>
         }

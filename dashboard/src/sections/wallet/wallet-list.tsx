@@ -5,6 +5,7 @@ import type { IWalletTableFilters } from 'src/types/wallet';
 import type { WalletOverview, ListWalletOverviewsResponse } from 'src/lib/swissknife';
 
 import { useState, useEffect, useCallback } from 'react';
+import { useBoolean, useSetState } from 'minimal-shared/hooks';
 
 import Card from '@mui/material/Card';
 import Table from '@mui/material/Table';
@@ -15,9 +16,7 @@ import TableBody from '@mui/material/TableBody';
 import IconButton from '@mui/material/IconButton';
 import TableContainer from '@mui/material/TableContainer';
 
-import { useBoolean } from 'src/hooks/use-boolean';
-import { useSetState } from 'src/hooks/use-set-state';
-
+import { handleActionError } from 'src/utils/errors';
 import { fIsAfter, fIsBetween } from 'src/utils/format-time';
 
 import { useTranslate } from 'src/locales';
@@ -75,7 +74,10 @@ export function WalletList({ data: wallets, fiatPrices, tableHead }: Props) {
     dateError,
   });
 
-  const dataInPage = dataFiltered.slice(table.page * table.rowsPerPage, table.page * table.rowsPerPage + table.rowsPerPage);
+  const dataInPage = dataFiltered.slice(
+    table.page * table.rowsPerPage,
+    table.page * table.rowsPerPage + table.rowsPerPage
+  );
   const denseHeight = table.dense ? 56 : 56 + 20;
   const canReset = !!filters.state.name || (!!filters.state.startDate && !!filters.state.endDate);
   const notFound = (!dataFiltered.length && canReset) || !dataFiltered.length;
@@ -95,7 +97,7 @@ export function WalletList({ data: wallets, fiatPrices, tableHead }: Props) {
         setTableData(deleteRow);
         table.onUpdatePageDeleteRow(dataInPage.length);
       } catch (error) {
-        toast.error(error.reason);
+        handleActionError(error);
       }
     },
     [dataInPage.length, table, tableData, t]
@@ -109,19 +111,20 @@ export function WalletList({ data: wallets, fiatPrices, tableHead }: Props) {
 
       toast.success(t('wallet_list.delete_multiple_success', { count: data }));
       setTableData(deleteRows);
-      table.onUpdatePageDeleteRows({
-        totalRowsInPage: dataInPage.length,
-        totalRowsFiltered: dataFiltered.length,
-      });
+      table.onUpdatePageDeleteRows(dataInPage.length, dataFiltered.length);
     } catch (error) {
-      toast.error(error.reason);
+      handleActionError(error);
     }
   }, [dataFiltered.length, dataInPage.length, table, tableData, t]);
 
   return (
     <>
       <Card>
-        <WalletTableToolbar filters={filters} onResetPage={table.onResetPage} dateError={dateError} />
+        <WalletTableToolbar
+          filters={filters}
+          onResetPage={table.onResetPage}
+          dateError={dateError}
+        />
 
         {canReset && (
           <WalletTableFiltersResult
@@ -171,7 +174,7 @@ export function WalletList({ data: wallets, fiatPrices, tableHead }: Props) {
               <TableHeadCustom
                 order={table.order}
                 orderBy={table.orderBy}
-                headLabel={tableHead}
+                headCells={tableHead}
                 rowCount={dataFiltered.length}
                 numSelected={table.selected.length}
                 onSort={table.onSort}
@@ -184,18 +187,26 @@ export function WalletList({ data: wallets, fiatPrices, tableHead }: Props) {
               />
 
               <TableBody>
-                {dataFiltered.slice(table.page * table.rowsPerPage, table.page * table.rowsPerPage + table.rowsPerPage).map((row) => (
-                  <WalletTableRow
-                    fiatPrices={fiatPrices}
-                    key={row.id}
-                    row={row}
-                    selected={table.selected.includes(row.id)}
-                    onSelectRow={() => table.onSelectRow(row.id)}
-                    onDeleteRow={() => handleDeleteRow(row.id)}
-                  />
-                ))}
+                {dataFiltered
+                  .slice(
+                    table.page * table.rowsPerPage,
+                    table.page * table.rowsPerPage + table.rowsPerPage
+                  )
+                  .map((row) => (
+                    <WalletTableRow
+                      fiatPrices={fiatPrices}
+                      key={row.id}
+                      row={row}
+                      selected={table.selected.includes(row.id)}
+                      onSelectRow={() => table.onSelectRow(row.id)}
+                      onDeleteRow={() => handleDeleteRow(row.id)}
+                    />
+                  ))}
 
-                <TableEmptyRows height={denseHeight} emptyRows={emptyRows(table.page, table.rowsPerPage, dataFiltered.length)} />
+                <TableEmptyRows
+                  height={denseHeight}
+                  emptyRows={emptyRows(table.page, table.rowsPerPage, dataFiltered.length)}
+                />
 
                 <TableNoData notFound={notFound} />
               </TableBody>
@@ -267,7 +278,8 @@ function applyFilter({
   if (name) {
     inputData = inputData.filter(
       (wallet) =>
-        wallet.user_id.toLowerCase().indexOf(name.toLowerCase()) !== -1 || wallet.id.toLowerCase().indexOf(name.toLowerCase()) !== -1
+        wallet.user_id.toLowerCase().indexOf(name.toLowerCase()) !== -1 ||
+        wallet.id.toLowerCase().indexOf(name.toLowerCase()) !== -1
     );
   }
 

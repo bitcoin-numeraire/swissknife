@@ -1,4 +1,4 @@
-import type { Theme, SxProps } from '@mui/material/styles';
+import type { Theme, SxProps, CSSObject } from '@mui/material/styles';
 
 import Box from '@mui/material/Box';
 import TableRow from '@mui/material/TableRow';
@@ -9,19 +9,27 @@ import TableSortLabel from '@mui/material/TableSortLabel';
 
 // ----------------------------------------------------------------------
 
-const visuallyHidden = {
+const visuallyHidden: CSSObject = {
   border: 0,
-  margin: -1,
   padding: 0,
   width: '1px',
   height: '1px',
+  margin: '-1px',
   overflow: 'hidden',
   position: 'absolute',
   whiteSpace: 'nowrap',
   clip: 'rect(0 0 0 0)',
-} as const;
+};
 
 // ----------------------------------------------------------------------
+
+export type TableHeadCellProps = {
+  id: string;
+  label?: string;
+  width?: CSSObject['width'];
+  align?: 'left' | 'center' | 'right';
+  sx?: SxProps<Theme>;
+};
 
 export type TableHeadCustomProps = {
   orderBy?: string;
@@ -29,8 +37,8 @@ export type TableHeadCustomProps = {
   sx?: SxProps<Theme>;
   numSelected?: number;
   order?: 'asc' | 'desc';
+  headCells: TableHeadCellProps[];
   onSort?: (id: string) => void;
-  headLabel: Record<string, any>[];
   onSelectAllRows?: (checked: boolean) => void;
 };
 
@@ -39,7 +47,7 @@ export function TableHeadCustom({
   order,
   onSort,
   orderBy,
-  headLabel,
+  headCells,
   rowCount = 0,
   numSelected = 0,
   onSelectAllRows,
@@ -52,21 +60,26 @@ export function TableHeadCustom({
             <Checkbox
               indeterminate={!!numSelected && numSelected < rowCount}
               checked={!!rowCount && numSelected === rowCount}
-              onChange={(event: React.ChangeEvent<HTMLInputElement>) => onSelectAllRows(event.target.checked)}
+              onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+                onSelectAllRows(event.target.checked)
+              }
               inputProps={{
-                name: 'select-all-rows',
-                'aria-label': 'select all rows',
+                id: `all-row-checkbox`,
+                'aria-label': `All row Checkbox`,
               }}
             />
           </TableCell>
         )}
 
-        {headLabel.map((headCell) => (
+        {headCells.map((headCell) => (
           <TableCell
             key={headCell.id}
             align={headCell.align || 'left'}
             sortDirection={orderBy === headCell.id ? order : false}
-            sx={{ width: headCell.width, minWidth: headCell.minWidth }}
+            sx={[
+              { width: headCell.width },
+              ...(Array.isArray(headCell.sx) ? headCell.sx : [headCell.sx]),
+            ]}
           >
             {onSort ? (
               <TableSortLabel
@@ -78,7 +91,9 @@ export function TableHeadCustom({
                 {headCell.label}
 
                 {orderBy === headCell.id ? (
-                  <Box sx={{ ...visuallyHidden }}>{order === 'desc' ? 'sorted descending' : 'sorted ascending'}</Box>
+                  <Box component="span" sx={visuallyHidden}>
+                    {order === 'desc' ? 'sorted descending' : 'sorted ascending'}
+                  </Box>
                 ) : null}
               </TableSortLabel>
             ) : (

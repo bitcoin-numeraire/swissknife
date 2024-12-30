@@ -1,7 +1,7 @@
-import { CONFIG } from 'src/config-global';
+import { CONFIG } from 'src/global-config';
 
 export function appTitle(str: string) {
-  return `${str} - ${CONFIG.site.name}`;
+  return `${str} - ${CONFIG.appName}`;
 }
 
 export function truncateText(text?: string | null, maxLength: number = 30) {

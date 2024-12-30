@@ -3,11 +3,10 @@
 import type { TFunction } from 'i18next';
 
 import { mutate } from 'swr';
+import { useBoolean } from 'minimal-shared/hooks';
 
 import Stack from '@mui/material/Stack';
 import Button from '@mui/material/Button';
-
-import { useBoolean } from 'src/hooks/use-boolean';
 
 import { shouldFail } from 'src/utils/errors';
 
@@ -54,7 +53,7 @@ export function ApiKeyListView() {
 
   return (
     <DashboardContent>
-      <RoleBasedGuard permissions={[Permission.READ_API_KEY]} hasContent>
+      <RoleBasedGuard permissions={[Permission['READ:API_KEY']]} hasContent>
         {failed ? (
           <ErrorView errors={errors} isLoading={isLoading} data={data} />
         ) : (
@@ -71,7 +70,11 @@ export function ApiKeyListView() {
               ]}
               action={
                 <Stack direction="row" spacing={1}>
-                  <Button onClick={newApiKey.onTrue} variant="contained" startIcon={<Iconify icon="mingcute:add-line" />}>
+                  <Button
+                    onClick={newApiKey.onTrue}
+                    variant="contained"
+                    startIcon={<Iconify icon="mingcute:add-line" />}
+                  >
                     {t('new')}
                   </Button>
                 </Stack>

@@ -12,8 +12,8 @@ use super::{HealthCheck, HealthStatus, SetupInfo, VersionInfo};
 
 #[derive(OpenApi)]
 #[openapi(
-    paths(readiness_check, health_check, version_check),
-    components(schemas(HealthCheck, HealthStatus, VersionInfo)),
+    paths(readiness_check, health_check, version_check, setup_check),
+    components(schemas(HealthCheck, HealthStatus, VersionInfo, SetupInfo)),
     tags(
         (name = "System", description = "System related endpoints")
     )

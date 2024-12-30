@@ -2,27 +2,26 @@
 
 import type { IconButtonProps } from '@mui/material/IconButton';
 
-import { useCallback } from 'react';
+import { useBoolean } from 'minimal-shared/hooks';
 
 import Box from '@mui/material/Box';
-import Stack from '@mui/material/Stack';
+import Link from '@mui/material/Link';
+import { Stack } from '@mui/material';
+import Avatar from '@mui/material/Avatar';
 import Drawer from '@mui/material/Drawer';
+import MenuList from '@mui/material/MenuList';
 import MenuItem from '@mui/material/MenuItem';
-import { useTheme } from '@mui/material/styles';
 import Typography from '@mui/material/Typography';
 import IconButton from '@mui/material/IconButton';
 
-import { useRouter } from 'src/routes/hooks';
+import { RouterLink } from 'src/routes/components';
 
-import { useBoolean } from 'src/hooks/use-boolean';
-
-import { CONFIG } from 'src/config-global';
-import { varAlpha } from 'src/theme/styles';
+import { CONFIG } from 'src/global-config';
 
 import { Label } from 'src/components/label';
 import { Iconify } from 'src/components/iconify';
 import { Scrollbar } from 'src/components/scrollbar';
-import { AnimateAvatar } from 'src/components/animate';
+import { AnimateBorder } from 'src/components/animate';
 
 import { useAuthContext } from 'src/auth/hooks';
 
@@ -42,60 +41,113 @@ export type AccountDrawerProps = IconButtonProps & {
 };
 
 export function AccountDrawer({ data = [], sx, ...other }: AccountDrawerProps) {
-  const theme = useTheme();
-
-  const router = useRouter();
-
   const { user } = useAuthContext();
 
-  const open = useBoolean(false);
+  const { value: open, onFalse: onClose, onTrue: onOpen } = useBoolean();
 
-  const handleClickItem = useCallback(
-    (path: string, target: string = '_self') => {
-      open.onFalse();
-      if (target === '_blank') {
-        window.open(path, target);
-      } else {
-        router.push(path);
-      }
-    },
-    [open, router]
-  );
-
-  const renderAvatar = (
-    <AnimateAvatar
-      width={96}
+  const renderAvatar = () => (
+    <AnimateBorder
+      sx={{ mb: 2, p: '6px', width: 96, height: 96, borderRadius: '50%' }}
       slotProps={{
-        avatar: { src: user?.photoURL, alt: user?.displayName },
-        overlay: {
-          border: 2,
-          spacing: 3,
-          color: `linear-gradient(135deg, ${varAlpha(theme.vars.palette.primary.mainChannel, 0)} 25%, ${theme.vars.palette.primary.main} 100%)`,
-        },
+        primaryBorder: { size: 120, sx: { color: 'primary.main' } },
       }}
     >
-      {user?.displayName?.charAt(0).toUpperCase()}
-    </AnimateAvatar>
+      <Avatar src={user?.photoURL} alt={user?.displayName} sx={{ width: 1, height: 1 }}>
+        {user?.displayName?.charAt(0).toUpperCase()}
+      </Avatar>
+    </AnimateBorder>
+  );
+
+  const renderList = () => (
+    <MenuList
+      disablePadding
+      sx={[
+        (theme) => ({
+          py: 3,
+          px: 2.5,
+          borderTop: `dashed 1px ${theme.vars.palette.divider}`,
+          borderBottom: `dashed 1px ${theme.vars.palette.divider}`,
+          '& li': { p: 0 },
+        }),
+      ]}
+    >
+      {data.map((option) => (
+        <MenuItem key={option.label}>
+          <Link
+            component={RouterLink}
+            href={option.label === 'Home' ? '/' : option.href}
+            target={option.target}
+            color="inherit"
+            underline="none"
+            onClick={onClose}
+            sx={{
+              p: 1,
+              width: 1,
+              display: 'flex',
+              typography: 'body2',
+              alignItems: 'center',
+              color: 'text.secondary',
+              '& svg': { width: 24, height: 24 },
+              '&:hover': { color: 'text.primary' },
+            }}
+          >
+            {option.icon}
+
+            <Box component="span" sx={{ ml: 2 }}>
+              {option.label === 'Home' ? 'Home' : option.label}
+            </Box>
+
+            {option.info && (
+              <Label color="error" sx={{ ml: 1 }}>
+                {option.info}
+              </Label>
+            )}
+          </Link>
+        </MenuItem>
+      ))}
+    </MenuList>
   );
 
   return (
     <>
-      <AccountButton open={open.value} onClick={open.onTrue} photoURL={user?.photoURL} displayName={user?.displayName} sx={sx} {...other} />
+      <AccountButton
+        onClick={onOpen}
+        photoURL={user?.photoURL}
+        displayName={user?.displayName}
+        sx={sx}
+        {...other}
+      />
 
       <Drawer
-        open={open.value}
-        onClose={open.onFalse}
+        open={open}
+        onClose={onClose}
         anchor="right"
         slotProps={{ backdrop: { invisible: true } }}
         PaperProps={{ sx: { width: 320 } }}
       >
-        <IconButton onClick={open.onFalse} sx={{ top: 12, left: 12, zIndex: 9, position: 'absolute' }}>
+        <IconButton
+          onClick={onClose}
+          sx={{
+            top: 12,
+            left: 12,
+            zIndex: 9,
+            position: 'absolute',
+          }}
+        >
           <Iconify icon="mingcute:close-line" />
         </IconButton>
 
         <Scrollbar>
-          <Stack alignItems="center" sx={{ pt: 8, pb: 3 }}>
-            {renderAvatar}
+          <Box
+            sx={{
+              pt: 8,
+              pb: 3,
+              display: 'flex',
+              alignItems: 'center',
+              flexDirection: 'column',
+            }}
+          >
+            {renderAvatar()}
 
             <Typography variant="subtitle1" noWrap sx={{ mt: 2 }}>
               {user?.displayName}
@@ -104,56 +156,22 @@ export function AccountDrawer({ data = [], sx, ...other }: AccountDrawerProps) {
             <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }} noWrap>
               {user?.email}
             </Typography>
-          </Stack>
-
-          <Stack
-            sx={{
-              py: 3,
-              px: 2.5,
-              borderTop: `dashed 1px ${theme.vars.palette.divider}`,
-              borderBottom: `dashed 1px ${theme.vars.palette.divider}`,
-            }}
-          >
-            {data.map((option) => (
-              <MenuItem
-                key={option.label}
-                onClick={() => handleClickItem(option.label === 'Home' ? '/' : option.href, option.target)}
-                sx={{
-                  py: 1,
-                  color: 'text.secondary',
-                  '& svg': { width: 24, height: 24 },
-                  '&:hover': { color: 'text.primary' },
-                }}
-              >
-                {option.icon}
-
-                <Box component="span" sx={{ ml: 2 }}>
-                  {option.label === 'Home' ? 'Home' : option.label}
-                </Box>
-
-                {option.info && (
-                  <Label color="error" sx={{ ml: 1 }}>
-                    {option.info}
-                  </Label>
-                )}
-              </MenuItem>
-            ))}
-          </Stack>
-
-          <Box sx={{ px: 2.5, py: 3 }}>
-            <Stack alignItems="flex-start" sx={{ position: 'relative' }}>
-              <Box component="span" sx={{ mb: 2, color: 'text.secondary', typography: 'body2' }}>
-                Version: {CONFIG.site.version}
-              </Box>
-
-              <Box component="span" sx={{ typography: 'body2', color: 'text.secondary' }}>
-                Built with <Iconify icon="solar:heart-bold" sx={{ color: 'red' }} /> from Switzerland
-              </Box>
-            </Stack>
           </Box>
+
+          {renderList()}
+
+          <Stack spacing={2} sx={{ px: 2.5, py: 3 }} alignItems="flex-start">
+            <Typography variant="body2" color="text.secondary">
+              Version: {CONFIG.appVersion}
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Built with <Iconify icon="solar:heart-bold" sx={{ color: 'red' }} /> from Switzerland
+            </Typography>
+          </Stack>
         </Scrollbar>
+
         <Box sx={{ p: 2.5 }}>
-          <SignOutButton onClose={open.onFalse} />
+          <SignOutButton onClose={onClose} />
         </Box>
       </Drawer>
     </>

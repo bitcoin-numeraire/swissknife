@@ -2,7 +2,7 @@
 
 import { useContext } from 'react';
 
-import { SettingsContext } from './settings-provider';
+import { SettingsContext } from './settings-context';
 
 // ----------------------------------------------------------------------
 

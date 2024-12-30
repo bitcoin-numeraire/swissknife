@@ -109,7 +109,7 @@ impl LnUrlUseCases for LnUrlService {
             Some(comment.unwrap_or(format!("Payment to {}@{}", username, self.domain)));
 
         // TODO: Get or add more information to make this a LNURLp invoice (like fetching a success action specific to the user)
-        let invoice = self.store.invoice.insert(None, invoice).await?;
+        let invoice = self.store.invoice.insert(invoice).await?;
         let lnurlp_invoice = LnUrlCallback {
             pr: invoice
                 .ln_invoice

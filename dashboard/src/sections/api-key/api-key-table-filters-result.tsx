@@ -1,7 +1,7 @@
 import type { Theme, SxProps } from '@mui/material';
 import type { StackProps } from '@mui/material/Stack';
 import type { IApiKeyTableFilters } from 'src/types/apikey';
-import type { UseSetStateReturn } from 'src/hooks/use-set-state';
+import type { UseSetStateReturn } from 'minimal-shared/hooks';
 
 import { useCallback } from 'react';
 
@@ -36,9 +36,16 @@ export function ApiKeyTableFiltersResult({ filters, totalResults, onResetPage, s
   }, [filters, onResetPage]);
 
   return (
-    <FiltersResult totalResults={totalResults} onReset={filters.onResetState} sx={sx}>
-      <FiltersBlock label={t('date_filter')} isShow={Boolean(filters.state.startDate && filters.state.endDate)}>
-        <Chip {...chipProps} label={fDateRangeShortLabel(filters.state.startDate, filters.state.endDate)} onDelete={handleRemoveDate} />
+    <FiltersResult totalResults={totalResults} onReset={() => filters.resetState()} sx={sx}>
+      <FiltersBlock
+        label={t('date_filter')}
+        isShow={Boolean(filters.state.startDate && filters.state.endDate)}
+      >
+        <Chip
+          {...chipProps}
+          label={fDateRangeShortLabel(filters.state.startDate, filters.state.endDate)}
+          onDelete={handleRemoveDate}
+        />
       </FiltersBlock>
 
       <FiltersBlock label={t('keyword')} isShow={!!filters.state.name}>

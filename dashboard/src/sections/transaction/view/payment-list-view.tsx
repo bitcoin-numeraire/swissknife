@@ -5,12 +5,11 @@ import type { Theme } from '@mui/material';
 import type { LabelColor } from 'src/components/label';
 
 import { mutate } from 'swr';
+import { useBoolean } from 'minimal-shared/hooks';
 
 import { Box, Stack, Button, Tooltip, useTheme } from '@mui/material';
 
 import { paths } from 'src/routes/paths';
-
-import { useBoolean } from 'src/hooks/use-boolean';
 
 import { shouldFail } from 'src/utils/errors';
 
@@ -18,7 +17,11 @@ import { useTranslate } from 'src/locales';
 import { endpointKeys } from 'src/actions/keys';
 import { DashboardContent } from 'src/layouts/dashboard';
 import { useFetchFiatPrices } from 'src/actions/mempool-space';
-import { useGetWalletBalance, useListWalletContacts, useListWalletPayments } from 'src/actions/user-wallet';
+import {
+  useGetWalletBalance,
+  useListWalletContacts,
+  useListWalletPayments,
+} from 'src/actions/user-wallet';
 
 import { Iconify } from 'src/components/iconify';
 import { ErrorView } from 'src/components/error/error-view';
@@ -86,7 +89,7 @@ export function PaymentListView() {
   const { t } = useTranslate();
   const theme = useTheme();
 
-  const { payments, paymentsLoading, paymentsError } = useListWalletPayments();
+  const { payments, paymentsLoading, paymentsError, paymentsMutate } = useListWalletPayments();
   const { userBalance, userBalanceLoading, userBalanceError } = useGetWalletBalance();
   const { contacts, contactsLoading, contactsError } = useListWalletContacts();
   const { fiatPrices, fiatPricesLoading, fiatPricesError } = useFetchFiatPrices();
@@ -122,7 +125,7 @@ export function PaymentListView() {
                 <Tooltip title={t('payment_list.clean_failed_payments')} placement="top" arrow>
                   <Box>
                     <CleanTransactionsButton
-                      onSuccess={() => mutate(endpointKeys.userWallet.payments.list)}
+                      onSuccess={paymentsMutate}
                       buttonProps={{
                         color: 'error',
                         variant: 'contained',
@@ -135,7 +138,11 @@ export function PaymentListView() {
                     </CleanTransactionsButton>
                   </Box>
                 </Tooltip>
-                <Button onClick={newPayment.onTrue} variant="contained" startIcon={<Iconify icon="mingcute:add-line" />}>
+                <Button
+                  onClick={newPayment.onTrue}
+                  variant="contained"
+                  startIcon={<Iconify icon="mingcute:add-line" />}
+                >
                   {t('new')}
                 </Button>
               </Stack>

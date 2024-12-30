@@ -1,9 +1,10 @@
 import type { IDatePickerControl } from 'src/types/common';
 import type { IWalletTableFilters } from 'src/types/wallet';
-import type { UseSetStateReturn } from 'src/hooks/use-set-state';
+import type { UseSetStateReturn } from 'minimal-shared/hooks';
 
 import { t } from 'i18next';
 import { useCallback } from 'react';
+import { usePopover } from 'minimal-shared/hooks';
 
 import Stack from '@mui/material/Stack';
 import { MenuList } from '@mui/material';
@@ -16,7 +17,7 @@ import { formHelperTextClasses } from '@mui/material/FormHelperText';
 
 import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
-import { usePopover, CustomPopover } from 'src/components/custom-popover';
+import { CustomPopover } from 'src/components/custom-popover';
 
 // ----------------------------------------------------------------------
 

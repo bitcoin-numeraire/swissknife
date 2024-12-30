@@ -1,13 +1,17 @@
 import { cookies } from 'next/headers';
 
-import { STORAGE_KEY, defaultSettings } from './config-settings';
+import { defaultSettings, SETTINGS_STORAGE_KEY } from './settings-config';
+
+import type { SettingsState } from './types';
 
 // ----------------------------------------------------------------------
 
-export async function detectSettings() {
+export async function detectSettings(
+  storageKey: string = SETTINGS_STORAGE_KEY
+): Promise<SettingsState> {
   const cookieStore = cookies();
 
-  const settingsStore = cookieStore.get(STORAGE_KEY);
+  const settingsStore = cookieStore.get(storageKey);
 
   return settingsStore ? JSON.parse(settingsStore?.value) : defaultSettings;
 }

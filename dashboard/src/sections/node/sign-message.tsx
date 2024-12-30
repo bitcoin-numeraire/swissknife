@@ -3,28 +3,24 @@ import type { SignMessageRequest } from 'src/lib/swissknife';
 
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { ajvResolver } from '@hookform/resolvers/ajv';
+import { useBoolean } from 'minimal-shared/hooks';
+import { zodResolver } from '@hookform/resolvers/zod';
 
 import Card from '@mui/material/Card';
 import Stack from '@mui/material/Stack';
 import { LoadingButton } from '@mui/lab';
 import CardHeader from '@mui/material/CardHeader';
 
-import { useBoolean } from 'src/hooks/use-boolean';
-
-import { ajvOptions } from 'src/utils/ajv';
+import { handleActionError } from 'src/utils/errors';
 
 import { useTranslate } from 'src/locales';
-import { signMessage, SignMessageRequestSchema } from 'src/lib/swissknife';
+import { signMessage } from 'src/lib/swissknife';
+import { zSignMessageRequest } from 'src/lib/swissknife/zod.gen';
 
 import { QRDialog } from 'src/components/qr';
-import { toast } from 'src/components/snackbar';
 import { Form, RHFTextField } from 'src/components/hook-form';
 
 // ----------------------------------------------------------------------
-
-// @ts-ignore
-const resolver = ajvResolver(SignMessageRequestSchema, ajvOptions);
 
 export function SignMessage({ ...other }: CardProps) {
   const { t } = useTranslate();
@@ -32,7 +28,7 @@ export function SignMessage({ ...other }: CardProps) {
   const confirm = useBoolean();
 
   const methods = useForm({
-    resolver,
+    resolver: zodResolver(zSignMessageRequest),
     defaultValues: {
       message: '',
     },
@@ -55,7 +51,7 @@ export function SignMessage({ ...other }: CardProps) {
       confirm.onTrue();
       reset();
     } catch (error) {
-      toast.error(error.reason);
+      handleActionError(error);
     }
   };
 
@@ -65,7 +61,14 @@ export function SignMessage({ ...other }: CardProps) {
       <Stack spacing={3} sx={{ p: 3 }}>
         <Form methods={methods} onSubmit={handleSubmit(onSubmit)}>
           <Stack spacing={3}>
-            <RHFTextField variant="outlined" fullWidth name="message" multiline rows={5} label={t('sign_message.message_label')} />
+            <RHFTextField
+              variant="outlined"
+              fullWidth
+              name="message"
+              multiline
+              rows={5}
+              label={t('sign_message.message_label')}
+            />
 
             <Stack direction="row" spacing={2}>
               <LoadingButton
@@ -84,7 +87,12 @@ export function SignMessage({ ...other }: CardProps) {
         </Form>
       </Stack>
 
-      <QRDialog title={t('sign_message.signature_dialog_title')} open={confirm.value} onClose={confirm.onFalse} value={qrValue} />
+      <QRDialog
+        title={t('sign_message.signature_dialog_title')}
+        open={confirm.value}
+        onClose={confirm.onFalse}
+        value={qrValue}
+      />
     </Card>
   );
 }

@@ -1,8 +1,8 @@
+import { useBoolean } from 'minimal-shared/hooks';
+
 import { LoadingButton } from '@mui/lab';
 import Tooltip from '@mui/material/Tooltip';
 import IconButton from '@mui/material/IconButton';
-
-import { useBoolean } from 'src/hooks/use-boolean';
 
 import { useTranslate } from 'src/locales';
 

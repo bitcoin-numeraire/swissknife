@@ -1,17 +1,37 @@
+import type { BoxProps } from '@mui/material/Box';
 import type { MuiOtpInputProps } from 'mui-one-time-password-input';
+import type { FormHelperTextProps } from '@mui/material/FormHelperText';
 
 import { MuiOtpInput } from 'mui-one-time-password-input';
 import { Controller, useFormContext } from 'react-hook-form';
 
-import FormHelperText from '@mui/material/FormHelperText';
+import Box from '@mui/material/Box';
+import { inputBaseClasses } from '@mui/material/InputBase';
+
+import { HelperText } from './help-text';
 
 // ----------------------------------------------------------------------
 
-type RHFCodesProps = MuiOtpInputProps & {
+export interface RHFCodesProps extends Omit<MuiOtpInputProps, 'sx'> {
   name: string;
-};
+  maxSize?: number;
+  placeholder?: string;
+  helperText?: React.ReactNode;
+  slotProps?: {
+    wrapper?: BoxProps;
+    helperText?: FormHelperTextProps;
+    textfield?: MuiOtpInputProps['TextFieldsProps'];
+  };
+}
 
-export function RHFCode({ name, ...other }: RHFCodesProps) {
+export function RHFCode({
+  name,
+  slotProps,
+  helperText,
+  maxSize = 56,
+  placeholder = '-',
+  ...other
+}: RHFCodesProps) {
   const { control } = useFormContext();
 
   return (
@@ -19,15 +39,43 @@ export function RHFCode({ name, ...other }: RHFCodesProps) {
       name={name}
       control={control}
       render={({ field, fieldState: { error } }) => (
-        <div>
-          <MuiOtpInput {...field} autoFocus gap={1.5} length={6} TextFieldsProps={{ error: !!error, placeholder: '-' }} {...other} />
+        <Box
+          {...slotProps?.wrapper}
+          sx={[
+            {
+              display: 'flex',
+              justifyContent: 'center',
+              [`& .${inputBaseClasses.input}`]: {
+                p: 0,
+                height: 'auto',
+                aspectRatio: '1/1',
+                maxWidth: maxSize,
+              },
+            },
+            ...(Array.isArray(slotProps?.wrapper?.sx)
+              ? (slotProps?.wrapper?.sx ?? [])
+              : [slotProps?.wrapper?.sx]),
+          ]}
+        >
+          <MuiOtpInput
+            {...field}
+            autoFocus
+            gap={1.5}
+            length={6}
+            TextFieldsProps={{
+              placeholder,
+              error: !!error,
+              ...slotProps?.textfield,
+            }}
+            {...other}
+          />
 
-          {error && (
-            <FormHelperText sx={{ px: 2 }} error>
-              {error.message}
-            </FormHelperText>
-          )}
-        </div>
+          <HelperText
+            {...slotProps?.helperText}
+            errorMessage={error?.message}
+            helperText={helperText}
+          />
+        </Box>
       )}
     />
   );

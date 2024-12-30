@@ -4,12 +4,11 @@ import type { TFunction } from 'i18next';
 import type { LabelColor } from 'src/components/label';
 
 import { mutate } from 'swr';
+import { useBoolean } from 'minimal-shared/hooks';
 
 import Stack from '@mui/material/Stack';
 import Button from '@mui/material/Button';
 import { useTheme } from '@mui/material/styles';
-
-import { useBoolean } from 'src/hooks/use-boolean';
 
 import { shouldFail } from 'src/utils/errors';
 
@@ -88,7 +87,7 @@ export function LnAddressListView() {
 
   return (
     <DashboardContent>
-      <RoleBasedGuard permissions={[Permission.READ_LN_ADDRESS]} hasContent>
+      <RoleBasedGuard permissions={[Permission['READ:LN_ADDRESS']]} hasContent>
         {failed ? (
           <ErrorView errors={errors} isLoading={isLoading} />
         ) : (
@@ -105,7 +104,11 @@ export function LnAddressListView() {
               ]}
               action={
                 <Stack direction="row" spacing={1}>
-                  <Button onClick={newLnAddress.onTrue} variant="contained" startIcon={<Iconify icon="mingcute:add-line" />}>
+                  <Button
+                    onClick={newLnAddress.onTrue}
+                    variant="contained"
+                    startIcon={<Iconify icon="mingcute:add-line" />}
+                  >
                     {t('new')}
                   </Button>
                 </Stack>

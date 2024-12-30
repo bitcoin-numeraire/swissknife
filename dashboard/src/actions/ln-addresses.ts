@@ -1,5 +1,3 @@
-import type { LnAddress, ListAddressesResponse } from 'src/lib/swissknife';
-
 import useSWR from 'swr';
 import { useMemo } from 'react';
 
@@ -7,14 +5,7 @@ import { getAddress, listAddresses } from 'src/lib/swissknife';
 
 import { endpointKeys } from './keys';
 
-interface IGetLnAddresses {
-  lnAddresses?: ListAddressesResponse;
-  lnAddressesLoading: boolean;
-  lnAddressesError?: any;
-  lnAddressesValidating: boolean;
-}
-
-export function useListLnAddresses(limit?: number, offset?: number): IGetLnAddresses {
+export function useListLnAddresses(limit?: number, offset?: number) {
   const fetcher = async () => {
     const { data, error } = await listAddresses({ query: { limit, offset } });
     if (error) {
@@ -24,7 +15,10 @@ export function useListLnAddresses(limit?: number, offset?: number): IGetLnAddre
     return data;
   };
 
-  const { data, error, isLoading, isValidating } = useSWR(endpointKeys.lightning.addresses.list, fetcher);
+  const { data, error, isLoading, isValidating } = useSWR(
+    endpointKeys.lightning.addresses.list,
+    fetcher
+  );
 
   return useMemo(
     () => ({
@@ -37,14 +31,7 @@ export function useListLnAddresses(limit?: number, offset?: number): IGetLnAddre
   );
 }
 
-interface IGetLnAddress {
-  lnAddress?: LnAddress;
-  lnAddressLoading: boolean;
-  lnAddressError?: any;
-  lnAddressValidating: boolean;
-}
-
-export function useGetLnAddress(id: string): IGetLnAddress {
+export function useGetLnAddress(id: string) {
   const fetcher = async () => {
     const { data, error } = await getAddress({ path: { id } });
     if (error) {
@@ -54,7 +41,10 @@ export function useGetLnAddress(id: string): IGetLnAddress {
     return data;
   };
 
-  const { data, error, isLoading, isValidating } = useSWR(endpointKeys.lightning.addresses.get, fetcher);
+  const { data, error, isLoading, isValidating } = useSWR(
+    endpointKeys.lightning.addresses.get,
+    fetcher
+  );
 
   return {
     lnAddress: data,

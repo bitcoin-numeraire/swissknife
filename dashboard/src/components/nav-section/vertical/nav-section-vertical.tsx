@@ -1,31 +1,38 @@
-import { useState, useCallback } from 'react';
+import { useBoolean } from 'minimal-shared/hooks';
+import { mergeClasses } from 'minimal-shared/utils';
 
-import Stack from '@mui/material/Stack';
 import Collapse from '@mui/material/Collapse';
 import { useTheme } from '@mui/material/styles';
 
-import { useAuthContext } from 'src/auth/hooks';
-import { hasAllPermissions } from 'src/auth/permissions';
-
 import { NavList } from './nav-list';
-import { navSectionClasses } from '../classes';
-import { navSectionCssVars } from '../css-vars';
-import { NavUl, NavLi, Subheader } from '../styles';
+import { Nav, NavUl, NavLi, NavSubheader } from '../components';
+import { navSectionClasses, navSectionCssVars } from '../styles';
 
 import type { NavGroupProps, NavSectionProps } from '../types';
 
 // ----------------------------------------------------------------------
 
-export function NavSectionVertical({ sx, data, render, slotProps, enabledRootRedirect, cssVars: overridesVars }: NavSectionProps) {
+export function NavSectionVertical({
+  sx,
+  data,
+  render,
+  className,
+  slotProps,
+  currentRole,
+  enabledRootRedirect,
+  cssVars: overridesVars,
+  ...other
+}: NavSectionProps) {
   const theme = useTheme();
 
-  const cssVars = {
-    ...navSectionCssVars.vertical(theme),
-    ...overridesVars,
-  };
+  const cssVars = { ...navSectionCssVars.vertical(theme), ...overridesVars };
 
   return (
-    <Stack component="nav" className={navSectionClasses.vertical.root} sx={{ ...cssVars, ...sx }}>
+    <Nav
+      className={mergeClasses([navSectionClasses.vertical, className])}
+      sx={[{ ...cssVars }, ...(Array.isArray(sx) ? sx : [sx])]}
+      {...other}
+    >
       <NavUl sx={{ flex: '1 1 auto', gap: 'var(--nav-item-gap)' }}>
         {data.map((group) => (
           <Group
@@ -34,34 +41,39 @@ export function NavSectionVertical({ sx, data, render, slotProps, enabledRootRed
             items={group.items}
             render={render}
             slotProps={slotProps}
+            currentRole={currentRole}
             enabledRootRedirect={enabledRootRedirect}
           />
         ))}
       </NavUl>
-    </Stack>
+    </Nav>
   );
 }
 
 // ----------------------------------------------------------------------
 
-function Group({ items, render, subheader, slotProps, enabledRootRedirect }: NavGroupProps) {
-  const [open, setOpen] = useState(true);
-  const { user } = useAuthContext();
+function Group({
+  items,
+  render,
+  subheader,
+  slotProps,
+  currentRole,
+  enabledRootRedirect,
+}: NavGroupProps) {
+  const groupOpen = useBoolean(true);
 
-  const handleToggle = useCallback(() => {
-    setOpen((prev) => !prev);
-  }, []);
-
-  const filteredItems = items.filter((item) => !item.permissions || hasAllPermissions(item.permissions, user?.permissions || []));
-
-  if (filteredItems.length === 0) {
-    return null;
-  }
-
-  const renderContent = (
+  const renderContent = () => (
     <NavUl sx={{ gap: 'var(--nav-item-gap)' }}>
-      {filteredItems.map((list) => (
-        <NavList key={list.title} data={list} render={render} depth={1} slotProps={slotProps} enabledRootRedirect={enabledRootRedirect} />
+      {items.map((list) => (
+        <NavList
+          key={list.title}
+          data={list}
+          render={render}
+          depth={1}
+          slotProps={slotProps}
+          currentRole={currentRole}
+          enabledRootRedirect={enabledRootRedirect}
+        />
       ))}
     </NavUl>
   );
@@ -70,14 +82,19 @@ function Group({ items, render, subheader, slotProps, enabledRootRedirect }: Nav
     <NavLi>
       {subheader ? (
         <>
-          <Subheader data-title={subheader} open={open} onClick={handleToggle} sx={slotProps?.subheader}>
+          <NavSubheader
+            data-title={subheader}
+            open={groupOpen.value}
+            onClick={groupOpen.onToggle}
+            sx={slotProps?.subheader}
+          >
             {subheader}
-          </Subheader>
+          </NavSubheader>
 
-          <Collapse in={open}>{renderContent}</Collapse>
+          <Collapse in={groupOpen.value}>{renderContent()}</Collapse>
         </>
       ) : (
-        renderContent
+        renderContent()
       )}
     </NavLi>
   );

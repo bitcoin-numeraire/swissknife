@@ -1,25 +1,36 @@
 import type { Permission, ApiKeyResponse, CreateApiKeyRequest } from 'src/lib/swissknife';
 
 import { useState } from 'react';
-import { ajvResolver } from '@hookform/resolvers/ajv';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm, FormProvider } from 'react-hook-form';
 
 import { LoadingButton } from '@mui/lab';
-import { Link, Stack, Alert, Divider, MenuItem, TextField, Typography, InputAdornment } from '@mui/material';
+import {
+  Link,
+  Stack,
+  Alert,
+  Divider,
+  MenuItem,
+  TextField,
+  Typography,
+  InputAdornment,
+} from '@mui/material';
 
-import { ajvOptions } from 'src/utils/ajv';
 import { fDate } from 'src/utils/format-time';
+import { handleActionError } from 'src/utils/errors';
 
 import { useTranslate } from 'src/locales';
-import { CONFIG } from 'src/config-global';
-import { createApiKey, PermissionSchema, createWalletApiKey, CreateApiKeyRequestSchema } from 'src/lib/swissknife';
+import { CONFIG } from 'src/global-config';
+import { zCreateApiKeyRequest } from 'src/lib/swissknife/zod.gen';
+import { createApiKey, createWalletApiKey } from 'src/lib/swissknife';
 
 import { toast } from 'src/components/snackbar';
-import { RHFSelect, RHFTextField, RHFWalletSelect, RHFMultiCheckbox } from 'src/components/hook-form';
+import { RHFSelect, RHFTextField, RHFMultiCheckbox } from 'src/components/hook-form';
 
 import { useAuthContext } from 'src/auth/hooks';
 
 import { CopyButton } from '../copy';
+import { WalletSelectDropdown } from '../wallet';
 
 // ----------------------------------------------------------------------
 
@@ -35,13 +46,8 @@ type Props = {
   isAdmin?: boolean;
 };
 
-// @ts-ignore
-const resolver = ajvResolver(CreateApiKeyRequestSchema, {
-  ...ajvOptions,
-  schemas: [{ ...PermissionSchema, $id: '#/components/schemas/Permission' }],
-});
-
-const permissionOptions = (permissions: Permission[]) => permissions.map((value) => ({ label: value, value }));
+const permissionOptions = (permissions: Permission[]) =>
+  permissions.map((value) => ({ label: value, value }));
 
 export function CreateApiKeyForm({ onSuccess, isAdmin }: Props) {
   const { t } = useTranslate();
@@ -49,43 +55,35 @@ export function CreateApiKeyForm({ onSuccess, isAdmin }: Props) {
   const [apiKey, setApiKey] = useState<ApiKeyResponse>();
 
   const methods = useForm({
-    resolver,
+    resolver: zodResolver(zCreateApiKeyRequest),
     defaultValues: {
       name: '',
-      wallet: null,
+      user_id: user?.sub,
       expiry: expiryOptions[2].value,
       permissions: [],
-      description: '',
     },
   });
 
   const {
     reset,
     handleSubmit,
-    formState: { isSubmitting },
+    formState: { isSubmitting, isValid },
   } = methods;
 
-  const onSubmit = async (body: any) => {
-    const submissionData: CreateApiKeyRequest = {
-      ...body,
-      expiry: body.expiry || undefined,
-      description: body.description || undefined,
-      user_id: body.wallet?.user_id,
-    };
-
+  const onSubmit = async (body: CreateApiKeyRequest) => {
     try {
       if (isAdmin) {
-        const { data } = await createApiKey({ body: submissionData });
+        const { data } = await createApiKey({ body });
         setApiKey(data);
       } else {
-        const { data } = await createWalletApiKey({ body: submissionData });
+        const { data } = await createWalletApiKey({ body });
         setApiKey(data);
       }
       toast.success(t('create_api_key_form.create_success'));
       reset();
       onSuccess();
     } catch (error) {
-      toast.error(error.reason);
+      handleActionError(error);
     }
   };
 
@@ -108,8 +106,18 @@ export function CreateApiKeyForm({ onSuccess, isAdmin }: Props) {
     <FormProvider {...methods}>
       <form onSubmit={handleSubmit(onSubmit)}>
         <Stack spacing={3}>
-          <RHFTextField autoFocus variant="outlined" name="name" label={t('create_api_key_form.name')} />
-          <RHFTextField variant="outlined" fullWidth name="description" label={t('create_api_key_form.description')} />
+          <RHFTextField
+            autoFocus
+            variant="outlined"
+            name="name"
+            label={t('create_api_key_form.name')}
+          />
+          <RHFTextField
+            variant="outlined"
+            fullWidth
+            name="description"
+            label={t('create_api_key_form.description')}
+          />
           <RHFSelect name="expiry" label={t('create_api_key_form.expiration')}>
             <MenuItem value={0}>
               <Typography variant="body1">Never expires</Typography>
@@ -144,15 +152,22 @@ export function CreateApiKeyForm({ onSuccess, isAdmin }: Props) {
           ) : (
             <Alert variant="filled" severity="info">
               {t('create_api_key_form.no_permissions')}:{' '}
-              <Link href={`${CONFIG.site.serverUrl}/docs#tag/user-wallet`} target="_blank">
+              <Link href={`${CONFIG.serverUrl}/docs#tag/user-wallet`} target="_blank">
                 See Docs
               </Link>
             </Alert>
           )}
 
-          {isAdmin && <RHFWalletSelect />}
+          {isAdmin && <WalletSelectDropdown name="user_id" />}
 
-          <LoadingButton type="submit" variant="contained" color="inherit" size="large" loading={isSubmitting}>
+          <LoadingButton
+            type="submit"
+            variant="contained"
+            color="inherit"
+            size="large"
+            loading={isSubmitting}
+            disabled={!isValid}
+          >
             {t('create_api_key_form.create_button')}
           </LoadingButton>
         </Stack>

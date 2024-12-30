@@ -45,7 +45,7 @@ install-tools:
 	@cargo install cargo-outdated
 
 generate-models:
-	@sea-orm-cli generate entity --output-dir src/infra/database/sea_orm/models 
+	@sea-orm-cli generate entity --output-dir src/infra/database/sea_orm/models2
 
 generate-certs:
 	@mkdir -p certs

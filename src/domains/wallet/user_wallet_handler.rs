@@ -17,7 +17,7 @@ use crate::{
         dtos::{
             ApiKeyResponse, CreateApiKeyRequest, ErrorResponse, InvoiceResponse, NewInvoiceRequest,
             PaymentResponse, RegisterLnAddressRequest, SendPaymentRequest, UpdateLnAddressRequest,
-            WalletResponse,
+            WalletLnAddressResponse, WalletResponse,
         },
         errors::{ApplicationError, DataError},
     },
@@ -46,7 +46,7 @@ use super::{Balance, Contact};
         list_contacts,
         create_wallet_api_key, list_wallet_api_keys, get_wallet_api_key, revoke_wallet_api_key, revoke_wallet_api_keys
     ),
-    components(schemas(WalletResponse, Balance, Contact)),
+    components(schemas(WalletResponse, Balance, Contact, WalletLnAddressResponse)),
     tags(
         (name = "User Wallet", description = "User Wallet endpoints. Available to any authenticated user.")
     ),
@@ -208,7 +208,7 @@ async fn new_wallet_invoice(
     tag = "User Wallet",
     context_path = CONTEXT_PATH,
     responses(
-        (status = 200, description = "Found", body = LnAddress),
+        (status = 200, description = "Found", body = WalletLnAddressResponse),
         (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
         (status = 404, description = "Not Found", body = ErrorResponse, example = json!(NOT_FOUND_EXAMPLE)),
         (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
@@ -217,7 +217,7 @@ async fn new_wallet_invoice(
 async fn get_wallet_address(
     State(app_state): State<Arc<AppState>>,
     user: User,
-) -> Result<Json<LnAddress>, ApplicationError> {
+) -> Result<Json<WalletLnAddressResponse>, ApplicationError> {
     let ln_addresses = app_state
         .services
         .ln_address
@@ -227,12 +227,9 @@ async fn get_wallet_address(
         })
         .await?;
 
-    let ln_address = ln_addresses
-        .first()
-        .cloned()
-        .ok_or_else(|| DataError::NotFound("LN Address not found.".to_string()))?;
+    let ln_address = ln_addresses.first().cloned();
 
-    Ok(ln_address.into())
+    Ok(WalletLnAddressResponse { ln_address }.into())
 }
 
 /// Register LN Address

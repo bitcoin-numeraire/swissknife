@@ -1,25 +1,26 @@
+import type { BoxProps } from '@mui/material/Box';
 import type { RatingProps } from '@mui/material/Rating';
-import type { Theme, SxProps } from '@mui/material/styles';
 import type { FormHelperTextProps } from '@mui/material/FormHelperText';
 
 import { Controller, useFormContext } from 'react-hook-form';
 
 import Box from '@mui/material/Box';
 import Rating from '@mui/material/Rating';
-import FormHelperText from '@mui/material/FormHelperText';
+
+import { HelperText } from './help-text';
 
 // ----------------------------------------------------------------------
 
-type Props = RatingProps & {
+export type RHFRatingProps = RatingProps & {
   name: string;
   helperText?: React.ReactNode;
   slotProps?: {
-    wrap?: SxProps<Theme>;
-    formHelperText?: FormHelperTextProps;
+    wrapper?: BoxProps;
+    helperText?: FormHelperTextProps;
   };
 };
 
-export function RHFRating({ name, helperText, slotProps, ...other }: Props) {
+export function RHFRating({ name, helperText, slotProps, ...other }: RHFRatingProps) {
   const { control } = useFormContext();
 
   return (
@@ -27,20 +28,27 @@ export function RHFRating({ name, helperText, slotProps, ...other }: Props) {
       name={name}
       control={control}
       render={({ field, fieldState: { error } }) => (
-        <Box sx={slotProps?.wrap}>
+        <Box
+          {...slotProps?.wrapper}
+          sx={[
+            { display: 'flex', flexDirection: 'column' },
+            ...(Array.isArray(slotProps?.wrapper?.sx)
+              ? (slotProps?.wrapper?.sx ?? [])
+              : [slotProps?.wrapper?.sx]),
+          ]}
+        >
           <Rating
             {...field}
-            onChange={(event, newValue) => {
-              field.onChange(Number(newValue));
-            }}
+            onChange={(event, newValue) => field.onChange(Number(newValue))}
             {...other}
           />
 
-          {(error?.message || helperText) && (
-            <FormHelperText error={!!error} {...slotProps?.formHelperText}>
-              {error?.message ?? helperText}
-            </FormHelperText>
-          )}
+          <HelperText
+            {...slotProps?.helperText}
+            disableGutters
+            errorMessage={error?.message}
+            helperText={helperText}
+          />
         </Box>
       )}
     />

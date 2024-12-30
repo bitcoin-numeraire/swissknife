@@ -5,6 +5,7 @@ import type { ILnAddressTableFilters } from 'src/types/ln-address';
 import type { LnAddress, ListAddressesResponse } from 'src/lib/swissknife';
 
 import { useState, useEffect, useCallback } from 'react';
+import { useBoolean, useSetState } from 'minimal-shared/hooks';
 
 import Tab from '@mui/material/Tab';
 import Tabs from '@mui/material/Tabs';
@@ -19,9 +20,7 @@ import IconButton from '@mui/material/IconButton';
 import { alpha, useTheme } from '@mui/material/styles';
 import TableContainer from '@mui/material/TableContainer';
 
-import { useBoolean } from 'src/hooks/use-boolean';
-import { useSetState } from 'src/hooks/use-set-state';
-
+import { handleActionError } from 'src/utils/errors';
 import { fIsAfter, fIsBetween } from 'src/utils/format-time';
 
 import { useTranslate } from 'src/locales';
@@ -31,8 +30,8 @@ import { Label } from 'src/components/label';
 import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
 import { Scrollbar } from 'src/components/scrollbar';
+import { ItemAnalytic } from 'src/components/analytic';
 import { ConfirmDialog } from 'src/components/custom-dialog';
-import { ItemAnalytic } from 'src/components/analytic/item-analytic';
 import {
   useTable,
   emptyRows,
@@ -93,9 +92,15 @@ export function LnAddressList({ data: lnAddresses, tableHead, tabs }: Props) {
     dateError,
   });
 
-  const dataInPage = dataFiltered.slice(table.page * table.rowsPerPage, table.page * table.rowsPerPage + table.rowsPerPage);
+  const dataInPage = dataFiltered.slice(
+    table.page * table.rowsPerPage,
+    table.page * table.rowsPerPage + table.rowsPerPage
+  );
   const denseHeight = table.dense ? 56 : 56 + 20;
-  const canReset = !!filters.state.name || filters.state.status !== 'all' || (!!filters.state.startDate && !!filters.state.endDate);
+  const canReset =
+    !!filters.state.name ||
+    filters.state.status !== 'all' ||
+    (!!filters.state.startDate && !!filters.state.endDate);
   const notFound = (!dataFiltered.length && canReset) || !dataFiltered.length;
 
   useEffect(() => {
@@ -113,7 +118,7 @@ export function LnAddressList({ data: lnAddresses, tableHead, tabs }: Props) {
         setTableData(deleteRow);
         table.onUpdatePageDeleteRow(dataInPage.length);
       } catch (error) {
-        toast.error(error.reason);
+        handleActionError(error);
       }
     },
     [dataInPage.length, table, tableData, t]
@@ -127,12 +132,9 @@ export function LnAddressList({ data: lnAddresses, tableHead, tabs }: Props) {
 
       toast.success(t('ln_address_list.delete_multiple_success', { count: data }));
       setTableData(deleteRows);
-      table.onUpdatePageDeleteRows({
-        totalRowsInPage: dataInPage.length,
-        totalRowsFiltered: dataFiltered.length,
-      });
+      table.onUpdatePageDeleteRows(dataInPage.length, dataFiltered.length);
     } catch (error) {
-      toast.error(error.reason);
+      handleActionError(error);
     }
   }, [dataFiltered.length, dataInPage.length, table, tableData, t]);
 
@@ -152,7 +154,8 @@ export function LnAddressList({ data: lnAddresses, tableHead, tabs }: Props) {
     return tableData.filter((item) => item.active === (status === 'active')).length;
   };
 
-  const getPercentByStatus = (status: string) => (getTransactionLength(status) / tableData.length) * 100;
+  const getPercentByStatus = (status: string) =>
+    (getTransactionLength(status) / tableData.length) * 100;
 
   return (
     <>
@@ -162,7 +165,11 @@ export function LnAddressList({ data: lnAddresses, tableHead, tabs }: Props) {
         }}
       >
         <Scrollbar>
-          <Stack direction="row" divider={<Divider orientation="vertical" flexItem sx={{ borderStyle: 'dashed' }} />} sx={{ py: 2 }}>
+          <Stack
+            direction="row"
+            divider={<Divider orientation="vertical" flexItem sx={{ borderStyle: 'dashed' }} />}
+            sx={{ py: 2 }}
+          >
             {tabs.map((tab) => (
               <ItemAnalytic
                 key={tab.title}
@@ -194,7 +201,13 @@ export function LnAddressList({ data: lnAddresses, tableHead, tabs }: Props) {
               label={tab.label}
               iconPosition="end"
               icon={
-                <Label variant={((tab.value === 'all' || tab.value === filters.state.status) && 'filled') || 'soft'} color={tab.color}>
+                <Label
+                  variant={
+                    ((tab.value === 'all' || tab.value === filters.state.status) && 'filled') ||
+                    'soft'
+                  }
+                  color={tab.color}
+                >
                   {getTransactionLength(tab.value)}
                 </Label>
               }
@@ -202,7 +215,11 @@ export function LnAddressList({ data: lnAddresses, tableHead, tabs }: Props) {
           ))}
         </Tabs>
 
-        <LnAddressTableToolbar filters={filters} onResetPage={table.onResetPage} dateError={dateError} />
+        <LnAddressTableToolbar
+          filters={filters}
+          onResetPage={table.onResetPage}
+          dateError={dateError}
+        />
 
         {canReset && (
           <LnAddressTableFiltersResult
@@ -252,7 +269,7 @@ export function LnAddressList({ data: lnAddresses, tableHead, tabs }: Props) {
               <TableHeadCustom
                 order={table.order}
                 orderBy={table.orderBy}
-                headLabel={tableHead}
+                headCells={tableHead}
                 rowCount={dataFiltered.length}
                 numSelected={table.selected.length}
                 onSort={table.onSort}
@@ -265,17 +282,25 @@ export function LnAddressList({ data: lnAddresses, tableHead, tabs }: Props) {
               />
 
               <TableBody>
-                {dataFiltered.slice(table.page * table.rowsPerPage, table.page * table.rowsPerPage + table.rowsPerPage).map((row) => (
-                  <LnAddressTableRow
-                    key={row.id}
-                    row={row}
-                    selected={table.selected.includes(row.id)}
-                    onSelectRow={() => table.onSelectRow(row.id)}
-                    onDeleteRow={() => handleDeleteRow(row.id)}
-                  />
-                ))}
+                {dataFiltered
+                  .slice(
+                    table.page * table.rowsPerPage,
+                    table.page * table.rowsPerPage + table.rowsPerPage
+                  )
+                  .map((row) => (
+                    <LnAddressTableRow
+                      key={row.id}
+                      row={row}
+                      selected={table.selected.includes(row.id)}
+                      onSelectRow={() => table.onSelectRow(row.id)}
+                      onDeleteRow={() => handleDeleteRow(row.id)}
+                    />
+                  ))}
 
-                <TableEmptyRows height={denseHeight} emptyRows={emptyRows(table.page, table.rowsPerPage, dataFiltered.length)} />
+                <TableEmptyRows
+                  height={denseHeight}
+                  emptyRows={emptyRows(table.page, table.rowsPerPage, dataFiltered.length)}
+                />
 
                 <TableNoData notFound={notFound} />
               </TableBody>

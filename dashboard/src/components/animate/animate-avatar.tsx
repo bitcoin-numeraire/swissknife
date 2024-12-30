@@ -21,7 +21,13 @@ export type AnimateAvatarProps = BoxProps & {
   };
 };
 
-export function AnimateAvatar({ sx, slotProps, children, width = 40, ...other }: AnimateAvatarProps) {
+export function AnimateAvatar({
+  sx,
+  slotProps,
+  children,
+  width = 40,
+  ...other
+}: AnimateAvatarProps) {
   const borderWidth = slotProps?.overlay?.border ?? 2;
 
   const spacing = slotProps?.overlay?.spacing ?? 2;

@@ -35,7 +35,10 @@ export function PaymentDetails({ payment, isAdmin }: Props) {
     <Grid container spacing={3} sx={{ my: 5 }}>
       <Grid item xs={12} md={4} sm={6}>
         <Title>{t('payment_details.amount_sent')}</Title>
-        <SatsWithIcon amountMSats={payment.amount_msat - (payment.fee_msat || 0)} color="text.secondary" />
+        <SatsWithIcon
+          amountMSats={payment.amount_msat - (payment.fee_msat || 0)}
+          color="text.secondary"
+        />
       </Grid>
       <Grid item xs={12} md={4} sm={6}>
         <Title>{t('payment_details.fees')}</Title>
@@ -153,8 +156,14 @@ export function PaymentDetails({ payment, isAdmin }: Props) {
 
   return (
     <>
-      <TransactionToolbar transaction={payment} transactionType={TransactionType.PAYMENT} isAdmin={isAdmin} />
-      <Card sx={{ pt: 5, px: { xs: 2, sm: 5, md: 8 }, maxWidth: { xs: '100%', md: '80%' }, mx: 'auto' }}>
+      <TransactionToolbar
+        transaction={payment}
+        transactionType={TransactionType.PAYMENT}
+        isAdmin={isAdmin}
+      />
+      <Card
+        sx={{ pt: 5, px: { xs: 2, sm: 5, md: 8 }, maxWidth: { xs: '100%', md: '80%' }, mx: 'auto' }}
+      >
         <Box
           rowGap={5}
           display="grid"
@@ -176,14 +185,18 @@ export function PaymentDetails({ payment, isAdmin }: Props) {
                   (payment.status === 'Failed' && 'error') ||
                   'default'
                 }
-                mr={1}
+                sx={{ mr: 1 }}
               >
                 {payment.status}
               </Label>
 
               <Label
                 variant="soft"
-                color={(payment.ledger === 'Lightning' && 'secondary') || (payment.ledger === 'Internal' && 'primary') || 'default'}
+                color={
+                  (payment.ledger === 'Lightning' && 'secondary') ||
+                  (payment.ledger === 'Internal' && 'primary') ||
+                  'default'
+                }
               >
                 {payment.ledger}
               </Label>

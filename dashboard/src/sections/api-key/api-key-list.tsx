@@ -4,6 +4,7 @@ import type { IApiKeyTableFilters } from 'src/types/apikey';
 import type { ApiKeyResponse, ListApiKeysResponse } from 'src/lib/swissknife';
 
 import { useState, useEffect, useCallback } from 'react';
+import { useBoolean, useSetState } from 'minimal-shared/hooks';
 
 import Card from '@mui/material/Card';
 import Table from '@mui/material/Table';
@@ -14,9 +15,7 @@ import TableBody from '@mui/material/TableBody';
 import IconButton from '@mui/material/IconButton';
 import TableContainer from '@mui/material/TableContainer';
 
-import { useBoolean } from 'src/hooks/use-boolean';
-import { useSetState } from 'src/hooks/use-set-state';
-
+import { handleActionError } from 'src/utils/errors';
 import { fIsAfter, fIsBetween } from 'src/utils/format-time';
 
 import { useTranslate } from 'src/locales';
@@ -73,7 +72,10 @@ export function ApiKeyList({ data: wallets, tableHead }: Props) {
     dateError,
   });
 
-  const dataInPage = dataFiltered.slice(table.page * table.rowsPerPage, table.page * table.rowsPerPage + table.rowsPerPage);
+  const dataInPage = dataFiltered.slice(
+    table.page * table.rowsPerPage,
+    table.page * table.rowsPerPage + table.rowsPerPage
+  );
   const denseHeight = table.dense ? 56 : 56 + 20;
   const canReset = !!filters.state.name || (!!filters.state.startDate && !!filters.state.endDate);
   const notFound = (!dataFiltered.length && canReset) || !dataFiltered.length;
@@ -93,7 +95,7 @@ export function ApiKeyList({ data: wallets, tableHead }: Props) {
         setTableData(deleteRow);
         table.onUpdatePageDeleteRow(dataInPage.length);
       } catch (error) {
-        toast.error(error.reason);
+        handleActionError(error);
       }
     },
     [dataInPage.length, table, tableData, t]
@@ -107,19 +109,20 @@ export function ApiKeyList({ data: wallets, tableHead }: Props) {
 
       toast.success(t('api_key_list.delete_multiple_success', { count: data }));
       setTableData(deleteRows);
-      table.onUpdatePageDeleteRows({
-        totalRowsInPage: dataInPage.length,
-        totalRowsFiltered: dataFiltered.length,
-      });
+      table.onUpdatePageDeleteRows(dataInPage.length, dataFiltered.length);
     } catch (error) {
-      toast.error(error.reason);
+      handleActionError(error);
     }
   }, [dataFiltered.length, dataInPage.length, table, tableData, t]);
 
   return (
     <>
       <Card>
-        <ApiKeyTableToolbar filters={filters} onResetPage={table.onResetPage} dateError={dateError} />
+        <ApiKeyTableToolbar
+          filters={filters}
+          onResetPage={table.onResetPage}
+          dateError={dateError}
+        />
 
         {canReset && (
           <ApiKeyTableFiltersResult
@@ -169,7 +172,7 @@ export function ApiKeyList({ data: wallets, tableHead }: Props) {
               <TableHeadCustom
                 order={table.order}
                 orderBy={table.orderBy}
-                headLabel={tableHead}
+                headCells={tableHead}
                 rowCount={dataFiltered.length}
                 numSelected={table.selected.length}
                 onSort={table.onSort}
@@ -182,17 +185,25 @@ export function ApiKeyList({ data: wallets, tableHead }: Props) {
               />
 
               <TableBody>
-                {dataFiltered.slice(table.page * table.rowsPerPage, table.page * table.rowsPerPage + table.rowsPerPage).map((row) => (
-                  <ApiKeyTableRow
-                    key={row.id}
-                    row={row}
-                    selected={table.selected.includes(row.id)}
-                    onSelectRow={() => table.onSelectRow(row.id)}
-                    onDeleteRow={() => handleDeleteRow(row.id)}
-                  />
-                ))}
+                {dataFiltered
+                  .slice(
+                    table.page * table.rowsPerPage,
+                    table.page * table.rowsPerPage + table.rowsPerPage
+                  )
+                  .map((row) => (
+                    <ApiKeyTableRow
+                      key={row.id}
+                      row={row}
+                      selected={table.selected.includes(row.id)}
+                      onSelectRow={() => table.onSelectRow(row.id)}
+                      onDeleteRow={() => handleDeleteRow(row.id)}
+                    />
+                  ))}
 
-                <TableEmptyRows height={denseHeight} emptyRows={emptyRows(table.page, table.rowsPerPage, dataFiltered.length)} />
+                <TableEmptyRows
+                  height={denseHeight}
+                  emptyRows={emptyRows(table.page, table.rowsPerPage, dataFiltered.length)}
+                />
 
                 <TableNoData notFound={notFound} />
               </TableBody>

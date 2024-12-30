@@ -1,8 +1,8 @@
 import type { IDatePickerControl } from 'src/types/common';
-import type { UseSetStateReturn } from 'src/hooks/use-set-state';
 import type { ILnAddressTableFilters } from 'src/types/ln-address';
 
 import { useCallback } from 'react';
+import { usePopover, type UseSetStateReturn } from 'minimal-shared/hooks';
 
 import Stack from '@mui/material/Stack';
 import { MenuList } from '@mui/material';
@@ -17,7 +17,7 @@ import { useTranslate } from 'src/locales';
 
 import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
-import { usePopover, CustomPopover } from 'src/components/custom-popover';
+import { CustomPopover } from 'src/components/custom-popover';
 
 // ----------------------------------------------------------------------
 

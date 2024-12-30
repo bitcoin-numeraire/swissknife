@@ -1,42 +1,43 @@
 'use client';
 
-import type {} from '@mui/lab/themeAugmentation';
-import type {} from '@mui/x-tree-view/themeAugmentation';
-import type {} from '@mui/x-data-grid/themeAugmentation';
-import type {} from '@mui/x-date-pickers/themeAugmentation';
-import type {} from '@mui/material/themeCssVarsAugmentation';
+import type { Theme } from '@mui/material/styles';
+import type { ThemeProviderProps as MuiThemeProviderProps } from '@mui/material/styles/ThemeProvider';
 
 import CssBaseline from '@mui/material/CssBaseline';
-import { AppRouterCacheProvider } from '@mui/material-nextjs/v14-appRouter';
-import { Experimental_CssVarsProvider as CssVarsProvider } from '@mui/material/styles';
+import { ThemeProvider as ThemeVarsProvider } from '@mui/material/styles';
 
 import { useTranslate } from 'src/locales';
 
 import { useSettingsContext } from 'src/components/settings';
 
 import { createTheme } from './create-theme';
-import { RTL } from './with-settings/right-to-left';
-import { schemeConfig } from './color-scheme-script';
+import { Rtl } from './with-settings/right-to-left';
+
+import type {} from './extend-theme-types';
+import type { ThemeOptions } from './types';
 
 // ----------------------------------------------------------------------
 
-type Props = {
-  children: React.ReactNode;
+export type ThemeProviderProps = Omit<MuiThemeProviderProps, 'theme'> & {
+  theme?: Theme;
+  themeOverrides?: ThemeOptions;
 };
 
-export function ThemeProvider({ children }: Props) {
+export function ThemeProvider({ themeOverrides, children, ...other }: ThemeProviderProps) {
   const { currentLang } = useTranslate();
 
   const settings = useSettingsContext();
 
-  const theme = createTheme(currentLang?.systemValue, settings);
+  const theme = createTheme({
+    settingsState: settings.state,
+    localeComponents: currentLang?.systemValue,
+    themeOverrides,
+  });
 
   return (
-    <AppRouterCacheProvider options={{ key: 'css' }}>
-      <CssVarsProvider theme={theme} defaultMode={schemeConfig.defaultMode} modeStorageKey={schemeConfig.modeStorageKey}>
-        <CssBaseline />
-        <RTL direction={settings.direction}>{children}</RTL>
-      </CssVarsProvider>
-    </AppRouterCacheProvider>
+    <ThemeVarsProvider disableTransitionOnChange theme={theme} {...other}>
+      <CssBaseline />
+      <Rtl direction={settings.state.direction!}>{children}</Rtl>
+    </ThemeVarsProvider>
   );
 }

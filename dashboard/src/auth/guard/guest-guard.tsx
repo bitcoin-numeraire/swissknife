@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 
 import { useRouter, useSearchParams } from 'src/routes/hooks';
 
-import { CONFIG } from 'src/config-global';
+import { CONFIG } from 'src/global-config';
 
 import { SplashScreen } from 'src/components/loading-screen';
 
@@ -12,20 +12,19 @@ import { useAuthContext } from '../hooks';
 
 // ----------------------------------------------------------------------
 
-type Props = {
+type GuestGuardProps = {
   children: React.ReactNode;
 };
 
-export function GuestGuard({ children }: Props) {
+export function GuestGuard({ children }: GuestGuardProps) {
   const router = useRouter();
 
   const searchParams = useSearchParams();
+  const returnTo = searchParams.get('returnTo') || CONFIG.auth.redirectPath;
 
   const { loading, authenticated } = useAuthContext();
 
   const [isChecking, setIsChecking] = useState<boolean>(true);
-
-  const returnTo = searchParams.get('returnTo') || CONFIG.auth.redirectPath;
 
   const checkPermissions = async (): Promise<void> => {
     if (loading) {

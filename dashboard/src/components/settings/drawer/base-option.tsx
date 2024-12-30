@@ -1,12 +1,13 @@
 import type { ButtonBaseProps } from '@mui/material/ButtonBase';
 
-import Box from '@mui/material/Box';
+import { varAlpha } from 'minimal-shared/utils';
+
 import Switch from '@mui/material/Switch';
 import Tooltip from '@mui/material/Tooltip';
+import { styled } from '@mui/material/styles';
 import ButtonBase from '@mui/material/ButtonBase';
 
-import { CONFIG } from 'src/config-global';
-import { varAlpha } from 'src/theme/styles';
+import { CONFIG } from 'src/global-config';
 
 import { Iconify } from 'src/components/iconify';
 
@@ -14,61 +15,87 @@ import { SvgColor } from '../../svg-color';
 
 // ----------------------------------------------------------------------
 
-type Props = ButtonBaseProps & {
+export type BaseOptionProps = ButtonBaseProps & {
   icon: string;
   label: string;
-  selected: boolean;
   tooltip?: string;
+  selected: boolean;
+  onChangeOption: () => void;
 };
 
-export function BaseOption({ icon, label, tooltip, selected, ...other }: Props) {
+export function BaseOption({
+  sx,
+  icon,
+  label,
+  tooltip,
+  selected,
+  onChangeOption,
+  ...other
+}: BaseOptionProps) {
   return (
-    <ButtonBase
-      disableRipple
-      sx={{
-        px: 2,
-        py: 2.5,
-        borderRadius: 2,
-        cursor: 'pointer',
-        flexDirection: 'column',
-        alignItems: 'flex-start',
-        border: (theme) => `solid 1px ${varAlpha(theme.vars.palette.grey['500Channel'], 0.12)}`,
-        '&:hover': { bgcolor: (theme) => varAlpha(theme.vars.palette.grey['500Channel'], 0.08) },
-        ...(selected && {
-          bgcolor: (theme) => varAlpha(theme.vars.palette.grey['500Channel'], 0.08),
-        }),
-      }}
-      {...other}
-    >
-      <Box display="flex" alignItems="center" justifyContent="space-between" sx={{ width: 1, mb: 3 }}>
-        <SvgColor src={`${CONFIG.site.basePath}/assets/icons/setting/ic-${icon}.svg`} />
+    <ItemRoot disableRipple selected={selected} onClick={onChangeOption} sx={sx} {...other}>
+      <TopContainer>
+        <SvgColor src={`${CONFIG.assetsDir}/assets/icons/settings/ic-${icon}.svg`} />
         <Switch name={label} size="small" color="default" checked={selected} sx={{ mr: -0.75 }} />
-      </Box>
+      </TopContainer>
 
-      <Box display="flex" alignItems="center" justifyContent="space-between" sx={{ width: 1 }}>
-        <Box
-          component="span"
-          sx={{
-            lineHeight: '18px',
-            fontWeight: 'fontWeightSemiBold',
-            fontSize: (theme) => theme.typography.pxToRem(13),
-          }}
-        >
-          {label}
-        </Box>
+      <BottomContainer>
+        <ItemLabel>{label}</ItemLabel>
 
         {tooltip && (
           <Tooltip
             arrow
             title={tooltip}
-            slotProps={{
-              tooltip: { sx: { maxWidth: 240, mr: 0.5 } },
-            }}
+            slotProps={{ tooltip: { sx: { maxWidth: 240, mr: 0.5 } } }}
           >
-            <Iconify width={16} icon="eva:info-outline" sx={{ cursor: 'pointer', color: 'text.disabled' }} />
+            <Iconify
+              width={16}
+              icon="eva:info-outline"
+              sx={{ cursor: 'pointer', color: 'text.disabled' }}
+            />
           </Tooltip>
         )}
-      </Box>
-    </ButtonBase>
+      </BottomContainer>
+    </ItemRoot>
   );
 }
+
+// ----------------------------------------------------------------------
+
+const ItemRoot = styled(ButtonBase, {
+  shouldForwardProp: (prop: string) => !['selected', 'sx'].includes(prop),
+})<{ selected: boolean }>(({ selected, theme }) => ({
+  cursor: 'pointer',
+  flexDirection: 'column',
+  alignItems: 'flex-start',
+  padding: theme.spacing(2, 2.5),
+  borderRadius: theme.shape.borderRadius * 2,
+  border: `solid 1px ${varAlpha(theme.vars.palette.grey['500Channel'], 0.12)}`,
+  '&:hover': {
+    backgroundColor: varAlpha(theme.vars.palette.grey['500Channel'], 0.08),
+  },
+  ...(selected && {
+    backgroundColor: varAlpha(theme.vars.palette.grey['500Channel'], 0.08),
+  }),
+}));
+
+const TopContainer = styled('div')(({ theme }) => ({
+  width: '100%',
+  display: 'flex',
+  alignItems: 'center',
+  marginBottom: theme.spacing(3),
+  justifyContent: 'space-between',
+}));
+
+const BottomContainer = styled('div')(({ theme }) => ({
+  width: '100%',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+}));
+
+const ItemLabel = styled('span')(({ theme }) => ({
+  lineHeight: '18px',
+  fontSize: theme.typography.pxToRem(13),
+  fontWeight: theme.typography.fontWeightSemiBold,
+}));

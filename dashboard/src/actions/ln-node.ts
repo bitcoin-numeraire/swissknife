@@ -9,28 +9,24 @@ import { endpointKeys } from './keys';
 
 // ----------------------------------------------------------------------
 
-type IGetNodeInfo = {
-  nodeInfo?: IBreezNodeInfo;
-  nodeInfoLoading: boolean;
-  nodeInfoError: any;
-  nodeInfoValidating: boolean;
-};
-
-export function useGetNodeInfo(): IGetNodeInfo {
+export function useGetNodeInfo() {
   const fetcher = async () => {
     const { data, error } = await nodeInfo();
     if (error) {
       throw Error(error.reason);
     }
 
-    return data;
+    return data as IBreezNodeInfo;
   };
 
-  const { data, isLoading, error, isValidating } = useSWR(endpointKeys.lightning.node.info, fetcher);
+  const { data, isLoading, error, isValidating } = useSWR(
+    endpointKeys.lightning.node.info,
+    fetcher
+  );
 
   return useMemo(
     () => ({
-      nodeInfo: data as IBreezNodeInfo,
+      nodeInfo: data,
       nodeInfoLoading: isLoading,
       nodeInfoError: error,
       nodeInfoValidating: isValidating,
@@ -39,28 +35,24 @@ export function useGetNodeInfo(): IGetNodeInfo {
   );
 }
 
-type IGetCurrentLSP = {
-  currentLSP?: IBreezLSP;
-  currentLSPLoading: boolean;
-  currentLSPError: any;
-  currentLSPValidating: boolean;
-};
-
-export function useGetCurrentLSP(): IGetCurrentLSP {
+export function useGetCurrentLSP() {
   const fetcher = async () => {
     const { data, error } = await lspInfo();
     if (error) {
       throw Error(error.reason);
     }
 
-    return data;
+    return data as IBreezLSP;
   };
 
-  const { data, isLoading, error, isValidating } = useSWR(endpointKeys.lightning.node.lspInfo, fetcher);
+  const { data, isLoading, error, isValidating } = useSWR(
+    endpointKeys.lightning.node.lspInfo,
+    fetcher
+  );
 
   return useMemo(
     () => ({
-      currentLSP: data as IBreezLSP,
+      currentLSP: data,
       currentLSPLoading: isLoading,
       currentLSPError: error,
       currentLSPValidating: isValidating,
@@ -69,24 +61,20 @@ export function useGetCurrentLSP(): IGetCurrentLSP {
   );
 }
 
-type IGetLSPs = {
-  lsps?: IBreezLSP[];
-  lspsLoading: boolean;
-  lspsError: any;
-  lspsValidating: boolean;
-};
-
-export function useGetLSPs(): IGetLSPs {
+export function useGetLSPs() {
   const fetcher = async () => {
     const { data, error } = await listLsps();
     if (error) {
       throw Error(error.reason);
     }
 
-    return data;
+    return data as IBreezLSP[];
   };
 
-  const { data, isLoading, error, isValidating } = useSWR(endpointKeys.lightning.node.lsps, fetcher);
+  const { data, isLoading, error, isValidating } = useSWR(
+    endpointKeys.lightning.node.lsps,
+    fetcher
+  );
 
   return useMemo(
     () => ({

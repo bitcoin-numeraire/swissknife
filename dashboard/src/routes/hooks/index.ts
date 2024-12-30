@@ -1,6 +1,3 @@
-export * from './use-active-link';
-//
-
 export { useParams } from './use-params';
 
 export { useRouter } from './use-router';

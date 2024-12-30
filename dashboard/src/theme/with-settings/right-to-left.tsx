@@ -7,18 +7,18 @@ import type { ThemeDirection } from '../types';
 
 // ----------------------------------------------------------------------
 
-type RTLProps = {
+type RtlProps = {
   children: React.ReactNode;
   direction: ThemeDirection;
 };
 
-const cacheRtl = createCache({
-  key: 'rtl',
-  prepend: true,
-  stylisPlugins: [rtlPlugin],
-});
+export function Rtl({ children, direction }: RtlProps) {
+  const cacheRtl = createCache({
+    key: 'rtl',
+    prepend: true,
+    stylisPlugins: [rtlPlugin],
+  });
 
-export function RTL({ children, direction }: RTLProps) {
   useEffect(() => {
     document.dir = direction;
   }, [direction]);

@@ -23,11 +23,23 @@ type Props = {
 
 export function ItemAnalytic({ title, total, icon, color, percent, price, countSuffix }: Props) {
   return (
-    <Stack spacing={2.5} direction="row" alignItems="center" justifyContent="center" sx={{ width: 1, minWidth: 200 }}>
+    <Stack
+      spacing={2.5}
+      direction="row"
+      alignItems="center"
+      justifyContent="center"
+      sx={{ width: 1, minWidth: 200 }}
+    >
       <Stack alignItems="center" justifyContent="center" sx={{ position: 'relative' }}>
         <Iconify icon={icon} width={32} sx={{ color, position: 'absolute' }} />
 
-        <CircularProgress variant="determinate" value={percent} size={56} thickness={2} sx={{ color, opacity: 0.48 }} />
+        <CircularProgress
+          variant="determinate"
+          value={percent}
+          size={56}
+          thickness={2}
+          sx={{ color, opacity: 0.48 }}
+        />
 
         <CircularProgress
           variant="determinate"

@@ -17,9 +17,9 @@ export default function OverviewBankingPage() {
     case 'breez':
       return <BreezNodeView />;
     case 'cln':
-      return <NodeView lnProviderLogo="cln.svg" />;
+      return <NodeView />;
     case 'lnd':
-      return <NodeView lnProviderLogo="lnd.png" />;
+      return <NodeView />;
     default:
       return (
         <DashboardContent>

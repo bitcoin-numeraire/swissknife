@@ -1,10 +1,10 @@
 import type { Theme, Components } from '@mui/material/styles';
 
+import { varAlpha } from 'minimal-shared/utils';
+
 import { inputBaseClasses } from '@mui/material/InputBase';
 import { filledInputClasses } from '@mui/material/FilledInput';
 import { outlinedInputClasses } from '@mui/material/OutlinedInput';
-
-import { varAlpha } from '../../styles';
 
 // ----------------------------------------------------------------------
 
@@ -14,9 +14,8 @@ const MuiInputBase: Components<Theme>['MuiInputBase'] = {
    *************************************** */
   styleOverrides: {
     root: ({ theme }) => ({
-      [`&.${inputBaseClasses.disabled}`]: {
-        '& svg': { color: theme.vars.palette.text.disabled },
-      },
+      [`&.${inputBaseClasses.disabled}`]: { '& svg': { color: theme.vars.palette.text.disabled } },
+      [`& .${inputBaseClasses.input}:focus`]: { borderRadius: 'inherit' },
     }),
     input: ({ theme }) => ({
       fontSize: theme.typography.pxToRem(15),
@@ -24,10 +23,7 @@ const MuiInputBase: Components<Theme>['MuiInputBase'] = {
         // This will prevent zoom in Safari min font size ~ 16px
         fontSize: theme.typography.pxToRem(16),
       },
-      '&::placeholder': {
-        opacity: 1,
-        color: theme.vars.palette.text.disabled,
-      },
+      '&::placeholder': { opacity: 1, color: theme.vars.palette.text.disabled },
     }),
   },
 };
@@ -111,6 +107,18 @@ const MuiFilledInput: Components<Theme>['MuiFilledInput'] = {
   },
 };
 
+const MuiTextField: Components<Theme>['MuiTextField'] = {
+  /** **************************************
+   * DEFAULT PROPS
+   *************************************** */
+  defaultProps: { variant: 'outlined' },
+
+  /** **************************************
+   * STYLE
+   *************************************** */
+  styleOverrides: {},
+};
+
 // ----------------------------------------------------------------------
 
 export const textfield = {
@@ -118,4 +126,5 @@ export const textfield = {
   MuiInputBase,
   MuiFilledInput,
   MuiOutlinedInput,
+  MuiTextField,
 };

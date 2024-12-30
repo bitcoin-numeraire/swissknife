@@ -3,7 +3,9 @@
 import type { LabelColor } from 'src/components/label';
 import type { ITransaction, ITransactionTableFilters } from 'src/types/transaction';
 
+import { sumBy } from 'es-toolkit';
 import { useState, useEffect, useCallback } from 'react';
+import { useBoolean, useSetState } from 'minimal-shared/hooks';
 
 import Tab from '@mui/material/Tab';
 import Tabs from '@mui/material/Tabs';
@@ -18,11 +20,8 @@ import IconButton from '@mui/material/IconButton';
 import { alpha, useTheme } from '@mui/material/styles';
 import TableContainer from '@mui/material/TableContainer';
 
-import { useBoolean } from 'src/hooks/use-boolean';
-import { useSetState } from 'src/hooks/use-set-state';
-
-import { sumBy } from 'src/utils/helper';
 import { LEDGERS } from 'src/utils/transactions';
+import { handleActionError } from 'src/utils/errors';
 import { fIsAfter, fIsBetween } from 'src/utils/format-time';
 
 import { useTranslate } from 'src/locales';
@@ -32,8 +31,8 @@ import { Label } from 'src/components/label';
 import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
 import { Scrollbar } from 'src/components/scrollbar';
+import { ItemAnalytic } from 'src/components/analytic';
 import { ConfirmDialog } from 'src/components/custom-dialog';
-import { ItemAnalytic } from 'src/components/analytic/item-analytic';
 import {
   useTable,
   emptyRows,
@@ -74,7 +73,14 @@ type TabsProps = {
 
 type TableHeadProps = { id: string; label?: string };
 
-export function TransactionList({ data: transactions, isAdmin, tableHead, tabs, href, transactionType }: Props) {
+export function TransactionList({
+  data: transactions,
+  isAdmin,
+  tableHead,
+  tabs,
+  href,
+  transactionType,
+}: Props) {
   const { t } = useTranslate();
   const theme = useTheme();
   const table = useTable({ defaultOrderBy: 'created_at', defaultRowsPerPage: 25 });
@@ -100,7 +106,10 @@ export function TransactionList({ data: transactions, isAdmin, tableHead, tabs, 
     dateError,
   });
 
-  const dataInPage = dataFiltered.slice(table.page * table.rowsPerPage, table.page * table.rowsPerPage + table.rowsPerPage);
+  const dataInPage = dataFiltered.slice(
+    table.page * table.rowsPerPage,
+    table.page * table.rowsPerPage + table.rowsPerPage
+  );
   const denseHeight = table.dense ? 56 : 56 + 20;
   const canReset =
     !!filters.state.name ||
@@ -128,7 +137,7 @@ export function TransactionList({ data: transactions, isAdmin, tableHead, tabs, 
         setTableData(deleteRow);
         table.onUpdatePageDeleteRow(dataInPage.length);
       } catch (error) {
-        toast.error(error.reason);
+        handleActionError(error);
       }
     },
     [dataInPage.length, table, tableData, transactionType, t]
@@ -145,12 +154,9 @@ export function TransactionList({ data: transactions, isAdmin, tableHead, tabs, 
 
       toast.success(t('transaction_list.transactions_deleted', { count: data }));
       setTableData(deleteRows);
-      table.onUpdatePageDeleteRows({
-        totalRowsInPage: dataInPage.length,
-        totalRowsFiltered: dataFiltered.length,
-      });
+      table.onUpdatePageDeleteRows(dataInPage.length, dataFiltered.length);
     } catch (error) {
-      toast.error(error.reason);
+      handleActionError(error);
     }
   }, [dataFiltered.length, dataInPage.length, table, tableData, transactionType, t]);
 
@@ -181,7 +187,8 @@ export function TransactionList({ data: transactions, isAdmin, tableHead, tabs, 
     );
   };
 
-  const getPercentByStatus = (status: string) => (getTransactionLength(status) / tableData.length) * 100;
+  const getPercentByStatus = (status: string) =>
+    (getTransactionLength(status) / tableData.length) * 100;
 
   return (
     <>
@@ -191,7 +198,11 @@ export function TransactionList({ data: transactions, isAdmin, tableHead, tabs, 
         }}
       >
         <Scrollbar>
-          <Stack direction="row" divider={<Divider orientation="vertical" flexItem sx={{ borderStyle: 'dashed' }} />} sx={{ py: 2 }}>
+          <Stack
+            direction="row"
+            divider={<Divider orientation="vertical" flexItem sx={{ borderStyle: 'dashed' }} />}
+            sx={{ py: 2 }}
+          >
             {tabs.map((tab) => (
               <ItemAnalytic
                 key={tab.title}
@@ -224,7 +235,13 @@ export function TransactionList({ data: transactions, isAdmin, tableHead, tabs, 
               label={tab.label}
               iconPosition="end"
               icon={
-                <Label variant={((tab.value === 'all' || tab.value === filters.state.status) && 'filled') || 'soft'} color={tab.color}>
+                <Label
+                  variant={
+                    ((tab.value === 'all' || tab.value === filters.state.status) && 'filled') ||
+                    'soft'
+                  }
+                  color={tab.color}
+                >
                   {getTransactionLength(tab.value)}
                 </Label>
               }
@@ -232,7 +249,12 @@ export function TransactionList({ data: transactions, isAdmin, tableHead, tabs, 
           ))}
         </Tabs>
 
-        <TransactionTableToolbar filters={filters} onResetPage={table.onResetPage} dateError={dateError} invoiceLedgerOptions={LEDGERS} />
+        <TransactionTableToolbar
+          filters={filters}
+          onResetPage={table.onResetPage}
+          dateError={dateError}
+          invoiceLedgerOptions={LEDGERS}
+        />
 
         {canReset && (
           <TransactionTableFiltersResult
@@ -284,7 +306,7 @@ export function TransactionList({ data: transactions, isAdmin, tableHead, tabs, 
               <TableHeadCustom
                 order={table.order}
                 orderBy={table.orderBy}
-                headLabel={tableHead}
+                headCells={tableHead}
                 rowCount={dataFiltered.length}
                 numSelected={table.selected.length}
                 onSort={table.onSort}
@@ -297,20 +319,28 @@ export function TransactionList({ data: transactions, isAdmin, tableHead, tabs, 
               />
 
               <TableBody>
-                {dataFiltered.slice(table.page * table.rowsPerPage, table.page * table.rowsPerPage + table.rowsPerPage).map((row) => (
-                  <TransactionTableRow
-                    isAdmin={isAdmin}
-                    transactionType={transactionType}
-                    key={row.id}
-                    row={row}
-                    selected={table.selected.includes(row.id)}
-                    onSelectRow={() => table.onSelectRow(row.id)}
-                    href={href(row.id)}
-                    onDeleteRow={() => handleDeleteRow(row.id)}
-                  />
-                ))}
+                {dataFiltered
+                  .slice(
+                    table.page * table.rowsPerPage,
+                    table.page * table.rowsPerPage + table.rowsPerPage
+                  )
+                  .map((row) => (
+                    <TransactionTableRow
+                      isAdmin={isAdmin}
+                      transactionType={transactionType}
+                      key={row.id}
+                      row={row}
+                      selected={table.selected.includes(row.id)}
+                      onSelectRow={() => table.onSelectRow(row.id)}
+                      href={href(row.id)}
+                      onDeleteRow={() => handleDeleteRow(row.id)}
+                    />
+                  ))}
 
-                <TableEmptyRows height={denseHeight} emptyRows={emptyRows(table.page, table.rowsPerPage, dataFiltered.length)} />
+                <TableEmptyRows
+                  height={denseHeight}
+                  emptyRows={emptyRows(table.page, table.rowsPerPage, dataFiltered.length)}
+                />
 
                 <TableNoData notFound={notFound} />
               </TableBody>

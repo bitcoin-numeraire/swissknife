@@ -1,22 +1,16 @@
 import { useId } from 'react';
 
-import { useTheme } from '@mui/material/styles';
-
 // ----------------------------------------------------------------------
 
 export function BackgroundShape() {
-  const theme = useTheme();
-
   const gradientId = useId();
-
-  const PRIMARY_MAIN = theme.vars.palette.primary.main;
 
   return (
     <>
       <defs>
         <linearGradient id={gradientId} x1="19.496%" x2="77.479%" y1="71.822%" y2="16.69%">
-          <stop offset="0%" stopColor={PRIMARY_MAIN} />
-          <stop offset="100%" stopColor={PRIMARY_MAIN} stopOpacity="0" />
+          <stop offset="0%" stopColor="var(--palette-primary-main)" />
+          <stop offset="100%" stopColor="var(--palette-primary-main)" stopOpacity="0" />
         </linearGradient>
       </defs>
 

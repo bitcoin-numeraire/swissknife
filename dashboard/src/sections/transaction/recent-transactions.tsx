@@ -5,6 +5,7 @@ import type { InvoiceResponse } from 'src/lib/swissknife';
 
 import { mutate } from 'swr';
 import Link from 'next/link';
+import { usePopover } from 'minimal-shared/hooks';
 
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
@@ -36,8 +37,8 @@ import { CopyMenuItem } from 'src/components/copy';
 import { Scrollbar } from 'src/components/scrollbar';
 import { SatsWithIcon } from 'src/components/bitcoin';
 import { TableHeadCustom } from 'src/components/table';
+import { CustomPopover } from 'src/components/custom-popover';
 import { CleanTransactionsButton } from 'src/components/transactions';
-import { usePopover, CustomPopover } from 'src/components/custom-popover';
 
 import { TransactionType } from 'src/types/transaction';
 
@@ -58,7 +59,8 @@ const adminTableLabels = (t: TFunction) => [
   { id: '' },
 ];
 
-const labels = (t: TFunction, isAdmin?: boolean) => (isAdmin ? adminTableLabels(t) : tableLabels(t));
+const labels = (t: TFunction, isAdmin?: boolean) =>
+  isAdmin ? adminTableLabels(t) : tableLabels(t);
 
 interface Props extends CardProps {
   title?: string;
@@ -80,7 +82,7 @@ export function RecentTransactions({ title, tableData, isAdmin, ...other }: Prop
       <TableContainer sx={{ overflow: 'unset' }}>
         <Scrollbar>
           <Table sx={{ minWidth: 720 }}>
-            <TableHeadCustom headLabel={labels(t, isAdmin)} />
+            <TableHeadCustom headCells={labels(t, isAdmin)} />
 
             <TableBody>
               {tableData.map((row) => (
@@ -127,7 +129,17 @@ type RecentTransactionsRowProps = {
 
 function RecentTransactionsRow({ row, isAdmin }: RecentTransactionsRowProps) {
   const { t } = useTranslate();
-  const { id, wallet_id, amount_msat, transaction_type, status, description, payment_time, fee_msat, created_at } = row;
+  const {
+    id,
+    wallet_id,
+    amount_msat,
+    transaction_type,
+    status,
+    description,
+    payment_time,
+    fee_msat,
+    created_at,
+  } = row;
 
   const popover = usePopover();
 
@@ -210,7 +222,12 @@ function RecentTransactionsRow({ row, isAdmin }: RecentTransactionsRowProps) {
         </TableCell>
 
         <TableCell>
-          <Label variant="soft" color={(status === 'Settled' && 'success') || (status === 'Pending' && 'warning') || 'error'}>
+          <Label
+            variant="soft"
+            color={
+              (status === 'Settled' && 'success') || (status === 'Pending' && 'warning') || 'error'
+            }
+          >
             {status}
           </Label>
         </TableCell>
@@ -237,9 +254,11 @@ function RecentTransactionsRow({ row, isAdmin }: RecentTransactionsRowProps) {
           </Link>
         </MenuList>
 
-        {transaction_type === TransactionType.INVOICE && status === 'Pending' && (
-          <CopyMenuItem value={(row as InvoiceResponse).ln_invoice?.bolt11!} />
-        )}
+        {transaction_type === TransactionType.INVOICE &&
+          status === 'Pending' &&
+          (row as InvoiceResponse).ln_invoice && (
+            <CopyMenuItem value={(row as InvoiceResponse).ln_invoice!.bolt11} />
+          )}
       </CustomPopover>
     </>
   );

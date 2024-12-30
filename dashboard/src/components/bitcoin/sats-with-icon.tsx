@@ -12,7 +12,13 @@ interface Props extends TypographyProps {
   children?: React.ReactNode;
 }
 
-export function SatsWithIcon({ amountMSats, placement = 'top-start', children, variant, ...other }: Props) {
+export function SatsWithIcon({
+  amountMSats,
+  placement = 'top-start',
+  children,
+  variant,
+  ...other
+}: Props) {
   return (
     <Tooltip title={`${amountMSats} mSats`} placement={placement} arrow>
       <Typography variant={variant || 'inherit'} {...other}>

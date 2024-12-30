@@ -1,70 +1,50 @@
-import type { WalletResponse, ListWalletOverviewsResponse } from 'src/lib/swissknife';
-
 import useSWR from 'swr';
 import { useMemo } from 'react';
 
-import { getWallet, listWalletOverviews } from 'src/lib/swissknife';
+import { getWallet, listWallets, listWalletOverviews } from 'src/lib/swissknife';
 
 import { endpointKeys } from './keys';
 
 // ----------------------------------------------------------------------
 
-export type IGetWallet = {
-  wallet?: WalletResponse;
-  walletLoading: boolean;
-  walletError?: any;
-  walletValidating: boolean;
-};
-
-export function useGetWallet(id: string): IGetWallet {
-  const fetcher = async () => {
-    const { data, error } = await getWallet({ path: { id } });
-    if (error) {
-      throw Error(error.reason);
-    }
-
-    return data;
-  };
-
-  const { data, error, isLoading, isValidating } = useSWR(endpointKeys.wallets.get, fetcher);
+export function useGetWallet(id: string) {
+  const result = useSWR(endpointKeys.wallets.get, () => getWallet<true>({ path: { id } }));
 
   return useMemo(
     () => ({
-      wallet: data,
-      walletLoading: isLoading,
-      walletError: error,
-      walletValidating: isValidating,
+      wallet: result.data?.data,
+      walletLoading: result.isLoading,
+      walletError: result.error,
+      walletValidating: result.isValidating,
     }),
-    [data, error, isLoading, isValidating]
+    [result]
   );
 }
 
-type IListWallets = {
-  walletOverviews?: ListWalletOverviewsResponse;
-  walletOverviewsLoading: boolean;
-  walletOverviewsError?: any;
-  walletOverviewsValidating: boolean;
-};
-
-export function useListWalletOverviews(): IListWallets {
-  const fetcher = async () => {
-    const { data, error } = await listWalletOverviews();
-    if (error) {
-      throw Error(error.reason);
-    }
-
-    return data;
-  };
-
-  const { data, error, isLoading, isValidating } = useSWR(endpointKeys.wallets.listOverviews, fetcher);
+export function useListWallets() {
+  const result = useSWR(endpointKeys.wallets.list, () => listWallets<true>());
 
   return useMemo(
     () => ({
-      walletOverviews: data,
-      walletOverviewsLoading: isLoading,
-      walletOverviewsError: error,
-      walletOverviewsValidating: isValidating,
+      wallets: result.data?.data,
+      walletsLoading: result.isLoading,
+      walletsError: result.error,
+      walletsValidating: result.isValidating,
     }),
-    [data, error, isLoading, isValidating]
+    [result]
+  );
+}
+
+export function useListWalletOverviews() {
+  const result = useSWR(endpointKeys.wallets.listOverviews, () => listWalletOverviews<true>());
+
+  return useMemo(
+    () => ({
+      walletOverviews: result.data?.data,
+      walletOverviewsLoading: result.isLoading,
+      walletOverviewsError: result.error,
+      walletOverviewsValidating: result.isValidating,
+    }),
+    [result]
   );
 }

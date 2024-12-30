@@ -1,5 +1,5 @@
 import type { Theme, SxProps } from '@mui/material';
-import type { UseSetStateReturn } from 'src/hooks/use-set-state';
+import type { UseSetStateReturn } from 'minimal-shared/hooks';
 import type { ITransactionTableFilters } from 'src/types/transaction';
 
 import { useCallback } from 'react';
@@ -50,7 +50,7 @@ export function TransactionTableFiltersResult({ filters, totalResults, onResetPa
   }, [filters, onResetPage]);
 
   return (
-    <FiltersResult totalResults={totalResults} onReset={filters.onResetState} sx={sx}>
+    <FiltersResult totalResults={totalResults} onReset={() => filters.resetState()} sx={sx}>
       <FiltersBlock label={t('transaction_filters.ledger')} isShow={!!filters.state.ledger.length}>
         {filters.state.ledger.map((item) => (
           <Chip {...chipProps} key={item} label={item} onDelete={() => handleRemoveLedger(item)} />
@@ -58,11 +58,23 @@ export function TransactionTableFiltersResult({ filters, totalResults, onResetPa
       </FiltersBlock>
 
       <FiltersBlock label={t('transaction_filters.status')} isShow={filters.state.status !== 'all'}>
-        <Chip {...chipProps} label={filters.state.status} onDelete={handleRemoveStatus} sx={{ textTransform: 'capitalize' }} />
+        <Chip
+          {...chipProps}
+          label={filters.state.status}
+          onDelete={handleRemoveStatus}
+          sx={{ textTransform: 'capitalize' }}
+        />
       </FiltersBlock>
 
-      <FiltersBlock label={t('transaction_filters.date')} isShow={Boolean(filters.state.startDate && filters.state.endDate)}>
-        <Chip {...chipProps} label={fDateRangeShortLabel(filters.state.startDate, filters.state.endDate)} onDelete={handleRemoveDate} />
+      <FiltersBlock
+        label={t('transaction_filters.date')}
+        isShow={Boolean(filters.state.startDate && filters.state.endDate)}
+      >
+        <Chip
+          {...chipProps}
+          label={fDateRangeShortLabel(filters.state.startDate, filters.state.endDate)}
+          onDelete={handleRemoveDate}
+        />
       </FiltersBlock>
 
       <FiltersBlock label={t('transaction_filters.keyword')} isShow={!!filters.state.name}>

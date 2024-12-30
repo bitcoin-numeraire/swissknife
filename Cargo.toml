@@ -39,6 +39,7 @@ sea-orm = { version = "1.0", features = [
     "macros",
     "with-chrono",
     "with-uuid",
+    "debug-print",
 ] }
 strum = "0.26"
 strum_macros = "0.26"

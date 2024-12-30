@@ -1,6 +1,8 @@
 import type { ITransaction } from 'src/types/transaction';
 import type { InvoiceResponse, PaymentResponse } from 'src/lib/swissknife';
 
+import { useBoolean, usePopover } from 'minimal-shared/hooks';
+
 import Link from '@mui/material/Link';
 import { LoadingButton } from '@mui/lab';
 import MenuItem from '@mui/material/MenuItem';
@@ -14,8 +16,6 @@ import { Avatar, Divider, MenuList } from '@mui/material';
 
 import { useRouter } from 'src/routes/hooks';
 
-import { useBoolean } from 'src/hooks/use-boolean';
-
 import { fDate, fTime } from 'src/utils/format-time';
 import { truncateText } from 'src/utils/format-string';
 
@@ -26,7 +26,7 @@ import { Iconify } from 'src/components/iconify';
 import { CopyMenuItem } from 'src/components/copy';
 import { SatsWithIcon } from 'src/components/bitcoin';
 import { ConfirmDialog } from 'src/components/custom-dialog';
-import { usePopover, CustomPopover } from 'src/components/custom-popover';
+import { CustomPopover } from 'src/components/custom-popover';
 
 import { TransactionType } from 'src/types/transaction';
 
@@ -42,7 +42,15 @@ type Props = {
   isAdmin?: boolean;
 };
 
-export function TransactionTableRow({ row, isAdmin, transactionType, selected, onSelectRow, href, onDeleteRow }: Props) {
+export function TransactionTableRow({
+  row,
+  isAdmin,
+  transactionType,
+  selected,
+  onSelectRow,
+  href,
+  onDeleteRow,
+}: Props) {
   const { id, amount_msat, wallet_id, description, created_at, payment_time, status, ledger } = row;
 
   const { t } = useTranslate();
@@ -75,7 +83,12 @@ export function TransactionTableRow({ row, isAdmin, transactionType, selected, o
               </Typography>
             }
             secondary={
-              <Link noWrap variant="body2" href={href} sx={{ color: 'text.disabled', cursor: 'pointer' }}>
+              <Link
+                noWrap
+                variant="body2"
+                href={href}
+                sx={{ color: 'text.disabled', cursor: 'pointer' }}
+              >
                 {truncateText(id, 15)}
               </Link>
             }
@@ -140,7 +153,14 @@ export function TransactionTableRow({ row, isAdmin, transactionType, selected, o
         </TableCell>
 
         <TableCell>
-          <Label variant="soft" color={(ledger === 'Lightning' && 'secondary') || (ledger === 'Internal' && 'primary') || 'default'}>
+          <Label
+            variant="soft"
+            color={
+              (ledger === 'Lightning' && 'secondary') ||
+              (ledger === 'Internal' && 'primary') ||
+              'default'
+            }
+          >
             {ledger}
           </Label>
         </TableCell>
@@ -149,7 +169,10 @@ export function TransactionTableRow({ row, isAdmin, transactionType, selected, o
           <Label
             variant="soft"
             color={
-              (status === 'Settled' && 'success') || (status === 'Pending' && 'warning') || (status === 'Expired' && 'error') || 'default'
+              (status === 'Settled' && 'success') ||
+              (status === 'Pending' && 'warning') ||
+              (status === 'Expired' && 'error') ||
+              'default'
             }
           >
             {status}
@@ -179,9 +202,11 @@ export function TransactionTableRow({ row, isAdmin, transactionType, selected, o
             <Iconify icon="solar:eye-bold" />
             {t('view')}
           </MenuItem>
-          {transactionType === TransactionType.INVOICE && status === 'Pending' && (
-            <CopyMenuItem value={(row as InvoiceResponse).ln_invoice?.bolt11!} />
-          )}
+          {transactionType === TransactionType.INVOICE &&
+            status === 'Pending' &&
+            (row as InvoiceResponse).ln_invoice && (
+              <CopyMenuItem value={(row as InvoiceResponse).ln_invoice!.bolt11} />
+            )}
 
           {isAdmin && (
             <>

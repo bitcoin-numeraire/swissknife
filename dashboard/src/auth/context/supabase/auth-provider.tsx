@@ -1,8 +1,7 @@
 'use client';
 
+import { useSetState } from 'minimal-shared/hooks';
 import { useMemo, useEffect, useCallback } from 'react';
-
-import { useSetState } from 'src/hooks/use-set-state';
 
 import { supabase } from 'src/lib/supabase';
 import { client } from 'src/lib/swissknife';

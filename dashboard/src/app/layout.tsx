@@ -1,16 +1,16 @@
 import 'src/global.css';
 
-// ----------------------------------------------------------------------
+import type { Metadata, Viewport } from 'next';
 
-import type { Viewport } from 'next';
+import InitColorSchemeScript from '@mui/material/InitColorSchemeScript';
+import { AppRouterCacheProvider } from '@mui/material-nextjs/v14-appRouter';
 
-import { CONFIG } from 'src/config-global';
+import { CONFIG } from 'src/global-config';
 import { primary } from 'src/theme/core/palette';
 import { LocalizationProvider } from 'src/locales';
 import { detectLanguage } from 'src/locales/server';
+import { themeConfig, ThemeProvider } from 'src/theme';
 import { I18nProvider } from 'src/locales/i18n-provider';
-import { ThemeProvider } from 'src/theme/theme-provider';
-import { getInitColorSchemeScript } from 'src/theme/color-scheme-script';
 
 import { Snackbar } from 'src/components/snackbar';
 import { ProgressBar } from 'src/components/progress-bar';
@@ -25,7 +25,9 @@ import { AuthProvider as SupabaseAuthProvider } from 'src/auth/context/supabase'
 // ----------------------------------------------------------------------
 
 const AuthProvider =
-  (CONFIG.auth.method === 'supabase' && SupabaseAuthProvider) || (CONFIG.auth.method === 'auth0' && Auth0AuthProvider) || JwtAuthProvider;
+  (CONFIG.auth.method === 'supabase' && SupabaseAuthProvider) ||
+  (CONFIG.auth.method === 'auth0' && Auth0AuthProvider) ||
+  JwtAuthProvider;
 
 export const viewport: Viewport = {
   width: 'device-width',
@@ -33,67 +35,100 @@ export const viewport: Viewport = {
   themeColor: primary.main,
 };
 
-export const metadata = {
-  title: CONFIG.site.name,
-  description: `${CONFIG.site.name}, your assistant to handle everything Bitcoin`,
-  keywords: 'bitcoin,numeraire,swissknife,blockchain,lightning,rgb,protocol,smartcontract,decentralised,network,taproot-assets',
+export const metadata: Metadata = {
+  title: CONFIG.appName,
+  description: `${CONFIG.appName}, your assistant to handle everything Bitcoin`,
+  keywords:
+    'bitcoin,numeraire,swissknife,blockchain,lightning,rgb,protocol,smartcontract,decentralised,network,taproot-assets',
   manifest: '/site.webmanifest',
   icons: [
-    { rel: 'icon', url: `${CONFIG.site.basePath}/favicon/favicon.ico` },
+    { rel: 'icon', url: `${CONFIG.assetsDir}/favicon/favicon.ico` },
     {
       rel: 'icon',
       type: 'image/png',
       sizes: '16x16',
-      url: `${CONFIG.site.basePath}/favicon/favicon-16x16.png`,
+      url: `${CONFIG.assetsDir}/favicon/favicon-16x16.png`,
     },
     {
       rel: 'icon',
       type: 'image/png',
       sizes: '32x32',
-      url: `${CONFIG.site.basePath}/favicon/favicon-32x32.png`,
+      url: `${CONFIG.assetsDir}/favicon/favicon-32x32.png`,
     },
     {
       rel: 'apple-touch-icon',
       sizes: '180x180',
-      url: `${CONFIG.site.basePath}/favicon/apple-touch-icon.png`,
+      url: `${CONFIG.assetsDir}/favicon/apple-touch-icon.png`,
     },
     {
       rel: 'mask-icon',
       color: '#5bbad5',
-      url: `${CONFIG.site.basePath}/favicon/safari-pinned-tab.svg`,
+      url: `${CONFIG.assetsDir}/favicon/safari-pinned-tab.svg`,
     },
   ],
 };
 
-type Props = {
+// ----------------------------------------------------------------------
+
+type RootLayoutProps = {
   children: React.ReactNode;
 };
 
-export default async function RootLayout({ children }: Props) {
-  const lang = CONFIG.isStaticExport ? 'en' : await detectLanguage();
+async function getAppConfig() {
+  if (CONFIG.isStaticExport) {
+    return {
+      lang: 'en',
+      i18nLang: undefined,
+      cookieSettings: undefined,
+      dir: defaultSettings.direction,
+    };
+  } else {
+    const [lang, settings] = await Promise.all([detectLanguage(), detectSettings()]);
 
-  const settings = CONFIG.isStaticExport ? defaultSettings : await detectSettings();
+    return {
+      lang: lang ?? 'en',
+      i18nLang: lang ?? 'en',
+      cookieSettings: settings,
+      dir: settings.direction,
+    };
+  }
+}
+
+export default async function RootLayout({ children }: RootLayoutProps) {
+  const appConfig = await getAppConfig();
 
   return (
-    <html lang={lang ?? 'en'} suppressHydrationWarning>
+    <html lang={appConfig.lang} dir={appConfig.dir} suppressHydrationWarning>
       <body>
-        {getInitColorSchemeScript}
+        <InitColorSchemeScript
+          defaultMode={themeConfig.defaultMode}
+          modeStorageKey={themeConfig.modeStorageKey}
+          attribute={themeConfig.cssVariables.colorSchemeSelector}
+        />
 
-        <I18nProvider lang={CONFIG.isStaticExport ? undefined : lang}>
-          <LocalizationProvider>
-            <AuthProvider>
-              <SettingsProvider settings={settings} caches={CONFIG.isStaticExport ? 'localStorage' : 'cookie'}>
-                <ThemeProvider>
-                  <MotionLazy>
-                    <Snackbar />
-                    <ProgressBar />
-                    <SettingsDrawer hideDirection hideFont hidePresets hideNavLayout hideNavColor />
-                    {children}
-                  </MotionLazy>
-                </ThemeProvider>
-              </SettingsProvider>
-            </AuthProvider>
-          </LocalizationProvider>
+        <I18nProvider lang={appConfig.i18nLang}>
+          <AuthProvider>
+            <SettingsProvider
+              cookieSettings={appConfig.cookieSettings}
+              defaultSettings={defaultSettings}
+            >
+              <LocalizationProvider>
+                <AppRouterCacheProvider options={{ key: 'css' }}>
+                  <ThemeProvider
+                    defaultMode={themeConfig.defaultMode}
+                    modeStorageKey={themeConfig.modeStorageKey}
+                  >
+                    <MotionLazy>
+                      <Snackbar />
+                      <ProgressBar />
+                      <SettingsDrawer defaultSettings={defaultSettings} />
+                      {children}
+                    </MotionLazy>
+                  </ThemeProvider>
+                </AppRouterCacheProvider>
+              </LocalizationProvider>
+            </SettingsProvider>
+          </AuthProvider>
         </I18nProvider>
       </body>
     </html>

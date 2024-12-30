@@ -2,11 +2,15 @@
 
 import { useMemo } from 'react';
 
-import { Box } from '@mui/material';
-import Grid from '@mui/material/Unstable_Grid2';
+import { Box, Grid2 } from '@mui/material';
 
 import { shouldFail } from 'src/utils/errors';
-import { getTotal, getCumulativeSeries, getPercentageChange, mergeAndSortTransactions as mergeTransactions } from 'src/utils/transactions';
+import {
+  getTotal,
+  getCumulativeSeries,
+  getPercentageChange,
+  mergeAndSortTransactions as mergeTransactions,
+} from 'src/utils/transactions';
 
 import { useTranslate } from 'src/locales';
 import { Permission } from 'src/lib/swissknife';
@@ -28,7 +32,7 @@ import { LnAddresses } from '../ln-addresses';
 
 // ----------------------------------------------------------------------
 
-export function NodeView({ lnProviderLogo }: { lnProviderLogo: string }) {
+export function NodeView() {
   const { t } = useTranslate();
 
   const { fiatPrices, fiatPricesLoading, fiatPricesError } = useFetchFiatPrices();
@@ -47,20 +51,29 @@ export function NodeView({ lnProviderLogo }: { lnProviderLogo: string }) {
   const totalInvoices = useMemo(() => getTotal(invoices || []), [invoices]);
   const totalPayments = useMemo(() => getTotal(payments || []), [payments]);
 
-  const transactions = useMemo(() => mergeTransactions(invoices || [], payments || []), [invoices, payments]);
+  const transactions = useMemo(
+    () => mergeTransactions(invoices || [], payments || []),
+    [invoices, payments]
+  );
 
   const failed = shouldFail(errors, data, isLoading);
 
   return (
     <DashboardContent maxWidth="xl">
-      <RoleBasedGuard permissions={[Permission.READ_TRANSACTION, Permission.READ_LN_NODE, Permission.READ_LN_ADDRESS]} hasContent>
+      <RoleBasedGuard
+        permissions={[
+          Permission['READ:TRANSACTION'],
+          Permission['READ:LN_NODE'],
+          Permission['READ:LN_ADDRESS'],
+        ]}
+        hasContent
+      >
         {failed ? (
           <ErrorView errors={errors} isLoading={isLoading} data={data} />
         ) : (
           <>
             <CustomBreadcrumbs
               heading={t('node_view.heading')}
-              icon={<Box component="img" src={`/assets/icons/brands/ic-brand-${lnProviderLogo}`} sx={{ height: { xs: 64, md: 92 } }} />}
               links={[
                 {
                   name: t('admin'),
@@ -72,8 +85,8 @@ export function NodeView({ lnProviderLogo }: { lnProviderLogo: string }) {
               sx={{ mb: { xs: 3, md: 5 } }}
             />
 
-            <Grid container spacing={3}>
-              <Grid xs={12} md={7} lg={8}>
+            <Grid2 container spacing={3}>
+              <Grid2 size={{ xs: 12, md: 7, lg: 8 }}>
                 <Box sx={{ gap: 3, display: 'flex', flexDirection: 'column' }}>
                   <BalanceOverview
                     isAdmin
@@ -102,17 +115,19 @@ export function NodeView({ lnProviderLogo }: { lnProviderLogo: string }) {
 
                   <RecentTransactions isAdmin tableData={transactions.slice(0, 20)} />
                 </Box>
-              </Grid>
+              </Grid2>
 
-              <Grid xs={12} md={5} lg={4}>
+              <Grid2 size={{ xs: 12, md: 5, lg: 4 }}>
                 <Box sx={{ gap: 3, display: 'flex', flexDirection: 'column' }}>
                   <LnAddresses
-                    subheader={t('node_view.registered_ln_addresses', { count: lnAddresses!.length })}
+                    subheader={t('node_view.registered_ln_addresses', {
+                      count: lnAddresses!.length,
+                    })}
                     list={lnAddresses!.slice(-20)}
                   />
                 </Box>
-              </Grid>
-            </Grid>
+              </Grid2>
+            </Grid2>
           </>
         )}
       </RoleBasedGuard>

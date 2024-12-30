@@ -18,9 +18,6 @@ pub enum DatabaseError {
     #[error("Failed to find related resources: {0}")]
     FindRelated(String),
 
-    #[error("Failed to find resource by statement: {0}")]
-    FindByStatement(String),
-
     #[error("Failed to save resource: {0}")]
     Insert(String),
 

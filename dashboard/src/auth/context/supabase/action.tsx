@@ -47,7 +47,10 @@ export type UpdatePasswordParams = {
 /** **************************************
  * Sign in
  *************************************** */
-export const signInWithPassword = async ({ email, password }: SignInParams): Promise<AuthTokenResponsePassword> => {
+export const signInWithPassword = async ({
+  email,
+  password,
+}: SignInParams): Promise<AuthTokenResponsePassword> => {
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
   if (error) {
@@ -61,7 +64,12 @@ export const signInWithPassword = async ({ email, password }: SignInParams): Pro
 /** **************************************
  * Sign up
  *************************************** */
-export const signUp = async ({ email, password, firstName, lastName }: SignUpParams): Promise<AuthResponse> => {
+export const signUp = async ({
+  email,
+  password,
+  firstName,
+  lastName,
+}: SignUpParams): Promise<AuthResponse> => {
   const { data, error } = await supabase.auth.signUp({
     email,
     password,

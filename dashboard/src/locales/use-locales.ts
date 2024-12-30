@@ -6,12 +6,10 @@ import { useTranslation } from 'react-i18next';
 
 import { useRouter } from 'src/routes/hooks';
 
-import { toast } from 'src/components/snackbar';
-
 import { allLangs } from './all-langs';
-import { fallbackLng, changeLangMessages as messages } from './config-locales';
+import { fallbackLng } from './locales-config';
 
-import type { LanguageValue } from './config-locales';
+import type { LanguageValue } from './locales-config';
 
 // ----------------------------------------------------------------------
 
@@ -26,8 +24,6 @@ export function useTranslate(ns?: string) {
 
   const onChangeLang = useCallback(
     async (newLang: LanguageValue) => {
-      const currentMessages = messages[newLang] || messages.en;
-
       try {
         await i18n.changeLanguage(newLang);
 
@@ -37,7 +33,7 @@ export function useTranslate(ns?: string) {
 
         router.refresh();
       } catch (error) {
-        toast.error(currentMessages.error);
+        console.error(error);
       }
     },
     [currentLang, i18n, router]

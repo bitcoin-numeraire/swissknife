@@ -1,9 +1,9 @@
 import { appTitle } from 'src/utils/format-string';
 
-import { CONFIG } from 'src/config-global';
+import { CONFIG } from 'src/global-config';
 
-import { JwtSignUpView } from 'src/sections/auth/jwt';
-import { SupabaseSignUpView } from 'src/sections/auth/supabase';
+import { JwtSignUpView } from 'src/auth/view/jwt';
+import { SupabaseSignUpView } from 'src/auth/view/supabase';
 
 // ----------------------------------------------------------------------
 

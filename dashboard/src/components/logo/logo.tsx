@@ -1,79 +1,73 @@
-'use client';
-
-import type { BoxProps } from '@mui/material/Box';
+import type { LinkProps } from '@mui/material/Link';
 
 import { forwardRef } from 'react';
+import { mergeClasses } from 'minimal-shared/utils';
 
-import Box from '@mui/material/Box';
-import NoSsr from '@mui/material/NoSsr';
-import { useTheme } from '@mui/material/styles';
+import Link from '@mui/material/Link';
+import { styled, useTheme } from '@mui/material/styles';
 
 import { RouterLink } from 'src/routes/components';
 
-import { CONFIG } from 'src/config-global';
+import { CONFIG } from 'src/global-config';
 
 import { logoClasses } from './classes';
 
 // ----------------------------------------------------------------------
 
-export type LogoProps = BoxProps & {
-  href?: string;
-  disableLink?: boolean;
-  type?: 'single' | 'full' | 'font';
+export type LogoProps = LinkProps & {
+  isSingle?: boolean;
+  disabled?: boolean;
 };
 
-export const Logo = forwardRef<HTMLDivElement, LogoProps>(
-  ({ width = 40, height = 40, disableLink = false, className, href = '/', type = 'single', sx, ...other }, ref) => {
-    const theme = useTheme();
+export const Logo = forwardRef<HTMLAnchorElement, LogoProps>((props, ref) => {
+  const {
+    width = 40,
+    height = 40,
+    className,
+    href = '/',
+    isSingle = false,
+    disabled,
+    sx,
+    ...other
+  } = props;
 
-    let filename = 'logo_single';
-    if (type === 'full') {
-      filename = 'logo';
-    } else if (type === 'font') {
-      filename = 'logo_font';
-    }
+  const theme = useTheme();
 
-    const logo = (
-      <Box
-        alt="logo"
-        component="img"
-        src={`${CONFIG.site.basePath}/logo/${theme.palette.mode === 'dark' ? filename : `${filename}_negative`}.svg`}
-        width={width}
-        height={height}
+  const filename = isSingle ? 'logo_single' : 'logo_font';
+
+  return (
+    <LogoRoot
+      ref={ref}
+      component={RouterLink}
+      href={href}
+      aria-label="Logo"
+      underline="none"
+      className={mergeClasses([logoClasses.root, className])}
+      sx={[
+        () => ({
+          width,
+          height,
+          ...(disabled && { pointerEvents: 'none' }),
+        }),
+        ...(Array.isArray(sx) ? sx : [sx]),
+      ]}
+      {...other}
+    >
+      <img
+        alt="Single logo"
+        src={`${CONFIG.assetsDir}/logo/${theme.palette.mode === 'dark' ? filename : `${filename}_negative`}.svg`}
+        width="100%"
+        height="100%"
       />
-    );
+    </LogoRoot>
+  );
+});
 
-    return (
-      <NoSsr
-        fallback={
-          <Box
-            width={width}
-            height={height}
-            className={logoClasses.root.concat(className ? ` ${className}` : '')}
-            sx={{ flexShrink: 0, display: 'inline-flex', verticalAlign: 'middle', ...sx }}
-          />
-        }
-      >
-        <Box
-          ref={ref}
-          component={RouterLink}
-          href={href}
-          width={width}
-          height={height}
-          className={logoClasses.root.concat(className ? ` ${className}` : '')}
-          aria-label="logo"
-          sx={{
-            flexShrink: 0,
-            display: 'inline-flex',
-            verticalAlign: 'middle',
-            ...(disableLink && { pointerEvents: 'none' }),
-            ...sx,
-          }}
-          {...other}
-        >
-          {logo}
-        </Box>
-      </NoSsr>
-    );
-  }
-);
+// ----------------------------------------------------------------------
+
+const LogoRoot = styled(Link)(() => ({
+  flexShrink: 0,
+  color: 'transparent',
+  display: 'inline-flex',
+  verticalAlign: 'middle',
+}));
