@@ -270,7 +270,10 @@ impl LnClient for LndRestClient {
         match result {
             Ok(response) => Ok(Some(response.into())),
             Err(err) => {
-                if err.to_string().contains("there are no existing invoices") {
+                let err_msg = err.to_string();
+                if err_msg.contains("there are no existing invoices")
+                    || err_msg.contains("unable to locate invoice")
+                {
                     Ok(None)
                 } else {
                     Err(LightningError::InvoiceByHash(err.to_string()))
