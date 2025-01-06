@@ -1,0 +1,19 @@
+{
+  "welcome": {
+    "title": "Welcome to Numeraire SwissKnife",
+    "content": "See that orange dot? That's Bitcoin absorbing the monetary value of every other asset in the universe. Be part of the journey with a mighty Bitcoin Lightning wallet."
+  },
+  "custody": {
+    "title": "Be Self-Sovereign",
+    "content": "Hold your own keys in self-custody so no-one but you can access your funds."
+  },
+  "accessibility": {
+    "title": "Up & Running",
+    "content": "Connect to your own node or get one for free running in the cloud. With support for all major Lightning node implementations."
+  },
+  "multi_user": {
+    "title": "Multiple Users",
+    "content": "Create as many wallets as you need with instantaneous and free internal transfers between users."
+  },
+  "get_started": "Get Started"
+}

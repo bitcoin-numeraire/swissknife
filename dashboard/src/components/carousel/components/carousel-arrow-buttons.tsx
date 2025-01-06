@@ -1,8 +1,63 @@
 import type { Theme } from '@mui/material/styles';
 
+import { varAlpha, mergeClasses } from 'minimal-shared/utils';
+
+import { styled } from '@mui/material/styles';
+
 import { ArrowButton } from './arrow-button';
+import { carouselClasses } from '../classes';
 
 import type { CarouselArrowButtonsProps } from '../types';
+
+// ----------------------------------------------------------------------
+
+const BasicButtonsRoot = styled('div')(({ theme }) => ({
+  gap: '4px',
+  zIndex: 9,
+  alignItems: 'center',
+  display: 'inline-flex',
+  color: theme.vars.palette.action.active,
+}));
+
+export function CarouselArrowBasicButtons({
+  sx,
+  options,
+  slotProps,
+  onClickPrev,
+  onClickNext,
+  disablePrev,
+  disableNext,
+  className,
+  ...other
+}: CarouselArrowButtonsProps) {
+  return (
+    <BasicButtonsRoot
+      className={mergeClasses([carouselClasses.arrows.root, className])}
+      sx={sx}
+      {...other}
+    >
+      <ArrowButton
+        variant="prev"
+        options={options}
+        disabled={disablePrev}
+        onClick={onClickPrev}
+        svgIcon={slotProps?.prevBtn?.svgIcon}
+        svgSize={slotProps?.prevBtn?.svgSize}
+        sx={slotProps?.prevBtn?.sx}
+      />
+
+      <ArrowButton
+        variant="next"
+        options={options}
+        disabled={disableNext}
+        onClick={onClickNext}
+        svgIcon={slotProps?.nextBtn?.svgIcon}
+        svgSize={slotProps?.nextBtn?.svgSize}
+        sx={slotProps?.nextBtn?.sx}
+      />
+    </BasicButtonsRoot>
+  );
+}
 
 // ----------------------------------------------------------------------
 
@@ -70,5 +125,76 @@ export function CarouselArrowFloatButtons({
         ]}
       />
     </>
+  );
+}
+
+// ----------------------------------------------------------------------
+
+const NumberButtonsRoot = styled('div')(({ theme }) => ({
+  gap: '2px',
+  zIndex: 9,
+  alignItems: 'center',
+  display: 'inline-flex',
+  padding: theme.spacing(0.5),
+  color: theme.vars.palette.common.white,
+  borderRadius: theme.shape.borderRadius * 1.25,
+  backgroundColor: varAlpha(theme.vars.palette.grey['900Channel'], 0.48),
+  [`& .${carouselClasses.arrows.label}`]: {
+    ...theme.typography.subtitle2,
+    margin: theme.spacing(0, 0.5),
+  },
+  [`& .${carouselClasses.arrows.prev}`]: {
+    borderRadius: 'inherit',
+    padding: theme.spacing(0.75),
+  },
+  [`& .${carouselClasses.arrows.next}`]: {
+    borderRadius: 'inherit',
+    padding: theme.spacing(0.75),
+  },
+}));
+
+export function CarouselArrowNumberButtons({
+  sx,
+  options,
+  slotProps,
+  className,
+  totalSlides,
+  onClickPrev,
+  onClickNext,
+  disablePrev,
+  disableNext,
+  selectedIndex,
+  ...other
+}: CarouselArrowButtonsProps) {
+  return (
+    <NumberButtonsRoot
+      className={mergeClasses([carouselClasses.arrows.root, className])}
+      sx={sx}
+      {...other}
+    >
+      <ArrowButton
+        variant="prev"
+        options={options}
+        disabled={disablePrev}
+        onClick={onClickPrev}
+        svgIcon={slotProps?.prevBtn?.svgIcon}
+        svgSize={slotProps?.prevBtn?.svgSize ?? 16}
+        sx={slotProps?.prevBtn?.sx}
+      />
+
+      <span className={carouselClasses.arrows.label}>
+        {selectedIndex}/{totalSlides}
+      </span>
+
+      <ArrowButton
+        variant="next"
+        options={options}
+        disabled={disableNext}
+        onClick={onClickNext}
+        svgIcon={slotProps?.nextBtn?.svgIcon}
+        svgSize={slotProps?.nextBtn?.svgSize ?? 16}
+        sx={slotProps?.nextBtn?.sx}
+      />
+    </NumberButtonsRoot>
   );
 }

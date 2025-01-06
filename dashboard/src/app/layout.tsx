@@ -18,6 +18,7 @@ import { MotionLazy } from 'src/components/animate/motion-lazy';
 import { detectSettings } from 'src/components/settings/server';
 import { SettingsDrawer, defaultSettings, SettingsProvider } from 'src/components/settings';
 
+import WelcomeGuard from 'src/auth/guard/welcome-guard';
 import { AuthProvider as JwtAuthProvider } from 'src/auth/context/jwt';
 import { AuthProvider as Auth0AuthProvider } from 'src/auth/context/auth0';
 import { AuthProvider as SupabaseAuthProvider } from 'src/auth/context/supabase';
@@ -122,7 +123,7 @@ export default async function RootLayout({ children }: RootLayoutProps) {
                       <Snackbar />
                       <ProgressBar />
                       <SettingsDrawer defaultSettings={defaultSettings} />
-                      {children}
+                      <WelcomeGuard>{children}</WelcomeGuard>
                     </MotionLazy>
                   </ThemeProvider>
                 </AppRouterCacheProvider>

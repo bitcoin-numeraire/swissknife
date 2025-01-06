@@ -1,0 +1,19 @@
+{
+  "welcome": {
+    "title": "Bienvenue sur Numeraire SwissKnife",
+    "content": "Vois ce point orange ? C’est Bitcoin qui absorbe la valeur monétaire de tous les autres actifs dans l’univers. Participe à l’aventure avec un puissant portefeuille Bitcoin Lightning."
+  },
+  "custody": {
+    "title": "Sois souverain",
+    "content": "Conserve tes propres clés pour que personne d’autre que toi ne puisse accéder à tes fonds."
+  },
+  "accessibility": {
+    "title": "Prêt à l'emploi",
+    "content": "Connecte-toi à ton propre nœud ou procure-t’en un gratuitement dans le cloud, avec la prise en charge de toutes les principales implémentations."
+  },
+  "multi_user": {
+    "title": "Utilisateurs multiples",
+    "content": "Crée autant de portefeuilles que nécessaire avec des transferts internes instantanés et gratuits entre utilisateurs."
+  },
+  "get_started": "Commencer"
+}

@@ -1,3 +1,4 @@
+import type { BoxProps } from '@mui/material/Box';
 import type { ButtonBaseProps } from '@mui/material/ButtonBase';
 import type { UseEmblaCarouselType } from 'embla-carousel-react';
 import type { Theme, SxProps, Breakpoint } from '@mui/material/styles';
@@ -15,6 +16,17 @@ export type UseCarouselDotsReturn = {
   onClickDot: (index: number) => void;
 };
 
+export type CarouselDotButtonsProps = BoxProps<'ul'> &
+  Omit<UseCarouselDotsReturn, 'dotCount'> & {
+    gap?: number;
+    variant?: 'circular' | 'rounded' | 'number';
+    slotProps?: {
+      dot?: {
+        size?: number;
+        sx?: SxProps<Theme>;
+      };
+    };
+  };
 /**
  * Prev & Next Buttons
  */
