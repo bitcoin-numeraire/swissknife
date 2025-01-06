@@ -181,6 +181,7 @@ import type {
   ListWalletInvoicesData,
   ListWalletPaymentsData,
   DeletePaymentsResponse,
+  ReadinessCheckResponse,
   RegisterWalletResponse,
   GenerateInvoiceResponse,
   DeleteAddressesResponse,
@@ -193,6 +194,7 @@ import type {
   DeleteWalletAddressData,
   UpdateWalletAddressData,
   ListWalletPaymentsError,
+  MarkWelcomeCompleteData,
   ListWalletOverviewsData,
   CloseLspChannelsResponse,
   RevokeWalletApiKeysError,
@@ -204,6 +206,7 @@ import type {
   UpdateWalletAddressError,
   DeleteFailedPaymentsData,
   GetWalletPaymentResponse,
+  MarkWelcomeCompleteError,
   ListWalletOverviewsError,
   ListWalletApiKeysResponse,
   DeleteExpiredInvoicesData,
@@ -216,6 +219,7 @@ import type {
   ListWalletPaymentsResponse,
   RevokeWalletApiKeysResponse,
   UpdateWalletAddressResponse,
+  MarkWelcomeCompleteResponse,
   ListWalletOverviewsResponse,
   DeleteFailedPaymentsResponse,
   DeleteExpiredInvoicesResponse,
@@ -1032,13 +1036,29 @@ export const healthCheck = <ThrowOnError extends boolean = false>(
   });
 
 /**
+ * Marks the welcome flow as completed
+ * Returns whether the application welcome flow is complete.
+ */
+export const markWelcomeComplete = <ThrowOnError extends boolean = false>(
+  options?: Options<MarkWelcomeCompleteData, ThrowOnError>
+) =>
+  (options?.client ?? client).post<
+    MarkWelcomeCompleteResponse,
+    MarkWelcomeCompleteError,
+    ThrowOnError
+  >({
+    ...options,
+    url: '/v1/system/mark-welcome-complete',
+  });
+
+/**
  * Readiness Check
  * Returns successfully if the server is reachable.
  */
 export const readinessCheck = <ThrowOnError extends boolean = false>(
   options?: Options<ReadinessCheckData, ThrowOnError>
 ) =>
-  (options?.client ?? client).get<unknown, unknown, ThrowOnError>({
+  (options?.client ?? client).get<ReadinessCheckResponse, unknown, ThrowOnError>({
     ...options,
     url: '/v1/system/ready',
   });

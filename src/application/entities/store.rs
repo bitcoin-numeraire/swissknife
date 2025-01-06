@@ -6,11 +6,11 @@ use crate::{
     application::errors::DatabaseError,
     domains::{
         invoice::InvoiceRepository, ln_address::LnAddressRepository, payment::PaymentRepository,
-        user::ApiKeyRepository, wallet::WalletRepository,
+        system::ConfigRepository, user::ApiKeyRepository, wallet::WalletRepository,
     },
     infra::database::sea_orm::{
-        SeaOrmApiKeyRepository, SeaOrmInvoiceRepository, SeaOrmLnAddressRepository,
-        SeaOrmPaymentRepository, SeaOrmWalletRepository,
+        SeaOrmApiKeyRepository, SeaOrmConfigRepository, SeaOrmInvoiceRepository,
+        SeaOrmLnAddressRepository, SeaOrmPaymentRepository, SeaOrmWalletRepository,
     },
 };
 
@@ -22,6 +22,7 @@ pub struct AppStore {
     pub invoice: Arc<dyn InvoiceRepository>,
     pub wallet: Arc<dyn WalletRepository>,
     pub api_key: Arc<dyn ApiKeyRepository>,
+    pub config: Arc<dyn ConfigRepository>,
 }
 
 impl AppStore {
@@ -31,6 +32,7 @@ impl AppStore {
         let invoice_repo = SeaOrmInvoiceRepository::new(db_conn.clone());
         let wallet_repo = SeaOrmWalletRepository::new(db_conn.clone());
         let api_key_repo = SeaOrmApiKeyRepository::new(db_conn.clone());
+        let config_repo = SeaOrmConfigRepository::new(db_conn.clone());
 
         AppStore {
             db_conn,
@@ -39,6 +41,7 @@ impl AppStore {
             invoice: Arc::new(invoice_repo),
             wallet: Arc::new(wallet_repo),
             api_key: Arc::new(api_key_repo),
+            config: Arc::new(config_repo),
         }
     }
 }

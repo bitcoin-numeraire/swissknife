@@ -636,7 +636,11 @@ export type SetupInfo = {
   /**
    * Whether the app is setup
    */
-  complete: boolean;
+  setup_complete: boolean;
+  /**
+   * Whether the welcome flow has been completed
+   */
+  welcome_complete: boolean;
 };
 
 /**
@@ -3209,6 +3213,32 @@ export type HealthCheckResponses = {
 
 export type HealthCheckResponse = HealthCheckResponses[keyof HealthCheckResponses];
 
+export type MarkWelcomeCompleteData = {
+  body?: never;
+  path?: never;
+  query?: never;
+  url: '/v1/system/mark-welcome-complete';
+};
+
+export type MarkWelcomeCompleteErrors = {
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
+
+export type MarkWelcomeCompleteError = MarkWelcomeCompleteErrors[keyof MarkWelcomeCompleteErrors];
+
+export type MarkWelcomeCompleteResponses = {
+  /**
+   * No Content on success
+   */
+  204: void;
+};
+
+export type MarkWelcomeCompleteResponse =
+  MarkWelcomeCompleteResponses[keyof MarkWelcomeCompleteResponses];
+
 export type ReadinessCheckData = {
   body?: never;
   path?: never;
@@ -3218,10 +3248,12 @@ export type ReadinessCheckData = {
 
 export type ReadinessCheckResponses = {
   /**
-   * OK
+   * No Content on success
    */
-  200: unknown;
+  204: void;
 };
+
+export type ReadinessCheckResponse = ReadinessCheckResponses[keyof ReadinessCheckResponses];
 
 export type SetupCheckData = {
   body?: never;

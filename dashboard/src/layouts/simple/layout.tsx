@@ -11,12 +11,15 @@ import Alert from '@mui/material/Alert';
 import { paths } from 'src/routes/paths';
 import { RouterLink } from 'src/routes/components';
 
+import { allLangs, useTranslate } from 'src/locales';
+
 import { Logo } from 'src/components/logo';
 
 import { SimpleCompactContent } from './content';
 import { MainSection } from '../core/main-section';
 import { LayoutSection } from '../core/layout-section';
 import { HeaderSection } from '../core/header-section';
+import { LanguagePopover } from '../components/language-popover';
 
 import type { SimpleCompactContentProps } from './content';
 import type { MainSectionProps } from '../core/main-section';
@@ -43,6 +46,8 @@ export function SimpleLayout({
   slotProps,
   layoutQuery = 'md',
 }: SimpleLayoutProps) {
+  const { t } = useTranslate();
+
   const renderHeader = () => {
     const headerSlotProps: HeaderSectionProps['slotProps'] = { container: { maxWidth: false } };
 
@@ -55,6 +60,9 @@ export function SimpleLayout({
       leftArea: <Logo width={150} />,
       rightArea: (
         <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 1, sm: 1.5 } }}>
+          {/** @slot Language popover */}
+          <LanguagePopover data={allLangs} />
+
           {/** @slot Help link */}
           <Link
             href={paths.external.numeraire.contact}
@@ -63,7 +71,7 @@ export function SimpleLayout({
             sx={{ typography: 'subtitle2' }}
             target="_blank"
           >
-            Need help?
+            {t('need_help')}
           </Link>
         </Box>
       ),

@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use std::sync::Arc;
-use tracing::{error, trace};
+use tracing::{debug, error, info, trace};
 
 use crate::{
     application::{entities::AppStore, errors::ApplicationError},
@@ -8,6 +8,8 @@ use crate::{
 };
 
 use super::{HealthCheck, HealthStatus, SetupInfo, SystemUseCases, VersionInfo};
+
+const WELCOME_COMPLETE_KEY: &str = "welcome_complete";
 
 pub struct SystemService {
     store: AppStore,
@@ -54,10 +56,32 @@ impl SystemUseCases for SystemService {
 
     async fn setup_check(&self) -> Result<SetupInfo, ApplicationError> {
         trace!("Checking system setup");
-        let n_wallets: u64 = self.store.wallet.count().await?;
 
+        let n_wallets = self.store.wallet.count().await?;
+        let setup_complete = n_wallets > 0;
+        let welcome_complete = self
+            .store
+            .config
+            .find(WELCOME_COMPLETE_KEY)
+            .await?
+            .is_some();
+
+        debug!(%welcome_complete, %setup_complete, "Checking system setup");
         Ok(SetupInfo {
-            complete: n_wallets > 0,
+            welcome_complete,
+            setup_complete,
         })
+    }
+
+    async fn mark_welcome_complete(&self) -> Result<(), ApplicationError> {
+        debug!("Marking welcome flow as completed");
+
+        self.store
+            .config
+            .insert(WELCOME_COMPLETE_KEY, true.into())
+            .await?;
+
+        info!("Welcome flow marked as complete successfully");
+        Ok(())
     }
 }
