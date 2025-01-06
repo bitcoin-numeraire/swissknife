@@ -3,6 +3,7 @@
 pub mod prelude;
 
 pub mod api_key;
+pub mod config;
 pub mod contact;
 pub mod invoice;
 pub mod ln_address;

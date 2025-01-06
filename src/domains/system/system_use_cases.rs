@@ -9,4 +9,5 @@ pub trait SystemUseCases: Send + Sync {
     async fn health_check(&self) -> HealthCheck;
     fn version(&self) -> VersionInfo;
     async fn setup_check(&self) -> Result<SetupInfo, ApplicationError>;
+    async fn mark_welcome_complete(&self) -> Result<(), ApplicationError>;
 }

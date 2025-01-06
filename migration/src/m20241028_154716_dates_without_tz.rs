@@ -2,9 +2,9 @@ use sea_orm::DatabaseBackend;
 use sea_orm_migration::{prelude::*, schema::*};
 
 use crate::{
-    m20240420_1_wallet_table::Wallet, m20240420_2_ln_address_table::LnAddress,
-    m20240420_3_invoice_table::Invoice, m20240420_4_payment_table::Payment,
-    m20241009_6_api_key_table::ApiKey,
+    m20240420_135900_wallet_table::Wallet, m20240420_135901_ln_address_table::LnAddress,
+    m20240420_135902_invoice_table::Invoice, m20240420_135903_payment_table::Payment,
+    m20241009_135905_api_key_table::ApiKey,
 };
 
 #[derive(DeriveMigrationName)]

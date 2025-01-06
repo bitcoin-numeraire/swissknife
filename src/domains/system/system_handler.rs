@@ -1,6 +1,12 @@
 use std::sync::Arc;
 
-use axum::{extract::State, http::StatusCode, response::IntoResponse, routing::get, Router};
+use axum::{
+    extract::State,
+    http::StatusCode,
+    response::IntoResponse,
+    routing::{get, post},
+    Router,
+};
 use utoipa::OpenApi;
 
 use crate::{
@@ -12,7 +18,7 @@ use super::{HealthCheck, HealthStatus, SetupInfo, VersionInfo};
 
 #[derive(OpenApi)]
 #[openapi(
-    paths(readiness_check, health_check, version_check, setup_check),
+    paths(readiness_check, health_check, version_check, setup_check, mark_welcome_complete),
     components(schemas(HealthCheck, HealthStatus, VersionInfo, SetupInfo)),
     tags(
         (name = "System", description = "System related endpoints")
@@ -27,6 +33,7 @@ pub fn router() -> Router<Arc<AppState>> {
         .route("/ready", get(readiness_check))
         .route("/version", get(version_check))
         .route("/setup", get(setup_check))
+        .route("/mark-welcome-complete", post(mark_welcome_complete))
 }
 
 /// Readiness Check
@@ -38,11 +45,11 @@ pub fn router() -> Router<Arc<AppState>> {
     tag = "System",
     context_path = CONTEXT_PATH,
     responses(
-        (status = 200, description = "OK")
+        (status = 204, description = "No Content on success"),
     )
 )]
 async fn readiness_check() -> impl IntoResponse {
-    StatusCode::OK
+    StatusCode::NO_CONTENT
 }
 
 /// Health Check
@@ -105,4 +112,24 @@ async fn setup_check(
 ) -> Result<Json<SetupInfo>, ApplicationError> {
     let info = app_state.services.system.setup_check().await?;
     Ok(info.into())
+}
+
+/// Marks the welcome flow as completed
+///
+/// Returns whether the application welcome flow is complete.
+#[utoipa::path(
+    post,
+    path = "/mark-welcome-complete",
+    tag = "System",
+    context_path = CONTEXT_PATH,
+    responses(
+        (status = 204, description = "No Content on success"),
+        (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
+    )
+)]
+async fn mark_welcome_complete(
+    State(app_state): State<Arc<AppState>>,
+) -> Result<impl IntoResponse, ApplicationError> {
+    app_state.services.system.mark_welcome_complete().await?;
+    Ok(StatusCode::NO_CONTENT)
 }

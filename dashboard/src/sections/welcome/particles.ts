@@ -67,8 +67,8 @@ const particleOptions: ISourceOptions = {
       limit: 60,
     },
     position: {
-      x: 70,
-      y: 30,
+      x: 50,
+      y: 20,
     },
   },
 };

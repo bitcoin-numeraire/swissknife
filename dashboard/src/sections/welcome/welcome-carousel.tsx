@@ -34,6 +34,7 @@ export function WelcomeCarousel({ data, onComplete }: Props) {
   return (
     <Box
       sx={{
+        mt: -20,
         width: '100%',
       }}
     >
