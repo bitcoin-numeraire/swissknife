@@ -6,4 +6,4 @@ export * from './carousel-dot-buttons';
 
 export * from './carousel-arrow-buttons';
 
-export * from '../../../sections/welcome/welcome-carousel';
+export * from '../../../sections/onboarding/welcome-carousel';

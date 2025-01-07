@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
+import { useBoolean } from 'minimal-shared/hooks';
 
 import { paths } from 'src/routes/paths';
 import { useRouter, usePathname } from 'src/routes/hooks';
@@ -26,10 +27,8 @@ const signInPaths = {
 export function AuthGuard({ children }: AuthGuardProps) {
   const router = useRouter();
   const pathname = usePathname();
-
   const { authenticated, loading } = useAuthContext();
-
-  const [isChecking, setIsChecking] = useState<boolean>(true);
+  const isChecking = useBoolean(true);
 
   const createRedirectPath = (currentPath: string) => {
     const queryString = new URLSearchParams({ returnTo: pathname }).toString();
@@ -52,7 +51,7 @@ export function AuthGuard({ children }: AuthGuardProps) {
       return;
     }
 
-    setIsChecking(false);
+    isChecking.onFalse();
   };
 
   useEffect(() => {
@@ -60,7 +59,7 @@ export function AuthGuard({ children }: AuthGuardProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authenticated, loading]);
 
-  if (isChecking) {
+  if (isChecking.value) {
     return <SplashScreen />;
   }
 

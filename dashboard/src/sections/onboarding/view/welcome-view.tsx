@@ -11,6 +11,10 @@ import Particles, { initParticlesEngine } from '@tsparticles/react';
 
 import { Box } from '@mui/material';
 
+import { handleActionError } from 'src/utils/errors';
+
+import { markWelcomeComplete } from 'src/lib/swissknife';
+
 import { WelcomeCarousel } from 'src/components/carousel';
 
 import particleOptions from '../particles';
@@ -37,11 +41,7 @@ const slides: SlideData[] = [
   },
 ];
 
-type WelcomeScreenProps = {
-  onComplete: () => void;
-};
-
-export function WelcomeView({ onComplete }: WelcomeScreenProps) {
+export function WelcomeView() {
   const init = useBoolean(false);
 
   useEffect(() => {
@@ -52,6 +52,14 @@ export function WelcomeView({ onComplete }: WelcomeScreenProps) {
       init.onTrue();
     });
   }, [init]);
+
+  const handleWelcomeComplete = async () => {
+    try {
+      await markWelcomeComplete();
+    } catch (err) {
+      handleActionError(err);
+    }
+  };
 
   return (
     <Box
@@ -67,7 +75,7 @@ export function WelcomeView({ onComplete }: WelcomeScreenProps) {
     >
       {init.value && <Box component={Particles} id="tsparticles" options={particleOptions} />}
 
-      <WelcomeCarousel data={slides} onComplete={onComplete} />
+      <WelcomeCarousel data={slides} onComplete={handleWelcomeComplete} />
     </Box>
   );
 }

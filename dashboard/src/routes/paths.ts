@@ -3,6 +3,12 @@ const ROOTS = {
 };
 
 export const paths = {
+  onboarding: {
+    welcome: '/welcome',
+    setup: {
+      root: '/setup',
+    },
+  },
   wallet: {
     root: '/wallet',
     payments: '/wallet/payments',
