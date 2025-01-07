@@ -35,15 +35,11 @@ export const paths = {
   },
   // AUTH
   auth: {
+    login: '/login',
     jwt: {
-      signIn: '/login',
       signUp: `${ROOTS.AUTH}/jwt/sign-up`,
     },
-    auth0: {
-      signIn: '/login',
-    },
     supabase: {
-      signIn: `${ROOTS.AUTH}/supabase/sign-in`,
       verify: `${ROOTS.AUTH}/supabase/verify`,
       signUp: `${ROOTS.AUTH}/supabase/sign-up`,
       updatePassword: `${ROOTS.AUTH}/supabase/update-password`,

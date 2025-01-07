@@ -1,4 +1,4 @@
-import { SimpleLayout } from 'src/layouts/simple';
+import { AuthSplitLayout } from 'src/layouts/auth-split';
 
 import { OnboardingGuard } from 'src/auth/guard/onboarding-guard';
 
@@ -11,7 +11,7 @@ type Props = {
 export default function Layout({ children }: Props) {
   return (
     <OnboardingGuard>
-      <SimpleLayout>{children}</SimpleLayout>
+      <AuthSplitLayout>{children}</AuthSplitLayout>
     </OnboardingGuard>
   );
 }

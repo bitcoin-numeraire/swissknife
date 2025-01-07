@@ -6,8 +6,6 @@ import { useBoolean } from 'minimal-shared/hooks';
 import { paths } from 'src/routes/paths';
 import { useRouter, usePathname } from 'src/routes/hooks';
 
-import { CONFIG } from 'src/global-config';
-
 import { SplashScreen } from 'src/components/loading-screen';
 
 import { useAuthContext } from '../hooks';
@@ -16,12 +14,6 @@ import { useAuthContext } from '../hooks';
 
 type AuthGuardProps = {
   children: React.ReactNode;
-};
-
-const signInPaths = {
-  jwt: paths.auth.jwt.signIn,
-  auth0: paths.auth.auth0.signIn,
-  supabase: paths.auth.supabase.signIn,
 };
 
 export function AuthGuard({ children }: AuthGuardProps) {
@@ -41,10 +33,7 @@ export function AuthGuard({ children }: AuthGuardProps) {
     }
 
     if (!authenticated) {
-      const { method } = CONFIG.auth;
-
-      const signInPath = signInPaths[method];
-      const redirectPath = createRedirectPath(signInPath);
+      const redirectPath = createRedirectPath(paths.auth.login);
 
       router.replace(redirectPath);
 

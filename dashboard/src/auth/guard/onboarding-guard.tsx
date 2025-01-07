@@ -18,9 +18,9 @@ export function OnboardingGuard({ children }: { children: React.ReactNode }) {
   const isChecking = useBoolean(true);
 
   useEffect(() => {
-    const localValue = localStorage.getItem(ONBOARDING_COMPLETE_STORAGE_KEY);
+    const onboardingComplete = localStorage.getItem(ONBOARDING_COMPLETE_STORAGE_KEY);
 
-    if (localValue === 'true') {
+    if (onboardingComplete === 'true') {
       isChecking.onFalse();
       return;
     }
@@ -28,16 +28,12 @@ export function OnboardingGuard({ children }: { children: React.ReactNode }) {
     (async () => {
       try {
         const { data } = await setupCheck<true>();
-        if (data.welcome_complete) {
-          router.replace(paths.onboarding.welcome);
-          return;
-        }
-        if (!data.setup_complete) {
-          router.replace(paths.onboarding.setup.root);
+        if (data.welcome_complete && data.setup_complete) {
+          localStorage.setItem(ONBOARDING_COMPLETE_STORAGE_KEY, 'true');
+          router.replace(paths.auth.login);
           return;
         }
 
-        localStorage.setItem(ONBOARDING_COMPLETE_STORAGE_KEY, 'true');
         isChecking.onFalse();
       } catch (err) {
         handleActionError(err);

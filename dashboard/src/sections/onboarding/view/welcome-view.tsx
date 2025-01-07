@@ -43,6 +43,7 @@ const slides: SlideData[] = [
 
 export function WelcomeView() {
   const init = useBoolean(false);
+  console.log('in view', init);
 
   useEffect(() => {
     initParticlesEngine(async (engine: Engine) => {

@@ -43,7 +43,7 @@ export async function setSession(accessToken: string) {
     client.interceptors.error.use((error, response) => {
       if (response.status === 401) {
         sessionStorage.removeItem(JWT_STORAGE_KEY);
-        window.location.href = paths.auth.jwt.signIn;
+        window.location.href = paths.auth.login;
       }
 
       return Promise.reject(error);
