@@ -79,6 +79,7 @@ leeway = "60s"
 
 [jwt]
 token_expiry = "1h"
+secret = "CHANGE_ME"
 
 # Database
 [database]
