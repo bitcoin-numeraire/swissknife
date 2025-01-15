@@ -7,14 +7,11 @@ import { useBoolean } from 'minimal-shared/hooks';
 import { zodResolver } from '@hookform/resolvers/zod';
 
 import Box from '@mui/material/Box';
-import Link from '@mui/material/Link';
 import IconButton from '@mui/material/IconButton';
 import LoadingButton from '@mui/lab/LoadingButton';
 import InputAdornment from '@mui/material/InputAdornment';
 
-import { paths } from 'src/routes/paths';
 import { useRouter } from 'src/routes/hooks';
-import { RouterLink } from 'src/routes/components';
 
 import { handleActionError } from 'src/utils/errors';
 
@@ -113,17 +110,7 @@ export function JwtSignInView() {
     <>
       <AnimateLogoRotate sx={{ mb: 3, mx: 'auto' }} />
 
-      <FormHead
-        title={t('sign_in.sign_in_to_your_account')}
-        description={
-          <>
-            {`Don’t have an account? `}
-            <Link component={RouterLink} href={paths.auth.jwt.signUp} variant="subtitle2">
-              Get started
-            </Link>
-          </>
-        }
-      />
+      <FormHead title={t('sign_in.sign_in_to_your_account')} />
 
       <Form methods={methods} onSubmit={onSubmit}>
         {renderForm()}
