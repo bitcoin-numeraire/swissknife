@@ -3024,7 +3024,7 @@ checksum = "78ca9ab1a0babb1e7d5695e3530886289c18cf2f87ec19a575a0abdce112e3a3"
 
 [[package]]
 name = "migration"
-version = "0.1.3"
+version = "0.1.4"
 dependencies = [
  "async-std",
  "sea-orm-migration",
@@ -5768,7 +5768,7 @@ checksum = "13c2bddecc57b384dee18652358fb23172facb8a2c51ccc10d74c157bdea3292"
 
 [[package]]
 name = "swissknife"
-version = "0.1.3"
+version = "0.1.4"
 dependencies = [
  "anyhow",
  "async-trait",
