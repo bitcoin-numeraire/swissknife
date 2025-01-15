@@ -49,6 +49,13 @@
   "request": "Requête",
   "view_all": "Voir tous",
   "need_help": "Besoin d'aide?",
+  "sign_up": {
+    "password": "Mot de passe",
+    "repeat_password": "Répéter le mot de passe",
+    "create_button": "Créer un compte",
+    "agreement": "En vous inscrivant, vous acceptez la ",
+    "privacy_policy": "Politique de Confidentialité"
+  },
   "sign_in": {
     "sign_in_to_your_account": "Connecte-toi à ton compte",
     "password": "Mot de passe",

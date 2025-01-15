@@ -1,4 +1,4 @@
-import { AuthCenteredLayout } from 'src/layouts/auth-centered';
+import { SimpleLayout } from 'src/layouts/simple';
 
 import { OnboardingGuard } from 'src/auth/guard/onboarding-guard';
 
@@ -11,7 +11,7 @@ type Props = {
 export default function Layout({ children }: Props) {
   return (
     <OnboardingGuard>
-      <AuthCenteredLayout>{children}</AuthCenteredLayout>
+      <SimpleLayout>{children}</SimpleLayout>
     </OnboardingGuard>
   );
 }

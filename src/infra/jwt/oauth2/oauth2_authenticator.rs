@@ -86,7 +86,7 @@ impl OAuth2Authenticator {
 
 #[async_trait]
 impl JWTAuthenticator for OAuth2Authenticator {
-    fn generate(&self, _: &str) -> Result<String, AuthenticationError> {
+    fn encode(&self, _: String, _: Vec<Permission>) -> Result<String, AuthenticationError> {
         Err(AuthenticationError::UnsupportedOperation)
     }
 
@@ -109,13 +109,11 @@ impl JWTAuthenticator for OAuth2Authenticator {
                     let decoding_key = DecodingKey::from_rsa_components(&rsa.n, &rsa.e)
                         .map_err(|e| AuthenticationError::DecodeJWTKey(e.to_string()))?;
 
-                    let decoded_token = decode::<Claims>(token, &decoding_key, &self.validation)
-                        .map_err(|e| AuthenticationError::DecodeJWT(e.to_string()))?;
+                    let decoded_token =
+                        decode::<AuthClaims>(token, &decoding_key, &self.validation)
+                            .map_err(|e| AuthenticationError::DecodeJWT(e.to_string()))?;
 
-                    Ok(AuthClaims {
-                        sub: decoded_token.claims.sub,
-                        permissions: decoded_token.claims.permissions,
-                    })
+                    Ok(decoded_token.claims)
                 }
                 _ => unreachable!("Only RSA algorithm is supported as JWK. should be unreachable"),
             }

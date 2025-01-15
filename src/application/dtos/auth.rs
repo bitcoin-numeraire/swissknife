@@ -1,11 +1,19 @@
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
+/// Sign Up Request
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct SignUpRequest {
+    /// User password
+    #[schema(example = "password")]
+    pub password: String,
+}
+
 /// Sign In Request
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct SignInRequest {
     /// User password
-    #[schema(example = "password_from_config_file")]
+    #[schema(example = "password")]
     pub password: String,
 }
 

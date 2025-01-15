@@ -78,10 +78,7 @@ jwks_refresh_interval = "1h"
 leeway = "60s"
 
 [jwt]
-username = "admin"
-password = "CHANGE_ME"
 token_expiry = "1h"
-secret = "CHANGE_ME"
 
 # Database
 [database]

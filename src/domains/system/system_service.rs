@@ -4,6 +4,7 @@ use tracing::{debug, error, info, trace};
 
 use crate::{
     application::{entities::AppStore, errors::ApplicationError},
+    domains::user::PASSWORD_HASH_KEY,
     infra::lightning::LnClient,
 };
 
@@ -57,24 +58,33 @@ impl SystemUseCases for SystemService {
     async fn setup_check(&self) -> Result<SetupInfo, ApplicationError> {
         trace!("Checking system setup");
 
-        let n_wallets = self.store.wallet.count().await?;
-        let setup_complete = n_wallets > 0;
         let welcome_complete = self
             .store
             .config
             .find(WELCOME_COMPLETE_KEY)
             .await?
             .is_some();
+        let sign_up_complete: bool = self.store.config.find(PASSWORD_HASH_KEY).await?.is_some();
 
-        debug!(%welcome_complete, %setup_complete, "Checking system setup");
+        debug!(%welcome_complete, %sign_up_complete, "Checking system setup");
         Ok(SetupInfo {
             welcome_complete,
-            setup_complete,
+            sign_up_complete,
         })
     }
 
     async fn mark_welcome_complete(&self) -> Result<(), ApplicationError> {
         debug!("Marking welcome flow as completed");
+
+        if self
+            .store
+            .config
+            .find(WELCOME_COMPLETE_KEY)
+            .await?
+            .is_some()
+        {
+            return Ok(());
+        }
 
         self.store
             .config

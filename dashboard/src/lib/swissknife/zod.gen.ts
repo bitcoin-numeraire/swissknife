@@ -241,7 +241,7 @@ export const zSendPaymentRequest = z.object({
 });
 
 export const zSetupInfo = z.object({
-  setup_complete: z.boolean(),
+  sign_up_complete: z.boolean(),
   welcome_complete: z.boolean(),
 });
 
@@ -259,6 +259,10 @@ export const zSignMessageRequest = z.object({
 
 export const zSignMessageResponse = z.object({
   signature: z.string(),
+});
+
+export const zSignUpRequest = z.object({
+  password: z.string(),
 });
 
 export const zUpdateLnAddressRequest = z.object({

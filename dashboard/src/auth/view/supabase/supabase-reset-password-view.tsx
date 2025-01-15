@@ -93,7 +93,7 @@ export function SupabaseResetPasswordView() {
         {renderForm()}
       </Form>
 
-      <FormReturnLink href={paths.auth.supabase.signIn} />
+      <FormReturnLink href={paths.auth.login} />
     </>
   );
 }

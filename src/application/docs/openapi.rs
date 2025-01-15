@@ -88,6 +88,13 @@ pub const UNSUPPORTED_EXAMPLE: &str = r#"
 }
 "#;
 
+pub const CONFLICT_EXAMPLE: &str = r#"
+{
+    "status": "409 Conflict",
+    "reason": "Admin user already created"
+}
+"#;
+
 pub const UNPROCESSABLE_EXAMPLE: &str = r#"
 {
     "status": "422 Unprocessable Entity",

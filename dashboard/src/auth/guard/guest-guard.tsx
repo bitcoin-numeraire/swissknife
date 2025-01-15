@@ -1,12 +1,18 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
+import { useBoolean } from 'minimal-shared/hooks';
 
+import { paths } from 'src/routes/paths';
 import { useRouter, useSearchParams } from 'src/routes/hooks';
 
+import { handleActionError } from 'src/utils/errors';
+
 import { CONFIG } from 'src/global-config';
+import { setupCheck } from 'src/lib/swissknife';
 
 import { SplashScreen } from 'src/components/loading-screen';
+import { ONBOARDING_COMPLETE_STORAGE_KEY } from 'src/components/settings';
 
 import { useAuthContext } from '../hooks';
 
@@ -24,9 +30,9 @@ export function GuestGuard({ children }: GuestGuardProps) {
 
   const { loading, authenticated } = useAuthContext();
 
-  const [isChecking, setIsChecking] = useState<boolean>(true);
+  const isChecking = useBoolean(true);
 
-  const checkPermissions = async (): Promise<void> => {
+  useEffect(() => {
     if (loading) {
       return;
     }
@@ -36,15 +42,33 @@ export function GuestGuard({ children }: GuestGuardProps) {
       return;
     }
 
-    setIsChecking(false);
-  };
+    if (localStorage.getItem(ONBOARDING_COMPLETE_STORAGE_KEY) === 'true') {
+      isChecking.onFalse();
+      return;
+    }
 
-  useEffect(() => {
-    checkPermissions();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authenticated, loading]);
+    (async () => {
+      try {
+        const { data } = await setupCheck<true>();
+        if (!data.welcome_complete) {
+          router.replace(paths.onboarding.welcome);
+          return;
+        }
 
-  if (isChecking) {
+        if (!data.sign_up_complete) {
+          router.replace(paths.auth.signUp);
+          return;
+        }
+
+        localStorage.setItem(ONBOARDING_COMPLETE_STORAGE_KEY, 'true');
+        isChecking.onFalse();
+      } catch (err) {
+        handleActionError(err);
+      }
+    })();
+  }, [authenticated, loading, isChecking, returnTo, router]);
+
+  if (isChecking.value) {
     return <SplashScreen />;
   }
 

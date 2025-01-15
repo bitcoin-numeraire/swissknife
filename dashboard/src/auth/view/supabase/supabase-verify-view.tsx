@@ -18,7 +18,7 @@ export function SupabaseVerifyView() {
         description={`We've emailed a 6-digit confirmation code. \nPlease enter the code in the box below to verify your email.`}
       />
 
-      <FormReturnLink href={paths.auth.supabase.signIn} sx={{ mt: 0 }} />
+      <FormReturnLink href={paths.auth.login} sx={{ mt: 0 }} />
     </>
   );
 }

@@ -5,6 +5,7 @@ import type { SettingsState } from './types';
 // ----------------------------------------------------------------------
 
 export const SETTINGS_STORAGE_KEY: string = 'app-settings';
+export const ONBOARDING_COMPLETE_STORAGE_KEY = 'onboarding-complete';
 
 export const defaultSettings: SettingsState = {
   colorScheme: themeConfig.defaultMode,

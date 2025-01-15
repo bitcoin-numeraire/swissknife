@@ -3,9 +3,15 @@ import type { BoxProps } from '@mui/material/Box';
 import Box from '@mui/material/Box';
 import Link from '@mui/material/Link';
 
+import { paths } from 'src/routes/paths';
+
+import { useTranslate } from 'src/locales';
+
 // ----------------------------------------------------------------------
 
 export function SignUpTerms({ sx, ...other }: BoxProps) {
+  const { t } = useTranslate();
+
   return (
     <Box
       component="span"
@@ -14,20 +20,21 @@ export function SignUpTerms({ sx, ...other }: BoxProps) {
           mt: 3,
           display: 'block',
           textAlign: 'center',
-          typography: 'caption',
+          typography: 'body2',
           color: 'text.secondary',
         }),
         ...(Array.isArray(sx) ? sx : [sx]),
       ]}
       {...other}
     >
-      {'By signing up, I agree to '}
-      <Link underline="always" color="text.primary">
-        Terms of service
-      </Link>
-      {' and '}
-      <Link underline="always" color="text.primary">
-        Privacy policy
+      {t('sign_up.agreement')}
+      <Link
+        href={paths.external.numeraire.privacy}
+        underline="always"
+        color="text.primary"
+        target="_blank"
+      >
+        {t('sign_up.privacy_policy')}
       </Link>
       .
     </Box>

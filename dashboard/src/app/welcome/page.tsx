@@ -1,11 +1,11 @@
 import { appTitle } from 'src/utils/format-string';
 
-import { JwtSignUpView } from 'src/auth/view/jwt';
+import { WelcomeView } from 'src/sections/onboarding/view';
 
 // ----------------------------------------------------------------------
 
-export const metadata = { title: appTitle('Sign Up') };
+export const metadata = { title: appTitle('Welcome') };
 
 export default function Page() {
-  return <JwtSignUpView />;
+  return <WelcomeView />;
 }

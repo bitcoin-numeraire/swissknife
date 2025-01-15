@@ -44,9 +44,11 @@ import type {
   SwapError,
   SyncError,
   SignInData,
+  SignUpData,
   BackupData,
   RedeemData,
   SignInError,
+  SignUpError,
   BackupError,
   LspInfoData,
   RedeemError,
@@ -64,6 +66,7 @@ import type {
   GetWalletData,
   WellKnownError,
   GetApiKeyError,
+  SignUpResponse,
   GetInvoiceData,
   GetAddressData,
   BackupResponse,
@@ -345,6 +348,22 @@ export const signIn = <ThrowOnError extends boolean = false>(
       ...options?.headers,
     },
     url: '/v1/auth/sign-in',
+  });
+
+/**
+ * Sign up
+ * Creates the initial Admin user. Returns a JWT token to be used for authentication. The JWT token contains authentication and permissions. Sign up is only available for `JWT` Auth provider.
+ */
+export const signUp = <ThrowOnError extends boolean = false>(
+  options: Options<SignUpData, ThrowOnError>
+) =>
+  (options?.client ?? client).post<SignUpResponse, SignUpError, ThrowOnError>({
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options?.headers,
+    },
+    url: '/v1/auth/sign-up',
   });
 
 /**

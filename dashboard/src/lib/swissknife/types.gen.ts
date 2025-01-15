@@ -634,9 +634,9 @@ export type SendPaymentRequest = {
  */
 export type SetupInfo = {
   /**
-   * Whether the app is setup
+   * Whether the admin user has been created
    */
-  setup_complete: boolean;
+  sign_up_complete: boolean;
   /**
    * Whether the welcome flow has been completed
    */
@@ -675,6 +675,16 @@ export type SignMessageResponse = {
    * zbase encoded signature
    */
   signature: string;
+};
+
+/**
+ * Sign Up Request
+ */
+export type SignUpRequest = {
+  /**
+   * User password
+   */
+  password: string;
 };
 
 export type UpdateLnAddressRequest = {
@@ -1157,6 +1167,10 @@ export type SignInErrors = {
    */
   401: ErrorResponse;
   /**
+   * Not Found
+   */
+  404: ErrorResponse;
+  /**
    * Unsupported
    */
   405: ErrorResponse;
@@ -1172,6 +1186,43 @@ export type SignInResponses = {
 };
 
 export type SignInResponse2 = SignInResponses[keyof SignInResponses];
+
+export type SignUpData = {
+  body: SignUpRequest;
+  path?: never;
+  query?: never;
+  url: '/v1/auth/sign-up';
+};
+
+export type SignUpErrors = {
+  /**
+   * Bad Request
+   */
+  400: ErrorResponse;
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Unsupported
+   */
+  405: ErrorResponse;
+  /**
+   * Duplicate
+   */
+  409: ErrorResponse;
+};
+
+export type SignUpError = SignUpErrors[keyof SignUpErrors];
+
+export type SignUpResponses = {
+  /**
+   * Admin user created
+   */
+  200: SignInResponse;
+};
+
+export type SignUpResponse = SignUpResponses[keyof SignUpResponses];
 
 export type DeleteInvoicesData = {
   body?: never;

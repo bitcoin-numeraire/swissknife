@@ -3,6 +3,9 @@ const ROOTS = {
 };
 
 export const paths = {
+  onboarding: {
+    welcome: '/welcome',
+  },
   wallet: {
     root: '/wallet',
     payments: '/wallet/payments',
@@ -29,15 +32,9 @@ export const paths = {
   },
   // AUTH
   auth: {
-    jwt: {
-      signIn: '/login',
-      signUp: `${ROOTS.AUTH}/jwt/sign-up`,
-    },
-    auth0: {
-      signIn: '/login',
-    },
+    login: '/login',
+    signUp: '/sign-up',
     supabase: {
-      signIn: `${ROOTS.AUTH}/supabase/sign-in`,
       verify: `${ROOTS.AUTH}/supabase/verify`,
       signUp: `${ROOTS.AUTH}/supabase/sign-up`,
       updatePassword: `${ROOTS.AUTH}/supabase/update-password`,
@@ -50,6 +47,7 @@ export const paths = {
       home: 'https://numeraire.tech',
       contact: 'https://numeraire.tech/contact',
       docs: 'https://docs.numeraire.tech',
+      privacy: 'https://numeraire.tech/privacy',
     },
   },
 };
