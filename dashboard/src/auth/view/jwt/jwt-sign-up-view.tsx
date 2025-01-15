@@ -31,10 +31,15 @@ import { SignUpTerms } from '../../components/sign-up-terms';
 
 export type SignUpSchemaType = zod.infer<typeof SignUpSchema>;
 
-export const SignUpSchema = zod.object({
-  password: zod.string().min(1).min(6),
-  repeatPassword: zod.string().min(1).min(6),
-});
+export const SignUpSchema = zod
+  .object({
+    password: zod.string().min(6),
+    repeatPassword: zod.string().min(6),
+  })
+  .refine((data) => data.password === data.repeatPassword, {
+    path: ['repeatPassword'],
+    message: 'Passwords do not match',
+  });
 
 // ----------------------------------------------------------------------
 
@@ -66,13 +71,8 @@ export function JwtSignUpView() {
       const { data } = await signUp<true>({
         body: { password: body.password },
       });
-      const accessToken = data.token;
 
-      if (!accessToken) {
-        throw new Error('Access token not found in response');
-      }
-
-      sessionStorage.setItem(JWT_STORAGE_KEY, accessToken);
+      sessionStorage.setItem(JWT_STORAGE_KEY, data.token);
       await checkUserSession?.();
 
       router.push(paths.wallet.root);
