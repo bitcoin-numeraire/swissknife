@@ -58,5 +58,5 @@ jobs:
       - name: Run Prettier
         run: yarn fm:check
 
-      - name: Run Typecheck
+      - name: Run build
         run: yarn build
