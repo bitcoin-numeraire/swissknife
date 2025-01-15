@@ -59,4 +59,4 @@ jobs:
         run: yarn fm:check
 
       - name: Run Typecheck
-        run: yarn ts
+        run: yarn build
