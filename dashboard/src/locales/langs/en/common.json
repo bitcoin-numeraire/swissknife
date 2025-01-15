@@ -50,6 +50,13 @@
   "important": "Important",
   "view_all": "View All",
   "need_help": "Need help?",
+  "sign_up": {
+    "password": "Password",
+    "repeat_password": "Repeat password",
+    "create_button": "Create Account",
+    "agreement": "By signing up, you agree to the ",
+    "privacy_policy": "Privacy Policy"
+  },
   "sign_in": {
     "sign_in_to_your_account": "Sign in to your account",
     "password": "Password",

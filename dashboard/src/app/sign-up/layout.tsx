@@ -1,6 +1,6 @@
 import { AuthCenteredLayout } from 'src/layouts/auth-centered';
 
-import { GuestGuard } from 'src/auth/guard';
+import { OnboardingGuard } from 'src/auth/guard/onboarding-guard';
 
 // ----------------------------------------------------------------------
 
@@ -10,8 +10,8 @@ type Props = {
 
 export default function Layout({ children }: Props) {
   return (
-    <GuestGuard>
+    <OnboardingGuard>
       <AuthCenteredLayout>{children}</AuthCenteredLayout>
-    </GuestGuard>
+    </OnboardingGuard>
   );
 }

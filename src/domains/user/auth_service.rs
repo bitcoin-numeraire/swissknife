@@ -1,43 +1,97 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use bcrypt::{hash, verify, DEFAULT_COST};
 use serde_bolt::bitcoin::hashes::{sha256, Hash};
 
 use tracing::{debug, info, trace};
 
 use crate::{
     application::{
+        dtos::AuthProvider,
         entities::AppStore,
         errors::{ApplicationError, AuthenticationError, DataError},
     },
     infra::jwt::JWTAuthenticator,
 };
 
-use super::{AuthUseCases, User};
+use super::{AuthUseCases, Permission, User};
+
+pub const PASSWORD_HASH_KEY: &str = "password_hash";
 
 pub struct AuthService {
     jwt_authenticator: Arc<dyn JWTAuthenticator>,
     store: AppStore,
+    provider: AuthProvider,
 }
 
 impl AuthService {
-    pub fn new(jwt_authenticator: Arc<dyn JWTAuthenticator>, store: AppStore) -> Self {
+    pub fn new(
+        jwt_authenticator: Arc<dyn JWTAuthenticator>,
+        store: AppStore,
+        provider: AuthProvider,
+    ) -> Self {
         AuthService {
             jwt_authenticator,
             store,
+            provider,
         }
     }
 }
 
 #[async_trait]
 impl AuthUseCases for AuthService {
-    fn sign_in(&self, password: String) -> Result<String, ApplicationError> {
+    async fn sign_up(&self, password: String) -> Result<String, ApplicationError> {
+        trace!("Start sign up");
+
+        if self.provider != AuthProvider::Jwt {
+            return Err(AuthenticationError::UnsupportedOperation.into());
+        }
+
+        if self.store.config.find(PASSWORD_HASH_KEY).await?.is_some() {
+            return Err(DataError::Conflict("Admin user already created".into()).into());
+        }
+
+        let password_hash =
+            hash(&password, DEFAULT_COST).map_err(|e| AuthenticationError::Hash(e.to_string()))?;
+
+        self.store
+            .config
+            .insert(PASSWORD_HASH_KEY, password_hash.into())
+            .await?;
+
+        let token = self
+            .jwt_authenticator
+            .encode("admin".to_string(), Permission::all_permissions())?;
+
+        debug!("Admin user created successfully");
+        Ok(token)
+    }
+
+    async fn sign_in(&self, password: String) -> Result<String, ApplicationError> {
         trace!("Start login");
 
-        let token = self.jwt_authenticator.generate(&password)?;
+        if self.provider != AuthProvider::Jwt {
+            return Err(AuthenticationError::UnsupportedOperation.into());
+        }
 
-        debug!("User logged in successfully");
-        Ok(token)
+        match self.store.config.find(PASSWORD_HASH_KEY).await? {
+            Some(password_hash) => {
+                if !verify(password, &password_hash.to_string())
+                    .map_err(|e| AuthenticationError::Hash(e.to_string()))?
+                {
+                    return Err(AuthenticationError::InvalidCredentials.into());
+                }
+
+                let token = self
+                    .jwt_authenticator
+                    .encode("admin".to_string(), Permission::all_permissions())?;
+
+                debug!("User logged in successfully");
+                Ok(token)
+            }
+            None => Err(DataError::NotFound("Missing admin credentials".into()).into()),
+        }
     }
 
     async fn authenticate_jwt(&self, token: &str) -> Result<User, ApplicationError> {

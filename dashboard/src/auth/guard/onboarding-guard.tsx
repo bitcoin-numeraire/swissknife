@@ -28,7 +28,7 @@ export function OnboardingGuard({ children }: { children: React.ReactNode }) {
     (async () => {
       try {
         const { data } = await setupCheck<true>();
-        if (data.welcome_complete && data.setup_complete) {
+        if (data.welcome_complete && data.sign_up_complete) {
           localStorage.setItem(ONBOARDING_COMPLETE_STORAGE_KEY, 'true');
           router.replace(paths.auth.login);
           return;

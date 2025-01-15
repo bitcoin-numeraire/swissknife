@@ -20,5 +20,4 @@ pub trait WalletRepository: Send + Sync {
     ) -> Result<Balance, DatabaseError>;
     async fn find_contacts(&self, id: Uuid) -> Result<Vec<Contact>, DatabaseError>;
     async fn delete_many(&self, filter: WalletFilter) -> Result<u64, DatabaseError>;
-    async fn count(&self) -> Result<u64, DatabaseError>;
 }

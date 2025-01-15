@@ -65,7 +65,7 @@ impl AppServices {
         );
         let ln_address = LnAddressService::new(store.clone());
         let wallet = WalletService::new(store.clone());
-        let auth = AuthService::new(jwt_authenticator, store.clone());
+        let auth = AuthService::new(jwt_authenticator, store.clone(), config.auth_provider);
         let system = SystemService::new(store.clone(), ln_client);
         let nostr = NostrService::new(store.clone());
         let api_key = ApiKeyService::new(store);

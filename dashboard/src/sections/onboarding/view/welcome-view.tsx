@@ -11,6 +11,9 @@ import Particles, { initParticlesEngine } from '@tsparticles/react';
 
 import { Box } from '@mui/material';
 
+import { paths } from 'src/routes/paths';
+import { useRouter } from 'src/routes/hooks';
+
 import { handleActionError } from 'src/utils/errors';
 
 import { markWelcomeComplete } from 'src/lib/swissknife';
@@ -42,8 +45,8 @@ const slides: SlideData[] = [
 ];
 
 export function WelcomeView() {
+  const router = useRouter();
   const init = useBoolean(false);
-  console.log('in view', init);
 
   useEffect(() => {
     initParticlesEngine(async (engine: Engine) => {
@@ -57,6 +60,7 @@ export function WelcomeView() {
   const handleWelcomeComplete = async () => {
     try {
       await markWelcomeComplete();
+      router.push(paths.auth.signUp);
     } catch (err) {
       handleActionError(err);
     }

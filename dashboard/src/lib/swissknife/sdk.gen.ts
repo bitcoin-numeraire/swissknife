@@ -44,9 +44,11 @@ import type {
   SwapError,
   SyncError,
   SignInData,
+  SignUpData,
   BackupData,
   RedeemData,
   SignInError,
+  SignUpError,
   BackupError,
   LspInfoData,
   RedeemError,
@@ -64,6 +66,7 @@ import type {
   GetWalletData,
   WellKnownError,
   GetApiKeyError,
+  SignUpResponse,
   GetInvoiceData,
   GetAddressData,
   BackupResponse,
@@ -234,8 +237,7 @@ export const client = createClient(createConfig());
  */
 export const wellKnown = <ThrowOnError extends boolean = false>(
   options: Options<WellKnownData, ThrowOnError>
-) =>
-  (options?.client ?? client).get<WellKnownResponse, WellKnownError, ThrowOnError>({
+) => (options?.client ?? client).get<WellKnownResponse, WellKnownError, ThrowOnError>({
     ...options,
     url: '/.well-known/lnurlp/{username}',
   });
@@ -246,11 +248,12 @@ export const wellKnown = <ThrowOnError extends boolean = false>(
  */
 export const wellKnownNostr = <ThrowOnError extends boolean = false>(
   options?: Options<WellKnownNostrData, ThrowOnError>
-) =>
-  (options?.client ?? client).get<WellKnownNostrResponse, WellKnownNostrError, ThrowOnError>({
-    ...options,
-    url: '/.well-known/nostr.json',
-  });
+) => (options?.client ?? client).get<WellKnownNostrResponse, WellKnownNostrError, ThrowOnError>(
+    {
+      ...options,
+      url: '/.well-known/nostr.json',
+    }
+  );
 
 /**
  * LNURL callback endpoint
@@ -258,8 +261,7 @@ export const wellKnownNostr = <ThrowOnError extends boolean = false>(
  */
 export const callback = <ThrowOnError extends boolean = false>(
   options: Options<CallbackData, ThrowOnError>
-) =>
-  (options?.client ?? client).get<CallbackResponse, CallbackError, ThrowOnError>({
+) => (options?.client ?? client).get<CallbackResponse, CallbackError, ThrowOnError>({
     ...options,
     url: '/lnurlp/{username}/callback',
   });
@@ -270,8 +272,11 @@ export const callback = <ThrowOnError extends boolean = false>(
  */
 export const revokeApiKeys = <ThrowOnError extends boolean = false>(
   options?: Options<RevokeApiKeysData, ThrowOnError>
-) =>
-  (options?.client ?? client).delete<RevokeApiKeysResponse, RevokeApiKeysError, ThrowOnError>({
+) => (options?.client ?? client).delete<
+    RevokeApiKeysResponse,
+    RevokeApiKeysError,
+    ThrowOnError
+  >({
     ...options,
     url: '/v1/api-keys',
   });
@@ -282,8 +287,7 @@ export const revokeApiKeys = <ThrowOnError extends boolean = false>(
  */
 export const listApiKeys = <ThrowOnError extends boolean = false>(
   options?: Options<ListApiKeysData, ThrowOnError>
-) =>
-  (options?.client ?? client).get<ListApiKeysResponse, ListApiKeysError, ThrowOnError>({
+) => (options?.client ?? client).get<ListApiKeysResponse, ListApiKeysError, ThrowOnError>({
     ...options,
     url: '/v1/api-keys',
     responseTransformer: listApiKeysResponseTransformer,
@@ -295,8 +299,7 @@ export const listApiKeys = <ThrowOnError extends boolean = false>(
  */
 export const createApiKey = <ThrowOnError extends boolean = false>(
   options: Options<CreateApiKeyData, ThrowOnError>
-) =>
-  (options?.client ?? client).post<CreateApiKeyResponse, CreateApiKeyError, ThrowOnError>({
+) => (options?.client ?? client).post<CreateApiKeyResponse, CreateApiKeyError, ThrowOnError>({
     ...options,
     headers: {
       'Content-Type': 'application/json',
@@ -312,8 +315,7 @@ export const createApiKey = <ThrowOnError extends boolean = false>(
  */
 export const revokeApiKey = <ThrowOnError extends boolean = false>(
   options: Options<RevokeApiKeyData, ThrowOnError>
-) =>
-  (options?.client ?? client).delete<unknown, RevokeApiKeyError, ThrowOnError>({
+) => (options?.client ?? client).delete<unknown, RevokeApiKeyError, ThrowOnError>({
     ...options,
     url: '/v1/api-keys/{id}',
   });
@@ -324,8 +326,7 @@ export const revokeApiKey = <ThrowOnError extends boolean = false>(
  */
 export const getApiKey = <ThrowOnError extends boolean = false>(
   options: Options<GetApiKeyData, ThrowOnError>
-) =>
-  (options?.client ?? client).get<GetApiKeyResponse, GetApiKeyError, ThrowOnError>({
+) => (options?.client ?? client).get<GetApiKeyResponse, GetApiKeyError, ThrowOnError>({
     ...options,
     url: '/v1/api-keys/{id}',
     responseTransformer: getApiKeyResponseTransformer,
@@ -337,8 +338,7 @@ export const getApiKey = <ThrowOnError extends boolean = false>(
  */
 export const signIn = <ThrowOnError extends boolean = false>(
   options: Options<SignInData, ThrowOnError>
-) =>
-  (options?.client ?? client).post<SignInResponse2, SignInError, ThrowOnError>({
+) => (options?.client ?? client).post<SignInResponse2, SignInError, ThrowOnError>({
     ...options,
     headers: {
       'Content-Type': 'application/json',
@@ -348,13 +348,31 @@ export const signIn = <ThrowOnError extends boolean = false>(
   });
 
 /**
+ * Sign up
+ * Creates the initial Admin user. Returns a JWT token to be used for authentication. The JWT token contains authentication and permissions. Sign up is only available for `JWT` Auth provider.
+ */
+export const signUp = <ThrowOnError extends boolean = false>(
+  options: Options<SignUpData, ThrowOnError>
+) => (options?.client ?? client).post<SignUpResponse, SignUpError, ThrowOnError>({
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options?.headers,
+    },
+    url: '/v1/auth/sign-up',
+  });
+
+/**
  * Delete invoices
  * Deletes all the invoices given a filter. Returns the number of deleted invoices. Deleting an invoice can have an effect on the user balance
  */
 export const deleteInvoices = <ThrowOnError extends boolean = false>(
   options?: Options<DeleteInvoicesData, ThrowOnError>
-) =>
-  (options?.client ?? client).delete<DeleteInvoicesResponse, DeleteInvoicesError, ThrowOnError>({
+) => (options?.client ?? client).delete<
+    DeleteInvoicesResponse,
+    DeleteInvoicesError,
+    ThrowOnError
+  >({
     ...options,
     url: '/v1/invoices',
   });
@@ -365,8 +383,7 @@ export const deleteInvoices = <ThrowOnError extends boolean = false>(
  */
 export const listInvoices = <ThrowOnError extends boolean = false>(
   options?: Options<ListInvoicesData, ThrowOnError>
-) =>
-  (options?.client ?? client).get<ListInvoicesResponse, ListInvoicesError, ThrowOnError>({
+) => (options?.client ?? client).get<ListInvoicesResponse, ListInvoicesError, ThrowOnError>({
     ...options,
     url: '/v1/invoices',
     responseTransformer: listInvoicesResponseTransformer,
@@ -378,8 +395,11 @@ export const listInvoices = <ThrowOnError extends boolean = false>(
  */
 export const generateInvoice = <ThrowOnError extends boolean = false>(
   options: Options<GenerateInvoiceData, ThrowOnError>
-) =>
-  (options?.client ?? client).post<GenerateInvoiceResponse, GenerateInvoiceError, ThrowOnError>({
+) => (options?.client ?? client).post<
+    GenerateInvoiceResponse,
+    GenerateInvoiceError,
+    ThrowOnError
+  >({
     ...options,
     headers: {
       'Content-Type': 'application/json',
@@ -395,8 +415,7 @@ export const generateInvoice = <ThrowOnError extends boolean = false>(
  */
 export const deleteInvoice = <ThrowOnError extends boolean = false>(
   options: Options<DeleteInvoiceData, ThrowOnError>
-) =>
-  (options?.client ?? client).delete<unknown, DeleteInvoiceError, ThrowOnError>({
+) => (options?.client ?? client).delete<unknown, DeleteInvoiceError, ThrowOnError>({
     ...options,
     url: '/v1/invoices/{id}',
   });
@@ -407,8 +426,7 @@ export const deleteInvoice = <ThrowOnError extends boolean = false>(
  */
 export const getInvoice = <ThrowOnError extends boolean = false>(
   options: Options<GetInvoiceData, ThrowOnError>
-) =>
-  (options?.client ?? client).get<GetInvoiceResponse, GetInvoiceError, ThrowOnError>({
+) => (options?.client ?? client).get<GetInvoiceResponse, GetInvoiceError, ThrowOnError>({
     ...options,
     url: '/v1/invoices/{id}',
     responseTransformer: getInvoiceResponseTransformer,
@@ -420,8 +438,11 @@ export const getInvoice = <ThrowOnError extends boolean = false>(
  */
 export const deleteAddresses = <ThrowOnError extends boolean = false>(
   options?: Options<DeleteAddressesData, ThrowOnError>
-) =>
-  (options?.client ?? client).delete<DeleteAddressesResponse, DeleteAddressesError, ThrowOnError>({
+) => (options?.client ?? client).delete<
+    DeleteAddressesResponse,
+    DeleteAddressesError,
+    ThrowOnError
+  >({
     ...options,
     url: '/v1/lightning-addresses',
   });
@@ -432,8 +453,7 @@ export const deleteAddresses = <ThrowOnError extends boolean = false>(
  */
 export const listAddresses = <ThrowOnError extends boolean = false>(
   options?: Options<ListAddressesData, ThrowOnError>
-) =>
-  (options?.client ?? client).get<ListAddressesResponse, ListAddressesError, ThrowOnError>({
+) => (options?.client ?? client).get<ListAddressesResponse, ListAddressesError, ThrowOnError>({
     ...options,
     url: '/v1/lightning-addresses',
     responseTransformer: listAddressesResponseTransformer,
@@ -445,8 +465,11 @@ export const listAddresses = <ThrowOnError extends boolean = false>(
  */
 export const registerAddress = <ThrowOnError extends boolean = false>(
   options: Options<RegisterAddressData, ThrowOnError>
-) =>
-  (options?.client ?? client).post<RegisterAddressResponse, RegisterAddressError, ThrowOnError>({
+) => (options?.client ?? client).post<
+    RegisterAddressResponse,
+    RegisterAddressError,
+    ThrowOnError
+  >({
     ...options,
     headers: {
       'Content-Type': 'application/json',
@@ -462,8 +485,7 @@ export const registerAddress = <ThrowOnError extends boolean = false>(
  */
 export const deleteAddress = <ThrowOnError extends boolean = false>(
   options: Options<DeleteAddressData, ThrowOnError>
-) =>
-  (options?.client ?? client).delete<unknown, DeleteAddressError, ThrowOnError>({
+) => (options?.client ?? client).delete<unknown, DeleteAddressError, ThrowOnError>({
     ...options,
     url: '/v1/lightning-addresses/{id}',
   });
@@ -474,8 +496,7 @@ export const deleteAddress = <ThrowOnError extends boolean = false>(
  */
 export const getAddress = <ThrowOnError extends boolean = false>(
   options: Options<GetAddressData, ThrowOnError>
-) =>
-  (options?.client ?? client).get<GetAddressResponse, GetAddressError, ThrowOnError>({
+) => (options?.client ?? client).get<GetAddressResponse, GetAddressError, ThrowOnError>({
     ...options,
     url: '/v1/lightning-addresses/{id}',
     responseTransformer: getAddressResponseTransformer,
@@ -487,8 +508,7 @@ export const getAddress = <ThrowOnError extends boolean = false>(
  */
 export const updateAddress = <ThrowOnError extends boolean = false>(
   options: Options<UpdateAddressData, ThrowOnError>
-) =>
-  (options?.client ?? client).put<UpdateAddressResponse, UpdateAddressError, ThrowOnError>({
+) => (options?.client ?? client).put<UpdateAddressResponse, UpdateAddressError, ThrowOnError>({
     ...options,
     headers: {
       'Content-Type': 'application/json',
@@ -504,8 +524,7 @@ export const updateAddress = <ThrowOnError extends boolean = false>(
  */
 export const backup = <ThrowOnError extends boolean = false>(
   options?: Options<BackupData, ThrowOnError>
-) =>
-  (options?.client ?? client).get<BackupResponse, BackupError, ThrowOnError>({
+) => (options?.client ?? client).get<BackupResponse, BackupError, ThrowOnError>({
     ...options,
     url: '/v1/lightning-node/backup',
   });
@@ -516,8 +535,7 @@ export const backup = <ThrowOnError extends boolean = false>(
  */
 export const checkMessage = <ThrowOnError extends boolean = false>(
   options: Options<CheckMessageData, ThrowOnError>
-) =>
-  (options?.client ?? client).post<CheckMessageResponse2, CheckMessageError, ThrowOnError>({
+) => (options?.client ?? client).post<CheckMessageResponse2, CheckMessageError, ThrowOnError>({
     ...options,
     headers: {
       'Content-Type': 'application/json',
@@ -532,8 +550,11 @@ export const checkMessage = <ThrowOnError extends boolean = false>(
  */
 export const closeLspChannels = <ThrowOnError extends boolean = false>(
   options?: Options<CloseLspChannelsData, ThrowOnError>
-) =>
-  (options?.client ?? client).post<CloseLspChannelsResponse, CloseLspChannelsError, ThrowOnError>({
+) => (options?.client ?? client).post<
+    CloseLspChannelsResponse,
+    CloseLspChannelsError,
+    ThrowOnError
+  >({
     ...options,
     url: '/v1/lightning-node/close-channels',
   });
@@ -544,8 +565,7 @@ export const closeLspChannels = <ThrowOnError extends boolean = false>(
  */
 export const connectLsp = <ThrowOnError extends boolean = false>(
   options: Options<ConnectLspData, ThrowOnError>
-) =>
-  (options?.client ?? client).post<unknown, ConnectLspError, ThrowOnError>({
+) => (options?.client ?? client).post<unknown, ConnectLspError, ThrowOnError>({
     ...options,
     headers: {
       'Content-Type': 'application/json',
@@ -560,8 +580,7 @@ export const connectLsp = <ThrowOnError extends boolean = false>(
  */
 export const nodeInfo = <ThrowOnError extends boolean = false>(
   options?: Options<NodeInfoData, ThrowOnError>
-) =>
-  (options?.client ?? client).get<unknown, NodeInfoError, ThrowOnError>({
+) => (options?.client ?? client).get<unknown, NodeInfoError, ThrowOnError>({
     ...options,
     url: '/v1/lightning-node/info',
   });
@@ -572,8 +591,7 @@ export const nodeInfo = <ThrowOnError extends boolean = false>(
  */
 export const lspInfo = <ThrowOnError extends boolean = false>(
   options?: Options<LspInfoData, ThrowOnError>
-) =>
-  (options?.client ?? client).get<unknown, LspInfoError, ThrowOnError>({
+) => (options?.client ?? client).get<unknown, LspInfoError, ThrowOnError>({
     ...options,
     url: '/v1/lightning-node/lsp-info',
   });
@@ -584,8 +602,7 @@ export const lspInfo = <ThrowOnError extends boolean = false>(
  */
 export const listLsps = <ThrowOnError extends boolean = false>(
   options?: Options<ListLspsData, ThrowOnError>
-) =>
-  (options?.client ?? client).get<ListLspsResponse, ListLspsError, ThrowOnError>({
+) => (options?.client ?? client).get<ListLspsResponse, ListLspsError, ThrowOnError>({
     ...options,
     url: '/v1/lightning-node/lsps',
   });
@@ -596,8 +613,7 @@ export const listLsps = <ThrowOnError extends boolean = false>(
  */
 export const redeem = <ThrowOnError extends boolean = false>(
   options: Options<RedeemData, ThrowOnError>
-) =>
-  (options?.client ?? client).post<RedeemResponse, RedeemError, ThrowOnError>({
+) => (options?.client ?? client).post<RedeemResponse, RedeemError, ThrowOnError>({
     ...options,
     headers: {
       'Content-Type': 'application/json',
@@ -612,8 +628,7 @@ export const redeem = <ThrowOnError extends boolean = false>(
  */
 export const signMessage = <ThrowOnError extends boolean = false>(
   options: Options<SignMessageData, ThrowOnError>
-) =>
-  (options?.client ?? client).post<SignMessageResponse2, SignMessageError, ThrowOnError>({
+) => (options?.client ?? client).post<SignMessageResponse2, SignMessageError, ThrowOnError>({
     ...options,
     headers: {
       'Content-Type': 'application/json',
@@ -628,8 +643,7 @@ export const signMessage = <ThrowOnError extends boolean = false>(
  */
 export const swap = <ThrowOnError extends boolean = false>(
   options: Options<SwapData, ThrowOnError>
-) =>
-  (options?.client ?? client).post<unknown, SwapError, ThrowOnError>({
+) => (options?.client ?? client).post<unknown, SwapError, ThrowOnError>({
     ...options,
     headers: {
       'Content-Type': 'application/json',
@@ -644,8 +658,7 @@ export const swap = <ThrowOnError extends boolean = false>(
  */
 export const sync = <ThrowOnError extends boolean = false>(
   options?: Options<SyncData, ThrowOnError>
-) =>
-  (options?.client ?? client).post<unknown, SyncError, ThrowOnError>({
+) => (options?.client ?? client).post<unknown, SyncError, ThrowOnError>({
     ...options,
     url: '/v1/lightning-node/sync',
   });
@@ -656,8 +669,7 @@ export const sync = <ThrowOnError extends boolean = false>(
  */
 export const getUserWallet = <ThrowOnError extends boolean = false>(
   options?: Options<GetUserWalletData, ThrowOnError>
-) =>
-  (options?.client ?? client).get<GetUserWalletResponse, GetUserWalletError, ThrowOnError>({
+) => (options?.client ?? client).get<GetUserWalletResponse, GetUserWalletError, ThrowOnError>({
     ...options,
     url: '/v1/me',
     responseTransformer: getUserWalletResponseTransformer,
@@ -669,8 +681,7 @@ export const getUserWallet = <ThrowOnError extends boolean = false>(
  */
 export const revokeWalletApiKeys = <ThrowOnError extends boolean = false>(
   options?: Options<RevokeWalletApiKeysData, ThrowOnError>
-) =>
-  (options?.client ?? client).delete<
+) => (options?.client ?? client).delete<
     RevokeWalletApiKeysResponse,
     RevokeWalletApiKeysError,
     ThrowOnError
@@ -685,8 +696,11 @@ export const revokeWalletApiKeys = <ThrowOnError extends boolean = false>(
  */
 export const listWalletApiKeys = <ThrowOnError extends boolean = false>(
   options?: Options<ListWalletApiKeysData, ThrowOnError>
-) =>
-  (options?.client ?? client).get<ListWalletApiKeysResponse, ListWalletApiKeysError, ThrowOnError>({
+) => (options?.client ?? client).get<
+    ListWalletApiKeysResponse,
+    ListWalletApiKeysError,
+    ThrowOnError
+  >({
     ...options,
     url: '/v1/me/api-keys',
     responseTransformer: listWalletApiKeysResponseTransformer,
@@ -698,8 +712,7 @@ export const listWalletApiKeys = <ThrowOnError extends boolean = false>(
  */
 export const createWalletApiKey = <ThrowOnError extends boolean = false>(
   options: Options<CreateWalletApiKeyData, ThrowOnError>
-) =>
-  (options?.client ?? client).post<
+) => (options?.client ?? client).post<
     CreateWalletApiKeyResponse,
     CreateWalletApiKeyError,
     ThrowOnError
@@ -719,8 +732,7 @@ export const createWalletApiKey = <ThrowOnError extends boolean = false>(
  */
 export const revokeWalletApiKey = <ThrowOnError extends boolean = false>(
   options: Options<RevokeWalletApiKeyData, ThrowOnError>
-) =>
-  (options?.client ?? client).delete<unknown, RevokeWalletApiKeyError, ThrowOnError>({
+) => (options?.client ?? client).delete<unknown, RevokeWalletApiKeyError, ThrowOnError>({
     ...options,
     url: '/v1/me/api-keys/{id}',
   });
@@ -731,8 +743,11 @@ export const revokeWalletApiKey = <ThrowOnError extends boolean = false>(
  */
 export const getWalletApiKey = <ThrowOnError extends boolean = false>(
   options: Options<GetWalletApiKeyData, ThrowOnError>
-) =>
-  (options?.client ?? client).get<GetWalletApiKeyResponse, GetWalletApiKeyError, ThrowOnError>({
+) => (options?.client ?? client).get<
+    GetWalletApiKeyResponse,
+    GetWalletApiKeyError,
+    ThrowOnError
+  >({
     ...options,
     url: '/v1/me/api-keys/{id}',
     responseTransformer: getWalletApiKeyResponseTransformer,
@@ -744,8 +759,11 @@ export const getWalletApiKey = <ThrowOnError extends boolean = false>(
  */
 export const getWalletBalance = <ThrowOnError extends boolean = false>(
   options?: Options<GetWalletBalanceData, ThrowOnError>
-) =>
-  (options?.client ?? client).get<GetWalletBalanceResponse, GetWalletBalanceError, ThrowOnError>({
+) => (options?.client ?? client).get<
+    GetWalletBalanceResponse,
+    GetWalletBalanceError,
+    ThrowOnError
+  >({
     ...options,
     url: '/v1/me/balance',
   });
@@ -756,8 +774,7 @@ export const getWalletBalance = <ThrowOnError extends boolean = false>(
  */
 export const listContacts = <ThrowOnError extends boolean = false>(
   options?: Options<ListContactsData, ThrowOnError>
-) =>
-  (options?.client ?? client).get<ListContactsResponse, ListContactsError, ThrowOnError>({
+) => (options?.client ?? client).get<ListContactsResponse, ListContactsError, ThrowOnError>({
     ...options,
     url: '/v1/me/contacts',
     responseTransformer: listContactsResponseTransformer,
@@ -769,8 +786,7 @@ export const listContacts = <ThrowOnError extends boolean = false>(
  */
 export const deleteExpiredInvoices = <ThrowOnError extends boolean = false>(
   options?: Options<DeleteExpiredInvoicesData, ThrowOnError>
-) =>
-  (options?.client ?? client).delete<
+) => (options?.client ?? client).delete<
     DeleteExpiredInvoicesResponse,
     DeleteExpiredInvoicesError,
     ThrowOnError
@@ -785,8 +801,7 @@ export const deleteExpiredInvoices = <ThrowOnError extends boolean = false>(
  */
 export const listWalletInvoices = <ThrowOnError extends boolean = false>(
   options?: Options<ListWalletInvoicesData, ThrowOnError>
-) =>
-  (options?.client ?? client).get<
+) => (options?.client ?? client).get<
     ListWalletInvoicesResponse,
     ListWalletInvoicesError,
     ThrowOnError
@@ -802,8 +817,11 @@ export const listWalletInvoices = <ThrowOnError extends boolean = false>(
  */
 export const newWalletInvoice = <ThrowOnError extends boolean = false>(
   options: Options<NewWalletInvoiceData, ThrowOnError>
-) =>
-  (options?.client ?? client).post<NewWalletInvoiceResponse, NewWalletInvoiceError, ThrowOnError>({
+) => (options?.client ?? client).post<
+    NewWalletInvoiceResponse,
+    NewWalletInvoiceError,
+    ThrowOnError
+  >({
     ...options,
     headers: {
       'Content-Type': 'application/json',
@@ -819,8 +837,11 @@ export const newWalletInvoice = <ThrowOnError extends boolean = false>(
  */
 export const getWalletInvoice = <ThrowOnError extends boolean = false>(
   options: Options<GetWalletInvoiceData, ThrowOnError>
-) =>
-  (options?.client ?? client).get<GetWalletInvoiceResponse, GetWalletInvoiceError, ThrowOnError>({
+) => (options?.client ?? client).get<
+    GetWalletInvoiceResponse,
+    GetWalletInvoiceError,
+    ThrowOnError
+  >({
     ...options,
     url: '/v1/me/invoices/{id}',
     responseTransformer: getWalletInvoiceResponseTransformer,
@@ -832,8 +853,7 @@ export const getWalletInvoice = <ThrowOnError extends boolean = false>(
  */
 export const deleteWalletAddress = <ThrowOnError extends boolean = false>(
   options?: Options<DeleteWalletAddressData, ThrowOnError>
-) =>
-  (options?.client ?? client).delete<unknown, DeleteWalletAddressError, ThrowOnError>({
+) => (options?.client ?? client).delete<unknown, DeleteWalletAddressError, ThrowOnError>({
     ...options,
     url: '/v1/me/lightning-address',
   });
@@ -844,8 +864,11 @@ export const deleteWalletAddress = <ThrowOnError extends boolean = false>(
  */
 export const getWalletAddress = <ThrowOnError extends boolean = false>(
   options?: Options<GetWalletAddressData, ThrowOnError>
-) =>
-  (options?.client ?? client).get<GetWalletAddressResponse, GetWalletAddressError, ThrowOnError>({
+) => (options?.client ?? client).get<
+    GetWalletAddressResponse,
+    GetWalletAddressError,
+    ThrowOnError
+  >({
     ...options,
     url: '/v1/me/lightning-address',
     responseTransformer: getWalletAddressResponseTransformer,
@@ -857,8 +880,7 @@ export const getWalletAddress = <ThrowOnError extends boolean = false>(
  */
 export const registerWalletAddress = <ThrowOnError extends boolean = false>(
   options: Options<RegisterWalletAddressData, ThrowOnError>
-) =>
-  (options?.client ?? client).post<
+) => (options?.client ?? client).post<
     RegisterWalletAddressResponse,
     RegisterWalletAddressError,
     ThrowOnError
@@ -878,8 +900,7 @@ export const registerWalletAddress = <ThrowOnError extends boolean = false>(
  */
 export const updateWalletAddress = <ThrowOnError extends boolean = false>(
   options: Options<UpdateWalletAddressData, ThrowOnError>
-) =>
-  (options?.client ?? client).put<
+) => (options?.client ?? client).put<
     UpdateWalletAddressResponse,
     UpdateWalletAddressError,
     ThrowOnError
@@ -899,8 +920,7 @@ export const updateWalletAddress = <ThrowOnError extends boolean = false>(
  */
 export const deleteFailedPayments = <ThrowOnError extends boolean = false>(
   options?: Options<DeleteFailedPaymentsData, ThrowOnError>
-) =>
-  (options?.client ?? client).delete<
+) => (options?.client ?? client).delete<
     DeleteFailedPaymentsResponse,
     DeleteFailedPaymentsError,
     ThrowOnError
@@ -915,8 +935,7 @@ export const deleteFailedPayments = <ThrowOnError extends boolean = false>(
  */
 export const listWalletPayments = <ThrowOnError extends boolean = false>(
   options?: Options<ListWalletPaymentsData, ThrowOnError>
-) =>
-  (options?.client ?? client).get<
+) => (options?.client ?? client).get<
     ListWalletPaymentsResponse,
     ListWalletPaymentsError,
     ThrowOnError
@@ -932,8 +951,7 @@ export const listWalletPayments = <ThrowOnError extends boolean = false>(
  */
 export const walletPay = <ThrowOnError extends boolean = false>(
   options: Options<WalletPayData, ThrowOnError>
-) =>
-  (options?.client ?? client).post<WalletPayResponse, WalletPayError, ThrowOnError>({
+) => (options?.client ?? client).post<WalletPayResponse, WalletPayError, ThrowOnError>({
     ...options,
     headers: {
       'Content-Type': 'application/json',
@@ -949,8 +967,11 @@ export const walletPay = <ThrowOnError extends boolean = false>(
  */
 export const getWalletPayment = <ThrowOnError extends boolean = false>(
   options: Options<GetWalletPaymentData, ThrowOnError>
-) =>
-  (options?.client ?? client).get<GetWalletPaymentResponse, GetWalletPaymentError, ThrowOnError>({
+) => (options?.client ?? client).get<
+    GetWalletPaymentResponse,
+    GetWalletPaymentError,
+    ThrowOnError
+  >({
     ...options,
     url: '/v1/me/payments/{id}',
     responseTransformer: getWalletPaymentResponseTransformer,
@@ -962,8 +983,11 @@ export const getWalletPayment = <ThrowOnError extends boolean = false>(
  */
 export const deletePayments = <ThrowOnError extends boolean = false>(
   options?: Options<DeletePaymentsData, ThrowOnError>
-) =>
-  (options?.client ?? client).delete<DeletePaymentsResponse, DeletePaymentsError, ThrowOnError>({
+) => (options?.client ?? client).delete<
+    DeletePaymentsResponse,
+    DeletePaymentsError,
+    ThrowOnError
+  >({
     ...options,
     url: '/v1/payments',
   });
@@ -974,8 +998,7 @@ export const deletePayments = <ThrowOnError extends boolean = false>(
  */
 export const listPayments = <ThrowOnError extends boolean = false>(
   options?: Options<ListPaymentsData, ThrowOnError>
-) =>
-  (options?.client ?? client).get<ListPaymentsResponse, ListPaymentsError, ThrowOnError>({
+) => (options?.client ?? client).get<ListPaymentsResponse, ListPaymentsError, ThrowOnError>({
     ...options,
     url: '/v1/payments',
     responseTransformer: listPaymentsResponseTransformer,
@@ -987,8 +1010,7 @@ export const listPayments = <ThrowOnError extends boolean = false>(
  */
 export const pay = <ThrowOnError extends boolean = false>(
   options: Options<PayData, ThrowOnError>
-) =>
-  (options?.client ?? client).post<PayResponse, PayError, ThrowOnError>({
+) => (options?.client ?? client).post<PayResponse, PayError, ThrowOnError>({
     ...options,
     headers: {
       'Content-Type': 'application/json',
@@ -1004,8 +1026,7 @@ export const pay = <ThrowOnError extends boolean = false>(
  */
 export const deletePayment = <ThrowOnError extends boolean = false>(
   options: Options<DeletePaymentData, ThrowOnError>
-) =>
-  (options?.client ?? client).delete<unknown, DeletePaymentError, ThrowOnError>({
+) => (options?.client ?? client).delete<unknown, DeletePaymentError, ThrowOnError>({
     ...options,
     url: '/v1/payments/{id}',
   });
@@ -1016,8 +1037,7 @@ export const deletePayment = <ThrowOnError extends boolean = false>(
  */
 export const getPayment = <ThrowOnError extends boolean = false>(
   options: Options<GetPaymentData, ThrowOnError>
-) =>
-  (options?.client ?? client).get<GetPaymentResponse, GetPaymentError, ThrowOnError>({
+) => (options?.client ?? client).get<GetPaymentResponse, GetPaymentError, ThrowOnError>({
     ...options,
     url: '/v1/payments/{id}',
     responseTransformer: getPaymentResponseTransformer,
@@ -1029,8 +1049,7 @@ export const getPayment = <ThrowOnError extends boolean = false>(
  */
 export const healthCheck = <ThrowOnError extends boolean = false>(
   options?: Options<HealthCheckData, ThrowOnError>
-) =>
-  (options?.client ?? client).get<HealthCheckResponse, HealthCheckError, ThrowOnError>({
+) => (options?.client ?? client).get<HealthCheckResponse, HealthCheckError, ThrowOnError>({
     ...options,
     url: '/v1/system/health',
   });
@@ -1041,8 +1060,7 @@ export const healthCheck = <ThrowOnError extends boolean = false>(
  */
 export const markWelcomeComplete = <ThrowOnError extends boolean = false>(
   options?: Options<MarkWelcomeCompleteData, ThrowOnError>
-) =>
-  (options?.client ?? client).post<
+) => (options?.client ?? client).post<
     MarkWelcomeCompleteResponse,
     MarkWelcomeCompleteError,
     ThrowOnError
@@ -1057,8 +1075,7 @@ export const markWelcomeComplete = <ThrowOnError extends boolean = false>(
  */
 export const readinessCheck = <ThrowOnError extends boolean = false>(
   options?: Options<ReadinessCheckData, ThrowOnError>
-) =>
-  (options?.client ?? client).get<ReadinessCheckResponse, unknown, ThrowOnError>({
+) => (options?.client ?? client).get<ReadinessCheckResponse, unknown, ThrowOnError>({
     ...options,
     url: '/v1/system/ready',
   });
@@ -1069,8 +1086,7 @@ export const readinessCheck = <ThrowOnError extends boolean = false>(
  */
 export const setupCheck = <ThrowOnError extends boolean = false>(
   options?: Options<SetupCheckData, ThrowOnError>
-) =>
-  (options?.client ?? client).get<SetupCheckResponse, SetupCheckError, ThrowOnError>({
+) => (options?.client ?? client).get<SetupCheckResponse, SetupCheckError, ThrowOnError>({
     ...options,
     url: '/v1/system/setup',
   });
@@ -1081,8 +1097,7 @@ export const setupCheck = <ThrowOnError extends boolean = false>(
  */
 export const versionCheck = <ThrowOnError extends boolean = false>(
   options?: Options<VersionCheckData, ThrowOnError>
-) =>
-  (options?.client ?? client).get<VersionCheckResponse, unknown, ThrowOnError>({
+) => (options?.client ?? client).get<VersionCheckResponse, unknown, ThrowOnError>({
     ...options,
     url: '/v1/system/version',
   });
@@ -1093,8 +1108,11 @@ export const versionCheck = <ThrowOnError extends boolean = false>(
  */
 export const deleteWallets = <ThrowOnError extends boolean = false>(
   options?: Options<DeleteWalletsData, ThrowOnError>
-) =>
-  (options?.client ?? client).delete<DeleteWalletsResponse, DeleteWalletsError, ThrowOnError>({
+) => (options?.client ?? client).delete<
+    DeleteWalletsResponse,
+    DeleteWalletsError,
+    ThrowOnError
+  >({
     ...options,
     url: '/v1/wallets',
   });
@@ -1105,8 +1123,7 @@ export const deleteWallets = <ThrowOnError extends boolean = false>(
  */
 export const listWallets = <ThrowOnError extends boolean = false>(
   options?: Options<ListWalletsData, ThrowOnError>
-) =>
-  (options?.client ?? client).get<ListWalletsResponse, ListWalletsError, ThrowOnError>({
+) => (options?.client ?? client).get<ListWalletsResponse, ListWalletsError, ThrowOnError>({
     ...options,
     url: '/v1/wallets',
     responseTransformer: listWalletsResponseTransformer,
@@ -1118,8 +1135,11 @@ export const listWallets = <ThrowOnError extends boolean = false>(
  */
 export const registerWallet = <ThrowOnError extends boolean = false>(
   options: Options<RegisterWalletData, ThrowOnError>
-) =>
-  (options?.client ?? client).post<RegisterWalletResponse, RegisterWalletError, ThrowOnError>({
+) => (options?.client ?? client).post<
+    RegisterWalletResponse,
+    RegisterWalletError,
+    ThrowOnError
+  >({
     ...options,
     headers: {
       'Content-Type': 'application/json',
@@ -1135,8 +1155,7 @@ export const registerWallet = <ThrowOnError extends boolean = false>(
  */
 export const listWalletOverviews = <ThrowOnError extends boolean = false>(
   options?: Options<ListWalletOverviewsData, ThrowOnError>
-) =>
-  (options?.client ?? client).get<
+) => (options?.client ?? client).get<
     ListWalletOverviewsResponse,
     ListWalletOverviewsError,
     ThrowOnError
@@ -1152,8 +1171,7 @@ export const listWalletOverviews = <ThrowOnError extends boolean = false>(
  */
 export const deleteWallet = <ThrowOnError extends boolean = false>(
   options: Options<DeleteWalletData, ThrowOnError>
-) =>
-  (options?.client ?? client).delete<unknown, DeleteWalletError, ThrowOnError>({
+) => (options?.client ?? client).delete<unknown, DeleteWalletError, ThrowOnError>({
     ...options,
     url: '/v1/wallets/{id}',
   });
@@ -1164,8 +1182,7 @@ export const deleteWallet = <ThrowOnError extends boolean = false>(
  */
 export const getWallet = <ThrowOnError extends boolean = false>(
   options: Options<GetWalletData, ThrowOnError>
-) =>
-  (options?.client ?? client).get<GetWalletResponse, GetWalletError, ThrowOnError>({
+) => (options?.client ?? client).get<GetWalletResponse, GetWalletError, ThrowOnError>({
     ...options,
     url: '/v1/wallets/{id}',
     responseTransformer: getWalletResponseTransformer,

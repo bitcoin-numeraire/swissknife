@@ -6,6 +6,6 @@ use utoipa::ToSchema;
 pub struct SetupInfo {
     /// Whether the welcome flow has been completed
     pub welcome_complete: bool,
-    /// Whether the app is setup
-    pub setup_complete: bool,
+    /// Whether the admin user has been created
+    pub sign_up_complete: bool,
 }

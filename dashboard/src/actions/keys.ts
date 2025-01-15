@@ -2,7 +2,6 @@ export const endpointKeys = {
   auth: {
     me: '/api/auth/me',
     signIn: 'signIn',
-    signUp: '/api/auth/sign-up',
   },
   mempoolSpace: {
     prices: 'mempoolSpacePrices',

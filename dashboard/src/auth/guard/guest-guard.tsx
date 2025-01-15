@@ -55,8 +55,8 @@ export function GuestGuard({ children }: GuestGuardProps) {
           return;
         }
 
-        if (!data.setup_complete) {
-          router.replace(paths.onboarding.setup.root);
+        if (!data.sign_up_complete) {
+          router.replace(paths.auth.signUp);
           return;
         }
 
