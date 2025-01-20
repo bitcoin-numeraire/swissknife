@@ -25,6 +25,7 @@ type Props = {
 
 export function AdminPaymentDetailsView({ id }: Props) {
   const { t } = useTranslate();
+
   const { payment, paymentLoading, paymentError } = useGetPayment(id);
 
   const errors = [paymentError];

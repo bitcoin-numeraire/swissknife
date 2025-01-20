@@ -8,7 +8,11 @@ use crate::{
 use axum::{routing::get, Router};
 use std::future::Future;
 use tokio::net::TcpListener;
-use tower_http::{cors::CorsLayer, trace::TraceLayer};
+use tower_http::{
+    cors::CorsLayer,
+    services::{ServeDir, ServeFile},
+    trace::TraceLayer,
+};
 use tracing::info;
 use utoipa_scalar::{Scalar, Servable as ScalarServable};
 
@@ -29,7 +33,11 @@ impl Server {
             .nest("/v1/auth", user::auth_router())
             .nest("/v1/api-keys", user::api_key_router())
             .nest("/v1/lightning-addresses", ln_address::router())
-            .merge(Scalar::with_url("/docs", merged_openapi()));
+            .merge(Scalar::with_url("/docs", merged_openapi()))
+            .fallback_service(
+                ServeDir::new("dashboard/out")
+                    .not_found_service(ServeFile::new("dashboard/out/404.html")),
+            );
 
         let router = match state.ln_node_client {
             LnNodeClient::Breez(_) => {

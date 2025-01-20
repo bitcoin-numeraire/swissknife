@@ -25,6 +25,7 @@ type Props = {
 
 export function AdminInvoiceDetailsView({ id }: Props) {
   const { t } = useTranslate();
+
   const { invoice, invoiceLoading, invoiceError } = useGetInvoice(id);
 
   const errors = [invoiceError];

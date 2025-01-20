@@ -1,6 +1,6 @@
 import { appTitle } from 'src/utils/format-string';
 
-import { AdminPaymentListView } from 'src/sections/transaction/view';
+import { AdminPaymentsView } from 'src/sections/transaction/view';
 
 // ----------------------------------------------------------------------
 
@@ -9,5 +9,5 @@ export const metadata = {
 };
 
 export default function AdminPaymentListPage() {
-  return <AdminPaymentListView />;
+  return <AdminPaymentsView />;
 }

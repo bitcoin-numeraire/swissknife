@@ -25,6 +25,7 @@ type Props = {
 
 export function AdminLnAddressDetailsView({ id }: Props) {
   const { t } = useTranslate();
+
   const { lnAddress, lnAddressLoading, lnAddressError } = useGetLnAddress(id);
 
   const errors = [lnAddressError];
