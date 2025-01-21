@@ -5,6 +5,7 @@ host = "https://api.numeraire.tech"
 fee_buffer = 0.02
 ln_provider = "breez"
 auth_provider = "jwt"
+dashboard_dir = "dashboard"
 
 # Web server
 [web]

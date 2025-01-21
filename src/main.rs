@@ -49,7 +49,7 @@ async fn main() {
         exit(1);
     }
 
-    let app = Server::new(app_state.clone());
+    let app = Server::new(app_state.clone(), &config.dashboard_dir);
     if let Err(err) = app
         .start(&config.web.addr, shutdown_signal(app_state.clone()))
         .await

@@ -21,7 +21,7 @@ pub struct Server {
 }
 
 impl Server {
-    pub fn new(state: Arc<AppState>) -> Self {
+    pub fn new(state: Arc<AppState>, dashboard_dir: &str) -> Self {
         let router = Router::new()
             .nest("/.well-known", Self::well_known_router())
             .nest("/v1/system", system::router())
@@ -35,8 +35,8 @@ impl Server {
             .nest("/v1/lightning-addresses", ln_address::router())
             .merge(Scalar::with_url("/docs", merged_openapi()))
             .fallback_service(
-                ServeDir::new("dashboard/out")
-                    .not_found_service(ServeFile::new("dashboard/out/404.html")),
+                ServeDir::new(dashboard_dir)
+                    .not_found_service(ServeFile::new(format!("{}/404.html", dashboard_dir))),
             );
 
         let router = match state.ln_node_client {

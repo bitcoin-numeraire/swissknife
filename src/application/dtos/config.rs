@@ -18,6 +18,7 @@ use crate::infra::{
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct AppConfig {
+    pub dashboard_dir: String,
     pub domain: String,
     pub host: String,
     pub auth_provider: AuthProvider,
