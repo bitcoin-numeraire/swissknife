@@ -5,7 +5,7 @@ host = "https://api.numeraire.tech"
 fee_buffer = 0.02
 ln_provider = "breez"
 auth_provider = "jwt"
-dashboard_dir = "dashboard"
+dashboard_dir = "/var/www/swissknife-dashboard"
 
 # Web server
 [web]
