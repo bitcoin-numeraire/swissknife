@@ -1,12 +1,11 @@
 // eslint-disable-next-line import/no-extraneous-dependencies
 import withPWA from 'next-pwa';
 
+const isStaticExport = 'true';
+
 /**
  * @type {import('next').NextConfig}
  */
-
-const isStaticExport = 'false';
-
 const nextConfig = {
   trailingSlash: true,
   basePath: process.env.NEXT_PUBLIC_BASE_PATH,

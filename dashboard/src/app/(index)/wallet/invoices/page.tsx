@@ -1,6 +1,6 @@
 import { appTitle } from 'src/utils/format-string';
 
-import { InvoiceListView } from 'src/sections/transaction/view';
+import { InvoicesView } from 'src/sections/transaction/view/invoices-view';
 
 // ----------------------------------------------------------------------
 
@@ -9,5 +9,5 @@ export const metadata = {
 };
 
 export default function InvoiceListPage() {
-  return <InvoiceListView />;
+  return <InvoicesView />;
 }

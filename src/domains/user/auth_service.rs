@@ -74,10 +74,13 @@ impl AuthUseCases for AuthService {
         if self.provider != AuthProvider::Jwt {
             return Err(AuthenticationError::UnsupportedOperation.into());
         }
-
         match self.store.config.find(PASSWORD_HASH_KEY).await? {
             Some(password_hash) => {
-                if !verify(password, &password_hash.to_string())
+                let password_hash_str = password_hash.as_str().ok_or_else(|| {
+                    DataError::Inconsistency("Expected string in password hash".to_string())
+                })?;
+
+                if !verify(password, password_hash_str)
                     .map_err(|e| AuthenticationError::Hash(e.to_string()))?
                 {
                     return Err(AuthenticationError::InvalidCredentials.into());
