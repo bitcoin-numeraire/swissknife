@@ -75,12 +75,7 @@ impl MigrationTrait for Migration {
             .await?;
 
         manager
-            .drop_foreign_key(
-                ForeignKey::drop()
-                    .name("fk_wallet")
-                    .table(Invoice::Table)
-                    .to_owned(),
-            )
+            .drop_foreign_key(ForeignKey::drop().name("fk_wallet").table(Invoice::Table).to_owned())
             .await?;
 
         manager
@@ -102,12 +97,7 @@ impl MigrationTrait for Migration {
             .await?;
 
         manager
-            .drop_index(
-                Index::drop()
-                    .name("UNIQUE_bolt11")
-                    .table(Invoice::Table)
-                    .to_owned(),
-            )
+            .drop_index(Index::drop().name("UNIQUE_bolt11").table(Invoice::Table).to_owned())
             .await?;
 
         Ok(())

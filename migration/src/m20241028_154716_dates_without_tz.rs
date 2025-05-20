@@ -21,9 +21,7 @@ impl MigrationTrait for Migration {
                 .alter_table(
                     Table::alter()
                         .table(Wallet::Table)
-                        .modify_column(
-                            timestamp(Wallet::CreatedAt).default(Expr::current_timestamp()),
-                        )
+                        .modify_column(timestamp(Wallet::CreatedAt).default(Expr::current_timestamp()))
                         .modify_column(timestamp_null(Wallet::UpdatedAt))
                         .to_owned(),
                 )
@@ -33,9 +31,7 @@ impl MigrationTrait for Migration {
                 .alter_table(
                     Table::alter()
                         .table(LnAddress::Table)
-                        .modify_column(
-                            timestamp(LnAddress::CreatedAt).default(Expr::current_timestamp()),
-                        )
+                        .modify_column(timestamp(LnAddress::CreatedAt).default(Expr::current_timestamp()))
                         .modify_column(timestamp_null(LnAddress::UpdatedAt))
                         .to_owned(),
                 )
@@ -47,9 +43,7 @@ impl MigrationTrait for Migration {
                         .table(Invoice::Table)
                         .modify_column(timestamp(Invoice::Timestamp))
                         .modify_column(timestamp_null(Invoice::PaymentTime))
-                        .modify_column(
-                            timestamp(Invoice::CreatedAt).default(Expr::current_timestamp()),
-                        )
+                        .modify_column(timestamp(Invoice::CreatedAt).default(Expr::current_timestamp()))
                         .modify_column(timestamp_null(Invoice::UpdatedAt))
                         .modify_column(timestamp_null(Invoice::ExpiresAt))
                         .to_owned(),
@@ -61,9 +55,7 @@ impl MigrationTrait for Migration {
                     Table::alter()
                         .table(Payment::Table)
                         .modify_column(timestamp_null(Payment::PaymentTime))
-                        .modify_column(
-                            timestamp(Payment::CreatedAt).default(Expr::current_timestamp()),
-                        )
+                        .modify_column(timestamp(Payment::CreatedAt).default(Expr::current_timestamp()))
                         .modify_column(timestamp_null(Payment::UpdatedAt))
                         .to_owned(),
                 )
@@ -73,9 +65,7 @@ impl MigrationTrait for Migration {
                 .alter_table(
                     Table::alter()
                         .table(ApiKey::Table)
-                        .modify_column(
-                            timestamp(ApiKey::CreatedAt).default(Expr::current_timestamp()),
-                        )
+                        .modify_column(timestamp(ApiKey::CreatedAt).default(Expr::current_timestamp()))
                         .modify_column(timestamp_null(ApiKey::ExpiresAt))
                         .to_owned(),
                 )
