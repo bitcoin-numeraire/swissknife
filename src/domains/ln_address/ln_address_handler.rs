@@ -140,7 +140,7 @@ async fn list_addresses(
 
     let ln_addresses = app_state.services.ln_address.list(query_params).await?;
 
-    let response: Vec<LnAddress> = ln_addresses.into_iter().map(Into::into).collect();
+    let response: Vec<LnAddress> = ln_addresses.into_iter().collect();
 
     Ok(response.into())
 }
