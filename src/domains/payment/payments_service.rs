@@ -77,6 +77,10 @@ impl PaymentService {
         let address_opt = self.store.ln_address.find_by_username(username).await?;
         match address_opt {
             Some(retrieved_address) => {
+                if !retrieved_address.active {
+                    return Err(DataError::NotFound("Recipient not found.".to_string()).into());
+                }
+
                 if retrieved_address.wallet_id == wallet_id {
                     return Err(DataError::Validation("Cannot pay to yourself.".to_string()).into());
                 }
