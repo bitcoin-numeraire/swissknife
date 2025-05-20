@@ -69,6 +69,10 @@ impl LnUrlUseCases for LnUrlService {
             .await?
             .ok_or_else(|| DataError::NotFound("Lightning address not found.".to_string()))?;
 
+        if !ln_address.active {
+            return Err(DataError::NotFound("Lightning address not found.".to_string()).into());
+        }
+
         let lnurlp = LnURLPayRequest {
             callback: format!("{}/lnurlp/{}/callback", self.host, username),
             max_sendable: MAX_SENDABLE,
@@ -98,6 +102,10 @@ impl LnUrlUseCases for LnUrlService {
             .find_by_username(&username)
             .await?
             .ok_or_else(|| DataError::NotFound("Lightning address not found.".to_string()))?;
+
+        if !ln_address.active {
+            return Err(DataError::NotFound("Lightning address not found.".to_string()).into());
+        }
 
         let mut invoice = self
             .ln_client
