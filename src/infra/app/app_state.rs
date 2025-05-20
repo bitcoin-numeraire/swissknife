@@ -73,10 +73,7 @@ async fn get_ln_client(
                 ConfigError::MissingLightningProviderConfig(config.ln_provider.to_string())
             })?;
 
-            debug!(
-                working_dir = %breez_config.working_dir,
-                "Lightning provider: Breez"
-            );
+            debug!(config = ?breez_config,"Lightning provider: Breez");
 
             let client = BreezClient::new(breez_config.clone(), ln_events).await?;
 
@@ -98,7 +95,7 @@ async fn get_ln_client(
                 ConfigError::MissingLightningProviderConfig(config.ln_provider.to_string())
             })?;
 
-            debug!(endpoint = %cln_config.endpoint, "Lightning provider: Core Lightning REST");
+            debug!(config = ?cln_config, "Lightning provider: Core Lightning REST");
 
             let client = ClnRestClient::new(cln_config.clone(), ln_events).await?;
 

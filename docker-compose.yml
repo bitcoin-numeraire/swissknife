@@ -1,6 +1,6 @@
 services:
   postgres:
-    image: postgres:16.3
+    image: postgres:16.6
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
@@ -24,7 +24,7 @@ services:
       - "log_destination=stderr" # Send logs to stderr
 
   pgadmin:
-    image: dpage/pgadmin4:8.9
+    image: dpage/pgadmin4:8.14
     environment:
       PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-pgadmin4@pgadmin.org}
       PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:-admin}
@@ -38,13 +38,12 @@ services:
       - postgres
 
   swissknife:
-    image: registry.digitalocean.com/swissknife/swissknife:latest
+    image: bitcoinnumeraire/swissknife:v0.1.4
     environment:
       SWISSKNIFE_DATABASE__URL: ${SWISSKNIFE_DATABASE__URL:-postgres://postgres:postgres@postgres/numeraire}
       SWISSKNIFE_BREEZ_CONFIG__API_KEY: ${SWISSKNIFE_BREEZ_CONFIG__API_KEY:-}
       SWISSKNIFE_BREEZ_CONFIG__SEED: ${SWISSKNIFE_BREEZ_CONFIG__SEED:-}
       SWISSKNIFE_CLN_REST_CONFIG__RUNE: ${SWISSKNIFE_CLN_REST_CONFIG__RUNE:-}
-      SWISSKNIFE_JWT__PASSWORD: ${SWISSKNIFE_JWT__PASSWORD:-}
       SWISSKNIFE_JWT__SECRET: ${SWISSKNIFE_JWT__SECRET:-}
     depends_on:
       - postgres
@@ -52,7 +51,6 @@ services:
       - "3000:3000"
     volumes:
       - ./config/development.toml:/config/development.toml
-      - ./config/production.toml:/config/production.toml
       - ./certs/greenlight:/certs/greenlight
       - ./storage/breez:/storage/breez
 

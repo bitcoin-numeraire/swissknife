@@ -77,7 +77,7 @@ pub const FORBIDDEN_EXAMPLE: &str = r#"
 pub const NOT_FOUND_EXAMPLE: &str = r#"
 {
     "status": "404 Not Found",
-    "reason": "Resouce not found"
+    "reason": "Resource not found"
 }
 "#;
 

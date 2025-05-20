@@ -29,7 +29,7 @@ pub struct WalletResponse {
     pub balance: Balance,
     /// List of payments
     pub payments: Vec<PaymentResponse>,
-    /// Lit of Invoices
+    /// List of Invoices
     pub invoices: Vec<InvoiceResponse>,
     /// List of contacts
     pub contacts: Vec<Contact>,
