@@ -23,7 +23,7 @@ COPY . .
 RUN cargo build --release
 
 # Node.js stage for building the dashboard
-FROM node:20 AS dashboard-builder
+FROM node:22-slim AS dashboard-builder
 WORKDIR /app/dashboard
 
 # Copy the dashboard source code
@@ -38,7 +38,7 @@ ENV NEXT_TELEMETRY_DISABLED=1
 RUN corepack enable && yarn --frozen-lockfile && yarn build
 
 # Use a minimal base image for the final stage
-FROM debian:bookworm-slim
+FROM debian:stable-slim
 
 # Install required runtime dependencies
 RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
