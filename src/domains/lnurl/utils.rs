@@ -52,11 +52,7 @@ pub async fn validate_lnurl_pay(
     Ok(callback_resp)
 }
 
-fn validate_user_input(
-    user_amount_msat: u64,
-    comment: &Option<String>,
-    req: &LnUrlPayRequestData,
-) -> Result<()> {
+fn validate_user_input(user_amount_msat: u64, comment: &Option<String>, req: &LnUrlPayRequestData) -> Result<()> {
     if user_amount_msat < req.min_sendable {
         return Err(anyhow!(format!(
             "Amount is smaller than the minimum allowed: {} sats",
@@ -98,10 +94,7 @@ fn validate_invoice(user_amount_msat: u64, bolt11: &str) -> Result<()> {
     }
 }
 
-pub fn process_success_action(
-    sa: SuccessAction,
-    payment_preimage: &str,
-) -> Option<LnUrlSuccessAction> {
+pub fn process_success_action(sa: SuccessAction, payment_preimage: &str) -> Option<LnUrlSuccessAction> {
     match sa {
         // For AES, we decrypt the contents on the fly
         SuccessAction::Aes(data) => {

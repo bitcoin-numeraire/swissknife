@@ -2,8 +2,8 @@ use async_trait::async_trait;
 use chrono::Utc;
 use nostr_sdk::PublicKey;
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, QueryOrder,
-    QuerySelect, QueryTrait, Set, Unchanged,
+    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, QueryOrder, QuerySelect, QueryTrait,
+    Set, Unchanged,
 };
 use uuid::Uuid;
 
@@ -56,13 +56,9 @@ impl LnAddressRepository for SeaOrmLnAddressRepository {
     async fn find_many(&self, filter: LnAddressFilter) -> Result<Vec<LnAddress>, DatabaseError> {
         let models = Entity::find()
             .apply_if(filter.wallet_id, |q, id| q.filter(Column::WalletId.eq(id)))
-            .apply_if(filter.username, |q, username| {
-                q.filter(Column::Username.eq(username))
-            })
+            .apply_if(filter.username, |q, username| q.filter(Column::Username.eq(username)))
             .apply_if(filter.ids, |q, ids| q.filter(Column::Id.is_in(ids)))
-            .apply_if(filter.active, |q, active| {
-                q.filter(Column::Active.eq(active))
-            })
+            .apply_if(filter.active, |q, active| q.filter(Column::Active.eq(active)))
             .order_by(Column::CreatedAt, filter.order_direction.into())
             .offset(filter.offset)
             .limit(filter.limit)
@@ -122,9 +118,7 @@ impl LnAddressRepository for SeaOrmLnAddressRepository {
         let result = Entity::delete_many()
             .apply_if(filter.wallet_id, |q, id| q.filter(Column::WalletId.eq(id)))
             .apply_if(filter.ids, |q, ids| q.filter(Column::Id.is_in(ids)))
-            .apply_if(filter.username, |q, username| {
-                q.filter(Column::Username.eq(username))
-            })
+            .apply_if(filter.username, |q, username| q.filter(Column::Username.eq(username)))
             .exec(&self.db)
             .await
             .map_err(|e| DatabaseError::Delete(e.to_string()))?;

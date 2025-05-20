@@ -2,19 +2,7 @@ use serde::{Deserialize, Serialize};
 use strum_macros::{Display, EnumString, VariantNames};
 use utoipa::ToSchema;
 
-#[derive(
-    Clone,
-    Debug,
-    PartialEq,
-    Eq,
-    Hash,
-    EnumString,
-    Display,
-    VariantNames,
-    Serialize,
-    Deserialize,
-    ToSchema,
-)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, EnumString, Display, VariantNames, Serialize, Deserialize, ToSchema)]
 pub enum Permission {
     #[serde(rename = "read:wallet")]
     ReadWallet,

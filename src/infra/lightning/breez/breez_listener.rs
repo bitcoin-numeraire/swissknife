@@ -25,18 +25,12 @@ impl EventListener for BreezListener {
 
                 if let Some(payment) = details.payment {
                     if payment.status != PaymentStatus::Complete {
-                        warn!(
-                            payment_hash = payment.id,
-                            "Invalid payment status. Expected Complete."
-                        );
+                        warn!(payment_hash = payment.id, "Invalid payment status. Expected Complete.");
                         return;
                     }
 
                     if payment.payment_type != PaymentType::Received {
-                        warn!(
-                            payment_hash = payment.id,
-                            "Invalid payment type. Expected Received."
-                        );
+                        warn!(payment_hash = payment.id, "Invalid payment type. Expected Received.");
                         return;
                     }
 
@@ -54,18 +48,12 @@ impl EventListener for BreezListener {
                 trace!("New PaymentSucceed event received");
 
                 if details.status != PaymentStatus::Complete {
-                    warn!(
-                        payment_hash = details.id,
-                        "Invalid payment status. Expected Complete."
-                    );
+                    warn!(payment_hash = details.id, "Invalid payment status. Expected Complete.");
                     return;
                 }
 
                 if details.payment_type != PaymentType::Sent {
-                    warn!(
-                        payment_hash = details.id,
-                        "Invalid payment type. Expected Sent."
-                    );
+                    warn!(payment_hash = details.id, "Invalid payment type. Expected Sent.");
                     return;
                 }
 

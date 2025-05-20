@@ -30,10 +30,7 @@ pub struct AppState {
 
 impl AppState {
     pub async fn new(config: AppConfig) -> Result<Self, ApplicationError> {
-        info!(
-            "Numeraire SwissKnife version: {}",
-            env!("CARGO_PKG_VERSION")
-        );
+        info!("Numeraire SwissKnife version: {}", env!("CARGO_PKG_VERSION"));
 
         // Infra
         let timeout_layer = TimeoutLayer::new(config.web.request_timeout);
@@ -69,9 +66,10 @@ async fn get_ln_client(
 ) -> Result<LnNodeClient, ApplicationError> {
     match config.ln_provider {
         LightningProvider::Breez => {
-            let breez_config = config.breez_config.clone().ok_or_else(|| {
-                ConfigError::MissingLightningProviderConfig(config.ln_provider.to_string())
-            })?;
+            let breez_config = config
+                .breez_config
+                .clone()
+                .ok_or_else(|| ConfigError::MissingLightningProviderConfig(config.ln_provider.to_string()))?;
 
             debug!(config = ?breez_config,"Lightning provider: Breez");
 
@@ -80,9 +78,10 @@ async fn get_ln_client(
             Ok(LnNodeClient::Breez(Arc::new(client)))
         }
         LightningProvider::ClnGrpc => {
-            let cln_config = config.cln_grpc_config.clone().ok_or_else(|| {
-                ConfigError::MissingLightningProviderConfig(config.ln_provider.to_string())
-            })?;
+            let cln_config = config
+                .cln_grpc_config
+                .clone()
+                .ok_or_else(|| ConfigError::MissingLightningProviderConfig(config.ln_provider.to_string()))?;
 
             debug!(config = ?cln_config, "Lightning provider: Core Lightning gRPC");
 
@@ -91,9 +90,10 @@ async fn get_ln_client(
             Ok(LnNodeClient::ClnGrpc(Arc::new(client)))
         }
         LightningProvider::ClnRest => {
-            let cln_config = config.cln_rest_config.clone().ok_or_else(|| {
-                ConfigError::MissingLightningProviderConfig(config.ln_provider.to_string())
-            })?;
+            let cln_config = config
+                .cln_rest_config
+                .clone()
+                .ok_or_else(|| ConfigError::MissingLightningProviderConfig(config.ln_provider.to_string()))?;
 
             debug!(config = ?cln_config, "Lightning provider: Core Lightning REST");
 
@@ -102,9 +102,10 @@ async fn get_ln_client(
             Ok(LnNodeClient::ClnRest(Arc::new(client)))
         }
         LightningProvider::Lnd => {
-            let lnd_config = config.lnd_config.clone().ok_or_else(|| {
-                ConfigError::MissingLightningProviderConfig(config.ln_provider.to_string())
-            })?;
+            let lnd_config = config
+                .lnd_config
+                .clone()
+                .ok_or_else(|| ConfigError::MissingLightningProviderConfig(config.ln_provider.to_string()))?;
 
             debug!(config = ?lnd_config, "Lightning provider: LND");
 
@@ -115,14 +116,13 @@ async fn get_ln_client(
     }
 }
 
-async fn get_authenticator(
-    config: AppConfig,
-) -> Result<Arc<dyn JWTAuthenticator>, ApplicationError> {
+async fn get_authenticator(config: AppConfig) -> Result<Arc<dyn JWTAuthenticator>, ApplicationError> {
     match config.auth_provider {
         AuthProvider::OAuth2 => {
-            let oauth2_config = config.oauth2.clone().ok_or_else(|| {
-                ConfigError::MissingAuthProviderConfig(config.auth_provider.to_string())
-            })?;
+            let oauth2_config = config
+                .oauth2
+                .clone()
+                .ok_or_else(|| ConfigError::MissingAuthProviderConfig(config.auth_provider.to_string()))?;
 
             debug!(
                 config = ?oauth2_config,
@@ -133,9 +133,10 @@ async fn get_authenticator(
             Ok(Arc::new(authenticator))
         }
         AuthProvider::Jwt => {
-            let jwt_config = config.jwt.clone().ok_or_else(|| {
-                ConfigError::MissingAuthProviderConfig(config.auth_provider.to_string())
-            })?;
+            let jwt_config = config
+                .jwt
+                .clone()
+                .ok_or_else(|| ConfigError::MissingAuthProviderConfig(config.auth_provider.to_string()))?;
 
             debug!(
                 config = ?jwt_config,

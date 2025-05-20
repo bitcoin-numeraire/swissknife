@@ -13,8 +13,8 @@ use crate::{
 };
 
 use super::cln::{
-    listinvoices_invoices::ListinvoicesInvoicesStatus, pay_response::PayStatus,
-    ListinvoicesInvoices, PayResponse, WaitanyinvoiceResponse,
+    listinvoices_invoices::ListinvoicesInvoicesStatus, pay_response::PayStatus, ListinvoicesInvoices, PayResponse,
+    WaitanyinvoiceResponse,
 };
 
 impl From<PayResponse> for Payment {

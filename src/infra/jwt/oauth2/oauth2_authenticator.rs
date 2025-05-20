@@ -30,10 +30,10 @@ pub struct OAuth2Config {
 #[derive(Debug, Serialize, Deserialize)]
 struct Claims {
     aud: Vec<String>, // Optional. Audience
-    exp: usize, // Required (validate_exp defaults to true in validation). Expiration time (as UTC timestamp)
-    iat: usize, // Optional. Issued at (as UTC timestamp)
-    iss: String, // Optional. Issuer
-    sub: String, // Optional. Subject (whom token refers to)
+    exp: usize,       // Required (validate_exp defaults to true in validation). Expiration time (as UTC timestamp)
+    iat: usize,       // Optional. Issued at (as UTC timestamp)
+    iss: String,      // Optional. Issuer
+    sub: String,      // Optional. Subject (whom token refers to)
     permissions: Vec<Permission>,
 }
 
@@ -94,8 +94,7 @@ impl JWTAuthenticator for OAuth2Authenticator {
         // Access the JWKs and clone the data
         let jwks = self.jwks.read().await.clone();
 
-        let header = decode_header(token)
-            .map_err(|e| AuthenticationError::DecodeJWTHeader(e.to_string()))?;
+        let header = decode_header(token).map_err(|e| AuthenticationError::DecodeJWTHeader(e.to_string()))?;
         let kid = match header.kid {
             Some(k) => k,
             None => {
@@ -109,9 +108,8 @@ impl JWTAuthenticator for OAuth2Authenticator {
                     let decoding_key = DecodingKey::from_rsa_components(&rsa.n, &rsa.e)
                         .map_err(|e| AuthenticationError::DecodeJWTKey(e.to_string()))?;
 
-                    let decoded_token =
-                        decode::<AuthClaims>(token, &decoding_key, &self.validation)
-                            .map_err(|e| AuthenticationError::DecodeJWT(e.to_string()))?;
+                    let decoded_token = decode::<AuthClaims>(token, &decoding_key, &self.validation)
+                        .map_err(|e| AuthenticationError::DecodeJWT(e.to_string()))?;
 
                     Ok(decoded_token.claims)
                 }

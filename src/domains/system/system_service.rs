@@ -58,12 +58,7 @@ impl SystemUseCases for SystemService {
     async fn setup_check(&self) -> Result<SetupInfo, ApplicationError> {
         trace!("Checking system setup");
 
-        let welcome_complete = self
-            .store
-            .config
-            .find(WELCOME_COMPLETE_KEY)
-            .await?
-            .is_some();
+        let welcome_complete = self.store.config.find(WELCOME_COMPLETE_KEY).await?.is_some();
         let sign_up_complete: bool = self.store.config.find(PASSWORD_HASH_KEY).await?.is_some();
 
         debug!(%welcome_complete, %sign_up_complete, "Checking system setup");
@@ -76,20 +71,11 @@ impl SystemUseCases for SystemService {
     async fn mark_welcome_complete(&self) -> Result<(), ApplicationError> {
         debug!("Marking welcome flow as completed");
 
-        if self
-            .store
-            .config
-            .find(WELCOME_COMPLETE_KEY)
-            .await?
-            .is_some()
-        {
+        if self.store.config.find(WELCOME_COMPLETE_KEY).await?.is_some() {
             return Ok(());
         }
 
-        self.store
-            .config
-            .insert(WELCOME_COMPLETE_KEY, true.into())
-            .await?;
+        self.store.config.insert(WELCOME_COMPLETE_KEY, true.into()).await?;
 
         info!("Welcome flow marked as complete successfully");
         Ok(())

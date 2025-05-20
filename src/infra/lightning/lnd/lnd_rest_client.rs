@@ -13,9 +13,7 @@ use tokio::fs;
 
 use crate::{
     application::errors::LightningError,
-    domains::{
-        invoice::Invoice, ln_node::LnEventsUseCases, payment::Payment, system::HealthStatus,
-    },
+    domains::{invoice::Invoice, ln_node::LnEventsUseCases, payment::Payment, system::HealthStatus},
     infra::{config::config_rs::deserialize_duration, lightning::LnClient},
 };
 use async_trait::async_trait;
@@ -62,8 +60,8 @@ impl LndRestClient {
             .map_err(|e| LightningError::ParseConfig(e.to_string()))?;
 
         let mut headers = HeaderMap::new();
-        let mut macaroon_header = HeaderValue::from_str(&macaroon)
-            .map_err(|e| LightningError::ParseConfig(e.to_string()))?;
+        let mut macaroon_header =
+            HeaderValue::from_str(&macaroon).map_err(|e| LightningError::ParseConfig(e.to_string()))?;
         macaroon_header.set_sensitive(true);
         headers.insert("Grpc-Metadata-Macaroon", macaroon_header);
 
@@ -118,11 +116,7 @@ impl LndRestClient {
         Ok(macaroon_header)
     }
 
-    async fn post_request_buffered<T>(
-        &self,
-        endpoint: &str,
-        payload: &impl Serialize,
-    ) -> anyhow::Result<T>
+    async fn post_request_buffered<T>(&self, endpoint: &str, payload: &impl Serialize) -> anyhow::Result<T>
     where
         T: DeserializeOwned,
     {
@@ -223,11 +217,7 @@ impl LnClient for LndRestClient {
         Ok(response.into())
     }
 
-    async fn pay(
-        &self,
-        bolt11: String,
-        amount_msat: Option<u64>,
-    ) -> Result<Payment, LightningError> {
+    async fn pay(&self, bolt11: String, amount_msat: Option<u64>) -> Result<Payment, LightningError> {
         let payload = PayRequest {
             payment_request: bolt11,
             amt_msat: amount_msat,
@@ -259,10 +249,7 @@ impl LnClient for LndRestClient {
         }
     }
 
-    async fn invoice_by_hash(
-        &self,
-        payment_hash: String,
-    ) -> Result<Option<Invoice>, LightningError> {
+    async fn invoice_by_hash(&self, payment_hash: String) -> Result<Option<Invoice>, LightningError> {
         let result = self
             .get_request::<InvoiceResponse>(&format!("v1/invoice/{}", payment_hash))
             .await;
@@ -271,9 +258,7 @@ impl LnClient for LndRestClient {
             Ok(response) => Ok(Some(response.into())),
             Err(err) => {
                 let err_msg = err.to_string();
-                if err_msg.contains("there are no existing invoices")
-                    || err_msg.contains("unable to locate invoice")
-                {
+                if err_msg.contains("there are no existing invoices") || err_msg.contains("unable to locate invoice") {
                     Ok(None)
                 } else {
                     Err(LightningError::InvoiceByHash(err.to_string()))

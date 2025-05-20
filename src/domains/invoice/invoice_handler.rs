@@ -11,8 +11,8 @@ use uuid::Uuid;
 use crate::{
     application::{
         docs::{
-            BAD_REQUEST_EXAMPLE, FORBIDDEN_EXAMPLE, INTERNAL_EXAMPLE, NOT_FOUND_EXAMPLE,
-            UNAUTHORIZED_EXAMPLE, UNPROCESSABLE_EXAMPLE,
+            BAD_REQUEST_EXAMPLE, FORBIDDEN_EXAMPLE, INTERNAL_EXAMPLE, NOT_FOUND_EXAMPLE, UNAUTHORIZED_EXAMPLE,
+            UNPROCESSABLE_EXAMPLE,
         },
         dtos::{ErrorResponse, InvoiceResponse, LnInvoiceResponse, NewInvoiceRequest},
         errors::ApplicationError,

@@ -7,10 +7,6 @@ use crate::{
 
 #[async_trait]
 pub trait JWTAuthenticator: Send + Sync {
-    fn encode(
-        &self,
-        username: String,
-        permissions: Vec<Permission>,
-    ) -> Result<String, AuthenticationError>;
+    fn encode(&self, username: String, permissions: Vec<Permission>) -> Result<String, AuthenticationError>;
     async fn decode(&self, token: &str) -> Result<AuthClaims, AuthenticationError>;
 }

@@ -15,16 +15,13 @@ use async_trait::async_trait;
 
 use crate::{
     application::errors::LightningError,
-    domains::{
-        invoice::Invoice, ln_node::LnEventsUseCases, payment::Payment, system::HealthStatus,
-    },
+    domains::{invoice::Invoice, ln_node::LnEventsUseCases, payment::Payment, system::HealthStatus},
     infra::{config::config_rs::deserialize_duration, lightning::LnClient},
 };
 
 use super::{
-    cln_websocket_client::connect_websocket, ErrorResponse, GetinfoRequest, GetinfoResponse,
-    InvoiceRequest, InvoiceResponse, ListInvoicesRequest, ListInvoicesResponse, PayRequest,
-    PayResponse,
+    cln_websocket_client::connect_websocket, ErrorResponse, GetinfoRequest, GetinfoResponse, InvoiceRequest,
+    InvoiceResponse, ListInvoicesRequest, ListInvoicesResponse, PayRequest, PayResponse,
 };
 
 #[derive(Clone, Debug, Deserialize)]
@@ -66,8 +63,8 @@ impl ClnRestClient {
         ln_events: Arc<dyn LnEventsUseCases>,
     ) -> Result<Self, LightningError> {
         let mut headers = HeaderMap::new();
-        let mut rune_header = HeaderValue::from_str(&config.rune)
-            .map_err(|e| LightningError::ParseConfig(e.to_string()))?;
+        let mut rune_header =
+            HeaderValue::from_str(&config.rune).map_err(|e| LightningError::ParseConfig(e.to_string()))?;
         rune_header.set_sensitive(true);
         headers.insert("Rune", rune_header);
 
@@ -111,11 +108,7 @@ impl ClnRestClient {
         Ok(ca_certificate)
     }
 
-    async fn post_request<T: DeserializeOwned>(
-        &self,
-        endpoint: &str,
-        payload: &impl Serialize,
-    ) -> anyhow::Result<T> {
+    async fn post_request<T: DeserializeOwned>(&self, endpoint: &str, payload: &impl Serialize) -> anyhow::Result<T> {
         let response = self
             .client
             .post(format!("{}/v1/{}", self.base_url, endpoint))
@@ -168,17 +161,12 @@ impl LnClient for ClnRestClient {
             .await
             .map_err(|e| LightningError::Invoice(e.to_string()))?;
 
-        let bolt11 = Bolt11Invoice::from_str(&response.bolt11)
-            .map_err(|e| LightningError::Invoice(e.to_string()))?;
+        let bolt11 = Bolt11Invoice::from_str(&response.bolt11).map_err(|e| LightningError::Invoice(e.to_string()))?;
 
         Ok(bolt11.into())
     }
 
-    async fn pay(
-        &self,
-        bolt11: String,
-        amount_msat: Option<u64>,
-    ) -> Result<Payment, LightningError> {
+    async fn pay(&self, bolt11: String, amount_msat: Option<u64>) -> Result<Payment, LightningError> {
         let response: PayResponse = self
             .post_request(
                 "pay",
@@ -197,10 +185,7 @@ impl LnClient for ClnRestClient {
         Ok(response.into())
     }
 
-    async fn invoice_by_hash(
-        &self,
-        payment_hash: String,
-    ) -> Result<Option<Invoice>, LightningError> {
+    async fn invoice_by_hash(&self, payment_hash: String) -> Result<Option<Invoice>, LightningError> {
         let response: ListInvoicesResponse = self
             .post_request(
                 "listinvoices",

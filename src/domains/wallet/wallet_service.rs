@@ -32,8 +32,8 @@ impl WalletUseCases for WalletService {
         }
 
         // Regex validation for allowed characters
-        let email_username_re = Regex::new(r"^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+$")
-            .expect("should not fail as a constant");
+        let email_username_re =
+            Regex::new(r"^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+$").expect("should not fail as a constant");
         if !email_username_re.is_match(&user_id) {
             return Err(DataError::Validation("Invalid user_id format.".to_string()).into());
         }

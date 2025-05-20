@@ -35,14 +35,11 @@ impl Server {
             .nest("/v1/lightning-addresses", ln_address::router())
             .merge(Scalar::with_url("/docs", merged_openapi()))
             .fallback_service(
-                ServeDir::new(dashboard_dir)
-                    .not_found_service(ServeFile::new(format!("{}/404.html", dashboard_dir))),
+                ServeDir::new(dashboard_dir).not_found_service(ServeFile::new(format!("{}/404.html", dashboard_dir))),
             );
 
         let router = match state.ln_node_client {
-            LnNodeClient::Breez(_) => {
-                router.nest("/v1/lightning-node", ln_node::breez_node_router())
-            }
+            LnNodeClient::Breez(_) => router.nest("/v1/lightning-node", ln_node::breez_node_router()),
             _ => router,
         };
 

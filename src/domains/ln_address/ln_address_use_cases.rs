@@ -18,11 +18,7 @@ pub trait LnAddressUseCases: Send + Sync {
     ) -> Result<LnAddress, ApplicationError>;
     async fn get(&self, id: Uuid) -> Result<LnAddress, ApplicationError>;
     async fn list(&self, filter: LnAddressFilter) -> Result<Vec<LnAddress>, ApplicationError>;
-    async fn update(
-        &self,
-        id: Uuid,
-        request: UpdateLnAddressRequest,
-    ) -> Result<LnAddress, ApplicationError>;
+    async fn update(&self, id: Uuid, request: UpdateLnAddressRequest) -> Result<LnAddress, ApplicationError>;
     async fn delete(&self, id: Uuid) -> Result<(), ApplicationError>;
     async fn delete_many(&self, filter: LnAddressFilter) -> Result<u64, ApplicationError>;
 }

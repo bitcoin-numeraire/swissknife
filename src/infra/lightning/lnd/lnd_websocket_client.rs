@@ -8,9 +8,7 @@ use serde_json::Value;
 use tokio::net::TcpStream;
 use tokio::{fs, time::sleep};
 use tokio_tungstenite::tungstenite::ClientRequestBuilder;
-use tokio_tungstenite::{
-    connect_async_tls_with_config, Connector, MaybeTlsStream, WebSocketStream,
-};
+use tokio_tungstenite::{connect_async_tls_with_config, Connector, MaybeTlsStream, WebSocketStream};
 use tracing::{debug, error, warn};
 
 use crate::infra::lightning::lnd::lnd_types::InvoiceResponse;
@@ -53,8 +51,7 @@ async fn connect_and_handle(
     ln_events: Arc<dyn LnEventsUseCases>,
 ) -> Result<(), LightningError> {
     let invoices_endpoint = format!("wss://{}/v1/invoices/subscribe", config.host);
-    let uri = Uri::from_str(&invoices_endpoint)
-        .map_err(|e| LightningError::ParseConfig(e.to_string()))?;
+    let uri = Uri::from_str(&invoices_endpoint).map_err(|e| LightningError::ParseConfig(e.to_string()))?;
     let builder = ClientRequestBuilder::new(uri).with_header("Grpc-Metadata-Macaroon", macaroon);
 
     let tls_connector = create_tls_connector(config).await?;
@@ -72,9 +69,7 @@ async fn connect_and_handle(
     Ok(())
 }
 
-async fn create_tls_connector(
-    config: &LndRestClientConfig,
-) -> Result<Option<Connector>, LightningError> {
+async fn create_tls_connector(config: &LndRestClientConfig) -> Result<Option<Connector>, LightningError> {
     if let Some(ca_cert_path) = &config.ca_cert_path {
         let ca_certificate = read_ca(ca_cert_path)
             .await

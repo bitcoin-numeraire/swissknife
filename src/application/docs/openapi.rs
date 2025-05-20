@@ -113,9 +113,6 @@ struct SecurityAddon;
 impl Modify for SecurityAddon {
     fn modify(&self, openapi: &mut OpenApi) {
         let components: &mut Components = openapi.components.as_mut().unwrap(); // we can unwrap safely since there already is components registered.
-        components.add_security_scheme(
-            "jwt",
-            SecurityScheme::Http(Http::new(HttpAuthScheme::Bearer)),
-        );
+        components.add_security_scheme("jwt", SecurityScheme::Http(Http::new(HttpAuthScheme::Bearer)));
     }
 }

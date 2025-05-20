@@ -92,11 +92,7 @@ fn on_error(err: Payload, _: Client) -> BoxFuture<'static, ()> {
     .boxed()
 }
 
-fn on_message(
-    ln_events: Arc<dyn LnEventsUseCases>,
-    payload: Payload,
-    _: Client,
-) -> BoxFuture<'static, ()> {
+fn on_message(ln_events: Arc<dyn LnEventsUseCases>, payload: Payload, _: Client) -> BoxFuture<'static, ()> {
     async move {
         match payload {
             Payload::Text(values) => {
@@ -104,14 +100,15 @@ fn on_message(
                     if let Some(event) = value.get("invoice_payment") {
                         match serde_json::from_value::<InvoicePayment>(event.clone()) {
                             Ok(invoice_payment) => {
-                                if let Err(err) =
-                                    ln_events.invoice_paid(invoice_payment.into()).await
-                                {
+                                if let Err(err) = ln_events.invoice_paid(invoice_payment.into()).await {
                                     warn!(%err, "Failed to process incoming payment");
                                 }
                             }
                             Err(err) => {
-                                warn!(?err, "Failed to parse invoice_payment event. Most likely an external payment");
+                                warn!(
+                                    ?err,
+                                    "Failed to parse invoice_payment event. Most likely an external payment"
+                                );
                             }
                         }
                     }
@@ -128,9 +125,7 @@ fn on_message(
                                     return;
                                 }
 
-                                if let Err(err) =
-                                    ln_events.outgoing_payment(sendpay_success.into()).await
-                                {
+                                if let Err(err) = ln_events.outgoing_payment(sendpay_success.into()).await {
                                     warn!(%err, "Failed to process outgoing payment");
                                 }
                             }
@@ -153,9 +148,7 @@ fn on_message(
                                     // return;
                                 }
 
-                                if let Err(err) =
-                                    ln_events.failed_payment(sendpay_failure.into()).await
-                                {
+                                if let Err(err) = ln_events.failed_payment(sendpay_failure.into()).await {
                                     warn!(%err, "Failed to process failed outgoing payment");
                                 }
                             }

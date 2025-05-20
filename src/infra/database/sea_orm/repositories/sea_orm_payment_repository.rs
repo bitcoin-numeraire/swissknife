@@ -1,8 +1,8 @@
 use async_trait::async_trait;
 use chrono::Utc;
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, DatabaseConnection, DatabaseTransaction, EntityTrait,
-    QueryFilter, QueryOrder, QuerySelect, QueryTrait, Set, Unchanged,
+    ActiveModelTrait, ColumnTrait, DatabaseConnection, DatabaseTransaction, EntityTrait, QueryFilter, QueryOrder,
+    QuerySelect, QueryTrait, Set, Unchanged,
 };
 use uuid::Uuid;
 
@@ -34,10 +34,7 @@ impl PaymentRepository for SeaOrmPaymentRepository {
         Ok(model.map(Into::into))
     }
 
-    async fn find_by_payment_hash(
-        &self,
-        payment_hash: &str,
-    ) -> Result<Option<Payment>, DatabaseError> {
+    async fn find_by_payment_hash(&self, payment_hash: &str) -> Result<Option<Payment>, DatabaseError> {
         let model = Entity::find()
             .filter(Column::PaymentHash.eq(payment_hash))
             .one(&self.db)
@@ -49,16 +46,10 @@ impl PaymentRepository for SeaOrmPaymentRepository {
 
     async fn find_many(&self, filter: PaymentFilter) -> Result<Vec<Payment>, DatabaseError> {
         let models = Entity::find()
-            .apply_if(filter.wallet_id, |q, wallet| {
-                q.filter(Column::WalletId.eq(wallet))
-            })
+            .apply_if(filter.wallet_id, |q, wallet| q.filter(Column::WalletId.eq(wallet)))
             .apply_if(filter.ids, |q, ids| q.filter(Column::Id.is_in(ids)))
-            .apply_if(filter.status, |q, s| {
-                q.filter(Column::Status.eq(s.to_string()))
-            })
-            .apply_if(filter.ledger, |q, l| {
-                q.filter(Column::Ledger.eq(l.to_string()))
-            })
+            .apply_if(filter.status, |q, s| q.filter(Column::Status.eq(s.to_string())))
+            .apply_if(filter.ledger, |q, l| q.filter(Column::Ledger.eq(l.to_string())))
             .order_by(Column::CreatedAt, filter.order_direction.into())
             .offset(filter.offset)
             .limit(filter.limit)
@@ -69,11 +60,7 @@ impl PaymentRepository for SeaOrmPaymentRepository {
         Ok(models.into_iter().map(Into::into).collect())
     }
 
-    async fn insert(
-        &self,
-        txn: Option<&DatabaseTransaction>,
-        payment: Payment,
-    ) -> Result<Payment, DatabaseError> {
+    async fn insert(&self, txn: Option<&DatabaseTransaction>, payment: Payment) -> Result<Payment, DatabaseError> {
         let model = ActiveModel {
             id: Set(Uuid::new_v4()),
             wallet_id: Set(payment.wallet_id),
@@ -128,13 +115,9 @@ impl PaymentRepository for SeaOrmPaymentRepository {
 
     async fn delete_many(&self, filter: PaymentFilter) -> Result<u64, DatabaseError> {
         let result = Entity::delete_many()
-            .apply_if(filter.wallet_id, |q, wallet| {
-                q.filter(Column::WalletId.eq(wallet))
-            })
+            .apply_if(filter.wallet_id, |q, wallet| q.filter(Column::WalletId.eq(wallet)))
             .apply_if(filter.ids, |q, ids| q.filter(Column::Id.is_in(ids)))
-            .apply_if(filter.status, |q, s| {
-                q.filter(Column::Status.eq(s.to_string()))
-            })
+            .apply_if(filter.status, |q, s| q.filter(Column::Status.eq(s.to_string())))
             .exec(&self.db)
             .await
             .map_err(|e| DatabaseError::Delete(e.to_string()))?;

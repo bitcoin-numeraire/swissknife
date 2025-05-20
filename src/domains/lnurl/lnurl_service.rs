@@ -44,14 +44,8 @@ impl LnUrlService {
 
     fn metadata(&self, username: &str) -> String {
         serde_json::to_string(&[
-            [
-                "text/identifier".to_string(),
-                format!("{}@{}", username, self.domain),
-            ],
-            [
-                "text/plain".to_string(),
-                format!("{} never refuses sats", username),
-            ],
+            ["text/identifier".to_string(), format!("{}@{}", username, self.domain)],
+            ["text/plain".to_string(), format!("{} never refuses sats", username)],
         ])
         .expect("should not fail as a constant")
     }
@@ -113,16 +107,12 @@ impl LnUrlUseCases for LnUrlService {
             .await?;
         invoice.wallet_id.clone_from(&ln_address.wallet_id);
         invoice.ln_address_id = Some(ln_address.id);
-        invoice.description =
-            Some(comment.unwrap_or(format!("Payment to {}@{}", username, self.domain)));
+        invoice.description = Some(comment.unwrap_or(format!("Payment to {}@{}", username, self.domain)));
 
         // TODO: Get or add more information to make this a LNURLp invoice (like fetching a success action specific to the user)
         let invoice = self.store.invoice.insert(invoice).await?;
         let lnurlp_invoice = LnUrlCallback {
-            pr: invoice
-                .ln_invoice
-                .expect("should exist for ledger Lightning")
-                .bolt11,
+            pr: invoice.ln_invoice.expect("should exist for ledger Lightning").bolt11,
             success_action: Some(LnUrlSuccessAction {
                 tag: "message".to_string(),
                 message: Some("Thanks for the sats!".to_string()),

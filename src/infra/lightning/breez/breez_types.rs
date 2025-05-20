@@ -1,8 +1,8 @@
 use std::time::Duration;
 
 use breez_sdk_core::{
-    HealthCheckStatus, LNInvoice, Network as BreezNetwork, Payment as BreezPayment, PaymentDetails,
-    PaymentFailedData, PaymentStatus,
+    HealthCheckStatus, LNInvoice, Network as BreezNetwork, Payment as BreezPayment, PaymentDetails, PaymentFailedData,
+    PaymentStatus,
 };
 use chrono::{TimeZone, Utc};
 use serde_bolt::bitcoin::hashes::hex::ToHex;
@@ -32,9 +32,7 @@ impl From<LNInvoice> for Invoice {
                 payment_secret: val.payment_secret.to_hex(),
                 min_final_cltv_expiry_delta: val.min_final_cltv_expiry_delta,
                 expiry: Duration::from_secs(val.expiry),
-                expires_at: Utc
-                    .timestamp_opt((val.timestamp + val.expiry) as i64, 0)
-                    .unwrap(),
+                expires_at: Utc.timestamp_opt((val.timestamp + val.expiry) as i64, 0).unwrap(),
             }),
             ..Default::default()
         }

@@ -15,11 +15,7 @@ pub trait AuthUseCases: Send + Sync {
 
 #[async_trait]
 pub trait ApiKeyUseCases: Send + Sync {
-    async fn generate(
-        &self,
-        user: User,
-        request: CreateApiKeyRequest,
-    ) -> Result<ApiKey, ApplicationError>;
+    async fn generate(&self, user: User, request: CreateApiKeyRequest) -> Result<ApiKey, ApplicationError>;
     async fn get(&self, id: Uuid) -> Result<ApiKey, ApplicationError>;
     async fn list(&self, filter: ApiKeyFilter) -> Result<Vec<ApiKey>, ApplicationError>;
     async fn revoke(&self, id: Uuid) -> Result<(), ApplicationError>;

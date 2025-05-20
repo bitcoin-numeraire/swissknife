@@ -12,8 +12,8 @@ use crate::domains::{
 
 use super::models::{
     api_key::Model as ApiKeyModel, contact::ContactModel, invoice::Model as InvoiceModel,
-    ln_address::Model as LnAddressModel, payment::Model as PaymentModel,
-    wallet::Model as WalletModel, wallet_overview::WalletOverviewModel,
+    ln_address::Model as LnAddressModel, payment::Model as PaymentModel, wallet::Model as WalletModel,
+    wallet_overview::WalletOverviewModel,
 };
 
 const ASSERTION_MSG: &str = "should parse successfully by assertion";
@@ -34,8 +34,7 @@ impl From<InvoiceModel> for Invoice {
                 bolt11: model.bolt11.expect(ASSERTION_MSG),
                 description_hash: model.description_hash,
                 payee_pubkey: model.payee_pubkey.expect(ASSERTION_MSG),
-                min_final_cltv_expiry_delta: model.min_final_cltv_expiry_delta.expect(ASSERTION_MSG)
-                    as u64,
+                min_final_cltv_expiry_delta: model.min_final_cltv_expiry_delta.expect(ASSERTION_MSG) as u64,
                 payment_secret: model.payment_secret.expect(ASSERTION_MSG),
                 expiry: Duration::from_secs(model.expiry.expect(ASSERTION_MSG) as u64),
                 expires_at: model.expires_at.expect(ASSERTION_MSG),

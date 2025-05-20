@@ -13,10 +13,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         std::env::var("OUT_DIR").unwrap()
     );
 
-    println!(
-        "cargo:rustc-env=CARGO_PKG_VERSION={}",
-        env!("CARGO_PKG_VERSION")
-    );
+    println!("cargo:rustc-env=CARGO_PKG_VERSION={}", env!("CARGO_PKG_VERSION"));
     println!("cargo:rustc-env=BUILD_TIME={}", Utc::now().to_rfc3339());
 
     Ok(())

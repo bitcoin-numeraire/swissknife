@@ -16,20 +16,13 @@ pub trait LnClient: Sync + Send {
         expiry: u32,
         deschashonly: bool,
     ) -> Result<Invoice, LightningError>;
-    async fn pay(
-        &self,
-        bolt11: String,
-        amount_msat: Option<u64>,
-    ) -> Result<Payment, LightningError>;
+    async fn pay(&self, bolt11: String, amount_msat: Option<u64>) -> Result<Payment, LightningError>;
     async fn pay_onchain(
         &self,
         amount_sat: u64,
         recipient_address: String,
         feerate: u32,
     ) -> Result<ReverseSwapInfo, LightningError>;
-    async fn invoice_by_hash(
-        &self,
-        payment_hash: String,
-    ) -> Result<Option<Invoice>, LightningError>;
+    async fn invoice_by_hash(&self, payment_hash: String) -> Result<Option<Invoice>, LightningError>;
     async fn health(&self) -> Result<HealthStatus, LightningError>;
 }

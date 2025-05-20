@@ -26,8 +26,8 @@ pub struct LocalAuthenticator {
 
 #[derive(Debug, Serialize, Deserialize)]
 struct Claims {
-    exp: usize, // Required (validate_exp defaults to true in validation). Expiration time (as UTC timestamp)
-    iat: usize, // Optional. Issued at (as UTC timestamp)
+    exp: usize,  // Required (validate_exp defaults to true in validation). Expiration time (as UTC timestamp)
+    iat: usize,  // Optional. Issued at (as UTC timestamp)
     sub: String, // Optional. Subject (whom token refers to)
     permissions: Vec<Permission>,
 }
@@ -44,11 +44,7 @@ impl LocalAuthenticator {
 
 #[async_trait]
 impl JWTAuthenticator for LocalAuthenticator {
-    fn encode(
-        &self,
-        sub: String,
-        permissions: Vec<Permission>,
-    ) -> Result<String, AuthenticationError> {
+    fn encode(&self, sub: String, permissions: Vec<Permission>) -> Result<String, AuthenticationError> {
         let now = chrono::Utc::now().timestamp();
         let expiration = now + self.token_expiry.as_secs() as i64;
 

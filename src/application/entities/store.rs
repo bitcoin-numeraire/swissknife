@@ -9,8 +9,8 @@ use crate::{
         system::ConfigRepository, user::ApiKeyRepository, wallet::WalletRepository,
     },
     infra::database::sea_orm::{
-        SeaOrmApiKeyRepository, SeaOrmConfigRepository, SeaOrmInvoiceRepository,
-        SeaOrmLnAddressRepository, SeaOrmPaymentRepository, SeaOrmWalletRepository,
+        SeaOrmApiKeyRepository, SeaOrmConfigRepository, SeaOrmInvoiceRepository, SeaOrmLnAddressRepository,
+        SeaOrmPaymentRepository, SeaOrmWalletRepository,
     },
 };
 
