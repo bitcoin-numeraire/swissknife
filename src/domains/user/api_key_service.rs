@@ -29,28 +29,18 @@ impl ApiKeyService {
 
 #[async_trait]
 impl ApiKeyUseCases for ApiKeyService {
-    async fn generate(
-        &self,
-        user: User,
-        request: CreateApiKeyRequest,
-    ) -> Result<ApiKey, ApplicationError> {
+    async fn generate(&self, user: User, request: CreateApiKeyRequest) -> Result<ApiKey, ApplicationError> {
         debug!(user_id = request.user_id, "Generating API key");
 
         // Validate that requested permissions are a subset of user's permissions
-        if !request
-            .permissions
-            .iter()
-            .all(|p| user.has_permission(p.clone()))
-        {
+        if !request.permissions.iter().all(|p| user.has_permission(p.clone())) {
             return Err(DataError::Validation("Invalid permissions".to_string()).into());
         }
 
         let expires_at = match request.expiry {
             Some(seconds) => {
                 if seconds > MAX_ALLOWED_EXPIRY_SECONDS {
-                    return Err(
-                        DataError::Validation("Expiry too far in the future".to_string()).into(),
-                    );
+                    return Err(DataError::Validation("Expiry too far in the future".to_string()).into());
                 }
 
                 Some(Utc::now() + Duration::seconds(seconds as i64))

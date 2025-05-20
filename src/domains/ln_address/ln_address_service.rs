@@ -42,23 +42,11 @@ impl LnAddressUseCases for LnAddressService {
         username = username.to_lowercase();
         validate_username(username.as_str())?;
 
-        if self
-            .store
-            .ln_address
-            .find_by_wallet_id(wallet_id)
-            .await?
-            .is_some()
-        {
+        if self.store.ln_address.find_by_wallet_id(wallet_id).await?.is_some() {
             return Err(DataError::Conflict("Duplicate User ID.".to_string()).into());
         }
 
-        if self
-            .store
-            .ln_address
-            .find_by_username(&username)
-            .await?
-            .is_some()
-        {
+        if self.store.ln_address.find_by_username(&username).await?.is_some() {
             return Err(DataError::Conflict("Duplicate username.".to_string()).into());
         }
 
@@ -100,11 +88,7 @@ impl LnAddressUseCases for LnAddressService {
         Ok(ln_addresses)
     }
 
-    async fn update(
-        &self,
-        id: Uuid,
-        request: UpdateLnAddressRequest,
-    ) -> Result<LnAddress, ApplicationError> {
+    async fn update(&self, id: Uuid, request: UpdateLnAddressRequest) -> Result<LnAddress, ApplicationError> {
         debug!(%id, ?request, "Updating lightning address");
 
         let mut ln_address = self
@@ -120,13 +104,7 @@ impl LnAddressUseCases for LnAddressService {
             if username != ln_address.username {
                 validate_username(username.as_str())?;
 
-                if self
-                    .store
-                    .ln_address
-                    .find_by_username(&username)
-                    .await?
-                    .is_some()
-                {
+                if self.store.ln_address.find_by_username(&username).await?.is_some() {
                     return Err(DataError::Conflict("Duplicate username.".to_string()).into());
                 }
 
@@ -177,28 +155,20 @@ impl LnAddressUseCases for LnAddressService {
 
         let n_deleted = self.store.ln_address.delete_many(filter.clone()).await?;
 
-        info!(
-            ?filter,
-            n_deleted, "Lightning addresses deleted successfully"
-        );
+        info!(?filter, n_deleted, "Lightning addresses deleted successfully");
         Ok(n_deleted)
     }
 }
 
 fn validate_username(username: &str) -> Result<(), DataError> {
     if username.len() < MIN_USERNAME_LENGTH || username.len() > MAX_USERNAME_LENGTH {
-        return Err(DataError::Validation(
-            "Invalid username length.".to_string(),
-        ));
+        return Err(DataError::Validation("Invalid username length.".to_string()));
     }
 
     // Regex validation for allowed characters in username
-    let email_username_re =
-        Regex::new(r"^[a-z0-9.!#$%&'*+/=?^_`{|}~-]+$").expect("should not fail as a constant");
+    let email_username_re = Regex::new(r"^[a-z0-9.!#$%&'*+/=?^_`{|}~-]+$").expect("should not fail as a constant");
     if !email_username_re.is_match(username) {
-        return Err(DataError::Validation(
-            "Invalid username format.".to_string(),
-        ));
+        return Err(DataError::Validation("Invalid username format.".to_string()));
     }
 
     Ok(())

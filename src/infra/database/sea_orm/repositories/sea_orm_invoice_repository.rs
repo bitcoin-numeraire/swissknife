@@ -6,8 +6,8 @@ use crate::{
 use async_trait::async_trait;
 use chrono::Utc;
 use sea_orm::{
-    sea_query::Expr, ActiveModelTrait, ColumnTrait, Condition, DatabaseConnection, EntityTrait,
-    QueryFilter, QueryOrder, QuerySelect, QueryTrait, Set, Unchanged,
+    sea_query::Expr, ActiveModelTrait, ColumnTrait, Condition, DatabaseConnection, EntityTrait, QueryFilter,
+    QueryOrder, QuerySelect, QueryTrait, Set, Unchanged,
 };
 use uuid::Uuid;
 
@@ -33,10 +33,7 @@ impl InvoiceRepository for SeaOrmInvoiceRepository {
         Ok(model.map(Into::into))
     }
 
-    async fn find_by_payment_hash(
-        &self,
-        payment_hash: &str,
-    ) -> Result<Option<Invoice>, DatabaseError> {
+    async fn find_by_payment_hash(&self, payment_hash: &str) -> Result<Option<Invoice>, DatabaseError> {
         let model = Entity::find()
             .filter(Column::PaymentHash.eq(payment_hash))
             .one(&self.db)
@@ -54,9 +51,7 @@ impl InvoiceRepository for SeaOrmInvoiceRepository {
         };
 
         let models = Entity::find()
-            .apply_if(filter.wallet_id, |q, wallet| {
-                q.filter(Column::WalletId.eq(wallet))
-            })
+            .apply_if(filter.wallet_id, |q, wallet| q.filter(Column::WalletId.eq(wallet)))
             .apply_if(filter.ids, |q, ids| q.filter(Column::Id.is_in(ids)))
             .apply_if(filter.status, |q, s| match s {
                 InvoiceStatus::Pending => q.filter(
@@ -71,9 +66,7 @@ impl InvoiceRepository for SeaOrmInvoiceRepository {
                         .add(Expr::col(Column::PaymentTime).is_null()),
                 ),
             })
-            .apply_if(filter.ledger, |q, l| {
-                q.filter(Column::Ledger.eq(l.to_string()))
-            })
+            .apply_if(filter.ledger, |q, l| q.filter(Column::Ledger.eq(l.to_string())))
             .order_by(order_by_column, filter.order_direction.into())
             .offset(filter.offset)
             .limit(filter.limit)
@@ -100,16 +93,13 @@ impl InvoiceRepository for SeaOrmInvoiceRepository {
         };
 
         if invoice.ledger == Ledger::Lightning {
-            let ln_invoice = invoice
-                .ln_invoice
-                .expect("should exist for ledger Lightning");
+            let ln_invoice = invoice.ln_invoice.expect("should exist for ledger Lightning");
             model.bolt11 = Set(ln_invoice.bolt11.into());
             model.payee_pubkey = Set(ln_invoice.payee_pubkey.into());
             model.payment_hash = Set(ln_invoice.payment_hash.into());
             model.description_hash = Set(ln_invoice.description_hash);
             model.payment_secret = Set(ln_invoice.payment_secret.into());
-            model.min_final_cltv_expiry_delta =
-                Set((ln_invoice.min_final_cltv_expiry_delta as i64).into());
+            model.min_final_cltv_expiry_delta = Set((ln_invoice.min_final_cltv_expiry_delta as i64).into());
             model.expiry = Set((ln_invoice.expiry.as_secs() as i64).into());
             model.expires_at = Set(Some(ln_invoice.expires_at));
         }
@@ -144,9 +134,7 @@ impl InvoiceRepository for SeaOrmInvoiceRepository {
 
     async fn delete_many(&self, filter: InvoiceFilter) -> Result<u64, DatabaseError> {
         let result = Entity::delete_many()
-            .apply_if(filter.wallet_id, |q, wallet| {
-                q.filter(Column::WalletId.eq(wallet))
-            })
+            .apply_if(filter.wallet_id, |q, wallet| q.filter(Column::WalletId.eq(wallet)))
             .apply_if(filter.ids, |q, ids| q.filter(Column::Id.is_in(ids)))
             .apply_if(filter.status, |q, status| match status {
                 InvoiceStatus::Pending => q.filter(
@@ -161,9 +149,7 @@ impl InvoiceRepository for SeaOrmInvoiceRepository {
                         .add(Expr::col(Column::PaymentTime).is_null()),
                 ),
             })
-            .apply_if(filter.ledger, |q, l| {
-                q.filter(Column::Ledger.eq(l.to_string()))
-            })
+            .apply_if(filter.ledger, |q, l| q.filter(Column::Ledger.eq(l.to_string())))
             .exec(&self.db)
             .await
             .map_err(|e| DatabaseError::Delete(e.to_string()))?;

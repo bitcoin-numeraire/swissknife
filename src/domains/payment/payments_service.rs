@@ -33,12 +33,7 @@ pub struct PaymentService {
 }
 
 impl PaymentService {
-    pub fn new(
-        store: AppStore,
-        ln_client: Arc<dyn LnClient>,
-        domain: String,
-        fee_buffer: f64,
-    ) -> Self {
+    pub fn new(store: AppStore, ln_client: Arc<dyn LnClient>, domain: String, fee_buffer: f64) -> Self {
         PaymentService {
             store,
             ln_client,
@@ -52,9 +47,7 @@ impl PaymentService {
     pub(crate) fn validate_amount(amount_msat: Option<u64>) -> Result<u64, ApplicationError> {
         let amount = amount_msat.unwrap_or_default();
         if amount == 0 {
-            return Err(
-                DataError::Validation("Amount must be greater than zero".to_string()).into(),
-            );
+            return Err(DataError::Validation("Amount must be greater than zero".to_string()).into());
         }
 
         Ok(amount)
@@ -70,9 +63,7 @@ impl PaymentService {
         let amount = Self::validate_amount(amount_msat)?;
         debug!(%wallet_id, %amount, ledger="Internal", "Sending internal payment");
 
-        let (username, _) = input
-            .split_once('@')
-            .expect("should not fail or malformed LN address");
+        let (username, _) = input.split_once('@').expect("should not fail or malformed LN address");
 
         let address_opt = self.store.ln_address.find_by_username(username).await?;
         match address_opt {
@@ -115,8 +106,7 @@ impl PaymentService {
                             wallet_id,
                             amount_msat: amount,
                             status: PaymentStatus::Settled,
-                            description: comment
-                                .or(DEFAULT_INTERNAL_PAYMENT_DESCRIPTION.to_string().into()),
+                            description: comment.or(DEFAULT_INTERNAL_PAYMENT_DESCRIPTION.to_string().into()),
                             fee_msat: Some(0),
                             payment_time: Some(curr_time),
                             ledger: Ledger::Internal,
@@ -147,31 +137,20 @@ impl PaymentService {
     ) -> Result<Payment, ApplicationError> {
         let specified_amount = invoice.amount_msat.or(amount_msat);
         if specified_amount == Some(0) {
-            return Err(
-                DataError::Validation("Amount must be greater than zero.".to_string()).into(),
-            );
+            return Err(DataError::Validation("Amount must be greater than zero.".to_string()).into());
         }
 
         if let Some(amount) = specified_amount {
             // Check if internal payment
-            let invoice_opt = self
-                .store
-                .invoice
-                .find_by_payment_hash(&invoice.payment_hash)
-                .await?;
+            let invoice_opt = self.store.invoice.find_by_payment_hash(&invoice.payment_hash).await?;
             if let Some(mut retrieved_invoice) = invoice_opt {
                 if retrieved_invoice.wallet_id == wallet_id {
-                    return Err(
-                        DataError::Validation("Cannot pay for own invoice.".to_string()).into(),
-                    );
+                    return Err(DataError::Validation("Cannot pay for own invoice.".to_string()).into());
                 }
 
                 match retrieved_invoice.status {
                     InvoiceStatus::Settled => {
-                        return Err(DataError::Validation(
-                            "Invoice has already been paid.".to_string(),
-                        )
-                        .into());
+                        return Err(DataError::Validation("Invoice has already been paid.".to_string()).into());
                     }
                     InvoiceStatus::Expired => {
                         return Err(DataError::Validation("Invoice is expired.".to_string()).into());
@@ -240,13 +219,9 @@ impl PaymentService {
                 )
                 .await;
 
-            self.handle_processed_payment(pending_payment, result, None)
-                .await
+            self.handle_processed_payment(pending_payment, result, None).await
         } else {
-            Err(DataError::Validation(
-                "Amount must be defined for zero-amount invoices.".to_string(),
-            )
-            .into())
+            Err(DataError::Validation("Amount must be defined for zero-amount invoices.".to_string()).into())
         }
     }
 
@@ -292,11 +267,7 @@ impl PaymentService {
             .await
     }
 
-    async fn insert_payment(
-        &self,
-        payment: Payment,
-        fee_buffer: f64,
-    ) -> Result<Payment, ApplicationError> {
+    async fn insert_payment(&self, payment: Payment, fee_buffer: f64) -> Result<Payment, ApplicationError> {
         let txn = self.store.begin().await?;
 
         let balance = self
@@ -332,10 +303,7 @@ impl PaymentService {
                 settled_payment.status = PaymentStatus::Settled;
 
                 let success_action = match success_action {
-                    Some(sa) => process_success_action(
-                        sa,
-                        settled_payment.payment_preimage.as_ref().unwrap(),
-                    ),
+                    Some(sa) => process_success_action(sa, settled_payment.payment_preimage.as_ref().unwrap()),
                     None => None,
                 };
 
@@ -398,22 +366,15 @@ impl PaymentsUseCases for PaymentService {
         debug!(%input, %wallet_id, "Received pay request");
 
         let payment = if self.is_internal_payment(&input) {
-            self.send_internal(input, amount_msat, comment, wallet_id)
-                .await
+            self.send_internal(input, amount_msat, comment, wallet_id).await
         } else {
             let input_type = parse(&input)
                 .await
                 .map_err(|err| DataError::Validation(err.to_string()))?;
 
             match input_type {
-                InputType::Bolt11 { invoice } => {
-                    self.send_bolt11(invoice, amount_msat, comment, wallet_id)
-                        .await
-                }
-                InputType::LnUrlPay { data } => {
-                    self.send_lnurl_pay(data, amount_msat, comment, wallet_id)
-                        .await
-                }
+                InputType::Bolt11 { invoice } => self.send_bolt11(invoice, amount_msat, comment, wallet_id).await,
+                InputType::LnUrlPay { data } => self.send_lnurl_pay(data, amount_msat, comment, wallet_id).await,
                 InputType::LnUrlError { data } => Err(DataError::Validation(data.reason).into()),
                 _ => Err(DataError::Validation("Unsupported payment input".to_string()).into()),
             }

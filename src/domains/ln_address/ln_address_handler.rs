@@ -12,8 +12,8 @@ use uuid::Uuid;
 use crate::{
     application::{
         docs::{
-            BAD_REQUEST_EXAMPLE, FORBIDDEN_EXAMPLE, INTERNAL_EXAMPLE, NOT_FOUND_EXAMPLE,
-            UNAUTHORIZED_EXAMPLE, UNPROCESSABLE_EXAMPLE,
+            BAD_REQUEST_EXAMPLE, FORBIDDEN_EXAMPLE, INTERNAL_EXAMPLE, NOT_FOUND_EXAMPLE, UNAUTHORIZED_EXAMPLE,
+            UNPROCESSABLE_EXAMPLE,
         },
         dtos::{ErrorResponse, RegisterLnAddressRequest, UpdateLnAddressRequest},
         errors::ApplicationError,
@@ -228,10 +228,6 @@ async fn delete_addresses(
 ) -> Result<Json<u64>, ApplicationError> {
     user.check_permission(Permission::WriteLnAddress)?;
 
-    let n_deleted = app_state
-        .services
-        .ln_address
-        .delete_many(query_params)
-        .await?;
+    let n_deleted = app_state.services.ln_address.delete_many(query_params).await?;
     Ok(n_deleted.into())
 }

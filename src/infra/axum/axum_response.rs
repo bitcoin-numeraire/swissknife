@@ -7,13 +7,10 @@ use tracing::{debug, error, trace, warn};
 
 use crate::application::{
     dtos::ErrorResponse,
-    errors::{
-        ApplicationError, AuthenticationError, AuthorizationError, DataError, LightningError,
-    },
+    errors::{ApplicationError, AuthenticationError, AuthorizationError, DataError, LightningError},
 };
 
-const INTERNAL_SERVER_ERROR_MSG: &str =
-    "Internal server error, Please contact your administrator or try later";
+const INTERNAL_SERVER_ERROR_MSG: &str = "Internal server error, Please contact your administrator or try later";
 
 impl IntoResponse for ApplicationError {
     fn into_response(self) -> Response {
@@ -36,9 +33,7 @@ impl IntoResponse for ApplicationError {
 impl IntoResponse for AuthorizationError {
     fn into_response(self) -> Response {
         let error_message = match self {
-            AuthorizationError::MissingPermission(_) => {
-                "Access denied due to insufficient permissions"
-            }
+            AuthorizationError::MissingPermission(_) => "Access denied due to insufficient permissions",
         };
 
         warn!("{}", self);
@@ -80,9 +75,7 @@ impl IntoResponse for AuthenticationError {
         // Add WWW-Authenticate header if needed
         if !header_message.is_empty() {
             if let Ok(header_value) = HeaderValue::from_str(header_message) {
-                response
-                    .headers_mut()
-                    .insert(WWW_AUTHENTICATE, header_value);
+                response.headers_mut().insert(WWW_AUTHENTICATE, header_value);
             } else {
                 error!("Failed to create WWW-Authenticate header");
             }
@@ -136,10 +129,7 @@ impl IntoResponse for LightningError {
             }
             _ => {
                 error!("{}", self);
-                (
-                    INTERNAL_SERVER_ERROR_MSG.to_string(),
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                )
+                (INTERNAL_SERVER_ERROR_MSG.to_string(), StatusCode::INTERNAL_SERVER_ERROR)
             }
         };
 

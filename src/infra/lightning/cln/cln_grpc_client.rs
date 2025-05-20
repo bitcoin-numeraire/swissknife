@@ -13,9 +13,7 @@ use cln::{node_client::NodeClient, Amount, GetinfoRequest, ListinvoicesRequest, 
 
 use crate::{
     application::errors::LightningError,
-    domains::{
-        invoice::Invoice, ln_node::LnEventsUseCases, payment::Payment, system::HealthStatus,
-    },
+    domains::{invoice::Invoice, ln_node::LnEventsUseCases, payment::Payment, system::HealthStatus},
     infra::{config::config_rs::deserialize_duration, lightning::LnClient},
 };
 
@@ -51,10 +49,7 @@ pub struct ClnGrpcClient {
 }
 
 impl ClnGrpcClient {
-    pub async fn new(
-        config: ClnClientConfig,
-        ln_events: Arc<dyn LnEventsUseCases>,
-    ) -> Result<Self, LightningError> {
+    pub async fn new(config: ClnClientConfig, ln_events: Arc<dyn LnEventsUseCases>) -> Result<Self, LightningError> {
         let (identity, ca_certificate) = Self::read_certificates(&config.certs_dir)
             .await
             .map_err(|e| LightningError::ReadCertificates(e.to_string()))?;
@@ -135,9 +130,7 @@ impl LnClient for ClnGrpcClient {
                 label: Uuid::new_v4().to_string(),
                 deschashonly: Some(deschashonly),
                 amount_msat: Some(cln::AmountOrAny {
-                    value: Some(cln::amount_or_any::Value::Amount(cln::Amount {
-                        msat: amount_msat,
-                    })),
+                    value: Some(cln::amount_or_any::Value::Amount(cln::Amount { msat: amount_msat })),
                 }),
                 ..Default::default()
             })
@@ -150,11 +143,7 @@ impl LnClient for ClnGrpcClient {
         Ok(bolt11.into())
     }
 
-    async fn pay(
-        &self,
-        bolt11: String,
-        amount_msat: Option<u64>,
-    ) -> Result<Payment, LightningError> {
+    async fn pay(&self, bolt11: String, amount_msat: Option<u64>) -> Result<Payment, LightningError> {
         let mut client = self.client.clone();
 
         let response = client
@@ -174,10 +163,7 @@ impl LnClient for ClnGrpcClient {
         Ok(response.into())
     }
 
-    async fn invoice_by_hash(
-        &self,
-        payment_hash: String,
-    ) -> Result<Option<Invoice>, LightningError> {
+    async fn invoice_by_hash(&self, payment_hash: String) -> Result<Option<Invoice>, LightningError> {
         let mut client = self.client.clone();
 
         let response = client

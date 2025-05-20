@@ -26,11 +26,7 @@ pub struct AuthService {
 }
 
 impl AuthService {
-    pub fn new(
-        jwt_authenticator: Arc<dyn JWTAuthenticator>,
-        store: AppStore,
-        provider: AuthProvider,
-    ) -> Self {
+    pub fn new(jwt_authenticator: Arc<dyn JWTAuthenticator>, store: AppStore, provider: AuthProvider) -> Self {
         AuthService {
             jwt_authenticator,
             store,
@@ -52,8 +48,7 @@ impl AuthUseCases for AuthService {
             return Err(DataError::Conflict("Admin user already created".into()).into());
         }
 
-        let password_hash =
-            hash(&password, DEFAULT_COST).map_err(|e| AuthenticationError::Hash(e.to_string()))?;
+        let password_hash = hash(&password, DEFAULT_COST).map_err(|e| AuthenticationError::Hash(e.to_string()))?;
 
         self.store
             .config
@@ -76,13 +71,11 @@ impl AuthUseCases for AuthService {
         }
         match self.store.config.find(PASSWORD_HASH_KEY).await? {
             Some(password_hash) => {
-                let password_hash_str = password_hash.as_str().ok_or_else(|| {
-                    DataError::Inconsistency("Expected string in password hash".to_string())
-                })?;
+                let password_hash_str = password_hash
+                    .as_str()
+                    .ok_or_else(|| DataError::Inconsistency("Expected string in password hash".to_string()))?;
 
-                if !verify(password, password_hash_str)
-                    .map_err(|e| AuthenticationError::Hash(e.to_string()))?
-                {
+                if !verify(password, password_hash_str).map_err(|e| AuthenticationError::Hash(e.to_string()))? {
                     return Err(AuthenticationError::InvalidCredentials.into());
                 }
 
@@ -142,10 +135,7 @@ impl AuthUseCases for AuthService {
         let wallet = match wallet_opt {
             Some(wallet) => wallet,
             None => {
-                return Err(DataError::Inconsistency(
-                    "Existing API key without wallet".to_string(),
-                )
-                .into());
+                return Err(DataError::Inconsistency("Existing API key without wallet".to_string()).into());
             }
         };
 

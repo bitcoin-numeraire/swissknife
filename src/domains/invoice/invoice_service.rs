@@ -123,9 +123,7 @@ impl InvoiceUseCases for InvoiceService {
     async fn sync(&self) -> Result<u32, ApplicationError> {
         trace!(ln_provider = %self.ln_provider, "Syncing invoices...");
 
-        if self.ln_provider != LightningProvider::ClnRest
-            && self.ln_provider != LightningProvider::Lnd
-        {
+        if self.ln_provider != LightningProvider::ClnRest && self.ln_provider != LightningProvider::Lnd {
             debug!("Lightning provider does not need initial syncing");
             return Ok(0);
         }
@@ -154,9 +152,7 @@ impl InvoiceUseCases for InvoiceService {
             })
             .await?;
 
-        let invoices = pending_invoices
-            .into_iter()
-            .chain(expired_invoices.into_iter());
+        let invoices = pending_invoices.into_iter().chain(expired_invoices.into_iter());
 
         for invoice in invoices {
             let payment_hash = invoice

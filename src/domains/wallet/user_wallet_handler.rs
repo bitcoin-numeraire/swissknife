@@ -10,14 +10,11 @@ use uuid::Uuid;
 
 use crate::{
     application::{
-        docs::{
-            BAD_REQUEST_EXAMPLE, INTERNAL_EXAMPLE, NOT_FOUND_EXAMPLE, UNAUTHORIZED_EXAMPLE,
-            UNPROCESSABLE_EXAMPLE,
-        },
+        docs::{BAD_REQUEST_EXAMPLE, INTERNAL_EXAMPLE, NOT_FOUND_EXAMPLE, UNAUTHORIZED_EXAMPLE, UNPROCESSABLE_EXAMPLE},
         dtos::{
-            ApiKeyResponse, CreateApiKeyRequest, ErrorResponse, InvoiceResponse, NewInvoiceRequest,
-            PaymentResponse, RegisterLnAddressRequest, SendPaymentRequest, UpdateLnAddressRequest,
-            WalletLnAddressResponse, WalletResponse,
+            ApiKeyResponse, CreateApiKeyRequest, ErrorResponse, InvoiceResponse, NewInvoiceRequest, PaymentResponse,
+            RegisterLnAddressRequest, SendPaymentRequest, UpdateLnAddressRequest, WalletLnAddressResponse,
+            WalletResponse,
         },
         errors::{ApplicationError, DataError},
     },
@@ -126,12 +123,7 @@ async fn wallet_pay(
     let payment = app_state
         .services
         .payment
-        .pay(
-            payload.input,
-            payload.amount_msat,
-            payload.comment,
-            user.wallet_id,
-        )
+        .pay(payload.input, payload.amount_msat, payload.comment, user.wallet_id)
         .await?;
 
     Ok(Json(payment.into()))
@@ -155,11 +147,7 @@ async fn get_wallet_balance(
     State(app_state): State<Arc<AppState>>,
     user: User,
 ) -> Result<Json<Balance>, ApplicationError> {
-    let balance = app_state
-        .services
-        .wallet
-        .get_balance(user.wallet_id)
-        .await?;
+    let balance = app_state.services.wallet.get_balance(user.wallet_id).await?;
     Ok(balance.into())
 }
 
@@ -188,12 +176,7 @@ async fn new_wallet_invoice(
     let invoice = app_state
         .services
         .invoice
-        .invoice(
-            user.wallet_id,
-            payload.amount_msat,
-            payload.description,
-            payload.expiry,
-        )
+        .invoice(user.wallet_id, payload.amount_msat, payload.description, payload.expiry)
         .await?;
 
     Ok(Json(invoice.into()))
@@ -304,11 +287,7 @@ async fn update_wallet_address(
         .cloned()
         .ok_or_else(|| DataError::NotFound("LN Address not found.".to_string()))?;
 
-    let ln_address = app_state
-        .services
-        .ln_address
-        .update(ln_address.id, payload)
-        .await?;
+    let ln_address = app_state.services.ln_address.update(ln_address.id, payload).await?;
 
     Ok(ln_address.into())
 }
@@ -329,10 +308,7 @@ async fn update_wallet_address(
         (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
     )
 )]
-async fn delete_wallet_address(
-    State(app_state): State<Arc<AppState>>,
-    user: User,
-) -> Result<(), ApplicationError> {
+async fn delete_wallet_address(State(app_state): State<Arc<AppState>>, user: User) -> Result<(), ApplicationError> {
     let n_deleted = app_state
         .services
         .ln_address
@@ -504,11 +480,7 @@ async fn list_contacts(
     State(app_state): State<Arc<AppState>>,
     user: User,
 ) -> Result<Json<Vec<Contact>>, ApplicationError> {
-    let contacts = app_state
-        .services
-        .wallet
-        .list_contacts(user.wallet_id)
-        .await?;
+    let contacts = app_state.services.wallet.list_contacts(user.wallet_id).await?;
     Ok(contacts.into())
 }
 

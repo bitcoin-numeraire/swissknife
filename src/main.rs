@@ -50,10 +50,7 @@ async fn main() {
     }
 
     let app = Server::new(app_state.clone(), &config.dashboard_dir);
-    if let Err(err) = app
-        .start(&config.web.addr, shutdown_signal(app_state.clone()))
-        .await
-    {
+    if let Err(err) = app.start(&config.web.addr, shutdown_signal(app_state.clone())).await {
         error!(%err, "failed to start API server");
         exit(1);
     }

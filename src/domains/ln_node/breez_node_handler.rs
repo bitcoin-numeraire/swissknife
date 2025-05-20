@@ -13,14 +13,10 @@ use utoipa::OpenApi;
 
 use crate::{
     application::{
-        docs::{
-            BAD_REQUEST_EXAMPLE, FORBIDDEN_EXAMPLE, INTERNAL_EXAMPLE, NOT_FOUND_EXAMPLE,
-            UNAUTHORIZED_EXAMPLE,
-        },
+        docs::{BAD_REQUEST_EXAMPLE, FORBIDDEN_EXAMPLE, INTERNAL_EXAMPLE, NOT_FOUND_EXAMPLE, UNAUTHORIZED_EXAMPLE},
         dtos::{
-            CheckMessageRequest, CheckMessageResponse, ConnectLSPRequest, ErrorResponse,
-            RedeemOnchainRequest, RedeemOnchainResponse, SendOnchainPaymentRequest,
-            SignMessageRequest, SignMessageResponse,
+            CheckMessageRequest, CheckMessageResponse, ConnectLSPRequest, ErrorResponse, RedeemOnchainRequest,
+            RedeemOnchainResponse, SendOnchainPaymentRequest, SignMessageRequest, SignMessageResponse,
         },
         errors::{ApplicationError, LightningError},
     },
@@ -69,10 +65,7 @@ pub fn breez_node_router() -> Router<Arc<AppState>> {
         (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
     )
 )]
-async fn node_info(
-    State(app_state): State<Arc<AppState>>,
-    user: User,
-) -> Result<Json<NodeState>, ApplicationError> {
+async fn node_info(State(app_state): State<Arc<AppState>>, user: User) -> Result<Json<NodeState>, ApplicationError> {
     user.check_permission(Permission::ReadLnNode)?;
 
     let client = app_state.ln_node_client.as_breez_client()?;
@@ -219,11 +212,7 @@ async fn swap(
 
     let client = app_state.ln_node_client.as_breez_client()?;
     let payment_info = client
-        .pay_onchain(
-            payload.amount_msat,
-            payload.recipient_address,
-            payload.feerate,
-        )
+        .pay_onchain(payload.amount_msat, payload.recipient_address, payload.feerate)
         .await?;
 
     Ok(payment_info.into())
@@ -254,9 +243,7 @@ async fn redeem(
     user.check_permission(Permission::WriteLnNode)?;
 
     let client = app_state.ln_node_client.as_breez_client()?;
-    let txid = client
-        .redeem_onchain(payload.to_address, payload.feerate)
-        .await?;
+    let txid = client.redeem_onchain(payload.to_address, payload.feerate).await?;
 
     Ok(RedeemOnchainResponse { txid }.into())
 }
@@ -362,10 +349,7 @@ async fn sync(State(app_state): State<Arc<AppState>>, user: User) -> Result<(), 
         (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
     )
 )]
-async fn backup(
-    State(app_state): State<Arc<AppState>>,
-    user: User,
-) -> Result<Response, ApplicationError> {
+async fn backup(State(app_state): State<Arc<AppState>>, user: User) -> Result<Response, ApplicationError> {
     user.check_permission(Permission::ReadLnNode)?;
 
     let client = app_state.ln_node_client.as_breez_client()?;

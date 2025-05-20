@@ -6,8 +6,8 @@ use crate::{
 use async_trait::async_trait;
 use chrono::Utc;
 use sea_orm::{
-    sea_query::Expr, ActiveModelTrait, ColumnTrait, Condition, DatabaseConnection, EntityTrait,
-    QueryFilter, QueryOrder, QuerySelect, QueryTrait, Set,
+    sea_query::Expr, ActiveModelTrait, ColumnTrait, Condition, DatabaseConnection, EntityTrait, QueryFilter,
+    QueryOrder, QuerySelect, QueryTrait, Set,
 };
 use uuid::Uuid;
 
@@ -63,8 +63,8 @@ impl ApiKeyRepository for SeaOrmApiKeyRepository {
     }
 
     async fn insert(&self, api_key: ApiKey) -> Result<ApiKey, DatabaseError> {
-        let permissions_json = serde_json::to_value(&api_key.permissions)
-            .map_err(|e| DatabaseError::Insert(e.to_string()))?;
+        let permissions_json =
+            serde_json::to_value(&api_key.permissions).map_err(|e| DatabaseError::Insert(e.to_string()))?;
 
         let model = ActiveModel {
             id: Set(Uuid::new_v4()),

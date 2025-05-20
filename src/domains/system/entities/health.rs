@@ -22,8 +22,7 @@ pub enum HealthStatus {
 
 impl HealthCheck {
     pub fn new(database: HealthStatus, ln_provider: HealthStatus) -> Self {
-        let is_healthy =
-            database == HealthStatus::Operational && ln_provider == HealthStatus::Operational;
+        let is_healthy = database == HealthStatus::Operational && ln_provider == HealthStatus::Operational;
         Self {
             database,
             ln_provider,

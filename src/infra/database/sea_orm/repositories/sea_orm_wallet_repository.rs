@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use sea_orm::{
-    sea_query::Expr, ActiveModelTrait, ActiveValue::Set, ColumnTrait, DatabaseConnection,
-    DatabaseTransaction, EntityTrait, ModelTrait, QueryFilter, QueryOrder, QuerySelect, QueryTrait,
+    sea_query::Expr, ActiveModelTrait, ActiveValue::Set, ColumnTrait, DatabaseConnection, DatabaseTransaction,
+    EntityTrait, ModelTrait, QueryFilter, QueryOrder, QuerySelect, QueryTrait,
 };
 use uuid::Uuid;
 
@@ -107,10 +107,7 @@ impl WalletRepository for SeaOrmWalletRepository {
             .column_as(PaymentColumn::FeeMsat.sum(), "fees_paid_msat")
             .column_as(PaymentColumn::Id.count(), "n_payments")
             .column_as(InvoiceColumn::Id.count(), "n_invoices")
-            .column_as(
-                Expr::col(PaymentColumn::LnAddress).count_distinct(),
-                "n_contacts",
-            )
+            .column_as(Expr::col(PaymentColumn::LnAddress).count_distinct(), "n_contacts")
             .group_by(Column::Id)
             .group_by(Column::UserId)
             .group_by(Column::CreatedAt)
@@ -148,11 +145,7 @@ impl WalletRepository for SeaOrmWalletRepository {
         Ok(model.into())
     }
 
-    async fn get_balance(
-        &self,
-        txn: Option<&DatabaseTransaction>,
-        id: Uuid,
-    ) -> Result<Balance, DatabaseError> {
+    async fn get_balance(&self, txn: Option<&DatabaseTransaction>, id: Uuid) -> Result<Balance, DatabaseError> {
         let received = Invoice::find()
             .filter(InvoiceColumn::WalletId.eq(id))
             .select_only()
@@ -161,10 +154,9 @@ impl WalletRepository for SeaOrmWalletRepository {
 
         let sent = Payment::find()
             .filter(PaymentColumn::WalletId.eq(id))
-            .filter(PaymentColumn::Status.is_in([
-                PaymentStatus::Settled.to_string(),
-                PaymentStatus::Pending.to_string(),
-            ]))
+            .filter(
+                PaymentColumn::Status.is_in([PaymentStatus::Settled.to_string(), PaymentStatus::Pending.to_string()]),
+            )
             .select_only()
             .column_as(PaymentColumn::AmountMsat.sum(), "sent_msat")
             .column_as(PaymentColumn::FeeMsat.sum(), "fees_paid_msat")

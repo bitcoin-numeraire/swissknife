@@ -9,9 +9,7 @@ use tracing::{debug, error, info, trace, warn};
 use crate::{
     application::errors::ApplicationError,
     domains::ln_node::LnEventsUseCases,
-    infra::lightning::cln::cln::{
-        waitanyinvoice_response::WaitanyinvoiceStatus, ListinvoicesRequest,
-    },
+    infra::lightning::cln::cln::{waitanyinvoice_response::WaitanyinvoiceStatus, ListinvoicesRequest},
 };
 
 use super::cln::{node_client::NodeClient, WaitanyinvoiceRequest};
@@ -40,10 +38,7 @@ pub async fn listen_invoices(
                 .into_inner()
                 .invoices;
 
-            invoices
-                .into_iter()
-                .next()
-                .map(|invoice| invoice.pay_index())
+            invoices.into_iter().next().map(|invoice| invoice.pay_index())
         }
         None => Some(0),
     };
@@ -97,10 +92,7 @@ pub async fn listen_invoices(
                 | Code::Internal
                 | Code::FailedPrecondition
                 | Code::Unavailable => {
-                    error!(
-                        err = err.message(),
-                        "Error waiting for invoice. Retrying..."
-                    );
+                    error!(err = err.message(), "Error waiting for invoice. Retrying...");
                     sleep(retry_delay).await;
                 }
                 _ => {

@@ -107,9 +107,7 @@ async fn version_check(State(app_state): State<Arc<AppState>>) -> Json<VersionIn
         (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
     )
 )]
-async fn setup_check(
-    State(app_state): State<Arc<AppState>>,
-) -> Result<Json<SetupInfo>, ApplicationError> {
+async fn setup_check(State(app_state): State<Arc<AppState>>) -> Result<Json<SetupInfo>, ApplicationError> {
     let info = app_state.services.system.setup_check().await?;
     Ok(info.into())
 }
@@ -127,9 +125,7 @@ async fn setup_check(
         (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
     )
 )]
-async fn mark_welcome_complete(
-    State(app_state): State<Arc<AppState>>,
-) -> Result<impl IntoResponse, ApplicationError> {
+async fn mark_welcome_complete(State(app_state): State<Arc<AppState>>) -> Result<impl IntoResponse, ApplicationError> {
     app_state.services.system.mark_welcome_complete().await?;
     Ok(StatusCode::NO_CONTENT)
 }

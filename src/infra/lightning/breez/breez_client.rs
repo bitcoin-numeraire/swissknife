@@ -7,18 +7,15 @@ use uuid::Uuid;
 use async_trait::async_trait;
 use bip39::Mnemonic;
 use breez_sdk_core::{
-    BreezServices, CheckMessageRequest, ConnectRequest, EnvironmentType, GreenlightCredentials,
-    GreenlightNodeConfig, LspInformation, NodeConfig, NodeState, PayOnchainRequest,
-    PrepareOnchainPaymentRequest, PrepareRedeemOnchainFundsRequest, ReceivePaymentRequest,
-    RedeemOnchainFundsRequest, ReverseSwapInfo, SendPaymentRequest, SignMessageRequest,
-    StaticBackupRequest, SwapAmountType,
+    BreezServices, CheckMessageRequest, ConnectRequest, EnvironmentType, GreenlightCredentials, GreenlightNodeConfig,
+    LspInformation, NodeConfig, NodeState, PayOnchainRequest, PrepareOnchainPaymentRequest,
+    PrepareRedeemOnchainFundsRequest, ReceivePaymentRequest, RedeemOnchainFundsRequest, ReverseSwapInfo,
+    SendPaymentRequest, SignMessageRequest, StaticBackupRequest, SwapAmountType,
 };
 
 use crate::{
     application::errors::LightningError,
-    domains::{
-        invoice::Invoice, ln_node::LnEventsUseCases, payment::Payment, system::HealthStatus,
-    },
+    domains::{invoice::Invoice, ln_node::LnEventsUseCases, payment::Payment, system::HealthStatus},
     infra::lightning::LnClient,
 };
 
@@ -44,10 +41,7 @@ pub struct BreezClient {
 }
 
 impl BreezClient {
-    pub async fn new(
-        config: BreezClientConfig,
-        ln_events: Arc<dyn LnEventsUseCases>,
-    ) -> Result<Self, LightningError> {
+    pub async fn new(config: BreezClientConfig, ln_events: Arc<dyn LnEventsUseCases>) -> Result<Self, LightningError> {
         if config.log_in_file {
             BreezServices::init_logging(&config.working_dir, None)
                 .map_err(|e| LightningError::Logging(e.to_string()))?;
@@ -71,8 +65,7 @@ impl BreezClient {
         );
         breez_config.working_dir.clone_from(&config.working_dir);
 
-        let seed =
-            Mnemonic::parse(config.seed).map_err(|e| LightningError::ParseSeed(e.to_string()))?;
+        let seed = Mnemonic::parse(config.seed).map_err(|e| LightningError::ParseSeed(e.to_string()))?;
 
         let listener = BreezListener::new(ln_events);
 
@@ -108,9 +101,7 @@ impl BreezClient {
         let node_info = self
             .sdk
             .node_info()
-            .map_err(|e: breez_sdk_core::error::SdkError| {
-                LightningError::NodeInfo(e.to_string())
-            })?;
+            .map_err(|e: breez_sdk_core::error::SdkError| LightningError::NodeInfo(e.to_string()))?;
 
         Ok(node_info)
     }
@@ -145,11 +136,7 @@ impl BreezClient {
         Ok(tx_ids)
     }
 
-    pub async fn redeem_onchain(
-        &self,
-        to_address: String,
-        feerate: u32,
-    ) -> Result<String, LightningError> {
+    pub async fn redeem_onchain(&self, to_address: String, feerate: u32) -> Result<String, LightningError> {
         let prepare_res = self
             .sdk
             .prepare_redeem_onchain_funds(PrepareRedeemOnchainFundsRequest {
@@ -213,10 +200,7 @@ impl BreezClient {
     }
 
     pub async fn sync(&self) -> Result<(), LightningError> {
-        self.sdk
-            .sync()
-            .await
-            .map_err(|e| LightningError::Sync(e.to_string()))
+        self.sdk.sync().await.map_err(|e| LightningError::Sync(e.to_string()))
     }
 
     pub fn backup(&self) -> Result<Option<Vec<String>>, LightningError> {
@@ -269,11 +253,7 @@ impl LnClient for BreezClient {
         Ok(response.ln_invoice.into())
     }
 
-    async fn pay(
-        &self,
-        bolt11: String,
-        amount_msat: Option<u64>,
-    ) -> Result<Payment, LightningError> {
+    async fn pay(&self, bolt11: String, amount_msat: Option<u64>) -> Result<Payment, LightningError> {
         let response = self
             .sdk
             .send_payment(SendPaymentRequest {
@@ -332,10 +312,7 @@ impl LnClient for BreezClient {
         Ok(response.reverse_swap_info)
     }
 
-    async fn invoice_by_hash(
-        &self,
-        payment_hash: String,
-    ) -> Result<Option<Invoice>, LightningError> {
+    async fn invoice_by_hash(&self, payment_hash: String) -> Result<Option<Invoice>, LightningError> {
         let response = self
             .sdk
             .payment_by_hash(payment_hash)

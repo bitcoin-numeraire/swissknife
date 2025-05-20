@@ -31,9 +31,7 @@ pub struct Payment {
     pub updated_at: Option<DateTime<Utc>>,
 }
 
-#[derive(
-    Clone, Debug, EnumString, Display, Deserialize, Serialize, PartialEq, Eq, Default, ToSchema,
-)]
+#[derive(Clone, Debug, EnumString, Display, Deserialize, Serialize, PartialEq, Eq, Default, ToSchema)]
 pub enum PaymentStatus {
     #[default]
     Pending,

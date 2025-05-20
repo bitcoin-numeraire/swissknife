@@ -48,11 +48,7 @@ impl LnEventsUseCases for LnEventsService {
     async fn invoice_paid(&self, event: LnInvoicePaidEvent) -> Result<(), ApplicationError> {
         debug!(?event, "Processing incoming Lightning payment...");
 
-        let invoice_option = self
-            .store
-            .invoice
-            .find_by_payment_hash(&event.payment_hash)
-            .await?;
+        let invoice_option = self.store.invoice.find_by_payment_hash(&event.payment_hash).await?;
 
         if let Some(mut invoice) = invoice_option {
             invoice.fee_msat = Some(event.fee_msat);
@@ -74,11 +70,7 @@ impl LnEventsUseCases for LnEventsService {
     async fn outgoing_payment(&self, event: LnPaySuccessEvent) -> Result<(), ApplicationError> {
         debug!(?event, "Processing outgoing Lightning payment...");
 
-        let payment_option = self
-            .store
-            .payment
-            .find_by_payment_hash(&event.payment_hash)
-            .await?;
+        let payment_option = self.store.payment.find_by_payment_hash(&event.payment_hash).await?;
 
         if let Some(mut payment_retrieved) = payment_option {
             if payment_retrieved.status == PaymentStatus::Settled {
@@ -111,11 +103,7 @@ impl LnEventsUseCases for LnEventsService {
     async fn failed_payment(&self, event: LnPayFailureEvent) -> Result<(), ApplicationError> {
         debug!(?event, "Processing failed outgoing Lightning payment");
 
-        let payment_option = self
-            .store
-            .payment
-            .find_by_payment_hash(&event.payment_hash)
-            .await?;
+        let payment_option = self.store.payment.find_by_payment_hash(&event.payment_hash).await?;
 
         if let Some(mut payment_retrieved) = payment_option {
             if payment_retrieved.status == PaymentStatus::Failed {

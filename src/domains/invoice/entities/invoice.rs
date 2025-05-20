@@ -40,9 +40,7 @@ pub struct LnInvoice {
     pub expires_at: DateTime<Utc>,
 }
 
-#[derive(
-    Clone, Debug, EnumString, Deserialize, Serialize, Display, PartialEq, Eq, Default, ToSchema,
-)]
+#[derive(Clone, Debug, EnumString, Deserialize, Serialize, Display, PartialEq, Eq, Default, ToSchema)]
 pub enum InvoiceStatus {
     #[default]
     Pending,

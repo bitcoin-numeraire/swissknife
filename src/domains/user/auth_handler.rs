@@ -5,10 +5,7 @@ use utoipa::OpenApi;
 
 use crate::{
     application::{
-        docs::{
-            BAD_REQUEST_EXAMPLE, CONFLICT_EXAMPLE, NOT_FOUND_EXAMPLE, UNAUTHORIZED_EXAMPLE,
-            UNSUPPORTED_EXAMPLE,
-        },
+        docs::{BAD_REQUEST_EXAMPLE, CONFLICT_EXAMPLE, NOT_FOUND_EXAMPLE, UNAUTHORIZED_EXAMPLE, UNSUPPORTED_EXAMPLE},
         dtos::{ErrorResponse, SignInRequest, SignInResponse, SignUpRequest},
         errors::ApplicationError,
     },

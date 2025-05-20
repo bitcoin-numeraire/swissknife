@@ -44,10 +44,6 @@ pub async fn well_known_nostr(
     Query(query_params): Query<NostrNIP05QueryParams>,
     State(app_state): State<Arc<AppState>>,
 ) -> Result<Json<NostrNIP05Response>, ApplicationError> {
-    let pubkey = app_state
-        .services
-        .nostr
-        .get_pubkey(query_params.name.clone())
-        .await?;
+    let pubkey = app_state.services.nostr.get_pubkey(query_params.name.clone()).await?;
     Ok(NostrNIP05Response::new(query_params.name, pubkey).into())
 }

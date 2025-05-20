@@ -105,8 +105,7 @@ impl From<ListInvoicesInvoice> for Invoice {
         match val.status.as_str() {
             "paid" => {
                 invoice.status = InvoiceStatus::Settled;
-                invoice.payment_time =
-                    Some(Utc.timestamp_opt(val.paid_at.unwrap() as i64, 0).unwrap());
+                invoice.payment_time = Some(Utc.timestamp_opt(val.paid_at.unwrap() as i64, 0).unwrap());
                 invoice.amount_received_msat = val.amount_received_msat;
             }
             "unpaid" => {

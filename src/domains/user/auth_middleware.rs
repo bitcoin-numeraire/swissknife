@@ -19,22 +19,15 @@ use super::User;
 impl FromRequestParts<Arc<AppState>> for User {
     type Rejection = ApplicationError;
 
-    async fn from_request_parts(
-        parts: &mut Parts,
-        state: &Arc<AppState>,
-    ) -> Result<Self, Self::Rejection> {
+    async fn from_request_parts(parts: &mut Parts, state: &Arc<AppState>) -> Result<Self, Self::Rejection> {
         // Try to extract the Authorization header as Bearer token
-        if let Ok(TypedHeader(Authorization(bearer))) =
-            parts.extract::<TypedHeader<Authorization<Bearer>>>().await
-        {
+        if let Ok(TypedHeader(Authorization(bearer))) = parts.extract::<TypedHeader<Authorization<Bearer>>>().await {
             let user = state.services.auth.authenticate_jwt(bearer.token()).await?;
             Ok(user)
         }
         // Try to extract the Api-Key header
         else if let Some(value) = parts.headers.get("api-key") {
-            let value_str = value
-                .to_str()
-                .map_err(|_| AuthenticationError::InvalidCredentials)?;
+            let value_str = value.to_str().map_err(|_| AuthenticationError::InvalidCredentials)?;
             let api_key = BASE64_STANDARD
                 .decode(value_str)
                 .map_err(|_| AuthenticationError::InvalidCredentials)?;

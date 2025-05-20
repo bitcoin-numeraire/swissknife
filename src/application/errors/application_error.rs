@@ -2,8 +2,7 @@ use thiserror::Error;
 use utoipa::ToSchema;
 
 use super::{
-    AuthenticationError, AuthorizationError, ConfigError, DataError, DatabaseError, LightningError,
-    WebServerError,
+    AuthenticationError, AuthorizationError, ConfigError, DataError, DatabaseError, LightningError, WebServerError,
 };
 
 #[derive(Debug, Error, ToSchema)]
