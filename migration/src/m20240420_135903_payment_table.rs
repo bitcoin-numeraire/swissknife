@@ -48,12 +48,7 @@ impl MigrationTrait for Migration {
             .await?;
 
         manager
-            .drop_foreign_key(
-                ForeignKey::drop()
-                    .name("fk_wallet")
-                    .table(Payment::Table)
-                    .to_owned(),
-            )
+            .drop_foreign_key(ForeignKey::drop().name("fk_wallet").table(Payment::Table).to_owned())
             .await?;
 
         Ok(())
