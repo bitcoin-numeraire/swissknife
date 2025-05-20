@@ -65,10 +65,10 @@ deps-outdated:
 	@cargo outdated
 
 lint:
-	@cargo clippy
+	@cargo clippy --workspace --all-targets -- -D warnings --no-deps
 
 fmt:
-	@cargo fmt
+	@cargo fmt --all -- --check
 
 new-migration:
 	@sea-orm-cli migrate generate $(name)
