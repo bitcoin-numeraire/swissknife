@@ -173,3 +173,196 @@ fn validate_username(username: &str) -> Result<(), DataError> {
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{
+        application::entities::AppStore,
+        domains::ln_address::{LnAddress, LnAddressFilter, MockLnAddressRepository},
+    };
+    use chrono::Utc;
+    use sea_orm::DatabaseConnection;
+    use std::sync::Arc;
+    use uuid::Uuid;
+
+    fn mock_store(repo: MockLnAddressRepository) -> AppStore {
+        let mut store = AppStore::new_sea_orm(DatabaseConnection::default());
+        store.ln_address = Arc::new(repo);
+        store
+    }
+
+    #[tokio::test]
+    async fn register_creates_address() {
+        let wallet_id = Uuid::new_v4();
+        let username = "alice".to_string();
+
+        let expected = LnAddress {
+            id: Uuid::new_v4(),
+            wallet_id,
+            username: username.clone(),
+            active: true,
+            allows_nostr: false,
+            nostr_pubkey: None,
+            created_at: Utc::now(),
+            updated_at: None,
+        };
+
+        let mut repo = MockLnAddressRepository::new();
+        repo.expect_find_by_wallet_id()
+            .withf(move |id| *id == wallet_id)
+            .return_once(|_| Ok(None));
+        let user_check = username.clone();
+        repo.expect_find_by_username()
+            .withf(move |u| u == user_check)
+            .return_once(|_| Ok(None));
+        let inserted = expected.clone();
+        repo.expect_insert()
+            .withf(move |id, user, allows_nostr, pk| {
+                *id == wallet_id && user == "alice" && !allows_nostr && pk.is_none()
+            })
+            .return_once(move |_, _, _, _| Ok(inserted));
+
+        let store = mock_store(repo);
+        let service = LnAddressService::new(store);
+        let result = service
+            .register(wallet_id, username.clone(), false, None)
+            .await
+            .unwrap();
+
+        assert_eq!(result.wallet_id, wallet_id);
+        assert_eq!(result.username, username);
+    }
+
+    #[tokio::test]
+    async fn get_returns_address() {
+        let id = Uuid::new_v4();
+        let address = LnAddress {
+            id,
+            wallet_id: Uuid::new_v4(),
+            username: "bob".into(),
+            active: true,
+            allows_nostr: false,
+            nostr_pubkey: None,
+            created_at: Utc::now(),
+            updated_at: None,
+        };
+
+        let mut repo = MockLnAddressRepository::new();
+        repo.expect_find()
+            .withf(move |uid| *uid == id)
+            .return_once(move |_| Ok(Some(address.clone())));
+
+        let store = mock_store(repo);
+        let service = LnAddressService::new(store);
+        let result = service.get(id).await.unwrap();
+
+        assert_eq!(result.id, id);
+    }
+
+    #[tokio::test]
+    async fn list_calls_repository() {
+        let filter = LnAddressFilter {
+            username: Some("charlie".into()),
+            ..Default::default()
+        };
+        let address = LnAddress {
+            id: Uuid::new_v4(),
+            wallet_id: Uuid::new_v4(),
+            username: "charlie".into(),
+            active: true,
+            allows_nostr: false,
+            nostr_pubkey: None,
+            created_at: Utc::now(),
+            updated_at: None,
+        };
+
+        let mut repo = MockLnAddressRepository::new();
+        let expected_filter = filter.clone();
+        repo.expect_find_many()
+            .withf(move |f| f.username == expected_filter.username)
+            .return_once(move |_| Ok(vec![address.clone()]));
+
+        let store = mock_store(repo);
+        let service = LnAddressService::new(store);
+        let list = service.list(filter.clone()).await.unwrap();
+        assert_eq!(list.len(), 1);
+        assert_eq!(list[0].username, "charlie");
+    }
+
+    #[tokio::test]
+    async fn update_updates_address() {
+        let id = Uuid::new_v4();
+        let mut existing = LnAddress {
+            id,
+            wallet_id: Uuid::new_v4(),
+            username: "dan".into(),
+            active: true,
+            allows_nostr: false,
+            nostr_pubkey: None,
+            created_at: Utc::now(),
+            updated_at: None,
+        };
+
+        let mut repo = MockLnAddressRepository::new();
+        repo.expect_find()
+            .withf(move |uid| *uid == id)
+            .return_once(move |_| Ok(Some(existing.clone())));
+        repo.expect_find_by_username()
+            .withf(|u| u == "eve")
+            .return_once(|_| Ok(None));
+        repo.expect_update()
+            .withf(|ln| ln.username == "eve" && !ln.active)
+            .return_once(|ln| Ok(ln));
+
+        let store = mock_store(repo);
+        let service = LnAddressService::new(store);
+        let result = service
+            .update(
+                id,
+                UpdateLnAddressRequest {
+                    username: Some("eve".into()),
+                    active: Some(false),
+                    allows_nostr: None,
+                    nostr_pubkey: None,
+                },
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(result.username, "eve");
+        assert!(!result.active);
+    }
+
+    #[tokio::test]
+    async fn delete_deletes_address() {
+        let id = Uuid::new_v4();
+        let mut repo = MockLnAddressRepository::new();
+        repo.expect_delete_many()
+            .withf(move |f| f.ids.as_ref().unwrap() == &[id])
+            .return_once(|_| Ok(1));
+
+        let store = mock_store(repo);
+        let service = LnAddressService::new(store);
+        service.delete(id).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn delete_many_calls_repository() {
+        let filter = LnAddressFilter {
+            active: Some(false),
+            ..Default::default()
+        };
+
+        let mut repo = MockLnAddressRepository::new();
+        let expected = filter.clone();
+        repo.expect_delete_many()
+            .withf(move |f| f.active == expected.active)
+            .return_once(|_| Ok(2));
+
+        let store = mock_store(repo);
+        let service = LnAddressService::new(store);
+        let n = service.delete_many(filter.clone()).await.unwrap();
+        assert_eq!(n, 2);
+    }
+}

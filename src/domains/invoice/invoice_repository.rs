@@ -5,6 +5,7 @@ use crate::application::errors::DatabaseError;
 
 use super::{Invoice, InvoiceFilter};
 
+#[cfg_attr(test, mockall::automock)]
 #[async_trait]
 pub trait InvoiceRepository: Send + Sync {
     async fn find(&self, id: Uuid) -> Result<Option<Invoice>, DatabaseError>;
