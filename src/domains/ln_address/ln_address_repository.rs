@@ -7,6 +7,7 @@ use crate::{
     domains::ln_address::entities::{LnAddress, LnAddressFilter},
 };
 
+#[cfg_attr(test, mockall::automock)]
 #[async_trait]
 pub trait LnAddressRepository: Send + Sync {
     async fn find(&self, id: Uuid) -> Result<Option<LnAddress>, DatabaseError>;
