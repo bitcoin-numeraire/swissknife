@@ -38,7 +38,7 @@ ENV NEXT_TELEMETRY_DISABLED=1
 RUN corepack enable && yarn --frozen-lockfile && yarn build
 
 # Use a minimal base image for the final stage
-FROM debian:stable-slim
+FROM debian:stable-slim AS runtime-base
 
 # Install required runtime dependencies
 RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
@@ -46,10 +46,19 @@ RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/
 # Copy the build artifact from the builder stage
 COPY --from=builder /app/target/release/swissknife /usr/local/bin
 COPY ./config/default.toml /config/default.toml
-COPY --from=dashboard-builder /app/dashboard/out /var/www/swissknife-dashboard
 
 # Set the environment variable for production
 ENV RUN_MODE=production
 
 # Set the entrypoint
 ENTRYPOINT ["swissknife"]
+
+FROM runtime-base AS swissknife-server
+
+ENV RUN_MODE=production
+ENV SWISSKNIFE_DASHBOARD_DIR=""
+
+FROM runtime-base AS swissknife
+
+COPY --from=dashboard-builder /app/dashboard/out /var/www/swissknife-dashboard
+ENV SWISSKNIFE_DASHBOARD_DIR="/var/www/swissknife-dashboard"

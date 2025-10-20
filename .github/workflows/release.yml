@@ -30,24 +30,74 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Extract metadata (tags, labels) for Docker
-        id: meta
+      - name: Extract metadata (combined image)
+        id: meta-app
         uses: docker/metadata-action@v5
         with:
           images: bitcoinnumeraire/swissknife
 
-      - name: Build and push Docker image
-        id: push
+      - name: Extract metadata (server image)
+        id: meta-server
+        uses: docker/metadata-action@v5
+        with:
+          images: bitcoinnumeraire/swissknife-server
+
+      - name: Extract metadata (dashboard image)
+        id: meta-dashboard
+        uses: docker/metadata-action@v5
+        with:
+          images: bitcoinnumeraire/swissknife-dashboard
+
+      - name: Build and push combined Docker image
+        id: push-app
         uses: docker/build-push-action@v6
         with:
+          context: .
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: ${{ steps.meta-app.outputs.tags }}
+          labels: ${{ steps.meta-app.outputs.labels }}
 
-      - name: Generate artifact attestation
+      - name: Build and push backend Docker image
+        id: push-server
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          target: swissknife-server
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta-server.outputs.tags }}
+          labels: ${{ steps.meta-server.outputs.labels }}
+
+      - name: Build and push dashboard Docker image
+        id: push-dashboard
+        uses: docker/build-push-action@v6
+        with:
+          context: ./dashboard
+          file: ./dashboard/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta-dashboard.outputs.tags }}
+          labels: ${{ steps.meta-dashboard.outputs.labels }}
+
+      - name: Generate artifact attestation (combined)
         uses: actions/attest-build-provenance@v1
         with:
           subject-name: docker.io/bitcoinnumeraire/swissknife
-          subject-digest: ${{ steps.push.outputs.digest }}
+          subject-digest: ${{ steps.push-app.outputs.digest }}
+          push-to-registry: true
+
+      - name: Generate artifact attestation (server)
+        uses: actions/attest-build-provenance@v1
+        with:
+          subject-name: docker.io/bitcoinnumeraire/swissknife-server
+          subject-digest: ${{ steps.push-server.outputs.digest }}
+          push-to-registry: true
+
+      - name: Generate artifact attestation (dashboard)
+        uses: actions/attest-build-provenance@v1
+        with:
+          subject-name: docker.io/bitcoinnumeraire/swissknife-dashboard
+          subject-digest: ${{ steps.push-dashboard.outputs.digest }}
           push-to-registry: true
