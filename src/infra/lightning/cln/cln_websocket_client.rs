@@ -4,7 +4,7 @@ use futures_util::{future::BoxFuture, FutureExt};
 use native_tls::{Certificate, TlsConnector};
 use rust_socketio::{
     asynchronous::{Client, ClientBuilder},
-    Payload,
+    Payload, TransportType,
 };
 use tokio::fs;
 use tracing::{debug, error, warn};
@@ -22,6 +22,7 @@ pub async fn connect_websocket(
     ln_events: Arc<dyn LnEventsUseCases>,
 ) -> Result<Client, LightningError> {
     let mut client_builder = ClientBuilder::new(config.endpoint.clone())
+        .transport_type(TransportType::Websocket)
         .reconnect_on_disconnect(true)
         .opening_header("rune", config.rune.clone())
         .reconnect_delay(
