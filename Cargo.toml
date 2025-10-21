@@ -72,8 +72,6 @@ tonic-build = "0.12.3"
 chrono = "0.4.38"
 
 [profile.release]
-opt-level = "z"     # Optimize for size
-lto = true          # Enable Link Time Optimization
-codegen-units = 1   # Better optimization, slower compile
-strip = true        # Strip symbols from binary
-panic = "abort"     # Reduce binary size by not including unwinding code
+lto = true
+codegen-units = 1
+strip = true

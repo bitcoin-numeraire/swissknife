@@ -55,15 +55,14 @@ COPY ./dashboard .
 RUN --mount=type=cache,target=/app/dashboard/.next/cache \
     yarn build
 
-# Use same Debian base as builder for GLIBC compatibility
-# The cargo-chef:rust-1.90 image is based on Debian trixie (testing)
+# Use debian:trixie-slim as minimal runtime base
+# Trixie = Debian 13
+# Matches cargo-chef GLIBC 2.38, includes OpenSSL for native-tls dependency
 FROM debian:trixie-slim AS runtime-base
 
-# Install minimal runtime dependencies  
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates \
-    libssl3t64 \
-    && rm -rf /var/lib/apt/lists/*
+# Install minimal runtime dependencies
+# ca-certificates: Required for HTTPS connections
+RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
 
 # Copy the build artifact from the builder stage
 COPY --from=builder /tmp/swissknife /usr/local/bin/swissknife
