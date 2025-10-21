@@ -121,7 +121,6 @@ impl From<WalletModel> for Wallet {
     }
 }
 
-
 impl From<ApiKeyModel> for ApiKey {
     fn from(model: ApiKeyModel) -> Self {
         ApiKey {

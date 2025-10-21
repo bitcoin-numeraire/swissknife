@@ -1,6 +1,6 @@
 use async_trait::async_trait;
-use rust_decimal::Decimal;
 use num_traits::ToPrimitive;
+use rust_decimal::Decimal;
 use sea_orm::{
     sea_query::Expr, ActiveModelTrait, ActiveValue::Set, ColumnTrait, DatabaseConnection, DatabaseTransaction,
     EntityTrait, ModelTrait, QueryFilter, QueryOrder, QuerySelect, QueryTrait,
@@ -147,25 +147,17 @@ impl WalletRepository for SeaOrmWalletRepository {
             .into_iter()
             .map(|(wallet_model, ln_address_model)| {
                 let wallet_id = wallet_model.id;
-                let (received_msat, n_invoices) = invoice_map
-                    .get(&wallet_id)
-                    .map(|(r, n)| (*r, *n))
-                    .unwrap_or((None, 0));
+                let (received_msat, n_invoices) =
+                    invoice_map.get(&wallet_id).map(|(r, n)| (*r, *n)).unwrap_or((None, 0));
                 let (sent_msat, fees_paid_msat, n_payments, n_contacts) = payment_map
                     .get(&wallet_id)
                     .map(|(s, f, np, nc)| (*s, *f, *np, *nc))
                     .unwrap_or((None, None, 0, 0));
 
                 // Convert Decimal to i64 for balance calculation
-                let received_msat_i64 = received_msat
-                    .map(|d| d.to_i64().unwrap_or(0))
-                    .unwrap_or(0);
-                let sent_msat_i64 = sent_msat
-                    .map(|d| d.to_i64().unwrap_or(0))
-                    .unwrap_or(0);
-                let fees_paid_msat_i64 = fees_paid_msat
-                    .map(|d| d.to_i64().unwrap_or(0))
-                    .unwrap_or(0);
+                let received_msat_i64 = received_msat.map(|d| d.to_i64().unwrap_or(0)).unwrap_or(0);
+                let sent_msat_i64 = sent_msat.map(|d| d.to_i64().unwrap_or(0)).unwrap_or(0);
+                let fees_paid_msat_i64 = fees_paid_msat.map(|d| d.to_i64().unwrap_or(0)).unwrap_or(0);
 
                 WalletOverview {
                     id: wallet_model.id,
