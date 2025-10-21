@@ -28,6 +28,9 @@ COPY . .
 # Uncomment the following line in case you want to disable telemetry during the build.
 ENV NEXT_TELEMETRY_DISABLED=1
 
+# Build in standalone mode (Node.js server for kubernetes deployment)
+# Do NOT set BUILD_STATIC_EXPORT - defaults to 'standalone'
+
 RUN --mount=type=cache,target=/app/.next/cache \
   if [ -f yarn.lock ]; then corepack enable && yarn run build; \
   elif [ -f package-lock.json ]; then npm run build; \

@@ -1,4 +1,4 @@
-FROM lukemathwalker/cargo-chef:latest-rust-1 AS chef
+FROM lukemathwalker/cargo-chef:0.1.73-rust-1.90 AS chef
 WORKDIR /app
 
 FROM chef AS planner
@@ -40,6 +40,9 @@ COPY ./dashboard/package.json ./dashboard/yarn.lock* ./dashboard/.yarnrc.yml* ./
 # Uncomment the following line in case you want to disable telemetry during the build.
 ENV NEXT_TELEMETRY_DISABLED=1
 
+# Build in static export mode for bundling with backend
+ENV BUILD_STATIC_EXPORT=true
+
 # Install dependencies with yarn cache mount
 RUN --mount=type=cache,target=/root/.yarn \
     corepack enable && yarn --frozen-lockfile
@@ -48,14 +51,19 @@ RUN --mount=type=cache,target=/root/.yarn \
 COPY ./dashboard .
 
 # Build the dashboard with Next.js cache mount
+# This will create /app/dashboard/out directory (static export)
 RUN --mount=type=cache,target=/app/dashboard/.next/cache \
     yarn build
 
-# Use a minimal base image for the final stage
-FROM debian:stable-slim AS runtime-base
+# Use same Debian base as builder for GLIBC compatibility
+# The cargo-chef:rust-1.90 image is based on Debian trixie (testing)
+FROM debian:trixie-slim AS runtime-base
 
-# Install required runtime dependencies
-RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
+# Install minimal runtime dependencies  
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    libssl3t64 \
+    && rm -rf /var/lib/apt/lists/*
 
 # Copy the build artifact from the builder stage
 COPY --from=builder /tmp/swissknife /usr/local/bin/swissknife

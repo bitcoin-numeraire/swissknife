@@ -1,7 +1,10 @@
 // eslint-disable-next-line import/no-extraneous-dependencies
 import withPWA from 'next-pwa';
 
-const isStaticExport = 'true';
+// Use environment variable to determine build mode
+// - 'true' = static export (for bundling with backend)
+// - undefined/false = standalone (for standalone dashboard deployment)
+const isStaticExport = process.env.BUILD_STATIC_EXPORT === 'true';
 
 /**
  * @type {import('next').NextConfig}
@@ -10,7 +13,7 @@ const nextConfig = {
   trailingSlash: true,
   basePath: process.env.NEXT_PUBLIC_BASE_PATH,
   env: {
-    BUILD_STATIC_EXPORT: isStaticExport,
+    BUILD_STATIC_EXPORT: isStaticExport ? 'true' : 'false',
   },
   modularizeImports: {
     '@mui/icons-material': {
@@ -31,10 +34,9 @@ const nextConfig = {
 
     return config;
   },
-  output: 'standalone', // or 'export' or 'browser' or 'server' or 'experimental-server'
-  ...(isStaticExport === 'true' && {
-    output: 'export',
-  }),
+  // Default to 'standalone' for Node.js server
+  // Override with 'export' when BUILD_STATIC_EXPORT=true (bundled with backend)
+  output: isStaticExport ? 'export' : 'standalone',
 };
 
 export default withPWA({
