@@ -21,7 +21,7 @@ pub struct Server {
 }
 
 impl Server {
-    pub fn new(state: Arc<AppState>, dashboard_dir: &str) -> Self {
+    pub fn new(state: Arc<AppState>, dashboard_dir: Option<&str>) -> Self {
         let router = Router::new()
             .nest("/.well-known", Self::well_known_router())
             .nest("/v1/system", system::router())
@@ -33,10 +33,13 @@ impl Server {
             .nest("/v1/auth", user::auth_router())
             .nest("/v1/api-keys", user::api_key_router())
             .nest("/v1/lightning-addresses", ln_address::router())
-            .merge(Scalar::with_url("/docs", merged_openapi()))
-            .fallback_service(
-                ServeDir::new(dashboard_dir).not_found_service(ServeFile::new(format!("{}/404.html", dashboard_dir))),
-            );
+            .merge(Scalar::with_url("/docs", merged_openapi()));
+
+        let router = match dashboard_dir {
+            Some(dir) => router
+                .fallback_service(ServeDir::new(dir).not_found_service(ServeFile::new(format!("{}/404.html", dir)))),
+            None => router,
+        };
 
         let router = match state.ln_node_client {
             LnNodeClient::Breez(_) => router.nest("/v1/lightning-node", ln_node::breez_node_router()),

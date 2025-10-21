@@ -5,14 +5,35 @@ on:
     tags:
       - "v*"
 
+# Prevent concurrent builds to avoid cache conflicts
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
-  release:
+  build-and-push:
     permissions:
       contents: write
       id-token: write
       attestations: write
 
     runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        include:
+          - image: swissknife
+            context: .
+            dockerfile: ./Dockerfile
+            target: ""
+          - image: swissknife-server
+            context: .
+            dockerfile: ./Dockerfile
+            target: swissknife-server
+          - image: swissknife-dashboard
+            context: ./dashboard
+            dockerfile: ./dashboard/Dockerfile
+            target: ""
 
     steps:
       - name: Checkout repository
@@ -30,24 +51,36 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Extract metadata (tags, labels) for Docker
+      - name: Extract metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: bitcoinnumeraire/swissknife
+          images: bitcoinnumeraire/${{ matrix.image }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=sha
 
       - name: Build and push Docker image
         id: push
         uses: docker/build-push-action@v6
         with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          target: ${{ matrix.target }}
           platforms: linux/amd64,linux/arm64
           push: true
+          cache-from: type=gha,scope=${{ matrix.image }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            BUILDKIT_INLINE_CACHE=1
 
       - name: Generate artifact attestation
         uses: actions/attest-build-provenance@v1
         with:
-          subject-name: docker.io/bitcoinnumeraire/swissknife
+          subject-name: docker.io/bitcoinnumeraire/${{ matrix.image }}
           subject-digest: ${{ steps.push.outputs.digest }}
           push-to-registry: true

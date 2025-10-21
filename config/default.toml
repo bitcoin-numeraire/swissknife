@@ -18,8 +18,8 @@ working_dir = "storage/breez"
 certs_dir = "certs/greenlight"
 log_in_file = false
 restore_only = true
-api_key = "CHANGE_ME"
-seed = "CHANGE_ME"
+api_key = "CHANGE_ME" # Recommended to use secret instead
+seed = "CHANGE_ME" # Recommended to use secret instead
 
 # Core Lightning provider
 [cln_grpc_config]
@@ -32,8 +32,8 @@ retry_delay = "5s"
 
 [cln_rest_config]
 endpoint = "http://localhost:3010"
-ca_cert_path = "certs/lightningd/ca.cert"
-rune = "CHANGE_ME"
+# ca_cert_path = "certs/lightningd/ca.cert" # Optional for HTTP
+rune = "CHANGE_ME" # Recommended to use secret instead
 connect_timeout = "5s"
 timeout = "90s"
 connection_verbose = true
@@ -49,7 +49,7 @@ ws_max_reconnect_delay = "30s"
 [lnd_config]
 host = "localhost:8080"
 macaroon_path = "certs/lnd/admin.macaroon"
-ca_cert_path = "certs/lnd/tls.cert"
+# ca_cert_path = "certs/lnd/tls.cert"" # Optional for HTTP
 connect_timeout = "5s"
 timeout = "90s"
 connection_verbose = true
@@ -80,7 +80,7 @@ leeway = "60s"
 
 [jwt]
 token_expiry = "1h"
-secret = "CHANGE_ME"
+secret = "CHANGE_ME" # Recommended to use secret instead
 
 # Database
 [database]

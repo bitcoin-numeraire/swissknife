@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use serde::Deserialize;
+use serde::{Deserialize, Deserializer};
 use strum_macros::{Display, EnumString};
 
 use crate::infra::{
@@ -18,7 +18,8 @@ use crate::infra::{
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct AppConfig {
-    pub dashboard_dir: String,
+    #[serde(default, deserialize_with = "deserialize_optional_string")]
+    pub dashboard_dir: Option<String>,
     pub domain: String,
     pub host: String,
     pub auth_provider: AuthProvider,
@@ -35,6 +36,22 @@ pub struct AppConfig {
     pub lnd_config: Option<LndRestClientConfig>,
     pub web: AxumServerConfig,
     pub logging: TracingLoggerConfig,
+}
+
+fn deserialize_optional_string<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let value = Option::<String>::deserialize(deserializer)?;
+
+    Ok(value.and_then(|s| {
+        let trimmed = s.trim();
+        if trimmed.is_empty() {
+            None
+        } else {
+            Some(trimmed.to_string())
+        }
+    }))
 }
 
 #[derive(Clone, Debug, Deserialize, EnumString, Display, PartialEq, Eq, Default)]
