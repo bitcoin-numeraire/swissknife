@@ -36,9 +36,8 @@ impl Server {
             .merge(Scalar::with_url("/docs", merged_openapi()));
 
         let router = match dashboard_dir {
-            Some(dir) => router.fallback_service(
-                ServeDir::new(dir).not_found_service(ServeFile::new(format!("{}/404.html", dir))),
-            ),
+            Some(dir) => router
+                .fallback_service(ServeDir::new(dir).not_found_service(ServeFile::new(format!("{}/404.html", dir)))),
             None => router,
         };
 

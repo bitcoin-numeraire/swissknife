@@ -38,11 +38,9 @@ services:
       - postgres
 
   swissknife:
-    image: bitcoinnumeraire/swissknife:v0.1.4
+    image: swissknife:latest
     environment:
       SWISSKNIFE_DATABASE__URL: ${SWISSKNIFE_DATABASE__URL:-postgres://postgres:postgres@postgres/numeraire}
-      SWISSKNIFE_BREEZ_CONFIG__API_KEY: ${SWISSKNIFE_BREEZ_CONFIG__API_KEY:-}
-      SWISSKNIFE_BREEZ_CONFIG__SEED: ${SWISSKNIFE_BREEZ_CONFIG__SEED:-}
       SWISSKNIFE_CLN_REST_CONFIG__RUNE: ${SWISSKNIFE_CLN_REST_CONFIG__RUNE:-}
       SWISSKNIFE_JWT__SECRET: ${SWISSKNIFE_JWT__SECRET:-}
     depends_on:
@@ -50,10 +48,7 @@ services:
     ports:
       - "3000:3000"
     volumes:
-      - ./config/development.toml:/config/development.toml
-      - ./certs/greenlight:/certs/greenlight
-      - ./storage/breez:/storage/breez
-
+      - ./config/production.toml:/config/production.toml
 volumes:
   db:
   pgadmin:

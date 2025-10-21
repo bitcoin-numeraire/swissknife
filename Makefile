@@ -1,11 +1,10 @@
 COMPOSE := docker compose -f docker-compose.yml
 DB_SERVICE := postgres
 PGADMIN_SERVICE := pgadmin
-LIGHTNINGD_SERVICE := lightningd
 SWISSKNIFE_SERVICE := swissknife
 IMAGE_NAME := swissknife:latest
 
-.PHONY: watch up up-lightningd up-postgres up-pgadmin shutdown down generate-certs build-docker build-docker-server build-docker-dashboard run-docker lint fmt fmt-fix deps-upgrade deps-outdated install-tools generate-models new-migration
+.PHONY: watch up up-postgres up-pgadmin shutdown down generate-certs build-docker build-docker-server build-docker-dashboard run-docker lint fmt fmt-fix deps-upgrade deps-outdated install-tools generate-models new-migration
 
 watch:
 	@cargo watch -x run
@@ -13,14 +12,11 @@ watch:
 up:
 	@$(MAKE) down
 	@$(MAKE) up-postgres
+	@$(MAKE) up-swissknife
 
 up-swissknife:
 	@$(COMPOSE) up -d $(SWISSKNIFE_SERVICE)
 	@until $(COMPOSE) logs $(SWISSKNIFE_SERVICE) | grep 'Listening on'; do sleep 1; done
-
-up-lightningd:
-	@$(COMPOSE) up -d $(LIGHTNINGD_SERVICE)
-	@until $(COMPOSE) logs $(LIGHTNINGD_SERVICE) | grep 'lightningd: Server started'; do sleep 1; done
 
 up-postgres:
 	@$(COMPOSE) up -d $(DB_SERVICE)
@@ -36,7 +32,6 @@ down:
 shutdown:
 	@$(COMPOSE) down -v
 	@rm -rf storage/rgblib/*
-	@rm -rf deps/lightningd/data/*
 
 install-tools:
 	@cargo install cargo-watch
