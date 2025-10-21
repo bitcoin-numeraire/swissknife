@@ -7,13 +7,12 @@ use crate::domains::{
     ln_address::LnAddress,
     payment::Payment,
     user::ApiKey,
-    wallet::{Balance, Contact, Wallet, WalletOverview},
+    wallet::{Contact, Wallet},
 };
 
 use super::models::{
     api_key::Model as ApiKeyModel, contact::ContactModel, invoice::Model as InvoiceModel,
     ln_address::Model as LnAddressModel, payment::Model as PaymentModel, wallet::Model as WalletModel,
-    wallet_overview::WalletOverviewModel,
 };
 
 const ASSERTION_MSG: &str = "should parse successfully by assertion";
@@ -23,7 +22,7 @@ impl From<InvoiceModel> for Invoice {
         let status = match model.payment_time {
             Some(_) => InvoiceStatus::Settled,
             None => match model.expires_at {
-                Some(expires_at) if Utc::now() > expires_at => InvoiceStatus::Expired,
+                Some(expires_at) if Utc::now() > expires_at.and_utc() => InvoiceStatus::Expired,
                 _ => InvoiceStatus::Pending,
             },
         };
@@ -37,7 +36,7 @@ impl From<InvoiceModel> for Invoice {
                 min_final_cltv_expiry_delta: model.min_final_cltv_expiry_delta.expect(ASSERTION_MSG) as u64,
                 payment_secret: model.payment_secret.expect(ASSERTION_MSG),
                 expiry: Duration::from_secs(model.expiry.expect(ASSERTION_MSG) as u64),
-                expires_at: model.expires_at.expect(ASSERTION_MSG),
+                expires_at: model.expires_at.expect(ASSERTION_MSG).and_utc(),
             }),
             _ => None,
         };
@@ -49,14 +48,14 @@ impl From<InvoiceModel> for Invoice {
             description: model.description,
             amount_msat: model.amount_msat.map(|v| v as u64),
             amount_received_msat: model.amount_received_msat.map(|v| v as u64),
-            timestamp: model.timestamp,
+            timestamp: model.timestamp.and_utc(),
             ledger: model.ledger.parse().expect(ASSERTION_MSG),
             currency: model.currency.parse().expect(ASSERTION_MSG),
             status,
             fee_msat: None,
-            payment_time: model.payment_time,
-            created_at: model.created_at,
-            updated_at: model.updated_at,
+            payment_time: model.payment_time.map(|t| t.and_utc()),
+            created_at: model.created_at.and_utc(),
+            updated_at: model.updated_at.map(|t| t.and_utc()),
             ln_invoice,
         }
     }
@@ -73,15 +72,15 @@ impl From<PaymentModel> for Payment {
             error: model.error,
             amount_msat: model.amount_msat as u64,
             fee_msat: model.fee_msat.map(|v| v as u64),
-            payment_time: model.payment_time,
+            payment_time: model.payment_time.map(|t| t.and_utc()),
             status: model.status.parse().expect(ASSERTION_MSG),
             ledger: model.ledger.parse().expect(ASSERTION_MSG),
             currency: model.currency.parse().expect(ASSERTION_MSG),
             description: model.description,
             metadata: model.metadata,
             success_action: serde_json::from_value(model.success_action.unwrap_or_default()).ok(),
-            created_at: model.created_at,
-            updated_at: model.updated_at,
+            created_at: model.created_at.and_utc(),
+            updated_at: model.updated_at.map(|t| t.and_utc()),
         }
     }
 }
@@ -90,7 +89,7 @@ impl From<ContactModel> for Contact {
     fn from(model: ContactModel) -> Self {
         Contact {
             ln_address: model.ln_address,
-            contact_since: model.contact_since,
+            contact_since: model.contact_since.map(|t| t.and_utc()).unwrap(),
         }
     }
 }
@@ -104,8 +103,8 @@ impl From<LnAddressModel> for LnAddress {
             active: model.active,
             allows_nostr: model.allows_nostr,
             nostr_pubkey: model.nostr_pubkey.map(|k| k.parse().expect(ASSERTION_MSG)),
-            created_at: model.created_at,
-            updated_at: model.updated_at,
+            created_at: model.created_at.and_utc(),
+            updated_at: model.updated_at.map(|t| t.and_utc()),
         }
     }
 }
@@ -115,34 +114,9 @@ impl From<WalletModel> for Wallet {
         Wallet {
             id: model.id,
             user_id: model.user_id,
-            created_at: model.created_at,
-            updated_at: model.updated_at,
+            created_at: model.created_at.and_utc(),
+            updated_at: model.updated_at.map(|t| t.and_utc()),
             ..Default::default()
-        }
-    }
-}
-
-impl From<WalletOverviewModel> for WalletOverview {
-    fn from(model: WalletOverviewModel) -> Self {
-        let received_msat = model.received_msat.unwrap_or(0);
-        let sent_msat = model.sent_msat.unwrap_or(0);
-        let fees_paid_msat = model.fees_paid_msat.unwrap_or(0);
-
-        WalletOverview {
-            id: model.id,
-            user_id: model.user_id,
-            ln_address: None,
-            balance: Balance {
-                received_msat: received_msat as u64,
-                sent_msat: sent_msat as u64,
-                fees_paid_msat: fees_paid_msat as u64,
-                available_msat: received_msat - (sent_msat + fees_paid_msat),
-            },
-            n_payments: model.n_payments as u32,
-            n_invoices: model.n_invoices as u32,
-            n_contacts: model.n_contacts as u32,
-            created_at: model.created_at,
-            updated_at: model.updated_at,
         }
     }
 }
@@ -157,8 +131,8 @@ impl From<ApiKeyModel> for ApiKey {
             key_hash: model.key_hash,
             permissions: serde_json::from_value(model.permissions).expect(ASSERTION_MSG),
             description: model.description,
-            created_at: model.created_at,
-            expires_at: model.expires_at,
+            created_at: model.created_at.and_utc(),
+            expires_at: model.expires_at.map(|t| t.and_utc()),
         }
     }
 }
