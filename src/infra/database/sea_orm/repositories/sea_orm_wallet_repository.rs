@@ -1,4 +1,6 @@
 use async_trait::async_trait;
+use rust_decimal::Decimal;
+use num_traits::ToPrimitive;
 use sea_orm::{
     sea_query::Expr, ActiveModelTrait, ActiveValue::Set, ColumnTrait, DatabaseConnection, DatabaseTransaction,
     EntityTrait, ModelTrait, QueryFilter, QueryOrder, QuerySelect, QueryTrait,
@@ -14,11 +16,9 @@ use crate::{
     infra::database::sea_orm::models::{
         contact::ContactModel,
         invoice::Column as InvoiceColumn,
-        ln_address::{Column as LnAddressColumn, Model as LnAddressModel},
         payment::Column as PaymentColumn,
         prelude::{Invoice, LnAddress, Payment},
         wallet::{ActiveModel, Column, Entity},
-        wallet_overview::WalletOverviewModel,
     },
 };
 
@@ -99,41 +99,90 @@ impl WalletRepository for SeaOrmWalletRepository {
     }
 
     async fn find_many_overview(&self) -> Result<Vec<WalletOverview>, DatabaseError> {
-        let wallet_q = Entity::find()
-            .left_join(Payment)
-            .left_join(Invoice)
-            .column_as(InvoiceColumn::AmountReceivedMsat.sum(), "received_msat")
-            .column_as(PaymentColumn::AmountMsat.sum(), "sent_msat")
-            .column_as(PaymentColumn::FeeMsat.sum(), "fees_paid_msat")
-            .column_as(PaymentColumn::Id.count(), "n_payments")
-            .column_as(InvoiceColumn::Id.count(), "n_invoices")
-            .column_as(Expr::col(PaymentColumn::LnAddress).count_distinct(), "n_contacts")
-            .group_by(Column::Id)
-            .group_by(Column::UserId)
-            .group_by(Column::CreatedAt)
-            .group_by(Column::UpdatedAt)
+        // Get all wallets with their ln_address (1-to-1 relation)
+        let wallets_with_ln = Entity::find()
             .find_also_related(LnAddress)
-            .group_by(LnAddressColumn::Id)
-            .group_by(LnAddressColumn::WalletId)
-            .group_by(LnAddressColumn::Username)
-            .group_by(LnAddressColumn::Active)
-            .group_by(LnAddressColumn::CreatedAt)
-            .group_by(LnAddressColumn::UpdatedAt)
-            .group_by(LnAddressColumn::AllowsNostr)
-            .group_by(LnAddressColumn::NostrPubkey);
-
-        let results = wallet_q
-            .into_model::<WalletOverviewModel, LnAddressModel>()
             .all(&self.db)
             .await
             .map_err(|e| DatabaseError::FindMany(e.to_string()))?;
 
-        Ok(results
+        // Get invoice aggregates grouped by wallet_id
+        let invoice_aggs = Invoice::find()
+            .select_only()
+            .column(InvoiceColumn::WalletId)
+            .column_as(InvoiceColumn::AmountReceivedMsat.sum(), "received_msat")
+            .column_as(InvoiceColumn::Id.count(), "n_invoices")
+            .group_by(InvoiceColumn::WalletId)
+            .into_tuple::<(Uuid, Option<Decimal>, i64)>()
+            .all(&self.db)
+            .await
+            .map_err(|e| DatabaseError::FindMany(e.to_string()))?;
+
+        // Get payment aggregates grouped by wallet_id
+        let payment_aggs = Payment::find()
+            .select_only()
+            .column(PaymentColumn::WalletId)
+            .column_as(PaymentColumn::AmountMsat.sum(), "sent_msat")
+            .column_as(PaymentColumn::FeeMsat.sum(), "fees_paid_msat")
+            .column_as(PaymentColumn::Id.count(), "n_payments")
+            .column_as(Expr::col(PaymentColumn::LnAddress).count_distinct(), "n_contacts")
+            .group_by(PaymentColumn::WalletId)
+            .into_tuple::<(Uuid, Option<Decimal>, Option<Decimal>, i64, i64)>()
+            .all(&self.db)
+            .await
+            .map_err(|e| DatabaseError::FindMany(e.to_string()))?;
+
+        // Convert to HashMaps for efficient lookup
+        let invoice_map: std::collections::HashMap<_, _> = invoice_aggs
+            .into_iter()
+            .map(|(id, received, count)| (id, (received, count)))
+            .collect();
+        let payment_map: std::collections::HashMap<_, _> = payment_aggs
+            .into_iter()
+            .map(|(id, sent, fees, count, contacts)| (id, (sent, fees, count, contacts)))
+            .collect();
+
+        // Combine the results
+        Ok(wallets_with_ln
             .into_iter()
             .map(|(wallet_model, ln_address_model)| {
-                let mut overview: WalletOverview = wallet_model.into();
-                overview.ln_address = ln_address_model.map(Into::into);
-                overview
+                let wallet_id = wallet_model.id;
+                let (received_msat, n_invoices) = invoice_map
+                    .get(&wallet_id)
+                    .map(|(r, n)| (*r, *n))
+                    .unwrap_or((None, 0));
+                let (sent_msat, fees_paid_msat, n_payments, n_contacts) = payment_map
+                    .get(&wallet_id)
+                    .map(|(s, f, np, nc)| (*s, *f, *np, *nc))
+                    .unwrap_or((None, None, 0, 0));
+
+                // Convert Decimal to i64 for balance calculation
+                let received_msat_i64 = received_msat
+                    .map(|d| d.to_i64().unwrap_or(0))
+                    .unwrap_or(0);
+                let sent_msat_i64 = sent_msat
+                    .map(|d| d.to_i64().unwrap_or(0))
+                    .unwrap_or(0);
+                let fees_paid_msat_i64 = fees_paid_msat
+                    .map(|d| d.to_i64().unwrap_or(0))
+                    .unwrap_or(0);
+
+                WalletOverview {
+                    id: wallet_model.id,
+                    user_id: wallet_model.user_id,
+                    balance: Balance {
+                        received_msat: received_msat_i64 as u64,
+                        sent_msat: sent_msat_i64 as u64,
+                        fees_paid_msat: fees_paid_msat_i64 as u64,
+                        available_msat: received_msat_i64 - (sent_msat_i64 + fees_paid_msat_i64),
+                    },
+                    n_payments: n_payments as u32,
+                    n_invoices: n_invoices as u32,
+                    n_contacts: n_contacts as u32,
+                    ln_address: ln_address_model.map(Into::into), // Will be set below
+                    created_at: wallet_model.created_at.and_utc(),
+                    updated_at: wallet_model.updated_at.map(|t| t.and_utc()),
+                }
             })
             .collect())
     }

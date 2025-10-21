@@ -4629,9 +4629,9 @@ dependencies = [
 
 [[package]]
 name = "rust_decimal"
-version = "1.36.0"
+version = "1.39.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b082d80e3e3cc52b2ed634388d436fe1f4de6af5786cc2de9ba9737527bdf555"
+checksum = "35affe401787a9bd846712274d97654355d21b2a2c092a3139aabe31e9022282"
 dependencies = [
  "arrayvec",
  "borsh",
@@ -5807,10 +5807,12 @@ dependencies = [
  "migration",
  "native-tls",
  "nostr-sdk",
+ "num-traits",
  "prost 0.13.3",
  "rand",
  "regex",
  "reqwest 0.12.8",
+ "rust_decimal",
  "rust_socketio",
  "sea-orm",
  "serde",
