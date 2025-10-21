@@ -72,8 +72,9 @@ jobs:
           target: ${{ matrix.target }}
           platforms: linux/amd64,linux/arm64
           push: true
-          cache-from: type=gha,scope=${{ matrix.image }}
-          cache-to: type=gha,mode=min,scope=${{ matrix.image }}
+          cache-from: type=registry,ref=docker.io/bitcoinnumeraire/${{ matrix.image }}:buildcache
+          # Use a Docker Hub registry-backed cache tag for cross-runner reliability
+          cache-to:   type=registry,ref=docker.io/bitcoinnumeraire/${{ matrix.image }}:buildcache,mode=max,ttl=168h,ignore-error=true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
