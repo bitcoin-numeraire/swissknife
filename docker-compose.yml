@@ -49,6 +49,20 @@ services:
       - "3000:3000"
     volumes:
       - ./config/production.toml:/config/production.toml
+
+  swissknife-server:
+    image: swissknife-server:latest
+    environment:
+      SWISSKNIFE_DATABASE__URL: ${SWISSKNIFE_DATABASE__URL:-postgres://postgres:postgres@postgres/numeraire}
+      SWISSKNIFE_CLN_REST_CONFIG__RUNE: ${SWISSKNIFE_CLN_REST_CONFIG__RUNE:-}
+      SWISSKNIFE_JWT__SECRET: ${SWISSKNIFE_JWT__SECRET:-}
+    depends_on:
+      - postgres
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./config/production.toml:/config/production.toml
+
 volumes:
   db:
   pgadmin:

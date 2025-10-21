@@ -2,6 +2,7 @@ COMPOSE := docker compose -f docker-compose.yml
 DB_SERVICE := postgres
 PGADMIN_SERVICE := pgadmin
 SWISSKNIFE_SERVICE := swissknife
+SWISSKNIFE_SERVER_SERVICE := swissknife-server
 IMAGE_NAME := swissknife:latest
 
 .PHONY: watch up up-postgres up-pgadmin shutdown down generate-certs build-docker build-docker-server build-docker-dashboard run-docker lint fmt fmt-fix deps-upgrade deps-outdated install-tools generate-models new-migration
@@ -17,6 +18,10 @@ up:
 up-swissknife:
 	@$(COMPOSE) up -d $(SWISSKNIFE_SERVICE)
 	@until $(COMPOSE) logs $(SWISSKNIFE_SERVICE) | grep 'Listening on'; do sleep 1; done
+
+up-server:
+	@$(COMPOSE) up -d $(SWISSKNIFE_SERVER_SERVICE)
+	@until $(COMPOSE) logs $(SWISSKNIFE_SERVER_SERVICE) | grep 'Listening on'; do sleep 1; done
 
 up-postgres:
 	@$(COMPOSE) up -d $(DB_SERVICE)
