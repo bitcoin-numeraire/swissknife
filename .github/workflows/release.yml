@@ -20,6 +20,7 @@ jobs:
     runs-on: ubuntu-latest
 
     strategy:
+      fail-fast: false
       matrix:
         include:
           - image: swissknife
@@ -72,11 +73,13 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           cache-from: type=gha,scope=${{ matrix.image }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.image }}
+          cache-to: type=gha,mode=min,scope=${{ matrix.image }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
             BUILDKIT_INLINE_CACHE=1
+          # Add retry logic for network issues
+          provenance: false
 
       - name: Generate artifact attestation
         uses: actions/attest-build-provenance@v1
