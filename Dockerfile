@@ -1,4 +1,4 @@
-FROM lukemathwalker/cargo-chef:0.1.67-rust-1.79 AS chef
+FROM lukemathwalker/cargo-chef:latest-rust-1 AS chef
 WORKDIR /app
 
 FROM chef AS planner
@@ -8,34 +8,48 @@ RUN cargo chef prepare --recipe-path recipe.json
 FROM chef AS builder 
 
 # Install required packages
-RUN apt-get update && apt-get install -y protobuf-compiler
+RUN apt-get update && apt-get install -y protobuf-compiler && rm -rf /var/lib/apt/lists/*
 
 COPY --from=planner /app/recipe.json recipe.json
 COPY ./migration ./migration
 
-# Fetch dependencies
-RUN cargo chef cook --release --recipe-path recipe.json
+# Fetch dependencies with cargo cache mount
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/usr/local/cargo/git \
+    cargo chef cook --release --recipe-path recipe.json
 
 # Copy the source code
 COPY . .
 
-# Build the project
-RUN cargo build --release
+# Build the project with cargo cache mount
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/usr/local/cargo/git \
+    --mount=type=cache,target=/app/target \
+    cargo build --release && \
+    cp /app/target/release/swissknife /tmp/swissknife
 
 # Node.js stage for building the dashboard
-FROM node:22-slim AS dashboard-builder
+FROM node:24-alpine AS dashboard-builder
 WORKDIR /app/dashboard
 
-# Copy the dashboard source code
-COPY ./dashboard .
+# Copy package files first for better caching
+COPY ./dashboard/package.json ./dashboard/yarn.lock* ./dashboard/.yarnrc.yml* ./
 
 # Next.js collects completely anonymous telemetry data about general usage.
 # Learn more here: https://nextjs.org/telemetry
 # Uncomment the following line in case you want to disable telemetry during the build.
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# Install dependencies and build the dashboard
-RUN corepack enable && yarn --frozen-lockfile && yarn build
+# Install dependencies with yarn cache mount
+RUN --mount=type=cache,target=/root/.yarn \
+    corepack enable && yarn --frozen-lockfile
+
+# Copy the dashboard source code
+COPY ./dashboard .
+
+# Build the dashboard with Next.js cache mount
+RUN --mount=type=cache,target=/app/dashboard/.next/cache \
+    yarn build
 
 # Use a minimal base image for the final stage
 FROM debian:stable-slim AS runtime-base
@@ -44,7 +58,7 @@ FROM debian:stable-slim AS runtime-base
 RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
 
 # Copy the build artifact from the builder stage
-COPY --from=builder /app/target/release/swissknife /usr/local/bin
+COPY --from=builder /tmp/swissknife /usr/local/bin/swissknife
 COPY ./config/default.toml /config/default.toml
 
 # Set the environment variable for production

@@ -5,7 +5,7 @@ LIGHTNINGD_SERVICE := lightningd
 SWISSKNIFE_SERVICE := swissknife
 IMAGE_NAME := swissknife:latest
 
-.PHONY: watch up up-lightningd up-postgres up-pgadmin shutdown down generate-certs build-docker run-docker lint fmt fmt-fix deps-upgrade deps-outdated install-tools generate-models new-migration
+.PHONY: watch up up-lightningd up-postgres up-pgadmin shutdown down generate-certs build-docker build-docker-server build-docker-dashboard run-docker lint fmt fmt-fix deps-upgrade deps-outdated install-tools generate-models new-migration
 
 watch:
 	@cargo watch -x run
@@ -54,6 +54,12 @@ generate-certs:
 
 build-docker:
 	@docker build -t $(IMAGE_NAME) .
+
+build-docker-server:
+	@docker build -t swissknife-server:latest --target swissknife-server .
+
+build-docker-dashboard:
+	@docker build -t swissknife-dashboard:latest -f dashboard/Dockerfile ./dashboard
 
 run-docker:
 	@docker run -p 5000:5000 $(IMAGE_NAME)
