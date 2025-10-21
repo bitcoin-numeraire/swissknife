@@ -73,7 +73,7 @@ impl ApiKeyRepository for SeaOrmApiKeyRepository {
             key_hash: Set(api_key.key_hash),
             permissions: Set(permissions_json),
             description: Set(api_key.description),
-            expires_at: Set(api_key.expires_at),
+            expires_at: Set(api_key.expires_at.map(|t| t.naive_utc())),
             ..Default::default()
         };
 

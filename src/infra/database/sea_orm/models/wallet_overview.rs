@@ -1,4 +1,4 @@
-use sea_orm::{prelude::DateTimeUtc, FromQueryResult};
+use sea_orm::{prelude::DateTime, FromQueryResult};
 use uuid::Uuid;
 
 #[derive(Debug, Clone, FromQueryResult)]
@@ -11,6 +11,6 @@ pub struct WalletOverviewModel {
     pub n_payments: i64,
     pub n_invoices: i64,
     pub n_contacts: i64,
-    pub created_at: DateTimeUtc,
-    pub updated_at: Option<DateTimeUtc>,
+    pub created_at: DateTime,
+    pub updated_at: Option<DateTime>,
 }

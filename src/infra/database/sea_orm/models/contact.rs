@@ -1,7 +1,7 @@
-use sea_orm::{prelude::DateTimeUtc, FromQueryResult};
+use sea_orm::{prelude::DateTime, FromQueryResult};
 
 #[derive(Debug, FromQueryResult)]
 pub struct ContactModel {
     pub ln_address: String,
-    pub contact_since: DateTimeUtc,
+    pub contact_since: Option<DateTime>,
 }

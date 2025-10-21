@@ -102,7 +102,7 @@ impl LnAddressRepository for SeaOrmLnAddressRepository {
             allows_nostr: Set(ln_address.allows_nostr),
             nostr_pubkey: Set(ln_address.nostr_pubkey.map(|k| k.to_hex())),
             active: Set(ln_address.active),
-            updated_at: Set(Some(Utc::now())),
+            updated_at: Set(Some(Utc::now().naive_utc())),
             ..Default::default()
         };
 

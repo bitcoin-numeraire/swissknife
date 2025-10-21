@@ -70,7 +70,7 @@ impl PaymentRepository for SeaOrmPaymentRepository {
             ledger: Set(payment.ledger.to_string()),
             currency: Set(payment.currency.to_string()),
             fee_msat: Set(payment.fee_msat.map(|v| v as i64)),
-            payment_time: Set(payment.payment_time),
+            payment_time: Set(payment.payment_time.map(|t| t.naive_utc())),
             payment_hash: Set(payment.payment_hash),
             description: Set(payment.description),
             metadata: Set(payment.metadata),
@@ -92,7 +92,7 @@ impl PaymentRepository for SeaOrmPaymentRepository {
             id: Unchanged(payment.id),
             status: Set(payment.status.to_string()),
             fee_msat: Set(payment.fee_msat.map(|v| v as i64)),
-            payment_time: Set(payment.payment_time),
+            payment_time: Set(payment.payment_time.map(|t| t.naive_utc())),
             payment_hash: Set(payment.payment_hash),
             payment_preimage: Set(payment.payment_preimage),
             error: Set(payment.error),
@@ -101,7 +101,7 @@ impl PaymentRepository for SeaOrmPaymentRepository {
             success_action: Set(payment
                 .success_action
                 .and_then(|action| serde_json::to_value(action).ok())),
-            updated_at: Set(Some(Utc::now())),
+            updated_at: Set(Some(Utc::now().naive_utc())),
             ..Default::default()
         };
 

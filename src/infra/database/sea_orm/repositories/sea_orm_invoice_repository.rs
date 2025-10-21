@@ -85,8 +85,8 @@ impl InvoiceRepository for SeaOrmInvoiceRepository {
             description: Set(invoice.description),
             amount_msat: Set(invoice.amount_msat.map(|v| v as i64)),
             amount_received_msat: Set(invoice.amount_received_msat.map(|v| v as i64)),
-            timestamp: Set(invoice.timestamp),
-            payment_time: Set(invoice.payment_time),
+            timestamp: Set(invoice.timestamp.naive_utc()),
+            payment_time: Set(invoice.payment_time.map(|t| t.naive_utc())),
             ledger: Set(invoice.ledger.to_string()),
             currency: Set(invoice.currency.to_string()),
             ..Default::default()
@@ -101,7 +101,7 @@ impl InvoiceRepository for SeaOrmInvoiceRepository {
             model.payment_secret = Set(ln_invoice.payment_secret.into());
             model.min_final_cltv_expiry_delta = Set((ln_invoice.min_final_cltv_expiry_delta as i64).into());
             model.expiry = Set((ln_invoice.expiry.as_secs() as i64).into());
-            model.expires_at = Set(Some(ln_invoice.expires_at));
+            model.expires_at = Set(Some(ln_invoice.expires_at.naive_utc()));
         }
 
         let result = model
@@ -116,11 +116,11 @@ impl InvoiceRepository for SeaOrmInvoiceRepository {
         let model = ActiveModel {
             id: Unchanged(invoice.id),
             fee_msat: Set(invoice.fee_msat.map(|v| v as i64)),
-            payment_time: Set(invoice.payment_time),
+            payment_time: Set(invoice.payment_time.map(|t| t.naive_utc())),
             description: Set(invoice.description),
             amount_received_msat: Set(invoice.amount_received_msat.map(|v| v as i64)),
             ledger: Set(invoice.ledger.to_string()),
-            updated_at: Set(Some(Utc::now())),
+            updated_at: Set(Some(Utc::now().naive_utc())),
             ..Default::default()
         };
 
