@@ -14,7 +14,7 @@ use crate::{
     infra::database::sea_orm::models::{
         contact::ContactModel,
         invoice::Column as InvoiceColumn,
-        ln_address::Model as LnAddressModel,
+        ln_address::{Column as LnAddressColumn, Model as LnAddressModel},
         payment::Column as PaymentColumn,
         prelude::{Invoice, LnAddress, Payment},
         wallet::{ActiveModel, Column, Entity},
@@ -112,7 +112,15 @@ impl WalletRepository for SeaOrmWalletRepository {
             .group_by(Column::UserId)
             .group_by(Column::CreatedAt)
             .group_by(Column::UpdatedAt)
-            .find_also_related(LnAddress);
+            .find_also_related(LnAddress)
+            .group_by(LnAddressColumn::Id)
+            .group_by(LnAddressColumn::WalletId)
+            .group_by(LnAddressColumn::Username)
+            .group_by(LnAddressColumn::Active)
+            .group_by(LnAddressColumn::CreatedAt)
+            .group_by(LnAddressColumn::UpdatedAt)
+            .group_by(LnAddressColumn::AllowsNostr)
+            .group_by(LnAddressColumn::NostrPubkey);
 
         let results = wallet_q
             .into_model::<WalletOverviewModel, LnAddressModel>()
