@@ -199,7 +199,7 @@ impl WalletRepository for SeaOrmWalletRepository {
             .filter(InvoiceColumn::WalletId.eq(id))
             .select_only()
             .column_as(InvoiceColumn::AmountReceivedMsat.sum(), "received_msat")
-            .into_tuple::<Option<i64>>();
+            .into_tuple::<Option<Decimal>>();
 
         let sent = Payment::find()
             .filter(PaymentColumn::WalletId.eq(id))
@@ -209,7 +209,7 @@ impl WalletRepository for SeaOrmWalletRepository {
             .select_only()
             .column_as(PaymentColumn::AmountMsat.sum(), "sent_msat")
             .column_as(PaymentColumn::FeeMsat.sum(), "fees_paid_msat")
-            .into_tuple::<(Option<i64>, Option<i64>)>();
+            .into_tuple::<(Option<Decimal>, Option<Decimal>)>();
 
         let (received_res, sent_res) = match txn {
             Some(txn) => (received.one(txn).await, sent.one(txn).await),
@@ -224,11 +224,12 @@ impl WalletRepository for SeaOrmWalletRepository {
             .map_err(|e| DatabaseError::FindOne(e.to_string()))?
             .unwrap_or((None, None));
 
-        Ok(Balance::new(
-            received.unwrap_or_default(),
-            sent_msat.unwrap_or_default(),
-            fees_paid_msat.unwrap_or_default(),
-        ))
+        // Convert Decimal to i64 for balance calculation
+        let received_msat_i64 = received.map(|d| d.to_i64().unwrap_or(0)).unwrap_or(0);
+        let sent_msat_i64 = sent_msat.map(|d| d.to_i64().unwrap_or(0)).unwrap_or(0);
+        let fees_paid_msat_i64 = fees_paid_msat.map(|d| d.to_i64().unwrap_or(0)).unwrap_or(0);
+
+        Ok(Balance::new(received_msat_i64, sent_msat_i64, fees_paid_msat_i64))
     }
 
     async fn find_contacts(&self, id: Uuid) -> Result<Vec<Contact>, DatabaseError> {
