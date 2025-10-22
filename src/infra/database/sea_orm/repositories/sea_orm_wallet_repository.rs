@@ -229,11 +229,7 @@ impl WalletRepository for SeaOrmWalletRepository {
         let sent_msat_i64 = sent_msat.map(|d| d.to_i64().unwrap_or(0)).unwrap_or(0);
         let fees_paid_msat_i64 = fees_paid_msat.map(|d| d.to_i64().unwrap_or(0)).unwrap_or(0);
 
-        Ok(Balance::new(
-            received_msat_i64,
-            sent_msat_i64,
-            fees_paid_msat_i64,
-        ))
+        Ok(Balance::new(received_msat_i64, sent_msat_i64, fees_paid_msat_i64))
     }
 
     async fn find_contacts(&self, id: Uuid) -> Result<Vec<Contact>, DatabaseError> {
