@@ -4,13 +4,8 @@ import type { AppState } from '@auth0/auth0-react';
 import type { DecodedToken } from 'src/auth/types';
 
 import { jwtDecode } from 'jwt-decode';
+import { useAuth0, Auth0Provider } from '@auth0/auth0-react';
 import { useMemo, useState, useEffect, useCallback } from 'react';
-import {
-  useAuth0,
-  Auth0Provider,
-  AuthenticationError,
-  MissingRefreshTokenError,
-} from '@auth0/auth0-react';
 
 import { CONFIG } from 'src/global-config';
 import { client } from 'src/lib/swissknife';
@@ -39,7 +34,6 @@ export function AuthProvider({ children }: Props) {
       domain={domain}
       clientId={clientId}
       authorizationParams={{ redirect_uri: callbackUrl, audience }}
-      useRefreshTokens
       onRedirectCallback={onRedirectCallback}
       cacheLocation="localstorage"
     >
@@ -51,22 +45,21 @@ export function AuthProvider({ children }: Props) {
 // ----------------------------------------------------------------------
 
 function AuthProviderContainer({ children }: Props) {
-  const { user, isLoading, isAuthenticated, getAccessTokenSilently, loginWithRedirect, logout } =
+  const { user, isLoading, isAuthenticated, getAccessTokenSilently, loginWithRedirect } =
     useAuth0();
-  const { audience } = CONFIG.auth0;
 
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [permissions, setPermissions] = useState<string[]>([]);
 
   const getAccessToken = useCallback(async () => {
     try {
-      const token = await getAccessTokenSilently({ authorizationParams: { audience } });
+      const token = await getAccessTokenSilently();
       setAccessToken(token);
       setPermissions(jwtDecode<DecodedToken>(token).permissions || []);
 
       client.interceptors.request.use(async (request) => {
         try {
-          const t = await getAccessTokenSilently({ authorizationParams: { audience } });
+          const t = await getAccessTokenSilently();
           request.headers.set('Authorization', `Bearer ${t}`);
         } catch (err: unknown) {
           console.error('Token expired or missing, redirecting to login', err);
@@ -74,21 +67,11 @@ function AuthProviderContainer({ children }: Props) {
         }
         return request;
       });
-    } catch (err: unknown) {
-      console.error('Failed to get token:', err);
-
-      setAccessToken(null);
-      setPermissions([]);
-
-      if (err instanceof MissingRefreshTokenError) {
-        loginWithRedirect();
-      } else if (err instanceof AuthenticationError && err.error === 'invalid_grant') {
-        loginWithRedirect();
-      } else {
-        logout();
-      }
+    } catch (err) {
+      console.debug('Error getting access token', err);
+      loginWithRedirect();
     }
-  }, [getAccessTokenSilently, audience, loginWithRedirect, logout]);
+  }, [getAccessTokenSilently, loginWithRedirect]);
 
   useEffect(() => {
     getAccessToken();

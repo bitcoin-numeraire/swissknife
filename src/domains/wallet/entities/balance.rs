@@ -19,14 +19,3 @@ pub struct Balance {
     #[schema(example = 989999000)]
     pub available_msat: i64,
 }
-
-impl Balance {
-    pub fn new(received_msat: i64, sent_msat: i64, fees_paid_msat: i64) -> Self {
-        Self {
-            received_msat: received_msat as u64,
-            sent_msat: sent_msat as u64,
-            fees_paid_msat: fees_paid_msat as u64,
-            available_msat: received_msat - (sent_msat + fees_paid_msat),
-        }
-    }
-}

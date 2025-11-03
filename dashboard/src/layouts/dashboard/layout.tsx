@@ -3,7 +3,6 @@
 import type { Breakpoint } from '@mui/material/styles';
 import type { NavSectionProps } from 'src/components/nav-section';
 
-import Script from 'next/script';
 import { merge } from 'es-toolkit';
 import { useBoolean } from 'minimal-shared/hooks';
 
@@ -193,43 +192,39 @@ export function DashboardLayout({
   const renderMain = () => <MainSection {...slotProps?.main}>{children}</MainSection>;
 
   return (
-    <>
-      <Script src="https://kit.fontawesome.com/090ca49637.js" />
-
-      <LayoutSection
-        /** **************************************
-         * @Header
-         *************************************** */
-        headerSection={renderHeader()}
-        /** **************************************
-         * @Sidebar
-         *************************************** */
-        sidebarSection={isNavHorizontal ? null : renderSidebar()}
-        /** **************************************
-         * @Footer
-         *************************************** */
-        footerSection={renderFooter()}
-        /** **************************************
-         * @Styles
-         *************************************** */
-        cssVars={{ ...dashboardLayoutVars(theme), ...navVars.layout, ...cssVars }}
-        sx={[
-          {
-            [`& .${layoutClasses.sidebarContainer}`]: {
-              [theme.breakpoints.up(layoutQuery)]: {
-                pl: isNavMini ? 'var(--layout-nav-mini-width)' : 'var(--layout-nav-vertical-width)',
-                transition: theme.transitions.create(['padding-left'], {
-                  easing: 'var(--layout-transition-easing)',
-                  duration: 'var(--layout-transition-duration)',
-                }),
-              },
+    <LayoutSection
+      /** **************************************
+       * @Header
+       *************************************** */
+      headerSection={renderHeader()}
+      /** **************************************
+       * @Sidebar
+       *************************************** */
+      sidebarSection={isNavHorizontal ? null : renderSidebar()}
+      /** **************************************
+       * @Footer
+       *************************************** */
+      footerSection={renderFooter()}
+      /** **************************************
+       * @Styles
+       *************************************** */
+      cssVars={{ ...dashboardLayoutVars(theme), ...navVars.layout, ...cssVars }}
+      sx={[
+        {
+          [`& .${layoutClasses.sidebarContainer}`]: {
+            [theme.breakpoints.up(layoutQuery)]: {
+              pl: isNavMini ? 'var(--layout-nav-mini-width)' : 'var(--layout-nav-vertical-width)',
+              transition: theme.transitions.create(['padding-left'], {
+                easing: 'var(--layout-transition-easing)',
+                duration: 'var(--layout-transition-duration)',
+              }),
             },
           },
-          ...(Array.isArray(sx) ? sx : [sx]),
-        ]}
-      >
-        {renderMain()}
-      </LayoutSection>
-    </>
+        },
+        ...(Array.isArray(sx) ? sx : [sx]),
+      ]}
+    >
+      {renderMain()}
+    </LayoutSection>
   );
 }

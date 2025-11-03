@@ -15,4 +15,4 @@ The models are generated based on the schema and not the other way around.
 
 # Dashboard
 
-The dashboard is located under `./dashboard` as a NextJS web app. It will use `breez` as LN_PROVIDER by default and look for a swissknife API running at `http://localhost:3000`. run `yarn install` and `yarn dev` to start the web app locally.
+The dashboard is located under `./dashboard` as a NextJS web app. It will look for a swissknife API running at `http://localhost:3000`. run `yarn install` and `yarn dev` to start the web app locally.

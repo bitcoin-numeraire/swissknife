@@ -1,6 +1,4 @@
 use async_trait::async_trait;
-use num_traits::ToPrimitive;
-use rust_decimal::Decimal;
 use sea_orm::{
     sea_query::Expr, ActiveModelTrait, ActiveValue::Set, ColumnTrait, DatabaseConnection, DatabaseTransaction,
     EntityTrait, ModelTrait, QueryFilter, QueryOrder, QuerySelect, QueryTrait,
@@ -110,10 +108,13 @@ impl WalletRepository for SeaOrmWalletRepository {
         let invoice_aggs = Invoice::find()
             .select_only()
             .column(InvoiceColumn::WalletId)
-            .column_as(InvoiceColumn::AmountReceivedMsat.sum(), "received_msat")
+            .column_as(
+                Expr::cust("CAST(SUM(invoice.amount_received_msat) AS BIGINT)"),
+                "received_msat",
+            )
             .column_as(InvoiceColumn::Id.count(), "n_invoices")
             .group_by(InvoiceColumn::WalletId)
-            .into_tuple::<(Uuid, Option<Decimal>, i64)>()
+            .into_tuple::<(Uuid, Option<i64>, i64)>()
             .all(&self.db)
             .await
             .map_err(|e| DatabaseError::FindMany(e.to_string()))?;
@@ -122,12 +123,12 @@ impl WalletRepository for SeaOrmWalletRepository {
         let payment_aggs = Payment::find()
             .select_only()
             .column(PaymentColumn::WalletId)
-            .column_as(PaymentColumn::AmountMsat.sum(), "sent_msat")
-            .column_as(PaymentColumn::FeeMsat.sum(), "fees_paid_msat")
+            .column_as(Expr::cust("CAST(SUM(payment.amount_msat) AS BIGINT)"), "sent_msat")
+            .column_as(Expr::cust("CAST(SUM(payment.fee_msat) AS BIGINT)"), "fees_paid_msat")
             .column_as(PaymentColumn::Id.count(), "n_payments")
             .column_as(Expr::col(PaymentColumn::LnAddress).count_distinct(), "n_contacts")
             .group_by(PaymentColumn::WalletId)
-            .into_tuple::<(Uuid, Option<Decimal>, Option<Decimal>, i64, i64)>()
+            .into_tuple::<(Uuid, Option<i64>, Option<i64>, i64, i64)>()
             .all(&self.db)
             .await
             .map_err(|e| DatabaseError::FindMany(e.to_string()))?;
@@ -154,10 +155,9 @@ impl WalletRepository for SeaOrmWalletRepository {
                     .map(|(s, f, np, nc)| (*s, *f, *np, *nc))
                     .unwrap_or((None, None, 0, 0));
 
-                // Convert Decimal to i64 for balance calculation
-                let received_msat_i64 = received_msat.map(|d| d.to_i64().unwrap_or(0)).unwrap_or(0);
-                let sent_msat_i64 = sent_msat.map(|d| d.to_i64().unwrap_or(0)).unwrap_or(0);
-                let fees_paid_msat_i64 = fees_paid_msat.map(|d| d.to_i64().unwrap_or(0)).unwrap_or(0);
+                let received_msat_i64 = received_msat.unwrap_or(0);
+                let sent_msat_i64 = sent_msat.unwrap_or(0);
+                let fees_paid_msat_i64 = fees_paid_msat.unwrap_or(0);
 
                 WalletOverview {
                     id: wallet_model.id,
@@ -171,7 +171,7 @@ impl WalletRepository for SeaOrmWalletRepository {
                     n_payments: n_payments as u32,
                     n_invoices: n_invoices as u32,
                     n_contacts: n_contacts as u32,
-                    ln_address: ln_address_model.map(Into::into), // Will be set below
+                    ln_address: ln_address_model.map(Into::into),
                     created_at: wallet_model.created_at.and_utc(),
                     updated_at: wallet_model.updated_at.map(|t| t.and_utc()),
                 }
@@ -198,8 +198,11 @@ impl WalletRepository for SeaOrmWalletRepository {
         let received = Invoice::find()
             .filter(InvoiceColumn::WalletId.eq(id))
             .select_only()
-            .column_as(InvoiceColumn::AmountReceivedMsat.sum(), "received_msat")
-            .into_tuple::<Option<Decimal>>();
+            .column_as(
+                Expr::cust("CAST(SUM(invoice.amount_received_msat) AS BIGINT)"),
+                "received_msat",
+            )
+            .into_tuple::<Option<i64>>();
 
         let sent = Payment::find()
             .filter(PaymentColumn::WalletId.eq(id))
@@ -207,9 +210,9 @@ impl WalletRepository for SeaOrmWalletRepository {
                 PaymentColumn::Status.is_in([PaymentStatus::Settled.to_string(), PaymentStatus::Pending.to_string()]),
             )
             .select_only()
-            .column_as(PaymentColumn::AmountMsat.sum(), "sent_msat")
-            .column_as(PaymentColumn::FeeMsat.sum(), "fees_paid_msat")
-            .into_tuple::<(Option<Decimal>, Option<Decimal>)>();
+            .column_as(Expr::cust("CAST(SUM(payment.amount_msat) AS BIGINT)"), "sent_msat")
+            .column_as(Expr::cust("CAST(SUM(payment.fee_msat) AS BIGINT)"), "fees_paid_msat")
+            .into_tuple::<(Option<i64>, Option<i64>)>();
 
         let (received_res, sent_res) = match txn {
             Some(txn) => (received.one(txn).await, sent.one(txn).await),
@@ -224,12 +227,16 @@ impl WalletRepository for SeaOrmWalletRepository {
             .map_err(|e| DatabaseError::FindOne(e.to_string()))?
             .unwrap_or((None, None));
 
-        // Convert Decimal to i64 for balance calculation
-        let received_msat_i64 = received.map(|d| d.to_i64().unwrap_or(0)).unwrap_or(0);
-        let sent_msat_i64 = sent_msat.map(|d| d.to_i64().unwrap_or(0)).unwrap_or(0);
-        let fees_paid_msat_i64 = fees_paid_msat.map(|d| d.to_i64().unwrap_or(0)).unwrap_or(0);
+        let received_msat_i64 = received.unwrap_or(0);
+        let sent_msat_i64 = sent_msat.unwrap_or(0);
+        let fees_paid_msat_i64 = fees_paid_msat.unwrap_or(0);
 
-        Ok(Balance::new(received_msat_i64, sent_msat_i64, fees_paid_msat_i64))
+        Ok(Balance {
+            received_msat: received_msat_i64 as u64,
+            sent_msat: sent_msat_i64 as u64,
+            fees_paid_msat: fees_paid_msat_i64 as u64,
+            available_msat: received_msat_i64 - (sent_msat_i64 + fees_paid_msat_i64),
+        })
     }
 
     async fn find_contacts(&self, id: Uuid) -> Result<Vec<Contact>, DatabaseError> {

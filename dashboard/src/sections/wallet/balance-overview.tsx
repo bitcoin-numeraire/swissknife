@@ -87,7 +87,7 @@ export function BalanceOverview({
     },
     stroke: { width: 3 },
     tooltip: {
-      y: { formatter: (value: number) => `${fSats(value)} sats`, title: { formatter: () => '' } },
+      y: { formatter: (value: number) => `₿ ${fSats(value)}`, title: { formatter: () => '' } },
     },
   });
 

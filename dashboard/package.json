@@ -25,7 +25,7 @@
     "openapi-ts": "rm -rf src/lib/swissknife && openapi-ts"
   },
   "dependencies": {
-    "@auth0/auth0-react": "^2.2.4",
+    "@auth0/auth0-react": "^2.8.0",
     "@emotion/cache": "^11.13.5",
     "@emotion/react": "^11.13.5",
     "@emotion/styled": "^11.13.5",

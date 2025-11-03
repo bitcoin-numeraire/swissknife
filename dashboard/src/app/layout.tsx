@@ -39,7 +39,7 @@ export const metadata: Metadata = {
   title: CONFIG.appName,
   description: `${CONFIG.appName}, your assistant to handle everything Bitcoin`,
   keywords:
-    'bitcoin,numeraire,swissknife,blockchain,lightning,rgb,protocol,smartcontract,decentralised,network,taproot-assets',
+    'bitcoin,numeraire,swissknife,blockchain,lightning,protocol,smartcontract,decentralised,network,taproot-assets',
   manifest: '/site.webmanifest',
   icons: [
     { rel: 'icon', url: `${CONFIG.assetsDir}/favicon/favicon.ico` },
