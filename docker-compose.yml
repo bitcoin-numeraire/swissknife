@@ -49,6 +49,7 @@ services:
       - "3000:3000"
     volumes:
       - ./config/production.toml:/config/production.toml
+      - ./certs:/certs
 
   swissknife-server:
     image: swissknife-server:latest
@@ -62,6 +63,7 @@ services:
       - "3000:3000"
     volumes:
       - ./config/production.toml:/config/production.toml
+      - ./certs:/certs
 
 volumes:
   db:

@@ -73,7 +73,7 @@ file = false
 
 # Authentication
 [oauth2]
-domain = "domain.auth0.com"
+domain = "auth.numeraire.tech"
 audience = "https://swissknife.numeraire.tech/api/v1"
 jwks_refresh_interval = "1h"
 leeway = "60s"

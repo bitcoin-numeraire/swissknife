@@ -71,14 +71,13 @@ jobs:
           file: ${{ matrix.dockerfile }}
           target: ${{ matrix.target }}
           platforms: linux/amd64,linux/arm64
+          pull: true
           push: true
           cache-from: type=registry,ref=docker.io/bitcoinnumeraire/${{ matrix.image }}:buildcache
           # Use a Docker Hub registry-backed cache tag for cross-runner reliability
-          cache-to:   type=registry,ref=docker.io/bitcoinnumeraire/${{ matrix.image }}:buildcache,mode=max,ttl=168h,ignore-error=true
+          cache-to:   type=registry,ref=docker.io/bitcoinnumeraire/${{ matrix.image }}:buildcache,mode=max,ignore-error=true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          build-args: |
-            BUILDKIT_INLINE_CACHE=1
           # Add retry logic for network issues
           provenance: false
 

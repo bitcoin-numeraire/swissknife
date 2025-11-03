@@ -232,9 +232,7 @@ type InputAmountProps = InputProps & {
 function InputAmount({ autoWidth, amount, onBlur, onChange, sx, ...other }: InputAmountProps) {
   return (
     <Stack direction="row" justifyContent="center" spacing={1} sx={sx}>
-      <Typography variant="h5">
-        <i className="fak fa-regular" />
-      </Typography>
+      <Typography variant="h5">₿</Typography>
 
       <Input
         name="amount"

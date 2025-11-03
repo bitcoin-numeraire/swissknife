@@ -22,8 +22,8 @@ export function SatsWithIcon({
   return (
     <Tooltip title={`${amountMSats} mSats`} placement={placement} arrow>
       <Typography variant={variant || 'inherit'} {...other}>
+        <span style={{ opacity: 0.65, marginRight: 2 }}>₿</span>
         {fSats(amountMSats / 1000)}
-        <i className="fak fa-light" />
         {children}
       </Typography>
     </Tooltip>
