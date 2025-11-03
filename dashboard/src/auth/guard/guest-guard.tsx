@@ -55,7 +55,7 @@ export function GuestGuard({ children }: GuestGuardProps) {
           return;
         }
 
-        if (!data.sign_up_complete) {
+        if (CONFIG.auth.method === 'jwt' && !data.sign_up_complete) {
           router.replace(paths.auth.signUp);
           return;
         }
