@@ -1,7 +1,7 @@
 {
   "name": "swissknife-dashboard",
   "author": "Dario Anongba Varela",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "email": "dario.varela@numeraire.tech",
   "description": "Numeraire Bitcoin SwissKnife Dashboard",
   "private": true,
