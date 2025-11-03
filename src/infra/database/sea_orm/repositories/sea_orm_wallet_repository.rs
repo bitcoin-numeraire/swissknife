@@ -123,14 +123,8 @@ impl WalletRepository for SeaOrmWalletRepository {
         let payment_aggs = Payment::find()
             .select_only()
             .column(PaymentColumn::WalletId)
-            .column_as(
-                Expr::cust("CAST(SUM(payment.amount_msat) AS BIGINT)"),
-                "sent_msat",
-            )
-            .column_as(
-                Expr::cust("CAST(SUM(payment.fee_msat) AS BIGINT)"),
-                "fees_paid_msat",
-            )
+            .column_as(Expr::cust("CAST(SUM(payment.amount_msat) AS BIGINT)"), "sent_msat")
+            .column_as(Expr::cust("CAST(SUM(payment.fee_msat) AS BIGINT)"), "fees_paid_msat")
             .column_as(PaymentColumn::Id.count(), "n_payments")
             .column_as(Expr::col(PaymentColumn::LnAddress).count_distinct(), "n_contacts")
             .group_by(PaymentColumn::WalletId)
@@ -216,14 +210,8 @@ impl WalletRepository for SeaOrmWalletRepository {
                 PaymentColumn::Status.is_in([PaymentStatus::Settled.to_string(), PaymentStatus::Pending.to_string()]),
             )
             .select_only()
-            .column_as(
-                Expr::cust("CAST(SUM(payment.amount_msat) AS BIGINT)"),
-                "sent_msat",
-            )
-            .column_as(
-                Expr::cust("CAST(SUM(payment.fee_msat) AS BIGINT)"),
-                "fees_paid_msat",
-            )
+            .column_as(Expr::cust("CAST(SUM(payment.amount_msat) AS BIGINT)"), "sent_msat")
+            .column_as(Expr::cust("CAST(SUM(payment.fee_msat) AS BIGINT)"), "fees_paid_msat")
             .into_tuple::<(Option<i64>, Option<i64>)>();
 
         let (received_res, sent_res) = match txn {
