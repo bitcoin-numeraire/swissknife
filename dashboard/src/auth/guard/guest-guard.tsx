@@ -47,6 +47,12 @@ export function GuestGuard({ children }: GuestGuardProps) {
       return;
     }
 
+    // Skip setupCheck for non-JWT auth methods (Auth0, Supabase) as they handle auth externally
+    if (CONFIG.auth.method !== 'jwt') {
+      isChecking.onFalse();
+      return;
+    }
+
     (async () => {
       try {
         const { data } = await setupCheck<true>();
@@ -55,7 +61,7 @@ export function GuestGuard({ children }: GuestGuardProps) {
           return;
         }
 
-        if (CONFIG.auth.method === 'jwt' && !data.sign_up_complete) {
+        if (!data.sign_up_complete) {
           router.replace(paths.auth.signUp);
           return;
         }
