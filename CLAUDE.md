@@ -16,6 +16,8 @@ make fmt                       # Check formatting
 make fmt-fix                   # Fix formatting
 ```
 
+Before committing, ensure the linting and formatting pass successfully using `make lint` and `make fmt-fix`.
+
 ### Dashboard (Next.js)
 ```bash
 cd dashboard
@@ -27,6 +29,8 @@ yarn lint:fix
 yarn fm:fix                    # Format with prettier
 yarn openapi-ts                # Regenerate API client from OpenAPI spec
 ```
+
+Before committing, ensure the linting and formatting pass successfully using `yarn lint:fix` and `yarn fm:fix`.
 
 ### Database Migrations
 ```bash
