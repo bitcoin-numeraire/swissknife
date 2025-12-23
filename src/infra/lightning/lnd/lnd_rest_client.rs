@@ -17,6 +17,7 @@ use crate::{
     infra::{config::config_rs::deserialize_duration, lightning::LnClient},
 };
 use async_trait::async_trait;
+use base64::{engine::general_purpose::STANDARD, Engine};
 
 use super::{lnd_types::*, lnd_websocket_client::listen_invoices};
 
@@ -111,9 +112,19 @@ impl LndRestClient {
 
     async fn read_macaroon(path: &str) -> anyhow::Result<String> {
         let macaroon_file = fs::read(PathBuf::from(path)).await?;
-        let macaroon_header = hex::encode(macaroon_file);
 
-        Ok(macaroon_header)
+        // Check if the file is base64-encoded text or raw binary
+        // Base64 files start with ASCII characters, raw binary macaroons start with 0x02
+        let macaroon_bytes = if macaroon_file.first() == Some(&0x02) {
+            // Raw binary format - use as-is
+            macaroon_file
+        } else {
+            // Base64-encoded text - decode it first
+            let base64_str = String::from_utf8(macaroon_file)?;
+            STANDARD.decode(base64_str.trim())?
+        };
+
+        Ok(hex::encode(macaroon_bytes))
     }
 
     async fn post_request_buffered<T>(&self, endpoint: &str, payload: &impl Serialize) -> anyhow::Result<T>
