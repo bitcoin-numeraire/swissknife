@@ -33,6 +33,7 @@ jobs:
         with:
           openai-api-key: ${{ secrets.OPENAI_API_KEY }}
           effort: high
+          model: gpt-5.2-codex-max
           prompt: |
             REPO: ${{ github.repository }}
             PR NUMBER: ${{ github.event.pull_request.number }}
@@ -52,6 +53,7 @@ jobs:
             ${{ github.event.pull_request.title }}
             ${{ github.event.pull_request.body }}
 
+            Use the repository's AGENTS.md for guidance on style and conventions.
             Provide concise, actionable feedback suitable for a PR comment.
 
   post_feedback:
