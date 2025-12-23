@@ -37,6 +37,11 @@ make run-migrations                       # Run migrations
 make generate-models                      # Regenerate Sea-ORM models from schema
 ```
 
+You can generate new migrations using `make new-migration name=migration-name`.
+See other migrations under the `./migration` folder.
+Once a migration is added, you can work on it by modifying the file and then adding it in the `lib.rs` file.
+The models are generated based on the schema and not the other way around.
+
 ### Docker
 ```bash
 make up-postgres               # Start postgres
