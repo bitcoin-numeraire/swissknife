@@ -30,28 +30,59 @@ If you like what we do, consider starring, sharing and contributing!
 - Data availability through pagination and advanced search.
 - API keys authentication
 
-Numeraire SwissKnife ships with a [Dashboard](https://github.com/bitcoin-numeraire/swissknife-dashboard).
+Numeraire SwissKnife ships with a [Dashboard](https://github.com/bitcoin-numeraire/swissknife/dashboard).
 
 ## Lightning Providers
 
 SwissKnife allows direct Lightning integration, supporting the most used node implementations and well-known providers:
 
-- [`Core Lightning`](https://corelightning.org/):
-  - Non-custodial
-  - Run your own node
-  - Manage your own liquidity.
-- [`Greenlight`](https://blockstream.com/lightning/greenlight/):
-  - Non-custodial
-  - Automatic node management.
-  - Manage your own liquidity.
-- [`Breez`](https://breez.technology/sdk/):
-  - Non-custodial
-  - Automatic node management.
-  - Automatic liquidity management via LSPs (user can switch LSPs)
 - [`LND`](https://github.com/lightningnetwork/lnd)
-  - Non-custodial
   - Run your own node
   - Manage your own liquidity
+- [`Core Lightning`](https://corelightning.org/):
+  - Run your own node
+  - Manage your own liquidity.
+
+## Installation
+
+SwissKnife provides multiple Docker deployment options to suit different infrastructure needs:
+
+### Self-Contained Installation (Recommended)
+
+The all-in-one image bundles the backend API and dashboard in a single container:
+
+```bash
+docker pull bitcoinnumeraire/swissknife:latest
+docker run -p 3000:3000 bitcoinnumeraire/swissknife:latest
+```
+
+This image includes:
+- Rust backend API server
+- Next.js dashboard (static export served by the backend)
+- Default configuration at `/config/default.toml`
+
+### Separated Backend and Frontend
+
+For Kubernetes or microservices deployments, use the separated images:
+
+#### Backend Only
+```bash
+docker pull bitcoinnumeraire/swissknife-server:latest
+docker run -p 3000:3000 bitcoinnumeraire/swissknife-server:latest
+```
+
+#### Frontend Only (Standalone Next.js Server)
+```bash
+docker pull bitcoinnumeraire/swissknife-dashboard:latest
+docker run -p 8080:8080 bitcoinnumeraire/swissknife-dashboard:latest
+```
+
+When using separated deployment:
+- Configure the dashboard to point to your backend API endpoint
+- Backend runs without the dashboard (`SWISSKNIFE_DASHBOARD_DIR=""`)
+- Frontend runs as a standalone Node.js server on port 8080
+
+All images support both `linux/amd64` and `linux/arm64` architectures.
 
 ## Documentation
 
@@ -64,22 +95,16 @@ Extended documentation is available [here](https://docs.numeraire.tech/swissknif
 - [ ] Webhooks
 - [ ] BOLT12 (offers)
 - [ ] Notifications (Email, SMS by Twilio)
-- [x] Dockerhub images
 - [ ] Desktop applications
-- [ ] Helm Charts
 
 #### Lightning providers
 
-- [ ] [`Phoenixd`](https://phoenix.acinq.co/server)
-  - Non-custodial
-  - Automatic node management
-  - Automatic liquidity management via ACINQ.
-- [ ] [`LightSpark`](https://www.lightspark.com/)
-  - Custodial
-  - Automatic node management
-  - Automatic liquidity management via Lightspark
+- [ ] [`Breez SDK (Liquid)`](https://phoenix.acinq.co/server)
+  - Nodeless
+- [ ] [`Breez SDK (Spark)`](https://www.lightspark.com/)
+  - Nodeless
 
 #### Smart contracts
 
-- [x] [RGB](https://rgb.tech/) Smart contracts
-- [ ] [Taproot Assets](https://docs.lightning.engineering/the-lightning-network/taproot-assets).
+- [ ] [RGB](https://rgb.tech/) Smart contracts
+- [x] [Taproot Assets](https://docs.lightning.engineering/the-lightning-network/taproot-assets).
