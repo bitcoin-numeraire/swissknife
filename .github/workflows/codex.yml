@@ -1,0 +1,98 @@
+name: Codex
+
+on:
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+  pull_request_review:
+    types: [submitted]
+  issues:
+    types: [opened, assigned]
+
+jobs:
+  codex:
+    if: |
+      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@codex')) ||
+      (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@codex')) ||
+      (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@codex')) ||
+      (github.event_name == 'issues' && (contains(github.event.issue.body, '@codex') || contains(github.event.issue.title, '@codex')))
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+      issues: read
+    outputs:
+      final_message: ${{ steps.run_codex.outputs.final-message }}
+      issue_number: ${{ steps.issue_meta.outputs.issue_number }}
+      is_pr: ${{ steps.issue_meta.outputs.is_pr }}
+    steps:
+      - name: Derive issue metadata
+        id: issue_meta
+        run: |
+          if [[ "${{ github.event_name }}" == "issues" || "${{ github.event_name }}" == "issue_comment" ]]; then
+            echo "issue_number=${{ github.event.issue.number }}" >> "$GITHUB_OUTPUT"
+            if [[ "${{ github.event.issue.pull_request }}" != "" ]]; then
+              echo "is_pr=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "is_pr=false" >> "$GITHUB_OUTPUT"
+            fi
+          else
+            echo "issue_number=${{ github.event.pull_request.number }}" >> "$GITHUB_OUTPUT"
+            echo "is_pr=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout repository (issue)
+        if: steps.issue_meta.outputs.is_pr == 'false'
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 1
+
+      - name: Checkout repository (PR)
+        if: steps.issue_meta.outputs.is_pr == 'true'
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 1
+          ref: refs/pull/${{ steps.issue_meta.outputs.issue_number }}/merge
+
+      - name: Run Codex
+        id: run_codex
+        uses: openai/codex-action@v1
+        with:
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          effort: high
+          prompt: |
+            REPO: ${{ github.repository }}
+            EVENT: ${{ github.event_name }}
+            ISSUE/PR NUMBER: ${{ steps.issue_meta.outputs.issue_number }}
+
+            USER REQUEST:
+            ${{ github.event.comment.body || github.event.review.body || github.event.issue.body }}
+
+            ISSUE TITLE:
+            ${{ github.event.issue.title }}
+
+            Follow the user request above. If this is a PR, focus on the changes in the PR checkout and be concise.
+
+  post_feedback:
+    runs-on: ubuntu-latest
+    needs: codex
+    if: needs.codex.outputs.final_message != ''
+    permissions:
+      issues: write
+      pull-requests: write
+    steps:
+      - name: Report Codex feedback
+        uses: actions/github-script@v7
+        env:
+          CODEX_FINAL_MESSAGE: ${{ needs.codex.outputs.final_message }}
+          ISSUE_NUMBER: ${{ needs.codex.outputs.issue_number }}
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: Number(process.env.ISSUE_NUMBER),
+              body: process.env.CODEX_FINAL_MESSAGE,
+            });
