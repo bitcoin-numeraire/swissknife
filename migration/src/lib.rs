@@ -9,6 +9,7 @@ mod m20241009_6_api_key_table;
 mod m20241028_135908_permissions_as_json;
 mod m20250106_141600_config_table;
 mod m20251021_162217_convert_timestamptz_to_timestamp;
+mod m20251223_191844_add_onchain_support;
 
 pub struct Migrator;
 
@@ -25,6 +26,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20241028_135908_permissions_as_json::Migration),
             Box::new(m20250106_141600_config_table::Migration),
             Box::new(m20251021_162217_convert_timestamptz_to_timestamp::Migration),
+            Box::new(m20251223_191844_add_onchain_support::Migration),
         ]
     }
 }

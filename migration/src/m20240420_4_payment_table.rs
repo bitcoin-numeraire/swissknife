@@ -75,4 +75,8 @@ pub(crate) enum Payment {
     SuccessAction,
     CreatedAt,
     UpdatedAt,
+    // Onchain-specific fields
+    Txid,
+    Confirmations,
+    DestinationAddress,
 }

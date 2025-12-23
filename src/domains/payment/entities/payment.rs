@@ -29,6 +29,14 @@ pub struct Payment {
     pub success_action: Option<LnUrlSuccessAction>,
     pub created_at: DateTime<Utc>,
     pub updated_at: Option<DateTime<Utc>>,
+    pub onchain_payment: Option<OnchainPayment>,
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct OnchainPayment {
+    pub txid: String,
+    pub confirmations: u32,
+    pub destination_address: String,
 }
 
 #[derive(Clone, Debug, EnumString, Display, Deserialize, Serialize, PartialEq, Eq, Default, ToSchema)]

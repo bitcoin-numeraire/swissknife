@@ -26,6 +26,14 @@ pub struct Invoice {
     pub created_at: DateTime<Utc>,
     pub updated_at: Option<DateTime<Utc>>,
     pub ln_invoice: Option<LnInvoice>,
+    pub onchain_invoice: Option<OnchainInvoice>,
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct OnchainInvoice {
+    pub txid: String,
+    pub confirmations: u32,
+    pub output_index: u32,
 }
 
 #[derive(Clone, Debug, Default)]
