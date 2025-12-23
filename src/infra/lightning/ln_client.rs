@@ -1,5 +1,6 @@
 use async_trait::async_trait;
 use breez_sdk_core::ReverseSwapInfo;
+use chrono::{DateTime, Utc};
 
 use crate::{
     application::{
@@ -9,21 +10,22 @@ use crate::{
     domains::{invoice::Invoice, payment::Payment, system::HealthStatus},
 };
 
-/// Onchain transaction information returned by the Lightning provider
+/// Bitcoin L1 transaction information returned by the Lightning provider
 #[derive(Debug, Clone)]
-pub struct OnchainTransaction {
+pub struct BtcTransaction {
     pub txid: String,
-    pub confirmations: u32,
+    pub confirmed: bool,
     pub amount_sat: u64,
     pub fee_sat: Option<u64>,
     pub address: Option<String>,
     pub is_outgoing: bool,
     pub block_height: Option<u32>,
+    pub timestamp: Option<DateTime<Utc>>,
 }
 
-/// Onchain balance information
+/// Bitcoin L1 balance information
 #[derive(Debug, Clone)]
-pub struct OnchainBalance {
+pub struct BtcBalance {
     pub confirmed_sat: u64,
     pub unconfirmed_sat: u64,
 }
@@ -48,16 +50,45 @@ pub trait LnClient: Sync + Send {
     async fn invoice_by_hash(&self, payment_hash: String) -> Result<Option<Invoice>, LightningError>;
     async fn health(&self) -> Result<HealthStatus, LightningError>;
 
-    // Onchain wallet methods
-    async fn get_new_onchain_address(&self) -> Result<String, LightningError>;
-    async fn get_onchain_balance(&self) -> Result<OnchainBalance, LightningError>;
-    async fn send_onchain(
+    // Bitcoin L1 wallet methods (default implementations return NotSupported)
+    async fn get_new_btc_address(&self) -> Result<String, LightningError> {
+        Err(LightningError::NotSupported(
+            "Bitcoin address generation".to_string(),
+        ))
+    }
+
+    async fn get_btc_balance(&self) -> Result<BtcBalance, LightningError> {
+        Err(LightningError::NotSupported(
+            "Bitcoin balance".to_string(),
+        ))
+    }
+
+    async fn send_btc(
         &self,
-        address: String,
-        amount_sat: u64,
-        fee_rate_sat_per_vbyte: Option<u32>,
-    ) -> Result<String, LightningError>; // Returns txid
-    async fn list_onchain_transactions(&self) -> Result<Vec<OnchainTransaction>, LightningError>;
-    async fn get_network(&self) -> Result<Currency, LightningError>;
-    async fn validate_address(&self, address: &str) -> Result<bool, LightningError>;
+        _address: &str,
+        _amount_sat: u64,
+        _fee_rate_sat_per_vbyte: Option<u32>,
+    ) -> Result<String, LightningError> {
+        Err(LightningError::NotSupported(
+            "Bitcoin send".to_string(),
+        ))
+    }
+
+    async fn list_btc_transactions(&self) -> Result<Vec<BtcTransaction>, LightningError> {
+        Err(LightningError::NotSupported(
+            "Bitcoin transaction listing".to_string(),
+        ))
+    }
+
+    async fn get_network(&self) -> Result<Currency, LightningError> {
+        Err(LightningError::NotSupported(
+            "Network info".to_string(),
+        ))
+    }
+
+    async fn validate_btc_address(&self, _address: &str) -> Result<bool, LightningError> {
+        Err(LightningError::NotSupported(
+            "Bitcoin address validation".to_string(),
+        ))
+    }
 }

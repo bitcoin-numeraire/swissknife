@@ -77,4 +77,7 @@ pub enum LightningError {
 
     #[error("Failed to check message signature: {0}")]
     CheckMessage(String),
+
+    #[error("Feature not supported by this provider: {0}")]
+    NotSupported(String),
 }

@@ -29,13 +29,13 @@ pub struct Payment {
     pub success_action: Option<LnUrlSuccessAction>,
     pub created_at: DateTime<Utc>,
     pub updated_at: Option<DateTime<Utc>>,
-    pub onchain_payment: Option<OnchainPayment>,
+    pub btc_payment: Option<BtcPayment>,
 }
 
 #[derive(Clone, Debug, Default)]
-pub struct OnchainPayment {
+pub struct BtcPayment {
     pub txid: String,
-    pub confirmations: u32,
+    pub confirmed: bool,
     pub destination_address: String,
 }
 

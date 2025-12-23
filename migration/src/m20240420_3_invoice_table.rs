@@ -128,8 +128,8 @@ pub(crate) enum Invoice {
     CreatedAt,
     UpdatedAt,
     ExpiresAt,
-    // Onchain-specific fields
+    // Bitcoin-specific fields
     Txid,
-    Confirmations,
+    Confirmed,
     OutputIndex,
 }

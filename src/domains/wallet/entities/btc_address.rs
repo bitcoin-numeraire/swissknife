@@ -2,7 +2,7 @@ use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
 #[derive(Clone, Debug, Default)]
-pub struct OnchainAddress {
+pub struct BtcAddress {
     pub id: Uuid,
     pub wallet_id: Uuid,
     pub address: String,

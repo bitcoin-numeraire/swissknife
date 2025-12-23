@@ -26,13 +26,13 @@ pub struct Invoice {
     pub created_at: DateTime<Utc>,
     pub updated_at: Option<DateTime<Utc>>,
     pub ln_invoice: Option<LnInvoice>,
-    pub onchain_invoice: Option<OnchainInvoice>,
+    pub btc_invoice: Option<BtcInvoice>,
 }
 
 #[derive(Clone, Debug, Default)]
-pub struct OnchainInvoice {
+pub struct BtcInvoice {
     pub txid: String,
-    pub confirmations: u32,
+    pub confirmed: bool,
     pub output_index: u32,
 }
 
