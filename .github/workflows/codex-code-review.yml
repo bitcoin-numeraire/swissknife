@@ -52,6 +52,7 @@ jobs:
             ${{ github.event.pull_request.title }}
             ${{ github.event.pull_request.body }}
 
+            Use the repository's AGENTS.md for guidance on style and conventions.
             Provide concise, actionable feedback suitable for a PR comment.
 
   post_feedback:
