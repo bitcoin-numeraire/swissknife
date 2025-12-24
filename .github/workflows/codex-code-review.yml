@@ -2,7 +2,7 @@ name: Codex Code Review
 
 on:
   pull_request:
-    types: [opened, synchronize]
+    types: [opened, reopened]
     # Optional: Only run on specific file changes
     # paths:
     #   - "src/**/*.rs"
