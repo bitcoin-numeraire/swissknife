@@ -26,10 +26,20 @@ pub struct Model {
     pub success_action: Option<Json>,
     pub created_at: DateTime,
     pub updated_at: Option<DateTime>,
+    pub btc_txid: Option<Uuid>,
+    pub destination_address: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
+    #[sea_orm(
+        belongs_to = "super::btc_transaction::Entity",
+        from = "Column::BtcTxid",
+        to = "super::btc_transaction::Column::Id",
+        on_update = "NoAction",
+        on_delete = "SetNull"
+    )]
+    BtcTransaction,
     #[sea_orm(
         belongs_to = "super::wallet::Entity",
         from = "Column::WalletId",
@@ -38,6 +48,12 @@ pub enum Relation {
         on_delete = "Cascade"
     )]
     Wallet,
+}
+
+impl Related<super::btc_transaction::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::BtcTransaction.def()
+    }
 }
 
 impl Related<super::wallet::Entity> for Entity {

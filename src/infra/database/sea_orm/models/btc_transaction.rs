@@ -3,51 +3,32 @@
 use sea_orm::entity::prelude::*;
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
-#[sea_orm(table_name = "wallet")]
+#[sea_orm(table_name = "btc_transaction")]
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
     pub id: Uuid,
     #[sea_orm(unique)]
-    pub user_id: String,
+    pub txid: String,
+    pub amount_sat: i64,
+    pub fee_sat: Option<i64>,
+    pub block_height: Option<i32>,
+    pub timestamp: Option<DateTime>,
+    pub currency: String,
     pub created_at: DateTime,
     pub updated_at: Option<DateTime>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
-    #[sea_orm(has_many = "super::api_key::Entity")]
-    ApiKey,
-    #[sea_orm(has_many = "super::btc_address::Entity")]
-    BtcAddress,
     #[sea_orm(has_many = "super::invoice::Entity")]
     Invoice,
-    #[sea_orm(has_one = "super::ln_address::Entity")]
-    LnAddress,
     #[sea_orm(has_many = "super::payment::Entity")]
     Payment,
-}
-
-impl Related<super::api_key::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::ApiKey.def()
-    }
-}
-
-impl Related<super::btc_address::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::BtcAddress.def()
-    }
 }
 
 impl Related<super::invoice::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::Invoice.def()
-    }
-}
-
-impl Related<super::ln_address::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::LnAddress.def()
     }
 }
 
