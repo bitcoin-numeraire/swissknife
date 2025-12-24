@@ -57,6 +57,7 @@ impl From<InvoiceModel> for Invoice {
             created_at: model.created_at.and_utc(),
             updated_at: model.updated_at.map(|t| t.and_utc()),
             ln_invoice,
+            bitcoin_transaction: None,
         }
     }
 }
@@ -81,6 +82,7 @@ impl From<PaymentModel> for Payment {
             success_action: serde_json::from_value(model.success_action.unwrap_or_default()).ok(),
             created_at: model.created_at.and_utc(),
             updated_at: model.updated_at.map(|t| t.and_utc()),
+            bitcoin_transaction: None,
         }
     }
 }

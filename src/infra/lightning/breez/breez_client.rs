@@ -14,8 +14,14 @@ use breez_sdk_core::{
 };
 
 use crate::{
-    application::errors::LightningError,
-    domains::{invoice::Invoice, ln_node::LnEventsUseCases, payment::Payment, system::HealthStatus},
+    application::{entities::Currency, errors::LightningError},
+    domains::{
+        bitcoin::{BitcoinBalance, BitcoinTransaction},
+        invoice::Invoice,
+        ln_node::LnEventsUseCases,
+        payment::Payment,
+        system::HealthStatus,
+    },
     infra::lightning::LnClient,
 };
 
@@ -328,5 +334,46 @@ impl LnClient for BreezClient {
             .map_err(|e| LightningError::HealthCheck(e.to_string()))?;
 
         Ok(response.status.into())
+    }
+
+    async fn get_new_bitcoin_address(&self) -> Result<String, LightningError> {
+        Err(LightningError::Unsupported(
+            "Bitcoin address generation is not yet implemented for Breez".to_string(),
+        ))
+    }
+
+    async fn get_bitcoin_balance(&self) -> Result<BitcoinBalance, LightningError> {
+        Err(LightningError::Unsupported(
+            "Bitcoin balance retrieval is not yet implemented for Breez".to_string(),
+        ))
+    }
+
+    async fn send_bitcoin(
+        &self,
+        _address: String,
+        _amount_sat: u64,
+        _fee_rate: Option<u32>,
+    ) -> Result<String, LightningError> {
+        Err(LightningError::Unsupported(
+            "Direct bitcoin sends are not yet implemented for Breez".to_string(),
+        ))
+    }
+
+    async fn list_bitcoin_transactions(&self) -> Result<Vec<BitcoinTransaction>, LightningError> {
+        Err(LightningError::Unsupported(
+            "Listing bitcoin transactions is not yet implemented for Breez".to_string(),
+        ))
+    }
+
+    async fn get_bitcoin_network(&self) -> Result<Currency, LightningError> {
+        Err(LightningError::Unsupported(
+            "Retrieving bitcoin network information is not yet implemented for Breez".to_string(),
+        ))
+    }
+
+    async fn validate_bitcoin_address(&self, _address: &str) -> Result<bool, LightningError> {
+        Err(LightningError::Unsupported(
+            "Validating bitcoin addresses is not yet implemented for Breez".to_string(),
+        ))
     }
 }

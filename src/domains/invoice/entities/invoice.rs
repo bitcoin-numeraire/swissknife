@@ -7,7 +7,10 @@ use strum_macros::{Display, EnumString};
 use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
 
-use crate::application::entities::{Currency, Ledger, OrderDirection};
+use crate::{
+    application::entities::{Currency, Ledger, OrderDirection},
+    domains::bitcoin::BitcoinTransaction,
+};
 
 #[derive(Clone, Debug, Default)]
 pub struct Invoice {
@@ -26,6 +29,8 @@ pub struct Invoice {
     pub created_at: DateTime<Utc>,
     pub updated_at: Option<DateTime<Utc>>,
     pub ln_invoice: Option<LnInvoice>,
+    #[allow(dead_code)]
+    pub bitcoin_transaction: Option<BitcoinTransaction>,
 }
 
 #[derive(Clone, Debug, Default)]

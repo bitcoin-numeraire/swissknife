@@ -7,6 +7,7 @@ use uuid::Uuid;
 
 use crate::{
     application::entities::{Currency, Ledger, OrderDirection},
+    domains::bitcoin::BitcoinTransaction,
     domains::lnurl::LnUrlSuccessAction,
 };
 
@@ -29,6 +30,8 @@ pub struct Payment {
     pub success_action: Option<LnUrlSuccessAction>,
     pub created_at: DateTime<Utc>,
     pub updated_at: Option<DateTime<Utc>>,
+    #[allow(dead_code)]
+    pub bitcoin_transaction: Option<BitcoinTransaction>,
 }
 
 #[derive(Clone, Debug, EnumString, Display, Deserialize, Serialize, PartialEq, Eq, Default, ToSchema)]

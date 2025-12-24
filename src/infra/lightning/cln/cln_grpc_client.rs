@@ -12,8 +12,14 @@ use async_trait::async_trait;
 use cln::{node_client::NodeClient, Amount, GetinfoRequest, ListinvoicesRequest, PayRequest};
 
 use crate::{
-    application::errors::LightningError,
-    domains::{invoice::Invoice, ln_node::LnEventsUseCases, payment::Payment, system::HealthStatus},
+    application::{entities::Currency, errors::LightningError},
+    domains::{
+        bitcoin::{BitcoinBalance, BitcoinTransaction},
+        invoice::Invoice,
+        ln_node::LnEventsUseCases,
+        payment::Payment,
+        system::HealthStatus,
+    },
     infra::{config::config_rs::deserialize_duration, lightning::LnClient},
 };
 
@@ -198,6 +204,49 @@ impl LnClient for ClnGrpcClient {
         _recipient_address: String,
         _feerate: u32,
     ) -> Result<ReverseSwapInfo, LightningError> {
-        todo!();
+        Err(LightningError::Unsupported(
+            "Bitcoin payments are not implemented for CLN gRPC client".to_string(),
+        ))
+    }
+
+    async fn get_new_bitcoin_address(&self) -> Result<String, LightningError> {
+        Err(LightningError::Unsupported(
+            "Bitcoin address generation is not implemented for CLN gRPC client".to_string(),
+        ))
+    }
+
+    async fn get_bitcoin_balance(&self) -> Result<BitcoinBalance, LightningError> {
+        Err(LightningError::Unsupported(
+            "Bitcoin balance retrieval is not implemented for CLN gRPC client".to_string(),
+        ))
+    }
+
+    async fn send_bitcoin(
+        &self,
+        _address: String,
+        _amount_sat: u64,
+        _fee_rate: Option<u32>,
+    ) -> Result<String, LightningError> {
+        Err(LightningError::Unsupported(
+            "Bitcoin send is not implemented for CLN gRPC client".to_string(),
+        ))
+    }
+
+    async fn list_bitcoin_transactions(&self) -> Result<Vec<BitcoinTransaction>, LightningError> {
+        Err(LightningError::Unsupported(
+            "Listing bitcoin transactions is not implemented for CLN gRPC client".to_string(),
+        ))
+    }
+
+    async fn get_bitcoin_network(&self) -> Result<Currency, LightningError> {
+        Err(LightningError::Unsupported(
+            "Network lookup is not implemented for CLN gRPC client".to_string(),
+        ))
+    }
+
+    async fn validate_bitcoin_address(&self, _address: &str) -> Result<bool, LightningError> {
+        Err(LightningError::Unsupported(
+            "Address validation is not implemented for CLN gRPC client".to_string(),
+        ))
     }
 }

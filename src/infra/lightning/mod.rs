@@ -4,4 +4,4 @@ mod ln_client;
 pub mod lnd;
 mod types;
 
-pub use ln_client::*;
+pub use ln_client::LnClient;
