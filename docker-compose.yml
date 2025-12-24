@@ -1,6 +1,6 @@
 services:
   postgres:
-    image: postgres:16.10
+    image: postgres:18.1
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
@@ -13,7 +13,7 @@ services:
     ports:
       - 5432:5432
     volumes:
-      - db:/var/lib/postgresql/data
+      - db:/var/lib/postgresql
     command:
       - "postgres"
       - "-c"
@@ -24,7 +24,7 @@ services:
       - "log_destination=stderr" # Send logs to stderr
 
   pgadmin:
-    image: dpage/pgadmin4:9.9
+    image: dpage/pgadmin4:9.11
     environment:
       PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-pgadmin4@pgadmin.org}
       PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:-admin}
