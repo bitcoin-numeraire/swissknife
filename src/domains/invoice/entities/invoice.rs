@@ -9,7 +9,7 @@ use uuid::Uuid;
 
 use crate::{
     application::entities::{Currency, Ledger, OrderDirection},
-    domains::bitcoin::BitcoinTransaction,
+    domains::bitcoin::BitcoinOutput,
 };
 
 #[derive(Clone, Debug, Default)]
@@ -30,7 +30,7 @@ pub struct Invoice {
     pub updated_at: Option<DateTime<Utc>>,
     pub ln_invoice: Option<LnInvoice>,
     #[allow(dead_code)]
-    pub bitcoin_transaction: Option<BitcoinTransaction>,
+    pub bitcoin_output: Option<BitcoinOutput>,
 }
 
 #[derive(Clone, Debug, Default)]

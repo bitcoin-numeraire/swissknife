@@ -73,8 +73,8 @@ pub enum LightningError {
     BitcoinPayment(String),
 
     #[allow(dead_code)]
-    #[error("Failed to list bitcoin transactions: {0}")]
-    BitcoinTransactions(String),
+    #[error("Failed to list bitcoin outputs: {0}")]
+    BitcoinOutputs(String),
 
     #[allow(dead_code)]
     #[error("Failed to validate bitcoin address: {0}")]

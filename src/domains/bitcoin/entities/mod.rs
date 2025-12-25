@@ -1,8 +1,8 @@
 mod address;
 mod balance;
-mod transaction;
+mod output;
 
 #[allow(unused_imports)]
 pub use address::*;
 pub use balance::*;
-pub use transaction::*;
+pub use output::*;

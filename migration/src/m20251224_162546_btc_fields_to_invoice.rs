@@ -1,7 +1,7 @@
 use sea_orm::DatabaseBackend;
 use sea_orm_migration::{prelude::*, schema::*};
 
-use crate::{m20240420_3_invoice_table::Invoice, m20251224_162542_btc_transaction_table::BtcTransaction};
+use crate::{m20240420_3_invoice_table::Invoice, m20251224_162542_btc_output_table::BtcOutput};
 
 #[derive(DeriveMigrationName)]
 pub struct Migration;
@@ -9,22 +9,12 @@ pub struct Migration;
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        // Add btc_transaction_id column
+        // Add btc_output_id column
         manager
             .alter_table(
                 Table::alter()
                     .table(Invoice::Table)
-                    .add_column(uuid_null(Invoice::BtcTxid))
-                    .to_owned(),
-            )
-            .await?;
-
-        // Add output_index column
-        manager
-            .alter_table(
-                Table::alter()
-                    .table(Invoice::Table)
-                    .add_column(integer_null(Invoice::OutputIndex))
+                    .add_column(uuid_null(Invoice::BtcOutputId))
                     .to_owned(),
             )
             .await?;
@@ -33,11 +23,11 @@ impl MigrationTrait for Migration {
         let db_backend = manager.get_database_backend();
         if db_backend == DatabaseBackend::Postgres {
             let fk_invoice = TableForeignKey::new()
-                .name("fk_invoice_btc_transaction")
+                .name("fk_invoice_btc_output")
                 .from_tbl(Invoice::Table)
-                .from_col(Invoice::BtcTxid)
-                .to_tbl(BtcTransaction::Table)
-                .to_col(BtcTransaction::Id)
+                .from_col(Invoice::BtcOutputId)
+                .to_tbl(BtcOutput::Table)
+                .to_col(BtcOutput::Id)
                 .on_delete(ForeignKeyAction::SetNull)
                 .to_owned();
 
@@ -63,7 +53,7 @@ impl MigrationTrait for Migration {
                 .alter_table(
                     Table::alter()
                         .table(Invoice::Table)
-                        .drop_foreign_key(Alias::new("fk_invoice_btc_transaction"))
+                        .drop_foreign_key(Alias::new("fk_invoice_btc_output"))
                         .to_owned(),
                 )
                 .await?;
@@ -74,16 +64,7 @@ impl MigrationTrait for Migration {
             .alter_table(
                 Table::alter()
                     .table(Invoice::Table)
-                    .drop_column(Invoice::BtcTxid)
-                    .to_owned(),
-            )
-            .await?;
-
-        manager
-            .alter_table(
-                Table::alter()
-                    .table(Invoice::Table)
-                    .drop_column(Invoice::OutputIndex)
+                    .drop_column(Invoice::BtcOutputId)
                     .to_owned(),
             )
             .await?;

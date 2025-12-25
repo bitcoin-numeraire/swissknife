@@ -29,20 +29,19 @@ pub struct Model {
     pub created_at: DateTime,
     pub updated_at: Option<DateTime>,
     pub expires_at: Option<DateTime>,
-    pub btc_txid: Option<Uuid>,
-    pub output_index: Option<i32>,
+    pub btc_output_id: Option<Uuid>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
     #[sea_orm(
-        belongs_to = "super::btc_transaction::Entity",
-        from = "Column::BtcTxid",
-        to = "super::btc_transaction::Column::Id",
+        belongs_to = "super::btc_output::Entity",
+        from = "Column::BtcOutputId",
+        to = "super::btc_output::Column::Id",
         on_update = "NoAction",
         on_delete = "SetNull"
     )]
-    BtcTransaction,
+    BtcOutput,
     #[sea_orm(
         belongs_to = "super::ln_address::Entity",
         from = "Column::LnAddressId",
@@ -61,9 +60,9 @@ pub enum Relation {
     Wallet,
 }
 
-impl Related<super::btc_transaction::Entity> for Entity {
+impl Related<super::btc_output::Entity> for Entity {
     fn to() -> RelationDef {
-        Relation::BtcTransaction.def()
+        Relation::BtcOutput.def()
     }
 }
 

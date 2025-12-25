@@ -16,7 +16,7 @@ use async_trait::async_trait;
 use crate::{
     application::{entities::Currency, errors::LightningError},
     domains::{
-        bitcoin::{BitcoinBalance, BitcoinTransaction},
+        bitcoin::{BitcoinBalance, BitcoinOutput},
         invoice::Invoice,
         ln_node::LnEventsUseCases,
         payment::Payment,
@@ -250,9 +250,9 @@ impl LnClient for ClnRestClient {
         ))
     }
 
-    async fn list_bitcoin_transactions(&self) -> Result<Vec<BitcoinTransaction>, LightningError> {
+    async fn list_bitcoin_outputs(&self) -> Result<Vec<BitcoinOutput>, LightningError> {
         Err(LightningError::Unsupported(
-            "Listing bitcoin transactions is not implemented for CLN REST client".to_string(),
+            "Listing bitcoin outputs is not implemented for CLN REST client".to_string(),
         ))
     }
 

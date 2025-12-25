@@ -4,10 +4,10 @@ pub mod prelude;
 
 pub mod api_key;
 pub mod btc_address;
-pub mod btc_transaction;
+pub mod btc_output;
 pub mod config;
+pub mod contact;
 pub mod invoice;
 pub mod ln_address;
 pub mod payment;
 pub mod wallet;
-pub mod contact;

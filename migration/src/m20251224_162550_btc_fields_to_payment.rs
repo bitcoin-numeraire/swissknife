@@ -1,7 +1,7 @@
 use sea_orm::DatabaseBackend;
 use sea_orm_migration::{prelude::*, schema::*};
 
-use crate::{m20240420_4_payment_table::Payment, m20251224_162542_btc_transaction_table::BtcTransaction};
+use crate::{m20240420_4_payment_table::Payment, m20251224_162542_btc_output_table::BtcOutput};
 
 #[derive(DeriveMigrationName)]
 pub struct Migration;
@@ -9,12 +9,12 @@ pub struct Migration;
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        // Add btc_transaction_id column
+        // Add btc_output_id column
         manager
             .alter_table(
                 Table::alter()
                     .table(Payment::Table)
-                    .add_column(uuid_null(Payment::BtcTxid))
+                    .add_column(uuid_null(Payment::BtcOutputId))
                     .to_owned(),
             )
             .await?;
@@ -33,11 +33,11 @@ impl MigrationTrait for Migration {
         let db_backend = manager.get_database_backend();
         if db_backend == DatabaseBackend::Postgres {
             let fk_payment = TableForeignKey::new()
-                .name("fk_payment_btc_transaction")
+                .name("fk_payment_btc_output")
                 .from_tbl(Payment::Table)
-                .from_col(Payment::BtcTxid)
-                .to_tbl(BtcTransaction::Table)
-                .to_col(BtcTransaction::Id)
+                .from_col(Payment::BtcOutputId)
+                .to_tbl(BtcOutput::Table)
+                .to_col(BtcOutput::Id)
                 .on_delete(ForeignKeyAction::SetNull)
                 .to_owned();
 
@@ -63,7 +63,7 @@ impl MigrationTrait for Migration {
                 .alter_table(
                     Table::alter()
                         .table(Payment::Table)
-                        .drop_foreign_key(Alias::new("fk_payment_btc_transaction"))
+                        .drop_foreign_key(Alias::new("fk_payment_btc_output"))
                         .to_owned(),
                 )
                 .await?;
@@ -74,7 +74,7 @@ impl MigrationTrait for Migration {
             .alter_table(
                 Table::alter()
                     .table(Payment::Table)
-                    .drop_column(Payment::BtcTxid)
+                    .drop_column(Payment::BtcOutputId)
                     .to_owned(),
             )
             .await?;

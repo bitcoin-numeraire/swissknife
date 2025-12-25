@@ -4,7 +4,7 @@ use breez_sdk_core::ReverseSwapInfo;
 use crate::{
     application::{entities::Currency, errors::LightningError},
     domains::{
-        bitcoin::{BitcoinBalance, BitcoinTransaction},
+        bitcoin::{BitcoinBalance, BitcoinOutput},
         invoice::Invoice,
         payment::Payment,
         system::HealthStatus,
@@ -40,7 +40,7 @@ pub trait LnClient: Sync + Send {
         amount_sat: u64,
         fee_rate: Option<u32>,
     ) -> Result<String, LightningError>;
-    async fn list_bitcoin_transactions(&self) -> Result<Vec<BitcoinTransaction>, LightningError>;
+    async fn list_bitcoin_outputs(&self) -> Result<Vec<BitcoinOutput>, LightningError>;
     async fn get_bitcoin_network(&self) -> Result<Currency, LightningError>;
     async fn validate_bitcoin_address(&self, address: &str) -> Result<bool, LightningError>;
 }

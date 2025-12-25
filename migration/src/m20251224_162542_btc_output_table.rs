@@ -1,0 +1,76 @@
+use sea_orm_migration::{prelude::*, schema::*};
+
+#[derive(DeriveMigrationName)]
+pub struct Migration;
+
+#[async_trait::async_trait]
+impl MigrationTrait for Migration {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .create_table(
+                Table::create()
+                    .table(BtcOutput::Table)
+                    .if_not_exists()
+                    .col(uuid(BtcOutput::Id).primary_key())
+                    .col(string_len(BtcOutput::Outpoint, 255).unique_key())
+                    .col(string_len(BtcOutput::Txid, 255))
+                    .col(integer(BtcOutput::OutputIndex))
+                    .col(big_integer(BtcOutput::AmountSat))
+                    .col(big_integer_null(BtcOutput::FeeSat))
+                    .col(integer_null(BtcOutput::BlockHeight))
+                    .col(timestamp_null(BtcOutput::Timestamp))
+                    .col(string_len(BtcOutput::Currency, 255))
+                    .col(timestamp(BtcOutput::CreatedAt).default(Expr::current_timestamp()))
+                    .col(timestamp_null(BtcOutput::UpdatedAt))
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .create_index(
+                Index::create()
+                    .name("idx_btc_output_txid_output_index")
+                    .table(BtcOutput::Table)
+                    .col(BtcOutput::Txid)
+                    .col(BtcOutput::OutputIndex)
+                    .unique()
+                    .to_owned(),
+            )
+            .await?;
+        Ok(())
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .drop_index(
+                Index::drop()
+                    .name("idx_btc_output_txid_output_index")
+                    .table(BtcOutput::Table)
+                    .to_owned(),
+            )
+            .await?;
+
+        // Drop table
+        manager
+            .drop_table(Table::drop().table(BtcOutput::Table).to_owned())
+            .await?;
+
+        Ok(())
+    }
+}
+
+#[derive(DeriveIden)]
+pub(crate) enum BtcOutput {
+    Table,
+    Id,
+    Outpoint,
+    Txid,
+    OutputIndex,
+    AmountSat,
+    FeeSat,
+    BlockHeight,
+    Timestamp,
+    Currency,
+    CreatedAt,
+    UpdatedAt,
+}

@@ -3,12 +3,14 @@
 use sea_orm::entity::prelude::*;
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
-#[sea_orm(table_name = "btc_transaction")]
+#[sea_orm(table_name = "btc_output")]
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
     pub id: Uuid,
     #[sea_orm(unique)]
+    pub outpoint: String,
     pub txid: String,
+    pub output_index: i32,
     pub amount_sat: i64,
     pub fee_sat: Option<i64>,
     pub block_height: Option<i32>,
