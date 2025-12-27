@@ -2,10 +2,16 @@ use async_trait::async_trait;
 use breez_sdk_core::ReverseSwapInfo;
 
 use crate::{
-    application::errors::LightningError,
-    domains::{invoice::Invoice, payment::Payment, system::HealthStatus},
+    application::{entities::Currency, errors::LightningError},
+    domains::{
+        bitcoin::{BitcoinBalance, BitcoinOutput},
+        invoice::Invoice,
+        payment::Payment,
+        system::HealthStatus,
+    },
 };
 
+#[allow(dead_code)]
 #[async_trait]
 pub trait LnClient: Sync + Send {
     async fn disconnect(&self) -> Result<(), LightningError>;
@@ -25,4 +31,16 @@ pub trait LnClient: Sync + Send {
     ) -> Result<ReverseSwapInfo, LightningError>;
     async fn invoice_by_hash(&self, payment_hash: String) -> Result<Option<Invoice>, LightningError>;
     async fn health(&self) -> Result<HealthStatus, LightningError>;
+
+    async fn get_new_bitcoin_address(&self) -> Result<String, LightningError>;
+    async fn get_bitcoin_balance(&self) -> Result<BitcoinBalance, LightningError>;
+    async fn send_bitcoin(
+        &self,
+        address: String,
+        amount_sat: u64,
+        fee_rate: Option<u32>,
+    ) -> Result<String, LightningError>;
+    async fn list_bitcoin_outputs(&self) -> Result<Vec<BitcoinOutput>, LightningError>;
+    async fn get_bitcoin_network(&self) -> Result<Currency, LightningError>;
+    async fn validate_bitcoin_address(&self, address: &str) -> Result<bool, LightningError>;
 }

@@ -60,6 +60,29 @@ pub enum LightningError {
     #[error("Failed to redeem on-chain: {0}")]
     RedeemOnChain(String),
 
+    #[allow(dead_code)]
+    #[error("Failed to get bitcoin address: {0}")]
+    BitcoinAddress(String),
+
+    #[allow(dead_code)]
+    #[error("Failed to get bitcoin balance: {0}")]
+    BitcoinBalance(String),
+
+    #[allow(dead_code)]
+    #[error("Failed to send bitcoin payment: {0}")]
+    BitcoinPayment(String),
+
+    #[allow(dead_code)]
+    #[error("Failed to list bitcoin outputs: {0}")]
+    BitcoinOutputs(String),
+
+    #[allow(dead_code)]
+    #[error("Failed to validate bitcoin address: {0}")]
+    ValidateBitcoinAddress(String),
+
+    #[error("Unsupported Lightning operation: {0}")]
+    Unsupported(String),
+
     #[error("Failed to connect to LSP: {0}")]
     ConnectLSP(String),
 

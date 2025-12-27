@@ -1,3 +1,4 @@
+pub mod bitcoin;
 pub mod invoice;
 pub mod ln_address;
 pub mod ln_node;

@@ -128,4 +128,6 @@ pub(crate) enum Invoice {
     CreatedAt,
     UpdatedAt,
     ExpiresAt,
+    // Bitcoin L1 support (added in m20251224_162546)
+    BtcOutputId,
 }
