@@ -12,9 +12,9 @@ use crate::{
     application::{
         docs::{BAD_REQUEST_EXAMPLE, INTERNAL_EXAMPLE, NOT_FOUND_EXAMPLE, UNAUTHORIZED_EXAMPLE, UNPROCESSABLE_EXAMPLE},
         dtos::{
-            ApiKeyResponse, CreateApiKeyRequest, ErrorResponse, InvoiceResponse, NewInvoiceRequest, PaymentResponse,
-            RegisterLnAddressRequest, SendPaymentRequest, UpdateLnAddressRequest, WalletLnAddressResponse,
-            WalletResponse,
+            ApiKeyResponse, BitcoinAddressResponse, CreateApiKeyRequest, ErrorResponse, InvoiceResponse,
+            NewInvoiceRequest, PaymentResponse, RegisterLnAddressRequest, SendPaymentRequest, UpdateLnAddressRequest,
+            WalletLnAddressResponse, WalletResponse,
         },
         errors::{ApplicationError, DataError},
     },
@@ -35,7 +35,7 @@ use super::{Balance, Contact};
 #[derive(OpenApi)]
 #[openapi(
     paths(
-        get_user_wallet,
+        get_user_wallet, get_bitcoin_deposit_address,
         get_wallet_balance,
         get_wallet_address, register_wallet_address, update_wallet_address, delete_wallet_address,
         wallet_pay, list_wallet_payments, get_wallet_payment, delete_failed_payments, list_wallet_invoices,
@@ -43,7 +43,7 @@ use super::{Balance, Contact};
         list_contacts,
         create_wallet_api_key, list_wallet_api_keys, get_wallet_api_key, revoke_wallet_api_key, revoke_wallet_api_keys
     ),
-    components(schemas(WalletResponse, Balance, Contact, WalletLnAddressResponse)),
+    components(schemas(WalletResponse, Balance, Contact, WalletLnAddressResponse, BitcoinAddressResponse)),
     tags(
         (name = "User Wallet", description = "User Wallet endpoints. Available to any authenticated user.")
     ),
@@ -54,6 +54,7 @@ pub const CONTEXT_PATH: &str = "/v1/me";
 pub fn user_router() -> Router<Arc<AppState>> {
     Router::new()
         .route("/", get(get_user_wallet))
+        .route("/bitcoin/address", get(get_bitcoin_deposit_address))
         .route("/balance", get(get_wallet_balance))
         .route("/lightning-address", get(get_wallet_address))
         .route("/lightning-address", post(register_wallet_address))
@@ -96,6 +97,28 @@ async fn get_user_wallet(
 ) -> Result<Json<WalletResponse>, ApplicationError> {
     let wallet = app_state.services.wallet.get(user.wallet_id).await?;
     Ok(Json(wallet.into()))
+}
+
+/// Get current Bitcoin deposit address
+///
+/// Returns the active onchain deposit address for the authenticated wallet.
+#[utoipa::path(
+    get,
+    path = "/bitcoin/address",
+    tag = "User Wallet",
+    context_path = CONTEXT_PATH,
+    responses(
+        (status = 200, description = "Found", body = BitcoinAddressResponse),
+        (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
+        (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
+    )
+)]
+async fn get_bitcoin_deposit_address(
+    State(app_state): State<Arc<AppState>>,
+    user: User,
+) -> Result<Json<BitcoinAddressResponse>, ApplicationError> {
+    let address = app_state.services.bitcoin.get_deposit_address(user.wallet_id).await?;
+    Ok(Json(address.into()))
 }
 
 /// Send payment

@@ -1,6 +1,7 @@
 use std::{path::PathBuf, process, str::FromStr, sync::Arc, time::Duration};
 
 use breez_sdk_core::ReverseSwapInfo;
+use chrono::Utc;
 use hex::decode;
 use lightning_invoice::Bolt11Invoice;
 use serde::Deserialize;
@@ -9,7 +10,10 @@ use tonic::transport::{Certificate, Channel, ClientTlsConfig, Identity};
 use uuid::Uuid;
 
 use async_trait::async_trait;
-use cln::{node_client::NodeClient, Amount, GetinfoRequest, ListinvoicesRequest, PayRequest};
+use cln::{
+    node_client::NodeClient, Amount, AmountOrAll, Feerate, GetinfoRequest, ListfundsRequest, ListinvoicesRequest,
+    NewaddrRequest, PayRequest, WithdrawRequest,
+};
 
 use crate::{
     application::{entities::Currency, errors::LightningError},
@@ -20,7 +24,10 @@ use crate::{
         payment::Payment,
         system::HealthStatus,
     },
-    infra::{config::config_rs::deserialize_duration, lightning::LnClient},
+    infra::{
+        config::config_rs::deserialize_duration,
+        lightning::{types::currency_from_network_name, types::validate_address_for_currency, LnClient},
+    },
 };
 
 use self::cln::InvoiceRequest;
@@ -210,43 +217,124 @@ impl LnClient for ClnGrpcClient {
     }
 
     async fn get_new_bitcoin_address(&self) -> Result<String, LightningError> {
-        Err(LightningError::Unsupported(
-            "Bitcoin address generation is not implemented for CLN gRPC client".to_string(),
-        ))
+        let mut client = self.client.clone();
+
+        let response = client
+            .new_addr(NewaddrRequest { addresstype: None })
+            .await
+            .map_err(|e| LightningError::BitcoinAddress(e.message().to_string()))?
+            .into_inner();
+
+        response
+            .bech32
+            .or(response.p2tr)
+            .ok_or_else(|| LightningError::BitcoinAddress("No address returned by CLN".to_string()))
     }
 
     async fn get_bitcoin_balance(&self) -> Result<BitcoinBalance, LightningError> {
-        Err(LightningError::Unsupported(
-            "Bitcoin balance retrieval is not implemented for CLN gRPC client".to_string(),
-        ))
+        let mut client = self.client.clone();
+
+        let response = client
+            .list_funds(ListfundsRequest { spent: Some(false) })
+            .await
+            .map_err(|e| LightningError::BitcoinBalance(e.message().to_string()))?
+            .into_inner();
+
+        let mut confirmed_sat = 0;
+        let mut unconfirmed_sat = 0;
+
+        for output in response.outputs {
+            let amount_msat = output.amount_msat.map(|a| a.msat).unwrap_or_default();
+            let amount_sat = amount_msat / 1000;
+
+            match cln::listfunds_outputs::ListfundsOutputsStatus::try_from(output.status) {
+                Ok(cln::listfunds_outputs::ListfundsOutputsStatus::Confirmed) => confirmed_sat += amount_sat,
+                _ => unconfirmed_sat += amount_sat,
+            }
+        }
+
+        Ok(BitcoinBalance {
+            confirmed_sat,
+            unconfirmed_sat,
+        })
     }
 
     async fn send_bitcoin(
         &self,
-        _address: String,
-        _amount_sat: u64,
-        _fee_rate: Option<u32>,
+        address: String,
+        amount_sat: u64,
+        fee_rate: Option<u32>,
     ) -> Result<String, LightningError> {
-        Err(LightningError::Unsupported(
-            "Bitcoin send is not implemented for CLN gRPC client".to_string(),
-        ))
+        let mut client = self.client.clone();
+        let feerate = fee_rate.map(|rate| Feerate {
+            style: Some(cln::feerate::Style::Perkb(rate * 1000)),
+        });
+
+        let response = client
+            .withdraw(WithdrawRequest {
+                destination: address,
+                satoshi: Some(AmountOrAll {
+                    value: Some(cln::amount_or_all::Value::Amount(Amount {
+                        msat: amount_sat * 1000,
+                    })),
+                }),
+                minconf: None,
+                utxos: vec![],
+                feerate,
+            })
+            .await
+            .map_err(|e| LightningError::BitcoinPayment(e.message().to_string()))?
+            .into_inner();
+
+        Ok(hex::encode(response.txid))
     }
 
     async fn list_bitcoin_outputs(&self) -> Result<Vec<BitcoinOutput>, LightningError> {
-        Err(LightningError::Unsupported(
-            "Listing bitcoin outputs is not implemented for CLN gRPC client".to_string(),
-        ))
+        let mut client = self.client.clone();
+        let currency = self.get_bitcoin_network().await?;
+
+        let response = client
+            .list_funds(ListfundsRequest { spent: Some(false) })
+            .await
+            .map_err(|e| LightningError::BitcoinOutputs(e.message().to_string()))?
+            .into_inner();
+
+        let outputs = response
+            .outputs
+            .into_iter()
+            .map(|output| BitcoinOutput {
+                id: Uuid::new_v4(),
+                outpoint: format!("{}:{}", hex::encode(output.txid.clone()), output.output),
+                txid: hex::encode(output.txid),
+                output_index: output.output,
+                address: output.address,
+                amount_sat: (output.amount_msat.map(|a| a.msat).unwrap_or_default() / 1000) as i64,
+                fee_sat: None,
+                block_height: output.blockheight,
+                timestamp: None,
+                currency: currency.clone(),
+                created_at: Utc::now(),
+                updated_at: None,
+            })
+            .collect();
+
+        Ok(outputs)
     }
 
     async fn get_bitcoin_network(&self) -> Result<Currency, LightningError> {
-        Err(LightningError::Unsupported(
-            "Network lookup is not implemented for CLN gRPC client".to_string(),
-        ))
+        let mut client = self.client.clone();
+        let response = client
+            .getinfo(GetinfoRequest {})
+            .await
+            .map_err(|e| LightningError::HealthCheck(e.message().to_string()))?
+            .into_inner();
+
+        currency_from_network_name(&response.network)
+            .ok_or_else(|| LightningError::HealthCheck("Unknown network returned by CLN".to_string()))
     }
 
-    async fn validate_bitcoin_address(&self, _address: &str) -> Result<bool, LightningError> {
-        Err(LightningError::Unsupported(
-            "Address validation is not implemented for CLN gRPC client".to_string(),
-        ))
+    async fn validate_bitcoin_address(&self, address: &str) -> Result<bool, LightningError> {
+        let currency = self.get_bitcoin_network().await?;
+        Ok(validate_address_for_currency(address, currency))
     }
 }

@@ -128,6 +128,102 @@ impl PaymentService {
         }
     }
 
+    async fn send_bitcoin_payment(
+        &self,
+        address: String,
+        amount_msat: Option<u64>,
+        comment: Option<String>,
+        wallet_id: Uuid,
+    ) -> Result<Payment, ApplicationError> {
+        let amount_msat = Self::validate_amount(amount_msat)?;
+        if amount_msat % 1000 != 0 {
+            return Err(DataError::Validation(
+                "Bitcoin payments must be specified in satoshis (multiples of 1000 msat).".into(),
+            )
+            .into());
+        }
+
+        let amount_sat = amount_msat / 1000;
+        let currency = self.ln_client.get_bitcoin_network().await?;
+
+        if let Some(recipient_address) = self.store.btc_address.find_by_address(&address).await? {
+            if recipient_address.wallet_id == wallet_id {
+                return Err(DataError::Validation("Cannot pay to your own bitcoin address.".to_string()).into());
+            }
+
+            let timestamp = Utc::now();
+
+            self.store
+                .invoice
+                .insert(Invoice {
+                    id: Uuid::new_v4(),
+                    wallet_id: recipient_address.wallet_id,
+                    ln_address_id: None,
+                    description: comment.clone(),
+                    amount_msat: Some(amount_msat),
+                    amount_received_msat: Some(amount_msat),
+                    timestamp,
+                    status: InvoiceStatus::Settled,
+                    ledger: Ledger::Internal,
+                    currency: currency.clone(),
+                    fee_msat: Some(0),
+                    payment_time: Some(timestamp),
+                    btc_output_id: None,
+                    ..Default::default()
+                })
+                .await?;
+
+            let internal_payment = self
+                .insert_payment(
+                    Payment {
+                        wallet_id,
+                        amount_msat,
+                        status: PaymentStatus::Settled,
+                        ledger: Ledger::Internal,
+                        currency,
+                        description: comment,
+                        destination_address: Some(address),
+                        fee_msat: Some(0),
+                        payment_time: Some(timestamp),
+                        ..Default::default()
+                    },
+                    0.0,
+                )
+                .await?;
+
+            return Ok(internal_payment);
+        }
+
+        let pending_payment = self
+            .insert_payment(
+                Payment {
+                    wallet_id,
+                    amount_msat,
+                    status: PaymentStatus::Pending,
+                    ledger: Ledger::Onchain,
+                    currency,
+                    description: comment,
+                    destination_address: Some(address.clone()),
+                    ..Default::default()
+                },
+                self.fee_buffer,
+            )
+            .await?;
+
+        let txid = self
+            .ln_client
+            .send_bitcoin(address, amount_sat, None)
+            .await
+            .map_err(|e| DataError::Validation(e.to_string()))?;
+
+        let mut updated_payment = pending_payment.clone();
+        updated_payment.payment_hash = Some(txid);
+
+        let payment = self.store.payment.update(updated_payment).await?;
+
+        Ok(payment)
+    }
+
     async fn send_bolt11(
         &self,
         invoice: LNInvoice,
@@ -364,6 +460,10 @@ impl PaymentsUseCases for PaymentService {
         wallet_id: Uuid,
     ) -> Result<Payment, ApplicationError> {
         debug!(%input, %wallet_id, "Received pay request");
+
+        if self.ln_client.validate_bitcoin_address(&input).await.unwrap_or(false) {
+            return self.send_bitcoin_payment(input, amount_msat, comment, wallet_id).await;
+        }
 
         let payment = if self.is_internal_payment(&input) {
             self.send_internal(input, amount_msat, comment, wallet_id).await

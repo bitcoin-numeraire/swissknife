@@ -3,6 +3,7 @@ use std::time::Duration;
 use chrono::Utc;
 
 use crate::domains::{
+    bitcoin::{BitcoinAddress, BitcoinOutput},
     invoice::{Invoice, InvoiceStatus, LnInvoice},
     ln_address::LnAddress,
     payment::Payment,
@@ -11,7 +12,7 @@ use crate::domains::{
 };
 
 use super::models::{
-    api_key::Model as ApiKeyModel, contact::ContactModel, invoice::Model as InvoiceModel,
+    api_key::Model as ApiKeyModel, btc_address, btc_output, contact::ContactModel, invoice::Model as InvoiceModel,
     ln_address::Model as LnAddressModel, payment::Model as PaymentModel, wallet::Model as WalletModel,
 };
 
@@ -57,6 +58,7 @@ impl From<InvoiceModel> for Invoice {
             created_at: model.created_at.and_utc(),
             updated_at: model.updated_at.map(|t| t.and_utc()),
             ln_invoice,
+            btc_output_id: model.btc_output_id,
             bitcoin_output: None,
         }
     }
@@ -82,6 +84,8 @@ impl From<PaymentModel> for Payment {
             success_action: serde_json::from_value(model.success_action.unwrap_or_default()).ok(),
             created_at: model.created_at.and_utc(),
             updated_at: model.updated_at.map(|t| t.and_utc()),
+            btc_output_id: model.btc_output_id,
+            destination_address: model.destination_address,
             bitcoin_output: None,
         }
     }
@@ -135,6 +139,39 @@ impl From<ApiKeyModel> for ApiKey {
             description: model.description,
             created_at: model.created_at.and_utc(),
             expires_at: model.expires_at.map(|t| t.and_utc()),
+        }
+    }
+}
+
+impl From<btc_output::Model> for BitcoinOutput {
+    fn from(model: btc_output::Model) -> Self {
+        BitcoinOutput {
+            id: model.id,
+            outpoint: model.outpoint,
+            txid: model.txid,
+            output_index: model.output_index as u32,
+            address: None,
+            amount_sat: model.amount_sat,
+            fee_sat: model.fee_sat,
+            block_height: model.block_height.map(|h| h as u32),
+            timestamp: model.timestamp.map(|t| t.and_utc()),
+            currency: model.currency.parse().expect(ASSERTION_MSG),
+            created_at: model.created_at.and_utc(),
+            updated_at: model.updated_at.map(|t| t.and_utc()),
+        }
+    }
+}
+
+impl From<btc_address::Model> for BitcoinAddress {
+    fn from(model: btc_address::Model) -> Self {
+        BitcoinAddress {
+            id: model.id,
+            wallet_id: model.wallet_id,
+            address: model.address,
+            used: model.used,
+            derivation_index: model.derivation_index,
+            created_at: model.created_at.and_utc(),
+            updated_at: model.updated_at.map(|t| t.and_utc()),
         }
     }
 }

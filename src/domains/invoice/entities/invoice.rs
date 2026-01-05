@@ -29,6 +29,7 @@ pub struct Invoice {
     pub created_at: DateTime<Utc>,
     pub updated_at: Option<DateTime<Utc>>,
     pub ln_invoice: Option<LnInvoice>,
+    pub btc_output_id: Option<Uuid>,
     #[allow(dead_code)]
     pub bitcoin_output: Option<BitcoinOutput>,
 }

@@ -2,6 +2,7 @@ use std::{path::PathBuf, process, sync::Arc, time::Duration};
 
 use anyhow::anyhow;
 use breez_sdk_core::ReverseSwapInfo;
+use chrono::{DateTime, TimeZone, Utc};
 use futures_util::StreamExt;
 use reqwest::{
     header::{HeaderMap, HeaderValue},
@@ -10,6 +11,7 @@ use reqwest::{
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_bolt::bitcoin::hashes::{sha256, Hash};
 use tokio::fs;
+use uuid::Uuid;
 
 use crate::{
     application::{entities::Currency, errors::LightningError},
@@ -20,7 +22,10 @@ use crate::{
         payment::Payment,
         system::HealthStatus,
     },
-    infra::{config::config_rs::deserialize_duration, lightning::LnClient},
+    infra::{
+        config::config_rs::deserialize_duration,
+        lightning::{types::currency_from_network_name, types::validate_address_for_currency, LnClient},
+    },
 };
 use async_trait::async_trait;
 use base64::{engine::general_purpose::STANDARD, Engine};
@@ -199,6 +204,16 @@ impl LndRestClient {
         let result = response.json::<T>().await?;
         Ok(result)
     }
+
+    fn parse_amount(value: Option<String>) -> i64 {
+        value.and_then(|v| v.parse::<i64>().ok()).unwrap_or_default()
+    }
+
+    fn parse_timestamp(value: Option<String>) -> Option<DateTime<Utc>> {
+        value
+            .and_then(|v| v.parse::<i64>().ok())
+            .and_then(|secs| Utc.timestamp_opt(secs, 0).single())
+    }
 }
 
 #[async_trait]
@@ -304,43 +319,120 @@ impl LnClient for LndRestClient {
     }
 
     async fn get_new_bitcoin_address(&self) -> Result<String, LightningError> {
-        Err(LightningError::Unsupported(
-            "Bitcoin address generation is not implemented for LND REST client".to_string(),
-        ))
+        let response: NewAddressResponse = self
+            .post_request(
+                "v1/newaddress",
+                &NewAddressRequest {
+                    address_type: "WITNESS_PUBKEY_HASH".to_string(),
+                },
+            )
+            .await
+            .map_err(|e| LightningError::BitcoinAddress(e.to_string()))?;
+
+        Ok(response.address)
     }
 
     async fn get_bitcoin_balance(&self) -> Result<BitcoinBalance, LightningError> {
-        Err(LightningError::Unsupported(
-            "Bitcoin balance retrieval is not implemented for LND REST client".to_string(),
-        ))
+        let response: WalletBalanceResponse = self
+            .get_request("v1/balance/blockchain")
+            .await
+            .map_err(|e| LightningError::BitcoinBalance(e.to_string()))?;
+
+        Ok(BitcoinBalance {
+            confirmed_sat: Self::parse_amount(response.confirmed_balance) as u64,
+            unconfirmed_sat: Self::parse_amount(response.unconfirmed_balance) as u64,
+        })
     }
 
     async fn send_bitcoin(
         &self,
-        _address: String,
-        _amount_sat: u64,
-        _fee_rate: Option<u32>,
+        address: String,
+        amount_sat: u64,
+        fee_rate: Option<u32>,
     ) -> Result<String, LightningError> {
-        Err(LightningError::Unsupported(
-            "Bitcoin send is not implemented for LND REST client".to_string(),
-        ))
+        let response: SendCoinsResponse = self
+            .post_request(
+                "v1/transactions",
+                &SendCoinsRequest {
+                    addr: address,
+                    amount: amount_sat as i64,
+                    sat_per_vbyte: fee_rate.map(|f| f as u64),
+                },
+            )
+            .await
+            .map_err(|e| LightningError::BitcoinPayment(e.to_string()))?;
+
+        Ok(response.txid)
     }
 
     async fn list_bitcoin_outputs(&self) -> Result<Vec<BitcoinOutput>, LightningError> {
-        Err(LightningError::Unsupported(
-            "Listing bitcoin outputs is not implemented for LND REST client".to_string(),
-        ))
+        let currency = self.get_bitcoin_network().await?;
+        let response: ListTransactionsResponse = self
+            .get_request("v1/transactions")
+            .await
+            .map_err(|e| LightningError::BitcoinOutputs(e.to_string()))?;
+
+        let mut outputs = Vec::new();
+
+        for transaction in response.transactions.unwrap_or_default() {
+            let txid = match transaction.tx_hash {
+                Some(ref hash) => hash.clone(),
+                None => continue,
+            };
+
+            if let Some(details) = transaction.output_details {
+                for detail in details {
+                    if !detail.is_ours.unwrap_or(false) {
+                        continue;
+                    }
+
+                    let output_index = detail.output_index.unwrap_or(0) as u32;
+                    let amount_sat = Self::parse_amount(detail.amount);
+
+                    outputs.push(BitcoinOutput {
+                        id: Uuid::new_v4(),
+                        outpoint: format!("{txid}:{output_index}"),
+                        txid: txid.clone(),
+                        output_index,
+                        address: detail.address,
+                        amount_sat,
+                        fee_sat: transaction.total_fees.as_ref().and_then(|f| f.parse::<i64>().ok()),
+                        block_height: transaction.block_height.map(|h| h as u32),
+                        timestamp: Self::parse_timestamp(transaction.time_stamp.clone()),
+                        currency: currency.clone(),
+                        created_at: Utc::now(),
+                        updated_at: None,
+                    });
+                }
+            }
+        }
+
+        Ok(outputs)
     }
 
     async fn get_bitcoin_network(&self) -> Result<Currency, LightningError> {
-        Err(LightningError::Unsupported(
-            "Network lookup is not implemented for LND REST client".to_string(),
+        let response: GetinfoResponse = self
+            .get_request("v1/getinfo")
+            .await
+            .map_err(|e| LightningError::HealthCheck(e.to_string()))?;
+
+        if let Some(chain) = response
+            .chains
+            .and_then(|mut chains| chains.pop())
+            .and_then(|chain| chain.network)
+        {
+            return currency_from_network_name(&chain)
+                .ok_or_else(|| LightningError::HealthCheck("Unknown network returned by LND".to_string()));
+        }
+
+        Err(LightningError::HealthCheck(
+            "No chain information returned by LND".to_string(),
         ))
     }
 
-    async fn validate_bitcoin_address(&self, _address: &str) -> Result<bool, LightningError> {
-        Err(LightningError::Unsupported(
-            "Address validation is not implemented for LND REST client".to_string(),
-        ))
+    async fn validate_bitcoin_address(&self, address: &str) -> Result<bool, LightningError> {
+        let currency = self.get_bitcoin_network().await?;
+
+        Ok(validate_address_for_currency(address, currency))
     }
 }

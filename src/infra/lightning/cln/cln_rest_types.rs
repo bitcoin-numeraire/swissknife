@@ -60,7 +60,56 @@ pub struct ListInvoicesResponse {
 pub struct GetinfoRequest {}
 
 #[derive(Debug, Deserialize)]
-pub struct GetinfoResponse {}
+pub struct GetinfoResponse {
+    pub network: String,
+}
+
+#[derive(Debug, Serialize, Default)]
+pub struct ListFundsRequest {
+    pub spent: Option<bool>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ListFundsResponse {
+    pub outputs: Vec<ListFundsOutput>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ListFundsOutput {
+    pub txid: String,
+    pub output: u32,
+    pub amount_msat: String,
+    pub address: Option<String>,
+    pub status: String,
+    pub blockheight: Option<u32>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct NewAddrRequest {
+    pub addresstype: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct NewAddrResponse {
+    pub bech32: Option<String>,
+    #[serde(rename = "p2sh-segwit")]
+    pub p2sh_segwit: Option<String>,
+    #[serde(rename = "p2tr")]
+    pub p2tr: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct WithdrawRequest {
+    pub destination: String,
+    pub satoshi: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub feerate: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct WithdrawResponse {
+    pub txid: String,
+}
 
 #[derive(Debug, Deserialize)]
 pub struct ListInvoicesInvoice {

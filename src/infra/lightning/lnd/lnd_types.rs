@@ -71,7 +71,14 @@ pub struct PayResponse {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct GetinfoResponse {}
+pub struct GetinfoResponse {
+    pub chains: Option<Vec<Chain>>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct Chain {
+    pub network: Option<String>,
+}
 
 impl From<PayResponse> for Payment {
     fn from(val: PayResponse) -> Self {
@@ -137,4 +144,69 @@ fn hex_from_base64(s: &str) -> String {
 #[derive(Debug, Deserialize)]
 pub struct ErrorResponse {
     pub message: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct WalletBalanceResponse {
+    pub confirmed_balance: Option<String>,
+    pub unconfirmed_balance: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct SendCoinsRequest {
+    pub addr: String,
+    pub amount: i64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sat_per_vbyte: Option<u64>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct SendCoinsResponse {
+    pub txid: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct NewAddressRequest {
+    #[serde(rename = "type")]
+    pub address_type: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct NewAddressResponse {
+    pub address: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ValidateAddressRequest {
+    pub address: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ValidateAddressResponse {
+    pub is_valid: bool,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ListTransactionsResponse {
+    pub transactions: Option<Vec<Transaction>>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct Transaction {
+    pub tx_hash: Option<String>,
+    pub amount: Option<String>,
+    pub num_confirmations: Option<i64>,
+    pub block_height: Option<i64>,
+    pub time_stamp: Option<String>,
+    pub total_fees: Option<String>,
+    pub dest_addresses: Option<Vec<String>>,
+    pub output_details: Option<Vec<OutputDetail>>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct OutputDetail {
+    pub output_index: Option<i64>,
+    pub amount: Option<String>,
+    pub address: Option<String>,
+    pub is_ours: Option<bool>,
 }

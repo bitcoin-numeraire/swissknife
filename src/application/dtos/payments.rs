@@ -56,6 +56,14 @@ pub struct PaymentResponse {
     #[schema(example = "hello@numeraire.tech")]
     pub ln_address: Option<String>,
 
+    /// Destination Bitcoin address. Populated for Bitcoin onchain payments.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub destination_address: Option<String>,
+
+    /// Linked Bitcoin output identifier when available.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub btc_output_id: Option<Uuid>,
+
     /// Payment hash
     #[serde(skip_serializing_if = "Option::is_none")]
     #[schema(example = "b587c7f76339e3fb87ad2b...")]
@@ -116,6 +124,8 @@ impl From<Payment> for PaymentResponse {
             id: payment.id,
             wallet_id: payment.wallet_id,
             ln_address: payment.ln_address,
+            destination_address: payment.destination_address,
+            btc_output_id: payment.btc_output_id,
             payment_hash: payment.payment_hash,
             payment_preimage: payment.payment_preimage,
             error: payment.error,

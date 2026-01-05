@@ -1,6 +1,8 @@
+use bitcoin::{Address, Network};
 use chrono::{TimeZone, Utc};
 use lightning_invoice::{Bolt11Invoice, Bolt11InvoiceDescription, Currency as LNInvoiceCurrency};
 use serde_bolt::bitcoin::hashes::hex::ToHex;
+use std::str::FromStr;
 
 use crate::{
     application::entities::{Currency, Ledger},
@@ -45,6 +47,36 @@ impl From<Bolt11Invoice> for Invoice {
             ..Default::default()
         }
     }
+}
+
+pub fn currency_from_network_name(name: &str) -> Option<Currency> {
+    match name.to_lowercase().as_str() {
+        "bitcoin" | "mainnet" => Some(Currency::Bitcoin),
+        "testnet" | "testnet3" => Some(Currency::BitcoinTestnet),
+        "regtest" => Some(Currency::Regtest),
+        "signet" => Some(Currency::Signet),
+        "simnet" => Some(Currency::Simnet),
+        _ => None,
+    }
+}
+
+pub fn currency_to_bitcoin_network(currency: Currency) -> Option<Network> {
+    match currency {
+        Currency::Bitcoin => Some(Network::Bitcoin),
+        Currency::BitcoinTestnet => Some(Network::Testnet),
+        Currency::Regtest | Currency::Simnet => Some(Network::Regtest),
+        Currency::Signet => Some(Network::Signet),
+    }
+}
+
+pub fn validate_address_for_currency(address: &str, currency: Currency) -> bool {
+    if let Ok(parsed) = Address::from_str(address) {
+        if let Some(expected_network) = currency_to_bitcoin_network(currency) {
+            return parsed.require_network(expected_network).is_ok();
+        }
+    }
+
+    false
 }
 
 impl From<LNInvoiceCurrency> for Currency {

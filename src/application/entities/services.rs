@@ -3,6 +3,7 @@ use std::sync::Arc;
 use crate::{
     application::{dtos::AppConfig, errors::ConfigError},
     domains::{
+        bitcoin::{BitcoinService, BitcoinUseCases},
         invoice::{InvoiceService, InvoiceUseCases},
         ln_address::{LnAddressService, LnAddressUseCases},
         lnurl::{LnUrlService, LnUrlUseCases},
@@ -35,6 +36,7 @@ pub struct AppServices {
     pub system: Box<dyn SystemUseCases>,
     pub nostr: Box<dyn NostrUseCases>,
     pub api_key: Box<dyn ApiKeyUseCases>,
+    pub bitcoin: Box<dyn BitcoinUseCases>,
 }
 
 impl AppServices {
@@ -66,9 +68,10 @@ impl AppServices {
         let ln_address = LnAddressService::new(store.clone());
         let wallet = WalletService::new(store.clone());
         let auth = AuthService::new(jwt_authenticator, store.clone(), config.auth_provider);
-        let system = SystemService::new(store.clone(), ln_client);
+        let system = SystemService::new(store.clone(), ln_client.clone());
         let nostr = NostrService::new(store.clone());
-        let api_key = ApiKeyService::new(store);
+        let api_key = ApiKeyService::new(store.clone());
+        let bitcoin = BitcoinService::new(store, ln_client);
 
         AppServices {
             invoice: Box::new(invoices),
@@ -80,6 +83,7 @@ impl AppServices {
             system: Box::new(system),
             nostr: Box::new(nostr),
             api_key: Box::new(api_key),
+            bitcoin: Box::new(bitcoin),
         }
     }
 }
