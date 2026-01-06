@@ -2,43 +2,33 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use chrono::Utc;
-use tracing::{debug, info, warn};
+use tracing::{debug, info, trace};
 use uuid::Uuid;
 
 use crate::{
     application::{
-        dtos::BitcoinAddressType,
-        entities::{AppStore, Ledger},
-        errors::{ApplicationError, LightningError},
+        entities::{AppStore, BitcoinWallet, Ledger},
+        errors::ApplicationError,
     },
     domains::invoice::{Invoice, InvoiceStatus},
-    infra::lightning::{types::validate_address_for_currency, LnClient},
 };
 
-use super::{BitcoinAddress, BitcoinOutput, BitcoinUseCases};
+use super::{BitcoinAddress, BitcoinAddressType, BitcoinOutput, BitcoinUseCases};
 
 const DEFAULT_DEPOSIT_DESCRIPTION: &str = "Bitcoin onchain deposit";
 
 pub struct BitcoinService {
     store: AppStore,
-    ln_client: Arc<dyn LnClient>,
+    wallet: Arc<dyn BitcoinWallet>,
     address_type: BitcoinAddressType,
 }
 
 impl BitcoinService {
-    pub fn new(store: AppStore, ln_client: Arc<dyn LnClient>, address_type: BitcoinAddressType) -> Self {
+    pub fn new(store: AppStore, wallet: Arc<dyn BitcoinWallet>, address_type: BitcoinAddressType) -> Self {
         Self {
             store,
-            ln_client,
+            wallet,
             address_type,
-        }
-    }
-
-    fn invoice_status_for_output(output: &BitcoinOutput) -> InvoiceStatus {
-        if output.block_height.is_some() {
-            InvoiceStatus::Settled
-        } else {
-            InvoiceStatus::Pending
         }
     }
 }
@@ -52,12 +42,7 @@ impl BitcoinUseCases for BitcoinService {
             return Ok(address);
         }
 
-        let address = self.ln_client.get_new_bitcoin_address(self.address_type).await?;
-        let currency = self.ln_client.get_bitcoin_network().await?;
-
-        if !validate_address_for_currency(&address, currency) {
-            return Err(LightningError::BitcoinAddress("Invalid bitcoin address returned by node".to_string()).into());
-        }
+        let address = self.wallet.new_address(self.address_type).await?;
 
         let btc_address = self
             .store
@@ -80,20 +65,17 @@ impl BitcoinUseCases for BitcoinService {
     async fn sync_outputs(&self) -> Result<Vec<BitcoinOutput>, ApplicationError> {
         debug!("Syncing bitcoin outputs from lightning node");
 
-        let outputs = self.ln_client.list_bitcoin_outputs().await?;
+        let outputs = self.wallet.list_outputs().await?;
         let mut persisted = Vec::new();
 
         for output in outputs {
             let Some(address) = output.address.clone() else {
-                warn!("Ignoring bitcoin output without address");
+                trace!("Ignoring bitcoin output without address");
                 continue;
             };
 
             let Some(btc_address) = self.store.btc_address.find_by_address(&address).await? else {
-                warn!(
-                    address,
-                    "Ignoring bitcoin output that does not match any known wallet address"
-                );
+                trace!(address, "Ignoring bitcoin output not matching any known wallet address");
                 continue;
             };
 
@@ -105,12 +87,11 @@ impl BitcoinUseCases for BitcoinService {
 
             let existing_invoice = self.store.invoice.find_by_btc_output_id(stored_output.id).await?;
 
-            let status = Self::invoice_status_for_output(&stored_output);
+            let status: InvoiceStatus = stored_output.status.into();
 
             if let Some(mut invoice) = existing_invoice {
-                let updated_status = Self::invoice_status_for_output(&stored_output);
-                if invoice.status != updated_status {
-                    invoice.status = updated_status;
+                if invoice.status != status {
+                    invoice.status = status;
                     invoice.payment_time = stored_output.timestamp;
                     invoice.amount_received_msat = Some((stored_output.amount_sat.max(0) as u64).saturating_mul(1000));
                     invoice.btc_output_id = Some(stored_output.id);
@@ -131,11 +112,8 @@ impl BitcoinUseCases for BitcoinService {
                     timestamp,
                     status,
                     ledger: Ledger::Onchain,
-                    currency: stored_output.currency.clone(),
-                    fee_msat: stored_output
-                        .fee_sat
-                        .and_then(|fee| fee.max(0).checked_mul(1000))
-                        .map(|fee| fee as u64),
+                    currency: stored_output.network.into(),
+                    fee_msat: None,
                     payment_time: stored_output.timestamp,
                     ln_invoice: None,
                     btc_output_id: Some(stored_output.id),

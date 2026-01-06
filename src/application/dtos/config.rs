@@ -65,6 +65,15 @@ pub enum BitcoinAddressType {
     P2tr,
 }
 
+impl From<BitcoinAddressType> for crate::domains::bitcoin::BitcoinAddressType {
+    fn from(dto: BitcoinAddressType) -> Self {
+        match dto {
+            BitcoinAddressType::P2wpkh => crate::domains::bitcoin::BitcoinAddressType::P2wpkh,
+            BitcoinAddressType::P2tr => crate::domains::bitcoin::BitcoinAddressType::P2tr,
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, Deserialize, EnumString, Display, PartialEq, Eq, Default)]
 #[serde(rename_all = "lowercase")]
 #[strum(serialize_all = "lowercase")]

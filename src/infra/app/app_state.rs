@@ -49,7 +49,7 @@ impl AppState {
         };
 
         // Services
-        let services = AppServices::new(config, store, ln_client.clone(), jwt_authenticator);
+        let services = AppServices::new(config, store, ln_client.clone(), ln_client.clone(), jwt_authenticator);
 
         Ok(Self {
             services,

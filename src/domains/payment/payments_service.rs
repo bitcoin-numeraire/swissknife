@@ -1,7 +1,7 @@
 use std::{str::FromStr, sync::Arc};
 
 use async_trait::async_trait;
-use breez_sdk_core::{parse, InputType, LNInvoice, LnUrlPayRequestData, SuccessAction};
+use breez_sdk_core::{parse, BitcoinAddressData, InputType, LNInvoice, LnUrlPayRequestData, SuccessAction};
 use chrono::Utc;
 use lightning_invoice::Bolt11Invoice;
 use serde_bolt::bitcoin::hashes::hex::ToHex;
@@ -10,14 +10,14 @@ use uuid::Uuid;
 
 use crate::{
     application::{
-        entities::{AppStore, Currency, Ledger},
+        entities::{AppStore, BitcoinWallet, Currency, Ledger},
         errors::{ApplicationError, DataError, DatabaseError, LightningError},
     },
     domains::{
         invoice::{Invoice, InvoiceStatus},
         lnurl::{process_success_action, validate_lnurl_pay},
     },
-    infra::lightning::{types::validate_address_for_currency, LnClient},
+    infra::lightning::LnClient,
 };
 
 use super::{Payment, PaymentFilter, PaymentStatus, PaymentsUseCases};
@@ -29,14 +29,22 @@ pub struct PaymentService {
     domain: String,
     store: AppStore,
     ln_client: Arc<dyn LnClient>,
+    bitcoin_wallet: Arc<dyn BitcoinWallet>,
     fee_buffer: f64,
 }
 
 impl PaymentService {
-    pub fn new(store: AppStore, ln_client: Arc<dyn LnClient>, domain: String, fee_buffer: f64) -> Self {
+    pub fn new(
+        store: AppStore,
+        ln_client: Arc<dyn LnClient>,
+        bitcoin_wallet: Arc<dyn BitcoinWallet>,
+        domain: String,
+        fee_buffer: f64,
+    ) -> Self {
         PaymentService {
             store,
             ln_client,
+            bitcoin_wallet,
             domain,
             fee_buffer,
         }
@@ -130,104 +138,105 @@ impl PaymentService {
 
     async fn send_bitcoin_payment(
         &self,
-        address: String,
-        amount_msat: Option<u64>,
+        data: BitcoinAddressData,
+        amount_sat: Option<u64>,
         comment: Option<String>,
         wallet_id: Uuid,
     ) -> Result<Payment, ApplicationError> {
-        let amount_msat = Self::validate_amount(amount_msat)?;
-        if amount_msat % 1000 != 0 {
-            return Err(DataError::Validation(
-                "Bitcoin payments must be specified in satoshis (multiples of 1000 msat).".into(),
-            )
-            .into());
+        let specified_amount = data.amount_sat.or(amount_sat);
+        if specified_amount == Some(0) {
+            return Err(DataError::Validation("Amount must be greater than zero.".to_string()).into());
         }
 
-        let amount_sat = amount_msat / 1000;
-        let currency = self.ln_client.get_bitcoin_network().await?;
+        if let Some(amount) = specified_amount {
+            let amount_msat = amount * 1000;
+            let description = comment.or(data.message);
 
-        if let Some(recipient_address) = self.store.btc_address.find_by_address(&address).await? {
-            if recipient_address.wallet_id == wallet_id {
-                return Err(DataError::Validation("Cannot pay to your own bitcoin address.".to_string()).into());
+            if let Some(recipient_address) = self.store.btc_address.find_by_address(&data.address).await? {
+                if recipient_address.wallet_id == wallet_id {
+                    return Err(DataError::Validation("Cannot pay to your own bitcoin address.".to_string()).into());
+                }
+
+                let timestamp = Utc::now();
+
+                self.store
+                    .invoice
+                    .insert(Invoice {
+                        id: Uuid::new_v4(),
+                        wallet_id: recipient_address.wallet_id,
+                        ln_address_id: None,
+                        description: description.clone(),
+                        amount_msat: Some(amount_msat),
+                        amount_received_msat: Some(amount_msat),
+                        timestamp,
+                        status: InvoiceStatus::Settled,
+                        ledger: Ledger::Internal,
+                        currency: data.network.into(),
+                        fee_msat: Some(0),
+                        payment_time: Some(timestamp),
+                        btc_output_id: None,
+                        ..Default::default()
+                    })
+                    .await?;
+
+                let internal_payment = self
+                    .insert_payment(
+                        Payment {
+                            wallet_id,
+                            amount_msat,
+                            status: PaymentStatus::Settled,
+                            ledger: Ledger::Internal,
+                            currency: data.network.into(),
+                            description: description.clone(),
+                            destination_address: Some(data.address),
+                            fee_msat: Some(0),
+                            payment_time: Some(timestamp),
+                            ..Default::default()
+                        },
+                        0.0,
+                    )
+                    .await?;
+
+                return Ok(internal_payment);
             }
 
-            let timestamp = Utc::now();
-
-            self.store
-                .invoice
-                .insert(Invoice {
-                    id: Uuid::new_v4(),
-                    wallet_id: recipient_address.wallet_id,
-                    ln_address_id: None,
-                    description: comment.clone(),
-                    amount_msat: Some(amount_msat),
-                    amount_received_msat: Some(amount_msat),
-                    timestamp,
-                    status: InvoiceStatus::Settled,
-                    ledger: Ledger::Internal,
-                    currency: currency.clone(),
-                    fee_msat: Some(0),
-                    payment_time: Some(timestamp),
-                    btc_output_id: None,
-                    ..Default::default()
-                })
-                .await?;
-
-            let internal_payment = self
+            let pending_payment = self
                 .insert_payment(
                     Payment {
                         wallet_id,
                         amount_msat,
-                        status: PaymentStatus::Settled,
-                        ledger: Ledger::Internal,
-                        currency,
-                        description: comment,
-                        destination_address: Some(address),
-                        fee_msat: Some(0),
-                        payment_time: Some(timestamp),
+                        status: PaymentStatus::Pending,
+                        ledger: Ledger::Onchain,
+                        currency: data.network.into(),
+                        description,
+                        destination_address: Some(data.address.clone()),
                         ..Default::default()
                     },
-                    0.0,
+                    self.fee_buffer,
                 )
                 .await?;
 
-            return Ok(internal_payment);
+            let txid = match self.bitcoin_wallet.send(data.address.clone(), amount, None).await {
+                Ok(txid) => txid,
+                Err(error) => {
+                    let mut failed_payment = pending_payment.clone();
+                    failed_payment.status = PaymentStatus::Failed;
+                    failed_payment.error = Some(error.to_string());
+                    self.store.payment.update(failed_payment).await?;
+
+                    return Err(error.into());
+                }
+            };
+
+            let mut updated_payment = pending_payment.clone();
+            updated_payment.payment_hash = Some(txid);
+
+            let payment = self.store.payment.update(updated_payment).await?;
+
+            Ok(payment)
+        } else {
+            Err(DataError::Validation("Amount must be defined for zero-amount invoices.".to_string()).into())
         }
-
-        let pending_payment = self
-            .insert_payment(
-                Payment {
-                    wallet_id,
-                    amount_msat,
-                    status: PaymentStatus::Pending,
-                    ledger: Ledger::Onchain,
-                    currency,
-                    description: comment,
-                    destination_address: Some(address.clone()),
-                    ..Default::default()
-                },
-                self.fee_buffer,
-            )
-            .await?;
-
-        let txid = match self.ln_client.send_bitcoin(address, amount_sat, None).await {
-            Ok(txid) => txid,
-            Err(error) => {
-                let mut failed_payment = pending_payment.clone();
-                failed_payment.status = PaymentStatus::Failed;
-                failed_payment.error = Some(error.to_string());
-                self.store.payment.update(failed_payment).await?;
-
-                return Err(error.into());
-            }
-        };
-
-        let mut updated_payment = pending_payment.clone();
-        updated_payment.payment_hash = Some(txid);
-
-        let payment = self.store.payment.update(updated_payment).await?;
-
-        Ok(payment)
     }
 
     async fn send_bolt11(
@@ -467,12 +476,6 @@ impl PaymentsUseCases for PaymentService {
     ) -> Result<Payment, ApplicationError> {
         debug!(%input, %wallet_id, "Received pay request");
 
-        if let Ok(currency) = self.ln_client.get_bitcoin_network().await {
-            if validate_address_for_currency(&input, currency) {
-                return self.send_bitcoin_payment(input, amount_msat, comment, wallet_id).await;
-            }
-        }
-
         let payment = if self.is_internal_payment(&input) {
             self.send_internal(input, amount_msat, comment, wallet_id).await
         } else {
@@ -481,6 +484,10 @@ impl PaymentsUseCases for PaymentService {
                 .map_err(|err| DataError::Validation(err.to_string()))?;
 
             match input_type {
+                InputType::BitcoinAddress { address } => {
+                    self.send_bitcoin_payment(address, amount_msat, comment, wallet_id)
+                        .await
+                }
                 InputType::Bolt11 { invoice } => self.send_bolt11(invoice, amount_msat, comment, wallet_id).await,
                 InputType::LnUrlPay { data } => self.send_lnurl_pay(data, amount_msat, comment, wallet_id).await,
                 InputType::LnUrlError { data } => Err(DataError::Validation(data.reason).into()),

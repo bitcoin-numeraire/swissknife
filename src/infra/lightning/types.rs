@@ -1,12 +1,13 @@
-use bitcoin::{Address, Network};
 use chrono::{TimeZone, Utc};
 use lightning_invoice::{Bolt11Invoice, Bolt11InvoiceDescription, Currency as LNInvoiceCurrency};
 use serde_bolt::bitcoin::hashes::hex::ToHex;
-use std::str::FromStr;
 
 use crate::{
     application::entities::{Currency, Ledger},
-    domains::invoice::{Invoice, LnInvoice},
+    domains::{
+        bitcoin::BitcoinNetwork,
+        invoice::{Invoice, LnInvoice},
+    },
 };
 
 impl From<Bolt11Invoice> for Invoice {
@@ -49,36 +50,6 @@ impl From<Bolt11Invoice> for Invoice {
     }
 }
 
-pub fn currency_from_network_name(name: &str) -> Option<Currency> {
-    match name.to_lowercase().as_str() {
-        "bitcoin" | "mainnet" => Some(Currency::Bitcoin),
-        "testnet" | "testnet3" => Some(Currency::BitcoinTestnet),
-        "regtest" => Some(Currency::Regtest),
-        "signet" => Some(Currency::Signet),
-        "simnet" => Some(Currency::Simnet),
-        _ => None,
-    }
-}
-
-pub fn currency_to_bitcoin_network(currency: Currency) -> Option<Network> {
-    match currency {
-        Currency::Bitcoin => Some(Network::Bitcoin),
-        Currency::BitcoinTestnet => Some(Network::Testnet),
-        Currency::Regtest | Currency::Simnet => Some(Network::Regtest),
-        Currency::Signet => Some(Network::Signet),
-    }
-}
-
-pub fn validate_address_for_currency(address: &str, currency: Currency) -> bool {
-    if let Ok(parsed) = Address::from_str(address) {
-        if let Some(expected_network) = currency_to_bitcoin_network(currency) {
-            return parsed.require_network(expected_network).is_ok();
-        }
-    }
-
-    false
-}
-
 impl From<LNInvoiceCurrency> for Currency {
     fn from(val: LNInvoiceCurrency) -> Self {
         match val {
@@ -88,5 +59,17 @@ impl From<LNInvoiceCurrency> for Currency {
             LNInvoiceCurrency::BitcoinTestnet => Currency::BitcoinTestnet,
             LNInvoiceCurrency::Simnet => Currency::Simnet,
         }
+    }
+}
+
+pub fn parse_network(s: &str) -> BitcoinNetwork {
+    match s.to_lowercase().as_str() {
+        "bitcoin" | "mainnet" => BitcoinNetwork::Bitcoin,
+        "testnet" | "testnet3" => BitcoinNetwork::Testnet,
+        "testnet4" => BitcoinNetwork::Testnet4,
+        "regtest" => BitcoinNetwork::Regtest,
+        "simnet" => BitcoinNetwork::Simnet,
+        "signet" => BitcoinNetwork::Signet,
+        _ => BitcoinNetwork::Bitcoin,
     }
 }

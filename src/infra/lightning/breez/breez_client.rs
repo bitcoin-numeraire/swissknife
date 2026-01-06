@@ -14,9 +14,12 @@ use breez_sdk_core::{
 };
 
 use crate::{
-    application::{dtos::BitcoinAddressType, entities::Currency, errors::LightningError},
+    application::{
+        entities::BitcoinWallet,
+        errors::{BitcoinError, LightningError},
+    },
     domains::{
-        bitcoin::{BitcoinBalance, BitcoinOutput},
+        bitcoin::{BitcoinAddressType, BitcoinBalance, BitcoinNetwork, BitcoinOutput},
         invoice::Invoice,
         ln_node::LnEventsUseCases,
         payment::Payment,
@@ -335,38 +338,36 @@ impl LnClient for BreezClient {
 
         Ok(response.status.into())
     }
+}
 
-    async fn get_new_bitcoin_address(&self, _address_type: BitcoinAddressType) -> Result<String, LightningError> {
-        Err(LightningError::Unsupported(
+#[async_trait]
+impl BitcoinWallet for BreezClient {
+    async fn new_address(&self, _address_type: BitcoinAddressType) -> Result<String, BitcoinError> {
+        Err(BitcoinError::Unsupported(
             "Bitcoin address generation is not yet implemented for Breez".to_string(),
         ))
     }
 
-    async fn get_bitcoin_balance(&self) -> Result<BitcoinBalance, LightningError> {
-        Err(LightningError::Unsupported(
+    async fn balance(&self) -> Result<BitcoinBalance, BitcoinError> {
+        Err(BitcoinError::Unsupported(
             "Bitcoin balance retrieval is not yet implemented for Breez".to_string(),
         ))
     }
 
-    async fn send_bitcoin(
-        &self,
-        _address: String,
-        _amount_sat: u64,
-        _fee_rate: Option<u32>,
-    ) -> Result<String, LightningError> {
-        Err(LightningError::Unsupported(
+    async fn send(&self, _address: String, _amount_sat: u64, _fee_rate: Option<u32>) -> Result<String, BitcoinError> {
+        Err(BitcoinError::Unsupported(
             "Direct bitcoin sends are not yet implemented for Breez".to_string(),
         ))
     }
 
-    async fn list_bitcoin_outputs(&self) -> Result<Vec<BitcoinOutput>, LightningError> {
-        Err(LightningError::Unsupported(
+    async fn list_outputs(&self) -> Result<Vec<BitcoinOutput>, BitcoinError> {
+        Err(BitcoinError::Unsupported(
             "Listing bitcoin outputs is not yet implemented for Breez".to_string(),
         ))
     }
 
-    async fn get_bitcoin_network(&self) -> Result<Currency, LightningError> {
-        Err(LightningError::Unsupported(
+    async fn network(&self) -> Result<BitcoinNetwork, BitcoinError> {
+        Err(BitcoinError::Unsupported(
             "Retrieving bitcoin network information is not yet implemented for Breez".to_string(),
         ))
     }

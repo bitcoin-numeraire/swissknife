@@ -1,8 +1,9 @@
 mod address;
 mod balance;
+mod network;
 mod output;
 
-#[allow(unused_imports)]
 pub use address::*;
 pub use balance::*;
+pub use network::*;
 pub use output::*;

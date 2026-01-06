@@ -14,9 +14,12 @@ use tokio::fs;
 use uuid::Uuid;
 
 use crate::{
-    application::{dtos::BitcoinAddressType, entities::Currency, errors::LightningError},
+    application::{
+        entities::BitcoinWallet,
+        errors::{BitcoinError, LightningError},
+    },
     domains::{
-        bitcoin::{BitcoinBalance, BitcoinOutput},
+        bitcoin::{BitcoinAddressType, BitcoinBalance, BitcoinNetwork, BitcoinOutput, BitcoinOutputStatus},
         invoice::Invoice,
         ln_node::LnEventsUseCases,
         payment::Payment,
@@ -24,7 +27,7 @@ use crate::{
     },
     infra::{
         config::config_rs::deserialize_duration,
-        lightning::{types::currency_from_network_name, LnClient},
+        lightning::{types::parse_network, LnClient},
     },
 };
 use async_trait::async_trait;
@@ -208,6 +211,14 @@ impl LndRestClient {
     fn parse_amount(value: Option<String>) -> i64 {
         value.and_then(|v| v.parse::<i64>().ok()).unwrap_or_default()
     }
+
+    fn map_address_type(address_type: BitcoinAddressType) -> String {
+        match address_type {
+            BitcoinAddressType::P2sh => "NESTED_PUBKEY_HASH".to_string(),
+            BitcoinAddressType::P2tr => "TAPROOT_PUBKEY".to_string(),
+            _ => "WITNESS_PUBKEY_HASH".to_string(),
+        }
+    }
 }
 
 #[async_trait]
@@ -293,17 +304,6 @@ impl LnClient for LndRestClient {
         }
     }
 
-    async fn pay_onchain(
-        &self,
-        _amount_sat: u64,
-        _recipient_address: String,
-        _feerate: u32,
-    ) -> Result<ReverseSwapInfo, LightningError> {
-        Err(LightningError::Unsupported(
-            "Bitcoin payments are not implemented for LND REST client".to_string(),
-        ))
-    }
-
     async fn health(&self) -> Result<HealthStatus, LightningError> {
         self.get_request::<GetinfoResponse>("v1/getinfo")
             .await
@@ -312,7 +312,21 @@ impl LnClient for LndRestClient {
         Ok(HealthStatus::Operational)
     }
 
-    async fn get_new_bitcoin_address(&self, address_type: BitcoinAddressType) -> Result<String, LightningError> {
+    async fn pay_onchain(
+        &self,
+        _amount_sat: u64,
+        _recipient_address: String,
+        _feerate: u32,
+    ) -> Result<ReverseSwapInfo, LightningError> {
+        Err(LightningError::Unsupported(
+            "Bitcoin payments are not implemented for LND".to_string(),
+        ))
+    }
+}
+
+#[async_trait]
+impl BitcoinWallet for LndRestClient {
+    async fn new_address(&self, address_type: BitcoinAddressType) -> Result<String, BitcoinError> {
         let response: NewAddressResponse = self
             .post_request(
                 "v1/newaddress",
@@ -321,16 +335,16 @@ impl LnClient for LndRestClient {
                 },
             )
             .await
-            .map_err(|e| LightningError::BitcoinAddress(e.to_string()))?;
+            .map_err(|e| BitcoinError::Address(e.to_string()))?;
 
         Ok(response.address)
     }
 
-    async fn get_bitcoin_balance(&self) -> Result<BitcoinBalance, LightningError> {
+    async fn balance(&self) -> Result<BitcoinBalance, BitcoinError> {
         let response: WalletBalanceResponse = self
             .get_request("v1/balance/blockchain")
             .await
-            .map_err(|e| LightningError::BitcoinBalance(e.to_string()))?;
+            .map_err(|e| BitcoinError::Balance(e.to_string()))?;
 
         Ok(BitcoinBalance {
             confirmed_sat: Self::parse_amount(response.confirmed_balance) as u64,
@@ -338,12 +352,7 @@ impl LnClient for LndRestClient {
         })
     }
 
-    async fn send_bitcoin(
-        &self,
-        address: String,
-        amount_sat: u64,
-        fee_rate: Option<u32>,
-    ) -> Result<String, LightningError> {
+    async fn send(&self, address: String, amount_sat: u64, fee_rate: Option<u32>) -> Result<String, BitcoinError> {
         let response: SendCoinsResponse = self
             .post_request(
                 "v1/transactions",
@@ -354,17 +363,17 @@ impl LnClient for LndRestClient {
                 },
             )
             .await
-            .map_err(|e| LightningError::BitcoinPayment(e.to_string()))?;
+            .map_err(|e| BitcoinError::Transaction(e.to_string()))?;
 
         Ok(response.txid)
     }
 
-    async fn list_bitcoin_outputs(&self) -> Result<Vec<BitcoinOutput>, LightningError> {
-        let currency = self.get_bitcoin_network().await?;
+    async fn list_outputs(&self) -> Result<Vec<BitcoinOutput>, BitcoinError> {
+        let network = self.network().await?;
         let response: ListUnspentResponse = self
             .get_request("v2/wallet/utxos")
             .await
-            .map_err(|e| LightningError::BitcoinOutputs(e.to_string()))?;
+            .map_err(|e| BitcoinError::Outputs(e.to_string()))?;
 
         let outputs = response
             .utxos
@@ -376,6 +385,17 @@ impl LnClient for LndRestClient {
                 let output_index = outpoint.output_index?;
                 let amount_sat = utxo.amount_sat?;
 
+                let status = match utxo.confirmations {
+                    Some(confirmations) => {
+                        if confirmations > 0 {
+                            BitcoinOutputStatus::Confirmed
+                        } else {
+                            BitcoinOutputStatus::Unconfirmed
+                        }
+                    }
+                    None => BitcoinOutputStatus::Unconfirmed,
+                };
+
                 Some(BitcoinOutput {
                     id: Uuid::new_v4(),
                     outpoint: format!("{txid}:{output_index}"),
@@ -383,10 +403,9 @@ impl LnClient for LndRestClient {
                     output_index: output_index as u32,
                     address: utxo.address,
                     amount_sat: Self::parse_amount(Some(amount_sat)),
-                    fee_sat: None,
-                    block_height: utxo.confirmations.map(|confirmations| confirmations as u32),
+                    status,
                     timestamp: None,
-                    currency: currency.clone(),
+                    network: network,
                     created_at: Utc::now(),
                     updated_at: None,
                 })
@@ -396,32 +415,22 @@ impl LnClient for LndRestClient {
         Ok(outputs)
     }
 
-    async fn get_bitcoin_network(&self) -> Result<Currency, LightningError> {
+    async fn network(&self) -> Result<BitcoinNetwork, BitcoinError> {
         let response: GetinfoResponse = self
             .get_request("v1/getinfo")
             .await
-            .map_err(|e| LightningError::HealthCheck(e.to_string()))?;
+            .map_err(|e| BitcoinError::Network(e.to_string()))?;
 
         if let Some(chain) = response
             .chains
             .and_then(|mut chains| chains.pop())
             .and_then(|chain| chain.network)
         {
-            return currency_from_network_name(&chain)
-                .ok_or_else(|| LightningError::HealthCheck("Unknown network returned by LND".to_string()));
+            return Ok(parse_network(&chain));
         }
 
-        Err(LightningError::HealthCheck(
+        Err(BitcoinError::Network(
             "No chain information returned by LND".to_string(),
         ))
-    }
-}
-
-impl LndRestClient {
-    fn map_address_type(address_type: BitcoinAddressType) -> String {
-        match address_type {
-            BitcoinAddressType::P2wpkh => "WITNESS_PUBKEY_HASH".to_string(),
-            BitcoinAddressType::P2tr => "TAPROOT_PUBKEY".to_string(),
-        }
     }
 }

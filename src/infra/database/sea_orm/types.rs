@@ -12,8 +12,9 @@ use crate::domains::{
 };
 
 use super::models::{
-    api_key::Model as ApiKeyModel, btc_address, btc_output, contact::ContactModel, invoice::Model as InvoiceModel,
-    ln_address::Model as LnAddressModel, payment::Model as PaymentModel, wallet::Model as WalletModel,
+    api_key::Model as ApiKeyModel, btc_address::Model as BitcoinAddressModel, btc_output::Model as BitcoinOutputModel,
+    contact::ContactModel, invoice::Model as InvoiceModel, ln_address::Model as LnAddressModel,
+    payment::Model as PaymentModel, wallet::Model as WalletModel,
 };
 
 const ASSERTION_MSG: &str = "should parse successfully by assertion";
@@ -143,8 +144,8 @@ impl From<ApiKeyModel> for ApiKey {
     }
 }
 
-impl From<btc_output::Model> for BitcoinOutput {
-    fn from(model: btc_output::Model) -> Self {
+impl From<BitcoinOutputModel> for BitcoinOutput {
+    fn from(model: BitcoinOutputModel) -> Self {
         BitcoinOutput {
             id: model.id,
             outpoint: model.outpoint,
@@ -152,18 +153,17 @@ impl From<btc_output::Model> for BitcoinOutput {
             output_index: model.output_index as u32,
             address: None,
             amount_sat: model.amount_sat,
-            fee_sat: model.fee_sat,
-            block_height: model.block_height.map(|h| h as u32),
+            status: model.status.parse().expect(ASSERTION_MSG),
             timestamp: model.timestamp.map(|t| t.and_utc()),
-            currency: model.currency.parse().expect(ASSERTION_MSG),
+            network: model.network.parse().expect(ASSERTION_MSG),
             created_at: model.created_at.and_utc(),
             updated_at: model.updated_at.map(|t| t.and_utc()),
         }
     }
 }
 
-impl From<btc_address::Model> for BitcoinAddress {
-    fn from(model: btc_address::Model) -> Self {
+impl From<BitcoinAddressModel> for BitcoinAddress {
+    fn from(model: BitcoinAddressModel) -> Self {
         BitcoinAddress {
             id: model.id,
             wallet_id: model.wallet_id,

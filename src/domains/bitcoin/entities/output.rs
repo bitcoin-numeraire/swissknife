@@ -1,10 +1,12 @@
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
+use strum_macros::{Display, EnumString};
+use utoipa::ToSchema;
 use uuid::Uuid;
 
-use crate::application::entities::Currency;
+use crate::domains::{bitcoin::BitcoinNetwork, invoice::InvoiceStatus};
 
 #[derive(Clone, Debug)]
-#[allow(dead_code)]
 pub struct BitcoinOutput {
     pub id: Uuid,
     pub outpoint: String,
@@ -12,10 +14,29 @@ pub struct BitcoinOutput {
     pub output_index: u32,
     pub address: Option<String>,
     pub amount_sat: i64,
-    pub fee_sat: Option<i64>,
-    pub block_height: Option<u32>,
+    pub status: BitcoinOutputStatus,
     pub timestamp: Option<DateTime<Utc>>,
-    pub currency: Currency,
+    pub network: BitcoinNetwork,
     pub created_at: DateTime<Utc>,
     pub updated_at: Option<DateTime<Utc>>,
+}
+
+#[derive(Clone, Debug, Copy, EnumString, Deserialize, Serialize, Display, PartialEq, Eq, Default, ToSchema)]
+pub enum BitcoinOutputStatus {
+    #[default]
+    Unconfirmed,
+    Confirmed,
+    Spent,
+    Immature,
+}
+
+impl From<BitcoinOutputStatus> for InvoiceStatus {
+    fn from(status: BitcoinOutputStatus) -> Self {
+        match status {
+            BitcoinOutputStatus::Unconfirmed => InvoiceStatus::Pending,
+            BitcoinOutputStatus::Confirmed => InvoiceStatus::Settled,
+            BitcoinOutputStatus::Spent => InvoiceStatus::Settled,
+            BitcoinOutputStatus::Immature => InvoiceStatus::Pending,
+        }
+    }
 }

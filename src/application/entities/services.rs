@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use crate::{
-    application::{dtos::AppConfig, errors::ConfigError},
+    application::{dtos::AppConfig, entities::BitcoinWallet, errors::ConfigError},
     domains::{
         bitcoin::{BitcoinService, BitcoinUseCases},
         invoice::{InvoiceService, InvoiceUseCases},
@@ -44,6 +44,7 @@ impl AppServices {
         config: AppConfig,
         store: AppStore,
         ln_client: Arc<dyn LnClient>,
+        bitcoin_wallet: Arc<dyn BitcoinWallet>,
         jwt_authenticator: Arc<dyn JWTAuthenticator>,
     ) -> Self {
         let AppConfig {
@@ -60,6 +61,7 @@ impl AppServices {
         let payments = PaymentService::new(
             store.clone(),
             ln_client.clone(),
+            bitcoin_wallet.clone(),
             domain.clone(),
             fee_buffer.unwrap_or_default(),
         );
@@ -82,7 +84,7 @@ impl AppServices {
         let system = SystemService::new(store.clone(), ln_client.clone());
         let nostr = NostrService::new(store.clone());
         let api_key = ApiKeyService::new(store.clone());
-        let bitcoin = BitcoinService::new(store, ln_client, bitcoin_address_type);
+        let bitcoin = BitcoinService::new(store, bitcoin_wallet, bitcoin_address_type.into());
 
         AppServices {
             invoice: Box::new(invoices),
