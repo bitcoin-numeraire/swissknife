@@ -9,7 +9,10 @@ use uuid::Uuid;
 use crate::{
     application::errors::DatabaseError,
     domains::payment::{Payment, PaymentFilter, PaymentRepository},
-    infra::database::sea_orm::models::payment::{ActiveModel, Column, Entity},
+    infra::database::sea_orm::models::{
+        btc_output,
+        payment::{ActiveModel, Column, Entity, Model as PaymentModel},
+    },
 };
 
 #[derive(Clone)]
@@ -18,6 +21,17 @@ pub struct SeaOrmPaymentRepository {
 }
 
 impl SeaOrmPaymentRepository {
+    fn map_with_output(model: PaymentModel, btc_output: Option<btc_output::Model>) -> Payment {
+        let mut payment: Payment = model.into();
+
+        if let Some(output) = btc_output {
+            payment.btc_output_id = Some(output.id);
+            payment.bitcoin_output = Some(output.into());
+        }
+
+        payment
+    }
+
     pub fn new(db: DatabaseConnection) -> Self {
         Self { db }
     }
@@ -27,21 +41,23 @@ impl SeaOrmPaymentRepository {
 impl PaymentRepository for SeaOrmPaymentRepository {
     async fn find(&self, id: Uuid) -> Result<Option<Payment>, DatabaseError> {
         let model = Entity::find_by_id(id)
+            .find_also_related(btc_output::Entity)
             .one(&self.db)
             .await
             .map_err(|e| DatabaseError::FindOne(e.to_string()))?;
 
-        Ok(model.map(Into::into))
+        Ok(model.map(|(payment, btc_output)| Self::map_with_output(payment, btc_output)))
     }
 
     async fn find_by_payment_hash(&self, payment_hash: &str) -> Result<Option<Payment>, DatabaseError> {
         let model = Entity::find()
             .filter(Column::PaymentHash.eq(payment_hash))
+            .find_also_related(btc_output::Entity)
             .one(&self.db)
             .await
             .map_err(|e| DatabaseError::FindOne(e.to_string()))?;
 
-        Ok(model.map(Into::into))
+        Ok(model.map(|(payment, btc_output)| Self::map_with_output(payment, btc_output)))
     }
 
     async fn find_many(&self, filter: PaymentFilter) -> Result<Vec<Payment>, DatabaseError> {
@@ -53,11 +69,15 @@ impl PaymentRepository for SeaOrmPaymentRepository {
             .order_by(Column::CreatedAt, filter.order_direction.into())
             .offset(filter.offset)
             .limit(filter.limit)
+            .find_also_related(btc_output::Entity)
             .all(&self.db)
             .await
             .map_err(|e| DatabaseError::FindMany(e.to_string()))?;
 
-        Ok(models.into_iter().map(Into::into).collect())
+        Ok(models
+            .into_iter()
+            .map(|(payment, btc_output)| Self::map_with_output(payment, btc_output))
+            .collect())
     }
 
     async fn insert(&self, txn: Option<&DatabaseTransaction>, payment: Payment) -> Result<Payment, DatabaseError> {
@@ -74,6 +94,8 @@ impl PaymentRepository for SeaOrmPaymentRepository {
             payment_hash: Set(payment.payment_hash),
             description: Set(payment.description),
             metadata: Set(payment.metadata),
+            destination_address: Set(payment.destination_address),
+            btc_output_id: Set(payment.btc_output_id),
             ..Default::default()
         };
 
@@ -98,6 +120,8 @@ impl PaymentRepository for SeaOrmPaymentRepository {
             error: Set(payment.error),
             amount_msat: Set(payment.amount_msat as i64),
             metadata: Set(payment.metadata),
+            destination_address: Set(payment.destination_address),
+            btc_output_id: Set(payment.btc_output_id),
             success_action: Set(payment
                 .success_action
                 .and_then(|action| serde_json::to_value(action).ok())),

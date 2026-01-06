@@ -1,6 +1,8 @@
 use thiserror::Error;
 use utoipa::ToSchema;
 
+use crate::application::errors::BitcoinError;
+
 use super::{
     AuthenticationError, AuthorizationError, ConfigError, DataError, DatabaseError, LightningError, WebServerError,
 };
@@ -12,6 +14,9 @@ pub enum ApplicationError {
 
     #[error("Lightning Error: {0}")]
     Lightning(#[from] LightningError),
+
+    #[error("Bitcoin Error: {0}")]
+    Bitcoin(#[from] BitcoinError),
 
     #[error("Web Server Error: {0}")]
     WebServer(#[from] WebServerError),

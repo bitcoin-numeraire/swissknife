@@ -16,8 +16,8 @@ impl MigrationTrait for Migration {
                     .col(uuid(BtcAddress::Id).primary_key())
                     .col(uuid(BtcAddress::WalletId))
                     .col(string_len(BtcAddress::Address, 255).unique_key())
+                    .col(string_len(BtcAddress::AddressType, 255))
                     .col(boolean(BtcAddress::Used).default(false))
-                    .col(integer_null(BtcAddress::DerivationIndex))
                     .col(timestamp(BtcAddress::CreatedAt).default(Expr::current_timestamp()))
                     .col(timestamp_null(BtcAddress::UpdatedAt))
                     .foreign_key(
@@ -71,8 +71,8 @@ pub(crate) enum BtcAddress {
     Id,
     WalletId,
     Address,
+    AddressType,
     Used,
-    DerivationIndex,
     CreatedAt,
     UpdatedAt,
 }

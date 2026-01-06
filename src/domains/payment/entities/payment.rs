@@ -30,7 +30,8 @@ pub struct Payment {
     pub success_action: Option<LnUrlSuccessAction>,
     pub created_at: DateTime<Utc>,
     pub updated_at: Option<DateTime<Utc>>,
-    #[allow(dead_code)]
+    pub btc_output_id: Option<Uuid>,
+    pub destination_address: Option<String>,
     pub bitcoin_output: Option<BitcoinOutput>,
 }
 

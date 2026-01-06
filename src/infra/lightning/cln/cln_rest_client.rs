@@ -1,6 +1,7 @@
 use std::{path::PathBuf, str::FromStr, sync::Arc, time::Duration};
 
 use breez_sdk_core::ReverseSwapInfo;
+use chrono::Utc;
 use lightning_invoice::Bolt11Invoice;
 use reqwest::{
     header::{HeaderMap, HeaderValue},
@@ -14,20 +15,27 @@ use uuid::Uuid;
 use async_trait::async_trait;
 
 use crate::{
-    application::{entities::Currency, errors::LightningError},
+    application::{
+        entities::BitcoinWallet,
+        errors::{BitcoinError, LightningError},
+    },
     domains::{
-        bitcoin::{BitcoinBalance, BitcoinOutput},
+        bitcoin::{BitcoinAddressType, BitcoinBalance, BitcoinNetwork, BitcoinOutput, BitcoinOutputStatus},
         invoice::Invoice,
         ln_node::LnEventsUseCases,
         payment::Payment,
         system::HealthStatus,
     },
-    infra::{config::config_rs::deserialize_duration, lightning::LnClient},
+    infra::{
+        config::config_rs::deserialize_duration,
+        lightning::{types::parse_network, LnClient},
+    },
 };
 
 use super::{
     cln_websocket_client::connect_websocket, ErrorResponse, GetinfoRequest, GetinfoResponse, InvoiceRequest,
-    InvoiceResponse, ListInvoicesRequest, ListInvoicesResponse, PayRequest, PayResponse,
+    InvoiceResponse, ListFundsRequest, ListFundsResponse, ListInvoicesRequest, ListInvoicesResponse, NewAddrRequest,
+    NewAddrResponse, PayRequest, PayResponse, WithdrawRequest, WithdrawResponse,
 };
 
 #[derive(Clone, Debug, Deserialize)]
@@ -135,6 +143,29 @@ impl ClnRestClient {
         let result = response.json::<T>().await?;
         Ok(result)
     }
+
+    fn parse_amount_msat(value: &str) -> anyhow::Result<u64> {
+        let cleaned = value.trim_end_matches("msat");
+        Ok(cleaned.parse::<u64>()?)
+    }
+
+    fn map_address_type(address_type: BitcoinAddressType) -> Option<String> {
+        match address_type {
+            BitcoinAddressType::P2wpkh => Some("bech32".to_string()),
+            BitcoinAddressType::P2tr => Some("p2tr".to_string()),
+            _ => None,
+        }
+    }
+
+    fn parse_status(status: &str) -> BitcoinOutputStatus {
+        match status.to_lowercase().as_str() {
+            "confirmed" => BitcoinOutputStatus::Confirmed,
+            "unconfirmed" => BitcoinOutputStatus::Unconfirmed,
+            "spent" => BitcoinOutputStatus::Spent,
+            "immature" => BitcoinOutputStatus::Immature,
+            _ => BitcoinOutputStatus::Unconfirmed,
+        }
+    }
 }
 
 #[async_trait]
@@ -226,45 +257,107 @@ impl LnClient for ClnRestClient {
 
         Ok(HealthStatus::Operational)
     }
+}
 
-    async fn get_new_bitcoin_address(&self) -> Result<String, LightningError> {
-        Err(LightningError::Unsupported(
-            "Bitcoin address generation is not implemented for CLN REST client".to_string(),
-        ))
+#[async_trait]
+impl BitcoinWallet for ClnRestClient {
+    async fn new_address(&self, address_type: BitcoinAddressType) -> Result<String, BitcoinError> {
+        let response: NewAddrResponse = self
+            .post_request(
+                "newaddr",
+                &NewAddrRequest {
+                    addresstype: Self::map_address_type(address_type),
+                },
+            )
+            .await
+            .map_err(|e| BitcoinError::Address(e.to_string()))?;
+
+        response
+            .bech32
+            .or(response.p2tr)
+            .ok_or_else(|| BitcoinError::Address("No address returned by CLN".to_string()))
     }
 
-    async fn get_bitcoin_balance(&self) -> Result<BitcoinBalance, LightningError> {
-        Err(LightningError::Unsupported(
-            "Bitcoin balance retrieval is not implemented for CLN REST client".to_string(),
-        ))
+    async fn balance(&self) -> Result<BitcoinBalance, BitcoinError> {
+        let list_funds: ListFundsResponse = self
+            .post_request("listfunds", &ListFundsRequest { spent: Some(false) })
+            .await
+            .map_err(|e| BitcoinError::Balance(e.to_string()))?;
+
+        let mut confirmed_sat = 0;
+        let mut unconfirmed_sat = 0;
+
+        for output in list_funds.outputs {
+            let amount_msat =
+                Self::parse_amount_msat(&output.amount_msat).map_err(|e| BitcoinError::Balance(e.to_string()))?;
+            let amount_sat = amount_msat / 1000;
+
+            match output.status.to_lowercase().as_str() {
+                "confirmed" => confirmed_sat += amount_sat,
+                _ => unconfirmed_sat += amount_sat,
+            }
+        }
+
+        Ok(BitcoinBalance {
+            confirmed_sat,
+            unconfirmed_sat,
+        })
     }
 
-    async fn send_bitcoin(
-        &self,
-        _address: String,
-        _amount_sat: u64,
-        _fee_rate: Option<u32>,
-    ) -> Result<String, LightningError> {
-        Err(LightningError::Unsupported(
-            "Bitcoin send is not implemented for CLN REST client".to_string(),
-        ))
+    async fn send(&self, address: String, amount_sat: u64, fee_rate: Option<u32>) -> Result<String, BitcoinError> {
+        let response: WithdrawResponse = self
+            .post_request(
+                "withdraw",
+                &WithdrawRequest {
+                    destination: address,
+                    satoshi: amount_sat,
+                    feerate: fee_rate.map(|rate| format!("{rate}perkb")),
+                },
+            )
+            .await
+            .map_err(|e| BitcoinError::Transaction(e.to_string()))?;
+
+        Ok(response.txid)
     }
 
-    async fn list_bitcoin_outputs(&self) -> Result<Vec<BitcoinOutput>, LightningError> {
-        Err(LightningError::Unsupported(
-            "Listing bitcoin outputs is not implemented for CLN REST client".to_string(),
-        ))
+    async fn list_outputs(&self) -> Result<Vec<BitcoinOutput>, BitcoinError> {
+        let network = self.network().await?;
+        let list_funds: ListFundsResponse = self
+            .post_request("listfunds", &ListFundsRequest { spent: Some(false) })
+            .await
+            .map_err(|e| BitcoinError::Outputs(e.to_string()))?;
+
+        let outputs = list_funds
+            .outputs
+            .into_iter()
+            .map(|output| {
+                let amount_msat = Self::parse_amount_msat(&output.amount_msat).unwrap_or_default();
+
+                BitcoinOutput {
+                    id: Uuid::new_v4(),
+                    outpoint: format!("{}:{}", output.txid, output.output),
+                    txid: output.txid.clone(),
+                    output_index: output.output,
+                    address: output.address,
+                    amount_sat: (amount_msat / 1000) as i64,
+                    status: Self::parse_status(&output.status),
+                    timestamp: None,
+                    network,
+                    created_at: Utc::now(),
+                    updated_at: None,
+                }
+            })
+            .collect();
+
+        Ok(outputs)
     }
 
-    async fn get_bitcoin_network(&self) -> Result<Currency, LightningError> {
-        Err(LightningError::Unsupported(
-            "Network lookup is not implemented for CLN REST client".to_string(),
-        ))
-    }
+    async fn network(&self) -> Result<BitcoinNetwork, BitcoinError> {
+        let response: GetinfoResponse = self
+            .post_request("getinfo", &GetinfoRequest {})
+            .await
+            .map_err(|e| BitcoinError::Network(e.to_string()))?;
 
-    async fn validate_bitcoin_address(&self, _address: &str) -> Result<bool, LightningError> {
-        Err(LightningError::Unsupported(
-            "Address validation is not implemented for CLN REST client".to_string(),
-        ))
+        Ok(parse_network(&response.network))
     }
 }

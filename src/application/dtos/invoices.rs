@@ -35,6 +35,10 @@ pub struct InvoiceResponse {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ln_address_id: Option<Uuid>,
 
+    /// Linked Bitcoin output when the invoice represents an onchain deposit.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub btc_output_id: Option<Uuid>,
+
     /// Description
     pub description: Option<String>,
     /// Amount requested in millisatoshis.
@@ -112,6 +116,7 @@ impl From<Invoice> for InvoiceResponse {
             id: invoice.id,
             wallet_id: invoice.wallet_id,
             ln_address_id: invoice.ln_address_id,
+            btc_output_id: invoice.btc_output_id,
             description: invoice.description,
             amount_msat: invoice.amount_msat,
             amount_received_msat: invoice.amount_received_msat,

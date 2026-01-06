@@ -6,10 +6,12 @@ use std::str::FromStr;
 use crate::{
     application::entities::Ledger,
     domains::{
+        bitcoin::BitcoinOutputStatus,
         invoice::{Invoice, InvoiceStatus},
         ln_node::LnInvoicePaidEvent,
         payment::Payment,
     },
+    infra::lightning::cln::cln::listfunds_outputs::ListfundsOutputsStatus,
 };
 
 use super::cln::{
@@ -74,6 +76,17 @@ impl From<WaitanyinvoiceResponse> for LnInvoicePaidEvent {
             amount_received_msat: val.amount_received_msat.as_ref().unwrap().msat,
             fee_msat: 0,
             payment_time: Utc.timestamp_opt(val.paid_at() as i64, 0).unwrap(),
+        }
+    }
+}
+
+impl From<ListfundsOutputsStatus> for BitcoinOutputStatus {
+    fn from(val: ListfundsOutputsStatus) -> Self {
+        match val {
+            ListfundsOutputsStatus::Unconfirmed => BitcoinOutputStatus::Unconfirmed,
+            ListfundsOutputsStatus::Confirmed => BitcoinOutputStatus::Confirmed,
+            ListfundsOutputsStatus::Spent => BitcoinOutputStatus::Spent,
+            ListfundsOutputsStatus::Immature => BitcoinOutputStatus::Immature,
         }
     }
 }

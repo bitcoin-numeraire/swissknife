@@ -9,6 +9,7 @@ use super::{Invoice, InvoiceFilter};
 pub trait InvoiceRepository: Send + Sync {
     async fn find(&self, id: Uuid) -> Result<Option<Invoice>, DatabaseError>;
     async fn find_by_payment_hash(&self, payment_hash: &str) -> Result<Option<Invoice>, DatabaseError>;
+    async fn find_by_btc_output_id(&self, btc_output_id: Uuid) -> Result<Option<Invoice>, DatabaseError>;
     async fn find_many(&self, filter: InvoiceFilter) -> Result<Vec<Invoice>, DatabaseError>;
     async fn insert(&self, invoice: Invoice) -> Result<Invoice, DatabaseError>;
     async fn update(&self, invoice: Invoice) -> Result<Invoice, DatabaseError>;

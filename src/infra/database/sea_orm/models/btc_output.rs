@@ -12,10 +12,9 @@ pub struct Model {
     pub txid: String,
     pub output_index: i32,
     pub amount_sat: i64,
-    pub fee_sat: Option<i64>,
-    pub block_height: Option<i32>,
+    pub status: String,
     pub timestamp: Option<DateTime>,
-    pub currency: String,
+    pub network: String,
     pub created_at: DateTime,
     pub updated_at: Option<DateTime>,
 }

@@ -3,17 +3,20 @@ use std::time::Duration;
 use serde::{Deserialize, Deserializer};
 use strum_macros::{Display, EnumString};
 
-use crate::infra::{
-    axum::AxumServerConfig,
-    config::config_rs::deserialize_duration,
-    database::sea_orm::SeaOrmConfig,
-    jwt::{local::JwtConfig, oauth2::OAuth2Config},
-    lightning::{
-        breez::BreezClientConfig,
-        cln::{ClnClientConfig, ClnRestClientConfig},
-        lnd::LndRestClientConfig,
+use crate::{
+    application::dtos::BitcoinAddressType,
+    infra::{
+        axum::AxumServerConfig,
+        config::config_rs::deserialize_duration,
+        database::sea_orm::SeaOrmConfig,
+        jwt::{local::JwtConfig, oauth2::OAuth2Config},
+        lightning::{
+            breez::BreezClientConfig,
+            cln::{ClnClientConfig, ClnRestClientConfig},
+            lnd::LndRestClientConfig,
+        },
+        logging::tracing::TracingLoggerConfig,
     },
-    logging::tracing::TracingLoggerConfig,
 };
 
 #[derive(Debug, Deserialize, Clone)]
@@ -28,6 +31,8 @@ pub struct AppConfig {
     #[serde(deserialize_with = "deserialize_duration")]
     pub invoice_expiry: Duration,
     pub fee_buffer: Option<f64>,
+    #[serde(default)]
+    pub bitcoin_address_type: BitcoinAddressType,
     pub ln_provider: LightningProvider,
     pub database: SeaOrmConfig,
     pub breez_config: Option<BreezClientConfig>,
@@ -54,7 +59,7 @@ where
     }))
 }
 
-#[derive(Clone, Debug, Deserialize, EnumString, Display, PartialEq, Eq, Default)]
+#[derive(Clone, Copy, Debug, Deserialize, EnumString, Display, PartialEq, Eq, Default)]
 #[serde(rename_all = "lowercase")]
 #[strum(serialize_all = "lowercase")]
 pub enum LightningProvider {
@@ -65,7 +70,7 @@ pub enum LightningProvider {
     Lnd,
 }
 
-#[derive(Clone, Debug, Deserialize, EnumString, Display, PartialEq, Eq, Default)]
+#[derive(Clone, Copy, Debug, Deserialize, EnumString, Display, PartialEq, Eq, Default)]
 #[serde(rename_all = "lowercase")]
 #[strum(serialize_all = "lowercase")]
 pub enum AuthProvider {

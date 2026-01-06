@@ -828,9 +828,9 @@ dependencies = [
 
 [[package]]
 name = "bitcoin"
-version = "0.32.3"
+version = "0.32.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0032b0e8ead7074cda7fc4f034409607e3f03a6f71d66ade8a307f79b4d99e73"
+checksum = "0fda569d741b895131a88ee5589a467e73e9c4718e958ac9308e4f7dc44b6945"
 dependencies = [
  "base58ck",
  "bech32 0.11.0",
@@ -2930,7 +2930,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "90ab9f6ea77e20e3129235e62a2e6bd64ed932363df104e864ee65ccffb54a8f"
 dependencies = [
  "bech32 0.9.1",
- "bitcoin 0.32.3",
+ "bitcoin 0.32.7",
  "lightning-types",
 ]
 
@@ -2941,7 +2941,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1083b8d9137000edf3bfcb1ff011c0d25e0cdd2feb98cc21d6765e64a494148f"
 dependencies = [
  "bech32 0.9.1",
- "bitcoin 0.32.3",
+ "bitcoin 0.32.7",
  "hex-conservative 0.2.1",
 ]
 
@@ -3182,7 +3182,7 @@ dependencies = [
  "base64 0.22.1",
  "bech32 0.11.0",
  "bip39",
- "bitcoin 0.32.3",
+ "bitcoin 0.32.7",
  "cbc",
  "chacha20",
  "chacha20poly1305",
@@ -5793,6 +5793,7 @@ dependencies = [
  "base64 0.22.1",
  "bcrypt",
  "bip39",
+ "bitcoin 0.32.7",
  "breez-sdk-core",
  "bytes",
  "chrono",

@@ -5,12 +5,17 @@ use sea_orm::{DatabaseConnection, DatabaseTransaction, TransactionTrait};
 use crate::{
     application::errors::DatabaseError,
     domains::{
-        invoice::InvoiceRepository, ln_address::LnAddressRepository, payment::PaymentRepository,
-        system::ConfigRepository, user::ApiKeyRepository, wallet::WalletRepository,
+        bitcoin::{BitcoinAddressRepository, BitcoinOutputRepository},
+        invoice::InvoiceRepository,
+        ln_address::LnAddressRepository,
+        payment::PaymentRepository,
+        system::ConfigRepository,
+        user::ApiKeyRepository,
+        wallet::WalletRepository,
     },
     infra::database::sea_orm::{
-        SeaOrmApiKeyRepository, SeaOrmConfigRepository, SeaOrmInvoiceRepository, SeaOrmLnAddressRepository,
-        SeaOrmPaymentRepository, SeaOrmWalletRepository,
+        SeaOrmApiKeyRepository, SeaOrmBitcoinAddressRepository, SeaOrmBitcoinOutputRepository, SeaOrmConfigRepository,
+        SeaOrmInvoiceRepository, SeaOrmLnAddressRepository, SeaOrmPaymentRepository, SeaOrmWalletRepository,
     },
 };
 
@@ -23,6 +28,8 @@ pub struct AppStore {
     pub wallet: Arc<dyn WalletRepository>,
     pub api_key: Arc<dyn ApiKeyRepository>,
     pub config: Arc<dyn ConfigRepository>,
+    pub btc_address: Arc<dyn BitcoinAddressRepository>,
+    pub btc_output: Arc<dyn BitcoinOutputRepository>,
 }
 
 impl AppStore {
@@ -33,6 +40,8 @@ impl AppStore {
         let wallet_repo = SeaOrmWalletRepository::new(db_conn.clone());
         let api_key_repo = SeaOrmApiKeyRepository::new(db_conn.clone());
         let config_repo = SeaOrmConfigRepository::new(db_conn.clone());
+        let btc_address_repo = SeaOrmBitcoinAddressRepository::new(db_conn.clone());
+        let btc_output_repo = SeaOrmBitcoinOutputRepository::new(db_conn.clone());
 
         AppStore {
             db_conn,
@@ -42,6 +51,8 @@ impl AppStore {
             wallet: Arc::new(wallet_repo),
             api_key: Arc::new(api_key_repo),
             config: Arc::new(config_repo),
+            btc_address: Arc::new(btc_address_repo),
+            btc_output: Arc::new(btc_output_repo),
         }
     }
 }

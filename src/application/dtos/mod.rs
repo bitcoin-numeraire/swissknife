@@ -1,5 +1,6 @@
 mod api_key;
 mod auth;
+mod bitcoin;
 mod config;
 mod error;
 mod invoices;
@@ -12,6 +13,7 @@ mod wallet;
 
 pub use api_key::*;
 pub use auth::*;
+pub use bitcoin::*;
 pub use config::*;
 pub use error::*;
 pub use invoices::*;
