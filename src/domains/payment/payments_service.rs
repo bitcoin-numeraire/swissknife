@@ -17,7 +17,7 @@ use crate::{
         invoice::{Invoice, InvoiceStatus},
         lnurl::{process_success_action, validate_lnurl_pay},
     },
-    infra::lightning::LnClient,
+    infra::lightning::{types::validate_address_for_currency, LnClient},
 };
 
 use super::{Payment, PaymentFilter, PaymentStatus, PaymentsUseCases};
@@ -210,11 +210,17 @@ impl PaymentService {
             )
             .await?;
 
-        let txid = self
-            .ln_client
-            .send_bitcoin(address, amount_sat, None)
-            .await
-            .map_err(|e| DataError::Validation(e.to_string()))?;
+        let txid = match self.ln_client.send_bitcoin(address, amount_sat, None).await {
+            Ok(txid) => txid,
+            Err(error) => {
+                let mut failed_payment = pending_payment.clone();
+                failed_payment.status = PaymentStatus::Failed;
+                failed_payment.error = Some(error.to_string());
+                self.store.payment.update(failed_payment).await?;
+
+                return Err(error.into());
+            }
+        };
 
         let mut updated_payment = pending_payment.clone();
         updated_payment.payment_hash = Some(txid);
@@ -461,8 +467,10 @@ impl PaymentsUseCases for PaymentService {
     ) -> Result<Payment, ApplicationError> {
         debug!(%input, %wallet_id, "Received pay request");
 
-        if self.ln_client.validate_bitcoin_address(&input).await.unwrap_or(false) {
-            return self.send_bitcoin_payment(input, amount_msat, comment, wallet_id).await;
+        if let Ok(currency) = self.ln_client.get_bitcoin_network().await {
+            if validate_address_for_currency(&input, currency) {
+                return self.send_bitcoin_payment(input, amount_msat, comment, wallet_id).await;
+            }
         }
 
         let payment = if self.is_internal_payment(&input) {

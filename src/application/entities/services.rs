@@ -46,32 +46,43 @@ impl AppServices {
         ln_client: Arc<dyn LnClient>,
         jwt_authenticator: Arc<dyn JWTAuthenticator>,
     ) -> Self {
+        let AppConfig {
+            domain,
+            host,
+            invoice_expiry,
+            fee_buffer,
+            ln_provider,
+            auth_provider,
+            bitcoin_address_type,
+            ..
+        } = config;
+
         let payments = PaymentService::new(
             store.clone(),
             ln_client.clone(),
-            config.domain.clone(),
-            config.fee_buffer.unwrap_or_default(),
+            domain.clone(),
+            fee_buffer.unwrap_or_default(),
         );
         let invoices = InvoiceService::new(
             store.clone(),
             ln_client.clone(),
-            config.invoice_expiry.as_secs() as u32,
-            config.ln_provider,
+            invoice_expiry.as_secs() as u32,
+            ln_provider,
         );
         let lnurl = LnUrlService::new(
             store.clone(),
             ln_client.clone(),
-            config.invoice_expiry.as_secs() as u32,
-            config.domain,
-            config.host,
+            invoice_expiry.as_secs() as u32,
+            domain,
+            host,
         );
         let ln_address = LnAddressService::new(store.clone());
         let wallet = WalletService::new(store.clone());
-        let auth = AuthService::new(jwt_authenticator, store.clone(), config.auth_provider);
+        let auth = AuthService::new(jwt_authenticator, store.clone(), auth_provider);
         let system = SystemService::new(store.clone(), ln_client.clone());
         let nostr = NostrService::new(store.clone());
         let api_key = ApiKeyService::new(store.clone());
-        let bitcoin = BitcoinService::new(store, ln_client);
+        let bitcoin = BitcoinService::new(store, ln_client, bitcoin_address_type);
 
         AppServices {
             invoice: Box::new(invoices),

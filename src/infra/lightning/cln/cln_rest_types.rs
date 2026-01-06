@@ -92,8 +92,6 @@ pub struct NewAddrRequest {
 #[derive(Debug, Deserialize)]
 pub struct NewAddrResponse {
     pub bech32: Option<String>,
-    #[serde(rename = "p2sh-segwit")]
-    pub p2sh_segwit: Option<String>,
     #[serde(rename = "p2tr")]
     pub p2tr: Option<String>,
 }

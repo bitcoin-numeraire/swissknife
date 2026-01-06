@@ -16,7 +16,7 @@ use cln::{
 };
 
 use crate::{
-    application::{entities::Currency, errors::LightningError},
+    application::{dtos::BitcoinAddressType, entities::Currency, errors::LightningError},
     domains::{
         bitcoin::{BitcoinBalance, BitcoinOutput},
         invoice::Invoice,
@@ -26,7 +26,7 @@ use crate::{
     },
     infra::{
         config::config_rs::deserialize_duration,
-        lightning::{types::currency_from_network_name, types::validate_address_for_currency, LnClient},
+        lightning::{types::currency_from_network_name, LnClient},
     },
 };
 
@@ -216,11 +216,13 @@ impl LnClient for ClnGrpcClient {
         ))
     }
 
-    async fn get_new_bitcoin_address(&self) -> Result<String, LightningError> {
+    async fn get_new_bitcoin_address(&self, address_type: BitcoinAddressType) -> Result<String, LightningError> {
         let mut client = self.client.clone();
 
         let response = client
-            .new_addr(NewaddrRequest { addresstype: None })
+            .new_addr(NewaddrRequest {
+                addresstype: Self::map_address_type(address_type),
+            })
             .await
             .map_err(|e| LightningError::BitcoinAddress(e.message().to_string()))?
             .into_inner();
@@ -332,9 +334,13 @@ impl LnClient for ClnGrpcClient {
         currency_from_network_name(&response.network)
             .ok_or_else(|| LightningError::HealthCheck("Unknown network returned by CLN".to_string()))
     }
+}
 
-    async fn validate_bitcoin_address(&self, address: &str) -> Result<bool, LightningError> {
-        let currency = self.get_bitcoin_network().await?;
-        Ok(validate_address_for_currency(address, currency))
+impl ClnGrpcClient {
+    fn map_address_type(address_type: BitcoinAddressType) -> Option<i32> {
+        match address_type {
+            BitcoinAddressType::P2wpkh => Some(cln::newaddr_request::NewaddrAddresstype::Bech32 as i32),
+            BitcoinAddressType::P2tr => Some(cln::newaddr_request::NewaddrAddresstype::P2tr as i32),
+        }
     }
 }

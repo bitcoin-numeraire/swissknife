@@ -28,6 +28,8 @@ pub struct AppConfig {
     #[serde(deserialize_with = "deserialize_duration")]
     pub invoice_expiry: Duration,
     pub fee_buffer: Option<f64>,
+    #[serde(default)]
+    pub bitcoin_address_type: BitcoinAddressType,
     pub ln_provider: LightningProvider,
     pub database: SeaOrmConfig,
     pub breez_config: Option<BreezClientConfig>,
@@ -54,7 +56,16 @@ where
     }))
 }
 
-#[derive(Clone, Debug, Deserialize, EnumString, Display, PartialEq, Eq, Default)]
+#[derive(Clone, Copy, Debug, Deserialize, EnumString, Display, PartialEq, Eq, Default)]
+#[serde(rename_all = "lowercase")]
+#[strum(serialize_all = "lowercase")]
+pub enum BitcoinAddressType {
+    #[default]
+    P2wpkh,
+    P2tr,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, EnumString, Display, PartialEq, Eq, Default)]
 #[serde(rename_all = "lowercase")]
 #[strum(serialize_all = "lowercase")]
 pub enum LightningProvider {
@@ -65,7 +76,7 @@ pub enum LightningProvider {
     Lnd,
 }
 
-#[derive(Clone, Debug, Deserialize, EnumString, Display, PartialEq, Eq, Default)]
+#[derive(Clone, Copy, Debug, Deserialize, EnumString, Display, PartialEq, Eq, Default)]
 #[serde(rename_all = "lowercase")]
 #[strum(serialize_all = "lowercase")]
 pub enum AuthProvider {

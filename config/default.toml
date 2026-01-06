@@ -3,6 +3,7 @@ invoice_expiry = "12h"
 domain = "numeraire.tech"
 host = "https://api.numeraire.tech"
 fee_buffer = 0.02
+bitcoin_address_type = "p2wpkh"
 ln_provider = "breez"
 auth_provider = "jwt"
 dashboard_dir = "/var/www/swissknife-dashboard"

@@ -15,7 +15,7 @@ use uuid::Uuid;
 use async_trait::async_trait;
 
 use crate::{
-    application::{entities::Currency, errors::LightningError},
+    application::{dtos::BitcoinAddressType, entities::Currency, errors::LightningError},
     domains::{
         bitcoin::{BitcoinBalance, BitcoinOutput},
         invoice::Invoice,
@@ -25,7 +25,7 @@ use crate::{
     },
     infra::{
         config::config_rs::deserialize_duration,
-        lightning::{types::currency_from_network_name, types::validate_address_for_currency, LnClient},
+        lightning::{types::currency_from_network_name, LnClient},
     },
 };
 
@@ -237,16 +237,20 @@ impl LnClient for ClnRestClient {
         Ok(HealthStatus::Operational)
     }
 
-    async fn get_new_bitcoin_address(&self) -> Result<String, LightningError> {
+    async fn get_new_bitcoin_address(&self, address_type: BitcoinAddressType) -> Result<String, LightningError> {
         let response: NewAddrResponse = self
-            .post_request("newaddr", &NewAddrRequest { addresstype: None })
+            .post_request(
+                "newaddr",
+                &NewAddrRequest {
+                    addresstype: Self::map_address_type(address_type),
+                },
+            )
             .await
             .map_err(|e| LightningError::BitcoinAddress(e.to_string()))?;
 
         response
             .bech32
             .or(response.p2tr)
-            .or(response.p2sh_segwit)
             .ok_or_else(|| LightningError::BitcoinAddress("No address returned by CLN".to_string()))
     }
 
@@ -339,9 +343,13 @@ impl LnClient for ClnRestClient {
         currency_from_network_name(&response.network)
             .ok_or_else(|| LightningError::HealthCheck("Unknown network returned by CLN".to_string()))
     }
+}
 
-    async fn validate_bitcoin_address(&self, address: &str) -> Result<bool, LightningError> {
-        let currency = self.get_bitcoin_network().await?;
-        Ok(validate_address_for_currency(address, currency))
+impl ClnRestClient {
+    fn map_address_type(address_type: BitcoinAddressType) -> Option<String> {
+        match address_type {
+            BitcoinAddressType::P2wpkh => Some("bech32".to_string()),
+            BitcoinAddressType::P2tr => Some("p2tr".to_string()),
+        }
     }
 }

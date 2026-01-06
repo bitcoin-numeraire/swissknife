@@ -2,7 +2,7 @@ use std::{path::PathBuf, process, sync::Arc, time::Duration};
 
 use anyhow::anyhow;
 use breez_sdk_core::ReverseSwapInfo;
-use chrono::{DateTime, TimeZone, Utc};
+use chrono::Utc;
 use futures_util::StreamExt;
 use reqwest::{
     header::{HeaderMap, HeaderValue},
@@ -14,7 +14,7 @@ use tokio::fs;
 use uuid::Uuid;
 
 use crate::{
-    application::{entities::Currency, errors::LightningError},
+    application::{dtos::BitcoinAddressType, entities::Currency, errors::LightningError},
     domains::{
         bitcoin::{BitcoinBalance, BitcoinOutput},
         invoice::Invoice,
@@ -24,7 +24,7 @@ use crate::{
     },
     infra::{
         config::config_rs::deserialize_duration,
-        lightning::{types::currency_from_network_name, types::validate_address_for_currency, LnClient},
+        lightning::{types::currency_from_network_name, LnClient},
     },
 };
 use async_trait::async_trait;
@@ -208,12 +208,6 @@ impl LndRestClient {
     fn parse_amount(value: Option<String>) -> i64 {
         value.and_then(|v| v.parse::<i64>().ok()).unwrap_or_default()
     }
-
-    fn parse_timestamp(value: Option<String>) -> Option<DateTime<Utc>> {
-        value
-            .and_then(|v| v.parse::<i64>().ok())
-            .and_then(|secs| Utc.timestamp_opt(secs, 0).single())
-    }
 }
 
 #[async_trait]
@@ -318,12 +312,12 @@ impl LnClient for LndRestClient {
         Ok(HealthStatus::Operational)
     }
 
-    async fn get_new_bitcoin_address(&self) -> Result<String, LightningError> {
+    async fn get_new_bitcoin_address(&self, address_type: BitcoinAddressType) -> Result<String, LightningError> {
         let response: NewAddressResponse = self
             .post_request(
                 "v1/newaddress",
                 &NewAddressRequest {
-                    address_type: "WITNESS_PUBKEY_HASH".to_string(),
+                    address_type: Self::map_address_type(address_type),
                 },
             )
             .await
@@ -367,45 +361,37 @@ impl LnClient for LndRestClient {
 
     async fn list_bitcoin_outputs(&self) -> Result<Vec<BitcoinOutput>, LightningError> {
         let currency = self.get_bitcoin_network().await?;
-        let response: ListTransactionsResponse = self
-            .get_request("v1/transactions")
+        let response: ListUnspentResponse = self
+            .get_request("v2/wallet/utxos")
             .await
             .map_err(|e| LightningError::BitcoinOutputs(e.to_string()))?;
 
-        let mut outputs = Vec::new();
+        let outputs = response
+            .utxos
+            .unwrap_or_default()
+            .into_iter()
+            .filter_map(|utxo| {
+                let outpoint = utxo.outpoint?;
+                let txid = outpoint.txid_str?;
+                let output_index = outpoint.output_index?;
+                let amount_sat = utxo.amount_sat?;
 
-        for transaction in response.transactions.unwrap_or_default() {
-            let txid = match transaction.tx_hash {
-                Some(ref hash) => hash.clone(),
-                None => continue,
-            };
-
-            if let Some(details) = transaction.output_details {
-                for detail in details {
-                    if !detail.is_ours.unwrap_or(false) {
-                        continue;
-                    }
-
-                    let output_index = detail.output_index.unwrap_or(0) as u32;
-                    let amount_sat = Self::parse_amount(detail.amount);
-
-                    outputs.push(BitcoinOutput {
-                        id: Uuid::new_v4(),
-                        outpoint: format!("{txid}:{output_index}"),
-                        txid: txid.clone(),
-                        output_index,
-                        address: detail.address,
-                        amount_sat,
-                        fee_sat: transaction.total_fees.as_ref().and_then(|f| f.parse::<i64>().ok()),
-                        block_height: transaction.block_height.map(|h| h as u32),
-                        timestamp: Self::parse_timestamp(transaction.time_stamp.clone()),
-                        currency: currency.clone(),
-                        created_at: Utc::now(),
-                        updated_at: None,
-                    });
-                }
-            }
-        }
+                Some(BitcoinOutput {
+                    id: Uuid::new_v4(),
+                    outpoint: format!("{txid}:{output_index}"),
+                    txid,
+                    output_index: output_index as u32,
+                    address: utxo.address,
+                    amount_sat: Self::parse_amount(Some(amount_sat)),
+                    fee_sat: None,
+                    block_height: utxo.confirmations.map(|confirmations| confirmations as u32),
+                    timestamp: None,
+                    currency: currency.clone(),
+                    created_at: Utc::now(),
+                    updated_at: None,
+                })
+            })
+            .collect();
 
         Ok(outputs)
     }
@@ -429,10 +415,13 @@ impl LnClient for LndRestClient {
             "No chain information returned by LND".to_string(),
         ))
     }
+}
 
-    async fn validate_bitcoin_address(&self, address: &str) -> Result<bool, LightningError> {
-        let currency = self.get_bitcoin_network().await?;
-
-        Ok(validate_address_for_currency(address, currency))
+impl LndRestClient {
+    fn map_address_type(address_type: BitcoinAddressType) -> String {
+        match address_type {
+            BitcoinAddressType::P2wpkh => "WITNESS_PUBKEY_HASH".to_string(),
+            BitcoinAddressType::P2tr => "TAPROOT_PUBKEY".to_string(),
+        }
     }
 }

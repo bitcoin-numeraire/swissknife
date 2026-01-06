@@ -52,7 +52,6 @@ impl BitcoinAddressRepository for SeaOrmBitcoinAddressRepository {
             wallet_id: Set(address.wallet_id),
             address: Set(address.address),
             used: Set(address.used),
-            derivation_index: Set(address.derivation_index),
             ..Default::default()
         };
 

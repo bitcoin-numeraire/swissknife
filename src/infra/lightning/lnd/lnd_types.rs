@@ -176,16 +176,6 @@ pub struct NewAddressResponse {
     pub address: String,
 }
 
-#[derive(Debug, Serialize)]
-pub struct ValidateAddressRequest {
-    pub address: String,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct ValidateAddressResponse {
-    pub is_valid: bool,
-}
-
 #[derive(Debug, Deserialize)]
 pub struct ListTransactionsResponse {
     pub transactions: Option<Vec<Transaction>>,
@@ -209,4 +199,25 @@ pub struct OutputDetail {
     pub amount: Option<String>,
     pub address: Option<String>,
     pub is_ours: Option<bool>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ListUnspentResponse {
+    pub utxos: Option<Vec<Utxo>>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct Utxo {
+    pub address_type: Option<String>,
+    pub address: Option<String>,
+    pub amount_sat: Option<String>,
+    pub pk_script: Option<String>,
+    pub outpoint: Option<UtxoOutpoint>,
+    pub confirmations: Option<i64>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct UtxoOutpoint {
+    pub txid_str: Option<String>,
+    pub output_index: Option<i64>,
 }

@@ -169,7 +169,6 @@ impl From<btc_address::Model> for BitcoinAddress {
             wallet_id: model.wallet_id,
             address: model.address,
             used: model.used,
-            derivation_index: model.derivation_index,
             created_at: model.created_at.and_utc(),
             updated_at: model.updated_at.map(|t| t.and_utc()),
         }

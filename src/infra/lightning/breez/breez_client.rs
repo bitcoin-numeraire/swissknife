@@ -14,7 +14,7 @@ use breez_sdk_core::{
 };
 
 use crate::{
-    application::{entities::Currency, errors::LightningError},
+    application::{dtos::BitcoinAddressType, entities::Currency, errors::LightningError},
     domains::{
         bitcoin::{BitcoinBalance, BitcoinOutput},
         invoice::Invoice,
@@ -336,7 +336,7 @@ impl LnClient for BreezClient {
         Ok(response.status.into())
     }
 
-    async fn get_new_bitcoin_address(&self) -> Result<String, LightningError> {
+    async fn get_new_bitcoin_address(&self, _address_type: BitcoinAddressType) -> Result<String, LightningError> {
         Err(LightningError::Unsupported(
             "Bitcoin address generation is not yet implemented for Breez".to_string(),
         ))
@@ -368,12 +368,6 @@ impl LnClient for BreezClient {
     async fn get_bitcoin_network(&self) -> Result<Currency, LightningError> {
         Err(LightningError::Unsupported(
             "Retrieving bitcoin network information is not yet implemented for Breez".to_string(),
-        ))
-    }
-
-    async fn validate_bitcoin_address(&self, _address: &str) -> Result<bool, LightningError> {
-        Err(LightningError::Unsupported(
-            "Validating bitcoin addresses is not yet implemented for Breez".to_string(),
         ))
     }
 }

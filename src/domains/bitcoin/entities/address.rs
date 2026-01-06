@@ -8,7 +8,6 @@ pub struct BitcoinAddress {
     pub wallet_id: Uuid,
     pub address: String,
     pub used: bool,
-    pub derivation_index: Option<i32>,
     pub created_at: DateTime<Utc>,
     pub updated_at: Option<DateTime<Utc>>,
 }
