@@ -136,7 +136,7 @@ impl PaymentService {
         }
     }
 
-    async fn send_bitcoin_payment(
+    async fn send_bitcoin(
         &self,
         data: BitcoinAddressData,
         amount_sat: Option<u64>,
@@ -150,7 +150,7 @@ impl PaymentService {
 
         if let Some(amount) = specified_amount {
             let amount_msat = amount * 1000;
-            let description = comment.or(data.message);
+            let description: Option<String> = comment.or(data.message);
 
             if let Some(recipient_address) = self.store.btc_address.find_by_address(&data.address).await? {
                 if recipient_address.wallet_id == wallet_id {
@@ -484,10 +484,10 @@ impl PaymentsUseCases for PaymentService {
                 .map_err(|err| DataError::Validation(err.to_string()))?;
 
             match input_type {
-                InputType::BitcoinAddress { address } => {
-                    self.send_bitcoin_payment(address, amount_msat, comment, wallet_id)
-                        .await
-                }
+                InputType::BitcoinAddress { address } =>{
+                    let amount_sat = amount_msat.map(|amount| amount / 1000);
+                    self.send_bitcoin(address, amount_sat, comment, wallet_id).await
+                },
                 InputType::Bolt11 { invoice } => self.send_bolt11(invoice, amount_msat, comment, wallet_id).await,
                 InputType::LnUrlPay { data } => self.send_lnurl_pay(data, amount_msat, comment, wallet_id).await,
                 InputType::LnUrlError { data } => Err(DataError::Validation(data.reason).into()),
