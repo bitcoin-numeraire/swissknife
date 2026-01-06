@@ -4,7 +4,6 @@ use strum_macros::{Display, EnumString};
 use utoipa::ToSchema;
 use uuid::Uuid;
 #[derive(Clone, Debug)]
-#[allow(dead_code)]
 pub struct BitcoinAddress {
     pub id: Uuid,
     pub wallet_id: Uuid,
