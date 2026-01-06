@@ -165,12 +165,6 @@ pub struct SendCoinsResponse {
     pub txid: String,
 }
 
-#[derive(Debug, Serialize)]
-pub struct NewAddressRequest {
-    #[serde(rename = "type")]
-    pub address_type: String,
-}
-
 #[derive(Debug, Deserialize)]
 pub struct NewAddressResponse {
     pub address: String,

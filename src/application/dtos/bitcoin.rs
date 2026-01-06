@@ -1,8 +1,10 @@
 use chrono::{DateTime, Utc};
-use serde::Serialize;
-use utoipa::ToSchema;
+use serde::{Deserialize, Serialize};
+use serde_with::serde_as;
+use strum_macros::{Display, EnumString};
+use utoipa::{IntoParams, ToSchema};
 
-use crate::domains::bitcoin::{BitcoinAddress, BitcoinAddressType};
+use crate::domains::bitcoin::{BitcoinAddress};
 
 #[derive(Debug, Serialize, ToSchema)]
 pub struct BitcoinAddressResponse {
@@ -13,7 +15,7 @@ pub struct BitcoinAddressResponse {
     pub used: bool,
 
     /// Address type
-    pub address_type: BitcoinAddressType,
+    pub address_type: crate::domains::bitcoin::BitcoinAddressType,
 
     /// Date of creation in database
     pub created_at: DateTime<Utc>,
@@ -33,4 +35,30 @@ impl From<BitcoinAddress> for BitcoinAddressResponse {
             updated_at: address.updated_at,
         }
     }
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, EnumString, Display, PartialEq, Eq, Default, ToSchema)]
+#[serde(rename_all = "lowercase")]
+#[strum(serialize_all = "lowercase")]
+pub enum BitcoinAddressType {
+    #[default]
+    P2wpkh,
+    P2tr,
+}
+
+impl From<BitcoinAddressType> for crate::domains::bitcoin::BitcoinAddressType {
+    fn from(dto: BitcoinAddressType) -> Self {
+        match dto {
+            BitcoinAddressType::P2wpkh => crate::domains::bitcoin::BitcoinAddressType::P2wpkh,
+            BitcoinAddressType::P2tr => crate::domains::bitcoin::BitcoinAddressType::P2tr,
+        }
+    }
+}
+
+#[serde_as]
+#[derive(Clone, Debug, Deserialize, Serialize, Default, IntoParams)]
+pub struct BitcoinAddressQueryParams {
+    /// Address type
+    #[serde(rename = "type")]
+    pub address_type: Option<BitcoinAddressType>,
 }

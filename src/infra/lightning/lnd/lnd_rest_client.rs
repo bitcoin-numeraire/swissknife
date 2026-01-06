@@ -327,13 +327,11 @@ impl LnClient for LndRestClient {
 #[async_trait]
 impl BitcoinWallet for LndRestClient {
     async fn new_address(&self, address_type: BitcoinAddressType) -> Result<String, BitcoinError> {
+        let address_type_param = Self::map_address_type(address_type);
+        let endpoint = format!("v1/newaddress?type={}", address_type_param);
+
         let response: NewAddressResponse = self
-            .post_request(
-                "v1/newaddress",
-                &NewAddressRequest {
-                    address_type: Self::map_address_type(address_type),
-                },
-            )
+            .get_request(&endpoint)
             .await
             .map_err(|e| BitcoinError::Address(e.to_string()))?;
 

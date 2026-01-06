@@ -14,7 +14,7 @@ use crate::{
         dtos::{
             ApiKeyResponse, BitcoinAddressResponse, CreateApiKeyRequest, ErrorResponse, InvoiceResponse,
             NewInvoiceRequest, PaymentResponse, RegisterLnAddressRequest, SendPaymentRequest, UpdateLnAddressRequest,
-            WalletLnAddressResponse, WalletResponse,
+            WalletLnAddressResponse, WalletResponse, BitcoinAddressQueryParams,
         },
         errors::{ApplicationError, DataError},
     },
@@ -107,6 +107,7 @@ async fn get_user_wallet(
     path = "/bitcoin/address",
     tag = "User Wallet",
     context_path = CONTEXT_PATH,
+    params(BitcoinAddressQueryParams),
     responses(
         (status = 200, description = "Found", body = BitcoinAddressResponse),
         (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
@@ -116,8 +117,13 @@ async fn get_user_wallet(
 async fn get_bitcoin_deposit_address(
     State(app_state): State<Arc<AppState>>,
     user: User,
+    Query(query_params): Query<BitcoinAddressQueryParams>,
 ) -> Result<Json<BitcoinAddressResponse>, ApplicationError> {
-    let address = app_state.services.bitcoin.get_deposit_address(user.wallet_id).await?;
+    let address = app_state.services.bitcoin.get_deposit_address(
+        user.wallet_id, 
+        query_params.address_type.map(Into::into)
+    ).await?;
+
     Ok(Json(address.into()))
 }
 

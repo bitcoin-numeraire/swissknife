@@ -3,7 +3,7 @@ use std::time::Duration;
 use serde::{Deserialize, Deserializer};
 use strum_macros::{Display, EnumString};
 
-use crate::infra::{
+use crate::{application::dtos::BitcoinAddressType, infra::{
     axum::AxumServerConfig,
     config::config_rs::deserialize_duration,
     database::sea_orm::SeaOrmConfig,
@@ -14,7 +14,7 @@ use crate::infra::{
         lnd::LndRestClientConfig,
     },
     logging::tracing::TracingLoggerConfig,
-};
+}};
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct AppConfig {
@@ -54,24 +54,6 @@ where
             Some(trimmed.to_string())
         }
     }))
-}
-
-#[derive(Clone, Copy, Debug, Deserialize, EnumString, Display, PartialEq, Eq, Default)]
-#[serde(rename_all = "lowercase")]
-#[strum(serialize_all = "lowercase")]
-pub enum BitcoinAddressType {
-    #[default]
-    P2wpkh,
-    P2tr,
-}
-
-impl From<BitcoinAddressType> for crate::domains::bitcoin::BitcoinAddressType {
-    fn from(dto: BitcoinAddressType) -> Self {
-        match dto {
-            BitcoinAddressType::P2wpkh => crate::domains::bitcoin::BitcoinAddressType::P2wpkh,
-            BitcoinAddressType::P2tr => crate::domains::bitcoin::BitcoinAddressType::P2tr,
-        }
-    }
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, EnumString, Display, PartialEq, Eq, Default)]

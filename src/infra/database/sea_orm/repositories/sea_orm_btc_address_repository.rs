@@ -7,7 +7,7 @@ use uuid::Uuid;
 
 use crate::{
     application::errors::DatabaseError,
-    domains::bitcoin::{BitcoinAddress, BitcoinAddressRepository},
+    domains::bitcoin::{BitcoinAddress, BitcoinAddressRepository, BitcoinAddressType},
     infra::database::sea_orm::models::btc_address::{ActiveModel, Column, Entity},
 };
 
@@ -24,10 +24,11 @@ impl SeaOrmBitcoinAddressRepository {
 
 #[async_trait]
 impl BitcoinAddressRepository for SeaOrmBitcoinAddressRepository {
-    async fn find_by_wallet_unused(&self, wallet_id: Uuid) -> Result<Option<BitcoinAddress>, DatabaseError> {
+    async fn find_by_wallet_unused(&self, wallet_id: Uuid, address_type: BitcoinAddressType) -> Result<Option<BitcoinAddress>, DatabaseError> {
         let model = Entity::find()
             .filter(Column::WalletId.eq(wallet_id))
             .filter(Column::Used.eq(false))
+            .filter(Column::AddressType.eq(address_type.to_string()))
             .order_by_desc(Column::CreatedAt)
             .one(&self.db)
             .await
