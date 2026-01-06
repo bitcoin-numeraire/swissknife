@@ -32,7 +32,6 @@ pub struct Payment {
     pub updated_at: Option<DateTime<Utc>>,
     pub btc_output_id: Option<Uuid>,
     pub destination_address: Option<String>,
-    #[allow(dead_code)]
     pub bitcoin_output: Option<BitcoinOutput>,
 }
 
