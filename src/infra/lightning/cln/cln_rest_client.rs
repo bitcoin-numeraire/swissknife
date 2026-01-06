@@ -342,7 +342,7 @@ impl BitcoinWallet for ClnRestClient {
                     amount_sat: (amount_msat / 1000) as i64,
                     status: Self::parse_status(&output.status),
                     timestamp: None,
-                    network: network,
+                    network,
                     created_at: Utc::now(),
                     updated_at: None,
                 }

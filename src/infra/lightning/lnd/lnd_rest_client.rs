@@ -405,7 +405,7 @@ impl BitcoinWallet for LndRestClient {
                     amount_sat: Self::parse_amount(Some(amount_sat)),
                     status,
                     timestamp: None,
-                    network: network,
+                    network,
                     created_at: Utc::now(),
                     updated_at: None,
                 })

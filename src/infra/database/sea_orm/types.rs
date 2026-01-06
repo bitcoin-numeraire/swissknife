@@ -168,6 +168,7 @@ impl From<BitcoinAddressModel> for BitcoinAddress {
             id: model.id,
             wallet_id: model.wallet_id,
             address: model.address,
+            address_type: model.address_type.parse().expect(ASSERTION_MSG),
             used: model.used,
             created_at: model.created_at.and_utc(),
             updated_at: model.updated_at.map(|t| t.and_utc()),

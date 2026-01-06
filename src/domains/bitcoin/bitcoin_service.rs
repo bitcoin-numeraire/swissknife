@@ -51,6 +51,7 @@ impl BitcoinUseCases for BitcoinService {
                 id: Uuid::new_v4(),
                 wallet_id,
                 address,
+                address_type: self.address_type,
                 used: false,
                 created_at: Utc::now(),
                 updated_at: None,

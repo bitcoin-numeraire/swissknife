@@ -51,6 +51,7 @@ impl BitcoinAddressRepository for SeaOrmBitcoinAddressRepository {
             id: Set(address.id),
             wallet_id: Set(address.wallet_id),
             address: Set(address.address),
+            address_type: Set(address.address_type.to_string()),
             used: Set(address.used),
             ..Default::default()
         };

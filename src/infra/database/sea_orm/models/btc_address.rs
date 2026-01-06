@@ -10,8 +10,8 @@ pub struct Model {
     pub wallet_id: Uuid,
     #[sea_orm(unique)]
     pub address: String,
+    pub address_type: String,
     pub used: bool,
-    pub derivation_index: Option<i32>,
     pub created_at: DateTime,
     pub updated_at: Option<DateTime>,
 }
