@@ -4,7 +4,7 @@ use serde_with::serde_as;
 use strum_macros::{Display, EnumString};
 use utoipa::{IntoParams, ToSchema};
 
-use crate::domains::bitcoin::{BitcoinAddress};
+use crate::domains::bitcoin::BitcoinAddress;
 
 #[derive(Debug, Serialize, ToSchema)]
 pub struct BitcoinAddressResponse {

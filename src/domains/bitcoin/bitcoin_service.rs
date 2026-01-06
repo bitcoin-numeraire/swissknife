@@ -35,12 +35,21 @@ impl BitcoinService {
 
 #[async_trait]
 impl BitcoinUseCases for BitcoinService {
-    async fn get_deposit_address(&self, wallet_id: Uuid, address_type: Option<BitcoinAddressType>) -> Result<BitcoinAddress, ApplicationError> {
+    async fn get_deposit_address(
+        &self,
+        wallet_id: Uuid,
+        address_type: Option<BitcoinAddressType>,
+    ) -> Result<BitcoinAddress, ApplicationError> {
         debug!(%wallet_id, ?address_type, "Fetching current bitcoin deposit address");
 
         let address_type = address_type.unwrap_or(self.address_type);
 
-        if let Some(address) = self.store.btc_address.find_by_wallet_unused(wallet_id, address_type).await? {
+        if let Some(address) = self
+            .store
+            .btc_address
+            .find_by_wallet_unused(wallet_id, address_type)
+            .await?
+        {
             return Ok(address);
         }
 

@@ -3,18 +3,21 @@ use std::time::Duration;
 use serde::{Deserialize, Deserializer};
 use strum_macros::{Display, EnumString};
 
-use crate::{application::dtos::BitcoinAddressType, infra::{
-    axum::AxumServerConfig,
-    config::config_rs::deserialize_duration,
-    database::sea_orm::SeaOrmConfig,
-    jwt::{local::JwtConfig, oauth2::OAuth2Config},
-    lightning::{
-        breez::BreezClientConfig,
-        cln::{ClnClientConfig, ClnRestClientConfig},
-        lnd::LndRestClientConfig,
+use crate::{
+    application::dtos::BitcoinAddressType,
+    infra::{
+        axum::AxumServerConfig,
+        config::config_rs::deserialize_duration,
+        database::sea_orm::SeaOrmConfig,
+        jwt::{local::JwtConfig, oauth2::OAuth2Config},
+        lightning::{
+            breez::BreezClientConfig,
+            cln::{ClnClientConfig, ClnRestClientConfig},
+            lnd::LndRestClientConfig,
+        },
+        logging::tracing::TracingLoggerConfig,
     },
-    logging::tracing::TracingLoggerConfig,
-}};
+};
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct AppConfig {

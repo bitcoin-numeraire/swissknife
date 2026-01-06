@@ -484,10 +484,10 @@ impl PaymentsUseCases for PaymentService {
                 .map_err(|err| DataError::Validation(err.to_string()))?;
 
             match input_type {
-                InputType::BitcoinAddress { address } =>{
+                InputType::BitcoinAddress { address } => {
                     let amount_sat = amount_msat.map(|amount| amount / 1000);
                     self.send_bitcoin(address, amount_sat, comment, wallet_id).await
-                },
+                }
                 InputType::Bolt11 { invoice } => self.send_bolt11(invoice, amount_msat, comment, wallet_id).await,
                 InputType::LnUrlPay { data } => self.send_lnurl_pay(data, amount_msat, comment, wallet_id).await,
                 InputType::LnUrlError { data } => Err(DataError::Validation(data.reason).into()),

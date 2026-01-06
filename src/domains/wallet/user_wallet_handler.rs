@@ -12,9 +12,9 @@ use crate::{
     application::{
         docs::{BAD_REQUEST_EXAMPLE, INTERNAL_EXAMPLE, NOT_FOUND_EXAMPLE, UNAUTHORIZED_EXAMPLE, UNPROCESSABLE_EXAMPLE},
         dtos::{
-            ApiKeyResponse, BitcoinAddressResponse, CreateApiKeyRequest, ErrorResponse, InvoiceResponse,
-            NewInvoiceRequest, PaymentResponse, RegisterLnAddressRequest, SendPaymentRequest, UpdateLnAddressRequest,
-            WalletLnAddressResponse, WalletResponse, BitcoinAddressQueryParams,
+            ApiKeyResponse, BitcoinAddressQueryParams, BitcoinAddressResponse, CreateApiKeyRequest, ErrorResponse,
+            InvoiceResponse, NewInvoiceRequest, PaymentResponse, RegisterLnAddressRequest, SendPaymentRequest,
+            UpdateLnAddressRequest, WalletLnAddressResponse, WalletResponse,
         },
         errors::{ApplicationError, DataError},
     },
@@ -119,10 +119,11 @@ async fn get_bitcoin_deposit_address(
     user: User,
     Query(query_params): Query<BitcoinAddressQueryParams>,
 ) -> Result<Json<BitcoinAddressResponse>, ApplicationError> {
-    let address = app_state.services.bitcoin.get_deposit_address(
-        user.wallet_id, 
-        query_params.address_type.map(Into::into)
-    ).await?;
+    let address = app_state
+        .services
+        .bitcoin
+        .get_deposit_address(user.wallet_id, query_params.address_type.map(Into::into))
+        .await?;
 
     Ok(Json(address.into()))
 }
