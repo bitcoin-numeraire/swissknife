@@ -14,6 +14,7 @@ pub struct Model {
     pub amount_sat: i64,
     pub status: String,
     pub timestamp: Option<DateTime>,
+    pub block_height: Option<i32>,
     pub network: String,
     pub created_at: DateTime,
     pub updated_at: Option<DateTime>,

@@ -56,6 +56,27 @@ pub struct ListInvoicesResponse {
     pub invoices: Vec<ListInvoicesInvoice>,
 }
 
+#[derive(Debug, Serialize, Default)]
+pub struct ListTransactionsRequest {}
+
+#[derive(Debug, Deserialize)]
+pub struct ListTransactionsResponse {
+    pub transactions: Vec<ListTransactionsTransaction>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ListTransactionsTransaction {
+    pub hash: String,
+    pub blockheight: Option<u32>,
+    pub outputs: Vec<ListTransactionsOutput>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ListTransactionsOutput {
+    pub index: u32,
+    pub amount_msat: String,
+}
+
 #[derive(Debug, Serialize)]
 pub struct GetinfoRequest {}
 

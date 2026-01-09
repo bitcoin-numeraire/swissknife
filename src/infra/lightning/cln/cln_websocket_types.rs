@@ -1,4 +1,7 @@
-use crate::domains::ln_node::{LnInvoicePaidEvent, LnPayFailureEvent, LnPaySuccessEvent};
+use crate::domains::{
+    bitcoin::{BitcoinTransaction, BitcoinTransactionOutput},
+    ln_node::{LnInvoicePaidEvent, LnPayFailureEvent, LnPaySuccessEvent},
+};
 use chrono::{TimeZone, Utc};
 use serde::Deserialize;
 use serde_bolt::bitcoin::hashes::hex::ToHex;
@@ -32,6 +35,52 @@ pub struct SendPayFailureData {
     pub status: String,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct CoinMovement {
+    #[serde(alias = "utxo_txid")]
+    pub txid: Option<String>,
+    #[serde(alias = "output", alias = "utxo_outnum")]
+    pub output_index: Option<u32>,
+    pub address: Option<String>,
+    #[serde(alias = "amount_msat")]
+    pub amount_msat: Option<String>,
+    #[serde(alias = "credit_msat")]
+    pub credit_msat: Option<String>,
+    #[serde(alias = "debit_msat")]
+    pub debit_msat: Option<String>,
+    #[serde(alias = "fees_msat")]
+    pub fees_msat: Option<String>,
+    pub timestamp: Option<u64>,
+    pub blockheight: Option<u32>,
+    pub tag: Option<String>,
+}
+
+impl CoinMovement {
+    fn parse_msat(value: &Option<String>) -> Option<i64> {
+        value
+            .as_ref()
+            .and_then(|raw| raw.trim_end_matches("msat").parse::<i64>().ok())
+    }
+
+    fn amount_msat(&self) -> Option<i64> {
+        Self::parse_msat(&self.amount_msat)
+            .or_else(|| Self::parse_msat(&self.credit_msat))
+            .or_else(|| Self::parse_msat(&self.debit_msat))
+    }
+
+    fn fee_sat(&self) -> Option<i64> {
+        Self::parse_msat(&self.fees_msat).map(|fee| fee / 1000)
+    }
+
+    fn is_ours(&self) -> bool {
+        match self.tag.as_deref() {
+            Some("deposit") | Some("to_wallet") => true,
+            Some("withdrawal") | Some("withdraw") => false,
+            _ => self.credit_msat.is_some() && self.debit_msat.is_none(),
+        }
+    }
+}
+
 impl From<InvoicePayment> for LnInvoicePaidEvent {
     fn from(val: InvoicePayment) -> Self {
         let preimage = hex::decode(val.preimage.clone()).expect("should be hex string");
@@ -63,5 +112,31 @@ impl From<SendPayFailure> for LnPayFailureEvent {
             reason: val.message,
             payment_hash: val.data.payment_hash,
         }
+    }
+}
+
+impl TryFrom<CoinMovement> for BitcoinTransaction {
+    type Error = &'static str;
+
+    fn try_from(val: CoinMovement) -> Result<Self, Self::Error> {
+        let txid = val.txid.clone().ok_or("missing txid")?;
+        let output_index = val.output_index.ok_or("missing output index")?;
+        let amount_msat = val.amount_msat().ok_or("missing amount")?;
+
+        let output = BitcoinTransactionOutput {
+            output_index,
+            address: val.address.clone(),
+            amount_sat: amount_msat / 1000,
+            is_ours: val.is_ours(),
+        };
+
+        Ok(BitcoinTransaction {
+            txid,
+            timestamp: val.timestamp.and_then(|t| Utc.timestamp_opt(t as i64, 0).single()),
+            fee_sat: val.fee_sat(),
+            block_height: val.blockheight.map(|height| height as i64),
+            confirmations: None,
+            outputs: vec![output],
+        })
     }
 }

@@ -20,7 +20,10 @@ use crate::{
         errors::{BitcoinError, LightningError},
     },
     domains::{
-        bitcoin::{BitcoinAddressType, BitcoinBalance, BitcoinNetwork, BitcoinOutput, BitcoinOutputStatus},
+        bitcoin::{
+            BitcoinAddressType, BitcoinBalance, BitcoinEventsUseCases, BitcoinNetwork, BitcoinOutput,
+            BitcoinOutputStatus, BitcoinTransaction, BitcoinTransactionOutput,
+        },
         invoice::Invoice,
         ln_node::LnEventsUseCases,
         payment::Payment,
@@ -34,8 +37,9 @@ use crate::{
 
 use super::{
     cln_websocket_client::connect_websocket, ErrorResponse, GetinfoRequest, GetinfoResponse, InvoiceRequest,
-    InvoiceResponse, ListFundsRequest, ListFundsResponse, ListInvoicesRequest, ListInvoicesResponse, NewAddrRequest,
-    NewAddrResponse, PayRequest, PayResponse, WithdrawRequest, WithdrawResponse,
+    InvoiceResponse, ListFundsRequest, ListFundsResponse, ListInvoicesRequest, ListInvoicesResponse,
+    ListTransactionsRequest, ListTransactionsResponse, NewAddrRequest, NewAddrResponse, PayRequest, PayResponse,
+    WithdrawRequest, WithdrawResponse,
 };
 
 #[derive(Clone, Debug, Deserialize)]
@@ -75,6 +79,7 @@ impl ClnRestClient {
     pub async fn new(
         config: ClnRestClientConfig,
         ln_events: Arc<dyn LnEventsUseCases>,
+        bitcoin_events: Arc<dyn BitcoinEventsUseCases>,
     ) -> Result<Self, LightningError> {
         let mut headers = HeaderMap::new();
         let mut rune_header =
@@ -103,7 +108,7 @@ impl ClnRestClient {
             .build()
             .map_err(|e| LightningError::ParseConfig(e.to_string()))?;
 
-        let ws_client = connect_websocket(&config, ln_events).await?;
+        let ws_client = connect_websocket(&config, ln_events, bitcoin_events).await?;
 
         Ok(Self {
             client,
@@ -342,6 +347,7 @@ impl BitcoinWallet for ClnRestClient {
                     amount_sat: (amount_msat / 1000) as i64,
                     status: Self::parse_status(&output.status),
                     timestamp: None,
+                    block_height: output.blockheight.map(|height| height as i64),
                     network,
                     created_at: Utc::now(),
                     updated_at: None,
@@ -350,6 +356,39 @@ impl BitcoinWallet for ClnRestClient {
             .collect();
 
         Ok(outputs)
+    }
+
+    async fn get_transaction(&self, txid: &str) -> Result<BitcoinTransaction, BitcoinError> {
+        let response: ListTransactionsResponse = self
+            .post_request("listtransactions", &ListTransactionsRequest {})
+            .await
+            .map_err(|e| BitcoinError::Transaction(e.to_string()))?;
+
+        let transaction = response
+            .transactions
+            .into_iter()
+            .find(|transaction| transaction.hash == txid)
+            .ok_or_else(|| BitcoinError::Transaction(format!("Transaction {txid} not found")))?;
+
+        let outputs = transaction
+            .outputs
+            .into_iter()
+            .map(|output| BitcoinTransactionOutput {
+                output_index: output.index,
+                address: None,
+                amount_sat: Self::parse_amount_msat(&output.amount_msat).unwrap_or_default() as i64 / 1000,
+                is_ours: false,
+            })
+            .collect();
+
+        Ok(BitcoinTransaction {
+            txid: transaction.hash,
+            timestamp: None,
+            fee_sat: None,
+            block_height: transaction.blockheight.map(|height| height as i64),
+            confirmations: None,
+            outputs,
+        })
     }
 
     async fn network(&self) -> Result<BitcoinNetwork, BitcoinError> {

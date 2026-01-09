@@ -2,6 +2,8 @@ use base64::{prelude::BASE64_STANDARD, Engine};
 use chrono::{TimeZone, Utc};
 use lightning_invoice::Bolt11Invoice;
 use serde::{Deserialize, Serialize};
+
+use crate::domains::bitcoin::{BitcoinTransaction, BitcoinTransactionOutput};
 use serde_with::{serde_as, DisplayFromStr};
 use std::str::FromStr;
 
@@ -193,6 +195,39 @@ pub struct OutputDetail {
     pub amount: Option<String>,
     pub address: Option<String>,
     pub is_ours: Option<bool>,
+}
+
+fn parse_amount(value: Option<String>) -> i64 {
+    value.and_then(|v| v.parse::<i64>().ok()).unwrap_or_default()
+}
+
+impl From<Transaction> for BitcoinTransaction {
+    fn from(val: Transaction) -> Self {
+        let timestamp = val.time_stamp.and_then(|value| value.parse::<i64>().ok());
+
+        let outputs = val
+            .output_details
+            .unwrap_or_default()
+            .into_iter()
+            .filter_map(|detail| {
+                Some(BitcoinTransactionOutput {
+                    output_index: detail.output_index? as u32,
+                    address: detail.address,
+                    amount_sat: parse_amount(detail.amount),
+                    is_ours: detail.is_ours.unwrap_or_default(),
+                })
+            })
+            .collect();
+
+        BitcoinTransaction {
+            txid: val.tx_hash.unwrap_or_default(),
+            timestamp: timestamp.and_then(|t| chrono::Utc.timestamp_opt(t, 0).single()),
+            fee_sat: val.total_fees.map(|fees| parse_amount(Some(fees))),
+            block_height: val.block_height,
+            confirmations: val.num_confirmations,
+            outputs,
+        }
+    }
 }
 
 #[derive(Debug, Deserialize)]

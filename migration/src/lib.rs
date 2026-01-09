@@ -8,6 +8,7 @@ mod m20241005_5_ln_address_nostr;
 mod m20241009_6_api_key_table;
 mod m20241028_135908_permissions_as_json;
 mod m20250106_141600_config_table;
+mod m20250311_000001_add_block_height_to_btc_output;
 mod m20251021_162217_convert_timestamptz_to_timestamp;
 mod m20251224_162538_btc_address_table;
 mod m20251224_162542_btc_output_table;
@@ -33,6 +34,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20251224_162542_btc_output_table::Migration),
             Box::new(m20251224_162546_btc_fields_to_invoice::Migration),
             Box::new(m20251224_162550_btc_fields_to_payment::Migration),
+            Box::new(m20250311_000001_add_block_height_to_btc_output::Migration),
         ]
     }
 }
