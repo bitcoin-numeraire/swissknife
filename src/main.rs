@@ -49,6 +49,11 @@ async fn main() {
         exit(1);
     }
 
+    if let Err(err) = app_state.bitcoin_events.sync_pending_transactions().await {
+        error!(%err, "failed to sync onchain transactions");
+        exit(1);
+    }
+
     let app = Server::new(app_state.clone(), config.dashboard_dir.as_deref());
     if let Err(err) = app.start(&config.web.addr, shutdown_signal(app_state.clone())).await {
         error!(%err, "failed to start API server");

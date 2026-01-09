@@ -68,6 +68,7 @@ pub(crate) enum BtcOutput {
     AmountSat,
     Status,
     Timestamp,
+    BlockHeight,
     Network,
     CreatedAt,
     UpdatedAt,

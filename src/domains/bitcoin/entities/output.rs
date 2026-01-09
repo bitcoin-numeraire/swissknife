@@ -16,6 +16,7 @@ pub struct BitcoinOutput {
     pub amount_sat: i64,
     pub status: BitcoinOutputStatus,
     pub timestamp: Option<DateTime<Utc>>,
+    pub block_height: Option<i64>,
     pub network: BitcoinNetwork,
     pub created_at: DateTime<Utc>,
     pub updated_at: Option<DateTime<Utc>>,

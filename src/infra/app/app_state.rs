@@ -3,10 +3,13 @@ use std::sync::Arc;
 use crate::{
     application::{
         dtos::{AppConfig, AuthProvider, LightningProvider},
-        entities::{AppServices, AppStore, LnNodeClient},
+        entities::{AppServices, AppStore, BitcoinWallet, LnNodeClient},
         errors::{ApplicationError, ConfigError},
     },
-    domains::ln_node::{LnEventsService, LnEventsUseCases},
+    domains::{
+        bitcoin::{BitcoinEventsService, BitcoinEventsUseCases},
+        ln_node::{LnEventsService, LnEventsUseCases},
+    },
     infra::{
         database::sea_orm::SeaORMClient,
         jwt::{local::LocalAuthenticator, oauth2::OAuth2Authenticator, JWTAuthenticator},
@@ -18,6 +21,7 @@ use crate::{
         },
     },
 };
+use tokio::sync::RwLock;
 use tower_http::timeout::TimeoutLayer;
 use tracing::{debug, info};
 
@@ -25,7 +29,69 @@ pub struct AppState {
     pub services: AppServices,
     pub ln_client: Arc<dyn LnClient>,
     pub ln_node_client: LnNodeClient,
+    pub bitcoin_events: Arc<dyn BitcoinEventsUseCases>,
     pub timeout_layer: TimeoutLayer,
+}
+
+#[derive(Default)]
+struct BitcoinWalletProxy {
+    inner: RwLock<Option<Arc<dyn BitcoinWallet>>>,
+}
+
+impl BitcoinWalletProxy {
+    async fn set(&self, wallet: Arc<dyn BitcoinWallet>) {
+        *self.inner.write().await = Some(wallet);
+    }
+
+    async fn get(&self) -> Result<Arc<dyn BitcoinWallet>, crate::application::errors::BitcoinError> {
+        self.inner.read().await.clone().ok_or_else(|| {
+            crate::application::errors::BitcoinError::Unsupported("Bitcoin wallet not ready".to_string())
+        })
+    }
+}
+
+#[async_trait::async_trait]
+impl BitcoinWallet for BitcoinWalletProxy {
+    async fn new_address(
+        &self,
+        address_type: crate::domains::bitcoin::BitcoinAddressType,
+    ) -> Result<String, crate::application::errors::BitcoinError> {
+        self.get().await?.new_address(address_type).await
+    }
+
+    async fn balance(
+        &self,
+    ) -> Result<crate::domains::bitcoin::BitcoinBalance, crate::application::errors::BitcoinError> {
+        self.get().await?.balance().await
+    }
+
+    async fn send(
+        &self,
+        address: String,
+        amount_sat: u64,
+        fee_rate: Option<u32>,
+    ) -> Result<String, crate::application::errors::BitcoinError> {
+        self.get().await?.send(address, amount_sat, fee_rate).await
+    }
+
+    async fn list_outputs(
+        &self,
+    ) -> Result<Vec<crate::domains::bitcoin::BitcoinOutput>, crate::application::errors::BitcoinError> {
+        self.get().await?.list_outputs().await
+    }
+
+    async fn get_transaction(
+        &self,
+        txid: &str,
+    ) -> Result<crate::domains::bitcoin::BitcoinTransaction, crate::application::errors::BitcoinError> {
+        self.get().await?.get_transaction(txid).await
+    }
+
+    async fn network(
+        &self,
+    ) -> Result<crate::domains::bitcoin::BitcoinNetwork, crate::application::errors::BitcoinError> {
+        self.get().await?.network().await
+    }
 }
 
 impl AppState {
@@ -39,14 +105,18 @@ impl AppState {
 
         // Adapters
         let store = AppStore::new_sea_orm(db_conn);
-        let ln_events = LnEventsService::new(store.clone());
-        let ln_node_client = get_ln_client(config.clone(), Arc::new(ln_events)).await?;
+        let ln_events = Arc::new(LnEventsService::new(store.clone()));
+        let bitcoin_wallet_proxy = Arc::new(BitcoinWalletProxy::default());
+        let bitcoin_events = Arc::new(BitcoinEventsService::new(store.clone(), bitcoin_wallet_proxy.clone()));
+        let ln_node_client = get_ln_client(config.clone(), ln_events, bitcoin_events.clone()).await?;
         let ln_client = match ln_node_client.clone() {
             LnNodeClient::Breez(client) => client as Arc<dyn LnClient>,
             LnNodeClient::ClnGrpc(client) => client as Arc<dyn LnClient>,
             LnNodeClient::ClnRest(client) => client as Arc<dyn LnClient>,
             LnNodeClient::Lnd(client) => client as Arc<dyn LnClient>,
         };
+
+        bitcoin_wallet_proxy.set(ln_client.clone()).await;
 
         // Services
         let services = AppServices::new(config, store, ln_client.clone(), ln_client.clone(), jwt_authenticator);
@@ -55,6 +125,7 @@ impl AppState {
             services,
             ln_client,
             ln_node_client,
+            bitcoin_events,
             timeout_layer,
         })
     }
@@ -63,6 +134,7 @@ impl AppState {
 async fn get_ln_client(
     config: AppConfig,
     ln_events: Arc<dyn LnEventsUseCases>,
+    bitcoin_events: Arc<dyn BitcoinEventsUseCases>,
 ) -> Result<LnNodeClient, ApplicationError> {
     match config.ln_provider {
         LightningProvider::Breez => {
@@ -97,7 +169,7 @@ async fn get_ln_client(
 
             debug!(config = ?cln_config, "Lightning provider: Core Lightning REST");
 
-            let client = ClnRestClient::new(cln_config.clone(), ln_events).await?;
+            let client = ClnRestClient::new(cln_config.clone(), ln_events, bitcoin_events).await?;
 
             Ok(LnNodeClient::ClnRest(Arc::new(client)))
         }
@@ -109,7 +181,7 @@ async fn get_ln_client(
 
             debug!(config = ?lnd_config, "Lightning provider: LND");
 
-            let client = LndRestClient::new(lnd_config.clone(), ln_events).await?;
+            let client = LndRestClient::new(lnd_config.clone(), ln_events, bitcoin_events).await?;
 
             Ok(LnNodeClient::Lnd(Arc::new(client)))
         }

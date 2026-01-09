@@ -11,8 +11,8 @@ use tracing::{debug, error, warn};
 
 use crate::{
     application::errors::LightningError,
-    domains::ln_node::LnEventsUseCases,
-    infra::lightning::cln::cln_websocket_types::{InvoicePayment, SendPayFailure, SendPaySuccess},
+    domains::{bitcoin::BitcoinEventsUseCases, ln_node::LnEventsUseCases},
+    infra::lightning::cln::cln_websocket_types::{CoinMovement, InvoicePayment, SendPayFailure, SendPaySuccess},
 };
 
 use super::ClnRestClientConfig;
@@ -20,6 +20,7 @@ use super::ClnRestClientConfig;
 pub async fn connect_websocket(
     config: &ClnRestClientConfig,
     ln_events: Arc<dyn LnEventsUseCases>,
+    bitcoin_events: Arc<dyn BitcoinEventsUseCases>,
 ) -> Result<Client, LightningError> {
     let mut client_builder = ClientBuilder::new(config.endpoint.clone())
         .transport_type(TransportType::Websocket)
@@ -33,7 +34,7 @@ pub async fn connect_websocket(
         .on("close", on_close)
         .on("error", on_error)
         .on("message", {
-            move |payload, socket: Client| on_message(ln_events.clone(), payload, socket)
+            move |payload, socket: Client| on_message(ln_events.clone(), bitcoin_events.clone(), payload, socket)
         });
 
     if let Some(ca_cert_path) = &config.ca_cert_path {
@@ -93,7 +94,12 @@ fn on_error(err: Payload, _: Client) -> BoxFuture<'static, ()> {
     .boxed()
 }
 
-fn on_message(ln_events: Arc<dyn LnEventsUseCases>, payload: Payload, _: Client) -> BoxFuture<'static, ()> {
+fn on_message(
+    ln_events: Arc<dyn LnEventsUseCases>,
+    bitcoin_events: Arc<dyn BitcoinEventsUseCases>,
+    payload: Payload,
+    _: Client,
+) -> BoxFuture<'static, ()> {
     async move {
         match payload {
             Payload::Text(values) => {
@@ -155,6 +161,24 @@ fn on_message(ln_events: Arc<dyn LnEventsUseCases>, payload: Payload, _: Client)
                             }
                             Err(err) => {
                                 error!(?err, "Failed to parse sendpay_failure event");
+                            }
+                        }
+                    }
+
+                    if let Some(event) = value.get("coin_movement") {
+                        match serde_json::from_value::<CoinMovement>(event.clone()) {
+                            Ok(coin_movement) => match coin_movement.try_into() {
+                                Ok(transaction) => {
+                                    if let Err(err) = bitcoin_events.onchain_transaction(transaction).await {
+                                        warn!(%err, "Failed to process onchain transaction");
+                                    }
+                                }
+                                Err(err) => {
+                                    warn!(%err, "Failed to parse coin_movement event");
+                                }
+                            },
+                            Err(err) => {
+                                warn!(?err, "Failed to parse coin_movement event");
                             }
                         }
                     }

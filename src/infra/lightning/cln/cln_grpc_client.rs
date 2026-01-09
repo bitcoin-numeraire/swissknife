@@ -21,7 +21,10 @@ use crate::{
         errors::{BitcoinError, LightningError},
     },
     domains::{
-        bitcoin::{BitcoinAddressType, BitcoinBalance, BitcoinNetwork, BitcoinOutput, BitcoinOutputStatus},
+        bitcoin::{
+            BitcoinAddressType, BitcoinBalance, BitcoinNetwork, BitcoinOutput, BitcoinOutputStatus, BitcoinTransaction,
+            BitcoinTransactionOutput,
+        },
         invoice::Invoice,
         ln_node::LnEventsUseCases,
         payment::Payment,
@@ -331,6 +334,7 @@ impl BitcoinWallet for ClnGrpcClient {
                     amount_sat: (output.amount_msat.map(|a| a.msat).unwrap_or_default() / 1000) as i64,
                     status,
                     timestamp: None,
+                    block_height: output.blockheight.map(|height| height as i64),
                     network,
                     created_at: Utc::now(),
                     updated_at: None,
@@ -339,6 +343,42 @@ impl BitcoinWallet for ClnGrpcClient {
             .collect();
 
         Ok(outputs)
+    }
+
+    async fn get_transaction(&self, txid: &str) -> Result<BitcoinTransaction, BitcoinError> {
+        let mut client = self.client.clone();
+
+        let response = client
+            .list_transactions(cln::ListtransactionsRequest {})
+            .await
+            .map_err(|e| BitcoinError::Transaction(e.message().to_string()))?
+            .into_inner();
+
+        let transaction = response
+            .transactions
+            .into_iter()
+            .find(|transaction| hex::encode(&transaction.hash) == txid)
+            .ok_or_else(|| BitcoinError::Transaction(format!("Transaction {txid} not found")))?;
+
+        let outputs = transaction
+            .outputs
+            .into_iter()
+            .map(|output| BitcoinTransactionOutput {
+                output_index: output.index,
+                address: None,
+                amount_sat: (output.amount_msat.map(|a| a.msat).unwrap_or_default() / 1000) as i64,
+                is_ours: false,
+            })
+            .collect();
+
+        Ok(BitcoinTransaction {
+            txid: hex::encode(transaction.hash),
+            timestamp: None,
+            fee_sat: None,
+            block_height: Some(transaction.blockheight as i64),
+            confirmations: None,
+            outputs,
+        })
     }
 
     async fn network(&self) -> Result<BitcoinNetwork, BitcoinError> {
