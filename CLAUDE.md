@@ -44,6 +44,13 @@ See other migrations under the `./migration` folder.
 Once a migration is added, you can work on it by modifying the file and then adding it in the `lib.rs` file.
 The models are generated based on the schema and not the other way around.
 
+To generate the models, the process is to start a postgres database with `make up-postgres`
+and execute the migration against it with `make run-migrations`, then generate the models against the schema
+with `make generate-models` with the ENV var `DATABASE_URL` as:
+`postgres://postgres:postgres@localhost:5432/numeraire`. This requires Docker to work on the environment and
+the postgres image needs to be downloaded, meaning that this is to be avoided as much as possible unless changes
+in the models are required.
+
 ### Docker
 ```bash
 make up-postgres               # Start postgres

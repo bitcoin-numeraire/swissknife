@@ -61,7 +61,7 @@ jobs:
         with:
           openai-api-key: ${{ secrets.OPENAI_API_KEY }}
           effort: high
-          model: gpt-5.2-codex
+          model: gpt-5.2
           prompt: |
             REPO: ${{ github.repository }}
             EVENT: ${{ github.event_name }}
