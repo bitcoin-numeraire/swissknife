@@ -4,9 +4,9 @@ use chrono::{DateTime, Utc};
 pub struct BitcoinTransaction {
     pub txid: String,
     pub timestamp: Option<DateTime<Utc>>,
-    pub fee_sat: Option<i64>,
-    pub block_height: Option<i64>,
-    pub confirmations: Option<i64>,
+    pub fee_sat: Option<u64>,
+    pub block_height: Option<u32>,
+    pub confirmations: Option<u32>,
     pub outputs: Vec<BitcoinTransactionOutput>,
 }
 
@@ -14,6 +14,6 @@ pub struct BitcoinTransaction {
 pub struct BitcoinTransactionOutput {
     pub output_index: u32,
     pub address: Option<String>,
-    pub amount_sat: i64,
+    pub amount_sat: u64,
     pub is_ours: bool,
 }

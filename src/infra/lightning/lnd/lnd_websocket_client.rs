@@ -11,6 +11,7 @@ use tokio_tungstenite::tungstenite::ClientRequestBuilder;
 use tokio_tungstenite::{connect_async_tls_with_config, Connector, MaybeTlsStream, WebSocketStream};
 use tracing::{debug, error, warn};
 
+use crate::domains::bitcoin::BitcoinNetwork;
 use crate::infra::lightning::lnd::lnd_types::{InvoiceResponse, Transaction};
 use crate::{
     application::errors::LightningError,
@@ -52,12 +53,13 @@ pub async fn listen_transactions(
     config: LndRestClientConfig,
     macaroon: String,
     bitcoin_events: Arc<dyn BitcoinEventsUseCases>,
+    network: BitcoinNetwork,
 ) -> Result<(), LightningError> {
     let max_reconnect_delay = config.ws_max_reconnect_delay;
     let mut reconnect_delay = config.ws_min_reconnect_delay;
 
     loop {
-        let result = connect_and_handle_transactions(&macaroon, &config, bitcoin_events.clone()).await;
+        let result = connect_and_handle_transactions(&macaroon, &config, bitcoin_events.clone(), network).await;
 
         if let Err(err) = result {
             match err {
@@ -105,6 +107,7 @@ async fn connect_and_handle_transactions(
     macaroon: &str,
     config: &LndRestClientConfig,
     bitcoin_events: Arc<dyn BitcoinEventsUseCases>,
+    network: BitcoinNetwork,
 ) -> Result<(), LightningError> {
     let endpoint = format!("wss://{}/v1/transactions/subscribe", config.host);
     let uri = Uri::from_str(&endpoint).map_err(|e| LightningError::ParseConfig(e.to_string()))?;
@@ -118,7 +121,7 @@ async fn connect_and_handle_transactions(
 
     debug!("Connected to LND WebSocket transaction server");
 
-    handle_transaction_messages(ws_stream, bitcoin_events).await;
+    handle_transaction_messages(ws_stream, bitcoin_events, network).await;
 
     debug!("Disconnected from LND WebSocket transaction server");
 
@@ -181,13 +184,14 @@ async fn handle_messages(
 async fn handle_transaction_messages(
     mut ws_stream: WebSocketStream<MaybeTlsStream<TcpStream>>,
     bitcoin_events: Arc<dyn BitcoinEventsUseCases>,
+    network: BitcoinNetwork,
 ) {
     while let Some(message) = ws_stream.next().await {
         match message {
             Ok(msg) => {
                 if msg.is_text() {
                     let text = msg.into_text().unwrap();
-                    if let Err(e) = process_transaction_message(&text, bitcoin_events.clone()).await {
+                    if let Err(e) = process_transaction_message(&text, bitcoin_events.clone(), network).await {
                         error!(%e, "Failed to process transaction message");
                     }
                 } else if msg.is_close() {
@@ -224,13 +228,17 @@ async fn process_message(text: &str, ln_events: Arc<dyn LnEventsUseCases>) -> an
     Ok(())
 }
 
-async fn process_transaction_message(text: &str, bitcoin_events: Arc<dyn BitcoinEventsUseCases>) -> anyhow::Result<()> {
+async fn process_transaction_message(
+    text: &str,
+    bitcoin_events: Arc<dyn BitcoinEventsUseCases>,
+    network: BitcoinNetwork,
+) -> anyhow::Result<()> {
     let value: Value = serde_json::from_str(text)?;
 
     if let Some(event) = value.get("result") {
         match serde_json::from_value::<Transaction>(event.clone()) {
             Ok(transaction) => {
-                if let Err(err) = bitcoin_events.onchain_transaction(transaction.into()).await {
+                if let Err(err) = bitcoin_events.onchain_transaction(transaction.into(), network).await {
                     warn!(%err, "Failed to process onchain transaction");
                 }
             }

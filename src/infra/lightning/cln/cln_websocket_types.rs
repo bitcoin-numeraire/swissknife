@@ -126,15 +126,15 @@ impl TryFrom<CoinMovement> for BitcoinTransaction {
         let output = BitcoinTransactionOutput {
             output_index,
             address: val.address.clone(),
-            amount_sat: amount_msat / 1000,
+            amount_sat: (amount_msat / 1000) as u64,
             is_ours: val.is_ours(),
         };
 
         Ok(BitcoinTransaction {
             txid,
             timestamp: val.timestamp.and_then(|t| Utc.timestamp_opt(t as i64, 0).single()),
-            fee_sat: val.fee_sat(),
-            block_height: val.blockheight.map(|height| height as i64),
+            fee_sat: val.fee_sat().map(|fee| fee as u64),
+            block_height: val.blockheight,
             confirmations: None,
             outputs: vec![output],
         })

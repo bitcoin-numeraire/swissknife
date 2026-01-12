@@ -1,36 +1,36 @@
-use std::sync::Arc;
-
 use async_trait::async_trait;
 use chrono::Utc;
-use tracing::{debug, info, trace};
+use tracing::{debug, trace};
 use uuid::Uuid;
 
 use crate::{
     application::{
-        entities::{AppStore, BitcoinWallet, Ledger},
+        entities::{AppStore, Ledger},
         errors::ApplicationError,
     },
     domains::{
-        invoice::{Invoice, InvoiceFilter, InvoiceStatus},
-        payment::{PaymentFilter, PaymentStatus},
+        invoice::{Invoice, InvoiceStatus},
+        payment::PaymentStatus,
     },
 };
 
-use super::{BitcoinEventsUseCases, BitcoinOutput, BitcoinOutputStatus, BitcoinTransaction, BitcoinTransactionOutput};
+use super::{
+    BitcoinEventsUseCases, BitcoinNetwork, BitcoinOutput, BitcoinOutputStatus, BitcoinTransaction,
+    BitcoinTransactionOutput,
+};
 
 const DEFAULT_DEPOSIT_DESCRIPTION: &str = "Bitcoin onchain deposit";
 
 pub struct BitcoinEventsService {
     store: AppStore,
-    wallet: Arc<dyn BitcoinWallet>,
 }
 
 impl BitcoinEventsService {
-    pub fn new(store: AppStore, wallet: Arc<dyn BitcoinWallet>) -> Self {
-        Self { store, wallet }
+    pub fn new(store: AppStore) -> Self {
+        Self { store }
     }
 
-    fn output_status(confirmations: Option<i64>, block_height: Option<i64>) -> BitcoinOutputStatus {
+    fn output_status(confirmations: Option<u32>, block_height: Option<u32>) -> BitcoinOutputStatus {
         match confirmations {
             Some(confirmations) if confirmations > 0 => BitcoinOutputStatus::Confirmed,
             _ => match block_height {
@@ -102,6 +102,7 @@ impl BitcoinEventsService {
         &self,
         transaction: &BitcoinTransaction,
         outputs: &[BitcoinTransactionOutput],
+        network: BitcoinNetwork,
     ) -> Result<(), ApplicationError> {
         let Some(payment) = self.store.payment.find_by_payment_hash(&transaction.txid).await? else {
             return Ok(());
@@ -142,7 +143,6 @@ impl BitcoinEventsService {
                 .or_else(|| outputs.iter().find(|output| !output.is_ours && output.amount_sat > 0));
 
             if let Some(output) = candidate_output {
-                let network = self.wallet.network().await?;
                 let status = Self::output_status(transaction.confirmations, transaction.block_height);
 
                 let btc_output = BitcoinOutput {
@@ -174,32 +174,23 @@ impl BitcoinEventsService {
 
 #[async_trait]
 impl BitcoinEventsUseCases for BitcoinEventsService {
-    async fn onchain_transaction(&self, transaction: BitcoinTransaction) -> Result<(), ApplicationError> {
-        debug!(txid = %transaction.txid, "Processing onchain transaction event");
+    async fn onchain_transaction(
+        &self,
+        transaction: BitcoinTransaction,
+        network: BitcoinNetwork,
+    ) -> Result<(), ApplicationError> {
+        trace!(txid = %transaction.txid, "Processing onchain transaction event");
 
-        let network = self.wallet.network().await?;
         let status = Self::output_status(transaction.confirmations, transaction.block_height);
-
-        let needs_address_lookup = transaction.outputs.iter().any(|output| output.address.is_none());
-        let utxos = if needs_address_lookup {
-            Some(self.wallet.list_outputs().await?)
-        } else {
-            None
-        };
 
         let mut resolved_outputs = Vec::new();
         for output in transaction.outputs.iter() {
             let outpoint = format!("{}:{}", transaction.txid, output.output_index);
-            let mut resolved_address = output.address.clone();
-            let mut is_ours = output.is_ours;
+            let is_ours = output.is_ours;
 
-            if resolved_address.is_none() {
-                if let Some(utxos) = &utxos {
-                    if let Some(utxo) = utxos.iter().find(|candidate| candidate.outpoint == outpoint) {
-                        resolved_address = utxo.address.clone();
-                        is_ours = true;
-                    }
-                }
+            if output.address.is_none() {
+                debug!(txid = %transaction.txid, "Output address not found, skipping");
+                continue;
             }
 
             let candidate = BitcoinOutput {
@@ -207,7 +198,7 @@ impl BitcoinEventsUseCases for BitcoinEventsService {
                 outpoint,
                 txid: transaction.txid.clone(),
                 output_index: output.output_index,
-                address: resolved_address,
+                address: output.address.clone(),
                 amount_sat: output.amount_sat,
                 status,
                 timestamp: transaction.timestamp,
@@ -236,57 +227,9 @@ impl BitcoinEventsUseCases for BitcoinEventsService {
             }
         }
 
-        self.update_payment(&transaction, &resolved_outputs).await?;
+        self.update_payment(&transaction, &resolved_outputs, network).await?;
 
-        info!(txid = %transaction.txid, "Onchain transaction processed");
-        Ok(())
-    }
-
-    async fn sync_pending_transactions(&self) -> Result<(), ApplicationError> {
-        debug!("Syncing pending onchain invoices and payments");
-
-        let invoices = self
-            .store
-            .invoice
-            .find_many(InvoiceFilter {
-                ledger: Some(Ledger::Onchain),
-                status: Some(InvoiceStatus::Pending),
-                ..Default::default()
-            })
-            .await?;
-
-        for invoice in invoices {
-            let Some(btc_output_id) = invoice.btc_output_id else {
-                continue;
-            };
-
-            let Some(output) = self.store.btc_output.find(btc_output_id).await? else {
-                continue;
-            };
-
-            let transaction = self.wallet.get_transaction(&output.txid).await?;
-            self.onchain_transaction(transaction).await?;
-        }
-
-        let payments = self
-            .store
-            .payment
-            .find_many(PaymentFilter {
-                ledger: Some(Ledger::Onchain),
-                status: Some(PaymentStatus::Pending),
-                ..Default::default()
-            })
-            .await?;
-
-        for payment in payments {
-            let Some(txid) = payment.payment_hash else {
-                continue;
-            };
-
-            let transaction = self.wallet.get_transaction(&txid).await?;
-            self.onchain_transaction(transaction).await?;
-        }
-
+        debug!(txid = %transaction.txid, "Onchain transaction processed");
         Ok(())
     }
 }

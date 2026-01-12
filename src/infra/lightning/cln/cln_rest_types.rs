@@ -85,26 +85,6 @@ pub struct GetinfoResponse {
     pub network: String,
 }
 
-#[derive(Debug, Serialize, Default)]
-pub struct ListFundsRequest {
-    pub spent: Option<bool>,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct ListFundsResponse {
-    pub outputs: Vec<ListFundsOutput>,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct ListFundsOutput {
-    pub txid: String,
-    pub output: u32,
-    pub amount_msat: String,
-    pub address: Option<String>,
-    pub status: String,
-    pub blockheight: Option<u32>,
-}
-
 #[derive(Debug, Serialize)]
 pub struct NewAddrRequest {
     pub addresstype: Option<String>,

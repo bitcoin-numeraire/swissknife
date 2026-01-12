@@ -19,7 +19,7 @@ use crate::{
         errors::{BitcoinError, LightningError},
     },
     domains::{
-        bitcoin::{BitcoinAddressType, BitcoinBalance, BitcoinNetwork, BitcoinOutput, BitcoinTransaction},
+        bitcoin::{BitcoinAddressType, BitcoinTransaction},
         invoice::Invoice,
         ln_node::LnEventsUseCases,
         payment::Payment,
@@ -348,33 +348,15 @@ impl BitcoinWallet for BreezClient {
         ))
     }
 
-    async fn balance(&self) -> Result<BitcoinBalance, BitcoinError> {
-        Err(BitcoinError::Unsupported(
-            "Bitcoin balance retrieval is not yet implemented for Breez".to_string(),
-        ))
-    }
-
     async fn send(&self, _address: String, _amount_sat: u64, _fee_rate: Option<u32>) -> Result<String, BitcoinError> {
         Err(BitcoinError::Unsupported(
             "Direct bitcoin sends are not yet implemented for Breez".to_string(),
         ))
     }
 
-    async fn list_outputs(&self) -> Result<Vec<BitcoinOutput>, BitcoinError> {
-        Err(BitcoinError::Unsupported(
-            "Listing bitcoin outputs is not yet implemented for Breez".to_string(),
-        ))
-    }
-
     async fn get_transaction(&self, _txid: &str) -> Result<BitcoinTransaction, BitcoinError> {
         Err(BitcoinError::Unsupported(
             "Transaction lookup is not yet implemented for Breez".to_string(),
-        ))
-    }
-
-    async fn network(&self) -> Result<BitcoinNetwork, BitcoinError> {
-        Err(BitcoinError::Unsupported(
-            "Retrieving bitcoin network information is not yet implemented for Breez".to_string(),
         ))
     }
 }

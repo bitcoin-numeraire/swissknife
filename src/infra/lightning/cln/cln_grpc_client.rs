@@ -1,7 +1,6 @@
 use std::{path::PathBuf, process, str::FromStr, sync::Arc, time::Duration};
 
 use breez_sdk_core::ReverseSwapInfo;
-use chrono::Utc;
 use hex::decode;
 use lightning_invoice::Bolt11Invoice;
 use serde::Deserialize;
@@ -11,8 +10,8 @@ use uuid::Uuid;
 
 use async_trait::async_trait;
 use cln::{
-    node_client::NodeClient, Amount, AmountOrAll, Feerate, GetinfoRequest, ListfundsRequest, ListinvoicesRequest,
-    NewaddrRequest, PayRequest, WithdrawRequest,
+    node_client::NodeClient, Amount, AmountOrAll, Feerate, GetinfoRequest, ListinvoicesRequest, NewaddrRequest,
+    PayRequest, WithdrawRequest,
 };
 
 use crate::{
@@ -21,10 +20,7 @@ use crate::{
         errors::{BitcoinError, LightningError},
     },
     domains::{
-        bitcoin::{
-            BitcoinAddressType, BitcoinBalance, BitcoinNetwork, BitcoinOutput, BitcoinOutputStatus, BitcoinTransaction,
-            BitcoinTransactionOutput,
-        },
+        bitcoin::{BitcoinAddressType, BitcoinNetwork, BitcoinTransaction, BitcoinTransactionOutput},
         invoice::Invoice,
         ln_node::LnEventsUseCases,
         payment::Payment,
@@ -32,11 +28,7 @@ use crate::{
     },
     infra::{
         config::config_rs::deserialize_duration,
-        lightning::{
-            cln::cln::{listfunds_outputs::ListfundsOutputsStatus, newaddr_request::NewaddrAddresstype},
-            types::parse_network,
-            LnClient,
-        },
+        lightning::{cln::cln::newaddr_request::NewaddrAddresstype, types::parse_network, LnClient},
     },
 };
 
@@ -69,6 +61,7 @@ pub struct ClnGrpcClient {
     maxfeepercent: Option<f64>,
     retry_for: Option<u32>,
     payment_exemptfee: Option<Amount>,
+    network: BitcoinNetwork,
 }
 
 impl ClnGrpcClient {
@@ -94,6 +87,17 @@ impl ClnGrpcClient {
 
         let client = NodeClient::new(channel);
 
+        let mut cln_client = Self {
+            client: client.clone(),
+            maxfeepercent: config.maxfeepercent,
+            retry_for: Some(config.payment_timeout.as_secs() as u32),
+            payment_exemptfee: config.payment_exemptfee.map(|fee| Amount { msat: fee }),
+            network: BitcoinNetwork::default(),
+        };
+
+        let network = cln_client.network().await?;
+        cln_client.network = network;
+
         let listener_client = client.clone();
         tokio::spawn(async move {
             if let Err(err) = listen_invoices(listener_client, ln_events, config.retry_delay)
@@ -105,12 +109,7 @@ impl ClnGrpcClient {
             }
         });
 
-        Ok(Self {
-            client,
-            maxfeepercent: config.maxfeepercent,
-            retry_for: Some(config.payment_timeout.as_secs() as u32),
-            payment_exemptfee: config.payment_exemptfee.map(|fee| Amount { msat: fee }),
-        })
+        Ok(cln_client)
     }
 
     async fn read_certificates(certs_dir: &str) -> io::Result<(Identity, Certificate)> {
@@ -128,6 +127,17 @@ impl ClnGrpcClient {
         let ca_certificate = Certificate::from_pem(ca_cert);
 
         Ok((identity, ca_certificate))
+    }
+
+    async fn network(&self) -> Result<BitcoinNetwork, LightningError> {
+        let mut client = self.client.clone();
+        let response = client
+            .getinfo(GetinfoRequest {})
+            .await
+            .map_err(|e| LightningError::NodeInfo(e.message().to_string()))?
+            .into_inner();
+
+        Ok(parse_network(&response.network))
     }
 
     fn map_address_type(address_type: BitcoinAddressType) -> Option<i32> {
@@ -253,34 +263,6 @@ impl BitcoinWallet for ClnGrpcClient {
             .ok_or_else(|| BitcoinError::Address("No address returned by CLN".to_string()))
     }
 
-    async fn balance(&self) -> Result<BitcoinBalance, BitcoinError> {
-        let mut client = self.client.clone();
-
-        let response = client
-            .list_funds(ListfundsRequest { spent: Some(false) })
-            .await
-            .map_err(|e| BitcoinError::Balance(e.message().to_string()))?
-            .into_inner();
-
-        let mut confirmed_sat = 0;
-        let mut unconfirmed_sat = 0;
-
-        for output in response.outputs {
-            let amount_msat = output.amount_msat.map(|a| a.msat).unwrap_or_default();
-            let amount_sat = amount_msat / 1000;
-
-            match cln::listfunds_outputs::ListfundsOutputsStatus::try_from(output.status) {
-                Ok(cln::listfunds_outputs::ListfundsOutputsStatus::Confirmed) => confirmed_sat += amount_sat,
-                _ => unconfirmed_sat += amount_sat,
-            }
-        }
-
-        Ok(BitcoinBalance {
-            confirmed_sat,
-            unconfirmed_sat,
-        })
-    }
-
     async fn send(&self, address: String, amount_sat: u64, fee_rate: Option<u32>) -> Result<String, BitcoinError> {
         let mut client = self.client.clone();
         let feerate = fee_rate.map(|rate| Feerate {
@@ -306,45 +288,6 @@ impl BitcoinWallet for ClnGrpcClient {
         Ok(hex::encode(response.txid))
     }
 
-    async fn list_outputs(&self) -> Result<Vec<BitcoinOutput>, BitcoinError> {
-        let mut client = self.client.clone();
-        let network = self.network().await?;
-
-        let response = client
-            .list_funds(ListfundsRequest { spent: Some(false) })
-            .await
-            .map_err(|e| BitcoinError::Outputs(e.message().to_string()))?
-            .into_inner();
-
-        let outputs = response
-            .outputs
-            .into_iter()
-            .map(|output| {
-                let status = ListfundsOutputsStatus::try_from(output.status)
-                    .ok()
-                    .map(|s| s.into())
-                    .unwrap_or(BitcoinOutputStatus::Unconfirmed);
-
-                BitcoinOutput {
-                    id: Uuid::new_v4(),
-                    outpoint: format!("{}:{}", hex::encode(output.txid.clone()), output.output),
-                    txid: hex::encode(output.txid),
-                    output_index: output.output,
-                    address: output.address,
-                    amount_sat: (output.amount_msat.map(|a| a.msat).unwrap_or_default() / 1000) as i64,
-                    status,
-                    timestamp: None,
-                    block_height: output.blockheight.map(|height| height as i64),
-                    network,
-                    created_at: Utc::now(),
-                    updated_at: None,
-                }
-            })
-            .collect();
-
-        Ok(outputs)
-    }
-
     async fn get_transaction(&self, txid: &str) -> Result<BitcoinTransaction, BitcoinError> {
         let mut client = self.client.clone();
 
@@ -366,7 +309,7 @@ impl BitcoinWallet for ClnGrpcClient {
             .map(|output| BitcoinTransactionOutput {
                 output_index: output.index,
                 address: None,
-                amount_sat: (output.amount_msat.map(|a| a.msat).unwrap_or_default() / 1000) as i64,
+                amount_sat: (output.amount_msat.map(|a| a.msat).unwrap_or_default() / 1000),
                 is_ours: false,
             })
             .collect();
@@ -375,20 +318,9 @@ impl BitcoinWallet for ClnGrpcClient {
             txid: hex::encode(transaction.hash),
             timestamp: None,
             fee_sat: None,
-            block_height: Some(transaction.blockheight as i64),
+            block_height: Some(transaction.blockheight),
             confirmations: None,
             outputs,
         })
-    }
-
-    async fn network(&self) -> Result<BitcoinNetwork, BitcoinError> {
-        let mut client = self.client.clone();
-        let response = client
-            .getinfo(GetinfoRequest {})
-            .await
-            .map_err(|e| BitcoinError::Network(e.message().to_string()))?
-            .into_inner();
-
-        Ok(parse_network(&response.network))
     }
 }

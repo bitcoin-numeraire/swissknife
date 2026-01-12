@@ -11,16 +11,20 @@ use tracing::{debug, error, warn};
 
 use crate::{
     application::errors::LightningError,
-    domains::{bitcoin::BitcoinEventsUseCases, ln_node::LnEventsUseCases},
+    domains::{
+        bitcoin::{BitcoinEventsUseCases, BitcoinNetwork},
+        ln_node::LnEventsUseCases,
+    },
     infra::lightning::cln::cln_websocket_types::{CoinMovement, InvoicePayment, SendPayFailure, SendPaySuccess},
 };
 
 use super::ClnRestClientConfig;
 
 pub async fn connect_websocket(
-    config: &ClnRestClientConfig,
+    config: ClnRestClientConfig,
     ln_events: Arc<dyn LnEventsUseCases>,
     bitcoin_events: Arc<dyn BitcoinEventsUseCases>,
+    network: BitcoinNetwork,
 ) -> Result<Client, LightningError> {
     let mut client_builder = ClientBuilder::new(config.endpoint.clone())
         .transport_type(TransportType::Websocket)
@@ -34,7 +38,9 @@ pub async fn connect_websocket(
         .on("close", on_close)
         .on("error", on_error)
         .on("message", {
-            move |payload, socket: Client| on_message(ln_events.clone(), bitcoin_events.clone(), payload, socket)
+            move |payload, socket: Client| {
+                on_message(ln_events.clone(), bitcoin_events.clone(), network, payload, socket)
+            }
         });
 
     if let Some(ca_cert_path) = &config.ca_cert_path {
@@ -97,6 +103,7 @@ fn on_error(err: Payload, _: Client) -> BoxFuture<'static, ()> {
 fn on_message(
     ln_events: Arc<dyn LnEventsUseCases>,
     bitcoin_events: Arc<dyn BitcoinEventsUseCases>,
+    network: BitcoinNetwork,
     payload: Payload,
     _: Client,
 ) -> BoxFuture<'static, ()> {
@@ -169,7 +176,7 @@ fn on_message(
                         match serde_json::from_value::<CoinMovement>(event.clone()) {
                             Ok(coin_movement) => match coin_movement.try_into() {
                                 Ok(transaction) => {
-                                    if let Err(err) = bitcoin_events.onchain_transaction(transaction).await {
+                                    if let Err(err) = bitcoin_events.onchain_transaction(transaction, network).await {
                                         warn!(%err, "Failed to process onchain transaction");
                                     }
                                 }

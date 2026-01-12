@@ -3,7 +3,7 @@ use uuid::Uuid;
 
 use crate::{application::errors::ApplicationError, domains::bitcoin::BitcoinAddressType};
 
-use super::{BitcoinAddress, BitcoinOutput};
+use super::BitcoinAddress;
 
 #[async_trait]
 pub trait BitcoinUseCases: Send + Sync {
@@ -12,5 +12,5 @@ pub trait BitcoinUseCases: Send + Sync {
         wallet_id: Uuid,
         address_type: Option<BitcoinAddressType>,
     ) -> Result<BitcoinAddress, ApplicationError>;
-    async fn sync_outputs(&self) -> Result<Vec<BitcoinOutput>, ApplicationError>;
+    async fn sync_pending_transactions(&self) -> Result<(), ApplicationError>;
 }

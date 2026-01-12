@@ -148,12 +148,6 @@ pub struct ErrorResponse {
     pub message: String,
 }
 
-#[derive(Debug, Deserialize)]
-pub struct WalletBalanceResponse {
-    pub confirmed_balance: Option<String>,
-    pub unconfirmed_balance: Option<String>,
-}
-
 #[derive(Debug, Serialize)]
 pub struct SendCoinsRequest {
     pub addr: String,
@@ -173,32 +167,25 @@ pub struct NewAddressResponse {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct ListTransactionsResponse {
-    pub transactions: Option<Vec<Transaction>>,
-}
-
-#[derive(Debug, Deserialize)]
 pub struct Transaction {
     pub tx_hash: Option<String>,
-    pub amount: Option<String>,
-    pub num_confirmations: Option<i64>,
-    pub block_height: Option<i64>,
+    pub num_confirmations: Option<u32>,
+    pub block_height: Option<u32>,
     pub time_stamp: Option<String>,
     pub total_fees: Option<String>,
-    pub dest_addresses: Option<Vec<String>>,
     pub output_details: Option<Vec<OutputDetail>>,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct OutputDetail {
-    pub output_index: Option<i64>,
+    pub output_index: Option<u32>,
     pub amount: Option<String>,
     pub address: Option<String>,
     pub is_ours: Option<bool>,
 }
 
-fn parse_amount(value: Option<String>) -> i64 {
-    value.and_then(|v| v.parse::<i64>().ok()).unwrap_or_default()
+fn parse_amount(value: Option<String>) -> u64 {
+    value.and_then(|v| v.parse::<u64>().ok()).unwrap_or_default()
 }
 
 impl From<Transaction> for BitcoinTransaction {
@@ -211,7 +198,7 @@ impl From<Transaction> for BitcoinTransaction {
             .into_iter()
             .filter_map(|detail| {
                 Some(BitcoinTransactionOutput {
-                    output_index: detail.output_index? as u32,
+                    output_index: detail.output_index?,
                     address: detail.address,
                     amount_sat: parse_amount(detail.amount),
                     is_ours: detail.is_ours.unwrap_or_default(),
@@ -228,25 +215,4 @@ impl From<Transaction> for BitcoinTransaction {
             outputs,
         }
     }
-}
-
-#[derive(Debug, Deserialize)]
-pub struct ListUnspentResponse {
-    pub utxos: Option<Vec<Utxo>>,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct Utxo {
-    pub address_type: Option<String>,
-    pub address: Option<String>,
-    pub amount_sat: Option<String>,
-    pub pk_script: Option<String>,
-    pub outpoint: Option<UtxoOutpoint>,
-    pub confirmations: Option<i64>,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct UtxoOutpoint {
-    pub txid_str: Option<String>,
-    pub output_index: Option<i64>,
 }

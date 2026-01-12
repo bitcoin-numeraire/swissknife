@@ -49,7 +49,7 @@ async fn main() {
         exit(1);
     }
 
-    if let Err(err) = app_state.bitcoin_events.sync_pending_transactions().await {
+    if let Err(err) = app_state.services.bitcoin.sync_pending_transactions().await {
         error!(%err, "failed to sync onchain transactions");
         exit(1);
     }

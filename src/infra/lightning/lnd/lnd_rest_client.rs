@@ -2,7 +2,6 @@ use std::{path::PathBuf, process, sync::Arc, time::Duration};
 
 use anyhow::anyhow;
 use breez_sdk_core::ReverseSwapInfo;
-use chrono::Utc;
 use futures_util::StreamExt;
 use reqwest::{
     header::{HeaderMap, HeaderValue},
@@ -11,7 +10,6 @@ use reqwest::{
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_bolt::bitcoin::hashes::{sha256, Hash};
 use tokio::fs;
-use uuid::Uuid;
 
 use crate::{
     application::{
@@ -19,10 +17,7 @@ use crate::{
         errors::{BitcoinError, LightningError},
     },
     domains::{
-        bitcoin::{
-            BitcoinAddressType, BitcoinBalance, BitcoinEventsUseCases, BitcoinNetwork, BitcoinOutput,
-            BitcoinOutputStatus, BitcoinTransaction,
-        },
+        bitcoin::{BitcoinAddressType, BitcoinEventsUseCases, BitcoinNetwork, BitcoinTransaction},
         invoice::Invoice,
         ln_node::LnEventsUseCases,
         payment::Payment,
@@ -67,6 +62,7 @@ pub struct LndRestClient {
     base_url: String,
     fee_limit_msat: u64,
     retry_for: u32,
+    network: BitcoinNetwork,
 }
 
 const USER_AGENT: &str = "Numeraire Swissknife/1.0";
@@ -108,6 +104,17 @@ impl LndRestClient {
             .build()
             .map_err(|e| LightningError::ParseConfig(e.to_string()))?;
 
+        let mut lnd_client = Self {
+            client,
+            base_url: config.host.clone(),
+            fee_limit_msat: config.fee_limit_msat,
+            retry_for: config.payment_timeout.as_secs() as u32,
+            network: BitcoinNetwork::default(),
+        };
+
+        let network = lnd_client.network().await?;
+        lnd_client.network = network;
+
         let config_clone = config.clone();
         let invoice_macaroon = macaroon.clone();
         tokio::spawn(async move {
@@ -119,18 +126,13 @@ impl LndRestClient {
 
         let transaction_config = config.clone();
         tokio::spawn(async move {
-            if let Err(err) = listen_transactions(transaction_config, macaroon, bitcoin_events).await {
+            if let Err(err) = listen_transactions(transaction_config, macaroon, bitcoin_events, network).await {
                 tracing::error!(%err);
                 process::exit(1);
             }
         });
 
-        Ok(Self {
-            client,
-            base_url: config.host,
-            fee_limit_msat: config.fee_limit_msat,
-            retry_for: config.payment_timeout.as_secs() as u32,
-        })
+        Ok(lnd_client)
     }
 
     async fn read_ca(path: &str) -> anyhow::Result<Certificate> {
@@ -224,8 +226,23 @@ impl LndRestClient {
         Ok(result)
     }
 
-    fn parse_amount(value: Option<String>) -> i64 {
-        value.and_then(|v| v.parse::<i64>().ok()).unwrap_or_default()
+    async fn network(&self) -> Result<BitcoinNetwork, LightningError> {
+        let response: GetinfoResponse = self
+            .get_request("v1/getinfo")
+            .await
+            .map_err(|e| LightningError::NodeInfo(e.to_string()))?;
+
+        if let Some(chain) = response
+            .chains
+            .and_then(|mut chains| chains.pop())
+            .and_then(|chain| chain.network)
+        {
+            return Ok(parse_network(&chain));
+        }
+
+        Err(LightningError::NodeInfo(
+            "No chain information returned by LND".to_string(),
+        ))
     }
 
     fn map_address_type(address_type: BitcoinAddressType) -> String {
@@ -354,18 +371,6 @@ impl BitcoinWallet for LndRestClient {
         Ok(response.address)
     }
 
-    async fn balance(&self) -> Result<BitcoinBalance, BitcoinError> {
-        let response: WalletBalanceResponse = self
-            .get_request("v1/balance/blockchain")
-            .await
-            .map_err(|e| BitcoinError::Balance(e.to_string()))?;
-
-        Ok(BitcoinBalance {
-            confirmed_sat: Self::parse_amount(response.confirmed_balance) as u64,
-            unconfirmed_sat: Self::parse_amount(response.unconfirmed_balance) as u64,
-        })
-    }
-
     async fn send(&self, address: String, amount_sat: u64, fee_rate: Option<u32>) -> Result<String, BitcoinError> {
         let response: SendCoinsResponse = self
             .post_request(
@@ -382,54 +387,6 @@ impl BitcoinWallet for LndRestClient {
         Ok(response.txid)
     }
 
-    async fn list_outputs(&self) -> Result<Vec<BitcoinOutput>, BitcoinError> {
-        let network = self.network().await?;
-        let response: ListUnspentResponse = self
-            .get_request("v2/wallet/utxos")
-            .await
-            .map_err(|e| BitcoinError::Outputs(e.to_string()))?;
-
-        let outputs = response
-            .utxos
-            .unwrap_or_default()
-            .into_iter()
-            .filter_map(|utxo| {
-                let outpoint = utxo.outpoint?;
-                let txid = outpoint.txid_str?;
-                let output_index = outpoint.output_index?;
-                let amount_sat = utxo.amount_sat?;
-
-                let status = match utxo.confirmations {
-                    Some(confirmations) => {
-                        if confirmations > 0 {
-                            BitcoinOutputStatus::Confirmed
-                        } else {
-                            BitcoinOutputStatus::Unconfirmed
-                        }
-                    }
-                    None => BitcoinOutputStatus::Unconfirmed,
-                };
-
-                Some(BitcoinOutput {
-                    id: Uuid::new_v4(),
-                    outpoint: format!("{txid}:{output_index}"),
-                    txid,
-                    output_index: output_index as u32,
-                    address: utxo.address,
-                    amount_sat: Self::parse_amount(Some(amount_sat)),
-                    status,
-                    timestamp: None,
-                    block_height: None,
-                    network,
-                    created_at: Utc::now(),
-                    updated_at: None,
-                })
-            })
-            .collect();
-
-        Ok(outputs)
-    }
-
     async fn get_transaction(&self, txid: &str) -> Result<BitcoinTransaction, BitcoinError> {
         let endpoint = format!("v2/wallet/transactions/{txid}");
         let response: Transaction = self
@@ -438,24 +395,5 @@ impl BitcoinWallet for LndRestClient {
             .map_err(|e| BitcoinError::Transaction(e.to_string()))?;
 
         Ok(response.into())
-    }
-
-    async fn network(&self) -> Result<BitcoinNetwork, BitcoinError> {
-        let response: GetinfoResponse = self
-            .get_request("v1/getinfo")
-            .await
-            .map_err(|e| BitcoinError::Network(e.to_string()))?;
-
-        if let Some(chain) = response
-            .chains
-            .and_then(|mut chains| chains.pop())
-            .and_then(|chain| chain.network)
-        {
-            return Ok(parse_network(&chain));
-        }
-
-        Err(BitcoinError::Network(
-            "No chain information returned by LND".to_string(),
-        ))
     }
 }
