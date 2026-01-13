@@ -318,8 +318,7 @@ impl BitcoinWallet for ClnGrpcClient {
             txid: hex::encode(transaction.hash),
             timestamp: None,
             fee_sat: None,
-            block_height: Some(transaction.blockheight),
-            confirmations: None,
+            block_height: transaction.blockheight,
             outputs,
         })
     }

@@ -170,7 +170,6 @@ pub struct NewAddressResponse {
 #[derive(Debug, Deserialize)]
 pub struct TransactionResponse {
     pub tx_hash: String,
-    pub num_confirmations: u32,
     pub block_height: u32,
     #[serde_as(as = "DisplayFromStr")]
     pub time_stamp: i64,
@@ -195,13 +194,11 @@ impl From<TransactionResponse> for BitcoinTransaction {
         let outputs = val
             .output_details
             .into_iter()
-            .filter_map(|detail| {
-                Some(BitcoinTransactionOutput {
-                    output_index: detail.output_index,
-                    address: Some(detail.address),
-                    amount_sat: detail.amount,
-                    is_ours: detail.is_our_address,
-                })
+            .map(|detail| BitcoinTransactionOutput {
+                output_index: detail.output_index,
+                address: Some(detail.address),
+                amount_sat: detail.amount,
+                is_ours: detail.is_our_address,
             })
             .collect();
 
@@ -209,8 +206,7 @@ impl From<TransactionResponse> for BitcoinTransaction {
             txid: val.tx_hash,
             timestamp: Some(Utc.timestamp_opt(val.time_stamp, 0).unwrap()),
             fee_sat: Some(val.total_fees),
-            block_height: Some(val.block_height),
-            confirmations: Some(val.num_confirmations),
+            block_height: val.block_height,
             outputs,
         }
     }

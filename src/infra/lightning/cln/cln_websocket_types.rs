@@ -53,8 +53,8 @@ pub struct CoinMovement {
     pub debit_msat: Option<String>,
     #[serde(alias = "fees_msat")]
     pub fees_msat: Option<String>,
-    pub timestamp: Option<u64>,
-    pub blockheight: Option<u32>,
+    pub timestamp: i64,
+    pub blockheight: u32,
     pub tag: Option<String>,
 }
 
@@ -132,10 +132,9 @@ impl TryFrom<CoinMovement> for BitcoinOutputEvent {
             output_index,
             address: val.address.clone(),
             amount_sat,
-            timestamp: val.timestamp.and_then(|t| Utc.timestamp_opt(t as i64, 0).single()),
+            timestamp: Utc.timestamp_opt(val.timestamp, 0).unwrap(),
             fee_sat: val.fee_sat().map(|fee| fee.unsigned_abs()),
             block_height: val.blockheight,
-            confirmations: None,
             network: BitcoinNetwork::default(),
         })
     }

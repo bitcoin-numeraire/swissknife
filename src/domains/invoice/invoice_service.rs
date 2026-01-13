@@ -176,7 +176,7 @@ impl InvoiceUseCases for InvoiceService {
             }
         }
 
-        info!(%n_synced, "Invoices synced successfully");
+        debug!(%n_synced, "Invoices synced successfully");
         Ok(n_synced)
     }
 }

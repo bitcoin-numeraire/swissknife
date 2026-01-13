@@ -4,7 +4,7 @@ use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::{
-    application::entities::{Currency, Ledger},
+    application::{dtos::BitcoinOutputResponse, entities::{Currency, Ledger}},
     domains::{
         lnurl::LnUrlSuccessAction,
         payment::{Payment, PaymentStatus},
@@ -110,6 +110,11 @@ pub struct PaymentResponse {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub success_action: Option<LnUrlSuccessAction>,
 
+
+    /// Bitcoin Output
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bitcoin_output: Option<BitcoinOutputResponse>,
+
     /// Date of creation in database
     pub created_at: DateTime<Utc>,
 
@@ -140,6 +145,7 @@ impl From<Payment> for PaymentResponse {
             success_action: payment.success_action,
             created_at: payment.created_at,
             updated_at: payment.updated_at,
+            bitcoin_output: payment.bitcoin_output.map(Into::into),
         }
     }
 }

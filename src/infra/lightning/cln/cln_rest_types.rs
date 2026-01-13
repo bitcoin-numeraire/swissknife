@@ -67,7 +67,7 @@ pub struct ListTransactionsResponse {
 #[derive(Debug, Deserialize)]
 pub struct ListTransactionsTransaction {
     pub hash: String,
-    pub blockheight: Option<u32>,
+    pub blockheight: u32,
     pub outputs: Vec<ListTransactionsOutput>,
 }
 

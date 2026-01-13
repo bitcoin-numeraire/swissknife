@@ -134,7 +134,7 @@ async fn get_bitcoin_deposit_address(
 #[utoipa::path(
     post,
     path = "/payments",
-    tag = "Payments",
+    tag = "User Wallet",
     context_path = CONTEXT_PATH,
     request_body = SendPaymentRequest,
     responses(

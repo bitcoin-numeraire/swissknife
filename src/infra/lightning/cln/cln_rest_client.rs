@@ -333,7 +333,6 @@ impl BitcoinWallet for ClnRestClient {
             timestamp: None,
             fee_sat: None,
             block_height: transaction.blockheight,
-            confirmations: None,
             outputs,
         })
     }

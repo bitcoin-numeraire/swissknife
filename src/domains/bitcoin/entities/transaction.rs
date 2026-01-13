@@ -7,8 +7,7 @@ pub struct BitcoinTransaction {
     pub txid: String,
     pub timestamp: Option<DateTime<Utc>>,
     pub fee_sat: Option<u64>,
-    pub block_height: Option<u32>,
-    pub confirmations: Option<u32>,
+    pub block_height: u32,
     pub outputs: Vec<BitcoinTransactionOutput>,
 }
 
@@ -19,10 +18,9 @@ impl BitcoinTransaction {
             output_index: output.output_index,
             address: output.address.clone(),
             amount_sat: output.amount_sat,
-            timestamp: self.timestamp,
+            timestamp: self.timestamp.unwrap_or(Utc::now()),
             fee_sat: self.fee_sat,
             block_height: self.block_height,
-            confirmations: self.confirmations,
             network,
         }
     }
@@ -42,9 +40,8 @@ pub struct BitcoinOutputEvent {
     pub output_index: u32,
     pub address: Option<String>,
     pub amount_sat: u64,
-    pub timestamp: Option<DateTime<Utc>>,
+    pub timestamp: DateTime<Utc>,
     pub fee_sat: Option<u64>,
-    pub block_height: Option<u32>,
-    pub confirmations: Option<u32>,
+    pub block_height: u32,
     pub network: BitcoinNetwork,
 }

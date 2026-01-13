@@ -234,7 +234,6 @@ async fn process_transaction_message(
     network: BitcoinNetwork,
 ) -> anyhow::Result<()> {
     let value: Value = serde_json::from_str(text)?;
-    debug!(%value, "Received transaction message");
 
     if let Some(event) = value.get("result") {
         match serde_json::from_value::<TransactionResponse>(event.clone()) {
@@ -250,7 +249,7 @@ async fn process_transaction_message(
                     };
 
                     if let Err(err) = result {
-                        warn!(%err, "Failed to process onchain transaction");
+                        error!(%err, "Failed to process onchain transaction");
                     }
                 }
             }

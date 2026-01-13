@@ -48,9 +48,9 @@ impl BitcoinUseCases for BitcoinService {
         wallet_id: Uuid,
         address_type: Option<BitcoinAddressType>,
     ) -> Result<BitcoinAddress, ApplicationError> {
-        trace!(%wallet_id, ?address_type, "Fetching current bitcoin deposit address");
-
         let address_type = address_type.unwrap_or(self.address_type);
+
+        trace!(%wallet_id, %address_type, "Fetching current bitcoin deposit address");
 
         if let Some(address) = self
             .store
@@ -85,8 +85,8 @@ impl BitcoinUseCases for BitcoinService {
     async fn sync_pending_transactions(&self) -> Result<(), ApplicationError> {
         trace!("Syncing pending onchain invoices and payments");
 
-        let mut n_invoices_synced = 0;
-        let mut n_payments_synced = 0;
+        let mut n_invoices = 0;
+        let mut n_payments = 0;
         let network = self.wallet.network();
 
         let invoices = self
@@ -122,7 +122,7 @@ impl BitcoinUseCases for BitcoinService {
                 .onchain_deposit(transaction.output_event(matching_output, network))
                 .await?;
 
-            n_invoices_synced += 1;
+            n_invoices += 1;
         }
 
         let payments = self
@@ -166,11 +166,11 @@ impl BitcoinUseCases for BitcoinService {
                     .onchain_withdrawal(transaction.output_event(output, network))
                     .await?;
 
-                n_payments_synced += 1;
+                n_payments += 1;
             }
         }
 
-        debug!(%n_invoices_synced, %n_payments_synced, "Synced pending onchain invoices and payments");
+        debug!(%n_invoices, %n_payments, "Synced pending onchain invoices and payments");
         Ok(())
     }
 }

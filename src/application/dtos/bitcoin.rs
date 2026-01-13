@@ -70,10 +70,6 @@ pub struct BitcoinOutputResponse {
     pub id: Uuid,
     /// Outpoint
     pub outpoint: String,
-    /// TXID
-    pub txid: String,
-    /// Output index
-    pub output_index: u32,
     /// Address
     pub address: String,
     /// Amount in satoshis
@@ -82,8 +78,11 @@ pub struct BitcoinOutputResponse {
     pub status: BitcoinOutputStatus,
     /// Timestamp
     pub timestamp: DateTime<Utc>,
+
     /// Block height
-    pub block_height: u32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub block_height: Option<u32>,
+
     /// Network
     pub network: BitcoinNetwork,
     /// Date of creation in database
@@ -99,13 +98,11 @@ impl From<BitcoinOutput> for BitcoinOutputResponse {
         BitcoinOutputResponse {
             id: output.id,
             outpoint: output.outpoint,
-            txid: output.txid,
-            output_index: output.output_index,
-            address: output.address.unwrap(),
+            address: output.address,
             amount_sat: output.amount_sat,
             status: output.status,
-            timestamp: output.timestamp.unwrap(),
-            block_height: output.block_height.unwrap(),
+            timestamp: output.timestamp,
+            block_height: output.block_height,
             network: output.network,
             created_at: output.created_at,
             updated_at: output.updated_at,

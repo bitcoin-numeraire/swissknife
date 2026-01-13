@@ -1,12 +1,11 @@
 use async_trait::async_trait;
-use chrono::Utc;
 use tracing::{debug, trace};
 use uuid::Uuid;
 
 use crate::{
     application::{
         entities::{AppStore, Ledger},
-        errors::ApplicationError,
+        errors::{ApplicationError, DataError},
     },
     domains::{
         invoice::{Invoice, InvoiceStatus},
@@ -27,13 +26,11 @@ impl BitcoinEventsService {
         Self { store }
     }
 
-    fn output_status(confirmations: Option<u32>, block_height: Option<u32>) -> BitcoinOutputStatus {
-        match confirmations {
-            Some(confirmations) if confirmations > 0 => BitcoinOutputStatus::Confirmed,
-            _ => match block_height {
-                Some(height) if height > 0 => BitcoinOutputStatus::Confirmed,
-                _ => BitcoinOutputStatus::Unconfirmed,
-            },
+    fn output_status(block_height: u32) -> BitcoinOutputStatus {
+        if block_height > 0 {
+            BitcoinOutputStatus::Confirmed
+        } else {
+            BitcoinOutputStatus::Unconfirmed
         }
     }
 }
@@ -49,30 +46,23 @@ impl BitcoinEventsUseCases for BitcoinEventsService {
             return Ok(());
         };
 
-        let status = Self::output_status(event.confirmations, event.block_height);
+        let status = Self::output_status(event.block_height);
         let output = BitcoinOutput {
             id: Uuid::new_v4(),
             outpoint: outpoint.clone(),
             txid: event.txid.clone(),
             output_index: event.output_index,
-            address: Some(address),
+            address: address.clone(),
             amount_sat: event.amount_sat,
             status,
             timestamp: event.timestamp,
-            block_height: event.block_height,
+            block_height: Some(event.block_height),
             network: event.network,
             ..Default::default()
         };
 
-        let Some(address) = output.address.clone() else {
-            trace!(outpoint = outpoint.clone(), "Ignoring bitcoin output without address");
-            return Ok(());
-        };
-
         let Some(btc_address) = self.store.btc_address.find_by_address(&address).await? else {
-            trace!(
-                address,
-                outpoint = outpoint.clone(),
+            trace!(%address, outpoint = outpoint.clone(),
                 "Ignoring bitcoin output not matching any known wallet address"
             );
             return Ok(());
@@ -87,9 +77,13 @@ impl BitcoinEventsUseCases for BitcoinEventsService {
         let existing_invoice = self.store.invoice.find_by_btc_output_id(stored_output.id).await?;
         let status: InvoiceStatus = stored_output.status.into();
 
+        let is_confirmed = stored_output.status == BitcoinOutputStatus::Confirmed;
+
         if let Some(mut invoice) = existing_invoice {
             invoice.status = status;
-            invoice.payment_time = stored_output.timestamp;
+            if is_confirmed {
+                invoice.payment_time = Some(stored_output.timestamp);
+            }
             invoice.amount_received_msat = Some(stored_output.amount_sat.saturating_mul(1000));
             invoice.btc_output_id = Some(stored_output.id);
             invoice.bitcoin_output = Some(stored_output.clone());
@@ -99,23 +93,23 @@ impl BitcoinEventsUseCases for BitcoinEventsService {
             debug!(invoice_id = %invoice.id, outpoint = outpoint.clone(), address = %btc_address.address,
                 "Existing onchain deposit processed");
         } else {
-            let timestamp = stored_output.timestamp.unwrap_or_else(Utc::now);
             let amount_msat = stored_output.amount_sat.saturating_mul(1000);
+            let payment_time = if is_confirmed {
+                Some(stored_output.timestamp)
+            } else {
+                None
+            };
 
             let invoice = Invoice {
                 id: Uuid::new_v4(),
                 wallet_id: btc_address.wallet_id,
-                ln_address_id: None,
                 description: Some(DEFAULT_DEPOSIT_DESCRIPTION.to_string()),
                 amount_msat: Some(amount_msat),
                 amount_received_msat: Some(amount_msat),
-                timestamp,
-                status,
+                timestamp: stored_output.timestamp,
                 ledger: Ledger::Onchain,
                 currency: stored_output.network.into(),
-                fee_msat: None,
-                payment_time: stored_output.timestamp,
-                ln_invoice: None,
+                payment_time,
                 btc_output_id: Some(stored_output.id),
                 bitcoin_output: Some(stored_output.clone()),
                 ..Default::default()
@@ -135,13 +129,14 @@ impl BitcoinEventsUseCases for BitcoinEventsService {
         trace!(outpoint = outpoint.clone(), "Processing onchain withdrawal event");
 
         let Some(payment) = self.store.payment.find_by_payment_hash(&event.txid).await? else {
+            trace!(
+                outpoint = outpoint.clone(),
+                "Ignoring bitcoin output not matching any known payment"
+            );
             return Ok(());
         };
 
-        let is_confirmed = match event.confirmations {
-            Some(confirmations) => confirmations > 0,
-            None => event.block_height.unwrap_or_default() > 0,
-        };
+        let is_confirmed = event.block_height > 0;
 
         let status: PaymentStatus = if is_confirmed {
             PaymentStatus::Settled
@@ -152,26 +147,30 @@ impl BitcoinEventsUseCases for BitcoinEventsService {
         let mut updated_payment = payment;
         updated_payment.status = status;
 
-        if updated_payment.payment_time.is_none() {
-            updated_payment.payment_time = event.timestamp;
+        if is_confirmed && updated_payment.payment_time.is_none() {
+            updated_payment.payment_time = Some(event.timestamp);
         }
 
         if updated_payment.fee_msat.is_none() {
             updated_payment.fee_msat = event.fee_sat.map(|fee| fee.saturating_mul(1000));
         }
 
-        let status = Self::output_status(event.confirmations, event.block_height);
+        let status = Self::output_status(event.block_height);
+
+        let Some(destination_address) = updated_payment.destination_address.clone() else {
+            return Err(DataError::Inconsistency("Destination address not found.".into()).into());
+        };
 
         let btc_output = BitcoinOutput {
             id: Uuid::new_v4(),
             outpoint: outpoint.clone(),
             txid: event.txid.clone(),
             output_index: event.output_index,
-            address: event.address.clone(),
+            address: destination_address,
             amount_sat: event.amount_sat,
             status,
             timestamp: event.timestamp,
-            block_height: event.block_height,
+            block_height: Some(event.block_height),
             network: event.network,
             ..Default::default()
         };
