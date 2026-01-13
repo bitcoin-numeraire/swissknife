@@ -6,7 +6,7 @@ use crate::{application::errors::AuthenticationError, domains::user::Permission}
 use async_trait::async_trait;
 
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 
 use crate::infra::config::config_rs::deserialize_duration;
 
@@ -22,14 +22,6 @@ pub struct LocalAuthenticator {
     token_expiry: Duration,
     encoding_key: EncodingKey,
     decoding_key: DecodingKey,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct Claims {
-    exp: usize,  // Required (validate_exp defaults to true in validation). Expiration time (as UTC timestamp)
-    iat: usize,  // Optional. Issued at (as UTC timestamp)
-    sub: String, // Optional. Subject (whom token refers to)
-    permissions: Vec<Permission>,
 }
 
 impl LocalAuthenticator {

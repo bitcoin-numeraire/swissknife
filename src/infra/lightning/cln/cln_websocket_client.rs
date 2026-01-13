@@ -12,7 +12,7 @@ use tracing::{debug, error, warn};
 use crate::{
     application::errors::LightningError,
     domains::{
-        bitcoin::{BitcoinEventsUseCases, BitcoinNetwork},
+        bitcoin::{BitcoinEventsUseCases, BitcoinNetwork, BitcoinOutputEvent},
         ln_node::LnEventsUseCases,
     },
     infra::lightning::cln::cln_websocket_types::{CoinMovement, InvoicePayment, SendPayFailure, SendPaySuccess},
@@ -186,11 +186,14 @@ fn on_message(
 
                                 match coin_movement.try_into() {
                                     Ok(output_event) => {
+                                        let output_event = BitcoinOutputEvent {
+                                            network,
+                                            ..output_event
+                                        };
+
                                         let result = match tag.as_str() {
-                                            "deposit" => bitcoin_events.onchain_deposit(output_event, network).await,
-                                            "withdrawal" => {
-                                                bitcoin_events.onchain_withdrawal(output_event, network).await
-                                            }
+                                            "deposit" => bitcoin_events.onchain_deposit(output_event).await,
+                                            "withdrawal" => bitcoin_events.onchain_withdrawal(output_event).await,
                                             _ => {
                                                 warn!(tag, "Unsupported coin_movement tag");
                                                 Ok(())

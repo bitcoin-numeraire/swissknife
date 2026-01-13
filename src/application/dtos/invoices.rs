@@ -7,7 +7,10 @@ use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::{
-    application::entities::{Currency, Ledger},
+    application::{
+        dtos::BitcoinOutputResponse,
+        entities::{Currency, Ledger},
+    },
     domains::invoice::{Invoice, InvoiceStatus, LnInvoice},
 };
 
@@ -34,10 +37,6 @@ pub struct InvoiceResponse {
     /// Lightning Address. Populated when invoice is generated as part of the LNURL protocol
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ln_address_id: Option<Uuid>,
-
-    /// Linked Bitcoin output when the invoice represents an onchain deposit.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub btc_output_id: Option<Uuid>,
 
     /// Description
     pub description: Option<String>,
@@ -72,6 +71,10 @@ pub struct InvoiceResponse {
     /// Lightning details of the invoice
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ln_invoice: Option<LnInvoiceResponse>,
+
+    /// Bitcoin output details of the invoice
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bitcoin_output: Option<BitcoinOutputResponse>,
 }
 
 #[serde_as]
@@ -116,7 +119,6 @@ impl From<Invoice> for InvoiceResponse {
             id: invoice.id,
             wallet_id: invoice.wallet_id,
             ln_address_id: invoice.ln_address_id,
-            btc_output_id: invoice.btc_output_id,
             description: invoice.description,
             amount_msat: invoice.amount_msat,
             amount_received_msat: invoice.amount_received_msat,
@@ -129,6 +131,7 @@ impl From<Invoice> for InvoiceResponse {
             created_at: invoice.created_at,
             updated_at: invoice.updated_at,
             ln_invoice: invoice.ln_invoice.map(Into::into),
+            bitcoin_output: invoice.bitcoin_output.map(Into::into),
         }
     }
 }

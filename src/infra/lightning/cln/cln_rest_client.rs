@@ -337,4 +337,8 @@ impl BitcoinWallet for ClnRestClient {
             outputs,
         })
     }
+
+    fn network(&self) -> BitcoinNetwork {
+        self.network
+    }
 }

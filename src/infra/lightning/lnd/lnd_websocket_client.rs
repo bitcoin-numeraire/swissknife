@@ -12,7 +12,7 @@ use tokio_tungstenite::{connect_async_tls_with_config, Connector, MaybeTlsStream
 use tracing::{debug, error, warn};
 
 use crate::domains::bitcoin::{BitcoinNetwork, BitcoinTransaction};
-use crate::infra::lightning::lnd::lnd_types::{InvoiceResponse, Transaction};
+use crate::infra::lightning::lnd::lnd_types::{InvoiceResponse, TransactionResponse};
 use crate::{
     application::errors::LightningError,
     domains::{bitcoin::BitcoinEventsUseCases, ln_node::LnEventsUseCases},
@@ -234,17 +234,19 @@ async fn process_transaction_message(
     network: BitcoinNetwork,
 ) -> anyhow::Result<()> {
     let value: Value = serde_json::from_str(text)?;
+    debug!(%value, "Received transaction message");
 
     if let Some(event) = value.get("result") {
-        match serde_json::from_value::<Transaction>(event.clone()) {
+        match serde_json::from_value::<TransactionResponse>(event.clone()) {
             Ok(transaction) => {
                 let transaction: BitcoinTransaction = transaction.into();
+
                 for output in transaction.outputs.iter() {
-                    let output_event = transaction.output_event(output);
+                    let output_event = transaction.output_event(output, network);
                     let result = if output.is_ours {
-                        bitcoin_events.onchain_deposit(output_event, network).await
+                        bitcoin_events.onchain_deposit(output_event).await
                     } else {
-                        bitcoin_events.onchain_withdrawal(output_event, network).await
+                        bitcoin_events.onchain_withdrawal(output_event).await
                     };
 
                     if let Err(err) = result {

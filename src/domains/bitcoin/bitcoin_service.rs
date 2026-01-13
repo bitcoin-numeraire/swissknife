@@ -48,7 +48,7 @@ impl BitcoinUseCases for BitcoinService {
         wallet_id: Uuid,
         address_type: Option<BitcoinAddressType>,
     ) -> Result<BitcoinAddress, ApplicationError> {
-        debug!(%wallet_id, ?address_type, "Fetching current bitcoin deposit address");
+        trace!(%wallet_id, ?address_type, "Fetching current bitcoin deposit address");
 
         let address_type = address_type.unwrap_or(self.address_type);
 
@@ -85,6 +85,10 @@ impl BitcoinUseCases for BitcoinService {
     async fn sync_pending_transactions(&self) -> Result<(), ApplicationError> {
         trace!("Syncing pending onchain invoices and payments");
 
+        let mut n_invoices_synced = 0;
+        let mut n_payments_synced = 0;
+        let network = self.wallet.network();
+
         let invoices = self
             .store
             .invoice
@@ -115,8 +119,10 @@ impl BitcoinUseCases for BitcoinService {
             };
 
             self.bitcoin_events
-                .onchain_deposit(transaction.output_event(matching_output), output.network)
+                .onchain_deposit(transaction.output_event(matching_output, network))
                 .await?;
+
+            n_invoices_synced += 1;
         }
 
         let payments = self
@@ -146,6 +152,8 @@ impl BitcoinUseCases for BitcoinService {
                     (None, _) => true,
                 })
                 .or_else(|| {
+                    // If the address is not found, we can assume this output is the withdrawal.
+                    // This is a CLN limitation, as it does not provide the address of the output.
                     transaction
                         .outputs
                         .iter()
@@ -155,12 +163,14 @@ impl BitcoinUseCases for BitcoinService {
 
             if let Some(output) = candidate_output {
                 self.bitcoin_events
-                    .onchain_withdrawal(transaction.output_event(output), payment.currency.into())
+                    .onchain_withdrawal(transaction.output_event(output, network))
                     .await?;
+
+                n_payments_synced += 1;
             }
         }
 
-        debug!("Synced pending onchain invoices and payments");
+        debug!(%n_invoices_synced, %n_payments_synced, "Synced pending onchain invoices and payments");
         Ok(())
     }
 }

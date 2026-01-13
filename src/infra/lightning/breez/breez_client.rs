@@ -19,7 +19,7 @@ use crate::{
         errors::{BitcoinError, LightningError},
     },
     domains::{
-        bitcoin::{BitcoinAddressType, BitcoinTransaction},
+        bitcoin::{BitcoinAddressType, BitcoinNetwork, BitcoinTransaction},
         invoice::Invoice,
         ln_node::LnEventsUseCases,
         payment::Payment,
@@ -358,5 +358,9 @@ impl BitcoinWallet for BreezClient {
         Err(BitcoinError::Unsupported(
             "Transaction lookup is not yet implemented for Breez".to_string(),
         ))
+    }
+
+    fn network(&self) -> BitcoinNetwork {
+        BitcoinNetwork::default()
     }
 }

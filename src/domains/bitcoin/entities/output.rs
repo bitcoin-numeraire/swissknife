@@ -6,7 +6,7 @@ use uuid::Uuid;
 
 use crate::domains::{bitcoin::BitcoinNetwork, invoice::InvoiceStatus};
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct BitcoinOutput {
     pub id: Uuid,
     pub outpoint: String,

@@ -323,4 +323,8 @@ impl BitcoinWallet for ClnGrpcClient {
             outputs,
         })
     }
+
+    fn network(&self) -> BitcoinNetwork {
+        self.network
+    }
 }

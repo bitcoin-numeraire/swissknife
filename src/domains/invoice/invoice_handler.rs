@@ -14,10 +14,16 @@ use crate::{
             BAD_REQUEST_EXAMPLE, FORBIDDEN_EXAMPLE, INTERNAL_EXAMPLE, NOT_FOUND_EXAMPLE, UNAUTHORIZED_EXAMPLE,
             UNPROCESSABLE_EXAMPLE,
         },
-        dtos::{ErrorResponse, InvoiceResponse, LnInvoiceResponse, NewInvoiceRequest},
+        dtos::{
+            BitcoinAddressResponse, BitcoinAddressType, BitcoinOutputResponse, ErrorResponse, InvoiceResponse,
+            LnInvoiceResponse, NewInvoiceRequest,
+        },
         errors::ApplicationError,
     },
-    domains::user::{Permission, User},
+    domains::{
+        bitcoin::{BitcoinNetwork, BitcoinOutputStatus},
+        user::{Permission, User},
+    },
     infra::{
         app::AppState,
         axum::{Json, Path, Query},
@@ -29,7 +35,8 @@ use super::{InvoiceFilter, InvoiceOrderBy, InvoiceStatus};
 #[derive(OpenApi)]
 #[openapi(
     paths(generate_invoice, list_invoices, get_invoice, delete_invoice, delete_invoices),
-    components(schemas(InvoiceResponse, NewInvoiceRequest, InvoiceStatus, LnInvoiceResponse, InvoiceOrderBy)),
+    components(schemas(InvoiceResponse, NewInvoiceRequest, InvoiceStatus, LnInvoiceResponse, InvoiceOrderBy, BitcoinOutputResponse,
+        BitcoinOutputStatus, BitcoinNetwork, BitcoinAddressResponse, BitcoinAddressType)),
     tags(
         (name = "Invoices", description = "Invoice management endpoints. Require `read:transaction` or `write:transaction` permissions.")
     ),

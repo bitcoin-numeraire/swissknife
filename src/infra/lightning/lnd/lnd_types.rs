@@ -166,52 +166,51 @@ pub struct NewAddressResponse {
     pub address: String,
 }
 
+#[serde_as]
 #[derive(Debug, Deserialize)]
-pub struct Transaction {
-    pub tx_hash: Option<String>,
-    pub num_confirmations: Option<u32>,
-    pub block_height: Option<u32>,
-    pub time_stamp: Option<String>,
-    pub total_fees: Option<String>,
-    pub output_details: Option<Vec<OutputDetail>>,
+pub struct TransactionResponse {
+    pub tx_hash: String,
+    pub num_confirmations: u32,
+    pub block_height: u32,
+    #[serde_as(as = "DisplayFromStr")]
+    pub time_stamp: i64,
+    #[serde_as(as = "DisplayFromStr")]
+    pub total_fees: u64,
+    pub output_details: Vec<OutputDetailResponse>,
 }
 
+#[serde_as]
 #[derive(Debug, Deserialize)]
-pub struct OutputDetail {
-    pub output_index: Option<u32>,
-    pub amount: Option<String>,
-    pub address: Option<String>,
-    pub is_ours: Option<bool>,
+pub struct OutputDetailResponse {
+    #[serde_as(as = "DisplayFromStr")]
+    pub output_index: u32,
+    #[serde_as(as = "DisplayFromStr")]
+    pub amount: u64,
+    pub address: String,
+    pub is_our_address: bool,
 }
 
-fn parse_amount(value: Option<String>) -> u64 {
-    value.and_then(|v| v.parse::<u64>().ok()).unwrap_or_default()
-}
-
-impl From<Transaction> for BitcoinTransaction {
-    fn from(val: Transaction) -> Self {
-        let timestamp = val.time_stamp.and_then(|value| value.parse::<i64>().ok());
-
+impl From<TransactionResponse> for BitcoinTransaction {
+    fn from(val: TransactionResponse) -> Self {
         let outputs = val
             .output_details
-            .unwrap_or_default()
             .into_iter()
             .filter_map(|detail| {
                 Some(BitcoinTransactionOutput {
-                    output_index: detail.output_index?,
-                    address: detail.address,
-                    amount_sat: parse_amount(detail.amount),
-                    is_ours: detail.is_ours.unwrap_or_default(),
+                    output_index: detail.output_index,
+                    address: Some(detail.address),
+                    amount_sat: detail.amount,
+                    is_ours: detail.is_our_address,
                 })
             })
             .collect();
 
         BitcoinTransaction {
-            txid: val.tx_hash.unwrap_or_default(),
-            timestamp: timestamp.and_then(|t| chrono::Utc.timestamp_opt(t, 0).single()),
-            fee_sat: val.total_fees.map(|fees| parse_amount(Some(fees))),
-            block_height: val.block_height,
-            confirmations: val.num_confirmations,
+            txid: val.tx_hash,
+            timestamp: Some(Utc.timestamp_opt(val.time_stamp, 0).unwrap()),
+            fee_sat: Some(val.total_fees),
+            block_height: Some(val.block_height),
+            confirmations: Some(val.num_confirmations),
             outputs,
         }
     }
