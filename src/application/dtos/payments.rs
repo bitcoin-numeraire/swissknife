@@ -4,7 +4,10 @@ use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::{
-    application::{dtos::BitcoinOutputResponse, entities::{Currency, Ledger}},
+    application::{
+        dtos::BitcoinOutputResponse,
+        entities::{Currency, Ledger},
+    },
     domains::{
         lnurl::LnUrlSuccessAction,
         payment::{Payment, PaymentStatus},
@@ -109,7 +112,6 @@ pub struct PaymentResponse {
     /// Success Action. Populated when sending to a LNURL or LN Address
     #[serde(skip_serializing_if = "Option::is_none")]
     pub success_action: Option<LnUrlSuccessAction>,
-
 
     /// Bitcoin Output
     #[serde(skip_serializing_if = "Option::is_none")]
