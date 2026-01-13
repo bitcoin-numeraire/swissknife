@@ -27,3 +27,15 @@ impl From<BitcoinNetwork> for Currency {
         }
     }
 }
+
+impl From<Currency> for BitcoinNetwork {
+    fn from(currency: Currency) -> Self {
+        match currency {
+            Currency::Bitcoin => BitcoinNetwork::Bitcoin,
+            Currency::BitcoinTestnet => BitcoinNetwork::Testnet,
+            Currency::Regtest => BitcoinNetwork::Regtest,
+            Currency::Simnet => BitcoinNetwork::Simnet,
+            Currency::Signet => BitcoinNetwork::Signet,
+        }
+    }
+}

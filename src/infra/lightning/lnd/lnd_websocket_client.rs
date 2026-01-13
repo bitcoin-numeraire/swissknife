@@ -11,7 +11,7 @@ use tokio_tungstenite::tungstenite::ClientRequestBuilder;
 use tokio_tungstenite::{connect_async_tls_with_config, Connector, MaybeTlsStream, WebSocketStream};
 use tracing::{debug, error, warn};
 
-use crate::domains::bitcoin::BitcoinNetwork;
+use crate::domains::bitcoin::{BitcoinNetwork, BitcoinTransaction};
 use crate::infra::lightning::lnd::lnd_types::{InvoiceResponse, Transaction};
 use crate::{
     application::errors::LightningError,
@@ -238,8 +238,18 @@ async fn process_transaction_message(
     if let Some(event) = value.get("result") {
         match serde_json::from_value::<Transaction>(event.clone()) {
             Ok(transaction) => {
-                if let Err(err) = bitcoin_events.onchain_transaction(transaction.into(), network).await {
-                    warn!(%err, "Failed to process onchain transaction");
+                let transaction: BitcoinTransaction = transaction.into();
+                for output in transaction.outputs.iter() {
+                    let output_event = transaction.output_event(output);
+                    let result = if output.is_ours {
+                        bitcoin_events.onchain_deposit(output_event, network).await
+                    } else {
+                        bitcoin_events.onchain_withdrawal(output_event, network).await
+                    };
+
+                    if let Err(err) = result {
+                        warn!(%err, "Failed to process onchain transaction");
+                    }
                 }
             }
             Err(err) => {

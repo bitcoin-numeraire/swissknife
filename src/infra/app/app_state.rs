@@ -54,7 +54,14 @@ impl AppState {
         let bitcoin_wallet = ln_client.clone();
 
         // Services
-        let services = AppServices::new(config, store, ln_client.clone(), bitcoin_wallet, jwt_authenticator);
+        let services = AppServices::new(
+            config,
+            store,
+            ln_client.clone(),
+            bitcoin_wallet,
+            bitcoin_events,
+            jwt_authenticator,
+        );
 
         Ok(Self {
             services,

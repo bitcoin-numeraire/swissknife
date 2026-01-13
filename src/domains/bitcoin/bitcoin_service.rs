@@ -16,21 +16,26 @@ use crate::{
     },
 };
 
-use super::{BitcoinAddress, BitcoinAddressType, BitcoinUseCases};
-
-const DEFAULT_DEPOSIT_DESCRIPTION: &str = "Bitcoin onchain deposit";
+use super::{BitcoinAddress, BitcoinAddressType, BitcoinEventsUseCases, BitcoinUseCases};
 
 pub struct BitcoinService {
     store: AppStore,
     wallet: Arc<dyn BitcoinWallet>,
+    bitcoin_events: Arc<dyn BitcoinEventsUseCases>,
     address_type: BitcoinAddressType,
 }
 
 impl BitcoinService {
-    pub fn new(store: AppStore, wallet: Arc<dyn BitcoinWallet>, address_type: BitcoinAddressType) -> Self {
+    pub fn new(
+        store: AppStore,
+        wallet: Arc<dyn BitcoinWallet>,
+        bitcoin_events: Arc<dyn BitcoinEventsUseCases>,
+        address_type: BitcoinAddressType,
+    ) -> Self {
         Self {
             store,
             wallet,
+            bitcoin_events,
             address_type,
         }
     }
@@ -101,7 +106,17 @@ impl BitcoinUseCases for BitcoinService {
 
             let transaction = self.wallet.get_transaction(&output.txid).await?;
 
-            // TODO: Handle onchain deposit
+            let Some(matching_output) = transaction
+                .outputs
+                .iter()
+                .find(|tx_output| tx_output.output_index == output.output_index)
+            else {
+                continue;
+            };
+
+            self.bitcoin_events
+                .onchain_deposit(transaction.output_event(matching_output), output.network)
+                .await?;
         }
 
         let payments = self
@@ -120,8 +135,29 @@ impl BitcoinUseCases for BitcoinService {
             };
 
             let transaction = self.wallet.get_transaction(&txid).await?;
+            let candidate_output = transaction
+                .outputs
+                .iter()
+                .filter(|output| output.amount_sat > 0)
+                .filter(|output| !output.is_ours)
+                .find(|output| match (&payment.destination_address, &output.address) {
+                    (Some(destination), Some(address)) => destination == address,
+                    (Some(_), None) => false,
+                    (None, _) => true,
+                })
+                .or_else(|| {
+                    transaction
+                        .outputs
+                        .iter()
+                        .filter(|output| output.amount_sat > 0)
+                        .find(|output| !output.is_ours)
+                });
 
-            // TODO: Handle onchain withdrawal
+            if let Some(output) = candidate_output {
+                self.bitcoin_events
+                    .onchain_withdrawal(transaction.output_event(output), payment.currency.into())
+                    .await?;
+            }
         }
 
         debug!("Synced pending onchain invoices and payments");

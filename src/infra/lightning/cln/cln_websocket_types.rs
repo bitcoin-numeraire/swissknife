@@ -1,5 +1,5 @@
 use crate::domains::{
-    bitcoin::{BitcoinTransaction, BitcoinTransactionOutput},
+    bitcoin::BitcoinOutputEvent,
     ln_node::{LnInvoicePaidEvent, LnPayFailureEvent, LnPaySuccessEvent},
 };
 use chrono::{TimeZone, Utc};
@@ -42,6 +42,9 @@ pub struct CoinMovement {
     #[serde(alias = "output", alias = "utxo_outnum")]
     pub output_index: Option<u32>,
     pub address: Option<String>,
+    #[serde(alias = "type")]
+    pub movement_type: Option<String>,
+    pub primary_tag: Option<String>,
     #[serde(alias = "amount_msat")]
     pub amount_msat: Option<String>,
     #[serde(alias = "credit_msat")]
@@ -72,12 +75,12 @@ impl CoinMovement {
         Self::parse_msat(&self.fees_msat).map(|fee| fee / 1000)
     }
 
-    fn is_ours(&self) -> bool {
-        match self.tag.as_deref() {
-            Some("deposit") | Some("to_wallet") => true,
-            Some("withdrawal") | Some("withdraw") => false,
-            _ => self.credit_msat.is_some() && self.debit_msat.is_none(),
-        }
+    pub fn is_chain_movement(&self) -> bool {
+        matches!(self.movement_type.as_deref(), Some("chain_mvt"))
+    }
+
+    pub fn movement_tag(&self) -> Option<&str> {
+        self.primary_tag.as_deref().or(self.tag.as_deref())
     }
 }
 
@@ -115,28 +118,24 @@ impl From<SendPayFailure> for LnPayFailureEvent {
     }
 }
 
-impl TryFrom<CoinMovement> for BitcoinTransaction {
+impl TryFrom<CoinMovement> for BitcoinOutputEvent {
     type Error = &'static str;
 
     fn try_from(val: CoinMovement) -> Result<Self, Self::Error> {
         let txid = val.txid.clone().ok_or("missing txid")?;
         let output_index = val.output_index.ok_or("missing output index")?;
         let amount_msat = val.amount_msat().ok_or("missing amount")?;
+        let amount_sat = amount_msat.unsigned_abs() / 1000;
 
-        let output = BitcoinTransactionOutput {
+        Ok(BitcoinOutputEvent {
+            txid,
             output_index,
             address: val.address.clone(),
-            amount_sat: (amount_msat / 1000) as u64,
-            is_ours: val.is_ours(),
-        };
-
-        Ok(BitcoinTransaction {
-            txid,
+            amount_sat,
             timestamp: val.timestamp.and_then(|t| Utc.timestamp_opt(t as i64, 0).single()),
-            fee_sat: val.fee_sat().map(|fee| fee as u64),
+            fee_sat: val.fee_sat().map(|fee| fee.unsigned_abs()),
             block_height: val.blockheight,
             confirmations: None,
-            outputs: vec![output],
         })
     }
 }

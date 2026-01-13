@@ -174,16 +174,38 @@ fn on_message(
 
                     if let Some(event) = value.get("coin_movement") {
                         match serde_json::from_value::<CoinMovement>(event.clone()) {
-                            Ok(coin_movement) => match coin_movement.try_into() {
-                                Ok(transaction) => {
-                                    if let Err(err) = bitcoin_events.onchain_transaction(transaction, network).await {
-                                        warn!(%err, "Failed to process onchain transaction");
+                            Ok(coin_movement) => {
+                                if !coin_movement.is_chain_movement() {
+                                    continue;
+                                }
+
+                                let Some(tag) = coin_movement.movement_tag().map(str::to_string) else {
+                                    warn!("coin_movement missing primary tag");
+                                    continue;
+                                };
+
+                                match coin_movement.try_into() {
+                                    Ok(output_event) => {
+                                        let result = match tag.as_str() {
+                                            "deposit" => bitcoin_events.onchain_deposit(output_event, network).await,
+                                            "withdrawal" => {
+                                                bitcoin_events.onchain_withdrawal(output_event, network).await
+                                            }
+                                            _ => {
+                                                warn!(tag, "Unsupported coin_movement tag");
+                                                Ok(())
+                                            }
+                                        };
+
+                                        if let Err(err) = result {
+                                            warn!(%err, "Failed to process onchain transaction");
+                                        }
+                                    }
+                                    Err(err) => {
+                                        warn!(%err, "Failed to parse coin_movement event");
                                     }
                                 }
-                                Err(err) => {
-                                    warn!(%err, "Failed to parse coin_movement event");
-                                }
-                            },
+                            }
                             Err(err) => {
                                 warn!(?err, "Failed to parse coin_movement event");
                             }
