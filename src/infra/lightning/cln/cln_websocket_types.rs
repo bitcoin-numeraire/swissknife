@@ -35,53 +35,14 @@ pub struct SendPayFailureData {
     pub status: String,
 }
 
-#[derive(Debug, Deserialize)]
-pub struct CoinMovement {
-    #[serde(alias = "utxo_txid")]
-    pub txid: Option<String>,
-    #[serde(alias = "output", alias = "utxo_outnum")]
-    pub output_index: Option<u32>,
-    pub address: Option<String>,
-    #[serde(alias = "type")]
-    pub movement_type: Option<String>,
-    pub primary_tag: Option<String>,
-    #[serde(alias = "amount_msat")]
-    pub amount_msat: Option<String>,
-    #[serde(alias = "credit_msat")]
-    pub credit_msat: Option<String>,
-    #[serde(alias = "debit_msat")]
-    pub debit_msat: Option<String>,
-    #[serde(alias = "fees_msat")]
-    pub fees_msat: Option<String>,
+#[derive(Debug, Deserialize, Clone)]
+pub struct ChainMovement {
+    pub primary_tag: String,
+    pub utxo: String,
+    pub output_msat: u64,
+    pub debit_msat: u64,
     pub timestamp: i64,
     pub blockheight: u32,
-    pub tag: Option<String>,
-}
-
-impl CoinMovement {
-    fn parse_msat(value: &Option<String>) -> Option<i64> {
-        value
-            .as_ref()
-            .and_then(|raw| raw.trim_end_matches("msat").parse::<i64>().ok())
-    }
-
-    fn amount_msat(&self) -> Option<i64> {
-        Self::parse_msat(&self.amount_msat)
-            .or_else(|| Self::parse_msat(&self.credit_msat))
-            .or_else(|| Self::parse_msat(&self.debit_msat))
-    }
-
-    fn fee_sat(&self) -> Option<i64> {
-        Self::parse_msat(&self.fees_msat).map(|fee| fee / 1000)
-    }
-
-    pub fn is_chain_movement(&self) -> bool {
-        matches!(self.movement_type.as_deref(), Some("chain_mvt"))
-    }
-
-    pub fn movement_tag(&self) -> Option<&str> {
-        self.primary_tag.as_deref().or(self.tag.as_deref())
-    }
 }
 
 impl From<InvoicePayment> for LnInvoicePaidEvent {
@@ -118,24 +79,26 @@ impl From<SendPayFailure> for LnPayFailureEvent {
     }
 }
 
-impl TryFrom<CoinMovement> for BitcoinOutputEvent {
-    type Error = &'static str;
+impl From<ChainMovement> for BitcoinOutputEvent {
+    fn from(val: ChainMovement) -> Self {
+        let parts = val.utxo.split(":").collect::<Vec<&str>>();
+        let txid = parts[0].to_string();
+        let output_index = parts[1].parse::<u32>().expect("invalid output index");
+        let mut fee_sat = None;
 
-    fn try_from(val: CoinMovement) -> Result<Self, Self::Error> {
-        let txid = val.txid.clone().ok_or("missing txid")?;
-        let output_index = val.output_index.ok_or("missing output index")?;
-        let amount_msat = val.amount_msat().ok_or("missing amount")?;
-        let amount_sat = amount_msat.unsigned_abs() / 1000;
+        if val.primary_tag == "withdrawal" {
+           fee_sat = Some((val.debit_msat - val.output_msat) / 1000);
+        }
 
-        Ok(BitcoinOutputEvent {
+        BitcoinOutputEvent {
             txid,
             output_index,
-            address: val.address.clone(),
-            amount_sat,
+            address: None,
+            amount_sat: val.output_msat / 1000,
             timestamp: Utc.timestamp_opt(val.timestamp, 0).unwrap(),
-            fee_sat: val.fee_sat().map(|fee| fee.unsigned_abs()),
+            fee_sat,
             block_height: val.blockheight,
             network: BitcoinNetwork::default(),
-        })
+        }
     }
 }

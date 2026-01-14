@@ -7,7 +7,7 @@ use rust_socketio::{
     Payload, TransportType,
 };
 use tokio::fs;
-use tracing::{debug, error, warn};
+use tracing::{debug, error, warn, trace};
 
 use crate::{
     application::errors::LightningError,
@@ -15,7 +15,7 @@ use crate::{
         bitcoin::{BitcoinEventsUseCases, BitcoinNetwork, BitcoinOutputEvent},
         ln_node::LnEventsUseCases,
     },
-    infra::lightning::cln::cln_websocket_types::{CoinMovement, InvoicePayment, SendPayFailure, SendPaySuccess},
+    infra::lightning::cln::cln_websocket_types::{ChainMovement, InvoicePayment, SendPayFailure, SendPaySuccess},
 };
 
 use super::ClnRestClientConfig;
@@ -109,7 +109,7 @@ fn on_message(
 ) -> BoxFuture<'static, ()> {
     async move {
         match payload {
-            Payload::Text(values) => {
+            Payload::Text(values) => {                
                 for value in values {
                     if let Some(event) = value.get("invoice_payment") {
                         match serde_json::from_value::<InvoicePayment>(event.clone()) {
@@ -173,41 +173,37 @@ fn on_message(
                     }
 
                     if let Some(event) = value.get("coin_movement") {
-                        match serde_json::from_value::<CoinMovement>(event.clone()) {
-                            Ok(coin_movement) => {
-                                if !coin_movement.is_chain_movement() {
-                                    continue;
-                                }
+                        // Only attempt to cast into CoinMovement if "type" == "chain_mvt"
+                        if let Some(movement_type) = event.get("type").and_then(|t| t.as_str()) {
+                            if movement_type != "chain_mvt" {
+                                continue;
+                            }
+                        } else {
+                            // If there's no type field, skip this event
+                            continue;
+                        }
 
-                                let Some(tag) = coin_movement.movement_tag().map(str::to_string) else {
-                                    warn!("coin_movement missing primary tag");
-                                    continue;
+                        match serde_json::from_value::<ChainMovement>(event.clone()) {
+                            Ok(chain_mvt) => {
+                                let output_event = chain_mvt.clone().into();
+                                let output_event = BitcoinOutputEvent {
+                                    network,
+                                    ..output_event
                                 };
 
-                                match coin_movement.try_into() {
-                                    Ok(output_event) => {
-                                        let output_event = BitcoinOutputEvent {
-                                            network,
-                                            ..output_event
-                                        };
-
-                                        let result = match tag.as_str() {
-                                            "deposit" => bitcoin_events.onchain_deposit(output_event).await,
-                                            "withdrawal" => bitcoin_events.onchain_withdrawal(output_event).await,
-                                            _ => {
-                                                warn!(tag, "Unsupported coin_movement tag");
-                                                Ok(())
-                                            }
-                                        };
-
-                                        if let Err(err) = result {
-                                            warn!(%err, "Failed to process onchain transaction");
-                                        }
+                                let tag = chain_mvt.primary_tag;
+                                let result = match tag.as_str() {
+                                    "deposit" => bitcoin_events.onchain_deposit(output_event).await,
+                                    "withdrawal" => bitcoin_events.onchain_withdrawal(output_event).await,
+                                    _ => {
+                                        trace!(tag, "Unsupported coin_movement tag");
+                                        Ok(())
                                     }
-                                    Err(err) => {
-                                        warn!(%err, "Failed to parse coin_movement event");
-                                    }
-                                }
+                                };
+
+                                if let Err(err) = result {
+                                    warn!(%err, "Failed to process onchain transaction");
+                                }   
                             }
                             Err(err) => {
                                 warn!(?err, "Failed to parse coin_movement event");
@@ -216,8 +212,7 @@ fn on_message(
                     }
                 }
             }
-            _ => error!(
-                ?payload,
+            _ => error!(?payload,
                 "Non supported payload type from Core Lightning websocket server"
             ),
         }

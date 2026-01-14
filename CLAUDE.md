@@ -149,6 +149,8 @@ Configured via `ln_provider` in config:
 - Repository traits should be used for data access, not direct database calls in services
 - DTOs should be used for API boundaries; domain entities for internal logic
 - New routes must be documented with utoipa annotations for OpenAPI spec
+- Logging happens in use cases (services) and nowhere else in general except in  
+  `infra` for listeners when they do not return errors and at the edges like `axum_response`.
 
 ### Security
 - Authentication middleware must be applied to protected routes
