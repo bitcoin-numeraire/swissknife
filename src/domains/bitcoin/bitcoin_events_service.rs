@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use tracing::{warn, info, trace};
+use tracing::{info, trace, warn};
 use uuid::Uuid;
 
 use crate::{

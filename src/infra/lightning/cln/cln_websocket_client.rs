@@ -7,7 +7,7 @@ use rust_socketio::{
     Payload, TransportType,
 };
 use tokio::fs;
-use tracing::{debug, error, warn, trace};
+use tracing::{debug, error, trace, warn};
 
 use crate::{
     application::errors::LightningError,
@@ -109,7 +109,7 @@ fn on_message(
 ) -> BoxFuture<'static, ()> {
     async move {
         match payload {
-            Payload::Text(values) => {                
+            Payload::Text(values) => {
                 for value in values {
                     if let Some(event) = value.get("invoice_payment") {
                         match serde_json::from_value::<InvoicePayment>(event.clone()) {
@@ -203,7 +203,7 @@ fn on_message(
 
                                 if let Err(err) = result {
                                     warn!(%err, "Failed to process onchain transaction");
-                                }   
+                                }
                             }
                             Err(err) => {
                                 warn!(?err, "Failed to parse coin_movement event");
@@ -212,7 +212,8 @@ fn on_message(
                     }
                 }
             }
-            _ => error!(?payload,
+            _ => error!(
+                ?payload,
                 "Non supported payload type from Core Lightning websocket server"
             ),
         }

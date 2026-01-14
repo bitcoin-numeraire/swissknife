@@ -24,8 +24,7 @@ impl MigrationTrait for Migration {
         db.execute_unprepared(r#"ALTER TABLE invoice DROP CONSTRAINT IF EXISTS "UNIQUE_bolt11""#)
             .await?;
 
-        db.execute_unprepared(r#"DROP INDEX IF EXISTS "UNIQUE_bolt11""#)
-            .await?;
+        db.execute_unprepared(r#"DROP INDEX IF EXISTS "UNIQUE_bolt11""#).await?;
 
         // Recreate as unique indexes without NULLS NOT DISTINCT
         // This allows multiple NULL values (needed for onchain invoices)
@@ -48,8 +47,7 @@ impl MigrationTrait for Migration {
         db.execute_unprepared(r#"DROP INDEX IF EXISTS "UNIQUE_payment_hash""#)
             .await?;
 
-        db.execute_unprepared(r#"DROP INDEX IF EXISTS "UNIQUE_bolt11""#)
-            .await?;
+        db.execute_unprepared(r#"DROP INDEX IF EXISTS "UNIQUE_bolt11""#).await?;
 
         // Recreate with NULLS NOT DISTINCT (original behavior)
         db.execute_unprepared(

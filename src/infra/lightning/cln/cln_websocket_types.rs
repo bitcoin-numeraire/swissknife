@@ -87,7 +87,7 @@ impl From<ChainMovement> for BitcoinOutputEvent {
         let mut fee_sat = None;
 
         if val.primary_tag == "withdrawal" {
-           fee_sat = Some((val.debit_msat - val.output_msat) / 1000);
+            fee_sat = Some((val.debit_msat - val.output_msat) / 1000);
         }
 
         BitcoinOutputEvent {
