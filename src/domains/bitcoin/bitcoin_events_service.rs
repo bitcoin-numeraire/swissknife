@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use tracing::{debug, trace};
+use tracing::{warn, info, trace};
 use uuid::Uuid;
 
 use crate::{
@@ -42,7 +42,7 @@ impl BitcoinEventsUseCases for BitcoinEventsService {
         trace!(%outpoint, "Processing onchain deposit event");
 
         let Some(address) = event.address.clone() else {
-            debug!(txid = %event.txid, "Output address not found, skipping");
+            warn!(txid = %event.txid, "Output address not found, skipping");
             return Ok(());
         };
 
@@ -90,7 +90,7 @@ impl BitcoinEventsUseCases for BitcoinEventsService {
 
             self.store.invoice.update(invoice.clone()).await?;
 
-            debug!(invoice_id = %invoice.id, outpoint = outpoint.clone(), address = %btc_address.address,
+            info!(invoice_id = %invoice.id, outpoint = outpoint.clone(), address = %btc_address.address,
                 "Existing onchain deposit processed");
         } else {
             let amount_msat = stored_output.amount_sat.saturating_mul(1000);
@@ -117,7 +117,7 @@ impl BitcoinEventsUseCases for BitcoinEventsService {
 
             self.store.invoice.insert(invoice.clone()).await?;
 
-            debug!(invoice_id = %invoice.id, outpoint = %outpoint.clone(), address = %btc_address.address,
+            info!(invoice_id = %invoice.id, outpoint = %outpoint.clone(), address = %btc_address.address,
                 "New onchain deposit processed");
         }
 
@@ -184,7 +184,7 @@ impl BitcoinEventsUseCases for BitcoinEventsService {
 
         self.store.payment.update(updated_payment).await?;
 
-        debug!(%outpoint, "Onchain withdrawal processed");
+        info!(%outpoint, "Onchain withdrawal processed");
         Ok(())
     }
 }
