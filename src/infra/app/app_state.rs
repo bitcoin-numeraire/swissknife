@@ -6,7 +6,10 @@ use crate::{
         entities::{AppServices, AppStore, LnNodeClient},
         errors::{ApplicationError, ConfigError},
     },
-    domains::ln_node::{LnEventsService, LnEventsUseCases},
+    domains::{
+        bitcoin::{BitcoinEventsService, BitcoinEventsUseCases},
+        ln_node::{LnEventsService, LnEventsUseCases},
+    },
     infra::{
         database::sea_orm::SeaORMClient,
         jwt::{local::LocalAuthenticator, oauth2::OAuth2Authenticator, JWTAuthenticator},
@@ -39,17 +42,26 @@ impl AppState {
 
         // Adapters
         let store = AppStore::new_sea_orm(db_conn);
-        let ln_events = LnEventsService::new(store.clone());
-        let ln_node_client = get_ln_client(config.clone(), Arc::new(ln_events)).await?;
+        let ln_events = Arc::new(LnEventsService::new(store.clone()));
+        let bitcoin_events = Arc::new(BitcoinEventsService::new(store.clone()));
+        let ln_node_client = get_ln_client(config.clone(), ln_events, bitcoin_events.clone()).await?;
         let ln_client = match ln_node_client.clone() {
             LnNodeClient::Breez(client) => client as Arc<dyn LnClient>,
             LnNodeClient::ClnGrpc(client) => client as Arc<dyn LnClient>,
             LnNodeClient::ClnRest(client) => client as Arc<dyn LnClient>,
             LnNodeClient::Lnd(client) => client as Arc<dyn LnClient>,
         };
+        let bitcoin_wallet = ln_client.clone();
 
         // Services
-        let services = AppServices::new(config, store, ln_client.clone(), ln_client.clone(), jwt_authenticator);
+        let services = AppServices::new(
+            config,
+            store,
+            ln_client.clone(),
+            bitcoin_wallet,
+            bitcoin_events,
+            jwt_authenticator,
+        );
 
         Ok(Self {
             services,
@@ -63,6 +75,7 @@ impl AppState {
 async fn get_ln_client(
     config: AppConfig,
     ln_events: Arc<dyn LnEventsUseCases>,
+    bitcoin_events: Arc<dyn BitcoinEventsUseCases>,
 ) -> Result<LnNodeClient, ApplicationError> {
     match config.ln_provider {
         LightningProvider::Breez => {
@@ -97,7 +110,7 @@ async fn get_ln_client(
 
             debug!(config = ?cln_config, "Lightning provider: Core Lightning REST");
 
-            let client = ClnRestClient::new(cln_config.clone(), ln_events).await?;
+            let client = ClnRestClient::new(cln_config.clone(), ln_events, bitcoin_events).await?;
 
             Ok(LnNodeClient::ClnRest(Arc::new(client)))
         }
@@ -109,7 +122,7 @@ async fn get_ln_client(
 
             debug!(config = ?lnd_config, "Lightning provider: LND");
 
-            let client = LndRestClient::new(lnd_config.clone(), ln_events).await?;
+            let client = LndRestClient::new(lnd_config.clone(), ln_events, bitcoin_events).await?;
 
             Ok(LnNodeClient::Lnd(Arc::new(client)))
         }

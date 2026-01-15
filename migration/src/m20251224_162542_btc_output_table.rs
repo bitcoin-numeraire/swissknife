@@ -14,10 +14,12 @@ impl MigrationTrait for Migration {
                     .col(uuid(BtcOutput::Id).primary_key())
                     .col(string_len(BtcOutput::Outpoint, 255).unique_key())
                     .col(string_len(BtcOutput::Txid, 255))
-                    .col(integer(BtcOutput::OutputIndex))
+                    .col(unsigned(BtcOutput::OutputIndex))
+                    .col(string_len(BtcOutput::Address, 255))
                     .col(big_integer(BtcOutput::AmountSat))
                     .col(string(BtcOutput::Status))
-                    .col(timestamp_null(BtcOutput::Timestamp))
+                    .col(timestamp(BtcOutput::Timestamp))
+                    .col(unsigned_null(BtcOutput::BlockHeight))
                     .col(string_len(BtcOutput::Network, 255))
                     .col(timestamp(BtcOutput::CreatedAt).default(Expr::current_timestamp()))
                     .col(timestamp_null(BtcOutput::UpdatedAt))
@@ -65,9 +67,11 @@ pub(crate) enum BtcOutput {
     Outpoint,
     Txid,
     OutputIndex,
+    Address,
     AmountSat,
     Status,
     Timestamp,
+    BlockHeight,
     Network,
     CreatedAt,
     UpdatedAt,

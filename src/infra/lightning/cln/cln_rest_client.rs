@@ -1,7 +1,6 @@
 use std::{path::PathBuf, str::FromStr, sync::Arc, time::Duration};
 
 use breez_sdk_core::ReverseSwapInfo;
-use chrono::Utc;
 use lightning_invoice::Bolt11Invoice;
 use reqwest::{
     header::{HeaderMap, HeaderValue},
@@ -20,7 +19,9 @@ use crate::{
         errors::{BitcoinError, LightningError},
     },
     domains::{
-        bitcoin::{BitcoinAddressType, BitcoinBalance, BitcoinNetwork, BitcoinOutput, BitcoinOutputStatus},
+        bitcoin::{
+            BitcoinAddressType, BitcoinEventsUseCases, BitcoinNetwork, BitcoinTransaction, BitcoinTransactionOutput,
+        },
         invoice::Invoice,
         ln_node::LnEventsUseCases,
         payment::Payment,
@@ -34,8 +35,8 @@ use crate::{
 
 use super::{
     cln_websocket_client::connect_websocket, ErrorResponse, GetinfoRequest, GetinfoResponse, InvoiceRequest,
-    InvoiceResponse, ListFundsRequest, ListFundsResponse, ListInvoicesRequest, ListInvoicesResponse, NewAddrRequest,
-    NewAddrResponse, PayRequest, PayResponse, WithdrawRequest, WithdrawResponse,
+    InvoiceResponse, ListInvoicesRequest, ListInvoicesResponse, ListTransactionsRequest, ListTransactionsResponse,
+    NewAddrRequest, NewAddrResponse, PayRequest, PayResponse, WithdrawRequest, WithdrawResponse,
 };
 
 #[derive(Clone, Debug, Deserialize)]
@@ -66,7 +67,8 @@ pub struct ClnRestClient {
     maxfeepercent: Option<f64>,
     retry_for: Option<u32>,
     payment_exemptfee: Option<u64>,
-    ws_client: WsClient,
+    ws_client: Option<WsClient>,
+    network: BitcoinNetwork,
 }
 
 const USER_AGENT: &str = "Numeraire Swissknife/1.0";
@@ -75,6 +77,7 @@ impl ClnRestClient {
     pub async fn new(
         config: ClnRestClientConfig,
         ln_events: Arc<dyn LnEventsUseCases>,
+        bitcoin_events: Arc<dyn BitcoinEventsUseCases>,
     ) -> Result<Self, LightningError> {
         let mut headers = HeaderMap::new();
         let mut rune_header =
@@ -103,16 +106,23 @@ impl ClnRestClient {
             .build()
             .map_err(|e| LightningError::ParseConfig(e.to_string()))?;
 
-        let ws_client = connect_websocket(&config, ln_events).await?;
-
-        Ok(Self {
+        let mut cln_client = Self {
             client,
-            base_url: config.endpoint,
+            base_url: config.endpoint.clone(),
             maxfeepercent: config.maxfeepercent,
             retry_for: Some(config.payment_timeout.as_secs() as u32),
             payment_exemptfee: config.payment_exemptfee,
-            ws_client,
-        })
+            network: BitcoinNetwork::default(),
+            ws_client: None,
+        };
+
+        let network = cln_client.network().await?;
+        cln_client.network = network;
+
+        let ws_client = connect_websocket(config, ln_events, bitcoin_events, network).await?;
+        cln_client.ws_client = Some(ws_client);
+
+        Ok(cln_client)
     }
 
     async fn read_ca(path: &str) -> anyhow::Result<Certificate> {
@@ -144,6 +154,15 @@ impl ClnRestClient {
         Ok(result)
     }
 
+    async fn network(&self) -> Result<BitcoinNetwork, LightningError> {
+        let response: GetinfoResponse = self
+            .post_request("getinfo", &GetinfoRequest {})
+            .await
+            .map_err(|e| LightningError::NodeInfo(e.to_string()))?;
+
+        Ok(parse_network(&response.network))
+    }
+
     fn parse_amount_msat(value: &str) -> anyhow::Result<u64> {
         let cleaned = value.trim_end_matches("msat");
         Ok(cleaned.parse::<u64>()?)
@@ -156,22 +175,14 @@ impl ClnRestClient {
             _ => None,
         }
     }
-
-    fn parse_status(status: &str) -> BitcoinOutputStatus {
-        match status.to_lowercase().as_str() {
-            "confirmed" => BitcoinOutputStatus::Confirmed,
-            "unconfirmed" => BitcoinOutputStatus::Unconfirmed,
-            "spent" => BitcoinOutputStatus::Spent,
-            "immature" => BitcoinOutputStatus::Immature,
-            _ => BitcoinOutputStatus::Unconfirmed,
-        }
-    }
 }
 
 #[async_trait]
 impl LnClient for ClnRestClient {
     async fn disconnect(&self) -> Result<(), LightningError> {
         self.ws_client
+            .as_ref()
+            .unwrap()
             .disconnect()
             .await
             .map_err(|e| LightningError::Disconnect(e.to_string()))
@@ -278,32 +289,6 @@ impl BitcoinWallet for ClnRestClient {
             .ok_or_else(|| BitcoinError::Address("No address returned by CLN".to_string()))
     }
 
-    async fn balance(&self) -> Result<BitcoinBalance, BitcoinError> {
-        let list_funds: ListFundsResponse = self
-            .post_request("listfunds", &ListFundsRequest { spent: Some(false) })
-            .await
-            .map_err(|e| BitcoinError::Balance(e.to_string()))?;
-
-        let mut confirmed_sat = 0;
-        let mut unconfirmed_sat = 0;
-
-        for output in list_funds.outputs {
-            let amount_msat =
-                Self::parse_amount_msat(&output.amount_msat).map_err(|e| BitcoinError::Balance(e.to_string()))?;
-            let amount_sat = amount_msat / 1000;
-
-            match output.status.to_lowercase().as_str() {
-                "confirmed" => confirmed_sat += amount_sat,
-                _ => unconfirmed_sat += amount_sat,
-            }
-        }
-
-        Ok(BitcoinBalance {
-            confirmed_sat,
-            unconfirmed_sat,
-        })
-    }
-
     async fn send(&self, address: String, amount_sat: u64, fee_rate: Option<u32>) -> Result<String, BitcoinError> {
         let response: WithdrawResponse = self
             .post_request(
@@ -320,44 +305,39 @@ impl BitcoinWallet for ClnRestClient {
         Ok(response.txid)
     }
 
-    async fn list_outputs(&self) -> Result<Vec<BitcoinOutput>, BitcoinError> {
-        let network = self.network().await?;
-        let list_funds: ListFundsResponse = self
-            .post_request("listfunds", &ListFundsRequest { spent: Some(false) })
+    async fn get_transaction(&self, txid: &str) -> Result<BitcoinTransaction, BitcoinError> {
+        let response: ListTransactionsResponse = self
+            .post_request("listtransactions", &ListTransactionsRequest {})
             .await
-            .map_err(|e| BitcoinError::Outputs(e.to_string()))?;
+            .map_err(|e| BitcoinError::Transaction(e.to_string()))?;
 
-        let outputs = list_funds
+        let transaction = response
+            .transactions
+            .into_iter()
+            .find(|transaction| transaction.hash == txid)
+            .ok_or_else(|| BitcoinError::Transaction(format!("Transaction {txid} not found")))?;
+
+        let outputs = transaction
             .outputs
             .into_iter()
-            .map(|output| {
-                let amount_msat = Self::parse_amount_msat(&output.amount_msat).unwrap_or_default();
-
-                BitcoinOutput {
-                    id: Uuid::new_v4(),
-                    outpoint: format!("{}:{}", output.txid, output.output),
-                    txid: output.txid.clone(),
-                    output_index: output.output,
-                    address: output.address,
-                    amount_sat: (amount_msat / 1000) as i64,
-                    status: Self::parse_status(&output.status),
-                    timestamp: None,
-                    network,
-                    created_at: Utc::now(),
-                    updated_at: None,
-                }
+            .map(|output| BitcoinTransactionOutput {
+                output_index: output.index,
+                address: None,
+                amount_sat: Self::parse_amount_msat(&output.amount_msat).unwrap_or_default() / 1000,
+                is_ours: false,
             })
             .collect();
 
-        Ok(outputs)
+        Ok(BitcoinTransaction {
+            txid: transaction.hash,
+            timestamp: None,
+            fee_sat: None,
+            block_height: transaction.blockheight,
+            outputs,
+        })
     }
 
-    async fn network(&self) -> Result<BitcoinNetwork, BitcoinError> {
-        let response: GetinfoResponse = self
-            .post_request("getinfo", &GetinfoRequest {})
-            .await
-            .map_err(|e| BitcoinError::Network(e.to_string()))?;
-
-        Ok(parse_network(&response.network))
+    fn network(&self) -> BitcoinNetwork {
+        self.network
     }
 }

@@ -10,7 +10,7 @@ use jsonwebtoken::{
     jwk::{AlgorithmParameters, JwkSet},
     Algorithm, DecodingKey, Validation,
 };
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use tokio::sync::RwLock;
 use tokio::time::sleep;
 use tracing::{error, trace};
@@ -26,17 +26,6 @@ pub struct OAuth2Config {
     #[serde(deserialize_with = "deserialize_duration")]
     leeway: Duration,
 }
-
-#[derive(Debug, Serialize, Deserialize)]
-struct Claims {
-    aud: Vec<String>, // Optional. Audience
-    exp: usize,       // Required (validate_exp defaults to true in validation). Expiration time (as UTC timestamp)
-    iat: usize,       // Optional. Issued at (as UTC timestamp)
-    iss: String,      // Optional. Issuer
-    sub: String,      // Optional. Subject (whom token refers to)
-    permissions: Vec<Permission>,
-}
-
 #[derive(Clone, Debug)]
 pub struct OAuth2Authenticator {
     jwks: Arc<RwLock<JwkSet>>,

@@ -13,6 +13,7 @@ mod m20251224_162538_btc_address_table;
 mod m20251224_162542_btc_output_table;
 mod m20251224_162546_btc_fields_to_invoice;
 mod m20251224_162550_btc_fields_to_payment;
+mod m20260113_222755_fix_invoice_payment_hash_unique;
 
 pub struct Migrator;
 
@@ -33,6 +34,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20251224_162542_btc_output_table::Migration),
             Box::new(m20251224_162546_btc_fields_to_invoice::Migration),
             Box::new(m20251224_162550_btc_fields_to_payment::Migration),
+            Box::new(m20260113_222755_fix_invoice_payment_hash_unique::Migration),
         ]
     }
 }

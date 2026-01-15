@@ -7,19 +7,24 @@ use rust_socketio::{
     Payload, TransportType,
 };
 use tokio::fs;
-use tracing::{debug, error, warn};
+use tracing::{debug, error, trace, warn};
 
 use crate::{
     application::errors::LightningError,
-    domains::ln_node::LnEventsUseCases,
-    infra::lightning::cln::cln_websocket_types::{InvoicePayment, SendPayFailure, SendPaySuccess},
+    domains::{
+        bitcoin::{BitcoinEventsUseCases, BitcoinNetwork, BitcoinOutputEvent},
+        ln_node::LnEventsUseCases,
+    },
+    infra::lightning::cln::cln_websocket_types::{ChainMovement, InvoicePayment, SendPayFailure, SendPaySuccess},
 };
 
 use super::ClnRestClientConfig;
 
 pub async fn connect_websocket(
-    config: &ClnRestClientConfig,
+    config: ClnRestClientConfig,
     ln_events: Arc<dyn LnEventsUseCases>,
+    bitcoin_events: Arc<dyn BitcoinEventsUseCases>,
+    network: BitcoinNetwork,
 ) -> Result<Client, LightningError> {
     let mut client_builder = ClientBuilder::new(config.endpoint.clone())
         .transport_type(TransportType::Websocket)
@@ -33,7 +38,9 @@ pub async fn connect_websocket(
         .on("close", on_close)
         .on("error", on_error)
         .on("message", {
-            move |payload, socket: Client| on_message(ln_events.clone(), payload, socket)
+            move |payload, socket: Client| {
+                on_message(ln_events.clone(), bitcoin_events.clone(), network, payload, socket)
+            }
         });
 
     if let Some(ca_cert_path) = &config.ca_cert_path {
@@ -93,7 +100,13 @@ fn on_error(err: Payload, _: Client) -> BoxFuture<'static, ()> {
     .boxed()
 }
 
-fn on_message(ln_events: Arc<dyn LnEventsUseCases>, payload: Payload, _: Client) -> BoxFuture<'static, ()> {
+fn on_message(
+    ln_events: Arc<dyn LnEventsUseCases>,
+    bitcoin_events: Arc<dyn BitcoinEventsUseCases>,
+    network: BitcoinNetwork,
+    payload: Payload,
+    _: Client,
+) -> BoxFuture<'static, ()> {
     async move {
         match payload {
             Payload::Text(values) => {
@@ -155,6 +168,45 @@ fn on_message(ln_events: Arc<dyn LnEventsUseCases>, payload: Payload, _: Client)
                             }
                             Err(err) => {
                                 error!(?err, "Failed to parse sendpay_failure event");
+                            }
+                        }
+                    }
+
+                    if let Some(event) = value.get("coin_movement") {
+                        // Only attempt to cast into CoinMovement if "type" == "chain_mvt"
+                        if let Some(movement_type) = event.get("type").and_then(|t| t.as_str()) {
+                            if movement_type != "chain_mvt" {
+                                continue;
+                            }
+                        } else {
+                            // If there's no type field, skip this event
+                            continue;
+                        }
+
+                        match serde_json::from_value::<ChainMovement>(event.clone()) {
+                            Ok(chain_mvt) => {
+                                let output_event = chain_mvt.clone().into();
+                                let output_event = BitcoinOutputEvent {
+                                    network,
+                                    ..output_event
+                                };
+
+                                let tag = chain_mvt.primary_tag;
+                                let result = match tag.as_str() {
+                                    "deposit" => bitcoin_events.onchain_deposit(output_event).await,
+                                    "withdrawal" => bitcoin_events.onchain_withdrawal(output_event).await,
+                                    _ => {
+                                        trace!(tag, "Unsupported coin_movement tag");
+                                        Ok(())
+                                    }
+                                };
+
+                                if let Err(err) = result {
+                                    warn!(%err, "Failed to process onchain transaction");
+                                }
+                            }
+                            Err(err) => {
+                                warn!(?err, "Failed to parse coin_movement event");
                             }
                         }
                     }

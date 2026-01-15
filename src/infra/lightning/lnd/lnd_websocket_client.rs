@@ -11,8 +11,12 @@ use tokio_tungstenite::tungstenite::ClientRequestBuilder;
 use tokio_tungstenite::{connect_async_tls_with_config, Connector, MaybeTlsStream, WebSocketStream};
 use tracing::{debug, error, warn};
 
-use crate::infra::lightning::lnd::lnd_types::InvoiceResponse;
-use crate::{application::errors::LightningError, domains::ln_node::LnEventsUseCases};
+use crate::domains::bitcoin::{BitcoinNetwork, BitcoinTransaction};
+use crate::infra::lightning::lnd::lnd_types::{InvoiceResponse, TransactionResponse};
+use crate::{
+    application::errors::LightningError,
+    domains::{bitcoin::BitcoinEventsUseCases, ln_node::LnEventsUseCases},
+};
 
 use super::LndRestClientConfig;
 
@@ -26,6 +30,36 @@ pub async fn listen_invoices(
 
     loop {
         let result = connect_and_handle(&macaroon, &config, ln_events.clone()).await;
+
+        if let Err(err) = result {
+            match err {
+                LightningError::ParseConfig(msg)
+                | LightningError::ConnectWebsocket(msg)
+                | LightningError::TLSConfig(msg)
+                | LightningError::ReadCertificates(msg) => {
+                    return Err(LightningError::Listener(msg));
+                }
+                _ => {
+                    error!(%err, "WebSocket connection error");
+                    sleep(reconnect_delay).await;
+                    reconnect_delay = min(reconnect_delay * 2, max_reconnect_delay);
+                }
+            }
+        }
+    }
+}
+
+pub async fn listen_transactions(
+    config: LndRestClientConfig,
+    macaroon: String,
+    bitcoin_events: Arc<dyn BitcoinEventsUseCases>,
+    network: BitcoinNetwork,
+) -> Result<(), LightningError> {
+    let max_reconnect_delay = config.ws_max_reconnect_delay;
+    let mut reconnect_delay = config.ws_min_reconnect_delay;
+
+    loop {
+        let result = connect_and_handle_transactions(&macaroon, &config, bitcoin_events.clone(), network).await;
 
         if let Err(err) = result {
             match err {
@@ -65,6 +99,31 @@ async fn connect_and_handle(
     handle_messages(ws_stream, ln_events).await;
 
     debug!("Disconnected from LND WebSocket server");
+
+    Ok(())
+}
+
+async fn connect_and_handle_transactions(
+    macaroon: &str,
+    config: &LndRestClientConfig,
+    bitcoin_events: Arc<dyn BitcoinEventsUseCases>,
+    network: BitcoinNetwork,
+) -> Result<(), LightningError> {
+    let endpoint = format!("wss://{}/v1/transactions/subscribe", config.host);
+    let uri = Uri::from_str(&endpoint).map_err(|e| LightningError::ParseConfig(e.to_string()))?;
+    let builder = ClientRequestBuilder::new(uri).with_header("Grpc-Metadata-Macaroon", macaroon);
+
+    let tls_connector = create_tls_connector(config).await?;
+
+    let (ws_stream, _) = connect_async_tls_with_config(builder, None, false, tls_connector)
+        .await
+        .map_err(|e| LightningError::ConnectWebsocket(e.to_string()))?;
+
+    debug!("Connected to LND WebSocket transaction server");
+
+    handle_transaction_messages(ws_stream, bitcoin_events, network).await;
+
+    debug!("Disconnected from LND WebSocket transaction server");
 
     Ok(())
 }
@@ -122,6 +181,32 @@ async fn handle_messages(
     }
 }
 
+async fn handle_transaction_messages(
+    mut ws_stream: WebSocketStream<MaybeTlsStream<TcpStream>>,
+    bitcoin_events: Arc<dyn BitcoinEventsUseCases>,
+    network: BitcoinNetwork,
+) {
+    while let Some(message) = ws_stream.next().await {
+        match message {
+            Ok(msg) => {
+                if msg.is_text() {
+                    let text = msg.into_text().unwrap();
+                    if let Err(e) = process_transaction_message(&text, bitcoin_events.clone(), network).await {
+                        error!(%e, "Failed to process transaction message");
+                    }
+                } else if msg.is_close() {
+                    debug!("WebSocket closed");
+                    break;
+                }
+            }
+            Err(err) => {
+                error!(%err, "Error receiving message");
+                break;
+            }
+        }
+    }
+}
+
 async fn process_message(text: &str, ln_events: Arc<dyn LnEventsUseCases>) -> anyhow::Result<()> {
     let value: Value = serde_json::from_str(text)?;
 
@@ -136,6 +221,40 @@ async fn process_message(text: &str, ln_events: Arc<dyn LnEventsUseCases>) -> an
             }
             Err(err) => {
                 error!(%err, "Failed to parse SubscribeInvoices event");
+            }
+        }
+    }
+
+    Ok(())
+}
+
+async fn process_transaction_message(
+    text: &str,
+    bitcoin_events: Arc<dyn BitcoinEventsUseCases>,
+    network: BitcoinNetwork,
+) -> anyhow::Result<()> {
+    let value: Value = serde_json::from_str(text)?;
+
+    if let Some(event) = value.get("result") {
+        match serde_json::from_value::<TransactionResponse>(event.clone()) {
+            Ok(transaction) => {
+                let transaction: BitcoinTransaction = transaction.into();
+
+                for output in transaction.outputs.iter() {
+                    let output_event = transaction.output_event(output, network);
+                    let result = if output.is_ours {
+                        bitcoin_events.onchain_deposit(output_event).await
+                    } else {
+                        bitcoin_events.onchain_withdrawal(output_event).await
+                    };
+
+                    if let Err(err) = result {
+                        error!(%err, "Failed to process onchain transaction");
+                    }
+                }
+            }
+            Err(err) => {
+                error!(%err, "Failed to parse SubscribeTransactions event");
             }
         }
     }

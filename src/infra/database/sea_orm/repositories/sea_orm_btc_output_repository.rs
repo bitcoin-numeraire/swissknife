@@ -47,9 +47,11 @@ impl BitcoinOutputRepository for SeaOrmBitcoinOutputRepository {
                 id: Unchanged(existing.id),
                 txid: Set(output.txid.clone()),
                 output_index: Set(output.output_index as i32),
-                amount_sat: Set(output.amount_sat),
+                address: Set(output.address.clone()),
+                amount_sat: Set(output.amount_sat as i64),
                 status: Set(output.status.to_string()),
-                timestamp: Set(output.timestamp.map(|t| t.naive_utc())),
+                timestamp: Set(output.timestamp.naive_utc()),
+                block_height: Set(output.block_height.map(|h| h as i32)),
                 network: Set(output.network.to_string()),
                 updated_at: Set(Some(Utc::now().naive_utc())),
                 ..Default::default()
@@ -68,9 +70,11 @@ impl BitcoinOutputRepository for SeaOrmBitcoinOutputRepository {
             outpoint: Set(output.outpoint.clone()),
             txid: Set(output.txid.clone()),
             output_index: Set(output.output_index as i32),
-            amount_sat: Set(output.amount_sat),
+            address: Set(output.address.clone()),
+            amount_sat: Set(output.amount_sat as i64),
             status: Set(output.status.to_string()),
-            timestamp: Set(output.timestamp.map(|t| t.naive_utc())),
+            timestamp: Set(output.timestamp.naive_utc()),
+            block_height: Set(output.block_height.map(|h| h as i32)),
             network: Set(output.network.to_string()),
             ..Default::default()
         };

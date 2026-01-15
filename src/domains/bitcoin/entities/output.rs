@@ -6,16 +6,17 @@ use uuid::Uuid;
 
 use crate::domains::{bitcoin::BitcoinNetwork, invoice::InvoiceStatus};
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct BitcoinOutput {
     pub id: Uuid,
     pub outpoint: String,
     pub txid: String,
     pub output_index: u32,
-    pub address: Option<String>,
-    pub amount_sat: i64,
+    pub address: String,
+    pub amount_sat: u64,
     pub status: BitcoinOutputStatus,
-    pub timestamp: Option<DateTime<Utc>>,
+    pub timestamp: DateTime<Utc>,
+    pub block_height: Option<u32>,
     pub network: BitcoinNetwork,
     pub created_at: DateTime<Utc>,
     pub updated_at: Option<DateTime<Utc>>,

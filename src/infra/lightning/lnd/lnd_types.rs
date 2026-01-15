@@ -2,6 +2,8 @@ use base64::{prelude::BASE64_STANDARD, Engine};
 use chrono::{TimeZone, Utc};
 use lightning_invoice::Bolt11Invoice;
 use serde::{Deserialize, Serialize};
+
+use crate::domains::bitcoin::{BitcoinTransaction, BitcoinTransactionOutput};
 use serde_with::{serde_as, DisplayFromStr};
 use std::str::FromStr;
 
@@ -146,12 +148,6 @@ pub struct ErrorResponse {
     pub message: String,
 }
 
-#[derive(Debug, Deserialize)]
-pub struct WalletBalanceResponse {
-    pub confirmed_balance: Option<String>,
-    pub unconfirmed_balance: Option<String>,
-}
-
 #[derive(Debug, Serialize)]
 pub struct SendCoinsRequest {
     pub addr: String,
@@ -170,48 +166,48 @@ pub struct NewAddressResponse {
     pub address: String,
 }
 
+#[serde_as]
 #[derive(Debug, Deserialize)]
-pub struct ListTransactionsResponse {
-    pub transactions: Option<Vec<Transaction>>,
+pub struct TransactionResponse {
+    pub tx_hash: String,
+    pub block_height: u32,
+    #[serde_as(as = "DisplayFromStr")]
+    pub time_stamp: i64,
+    #[serde_as(as = "DisplayFromStr")]
+    pub total_fees: u64,
+    pub output_details: Vec<OutputDetailResponse>,
 }
 
+#[serde_as]
 #[derive(Debug, Deserialize)]
-pub struct Transaction {
-    pub tx_hash: Option<String>,
-    pub amount: Option<String>,
-    pub num_confirmations: Option<i64>,
-    pub block_height: Option<i64>,
-    pub time_stamp: Option<String>,
-    pub total_fees: Option<String>,
-    pub dest_addresses: Option<Vec<String>>,
-    pub output_details: Option<Vec<OutputDetail>>,
+pub struct OutputDetailResponse {
+    #[serde_as(as = "DisplayFromStr")]
+    pub output_index: u32,
+    #[serde_as(as = "DisplayFromStr")]
+    pub amount: u64,
+    pub address: String,
+    pub is_our_address: bool,
 }
 
-#[derive(Debug, Deserialize)]
-pub struct OutputDetail {
-    pub output_index: Option<i64>,
-    pub amount: Option<String>,
-    pub address: Option<String>,
-    pub is_ours: Option<bool>,
-}
+impl From<TransactionResponse> for BitcoinTransaction {
+    fn from(val: TransactionResponse) -> Self {
+        let outputs = val
+            .output_details
+            .into_iter()
+            .map(|detail| BitcoinTransactionOutput {
+                output_index: detail.output_index,
+                address: Some(detail.address),
+                amount_sat: detail.amount,
+                is_ours: detail.is_our_address,
+            })
+            .collect();
 
-#[derive(Debug, Deserialize)]
-pub struct ListUnspentResponse {
-    pub utxos: Option<Vec<Utxo>>,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct Utxo {
-    pub address_type: Option<String>,
-    pub address: Option<String>,
-    pub amount_sat: Option<String>,
-    pub pk_script: Option<String>,
-    pub outpoint: Option<UtxoOutpoint>,
-    pub confirmations: Option<i64>,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct UtxoOutpoint {
-    pub txid_str: Option<String>,
-    pub output_index: Option<i64>,
+        BitcoinTransaction {
+            txid: val.tx_hash,
+            timestamp: Some(Utc.timestamp_opt(val.time_stamp, 0).unwrap()),
+            fee_sat: Some(val.total_fees),
+            block_height: val.block_height,
+            outputs,
+        }
+    }
 }
