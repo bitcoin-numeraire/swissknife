@@ -3,21 +3,21 @@ use std::sync::Arc;
 use crate::{
     application::{
         dtos::{AppConfig, AuthProvider, LightningProvider},
-        entities::{AppServices, AppStore, LnNodeClient},
+        entities::{AppServices, AppStore, BitcoinWallet, LnNodeClient},
         errors::{ApplicationError, ConfigError},
     },
     domains::{
-        bitcoin::{BitcoinEventsService, BitcoinEventsUseCases},
+        bitcoin::BitcoinEventsService,
         ln_node::{LnEventsService, LnEventsUseCases},
     },
     infra::{
         database::sea_orm::SeaORMClient,
         jwt::{local::LocalAuthenticator, oauth2::OAuth2Authenticator, JWTAuthenticator},
         lightning::{
-            breez::BreezClient,
-            cln::{ClnGrpcClient, ClnRestClient},
-            lnd::LndRestClient,
-            LnClient,
+            breez::{BreezClient, BreezListener},
+            cln::{ClnGrpcClient, ClnGrpcListener, ClnRestClient, ClnRestListener},
+            lnd::{LndRestClient, LndWebsocketListener},
+            LnClient, LnNodeListener,
         },
     },
 };
@@ -28,6 +28,8 @@ pub struct AppState {
     pub services: AppServices,
     pub ln_client: Arc<dyn LnClient>,
     pub ln_node_client: LnNodeClient,
+    #[allow(dead_code)]
+    pub ln_listener: Option<Arc<dyn LnNodeListener>>,
     pub timeout_layer: TimeoutLayer,
 }
 
@@ -44,14 +46,26 @@ impl AppState {
         let store = AppStore::new_sea_orm(db_conn);
         let ln_events = Arc::new(LnEventsService::new(store.clone()));
         let bitcoin_events = Arc::new(BitcoinEventsService::new(store.clone()));
-        let ln_node_client = get_ln_client(config.clone(), ln_events, bitcoin_events.clone()).await?;
+        let lightning = get_ln_client(config.clone(), ln_events.clone()).await?;
+        let ln_node_client = lightning.ln_node_client;
         let ln_client = match ln_node_client.clone() {
             LnNodeClient::Breez(client) => client as Arc<dyn LnClient>,
             LnNodeClient::ClnGrpc(client) => client as Arc<dyn LnClient>,
             LnNodeClient::ClnRest(client) => client as Arc<dyn LnClient>,
             LnNodeClient::Lnd(client) => client as Arc<dyn LnClient>,
         };
-        let bitcoin_wallet = ln_client.clone();
+        let bitcoin_wallet = lightning.bitcoin_wallet;
+
+        if let Some(listener) = lightning.ln_listener.clone() {
+            let ln_events = ln_events.clone();
+            let bitcoin_events = bitcoin_events.clone();
+            let bitcoin_wallet = bitcoin_wallet.clone();
+            tokio::spawn(async move {
+                if let Err(err) = listener.listen(ln_events, bitcoin_events, bitcoin_wallet).await {
+                    tracing::error!(%err, "Lightning listener failed");
+                }
+            });
+        }
 
         // Services
         let services = AppServices::new(
@@ -67,16 +81,22 @@ impl AppState {
             services,
             ln_client,
             ln_node_client,
+            ln_listener: lightning.ln_listener,
             timeout_layer,
         })
     }
 }
 
+struct LightningAdapter {
+    ln_node_client: LnNodeClient,
+    ln_listener: Option<Arc<dyn LnNodeListener>>,
+    bitcoin_wallet: Arc<dyn BitcoinWallet>,
+}
+
 async fn get_ln_client(
     config: AppConfig,
     ln_events: Arc<dyn LnEventsUseCases>,
-    bitcoin_events: Arc<dyn BitcoinEventsUseCases>,
-) -> Result<LnNodeClient, ApplicationError> {
+) -> Result<LightningAdapter, ApplicationError> {
     match config.ln_provider {
         LightningProvider::Breez => {
             let breez_config = config
@@ -86,9 +106,15 @@ async fn get_ln_client(
 
             debug!(config = ?breez_config,"Lightning provider: Breez");
 
-            let client = BreezClient::new(breez_config.clone(), ln_events).await?;
+            let listener = BreezListener::new(ln_events);
+            let client = Arc::new(BreezClient::new(breez_config.clone(), Box::new(listener)).await?);
+            let bitcoin_wallet = client.clone() as Arc<dyn BitcoinWallet>;
 
-            Ok(LnNodeClient::Breez(Arc::new(client)))
+            Ok(LightningAdapter {
+                ln_node_client: LnNodeClient::Breez(client),
+                ln_listener: None,
+                bitcoin_wallet,
+            })
         }
         LightningProvider::ClnGrpc => {
             let cln_config = config
@@ -98,9 +124,15 @@ async fn get_ln_client(
 
             debug!(config = ?cln_config, "Lightning provider: Core Lightning gRPC");
 
-            let client = ClnGrpcClient::new(cln_config.clone(), ln_events).await?;
+            let client = Arc::new(ClnGrpcClient::new(cln_config.clone()).await?);
+            let listener: Arc<dyn LnNodeListener> = Arc::new(ClnGrpcListener::new(cln_config));
+            let bitcoin_wallet = client.clone() as Arc<dyn BitcoinWallet>;
 
-            Ok(LnNodeClient::ClnGrpc(Arc::new(client)))
+            Ok(LightningAdapter {
+                ln_node_client: LnNodeClient::ClnGrpc(client),
+                ln_listener: Some(listener),
+                bitcoin_wallet,
+            })
         }
         LightningProvider::ClnRest => {
             let cln_config = config
@@ -110,9 +142,15 @@ async fn get_ln_client(
 
             debug!(config = ?cln_config, "Lightning provider: Core Lightning REST");
 
-            let client = ClnRestClient::new(cln_config.clone(), ln_events, bitcoin_events).await?;
+            let client = Arc::new(ClnRestClient::new(cln_config.clone()).await?);
+            let listener: Arc<dyn LnNodeListener> = Arc::new(ClnRestListener::new(cln_config));
+            let bitcoin_wallet = client.clone() as Arc<dyn BitcoinWallet>;
 
-            Ok(LnNodeClient::ClnRest(Arc::new(client)))
+            Ok(LightningAdapter {
+                ln_node_client: LnNodeClient::ClnRest(client),
+                ln_listener: Some(listener),
+                bitcoin_wallet,
+            })
         }
         LightningProvider::Lnd => {
             let lnd_config = config
@@ -122,9 +160,15 @@ async fn get_ln_client(
 
             debug!(config = ?lnd_config, "Lightning provider: LND");
 
-            let client = LndRestClient::new(lnd_config.clone(), ln_events, bitcoin_events).await?;
+            let client = Arc::new(LndRestClient::new(lnd_config.clone()).await?);
+            let listener: Arc<dyn LnNodeListener> = Arc::new(LndWebsocketListener::new(lnd_config).await?);
+            let bitcoin_wallet = client.clone() as Arc<dyn BitcoinWallet>;
 
-            Ok(LnNodeClient::Lnd(Arc::new(client)))
+            Ok(LightningAdapter {
+                ln_node_client: LnNodeClient::Lnd(client),
+                ln_listener: Some(listener),
+                bitcoin_wallet,
+            })
         }
     }
 }

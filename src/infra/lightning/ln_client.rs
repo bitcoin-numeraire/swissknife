@@ -2,12 +2,12 @@ use async_trait::async_trait;
 use breez_sdk_core::ReverseSwapInfo;
 
 use crate::{
-    application::{entities::BitcoinWallet, errors::LightningError},
+    application::errors::LightningError,
     domains::{invoice::Invoice, payment::Payment, system::HealthStatus},
 };
 
 #[async_trait]
-pub trait LnClient: BitcoinWallet + Sync + Send {
+pub trait LnClient: Sync + Send {
     async fn disconnect(&self) -> Result<(), LightningError>;
     async fn pay_onchain(
         &self,
