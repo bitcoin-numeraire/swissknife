@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use utoipa::{ToSchema};
 use uuid::Uuid;
 
-use crate::domains::bitcoin::{BtcAddress, BtcAddressType, BtcNetwork, BitcoinOutput, BtcOutputStatus};
+use crate::domains::bitcoin::{BtcAddress, BtcAddressType, BtcNetwork, BtcOutput, BtcOutputStatus};
 
 
 /// New Invoice Request
@@ -77,8 +77,8 @@ pub struct BtcOutputResponse {
     pub updated_at: Option<DateTime<Utc>>,
 }
 
-impl From<BitcoinOutput> for BtcOutputResponse {
-    fn from(output: BitcoinOutput) -> Self {
+impl From<BtcOutput> for BtcOutputResponse {
+    fn from(output: BtcOutput) -> Self {
         BtcOutputResponse {
             id: output.id,
             outpoint: output.outpoint,

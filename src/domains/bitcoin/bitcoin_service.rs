@@ -188,7 +188,7 @@ impl BitcoinUseCases for BitcoinService {
                 .iter()
                 .filter(|output| output.amount_sat > 0)
                 .filter(|output| !output.is_ours)
-                .find(|output| match (&payment.destination_address, &output.address) {
+                .find(|output| match (&payment.btc_address, &output.address) {
                     (Some(destination), Some(address)) => destination == address,
                     (Some(_), None) => false,
                     (None, _) => true,

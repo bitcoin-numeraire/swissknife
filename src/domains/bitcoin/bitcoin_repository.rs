@@ -3,7 +3,7 @@ use uuid::Uuid;
 
 use crate::{application::errors::DatabaseError, domains::bitcoin::BtcAddressFilter};
 
-use super::{BtcAddress, BtcAddressType, BitcoinOutput};
+use super::{BtcAddress, BtcAddressType, BtcOutput};
 
 #[async_trait]
 pub trait BtcAddressRepository: Send + Sync {
@@ -27,7 +27,7 @@ pub trait BtcAddressRepository: Send + Sync {
 
 #[async_trait]
 pub trait BtcOutputRepository: Send + Sync {
-    async fn find_by_outpoint(&self, outpoint: &str) -> Result<Option<BitcoinOutput>, DatabaseError>;
-    async fn find(&self, id: Uuid) -> Result<Option<BitcoinOutput>, DatabaseError>;
-    async fn upsert(&self, output: BitcoinOutput) -> Result<BitcoinOutput, DatabaseError>;
+    async fn find_by_outpoint(&self, outpoint: &str) -> Result<Option<BtcOutput>, DatabaseError>;
+    async fn find(&self, id: Uuid) -> Result<Option<BtcOutput>, DatabaseError>;
+    async fn upsert(&self, output: BtcOutput) -> Result<BtcOutput, DatabaseError>;
 }

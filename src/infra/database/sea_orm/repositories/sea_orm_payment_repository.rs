@@ -26,7 +26,7 @@ impl SeaOrmPaymentRepository {
 
         if let Some(output) = btc_output {
             payment.btc_output_id = Some(output.id);
-            payment.bitcoin_output = Some(output.into());
+            payment.btc_output = Some(output.into());
         }
 
         payment
@@ -66,6 +66,8 @@ impl PaymentRepository for SeaOrmPaymentRepository {
             .apply_if(filter.ids, |q, ids| q.filter(Column::Id.is_in(ids)))
             .apply_if(filter.status, |q, s| q.filter(Column::Status.eq(s.to_string())))
             .apply_if(filter.ledger, |q, l| q.filter(Column::Ledger.eq(l.to_string())))
+            .apply_if(filter.ln_addresses, |q, ln_addresses| q.filter(Column::LnAddress.is_in(ln_addresses)))
+            .apply_if(filter.btc_addresses, |q, btc_addresses| q.filter(Column::BtcAddress.is_in(btc_addresses)))
             .order_by(Column::CreatedAt, filter.order_direction.into())
             .offset(filter.offset)
             .limit(filter.limit)
@@ -85,6 +87,7 @@ impl PaymentRepository for SeaOrmPaymentRepository {
             id: Set(Uuid::new_v4()),
             wallet_id: Set(payment.wallet_id),
             ln_address: Set(payment.ln_address),
+            btc_address: Set(payment.btc_address),
             amount_msat: Set(payment.amount_msat as i64),
             status: Set(payment.status.to_string()),
             ledger: Set(payment.ledger.to_string()),
@@ -94,7 +97,6 @@ impl PaymentRepository for SeaOrmPaymentRepository {
             payment_hash: Set(payment.payment_hash),
             description: Set(payment.description),
             metadata: Set(payment.metadata),
-            destination_address: Set(payment.destination_address),
             btc_output_id: Set(payment.btc_output_id),
             ..Default::default()
         };
@@ -120,7 +122,7 @@ impl PaymentRepository for SeaOrmPaymentRepository {
             error: Set(payment.error),
             amount_msat: Set(payment.amount_msat as i64),
             metadata: Set(payment.metadata),
-            destination_address: Set(payment.destination_address),
+            btc_address: Set(payment.btc_address),
             btc_output_id: Set(payment.btc_output_id),
             success_action: Set(payment
                 .success_action
@@ -142,6 +144,8 @@ impl PaymentRepository for SeaOrmPaymentRepository {
             .apply_if(filter.wallet_id, |q, wallet| q.filter(Column::WalletId.eq(wallet)))
             .apply_if(filter.ids, |q, ids| q.filter(Column::Id.is_in(ids)))
             .apply_if(filter.status, |q, s| q.filter(Column::Status.eq(s.to_string())))
+            .apply_if(filter.ln_addresses, |q, ln_addresses| q.filter(Column::LnAddress.is_in(ln_addresses)))
+            .apply_if(filter.btc_addresses, |q, btc_addresses| q.filter(Column::BtcAddress.is_in(btc_addresses)))
             .exec(&self.db)
             .await
             .map_err(|e| DatabaseError::Delete(e.to_string()))?;

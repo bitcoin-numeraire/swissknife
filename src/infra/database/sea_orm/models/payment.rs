@@ -27,7 +27,7 @@ pub struct Model {
     pub created_at: DateTime,
     pub updated_at: Option<DateTime>,
     pub btc_output_id: Option<Uuid>,
-    pub destination_address: Option<String>,
+    pub btc_address: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

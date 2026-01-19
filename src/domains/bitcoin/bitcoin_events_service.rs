@@ -13,7 +13,7 @@ use crate::{
     },
 };
 
-use super::{BitcoinEventsUseCases, BitcoinOutput, BitcoinOutputEvent, BtcOutputStatus};
+use super::{BitcoinEventsUseCases, BtcOutput, BitcoinOutputEvent, BtcOutputStatus};
 
 const DEFAULT_DEPOSIT_DESCRIPTION: &str = "Bitcoin onchain deposit";
 
@@ -47,7 +47,7 @@ impl BitcoinEventsUseCases for BitcoinEventsService {
         };
 
         let status = Self::output_status(event.block_height);
-        let output = BitcoinOutput {
+        let output = BtcOutput {
             id: Uuid::new_v4(),
             outpoint: outpoint.clone(),
             txid: event.txid.clone(),
@@ -157,11 +157,11 @@ impl BitcoinEventsUseCases for BitcoinEventsService {
 
         let status = Self::output_status(event.block_height);
 
-        let Some(destination_address) = updated_payment.destination_address.clone() else {
+        let Some(destination_address) = updated_payment.btc_address.clone() else {
             return Err(DataError::Inconsistency("Destination address not found.".into()).into());
         };
 
-        let btc_output = BitcoinOutput {
+        let btc_output = BtcOutput {
             id: Uuid::new_v4(),
             outpoint: outpoint.clone(),
             txid: event.txid.clone(),
@@ -176,7 +176,7 @@ impl BitcoinEventsUseCases for BitcoinEventsService {
         };
 
         let stored_output = self.store.btc_output.upsert(btc_output).await?;
-        updated_payment.bitcoin_output = Some(stored_output.clone());
+        updated_payment.btc_output = Some(stored_output.clone());
 
         if updated_payment.btc_output_id.is_none() {
             updated_payment.btc_output_id = Some(stored_output.id);

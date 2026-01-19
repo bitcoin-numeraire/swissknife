@@ -131,7 +131,7 @@ impl From<Payment> for PaymentResponse {
             id: payment.id,
             wallet_id: payment.wallet_id,
             ln_address: payment.ln_address,
-            destination_address: payment.destination_address,
+            destination_address: payment.btc_address,
             btc_output_id: payment.btc_output_id,
             payment_hash: payment.payment_hash,
             payment_preimage: payment.payment_preimage,
@@ -147,7 +147,7 @@ impl From<Payment> for PaymentResponse {
             success_action: payment.success_action,
             created_at: payment.created_at,
             updated_at: payment.updated_at,
-            bitcoin_output: payment.bitcoin_output.map(Into::into),
+            bitcoin_output: payment.btc_output.map(Into::into),
         }
     }
 }
