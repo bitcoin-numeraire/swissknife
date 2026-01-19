@@ -1,5 +1,5 @@
 use crate::domains::{
-    bitcoin::{BitcoinNetwork, BitcoinOutputEvent},
+    bitcoin::{BtcNetwork, BitcoinOutputEvent},
     ln_node::{LnInvoicePaidEvent, LnPayFailureEvent, LnPaySuccessEvent},
 };
 use chrono::{TimeZone, Utc};
@@ -98,7 +98,7 @@ impl From<ChainMovement> for BitcoinOutputEvent {
             timestamp: Utc.timestamp_opt(val.timestamp, 0).unwrap(),
             fee_sat,
             block_height: val.blockheight,
-            network: BitcoinNetwork::default(),
+            network: BtcNetwork::default(),
         }
     }
 }

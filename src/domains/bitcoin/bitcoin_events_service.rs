@@ -13,7 +13,7 @@ use crate::{
     },
 };
 
-use super::{BitcoinEventsUseCases, BitcoinOutput, BitcoinOutputEvent, BitcoinOutputStatus};
+use super::{BitcoinEventsUseCases, BitcoinOutput, BitcoinOutputEvent, BtcOutputStatus};
 
 const DEFAULT_DEPOSIT_DESCRIPTION: &str = "Bitcoin onchain deposit";
 
@@ -26,11 +26,11 @@ impl BitcoinEventsService {
         Self { store }
     }
 
-    fn output_status(block_height: u32) -> BitcoinOutputStatus {
+    fn output_status(block_height: u32) -> BtcOutputStatus {
         if block_height > 0 {
-            BitcoinOutputStatus::Confirmed
+            BtcOutputStatus::Confirmed
         } else {
-            BitcoinOutputStatus::Unconfirmed
+            BtcOutputStatus::Unconfirmed
         }
     }
 }
@@ -77,7 +77,7 @@ impl BitcoinEventsUseCases for BitcoinEventsService {
         let existing_invoice = self.store.invoice.find_by_btc_output_id(stored_output.id).await?;
         let status: InvoiceStatus = stored_output.status.into();
 
-        let is_confirmed = stored_output.status == BitcoinOutputStatus::Confirmed;
+        let is_confirmed = stored_output.status == BtcOutputStatus::Confirmed;
 
         if let Some(mut invoice) = existing_invoice {
             invoice.status = status;

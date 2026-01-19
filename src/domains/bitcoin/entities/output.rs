@@ -4,7 +4,7 @@ use strum_macros::{Display, EnumString};
 use utoipa::ToSchema;
 use uuid::Uuid;
 
-use crate::domains::{bitcoin::BitcoinNetwork, invoice::InvoiceStatus};
+use crate::domains::{bitcoin::BtcNetwork, invoice::InvoiceStatus};
 
 #[derive(Clone, Debug, Default)]
 pub struct BitcoinOutput {
@@ -14,16 +14,16 @@ pub struct BitcoinOutput {
     pub output_index: u32,
     pub address: String,
     pub amount_sat: u64,
-    pub status: BitcoinOutputStatus,
+    pub status: BtcOutputStatus,
     pub timestamp: DateTime<Utc>,
     pub block_height: Option<u32>,
-    pub network: BitcoinNetwork,
+    pub network: BtcNetwork,
     pub created_at: DateTime<Utc>,
     pub updated_at: Option<DateTime<Utc>>,
 }
 
 #[derive(Clone, Debug, Copy, EnumString, Deserialize, Serialize, Display, PartialEq, Eq, Default, ToSchema)]
-pub enum BitcoinOutputStatus {
+pub enum BtcOutputStatus {
     #[default]
     Unconfirmed,
     Confirmed,
@@ -31,13 +31,13 @@ pub enum BitcoinOutputStatus {
     Immature,
 }
 
-impl From<BitcoinOutputStatus> for InvoiceStatus {
-    fn from(status: BitcoinOutputStatus) -> Self {
+impl From<BtcOutputStatus> for InvoiceStatus {
+    fn from(status: BtcOutputStatus) -> Self {
         match status {
-            BitcoinOutputStatus::Unconfirmed => InvoiceStatus::Pending,
-            BitcoinOutputStatus::Confirmed => InvoiceStatus::Settled,
-            BitcoinOutputStatus::Spent => InvoiceStatus::Settled,
-            BitcoinOutputStatus::Immature => InvoiceStatus::Pending,
+            BtcOutputStatus::Unconfirmed => InvoiceStatus::Pending,
+            BtcOutputStatus::Confirmed => InvoiceStatus::Settled,
+            BtcOutputStatus::Spent => InvoiceStatus::Settled,
+            BtcOutputStatus::Immature => InvoiceStatus::Pending,
         }
     }
 }

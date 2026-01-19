@@ -1,6 +1,6 @@
 use chrono::{DateTime, Utc};
 
-use crate::domains::bitcoin::BitcoinNetwork;
+use crate::domains::bitcoin::BtcNetwork;
 
 #[derive(Clone, Debug)]
 pub struct BitcoinTransaction {
@@ -12,7 +12,7 @@ pub struct BitcoinTransaction {
 }
 
 impl BitcoinTransaction {
-    pub fn output_event(&self, output: &BitcoinTransactionOutput, network: BitcoinNetwork) -> BitcoinOutputEvent {
+    pub fn output_event(&self, output: &BitcoinTransactionOutput, network: BtcNetwork) -> BitcoinOutputEvent {
         BitcoinOutputEvent {
             txid: self.txid.clone(),
             output_index: output.output_index,
@@ -43,5 +43,5 @@ pub struct BitcoinOutputEvent {
     pub timestamp: DateTime<Utc>,
     pub fee_sat: Option<u64>,
     pub block_height: u32,
-    pub network: BitcoinNetwork,
+    pub network: BtcNetwork,
 }

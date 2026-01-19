@@ -121,7 +121,7 @@ impl InvoiceUseCases for InvoiceService {
 
     // TODO: Move to Lightning node
     async fn sync(&self) -> Result<u32, ApplicationError> {
-        trace!(ln_provider = %self.ln_provider, "Syncing invoices...");
+        trace!(ln_provider = %self.ln_provider, "Syncing lightning invoices...");
 
         if self.ln_provider != LightningProvider::ClnRest && self.ln_provider != LightningProvider::Lnd {
             debug!("Lightning provider does not need initial syncing");
@@ -176,7 +176,7 @@ impl InvoiceUseCases for InvoiceService {
             }
         }
 
-        debug!(%n_synced, "Invoices synced successfully");
+        debug!(%n_synced, "Lightning invoices synced successfully");
         Ok(n_synced)
     }
 }

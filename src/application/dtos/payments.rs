@@ -5,7 +5,7 @@ use uuid::Uuid;
 
 use crate::{
     application::{
-        dtos::BitcoinOutputResponse,
+        dtos::BtcOutputResponse,
         entities::{Currency, Ledger},
     },
     domains::{
@@ -115,7 +115,7 @@ pub struct PaymentResponse {
 
     /// Bitcoin Output
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub bitcoin_output: Option<BitcoinOutputResponse>,
+    pub bitcoin_output: Option<BtcOutputResponse>,
 
     /// Date of creation in database
     pub created_at: DateTime<Utc>,

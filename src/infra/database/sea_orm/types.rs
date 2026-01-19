@@ -3,7 +3,7 @@ use std::time::Duration;
 use chrono::Utc;
 
 use crate::domains::{
-    bitcoin::{BitcoinAddress, BitcoinOutput},
+    bitcoin::{BtcAddress, BitcoinOutput},
     invoice::{Invoice, InvoiceStatus, LnInvoice},
     ln_address::LnAddress,
     payment::Payment,
@@ -163,9 +163,9 @@ impl From<BitcoinOutputModel> for BitcoinOutput {
     }
 }
 
-impl From<BitcoinAddressModel> for BitcoinAddress {
+impl From<BitcoinAddressModel> for BtcAddress {
     fn from(model: BitcoinAddressModel) -> Self {
-        BitcoinAddress {
+        BtcAddress {
             id: model.id,
             wallet_id: model.wallet_id,
             address: model.address,

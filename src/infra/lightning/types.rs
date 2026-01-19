@@ -5,7 +5,7 @@ use serde_bolt::bitcoin::hashes::hex::ToHex;
 use crate::{
     application::entities::{Currency, Ledger},
     domains::{
-        bitcoin::BitcoinNetwork,
+        bitcoin::BtcNetwork,
         invoice::{Invoice, LnInvoice},
     },
 };
@@ -62,14 +62,14 @@ impl From<LNInvoiceCurrency> for Currency {
     }
 }
 
-pub fn parse_network(s: &str) -> BitcoinNetwork {
+pub fn parse_network(s: &str) -> BtcNetwork {
     match s.to_lowercase().as_str() {
-        "bitcoin" | "mainnet" => BitcoinNetwork::Bitcoin,
-        "testnet" | "testnet3" => BitcoinNetwork::Testnet,
-        "testnet4" => BitcoinNetwork::Testnet4,
-        "regtest" => BitcoinNetwork::Regtest,
-        "simnet" => BitcoinNetwork::Simnet,
-        "signet" => BitcoinNetwork::Signet,
-        _ => BitcoinNetwork::Bitcoin,
+        "bitcoin" | "mainnet" => BtcNetwork::Bitcoin,
+        "testnet" | "testnet3" => BtcNetwork::Testnet,
+        "testnet4" => BtcNetwork::Testnet4,
+        "regtest" => BtcNetwork::Regtest,
+        "simnet" => BtcNetwork::Simnet,
+        "signet" => BtcNetwork::Signet,
+        _ => BtcNetwork::Bitcoin,
     }
 }

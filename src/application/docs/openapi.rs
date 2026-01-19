@@ -4,15 +4,10 @@ use crate::{
         entities::{Currency, Ledger, OrderDirection},
     },
     domains::{
-        invoice::InvoiceHandler,
-        ln_address::LnAddressHandler,
-        ln_node::BreezNodeHandler,
-        lnurl::LnURLHandler,
-        nostr::NostrHandler,
-        payment::PaymentHandler,
-        system::SystemHandler,
-        user::{ApiKeyHandler, AuthHandler},
-        wallet::{UserWalletHandler, WalletHandler},
+        bitcoin::BtcAddressHandler, invoice::InvoiceHandler, ln_address::LnAddressHandler,
+        ln_node::BreezNodeHandler, lnurl::LnURLHandler, nostr::NostrHandler, 
+        payment::PaymentHandler, system::SystemHandler, user::{ApiKeyHandler, AuthHandler}, 
+        wallet::{UserWalletHandler, WalletHandler}
     },
 };
 use utoipa::{
@@ -49,6 +44,7 @@ pub fn merged_openapi() -> OpenApi {
     openapi.merge(BreezNodeHandler::openapi());
     openapi.merge(SystemHandler::openapi());
     openapi.merge(ApiKeyHandler::openapi());
+    openapi.merge(BtcAddressHandler::openapi());
 
     openapi
 }

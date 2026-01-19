@@ -1,14 +1,24 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use serde_with::serde_as;
-use strum_macros::{Display, EnumString};
-use utoipa::{IntoParams, ToSchema};
+use utoipa::{ToSchema};
 use uuid::Uuid;
 
-use crate::domains::bitcoin::{BitcoinAddress, BitcoinNetwork, BitcoinOutput, BitcoinOutputStatus};
+use crate::domains::bitcoin::{BtcAddress, BtcAddressType, BtcNetwork, BitcoinOutput, BtcOutputStatus};
+
+
+/// New Invoice Request
+#[derive(Deserialize, ToSchema)]
+pub struct NewBtcAddressRequest {
+    /// User ID. Will be populated with your own ID by default
+    pub wallet_id: Option<Uuid>,
+
+    /// Address type
+    #[serde(rename = "type")]
+    pub address_type: Option<BtcAddressType>,
+}
 
 #[derive(Debug, Serialize, ToSchema)]
-pub struct BitcoinAddressResponse {
+pub struct BtcAddressResponse {
     /// Internal ID
     pub id: Uuid,
     /// Current deposit address
@@ -16,7 +26,7 @@ pub struct BitcoinAddressResponse {
     /// Whether the address has already been used on-chain
     pub used: bool,
     /// Address type
-    pub address_type: crate::domains::bitcoin::BitcoinAddressType,
+    pub address_type: crate::domains::bitcoin::BtcAddressType,
     /// Date of creation in database
     pub created_at: DateTime<Utc>,
 
@@ -25,9 +35,9 @@ pub struct BitcoinAddressResponse {
     pub updated_at: Option<DateTime<Utc>>,
 }
 
-impl From<BitcoinAddress> for BitcoinAddressResponse {
-    fn from(address: BitcoinAddress) -> Self {
-        BitcoinAddressResponse {
+impl From<BtcAddress> for BtcAddressResponse {
+    fn from(address: BtcAddress) -> Self {
+        BtcAddressResponse {
             id: address.id,
             address: address.address,
             used: address.used,
@@ -38,34 +48,8 @@ impl From<BitcoinAddress> for BitcoinAddressResponse {
     }
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, Serialize, EnumString, Display, PartialEq, Eq, Default, ToSchema)]
-#[serde(rename_all = "lowercase")]
-#[strum(serialize_all = "lowercase")]
-pub enum BitcoinAddressType {
-    #[default]
-    P2wpkh,
-    P2tr,
-}
-
-impl From<BitcoinAddressType> for crate::domains::bitcoin::BitcoinAddressType {
-    fn from(dto: BitcoinAddressType) -> Self {
-        match dto {
-            BitcoinAddressType::P2wpkh => crate::domains::bitcoin::BitcoinAddressType::P2wpkh,
-            BitcoinAddressType::P2tr => crate::domains::bitcoin::BitcoinAddressType::P2tr,
-        }
-    }
-}
-
-#[serde_as]
-#[derive(Clone, Debug, Deserialize, Serialize, Default, IntoParams)]
-pub struct BitcoinAddressQueryParams {
-    /// Address type
-    #[serde(rename = "type")]
-    pub address_type: Option<BitcoinAddressType>,
-}
-
 #[derive(Serialize, ToSchema)]
-pub struct BitcoinOutputResponse {
+pub struct BtcOutputResponse {
     /// Internal ID
     pub id: Uuid,
     /// Outpoint
@@ -75,7 +59,7 @@ pub struct BitcoinOutputResponse {
     /// Amount in satoshis
     pub amount_sat: u64,
     /// Status
-    pub status: BitcoinOutputStatus,
+    pub status: BtcOutputStatus,
     /// Timestamp
     pub timestamp: DateTime<Utc>,
 
@@ -84,7 +68,7 @@ pub struct BitcoinOutputResponse {
     pub block_height: Option<u32>,
 
     /// Network
-    pub network: BitcoinNetwork,
+    pub network: BtcNetwork,
     /// Date of creation in database
     pub created_at: DateTime<Utc>,
 
@@ -93,9 +77,9 @@ pub struct BitcoinOutputResponse {
     pub updated_at: Option<DateTime<Utc>>,
 }
 
-impl From<BitcoinOutput> for BitcoinOutputResponse {
+impl From<BitcoinOutput> for BtcOutputResponse {
     fn from(output: BitcoinOutput) -> Self {
-        BitcoinOutputResponse {
+        BtcOutputResponse {
             id: output.id,
             outpoint: output.outpoint,
             address: output.address,

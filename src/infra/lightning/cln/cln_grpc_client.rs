@@ -20,7 +20,7 @@ use crate::{
         errors::{BitcoinError, LightningError},
     },
     domains::{
-        bitcoin::{BitcoinAddressType, BitcoinNetwork, BitcoinTransaction, BitcoinTransactionOutput},
+        bitcoin::{BtcAddressType, BtcNetwork, BitcoinTransaction, BitcoinTransactionOutput},
         invoice::Invoice,
         ln_node::LnEventsUseCases,
         payment::Payment,
@@ -61,7 +61,7 @@ pub struct ClnGrpcClient {
     maxfeepercent: Option<f64>,
     retry_for: Option<u32>,
     payment_exemptfee: Option<Amount>,
-    network: BitcoinNetwork,
+    network: BtcNetwork,
 }
 
 impl ClnGrpcClient {
@@ -92,7 +92,7 @@ impl ClnGrpcClient {
             maxfeepercent: config.maxfeepercent,
             retry_for: Some(config.payment_timeout.as_secs() as u32),
             payment_exemptfee: config.payment_exemptfee.map(|fee| Amount { msat: fee }),
-            network: BitcoinNetwork::default(),
+            network: BtcNetwork::default(),
         };
 
         let network = cln_client.network().await?;
@@ -129,7 +129,7 @@ impl ClnGrpcClient {
         Ok((identity, ca_certificate))
     }
 
-    async fn network(&self) -> Result<BitcoinNetwork, LightningError> {
+    async fn network(&self) -> Result<BtcNetwork, LightningError> {
         let mut client = self.client.clone();
         let response = client
             .getinfo(GetinfoRequest {})
@@ -140,9 +140,9 @@ impl ClnGrpcClient {
         Ok(parse_network(&response.network))
     }
 
-    fn map_address_type(address_type: BitcoinAddressType) -> Option<i32> {
+    fn map_address_type(address_type: BtcAddressType) -> Option<i32> {
         match address_type {
-            BitcoinAddressType::P2tr => Some(NewaddrAddresstype::P2tr as i32),
+            BtcAddressType::P2tr => Some(NewaddrAddresstype::P2tr as i32),
             _ => Some(NewaddrAddresstype::Bech32 as i32),
         }
     }
@@ -246,7 +246,7 @@ impl LnClient for ClnGrpcClient {
 
 #[async_trait]
 impl BitcoinWallet for ClnGrpcClient {
-    async fn new_address(&self, address_type: BitcoinAddressType) -> Result<String, BitcoinError> {
+    async fn new_address(&self, address_type: BtcAddressType) -> Result<String, BitcoinError> {
         let mut client = self.client.clone();
 
         let response = client
@@ -323,7 +323,7 @@ impl BitcoinWallet for ClnGrpcClient {
         })
     }
 
-    fn network(&self) -> BitcoinNetwork {
+    fn network(&self) -> BtcNetwork {
         self.network
     }
 }

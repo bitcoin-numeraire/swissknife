@@ -5,7 +5,7 @@ use sea_orm::{DatabaseConnection, DatabaseTransaction, TransactionTrait};
 use crate::{
     application::errors::DatabaseError,
     domains::{
-        bitcoin::{BitcoinAddressRepository, BitcoinOutputRepository},
+        bitcoin::{BtcAddressRepository, BtcOutputRepository},
         invoice::InvoiceRepository,
         ln_address::LnAddressRepository,
         payment::PaymentRepository,
@@ -28,8 +28,8 @@ pub struct AppStore {
     pub wallet: Arc<dyn WalletRepository>,
     pub api_key: Arc<dyn ApiKeyRepository>,
     pub config: Arc<dyn ConfigRepository>,
-    pub btc_address: Arc<dyn BitcoinAddressRepository>,
-    pub btc_output: Arc<dyn BitcoinOutputRepository>,
+    pub btc_address: Arc<dyn BtcAddressRepository>,
+    pub btc_output: Arc<dyn BtcOutputRepository>,
 }
 
 impl AppStore {

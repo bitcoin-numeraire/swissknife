@@ -20,7 +20,7 @@ use crate::{
     },
     domains::{
         bitcoin::{
-            BitcoinAddressType, BitcoinEventsUseCases, BitcoinNetwork, BitcoinTransaction, BitcoinTransactionOutput,
+            BtcAddressType, BitcoinEventsUseCases, BtcNetwork, BitcoinTransaction, BitcoinTransactionOutput,
         },
         invoice::Invoice,
         ln_node::LnEventsUseCases,
@@ -68,7 +68,7 @@ pub struct ClnRestClient {
     retry_for: Option<u32>,
     payment_exemptfee: Option<u64>,
     ws_client: Option<WsClient>,
-    network: BitcoinNetwork,
+    network: BtcNetwork,
 }
 
 const USER_AGENT: &str = "Numeraire Swissknife/1.0";
@@ -112,7 +112,7 @@ impl ClnRestClient {
             maxfeepercent: config.maxfeepercent,
             retry_for: Some(config.payment_timeout.as_secs() as u32),
             payment_exemptfee: config.payment_exemptfee,
-            network: BitcoinNetwork::default(),
+            network: BtcNetwork::default(),
             ws_client: None,
         };
 
@@ -154,7 +154,7 @@ impl ClnRestClient {
         Ok(result)
     }
 
-    async fn network(&self) -> Result<BitcoinNetwork, LightningError> {
+    async fn network(&self) -> Result<BtcNetwork, LightningError> {
         let response: GetinfoResponse = self
             .post_request("getinfo", &GetinfoRequest {})
             .await
@@ -168,10 +168,10 @@ impl ClnRestClient {
         Ok(cleaned.parse::<u64>()?)
     }
 
-    fn map_address_type(address_type: BitcoinAddressType) -> Option<String> {
+    fn map_address_type(address_type: BtcAddressType) -> Option<String> {
         match address_type {
-            BitcoinAddressType::P2wpkh => Some("bech32".to_string()),
-            BitcoinAddressType::P2tr => Some("p2tr".to_string()),
+            BtcAddressType::P2wpkh => Some("bech32".to_string()),
+            BtcAddressType::P2tr => Some("p2tr".to_string()),
             _ => None,
         }
     }
@@ -272,7 +272,7 @@ impl LnClient for ClnRestClient {
 
 #[async_trait]
 impl BitcoinWallet for ClnRestClient {
-    async fn new_address(&self, address_type: BitcoinAddressType) -> Result<String, BitcoinError> {
+    async fn new_address(&self, address_type: BtcAddressType) -> Result<String, BitcoinError> {
         let response: NewAddrResponse = self
             .post_request(
                 "newaddr",
@@ -337,7 +337,7 @@ impl BitcoinWallet for ClnRestClient {
         })
     }
 
-    fn network(&self) -> BitcoinNetwork {
+    fn network(&self) -> BtcNetwork {
         self.network
     }
 }

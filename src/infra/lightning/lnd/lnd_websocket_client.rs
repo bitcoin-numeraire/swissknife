@@ -11,7 +11,7 @@ use tokio_tungstenite::tungstenite::ClientRequestBuilder;
 use tokio_tungstenite::{connect_async_tls_with_config, Connector, MaybeTlsStream, WebSocketStream};
 use tracing::{debug, error, warn};
 
-use crate::domains::bitcoin::{BitcoinNetwork, BitcoinTransaction};
+use crate::domains::bitcoin::{BtcNetwork, BitcoinTransaction};
 use crate::infra::lightning::lnd::lnd_types::{InvoiceResponse, TransactionResponse};
 use crate::{
     application::errors::LightningError,
@@ -53,7 +53,7 @@ pub async fn listen_transactions(
     config: LndRestClientConfig,
     macaroon: String,
     bitcoin_events: Arc<dyn BitcoinEventsUseCases>,
-    network: BitcoinNetwork,
+    network: BtcNetwork,
 ) -> Result<(), LightningError> {
     let max_reconnect_delay = config.ws_max_reconnect_delay;
     let mut reconnect_delay = config.ws_min_reconnect_delay;
@@ -107,7 +107,7 @@ async fn connect_and_handle_transactions(
     macaroon: &str,
     config: &LndRestClientConfig,
     bitcoin_events: Arc<dyn BitcoinEventsUseCases>,
-    network: BitcoinNetwork,
+    network: BtcNetwork,
 ) -> Result<(), LightningError> {
     let endpoint = format!("wss://{}/v1/transactions/subscribe", config.host);
     let uri = Uri::from_str(&endpoint).map_err(|e| LightningError::ParseConfig(e.to_string()))?;
@@ -184,7 +184,7 @@ async fn handle_messages(
 async fn handle_transaction_messages(
     mut ws_stream: WebSocketStream<MaybeTlsStream<TcpStream>>,
     bitcoin_events: Arc<dyn BitcoinEventsUseCases>,
-    network: BitcoinNetwork,
+    network: BtcNetwork,
 ) {
     while let Some(message) = ws_stream.next().await {
         match message {
@@ -231,7 +231,7 @@ async fn process_message(text: &str, ln_events: Arc<dyn LnEventsUseCases>) -> an
 async fn process_transaction_message(
     text: &str,
     bitcoin_events: Arc<dyn BitcoinEventsUseCases>,
-    network: BitcoinNetwork,
+    network: BtcNetwork,
 ) -> anyhow::Result<()> {
     let value: Value = serde_json::from_str(text)?;
 

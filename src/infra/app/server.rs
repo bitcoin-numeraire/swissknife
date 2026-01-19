@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use crate::{
     application::{docs::merged_openapi, entities::LnNodeClient, errors::WebServerError},
-    domains::{invoice, ln_address, ln_node, lnurl, nostr, payment, system, user, wallet},
+    domains::{invoice, ln_address, ln_node, lnurl, nostr, payment, system, user, wallet, bitcoin},
     infra::app::AppState,
 };
 use axum::{routing::get, Router};
@@ -33,6 +33,7 @@ impl Server {
             .nest("/v1/auth", user::auth_router())
             .nest("/v1/api-keys", user::api_key_router())
             .nest("/v1/lightning-addresses", ln_address::router())
+            .nest("/v1/bitcoin/addresses", bitcoin::router())
             .merge(Scalar::with_url("/docs", merged_openapi()));
 
         let router = match dashboard_dir {

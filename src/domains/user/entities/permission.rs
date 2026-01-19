@@ -24,6 +24,10 @@ pub enum Permission {
     ReadApiKey,
     #[serde(rename = "write:api_key")]
     WriteApiKey,
+    #[serde(rename = "read:btc_address")]
+    ReadBtcAddress,
+    #[serde(rename = "write:btc_address")]
+    WriteBtcAddress,
 }
 
 impl Permission {
@@ -39,6 +43,8 @@ impl Permission {
             Permission::WriteLnNode,
             Permission::ReadApiKey,
             Permission::WriteApiKey,
+            Permission::ReadBtcAddress,
+            Permission::WriteBtcAddress
         ]
     }
 }

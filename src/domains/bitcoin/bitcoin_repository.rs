@@ -1,24 +1,32 @@
 use async_trait::async_trait;
 use uuid::Uuid;
 
-use crate::application::errors::DatabaseError;
+use crate::{application::errors::DatabaseError, domains::bitcoin::BtcAddressFilter};
 
-use super::{BitcoinAddress, BitcoinAddressType, BitcoinOutput};
+use super::{BtcAddress, BtcAddressType, BitcoinOutput};
 
 #[async_trait]
-pub trait BitcoinAddressRepository: Send + Sync {
+pub trait BtcAddressRepository: Send + Sync {
+    async fn find(&self, id: Uuid) -> Result<Option<BtcAddress>, DatabaseError>;
     async fn find_by_wallet_unused(
         &self,
         wallet_id: Uuid,
-        address_type: BitcoinAddressType,
-    ) -> Result<Option<BitcoinAddress>, DatabaseError>;
-    async fn find_by_address(&self, address: &str) -> Result<Option<BitcoinAddress>, DatabaseError>;
-    async fn insert(&self, address: BitcoinAddress) -> Result<BitcoinAddress, DatabaseError>;
+        address_type: BtcAddressType,
+    ) -> Result<Option<BtcAddress>, DatabaseError>;
+    async fn find_by_address(&self, address: &str) -> Result<Option<BtcAddress>, DatabaseError>;
+    async fn find_many(&self, filter: BtcAddressFilter) -> Result<Vec<BtcAddress>, DatabaseError>;
+    async fn insert(
+        &self,
+        wallet_id: Uuid,
+        address: &str,
+        address_type: BtcAddressType
+    ) -> Result<BtcAddress, DatabaseError>;
     async fn mark_used(&self, id: Uuid) -> Result<(), DatabaseError>;
+    async fn delete_many(&self, filter: BtcAddressFilter) -> Result<u64, DatabaseError>;
 }
 
 #[async_trait]
-pub trait BitcoinOutputRepository: Send + Sync {
+pub trait BtcOutputRepository: Send + Sync {
     async fn find_by_outpoint(&self, outpoint: &str) -> Result<Option<BitcoinOutput>, DatabaseError>;
     async fn find(&self, id: Uuid) -> Result<Option<BitcoinOutput>, DatabaseError>;
     async fn upsert(&self, output: BitcoinOutput) -> Result<BitcoinOutput, DatabaseError>;

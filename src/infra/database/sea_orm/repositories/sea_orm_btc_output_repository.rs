@@ -5,7 +5,7 @@ use uuid::Uuid;
 
 use crate::{
     application::errors::DatabaseError,
-    domains::bitcoin::{BitcoinOutput, BitcoinOutputRepository},
+    domains::bitcoin::{BitcoinOutput, BtcOutputRepository},
     infra::database::sea_orm::models::btc_output::{ActiveModel, Column, Entity},
 };
 
@@ -21,7 +21,7 @@ impl SeaOrmBitcoinOutputRepository {
 }
 
 #[async_trait]
-impl BitcoinOutputRepository for SeaOrmBitcoinOutputRepository {
+impl BtcOutputRepository for SeaOrmBitcoinOutputRepository {
     async fn find_by_outpoint(&self, outpoint: &str) -> Result<Option<BitcoinOutput>, DatabaseError> {
         let model = Entity::find()
             .filter(Column::Outpoint.eq(outpoint))
