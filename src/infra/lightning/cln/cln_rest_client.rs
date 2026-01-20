@@ -19,9 +19,7 @@ use crate::{
         errors::{BitcoinError, LightningError},
     },
     domains::{
-        bitcoin::{
-            BtcAddressType, BitcoinEventsUseCases, BtcNetwork, BitcoinTransaction, BitcoinTransactionOutput,
-        },
+        bitcoin::{BitcoinEventsUseCases, BitcoinTransaction, BitcoinTransactionOutput, BtcAddressType, BtcNetwork},
         invoice::Invoice,
         ln_node::LnEventsUseCases,
         payment::Payment,

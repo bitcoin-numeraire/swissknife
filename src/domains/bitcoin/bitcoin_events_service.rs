@@ -13,7 +13,7 @@ use crate::{
     },
 };
 
-use super::{BitcoinEventsUseCases, BtcOutput, BitcoinOutputEvent, BtcOutputStatus};
+use super::{BitcoinEventsUseCases, BitcoinOutputEvent, BtcOutput, BtcOutputStatus};
 
 const DEFAULT_DEPOSIT_DESCRIPTION: &str = "Bitcoin onchain deposit";
 

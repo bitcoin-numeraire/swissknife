@@ -1,7 +1,10 @@
 use async_trait::async_trait;
 use uuid::Uuid;
 
-use crate::{application::errors::ApplicationError, domains::bitcoin::{BtcAddressFilter, BtcAddressType}};
+use crate::{
+    application::errors::ApplicationError,
+    domains::bitcoin::{BtcAddressFilter, BtcAddressType},
+};
 
 use super::BtcAddress;
 

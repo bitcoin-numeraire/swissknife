@@ -69,7 +69,7 @@ pub struct InvoiceFilter {
     /// Status
     pub status: Option<InvoiceStatus>,
     /// Ledger
-    pub ledger: Option<Ledger>,    
+    pub ledger: Option<Ledger>,
     /// Order by
     #[serde(default)]
     pub order_by: InvoiceOrderBy,

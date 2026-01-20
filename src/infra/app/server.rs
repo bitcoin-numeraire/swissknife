@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use crate::{
     application::{docs::merged_openapi, entities::LnNodeClient, errors::WebServerError},
-    domains::{invoice, ln_address, ln_node, lnurl, nostr, payment, system, user, wallet, bitcoin},
+    domains::{bitcoin, invoice, ln_address, ln_node, lnurl, nostr, payment, system, user, wallet},
     infra::app::AppState,
 };
 use axum::{routing::get, Router};

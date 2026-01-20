@@ -10,11 +10,13 @@ use crate::{
         errors::{ApplicationError, DataError},
     },
     domains::{
-        bitcoin::BtcAddressFilter, invoice::{InvoiceFilter, InvoiceStatus}, payment::{PaymentFilter, PaymentStatus}
+        bitcoin::BtcAddressFilter,
+        invoice::{InvoiceFilter, InvoiceStatus},
+        payment::{PaymentFilter, PaymentStatus},
     },
 };
 
-use super::{BtcAddress, BtcAddressType, BitcoinEventsUseCases, BitcoinUseCases};
+use super::{BitcoinEventsUseCases, BitcoinUseCases, BtcAddress, BtcAddressType};
 
 pub struct BitcoinService {
     store: AppStore,
@@ -61,11 +63,7 @@ impl BitcoinUseCases for BitcoinService {
 
         let address = self.wallet.new_address(address_type).await?;
 
-        let btc_address = self
-            .store
-            .btc_address
-            .insert(wallet_id,&address,address_type)
-            .await?;
+        let btc_address = self.store.btc_address.insert(wallet_id, &address, address_type).await?;
 
         info!(%wallet_id, address = %btc_address.address, "New bitcoin deposit address issued");
 

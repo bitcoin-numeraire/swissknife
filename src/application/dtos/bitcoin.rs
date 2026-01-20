@@ -1,10 +1,9 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use utoipa::{ToSchema};
+use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::domains::bitcoin::{BtcAddress, BtcAddressType, BtcNetwork, BtcOutput, BtcOutputStatus};
-
 
 /// New Invoice Request
 #[derive(Deserialize, ToSchema)]

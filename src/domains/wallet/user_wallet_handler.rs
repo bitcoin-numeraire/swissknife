@@ -12,9 +12,9 @@ use crate::{
     application::{
         docs::{BAD_REQUEST_EXAMPLE, INTERNAL_EXAMPLE, NOT_FOUND_EXAMPLE, UNAUTHORIZED_EXAMPLE, UNPROCESSABLE_EXAMPLE},
         dtos::{
-            ApiKeyResponse, BtcAddressResponse, CreateApiKeyRequest, ErrorResponse, InvoiceResponse, NewBtcAddressRequest,
-            NewInvoiceRequest, PaymentResponse, RegisterLnAddressRequest, SendPaymentRequest, UpdateLnAddressRequest,
-            WalletLnAddressResponse, WalletResponse
+            ApiKeyResponse, BtcAddressResponse, CreateApiKeyRequest, ErrorResponse, InvoiceResponse,
+            NewBtcAddressRequest, NewInvoiceRequest, PaymentResponse, RegisterLnAddressRequest, SendPaymentRequest,
+            UpdateLnAddressRequest, WalletLnAddressResponse, WalletResponse,
         },
         errors::{ApplicationError, DataError},
     },
@@ -99,7 +99,7 @@ async fn get_user_wallet(
     Ok(Json(wallet.into()))
 }
 
-/// Generate a new Bitcoin address. 
+/// Generate a new Bitcoin address.
 ///
 /// Returns the Bitcoin address for the given address type. The returned address is the same until used.
 #[utoipa::path(

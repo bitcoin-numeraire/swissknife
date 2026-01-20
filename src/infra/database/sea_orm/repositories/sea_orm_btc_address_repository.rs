@@ -65,7 +65,9 @@ impl BtcAddressRepository for SeaOrmBitcoinAddressRepository {
         let models = Entity::find()
             .apply_if(filter.wallet_id, |q, id| q.filter(Column::WalletId.eq(id)))
             .apply_if(filter.address, |q, address| q.filter(Column::Address.eq(address)))
-            .apply_if(filter.address_type, |q, address_type| q.filter(Column::AddressType.eq(address_type.to_string())))
+            .apply_if(filter.address_type, |q, address_type| {
+                q.filter(Column::AddressType.eq(address_type.to_string()))
+            })
             .apply_if(filter.ids, |q, ids| q.filter(Column::Id.is_in(ids)))
             .apply_if(filter.used, |q, active| q.filter(Column::Used.eq(active)))
             .order_by(Column::CreatedAt, filter.order_direction.into())
@@ -82,7 +84,7 @@ impl BtcAddressRepository for SeaOrmBitcoinAddressRepository {
         &self,
         wallet_id: Uuid,
         address: &str,
-        address_type: BtcAddressType
+        address_type: BtcAddressType,
     ) -> Result<BtcAddress, DatabaseError> {
         let model = ActiveModel {
             id: Set(Uuid::new_v4()),

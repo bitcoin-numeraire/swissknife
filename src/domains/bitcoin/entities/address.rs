@@ -29,8 +29,6 @@ pub enum BtcAddressType {
     P2tr,
 }
 
-
-
 #[serde_as]
 #[derive(Clone, Debug, Deserialize, Serialize, Default, IntoParams)]
 pub struct BtcAddressFilter {

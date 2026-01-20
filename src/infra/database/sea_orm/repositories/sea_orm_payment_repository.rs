@@ -66,8 +66,12 @@ impl PaymentRepository for SeaOrmPaymentRepository {
             .apply_if(filter.ids, |q, ids| q.filter(Column::Id.is_in(ids)))
             .apply_if(filter.status, |q, s| q.filter(Column::Status.eq(s.to_string())))
             .apply_if(filter.ledger, |q, l| q.filter(Column::Ledger.eq(l.to_string())))
-            .apply_if(filter.ln_addresses, |q, ln_addresses| q.filter(Column::LnAddress.is_in(ln_addresses)))
-            .apply_if(filter.btc_addresses, |q, btc_addresses| q.filter(Column::BtcAddress.is_in(btc_addresses)))
+            .apply_if(filter.ln_addresses, |q, ln_addresses| {
+                q.filter(Column::LnAddress.is_in(ln_addresses))
+            })
+            .apply_if(filter.btc_addresses, |q, btc_addresses| {
+                q.filter(Column::BtcAddress.is_in(btc_addresses))
+            })
             .order_by(Column::CreatedAt, filter.order_direction.into())
             .offset(filter.offset)
             .limit(filter.limit)
@@ -144,8 +148,12 @@ impl PaymentRepository for SeaOrmPaymentRepository {
             .apply_if(filter.wallet_id, |q, wallet| q.filter(Column::WalletId.eq(wallet)))
             .apply_if(filter.ids, |q, ids| q.filter(Column::Id.is_in(ids)))
             .apply_if(filter.status, |q, s| q.filter(Column::Status.eq(s.to_string())))
-            .apply_if(filter.ln_addresses, |q, ln_addresses| q.filter(Column::LnAddress.is_in(ln_addresses)))
-            .apply_if(filter.btc_addresses, |q, btc_addresses| q.filter(Column::BtcAddress.is_in(btc_addresses)))
+            .apply_if(filter.ln_addresses, |q, ln_addresses| {
+                q.filter(Column::LnAddress.is_in(ln_addresses))
+            })
+            .apply_if(filter.btc_addresses, |q, btc_addresses| {
+                q.filter(Column::BtcAddress.is_in(btc_addresses))
+            })
             .exec(&self.db)
             .await
             .map_err(|e| DatabaseError::Delete(e.to_string()))?;

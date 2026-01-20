@@ -15,8 +15,7 @@ use crate::{
             UNPROCESSABLE_EXAMPLE,
         },
         dtos::{
-            BtcAddressResponse, BtcOutputResponse, ErrorResponse, InvoiceResponse,
-            LnInvoiceResponse, NewInvoiceRequest,
+            BtcAddressResponse, BtcOutputResponse, ErrorResponse, InvoiceResponse, LnInvoiceResponse, NewInvoiceRequest,
         },
         errors::ApplicationError,
     },

@@ -44,7 +44,7 @@ impl Permission {
             Permission::ReadApiKey,
             Permission::WriteApiKey,
             Permission::ReadBtcAddress,
-            Permission::WriteBtcAddress
+            Permission::WriteBtcAddress,
         ]
     }
 }

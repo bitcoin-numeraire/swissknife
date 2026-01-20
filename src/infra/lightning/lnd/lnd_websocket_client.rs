@@ -11,7 +11,7 @@ use tokio_tungstenite::tungstenite::ClientRequestBuilder;
 use tokio_tungstenite::{connect_async_tls_with_config, Connector, MaybeTlsStream, WebSocketStream};
 use tracing::{debug, error, warn};
 
-use crate::domains::bitcoin::{BtcNetwork, BitcoinTransaction};
+use crate::domains::bitcoin::{BitcoinTransaction, BtcNetwork};
 use crate::infra::lightning::lnd::lnd_types::{InvoiceResponse, TransactionResponse};
 use crate::{
     application::errors::LightningError,

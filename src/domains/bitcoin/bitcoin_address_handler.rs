@@ -27,7 +27,6 @@ use crate::{
     },
 };
 
-
 #[derive(OpenApi)]
 #[openapi(
     paths(generate_btc_address, list_btc_addresses, get_btc_address, delete_btc_address, delete_btc_addresses),

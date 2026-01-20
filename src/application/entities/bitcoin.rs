@@ -2,7 +2,7 @@ use async_trait::async_trait;
 
 use crate::{
     application::errors::BitcoinError,
-    domains::bitcoin::{BtcAddressType, BtcNetwork, BitcoinTransaction},
+    domains::bitcoin::{BitcoinTransaction, BtcAddressType, BtcNetwork},
 };
 
 #[async_trait]

@@ -64,10 +64,10 @@ pub struct PaymentFilter {
     /// Lightning addresses
     #[schema(example = "donations@numeraire.tech")]
     pub ln_addresses: Option<Vec<String>>,
-    
+
     /// Bitcoin addresses
     #[schema(example = "bc1q...")]
-    pub btc_addresses: Option<Vec<String>>,    
+    pub btc_addresses: Option<Vec<String>>,
 
     /// Direction of the ordering of results
     #[serde(default)]

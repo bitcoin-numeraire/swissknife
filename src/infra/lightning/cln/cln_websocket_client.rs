@@ -12,7 +12,7 @@ use tracing::{debug, error, trace, warn};
 use crate::{
     application::errors::LightningError,
     domains::{
-        bitcoin::{BitcoinEventsUseCases, BtcNetwork, BitcoinOutputEvent},
+        bitcoin::{BitcoinEventsUseCases, BitcoinOutputEvent, BtcNetwork},
         ln_node::LnEventsUseCases,
     },
     infra::lightning::cln::cln_websocket_types::{ChainMovement, InvoicePayment, SendPayFailure, SendPaySuccess},

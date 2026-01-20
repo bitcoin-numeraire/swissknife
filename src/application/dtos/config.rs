@@ -4,7 +4,8 @@ use serde::{Deserialize, Deserializer};
 use strum_macros::{Display, EnumString};
 
 use crate::{
-    domains::bitcoin::BtcAddressType, infra::{
+    domains::bitcoin::BtcAddressType,
+    infra::{
         axum::AxumServerConfig,
         config::config_rs::deserialize_duration,
         database::sea_orm::SeaOrmConfig,
@@ -15,7 +16,7 @@ use crate::{
             lnd::LndRestClientConfig,
         },
         logging::tracing::TracingLoggerConfig,
-    }
+    },
 };
 
 #[derive(Debug, Deserialize, Clone)]

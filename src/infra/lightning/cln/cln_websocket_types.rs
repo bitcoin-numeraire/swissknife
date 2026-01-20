@@ -1,5 +1,5 @@
 use crate::domains::{
-    bitcoin::{BtcNetwork, BitcoinOutputEvent},
+    bitcoin::{BitcoinOutputEvent, BtcNetwork},
     ln_node::{LnInvoicePaidEvent, LnPayFailureEvent, LnPaySuccessEvent},
 };
 use chrono::{TimeZone, Utc};
