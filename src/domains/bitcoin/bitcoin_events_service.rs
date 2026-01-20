@@ -13,7 +13,7 @@ use crate::{
     },
 };
 
-use super::{BitcoinEventsUseCases, BitcoinOutput, BitcoinOutputEvent, BitcoinOutputStatus};
+use super::{BitcoinEventsUseCases, BitcoinOutputEvent, BtcOutput, BtcOutputStatus};
 
 const DEFAULT_DEPOSIT_DESCRIPTION: &str = "Bitcoin onchain deposit";
 
@@ -26,11 +26,11 @@ impl BitcoinEventsService {
         Self { store }
     }
 
-    fn output_status(block_height: u32) -> BitcoinOutputStatus {
+    fn output_status(block_height: u32) -> BtcOutputStatus {
         if block_height > 0 {
-            BitcoinOutputStatus::Confirmed
+            BtcOutputStatus::Confirmed
         } else {
-            BitcoinOutputStatus::Unconfirmed
+            BtcOutputStatus::Unconfirmed
         }
     }
 }
@@ -47,7 +47,7 @@ impl BitcoinEventsUseCases for BitcoinEventsService {
         };
 
         let status = Self::output_status(event.block_height);
-        let output = BitcoinOutput {
+        let output = BtcOutput {
             id: Uuid::new_v4(),
             outpoint: outpoint.clone(),
             txid: event.txid.clone(),
@@ -77,7 +77,7 @@ impl BitcoinEventsUseCases for BitcoinEventsService {
         let existing_invoice = self.store.invoice.find_by_btc_output_id(stored_output.id).await?;
         let status: InvoiceStatus = stored_output.status.into();
 
-        let is_confirmed = stored_output.status == BitcoinOutputStatus::Confirmed;
+        let is_confirmed = stored_output.status == BtcOutputStatus::Confirmed;
 
         if let Some(mut invoice) = existing_invoice {
             invoice.status = status;
@@ -157,11 +157,11 @@ impl BitcoinEventsUseCases for BitcoinEventsService {
 
         let status = Self::output_status(event.block_height);
 
-        let Some(destination_address) = updated_payment.destination_address.clone() else {
+        let Some(destination_address) = updated_payment.btc_address.clone() else {
             return Err(DataError::Inconsistency("Destination address not found.".into()).into());
         };
 
-        let btc_output = BitcoinOutput {
+        let btc_output = BtcOutput {
             id: Uuid::new_v4(),
             outpoint: outpoint.clone(),
             txid: event.txid.clone(),
@@ -176,7 +176,7 @@ impl BitcoinEventsUseCases for BitcoinEventsService {
         };
 
         let stored_output = self.store.btc_output.upsert(btc_output).await?;
-        updated_payment.bitcoin_output = Some(stored_output.clone());
+        updated_payment.btc_output = Some(stored_output.clone());
 
         if updated_payment.btc_output_id.is_none() {
             updated_payment.btc_output_id = Some(stored_output.id);

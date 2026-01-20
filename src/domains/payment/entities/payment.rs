@@ -7,7 +7,7 @@ use uuid::Uuid;
 
 use crate::{
     application::entities::{Currency, Ledger, OrderDirection},
-    domains::bitcoin::BitcoinOutput,
+    domains::bitcoin::BtcOutput,
     domains::lnurl::LnUrlSuccessAction,
 };
 
@@ -16,6 +16,7 @@ pub struct Payment {
     pub id: Uuid,
     pub wallet_id: Uuid,
     pub ln_address: Option<String>,
+    pub btc_address: Option<String>,
     pub payment_hash: Option<String>,
     pub payment_preimage: Option<String>,
     pub error: Option<String>,
@@ -31,8 +32,7 @@ pub struct Payment {
     pub created_at: DateTime<Utc>,
     pub updated_at: Option<DateTime<Utc>>,
     pub btc_output_id: Option<Uuid>,
-    pub destination_address: Option<String>,
-    pub bitcoin_output: Option<BitcoinOutput>,
+    pub btc_output: Option<BtcOutput>,
 }
 
 #[derive(Clone, Debug, EnumString, Display, Deserialize, Serialize, PartialEq, Eq, Default, ToSchema)]
@@ -44,7 +44,7 @@ pub enum PaymentStatus {
 }
 
 #[serde_as]
-#[derive(Clone, Debug, Deserialize, Serialize, Default, IntoParams)]
+#[derive(Clone, Debug, Deserialize, Serialize, Default, IntoParams, ToSchema)]
 pub struct PaymentFilter {
     /// Total amount of results to return
     #[serde_as(as = "Option<DisplayFromStr>")]
@@ -60,6 +60,15 @@ pub struct PaymentFilter {
     pub status: Option<PaymentStatus>,
     /// Ledger
     pub ledger: Option<Ledger>,
+
+    /// Lightning addresses
+    #[schema(example = "donations@numeraire.tech")]
+    pub ln_addresses: Option<Vec<String>>,
+
+    /// Bitcoin addresses
+    #[schema(example = "bc1q...")]
+    pub btc_addresses: Option<Vec<String>>,
+
     /// Direction of the ordering of results
     #[serde(default)]
     pub order_direction: OrderDirection,

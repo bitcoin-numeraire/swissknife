@@ -188,7 +188,7 @@ impl PaymentService {
                             ledger: Ledger::Internal,
                             currency: data.network.into(),
                             description: description.clone(),
-                            destination_address: Some(data.address),
+                            btc_address: Some(data.address),
                             fee_msat: Some(0),
                             payment_time: Some(timestamp),
                             ..Default::default()
@@ -209,7 +209,7 @@ impl PaymentService {
                         ledger: Ledger::Onchain,
                         currency: data.network.into(),
                         description,
-                        destination_address: Some(data.address.clone()),
+                        btc_address: Some(data.address.clone()),
                         ..Default::default()
                     },
                     self.fee_buffer,

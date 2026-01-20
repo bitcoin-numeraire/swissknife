@@ -4,6 +4,7 @@ use crate::{
         entities::{Currency, Ledger, OrderDirection},
     },
     domains::{
+        bitcoin::BtcAddressHandler,
         invoice::InvoiceHandler,
         ln_address::LnAddressHandler,
         ln_node::BreezNodeHandler,
@@ -49,6 +50,7 @@ pub fn merged_openapi() -> OpenApi {
     openapi.merge(BreezNodeHandler::openapi());
     openapi.merge(SystemHandler::openapi());
     openapi.merge(ApiKeyHandler::openapi());
+    openapi.merge(BtcAddressHandler::openapi());
 
     openapi
 }

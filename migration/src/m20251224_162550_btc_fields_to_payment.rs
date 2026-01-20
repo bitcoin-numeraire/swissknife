@@ -24,7 +24,7 @@ impl MigrationTrait for Migration {
             .alter_table(
                 Table::alter()
                     .table(Payment::Table)
-                    .add_column(string_len_null(Payment::DestinationAddress, 255))
+                    .add_column(string_len_null(Payment::BtcAddress, 255))
                     .to_owned(),
             )
             .await?;
@@ -83,7 +83,7 @@ impl MigrationTrait for Migration {
             .alter_table(
                 Table::alter()
                     .table(Payment::Table)
-                    .drop_column(Payment::DestinationAddress)
+                    .drop_column(Payment::BtcAddress)
                     .to_owned(),
             )
             .await?;

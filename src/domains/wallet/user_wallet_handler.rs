@@ -12,8 +12,8 @@ use crate::{
     application::{
         docs::{BAD_REQUEST_EXAMPLE, INTERNAL_EXAMPLE, NOT_FOUND_EXAMPLE, UNAUTHORIZED_EXAMPLE, UNPROCESSABLE_EXAMPLE},
         dtos::{
-            ApiKeyResponse, BitcoinAddressQueryParams, BitcoinAddressResponse, CreateApiKeyRequest, ErrorResponse,
-            InvoiceResponse, NewInvoiceRequest, PaymentResponse, RegisterLnAddressRequest, SendPaymentRequest,
+            ApiKeyResponse, BtcAddressResponse, CreateApiKeyRequest, ErrorResponse, InvoiceResponse,
+            NewBtcAddressRequest, NewInvoiceRequest, PaymentResponse, RegisterLnAddressRequest, SendPaymentRequest,
             UpdateLnAddressRequest, WalletLnAddressResponse, WalletResponse,
         },
         errors::{ApplicationError, DataError},
@@ -35,15 +35,15 @@ use super::{Balance, Contact};
 #[derive(OpenApi)]
 #[openapi(
     paths(
-        get_user_wallet, get_bitcoin_deposit_address,
-        get_wallet_balance,
+        get_user_wallet, get_wallet_balance,
+        new_wallet_btc_address,
         get_wallet_address, register_wallet_address, update_wallet_address, delete_wallet_address,
         wallet_pay, list_wallet_payments, get_wallet_payment, delete_failed_payments, list_wallet_invoices,
         get_wallet_invoice, new_wallet_invoice, delete_expired_invoices,
         list_contacts,
-        create_wallet_api_key, list_wallet_api_keys, get_wallet_api_key, revoke_wallet_api_key, revoke_wallet_api_keys
+        create_wallet_api_key, list_wallet_api_keys, get_wallet_api_key, revoke_wallet_api_key, revoke_wallet_api_keys,
     ),
-    components(schemas(WalletResponse, Balance, Contact, WalletLnAddressResponse, BitcoinAddressResponse)),
+    components(schemas(WalletResponse, Balance, Contact, WalletLnAddressResponse, BtcAddressResponse)),
     tags(
         (name = "User Wallet", description = "User Wallet endpoints. Available to any authenticated user.")
     ),
@@ -54,8 +54,8 @@ pub const CONTEXT_PATH: &str = "/v1/me";
 pub fn user_router() -> Router<Arc<AppState>> {
     Router::new()
         .route("/", get(get_user_wallet))
-        .route("/bitcoin/address", get(get_bitcoin_deposit_address))
         .route("/balance", get(get_wallet_balance))
+        .route("/bitcoin/address", post(new_wallet_btc_address))
         .route("/lightning-address", get(get_wallet_address))
         .route("/lightning-address", post(register_wallet_address))
         .route("/lightning-address", put(update_wallet_address))
@@ -99,32 +99,33 @@ async fn get_user_wallet(
     Ok(Json(wallet.into()))
 }
 
-/// Get current Bitcoin deposit address
+/// Generate a new Bitcoin address.
 ///
-/// Returns the active onchain deposit address for the authenticated wallet.
+/// Returns the Bitcoin address for the given address type. The returned address is the same until used.
 #[utoipa::path(
-    get,
+    post,
     path = "/bitcoin/address",
     tag = "User Wallet",
     context_path = CONTEXT_PATH,
-    params(BitcoinAddressQueryParams),
+    request_body = NewBtcAddressRequest,
     responses(
-        (status = 200, description = "Found", body = BitcoinAddressResponse),
+        (status = 200, description = "Bitcoin Address Created", body = BtcAddressResponse),
+        (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
         (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
+        (status = 422, description = "Unprocessable Entity", body = ErrorResponse, example = json!(UNPROCESSABLE_EXAMPLE)),
         (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
     )
 )]
-async fn get_bitcoin_deposit_address(
+async fn new_wallet_btc_address(
     State(app_state): State<Arc<AppState>>,
     user: User,
-    Query(query_params): Query<BitcoinAddressQueryParams>,
-) -> Result<Json<BitcoinAddressResponse>, ApplicationError> {
+    Json(payload): Json<NewBtcAddressRequest>,
+) -> Result<Json<BtcAddressResponse>, ApplicationError> {
     let address = app_state
         .services
         .bitcoin
-        .get_deposit_address(user.wallet_id, query_params.address_type.map(Into::into))
+        .new_deposit_address(user.wallet_id, payload.address_type.map(Into::into))
         .await?;
-
     Ok(Json(address.into()))
 }
 

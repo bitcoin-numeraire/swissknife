@@ -12,7 +12,7 @@ use tracing::{debug, error, trace, warn};
 use crate::{
     application::errors::LightningError,
     domains::{
-        bitcoin::{BitcoinEventsUseCases, BitcoinNetwork, BitcoinOutputEvent},
+        bitcoin::{BitcoinEventsUseCases, BitcoinOutputEvent, BtcNetwork},
         ln_node::LnEventsUseCases,
     },
     infra::lightning::cln::cln_websocket_types::{ChainMovement, InvoicePayment, SendPayFailure, SendPaySuccess},
@@ -24,7 +24,7 @@ pub async fn connect_websocket(
     config: ClnRestClientConfig,
     ln_events: Arc<dyn LnEventsUseCases>,
     bitcoin_events: Arc<dyn BitcoinEventsUseCases>,
-    network: BitcoinNetwork,
+    network: BtcNetwork,
 ) -> Result<Client, LightningError> {
     let mut client_builder = ClientBuilder::new(config.endpoint.clone())
         .transport_type(TransportType::Websocket)
@@ -103,7 +103,7 @@ fn on_error(err: Payload, _: Client) -> BoxFuture<'static, ()> {
 fn on_message(
     ln_events: Arc<dyn LnEventsUseCases>,
     bitcoin_events: Arc<dyn BitcoinEventsUseCases>,
-    network: BitcoinNetwork,
+    network: BtcNetwork,
     payload: Payload,
     _: Client,
 ) -> BoxFuture<'static, ()> {

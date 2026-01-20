@@ -6,7 +6,7 @@ use std::str::FromStr;
 use crate::{
     application::entities::Ledger,
     domains::{
-        bitcoin::BitcoinOutputStatus,
+        bitcoin::BtcOutputStatus,
         invoice::{Invoice, InvoiceStatus},
         ln_node::LnInvoicePaidEvent,
         payment::Payment,
@@ -80,13 +80,13 @@ impl From<WaitanyinvoiceResponse> for LnInvoicePaidEvent {
     }
 }
 
-impl From<ListfundsOutputsStatus> for BitcoinOutputStatus {
+impl From<ListfundsOutputsStatus> for BtcOutputStatus {
     fn from(val: ListfundsOutputsStatus) -> Self {
         match val {
-            ListfundsOutputsStatus::Unconfirmed => BitcoinOutputStatus::Unconfirmed,
-            ListfundsOutputsStatus::Confirmed => BitcoinOutputStatus::Confirmed,
-            ListfundsOutputsStatus::Spent => BitcoinOutputStatus::Spent,
-            ListfundsOutputsStatus::Immature => BitcoinOutputStatus::Immature,
+            ListfundsOutputsStatus::Unconfirmed => BtcOutputStatus::Unconfirmed,
+            ListfundsOutputsStatus::Confirmed => BtcOutputStatus::Confirmed,
+            ListfundsOutputsStatus::Spent => BtcOutputStatus::Spent,
+            ListfundsOutputsStatus::Immature => BtcOutputStatus::Immature,
         }
     }
 }

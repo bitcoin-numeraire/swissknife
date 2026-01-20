@@ -4,7 +4,7 @@ use serde::{Deserialize, Deserializer};
 use strum_macros::{Display, EnumString};
 
 use crate::{
-    application::dtos::BitcoinAddressType,
+    domains::bitcoin::BtcAddressType,
     infra::{
         axum::AxumServerConfig,
         config::config_rs::deserialize_duration,
@@ -32,7 +32,7 @@ pub struct AppConfig {
     pub invoice_expiry: Duration,
     pub fee_buffer: Option<f64>,
     #[serde(default)]
-    pub bitcoin_address_type: BitcoinAddressType,
+    pub bitcoin_address_type: BtcAddressType,
     pub ln_provider: LightningProvider,
     pub database: SeaOrmConfig,
     pub breez_config: Option<BreezClientConfig>,
