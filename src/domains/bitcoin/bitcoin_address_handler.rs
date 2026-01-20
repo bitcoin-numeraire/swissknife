@@ -14,9 +14,7 @@ use crate::{
             BAD_REQUEST_EXAMPLE, FORBIDDEN_EXAMPLE, INTERNAL_EXAMPLE, NOT_FOUND_EXAMPLE, UNAUTHORIZED_EXAMPLE,
             UNPROCESSABLE_EXAMPLE,
         },
-        dtos::{
-            BtcAddressResponse, ErrorResponse, NewBtcAddressRequest
-        },
+        dtos::{BtcAddressResponse, ErrorResponse, NewBtcAddressRequest},
         errors::ApplicationError,
     },
     domains::{

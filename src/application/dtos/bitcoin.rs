@@ -21,6 +21,8 @@ pub struct NewBtcAddressRequest {
 pub struct BtcAddressResponse {
     /// Internal ID
     pub id: Uuid,
+    /// Wallet ID
+    pub wallet_id: Uuid,
     /// Current deposit address
     pub address: String,
     /// Whether the address has already been used on-chain
@@ -39,6 +41,7 @@ impl From<BtcAddress> for BtcAddressResponse {
     fn from(address: BtcAddress) -> Self {
         BtcAddressResponse {
             id: address.id,
+            wallet_id: address.wallet_id,
             address: address.address,
             used: address.used,
             address_type: address.address_type,

@@ -55,7 +55,7 @@ pub fn user_router() -> Router<Arc<AppState>> {
     Router::new()
         .route("/", get(get_user_wallet))
         .route("/balance", get(get_wallet_balance))
-        .route("/bitcoin/address", get(new_wallet_btc_address))
+        .route("/bitcoin/address", post(new_wallet_btc_address))
         .route("/lightning-address", get(get_wallet_address))
         .route("/lightning-address", post(register_wallet_address))
         .route("/lightning-address", put(update_wallet_address))
