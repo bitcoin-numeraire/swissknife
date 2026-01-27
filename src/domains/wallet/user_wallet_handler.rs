@@ -121,7 +121,7 @@ async fn new_wallet_btc_address(
 ) -> Result<Json<BtcAddressResponse>, ApplicationError> {
     let address = services
         .bitcoin
-        .new_deposit_address(user.wallet_id, payload.address_type.map(Into::into))
+        .new_deposit_address(user.wallet_id, payload.address_type)
         .await?;
     Ok(Json(address.into()))
 }

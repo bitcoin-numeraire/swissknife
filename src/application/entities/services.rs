@@ -80,7 +80,7 @@ impl AppServices {
         let system = SystemService::new(store.clone(), ln_client.clone());
         let nostr = NostrService::new(store.clone());
         let api_key = ApiKeyService::new(store.clone());
-        let bitcoin = BitcoinService::new(store, bitcoin_wallet, adapters.events, bitcoin_address_type.into());
+        let bitcoin = BitcoinService::new(store, bitcoin_wallet, adapters.events, bitcoin_address_type);
 
         AppServices {
             invoice: Box::new(invoices),

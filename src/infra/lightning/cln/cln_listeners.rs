@@ -28,7 +28,11 @@ impl ClnGrpcListener {
 
 #[async_trait]
 impl EventsListener for ClnGrpcListener {
-    async fn listen( &self,events: Arc<dyn EventsUseCases>, _bitcoin_wallet: Arc<dyn BitcoinWallet>) -> Result<(), LightningError> {
+    async fn listen(
+        &self,
+        events: Arc<dyn EventsUseCases>,
+        _bitcoin_wallet: Arc<dyn BitcoinWallet>,
+    ) -> Result<(), LightningError> {
         let client = ClnGrpcClient::connect(&self.config).await?;
         listen_invoices(client, events, self.config.retry_delay)
             .await
@@ -52,7 +56,11 @@ impl ClnRestListener {
 
 #[async_trait]
 impl EventsListener for ClnRestListener {
-    async fn listen( &self,  events: Arc<dyn EventsUseCases>,  bitcoin_wallet: Arc<dyn BitcoinWallet>) -> Result<(), LightningError> {
+    async fn listen(
+        &self,
+        events: Arc<dyn EventsUseCases>,
+        bitcoin_wallet: Arc<dyn BitcoinWallet>,
+    ) -> Result<(), LightningError> {
         let network = bitcoin_wallet.network();
         let ws_client = connect_websocket(self.config.clone(), events, network).await?;
         let mut guard = self

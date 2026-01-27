@@ -72,10 +72,7 @@ async fn generate_btc_address(
 
     let address = services
         .bitcoin
-        .new_deposit_address(
-            payload.wallet_id.unwrap_or(user.wallet_id),
-            payload.address_type.map(Into::into),
-        )
+        .new_deposit_address(payload.wallet_id.unwrap_or(user.wallet_id), payload.address_type)
         .await?;
     Ok(Json(address.into()))
 }
