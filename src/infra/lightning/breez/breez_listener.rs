@@ -4,15 +4,15 @@ use async_trait::async_trait;
 use breez_sdk_core::{BreezEvent, EventListener, PaymentStatus, PaymentType};
 use tracing::{trace, warn};
 
-use crate::domains::ln_node::LnEventsUseCases;
+use crate::application::entities::EventsUseCases;
 
 pub struct BreezListener {
-    pub ln_events: Arc<dyn LnEventsUseCases>,
+    pub events: Arc<dyn EventsUseCases>,
 }
 
 impl BreezListener {
-    pub fn new(ln_events: Arc<dyn LnEventsUseCases>) -> Self {
-        Self { ln_events }
+    pub fn new(events: Arc<dyn EventsUseCases>) -> Self {
+        Self { events }
     }
 }
 
@@ -34,7 +34,7 @@ impl EventListener for BreezListener {
                         return;
                     }
 
-                    let ln_events = self.ln_events.clone();
+                    let ln_events = self.events.clone();
                     tokio::spawn(async move {
                         if let Err(err) = ln_events.invoice_paid(payment.into()).await {
                             warn!(%err, "Failed to process incoming payment");
@@ -57,7 +57,7 @@ impl EventListener for BreezListener {
                     return;
                 }
 
-                let ln_events = self.ln_events.clone();
+                let ln_events = self.events.clone();
                 tokio::spawn(async move {
                     if let Err(err) = ln_events.outgoing_payment(details.into()).await {
                         warn!(%err, "Failed to process outgoing payment");
@@ -67,7 +67,7 @@ impl EventListener for BreezListener {
             BreezEvent::PaymentFailed { details } => {
                 trace!("New PaymentFailed event received");
 
-                let ln_events = self.ln_events.clone();
+                let ln_events = self.events.clone();
                 tokio::spawn(async move {
                     if let Err(err) = ln_events.failed_payment(details.into()).await {
                         warn!(%err, "Failed to process outgoing payment");

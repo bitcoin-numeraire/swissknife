@@ -3,9 +3,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 
 use crate::{
-    application::errors::LightningError,
-    domains::{bitcoin::{BitcoinEventsUseCases, BitcoinWallet}, ln_node::LnEventsUseCases},
-    infra::lightning::LnNodeListener,
+    application::{entities::EventsUseCases, errors::LightningError}, domains::bitcoin::BitcoinWallet, infra::lightning::EventsListener
 };
 
 use super::{
@@ -30,17 +28,16 @@ impl LndWebsocketListener {
 }
 
 #[async_trait]
-impl LnNodeListener for LndWebsocketListener {
+impl EventsListener for LndWebsocketListener {
     async fn listen(
         &self,
-        ln_events: Arc<dyn LnEventsUseCases>,
-        bitcoin_events: Arc<dyn BitcoinEventsUseCases>,
+        events: Arc<dyn EventsUseCases>,
         bitcoin_wallet: Arc<dyn BitcoinWallet>,
     ) -> Result<(), LightningError> {
         let network = bitcoin_wallet.network();
         tokio::try_join!(
-            listen_invoices(self.config.clone(), self.macaroon.clone(), ln_events),
-            listen_transactions(self.config.clone(), self.macaroon.clone(), bitcoin_events, network),
+            listen_invoices(self.config.clone(), self.macaroon.clone(), events.clone()),
+            listen_transactions(self.config.clone(), self.macaroon.clone(), events, network),
         )?;
 
         Ok(())

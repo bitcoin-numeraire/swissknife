@@ -7,20 +7,19 @@ use tonic::{transport::Channel, Code};
 use tracing::{debug, error, info, trace, warn};
 
 use crate::{
-    application::errors::ApplicationError,
-    domains::ln_node::LnEventsUseCases,
-    infra::lightning::cln::cln::{waitanyinvoice_response::WaitanyinvoiceStatus, ListinvoicesRequest},
+    application::{entities::EventsUseCases, errors::ApplicationError},
+    infra::lightning::cln::cln::{ListinvoicesRequest, waitanyinvoice_response::WaitanyinvoiceStatus},
 };
 
 use super::cln::{node_client::NodeClient, WaitanyinvoiceRequest};
 
 pub async fn listen_invoices(
     mut client: NodeClient<Channel>,
-    ln_events: Arc<dyn LnEventsUseCases>,
+    events: Arc<dyn EventsUseCases>,
     retry_delay: Duration,
 ) -> Result<()> {
     // Temporary. get the latest settled invoice payment_hash as starting point for event listening
-    let last_settled_invoice = ln_events.latest_settled_invoice().await?;
+    let last_settled_invoice = events.latest_settled_invoice().await?;
 
     let mut lastpay_index = match last_settled_invoice {
         Some(invoice) => {
@@ -61,7 +60,7 @@ pub async fn listen_invoices(
                         trace!("New InvoicePaid event received");
 
                         loop {
-                            match ln_events.invoice_paid(invoice.clone().into()).await {
+                            match events.invoice_paid(invoice.clone().into()).await {
                                 Ok(_) => break,
                                 Err(err) => match err {
                                     ApplicationError::Database(db_err) => {

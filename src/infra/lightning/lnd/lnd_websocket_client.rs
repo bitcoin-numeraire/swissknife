@@ -11,25 +11,23 @@ use tokio_tungstenite::tungstenite::ClientRequestBuilder;
 use tokio_tungstenite::{connect_async_tls_with_config, Connector, MaybeTlsStream, WebSocketStream};
 use tracing::{debug, error, warn};
 
+use crate::application::entities::EventsUseCases;
 use crate::domains::bitcoin::{BitcoinTransaction, BtcNetwork};
 use crate::infra::lightning::lnd::lnd_types::{InvoiceResponse, TransactionResponse};
-use crate::{
-    application::errors::LightningError,
-    domains::{bitcoin::BitcoinEventsUseCases, ln_node::LnEventsUseCases},
-};
+use crate::application::errors::LightningError;
 
 use super::LndRestClientConfig;
 
 pub async fn listen_invoices(
     config: LndRestClientConfig,
     macaroon: String,
-    ln_events: Arc<dyn LnEventsUseCases>,
+    events: Arc<dyn EventsUseCases>,
 ) -> Result<(), LightningError> {
     let max_reconnect_delay = config.ws_max_reconnect_delay;
     let mut reconnect_delay = config.ws_min_reconnect_delay;
 
     loop {
-        let result = connect_and_handle(&macaroon, &config, ln_events.clone()).await;
+        let result = connect_and_handle(&macaroon, &config, events.clone()).await;
 
         if let Err(err) = result {
             match err {
@@ -52,14 +50,14 @@ pub async fn listen_invoices(
 pub async fn listen_transactions(
     config: LndRestClientConfig,
     macaroon: String,
-    bitcoin_events: Arc<dyn BitcoinEventsUseCases>,
+    events: Arc<dyn EventsUseCases>,
     network: BtcNetwork,
 ) -> Result<(), LightningError> {
     let max_reconnect_delay = config.ws_max_reconnect_delay;
     let mut reconnect_delay = config.ws_min_reconnect_delay;
 
     loop {
-        let result = connect_and_handle_transactions(&macaroon, &config, bitcoin_events.clone(), network).await;
+        let result = connect_and_handle_transactions(&macaroon, &config, events.clone(), network).await;
 
         if let Err(err) = result {
             match err {
@@ -82,7 +80,7 @@ pub async fn listen_transactions(
 async fn connect_and_handle(
     macaroon: &str,
     config: &LndRestClientConfig,
-    ln_events: Arc<dyn LnEventsUseCases>,
+    events: Arc<dyn EventsUseCases>,
 ) -> Result<(), LightningError> {
     let invoices_endpoint = format!("wss://{}/v1/invoices/subscribe", config.host);
     let uri = Uri::from_str(&invoices_endpoint).map_err(|e| LightningError::ParseConfig(e.to_string()))?;
@@ -96,7 +94,7 @@ async fn connect_and_handle(
 
     debug!("Connected to LND WebSocket server");
 
-    handle_messages(ws_stream, ln_events).await;
+    handle_messages(ws_stream, events).await;
 
     debug!("Disconnected from LND WebSocket server");
 
@@ -106,7 +104,7 @@ async fn connect_and_handle(
 async fn connect_and_handle_transactions(
     macaroon: &str,
     config: &LndRestClientConfig,
-    bitcoin_events: Arc<dyn BitcoinEventsUseCases>,
+    events: Arc<dyn EventsUseCases>,
     network: BtcNetwork,
 ) -> Result<(), LightningError> {
     let endpoint = format!("wss://{}/v1/transactions/subscribe", config.host);
@@ -121,7 +119,7 @@ async fn connect_and_handle_transactions(
 
     debug!("Connected to LND WebSocket transaction server");
 
-    handle_transaction_messages(ws_stream, bitcoin_events, network).await;
+    handle_transaction_messages(ws_stream, events, network).await;
 
     debug!("Disconnected from LND WebSocket transaction server");
 
@@ -158,7 +156,7 @@ async fn read_ca(path: &str) -> anyhow::Result<Certificate> {
 
 async fn handle_messages(
     mut ws_stream: WebSocketStream<MaybeTlsStream<TcpStream>>,
-    ln_events: Arc<dyn LnEventsUseCases>,
+    ln_events: Arc<dyn EventsUseCases>,
 ) {
     while let Some(message) = ws_stream.next().await {
         match message {
@@ -183,7 +181,7 @@ async fn handle_messages(
 
 async fn handle_transaction_messages(
     mut ws_stream: WebSocketStream<MaybeTlsStream<TcpStream>>,
-    bitcoin_events: Arc<dyn BitcoinEventsUseCases>,
+    events: Arc<dyn EventsUseCases>,
     network: BtcNetwork,
 ) {
     while let Some(message) = ws_stream.next().await {
@@ -191,7 +189,7 @@ async fn handle_transaction_messages(
             Ok(msg) => {
                 if msg.is_text() {
                     let text = msg.into_text().unwrap();
-                    if let Err(e) = process_transaction_message(&text, bitcoin_events.clone(), network).await {
+                    if let Err(e) = process_transaction_message(&text, events.clone(), network).await {
                         error!(%e, "Failed to process transaction message");
                     }
                 } else if msg.is_close() {
@@ -207,14 +205,14 @@ async fn handle_transaction_messages(
     }
 }
 
-async fn process_message(text: &str, ln_events: Arc<dyn LnEventsUseCases>) -> anyhow::Result<()> {
+async fn process_message(text: &str, events: Arc<dyn EventsUseCases>) -> anyhow::Result<()> {
     let value: Value = serde_json::from_str(text)?;
 
     if let Some(event) = value.get("result") {
         match serde_json::from_value::<InvoiceResponse>(event.clone()) {
             Ok(invoice) => {
                 if invoice.state.as_str() == "SETTLED" {
-                    if let Err(err) = ln_events.invoice_paid(invoice.into()).await {
+                    if let Err(err) = events.invoice_paid(invoice.into()).await {
                         warn!(%err, "Failed to process incoming payment");
                     }
                 }
@@ -230,7 +228,7 @@ async fn process_message(text: &str, ln_events: Arc<dyn LnEventsUseCases>) -> an
 
 async fn process_transaction_message(
     text: &str,
-    bitcoin_events: Arc<dyn BitcoinEventsUseCases>,
+    events: Arc<dyn EventsUseCases>,
     network: BtcNetwork,
 ) -> anyhow::Result<()> {
     let value: Value = serde_json::from_str(text)?;
@@ -243,9 +241,9 @@ async fn process_transaction_message(
                 for output in transaction.outputs.iter() {
                     let output_event = transaction.output_event(output, network);
                     let result = if output.is_ours {
-                        bitcoin_events.onchain_deposit(output_event).await
+                        events.onchain_deposit(output_event).await
                     } else {
-                        bitcoin_events.onchain_withdrawal(output_event).await
+                        events.onchain_withdrawal(output_event).await
                     };
 
                     if let Err(err) = result {

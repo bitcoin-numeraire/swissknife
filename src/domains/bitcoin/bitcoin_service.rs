@@ -6,22 +6,22 @@ use uuid::Uuid;
 
 use crate::{
     application::{
-        entities::{AppStore, Ledger},
+        entities::{AppStore, EventsUseCases, Ledger},
         errors::{ApplicationError, DataError},
     },
     domains::{
-        bitcoin::{BtcAddressFilter, BitcoinWallet},
+        bitcoin::{BitcoinWallet, BtcAddressFilter},
         invoice::{InvoiceFilter, InvoiceStatus},
         payment::{PaymentFilter, PaymentStatus},
     },
 };
 
-use super::{BitcoinEventsUseCases, BitcoinUseCases, BtcAddress, BtcAddressType};
+use super::{BitcoinUseCases, BtcAddress, BtcAddressType};
 
 pub struct BitcoinService {
     store: AppStore,
     wallet: Arc<dyn BitcoinWallet>,
-    bitcoin_events: Arc<dyn BitcoinEventsUseCases>,
+    events: Arc<dyn EventsUseCases>,
     address_type: BtcAddressType,
 }
 
@@ -29,13 +29,13 @@ impl BitcoinService {
     pub fn new(
         store: AppStore,
         wallet: Arc<dyn BitcoinWallet>,
-        bitcoin_events: Arc<dyn BitcoinEventsUseCases>,
+        events: Arc<dyn EventsUseCases>,
         address_type: BtcAddressType,
     ) -> Self {
         Self {
             store,
             wallet,
-            bitcoin_events,
+            events,
             address_type,
         }
     }
@@ -158,7 +158,7 @@ impl BitcoinUseCases for BitcoinService {
                 continue;
             };
 
-            self.bitcoin_events
+            self.events
                 .onchain_deposit(transaction.output_event(matching_output, network))
                 .await?;
 
@@ -202,7 +202,7 @@ impl BitcoinUseCases for BitcoinService {
                 });
 
             if let Some(output) = candidate_output {
-                self.bitcoin_events
+                self.events
                     .onchain_withdrawal(transaction.output_event(output, network))
                     .await?;
 

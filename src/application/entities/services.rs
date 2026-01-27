@@ -1,9 +1,9 @@
 use std::sync::Arc;
 
 use crate::{
-    application::{dtos::AppConfig, errors::ConfigError},
+    application::{dtos::AppConfig, entities::EventsUseCases, errors::ConfigError},
     domains::{
-        bitcoin::{BitcoinEventsUseCases, BitcoinService, BitcoinUseCases, BitcoinWallet},
+        bitcoin::{BitcoinService, BitcoinUseCases, BitcoinWallet},
         invoice::{InvoiceService, InvoiceUseCases},
         ln_address::{LnAddressService, LnAddressUseCases},
         lnurl::{LnUrlService, LnUrlUseCases},
@@ -16,10 +16,7 @@ use crate::{
     infra::{
         jwt::JWTAuthenticator,
         lightning::{
-            breez::BreezClient,
-            cln::{ClnGrpcClient, ClnRestClient},
-            lnd::LndRestClient,
-            LnClient,
+            LnClient, breez::BreezClient, cln::{ClnGrpcClient, ClnRestClient}, lnd::LndRestClient
         },
     },
 };
@@ -45,7 +42,7 @@ impl AppServices {
         store: AppStore,
         ln_client: Arc<dyn LnClient>,
         bitcoin_wallet: Arc<dyn BitcoinWallet>,
-        bitcoin_events: Arc<dyn BitcoinEventsUseCases>,
+        events: Arc<dyn EventsUseCases>,
         jwt_authenticator: Arc<dyn JWTAuthenticator>,
     ) -> Self {
         let AppConfig {
@@ -85,7 +82,7 @@ impl AppServices {
         let system = SystemService::new(store.clone(), ln_client.clone());
         let nostr = NostrService::new(store.clone());
         let api_key = ApiKeyService::new(store.clone());
-        let bitcoin = BitcoinService::new(store, bitcoin_wallet, bitcoin_events, bitcoin_address_type.into());
+        let bitcoin = BitcoinService::new(store, bitcoin_wallet, events, bitcoin_address_type.into());
 
         AppServices {
             invoice: Box::new(invoices),

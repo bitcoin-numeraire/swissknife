@@ -8,10 +8,9 @@ use chrono::{TimeZone, Utc};
 use serde_bolt::bitcoin::hashes::hex::ToHex;
 
 use crate::{
-    application::entities::{Currency, Ledger},
+    application::entities::{Currency, Ledger, LnInvoicePaidEvent, LnPayFailureEvent, LnPaySuccessEvent},
     domains::{
         invoice::{Invoice, InvoiceStatus, LnInvoice},
-        ln_node::{LnInvoicePaidEvent, LnPayFailureEvent, LnPaySuccessEvent},
         payment::Payment,
         system::HealthStatus,
     },
