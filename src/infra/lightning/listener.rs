@@ -9,5 +9,9 @@ use crate::{
 
 #[async_trait]
 pub trait EventsListener: Send + Sync {
-    async fn listen(&self, events: Arc<dyn EventsUseCases>, bitcoin_wallet: Arc<dyn BitcoinWallet>) -> Result<(), LightningError>;
+    async fn listen(
+        &self,
+        events: Arc<dyn EventsUseCases>,
+        bitcoin_wallet: Arc<dyn BitcoinWallet>,
+    ) -> Result<(), LightningError>;
 }

@@ -14,9 +14,9 @@ use breez_sdk_core::{
 };
 
 use crate::{
-    application::{        errors::{BitcoinError, LightningError}},
+    application::errors::{BitcoinError, LightningError},
     domains::{
-        bitcoin::{BitcoinTransaction, BtcAddressType, BtcNetwork, BitcoinWallet},
+        bitcoin::{BitcoinTransaction, BitcoinWallet, BtcAddressType, BtcNetwork},
         invoice::Invoice,
         payment::Payment,
         system::HealthStatus,

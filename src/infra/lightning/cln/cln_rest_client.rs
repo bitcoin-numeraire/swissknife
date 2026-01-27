@@ -13,7 +13,7 @@ use uuid::Uuid;
 use async_trait::async_trait;
 
 use crate::{
-    application::{errors::{BitcoinError, LightningError}},
+    application::errors::{BitcoinError, LightningError},
     domains::{
         bitcoin::{BitcoinTransaction, BitcoinTransactionOutput, BitcoinWallet, BtcAddressType, BtcNetwork},
         invoice::Invoice,

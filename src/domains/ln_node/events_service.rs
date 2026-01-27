@@ -1,14 +1,18 @@
 use async_trait::async_trait;
-use tracing::{debug, info, warn, trace};
+use tracing::{debug, info, trace, warn};
 use uuid::Uuid;
 
 use crate::{
     application::{
-        entities::{AppStore, BtcOutputEvent, EventsUseCases, Ledger, LnInvoicePaidEvent, LnPayFailureEvent, LnPaySuccessEvent},
+        entities::{
+            AppStore, BtcOutputEvent, EventsUseCases, Ledger, LnInvoicePaidEvent, LnPayFailureEvent, LnPaySuccessEvent,
+        },
         errors::{ApplicationError, DataError},
     },
     domains::{
-        bitcoin::{BtcOutput, BtcOutputStatus}, invoice::{Invoice, InvoiceFilter, InvoiceOrderBy, InvoiceStatus}, payment::PaymentStatus
+        bitcoin::{BtcOutput, BtcOutputStatus},
+        invoice::{Invoice, InvoiceFilter, InvoiceOrderBy, InvoiceStatus},
+        payment::PaymentStatus,
     },
 };
 
@@ -286,4 +290,5 @@ impl EventsUseCases for EventsService {
 
         info!(%outpoint, "Onchain withdrawal processed");
         Ok(())
-    }}
+    }
+}

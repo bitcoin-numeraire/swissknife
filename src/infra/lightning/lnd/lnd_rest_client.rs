@@ -12,9 +12,9 @@ use serde_bolt::bitcoin::hashes::{sha256, Hash};
 use tokio::fs;
 
 use crate::{
-    application::{errors::{BitcoinError, LightningError}},
+    application::errors::{BitcoinError, LightningError},
     domains::{
-        bitcoin::{BitcoinTransaction, BtcAddressType, BtcNetwork, BitcoinWallet},
+        bitcoin::{BitcoinTransaction, BitcoinWallet, BtcAddressType, BtcNetwork},
         invoice::Invoice,
         payment::Payment,
         system::HealthStatus,

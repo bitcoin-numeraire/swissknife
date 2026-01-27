@@ -11,7 +11,4 @@ pub enum ConfigError {
 
     #[error("Missing auth provider config: {0}")]
     MissingAuthProviderConfig(String),
-
-    #[error("Expected {0} but found a different client")]
-    InvalidLightningProvider(String),
 }

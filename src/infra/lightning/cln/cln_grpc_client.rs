@@ -24,7 +24,7 @@ use crate::{
     },
     infra::{
         config::config_rs::deserialize_duration,
-        lightning::{LnClient, cln::cln::newaddr_request::NewaddrAddresstype, types::parse_network},
+        lightning::{cln::cln::newaddr_request::NewaddrAddresstype, types::parse_network, LnClient},
     },
 };
 

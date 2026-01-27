@@ -14,8 +14,8 @@ use crate::{
         errors::{ApplicationError, DataError, DatabaseError, LightningError},
     },
     domains::{
-        invoice::{Invoice, InvoiceStatus},
         bitcoin::BitcoinWallet,
+        invoice::{Invoice, InvoiceStatus},
         lnurl::{process_success_action, validate_lnurl_pay},
     },
     infra::lightning::LnClient,

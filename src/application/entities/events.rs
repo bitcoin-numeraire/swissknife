@@ -1,8 +1,10 @@
-use chrono::{DateTime, Utc};
 use async_trait::async_trait;
+use chrono::{DateTime, Utc};
 
-use crate::{application::errors::ApplicationError, domains::{bitcoin::BtcNetwork, invoice::Invoice}};
-
+use crate::{
+    application::errors::ApplicationError,
+    domains::{bitcoin::BtcNetwork, invoice::Invoice},
+};
 
 #[derive(Debug, Clone)]
 pub struct LnInvoicePaidEvent {

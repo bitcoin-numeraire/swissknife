@@ -33,4 +33,3 @@ pub struct BitcoinTransactionOutput {
     pub amount_sat: u64,
     pub is_ours: bool,
 }
-

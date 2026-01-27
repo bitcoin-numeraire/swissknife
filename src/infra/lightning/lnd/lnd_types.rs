@@ -3,7 +3,10 @@ use chrono::{TimeZone, Utc};
 use lightning_invoice::Bolt11Invoice;
 use serde::{Deserialize, Serialize};
 
-use crate::{application::entities::LnInvoicePaidEvent, domains::bitcoin::{BitcoinTransaction, BitcoinTransactionOutput}};
+use crate::{
+    application::entities::LnInvoicePaidEvent,
+    domains::bitcoin::{BitcoinTransaction, BitcoinTransactionOutput},
+};
 use serde_with::{serde_as, DisplayFromStr};
 use std::str::FromStr;
 

@@ -12,9 +12,9 @@ use tokio_tungstenite::{connect_async_tls_with_config, Connector, MaybeTlsStream
 use tracing::{debug, error, warn};
 
 use crate::application::entities::EventsUseCases;
+use crate::application::errors::LightningError;
 use crate::domains::bitcoin::{BitcoinTransaction, BtcNetwork};
 use crate::infra::lightning::lnd::lnd_types::{InvoiceResponse, TransactionResponse};
-use crate::application::errors::LightningError;
 
 use super::LndRestClientConfig;
 
@@ -133,12 +133,14 @@ async fn create_tls_connector(config: &LndRestClientConfig) -> Result<Option<Con
             .map_err(|e| LightningError::ReadCertificates(e.to_string()))?;
         let tls_connector = TlsConnector::builder()
             .add_root_certificate(ca_certificate)
+            .danger_accept_invalid_certs(config.accept_invalid_certs)
             .danger_accept_invalid_hostnames(config.accept_invalid_hostnames)
             .build()
             .map_err(|e| LightningError::TLSConfig(e.to_string()))?;
         Ok(Some(Connector::NativeTls(tls_connector)))
     } else if config.accept_invalid_certs || config.accept_invalid_hostnames {
         let tls_connector = TlsConnector::builder()
+            .danger_accept_invalid_certs(config.accept_invalid_certs)
             .danger_accept_invalid_hostnames(config.accept_invalid_hostnames)
             .build()
             .map_err(|e| LightningError::TLSConfig(e.to_string()))?;

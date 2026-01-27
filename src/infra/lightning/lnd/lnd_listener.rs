@@ -3,7 +3,9 @@ use std::sync::Arc;
 use async_trait::async_trait;
 
 use crate::{
-    application::{entities::EventsUseCases, errors::LightningError}, domains::bitcoin::BitcoinWallet, infra::lightning::EventsListener
+    application::{entities::EventsUseCases, errors::LightningError},
+    domains::bitcoin::BitcoinWallet,
+    infra::lightning::EventsListener,
 };
 
 use super::{

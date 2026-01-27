@@ -10,9 +10,12 @@ use tokio::fs;
 use tracing::{debug, error, trace, warn};
 
 use crate::{
-    application::{entities::{BtcOutputEvent, EventsUseCases}, errors::LightningError},
+    application::{
+        entities::{BtcOutputEvent, EventsUseCases},
+        errors::LightningError,
+    },
     domains::bitcoin::BtcNetwork,
-    infra::lightning::cln::cln_websocket_types::{ChainMovement, InvoicePayment, SendPayFailure, SendPaySuccess}
+    infra::lightning::cln::cln_websocket_types::{ChainMovement, InvoicePayment, SendPayFailure, SendPaySuccess},
 };
 
 use super::ClnRestClientConfig;
@@ -34,9 +37,7 @@ pub async fn connect_websocket(
         .on("close", on_close)
         .on("error", on_error)
         .on("message", {
-            move |payload, _: Client| {
-                on_message(events.clone(), network, payload)
-            }
+            move |payload, _: Client| on_message(events.clone(), network, payload)
         });
 
     if let Some(ca_cert_path) = &config.ca_cert_path {
@@ -96,11 +97,7 @@ fn on_error(err: Payload, _: Client) -> BoxFuture<'static, ()> {
     .boxed()
 }
 
-fn on_message(
-    events: Arc<dyn EventsUseCases>,
-    network: BtcNetwork,
-    payload: Payload,
-) -> BoxFuture<'static, ()> {
+fn on_message(events: Arc<dyn EventsUseCases>, network: BtcNetwork, payload: Payload) -> BoxFuture<'static, ()> {
     async move {
         match payload {
             Payload::Text(values) => {

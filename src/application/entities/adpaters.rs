@@ -1,78 +1,77 @@
 use std::sync::Arc;
 
+use tower_http::timeout::TimeoutLayer;
+use tracing::debug;
+
 use crate::{
     application::{
         dtos::{AppConfig, AuthProvider, LightningProvider},
-        entities::{AppServices, AppStore, EventsUseCases, LnNodeClient},
+        entities::{EventsUseCases, LnNodeClient},
         errors::{ApplicationError, ConfigError},
-    }, domains::{bitcoin::BitcoinWallet, ln_node::EventsService}, infra::{
+    },
+    domains::{bitcoin::BitcoinWallet, ln_node::EventsService},
+    infra::{
         database::sea_orm::SeaORMClient,
-        jwt::{JWTAuthenticator, local::LocalAuthenticator, oauth2::OAuth2Authenticator},
+        jwt::{local::LocalAuthenticator, oauth2::OAuth2Authenticator, JWTAuthenticator},
         lightning::{
-            EventsListener, LnClient, breez::{BreezClient, BreezListener}, cln::{ClnGrpcClient, ClnGrpcListener, ClnRestClient, ClnRestListener}, lnd::{LndRestClient, LndWebsocketListener}
+            breez::{BreezClient, BreezListener},
+            cln::{ClnGrpcClient, ClnGrpcListener, ClnRestClient, ClnRestListener},
+            lnd::{LndRestClient, LndWebsocketListener},
+            EventsListener, LnClient,
         },
-    }
+    },
 };
-use tower_http::timeout::TimeoutLayer;
-use tracing::{debug, info};
 
-pub struct AppState {
-    pub services: AppServices,
+use super::AppStore;
+
+#[derive(Clone)]
+pub struct AppAdapters {
+    pub store: AppStore,
     pub ln_client: Arc<dyn LnClient>,
-    pub ln_node_client: LnNodeClient,
-    #[allow(dead_code)]
     pub ln_listener: Option<Arc<dyn EventsListener>>,
     pub timeout_layer: TimeoutLayer,
+    pub bitcoin_wallet: Arc<dyn BitcoinWallet>,
+    pub jwt_authenticator: Arc<dyn JWTAuthenticator>,
+    pub events: Arc<dyn EventsUseCases>,
 }
 
-impl AppState {
+impl AppAdapters {
     pub async fn new(config: AppConfig) -> Result<Self, ApplicationError> {
-        info!("Numeraire SwissKnife version: {}", env!("CARGO_PKG_VERSION"));
+        let AppConfig { web, database, .. } = config.clone();
 
-        // Infra
-        let timeout_layer = TimeoutLayer::new(config.web.request_timeout);
-        let db_conn = SeaORMClient::connect(config.database.clone()).await?;
+        let timeout_layer = TimeoutLayer::new(web.request_timeout);
+        let db_conn = SeaORMClient::connect(database).await?;
+        let store = AppStore::new_sea_orm(db_conn);
         let jwt_authenticator = get_authenticator(config.clone()).await?;
 
-        // Adapters
-        let store = AppStore::new_sea_orm(db_conn);
+        // Events are use cases but we need to define them because Breez accepts the use cases in its
+        // connect function that returns the SDK.
         let events = Arc::new(EventsService::new(store.clone()));
-        let lightning = get_ln_client(config.clone(), events.clone()).await?;
-        let ln_node_client = lightning.ln_node_client;
-        let ln_client = match ln_node_client.clone() {
+
+        let lightning = get_ln_client(config, events.clone()).await?;
+
+        let ln_client = match lightning.ln_node_client.clone() {
             LnNodeClient::Breez(client) => client as Arc<dyn LnClient>,
             LnNodeClient::ClnGrpc(client) => client as Arc<dyn LnClient>,
             LnNodeClient::ClnRest(client) => client as Arc<dyn LnClient>,
             LnNodeClient::Lnd(client) => client as Arc<dyn LnClient>,
         };
-        let bitcoin_wallet = lightning.bitcoin_wallet;
 
-        if let Some(listener) = lightning.ln_listener.clone() {
-            let events = events.clone();
-            let bitcoin_wallet = bitcoin_wallet.clone();
-            tokio::spawn(async move {
-                if let Err(err) = listener.listen(events, bitcoin_wallet).await {
-                    tracing::error!(%err, "Lightning listener failed");
-                }
-            });
-        }
+        let bitcoin_wallet = match lightning.ln_node_client.clone() {
+            LnNodeClient::Breez(client) => client as Arc<dyn BitcoinWallet>,
+            LnNodeClient::ClnGrpc(client) => client as Arc<dyn BitcoinWallet>,
+            LnNodeClient::ClnRest(client) => client as Arc<dyn BitcoinWallet>,
+            LnNodeClient::Lnd(client) => client as Arc<dyn BitcoinWallet>,
+        };
 
-        // Services
-        let services = AppServices::new(
-            config,
+        Ok(AppAdapters {
             store,
-            ln_client.clone(),
-            bitcoin_wallet,
-            events,
-            jwt_authenticator,
-        );
-
-        Ok(Self {
-            services,
             ln_client,
-            ln_node_client,
             ln_listener: lightning.ln_listener,
             timeout_layer,
+            bitcoin_wallet,
+            jwt_authenticator,
+            events,
         })
     }
 }
@@ -80,7 +79,6 @@ impl AppState {
 struct LightningAdapter {
     ln_node_client: LnNodeClient,
     ln_listener: Option<Arc<dyn EventsListener>>,
-    bitcoin_wallet: Arc<dyn BitcoinWallet>,
 }
 
 async fn get_ln_client(
@@ -98,12 +96,10 @@ async fn get_ln_client(
 
             let listener = BreezListener::new(events);
             let client = Arc::new(BreezClient::new(breez_config.clone(), Box::new(listener)).await?);
-            let bitcoin_wallet = client.clone() as Arc<dyn BitcoinWallet>;
 
             Ok(LightningAdapter {
                 ln_node_client: LnNodeClient::Breez(client),
                 ln_listener: None,
-                bitcoin_wallet,
             })
         }
         LightningProvider::ClnGrpc => {
@@ -116,12 +112,10 @@ async fn get_ln_client(
 
             let client = Arc::new(ClnGrpcClient::new(cln_config.clone()).await?);
             let listener: Arc<dyn EventsListener> = Arc::new(ClnGrpcListener::new(cln_config));
-            let bitcoin_wallet = client.clone() as Arc<dyn BitcoinWallet>;
 
             Ok(LightningAdapter {
                 ln_node_client: LnNodeClient::ClnGrpc(client),
                 ln_listener: Some(listener),
-                bitcoin_wallet,
             })
         }
         LightningProvider::ClnRest => {
@@ -134,12 +128,10 @@ async fn get_ln_client(
 
             let client = Arc::new(ClnRestClient::new(cln_config.clone()).await?);
             let listener: Arc<dyn EventsListener> = Arc::new(ClnRestListener::new(cln_config));
-            let bitcoin_wallet = client.clone() as Arc<dyn BitcoinWallet>;
 
             Ok(LightningAdapter {
                 ln_node_client: LnNodeClient::ClnRest(client),
                 ln_listener: Some(listener),
-                bitcoin_wallet,
             })
         }
         LightningProvider::Lnd => {
@@ -152,12 +144,10 @@ async fn get_ln_client(
 
             let client = Arc::new(LndRestClient::new(lnd_config.clone()).await?);
             let listener: Arc<dyn EventsListener> = Arc::new(LndWebsocketListener::new(lnd_config).await?);
-            let bitcoin_wallet = client.clone() as Arc<dyn BitcoinWallet>;
 
             Ok(LightningAdapter {
                 ln_node_client: LnNodeClient::Lnd(client),
                 ln_listener: Some(listener),
-                bitcoin_wallet,
             })
         }
     }
