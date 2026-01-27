@@ -4,8 +4,8 @@ use async_trait::async_trait;
 use rust_socketio::asynchronous::Client as WsClient;
 
 use crate::{
-    application::{entities::BitcoinWallet, errors::LightningError},
-    domains::{bitcoin::BitcoinEventsUseCases, ln_node::LnEventsUseCases},
+    application::errors::LightningError,
+    domains::{bitcoin::{BitcoinEventsUseCases, BitcoinWallet}, ln_node::LnEventsUseCases},
     infra::lightning::LnNodeListener,
 };
 

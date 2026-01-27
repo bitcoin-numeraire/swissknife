@@ -5,7 +5,7 @@ use utoipa::ToSchema;
 use crate::application::entities::Currency;
 
 #[derive(Clone, Debug, Copy, EnumString, Deserialize, Serialize, Display, PartialEq, Eq, Default, ToSchema)]
-pub enum BitcoinNetwork {
+pub enum BtcNetwork {
     #[default]
     Bitcoin,
     Testnet,
@@ -15,27 +15,27 @@ pub enum BitcoinNetwork {
     Signet,
 }
 
-impl From<BitcoinNetwork> for Currency {
-    fn from(network: BitcoinNetwork) -> Self {
+impl From<BtcNetwork> for Currency {
+    fn from(network: BtcNetwork) -> Self {
         match network {
-            BitcoinNetwork::Bitcoin => Currency::Bitcoin,
-            BitcoinNetwork::Testnet => Currency::BitcoinTestnet,
-            BitcoinNetwork::Testnet4 => Currency::BitcoinTestnet,
-            BitcoinNetwork::Regtest => Currency::Regtest,
-            BitcoinNetwork::Simnet => Currency::Simnet,
-            BitcoinNetwork::Signet => Currency::Signet,
+            BtcNetwork::Bitcoin => Currency::Bitcoin,
+            BtcNetwork::Testnet => Currency::BitcoinTestnet,
+            BtcNetwork::Testnet4 => Currency::BitcoinTestnet,
+            BtcNetwork::Regtest => Currency::Regtest,
+            BtcNetwork::Simnet => Currency::Simnet,
+            BtcNetwork::Signet => Currency::Signet,
         }
     }
 }
 
-impl From<Currency> for BitcoinNetwork {
+impl From<Currency> for BtcNetwork {
     fn from(currency: Currency) -> Self {
         match currency {
-            Currency::Bitcoin => BitcoinNetwork::Bitcoin,
-            Currency::BitcoinTestnet => BitcoinNetwork::Testnet,
-            Currency::Regtest => BitcoinNetwork::Regtest,
-            Currency::Simnet => BitcoinNetwork::Simnet,
-            Currency::Signet => BitcoinNetwork::Signet,
+            Currency::Bitcoin => BtcNetwork::Bitcoin,
+            Currency::BitcoinTestnet => BtcNetwork::Testnet,
+            Currency::Regtest => BtcNetwork::Regtest,
+            Currency::Simnet => BtcNetwork::Simnet,
+            Currency::Signet => BtcNetwork::Signet,
         }
     }
 }

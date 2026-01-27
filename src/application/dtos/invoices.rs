@@ -8,7 +8,7 @@ use uuid::Uuid;
 
 use crate::{
     application::{
-        dtos::BitcoinOutputResponse,
+        dtos::BtcOutputResponse,
         entities::{Currency, Ledger},
     },
     domains::invoice::{Invoice, InvoiceStatus, LnInvoice},
@@ -74,7 +74,7 @@ pub struct InvoiceResponse {
 
     /// Bitcoin output details of the invoice
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub bitcoin_output: Option<BitcoinOutputResponse>,
+    pub bitcoin_output: Option<BtcOutputResponse>,
 }
 
 #[serde_as]

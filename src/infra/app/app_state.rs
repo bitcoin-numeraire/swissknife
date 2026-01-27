@@ -3,11 +3,11 @@ use std::sync::Arc;
 use crate::{
     application::{
         dtos::{AppConfig, AuthProvider, LightningProvider},
-        entities::{AppServices, AppStore, BitcoinWallet, LnNodeClient},
+        entities::{AppServices, AppStore, LnNodeClient},
         errors::{ApplicationError, ConfigError},
     },
     domains::{
-        bitcoin::BitcoinEventsService,
+        bitcoin::{BitcoinEventsService, BitcoinWallet},
         ln_node::{LnEventsService, LnEventsUseCases},
     },
     infra::{

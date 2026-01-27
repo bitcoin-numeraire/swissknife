@@ -9,7 +9,7 @@ use uuid::Uuid;
 
 use crate::{
     application::entities::{Currency, Ledger, OrderDirection},
-    domains::bitcoin::BitcoinOutput,
+    domains::bitcoin::BtcOutput,
 };
 
 #[derive(Clone, Debug, Default)]
@@ -30,7 +30,7 @@ pub struct Invoice {
     pub updated_at: Option<DateTime<Utc>>,
     pub ln_invoice: Option<LnInvoice>,
     pub btc_output_id: Option<Uuid>,
-    pub bitcoin_output: Option<BitcoinOutput>,
+    pub bitcoin_output: Option<BtcOutput>,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -54,7 +54,7 @@ pub enum InvoiceStatus {
 }
 
 #[serde_as]
-#[derive(Clone, Debug, Deserialize, Serialize, Default, IntoParams)]
+#[derive(Clone, Debug, Deserialize, Serialize, Default, IntoParams, ToSchema)]
 pub struct InvoiceFilter {
     /// Total amount of results to return
     #[serde_as(as = "Option<DisplayFromStr>")]

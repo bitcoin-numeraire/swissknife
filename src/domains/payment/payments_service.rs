@@ -10,11 +10,12 @@ use uuid::Uuid;
 
 use crate::{
     application::{
-        entities::{AppStore, BitcoinWallet, Currency, Ledger},
+        entities::{AppStore, Currency, Ledger},
         errors::{ApplicationError, DataError, DatabaseError, LightningError},
     },
     domains::{
         invoice::{Invoice, InvoiceStatus},
+        bitcoin::BitcoinWallet,
         lnurl::{process_success_action, validate_lnurl_pay},
     },
     infra::lightning::LnClient,
@@ -188,7 +189,7 @@ impl PaymentService {
                             ledger: Ledger::Internal,
                             currency: data.network.into(),
                             description: description.clone(),
-                            destination_address: Some(data.address),
+                            btc_address: Some(data.address),
                             fee_msat: Some(0),
                             payment_time: Some(timestamp),
                             ..Default::default()
@@ -209,7 +210,7 @@ impl PaymentService {
                         ledger: Ledger::Onchain,
                         currency: data.network.into(),
                         description,
-                        destination_address: Some(data.address.clone()),
+                        btc_address: Some(data.address.clone()),
                         ..Default::default()
                     },
                     self.fee_buffer,

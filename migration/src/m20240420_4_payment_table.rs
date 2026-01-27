@@ -77,5 +77,5 @@ pub(crate) enum Payment {
     UpdatedAt,
     // Bitcoin L1 support (added in m20251224_162550)
     BtcOutputId,
-    DestinationAddress,
+    BtcAddress,
 }

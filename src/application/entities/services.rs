@@ -1,9 +1,9 @@
 use std::sync::Arc;
 
 use crate::{
-    application::{dtos::AppConfig, entities::BitcoinWallet, errors::ConfigError},
+    application::{dtos::AppConfig, errors::ConfigError},
     domains::{
-        bitcoin::{BitcoinEventsUseCases, BitcoinService, BitcoinUseCases},
+        bitcoin::{BitcoinEventsUseCases, BitcoinService, BitcoinUseCases, BitcoinWallet},
         invoice::{InvoiceService, InvoiceUseCases},
         ln_address::{LnAddressService, LnAddressUseCases},
         lnurl::{LnUrlService, LnUrlUseCases},

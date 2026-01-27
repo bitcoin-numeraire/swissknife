@@ -12,12 +12,9 @@ use serde_bolt::bitcoin::hashes::{sha256, Hash};
 use tokio::fs;
 
 use crate::{
-    application::{
-        entities::BitcoinWallet,
-        errors::{BitcoinError, LightningError},
-    },
+    application::{errors::{BitcoinError, LightningError}},
     domains::{
-        bitcoin::{BitcoinAddressType, BitcoinNetwork, BitcoinTransaction},
+        bitcoin::{BitcoinTransaction, BtcAddressType, BtcNetwork, BitcoinWallet},
         invoice::Invoice,
         payment::Payment,
         system::HealthStatus,
@@ -58,7 +55,7 @@ pub struct LndRestClient {
     base_url: String,
     fee_limit_msat: u64,
     retry_for: u32,
-    network: BitcoinNetwork,
+    network: BtcNetwork,
 }
 
 const USER_AGENT: &str = "Numeraire Swissknife/1.0";
@@ -101,7 +98,7 @@ impl LndRestClient {
             base_url: config.host.clone(),
             fee_limit_msat: config.fee_limit_msat,
             retry_for: config.payment_timeout.as_secs() as u32,
-            network: BitcoinNetwork::default(),
+            network: BtcNetwork::default(),
         };
 
         let network = lnd_client.network().await?;
@@ -184,7 +181,7 @@ impl LndRestClient {
         Ok(result)
     }
 
-    async fn network(&self) -> Result<BitcoinNetwork, LightningError> {
+    async fn network(&self) -> Result<BtcNetwork, LightningError> {
         let response: GetinfoResponse = self
             .get_request("v1/getinfo")
             .await
@@ -203,10 +200,10 @@ impl LndRestClient {
         ))
     }
 
-    fn map_address_type(address_type: BitcoinAddressType) -> String {
+    fn map_address_type(address_type: BtcAddressType) -> String {
         match address_type {
-            BitcoinAddressType::P2sh => "NESTED_PUBKEY_HASH".to_string(),
-            BitcoinAddressType::P2tr => "TAPROOT_PUBKEY".to_string(),
+            BtcAddressType::P2sh => "NESTED_PUBKEY_HASH".to_string(),
+            BtcAddressType::P2tr => "TAPROOT_PUBKEY".to_string(),
             _ => "WITNESS_PUBKEY_HASH".to_string(),
         }
     }
@@ -334,7 +331,7 @@ impl LnClient for LndRestClient {
 
 #[async_trait]
 impl BitcoinWallet for LndRestClient {
-    async fn new_address(&self, address_type: BitcoinAddressType) -> Result<String, BitcoinError> {
+    async fn new_address(&self, address_type: BtcAddressType) -> Result<String, BitcoinError> {
         let address_type_param = Self::map_address_type(address_type);
         let endpoint = format!("v1/newaddress?type={}", address_type_param);
 
@@ -372,7 +369,7 @@ impl BitcoinWallet for LndRestClient {
         Ok(response.into())
     }
 
-    fn network(&self) -> BitcoinNetwork {
+    fn network(&self) -> BtcNetwork {
         self.network
     }
 }

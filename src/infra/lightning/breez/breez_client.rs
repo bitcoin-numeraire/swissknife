@@ -14,12 +14,9 @@ use breez_sdk_core::{
 };
 
 use crate::{
-    application::{
-        entities::BitcoinWallet,
-        errors::{BitcoinError, LightningError},
-    },
+    application::{        errors::{BitcoinError, LightningError}},
     domains::{
-        bitcoin::{BitcoinAddressType, BitcoinNetwork, BitcoinTransaction},
+        bitcoin::{BitcoinTransaction, BtcAddressType, BtcNetwork, BitcoinWallet},
         invoice::Invoice,
         payment::Payment,
         system::HealthStatus,
@@ -337,7 +334,7 @@ impl LnClient for BreezClient {
 
 #[async_trait]
 impl BitcoinWallet for BreezClient {
-    async fn new_address(&self, _address_type: BitcoinAddressType) -> Result<String, BitcoinError> {
+    async fn new_address(&self, _address_type: BtcAddressType) -> Result<String, BitcoinError> {
         Err(BitcoinError::Unsupported(
             "Bitcoin address generation is not yet implemented for Breez".to_string(),
         ))
@@ -355,7 +352,7 @@ impl BitcoinWallet for BreezClient {
         ))
     }
 
-    fn network(&self) -> BitcoinNetwork {
-        BitcoinNetwork::default()
+    fn network(&self) -> BtcNetwork {
+        BtcNetwork::default()
     }
 }

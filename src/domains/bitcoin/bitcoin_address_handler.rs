@@ -14,13 +14,11 @@ use crate::{
             BAD_REQUEST_EXAMPLE, FORBIDDEN_EXAMPLE, INTERNAL_EXAMPLE, NOT_FOUND_EXAMPLE, UNAUTHORIZED_EXAMPLE,
             UNPROCESSABLE_EXAMPLE,
         },
-        dtos::{
-            BtcAddressResponse, BtcOutputResponse, ErrorResponse, InvoiceResponse, LnInvoiceResponse, NewInvoiceRequest,
-        },
+        dtos::{BtcAddressResponse, ErrorResponse, NewBtcAddressRequest},
         errors::ApplicationError,
     },
     domains::{
-        bitcoin::{BtcNetwork, BtcOutputStatus},
+        bitcoin::{BtcAddressFilter, BtcAddressType, BtcNetwork},
         user::{Permission, User},
     },
     infra::{
@@ -29,40 +27,37 @@ use crate::{
     },
 };
 
-use super::{InvoiceFilter, InvoiceOrderBy, InvoiceStatus};
-
 #[derive(OpenApi)]
 #[openapi(
-    paths(generate_invoice, list_invoices, get_invoice, delete_invoice, delete_invoices),
-    components(schemas(InvoiceResponse, NewInvoiceRequest, InvoiceStatus, LnInvoiceResponse, InvoiceOrderBy, BtcOutputResponse,
-        BtcOutputStatus, BtcNetwork, BtcAddressResponse)),
+    paths(generate_btc_address, list_btc_addresses, get_btc_address, delete_btc_address, delete_btc_addresses),
+    components(schemas(NewBtcAddressRequest, BtcAddressResponse, BtcNetwork, BtcAddressResponse, BtcAddressType)),
     tags(
-        (name = "Invoices", description = "Invoice management endpoints. Require `read:transaction` or `write:transaction` permissions.")
+        (name = "Bitcoin Addresses", description = "Bitcoin Address management endpoints. Require `read:btc_address` or `write:btc_address` permissions.")
     ),
 )]
-pub struct InvoiceHandler;
-pub const CONTEXT_PATH: &str = "/v1/invoices";
+pub struct BtcAddressHandler;
+pub const CONTEXT_PATH: &str = "/v1/bitcoin/addresses";
 
 pub fn router() -> Router<Arc<AppState>> {
     Router::new()
-        .route("/", post(generate_invoice))
-        .route("/", get(list_invoices))
-        .route("/:id", get(get_invoice))
-        .route("/:id", delete(delete_invoice))
-        .route("/", delete(delete_invoices))
+        .route("/", post(generate_btc_address))
+        .route("/", get(list_btc_addresses))
+        .route("/:id", get(get_btc_address))
+        .route("/:id", delete(delete_btc_address))
+        .route("/", delete(delete_btc_addresses))
 }
 
-/// Generate a new invoice
+/// Generate a new Bitcoin address
 ///
-/// Returns the generated invoice for the given user
+/// Returns the generated Bitcoin address for the given user
 #[utoipa::path(
     post,
     path = "",
-    tag = "Invoices",
+    tag = "Bitcoin Addresses",
     context_path = CONTEXT_PATH,
-    request_body = NewInvoiceRequest,
+    request_body = NewBtcAddressRequest,
     responses(
-        (status = 200, description = "Invoice Created", body = InvoiceResponse),
+        (status = 200, description = "Bitcoin Address Created", body = BtcAddressResponse),
         (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
         (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
         (status = 403, description = "Forbidden", body = ErrorResponse, example = json!(FORBIDDEN_EXAMPLE)),
@@ -70,36 +65,34 @@ pub fn router() -> Router<Arc<AppState>> {
         (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
     )
 )]
-async fn generate_invoice(
+async fn generate_btc_address(
     State(app_state): State<Arc<AppState>>,
     user: User,
-    Json(payload): Json<NewInvoiceRequest>,
-) -> Result<Json<InvoiceResponse>, ApplicationError> {
-    user.check_permission(Permission::WriteLnTransaction)?;
+    Json(payload): Json<NewBtcAddressRequest>,
+) -> Result<Json<BtcAddressResponse>, ApplicationError> {
+    user.check_permission(Permission::WriteBtcAddress)?;
 
-    let invoice = app_state
+    let address = app_state
         .services
-        .invoice
-        .invoice(
+        .bitcoin
+        .new_deposit_address(
             payload.wallet_id.unwrap_or(user.wallet_id),
-            payload.amount_msat,
-            payload.description,
-            payload.expiry,
+            payload.address_type.map(Into::into),
         )
         .await?;
-    Ok(Json(invoice.into()))
+    Ok(Json(address.into()))
 }
 
-/// Find an invoice
+/// Find a Bitcoin address
 ///
-/// Returns the invoice by its ID.
+/// Returns the Bitcoin address by its ID.
 #[utoipa::path(
     get,
     path = "/{id}",
-    tag = "Invoices",
+    tag = "Bitcoin Addresses",
     context_path = CONTEXT_PATH,
     responses(
-        (status = 200, description = "Found", body = InvoiceResponse),
+        (status = 200, description = "Found", body = BtcAddressResponse),
         (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
         (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
         (status = 403, description = "Forbidden", body = ErrorResponse, example = json!(FORBIDDEN_EXAMPLE)),
@@ -107,54 +100,54 @@ async fn generate_invoice(
         (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
     )
 )]
-async fn get_invoice(
+async fn get_btc_address(
     State(app_state): State<Arc<AppState>>,
     user: User,
     Path(id): Path<Uuid>,
-) -> Result<Json<InvoiceResponse>, ApplicationError> {
-    user.check_permission(Permission::ReadLnTransaction)?;
+) -> Result<Json<BtcAddressResponse>, ApplicationError> {
+    user.check_permission(Permission::ReadBtcAddress)?;
 
-    let invoice = app_state.services.invoice.get(id).await?;
-    Ok(Json(invoice.into()))
+    let address = app_state.services.bitcoin.get_address(id).await?;
+    Ok(Json(address.into()))
 }
 
-/// List invoices
+/// List Bitcoin addresses
 ///
-/// Returns all the invoices given a filter
+/// Returns all the Bitcoin addresses given a filter
 #[utoipa::path(
     get,
     path = "",
-    tag = "Invoices",
+    tag = "Bitcoin Addresses",
     context_path = CONTEXT_PATH,
-    params(InvoiceFilter),
+    params(BtcAddressFilter),
     responses(
-        (status = 200, description = "Success", body = Vec<InvoiceResponse>),
+        (status = 200, description = "Success", body = Vec<BtcAddressResponse>),
         (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
         (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
         (status = 403, description = "Forbidden", body = ErrorResponse, example = json!(FORBIDDEN_EXAMPLE)),
         (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
     )
 )]
-async fn list_invoices(
+async fn list_btc_addresses(
     State(app_state): State<Arc<AppState>>,
     user: User,
-    Query(filter): Query<InvoiceFilter>,
-) -> Result<Json<Vec<InvoiceResponse>>, ApplicationError> {
-    user.check_permission(Permission::ReadLnTransaction)?;
+    Query(filter): Query<BtcAddressFilter>,
+) -> Result<Json<Vec<BtcAddressResponse>>, ApplicationError> {
+    user.check_permission(Permission::ReadBtcAddress)?;
 
-    let invoices = app_state.services.invoice.list(filter).await?;
-    let response: Vec<InvoiceResponse> = invoices.into_iter().map(Into::into).collect();
+    let addresses = app_state.services.bitcoin.list_addresses(filter).await?;
+    let response: Vec<BtcAddressResponse> = addresses.into_iter().map(Into::into).collect();
 
     Ok(response.into())
 }
 
-/// Delete an invoice
+/// Delete a Bitcoin address
 ///
-/// Deletes an invoice by ID. Returns an empty body. Deleting an invoice has an effect on the user balance
+/// Deletes an Bitcoin address by ID. Returns an empty body. Deleting a Bitcoin address has an effect on the user balance
 #[utoipa::path(
     delete,
     path = "/{id}",
-    tag = "Invoices",
+    tag = "Bitcoin Addresses",
     context_path = CONTEXT_PATH,
     responses(
         (status = 200, description = "Deleted"),
@@ -165,26 +158,26 @@ async fn list_invoices(
         (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
     )
 )]
-async fn delete_invoice(
+async fn delete_btc_address(
     State(app_state): State<Arc<AppState>>,
     user: User,
     Path(id): Path<Uuid>,
 ) -> Result<(), ApplicationError> {
-    user.check_permission(Permission::WriteLnTransaction)?;
+    user.check_permission(Permission::WriteBtcAddress)?;
 
-    app_state.services.invoice.delete(id).await?;
+    app_state.services.bitcoin.delete_address(id).await?;
     Ok(())
 }
 
-/// Delete invoices
+/// Delete Bitcoin addresses
 ///
-/// Deletes all the invoices given a filter. Returns the number of deleted invoices. Deleting an invoice can have an effect on the user balance
+/// Deletes all the Bitcoin addresses given a filter. Returns the number of deleted addresses. Deleting an address can have an effect on the user balance
 #[utoipa::path(
     delete,
     path = "",
-    tag = "Invoices",
+    tag = "Bitcoin Addresses",
     context_path = CONTEXT_PATH,
-    params(InvoiceFilter),
+    params(BtcAddressFilter),
     responses(
         (status = 200, description = "Success", body = u64),
         (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
@@ -193,13 +186,13 @@ async fn delete_invoice(
         (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
     )
 )]
-async fn delete_invoices(
+async fn delete_btc_addresses(
     State(app_state): State<Arc<AppState>>,
     user: User,
-    Query(query_params): Query<InvoiceFilter>,
+    Query(query_params): Query<BtcAddressFilter>,
 ) -> Result<Json<u64>, ApplicationError> {
-    user.check_permission(Permission::WriteLnTransaction)?;
+    user.check_permission(Permission::WriteBtcAddress)?;
 
-    let n_deleted = app_state.services.invoice.delete_many(query_params).await?;
+    let n_deleted = app_state.services.bitcoin.delete_many_addresses(query_params).await?;
     Ok(n_deleted.into())
 }

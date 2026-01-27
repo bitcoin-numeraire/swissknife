@@ -5,7 +5,7 @@ use uuid::Uuid;
 
 use crate::{
     application::errors::DatabaseError,
-    domains::bitcoin::{BitcoinOutput, BitcoinOutputRepository},
+    domains::bitcoin::{BtcOutput, BtcOutputRepository},
     infra::database::sea_orm::models::btc_output::{ActiveModel, Column, Entity},
 };
 
@@ -21,8 +21,8 @@ impl SeaOrmBitcoinOutputRepository {
 }
 
 #[async_trait]
-impl BitcoinOutputRepository for SeaOrmBitcoinOutputRepository {
-    async fn find_by_outpoint(&self, outpoint: &str) -> Result<Option<BitcoinOutput>, DatabaseError> {
+impl BtcOutputRepository for SeaOrmBitcoinOutputRepository {
+    async fn find_by_outpoint(&self, outpoint: &str) -> Result<Option<BtcOutput>, DatabaseError> {
         let model = Entity::find()
             .filter(Column::Outpoint.eq(outpoint))
             .one(&self.db)
@@ -32,7 +32,7 @@ impl BitcoinOutputRepository for SeaOrmBitcoinOutputRepository {
         Ok(model.map(Into::into))
     }
 
-    async fn find(&self, id: Uuid) -> Result<Option<BitcoinOutput>, DatabaseError> {
+    async fn find(&self, id: Uuid) -> Result<Option<BtcOutput>, DatabaseError> {
         let model = Entity::find_by_id(id)
             .one(&self.db)
             .await
@@ -41,7 +41,7 @@ impl BitcoinOutputRepository for SeaOrmBitcoinOutputRepository {
         Ok(model.map(Into::into))
     }
 
-    async fn upsert(&self, output: BitcoinOutput) -> Result<BitcoinOutput, DatabaseError> {
+    async fn upsert(&self, output: BtcOutput) -> Result<BtcOutput, DatabaseError> {
         if let Some(existing) = self.find_by_outpoint(&output.outpoint).await? {
             let active_model = ActiveModel {
                 id: Unchanged(existing.id),
