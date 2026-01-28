@@ -16,10 +16,10 @@ use crate::{
             UNPROCESSABLE_EXAMPLE,
         },
         dtos::{ErrorResponse, RegisterWalletRequest, WalletResponse},
+        entities::AppServices,
         errors::ApplicationError,
     },
     domains::user::{Permission, User},
-    infra::app::AppState,
 };
 
 use super::{WalletFilter, WalletOverview};
@@ -35,7 +35,7 @@ use super::{WalletFilter, WalletOverview};
 pub struct WalletHandler;
 pub const CONTEXT_PATH: &str = "/v1/wallets";
 
-pub fn router() -> Router<Arc<AppState>> {
+pub fn router() -> Router<Arc<AppServices>> {
     Router::new()
         .route("/", post(register_wallet))
         .route("/", get(list_wallets))
@@ -64,13 +64,13 @@ pub fn router() -> Router<Arc<AppState>> {
     )
 )]
 async fn register_wallet(
-    State(app_state): State<Arc<AppState>>,
+    State(services): State<Arc<AppServices>>,
     user: User,
     Json(payload): Json<RegisterWalletRequest>,
 ) -> Result<Json<WalletResponse>, ApplicationError> {
     user.check_permission(Permission::WriteWallet)?;
 
-    let wallet = app_state.services.wallet.register(payload.user_id).await?;
+    let wallet = services.wallet.register(payload.user_id).await?;
     Ok(Json(wallet.into()))
 }
 
@@ -91,13 +91,13 @@ async fn register_wallet(
     )
 )]
 async fn list_wallets(
-    State(app_state): State<Arc<AppState>>,
+    State(services): State<Arc<AppServices>>,
     user: User,
     Query(filter): Query<WalletFilter>,
 ) -> Result<Json<Vec<WalletResponse>>, ApplicationError> {
     user.check_permission(Permission::ReadWallet)?;
 
-    let wallets = app_state.services.wallet.list(filter).await?;
+    let wallets = services.wallet.list(filter).await?;
     let response: Vec<WalletResponse> = wallets.into_iter().map(Into::into).collect();
 
     Ok(response.into())
@@ -120,12 +120,12 @@ async fn list_wallets(
     )
 )]
 async fn list_wallet_overviews(
-    State(app_state): State<Arc<AppState>>,
+    State(services): State<Arc<AppServices>>,
     user: User,
 ) -> Result<Json<Vec<WalletOverview>>, ApplicationError> {
     user.check_permission(Permission::ReadWallet)?;
 
-    let overviews = app_state.services.wallet.list_overviews().await?;
+    let overviews = services.wallet.list_overviews().await?;
 
     Ok(Json(overviews))
 }
@@ -148,13 +148,13 @@ async fn list_wallet_overviews(
     )
 )]
 async fn get_wallet(
-    State(app_state): State<Arc<AppState>>,
+    State(services): State<Arc<AppServices>>,
     user: User,
     Path(id): Path<Uuid>,
 ) -> Result<Json<WalletResponse>, ApplicationError> {
     user.check_permission(Permission::ReadWallet)?;
 
-    let wallet = app_state.services.wallet.get(id).await?;
+    let wallet = services.wallet.get(id).await?;
     Ok(Json(wallet.into()))
 }
 
@@ -176,13 +176,13 @@ async fn get_wallet(
     )
 )]
 async fn delete_wallet(
-    State(app_state): State<Arc<AppState>>,
+    State(services): State<Arc<AppServices>>,
     user: User,
     Path(id): Path<Uuid>,
 ) -> Result<(), ApplicationError> {
     user.check_permission(Permission::WriteWallet)?;
 
-    app_state.services.wallet.delete(id).await?;
+    services.wallet.delete(id).await?;
     Ok(())
 }
 
@@ -204,12 +204,12 @@ async fn delete_wallet(
     )
 )]
 async fn delete_wallets(
-    State(app_state): State<Arc<AppState>>,
+    State(services): State<Arc<AppServices>>,
     user: User,
     Query(query_params): Query<WalletFilter>,
 ) -> Result<Json<u64>, ApplicationError> {
     user.check_permission(Permission::WriteWallet)?;
 
-    let n_deleted = app_state.services.wallet.delete_many(query_params).await?;
+    let n_deleted = services.wallet.delete_many(query_params).await?;
     Ok(n_deleted.into())
 }

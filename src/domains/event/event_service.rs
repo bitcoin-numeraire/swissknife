@@ -1,5 +1,4 @@
-use async_trait::async_trait;
-use tracing::{info, trace, warn};
+use tracing::{debug, info, trace, warn};
 use uuid::Uuid;
 
 use crate::{
@@ -8,22 +7,23 @@ use crate::{
         errors::{ApplicationError, DataError},
     },
     domains::{
-        invoice::{Invoice, InvoiceStatus},
+        bitcoin::{BtcOutput, BtcOutputStatus},
+        event::{BtcOutputEvent, LnInvoicePaidEvent, LnPayFailureEvent, LnPaySuccessEvent},
+        invoice::{Invoice, InvoiceFilter, InvoiceOrderBy, InvoiceStatus},
         payment::PaymentStatus,
     },
 };
 
-use super::{BitcoinEventsUseCases, BitcoinOutputEvent, BtcOutput, BtcOutputStatus};
-
 const DEFAULT_DEPOSIT_DESCRIPTION: &str = "Bitcoin onchain deposit";
 
-pub struct BitcoinEventsService {
+#[derive(Clone)]
+pub struct EventService {
     store: AppStore,
 }
 
-impl BitcoinEventsService {
+impl EventService {
     pub fn new(store: AppStore) -> Self {
-        Self { store }
+        EventService { store }
     }
 
     fn output_status(block_height: u32) -> BtcOutputStatus {
@@ -33,11 +33,98 @@ impl BitcoinEventsService {
             BtcOutputStatus::Unconfirmed
         }
     }
-}
 
-#[async_trait]
-impl BitcoinEventsUseCases for BitcoinEventsService {
-    async fn onchain_deposit(&self, event: BitcoinOutputEvent) -> Result<(), ApplicationError> {
+    pub async fn latest_settled_invoice(&self) -> Result<Option<Invoice>, ApplicationError> {
+        trace!("Fetching latest settled invoice...");
+
+        let invoices = self
+            .store
+            .invoice
+            .find_many(InvoiceFilter {
+                status: Some(InvoiceStatus::Settled),
+                ledger: Some(Ledger::Lightning),
+                limit: Some(1),
+                order_by: InvoiceOrderBy::PaymentTime,
+                ..Default::default()
+            })
+            .await?;
+
+        Ok(invoices.into_iter().next())
+    }
+
+    pub async fn invoice_paid(&self, event: LnInvoicePaidEvent) -> Result<(), ApplicationError> {
+        debug!(?event, "Processing incoming Lightning payment...");
+
+        let invoice_option = self.store.invoice.find_by_payment_hash(&event.payment_hash).await?;
+
+        if let Some(mut invoice) = invoice_option {
+            invoice.fee_msat = Some(event.fee_msat);
+            invoice.payment_time = Some(event.payment_time);
+            invoice.amount_received_msat = Some(event.amount_received_msat);
+
+            invoice = self.store.invoice.update(invoice).await?;
+
+            info!(id = %invoice.id, "Incoming Lightning payment processed successfully");
+            return Ok(());
+        }
+
+        return Err(DataError::NotFound("Lightning invoice not found.".into()).into());
+    }
+
+    pub async fn outgoing_payment(&self, event: LnPaySuccessEvent) -> Result<(), ApplicationError> {
+        debug!(?event, "Processing outgoing Lightning payment...");
+
+        let payment_option = self.store.payment.find_by_payment_hash(&event.payment_hash).await?;
+
+        if let Some(mut payment_retrieved) = payment_option {
+            if payment_retrieved.status == PaymentStatus::Settled {
+                debug!(id = %payment_retrieved.id,"Lightning payment already settled");
+                return Ok(());
+            }
+
+            payment_retrieved.status = PaymentStatus::Settled;
+            payment_retrieved.payment_time = Some(event.payment_time);
+            payment_retrieved.payment_preimage = Some(event.payment_preimage);
+            payment_retrieved.amount_msat = event.amount_msat;
+            payment_retrieved.fee_msat = Some(event.fees_msat);
+
+            let payment = self.store.payment.update(payment_retrieved).await?;
+
+            info!(id = %payment.id, payment_status = %payment.status,
+                "Outgoing Lightning payment processed successfully");
+
+            return Ok(());
+        }
+
+        return Err(DataError::NotFound("Lightning payment not found.".into()).into());
+    }
+
+    pub async fn failed_payment(&self, event: LnPayFailureEvent) -> Result<(), ApplicationError> {
+        debug!(?event, "Processing failed outgoing Lightning payment");
+
+        let payment_option = self.store.payment.find_by_payment_hash(&event.payment_hash).await?;
+
+        if let Some(mut payment_retrieved) = payment_option {
+            if payment_retrieved.status == PaymentStatus::Failed {
+                debug!(id = %payment_retrieved.id, "Lightning payment already failed");
+                return Ok(());
+            }
+
+            payment_retrieved.status = PaymentStatus::Failed;
+            payment_retrieved.error = Some(event.reason);
+
+            let payment = self.store.payment.update(payment_retrieved).await?;
+
+            info!(id = %payment.id,payment_status = %payment.status,
+                "Outgoing Lightning payment processed successfully");
+
+            return Ok(());
+        }
+
+        return Err(DataError::NotFound("Lightning payment not found.".into()).into());
+    }
+
+    pub async fn onchain_deposit(&self, event: BtcOutputEvent) -> Result<(), ApplicationError> {
         let outpoint = format!("{}:{}", event.txid, event.output_index);
         trace!(%outpoint, "Processing onchain deposit event");
 
@@ -63,8 +150,7 @@ impl BitcoinEventsUseCases for BitcoinEventsService {
 
         let Some(btc_address) = self.store.btc_address.find_by_address(&address).await? else {
             trace!(%address, outpoint = outpoint.clone(),
-                "Ignoring bitcoin output not matching any known wallet address"
-            );
+                "Ignoring bitcoin output not matching any known wallet address");
             return Ok(());
         };
 
@@ -124,7 +210,7 @@ impl BitcoinEventsUseCases for BitcoinEventsService {
         Ok(())
     }
 
-    async fn onchain_withdrawal(&self, event: BitcoinOutputEvent) -> Result<(), ApplicationError> {
+    pub async fn onchain_withdrawal(&self, event: BtcOutputEvent) -> Result<(), ApplicationError> {
         let outpoint = format!("{}:{}", event.txid, event.output_index);
         trace!(outpoint = outpoint.clone(), "Processing onchain withdrawal event");
 

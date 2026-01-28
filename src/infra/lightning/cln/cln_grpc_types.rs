@@ -7,8 +7,8 @@ use crate::{
     application::entities::Ledger,
     domains::{
         bitcoin::BtcOutputStatus,
+        event::LnInvoicePaidEvent,
         invoice::{Invoice, InvoiceStatus},
-        ln_node::LnInvoicePaidEvent,
         payment::Payment,
     },
     infra::lightning::cln::cln::listfunds_outputs::ListfundsOutputsStatus,

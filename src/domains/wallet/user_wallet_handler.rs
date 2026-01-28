@@ -16,6 +16,7 @@ use crate::{
             NewBtcAddressRequest, NewInvoiceRequest, PaymentResponse, RegisterLnAddressRequest, SendPaymentRequest,
             UpdateLnAddressRequest, WalletLnAddressResponse, WalletResponse,
         },
+        entities::AppServices,
         errors::{ApplicationError, DataError},
     },
     domains::{
@@ -24,10 +25,7 @@ use crate::{
         payment::{PaymentFilter, PaymentStatus},
         user::{ApiKeyFilter, User},
     },
-    infra::{
-        app::AppState,
-        axum::{Json, Path, Query},
-    },
+    infra::axum::{Json, Path, Query},
 };
 
 use super::{Balance, Contact};
@@ -51,7 +49,7 @@ use super::{Balance, Contact};
 pub struct UserWalletHandler;
 pub const CONTEXT_PATH: &str = "/v1/me";
 
-pub fn user_router() -> Router<Arc<AppState>> {
+pub fn user_router() -> Router<Arc<AppServices>> {
     Router::new()
         .route("/", get(get_user_wallet))
         .route("/balance", get(get_wallet_balance))
@@ -92,10 +90,10 @@ pub fn user_router() -> Router<Arc<AppState>> {
     )
 )]
 async fn get_user_wallet(
-    State(app_state): State<Arc<AppState>>,
+    State(services): State<Arc<AppServices>>,
     user: User,
 ) -> Result<Json<WalletResponse>, ApplicationError> {
-    let wallet = app_state.services.wallet.get(user.wallet_id).await?;
+    let wallet = services.wallet.get(user.wallet_id).await?;
     Ok(Json(wallet.into()))
 }
 
@@ -117,14 +115,13 @@ async fn get_user_wallet(
     )
 )]
 async fn new_wallet_btc_address(
-    State(app_state): State<Arc<AppState>>,
+    State(services): State<Arc<AppServices>>,
     user: User,
     Json(payload): Json<NewBtcAddressRequest>,
 ) -> Result<Json<BtcAddressResponse>, ApplicationError> {
-    let address = app_state
-        .services
+    let address = services
         .bitcoin
-        .new_deposit_address(user.wallet_id, payload.address_type.map(Into::into))
+        .new_deposit_address(user.wallet_id, payload.address_type)
         .await?;
     Ok(Json(address.into()))
 }
@@ -147,12 +144,11 @@ async fn new_wallet_btc_address(
     )
 )]
 async fn wallet_pay(
-    State(app_state): State<Arc<AppState>>,
+    State(services): State<Arc<AppServices>>,
     user: User,
     Json(payload): Json<SendPaymentRequest>,
 ) -> Result<Json<PaymentResponse>, ApplicationError> {
-    let payment = app_state
-        .services
+    let payment = services
         .payment
         .pay(payload.input, payload.amount_msat, payload.comment, user.wallet_id)
         .await?;
@@ -175,10 +171,10 @@ async fn wallet_pay(
     )
 )]
 async fn get_wallet_balance(
-    State(app_state): State<Arc<AppState>>,
+    State(services): State<Arc<AppServices>>,
     user: User,
 ) -> Result<Json<Balance>, ApplicationError> {
-    let balance = app_state.services.wallet.get_balance(user.wallet_id).await?;
+    let balance = services.wallet.get_balance(user.wallet_id).await?;
     Ok(balance.into())
 }
 
@@ -200,12 +196,11 @@ async fn get_wallet_balance(
     )
 )]
 async fn new_wallet_invoice(
-    State(app_state): State<Arc<AppState>>,
+    State(services): State<Arc<AppServices>>,
     user: User,
     Json(payload): Json<NewInvoiceRequest>,
 ) -> Result<Json<InvoiceResponse>, ApplicationError> {
-    let invoice = app_state
-        .services
+    let invoice = services
         .invoice
         .invoice(user.wallet_id, payload.amount_msat, payload.description, payload.expiry)
         .await?;
@@ -229,11 +224,10 @@ async fn new_wallet_invoice(
     )
 )]
 async fn get_wallet_address(
-    State(app_state): State<Arc<AppState>>,
+    State(services): State<Arc<AppServices>>,
     user: User,
 ) -> Result<Json<WalletLnAddressResponse>, ApplicationError> {
-    let ln_addresses = app_state
-        .services
+    let ln_addresses = services
         .ln_address
         .list(LnAddressFilter {
             wallet_id: Some(user.wallet_id),
@@ -264,12 +258,11 @@ async fn get_wallet_address(
     )
 )]
 async fn register_wallet_address(
-    State(app_state): State<Arc<AppState>>,
+    State(services): State<Arc<AppServices>>,
     user: User,
     Json(payload): Json<RegisterLnAddressRequest>,
 ) -> Result<Json<LnAddress>, ApplicationError> {
-    let ln_address = app_state
-        .services
+    let ln_address = services
         .ln_address
         .register(
             user.wallet_id,
@@ -300,12 +293,11 @@ async fn register_wallet_address(
     )
 )]
 async fn update_wallet_address(
-    State(app_state): State<Arc<AppState>>,
+    State(services): State<Arc<AppServices>>,
     user: User,
     Json(payload): Json<UpdateLnAddressRequest>,
 ) -> Result<Json<LnAddress>, ApplicationError> {
-    let ln_addresses = app_state
-        .services
+    let ln_addresses = services
         .ln_address
         .list(LnAddressFilter {
             wallet_id: Some(user.wallet_id),
@@ -318,7 +310,7 @@ async fn update_wallet_address(
         .cloned()
         .ok_or_else(|| DataError::NotFound("LN Address not found.".to_string()))?;
 
-    let ln_address = app_state.services.ln_address.update(ln_address.id, payload).await?;
+    let ln_address = services.ln_address.update(ln_address.id, payload).await?;
 
     Ok(ln_address.into())
 }
@@ -339,9 +331,8 @@ async fn update_wallet_address(
         (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
     )
 )]
-async fn delete_wallet_address(State(app_state): State<Arc<AppState>>, user: User) -> Result<(), ApplicationError> {
-    let n_deleted = app_state
-        .services
+async fn delete_wallet_address(State(services): State<Arc<AppServices>>, user: User) -> Result<(), ApplicationError> {
+    let n_deleted = services
         .ln_address
         .delete_many(LnAddressFilter {
             wallet_id: Some(user.wallet_id),
@@ -373,12 +364,12 @@ async fn delete_wallet_address(State(app_state): State<Arc<AppState>>, user: Use
     )
 )]
 async fn list_wallet_payments(
-    State(app_state): State<Arc<AppState>>,
+    State(services): State<Arc<AppServices>>,
     user: User,
     Query(mut query_params): Query<PaymentFilter>,
 ) -> Result<Json<Vec<PaymentResponse>>, ApplicationError> {
     query_params.wallet_id = Some(user.wallet_id);
-    let payments = app_state.services.payment.list(query_params).await?;
+    let payments = services.payment.list(query_params).await?;
 
     let response: Vec<PaymentResponse> = payments.into_iter().map(Into::into).collect();
 
@@ -402,12 +393,11 @@ async fn list_wallet_payments(
     )
 )]
 async fn get_wallet_payment(
-    State(app_state): State<Arc<AppState>>,
+    State(services): State<Arc<AppServices>>,
     user: User,
     Path(id): Path<Uuid>,
 ) -> Result<Json<PaymentResponse>, ApplicationError> {
-    let payments = app_state
-        .services
+    let payments = services
         .payment
         .list(PaymentFilter {
             wallet_id: Some(user.wallet_id),
@@ -441,12 +431,12 @@ async fn get_wallet_payment(
     )
 )]
 async fn list_wallet_invoices(
-    State(app_state): State<Arc<AppState>>,
+    State(services): State<Arc<AppServices>>,
     user: User,
     Query(mut query_params): Query<InvoiceFilter>,
 ) -> Result<Json<Vec<InvoiceResponse>>, ApplicationError> {
     query_params.wallet_id = Some(user.wallet_id);
-    let invoices = app_state.services.invoice.list(query_params).await?;
+    let invoices = services.invoice.list(query_params).await?;
 
     let response: Vec<InvoiceResponse> = invoices.into_iter().map(Into::into).collect();
 
@@ -470,12 +460,11 @@ async fn list_wallet_invoices(
     )
 )]
 async fn get_wallet_invoice(
-    State(app_state): State<Arc<AppState>>,
+    State(services): State<Arc<AppServices>>,
     user: User,
     Path(id): Path<Uuid>,
 ) -> Result<Json<InvoiceResponse>, ApplicationError> {
-    let invoices = app_state
-        .services
+    let invoices = services
         .invoice
         .list(InvoiceFilter {
             wallet_id: Some(user.wallet_id),
@@ -508,10 +497,10 @@ async fn get_wallet_invoice(
     )
 )]
 async fn list_contacts(
-    State(app_state): State<Arc<AppState>>,
+    State(services): State<Arc<AppServices>>,
     user: User,
 ) -> Result<Json<Vec<Contact>>, ApplicationError> {
-    let contacts = app_state.services.wallet.list_contacts(user.wallet_id).await?;
+    let contacts = services.wallet.list_contacts(user.wallet_id).await?;
     Ok(contacts.into())
 }
 
@@ -530,11 +519,10 @@ async fn list_contacts(
     )
 )]
 async fn delete_expired_invoices(
-    State(app_state): State<Arc<AppState>>,
+    State(services): State<Arc<AppServices>>,
     user: User,
 ) -> Result<Json<u64>, ApplicationError> {
-    let n_deleted = app_state
-        .services
+    let n_deleted = services
         .invoice
         .delete_many(InvoiceFilter {
             wallet_id: Some(user.wallet_id),
@@ -560,11 +548,10 @@ async fn delete_expired_invoices(
     )
 )]
 async fn delete_failed_payments(
-    State(app_state): State<Arc<AppState>>,
+    State(services): State<Arc<AppServices>>,
     user: User,
 ) -> Result<Json<u64>, ApplicationError> {
-    let n_deleted = app_state
-        .services
+    let n_deleted = services
         .payment
         .delete_many(PaymentFilter {
             wallet_id: Some(user.wallet_id),
@@ -593,12 +580,12 @@ async fn delete_failed_payments(
     )
 )]
 async fn create_wallet_api_key(
-    State(app_state): State<Arc<AppState>>,
+    State(services): State<Arc<AppServices>>,
     user: User,
     Json(mut payload): Json<CreateApiKeyRequest>,
 ) -> Result<Json<ApiKeyResponse>, ApplicationError> {
     payload.user_id = Some(user.id.clone());
-    let api_key = app_state.services.api_key.generate(user, payload).await?;
+    let api_key = services.api_key.generate(user, payload).await?;
     Ok(Json(api_key.into()))
 }
 
@@ -619,12 +606,11 @@ async fn create_wallet_api_key(
     )
 )]
 async fn get_wallet_api_key(
-    State(app_state): State<Arc<AppState>>,
+    State(services): State<Arc<AppServices>>,
     user: User,
     Path(id): Path<Uuid>,
 ) -> Result<Json<ApiKeyResponse>, ApplicationError> {
-    let api_keys = app_state
-        .services
+    let api_keys = services
         .api_key
         .list(ApiKeyFilter {
             user_id: Some(user.id),
@@ -658,12 +644,12 @@ async fn get_wallet_api_key(
     )
 )]
 async fn list_wallet_api_keys(
-    State(app_state): State<Arc<AppState>>,
+    State(services): State<Arc<AppServices>>,
     user: User,
     Query(mut filter): Query<ApiKeyFilter>,
 ) -> Result<Json<Vec<ApiKeyResponse>>, ApplicationError> {
     filter.user_id = Some(user.id);
-    let api_keys = app_state.services.api_key.list(filter).await?;
+    let api_keys = services.api_key.list(filter).await?;
     let response: Vec<ApiKeyResponse> = api_keys.into_iter().map(Into::into).collect();
 
     Ok(response.into())
@@ -686,12 +672,11 @@ async fn list_wallet_api_keys(
     )
 )]
 async fn revoke_wallet_api_key(
-    State(app_state): State<Arc<AppState>>,
+    State(services): State<Arc<AppServices>>,
     user: User,
     Path(id): Path<Uuid>,
 ) -> Result<(), ApplicationError> {
-    let n_revoked = app_state
-        .services
+    let n_revoked = services
         .api_key
         .revoke_many(ApiKeyFilter {
             user_id: Some(user.id),
@@ -724,11 +709,11 @@ async fn revoke_wallet_api_key(
     )
 )]
 async fn revoke_wallet_api_keys(
-    State(app_state): State<Arc<AppState>>,
+    State(services): State<Arc<AppServices>>,
     user: User,
     Query(mut filter): Query<ApiKeyFilter>,
 ) -> Result<Json<u64>, ApplicationError> {
     filter.user_id = Some(user.id);
-    let n_revoked = app_state.services.api_key.revoke_many(filter).await?;
+    let n_revoked = services.api_key.revoke_many(filter).await?;
     Ok(n_revoked.into())
 }

@@ -17,16 +17,14 @@ use crate::{
         dtos::{
             BtcAddressResponse, BtcOutputResponse, ErrorResponse, InvoiceResponse, LnInvoiceResponse, NewInvoiceRequest,
         },
+        entities::AppServices,
         errors::ApplicationError,
     },
     domains::{
         bitcoin::{BtcNetwork, BtcOutputStatus},
         user::{Permission, User},
     },
-    infra::{
-        app::AppState,
-        axum::{Json, Path, Query},
-    },
+    infra::axum::{Json, Path, Query},
 };
 
 use super::{InvoiceFilter, InvoiceOrderBy, InvoiceStatus};
@@ -43,7 +41,7 @@ use super::{InvoiceFilter, InvoiceOrderBy, InvoiceStatus};
 pub struct InvoiceHandler;
 pub const CONTEXT_PATH: &str = "/v1/invoices";
 
-pub fn router() -> Router<Arc<AppState>> {
+pub fn router() -> Router<Arc<AppServices>> {
     Router::new()
         .route("/", post(generate_invoice))
         .route("/", get(list_invoices))
@@ -71,14 +69,13 @@ pub fn router() -> Router<Arc<AppState>> {
     )
 )]
 async fn generate_invoice(
-    State(app_state): State<Arc<AppState>>,
+    State(services): State<Arc<AppServices>>,
     user: User,
     Json(payload): Json<NewInvoiceRequest>,
 ) -> Result<Json<InvoiceResponse>, ApplicationError> {
     user.check_permission(Permission::WriteLnTransaction)?;
 
-    let invoice = app_state
-        .services
+    let invoice = services
         .invoice
         .invoice(
             payload.wallet_id.unwrap_or(user.wallet_id),
@@ -108,13 +105,13 @@ async fn generate_invoice(
     )
 )]
 async fn get_invoice(
-    State(app_state): State<Arc<AppState>>,
+    State(services): State<Arc<AppServices>>,
     user: User,
     Path(id): Path<Uuid>,
 ) -> Result<Json<InvoiceResponse>, ApplicationError> {
     user.check_permission(Permission::ReadLnTransaction)?;
 
-    let invoice = app_state.services.invoice.get(id).await?;
+    let invoice = services.invoice.get(id).await?;
     Ok(Json(invoice.into()))
 }
 
@@ -136,13 +133,13 @@ async fn get_invoice(
     )
 )]
 async fn list_invoices(
-    State(app_state): State<Arc<AppState>>,
+    State(services): State<Arc<AppServices>>,
     user: User,
     Query(filter): Query<InvoiceFilter>,
 ) -> Result<Json<Vec<InvoiceResponse>>, ApplicationError> {
     user.check_permission(Permission::ReadLnTransaction)?;
 
-    let invoices = app_state.services.invoice.list(filter).await?;
+    let invoices = services.invoice.list(filter).await?;
     let response: Vec<InvoiceResponse> = invoices.into_iter().map(Into::into).collect();
 
     Ok(response.into())
@@ -166,13 +163,13 @@ async fn list_invoices(
     )
 )]
 async fn delete_invoice(
-    State(app_state): State<Arc<AppState>>,
+    State(services): State<Arc<AppServices>>,
     user: User,
     Path(id): Path<Uuid>,
 ) -> Result<(), ApplicationError> {
     user.check_permission(Permission::WriteLnTransaction)?;
 
-    app_state.services.invoice.delete(id).await?;
+    services.invoice.delete(id).await?;
     Ok(())
 }
 
@@ -194,12 +191,12 @@ async fn delete_invoice(
     )
 )]
 async fn delete_invoices(
-    State(app_state): State<Arc<AppState>>,
+    State(services): State<Arc<AppServices>>,
     user: User,
     Query(query_params): Query<InvoiceFilter>,
 ) -> Result<Json<u64>, ApplicationError> {
     user.check_permission(Permission::WriteLnTransaction)?;
 
-    let n_deleted = app_state.services.invoice.delete_many(query_params).await?;
+    let n_deleted = services.invoice.delete_many(query_params).await?;
     Ok(n_deleted.into())
 }

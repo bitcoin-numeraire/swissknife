@@ -7,12 +7,10 @@ use crate::{
     application::{
         docs::{BAD_REQUEST_EXAMPLE, INTERNAL_EXAMPLE, NOT_FOUND_EXAMPLE, UNPROCESSABLE_EXAMPLE},
         dtos::{ErrorResponse, LNUrlpInvoiceQueryParams, LnUrlCallbackResponse},
+        entities::AppServices,
         errors::ApplicationError,
     },
-    infra::{
-        app::AppState,
-        axum::{Json, Path, Query},
-    },
+    infra::axum::{Json, Path, Query},
 };
 
 use super::LnURLPayRequest;
@@ -27,7 +25,7 @@ use super::LnURLPayRequest;
 )]
 pub struct LnURLHandler;
 
-pub fn router() -> Router<Arc<AppState>> {
+pub fn router() -> Router<Arc<AppServices>> {
     Router::new().route("/:username/callback", get(callback))
 }
 
@@ -47,9 +45,9 @@ pub fn router() -> Router<Arc<AppState>> {
 )]
 pub async fn well_known(
     Path(username): Path<String>,
-    State(app_state): State<Arc<AppState>>,
+    State(services): State<Arc<AppServices>>,
 ) -> Result<Json<LnURLPayRequest>, ApplicationError> {
-    let lnurlp = app_state.services.lnurl.lnurlp(username).await?;
+    let lnurlp = services.lnurl.lnurlp(username).await?;
     Ok(lnurlp.into())
 }
 
@@ -73,10 +71,9 @@ pub async fn well_known(
 async fn callback(
     Path(username): Path<String>,
     Query(query_params): Query<LNUrlpInvoiceQueryParams>,
-    State(app_state): State<Arc<AppState>>,
+    State(services): State<Arc<AppServices>>,
 ) -> Result<Json<LnUrlCallbackResponse>, ApplicationError> {
-    let callback = app_state
-        .services
+    let callback = services
         .lnurl
         .lnurlp_callback(username, query_params.amount, query_params.comment)
         .await?;

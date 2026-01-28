@@ -1,4 +1,4 @@
-use std::{path::PathBuf, process, str::FromStr, sync::Arc, time::Duration};
+use std::{path::PathBuf, str::FromStr, time::Duration};
 
 use breez_sdk_core::ReverseSwapInfo;
 use hex::decode;
@@ -15,14 +15,10 @@ use cln::{
 };
 
 use crate::{
-    application::{
-        entities::BitcoinWallet,
-        errors::{BitcoinError, LightningError},
-    },
+    application::errors::{BitcoinError, LightningError},
     domains::{
-        bitcoin::{BitcoinTransaction, BitcoinTransactionOutput, BtcAddressType, BtcNetwork},
+        bitcoin::{BitcoinTransaction, BitcoinTransactionOutput, BitcoinWallet, BtcAddressType, BtcNetwork},
         invoice::Invoice,
-        ln_node::LnEventsUseCases,
         payment::Payment,
         system::HealthStatus,
     },
@@ -33,8 +29,6 @@ use crate::{
 };
 
 use self::cln::InvoiceRequest;
-
-use super::cln_grpc_listener::listen_invoices;
 
 pub mod cln {
     tonic::include_proto!("cln");
@@ -65,27 +59,8 @@ pub struct ClnGrpcClient {
 }
 
 impl ClnGrpcClient {
-    pub async fn new(config: ClnClientConfig, ln_events: Arc<dyn LnEventsUseCases>) -> Result<Self, LightningError> {
-        let (identity, ca_certificate) = Self::read_certificates(&config.certs_dir)
-            .await
-            .map_err(|e| LightningError::ReadCertificates(e.to_string()))?;
-
-        let tls_config = ClientTlsConfig::new()
-            .identity(identity)
-            .ca_certificate(ca_certificate)
-            .domain_name("localhost"); // Use localhost if you are not sure about the domain name
-
-        let endpoint = Channel::from_shared(config.endpoint)
-            .map_err(|e| LightningError::ParseConfig(e.to_string()))?
-            .tls_config(tls_config)
-            .map_err(|e| LightningError::ParseConfig(e.to_string()))?;
-
-        let channel = endpoint
-            .connect()
-            .await
-            .map_err(|e| LightningError::Connect(e.to_string()))?;
-
-        let client = NodeClient::new(channel);
+    pub async fn new(config: ClnClientConfig) -> Result<Self, LightningError> {
+        let client = Self::connect(&config).await?;
 
         let mut cln_client = Self {
             client: client.clone(),
@@ -98,18 +73,30 @@ impl ClnGrpcClient {
         let network = cln_client.network().await?;
         cln_client.network = network;
 
-        let listener_client = client.clone();
-        tokio::spawn(async move {
-            if let Err(err) = listen_invoices(listener_client, ln_events, config.retry_delay)
-                .await
-                .map_err(|e| LightningError::Listener(e.to_string()))
-            {
-                tracing::error!(%err, "Event listener failed");
-                process::exit(1);
-            }
-        });
-
         Ok(cln_client)
+    }
+
+    pub async fn connect(config: &ClnClientConfig) -> Result<NodeClient<Channel>, LightningError> {
+        let (identity, ca_certificate) = Self::read_certificates(&config.certs_dir)
+            .await
+            .map_err(|e| LightningError::ReadCertificates(e.to_string()))?;
+
+        let tls_config = ClientTlsConfig::new()
+            .identity(identity)
+            .ca_certificate(ca_certificate)
+            .domain_name("localhost"); // Use localhost if you are not sure about the domain name
+
+        let endpoint = Channel::from_shared(config.endpoint.clone())
+            .map_err(|e| LightningError::ParseConfig(e.to_string()))?
+            .tls_config(tls_config)
+            .map_err(|e| LightningError::ParseConfig(e.to_string()))?;
+
+        let channel = endpoint
+            .connect()
+            .await
+            .map_err(|e| LightningError::Connect(e.to_string()))?;
+
+        Ok(NodeClient::new(channel))
     }
 
     async fn read_certificates(certs_dir: &str) -> io::Result<(Identity, Certificate)> {
@@ -183,14 +170,14 @@ impl LnClient for ClnGrpcClient {
         Ok(bolt11.into())
     }
 
-    async fn pay(&self, bolt11: String, amount_msat: Option<u64>) -> Result<Payment, LightningError> {
+    async fn pay(&self, bolt11: String, amount_msat: Option<u64>, label: String) -> Result<Payment, LightningError> {
         let mut client = self.client.clone();
 
         let response = client
             .pay(PayRequest {
                 bolt11,
                 amount_msat: amount_msat.map(|msat| cln::Amount { msat }),
-                label: Some(Uuid::new_v4().to_string()),
+                label: Some(label),
                 maxfeepercent: self.maxfeepercent,
                 retry_for: self.retry_for,
                 exemptfee: self.payment_exemptfee,

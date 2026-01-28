@@ -7,7 +7,6 @@ use crate::{
         bitcoin::BtcAddressHandler,
         invoice::InvoiceHandler,
         ln_address::LnAddressHandler,
-        ln_node::BreezNodeHandler,
         lnurl::LnURLHandler,
         nostr::NostrHandler,
         payment::PaymentHandler,
@@ -47,7 +46,6 @@ pub fn merged_openapi() -> OpenApi {
     openapi.merge(LnAddressHandler::openapi());
     openapi.merge(LnURLHandler::openapi());
     openapi.merge(NostrHandler::openapi());
-    openapi.merge(BreezNodeHandler::openapi());
     openapi.merge(SystemHandler::openapi());
     openapi.merge(ApiKeyHandler::openapi());
     openapi.merge(BtcAddressHandler::openapi());

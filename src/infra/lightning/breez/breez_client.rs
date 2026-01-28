@@ -2,33 +2,26 @@ use serde::Deserialize;
 use serde_bolt::bitcoin::hashes::hex::ToHex;
 use std::{fs, io, path::PathBuf, sync::Arc};
 use tracing::{debug, info};
-use uuid::Uuid;
 
 use async_trait::async_trait;
 use bip39::Mnemonic;
 use breez_sdk_core::{
-    BreezServices, CheckMessageRequest, ConnectRequest, EnvironmentType, GreenlightCredentials, GreenlightNodeConfig,
-    LspInformation, NodeConfig, NodeState, PayOnchainRequest, PrepareOnchainPaymentRequest,
+    BreezServices, CheckMessageRequest, ConnectRequest, EnvironmentType, EventListener, GreenlightCredentials,
+    GreenlightNodeConfig, LspInformation, NodeConfig, NodeState, PayOnchainRequest, PrepareOnchainPaymentRequest,
     PrepareRedeemOnchainFundsRequest, ReceivePaymentRequest, RedeemOnchainFundsRequest, ReverseSwapInfo,
     SendPaymentRequest, SignMessageRequest, StaticBackupRequest, SwapAmountType,
 };
 
 use crate::{
-    application::{
-        entities::BitcoinWallet,
-        errors::{BitcoinError, LightningError},
-    },
+    application::errors::{BitcoinError, LightningError},
     domains::{
-        bitcoin::{BitcoinTransaction, BtcAddressType, BtcNetwork},
+        bitcoin::{BitcoinTransaction, BitcoinWallet, BtcAddressType, BtcNetwork},
         invoice::Invoice,
-        ln_node::LnEventsUseCases,
         payment::Payment,
         system::HealthStatus,
     },
     infra::lightning::LnClient,
 };
-
-use super::BreezListener;
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct BreezClientConfig {
@@ -50,7 +43,7 @@ pub struct BreezClient {
 }
 
 impl BreezClient {
-    pub async fn new(config: BreezClientConfig, ln_events: Arc<dyn LnEventsUseCases>) -> Result<Self, LightningError> {
+    pub async fn new(config: BreezClientConfig, listener: Box<dyn EventListener>) -> Result<Self, LightningError> {
         if config.log_in_file {
             BreezServices::init_logging(&config.working_dir, None)
                 .map_err(|e| LightningError::Logging(e.to_string()))?;
@@ -76,15 +69,13 @@ impl BreezClient {
 
         let seed = Mnemonic::parse(config.seed).map_err(|e| LightningError::ParseSeed(e.to_string()))?;
 
-        let listener = BreezListener::new(ln_events);
-
         let sdk = BreezServices::connect(
             ConnectRequest {
                 config: breez_config.clone(),
                 seed: seed.to_seed("").to_vec(),
                 restore_only: Some(config.restore_only),
             },
-            Box::new(listener),
+            listener,
         )
         .await
         .map_err(|e| LightningError::Connect(e.to_string()))?;
@@ -262,13 +253,13 @@ impl LnClient for BreezClient {
         Ok(response.ln_invoice.into())
     }
 
-    async fn pay(&self, bolt11: String, amount_msat: Option<u64>) -> Result<Payment, LightningError> {
+    async fn pay(&self, bolt11: String, amount_msat: Option<u64>, label: String) -> Result<Payment, LightningError> {
         let response = self
             .sdk
             .send_payment(SendPaymentRequest {
                 bolt11,
                 amount_msat,
-                label: Some(Uuid::new_v4().to_string()),
+                label: Some(label),
                 use_trampoline: false,
             })
             .await

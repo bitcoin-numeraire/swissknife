@@ -1,14 +1,15 @@
-use std::{sync::Arc, time::Duration};
+use std::time::Duration;
 
 use anyhow::{anyhow, Result};
+use hex::decode;
 use serde_bolt::bitcoin::hashes::hex::ToHex;
 use tokio::time::sleep;
 use tonic::{transport::Channel, Code};
-use tracing::{debug, error, info, trace, warn};
+use tracing::{error, info, trace, warn};
 
 use crate::{
     application::errors::ApplicationError,
-    domains::ln_node::LnEventsUseCases,
+    domains::event::EventService,
     infra::lightning::cln::cln::{waitanyinvoice_response::WaitanyinvoiceStatus, ListinvoicesRequest},
 };
 
@@ -16,22 +17,21 @@ use super::cln::{node_client::NodeClient, WaitanyinvoiceRequest};
 
 pub async fn listen_invoices(
     mut client: NodeClient<Channel>,
-    ln_events: Arc<dyn LnEventsUseCases>,
+    events: EventService,
     retry_delay: Duration,
 ) -> Result<()> {
     // Temporary. get the latest settled invoice payment_hash as starting point for event listening
-    let last_settled_invoice = ln_events.latest_settled_invoice().await?;
+    let last_settled_invoice = events.latest_settled_invoice().await?;
 
     let mut lastpay_index = match last_settled_invoice {
         Some(invoice) => {
-            debug!(
-                id = %invoice.id,
-                "Fetching latest settled invoice from node..."
-            );
-
+            let payment_hash = invoice
+                .ln_invoice
+                .as_ref()
+                .and_then(|ln_invoice| decode(&ln_invoice.payment_hash).ok());
             let invoices = client
                 .list_invoices(ListinvoicesRequest {
-                    label: Some(invoice.id.into()),
+                    payment_hash,
                     ..Default::default()
                 })
                 .await?
@@ -61,7 +61,7 @@ pub async fn listen_invoices(
                         trace!("New InvoicePaid event received");
 
                         loop {
-                            match ln_events.invoice_paid(invoice.clone().into()).await {
+                            match events.invoice_paid(invoice.clone().into()).await {
                                 Ok(_) => break,
                                 Err(err) => match err {
                                     ApplicationError::Database(db_err) => {

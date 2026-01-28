@@ -10,8 +10,8 @@ use serde_bolt::bitcoin::hashes::hex::ToHex;
 use crate::{
     application::entities::{Currency, Ledger},
     domains::{
+        event::{LnInvoicePaidEvent, LnPayFailureEvent, LnPaySuccessEvent},
         invoice::{Invoice, InvoiceStatus, LnInvoice},
-        ln_node::{LnInvoicePaidEvent, LnPayFailureEvent, LnPaySuccessEvent},
         payment::Payment,
         system::HealthStatus,
     },

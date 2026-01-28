@@ -15,16 +15,14 @@ use crate::{
             UNPROCESSABLE_EXAMPLE,
         },
         dtos::{BtcAddressResponse, ErrorResponse, NewBtcAddressRequest},
+        entities::AppServices,
         errors::ApplicationError,
     },
     domains::{
         bitcoin::{BtcAddressFilter, BtcAddressType, BtcNetwork},
         user::{Permission, User},
     },
-    infra::{
-        app::AppState,
-        axum::{Json, Path, Query},
-    },
+    infra::axum::{Json, Path, Query},
 };
 
 #[derive(OpenApi)]
@@ -38,7 +36,7 @@ use crate::{
 pub struct BtcAddressHandler;
 pub const CONTEXT_PATH: &str = "/v1/bitcoin/addresses";
 
-pub fn router() -> Router<Arc<AppState>> {
+pub fn router() -> Router<Arc<AppServices>> {
     Router::new()
         .route("/", post(generate_btc_address))
         .route("/", get(list_btc_addresses))
@@ -66,19 +64,15 @@ pub fn router() -> Router<Arc<AppState>> {
     )
 )]
 async fn generate_btc_address(
-    State(app_state): State<Arc<AppState>>,
+    State(services): State<Arc<AppServices>>,
     user: User,
     Json(payload): Json<NewBtcAddressRequest>,
 ) -> Result<Json<BtcAddressResponse>, ApplicationError> {
     user.check_permission(Permission::WriteBtcAddress)?;
 
-    let address = app_state
-        .services
+    let address = services
         .bitcoin
-        .new_deposit_address(
-            payload.wallet_id.unwrap_or(user.wallet_id),
-            payload.address_type.map(Into::into),
-        )
+        .new_deposit_address(payload.wallet_id.unwrap_or(user.wallet_id), payload.address_type)
         .await?;
     Ok(Json(address.into()))
 }
@@ -101,13 +95,13 @@ async fn generate_btc_address(
     )
 )]
 async fn get_btc_address(
-    State(app_state): State<Arc<AppState>>,
+    State(services): State<Arc<AppServices>>,
     user: User,
     Path(id): Path<Uuid>,
 ) -> Result<Json<BtcAddressResponse>, ApplicationError> {
     user.check_permission(Permission::ReadBtcAddress)?;
 
-    let address = app_state.services.bitcoin.get_address(id).await?;
+    let address = services.bitcoin.get_address(id).await?;
     Ok(Json(address.into()))
 }
 
@@ -129,13 +123,13 @@ async fn get_btc_address(
     )
 )]
 async fn list_btc_addresses(
-    State(app_state): State<Arc<AppState>>,
+    State(services): State<Arc<AppServices>>,
     user: User,
     Query(filter): Query<BtcAddressFilter>,
 ) -> Result<Json<Vec<BtcAddressResponse>>, ApplicationError> {
     user.check_permission(Permission::ReadBtcAddress)?;
 
-    let addresses = app_state.services.bitcoin.list_addresses(filter).await?;
+    let addresses = services.bitcoin.list_addresses(filter).await?;
     let response: Vec<BtcAddressResponse> = addresses.into_iter().map(Into::into).collect();
 
     Ok(response.into())
@@ -159,13 +153,13 @@ async fn list_btc_addresses(
     )
 )]
 async fn delete_btc_address(
-    State(app_state): State<Arc<AppState>>,
+    State(services): State<Arc<AppServices>>,
     user: User,
     Path(id): Path<Uuid>,
 ) -> Result<(), ApplicationError> {
     user.check_permission(Permission::WriteBtcAddress)?;
 
-    app_state.services.bitcoin.delete_address(id).await?;
+    services.bitcoin.delete_address(id).await?;
     Ok(())
 }
 
@@ -187,12 +181,12 @@ async fn delete_btc_address(
     )
 )]
 async fn delete_btc_addresses(
-    State(app_state): State<Arc<AppState>>,
+    State(services): State<Arc<AppServices>>,
     user: User,
     Query(query_params): Query<BtcAddressFilter>,
 ) -> Result<Json<u64>, ApplicationError> {
     user.check_permission(Permission::WriteBtcAddress)?;
 
-    let n_deleted = app_state.services.bitcoin.delete_many_addresses(query_params).await?;
+    let n_deleted = services.bitcoin.delete_many_addresses(query_params).await?;
     Ok(n_deleted.into())
 }

@@ -7,12 +7,10 @@ use crate::{
     application::{
         docs::{INTERNAL_EXAMPLE, NOT_FOUND_EXAMPLE},
         dtos::{ErrorResponse, NostrNIP05QueryParams, NostrNIP05Response},
+        entities::AppServices,
         errors::ApplicationError,
     },
-    infra::{
-        app::AppState,
-        axum::{Json, Query},
-    },
+    infra::axum::{Json, Query},
 };
 
 #[derive(OpenApi)]
@@ -42,8 +40,8 @@ pub struct NostrHandler;
 )]
 pub async fn well_known_nostr(
     Query(query_params): Query<NostrNIP05QueryParams>,
-    State(app_state): State<Arc<AppState>>,
+    State(services): State<Arc<AppServices>>,
 ) -> Result<Json<NostrNIP05Response>, ApplicationError> {
-    let pubkey = app_state.services.nostr.get_pubkey(query_params.name.clone()).await?;
+    let pubkey = services.nostr.get_pubkey(query_params.name.clone()).await?;
     Ok(NostrNIP05Response::new(query_params.name, pubkey).into())
 }

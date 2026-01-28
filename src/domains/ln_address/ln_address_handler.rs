@@ -16,13 +16,11 @@ use crate::{
             UNPROCESSABLE_EXAMPLE,
         },
         dtos::{ErrorResponse, RegisterLnAddressRequest, UpdateLnAddressRequest},
+        entities::AppServices,
         errors::ApplicationError,
     },
     domains::user::{Permission, User},
-    infra::{
-        app::AppState,
-        axum::{Json, Path},
-    },
+    infra::axum::{Json, Path},
 };
 
 use super::{LnAddress, LnAddressFilter};
@@ -38,7 +36,7 @@ use super::{LnAddress, LnAddressFilter};
 pub struct LnAddressHandler;
 pub const CONTEXT_PATH: &str = "/v1/lightning-addresses";
 
-pub fn router() -> Router<Arc<AppState>> {
+pub fn router() -> Router<Arc<AppServices>> {
     Router::new()
         .route("/", get(list_addresses))
         .route("/", post(register_address))
@@ -67,14 +65,13 @@ pub fn router() -> Router<Arc<AppState>> {
     )
 )]
 async fn register_address(
-    State(app_state): State<Arc<AppState>>,
+    State(services): State<Arc<AppServices>>,
     user: User,
     Json(payload): Json<RegisterLnAddressRequest>,
 ) -> Result<Json<LnAddress>, ApplicationError> {
     user.check_permission(Permission::WriteLnAddress)?;
 
-    let ln_address = app_state
-        .services
+    let ln_address = services
         .ln_address
         .register(
             payload.wallet_id.unwrap_or(user.wallet_id),
@@ -104,13 +101,13 @@ async fn register_address(
     )
 )]
 async fn get_address(
-    State(app_state): State<Arc<AppState>>,
+    State(services): State<Arc<AppServices>>,
     user: User,
     Path(id): Path<Uuid>,
 ) -> Result<Json<LnAddress>, ApplicationError> {
     user.check_permission(Permission::ReadLnAddress)?;
 
-    let ln_address = app_state.services.ln_address.get(id).await?;
+    let ln_address = services.ln_address.get(id).await?;
     Ok(ln_address.into())
 }
 
@@ -132,13 +129,13 @@ async fn get_address(
     )
 )]
 async fn list_addresses(
-    State(app_state): State<Arc<AppState>>,
+    State(services): State<Arc<AppServices>>,
     user: User,
     Query(query_params): Query<LnAddressFilter>,
 ) -> Result<Json<Vec<LnAddress>>, ApplicationError> {
     user.check_permission(Permission::ReadLnAddress)?;
 
-    let ln_addresses = app_state.services.ln_address.list(query_params).await?;
+    let ln_addresses = services.ln_address.list(query_params).await?;
 
     let response: Vec<LnAddress> = ln_addresses.into_iter().collect();
 
@@ -165,14 +162,14 @@ async fn list_addresses(
     )
 )]
 async fn update_address(
-    State(app_state): State<Arc<AppState>>,
+    State(services): State<Arc<AppServices>>,
     user: User,
     Path(id): Path<Uuid>,
     Json(payload): Json<UpdateLnAddressRequest>,
 ) -> Result<Json<LnAddress>, ApplicationError> {
     user.check_permission(Permission::WriteLnAddress)?;
 
-    let ln_address = app_state.services.ln_address.update(id, payload).await?;
+    let ln_address = services.ln_address.update(id, payload).await?;
     Ok(ln_address.into())
 }
 
@@ -194,13 +191,13 @@ async fn update_address(
     )
 )]
 async fn delete_address(
-    State(app_state): State<Arc<AppState>>,
+    State(services): State<Arc<AppServices>>,
     user: User,
     Path(id): Path<Uuid>,
 ) -> Result<(), ApplicationError> {
     user.check_permission(Permission::WriteLnAddress)?;
 
-    app_state.services.ln_address.delete(id).await?;
+    services.ln_address.delete(id).await?;
     Ok(())
 }
 
@@ -222,12 +219,12 @@ async fn delete_address(
     )
 )]
 async fn delete_addresses(
-    State(app_state): State<Arc<AppState>>,
+    State(services): State<Arc<AppServices>>,
     user: User,
     Query(query_params): Query<LnAddressFilter>,
 ) -> Result<Json<u64>, ApplicationError> {
     user.check_permission(Permission::WriteLnAddress)?;
 
-    let n_deleted = app_state.services.ln_address.delete_many(query_params).await?;
+    let n_deleted = services.ln_address.delete_many(query_params).await?;
     Ok(n_deleted.into())
 }
