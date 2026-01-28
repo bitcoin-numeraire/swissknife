@@ -170,14 +170,14 @@ impl LnClient for ClnGrpcClient {
         Ok(bolt11.into())
     }
 
-    async fn pay(&self, bolt11: String, amount_msat: Option<u64>) -> Result<Payment, LightningError> {
+    async fn pay(&self, bolt11: String, amount_msat: Option<u64>, label: String) -> Result<Payment, LightningError> {
         let mut client = self.client.clone();
 
         let response = client
             .pay(PayRequest {
                 bolt11,
                 amount_msat: amount_msat.map(|msat| cln::Amount { msat }),
-                label: Some(Uuid::new_v4().to_string()),
+                label: Some(label),
                 maxfeepercent: self.maxfeepercent,
                 retry_for: self.retry_for,
                 exemptfee: self.payment_exemptfee,

@@ -199,14 +199,6 @@ impl LndRestClient {
             "No chain information returned by LND".to_string(),
         ))
     }
-
-    fn map_address_type(address_type: BtcAddressType) -> String {
-        match address_type {
-            BtcAddressType::P2sh => "NESTED_PUBKEY_HASH".to_string(),
-            BtcAddressType::P2tr => "TAPROOT_PUBKEY".to_string(),
-            _ => "WITNESS_PUBKEY_HASH".to_string(),
-        }
-    }
 }
 
 pub(crate) async fn read_macaroon(path: &str) -> anyhow::Result<String> {
@@ -259,7 +251,7 @@ impl LnClient for LndRestClient {
         Ok(response.into())
     }
 
-    async fn pay(&self, bolt11: String, amount_msat: Option<u64>) -> Result<Payment, LightningError> {
+    async fn pay(&self, bolt11: String, amount_msat: Option<u64>, _label: String) -> Result<Payment, LightningError> {
         let payload = PayRequest {
             payment_request: bolt11,
             amt_msat: amount_msat,
@@ -332,7 +324,13 @@ impl LnClient for LndRestClient {
 #[async_trait]
 impl BitcoinWallet for LndRestClient {
     async fn new_address(&self, address_type: BtcAddressType) -> Result<String, BitcoinError> {
-        let address_type_param = Self::map_address_type(address_type);
+        let address_type_param = match address_type {
+            BtcAddressType::P2sh => "NESTED_PUBKEY_HASH".to_string(),
+            BtcAddressType::P2tr => "TAPROOT_PUBKEY".to_string(),
+            BtcAddressType::P2wpkh => "WITNESS_PUBKEY_HASH".to_string(),
+            _ => return Err(BitcoinError::AddressType(address_type.to_string())),
+        };
+
         let endpoint = format!("v1/newaddress?type={}", address_type_param);
 
         let response: NewAddressResponse = self

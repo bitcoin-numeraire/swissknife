@@ -35,7 +35,7 @@ impl EventService {
     }
 
     pub async fn latest_settled_invoice(&self) -> Result<Option<Invoice>, ApplicationError> {
-        debug!("Fetching latest settled invoice...");
+        trace!("Fetching latest settled invoice...");
 
         let invoices = self
             .store

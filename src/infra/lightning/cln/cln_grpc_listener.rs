@@ -1,10 +1,11 @@
 use std::time::Duration;
 
 use anyhow::{anyhow, Result};
+use hex::decode;
 use serde_bolt::bitcoin::hashes::hex::ToHex;
 use tokio::time::sleep;
 use tonic::{transport::Channel, Code};
-use tracing::{debug, error, info, trace, warn};
+use tracing::{error, info, trace, warn};
 
 use crate::{
     application::errors::ApplicationError,
@@ -24,14 +25,13 @@ pub async fn listen_invoices(
 
     let mut lastpay_index = match last_settled_invoice {
         Some(invoice) => {
-            debug!(
-                id = %invoice.id,
-                "Fetching latest settled invoice from node..."
-            );
-
+            let payment_hash = invoice
+                .ln_invoice
+                .as_ref()
+                .and_then(|ln_invoice| decode(&ln_invoice.payment_hash).ok());
             let invoices = client
                 .list_invoices(ListinvoicesRequest {
-                    label: Some(invoice.id.into()),
+                    payment_hash,
                     ..Default::default()
                 })
                 .await?

@@ -2,7 +2,6 @@ use serde::Deserialize;
 use serde_bolt::bitcoin::hashes::hex::ToHex;
 use std::{fs, io, path::PathBuf, sync::Arc};
 use tracing::{debug, info};
-use uuid::Uuid;
 
 use async_trait::async_trait;
 use bip39::Mnemonic;
@@ -254,13 +253,13 @@ impl LnClient for BreezClient {
         Ok(response.ln_invoice.into())
     }
 
-    async fn pay(&self, bolt11: String, amount_msat: Option<u64>) -> Result<Payment, LightningError> {
+    async fn pay(&self, bolt11: String, amount_msat: Option<u64>, label: String) -> Result<Payment, LightningError> {
         let response = self
             .sdk
             .send_payment(SendPaymentRequest {
                 bolt11,
                 amount_msat,
-                label: Some(Uuid::new_v4().to_string()),
+                label: Some(label),
                 use_trampoline: false,
             })
             .await
