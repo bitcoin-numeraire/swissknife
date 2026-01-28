@@ -1,9 +1,8 @@
-use std::sync::Arc;
-
 use crate::{
     application::{dtos::AppConfig, entities::AppAdapters},
     domains::{
         bitcoin::{BitcoinService, BitcoinUseCases},
+        event::EventService,
         invoice::{InvoiceService, InvoiceUseCases},
         ln_address::{LnAddressService, LnAddressUseCases},
         lnurl::{LnUrlService, LnUrlUseCases},
@@ -12,11 +11,6 @@ use crate::{
         system::{SystemService, SystemUseCases},
         user::{ApiKeyService, ApiKeyUseCases, AuthService, AuthUseCases},
         wallet::{WalletService, WalletUseCases},
-    },
-    infra::lightning::{
-        breez::BreezClient,
-        cln::{ClnGrpcClient, ClnRestClient},
-        lnd::LndRestClient,
     },
 };
 
@@ -31,6 +25,7 @@ pub struct AppServices {
     pub nostr: Box<dyn NostrUseCases>,
     pub api_key: Box<dyn ApiKeyUseCases>,
     pub bitcoin: Box<dyn BitcoinUseCases>,
+    pub event: EventService,
 }
 
 impl AppServices {
@@ -80,7 +75,8 @@ impl AppServices {
         let system = SystemService::new(store.clone(), ln_client.clone());
         let nostr = NostrService::new(store.clone());
         let api_key = ApiKeyService::new(store.clone());
-        let bitcoin = BitcoinService::new(store, bitcoin_wallet, adapters.events, bitcoin_address_type);
+        let bitcoin = BitcoinService::new(store.clone(), bitcoin_wallet, bitcoin_address_type);
+        let event = EventService::new(store.clone());
 
         AppServices {
             invoice: Box::new(invoices),
@@ -93,14 +89,7 @@ impl AppServices {
             nostr: Box::new(nostr),
             api_key: Box::new(api_key),
             bitcoin: Box::new(bitcoin),
+            event,
         }
     }
-}
-
-#[derive(Clone)]
-pub enum LnNodeClient {
-    Breez(Arc<BreezClient>),
-    ClnGrpc(Arc<ClnGrpcClient>),
-    ClnRest(Arc<ClnRestClient>),
-    Lnd(Arc<LndRestClient>),
 }

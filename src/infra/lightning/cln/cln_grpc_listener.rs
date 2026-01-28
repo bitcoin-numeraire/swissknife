@@ -1,4 +1,4 @@
-use std::{sync::Arc, time::Duration};
+use std::time::Duration;
 
 use anyhow::{anyhow, Result};
 use serde_bolt::bitcoin::hashes::hex::ToHex;
@@ -7,7 +7,8 @@ use tonic::{transport::Channel, Code};
 use tracing::{debug, error, info, trace, warn};
 
 use crate::{
-    application::{entities::EventsUseCases, errors::ApplicationError},
+    application::errors::ApplicationError,
+    domains::event::EventService,
     infra::lightning::cln::cln::{waitanyinvoice_response::WaitanyinvoiceStatus, ListinvoicesRequest},
 };
 
@@ -15,7 +16,7 @@ use super::cln::{node_client::NodeClient, WaitanyinvoiceRequest};
 
 pub async fn listen_invoices(
     mut client: NodeClient<Channel>,
-    events: Arc<dyn EventsUseCases>,
+    events: EventService,
     retry_delay: Duration,
 ) -> Result<()> {
     // Temporary. get the latest settled invoice payment_hash as starting point for event listening

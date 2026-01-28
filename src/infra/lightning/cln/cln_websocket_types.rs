@@ -3,8 +3,8 @@ use serde::Deserialize;
 use serde_bolt::bitcoin::hashes::hex::ToHex;
 use serde_bolt::bitcoin::hashes::{sha256, Hash};
 
-use crate::application::entities::{BtcOutputEvent, LnInvoicePaidEvent, LnPayFailureEvent, LnPaySuccessEvent};
 use crate::domains::bitcoin::BtcNetwork;
+use crate::domains::event::{BtcOutputEvent, LnInvoicePaidEvent, LnPayFailureEvent, LnPaySuccessEvent};
 
 #[derive(Debug, Deserialize)]
 pub struct InvoicePayment {

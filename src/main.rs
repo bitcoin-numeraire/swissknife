@@ -2,24 +2,18 @@ mod application;
 mod domains;
 mod infra;
 
-use std::process::exit;
-use std::sync::Arc;
+use std::{process::exit, sync::Arc};
 
 #[cfg(debug_assertions)]
 use dotenv::dotenv;
-use tokio::signal::ctrl_c;
-use tokio::signal::unix::signal;
-use tokio::signal::unix::SignalKind;
-use tracing::debug;
-use tracing::info;
+use tokio::signal::{
+    ctrl_c,
+    unix::{signal, SignalKind},
+};
+use tracing::{debug, error, info};
 
-use crate::application::entities::AppAdapters;
-use crate::application::entities::AppServices;
-use crate::infra::app::Server;
-use crate::infra::config::config_rs::load_config;
-use crate::infra::logging::tracing::setup_tracing;
-
-use tracing::error;
+use crate::application::entities::{AppAdapters, AppServices};
+use crate::infra::{app::Server, config::config_rs::load_config, logging::tracing::setup_tracing};
 
 #[tokio::main]
 async fn main() {
@@ -52,7 +46,8 @@ async fn main() {
     // Start the event listener first so we don't miss any events
     if let Some(listener) = adapters.ln_listener.clone() {
         let bitcoin_wallet = adapters.bitcoin_wallet.clone();
-        let events = adapters.events.clone();
+        let events = services.event.clone();
+
         tokio::spawn(async move {
             if let Err(err) = listener.listen(events, bitcoin_wallet).await {
                 tracing::error!(%err, "Lightning listener failed");
@@ -60,16 +55,14 @@ async fn main() {
         });
     }
 
+    // Sync pending invoices and payments if necessary
+    // TODO: Move to events
     if let Err(err) = services.invoice.sync().await {
         error!(%err, "failed to sync invoices");
         exit(1);
     }
 
-    if let Err(err) = services.bitcoin.sync_pending_transactions().await {
-        error!(%err, "failed to sync onchain transactions");
-        exit(1);
-    }
-
+    // We start accepting external requests only when everything is synced and ready
     let app = Server::new(adapters.clone(), services.clone(), config.dashboard_dir.as_deref());
     if let Err(err) = app.start(&config.web.addr, shutdown_signal(adapters.clone())).await {
         error!(%err, "failed to start API server");

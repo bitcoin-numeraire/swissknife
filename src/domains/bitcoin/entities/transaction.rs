@@ -1,6 +1,6 @@
 use chrono::{DateTime, Utc};
 
-use crate::{application::entities::BtcOutputEvent, domains::bitcoin::BtcNetwork};
+use crate::domains::{bitcoin::BtcNetwork, event::BtcOutputEvent};
 
 #[derive(Clone, Debug)]
 pub struct BitcoinTransaction {

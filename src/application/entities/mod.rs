@@ -1,12 +1,10 @@
-mod adpaters;
-mod events;
+mod adapters;
 mod ordering;
 mod services;
 mod store;
 mod transaction;
 
-pub use adpaters::*;
-pub use events::*;
+pub use adapters::*;
 pub use ordering::*;
 pub use services::*;
 pub use store::AppStore;

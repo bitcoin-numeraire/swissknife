@@ -1,17 +1,15 @@
-use std::sync::Arc;
-
 use async_trait::async_trait;
 use breez_sdk_core::{BreezEvent, EventListener, PaymentStatus, PaymentType};
 use tracing::{trace, warn};
 
-use crate::application::entities::EventsUseCases;
+use crate::domains::event::EventService;
 
 pub struct BreezListener {
-    pub events: Arc<dyn EventsUseCases>,
+    pub events: EventService,
 }
 
 impl BreezListener {
-    pub fn new(events: Arc<dyn EventsUseCases>) -> Self {
+    pub fn new(events: EventService) -> Self {
         Self { events }
     }
 }

@@ -1,4 +1,4 @@
-use std::{path::PathBuf, sync::Arc};
+use std::path::PathBuf;
 
 use futures_util::{future::BoxFuture, FutureExt};
 use native_tls::{Certificate, TlsConnector};
@@ -10,11 +10,11 @@ use tokio::fs;
 use tracing::{debug, error, trace, warn};
 
 use crate::{
-    application::{
-        entities::{BtcOutputEvent, EventsUseCases},
-        errors::LightningError,
+    application::errors::LightningError,
+    domains::{
+        bitcoin::BtcNetwork,
+        event::{BtcOutputEvent, EventService},
     },
-    domains::bitcoin::BtcNetwork,
     infra::lightning::cln::cln_websocket_types::{ChainMovement, InvoicePayment, SendPayFailure, SendPaySuccess},
 };
 
@@ -22,7 +22,7 @@ use super::ClnRestClientConfig;
 
 pub async fn connect_websocket(
     config: ClnRestClientConfig,
-    events: Arc<dyn EventsUseCases>,
+    events: EventService,
     network: BtcNetwork,
 ) -> Result<Client, LightningError> {
     let mut client_builder = ClientBuilder::new(config.endpoint.clone())
@@ -97,7 +97,7 @@ fn on_error(err: Payload, _: Client) -> BoxFuture<'static, ()> {
     .boxed()
 }
 
-fn on_message(events: Arc<dyn EventsUseCases>, network: BtcNetwork, payload: Payload) -> BoxFuture<'static, ()> {
+fn on_message(events: EventService, network: BtcNetwork, payload: Payload) -> BoxFuture<'static, ()> {
     async move {
         match payload {
             Payload::Text(values) => {

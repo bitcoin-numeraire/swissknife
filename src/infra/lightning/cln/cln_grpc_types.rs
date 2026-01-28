@@ -4,9 +4,10 @@ use serde_bolt::bitcoin::hashes::hex::ToHex;
 use std::str::FromStr;
 
 use crate::{
-    application::entities::{Ledger, LnInvoicePaidEvent},
+    application::entities::Ledger,
     domains::{
         bitcoin::BtcOutputStatus,
+        event::LnInvoicePaidEvent,
         invoice::{Invoice, InvoiceStatus},
         payment::Payment,
     },

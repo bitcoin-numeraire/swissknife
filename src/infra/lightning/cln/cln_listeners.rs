@@ -4,8 +4,8 @@ use async_trait::async_trait;
 use rust_socketio::asynchronous::Client as WsClient;
 
 use crate::{
-    application::{entities::EventsUseCases, errors::LightningError},
-    domains::bitcoin::BitcoinWallet,
+    application::errors::LightningError,
+    domains::{bitcoin::BitcoinWallet, event::EventService},
     infra::lightning::EventsListener,
 };
 
@@ -30,7 +30,7 @@ impl ClnGrpcListener {
 impl EventsListener for ClnGrpcListener {
     async fn listen(
         &self,
-        events: Arc<dyn EventsUseCases>,
+        events: EventService,
         _bitcoin_wallet: Arc<dyn BitcoinWallet>,
     ) -> Result<(), LightningError> {
         let client = ClnGrpcClient::connect(&self.config).await?;
@@ -56,11 +56,7 @@ impl ClnRestListener {
 
 #[async_trait]
 impl EventsListener for ClnRestListener {
-    async fn listen(
-        &self,
-        events: Arc<dyn EventsUseCases>,
-        bitcoin_wallet: Arc<dyn BitcoinWallet>,
-    ) -> Result<(), LightningError> {
+    async fn listen(&self, events: EventService, bitcoin_wallet: Arc<dyn BitcoinWallet>) -> Result<(), LightningError> {
         let network = bitcoin_wallet.network();
         let ws_client = connect_websocket(self.config.clone(), events, network).await?;
         let mut guard = self
