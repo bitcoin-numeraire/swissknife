@@ -157,7 +157,11 @@ impl BitcoinEventsUseCases for BitcoinEventsService {
 
         let status = Self::output_status(event.block_height);
 
-        let Some(destination_address) = updated_payment.btc_address.clone() else {
+        let Some(destination_address) = updated_payment
+            .bitcoin
+            .as_ref()
+            .and_then(|bitcoin| bitcoin.destination_address.clone())
+        else {
             return Err(DataError::Inconsistency("Destination address not found.".into()).into());
         };
 
@@ -176,10 +180,11 @@ impl BitcoinEventsUseCases for BitcoinEventsService {
         };
 
         let stored_output = self.store.btc_output.upsert(btc_output).await?;
-        updated_payment.btc_output = Some(stored_output.clone());
+        let bitcoin = updated_payment.bitcoin.get_or_insert_with(Default::default);
+        bitcoin.btc_output = Some(stored_output.clone());
 
-        if updated_payment.btc_output_id.is_none() {
-            updated_payment.btc_output_id = Some(stored_output.id);
+        if bitcoin.btc_output_id.is_none() {
+            bitcoin.btc_output_id = Some(stored_output.id);
         }
 
         self.store.payment.update(updated_payment).await?;

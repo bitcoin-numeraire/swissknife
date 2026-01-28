@@ -2,13 +2,16 @@ use std::time::Duration;
 
 use chrono::Utc;
 
-use crate::domains::{
-    bitcoin::{BtcAddress, BtcOutput},
-    invoice::{Invoice, InvoiceStatus, LnInvoice},
-    ln_address::LnAddress,
-    payment::Payment,
-    user::ApiKey,
-    wallet::{Contact, Wallet},
+use crate::{
+    application::entities::Ledger,
+    domains::{
+        bitcoin::{BtcAddress, BtcOutput},
+        invoice::{Invoice, InvoiceStatus, LnInvoice},
+        ln_address::LnAddress,
+        payment::{BitcoinPayment, LnPayment, Payment},
+        user::ApiKey,
+        wallet::{Contact, Wallet},
+    },
 };
 
 use super::models::{
@@ -67,27 +70,48 @@ impl From<InvoiceModel> for Invoice {
 
 impl From<PaymentModel> for Payment {
     fn from(model: PaymentModel) -> Self {
+        let ledger = model.ledger.parse().expect(ASSERTION_MSG);
+
+        let lightning = (ledger == Ledger::Lightning
+            || model.ln_address.is_some()
+            || model.payment_preimage.is_some()
+            || model.metadata.is_some()
+            || model.success_action.is_some()
+            || (model.payment_hash.is_some()
+                && model.btc_address.is_none()
+                && model.btc_output_id.is_none()
+                && ledger != Ledger::Onchain))
+            .then(|| LnPayment {
+                ln_address: model.ln_address,
+                payment_hash: model.payment_hash.clone(),
+                payment_preimage: model.payment_preimage,
+                metadata: model.metadata,
+                success_action: serde_json::from_value(model.success_action.unwrap_or_default()).ok(),
+            });
+
+        let bitcoin = (model.btc_address.is_some() || model.btc_output_id.is_some() || ledger == Ledger::Onchain)
+            .then_some(BitcoinPayment {
+                destination_address: model.btc_address,
+                txid: model.payment_hash,
+                btc_output_id: model.btc_output_id,
+                btc_output: None,
+            });
+
         Payment {
             id: model.id,
             wallet_id: model.wallet_id,
-            ln_address: model.ln_address,
-            payment_hash: model.payment_hash,
-            payment_preimage: model.payment_preimage,
             error: model.error,
             amount_msat: model.amount_msat as u64,
             fee_msat: model.fee_msat.map(|v| v as u64),
             payment_time: model.payment_time.map(|t| t.and_utc()),
             status: model.status.parse().expect(ASSERTION_MSG),
-            ledger: model.ledger.parse().expect(ASSERTION_MSG),
+            ledger,
             currency: model.currency.parse().expect(ASSERTION_MSG),
             description: model.description,
-            metadata: model.metadata,
-            success_action: serde_json::from_value(model.success_action.unwrap_or_default()).ok(),
             created_at: model.created_at.and_utc(),
             updated_at: model.updated_at.map(|t| t.and_utc()),
-            btc_output_id: model.btc_output_id,
-            btc_address: model.btc_address,
-            btc_output: None,
+            lightning,
+            bitcoin,
         }
     }
 }

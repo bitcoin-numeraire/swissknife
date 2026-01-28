@@ -12,7 +12,7 @@ use crate::{
     domains::{
         invoice::{Invoice, InvoiceStatus, LnInvoice},
         ln_node::{LnInvoicePaidEvent, LnPayFailureEvent, LnPaySuccessEvent},
-        payment::Payment,
+        payment::{LnPayment, Payment},
         system::HealthStatus,
     },
 };
@@ -43,17 +43,20 @@ impl From<BreezPayment> for Payment {
     fn from(val: BreezPayment) -> Self {
         Payment {
             ledger: Ledger::Lightning,
-            payment_hash: Some(val.id),
-            payment_preimage: match val.details {
-                PaymentDetails::Ln { data } => Some(data.payment_preimage),
-                _ => None,
-            },
             error: val.error,
             amount_msat: val.amount_msat,
             fee_msat: Some(val.fee_msat),
             payment_time: Some(Utc.timestamp_opt(val.payment_time, 0).unwrap()),
             description: val.description,
-            metadata: val.metadata,
+            lightning: Some(LnPayment {
+                payment_hash: Some(val.id),
+                payment_preimage: match val.details {
+                    PaymentDetails::Ln { data } => Some(data.payment_preimage),
+                    _ => None,
+                },
+                metadata: val.metadata,
+                ..Default::default()
+            }),
             ..Default::default()
         }
     }

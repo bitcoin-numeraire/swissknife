@@ -83,9 +83,10 @@ impl LnEventsUseCases for LnEventsService {
 
             payment_retrieved.status = PaymentStatus::Settled;
             payment_retrieved.payment_time = Some(event.payment_time);
-            payment_retrieved.payment_preimage = Some(event.payment_preimage);
             payment_retrieved.amount_msat = event.amount_msat;
             payment_retrieved.fee_msat = Some(event.fees_msat);
+            let lightning = payment_retrieved.lightning.get_or_insert_with(Default::default);
+            lightning.payment_preimage = Some(event.payment_preimage);
 
             let payment = self.store.payment.update(payment_retrieved).await?;
 

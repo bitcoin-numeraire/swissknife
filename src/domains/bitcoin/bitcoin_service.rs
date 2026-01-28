@@ -176,7 +176,7 @@ impl BitcoinUseCases for BitcoinService {
             .await?;
 
         for payment in payments {
-            let Some(txid) = payment.payment_hash else {
+            let Some(txid) = payment.bitcoin.as_ref().and_then(|bitcoin| bitcoin.txid.clone()) else {
                 return Err(DataError::Inconsistency("Payment without transaction hash".to_string()).into());
             };
 
@@ -186,10 +186,17 @@ impl BitcoinUseCases for BitcoinService {
                 .iter()
                 .filter(|output| output.amount_sat > 0)
                 .filter(|output| !output.is_ours)
-                .find(|output| match (&payment.btc_address, &output.address) {
-                    (Some(destination), Some(address)) => destination == address,
-                    (Some(_), None) => false,
-                    (None, _) => true,
+                .find(|output| {
+                    let payment_address = payment
+                        .bitcoin
+                        .as_ref()
+                        .and_then(|bitcoin| bitcoin.destination_address.as_ref());
+
+                    match (payment_address, &output.address) {
+                        (Some(destination), Some(address)) => destination == address,
+                        (Some(_), None) => false,
+                        (None, _) => true,
+                    }
                 })
                 .or_else(|| {
                     // If the address is not found, we can assume this output is the withdrawal.

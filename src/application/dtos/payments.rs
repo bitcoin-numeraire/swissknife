@@ -54,28 +54,6 @@ pub struct PaymentResponse {
     /// Wallet ID
     pub wallet_id: Uuid,
 
-    /// Lightning Address. Populated when sending to a LN Address
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[schema(example = "hello@numeraire.tech")]
-    pub ln_address: Option<String>,
-
-    /// Destination Bitcoin address. Populated for Bitcoin onchain payments.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub destination_address: Option<String>,
-
-    /// Linked Bitcoin output identifier when available.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub btc_output_id: Option<Uuid>,
-
-    /// Payment hash
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[schema(example = "b587c7f76339e3fb87ad2b...")]
-    pub payment_hash: Option<String>,
-
-    /// Payment Preimage
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub payment_preimage: Option<String>,
-
     /// Error message
     #[serde(skip_serializing_if = "Option::is_none")]
     #[schema(example = "failed to pay error message")]
@@ -105,6 +83,38 @@ pub struct PaymentResponse {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
 
+    /// Date of creation in database
+    pub created_at: DateTime<Utc>,
+
+    /// Date of update in database
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub updated_at: Option<DateTime<Utc>>,
+
+    /// Lightning payment details
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub lightning: Option<LightningPaymentResponse>,
+
+    /// Bitcoin on-chain payment details
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bitcoin: Option<BitcoinPaymentResponse>,
+}
+
+#[derive(Serialize, ToSchema)]
+pub struct LightningPaymentResponse {
+    /// Lightning Address. Populated when sending to a LN Address
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(example = "hello@numeraire.tech")]
+    pub ln_address: Option<String>,
+
+    /// Payment hash
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(example = "b587c7f76339e3fb87ad2b...")]
+    pub payment_hash: Option<String>,
+
+    /// Payment Preimage
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub payment_preimage: Option<String>,
+
     /// Metadata
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metadata: Option<String>,
@@ -112,17 +122,25 @@ pub struct PaymentResponse {
     /// Success Action. Populated when sending to a LNURL or LN Address
     #[serde(skip_serializing_if = "Option::is_none")]
     pub success_action: Option<LnUrlSuccessAction>,
+}
+
+#[derive(Serialize, ToSchema)]
+pub struct BitcoinPaymentResponse {
+    /// Destination Bitcoin address. Populated for Bitcoin onchain payments.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub destination_address: Option<String>,
+
+    /// Transaction ID for on-chain payments.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub txid: Option<String>,
+
+    /// Linked Bitcoin output identifier when available.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub btc_output_id: Option<Uuid>,
 
     /// Bitcoin Output
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bitcoin_output: Option<BtcOutputResponse>,
-
-    /// Date of creation in database
-    pub created_at: DateTime<Utc>,
-
-    /// Date of update in database
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub updated_at: Option<DateTime<Utc>>,
 }
 
 impl From<Payment> for PaymentResponse {
@@ -130,11 +148,6 @@ impl From<Payment> for PaymentResponse {
         PaymentResponse {
             id: payment.id,
             wallet_id: payment.wallet_id,
-            ln_address: payment.ln_address,
-            destination_address: payment.btc_address,
-            btc_output_id: payment.btc_output_id,
-            payment_hash: payment.payment_hash,
-            payment_preimage: payment.payment_preimage,
             error: payment.error,
             amount_msat: payment.amount_msat,
             fee_msat: payment.fee_msat,
@@ -143,10 +156,32 @@ impl From<Payment> for PaymentResponse {
             payment_time: payment.payment_time,
             status: payment.status,
             description: payment.description,
-            metadata: payment.metadata,
-            success_action: payment.success_action,
             created_at: payment.created_at,
             updated_at: payment.updated_at,
+            lightning: payment.lightning.map(Into::into),
+            bitcoin: payment.bitcoin.map(Into::into),
+        }
+    }
+}
+
+impl From<crate::domains::payment::LnPayment> for LightningPaymentResponse {
+    fn from(payment: crate::domains::payment::LnPayment) -> Self {
+        LightningPaymentResponse {
+            ln_address: payment.ln_address,
+            payment_hash: payment.payment_hash,
+            payment_preimage: payment.payment_preimage,
+            metadata: payment.metadata,
+            success_action: payment.success_action,
+        }
+    }
+}
+
+impl From<crate::domains::payment::BitcoinPayment> for BitcoinPaymentResponse {
+    fn from(payment: crate::domains::payment::BitcoinPayment) -> Self {
+        BitcoinPaymentResponse {
+            destination_address: payment.destination_address,
+            txid: payment.txid,
+            btc_output_id: payment.btc_output_id,
             bitcoin_output: payment.btc_output.map(Into::into),
         }
     }
