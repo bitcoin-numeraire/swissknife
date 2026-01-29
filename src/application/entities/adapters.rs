@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use http::StatusCode;
 use tower_http::timeout::TimeoutLayer;
 use tracing::debug;
 
@@ -37,7 +38,7 @@ impl AppAdapters {
     pub async fn new(config: AppConfig) -> Result<Self, ApplicationError> {
         let AppConfig { web, database, .. } = config.clone();
 
-        let timeout_layer = TimeoutLayer::new(web.request_timeout);
+        let timeout_layer = TimeoutLayer::with_status_code(StatusCode::REQUEST_TIMEOUT, web.request_timeout);
         let db_conn = SeaORMClient::connect(database).await?;
         let store = AppStore::new_sea_orm(db_conn);
         let jwt_authenticator = get_authenticator(config.clone()).await?;
