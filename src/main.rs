@@ -2,29 +2,26 @@ mod application;
 mod domains;
 mod infra;
 
-use std::process::exit;
-use std::sync::Arc;
+use std::{process::exit, sync::Arc};
 
 #[cfg(debug_assertions)]
 use dotenv::dotenv;
-use tokio::signal::ctrl_c;
-use tokio::signal::unix::signal;
-use tokio::signal::unix::SignalKind;
-use tracing::debug;
-use tracing::info;
+use tokio::signal::{
+    ctrl_c,
+    unix::{signal, SignalKind},
+};
+use tracing::{debug, error, info};
 
-use crate::infra::app::AppState;
-use crate::infra::app::Server;
-use crate::infra::config::config_rs::load_config;
-use crate::infra::logging::tracing::setup_tracing;
-
-use tracing::error;
+use crate::application::entities::{AppAdapters, AppServices};
+use crate::infra::{app::Server, config::config_rs::load_config, logging::tracing::setup_tracing};
 
 #[tokio::main]
 async fn main() {
     // Load .env file in development
     #[cfg(debug_assertions)]
     dotenv().ok();
+
+    info!("Numeraire SwissKnife version: {}", env!("CARGO_PKG_VERSION"));
 
     // Load config and logger
     let config = match load_config() {
@@ -36,32 +33,44 @@ async fn main() {
     };
     setup_tracing(config.logging.clone());
 
-    let app_state = match AppState::new(config.clone()).await {
-        Ok(state) => Arc::new(state),
+    let adapters = match AppAdapters::new(config.clone()).await {
+        Ok(state) => state,
         Err(err) => {
             error!(%err, "failed to create app state");
             exit(1);
         }
     };
 
-    if let Err(err) = app_state.services.invoice.sync().await {
+    let services = Arc::new(AppServices::new(config.clone(), adapters.clone()));
+
+    // Start the event listener first so we don't miss any events
+    if let Some(listener) = adapters.ln_listener.clone() {
+        let bitcoin_wallet = adapters.bitcoin_wallet.clone();
+        let events = services.event.clone();
+
+        tokio::spawn(async move {
+            if let Err(err) = listener.listen(events, bitcoin_wallet).await {
+                tracing::error!(%err, "Lightning listener failed");
+            }
+        });
+    }
+
+    // Sync pending invoices and payments if necessary
+    // TODO: Move to events
+    if let Err(err) = services.invoice.sync().await {
         error!(%err, "failed to sync invoices");
         exit(1);
     }
 
-    if let Err(err) = app_state.services.bitcoin.sync_pending_transactions().await {
-        error!(%err, "failed to sync onchain transactions");
-        exit(1);
-    }
-
-    let app = Server::new(app_state.clone(), config.dashboard_dir.as_deref());
-    if let Err(err) = app.start(&config.web.addr, shutdown_signal(app_state.clone())).await {
+    // We start accepting external requests only when everything is synced and ready
+    let app = Server::new(adapters.clone(), services.clone(), config.dashboard_dir.as_deref());
+    if let Err(err) = app.start(&config.web.addr, shutdown_signal(adapters.clone())).await {
         error!(%err, "failed to start API server");
         exit(1);
     }
 }
 
-async fn shutdown_signal(state: Arc<AppState>) {
+async fn shutdown_signal(adapters: AppAdapters) {
     let ctrl_c = async {
         if let Err(err) = ctrl_c().await {
             error!(%err, "Failed to install Ctrl+C handler");
@@ -88,7 +97,7 @@ async fn shutdown_signal(state: Arc<AppState>) {
         _ = terminate => {},
     }
 
-    if let Err(err) = state.ln_client.disconnect().await {
+    if let Err(err) = adapters.ln_client.disconnect().await {
         error!(%err, "Failed to shutdown gracefully");
     }
 

@@ -1,11 +1,10 @@
-use crate::domains::{
-    bitcoin::{BitcoinOutputEvent, BtcNetwork},
-    ln_node::{LnInvoicePaidEvent, LnPayFailureEvent, LnPaySuccessEvent},
-};
 use chrono::{TimeZone, Utc};
 use serde::Deserialize;
 use serde_bolt::bitcoin::hashes::hex::ToHex;
 use serde_bolt::bitcoin::hashes::{sha256, Hash};
+
+use crate::domains::bitcoin::BtcNetwork;
+use crate::domains::event::{BtcOutputEvent, LnInvoicePaidEvent, LnPayFailureEvent, LnPaySuccessEvent};
 
 #[derive(Debug, Deserialize)]
 pub struct InvoicePayment {
@@ -79,7 +78,7 @@ impl From<SendPayFailure> for LnPayFailureEvent {
     }
 }
 
-impl From<ChainMovement> for BitcoinOutputEvent {
+impl From<ChainMovement> for BtcOutputEvent {
     fn from(val: ChainMovement) -> Self {
         let parts = val.utxo.split(":").collect::<Vec<&str>>();
         let txid = parts[0].to_string();
@@ -90,7 +89,7 @@ impl From<ChainMovement> for BitcoinOutputEvent {
             fee_sat = Some((val.debit_msat - val.output_msat) / 1000);
         }
 
-        BitcoinOutputEvent {
+        BtcOutputEvent {
             txid,
             output_index,
             address: None,

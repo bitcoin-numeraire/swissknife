@@ -16,16 +16,14 @@ use crate::{
             UNPROCESSABLE_EXAMPLE,
         },
         dtos::{BitcoinPaymentResponse, ErrorResponse, LightningPaymentResponse, PaymentResponse, SendPaymentRequest},
+        entities::AppServices,
         errors::ApplicationError,
     },
     domains::{
         lnurl::LnUrlSuccessAction,
         user::{Permission, User},
     },
-    infra::{
-        app::AppState,
-        axum::{Json, Path},
-    },
+    infra::axum::{Json, Path},
 };
 
 use super::{PaymentFilter, PaymentStatus};
@@ -48,7 +46,7 @@ use super::{PaymentFilter, PaymentStatus};
 pub struct PaymentHandler;
 pub const CONTEXT_PATH: &str = "/v1/payments";
 
-pub fn router() -> Router<Arc<AppState>> {
+pub fn router() -> Router<Arc<AppServices>> {
     Router::new()
         .route("/", post(pay))
         .route("/", get(list_payments))
@@ -76,14 +74,13 @@ pub fn router() -> Router<Arc<AppState>> {
     )
 )]
 async fn pay(
-    State(app_state): State<Arc<AppState>>,
+    State(services): State<Arc<AppServices>>,
     user: User,
     Json(payload): Json<SendPaymentRequest>,
 ) -> Result<Json<PaymentResponse>, ApplicationError> {
     user.check_permission(Permission::WriteLnTransaction)?;
 
-    let payment = app_state
-        .services
+    let payment = services
         .payment
         .pay(
             payload.input,
@@ -114,13 +111,13 @@ async fn pay(
     )
 )]
 async fn get_payment(
-    State(app_state): State<Arc<AppState>>,
+    State(services): State<Arc<AppServices>>,
     user: User,
     Path(id): Path<Uuid>,
 ) -> Result<Json<PaymentResponse>, ApplicationError> {
     user.check_permission(Permission::ReadLnTransaction)?;
 
-    let payment = app_state.services.payment.get(id).await?;
+    let payment = services.payment.get(id).await?;
     Ok(Json(payment.into()))
 }
 
@@ -142,13 +139,13 @@ async fn get_payment(
     )
 )]
 async fn list_payments(
-    State(app_state): State<Arc<AppState>>,
+    State(services): State<Arc<AppServices>>,
     user: User,
     Query(query_params): Query<PaymentFilter>,
 ) -> Result<Json<Vec<PaymentResponse>>, ApplicationError> {
     user.check_permission(Permission::ReadLnTransaction)?;
 
-    let payments = app_state.services.payment.list(query_params).await?;
+    let payments = services.payment.list(query_params).await?;
     let response: Vec<PaymentResponse> = payments.into_iter().map(Into::into).collect();
 
     Ok(response.into())
@@ -172,13 +169,13 @@ async fn list_payments(
     )
 )]
 async fn delete_payment(
-    State(app_state): State<Arc<AppState>>,
+    State(services): State<Arc<AppServices>>,
     user: User,
     Path(id): Path<Uuid>,
 ) -> Result<(), ApplicationError> {
     user.check_permission(Permission::WriteLnTransaction)?;
 
-    app_state.services.payment.delete(id).await?;
+    services.payment.delete(id).await?;
     Ok(())
 }
 
@@ -200,12 +197,12 @@ async fn delete_payment(
     )
 )]
 async fn delete_payments(
-    State(app_state): State<Arc<AppState>>,
+    State(services): State<Arc<AppServices>>,
     user: User,
     Query(query_params): Query<PaymentFilter>,
 ) -> Result<Json<u64>, ApplicationError> {
     user.check_permission(Permission::WriteLnTransaction)?;
 
-    let n_deleted = app_state.services.payment.delete_many(query_params).await?;
+    let n_deleted = services.payment.delete_many(query_params).await?;
     Ok(n_deleted.into())
 }

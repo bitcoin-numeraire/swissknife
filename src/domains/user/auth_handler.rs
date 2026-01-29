@@ -7,9 +7,10 @@ use crate::{
     application::{
         docs::{BAD_REQUEST_EXAMPLE, CONFLICT_EXAMPLE, NOT_FOUND_EXAMPLE, UNAUTHORIZED_EXAMPLE, UNSUPPORTED_EXAMPLE},
         dtos::{ErrorResponse, SignInRequest, SignInResponse, SignUpRequest},
+        entities::AppServices,
         errors::ApplicationError,
     },
-    infra::{app::AppState, axum::Json},
+    infra::axum::Json,
 };
 
 #[derive(OpenApi)]
@@ -23,7 +24,7 @@ use crate::{
 pub struct AuthHandler;
 pub const CONTEXT_PATH: &str = "/v1/auth";
 
-pub fn auth_router() -> Router<Arc<AppState>> {
+pub fn auth_router() -> Router<Arc<AppServices>> {
     Router::new()
         .route("/sign-up", post(sign_up))
         .route("/sign-in", post(sign_in))
@@ -47,10 +48,10 @@ pub fn auth_router() -> Router<Arc<AppState>> {
     )
 )]
 async fn sign_up(
-    State(app_state): State<Arc<AppState>>,
+    State(services): State<Arc<AppServices>>,
     Json(payload): Json<SignUpRequest>,
 ) -> Result<Json<SignInResponse>, ApplicationError> {
-    let token = app_state.services.auth.sign_up(payload.password).await?;
+    let token = services.auth.sign_up(payload.password).await?;
     Ok(SignInResponse { token }.into())
 }
 
@@ -72,9 +73,9 @@ async fn sign_up(
     )
 )]
 async fn sign_in(
-    State(app_state): State<Arc<AppState>>,
+    State(services): State<Arc<AppServices>>,
     Json(payload): Json<SignInRequest>,
 ) -> Result<Json<SignInResponse>, ApplicationError> {
-    let token = app_state.services.auth.sign_in(payload.password).await?;
+    let token = services.auth.sign_in(payload.password).await?;
     Ok(SignInResponse { token }.into())
 }

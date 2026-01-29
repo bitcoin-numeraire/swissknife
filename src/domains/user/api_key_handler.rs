@@ -16,12 +16,10 @@ use crate::{
             UNPROCESSABLE_EXAMPLE,
         },
         dtos::{ApiKeyResponse, CreateApiKeyRequest, ErrorResponse},
+        entities::AppServices,
         errors::ApplicationError,
     },
-    infra::{
-        app::AppState,
-        axum::{Json, Path},
-    },
+    infra::axum::{Json, Path},
 };
 
 use super::{ApiKeyFilter, Permission, User};
@@ -37,7 +35,7 @@ use super::{ApiKeyFilter, Permission, User};
 pub struct ApiKeyHandler;
 pub const CONTEXT_PATH: &str = "/v1/api-keys";
 
-pub fn api_key_router() -> Router<Arc<AppState>> {
+pub fn api_key_router() -> Router<Arc<AppServices>> {
     Router::new()
         .route("/", post(create_api_key))
         .route("/", get(list_api_keys))
@@ -65,13 +63,13 @@ pub fn api_key_router() -> Router<Arc<AppState>> {
     )
 )]
 async fn create_api_key(
-    State(app_state): State<Arc<AppState>>,
+    State(services): State<Arc<AppServices>>,
     user: User,
     Json(payload): Json<CreateApiKeyRequest>,
 ) -> Result<Json<ApiKeyResponse>, ApplicationError> {
     user.check_permission(Permission::WriteApiKey)?;
 
-    let api_key = app_state.services.api_key.generate(user, payload).await?;
+    let api_key = services.api_key.generate(user, payload).await?;
     Ok(Json(api_key.into()))
 }
 
@@ -93,13 +91,13 @@ async fn create_api_key(
     )
 )]
 async fn get_api_key(
-    State(app_state): State<Arc<AppState>>,
+    State(services): State<Arc<AppServices>>,
     user: User,
     Path(id): Path<Uuid>,
 ) -> Result<Json<ApiKeyResponse>, ApplicationError> {
     user.check_permission(Permission::ReadApiKey)?;
 
-    let api_key = app_state.services.api_key.get(id).await?;
+    let api_key = services.api_key.get(id).await?;
     Ok(Json(api_key.into()))
 }
 
@@ -121,13 +119,13 @@ async fn get_api_key(
     )
 )]
 async fn list_api_keys(
-    State(app_state): State<Arc<AppState>>,
+    State(services): State<Arc<AppServices>>,
     user: User,
     Query(filter): Query<ApiKeyFilter>,
 ) -> Result<Json<Vec<ApiKeyResponse>>, ApplicationError> {
     user.check_permission(Permission::ReadApiKey)?;
 
-    let api_keys = app_state.services.api_key.list(filter).await?;
+    let api_keys = services.api_key.list(filter).await?;
     let response: Vec<ApiKeyResponse> = api_keys.into_iter().map(Into::into).collect();
 
     Ok(response.into())
@@ -151,13 +149,13 @@ async fn list_api_keys(
     )
 )]
 async fn revoke_api_key(
-    State(app_state): State<Arc<AppState>>,
+    State(services): State<Arc<AppServices>>,
     user: User,
     Path(id): Path<Uuid>,
 ) -> Result<(), ApplicationError> {
     user.check_permission(Permission::WriteApiKey)?;
 
-    app_state.services.api_key.revoke(id).await?;
+    services.api_key.revoke(id).await?;
     Ok(())
 }
 
@@ -179,12 +177,12 @@ async fn revoke_api_key(
     )
 )]
 async fn revoke_api_keys(
-    State(app_state): State<Arc<AppState>>,
+    State(services): State<Arc<AppServices>>,
     user: User,
     Query(query_params): Query<ApiKeyFilter>,
 ) -> Result<Json<u64>, ApplicationError> {
     user.check_permission(Permission::WriteApiKey)?;
 
-    let n_revoked = app_state.services.api_key.revoke_many(query_params).await?;
+    let n_revoked = services.api_key.revoke_many(query_params).await?;
     Ok(n_revoked.into())
 }

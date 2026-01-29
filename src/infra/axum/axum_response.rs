@@ -7,7 +7,7 @@ use tracing::{debug, error, trace, warn};
 
 use crate::application::{
     dtos::ErrorResponse,
-    errors::{ApplicationError, AuthenticationError, AuthorizationError, DataError, LightningError},
+    errors::{ApplicationError, AuthenticationError, AuthorizationError, BitcoinError, DataError, LightningError},
 };
 
 const INTERNAL_SERVER_ERROR_MSG: &str = "Internal server error, Please contact your administrator or try later";
@@ -19,6 +19,7 @@ impl IntoResponse for ApplicationError {
             ApplicationError::Authorization(error) => error.into_response(),
             ApplicationError::Data(error) => error.into_response(),
             ApplicationError::Lightning(error) => error.into_response(),
+            ApplicationError::Bitcoin(error) => error.into_response(),
             _ => {
                 error!("{}", self);
 
@@ -124,6 +125,24 @@ impl IntoResponse for LightningError {
             | LightningError::SignMessage(_)
             | LightningError::CheckMessage(_)
             | LightningError::RedeemOnChain(_) => {
+                warn!("{}", self);
+                (self.to_string(), StatusCode::UNPROCESSABLE_ENTITY)
+            }
+            _ => {
+                error!("{}", self);
+                (INTERNAL_SERVER_ERROR_MSG.to_string(), StatusCode::INTERNAL_SERVER_ERROR)
+            }
+        };
+
+        let body = generate_body(status, error_message);
+        (status, body).into_response()
+    }
+}
+
+impl IntoResponse for BitcoinError {
+    fn into_response(self) -> Response {
+        let (error_message, status) = match self {
+            BitcoinError::AddressType(_) => {
                 warn!("{}", self);
                 (self.to_string(), StatusCode::UNPROCESSABLE_ENTITY)
             }

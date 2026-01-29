@@ -1,4 +1,4 @@
-use std::{path::PathBuf, process, sync::Arc, time::Duration};
+use std::{path::PathBuf, time::Duration};
 
 use anyhow::anyhow;
 use breez_sdk_core::ReverseSwapInfo;
@@ -12,14 +12,10 @@ use serde_bolt::bitcoin::hashes::{sha256, Hash};
 use tokio::fs;
 
 use crate::{
-    application::{
-        entities::BitcoinWallet,
-        errors::{BitcoinError, LightningError},
-    },
+    application::errors::{BitcoinError, LightningError},
     domains::{
-        bitcoin::{BitcoinEventsUseCases, BitcoinTransaction, BtcAddressType, BtcNetwork},
+        bitcoin::{BitcoinTransaction, BitcoinWallet, BtcAddressType, BtcNetwork},
         invoice::Invoice,
-        ln_node::LnEventsUseCases,
         payment::Payment,
         system::HealthStatus,
     },
@@ -31,10 +27,7 @@ use crate::{
 use async_trait::async_trait;
 use base64::{engine::general_purpose::STANDARD, Engine};
 
-use super::{
-    lnd_types::*,
-    lnd_websocket_client::{listen_invoices, listen_transactions},
-};
+use super::lnd_types::*;
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct LndRestClientConfig {
@@ -68,12 +61,8 @@ pub struct LndRestClient {
 const USER_AGENT: &str = "Numeraire Swissknife/1.0";
 
 impl LndRestClient {
-    pub async fn new(
-        config: LndRestClientConfig,
-        ln_events: Arc<dyn LnEventsUseCases>,
-        bitcoin_events: Arc<dyn BitcoinEventsUseCases>,
-    ) -> Result<Self, LightningError> {
-        let macaroon = Self::read_macaroon(&config.macaroon_path)
+    pub async fn new(config: LndRestClientConfig) -> Result<Self, LightningError> {
+        let macaroon = read_macaroon(&config.macaroon_path)
             .await
             .map_err(|e| LightningError::ParseConfig(e.to_string()))?;
 
@@ -115,23 +104,6 @@ impl LndRestClient {
         let network = lnd_client.network().await?;
         lnd_client.network = network;
 
-        let config_clone = config.clone();
-        let invoice_macaroon = macaroon.clone();
-        tokio::spawn(async move {
-            if let Err(err) = listen_invoices(config_clone, invoice_macaroon, ln_events).await {
-                tracing::error!(%err);
-                process::exit(1);
-            }
-        });
-
-        let transaction_config = config.clone();
-        tokio::spawn(async move {
-            if let Err(err) = listen_transactions(transaction_config, macaroon, bitcoin_events, network).await {
-                tracing::error!(%err);
-                process::exit(1);
-            }
-        });
-
         Ok(lnd_client)
     }
 
@@ -140,23 +112,6 @@ impl LndRestClient {
         let ca_certificate = Certificate::from_pem(&ca_file)?;
 
         Ok(ca_certificate)
-    }
-
-    async fn read_macaroon(path: &str) -> anyhow::Result<String> {
-        let macaroon_file = fs::read(PathBuf::from(path)).await?;
-
-        // Check if the file is base64-encoded text or raw binary
-        // Base64 files start with ASCII characters, raw binary macaroons start with 0x02
-        let macaroon_bytes = if macaroon_file.first() == Some(&0x02) {
-            // Raw binary format - use as-is
-            macaroon_file
-        } else {
-            // Base64-encoded text - decode it first
-            let base64_str = String::from_utf8(macaroon_file)?;
-            STANDARD.decode(base64_str.trim())?
-        };
-
-        Ok(hex::encode(macaroon_bytes))
     }
 
     async fn post_request_buffered<T>(&self, endpoint: &str, payload: &impl Serialize) -> anyhow::Result<T>
@@ -244,14 +199,23 @@ impl LndRestClient {
             "No chain information returned by LND".to_string(),
         ))
     }
+}
 
-    fn map_address_type(address_type: BtcAddressType) -> String {
-        match address_type {
-            BtcAddressType::P2sh => "NESTED_PUBKEY_HASH".to_string(),
-            BtcAddressType::P2tr => "TAPROOT_PUBKEY".to_string(),
-            _ => "WITNESS_PUBKEY_HASH".to_string(),
-        }
-    }
+pub(crate) async fn read_macaroon(path: &str) -> anyhow::Result<String> {
+    let macaroon_file = fs::read(PathBuf::from(path)).await?;
+
+    // Check if the file is base64-encoded text or raw binary
+    // Base64 files start with ASCII characters, raw binary macaroons start with 0x02
+    let macaroon_bytes = if macaroon_file.first() == Some(&0x02) {
+        // Raw binary format - use as-is
+        macaroon_file
+    } else {
+        // Base64-encoded text - decode it first
+        let base64_str = String::from_utf8(macaroon_file)?;
+        STANDARD.decode(base64_str.trim())?
+    };
+
+    Ok(hex::encode(macaroon_bytes))
 }
 
 #[async_trait]
@@ -287,7 +251,7 @@ impl LnClient for LndRestClient {
         Ok(response.into())
     }
 
-    async fn pay(&self, bolt11: String, amount_msat: Option<u64>) -> Result<Payment, LightningError> {
+    async fn pay(&self, bolt11: String, amount_msat: Option<u64>, _label: String) -> Result<Payment, LightningError> {
         let payload = PayRequest {
             payment_request: bolt11,
             amt_msat: amount_msat,
@@ -360,7 +324,13 @@ impl LnClient for LndRestClient {
 #[async_trait]
 impl BitcoinWallet for LndRestClient {
     async fn new_address(&self, address_type: BtcAddressType) -> Result<String, BitcoinError> {
-        let address_type_param = Self::map_address_type(address_type);
+        let address_type_param = match address_type {
+            BtcAddressType::P2sh => "NESTED_PUBKEY_HASH".to_string(),
+            BtcAddressType::P2tr => "TAPROOT_PUBKEY".to_string(),
+            BtcAddressType::P2wpkh => "WITNESS_PUBKEY_HASH".to_string(),
+            _ => return Err(BitcoinError::AddressType(address_type.to_string())),
+        };
+
         let endpoint = format!("v1/newaddress?type={}", address_type_param);
 
         let response: NewAddressResponse = self

@@ -1,4 +1,4 @@
-use std::{path::PathBuf, sync::Arc};
+use std::path::PathBuf;
 
 use futures_util::{future::BoxFuture, FutureExt};
 use native_tls::{Certificate, TlsConnector};
@@ -12,8 +12,8 @@ use tracing::{debug, error, trace, warn};
 use crate::{
     application::errors::LightningError,
     domains::{
-        bitcoin::{BitcoinEventsUseCases, BitcoinOutputEvent, BtcNetwork},
-        ln_node::LnEventsUseCases,
+        bitcoin::BtcNetwork,
+        event::{BtcOutputEvent, EventService},
     },
     infra::lightning::cln::cln_websocket_types::{ChainMovement, InvoicePayment, SendPayFailure, SendPaySuccess},
 };
@@ -22,8 +22,7 @@ use super::ClnRestClientConfig;
 
 pub async fn connect_websocket(
     config: ClnRestClientConfig,
-    ln_events: Arc<dyn LnEventsUseCases>,
-    bitcoin_events: Arc<dyn BitcoinEventsUseCases>,
+    events: EventService,
     network: BtcNetwork,
 ) -> Result<Client, LightningError> {
     let mut client_builder = ClientBuilder::new(config.endpoint.clone())
@@ -38,9 +37,7 @@ pub async fn connect_websocket(
         .on("close", on_close)
         .on("error", on_error)
         .on("message", {
-            move |payload, socket: Client| {
-                on_message(ln_events.clone(), bitcoin_events.clone(), network, payload, socket)
-            }
+            move |payload, _: Client| on_message(events.clone(), network, payload)
         });
 
     if let Some(ca_cert_path) = &config.ca_cert_path {
@@ -100,13 +97,7 @@ fn on_error(err: Payload, _: Client) -> BoxFuture<'static, ()> {
     .boxed()
 }
 
-fn on_message(
-    ln_events: Arc<dyn LnEventsUseCases>,
-    bitcoin_events: Arc<dyn BitcoinEventsUseCases>,
-    network: BtcNetwork,
-    payload: Payload,
-    _: Client,
-) -> BoxFuture<'static, ()> {
+fn on_message(events: EventService, network: BtcNetwork, payload: Payload) -> BoxFuture<'static, ()> {
     async move {
         match payload {
             Payload::Text(values) => {
@@ -114,7 +105,7 @@ fn on_message(
                     if let Some(event) = value.get("invoice_payment") {
                         match serde_json::from_value::<InvoicePayment>(event.clone()) {
                             Ok(invoice_payment) => {
-                                if let Err(err) = ln_events.invoice_paid(invoice_payment.into()).await {
+                                if let Err(err) = events.invoice_paid(invoice_payment.into()).await {
                                     warn!(%err, "Failed to process incoming payment");
                                 }
                             }
@@ -139,7 +130,7 @@ fn on_message(
                                     return;
                                 }
 
-                                if let Err(err) = ln_events.outgoing_payment(sendpay_success.into()).await {
+                                if let Err(err) = events.outgoing_payment(sendpay_success.into()).await {
                                     warn!(%err, "Failed to process outgoing payment");
                                 }
                             }
@@ -162,7 +153,7 @@ fn on_message(
                                     // return;
                                 }
 
-                                if let Err(err) = ln_events.failed_payment(sendpay_failure.into()).await {
+                                if let Err(err) = events.failed_payment(sendpay_failure.into()).await {
                                     warn!(%err, "Failed to process failed outgoing payment");
                                 }
                             }
@@ -186,15 +177,15 @@ fn on_message(
                         match serde_json::from_value::<ChainMovement>(event.clone()) {
                             Ok(chain_mvt) => {
                                 let output_event = chain_mvt.clone().into();
-                                let output_event = BitcoinOutputEvent {
+                                let output_event = BtcOutputEvent {
                                     network,
                                     ..output_event
                                 };
 
                                 let tag = chain_mvt.primary_tag;
                                 let result = match tag.as_str() {
-                                    "deposit" => bitcoin_events.onchain_deposit(output_event).await,
-                                    "withdrawal" => bitcoin_events.onchain_withdrawal(output_event).await,
+                                    "deposit" => events.onchain_deposit(output_event).await,
+                                    "withdrawal" => events.onchain_withdrawal(output_event).await,
                                     _ => {
                                         trace!(tag, "Unsupported coin_movement tag");
                                         Ok(())

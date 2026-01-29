@@ -1,9 +1,12 @@
 use std::sync::Arc;
 
 use crate::{
-    application::{docs::merged_openapi, entities::LnNodeClient, errors::WebServerError},
-    domains::{bitcoin, invoice, ln_address, ln_node, lnurl, nostr, payment, system, user, wallet},
-    infra::app::AppState,
+    application::{
+        docs::merged_openapi,
+        entities::{AppAdapters, AppServices},
+        errors::WebServerError,
+    },
+    domains::{bitcoin, invoice, ln_address, lnurl, nostr, payment, system, user, wallet},
 };
 use axum::{routing::get, Router};
 use std::future::Future;
@@ -21,7 +24,7 @@ pub struct Server {
 }
 
 impl Server {
-    pub fn new(state: Arc<AppState>, dashboard_dir: Option<&str>) -> Self {
+    pub fn new(adapters: AppAdapters, services: Arc<AppServices>, dashboard_dir: Option<&str>) -> Self {
         let router = Router::new()
             .nest("/.well-known", Self::well_known_router())
             .nest("/v1/system", system::router())
@@ -42,16 +45,11 @@ impl Server {
             None => router,
         };
 
-        let router = match state.ln_node_client {
-            LnNodeClient::Breez(_) => router.nest("/v1/lightning-node", ln_node::breez_node_router()),
-            _ => router,
-        };
-
         let router = router
             .layer(TraceLayer::new_for_http())
-            .layer(state.timeout_layer)
+            .layer(adapters.timeout_layer)
             .layer(CorsLayer::permissive())
-            .with_state(state);
+            .with_state(services);
 
         Self { router }
     }
@@ -75,7 +73,7 @@ impl Server {
         Ok(())
     }
 
-    fn well_known_router() -> Router<Arc<AppState>> {
+    fn well_known_router() -> Router<Arc<AppServices>> {
         Router::new()
             .route("/lnurlp/:username", get(lnurl::well_known))
             .route("/nostr.json", get(nostr::well_known_nostr))

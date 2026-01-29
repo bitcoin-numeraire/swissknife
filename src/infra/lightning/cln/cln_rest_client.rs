@@ -1,4 +1,4 @@
-use std::{path::PathBuf, str::FromStr, sync::Arc, time::Duration};
+use std::{path::PathBuf, str::FromStr, time::Duration};
 
 use breez_sdk_core::ReverseSwapInfo;
 use lightning_invoice::Bolt11Invoice;
@@ -6,7 +6,6 @@ use reqwest::{
     header::{HeaderMap, HeaderValue},
     Certificate, Client,
 };
-use rust_socketio::asynchronous::Client as WsClient;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use tokio::fs;
 use uuid::Uuid;
@@ -14,14 +13,10 @@ use uuid::Uuid;
 use async_trait::async_trait;
 
 use crate::{
-    application::{
-        entities::BitcoinWallet,
-        errors::{BitcoinError, LightningError},
-    },
+    application::errors::{BitcoinError, LightningError},
     domains::{
-        bitcoin::{BitcoinEventsUseCases, BitcoinTransaction, BitcoinTransactionOutput, BtcAddressType, BtcNetwork},
+        bitcoin::{BitcoinTransaction, BitcoinTransactionOutput, BitcoinWallet, BtcAddressType, BtcNetwork},
         invoice::Invoice,
-        ln_node::LnEventsUseCases,
         payment::Payment,
         system::HealthStatus,
     },
@@ -32,9 +27,9 @@ use crate::{
 };
 
 use super::{
-    cln_websocket_client::connect_websocket, ErrorResponse, GetinfoRequest, GetinfoResponse, InvoiceRequest,
-    InvoiceResponse, ListInvoicesRequest, ListInvoicesResponse, ListTransactionsRequest, ListTransactionsResponse,
-    NewAddrRequest, NewAddrResponse, PayRequest, PayResponse, WithdrawRequest, WithdrawResponse,
+    ErrorResponse, GetinfoRequest, GetinfoResponse, InvoiceRequest, InvoiceResponse, ListInvoicesRequest,
+    ListInvoicesResponse, ListTransactionsRequest, ListTransactionsResponse, NewAddrRequest, NewAddrResponse,
+    PayRequest, PayResponse, WithdrawRequest, WithdrawResponse,
 };
 
 #[derive(Clone, Debug, Deserialize)]
@@ -65,18 +60,13 @@ pub struct ClnRestClient {
     maxfeepercent: Option<f64>,
     retry_for: Option<u32>,
     payment_exemptfee: Option<u64>,
-    ws_client: Option<WsClient>,
     network: BtcNetwork,
 }
 
 const USER_AGENT: &str = "Numeraire Swissknife/1.0";
 
 impl ClnRestClient {
-    pub async fn new(
-        config: ClnRestClientConfig,
-        ln_events: Arc<dyn LnEventsUseCases>,
-        bitcoin_events: Arc<dyn BitcoinEventsUseCases>,
-    ) -> Result<Self, LightningError> {
+    pub async fn new(config: ClnRestClientConfig) -> Result<Self, LightningError> {
         let mut headers = HeaderMap::new();
         let mut rune_header =
             HeaderValue::from_str(&config.rune).map_err(|e| LightningError::ParseConfig(e.to_string()))?;
@@ -111,14 +101,10 @@ impl ClnRestClient {
             retry_for: Some(config.payment_timeout.as_secs() as u32),
             payment_exemptfee: config.payment_exemptfee,
             network: BtcNetwork::default(),
-            ws_client: None,
         };
 
         let network = cln_client.network().await?;
         cln_client.network = network;
-
-        let ws_client = connect_websocket(config, ln_events, bitcoin_events, network).await?;
-        cln_client.ws_client = Some(ws_client);
 
         Ok(cln_client)
     }
@@ -178,12 +164,7 @@ impl ClnRestClient {
 #[async_trait]
 impl LnClient for ClnRestClient {
     async fn disconnect(&self) -> Result<(), LightningError> {
-        self.ws_client
-            .as_ref()
-            .unwrap()
-            .disconnect()
-            .await
-            .map_err(|e| LightningError::Disconnect(e.to_string()))
+        Ok(())
     }
 
     async fn invoice(
@@ -212,14 +193,14 @@ impl LnClient for ClnRestClient {
         Ok(bolt11.into())
     }
 
-    async fn pay(&self, bolt11: String, amount_msat: Option<u64>) -> Result<Payment, LightningError> {
+    async fn pay(&self, bolt11: String, amount_msat: Option<u64>, label: String) -> Result<Payment, LightningError> {
         let response: PayResponse = self
             .post_request(
                 "pay",
                 &PayRequest {
                     bolt11,
                     amount_msat,
-                    label: Some(Uuid::new_v4().to_string()),
+                    label: Some(label),
                     maxfeepercent: self.maxfeepercent,
                     retry_for: self.retry_for,
                     exemptfee: self.payment_exemptfee,

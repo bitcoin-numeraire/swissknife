@@ -10,8 +10,8 @@ use axum::{
 use utoipa::OpenApi;
 
 use crate::{
-    application::{docs::INTERNAL_EXAMPLE, dtos::ErrorResponse, errors::ApplicationError},
-    infra::{app::AppState, axum::Json},
+    application::{docs::INTERNAL_EXAMPLE, dtos::ErrorResponse, entities::AppServices, errors::ApplicationError},
+    infra::axum::Json,
 };
 
 use super::{HealthCheck, HealthStatus, SetupInfo, VersionInfo};
@@ -27,7 +27,7 @@ use super::{HealthCheck, HealthStatus, SetupInfo, VersionInfo};
 pub struct SystemHandler;
 pub const CONTEXT_PATH: &str = "/v1/system";
 
-pub fn router() -> Router<Arc<AppState>> {
+pub fn router() -> Router<Arc<AppServices>> {
     Router::new()
         .route("/health", get(health_check))
         .route("/ready", get(readiness_check))
@@ -65,8 +65,8 @@ async fn readiness_check() -> impl IntoResponse {
         (status = 503, description = "Service Unavailable", body = HealthCheck)
     )
 )]
-async fn health_check(State(app_state): State<Arc<AppState>>) -> impl IntoResponse {
-    let health_check = app_state.services.system.health_check().await;
+async fn health_check(State(services): State<Arc<AppServices>>) -> impl IntoResponse {
+    let health_check = services.system.health_check().await;
 
     let status_code = if health_check.is_healthy {
         StatusCode::OK
@@ -90,8 +90,8 @@ async fn health_check(State(app_state): State<Arc<AppState>>) -> impl IntoRespon
 
     )
 )]
-async fn version_check(State(app_state): State<Arc<AppState>>) -> Json<VersionInfo> {
-    app_state.services.system.version().into()
+async fn version_check(State(services): State<Arc<AppServices>>) -> Json<VersionInfo> {
+    services.system.version().into()
 }
 
 /// Setup Status Check
@@ -107,8 +107,8 @@ async fn version_check(State(app_state): State<Arc<AppState>>) -> Json<VersionIn
         (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
     )
 )]
-async fn setup_check(State(app_state): State<Arc<AppState>>) -> Result<Json<SetupInfo>, ApplicationError> {
-    let info = app_state.services.system.setup_check().await?;
+async fn setup_check(State(services): State<Arc<AppServices>>) -> Result<Json<SetupInfo>, ApplicationError> {
+    let info = services.system.setup_check().await?;
     Ok(info.into())
 }
 
@@ -125,7 +125,9 @@ async fn setup_check(State(app_state): State<Arc<AppState>>) -> Result<Json<Setu
         (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
     )
 )]
-async fn mark_welcome_complete(State(app_state): State<Arc<AppState>>) -> Result<impl IntoResponse, ApplicationError> {
-    app_state.services.system.mark_welcome_complete().await?;
+async fn mark_welcome_complete(
+    State(services): State<Arc<AppServices>>,
+) -> Result<impl IntoResponse, ApplicationError> {
+    services.system.mark_welcome_complete().await?;
     Ok(StatusCode::NO_CONTENT)
 }

@@ -30,22 +30,6 @@ pub struct SendPaymentRequest {
     pub comment: Option<String>,
 }
 
-/// Send On-chain Payment Request
-#[derive(Debug, Deserialize, ToSchema)]
-pub struct SendOnchainPaymentRequest {
-    /// Amount in millisatoshis
-    #[schema(example = 100000000)]
-    pub amount_msat: u64,
-
-    /// Recipient Bitcoin address
-    #[schema(example = "bc1q7jys2n3jjf9t25r6ut369taap8v38pgqekq8v4")]
-    pub recipient_address: String,
-
-    /// Fee rate in sats/vb
-    #[schema(example = "8")]
-    pub feerate: u32,
-}
-
 #[derive(Serialize, ToSchema)]
 pub struct PaymentResponse {
     /// Internal ID

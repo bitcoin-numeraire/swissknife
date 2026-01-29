@@ -10,10 +10,11 @@ use uuid::Uuid;
 
 use crate::{
     application::{
-        entities::{AppStore, BitcoinWallet, Currency, Ledger},
+        entities::{AppStore, Currency, Ledger},
         errors::{ApplicationError, DataError, DatabaseError, LightningError},
     },
     domains::{
+        bitcoin::BitcoinWallet,
         invoice::{Invoice, InvoiceStatus},
         lnurl::{process_success_action, validate_lnurl_pay},
     },
@@ -343,6 +344,7 @@ impl PaymentService {
                     } else {
                         Some(amount)
                     },
+                    pending_payment.id.to_string(),
                 )
                 .await;
 
@@ -391,7 +393,7 @@ impl PaymentService {
             )
             .await?;
 
-        let result = self.ln_client.pay(cb.pr, None).await;
+        let result = self.ln_client.pay(cb.pr, None, pending_payment.id.to_string()).await;
 
         self.handle_processed_payment(pending_payment, result, cb.success_action)
             .await

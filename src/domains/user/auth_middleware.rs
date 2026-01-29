@@ -8,21 +8,21 @@ use axum_extra::{
 };
 use base64::{prelude::BASE64_STANDARD, Engine};
 
-use crate::{
-    application::errors::{ApplicationError, AuthenticationError},
-    infra::app::AppState,
+use crate::application::{
+    entities::AppServices,
+    errors::{ApplicationError, AuthenticationError},
 };
 
 use super::User;
 
 #[async_trait]
-impl FromRequestParts<Arc<AppState>> for User {
+impl FromRequestParts<Arc<AppServices>> for User {
     type Rejection = ApplicationError;
 
-    async fn from_request_parts(parts: &mut Parts, state: &Arc<AppState>) -> Result<Self, Self::Rejection> {
+    async fn from_request_parts(parts: &mut Parts, services: &Arc<AppServices>) -> Result<Self, Self::Rejection> {
         // Try to extract the Authorization header as Bearer token
         if let Ok(TypedHeader(Authorization(bearer))) = parts.extract::<TypedHeader<Authorization<Bearer>>>().await {
-            let user = state.services.auth.authenticate_jwt(bearer.token()).await?;
+            let user = services.auth.authenticate_jwt(bearer.token()).await?;
             Ok(user)
         }
         // Try to extract the Api-Key header
@@ -32,7 +32,7 @@ impl FromRequestParts<Arc<AppState>> for User {
                 .decode(value_str)
                 .map_err(|_| AuthenticationError::InvalidCredentials)?;
 
-            let user = state.services.auth.authenticate_api_key(api_key).await?;
+            let user = services.auth.authenticate_api_key(api_key).await?;
             Ok(user)
         }
         // If no Authorization header is present, return an error

@@ -1,9 +1,8 @@
-use std::sync::Arc;
-
 use crate::{
-    application::{dtos::AppConfig, entities::BitcoinWallet, errors::ConfigError},
+    application::{dtos::AppConfig, entities::AppAdapters},
     domains::{
-        bitcoin::{BitcoinEventsUseCases, BitcoinService, BitcoinUseCases},
+        bitcoin::{BitcoinService, BitcoinUseCases},
+        event::EventService,
         invoice::{InvoiceService, InvoiceUseCases},
         ln_address::{LnAddressService, LnAddressUseCases},
         lnurl::{LnUrlService, LnUrlUseCases},
@@ -13,18 +12,7 @@ use crate::{
         user::{ApiKeyService, ApiKeyUseCases, AuthService, AuthUseCases},
         wallet::{WalletService, WalletUseCases},
     },
-    infra::{
-        jwt::JWTAuthenticator,
-        lightning::{
-            breez::BreezClient,
-            cln::{ClnGrpcClient, ClnRestClient},
-            lnd::LndRestClient,
-            LnClient,
-        },
-    },
 };
-
-use super::AppStore;
 
 pub struct AppServices {
     pub invoice: Box<dyn InvoiceUseCases>,
@@ -37,17 +25,11 @@ pub struct AppServices {
     pub nostr: Box<dyn NostrUseCases>,
     pub api_key: Box<dyn ApiKeyUseCases>,
     pub bitcoin: Box<dyn BitcoinUseCases>,
+    pub event: EventService,
 }
 
 impl AppServices {
-    pub fn new(
-        config: AppConfig,
-        store: AppStore,
-        ln_client: Arc<dyn LnClient>,
-        bitcoin_wallet: Arc<dyn BitcoinWallet>,
-        bitcoin_events: Arc<dyn BitcoinEventsUseCases>,
-        jwt_authenticator: Arc<dyn JWTAuthenticator>,
-    ) -> Self {
+    pub fn new(config: AppConfig, adapters: AppAdapters) -> Self {
         let AppConfig {
             domain,
             host,
@@ -58,6 +40,14 @@ impl AppServices {
             bitcoin_address_type,
             ..
         } = config;
+
+        let AppAdapters {
+            store,
+            ln_client,
+            bitcoin_wallet,
+            jwt_authenticator,
+            ..
+        } = adapters;
 
         let payments = PaymentService::new(
             store.clone(),
@@ -85,7 +75,8 @@ impl AppServices {
         let system = SystemService::new(store.clone(), ln_client.clone());
         let nostr = NostrService::new(store.clone());
         let api_key = ApiKeyService::new(store.clone());
-        let bitcoin = BitcoinService::new(store, bitcoin_wallet, bitcoin_events, bitcoin_address_type.into());
+        let bitcoin = BitcoinService::new(store.clone(), bitcoin_wallet, bitcoin_address_type);
+        let event = EventService::new(store.clone());
 
         AppServices {
             invoice: Box::new(invoices),
@@ -98,24 +89,7 @@ impl AppServices {
             nostr: Box::new(nostr),
             api_key: Box::new(api_key),
             bitcoin: Box::new(bitcoin),
-        }
-    }
-}
-
-#[derive(Clone)]
-pub enum LnNodeClient {
-    Breez(Arc<BreezClient>),
-    ClnGrpc(Arc<ClnGrpcClient>),
-    ClnRest(Arc<ClnRestClient>),
-    Lnd(Arc<LndRestClient>),
-}
-
-impl LnNodeClient {
-    pub fn as_breez_client(&self) -> Result<&BreezClient, ConfigError> {
-        if let LnNodeClient::Breez(client) = self {
-            Ok(client)
-        } else {
-            Err(ConfigError::InvalidLightningProvider("Breez".to_string()))
+            event,
         }
     }
 }
