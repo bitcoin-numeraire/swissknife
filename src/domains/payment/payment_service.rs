@@ -21,7 +21,7 @@ use crate::{
     infra::lightning::LnClient,
 };
 
-use super::{Payment, PaymentFilter, PaymentStatus, PaymentsUseCases};
+use super::{BtcPayment, LnPayment, Payment, PaymentFilter, PaymentStatus, PaymentsUseCases};
 
 const DEFAULT_INTERNAL_INVOICE_DESCRIPTION: &str = "Numeraire Invoice";
 const DEFAULT_INTERNAL_PAYMENT_DESCRIPTION: &str = "Payment to Numeraire";
@@ -120,7 +120,10 @@ impl PaymentService {
                             payment_time: Some(curr_time),
                             ledger: Ledger::Internal,
                             currency: Currency::Bitcoin,
-                            ln_address: Some(input),
+                            lightning: Some(LnPayment {
+                                ln_address: Some(input),
+                                ..Default::default()
+                            }),
                             ..Default::default()
                         },
                         0.0,
@@ -189,7 +192,10 @@ impl PaymentService {
                             ledger: Ledger::Internal,
                             currency: data.network.into(),
                             description: description.clone(),
-                            btc_address: Some(data.address),
+                            bitcoin: Some(BtcPayment {
+                                destination_address: Some(data.address),
+                                ..Default::default()
+                            }),
                             fee_msat: Some(0),
                             payment_time: Some(timestamp),
                             ..Default::default()
@@ -210,7 +216,10 @@ impl PaymentService {
                         ledger: Ledger::Onchain,
                         currency: data.network.into(),
                         description,
-                        btc_address: Some(data.address.clone()),
+                        bitcoin: Some(BtcPayment {
+                            destination_address: Some(data.address.clone()),
+                            ..Default::default()
+                        }),
                         ..Default::default()
                     },
                     self.fee_buffer,
@@ -230,7 +239,8 @@ impl PaymentService {
             };
 
             let mut updated_payment = pending_payment.clone();
-            updated_payment.payment_hash = Some(txid);
+            let bitcoin = updated_payment.bitcoin.get_or_insert_with(Default::default);
+            bitcoin.txid = Some(txid);
 
             let payment = self.store.payment.update(updated_payment).await?;
 
@@ -277,12 +287,15 @@ impl PaymentService {
                                     wallet_id,
                                     amount_msat: amount,
                                     status: PaymentStatus::Settled,
-                                    payment_hash: Some(invoice.payment_hash),
                                     description: invoice.description,
                                     fee_msat: Some(0),
                                     payment_time: Some(Utc::now()),
                                     ledger: Ledger::Internal,
                                     currency: invoice.network.into(),
+                                    lightning: Some(LnPayment {
+                                        payment_hash: Some(invoice.payment_hash),
+                                        ..Default::default()
+                                    }),
                                     ..Default::default()
                                 },
                                 0.0,
@@ -311,8 +324,11 @@ impl PaymentService {
                         status: PaymentStatus::Pending,
                         ledger: Ledger::Lightning,
                         currency: invoice.network.into(),
-                        payment_hash: Some(invoice.payment_hash),
                         description: comment,
+                        lightning: Some(LnPayment {
+                            payment_hash: Some(invoice.payment_hash),
+                            ..Default::default()
+                        }),
                         ..Default::default()
                     },
                     self.fee_buffer,
@@ -358,16 +374,19 @@ impl PaymentService {
                     wallet_id,
                     amount_msat: amount,
                     status: PaymentStatus::Pending,
-                    ln_address: data.ln_address.clone(),
                     description: comment.clone(),
-                    payment_hash: Some(
-                        Bolt11Invoice::from_str(&cb.pr)
-                            .expect("should not fail or malformed callback")
-                            .payment_hash()
-                            .to_hex(),
-                    ),
                     ledger: Ledger::Lightning,
                     currency: Currency::Bitcoin,
+                    lightning: Some(LnPayment {
+                        ln_address: data.ln_address.clone(),
+                        payment_hash: Some(
+                            Bolt11Invoice::from_str(&cb.pr)
+                                .expect("should not fail or malformed callback")
+                                .payment_hash()
+                                .to_hex(),
+                        ),
+                        ..Default::default()
+                    }),
                     ..Default::default()
                 },
                 self.fee_buffer,
@@ -415,12 +434,21 @@ impl PaymentService {
                 settled_payment.id = pending_payment.id;
                 settled_payment.status = PaymentStatus::Settled;
 
-                let success_action = match success_action {
-                    Some(sa) => process_success_action(sa, settled_payment.payment_preimage.as_ref().unwrap()),
-                    None => None,
+                let success_action = match (
+                    success_action,
+                    settled_payment
+                        .lightning
+                        .as_ref()
+                        .and_then(|lightning| lightning.payment_preimage.as_deref()),
+                ) {
+                    (Some(sa), Some(preimage)) => process_success_action(sa, preimage),
+                    _ => None,
                 };
 
-                settled_payment.success_action = success_action;
+                if let Some(success_action) = success_action {
+                    let lightning = settled_payment.lightning.get_or_insert_with(Default::default);
+                    lightning.success_action = Some(success_action);
+                }
 
                 let payment = self.store.payment.update(settled_payment).await?;
 

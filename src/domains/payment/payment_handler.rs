@@ -15,7 +15,7 @@ use crate::{
             BAD_REQUEST_EXAMPLE, FORBIDDEN_EXAMPLE, INTERNAL_EXAMPLE, NOT_FOUND_EXAMPLE, UNAUTHORIZED_EXAMPLE,
             UNPROCESSABLE_EXAMPLE,
         },
-        dtos::{ErrorResponse, PaymentResponse, SendPaymentRequest},
+        dtos::{BtcPaymentResponse, ErrorResponse, LnPaymentResponse, PaymentResponse, SendPaymentRequest},
         entities::AppServices,
         errors::ApplicationError,
     },
@@ -31,7 +31,14 @@ use super::{PaymentFilter, PaymentStatus};
 #[derive(OpenApi)]
 #[openapi(
     paths(pay, get_payment, list_payments, delete_payment, delete_payments),
-    components(schemas(PaymentResponse, SendPaymentRequest, PaymentStatus, LnUrlSuccessAction)),
+    components(schemas(
+        PaymentResponse,
+        LnPaymentResponse,
+        BtcPaymentResponse,
+        SendPaymentRequest,
+        PaymentStatus,
+        LnUrlSuccessAction
+    )),
     tags(
         (name = "Payments", description = "Payment management endpoints. Require `read:transaction` or `write:transaction` permissions.")
     )

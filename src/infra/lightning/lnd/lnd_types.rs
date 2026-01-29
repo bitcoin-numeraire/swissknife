@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 use crate::domains::{
     bitcoin::{BitcoinTransaction, BitcoinTransactionOutput},
     event::LnInvoicePaidEvent,
+    payment::LnPayment,
 };
 use serde_with::{serde_as, DisplayFromStr};
 use std::str::FromStr;
@@ -88,11 +89,14 @@ impl From<PayResponse> for Payment {
     fn from(val: PayResponse) -> Self {
         Payment {
             ledger: Ledger::Lightning,
-            payment_hash: Some(val.payment_hash),
-            payment_preimage: Some(val.payment_preimage),
             amount_msat: val.value_msat,
             fee_msat: Some(val.fee_msat),
             payment_time: Some(Utc.timestamp_nanos(val.creation_time_ns)),
+            lightning: Some(LnPayment {
+                payment_hash: Some(val.payment_hash),
+                payment_preimage: Some(val.payment_preimage),
+                ..Default::default()
+            }),
             ..Default::default()
         }
     }

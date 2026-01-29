@@ -8,7 +8,7 @@ use crate::{
     application::entities::Ledger,
     domains::{
         invoice::{Invoice, InvoiceStatus},
-        payment::Payment,
+        payment::{LnPayment, Payment},
     },
 };
 
@@ -133,12 +133,15 @@ impl From<PayResponse> for Payment {
 
         Payment {
             ledger: Ledger::Lightning,
-            payment_hash: Some(val.payment_hash),
-            payment_preimage: Some(val.payment_preimage),
             amount_msat: val.amount_sent_msat,
             fee_msat: Some(val.amount_sent_msat - val.amount_msat),
             payment_time: Some(Utc.timestamp_opt(seconds, nanoseconds).unwrap()),
             error,
+            lightning: Some(LnPayment {
+                payment_hash: Some(val.payment_hash),
+                payment_preimage: Some(val.payment_preimage),
+                ..Default::default()
+            }),
             ..Default::default()
         }
     }

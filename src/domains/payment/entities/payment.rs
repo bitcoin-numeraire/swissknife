@@ -15,10 +15,6 @@ use crate::{
 pub struct Payment {
     pub id: Uuid,
     pub wallet_id: Uuid,
-    pub ln_address: Option<String>,
-    pub btc_address: Option<String>,
-    pub payment_hash: Option<String>,
-    pub payment_preimage: Option<String>,
     pub error: Option<String>,
     pub amount_msat: u64,
     pub fee_msat: Option<u64>,
@@ -27,12 +23,27 @@ pub struct Payment {
     pub payment_time: Option<DateTime<Utc>>,
     pub status: PaymentStatus,
     pub description: Option<String>,
-    pub metadata: Option<String>,
-    pub success_action: Option<LnUrlSuccessAction>,
     pub created_at: DateTime<Utc>,
     pub updated_at: Option<DateTime<Utc>>,
-    pub btc_output_id: Option<Uuid>,
-    pub btc_output: Option<BtcOutput>,
+    pub lightning: Option<LnPayment>,
+    pub bitcoin: Option<BtcPayment>,
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct LnPayment {
+    pub ln_address: Option<String>,
+    pub payment_hash: Option<String>,
+    pub payment_preimage: Option<String>,
+    pub metadata: Option<String>,
+    pub success_action: Option<LnUrlSuccessAction>,
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct BtcPayment {
+    pub destination_address: Option<String>,
+    pub txid: Option<String>,
+    pub output_id: Option<Uuid>,
+    pub output: Option<BtcOutput>,
 }
 
 #[derive(Clone, Debug, EnumString, Display, Deserialize, Serialize, PartialEq, Eq, Default, ToSchema)]
@@ -49,9 +60,11 @@ pub struct PaymentFilter {
     /// Total amount of results to return
     #[serde_as(as = "Option<DisplayFromStr>")]
     pub limit: Option<u64>,
+
     /// Offset where to start returning results
     #[serde_as(as = "Option<DisplayFromStr>")]
     pub offset: Option<u64>,
+
     /// List of IDs
     pub ids: Option<Vec<Uuid>>,
     /// Wallet ID. Automatically populated with your ID
