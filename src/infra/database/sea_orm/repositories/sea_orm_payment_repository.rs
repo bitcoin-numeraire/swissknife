@@ -1,8 +1,8 @@
 use async_trait::async_trait;
 use chrono::Utc;
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, DatabaseConnection, DatabaseTransaction, EntityTrait, QueryFilter, QueryOrder,
-    QuerySelect, QueryTrait, Set, Unchanged,
+    ActiveModelTrait, ActiveValue, ColumnTrait, DatabaseConnection, DatabaseTransaction, EntityTrait, QueryFilter,
+    QueryOrder, QuerySelect, QueryTrait, Set, Unchanged,
 };
 use uuid::Uuid;
 
@@ -165,6 +165,11 @@ impl PaymentRepository for SeaOrmPaymentRepository {
             })
             .unwrap_or_default();
 
+        let ln_address = match ln_address {
+            Some(address) => Set(Some(address)),
+            None => ActiveValue::NotSet,
+        };
+
         let (btc_address, btc_txid, btc_output_id) = payment
             .bitcoin
             .as_ref()
@@ -187,7 +192,7 @@ impl PaymentRepository for SeaOrmPaymentRepository {
             error: Set(payment.error),
             amount_msat: Set(payment.amount_msat as i64),
             metadata: Set(metadata),
-            ln_address: Set(ln_address),
+            ln_address,
             btc_address: Set(btc_address),
             btc_output_id: Set(btc_output_id),
             success_action: Set(success_action),
