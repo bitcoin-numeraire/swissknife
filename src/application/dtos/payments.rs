@@ -10,7 +10,7 @@ use crate::{
     },
     domains::{
         lnurl::LnUrlSuccessAction,
-        payment::{Payment, PaymentStatus},
+        payment::{BtcPayment, LnPayment, Payment, PaymentStatus},
     },
 };
 
@@ -76,15 +76,15 @@ pub struct PaymentResponse {
 
     /// Lightning payment details
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub lightning: Option<LightningPaymentResponse>,
+    pub lightning: Option<LnPaymentResponse>,
 
     /// Bitcoin on-chain payment details
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub bitcoin: Option<BitcoinPaymentResponse>,
+    pub bitcoin: Option<BtcPaymentResponse>,
 }
 
 #[derive(Serialize, ToSchema)]
-pub struct LightningPaymentResponse {
+pub struct LnPaymentResponse {
     /// Lightning Address. Populated when sending to a LN Address
     #[serde(skip_serializing_if = "Option::is_none")]
     #[schema(example = "hello@numeraire.tech")]
@@ -109,7 +109,7 @@ pub struct LightningPaymentResponse {
 }
 
 #[derive(Serialize, ToSchema)]
-pub struct BitcoinPaymentResponse {
+pub struct BtcPaymentResponse {
     /// Destination Bitcoin address. Populated for Bitcoin onchain payments.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub destination_address: Option<String>,
@@ -118,13 +118,9 @@ pub struct BitcoinPaymentResponse {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub txid: Option<String>,
 
-    /// Linked Bitcoin output identifier when available.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub btc_output_id: Option<Uuid>,
-
     /// Bitcoin Output
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub bitcoin_output: Option<BtcOutputResponse>,
+    pub output: Option<BtcOutputResponse>,
 }
 
 impl From<Payment> for PaymentResponse {
@@ -148,9 +144,9 @@ impl From<Payment> for PaymentResponse {
     }
 }
 
-impl From<crate::domains::payment::LnPayment> for LightningPaymentResponse {
-    fn from(payment: crate::domains::payment::LnPayment) -> Self {
-        LightningPaymentResponse {
+impl From<LnPayment> for LnPaymentResponse {
+    fn from(payment: LnPayment) -> Self {
+        LnPaymentResponse {
             ln_address: payment.ln_address,
             payment_hash: payment.payment_hash,
             payment_preimage: payment.payment_preimage,
@@ -160,13 +156,12 @@ impl From<crate::domains::payment::LnPayment> for LightningPaymentResponse {
     }
 }
 
-impl From<crate::domains::payment::BitcoinPayment> for BitcoinPaymentResponse {
-    fn from(payment: crate::domains::payment::BitcoinPayment) -> Self {
-        BitcoinPaymentResponse {
+impl From<BtcPayment> for BtcPaymentResponse {
+    fn from(payment: BtcPayment) -> Self {
+        BtcPaymentResponse {
             destination_address: payment.destination_address,
             txid: payment.txid,
-            btc_output_id: payment.btc_output_id,
-            bitcoin_output: payment.btc_output.map(Into::into),
+            output: payment.output.map(Into::into),
         }
     }
 }

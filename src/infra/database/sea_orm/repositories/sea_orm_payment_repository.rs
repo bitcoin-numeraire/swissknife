@@ -26,8 +26,8 @@ impl SeaOrmPaymentRepository {
 
         if let Some(output) = btc_output {
             let bitcoin = payment.bitcoin.get_or_insert_with(Default::default);
-            bitcoin.btc_output_id = Some(output.id);
-            bitcoin.btc_output = Some(output.into());
+            bitcoin.output_id = Some(output.id);
+            bitcoin.output = Some(output.into());
         }
 
         payment
@@ -112,7 +112,7 @@ impl PaymentRepository for SeaOrmPaymentRepository {
                 (
                     bitcoin.destination_address.clone(),
                     bitcoin.txid.clone(),
-                    bitcoin.btc_output_id,
+                    bitcoin.output_id,
                 )
             })
             .unwrap_or_default();
@@ -172,7 +172,7 @@ impl PaymentRepository for SeaOrmPaymentRepository {
                 (
                     bitcoin.destination_address.clone(),
                     bitcoin.txid.clone(),
-                    bitcoin.btc_output_id,
+                    bitcoin.output_id,
                 )
             })
             .unwrap_or_default();

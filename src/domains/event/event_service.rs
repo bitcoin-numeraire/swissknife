@@ -247,7 +247,7 @@ impl EventService {
         let Some(destination_address) = updated_payment
             .bitcoin
             .as_ref()
-            .and_then(|bitcoin| bitcoin.destination_address.clone())
+            .and_then(|b| b.destination_address.clone())
         else {
             return Err(DataError::Inconsistency("Destination address not found.".into()).into());
         };
@@ -268,10 +268,10 @@ impl EventService {
 
         let stored_output = self.store.btc_output.upsert(btc_output).await?;
         let bitcoin = updated_payment.bitcoin.get_or_insert_with(Default::default);
-        bitcoin.btc_output = Some(stored_output.clone());
+        bitcoin.output = Some(stored_output.clone());
 
-        if bitcoin.btc_output_id.is_none() {
-            bitcoin.btc_output_id = Some(stored_output.id);
+        if bitcoin.output_id.is_none() {
+            bitcoin.output_id = Some(stored_output.id);
         }
 
         self.store.payment.update(updated_payment).await?;

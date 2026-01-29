@@ -15,7 +15,7 @@ use crate::{
             BAD_REQUEST_EXAMPLE, FORBIDDEN_EXAMPLE, INTERNAL_EXAMPLE, NOT_FOUND_EXAMPLE, UNAUTHORIZED_EXAMPLE,
             UNPROCESSABLE_EXAMPLE,
         },
-        dtos::{BitcoinPaymentResponse, ErrorResponse, LightningPaymentResponse, PaymentResponse, SendPaymentRequest},
+        dtos::{BtcPaymentResponse, ErrorResponse, LnPaymentResponse, PaymentResponse, SendPaymentRequest},
         entities::AppServices,
         errors::ApplicationError,
     },
@@ -33,8 +33,8 @@ use super::{PaymentFilter, PaymentStatus};
     paths(pay, get_payment, list_payments, delete_payment, delete_payments),
     components(schemas(
         PaymentResponse,
-        LightningPaymentResponse,
-        BitcoinPaymentResponse,
+        LnPaymentResponse,
+        BtcPaymentResponse,
         SendPaymentRequest,
         PaymentStatus,
         LnUrlSuccessAction

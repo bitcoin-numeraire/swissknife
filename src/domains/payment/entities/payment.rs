@@ -26,7 +26,7 @@ pub struct Payment {
     pub created_at: DateTime<Utc>,
     pub updated_at: Option<DateTime<Utc>>,
     pub lightning: Option<LnPayment>,
-    pub bitcoin: Option<BitcoinPayment>,
+    pub bitcoin: Option<BtcPayment>,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -39,11 +39,11 @@ pub struct LnPayment {
 }
 
 #[derive(Clone, Debug, Default)]
-pub struct BitcoinPayment {
+pub struct BtcPayment {
     pub destination_address: Option<String>,
     pub txid: Option<String>,
-    pub btc_output_id: Option<Uuid>,
-    pub btc_output: Option<BtcOutput>,
+    pub output_id: Option<Uuid>,
+    pub output: Option<BtcOutput>,
 }
 
 #[derive(Clone, Debug, EnumString, Display, Deserialize, Serialize, PartialEq, Eq, Default, ToSchema)]
@@ -60,9 +60,11 @@ pub struct PaymentFilter {
     /// Total amount of results to return
     #[serde_as(as = "Option<DisplayFromStr>")]
     pub limit: Option<u64>,
+    
     /// Offset where to start returning results
     #[serde_as(as = "Option<DisplayFromStr>")]
     pub offset: Option<u64>,
+    
     /// List of IDs
     pub ids: Option<Vec<Uuid>>,
     /// Wallet ID. Automatically populated with your ID

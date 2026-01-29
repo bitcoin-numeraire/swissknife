@@ -8,7 +8,7 @@ use crate::{
         bitcoin::{BtcAddress, BtcOutput},
         invoice::{Invoice, InvoiceStatus, LnInvoice},
         ln_address::LnAddress,
-        payment::{BitcoinPayment, LnPayment, Payment},
+        payment::{BtcPayment, LnPayment, Payment},
         user::ApiKey,
         wallet::{Contact, Wallet},
     },
@@ -90,11 +90,11 @@ impl From<PaymentModel> for Payment {
             });
 
         let bitcoin = (model.btc_address.is_some() || model.btc_output_id.is_some() || ledger == Ledger::Onchain)
-            .then_some(BitcoinPayment {
+            .then_some(BtcPayment {
                 destination_address: model.btc_address,
                 txid: model.payment_hash,
-                btc_output_id: model.btc_output_id,
-                btc_output: None,
+                output_id: model.btc_output_id,
+                output: None,
             });
 
         Payment {

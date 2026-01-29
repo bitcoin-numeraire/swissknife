@@ -21,7 +21,7 @@ use crate::{
     infra::lightning::LnClient,
 };
 
-use super::{BitcoinPayment, LnPayment, Payment, PaymentFilter, PaymentStatus, PaymentsUseCases};
+use super::{BtcPayment, LnPayment, Payment, PaymentFilter, PaymentStatus, PaymentsUseCases};
 
 const DEFAULT_INTERNAL_INVOICE_DESCRIPTION: &str = "Numeraire Invoice";
 const DEFAULT_INTERNAL_PAYMENT_DESCRIPTION: &str = "Payment to Numeraire";
@@ -192,7 +192,7 @@ impl PaymentService {
                             ledger: Ledger::Internal,
                             currency: data.network.into(),
                             description: description.clone(),
-                            bitcoin: Some(BitcoinPayment {
+                            bitcoin: Some(BtcPayment {
                                 destination_address: Some(data.address),
                                 ..Default::default()
                             }),
@@ -216,7 +216,7 @@ impl PaymentService {
                         ledger: Ledger::Onchain,
                         currency: data.network.into(),
                         description,
-                        bitcoin: Some(BitcoinPayment {
+                        bitcoin: Some(BtcPayment {
                             destination_address: Some(data.address.clone()),
                             ..Default::default()
                         }),
