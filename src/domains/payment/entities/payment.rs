@@ -60,11 +60,11 @@ pub struct PaymentFilter {
     /// Total amount of results to return
     #[serde_as(as = "Option<DisplayFromStr>")]
     pub limit: Option<u64>,
-    
+
     /// Offset where to start returning results
     #[serde_as(as = "Option<DisplayFromStr>")]
     pub offset: Option<u64>,
-    
+
     /// List of IDs
     pub ids: Option<Vec<Uuid>>,
     /// Wallet ID. Automatically populated with your ID
