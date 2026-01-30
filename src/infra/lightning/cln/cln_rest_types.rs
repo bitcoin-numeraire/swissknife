@@ -77,6 +77,47 @@ pub struct ListTransactionsOutput {
     pub amount_msat: String,
 }
 
+#[derive(Debug, Serialize, Default)]
+pub struct ListPaysRequest {
+    pub payment_hash: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ListPaysResponse {
+    pub pays: Vec<ListPaysPayment>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ListPaysPayment {
+    pub status: String,
+    pub payment_hash: String,
+    pub payment_preimage: Option<String>,
+    pub amount_msat: Option<String>,
+    pub amount_sent_msat: Option<String>,
+    pub created_at: Option<f64>,
+    pub completed_at: Option<f64>,
+}
+
+#[derive(Debug, Serialize, Default)]
+pub struct ListFundsRequest {
+    pub spent: Option<bool>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ListFundsResponse {
+    pub outputs: Vec<ListFundsOutput>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ListFundsOutput {
+    pub txid: String,
+    pub output: u32,
+    pub amount_msat: String,
+    pub address: Option<String>,
+    pub status: Option<String>,
+    pub blockheight: Option<u32>,
+}
+
 #[derive(Debug, Serialize)]
 pub struct GetinfoRequest {}
 

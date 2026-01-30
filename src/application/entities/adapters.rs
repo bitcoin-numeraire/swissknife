@@ -15,9 +15,9 @@ use crate::{
         jwt::{local::LocalAuthenticator, oauth2::OAuth2Authenticator, JWTAuthenticator},
         lightning::{
             breez::{BreezClient, BreezListener},
-            cln::{ClnGrpcClient, ClnGrpcListener, ClnRestClient, ClnRestListener},
-            lnd::{LndRestClient, LndWebsocketListener},
-            EventsListener, LnClient,
+            cln::{ClnGrpcClient, ClnRestClient},
+            lnd::LndRestClient,
+            LnClient,
         },
     },
 };
@@ -28,7 +28,6 @@ use super::AppStore;
 pub struct AppAdapters {
     pub store: AppStore,
     pub ln_client: Arc<dyn LnClient>,
-    pub ln_listener: Option<Arc<dyn EventsListener>>,
     pub timeout_layer: TimeoutLayer,
     pub bitcoin_wallet: Arc<dyn BitcoinWallet>,
     pub jwt_authenticator: Arc<dyn JWTAuthenticator>,
@@ -47,7 +46,6 @@ impl AppAdapters {
         Ok(AppAdapters {
             store,
             ln_client: lightning.ln_client,
-            ln_listener: lightning.ln_listener,
             timeout_layer,
             bitcoin_wallet: lightning.bitcoin_wallet,
             jwt_authenticator,
@@ -57,7 +55,6 @@ impl AppAdapters {
 
 struct LightningAdapter {
     ln_client: Arc<dyn LnClient>,
-    ln_listener: Option<Arc<dyn EventsListener>>,
     bitcoin_wallet: Arc<dyn BitcoinWallet>,
 }
 
@@ -111,7 +108,6 @@ async fn get_ln_client(config: AppConfig, store: AppStore) -> Result<LightningAd
 
             Ok(LightningAdapter {
                 ln_client,
-                ln_listener: None,
                 bitcoin_wallet,
             })
         }
@@ -124,12 +120,10 @@ async fn get_ln_client(config: AppConfig, store: AppStore) -> Result<LightningAd
             debug!(config = ?cln_config, "Lightning provider: Core Lightning gRPC");
 
             let ln_client = Arc::new(ClnGrpcClient::new(cln_config.clone()).await?);
-            let listener: Arc<dyn EventsListener> = Arc::new(ClnGrpcListener::new(cln_config));
             let bitcoin_wallet = ln_client.clone();
 
             Ok(LightningAdapter {
                 ln_client,
-                ln_listener: Some(listener),
                 bitcoin_wallet,
             })
         }
@@ -142,12 +136,10 @@ async fn get_ln_client(config: AppConfig, store: AppStore) -> Result<LightningAd
             debug!(config = ?cln_config, "Lightning provider: Core Lightning REST");
 
             let ln_client = Arc::new(ClnRestClient::new(cln_config.clone()).await?);
-            let listener: Arc<dyn EventsListener> = Arc::new(ClnRestListener::new(cln_config));
             let bitcoin_wallet = ln_client.clone();
 
             Ok(LightningAdapter {
                 ln_client,
-                ln_listener: Some(listener),
                 bitcoin_wallet,
             })
         }
@@ -160,12 +152,10 @@ async fn get_ln_client(config: AppConfig, store: AppStore) -> Result<LightningAd
             debug!(config = ?lnd_config, "Lightning provider: LND");
 
             let ln_client = Arc::new(LndRestClient::new(lnd_config.clone()).await?);
-            let listener: Arc<dyn EventsListener> = Arc::new(LndWebsocketListener::new(lnd_config).await?);
             let bitcoin_wallet = ln_client.clone();
 
             Ok(LightningAdapter {
                 ln_client,
-                ln_listener: Some(listener),
                 bitcoin_wallet,
             })
         }

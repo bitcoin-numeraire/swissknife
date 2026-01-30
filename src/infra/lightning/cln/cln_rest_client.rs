@@ -1,6 +1,7 @@
 use std::{path::PathBuf, str::FromStr, time::Duration};
 
 use breez_sdk_core::ReverseSwapInfo;
+use chrono::{TimeZone, Utc};
 use lightning_invoice::Bolt11Invoice;
 use reqwest::{
     header::{HeaderMap, HeaderValue},
@@ -13,11 +14,16 @@ use uuid::Uuid;
 use async_trait::async_trait;
 
 use crate::{
-    application::errors::{BitcoinError, LightningError},
+    application::{
+        entities::Ledger,
+        errors::{BitcoinError, LightningError},
+    },
     domains::{
-        bitcoin::{BitcoinTransaction, BitcoinTransactionOutput, BitcoinWallet, BtcAddressType, BtcNetwork},
+        bitcoin::{
+            BitcoinOutput, BitcoinTransaction, BitcoinTransactionOutput, BitcoinWallet, BtcAddressType, BtcNetwork,
+        },
         invoice::Invoice,
-        payment::Payment,
+        payment::{LnPayment, Payment, PaymentStatus},
         system::HealthStatus,
     },
     infra::{
@@ -27,9 +33,10 @@ use crate::{
 };
 
 use super::{
-    ErrorResponse, GetinfoRequest, GetinfoResponse, InvoiceRequest, InvoiceResponse, ListInvoicesRequest,
-    ListInvoicesResponse, ListTransactionsRequest, ListTransactionsResponse, NewAddrRequest, NewAddrResponse,
-    PayRequest, PayResponse, WithdrawRequest, WithdrawResponse,
+    ErrorResponse, GetinfoRequest, GetinfoResponse, InvoiceRequest, InvoiceResponse, ListFundsRequest,
+    ListFundsResponse, ListInvoicesRequest, ListInvoicesResponse, ListPaysRequest, ListPaysResponse,
+    ListTransactionsRequest, ListTransactionsResponse, NewAddrRequest, NewAddrResponse, PayRequest, PayResponse,
+    WithdrawRequest, WithdrawResponse,
 };
 
 #[derive(Clone, Debug, Deserialize)]
@@ -159,6 +166,23 @@ impl ClnRestClient {
             _ => None,
         }
     }
+
+    pub async fn list_pays(&self, payment_hash: String) -> Result<ListPaysResponse, LightningError> {
+        self.post_request(
+            "listpays",
+            &ListPaysRequest {
+                payment_hash: Some(payment_hash),
+            },
+        )
+        .await
+        .map_err(|e| LightningError::Sync(e.to_string()))
+    }
+
+    pub async fn list_funds(&self, spent: Option<bool>) -> Result<ListFundsResponse, LightningError> {
+        self.post_request("listfunds", &ListFundsRequest { spent })
+            .await
+            .map_err(|e| LightningError::Sync(e.to_string()))
+    }
 }
 
 #[async_trait]
@@ -227,6 +251,59 @@ impl LnClient for ClnRestClient {
             Some(invoice) => Ok(Some(invoice.into())),
             None => Ok(None),
         }
+    }
+
+    async fn payment_by_hash(&self, payment_hash: String) -> Result<Option<Payment>, LightningError> {
+        let response = self.list_pays(payment_hash.clone()).await?;
+        let payment = response
+            .pays
+            .into_iter()
+            .find(|pay| matches!(pay.status.as_str(), "complete" | "failed") && pay.payment_hash == payment_hash);
+
+        let Some(payment) = payment else {
+            return Ok(None);
+        };
+
+        let amount_msat = payment
+            .amount_msat
+            .as_ref()
+            .and_then(|amount| amount.trim_end_matches("msat").parse::<u64>().ok())
+            .unwrap_or_default();
+        let amount_sent_msat = payment
+            .amount_sent_msat
+            .as_ref()
+            .and_then(|amount| amount.trim_end_matches("msat").parse::<u64>().ok())
+            .unwrap_or(amount_msat);
+        let payment_time = payment.completed_at.or(payment.created_at).map(|timestamp| {
+            let seconds = timestamp as i64;
+            let nanos = ((timestamp - seconds as f64) * 1e9) as u32;
+            Utc.timestamp_opt(seconds, nanos).single().unwrap_or_else(Utc::now)
+        });
+
+        let status = if payment.status == "complete" {
+            PaymentStatus::Settled
+        } else {
+            PaymentStatus::Failed
+        };
+
+        Ok(Some(Payment {
+            ledger: Ledger::Lightning,
+            status,
+            amount_msat: amount_sent_msat,
+            fee_msat: Some(amount_sent_msat.saturating_sub(amount_msat)),
+            payment_time,
+            error: if payment.status == "failed" {
+                Some("Payment failed".to_string())
+            } else {
+                None
+            },
+            lightning: Some(LnPayment {
+                payment_hash: Some(payment_hash),
+                payment_preimage: payment.payment_preimage,
+                ..Default::default()
+            }),
+            ..Default::default()
+        }))
     }
 
     async fn pay_onchain(
@@ -314,6 +391,42 @@ impl BitcoinWallet for ClnRestClient {
             block_height: transaction.blockheight,
             outputs,
         })
+    }
+
+    async fn get_output(
+        &self,
+        txid: &str,
+        output_index: Option<u32>,
+        address: Option<&str>,
+    ) -> Result<Option<BitcoinOutput>, BitcoinError> {
+        let response = self
+            .list_funds(None)
+            .await
+            .map_err(|e| BitcoinError::Transaction(e.to_string()))?;
+
+        let output = response.outputs.into_iter().find(|output| {
+            if output.txid != txid {
+                return false;
+            }
+
+            if let Some(index) = output_index {
+                output.output == index
+            } else {
+                address
+                    .and_then(|target| output.address.as_deref().map(|addr| addr == target))
+                    .unwrap_or(false)
+            }
+        });
+
+        Ok(output.map(|output| BitcoinOutput {
+            txid: output.txid,
+            output_index: output.output,
+            address: output.address,
+            amount_sat: Self::parse_amount_msat(&output.amount_msat).unwrap_or_default() / 1000,
+            block_height: output.blockheight.unwrap_or_default(),
+            timestamp: None,
+            fee_sat: None,
+        }))
     }
 
     fn network(&self) -> BtcNetwork {

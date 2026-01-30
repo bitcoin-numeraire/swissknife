@@ -13,11 +13,14 @@ use breez_sdk_core::{
 };
 
 use crate::{
-    application::errors::{BitcoinError, LightningError},
+    application::{
+        entities::Ledger,
+        errors::{BitcoinError, LightningError},
+    },
     domains::{
-        bitcoin::{BitcoinTransaction, BitcoinWallet, BtcAddressType, BtcNetwork},
+        bitcoin::{BitcoinOutput, BitcoinTransaction, BitcoinWallet, BtcAddressType, BtcNetwork},
         invoice::Invoice,
-        payment::Payment,
+        payment::{Payment, PaymentStatus},
         system::HealthStatus,
     },
     infra::lightning::LnClient,
@@ -322,6 +325,26 @@ impl LnClient for BreezClient {
         Ok(response.map(Into::into))
     }
 
+    async fn payment_by_hash(&self, payment_hash: String) -> Result<Option<Payment>, LightningError> {
+        let response = self
+            .sdk
+            .payment_by_hash(payment_hash)
+            .await
+            .map_err(|e| LightningError::Pay(e.to_string()))?;
+
+        Ok(response.map(|payment| {
+            let status = payment.status;
+            let mut mapped: Payment = payment.into();
+            mapped.ledger = Ledger::Lightning;
+            mapped.status = match status {
+                breez_sdk_core::PaymentStatus::Complete => PaymentStatus::Settled,
+                breez_sdk_core::PaymentStatus::Failed => PaymentStatus::Failed,
+                breez_sdk_core::PaymentStatus::Pending => PaymentStatus::Pending,
+            };
+            mapped
+        }))
+    }
+
     async fn health(&self) -> Result<HealthStatus, LightningError> {
         let response = BreezServices::service_health_check(self.api_key.clone())
             .await
@@ -348,6 +371,17 @@ impl BitcoinWallet for BreezClient {
     async fn get_transaction(&self, _txid: &str) -> Result<BitcoinTransaction, BitcoinError> {
         Err(BitcoinError::Unsupported(
             "Transaction lookup is not yet implemented for Breez".to_string(),
+        ))
+    }
+
+    async fn get_output(
+        &self,
+        _txid: &str,
+        _output_index: Option<u32>,
+        _address: Option<&str>,
+    ) -> Result<Option<BitcoinOutput>, BitcoinError> {
+        Err(BitcoinError::Unsupported(
+            "Output lookup is not yet implemented for Breez".to_string(),
         ))
     }
 

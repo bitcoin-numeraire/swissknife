@@ -35,7 +35,6 @@ impl AppServices {
             host,
             invoice_expiry,
             fee_buffer,
-            ln_provider,
             auth_provider,
             bitcoin_address_type,
             ..
@@ -49,18 +48,21 @@ impl AppServices {
             ..
         } = adapters;
 
+        let event = EventService::new(store.clone());
         let payments = PaymentService::new(
             store.clone(),
             ln_client.clone(),
             bitcoin_wallet.clone(),
             domain.clone(),
             fee_buffer.unwrap_or_default(),
+            event.clone(),
         );
         let invoices = InvoiceService::new(
             store.clone(),
             ln_client.clone(),
+            bitcoin_wallet.clone(),
             invoice_expiry.as_secs() as u32,
-            ln_provider,
+            event.clone(),
         );
         let lnurl = LnUrlService::new(
             store.clone(),
@@ -76,8 +78,6 @@ impl AppServices {
         let nostr = NostrService::new(store.clone());
         let api_key = ApiKeyService::new(store.clone());
         let bitcoin = BitcoinService::new(store.clone(), bitcoin_wallet, bitcoin_address_type);
-        let event = EventService::new(store.clone());
-
         AppServices {
             invoice: Box::new(invoices),
             payment: Box::new(payments),

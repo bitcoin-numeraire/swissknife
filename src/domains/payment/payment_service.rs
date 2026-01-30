@@ -15,6 +15,7 @@ use crate::{
     },
     domains::{
         bitcoin::BitcoinWallet,
+        event::{BtcOutputEvent, EventService, LnPayFailureEvent, LnPaySuccessEvent},
         invoice::{Invoice, InvoiceStatus},
         lnurl::{process_success_action, validate_lnurl_pay},
     },
@@ -32,6 +33,7 @@ pub struct PaymentService {
     ln_client: Arc<dyn LnClient>,
     bitcoin_wallet: Arc<dyn BitcoinWallet>,
     fee_buffer: f64,
+    events: EventService,
 }
 
 impl PaymentService {
@@ -41,6 +43,7 @@ impl PaymentService {
         bitcoin_wallet: Arc<dyn BitcoinWallet>,
         domain: String,
         fee_buffer: f64,
+        events: EventService,
     ) -> Self {
         PaymentService {
             store,
@@ -48,6 +51,7 @@ impl PaymentService {
             bitcoin_wallet,
             domain,
             fee_buffer,
+            events,
         }
     }
 }
@@ -556,5 +560,109 @@ impl PaymentsUseCases for PaymentService {
 
         info!(?filter, n_deleted, "Payments deleted successfully");
         Ok(n_deleted)
+    }
+
+    async fn sync(&self) -> Result<u32, ApplicationError> {
+        trace!("Syncing pending payments...");
+
+        let pending_payments = self
+            .store
+            .payment
+            .find_many(PaymentFilter {
+                status: Some(PaymentStatus::Pending),
+                ..Default::default()
+            })
+            .await?;
+
+        let mut synced = 0;
+
+        for payment in pending_payments {
+            match payment.ledger {
+                Ledger::Lightning => {
+                    let Some(payment_hash) = payment
+                        .lightning
+                        .as_ref()
+                        .and_then(|lightning| lightning.payment_hash.clone())
+                    else {
+                        debug!(payment_id = %payment.id, "Missing lightning payment hash; skipping sync");
+                        continue;
+                    };
+
+                    let Some(node_payment) = self.ln_client.payment_by_hash(payment_hash.clone()).await? else {
+                        continue;
+                    };
+
+                    match node_payment.status {
+                        PaymentStatus::Settled => {
+                            let payment_time = node_payment.payment_time.unwrap_or_else(Utc::now);
+                            let payment_preimage = node_payment
+                                .lightning
+                                .as_ref()
+                                .and_then(|lightning| lightning.payment_preimage.clone())
+                                .unwrap_or_default();
+
+                            let event = LnPaySuccessEvent {
+                                amount_msat: node_payment.amount_msat,
+                                fees_msat: node_payment.fee_msat.unwrap_or_default(),
+                                payment_hash: payment_hash.clone(),
+                                payment_preimage,
+                                payment_time,
+                            };
+
+                            self.events.outgoing_payment(event).await?;
+                            synced += 1;
+                        }
+                        PaymentStatus::Failed => {
+                            let reason = node_payment
+                                .error
+                                .clone()
+                                .unwrap_or_else(|| "Payment failed".to_string());
+                            self.events
+                                .failed_payment(LnPayFailureEvent { payment_hash, reason })
+                                .await?;
+                            synced += 1;
+                        }
+                        PaymentStatus::Pending => {}
+                    }
+                }
+                Ledger::Onchain => {
+                    let Some(bitcoin) = payment.bitcoin.clone() else {
+                        debug!(payment_id = %payment.id, "Missing bitcoin metadata; skipping sync");
+                        continue;
+                    };
+                    let Some(txid) = bitcoin.txid.clone() else {
+                        debug!(payment_id = %payment.id, "Missing transaction id; skipping sync");
+                        continue;
+                    };
+
+                    let output_index = bitcoin.output.as_ref().map(|output| output.output_index);
+                    let output = self
+                        .bitcoin_wallet
+                        .get_output(&txid, output_index, bitcoin.destination_address.as_deref())
+                        .await?;
+                    let Some(output) = output else {
+                        continue;
+                    };
+
+                    let event = BtcOutputEvent {
+                        txid: output.txid,
+                        output_index: output.output_index,
+                        address: output.address,
+                        amount_sat: output.amount_sat,
+                        timestamp: output.timestamp.unwrap_or_else(Utc::now),
+                        fee_sat: output.fee_sat,
+                        block_height: output.block_height,
+                        network: self.bitcoin_wallet.network(),
+                    };
+
+                    self.events.onchain_withdrawal(event).await?;
+                    synced += 1;
+                }
+                Ledger::Internal => {}
+            }
+        }
+
+        info!(synced, "Pending payments synced successfully");
+        Ok(synced)
     }
 }

@@ -33,3 +33,14 @@ pub struct BitcoinTransactionOutput {
     pub amount_sat: u64,
     pub is_ours: bool,
 }
+
+#[derive(Clone, Debug)]
+pub struct BitcoinOutput {
+    pub txid: String,
+    pub output_index: u32,
+    pub address: Option<String>,
+    pub amount_sat: u64,
+    pub block_height: u32,
+    pub timestamp: Option<DateTime<Utc>>,
+    pub fee_sat: Option<u64>,
+}

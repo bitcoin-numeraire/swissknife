@@ -54,6 +54,29 @@ pub struct PayRequest {
     pub no_inflight_updates: bool,
 }
 
+#[derive(Debug, Serialize)]
+pub struct TrackPaymentRequest {
+    pub no_inflight_updates: bool,
+}
+
+#[serde_as]
+#[derive(Debug, Deserialize)]
+pub struct TrackPaymentResponse {
+    pub payment_hash: String,
+    pub payment_preimage: String,
+    #[serde_as(as = "Option<DisplayFromStr>")]
+    pub value_msat: Option<u64>,
+    #[serde_as(as = "Option<DisplayFromStr>")]
+    pub fee_msat: Option<u64>,
+    #[serde_as(as = "Option<DisplayFromStr>")]
+    pub creation_time_ns: Option<i64>,
+    #[serde_as(as = "Option<DisplayFromStr>")]
+    pub payment_time_ns: Option<i64>,
+    pub status: String,
+    #[serde(default)]
+    pub failure_reason: String,
+}
+
 #[derive(Deserialize)]
 pub struct StreamPayResponse {
     pub result: Option<PayResponse>,

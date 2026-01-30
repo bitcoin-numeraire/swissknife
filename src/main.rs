@@ -13,7 +13,11 @@ use tokio::signal::{
 use tracing::{debug, error, info};
 
 use crate::application::entities::{AppAdapters, AppServices};
-use crate::infra::{app::Server, config::config_rs::load_config, logging::tracing::setup_tracing};
+use crate::infra::{
+    app::{EventListener, Server},
+    config::config_rs::load_config,
+    logging::tracing::setup_tracing,
+};
 
 #[tokio::main]
 async fn main() {
@@ -43,22 +47,17 @@ async fn main() {
 
     let services = Arc::new(AppServices::new(config.clone(), adapters.clone()));
 
-    // Start the event listener first so we don't miss any events
-    if let Some(listener) = adapters.ln_listener.clone() {
-        let bitcoin_wallet = adapters.bitcoin_wallet.clone();
-        let events = services.event.clone();
+    let event_listener = match EventListener::new(config.clone(), adapters.clone(), services.clone()).await {
+        Ok(listener) => listener,
+        Err(err) => {
+            error!(%err, "failed to build event listener");
+            exit(1);
+        }
+    };
 
-        tokio::spawn(async move {
-            if let Err(err) = listener.listen(events, bitcoin_wallet).await {
-                tracing::error!(%err, "Lightning listener failed");
-            }
-        });
-    }
-
-    // Sync pending invoices and payments if necessary
-    // TODO: Move to events
-    if let Err(err) = services.invoice.sync().await {
-        error!(%err, "failed to sync invoices");
+    // Start the event listener first so we don't miss any events.
+    if let Err(err) = event_listener.start().await {
+        error!(%err, "failed to start event listener");
         exit(1);
     }
 
