@@ -216,7 +216,7 @@ impl EventUseCases for EventService {
         let Some(payment) = self.store.payment.find_by_payment_hash(&event.txid).await? else {
             trace!(
                 outpoint = outpoint.clone(),
-                "Ignoring bitcoin output not matching any known payment"
+                "Ignoring bitcoin output not matching any known payment (probably change output)"
             );
             return Ok(());
         };

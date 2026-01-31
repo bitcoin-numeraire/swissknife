@@ -7,9 +7,8 @@ use async_trait::async_trait;
 use bip39::Mnemonic;
 use breez_sdk_core::{
     BreezServices, CheckMessageRequest, ConnectRequest, EnvironmentType, GreenlightCredentials, GreenlightNodeConfig,
-    LspInformation, NodeConfig, NodeState,
-    PrepareRedeemOnchainFundsRequest, ReceivePaymentRequest, RedeemOnchainFundsRequest,
-    SendPaymentRequest, SignMessageRequest, StaticBackupRequest,
+    LspInformation, NodeConfig, NodeState, PrepareRedeemOnchainFundsRequest, ReceivePaymentRequest,
+    RedeemOnchainFundsRequest, SendPaymentRequest, SignMessageRequest, StaticBackupRequest,
 };
 
 use crate::{
