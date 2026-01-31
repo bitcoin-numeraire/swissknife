@@ -200,10 +200,6 @@ pub struct NewAddressResponse {
 pub struct TransactionResponse {
     pub tx_hash: String,
     pub block_height: u32,
-    #[serde_as(as = "DisplayFromStr")]
-    pub time_stamp: i64,
-    #[serde_as(as = "DisplayFromStr")]
-    pub total_fees: u64,
     pub output_details: Vec<OutputDetailResponse>,
 }
 
@@ -233,8 +229,6 @@ impl From<TransactionResponse> for BtcTransaction {
 
         BtcTransaction {
             txid: val.tx_hash,
-            timestamp: Some(Utc.timestamp_opt(val.time_stamp, 0).unwrap()),
-            fee_sat: Some(val.total_fees),
             block_height: Some(val.block_height),
             outputs,
         }

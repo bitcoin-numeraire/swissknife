@@ -391,9 +391,9 @@ impl LnClient for LndRestClient {
 impl BitcoinWallet for LndRestClient {
     async fn new_address(&self, address_type: BtcAddressType) -> Result<String, BitcoinError> {
         let address_type_param = match address_type {
-            BtcAddressType::P2sh => "NESTED_PUBKEY_HASH".to_string(),
-            BtcAddressType::P2tr => "TAPROOT_PUBKEY".to_string(),
-            BtcAddressType::P2wpkh => "WITNESS_PUBKEY_HASH".to_string(),
+            BtcAddressType::P2sh => "NESTED_PUBKEY_HASH",
+            BtcAddressType::P2tr => "TAPROOT_PUBKEY",
+            BtcAddressType::P2wpkh => "WITNESS_PUBKEY_HASH",
             _ => return Err(BitcoinError::AddressType(address_type.to_string())),
         };
 

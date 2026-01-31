@@ -12,7 +12,7 @@ use crate::{
     },
     domains::{
         bitcoin::BitcoinWallet,
-        event::{BtcOutputEvent, EventUseCases, LnInvoicePaidEvent},
+        event::{EventUseCases, LnInvoicePaidEvent},
     },
     infra::lightning::LnClient,
 };
@@ -202,18 +202,7 @@ impl InvoiceUseCases for InvoiceService {
                         continue;
                     };
 
-                    let event = BtcOutputEvent {
-                        txid: output.txid,
-                        output_index: output.output_index,
-                        address: Some(output.address),
-                        amount_sat: output.amount_sat,
-                        block_height: output.block_height,
-                        network: self.bitcoin_wallet.network(),
-                        timestamp: Utc::now(),
-                        fee_sat: None,
-                    };
-
-                    self.events.onchain_deposit(event).await?;
+                    self.events.onchain_deposit(output.into()).await?;
                     synced += 1;
                 }
                 Ledger::Internal => {}

@@ -15,7 +15,7 @@ use crate::{
     },
     domains::{
         bitcoin::BitcoinWallet,
-        event::{BtcOutputEvent, EventUseCases, LnPayFailureEvent, LnPaySuccessEvent},
+        event::{EventUseCases, LnPayFailureEvent, LnPaySuccessEvent},
         invoice::{Invoice, InvoiceStatus},
         lnurl::{process_success_action, validate_lnurl_pay},
     },
@@ -644,25 +644,14 @@ impl PaymentsUseCases for PaymentService {
                         continue;
                     };
 
-                    let event = BtcOutputEvent {
-                        txid: output.txid,
-                        output_index: output.output_index,
-                        address: Some(output.address),
-                        amount_sat: output.amount_sat,
-                        fee_sat: None,
-                        block_height: output.block_height,
-                        network: self.bitcoin_wallet.network(),
-                        timestamp: Utc::now(),
-                    };
-
-                    self.events.onchain_withdrawal(event).await?;
+                    self.events.onchain_withdrawal(output.into()).await?;
                     synced += 1;
                 }
                 Ledger::Internal => {}
             }
         }
 
-        info!(synced, "Pending payments synced successfully");
+        debug!(synced, "Pending payments synced successfully");
         Ok(synced)
     }
 }

@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-
 use crate::{
     application::{
         dtos::{AppConfig, LightningProvider},
@@ -9,7 +8,7 @@ use crate::{
     },
     domains::bitcoin::BitcoinWallet,
     infra::lightning::{
-        cln::{ClnGrpcListener, ClnRestListener},
+        cln::{ClnGrpcListener, ClnWebsocketListener},
         lnd::LndWebsocketListener,
         EventsListener,
     },
@@ -43,7 +42,10 @@ impl EventListener {
                     .clone()
                     .ok_or_else(|| ConfigError::MissingLightningProviderConfig(config.ln_provider.to_string()))?;
 
-                Some(Arc::new(ClnRestListener::new(cln_config)) as Arc<dyn EventsListener>)
+                let listener =
+                    ClnWebsocketListener::new(cln_config, services.event.clone(), bitcoin_wallet.clone()).await?;
+
+                Some(Arc::new(listener) as Arc<dyn EventsListener>)
             }
             LightningProvider::Lnd => {
                 let lnd_config = config

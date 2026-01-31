@@ -159,14 +159,6 @@ impl ClnRestClient {
         Ok(cleaned.parse::<u64>()?)
     }
 
-    fn map_address_type(address_type: BtcAddressType) -> Option<String> {
-        match address_type {
-            BtcAddressType::P2wpkh => Some("bech32".to_string()),
-            BtcAddressType::P2tr => Some("p2tr".to_string()),
-            _ => None,
-        }
-    }
-
     fn map_status(status: Option<&str>) -> BtcOutputStatus {
         match status {
             Some("unconfirmed") => BtcOutputStatus::Unconfirmed,
@@ -339,11 +331,17 @@ impl LnClient for ClnRestClient {
 #[async_trait]
 impl BitcoinWallet for ClnRestClient {
     async fn new_address(&self, address_type: BtcAddressType) -> Result<String, BitcoinError> {
+        let address_type_param = match address_type {
+            BtcAddressType::P2wpkh => "bech32",
+            BtcAddressType::P2tr => "p2tr",
+            _ => return Err(BitcoinError::AddressType(address_type.to_string())),
+        };
+
         let response: NewAddrResponse = self
             .post_request(
                 "newaddr",
                 &NewAddrRequest {
-                    addresstype: Self::map_address_type(address_type),
+                    addresstype: Some(address_type_param.to_string()),
                 },
             )
             .await
@@ -396,8 +394,6 @@ impl BitcoinWallet for ClnRestClient {
 
         Ok(BtcTransaction {
             txid: transaction.hash,
-            timestamp: None,
-            fee_sat: None,
             block_height: Some(transaction.blockheight),
             outputs,
         })

@@ -1,0 +1,262 @@
+use std::{
+    path::PathBuf,
+    str::FromStr,
+    sync::{Arc, Mutex},
+};
+
+use async_trait::async_trait;
+use bitcoin::OutPoint;
+use futures_util::{future::BoxFuture, FutureExt};
+use native_tls::{Certificate, TlsConnector};
+use rust_socketio::{
+    asynchronous::{Client, ClientBuilder},
+    Payload, TransportType,
+};
+use tokio::fs;
+use tracing::{debug, error, trace, warn};
+
+use crate::{
+    application::errors::LightningError,
+    domains::{bitcoin::BitcoinWallet, event::EventUseCases},
+    infra::lightning::EventsListener,
+};
+
+use super::{
+    cln_websocket_types::{ChainMovement, InvoicePayment, SendPayFailure, SendPaySuccess},
+    ClnRestClientConfig,
+};
+
+pub struct ClnWebsocketListener {
+    client_builder: Mutex<Option<ClientBuilder>>,
+}
+
+impl ClnWebsocketListener {
+    pub async fn new(
+        config: ClnRestClientConfig,
+        events: Arc<dyn EventUseCases>,
+        wallet: Arc<dyn BitcoinWallet>,
+    ) -> Result<Self, LightningError> {
+        let mut client_builder = ClientBuilder::new(config.endpoint.clone())
+            .transport_type(TransportType::Websocket)
+            .reconnect_on_disconnect(true)
+            .opening_header("rune", config.rune.clone())
+            .reconnect_delay(
+                config.ws_min_reconnect_delay.as_secs(),
+                config.ws_max_reconnect_delay.as_secs(),
+            )
+            .on("open", on_open)
+            .on("close", on_close)
+            .on("error", on_error)
+            .on("message", move |payload, _: Client| {
+                Self::on_message(events.clone(), wallet.clone(), payload)
+            });
+
+        if let Some(ca_cert_path) = &config.ca_cert_path {
+            let ca_certificate = read_ca(ca_cert_path)
+                .await
+                .map_err(|e| LightningError::ReadCertificates(e.to_string()))?;
+            let tls_connector = TlsConnector::builder()
+                .add_root_certificate(ca_certificate)
+                .danger_accept_invalid_hostnames(config.accept_invalid_hostnames)
+                .build()
+                .map_err(|e| LightningError::TLSConfig(e.to_string()))?;
+            client_builder = client_builder.tls_config(tls_connector.clone());
+        }
+
+        if config.accept_invalid_certs {
+            let tls_connector = TlsConnector::builder()
+                .danger_accept_invalid_certs(true)
+                .build()
+                .map_err(|e| LightningError::TLSConfig(e.to_string()))?;
+
+            client_builder = client_builder.tls_config(tls_connector);
+        }
+
+        Ok(Self {
+            client_builder: Mutex::new(Some(client_builder)),
+        })
+    }
+
+    fn on_message(
+        events: Arc<dyn EventUseCases>,
+        wallet: Arc<dyn BitcoinWallet>,
+        payload: Payload,
+    ) -> BoxFuture<'static, ()> {
+        async move {
+            match payload {
+                Payload::Text(values) => {
+                    for value in values {
+                        if let Some(event) = value.get("invoice_payment") {
+                            match serde_json::from_value::<InvoicePayment>(event.clone()) {
+                                Ok(invoice_payment) => {
+                                    if let Err(err) = events.invoice_paid(invoice_payment.into()).await {
+                                        warn!(%err, "Failed to process incoming payment");
+                                    }
+                                }
+                                Err(err) => {
+                                    warn!(
+                                        ?err,
+                                        "Failed to parse invoice_payment event. Most likely an external payment"
+                                    );
+                                }
+                            }
+                        }
+
+                        if let Some(event) = value.get("sendpay_success") {
+                            match serde_json::from_value::<SendPaySuccess>(event.clone()) {
+                                Ok(sendpay_success) => {
+                                    if sendpay_success.status != "complete" {
+                                        warn!(
+                                            payment_hash = sendpay_success.payment_hash,
+                                            status = sendpay_success.status,
+                                            "Invalid payment status. Expected Complete."
+                                        );
+                                        return;
+                                    }
+
+                                    if let Err(err) = events.outgoing_payment(sendpay_success.into()).await {
+                                        warn!(%err, "Failed to process outgoing payment");
+                                    }
+                                }
+                                Err(err) => {
+                                    error!(?err, "Failed to parse sendpay_success event");
+                                }
+                            }
+                        }
+
+                        if let Some(event) = value.get("sendpay_failure") {
+                            match serde_json::from_value::<SendPayFailure>(event.clone()) {
+                                Ok(sendpay_failure) => {
+                                    if sendpay_failure.data.status != "failed" {
+                                        warn!(
+                                            payment_hash = sendpay_failure.data.payment_hash,
+                                            status = sendpay_failure.data.status,
+                                            "Invalid payment status. Expected Failed."
+                                        );
+                                        // We must accept the payment as failed until this is fixed: https://github.com/ElementsProject/lightning/issues/7561
+                                        // return;
+                                    }
+
+                                    if let Err(err) = events.failed_payment(sendpay_failure.into()).await {
+                                        warn!(%err, "Failed to process failed outgoing payment");
+                                    }
+                                }
+                                Err(err) => {
+                                    error!(?err, "Failed to parse sendpay_failure event");
+                                }
+                            }
+                        }
+
+                        if let Some(event) = value.get("coin_movement") {
+                            // Only attempt to cast into CoinMovement if "type" == "chain_mvt"
+                            if let Some(movement_type) = event.get("type").and_then(|t| t.as_str()) {
+                                if movement_type != "chain_mvt" {
+                                    continue;
+                                }
+                            } else {
+                                // If there's no type field, skip this event
+                                continue;
+                            }
+
+                            match serde_json::from_value::<ChainMovement>(event.clone()) {
+                                Ok(chain_mvt) => {
+                                    println!("Received chain movement: {:?}", chain_mvt);
+
+                                    let outpoint =
+                                        OutPoint::from_str(&chain_mvt.utxo).expect("invalid outpoint format");
+
+                                    let output = match wallet
+                                        .get_output(&outpoint.txid.to_string(), Some(outpoint.vout), None)
+                                        .await
+                                    {
+                                        Ok(Some(out)) => out,
+                                        Ok(None) => {
+                                            trace!(outpoint = ?outpoint, "Output not found in wallet, skipping");
+                                            continue;
+                                        }
+                                        Err(err) => {
+                                            warn!(%err, "Failed to get output from wallet");
+                                            continue;
+                                        }
+                                    };
+
+                                    let output_event = output.into();
+
+                                    let tag = chain_mvt.primary_tag;
+                                    let result = match tag.as_str() {
+                                        "deposit" => events.onchain_deposit(output_event).await,
+                                        "withdrawal" => events.onchain_withdrawal(output_event).await,
+                                        _ => {
+                                            trace!(tag, "Unsupported coin_movement tag");
+                                            Ok(())
+                                        }
+                                    };
+
+                                    if let Err(err) = result {
+                                        warn!(%err, "Failed to process onchain transaction");
+                                    }
+                                }
+                                Err(err) => {
+                                    warn!(?err, "Failed to parse coin_movement event");
+                                }
+                            }
+                        }
+                    }
+                }
+                _ => error!(?payload, "Non supported payload type"),
+            }
+        }
+        .boxed()
+    }
+}
+
+#[async_trait]
+impl EventsListener for ClnWebsocketListener {
+    async fn listen(
+        &self,
+        _events: Arc<dyn EventUseCases>,
+        _bitcoin_wallet: Arc<dyn BitcoinWallet>,
+    ) -> Result<(), LightningError> {
+        let client_builder = self
+            .client_builder
+            .lock()
+            .map_err(|_| LightningError::Listener("Failed to lock client builder".to_string()))?
+            .take()
+            .ok_or_else(|| LightningError::Listener("Listener already started".to_string()))?;
+
+        let _client = client_builder
+            .connect()
+            .await
+            .map_err(|e| LightningError::ConnectWebsocket(e.to_string()))?;
+
+        Ok(())
+    }
+}
+
+async fn read_ca(path: &str) -> anyhow::Result<Certificate> {
+    let ca_file = fs::read(PathBuf::from(path)).await?;
+    let ca_certificate = Certificate::from_pem(&ca_file)?;
+
+    Ok(ca_certificate)
+}
+
+fn on_open(_: Payload, _: Client) -> BoxFuture<'static, ()> {
+    async move {
+        debug!("Connected to Core Lightning websocket server");
+    }
+    .boxed()
+}
+
+fn on_close(_: Payload, _: Client) -> BoxFuture<'static, ()> {
+    async move {
+        debug!("Disconnected from Core Lightning websocket server");
+    }
+    .boxed()
+}
+
+fn on_error(err: Payload, _: Client) -> BoxFuture<'static, ()> {
+    async move {
+        error!(?err, "Error from Core Lightning websocket server ");
+    }
+    .boxed()
+}

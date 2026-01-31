@@ -130,13 +130,6 @@ impl ClnGrpcClient {
 
         Ok(parse_network(&response.network))
     }
-
-    fn map_address_type(address_type: BtcAddressType) -> Option<i32> {
-        match address_type {
-            BtcAddressType::P2tr => Some(NewaddrAddresstype::P2tr as i32),
-            _ => Some(NewaddrAddresstype::Bech32 as i32),
-        }
-    }
 }
 
 #[async_trait]
@@ -299,9 +292,15 @@ impl BitcoinWallet for ClnGrpcClient {
     async fn new_address(&self, address_type: BtcAddressType) -> Result<String, BitcoinError> {
         let mut client = self.client.clone();
 
+        let address_type_param = match address_type {
+            BtcAddressType::P2wpkh => NewaddrAddresstype::Bech32,
+            BtcAddressType::P2tr => NewaddrAddresstype::P2tr,
+            _ => return Err(BitcoinError::AddressType(address_type.to_string())),
+        };
+
         let response = client
             .new_addr(NewaddrRequest {
-                addresstype: Self::map_address_type(address_type),
+                addresstype: Some(address_type_param as i32),
             })
             .await
             .map_err(|e| BitcoinError::Address(e.message().to_string()))?
@@ -366,8 +365,6 @@ impl BitcoinWallet for ClnGrpcClient {
 
         Ok(BtcTransaction {
             txid: hex::encode(transaction.hash),
-            timestamp: None,
-            fee_sat: None,
             block_height: Some(transaction.blockheight),
             outputs,
         })

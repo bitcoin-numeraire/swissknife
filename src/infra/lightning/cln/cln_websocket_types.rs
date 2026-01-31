@@ -3,8 +3,7 @@ use serde::Deserialize;
 use serde_bolt::bitcoin::hashes::hex::ToHex;
 use serde_bolt::bitcoin::hashes::{sha256, Hash};
 
-use crate::domains::bitcoin::BtcNetwork;
-use crate::domains::event::{BtcOutputEvent, LnInvoicePaidEvent, LnPayFailureEvent, LnPaySuccessEvent};
+use crate::domains::event::{LnInvoicePaidEvent, LnPayFailureEvent, LnPaySuccessEvent};
 
 #[derive(Debug, Deserialize)]
 pub struct InvoicePayment {
@@ -38,10 +37,6 @@ pub struct SendPayFailureData {
 pub struct ChainMovement {
     pub primary_tag: String,
     pub utxo: String,
-    pub output_msat: u64,
-    pub debit_msat: u64,
-    pub timestamp: i64,
-    pub blockheight: u32,
 }
 
 impl From<InvoicePayment> for LnInvoicePaidEvent {
@@ -74,30 +69,6 @@ impl From<SendPayFailure> for LnPayFailureEvent {
         LnPayFailureEvent {
             reason: val.message,
             payment_hash: val.data.payment_hash,
-        }
-    }
-}
-
-impl From<ChainMovement> for BtcOutputEvent {
-    fn from(val: ChainMovement) -> Self {
-        let parts = val.utxo.split(":").collect::<Vec<&str>>();
-        let txid = parts[0].to_string();
-        let output_index = parts[1].parse::<u32>().expect("invalid output index");
-        let mut fee_sat = None;
-
-        if val.primary_tag == "withdrawal" {
-            fee_sat = Some((val.debit_msat - val.output_msat) / 1000);
-        }
-
-        BtcOutputEvent {
-            txid,
-            output_index,
-            address: None,
-            amount_sat: val.output_msat / 1000,
-            timestamp: Utc.timestamp_opt(val.timestamp, 0).unwrap(),
-            fee_sat,
-            block_height: Some(val.blockheight),
-            network: BtcNetwork::default(),
         }
     }
 }

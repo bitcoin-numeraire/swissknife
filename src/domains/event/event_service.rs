@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use chrono::Utc;
 use tracing::{debug, info, trace, warn};
 
 use crate::{
@@ -169,7 +170,7 @@ impl EventUseCases for EventService {
         if let Some(mut invoice) = existing_invoice {
             invoice.status = status;
             if is_confirmed {
-                invoice.payment_time = Some(event.timestamp);
+                invoice.payment_time = Some(Utc::now());
             }
             invoice.amount_received_msat = Some(stored_output.amount_sat.saturating_mul(1000));
             invoice.btc_output_id = Some(stored_output.id);
@@ -181,14 +182,14 @@ impl EventUseCases for EventService {
                 "Existing onchain deposit processed");
         } else {
             let amount_msat = stored_output.amount_sat.saturating_mul(1000);
-            let payment_time = if is_confirmed { Some(event.timestamp) } else { None };
+            let payment_time = if is_confirmed { Some(Utc::now()) } else { None };
 
             let invoice = Invoice {
                 wallet_id: btc_address.wallet_id,
                 description: Some(DEFAULT_DEPOSIT_DESCRIPTION.to_string()),
                 amount_msat: Some(amount_msat),
                 amount_received_msat: Some(amount_msat),
-                timestamp: event.timestamp,
+                timestamp: Utc::now(),
                 ledger: Ledger::Onchain,
                 currency: stored_output.network.into(),
                 payment_time,
@@ -231,11 +232,7 @@ impl EventUseCases for EventService {
         updated_payment.status = payment_status;
 
         if is_confirmed && updated_payment.payment_time.is_none() {
-            updated_payment.payment_time = Some(event.timestamp);
-        }
-
-        if updated_payment.fee_msat.is_none() {
-            updated_payment.fee_msat = event.fee_sat.map(|fee| fee.saturating_mul(1000));
+            updated_payment.payment_time = Some(Utc::now());
         }
 
         let status = Self::output_status(event.block_height);
