@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use tracing::{info, warn};
 
 use crate::{
     application::{
@@ -72,15 +71,13 @@ impl EventListener {
 
             tokio::spawn(async move {
                 if let Err(err) = listener.listen(events, bitcoin_wallet).await {
-                    warn!(%err, "Lightning listener failed");
+                    panic!("Critical: Lightning listener failed: {}", err);
                 }
             });
         }
 
-        let (invoices_synced, payments_synced) =
-            tokio::try_join!(self.services.invoice.sync(), self.services.payment.sync())?;
+        tokio::try_join!(self.services.invoice.sync(), self.services.payment.sync())?;
 
-        info!(invoices_synced, payments_synced, "Event listeners synced successfully");
         Ok(())
     }
 }

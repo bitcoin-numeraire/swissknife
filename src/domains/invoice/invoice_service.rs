@@ -128,7 +128,7 @@ impl InvoiceUseCases for InvoiceService {
     }
 
     async fn sync(&self) -> Result<u32, ApplicationError> {
-        trace!("Syncing pending invoices...");
+        trace!("Syncing pending and expired invoices...");
 
         let pending_invoices = self
             .store
@@ -220,7 +220,7 @@ impl InvoiceUseCases for InvoiceService {
             }
         }
 
-        info!(synced, "Pending invoices synced successfully");
+        debug!(synced, "Pending and expired invoices synced successfully");
         Ok(synced)
     }
 }
