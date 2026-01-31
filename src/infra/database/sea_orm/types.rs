@@ -179,7 +179,6 @@ impl From<BitcoinOutputModel> for BtcOutput {
             amount_sat: model.amount_sat as u64,
             status: model.status.parse().expect(ASSERTION_MSG),
             block_height: model.block_height.map(|h| h as u32),
-            network: model.network.parse().expect(ASSERTION_MSG),
             created_at: model.created_at.and_utc(),
             updated_at: model.updated_at.map(|t| t.and_utc()),
         }

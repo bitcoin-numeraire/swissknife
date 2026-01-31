@@ -19,7 +19,7 @@ use crate::{
     application::errors::LightningError,
     domains::{
         bitcoin::BitcoinWallet,
-        event::{BtcOutputEvent, EventUseCases},
+        event::{BtcOutputEvent, BtcWithdrawalConfirmedEvent, EventUseCases},
     },
     infra::lightning::EventsListener,
 };
@@ -161,16 +161,34 @@ impl ClnWebsocketListener {
                                 continue;
                             }
 
-                            println!("Processing chain mvt event: {:?}", event.clone());
-
                             match serde_json::from_value::<ChainMovement>(event.clone()) {
                                 Ok(chain_mvt) => {
-                                    let tag = chain_mvt.primary_tag.clone();
+                                    let block_height = match chain_mvt.blockheight {
+                                        Some(height) if height > 0 => Some(height),
+                                        _ => None,
+                                    };
 
-                                    let result = match tag.as_str() {
-                                        "deposit" => {
-                                            let outpoint =
-                                                OutPoint::from_str(&chain_mvt.utxo).expect("invalid outpoint format");
+                                    match (
+                                        chain_mvt.primary_tag.as_str(),
+                                        chain_mvt.account_id.as_str(),
+                                        chain_mvt.originating_account.as_deref(),
+                                    ) {
+                                        ("deposit", "wallet", _) => {
+                                            if block_height.is_none() {
+                                                error!(
+                                                    utxo = chain_mvt.utxo,
+                                                    "Ignoring wallet deposit without block height"
+                                                );
+                                                continue;
+                                            }
+
+                                            let outpoint = match OutPoint::from_str(&chain_mvt.utxo) {
+                                                Ok(outpoint) => outpoint,
+                                                Err(err) => {
+                                                    error!(?err, utxo = chain_mvt.utxo, "Invalid outpoint format");
+                                                    continue;
+                                                }
+                                            };
 
                                             let output = match wallet
                                                 .get_output(
@@ -193,28 +211,67 @@ impl ClnWebsocketListener {
                                             };
 
                                             let output_event = output.into();
-                                            events.onchain_deposit(output_event).await
+                                            if let Err(err) =
+                                                events.onchain_deposit(output_event, wallet.network().into()).await
+                                            {
+                                                warn!(%err, "Failed to process onchain deposit");
+                                            }
                                         }
-                                        "withdrawal" => {
-                                            let output_event = chain_mvt.into();
-                                            let output_event = BtcOutputEvent {
-                                                network: wallet.network(),
-                                                ..output_event
+                                        ("deposit", "external", Some("wallet")) => {
+                                            let outpoint = match OutPoint::from_str(&chain_mvt.utxo) {
+                                                Ok(outpoint) => outpoint,
+                                                Err(err) => {
+                                                    error!(?err, utxo = chain_mvt.utxo, "Invalid outpoint format");
+                                                    continue;
+                                                }
                                             };
-                                            events.onchain_withdrawal(output_event).await
+
+                                            let output_event = BtcOutputEvent {
+                                                txid: outpoint.txid.to_string(),
+                                                output_index: outpoint.vout,
+                                                address: None,
+                                                amount_sat: chain_mvt.output_msat / 1000,
+                                                block_height: chain_mvt.blockheight,
+                                            };
+
+                                            if let Err(err) = events.onchain_withdrawal(output_event).await {
+                                                error!(%err, "Failed to process onchain withdrawal");
+                                            }
+                                        }
+                                        ("withdrawal", "wallet", _) => {
+                                            let Some(height) = block_height else {
+                                                trace!(
+                                                    txid = chain_mvt.spending_txid.as_deref().unwrap_or_default(),
+                                                    "Ignoring withdrawal confirmation without block height"
+                                                );
+                                                continue;
+                                            };
+
+                                            let Some(spending_txid) = chain_mvt.spending_txid.as_deref() else {
+                                                error!("Withdrawal confirmation missing spending txid");
+                                                continue;
+                                            };
+
+                                            let confirm_event = BtcWithdrawalConfirmedEvent {
+                                                txid: spending_txid.to_string(),
+                                                block_height: height,
+                                            };
+
+                                            if let Err(err) = events.onchain_withdrawal_confirmed(confirm_event).await {
+                                                error!(%err, "Failed to process onchain withdrawal confirmation");
+                                            }
                                         }
                                         _ => {
-                                            trace!(tag, "Unsupported coin_movement tag");
-                                            Ok(())
+                                            trace!(
+                                                tag = %chain_mvt.primary_tag,
+                                                account_id = %chain_mvt.account_id,
+                                                "Unsupported coin_movement event"
+                                            );
                                         }
-                                    };
-
-                                    if let Err(err) = result {
-                                        warn!(%err, "Failed to process onchain transaction");
                                     }
                                 }
                                 Err(err) => {
-                                    warn!(?err, "Failed to parse coin_movement event");
+                                    error!(%err, "Failed to parse coin_movement event");
                                 }
                             }
                         }

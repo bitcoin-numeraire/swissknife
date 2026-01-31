@@ -11,8 +11,8 @@ use crate::{
     domains::payment::{Payment, PaymentFilter, PaymentRepository},
     infra::database::sea_orm::models::{
         btc_output::Model as BtcOutputModel,
-        payment::{ActiveModel, Column, Entity, Model as PaymentModel},
-        prelude::BtcOutput,
+        payment::{ActiveModel, Column, Model as PaymentModel},
+        prelude::{BtcOutput, Payment as PaymentEntity},
     },
 };
 
@@ -42,7 +42,7 @@ impl SeaOrmPaymentRepository {
 #[async_trait]
 impl PaymentRepository for SeaOrmPaymentRepository {
     async fn find(&self, id: Uuid) -> Result<Option<Payment>, DatabaseError> {
-        let model = Entity::find_by_id(id)
+        let model = PaymentEntity::find_by_id(id)
             .find_also_related(BtcOutput)
             .one(&self.db)
             .await
@@ -52,7 +52,7 @@ impl PaymentRepository for SeaOrmPaymentRepository {
     }
 
     async fn find_by_payment_hash(&self, payment_hash: &str) -> Result<Option<Payment>, DatabaseError> {
-        let model = Entity::find()
+        let model = PaymentEntity::find()
             .filter(Column::PaymentHash.eq(payment_hash))
             .find_also_related(BtcOutput)
             .one(&self.db)
@@ -63,7 +63,7 @@ impl PaymentRepository for SeaOrmPaymentRepository {
     }
 
     async fn find_many(&self, filter: PaymentFilter) -> Result<Vec<Payment>, DatabaseError> {
-        let models = Entity::find()
+        let models = PaymentEntity::find()
             .apply_if(filter.wallet_id, |q, wallet| q.filter(Column::WalletId.eq(wallet)))
             .apply_if(filter.ids, |q, ids| q.filter(Column::Id.is_in(ids)))
             .apply_if(filter.status, |q, s| q.filter(Column::Status.eq(s.to_string())))
@@ -210,7 +210,7 @@ impl PaymentRepository for SeaOrmPaymentRepository {
     }
 
     async fn delete_many(&self, filter: PaymentFilter) -> Result<u64, DatabaseError> {
-        let result = Entity::delete_many()
+        let result = PaymentEntity::delete_many()
             .apply_if(filter.wallet_id, |q, wallet| q.filter(Column::WalletId.eq(wallet)))
             .apply_if(filter.ids, |q, ids| q.filter(Column::Id.is_in(ids)))
             .apply_if(filter.status, |q, s| q.filter(Column::Status.eq(s.to_string())))

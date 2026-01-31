@@ -203,7 +203,9 @@ impl InvoiceUseCases for InvoiceService {
                         continue;
                     };
 
-                    self.events.onchain_deposit(output.into()).await?;
+                    self.events
+                        .onchain_deposit(output.into(), self.bitcoin_wallet.network().into())
+                        .await?;
                     synced += 1;
                 }
                 Ledger::Internal => {}

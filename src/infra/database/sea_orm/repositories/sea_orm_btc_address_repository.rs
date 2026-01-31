@@ -9,7 +9,10 @@ use uuid::Uuid;
 use crate::{
     application::errors::DatabaseError,
     domains::bitcoin::{BtcAddress, BtcAddressFilter, BtcAddressRepository, BtcAddressType},
-    infra::database::sea_orm::models::btc_address::{ActiveModel, Column, Entity},
+    infra::database::sea_orm::models::{
+        btc_address::{ActiveModel, Column},
+        prelude::BtcAddress as BtcAddressEntity,
+    },
 };
 
 #[derive(Clone)]
@@ -26,7 +29,7 @@ impl SeaOrmBitcoinAddressRepository {
 #[async_trait]
 impl BtcAddressRepository for SeaOrmBitcoinAddressRepository {
     async fn find(&self, id: Uuid) -> Result<Option<BtcAddress>, DatabaseError> {
-        let model = Entity::find_by_id(id)
+        let model = BtcAddressEntity::find_by_id(id)
             .one(&self.db)
             .await
             .map_err(|e| DatabaseError::FindOne(e.to_string()))?;
@@ -39,7 +42,7 @@ impl BtcAddressRepository for SeaOrmBitcoinAddressRepository {
         wallet_id: Uuid,
         address_type: BtcAddressType,
     ) -> Result<Option<BtcAddress>, DatabaseError> {
-        let model = Entity::find()
+        let model = BtcAddressEntity::find()
             .filter(Column::WalletId.eq(wallet_id))
             .filter(Column::Used.eq(false))
             .filter(Column::AddressType.eq(address_type.to_string()))
@@ -52,7 +55,7 @@ impl BtcAddressRepository for SeaOrmBitcoinAddressRepository {
     }
 
     async fn find_by_address(&self, address: &str) -> Result<Option<BtcAddress>, DatabaseError> {
-        let model = Entity::find()
+        let model = BtcAddressEntity::find()
             .filter(Column::Address.eq(address))
             .one(&self.db)
             .await
@@ -62,7 +65,7 @@ impl BtcAddressRepository for SeaOrmBitcoinAddressRepository {
     }
 
     async fn find_many(&self, filter: BtcAddressFilter) -> Result<Vec<BtcAddress>, DatabaseError> {
-        let models = Entity::find()
+        let models = BtcAddressEntity::find()
             .apply_if(filter.wallet_id, |q, id| q.filter(Column::WalletId.eq(id)))
             .apply_if(filter.address, |q, address| q.filter(Column::Address.eq(address)))
             .apply_if(filter.address_type, |q, address_type| {
@@ -120,7 +123,7 @@ impl BtcAddressRepository for SeaOrmBitcoinAddressRepository {
     }
 
     async fn delete_many(&self, filter: BtcAddressFilter) -> Result<u64, DatabaseError> {
-        let result = Entity::delete_many()
+        let result = BtcAddressEntity::delete_many()
             .apply_if(filter.wallet_id, |q, id| q.filter(Column::WalletId.eq(id)))
             .apply_if(filter.ids, |q, ids| q.filter(Column::Id.is_in(ids)))
             .apply_if(filter.address, |q, address| q.filter(Column::Address.eq(address)))

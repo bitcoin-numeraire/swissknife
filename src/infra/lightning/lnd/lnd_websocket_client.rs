@@ -239,9 +239,9 @@ async fn process_transaction_message(
                 let transaction: BtcTransaction = transaction.into();
 
                 for output in transaction.outputs.iter() {
-                    let output_event = transaction.output_event(output, network);
+                    let output_event = transaction.output_event(output);
                     let result = if output.is_ours {
-                        events.onchain_deposit(output_event).await
+                        events.onchain_deposit(output_event, network.into()).await
                     } else {
                         events.onchain_withdrawal(output_event).await
                     };

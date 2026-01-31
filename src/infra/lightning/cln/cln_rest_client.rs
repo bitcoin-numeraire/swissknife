@@ -1,6 +1,5 @@
 use std::{path::PathBuf, str::FromStr, time::Duration};
 
-use breez_sdk_core::ReverseSwapInfo;
 use chrono::{TimeZone, Utc};
 use lightning_invoice::Bolt11Invoice;
 use reqwest::{
@@ -297,17 +296,6 @@ impl LnClient for ClnRestClient {
         }))
     }
 
-    async fn pay_onchain(
-        &self,
-        _amount_sat: u64,
-        _recipient_address: String,
-        _feerate: u32,
-    ) -> Result<ReverseSwapInfo, LightningError> {
-        Err(LightningError::Unsupported(
-            "Bitcoin payments are not implemented for CLN REST client".to_string(),
-        ))
-    }
-
     async fn health(&self) -> Result<HealthStatus, LightningError> {
         self.post_request::<GetinfoResponse>("getinfo", &GetinfoRequest {})
             .await
@@ -425,7 +413,6 @@ impl BitcoinWallet for ClnRestClient {
             address: output.address.unwrap_or_default(),
             amount_sat: output.amount_msat / 1000,
             block_height: output.blockheight,
-            network: self.network,
             outpoint: format!("{}:{}", output.txid, output.output),
             status: Self::map_status(&output.status),
             ..Default::default()

@@ -6,7 +6,10 @@ use uuid::Uuid;
 use crate::{
     application::errors::DatabaseError,
     domains::bitcoin::{BtcOutput, BtcOutputRepository},
-    infra::database::sea_orm::models::btc_output::{ActiveModel, Column, Entity},
+    infra::database::sea_orm::models::{
+        btc_output::{ActiveModel, Column},
+        prelude::BtcOutput as BtcOutputEntity,
+    },
 };
 
 #[derive(Clone)]
@@ -23,7 +26,7 @@ impl SeaOrmBitcoinOutputRepository {
 #[async_trait]
 impl BtcOutputRepository for SeaOrmBitcoinOutputRepository {
     async fn find_by_outpoint(&self, outpoint: &str) -> Result<Option<BtcOutput>, DatabaseError> {
-        let model = Entity::find()
+        let model = BtcOutputEntity::find()
             .filter(Column::Outpoint.eq(outpoint))
             .one(&self.db)
             .await
@@ -42,7 +45,6 @@ impl BtcOutputRepository for SeaOrmBitcoinOutputRepository {
                 amount_sat: Set(output.amount_sat as i64),
                 status: Set(output.status.to_string()),
                 block_height: Set(output.block_height.map(|h| h as i32)),
-                network: Set(output.network.to_string()),
                 updated_at: Set(Some(Utc::now().naive_utc())),
                 ..Default::default()
             };
@@ -64,7 +66,6 @@ impl BtcOutputRepository for SeaOrmBitcoinOutputRepository {
             amount_sat: Set(output.amount_sat as i64),
             status: Set(output.status.to_string()),
             block_height: Set(output.block_height.map(|h| h as i32)),
-            network: Set(output.network.to_string()),
             ..Default::default()
         };
 

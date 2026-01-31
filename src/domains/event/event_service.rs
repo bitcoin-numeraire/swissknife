@@ -4,12 +4,15 @@ use tracing::{debug, info, trace, warn};
 
 use crate::{
     application::{
-        entities::{AppStore, Ledger},
+        entities::{AppStore, Currency, Ledger},
         errors::{ApplicationError, DataError},
     },
     domains::{
         bitcoin::{BtcOutput, BtcOutputStatus},
-        event::{BtcOutputEvent, EventUseCases, LnInvoicePaidEvent, LnPayFailureEvent, LnPaySuccessEvent},
+        event::{
+            BtcOutputEvent, BtcWithdrawalConfirmedEvent, EventUseCases, LnInvoicePaidEvent, LnPayFailureEvent,
+            LnPaySuccessEvent,
+        },
         invoice::{Invoice, InvoiceFilter, InvoiceOrderBy, InvoiceStatus},
         payment::PaymentStatus,
     },
@@ -128,7 +131,7 @@ impl EventUseCases for EventService {
         return Err(DataError::NotFound("Lightning payment not found.".into()).into());
     }
 
-    async fn onchain_deposit(&self, event: BtcOutputEvent) -> Result<(), ApplicationError> {
+    async fn onchain_deposit(&self, event: BtcOutputEvent, currency: Currency) -> Result<(), ApplicationError> {
         let outpoint = format!("{}:{}", event.txid, event.output_index);
         trace!(%outpoint, "Processing onchain deposit event");
 
@@ -146,7 +149,6 @@ impl EventUseCases for EventService {
             amount_sat: event.amount_sat,
             status,
             block_height: event.block_height,
-            network: event.network,
             ..Default::default()
         };
 
@@ -191,7 +193,7 @@ impl EventUseCases for EventService {
                 amount_received_msat: Some(amount_msat),
                 timestamp: Utc::now(),
                 ledger: Ledger::Onchain,
-                currency: stored_output.network.into(),
+                currency,
                 payment_time,
                 btc_output_id: Some(stored_output.id),
                 bitcoin_output: Some(stored_output.clone()),
@@ -253,7 +255,6 @@ impl EventUseCases for EventService {
             amount_sat: event.amount_sat,
             status,
             block_height: event.block_height,
-            network: event.network,
             ..Default::default()
         };
 
@@ -268,6 +269,51 @@ impl EventUseCases for EventService {
         self.store.payment.update(updated_payment).await?;
 
         info!(%outpoint, "Onchain withdrawal processed");
+        Ok(())
+    }
+
+    async fn onchain_withdrawal_confirmed(&self, event: BtcWithdrawalConfirmedEvent) -> Result<(), ApplicationError> {
+        if event.block_height == 0 {
+            trace!(txid = %event.txid, "Ignoring withdrawal confirmation with zero block height");
+            return Ok(());
+        }
+
+        trace!(
+            txid = %event.txid,
+            block_height = event.block_height,
+            "Processing onchain withdrawal confirmation"
+        );
+
+        let Some(mut payment) = self.store.payment.find_by_payment_hash(&event.txid).await? else {
+            trace!(txid = %event.txid, "Ignoring withdrawal confirmation for unknown payment");
+            return Ok(());
+        };
+
+        payment.status = PaymentStatus::Settled;
+
+        if payment.payment_time.is_none() {
+            payment.payment_time = Some(Utc::now());
+        }
+
+        if let Some(output) = payment.bitcoin.as_ref().and_then(|bitcoin| bitcoin.output.clone()) {
+            let mut updated_output = output.clone();
+            let block_height = Some(event.block_height);
+            updated_output.block_height = block_height;
+            updated_output.status = Self::output_status(block_height);
+
+            let stored_output = self.store.btc_output.upsert(updated_output).await?;
+            let bitcoin = payment.bitcoin.get_or_insert_with(Default::default);
+            bitcoin.output = Some(stored_output.clone());
+            if bitcoin.output_id.is_none() {
+                bitcoin.output_id = Some(stored_output.id);
+            }
+        } else {
+            warn!(txid = %event.txid, "Withdrawal output missing; updating payment only");
+        }
+
+        self.store.payment.update(payment).await?;
+
+        info!(txid = %event.txid, "Onchain withdrawal confirmed");
         Ok(())
     }
 }

@@ -1,7 +1,6 @@
 use std::{path::PathBuf, time::Duration};
 
 use anyhow::anyhow;
-use breez_sdk_core::ReverseSwapInfo;
 use chrono::TimeZone;
 use futures_util::StreamExt;
 use reqwest::{
@@ -374,17 +373,6 @@ impl LnClient for LndRestClient {
 
         Ok(HealthStatus::Operational)
     }
-
-    async fn pay_onchain(
-        &self,
-        _amount_sat: u64,
-        _recipient_address: String,
-        _feerate: u32,
-    ) -> Result<ReverseSwapInfo, LightningError> {
-        Err(LightningError::Unsupported(
-            "Bitcoin payments are not implemented for LND".to_string(),
-        ))
-    }
 }
 
 #[async_trait]
@@ -454,7 +442,6 @@ impl BitcoinWallet for LndRestClient {
             address: output.address.clone().unwrap_or_default(),
             amount_sat: output.amount_sat,
             block_height: transaction.block_height,
-            network: self.network,
             outpoint: format!("{}:{}", transaction.txid, output.output_index),
             status: if transaction.block_height.is_some() && transaction.block_height.unwrap() > 0 {
                 BtcOutputStatus::Confirmed

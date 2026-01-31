@@ -4,7 +4,7 @@ use strum_macros::{Display, EnumString};
 use utoipa::ToSchema;
 use uuid::Uuid;
 
-use crate::domains::{bitcoin::BtcNetwork, invoice::InvoiceStatus};
+use crate::domains::invoice::InvoiceStatus;
 
 #[derive(Clone, Debug, Default)]
 pub struct BtcOutput {
@@ -16,7 +16,6 @@ pub struct BtcOutput {
     pub amount_sat: u64,
     pub status: BtcOutputStatus,
     pub block_height: Option<u32>,
-    pub network: BtcNetwork,
     pub created_at: DateTime<Utc>,
     pub updated_at: Option<DateTime<Utc>>,
 }

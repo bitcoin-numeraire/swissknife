@@ -1,4 +1,4 @@
-use crate::domains::bitcoin::{BtcNetwork, BtcOutput};
+use crate::domains::bitcoin::BtcOutput;
 
 #[derive(Debug, Clone, Default)]
 pub struct BtcOutputEvent {
@@ -7,7 +7,12 @@ pub struct BtcOutputEvent {
     pub address: Option<String>,
     pub amount_sat: u64,
     pub block_height: Option<u32>,
-    pub network: BtcNetwork,
+}
+
+#[derive(Debug, Clone)]
+pub struct BtcWithdrawalConfirmedEvent {
+    pub txid: String,
+    pub block_height: u32,
 }
 
 impl From<BtcOutput> for BtcOutputEvent {
@@ -18,7 +23,6 @@ impl From<BtcOutput> for BtcOutputEvent {
             address: Some(output.address),
             amount_sat: output.amount_sat,
             block_height: output.block_height,
-            network: output.network,
         }
     }
 }

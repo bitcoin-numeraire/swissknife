@@ -39,10 +39,12 @@ pub struct SendPayFailureData {
 #[derive(Debug, Deserialize, Clone)]
 pub struct ChainMovement {
     pub account_id: String,
+    pub originating_account: Option<String>,
+    pub spending_txid: Option<String>,
     pub primary_tag: String,
     pub utxo: String,
     pub output_msat: u64,
-    pub blockheight: u32,
+    pub blockheight: Option<u32>,
 }
 
 impl From<InvoicePayment> for LnInvoicePaidEvent {
@@ -88,7 +90,7 @@ impl From<ChainMovement> for BtcOutputEvent {
             output_index: outpoint.vout,
             address: None,
             amount_sat: mvt.output_msat / 1000,
-            block_height: Some(mvt.blockheight),
+            block_height: mvt.blockheight,
             ..Default::default()
         }
     }

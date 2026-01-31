@@ -1,7 +1,10 @@
 use crate::{
     application::errors::DatabaseError,
     domains::user::{ApiKey, ApiKeyFilter, ApiKeyRepository},
-    infra::database::sea_orm::models::api_key::{ActiveModel, Column, Entity},
+    infra::database::sea_orm::models::{
+        api_key::{ActiveModel, Column},
+        prelude::ApiKey as ApiKeyEntity,
+    },
 };
 use async_trait::async_trait;
 use chrono::Utc;
@@ -25,7 +28,7 @@ impl SeaOrmApiKeyRepository {
 #[async_trait]
 impl ApiKeyRepository for SeaOrmApiKeyRepository {
     async fn find(&self, id: Uuid) -> Result<Option<ApiKey>, DatabaseError> {
-        let model = Entity::find_by_id(id)
+        let model = ApiKeyEntity::find_by_id(id)
             .one(&self.db)
             .await
             .map_err(|e| DatabaseError::FindOne(e.to_string()))?;
@@ -34,7 +37,7 @@ impl ApiKeyRepository for SeaOrmApiKeyRepository {
     }
 
     async fn find_by_key_hash(&self, key_hash: Vec<u8>) -> Result<Option<ApiKey>, DatabaseError> {
-        let model = Entity::find()
+        let model = ApiKeyEntity::find()
             .filter(Column::KeyHash.eq(key_hash))
             .filter(
                 Condition::any()
@@ -49,7 +52,7 @@ impl ApiKeyRepository for SeaOrmApiKeyRepository {
     }
 
     async fn find_many(&self, filter: ApiKeyFilter) -> Result<Vec<ApiKey>, DatabaseError> {
-        let models = Entity::find()
+        let models = ApiKeyEntity::find()
             .apply_if(filter.user_id, |q, user| q.filter(Column::UserId.eq(user)))
             .apply_if(filter.ids, |q, ids| q.filter(Column::Id.is_in(ids)))
             .order_by(Column::CreatedAt, filter.order_direction.into())
@@ -86,7 +89,7 @@ impl ApiKeyRepository for SeaOrmApiKeyRepository {
     }
 
     async fn delete_many(&self, filter: ApiKeyFilter) -> Result<u64, DatabaseError> {
-        let result = Entity::delete_many()
+        let result = ApiKeyEntity::delete_many()
             .apply_if(filter.user_id, |q, user| q.filter(Column::UserId.eq(user)))
             .apply_if(filter.ids, |q, ids| q.filter(Column::Id.is_in(ids)))
             .exec(&self.db)

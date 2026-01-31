@@ -19,7 +19,6 @@ impl MigrationTrait for Migration {
                     .col(big_integer(BtcOutput::AmountSat))
                     .col(string(BtcOutput::Status))
                     .col(unsigned_null(BtcOutput::BlockHeight))
-                    .col(string_len(BtcOutput::Network, 255))
                     .col(timestamp(BtcOutput::CreatedAt).default(Expr::current_timestamp()))
                     .col(timestamp_null(BtcOutput::UpdatedAt))
                     .to_owned(),
@@ -70,7 +69,6 @@ pub(crate) enum BtcOutput {
     AmountSat,
     Status,
     BlockHeight,
-    Network,
     CreatedAt,
     UpdatedAt,
 }

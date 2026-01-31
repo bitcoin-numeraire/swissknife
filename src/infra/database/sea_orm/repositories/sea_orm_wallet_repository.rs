@@ -15,8 +15,8 @@ use crate::{
         contact::ContactModel,
         invoice::Column as InvoiceColumn,
         payment::Column as PaymentColumn,
-        prelude::{BtcOutput, Invoice, LnAddress, Payment},
-        wallet::{ActiveModel, Column, Entity},
+        prelude::{BtcOutput, Invoice, LnAddress, Payment, Wallet as WalletEntity},
+        wallet::{ActiveModel, Column},
     },
 };
 
@@ -34,7 +34,7 @@ impl SeaOrmWalletRepository {
 #[async_trait]
 impl WalletRepository for SeaOrmWalletRepository {
     async fn find(&self, id: Uuid) -> Result<Option<Wallet>, DatabaseError> {
-        let model_opt = Entity::find_by_id(id)
+        let model_opt = WalletEntity::find_by_id(id)
             .one(&self.db)
             .await
             .map_err(|e| DatabaseError::FindOne(e.to_string()))?;
@@ -91,7 +91,7 @@ impl WalletRepository for SeaOrmWalletRepository {
     }
 
     async fn find_by_user_id(&self, user_id: &str) -> Result<Option<Wallet>, DatabaseError> {
-        let model = Entity::find()
+        let model = WalletEntity::find()
             .filter(Column::UserId.eq(user_id))
             .one(&self.db)
             .await
@@ -101,7 +101,7 @@ impl WalletRepository for SeaOrmWalletRepository {
     }
 
     async fn find_many(&self, filter: WalletFilter) -> Result<Vec<Wallet>, DatabaseError> {
-        let models = Entity::find()
+        let models = WalletEntity::find()
             .apply_if(filter.user_id, |q, user| q.filter(Column::UserId.eq(user)))
             .apply_if(filter.ids, |q, ids| q.filter(Column::Id.is_in(ids)))
             .order_by(Column::CreatedAt, filter.order_direction.into())
@@ -116,7 +116,7 @@ impl WalletRepository for SeaOrmWalletRepository {
 
     async fn find_many_overview(&self) -> Result<Vec<WalletOverview>, DatabaseError> {
         // Get all wallets with their ln_address (1-to-1 relation)
-        let wallets_with_ln = Entity::find()
+        let wallets_with_ln = WalletEntity::find()
             .find_also_related(LnAddress)
             .all(&self.db)
             .await
@@ -277,7 +277,7 @@ impl WalletRepository for SeaOrmWalletRepository {
     }
 
     async fn delete_many(&self, filter: WalletFilter) -> Result<u64, DatabaseError> {
-        let result = Entity::delete_many()
+        let result = WalletEntity::delete_many()
             .apply_if(filter.user_id, |q, user| q.filter(Column::UserId.eq(user)))
             .apply_if(filter.ids, |q, ids| q.filter(Column::Id.is_in(ids)))
             .exec(&self.db)

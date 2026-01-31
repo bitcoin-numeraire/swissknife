@@ -1,4 +1,4 @@
-use crate::domains::{bitcoin::BtcNetwork, event::BtcOutputEvent};
+use crate::domains::event::BtcOutputEvent;
 
 #[derive(Clone, Debug)]
 pub struct BtcTransaction {
@@ -8,14 +8,13 @@ pub struct BtcTransaction {
 }
 
 impl BtcTransaction {
-    pub fn output_event(&self, output: &BtcTransactionOutput, network: BtcNetwork) -> BtcOutputEvent {
+    pub fn output_event(&self, output: &BtcTransactionOutput) -> BtcOutputEvent {
         BtcOutputEvent {
             txid: self.txid.clone(),
             output_index: output.output_index,
             address: output.address.clone(),
             amount_sat: output.amount_sat,
             block_height: self.block_height,
-            network,
         }
     }
 }
