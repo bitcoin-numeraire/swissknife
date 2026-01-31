@@ -7,7 +7,7 @@ pub struct BtcTransaction {
     pub txid: String,
     pub timestamp: Option<DateTime<Utc>>,
     pub fee_sat: Option<u64>,
-    pub block_height: u32,
+    pub block_height: Option<u32>,
     pub outputs: Vec<BtcTransactionOutput>,
 }
 

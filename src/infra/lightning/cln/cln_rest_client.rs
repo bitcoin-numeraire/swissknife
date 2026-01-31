@@ -20,7 +20,7 @@ use crate::{
     },
     domains::{
         bitcoin::{
-            BitcoinWallet, BtcAddressType, BtcNetwork, BtcOutput, BtcOutputStatus, BtcTransaction, BtcTransactionOutput
+            BitcoinWallet, BtcAddressType, BtcNetwork, BtcOutput, BtcOutputStatus, BtcTransaction, BtcTransactionOutput,
         },
         invoice::Invoice,
         payment::{LnPayment, Payment, PaymentStatus},
@@ -28,7 +28,7 @@ use crate::{
     },
     infra::{
         config::config_rs::deserialize_duration,
-        lightning::{LnClient, types::parse_network},
+        lightning::{types::parse_network, LnClient},
     },
 };
 
@@ -398,7 +398,7 @@ impl BitcoinWallet for ClnRestClient {
             txid: transaction.hash,
             timestamp: None,
             fee_sat: None,
-            block_height: transaction.blockheight,
+            block_height: Some(transaction.blockheight),
             outputs,
         })
     }

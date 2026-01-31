@@ -13,10 +13,12 @@ use serde_bolt::bitcoin::hashes::{sha256, Hash};
 use tokio::fs;
 
 use crate::{
-    application::entities::Ledger,
-    application::errors::{BitcoinError, LightningError},
+    application::{
+        entities::Ledger,
+        errors::{BitcoinError, LightningError},
+    },
     domains::{
-        bitcoin::{BitcoinOutput, BtcTransaction, BitcoinWallet, BtcAddressType, BtcNetwork},
+        bitcoin::{BitcoinWallet, BtcAddressType, BtcNetwork, BtcOutput, BtcOutputStatus, BtcTransaction},
         invoice::Invoice,
         payment::{LnPayment, Payment, PaymentStatus},
         system::HealthStatus,
@@ -436,7 +438,7 @@ impl BitcoinWallet for LndRestClient {
         txid: &str,
         output_index: Option<u32>,
         address: Option<&str>,
-    ) -> Result<Option<BitcoinOutput>, BitcoinError> {
+    ) -> Result<Option<BtcOutput>, BitcoinError> {
         let transaction = self.get_transaction(txid).await?;
         let output = transaction.outputs.iter().find(|output| match output_index {
             Some(index) => output.output_index == index,
@@ -445,14 +447,20 @@ impl BitcoinWallet for LndRestClient {
                 .unwrap_or(false),
         });
 
-        Ok(output.map(|output| BitcoinOutput {
+        Ok(output.map(|output| BtcOutput {
             txid: transaction.txid.clone(),
             output_index: output.output_index,
-            address: output.address.clone(),
+            address: output.address.clone().unwrap_or_default(),
             amount_sat: output.amount_sat,
             block_height: transaction.block_height,
-            timestamp: transaction.timestamp,
-            fee_sat: transaction.fee_sat,
+            network: self.network,
+            outpoint: format!("{}:{}", transaction.txid, output.output_index),
+            status: if transaction.block_height.is_some() && transaction.block_height.unwrap() > 0 {
+                BtcOutputStatus::Confirmed
+            } else {
+                BtcOutputStatus::Unconfirmed
+            },
+            ..Default::default()
         }))
     }
 

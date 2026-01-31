@@ -647,12 +647,12 @@ impl PaymentsUseCases for PaymentService {
                     let event = BtcOutputEvent {
                         txid: output.txid,
                         output_index: output.output_index,
-                        address: output.address,
+                        address: Some(output.address),
                         amount_sat: output.amount_sat,
-                        timestamp: output.timestamp.unwrap_or_else(Utc::now),
-                        fee_sat: output.fee_sat,
+                        fee_sat: None,
                         block_height: output.block_height,
                         network: self.bitcoin_wallet.network(),
+                        timestamp: Utc::now(),
                     };
 
                     self.events.onchain_withdrawal(event).await?;

@@ -10,6 +10,6 @@ pub struct BtcOutputEvent {
     pub amount_sat: u64,
     pub timestamp: DateTime<Utc>,
     pub fee_sat: Option<u64>,
-    pub block_height: u32,
+    pub block_height: Option<u32>,
     pub network: BtcNetwork,
 }

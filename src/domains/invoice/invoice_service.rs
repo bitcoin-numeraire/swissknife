@@ -10,8 +10,10 @@ use crate::{
         entities::{AppStore, Ledger},
         errors::{ApplicationError, DataError},
     },
-    domains::bitcoin::BitcoinWallet,
-    domains::event::{BtcOutputEvent, EventUseCases, LnInvoicePaidEvent},
+    domains::{
+        bitcoin::BitcoinWallet,
+        event::{BtcOutputEvent, EventUseCases, LnInvoicePaidEvent},
+    },
     infra::lightning::LnClient,
 };
 
@@ -181,10 +183,12 @@ impl InvoiceUseCases for InvoiceService {
                 }
                 Ledger::Onchain => {
                     let Some(stored_output) = invoice.bitcoin_output.clone() else {
-                        debug!(invoice_id = %invoice.id, "Missing bitcoin output details; skipping sync");
-                        continue;
+                        return Err(DataError::Inconsistency(format!(
+                            "Bitcoin output not found on onchain invoice with id: {}",
+                            invoice.id
+                        ))
+                        .into());
                     };
-                    let fallback_address = stored_output.address.clone();
 
                     let output = self
                         .bitcoin_wallet
@@ -201,12 +205,12 @@ impl InvoiceUseCases for InvoiceService {
                     let event = BtcOutputEvent {
                         txid: output.txid,
                         output_index: output.output_index,
-                        address: output.address.or(Some(fallback_address)),
+                        address: Some(output.address),
                         amount_sat: output.amount_sat,
-                        timestamp: output.timestamp.unwrap_or_else(Utc::now),
-                        fee_sat: output.fee_sat,
                         block_height: output.block_height,
                         network: self.bitcoin_wallet.network(),
+                        timestamp: Utc::now(),
+                        fee_sat: None,
                     };
 
                     self.events.onchain_deposit(event).await?;

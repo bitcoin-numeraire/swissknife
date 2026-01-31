@@ -47,13 +47,14 @@ async fn main() {
 
     let services = Arc::new(AppServices::new(config.clone(), adapters.clone()));
 
-    let event_listener = match EventListener::new(config.clone(), adapters.clone(), services.clone()).await {
-        Ok(listener) => listener,
-        Err(err) => {
-            error!(%err, "failed to build event listener");
-            exit(1);
-        }
-    };
+    let event_listener =
+        match EventListener::new(config.clone(), adapters.bitcoin_wallet.clone(), services.clone()).await {
+            Ok(listener) => listener,
+            Err(err) => {
+                error!(%err, "failed to build event listener");
+                exit(1);
+            }
+        };
 
     // Start the event listener first so we don't miss any events.
     if let Err(err) = event_listener.start().await {

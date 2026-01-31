@@ -96,7 +96,7 @@ impl From<ChainMovement> for BtcOutputEvent {
             amount_sat: val.output_msat / 1000,
             timestamp: Utc.timestamp_opt(val.timestamp, 0).unwrap(),
             fee_sat,
-            block_height: val.blockheight,
+            block_height: Some(val.blockheight),
             network: BtcNetwork::default(),
         }
     }

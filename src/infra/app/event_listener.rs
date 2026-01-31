@@ -1,13 +1,14 @@
 use std::sync::Arc;
 
-use tracing::{debug, info, warn};
+use tracing::{info, warn};
 
 use crate::{
     application::{
         dtos::{AppConfig, LightningProvider},
-        entities::{AppAdapters, AppServices},
+        entities::AppServices,
         errors::{ApplicationError, ConfigError},
     },
+    domains::bitcoin::BitcoinWallet,
     infra::lightning::{
         cln::{ClnGrpcListener, ClnRestListener},
         lnd::LndWebsocketListener,
@@ -16,29 +17,57 @@ use crate::{
 };
 
 pub struct EventListener {
-    ln_listener: Option<Arc<dyn EventsListener>>,
+    listener: Option<Arc<dyn EventsListener>>,
     services: Arc<AppServices>,
-    adapters: AppAdapters,
+    bitcoin_wallet: Arc<dyn BitcoinWallet>,
 }
 
 impl EventListener {
     pub async fn new(
         config: AppConfig,
-        adapters: AppAdapters,
+        bitcoin_wallet: Arc<dyn BitcoinWallet>,
         services: Arc<AppServices>,
     ) -> Result<Self, ApplicationError> {
-        let ln_listener = build_ln_listener(&config).await?;
+        let listener = match config.ln_provider {
+            LightningProvider::Breez => None,
+            LightningProvider::ClnGrpc => {
+                let cln_config = config
+                    .cln_grpc_config
+                    .clone()
+                    .ok_or_else(|| ConfigError::MissingLightningProviderConfig(config.ln_provider.to_string()))?;
+
+                Some(Arc::new(ClnGrpcListener::new(cln_config)) as Arc<dyn EventsListener>)
+            }
+            LightningProvider::ClnRest => {
+                let cln_config = config
+                    .cln_rest_config
+                    .clone()
+                    .ok_or_else(|| ConfigError::MissingLightningProviderConfig(config.ln_provider.to_string()))?;
+
+                Some(Arc::new(ClnRestListener::new(cln_config)) as Arc<dyn EventsListener>)
+            }
+            LightningProvider::Lnd => {
+                let lnd_config = config
+                    .lnd_config
+                    .clone()
+                    .ok_or_else(|| ConfigError::MissingLightningProviderConfig(config.ln_provider.to_string()))?;
+
+                let listener = LndWebsocketListener::new(lnd_config).await?;
+
+                Some(Arc::new(listener) as Arc<dyn EventsListener>)
+            }
+        };
 
         Ok(Self {
-            ln_listener,
+            listener,
             services,
-            adapters,
+            bitcoin_wallet,
         })
     }
 
     pub async fn start(&self) -> Result<(), ApplicationError> {
-        if let Some(listener) = self.ln_listener.clone() {
-            let bitcoin_wallet = self.adapters.bitcoin_wallet.clone();
+        if let Some(listener) = self.listener.clone() {
+            let bitcoin_wallet = self.bitcoin_wallet.clone();
             let events = self.services.event.clone();
 
             tokio::spawn(async move {
@@ -48,51 +77,10 @@ impl EventListener {
             });
         }
 
-        if self.ln_listener.is_some() {
-            let (invoices_synced, payments_synced) =
-                tokio::try_join!(self.services.invoice.sync(), self.services.payment.sync())?;
+        let (invoices_synced, payments_synced) =
+            tokio::try_join!(self.services.invoice.sync(), self.services.payment.sync())?;
 
-            info!(invoices_synced, payments_synced, "Event listeners synced successfully");
-        } else {
-            debug!("Event listener sync skipped for provider without external listener");
-        }
-
+        info!(invoices_synced, payments_synced, "Event listeners synced successfully");
         Ok(())
-    }
-}
-
-async fn build_ln_listener(config: &AppConfig) -> Result<Option<Arc<dyn EventsListener>>, ApplicationError> {
-    match config.ln_provider {
-        LightningProvider::Breez => Ok(None),
-        LightningProvider::ClnGrpc => {
-            let cln_config = config
-                .cln_grpc_config
-                .clone()
-                .ok_or_else(|| ConfigError::MissingLightningProviderConfig(config.ln_provider.to_string()))?;
-
-            Ok(Some(
-                Arc::new(ClnGrpcListener::new(cln_config)) as Arc<dyn EventsListener>
-            ))
-        }
-        LightningProvider::ClnRest => {
-            let cln_config = config
-                .cln_rest_config
-                .clone()
-                .ok_or_else(|| ConfigError::MissingLightningProviderConfig(config.ln_provider.to_string()))?;
-
-            Ok(Some(
-                Arc::new(ClnRestListener::new(cln_config)) as Arc<dyn EventsListener>
-            ))
-        }
-        LightningProvider::Lnd => {
-            let lnd_config = config
-                .lnd_config
-                .clone()
-                .ok_or_else(|| ConfigError::MissingLightningProviderConfig(config.ln_provider.to_string()))?;
-
-            let listener = LndWebsocketListener::new(lnd_config).await?;
-
-            Ok(Some(Arc::new(listener) as Arc<dyn EventsListener>))
-        }
     }
 }

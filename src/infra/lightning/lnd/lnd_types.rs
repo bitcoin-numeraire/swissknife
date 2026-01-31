@@ -235,7 +235,7 @@ impl From<TransactionResponse> for BtcTransaction {
             txid: val.tx_hash,
             timestamp: Some(Utc.timestamp_opt(val.time_stamp, 0).unwrap()),
             fee_sat: Some(val.total_fees),
-            block_height: val.block_height,
+            block_height: Some(val.block_height),
             outputs,
         }
     }

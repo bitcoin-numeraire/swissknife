@@ -21,9 +21,7 @@ use crate::{
         errors::{BitcoinError, LightningError},
     },
     domains::{
-        bitcoin::{
-            BitcoinOutput, BtcTransaction, BtcTransactionOutput, BitcoinWallet, BtcAddressType, BtcNetwork,
-        },
+        bitcoin::{BitcoinWallet, BtcAddressType, BtcNetwork, BtcOutput, BtcTransaction, BtcTransactionOutput},
         invoice::Invoice,
         payment::{LnPayment, Payment, PaymentStatus},
         system::HealthStatus,
@@ -370,7 +368,7 @@ impl BitcoinWallet for ClnGrpcClient {
             txid: hex::encode(transaction.hash),
             timestamp: None,
             fee_sat: None,
-            block_height: transaction.blockheight,
+            block_height: Some(transaction.blockheight),
             outputs,
         })
     }
@@ -380,7 +378,7 @@ impl BitcoinWallet for ClnGrpcClient {
         txid: &str,
         output_index: Option<u32>,
         address: Option<&str>,
-    ) -> Result<Option<BitcoinOutput>, BitcoinError> {
+    ) -> Result<Option<BtcOutput>, BitcoinError> {
         let mut client = self.client.clone();
 
         let response = client
@@ -404,14 +402,22 @@ impl BitcoinWallet for ClnGrpcClient {
             }
         });
 
-        Ok(output.map(|output| BitcoinOutput {
-            txid: hex::encode(output.txid),
-            output_index: output.output,
-            address: output.address,
-            amount_sat: output.amount_msat.map(|a| a.msat).unwrap_or_default() / 1000,
-            block_height: output.blockheight.unwrap_or_default(),
-            timestamp: None,
-            fee_sat: None,
+        Ok(output.map(|output| {
+            let txid_hex = hex::encode(&output.txid);
+            let address_str = output.address.clone().unwrap_or_default();
+            let outpoint = format!("{}:{}", txid_hex, output.output);
+
+            BtcOutput {
+                txid: txid_hex,
+                output_index: output.output,
+                address: address_str,
+                amount_sat: output.amount_msat.map(|a| a.msat).unwrap_or_default() / 1000,
+                block_height: output.blockheight,
+                network: self.network,
+                outpoint,
+                status: output.status().into(),
+                ..Default::default()
+            }
         }))
     }
 

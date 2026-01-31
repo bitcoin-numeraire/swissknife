@@ -1,6 +1,5 @@
 use async_trait::async_trait;
 use tracing::{debug, info, trace, warn};
-use uuid::Uuid;
 
 use crate::{
     application::{
@@ -27,11 +26,10 @@ impl EventService {
         EventService { store }
     }
 
-    fn output_status(block_height: u32) -> BtcOutputStatus {
-        if block_height > 0 {
-            BtcOutputStatus::Confirmed
-        } else {
-            BtcOutputStatus::Unconfirmed
+    fn output_status(block_height: Option<u32>) -> BtcOutputStatus {
+        match block_height {
+            Some(height) if height > 0 => BtcOutputStatus::Confirmed,
+            _ => BtcOutputStatus::Unconfirmed,
         }
     }
 }
@@ -146,8 +144,7 @@ impl EventUseCases for EventService {
             address: address.clone(),
             amount_sat: event.amount_sat,
             status,
-            timestamp: event.timestamp,
-            block_height: Some(event.block_height),
+            block_height: event.block_height,
             network: event.network,
             ..Default::default()
         };
@@ -172,7 +169,7 @@ impl EventUseCases for EventService {
         if let Some(mut invoice) = existing_invoice {
             invoice.status = status;
             if is_confirmed {
-                invoice.payment_time = Some(stored_output.timestamp);
+                invoice.payment_time = Some(event.timestamp);
             }
             invoice.amount_received_msat = Some(stored_output.amount_sat.saturating_mul(1000));
             invoice.btc_output_id = Some(stored_output.id);
@@ -184,19 +181,14 @@ impl EventUseCases for EventService {
                 "Existing onchain deposit processed");
         } else {
             let amount_msat = stored_output.amount_sat.saturating_mul(1000);
-            let payment_time = if is_confirmed {
-                Some(stored_output.timestamp)
-            } else {
-                None
-            };
+            let payment_time = if is_confirmed { Some(event.timestamp) } else { None };
 
             let invoice = Invoice {
-                id: Uuid::new_v4(),
                 wallet_id: btc_address.wallet_id,
                 description: Some(DEFAULT_DEPOSIT_DESCRIPTION.to_string()),
                 amount_msat: Some(amount_msat),
                 amount_received_msat: Some(amount_msat),
-                timestamp: stored_output.timestamp,
+                timestamp: event.timestamp,
                 ledger: Ledger::Onchain,
                 currency: stored_output.network.into(),
                 payment_time,
@@ -226,16 +218,17 @@ impl EventUseCases for EventService {
             return Ok(());
         };
 
-        let is_confirmed = event.block_height > 0;
+        let status = Self::output_status(event.block_height);
+        let is_confirmed = status == BtcOutputStatus::Confirmed;
 
-        let status: PaymentStatus = if is_confirmed {
+        let payment_status: PaymentStatus = if is_confirmed {
             PaymentStatus::Settled
         } else {
             payment.status.clone()
         };
 
         let mut updated_payment = payment;
-        updated_payment.status = status;
+        updated_payment.status = payment_status;
 
         if is_confirmed && updated_payment.payment_time.is_none() {
             updated_payment.payment_time = Some(event.timestamp);
@@ -262,8 +255,7 @@ impl EventUseCases for EventService {
             address: destination_address,
             amount_sat: event.amount_sat,
             status,
-            timestamp: event.timestamp,
-            block_height: Some(event.block_height),
+            block_height: event.block_height,
             network: event.network,
             ..Default::default()
         };

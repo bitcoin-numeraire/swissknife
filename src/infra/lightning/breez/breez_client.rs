@@ -18,7 +18,7 @@ use crate::{
         errors::{BitcoinError, LightningError},
     },
     domains::{
-        bitcoin::{BitcoinOutput, BtcTransaction, BitcoinWallet, BtcAddressType, BtcNetwork},
+        bitcoin::{BitcoinWallet, BtcAddressType, BtcNetwork, BtcOutput, BtcTransaction},
         invoice::Invoice,
         payment::{Payment, PaymentStatus},
         system::HealthStatus,
@@ -379,7 +379,7 @@ impl BitcoinWallet for BreezClient {
         _txid: &str,
         _output_index: Option<u32>,
         _address: Option<&str>,
-    ) -> Result<Option<BitcoinOutput>, BitcoinError> {
+    ) -> Result<Option<BtcOutput>, BitcoinError> {
         Err(BitcoinError::Unsupported(
             "Output lookup is not yet implemented for Breez".to_string(),
         ))
