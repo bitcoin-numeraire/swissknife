@@ -6,8 +6,8 @@ use tracing::{debug, info};
 use async_trait::async_trait;
 use bip39::Mnemonic;
 use breez_sdk_core::{
-    BreezServices, CheckMessageRequest, ConnectRequest, EnvironmentType, EventListener, GreenlightCredentials,
-    GreenlightNodeConfig, LspInformation, NodeConfig, NodeState, PayOnchainRequest, PrepareOnchainPaymentRequest,
+    BreezServices, CheckMessageRequest, ConnectRequest, EnvironmentType, GreenlightCredentials, GreenlightNodeConfig,
+    LspInformation, NodeConfig, NodeState, PayOnchainRequest, PrepareOnchainPaymentRequest,
     PrepareRedeemOnchainFundsRequest, ReceivePaymentRequest, RedeemOnchainFundsRequest, ReverseSwapInfo,
     SendPaymentRequest, SignMessageRequest, StaticBackupRequest, SwapAmountType,
 };
@@ -23,7 +23,7 @@ use crate::{
         payment::{Payment, PaymentStatus},
         system::HealthStatus,
     },
-    infra::lightning::LnClient,
+    infra::lightning::{breez::BreezListener, LnClient},
 };
 
 #[derive(Clone, Debug, Deserialize)]
@@ -46,7 +46,7 @@ pub struct BreezClient {
 }
 
 impl BreezClient {
-    pub async fn new(config: BreezClientConfig, listener: Box<dyn EventListener>) -> Result<Self, LightningError> {
+    pub async fn new(config: BreezClientConfig, listener: BreezListener) -> Result<Self, LightningError> {
         if config.log_in_file {
             BreezServices::init_logging(&config.working_dir, None)
                 .map_err(|e| LightningError::Logging(e.to_string()))?;
@@ -78,7 +78,7 @@ impl BreezClient {
                 seed: seed.to_seed("").to_vec(),
                 restore_only: Some(config.restore_only),
             },
-            listener,
+            Box::new(listener),
         )
         .await
         .map_err(|e| LightningError::Connect(e.to_string()))?;

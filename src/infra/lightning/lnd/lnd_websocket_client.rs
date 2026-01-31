@@ -1,4 +1,5 @@
 use std::str::FromStr;
+use std::sync::Arc;
 use std::{cmp::min, path::PathBuf};
 
 use futures_util::StreamExt;
@@ -13,7 +14,7 @@ use tracing::{debug, error, warn};
 
 use crate::application::errors::LightningError;
 use crate::domains::bitcoin::{BitcoinTransaction, BtcNetwork};
-use crate::domains::event::EventService;
+use crate::domains::event::EventUseCases;
 use crate::infra::lightning::lnd::lnd_types::{InvoiceResponse, TransactionResponse};
 
 use super::LndRestClientConfig;
@@ -21,7 +22,7 @@ use super::LndRestClientConfig;
 pub async fn listen_invoices(
     config: LndRestClientConfig,
     macaroon: String,
-    events: EventService,
+    events: Arc<dyn EventUseCases>,
 ) -> Result<(), LightningError> {
     let max_reconnect_delay = config.ws_max_reconnect_delay;
     let mut reconnect_delay = config.ws_min_reconnect_delay;
@@ -50,7 +51,7 @@ pub async fn listen_invoices(
 pub async fn listen_transactions(
     config: LndRestClientConfig,
     macaroon: String,
-    events: EventService,
+    events: Arc<dyn EventUseCases>,
     network: BtcNetwork,
 ) -> Result<(), LightningError> {
     let max_reconnect_delay = config.ws_max_reconnect_delay;
@@ -80,7 +81,7 @@ pub async fn listen_transactions(
 async fn connect_and_handle(
     macaroon: &str,
     config: &LndRestClientConfig,
-    events: EventService,
+    events: Arc<dyn EventUseCases>,
 ) -> Result<(), LightningError> {
     let invoices_endpoint = format!("wss://{}/v1/invoices/subscribe", config.host);
     let uri = Uri::from_str(&invoices_endpoint).map_err(|e| LightningError::ParseConfig(e.to_string()))?;
@@ -104,7 +105,7 @@ async fn connect_and_handle(
 async fn connect_and_handle_transactions(
     macaroon: &str,
     config: &LndRestClientConfig,
-    events: EventService,
+    events: Arc<dyn EventUseCases>,
     network: BtcNetwork,
 ) -> Result<(), LightningError> {
     let endpoint = format!("wss://{}/v1/transactions/subscribe", config.host);
@@ -156,7 +157,7 @@ async fn read_ca(path: &str) -> anyhow::Result<Certificate> {
     Ok(ca_certificate)
 }
 
-async fn handle_messages(mut ws_stream: WebSocketStream<MaybeTlsStream<TcpStream>>, events: EventService) {
+async fn handle_messages(mut ws_stream: WebSocketStream<MaybeTlsStream<TcpStream>>, events: Arc<dyn EventUseCases>) {
     while let Some(message) = ws_stream.next().await {
         match message {
             Ok(msg) => {
@@ -180,7 +181,7 @@ async fn handle_messages(mut ws_stream: WebSocketStream<MaybeTlsStream<TcpStream
 
 async fn handle_transaction_messages(
     mut ws_stream: WebSocketStream<MaybeTlsStream<TcpStream>>,
-    events: EventService,
+    events: Arc<dyn EventUseCases>,
     network: BtcNetwork,
 ) {
     while let Some(message) = ws_stream.next().await {
@@ -204,7 +205,7 @@ async fn handle_transaction_messages(
     }
 }
 
-async fn process_message(text: &str, events: EventService) -> anyhow::Result<()> {
+async fn process_message(text: &str, events: Arc<dyn EventUseCases>) -> anyhow::Result<()> {
     let value: Value = serde_json::from_str(text)?;
 
     if let Some(event) = value.get("result") {
@@ -225,7 +226,11 @@ async fn process_message(text: &str, events: EventService) -> anyhow::Result<()>
     Ok(())
 }
 
-async fn process_transaction_message(text: &str, events: EventService, network: BtcNetwork) -> anyhow::Result<()> {
+async fn process_transaction_message(
+    text: &str,
+    events: Arc<dyn EventUseCases>,
+    network: BtcNetwork,
+) -> anyhow::Result<()> {
     let value: Value = serde_json::from_str(text)?;
 
     if let Some(event) = value.get("result") {

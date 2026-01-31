@@ -32,15 +32,6 @@ impl BtcOutputRepository for SeaOrmBitcoinOutputRepository {
         Ok(model.map(Into::into))
     }
 
-    async fn find(&self, id: Uuid) -> Result<Option<BtcOutput>, DatabaseError> {
-        let model = Entity::find_by_id(id)
-            .one(&self.db)
-            .await
-            .map_err(|e| DatabaseError::FindOne(e.to_string()))?;
-
-        Ok(model.map(Into::into))
-    }
-
     async fn upsert(&self, output: BtcOutput) -> Result<BtcOutput, DatabaseError> {
         if let Some(existing) = self.find_by_outpoint(&output.outpoint).await? {
             let active_model = ActiveModel {
@@ -66,7 +57,7 @@ impl BtcOutputRepository for SeaOrmBitcoinOutputRepository {
         }
 
         let model = ActiveModel {
-            id: Set(output.id),
+            id: Set(Uuid::new_v4()),
             outpoint: Set(output.outpoint.clone()),
             txid: Set(output.txid.clone()),
             output_index: Set(output.output_index as i32),

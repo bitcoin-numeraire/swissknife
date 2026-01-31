@@ -1,3 +1,4 @@
+use async_trait::async_trait;
 use tracing::{debug, info, trace, warn};
 use uuid::Uuid;
 
@@ -8,7 +9,7 @@ use crate::{
     },
     domains::{
         bitcoin::{BtcOutput, BtcOutputStatus},
-        event::{BtcOutputEvent, LnInvoicePaidEvent, LnPayFailureEvent, LnPaySuccessEvent},
+        event::{BtcOutputEvent, EventUseCases, LnInvoicePaidEvent, LnPayFailureEvent, LnPaySuccessEvent},
         invoice::{Invoice, InvoiceFilter, InvoiceOrderBy, InvoiceStatus},
         payment::PaymentStatus,
     },
@@ -33,8 +34,11 @@ impl EventService {
             BtcOutputStatus::Unconfirmed
         }
     }
+}
 
-    pub async fn latest_settled_invoice(&self) -> Result<Option<Invoice>, ApplicationError> {
+#[async_trait]
+impl EventUseCases for EventService {
+    async fn latest_settled_invoice(&self) -> Result<Option<Invoice>, ApplicationError> {
         trace!("Fetching latest settled invoice...");
 
         let invoices = self
@@ -52,7 +56,7 @@ impl EventService {
         Ok(invoices.into_iter().next())
     }
 
-    pub async fn invoice_paid(&self, event: LnInvoicePaidEvent) -> Result<(), ApplicationError> {
+    async fn invoice_paid(&self, event: LnInvoicePaidEvent) -> Result<(), ApplicationError> {
         debug!(?event, "Processing incoming Lightning payment...");
 
         let invoice_option = self.store.invoice.find_by_payment_hash(&event.payment_hash).await?;
@@ -71,7 +75,7 @@ impl EventService {
         return Err(DataError::NotFound("Lightning invoice not found.".into()).into());
     }
 
-    pub async fn outgoing_payment(&self, event: LnPaySuccessEvent) -> Result<(), ApplicationError> {
+    async fn outgoing_payment(&self, event: LnPaySuccessEvent) -> Result<(), ApplicationError> {
         debug!(?event, "Processing outgoing Lightning payment...");
 
         let payment_option = self.store.payment.find_by_payment_hash(&event.payment_hash).await?;
@@ -100,7 +104,7 @@ impl EventService {
         return Err(DataError::NotFound("Lightning payment not found.".into()).into());
     }
 
-    pub async fn failed_payment(&self, event: LnPayFailureEvent) -> Result<(), ApplicationError> {
+    async fn failed_payment(&self, event: LnPayFailureEvent) -> Result<(), ApplicationError> {
         debug!(?event, "Processing failed outgoing Lightning payment");
 
         let payment_option = self.store.payment.find_by_payment_hash(&event.payment_hash).await?;
@@ -125,7 +129,7 @@ impl EventService {
         return Err(DataError::NotFound("Lightning payment not found.".into()).into());
     }
 
-    pub async fn onchain_deposit(&self, event: BtcOutputEvent) -> Result<(), ApplicationError> {
+    async fn onchain_deposit(&self, event: BtcOutputEvent) -> Result<(), ApplicationError> {
         let outpoint = format!("{}:{}", event.txid, event.output_index);
         trace!(%outpoint, "Processing onchain deposit event");
 
@@ -136,7 +140,6 @@ impl EventService {
 
         let status = Self::output_status(event.block_height);
         let output = BtcOutput {
-            id: Uuid::new_v4(),
             outpoint: outpoint.clone(),
             txid: event.txid.clone(),
             output_index: event.output_index,
@@ -211,7 +214,7 @@ impl EventService {
         Ok(())
     }
 
-    pub async fn onchain_withdrawal(&self, event: BtcOutputEvent) -> Result<(), ApplicationError> {
+    async fn onchain_withdrawal(&self, event: BtcOutputEvent) -> Result<(), ApplicationError> {
         let outpoint = format!("{}:{}", event.txid, event.output_index);
         trace!(outpoint = outpoint.clone(), "Processing onchain withdrawal event");
 
@@ -253,7 +256,6 @@ impl EventService {
         };
 
         let btc_output = BtcOutput {
-            id: Uuid::new_v4(),
             outpoint: outpoint.clone(),
             txid: event.txid.clone(),
             output_index: event.output_index,

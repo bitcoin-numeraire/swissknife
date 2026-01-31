@@ -1,8 +1,10 @@
+use std::sync::Arc;
+
 use crate::{
     application::{dtos::AppConfig, entities::AppAdapters},
     domains::{
         bitcoin::{BitcoinService, BitcoinUseCases},
-        event::EventService,
+        event::{EventService, EventUseCases},
         invoice::{InvoiceService, InvoiceUseCases},
         ln_address::{LnAddressService, LnAddressUseCases},
         lnurl::{LnUrlService, LnUrlUseCases},
@@ -25,7 +27,7 @@ pub struct AppServices {
     pub nostr: Box<dyn NostrUseCases>,
     pub api_key: Box<dyn ApiKeyUseCases>,
     pub bitcoin: Box<dyn BitcoinUseCases>,
-    pub event: EventService,
+    pub event: Arc<dyn EventUseCases>,
 }
 
 impl AppServices {
@@ -48,7 +50,7 @@ impl AppServices {
             ..
         } = adapters;
 
-        let event = EventService::new(store.clone());
+        let event = Arc::new(EventService::new(store.clone()));
         let payments = PaymentService::new(
             store.clone(),
             ln_client.clone(),
@@ -78,6 +80,7 @@ impl AppServices {
         let nostr = NostrService::new(store.clone());
         let api_key = ApiKeyService::new(store.clone());
         let bitcoin = BitcoinService::new(store.clone(), bitcoin_wallet, bitcoin_address_type);
+
         AppServices {
             invoice: Box::new(invoices),
             payment: Box::new(payments),

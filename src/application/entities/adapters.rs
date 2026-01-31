@@ -103,7 +103,7 @@ async fn get_ln_client(config: AppConfig, store: AppStore) -> Result<LightningAd
 
             let events = EventService::new(store);
             let ln_listener = BreezListener::new(events);
-            let ln_client = Arc::new(BreezClient::new(breez_config.clone(), Box::new(ln_listener)).await?);
+            let ln_client = Arc::new(BreezClient::new(breez_config.clone(), ln_listener).await?);
             let bitcoin_wallet = ln_client.clone();
 
             Ok(LightningAdapter {

@@ -400,7 +400,7 @@ impl BitcoinWallet for ClnRestClient {
         address: Option<&str>,
     ) -> Result<Option<BitcoinOutput>, BitcoinError> {
         let response = self
-            .list_funds(None)
+            .list_funds(Some(true))
             .await
             .map_err(|e| BitcoinError::Transaction(e.to_string()))?;
 

@@ -15,7 +15,7 @@ use crate::{
     },
     domains::{
         bitcoin::BitcoinWallet,
-        event::{BtcOutputEvent, EventService, LnPayFailureEvent, LnPaySuccessEvent},
+        event::{BtcOutputEvent, EventUseCases, LnPayFailureEvent, LnPaySuccessEvent},
         invoice::{Invoice, InvoiceStatus},
         lnurl::{process_success_action, validate_lnurl_pay},
     },
@@ -33,7 +33,7 @@ pub struct PaymentService {
     ln_client: Arc<dyn LnClient>,
     bitcoin_wallet: Arc<dyn BitcoinWallet>,
     fee_buffer: f64,
-    events: EventService,
+    events: Arc<dyn EventUseCases>,
 }
 
 impl PaymentService {
@@ -43,7 +43,7 @@ impl PaymentService {
         bitcoin_wallet: Arc<dyn BitcoinWallet>,
         domain: String,
         fee_buffer: f64,
-        events: EventService,
+        events: Arc<dyn EventUseCases>,
     ) -> Self {
         PaymentService {
             store,

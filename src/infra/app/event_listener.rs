@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
 
 use crate::{
     application::{
@@ -50,11 +50,11 @@ impl EventListener {
 
         if self.ln_listener.is_some() {
             let (invoices_synced, payments_synced) =
-                tokio::try_join!(self.services.invoice.sync(), self.services.payment.sync(),)?;
+                tokio::try_join!(self.services.invoice.sync(), self.services.payment.sync())?;
 
             info!(invoices_synced, payments_synced, "Event listeners synced successfully");
         } else {
-            info!("Event listener sync skipped for provider without external listener");
+            debug!("Event listener sync skipped for provider without external listener");
         }
 
         Ok(())
@@ -69,22 +69,30 @@ async fn build_ln_listener(config: &AppConfig) -> Result<Option<Arc<dyn EventsLi
                 .cln_grpc_config
                 .clone()
                 .ok_or_else(|| ConfigError::MissingLightningProviderConfig(config.ln_provider.to_string()))?;
-            Ok(Some(Arc::new(ClnGrpcListener::new(cln_config))))
+
+            Ok(Some(
+                Arc::new(ClnGrpcListener::new(cln_config)) as Arc<dyn EventsListener>
+            ))
         }
         LightningProvider::ClnRest => {
             let cln_config = config
                 .cln_rest_config
                 .clone()
                 .ok_or_else(|| ConfigError::MissingLightningProviderConfig(config.ln_provider.to_string()))?;
-            Ok(Some(Arc::new(ClnRestListener::new(cln_config))))
+
+            Ok(Some(
+                Arc::new(ClnRestListener::new(cln_config)) as Arc<dyn EventsListener>
+            ))
         }
         LightningProvider::Lnd => {
             let lnd_config = config
                 .lnd_config
                 .clone()
                 .ok_or_else(|| ConfigError::MissingLightningProviderConfig(config.ln_provider.to_string()))?;
+
             let listener = LndWebsocketListener::new(lnd_config).await?;
-            Ok(Some(Arc::new(listener)))
+
+            Ok(Some(Arc::new(listener) as Arc<dyn EventsListener>))
         }
     }
 }

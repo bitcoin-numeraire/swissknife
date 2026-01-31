@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{sync::Arc, time::Duration};
 
 use anyhow::{anyhow, Result};
 use hex::decode;
@@ -9,7 +9,7 @@ use tracing::{error, info, trace, warn};
 
 use crate::{
     application::errors::ApplicationError,
-    domains::event::EventService,
+    domains::event::EventUseCases,
     infra::lightning::cln::cln::{waitanyinvoice_response::WaitanyinvoiceStatus, ListinvoicesRequest},
 };
 
@@ -17,7 +17,7 @@ use super::cln::{node_client::NodeClient, WaitanyinvoiceRequest};
 
 pub async fn listen_invoices(
     mut client: NodeClient<Channel>,
-    events: EventService,
+    events: Arc<dyn EventUseCases>,
     retry_delay: Duration,
 ) -> Result<()> {
     // Temporary. get the latest settled invoice payment_hash as starting point for event listening

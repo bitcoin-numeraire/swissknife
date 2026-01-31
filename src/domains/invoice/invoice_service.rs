@@ -3,16 +3,15 @@ use chrono::Utc;
 use tracing::{debug, info, trace};
 use uuid::Uuid;
 
-use crate::application::{
-    entities::{AppStore, Ledger},
-    errors::{ApplicationError, DataError},
-};
-
 use std::sync::Arc;
 
 use crate::{
+    application::{
+        entities::{AppStore, Ledger},
+        errors::{ApplicationError, DataError},
+    },
     domains::bitcoin::BitcoinWallet,
-    domains::event::{BtcOutputEvent, EventService, LnInvoicePaidEvent},
+    domains::event::{BtcOutputEvent, EventUseCases, LnInvoicePaidEvent},
     infra::lightning::LnClient,
 };
 
@@ -25,7 +24,7 @@ pub struct InvoiceService {
     ln_client: Arc<dyn LnClient>,
     bitcoin_wallet: Arc<dyn BitcoinWallet>,
     invoice_expiry: u32,
-    events: EventService,
+    events: Arc<dyn EventUseCases>,
 }
 
 impl InvoiceService {
@@ -34,7 +33,7 @@ impl InvoiceService {
         ln_client: Arc<dyn LnClient>,
         bitcoin_wallet: Arc<dyn BitcoinWallet>,
         invoice_expiry: u32,
-        events: EventService,
+        events: Arc<dyn EventUseCases>,
     ) -> Self {
         InvoiceService {
             store,
@@ -138,9 +137,23 @@ impl InvoiceUseCases for InvoiceService {
             })
             .await?;
 
+        // We have to also check the expired invoices because they can become expired while the app is down and the payment received
+        // Ideally the expired invoices should be cleaned, not to have too many to sync on startup
+        let expired_invoices = self
+            .store
+            .invoice
+            .find_many(InvoiceFilter {
+                status: Some(InvoiceStatus::Expired),
+                ledger: Some(Ledger::Lightning),
+                ..Default::default()
+            })
+            .await?;
+
+        let invoices = pending_invoices.into_iter().chain(expired_invoices.into_iter());
+
         let mut synced = 0;
 
-        for invoice in pending_invoices {
+        for invoice in invoices {
             match invoice.ledger {
                 Ledger::Lightning => {
                     let Some(ln_invoice) = invoice.ln_invoice.as_ref() else {
