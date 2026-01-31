@@ -34,7 +34,9 @@ impl EventListener {
                     .clone()
                     .ok_or_else(|| ConfigError::MissingLightningProviderConfig(config.ln_provider.to_string()))?;
 
-                Some(Arc::new(ClnGrpcListener::new(cln_config)) as Arc<dyn EventsListener>)
+                let listener = ClnGrpcListener::new(cln_config, services.event.clone(), bitcoin_wallet.clone());
+
+                Some(Arc::new(listener) as Arc<dyn EventsListener>)
             }
             LightningProvider::ClnRest => {
                 let cln_config = config
@@ -53,7 +55,8 @@ impl EventListener {
                     .clone()
                     .ok_or_else(|| ConfigError::MissingLightningProviderConfig(config.ln_provider.to_string()))?;
 
-                let listener = LndWebsocketListener::new(lnd_config).await?;
+                let listener =
+                    LndWebsocketListener::new(lnd_config, services.event.clone(), bitcoin_wallet.clone()).await?;
 
                 Some(Arc::new(listener) as Arc<dyn EventsListener>)
             }

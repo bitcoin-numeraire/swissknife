@@ -54,9 +54,6 @@ pub enum LightningError {
     #[error("Failed to close LSP channels: {0}")]
     CloseLSPChannels(String),
 
-    #[error("Failed to pay on-chain: {0}")]
-    PayOnChain(String),
-
     #[error("Failed to redeem on-chain: {0}")]
     RedeemOnChain(String),
 

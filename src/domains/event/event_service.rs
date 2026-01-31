@@ -13,7 +13,7 @@ use crate::{
             BtcOutputEvent, BtcWithdrawalConfirmedEvent, EventUseCases, LnInvoicePaidEvent, LnPayFailureEvent,
             LnPaySuccessEvent,
         },
-        invoice::{Invoice, InvoiceFilter, InvoiceOrderBy, InvoiceStatus},
+        invoice::{Invoice, InvoiceStatus},
         payment::PaymentStatus,
     },
 };
@@ -40,24 +40,6 @@ impl EventService {
 
 #[async_trait]
 impl EventUseCases for EventService {
-    async fn latest_settled_invoice(&self) -> Result<Option<Invoice>, ApplicationError> {
-        trace!("Fetching latest settled invoice...");
-
-        let invoices = self
-            .store
-            .invoice
-            .find_many(InvoiceFilter {
-                status: Some(InvoiceStatus::Settled),
-                ledger: Some(Ledger::Lightning),
-                limit: Some(1),
-                order_by: InvoiceOrderBy::PaymentTime,
-                ..Default::default()
-            })
-            .await?;
-
-        Ok(invoices.into_iter().next())
-    }
-
     async fn invoice_paid(&self, event: LnInvoicePaidEvent) -> Result<(), ApplicationError> {
         debug!(?event, "Processing incoming Lightning payment...");
 
@@ -274,7 +256,7 @@ impl EventUseCases for EventService {
 
     async fn onchain_withdrawal_confirmed(&self, event: BtcWithdrawalConfirmedEvent) -> Result<(), ApplicationError> {
         if event.block_height == 0 {
-            trace!(txid = %event.txid, "Ignoring withdrawal confirmation with zero block height");
+            debug!(txid = %event.txid, "Ignoring withdrawal confirmation with zero block height");
             return Ok(());
         }
 
@@ -285,7 +267,7 @@ impl EventUseCases for EventService {
         );
 
         let Some(mut payment) = self.store.payment.find_by_payment_hash(&event.txid).await? else {
-            trace!(txid = %event.txid, "Ignoring withdrawal confirmation for unknown payment");
+            debug!(txid = %event.txid, "Ignoring withdrawal confirmation for unknown payment");
             return Ok(());
         };
 
