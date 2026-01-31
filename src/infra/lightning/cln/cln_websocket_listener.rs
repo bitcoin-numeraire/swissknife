@@ -13,11 +13,14 @@ use rust_socketio::{
     Payload, TransportType,
 };
 use tokio::fs;
-use tracing::{debug, error, trace, warn};
+use tracing::{error, info, trace, warn};
 
 use crate::{
     application::errors::LightningError,
-    domains::{bitcoin::BitcoinWallet, event::EventUseCases},
+    domains::{
+        bitcoin::BitcoinWallet,
+        event::{BtcOutputEvent, EventUseCases},
+    },
     infra::lightning::EventsListener,
 };
 
@@ -158,34 +161,48 @@ impl ClnWebsocketListener {
                                 continue;
                             }
 
+                            println!("Processing chain mvt event: {:?}", event.clone());
+
                             match serde_json::from_value::<ChainMovement>(event.clone()) {
                                 Ok(chain_mvt) => {
-                                    println!("Received chain movement: {:?}", chain_mvt);
+                                    let tag = chain_mvt.primary_tag.clone();
 
-                                    let outpoint =
-                                        OutPoint::from_str(&chain_mvt.utxo).expect("invalid outpoint format");
-
-                                    let output = match wallet
-                                        .get_output(&outpoint.txid.to_string(), Some(outpoint.vout), None)
-                                        .await
-                                    {
-                                        Ok(Some(out)) => out,
-                                        Ok(None) => {
-                                            trace!(outpoint = ?outpoint, "Output not found in wallet, skipping");
-                                            continue;
-                                        }
-                                        Err(err) => {
-                                            warn!(%err, "Failed to get output from wallet");
-                                            continue;
-                                        }
-                                    };
-
-                                    let output_event = output.into();
-
-                                    let tag = chain_mvt.primary_tag;
                                     let result = match tag.as_str() {
-                                        "deposit" => events.onchain_deposit(output_event).await,
-                                        "withdrawal" => events.onchain_withdrawal(output_event).await,
+                                        "deposit" => {
+                                            let outpoint =
+                                                OutPoint::from_str(&chain_mvt.utxo).expect("invalid outpoint format");
+
+                                            let output = match wallet
+                                                .get_output(
+                                                    &outpoint.txid.to_string(),
+                                                    Some(outpoint.vout),
+                                                    None,
+                                                    false,
+                                                )
+                                                .await
+                                            {
+                                                Ok(Some(out)) => out,
+                                                Ok(None) => {
+                                                    trace!(%outpoint, "Output not found in wallet, skipping");
+                                                    continue;
+                                                }
+                                                Err(err) => {
+                                                    error!(%err, "Failed to get output from wallet");
+                                                    continue;
+                                                }
+                                            };
+
+                                            let output_event = output.into();
+                                            events.onchain_deposit(output_event).await
+                                        }
+                                        "withdrawal" => {
+                                            let output_event = chain_mvt.into();
+                                            let output_event = BtcOutputEvent {
+                                                network: wallet.network(),
+                                                ..output_event
+                                            };
+                                            events.onchain_withdrawal(output_event).await
+                                        }
                                         _ => {
                                             trace!(tag, "Unsupported coin_movement tag");
                                             Ok(())
@@ -242,14 +259,14 @@ async fn read_ca(path: &str) -> anyhow::Result<Certificate> {
 
 fn on_open(_: Payload, _: Client) -> BoxFuture<'static, ()> {
     async move {
-        debug!("Connected to Core Lightning websocket server");
+        info!("Connected to Core Lightning websocket server");
     }
     .boxed()
 }
 
 fn on_close(_: Payload, _: Client) -> BoxFuture<'static, ()> {
     async move {
-        debug!("Disconnected from Core Lightning websocket server");
+        info!("Disconnected from Core Lightning websocket server");
     }
     .boxed()
 }

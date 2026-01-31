@@ -12,6 +12,9 @@ pub enum BitcoinError {
     #[error("Failed to send bitcoin transaction: {0}")]
     Transaction(String),
 
+    #[error("Failed to get bitcoin output: {0}")]
+    GetOutput(String),
+
     #[error("Unsupported bitcoin operation: {0}")]
     Unsupported(String),
 }

@@ -28,15 +28,15 @@ use crate::{
     },
     infra::{
         config::config_rs::deserialize_duration,
-        lightning::{types::parse_network, LnClient},
+        lightning::{cln::ListFundsResponse, types::parse_network, LnClient},
     },
 };
 
 use super::{
     ErrorResponse, GetinfoRequest, GetinfoResponse, InvoiceRequest, InvoiceResponse, ListFundsRequest,
-    ListFundsResponse, ListInvoicesRequest, ListInvoicesResponse, ListPaysRequest, ListPaysResponse,
-    ListTransactionsRequest, ListTransactionsResponse, NewAddrRequest, NewAddrResponse, PayRequest, PayResponse,
-    WithdrawRequest, WithdrawResponse,
+    ListInvoicesRequest, ListInvoicesResponse, ListPaysRequest, ListPaysResponse, ListTransactionsRequest,
+    ListTransactionsResponse, NewAddrRequest, NewAddrResponse, PayRequest, PayResponse, WithdrawRequest,
+    WithdrawResponse,
 };
 
 #[derive(Clone, Debug, Deserialize)]
@@ -154,17 +154,12 @@ impl ClnRestClient {
         Ok(parse_network(&response.network))
     }
 
-    fn parse_amount_msat(value: &str) -> anyhow::Result<u64> {
-        let cleaned = value.trim_end_matches("msat");
-        Ok(cleaned.parse::<u64>()?)
-    }
-
-    fn map_status(status: Option<&str>) -> BtcOutputStatus {
+    fn map_status(status: &str) -> BtcOutputStatus {
         match status {
-            Some("unconfirmed") => BtcOutputStatus::Unconfirmed,
-            Some("confirmed") => BtcOutputStatus::Confirmed,
-            Some("spent") => BtcOutputStatus::Spent,
-            Some("immature") => BtcOutputStatus::Immature,
+            "unconfirmed" => BtcOutputStatus::Unconfirmed,
+            "confirmed" => BtcOutputStatus::Confirmed,
+            "spent" => BtcOutputStatus::Spent,
+            "immature" => BtcOutputStatus::Immature,
             _ => BtcOutputStatus::default(),
         }
     }
@@ -178,12 +173,6 @@ impl ClnRestClient {
         )
         .await
         .map_err(|e| LightningError::Sync(e.to_string()))
-    }
-
-    pub async fn list_funds(&self, spent: Option<bool>) -> Result<ListFundsResponse, LightningError> {
-        self.post_request("listfunds", &ListFundsRequest { spent })
-            .await
-            .map_err(|e| LightningError::Sync(e.to_string()))
     }
 }
 
@@ -387,7 +376,7 @@ impl BitcoinWallet for ClnRestClient {
             .map(|output| BtcTransactionOutput {
                 output_index: output.index,
                 address: None,
-                amount_sat: Self::parse_amount_msat(&output.amount_msat).unwrap_or_default() / 1000,
+                amount_sat: output.amount_msat / 1000,
                 is_ours: false,
             })
             .collect();
@@ -404,11 +393,17 @@ impl BitcoinWallet for ClnRestClient {
         txid: &str,
         output_index: Option<u32>,
         address: Option<&str>,
+        include_spent: bool,
     ) -> Result<Option<BtcOutput>, BitcoinError> {
-        let response = self
-            .list_funds(Some(true))
+        let response: ListFundsResponse = self
+            .post_request(
+                "listfunds",
+                &ListFundsRequest {
+                    spent: Some(include_spent),
+                },
+            )
             .await
-            .map_err(|e| BitcoinError::Transaction(e.to_string()))?;
+            .map_err(|e| BitcoinError::GetOutput(e.to_string()))?;
 
         let output = response.outputs.into_iter().find(|output| {
             if output.txid != txid {
@@ -428,11 +423,11 @@ impl BitcoinWallet for ClnRestClient {
             txid: output.txid.clone(),
             output_index: output.output,
             address: output.address.unwrap_or_default(),
-            amount_sat: Self::parse_amount_msat(&output.amount_msat).unwrap_or_default() / 1000,
+            amount_sat: output.amount_msat / 1000,
             block_height: output.blockheight,
             network: self.network,
             outpoint: format!("{}:{}", output.txid, output.output),
-            status: Self::map_status(output.status.as_deref()),
+            status: Self::map_status(&output.status),
             ..Default::default()
         }))
     }

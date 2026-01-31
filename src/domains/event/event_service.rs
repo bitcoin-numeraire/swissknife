@@ -15,7 +15,7 @@ use crate::{
     },
 };
 
-const DEFAULT_DEPOSIT_DESCRIPTION: &str = "Bitcoin onchain deposit";
+const DEFAULT_DEPOSIT_DESCRIPTION: &str = "Bitcoin On-chain deposit";
 
 #[derive(Clone)]
 pub struct EventService {
@@ -198,9 +198,9 @@ impl EventUseCases for EventService {
                 ..Default::default()
             };
 
-            self.store.invoice.insert(invoice.clone()).await?;
+            let stored_invoice = self.store.invoice.insert(invoice.clone()).await?;
 
-            info!(invoice_id = %invoice.id, outpoint = %outpoint.clone(), address = %btc_address.address,
+            info!(invoice_id = %stored_invoice.id, outpoint = %outpoint.clone(), address = %btc_address.address,
                 "New onchain deposit processed");
         }
 

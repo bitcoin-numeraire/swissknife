@@ -638,7 +638,7 @@ impl PaymentsUseCases for PaymentService {
                     let output_index = bitcoin.output.as_ref().map(|output| output.output_index);
                     let output = self
                         .bitcoin_wallet
-                        .get_output(&txid, output_index, bitcoin.destination_address.as_deref())
+                        .get_output(&txid, output_index, bitcoin.destination_address.as_deref(), true)
                         .await?;
                     let Some(output) = output else {
                         continue;

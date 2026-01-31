@@ -438,6 +438,7 @@ impl BitcoinWallet for LndRestClient {
         txid: &str,
         output_index: Option<u32>,
         address: Option<&str>,
+        _include_spent: bool,
     ) -> Result<Option<BtcOutput>, BitcoinError> {
         let transaction = self.get_transaction(txid).await?;
         let output = transaction.outputs.iter().find(|output| match output_index {

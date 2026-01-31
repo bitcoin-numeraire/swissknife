@@ -15,6 +15,7 @@ pub trait BitcoinWallet: Sync + Send {
         txid: &str,
         output_index: Option<u32>,
         address: Option<&str>,
+        include_spent: bool,
     ) -> Result<Option<BtcOutput>, BitcoinError>;
     fn network(&self) -> BtcNetwork;
 }

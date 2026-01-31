@@ -196,6 +196,7 @@ impl InvoiceUseCases for InvoiceService {
                             &stored_output.txid,
                             Some(stored_output.output_index),
                             Some(&stored_output.address),
+                            true,
                         )
                         .await?;
                     let Some(output) = output else {

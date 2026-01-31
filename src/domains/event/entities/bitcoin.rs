@@ -1,6 +1,6 @@
 use crate::domains::bitcoin::{BtcNetwork, BtcOutput};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct BtcOutputEvent {
     pub txid: String,
     pub output_index: u32,

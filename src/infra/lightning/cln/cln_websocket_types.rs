@@ -1,9 +1,12 @@
+use std::str::FromStr;
+
+use bitcoin::OutPoint;
 use chrono::{TimeZone, Utc};
 use serde::Deserialize;
 use serde_bolt::bitcoin::hashes::hex::ToHex;
 use serde_bolt::bitcoin::hashes::{sha256, Hash};
 
-use crate::domains::event::{LnInvoicePaidEvent, LnPayFailureEvent, LnPaySuccessEvent};
+use crate::domains::event::{BtcOutputEvent, LnInvoicePaidEvent, LnPayFailureEvent, LnPaySuccessEvent};
 
 #[derive(Debug, Deserialize)]
 pub struct InvoicePayment {
@@ -35,8 +38,11 @@ pub struct SendPayFailureData {
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct ChainMovement {
+    pub account_id: String,
     pub primary_tag: String,
     pub utxo: String,
+    pub output_msat: u64,
+    pub blockheight: u32,
 }
 
 impl From<InvoicePayment> for LnInvoicePaidEvent {
@@ -69,6 +75,21 @@ impl From<SendPayFailure> for LnPayFailureEvent {
         LnPayFailureEvent {
             reason: val.message,
             payment_hash: val.data.payment_hash,
+        }
+    }
+}
+
+impl From<ChainMovement> for BtcOutputEvent {
+    fn from(mvt: ChainMovement) -> Self {
+        let outpoint = OutPoint::from_str(&mvt.utxo).expect("invalid outpoint format");
+
+        BtcOutputEvent {
+            txid: outpoint.txid.to_string(),
+            output_index: outpoint.vout,
+            address: None,
+            amount_sat: mvt.output_msat / 1000,
+            block_height: Some(mvt.blockheight),
+            ..Default::default()
         }
     }
 }

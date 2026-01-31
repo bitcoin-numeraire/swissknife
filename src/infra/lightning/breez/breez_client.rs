@@ -379,6 +379,7 @@ impl BitcoinWallet for BreezClient {
         _txid: &str,
         _output_index: Option<u32>,
         _address: Option<&str>,
+        _include_spent: bool,
     ) -> Result<Option<BtcOutput>, BitcoinError> {
         Err(BitcoinError::Unsupported(
             "Output lookup is not yet implemented for Breez".to_string(),

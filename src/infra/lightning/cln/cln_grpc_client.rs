@@ -375,13 +375,16 @@ impl BitcoinWallet for ClnGrpcClient {
         txid: &str,
         output_index: Option<u32>,
         address: Option<&str>,
+        include_spent: bool,
     ) -> Result<Option<BtcOutput>, BitcoinError> {
         let mut client = self.client.clone();
 
         let response = client
-            .list_funds(cln::ListfundsRequest { spent: None })
+            .list_funds(cln::ListfundsRequest {
+                spent: Some(include_spent),
+            })
             .await
-            .map_err(|e| BitcoinError::Transaction(e.message().to_string()))?
+            .map_err(|e| BitcoinError::GetOutput(e.message().to_string()))?
             .into_inner();
 
         let output = response.outputs.into_iter().find(|output| {

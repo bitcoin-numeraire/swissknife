@@ -74,7 +74,7 @@ pub struct ListTransactionsTransaction {
 #[derive(Debug, Deserialize)]
 pub struct ListTransactionsOutput {
     pub index: u32,
-    pub amount_msat: String,
+    pub amount_msat: u64,
 }
 
 #[derive(Debug, Serialize, Default)]
@@ -112,9 +112,9 @@ pub struct ListFundsResponse {
 pub struct ListFundsOutput {
     pub txid: String,
     pub output: u32,
-    pub amount_msat: String,
+    pub amount_msat: u64,
     pub address: Option<String>,
-    pub status: Option<String>,
+    pub status: String,
     pub blockheight: Option<u32>,
 }
 
