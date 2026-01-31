@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use breez_sdk_core::{BreezEvent, EventListener, PaymentStatus, PaymentType};
 use tracing::{trace, warn};
 
-use crate::domains::event::EventService;
+use crate::domains::event::{EventService, EventUseCases};
 
 pub struct BreezListener {
     pub events: EventService,

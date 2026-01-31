@@ -1,6 +1,7 @@
 use std::{path::PathBuf, str::FromStr, time::Duration};
 
 use breez_sdk_core::ReverseSwapInfo;
+use chrono::{TimeZone, Utc};
 use lightning_invoice::Bolt11Invoice;
 use reqwest::{
     header::{HeaderMap, HeaderValue},
@@ -13,23 +14,29 @@ use uuid::Uuid;
 use async_trait::async_trait;
 
 use crate::{
-    application::errors::{BitcoinError, LightningError},
+    application::{
+        entities::Ledger,
+        errors::{BitcoinError, LightningError},
+    },
     domains::{
-        bitcoin::{BitcoinTransaction, BitcoinTransactionOutput, BitcoinWallet, BtcAddressType, BtcNetwork},
+        bitcoin::{
+            BitcoinWallet, BtcAddressType, BtcNetwork, BtcOutput, BtcOutputStatus, BtcTransaction, BtcTransactionOutput,
+        },
         invoice::Invoice,
-        payment::Payment,
+        payment::{LnPayment, Payment, PaymentStatus},
         system::HealthStatus,
     },
     infra::{
         config::config_rs::deserialize_duration,
-        lightning::{types::parse_network, LnClient},
+        lightning::{cln::ListFundsResponse, types::parse_network, LnClient},
     },
 };
 
 use super::{
-    ErrorResponse, GetinfoRequest, GetinfoResponse, InvoiceRequest, InvoiceResponse, ListInvoicesRequest,
-    ListInvoicesResponse, ListTransactionsRequest, ListTransactionsResponse, NewAddrRequest, NewAddrResponse,
-    PayRequest, PayResponse, WithdrawRequest, WithdrawResponse,
+    ErrorResponse, GetinfoRequest, GetinfoResponse, InvoiceRequest, InvoiceResponse, ListFundsRequest,
+    ListInvoicesRequest, ListInvoicesResponse, ListPaysRequest, ListPaysResponse, ListTransactionsRequest,
+    ListTransactionsResponse, NewAddrRequest, NewAddrResponse, PayRequest, PayResponse, WithdrawRequest,
+    WithdrawResponse,
 };
 
 #[derive(Clone, Debug, Deserialize)]
@@ -147,17 +154,25 @@ impl ClnRestClient {
         Ok(parse_network(&response.network))
     }
 
-    fn parse_amount_msat(value: &str) -> anyhow::Result<u64> {
-        let cleaned = value.trim_end_matches("msat");
-        Ok(cleaned.parse::<u64>()?)
+    fn map_status(status: &str) -> BtcOutputStatus {
+        match status {
+            "unconfirmed" => BtcOutputStatus::Unconfirmed,
+            "confirmed" => BtcOutputStatus::Confirmed,
+            "spent" => BtcOutputStatus::Spent,
+            "immature" => BtcOutputStatus::Immature,
+            _ => BtcOutputStatus::default(),
+        }
     }
 
-    fn map_address_type(address_type: BtcAddressType) -> Option<String> {
-        match address_type {
-            BtcAddressType::P2wpkh => Some("bech32".to_string()),
-            BtcAddressType::P2tr => Some("p2tr".to_string()),
-            _ => None,
-        }
+    pub async fn list_pays(&self, payment_hash: String) -> Result<ListPaysResponse, LightningError> {
+        self.post_request(
+            "listpays",
+            &ListPaysRequest {
+                payment_hash: Some(payment_hash),
+            },
+        )
+        .await
+        .map_err(|e| LightningError::Sync(e.to_string()))
     }
 }
 
@@ -229,6 +244,59 @@ impl LnClient for ClnRestClient {
         }
     }
 
+    async fn payment_by_hash(&self, payment_hash: String) -> Result<Option<Payment>, LightningError> {
+        let response = self.list_pays(payment_hash.clone()).await?;
+        let payment = response
+            .pays
+            .into_iter()
+            .find(|pay| matches!(pay.status.as_str(), "complete" | "failed") && pay.payment_hash == payment_hash);
+
+        let Some(payment) = payment else {
+            return Ok(None);
+        };
+
+        let amount_msat = payment
+            .amount_msat
+            .as_ref()
+            .and_then(|amount| amount.trim_end_matches("msat").parse::<u64>().ok())
+            .unwrap_or_default();
+        let amount_sent_msat = payment
+            .amount_sent_msat
+            .as_ref()
+            .and_then(|amount| amount.trim_end_matches("msat").parse::<u64>().ok())
+            .unwrap_or(amount_msat);
+        let payment_time = payment.completed_at.or(payment.created_at).map(|timestamp| {
+            let seconds = timestamp as i64;
+            let nanos = ((timestamp - seconds as f64) * 1e9) as u32;
+            Utc.timestamp_opt(seconds, nanos).single().unwrap_or_else(Utc::now)
+        });
+
+        let status = if payment.status == "complete" {
+            PaymentStatus::Settled
+        } else {
+            PaymentStatus::Failed
+        };
+
+        Ok(Some(Payment {
+            ledger: Ledger::Lightning,
+            status,
+            amount_msat: amount_sent_msat,
+            fee_msat: Some(amount_sent_msat.saturating_sub(amount_msat)),
+            payment_time,
+            error: if payment.status == "failed" {
+                Some("Payment failed".to_string())
+            } else {
+                None
+            },
+            lightning: Some(LnPayment {
+                payment_hash: Some(payment_hash),
+                payment_preimage: payment.payment_preimage,
+                ..Default::default()
+            }),
+            ..Default::default()
+        }))
+    }
+
     async fn pay_onchain(
         &self,
         _amount_sat: u64,
@@ -252,11 +320,17 @@ impl LnClient for ClnRestClient {
 #[async_trait]
 impl BitcoinWallet for ClnRestClient {
     async fn new_address(&self, address_type: BtcAddressType) -> Result<String, BitcoinError> {
+        let address_type_param = match address_type {
+            BtcAddressType::P2wpkh => "bech32",
+            BtcAddressType::P2tr => "p2tr",
+            _ => return Err(BitcoinError::AddressType(address_type.to_string())),
+        };
+
         let response: NewAddrResponse = self
             .post_request(
                 "newaddr",
                 &NewAddrRequest {
-                    addresstype: Self::map_address_type(address_type),
+                    addresstype: Some(address_type_param.to_string()),
                 },
             )
             .await
@@ -284,7 +358,7 @@ impl BitcoinWallet for ClnRestClient {
         Ok(response.txid)
     }
 
-    async fn get_transaction(&self, txid: &str) -> Result<BitcoinTransaction, BitcoinError> {
+    async fn get_transaction(&self, txid: &str) -> Result<BtcTransaction, BitcoinError> {
         let response: ListTransactionsResponse = self
             .post_request("listtransactions", &ListTransactionsRequest {})
             .await
@@ -299,21 +373,63 @@ impl BitcoinWallet for ClnRestClient {
         let outputs = transaction
             .outputs
             .into_iter()
-            .map(|output| BitcoinTransactionOutput {
+            .map(|output| BtcTransactionOutput {
                 output_index: output.index,
                 address: None,
-                amount_sat: Self::parse_amount_msat(&output.amount_msat).unwrap_or_default() / 1000,
+                amount_sat: output.amount_msat / 1000,
                 is_ours: false,
             })
             .collect();
 
-        Ok(BitcoinTransaction {
+        Ok(BtcTransaction {
             txid: transaction.hash,
-            timestamp: None,
-            fee_sat: None,
-            block_height: transaction.blockheight,
+            block_height: Some(transaction.blockheight),
             outputs,
         })
+    }
+
+    async fn get_output(
+        &self,
+        txid: &str,
+        output_index: Option<u32>,
+        address: Option<&str>,
+        include_spent: bool,
+    ) -> Result<Option<BtcOutput>, BitcoinError> {
+        let response: ListFundsResponse = self
+            .post_request(
+                "listfunds",
+                &ListFundsRequest {
+                    spent: Some(include_spent),
+                },
+            )
+            .await
+            .map_err(|e| BitcoinError::GetOutput(e.to_string()))?;
+
+        let output = response.outputs.into_iter().find(|output| {
+            if output.txid != txid {
+                return false;
+            }
+
+            if let Some(index) = output_index {
+                output.output == index
+            } else {
+                address
+                    .and_then(|target| output.address.as_deref().map(|addr| addr == target))
+                    .unwrap_or(false)
+            }
+        });
+
+        Ok(output.map(|output| BtcOutput {
+            txid: output.txid.clone(),
+            output_index: output.output,
+            address: output.address.unwrap_or_default(),
+            amount_sat: output.amount_msat / 1000,
+            block_height: output.blockheight,
+            network: self.network,
+            outpoint: format!("{}:{}", output.txid, output.output),
+            status: Self::map_status(&output.status),
+            ..Default::default()
+        }))
     }
 
     fn network(&self) -> BtcNetwork {

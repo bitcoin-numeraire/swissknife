@@ -10,8 +10,9 @@ use crate::{
     application::errors::DatabaseError,
     domains::payment::{Payment, PaymentFilter, PaymentRepository},
     infra::database::sea_orm::models::{
-        btc_output,
+        btc_output::Model as BtcOutputModel,
         payment::{ActiveModel, Column, Entity, Model as PaymentModel},
+        prelude::BtcOutput,
     },
 };
 
@@ -21,7 +22,7 @@ pub struct SeaOrmPaymentRepository {
 }
 
 impl SeaOrmPaymentRepository {
-    fn map_with_output(model: PaymentModel, btc_output: Option<btc_output::Model>) -> Payment {
+    fn map_with_output(model: PaymentModel, btc_output: Option<BtcOutputModel>) -> Payment {
         let mut payment: Payment = model.into();
 
         if let Some(output) = btc_output {
@@ -42,7 +43,7 @@ impl SeaOrmPaymentRepository {
 impl PaymentRepository for SeaOrmPaymentRepository {
     async fn find(&self, id: Uuid) -> Result<Option<Payment>, DatabaseError> {
         let model = Entity::find_by_id(id)
-            .find_also_related(btc_output::Entity)
+            .find_also_related(BtcOutput)
             .one(&self.db)
             .await
             .map_err(|e| DatabaseError::FindOne(e.to_string()))?;
@@ -53,7 +54,7 @@ impl PaymentRepository for SeaOrmPaymentRepository {
     async fn find_by_payment_hash(&self, payment_hash: &str) -> Result<Option<Payment>, DatabaseError> {
         let model = Entity::find()
             .filter(Column::PaymentHash.eq(payment_hash))
-            .find_also_related(btc_output::Entity)
+            .find_also_related(BtcOutput)
             .one(&self.db)
             .await
             .map_err(|e| DatabaseError::FindOne(e.to_string()))?;
@@ -76,7 +77,7 @@ impl PaymentRepository for SeaOrmPaymentRepository {
             .order_by(Column::CreatedAt, filter.order_direction.into())
             .offset(filter.offset)
             .limit(filter.limit)
-            .find_also_related(btc_output::Entity)
+            .find_also_related(BtcOutput)
             .all(&self.db)
             .await
             .map_err(|e| DatabaseError::FindMany(e.to_string()))?;

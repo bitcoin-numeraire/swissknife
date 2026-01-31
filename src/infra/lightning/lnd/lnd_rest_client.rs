@@ -2,6 +2,7 @@ use std::{path::PathBuf, time::Duration};
 
 use anyhow::anyhow;
 use breez_sdk_core::ReverseSwapInfo;
+use chrono::TimeZone;
 use futures_util::StreamExt;
 use reqwest::{
     header::{HeaderMap, HeaderValue},
@@ -12,11 +13,14 @@ use serde_bolt::bitcoin::hashes::{sha256, Hash};
 use tokio::fs;
 
 use crate::{
-    application::errors::{BitcoinError, LightningError},
+    application::{
+        entities::Ledger,
+        errors::{BitcoinError, LightningError},
+    },
     domains::{
-        bitcoin::{BitcoinTransaction, BitcoinWallet, BtcAddressType, BtcNetwork},
+        bitcoin::{BitcoinWallet, BtcAddressType, BtcNetwork, BtcOutput, BtcOutputStatus, BtcTransaction},
         invoice::Invoice,
-        payment::Payment,
+        payment::{LnPayment, Payment, PaymentStatus},
         system::HealthStatus,
     },
     infra::{
@@ -181,6 +185,29 @@ impl LndRestClient {
         Ok(result)
     }
 
+    pub async fn track_payment(&self, payment_hash: &str) -> Result<Option<TrackPaymentResponse>, LightningError> {
+        let endpoint = format!("v2/router/track/{}", payment_hash);
+        let payload = TrackPaymentRequest {
+            no_inflight_updates: true,
+        };
+
+        let result = self
+            .post_request_buffered::<TrackPaymentResponse>(&endpoint, &payload)
+            .await;
+
+        match result {
+            Ok(response) => Ok(Some(response)),
+            Err(err) => {
+                let err_msg = err.to_string();
+                if err_msg.contains("unable to find payment") || err_msg.contains("unknown payment") {
+                    Ok(None)
+                } else {
+                    Err(LightningError::Sync(err.to_string()))
+                }
+            }
+        }
+    }
+
     async fn network(&self) -> Result<BtcNetwork, LightningError> {
         let response: GetinfoResponse = self
             .get_request("v1/getinfo")
@@ -301,6 +328,45 @@ impl LnClient for LndRestClient {
         }
     }
 
+    async fn payment_by_hash(&self, payment_hash: String) -> Result<Option<Payment>, LightningError> {
+        let status = self.track_payment(&payment_hash).await?;
+        let Some(status) = status else {
+            return Ok(None);
+        };
+
+        match status.status.as_str() {
+            "SUCCEEDED" => {
+                let payment_time_ns = status.payment_time_ns.or(status.creation_time_ns).unwrap_or_default();
+                Ok(Some(Payment {
+                    ledger: Ledger::Lightning,
+                    status: PaymentStatus::Settled,
+                    amount_msat: status.value_msat.unwrap_or_default(),
+                    fee_msat: status.fee_msat,
+                    payment_time: Some(chrono::Utc.timestamp_nanos(payment_time_ns)),
+                    lightning: Some(LnPayment {
+                        payment_hash: Some(status.payment_hash),
+                        payment_preimage: Some(status.payment_preimage),
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                }))
+            }
+            "FAILED" => Ok(Some(Payment {
+                ledger: Ledger::Lightning,
+                status: PaymentStatus::Failed,
+                error: Some(status.failure_reason),
+                amount_msat: status.value_msat.unwrap_or_default(),
+                fee_msat: status.fee_msat,
+                lightning: Some(LnPayment {
+                    payment_hash: Some(status.payment_hash),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            })),
+            _ => Ok(None),
+        }
+    }
+
     async fn health(&self) -> Result<HealthStatus, LightningError> {
         self.get_request::<GetinfoResponse>("v1/getinfo")
             .await
@@ -325,9 +391,9 @@ impl LnClient for LndRestClient {
 impl BitcoinWallet for LndRestClient {
     async fn new_address(&self, address_type: BtcAddressType) -> Result<String, BitcoinError> {
         let address_type_param = match address_type {
-            BtcAddressType::P2sh => "NESTED_PUBKEY_HASH".to_string(),
-            BtcAddressType::P2tr => "TAPROOT_PUBKEY".to_string(),
-            BtcAddressType::P2wpkh => "WITNESS_PUBKEY_HASH".to_string(),
+            BtcAddressType::P2sh => "NESTED_PUBKEY_HASH",
+            BtcAddressType::P2tr => "TAPROOT_PUBKEY",
+            BtcAddressType::P2wpkh => "WITNESS_PUBKEY_HASH",
             _ => return Err(BitcoinError::AddressType(address_type.to_string())),
         };
 
@@ -357,7 +423,7 @@ impl BitcoinWallet for LndRestClient {
         Ok(response.txid)
     }
 
-    async fn get_transaction(&self, txid: &str) -> Result<BitcoinTransaction, BitcoinError> {
+    async fn get_transaction(&self, txid: &str) -> Result<BtcTransaction, BitcoinError> {
         let endpoint = format!("v2/wallet/transactions/{txid}");
         let response: TransactionResponse = self
             .get_request(&endpoint)
@@ -365,6 +431,38 @@ impl BitcoinWallet for LndRestClient {
             .map_err(|e| BitcoinError::Transaction(e.to_string()))?;
 
         Ok(response.into())
+    }
+
+    async fn get_output(
+        &self,
+        txid: &str,
+        output_index: Option<u32>,
+        address: Option<&str>,
+        _include_spent: bool,
+    ) -> Result<Option<BtcOutput>, BitcoinError> {
+        let transaction = self.get_transaction(txid).await?;
+        let output = transaction.outputs.iter().find(|output| match output_index {
+            Some(index) => output.output_index == index,
+            None => address
+                .and_then(|target| output.address.as_deref().map(|addr| addr == target))
+                .unwrap_or(false),
+        });
+
+        Ok(output.map(|output| BtcOutput {
+            txid: transaction.txid.clone(),
+            output_index: output.output_index,
+            address: output.address.clone().unwrap_or_default(),
+            amount_sat: output.amount_sat,
+            block_height: transaction.block_height,
+            network: self.network,
+            outpoint: format!("{}:{}", transaction.txid, output.output_index),
+            status: if transaction.block_height.is_some() && transaction.block_height.unwrap() > 0 {
+                BtcOutputStatus::Confirmed
+            } else {
+                BtcOutputStatus::Unconfirmed
+            },
+            ..Default::default()
+        }))
     }
 
     fn network(&self) -> BtcNetwork {

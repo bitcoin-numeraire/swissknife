@@ -24,5 +24,6 @@ pub trait LnClient: Sync + Send {
     ) -> Result<Invoice, LightningError>;
     async fn pay(&self, bolt11: String, amount_msat: Option<u64>, label: String) -> Result<Payment, LightningError>;
     async fn invoice_by_hash(&self, payment_hash: String) -> Result<Option<Invoice>, LightningError>;
+    async fn payment_by_hash(&self, payment_hash: String) -> Result<Option<Payment>, LightningError>;
     async fn health(&self) -> Result<HealthStatus, LightningError>;
 }

@@ -15,7 +15,6 @@ pub struct BtcOutput {
     pub address: String,
     pub amount_sat: u64,
     pub status: BtcOutputStatus,
-    pub timestamp: DateTime<Utc>,
     pub block_height: Option<u32>,
     pub network: BtcNetwork,
     pub created_at: DateTime<Utc>,

@@ -15,7 +15,7 @@ use crate::{
         contact::ContactModel,
         invoice::Column as InvoiceColumn,
         payment::Column as PaymentColumn,
-        prelude::{Invoice, LnAddress, Payment},
+        prelude::{BtcOutput, Invoice, LnAddress, Payment},
         wallet::{ActiveModel, Column, Entity},
     },
 };
@@ -42,13 +42,15 @@ impl WalletRepository for SeaOrmWalletRepository {
         match model_opt {
             Some(model) => {
                 let balance = self.get_balance(None, id).await?;
-                let payments = model
-                    .find_related(Payment)
+                let payments_with_output = Payment::find()
+                    .filter(PaymentColumn::WalletId.eq(id))
+                    .find_also_related(BtcOutput)
                     .all(&self.db)
                     .await
                     .map_err(|e| DatabaseError::FindRelated(e.to_string()))?;
-                let invoices = model
-                    .find_related(Invoice)
+                let invoices_with_output = Invoice::find()
+                    .filter(InvoiceColumn::WalletId.eq(id))
+                    .find_also_related(BtcOutput)
                     .all(&self.db)
                     .await
                     .map_err(|e| DatabaseError::FindRelated(e.to_string()))?;
@@ -61,8 +63,24 @@ impl WalletRepository for SeaOrmWalletRepository {
 
                 let mut wallet: Wallet = model.into();
                 wallet.balance = balance;
-                wallet.payments = payments.into_iter().map(Into::into).collect();
-                wallet.invoices = invoices.into_iter().map(Into::into).collect();
+                wallet.payments = payments_with_output
+                    .into_iter()
+                    .map(|(payment_model, output_model)| {
+                        let mut payment: crate::domains::payment::Payment = payment_model.into();
+                        if let Some(ref mut bitcoin) = payment.bitcoin {
+                            bitcoin.output = output_model.map(Into::into);
+                        }
+                        payment
+                    })
+                    .collect();
+                wallet.invoices = invoices_with_output
+                    .into_iter()
+                    .map(|(invoice_model, output_model)| {
+                        let mut invoice: crate::domains::invoice::Invoice = invoice_model.into();
+                        invoice.bitcoin_output = output_model.map(Into::into);
+                        invoice
+                    })
+                    .collect();
                 wallet.ln_address = ln_address.map(Into::into);
                 wallet.contacts = contacts;
 

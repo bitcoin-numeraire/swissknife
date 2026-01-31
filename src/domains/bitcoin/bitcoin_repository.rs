@@ -28,6 +28,5 @@ pub trait BtcAddressRepository: Send + Sync {
 #[async_trait]
 pub trait BtcOutputRepository: Send + Sync {
     async fn find_by_outpoint(&self, outpoint: &str) -> Result<Option<BtcOutput>, DatabaseError>;
-    async fn find(&self, id: Uuid) -> Result<Option<BtcOutput>, DatabaseError>;
     async fn upsert(&self, output: BtcOutput) -> Result<BtcOutput, DatabaseError>;
 }

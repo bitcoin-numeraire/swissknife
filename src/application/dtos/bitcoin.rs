@@ -62,8 +62,6 @@ pub struct BtcOutputResponse {
     pub amount_sat: u64,
     /// Status
     pub status: BtcOutputStatus,
-    /// Timestamp
-    pub timestamp: DateTime<Utc>,
 
     /// Block height
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -87,7 +85,6 @@ impl From<BtcOutput> for BtcOutputResponse {
             address: output.address,
             amount_sat: output.amount_sat,
             status: output.status,
-            timestamp: output.timestamp,
             block_height: output.block_height,
             network: output.network,
             created_at: output.created_at,

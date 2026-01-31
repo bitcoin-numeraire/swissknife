@@ -2,8 +2,9 @@ use crate::{
     application::{entities::Ledger, errors::DatabaseError},
     domains::invoice::{Invoice, InvoiceFilter, InvoiceOrderBy, InvoiceRepository, InvoiceStatus},
     infra::database::sea_orm::models::{
-        btc_output,
+        btc_output::Model as BtcOutputModel,
         invoice::{ActiveModel, Column, Entity, Model as InvoiceModel},
+        prelude::BtcOutput,
     },
 };
 use async_trait::async_trait;
@@ -20,7 +21,7 @@ pub struct SeaOrmInvoiceRepository {
 }
 
 impl SeaOrmInvoiceRepository {
-    fn map_with_output(model: InvoiceModel, btc_output: Option<btc_output::Model>) -> Invoice {
+    fn map_with_output(model: InvoiceModel, btc_output: Option<BtcOutputModel>) -> Invoice {
         let mut invoice: Invoice = model.into();
 
         if let Some(output) = btc_output {
@@ -40,7 +41,7 @@ impl SeaOrmInvoiceRepository {
 impl InvoiceRepository for SeaOrmInvoiceRepository {
     async fn find(&self, id: Uuid) -> Result<Option<Invoice>, DatabaseError> {
         let model = Entity::find_by_id(id)
-            .find_also_related(btc_output::Entity)
+            .find_also_related(BtcOutput)
             .one(&self.db)
             .await
             .map_err(|e| DatabaseError::FindOne(e.to_string()))?;
@@ -51,7 +52,7 @@ impl InvoiceRepository for SeaOrmInvoiceRepository {
     async fn find_by_payment_hash(&self, payment_hash: &str) -> Result<Option<Invoice>, DatabaseError> {
         let model = Entity::find()
             .filter(Column::PaymentHash.eq(payment_hash))
-            .find_also_related(btc_output::Entity)
+            .find_also_related(BtcOutput)
             .one(&self.db)
             .await
             .map_err(|e| DatabaseError::FindOne(e.to_string()))?;
@@ -62,7 +63,7 @@ impl InvoiceRepository for SeaOrmInvoiceRepository {
     async fn find_by_btc_output_id(&self, btc_output_id: Uuid) -> Result<Option<Invoice>, DatabaseError> {
         let model = Entity::find()
             .filter(Column::BtcOutputId.eq(btc_output_id))
-            .find_also_related(btc_output::Entity)
+            .find_also_related(BtcOutput)
             .one(&self.db)
             .await
             .map_err(|e| DatabaseError::FindOne(e.to_string()))?;
@@ -97,7 +98,7 @@ impl InvoiceRepository for SeaOrmInvoiceRepository {
             .order_by(order_by_column, filter.order_direction.into())
             .offset(filter.offset)
             .limit(filter.limit)
-            .find_also_related(btc_output::Entity)
+            .find_also_related(BtcOutput)
             .all(&self.db)
             .await
             .map_err(|e| DatabaseError::FindMany(e.to_string()))?;

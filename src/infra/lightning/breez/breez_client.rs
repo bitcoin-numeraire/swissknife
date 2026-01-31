@@ -6,21 +6,24 @@ use tracing::{debug, info};
 use async_trait::async_trait;
 use bip39::Mnemonic;
 use breez_sdk_core::{
-    BreezServices, CheckMessageRequest, ConnectRequest, EnvironmentType, EventListener, GreenlightCredentials,
-    GreenlightNodeConfig, LspInformation, NodeConfig, NodeState, PayOnchainRequest, PrepareOnchainPaymentRequest,
+    BreezServices, CheckMessageRequest, ConnectRequest, EnvironmentType, GreenlightCredentials, GreenlightNodeConfig,
+    LspInformation, NodeConfig, NodeState, PayOnchainRequest, PrepareOnchainPaymentRequest,
     PrepareRedeemOnchainFundsRequest, ReceivePaymentRequest, RedeemOnchainFundsRequest, ReverseSwapInfo,
     SendPaymentRequest, SignMessageRequest, StaticBackupRequest, SwapAmountType,
 };
 
 use crate::{
-    application::errors::{BitcoinError, LightningError},
+    application::{
+        entities::Ledger,
+        errors::{BitcoinError, LightningError},
+    },
     domains::{
-        bitcoin::{BitcoinTransaction, BitcoinWallet, BtcAddressType, BtcNetwork},
+        bitcoin::{BitcoinWallet, BtcAddressType, BtcNetwork, BtcOutput, BtcTransaction},
         invoice::Invoice,
-        payment::Payment,
+        payment::{Payment, PaymentStatus},
         system::HealthStatus,
     },
-    infra::lightning::LnClient,
+    infra::lightning::{breez::BreezListener, LnClient},
 };
 
 #[derive(Clone, Debug, Deserialize)]
@@ -43,7 +46,7 @@ pub struct BreezClient {
 }
 
 impl BreezClient {
-    pub async fn new(config: BreezClientConfig, listener: Box<dyn EventListener>) -> Result<Self, LightningError> {
+    pub async fn new(config: BreezClientConfig, listener: BreezListener) -> Result<Self, LightningError> {
         if config.log_in_file {
             BreezServices::init_logging(&config.working_dir, None)
                 .map_err(|e| LightningError::Logging(e.to_string()))?;
@@ -75,7 +78,7 @@ impl BreezClient {
                 seed: seed.to_seed("").to_vec(),
                 restore_only: Some(config.restore_only),
             },
-            listener,
+            Box::new(listener),
         )
         .await
         .map_err(|e| LightningError::Connect(e.to_string()))?;
@@ -322,6 +325,26 @@ impl LnClient for BreezClient {
         Ok(response.map(Into::into))
     }
 
+    async fn payment_by_hash(&self, payment_hash: String) -> Result<Option<Payment>, LightningError> {
+        let response = self
+            .sdk
+            .payment_by_hash(payment_hash)
+            .await
+            .map_err(|e| LightningError::Pay(e.to_string()))?;
+
+        Ok(response.map(|payment| {
+            let status = payment.status;
+            let mut mapped: Payment = payment.into();
+            mapped.ledger = Ledger::Lightning;
+            mapped.status = match status {
+                breez_sdk_core::PaymentStatus::Complete => PaymentStatus::Settled,
+                breez_sdk_core::PaymentStatus::Failed => PaymentStatus::Failed,
+                breez_sdk_core::PaymentStatus::Pending => PaymentStatus::Pending,
+            };
+            mapped
+        }))
+    }
+
     async fn health(&self) -> Result<HealthStatus, LightningError> {
         let response = BreezServices::service_health_check(self.api_key.clone())
             .await
@@ -345,9 +368,21 @@ impl BitcoinWallet for BreezClient {
         ))
     }
 
-    async fn get_transaction(&self, _txid: &str) -> Result<BitcoinTransaction, BitcoinError> {
+    async fn get_transaction(&self, _txid: &str) -> Result<BtcTransaction, BitcoinError> {
         Err(BitcoinError::Unsupported(
             "Transaction lookup is not yet implemented for Breez".to_string(),
+        ))
+    }
+
+    async fn get_output(
+        &self,
+        _txid: &str,
+        _output_index: Option<u32>,
+        _address: Option<&str>,
+        _include_spent: bool,
+    ) -> Result<Option<BtcOutput>, BitcoinError> {
+        Err(BitcoinError::Unsupported(
+            "Output lookup is not yet implemented for Breez".to_string(),
         ))
     }
 
