@@ -16,7 +16,7 @@ use crate::{
     application::entities::Ledger,
     application::errors::{BitcoinError, LightningError},
     domains::{
-        bitcoin::{BitcoinOutput, BitcoinTransaction, BitcoinWallet, BtcAddressType, BtcNetwork},
+        bitcoin::{BitcoinOutput, BtcTransaction, BitcoinWallet, BtcAddressType, BtcNetwork},
         invoice::Invoice,
         payment::{LnPayment, Payment, PaymentStatus},
         system::HealthStatus,
@@ -421,7 +421,7 @@ impl BitcoinWallet for LndRestClient {
         Ok(response.txid)
     }
 
-    async fn get_transaction(&self, txid: &str) -> Result<BitcoinTransaction, BitcoinError> {
+    async fn get_transaction(&self, txid: &str) -> Result<BtcTransaction, BitcoinError> {
         let endpoint = format!("v2/wallet/transactions/{txid}");
         let response: TransactionResponse = self
             .get_request(&endpoint)

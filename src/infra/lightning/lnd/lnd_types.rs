@@ -4,7 +4,7 @@ use lightning_invoice::Bolt11Invoice;
 use serde::{Deserialize, Serialize};
 
 use crate::domains::{
-    bitcoin::{BitcoinTransaction, BitcoinTransactionOutput},
+    bitcoin::{BtcTransaction, BtcTransactionOutput},
     event::LnInvoicePaidEvent,
     payment::LnPayment,
 };
@@ -218,12 +218,12 @@ pub struct OutputDetailResponse {
     pub is_our_address: bool,
 }
 
-impl From<TransactionResponse> for BitcoinTransaction {
+impl From<TransactionResponse> for BtcTransaction {
     fn from(val: TransactionResponse) -> Self {
         let outputs = val
             .output_details
             .into_iter()
-            .map(|detail| BitcoinTransactionOutput {
+            .map(|detail| BtcTransactionOutput {
                 output_index: detail.output_index,
                 address: Some(detail.address),
                 amount_sat: detail.amount,
@@ -231,7 +231,7 @@ impl From<TransactionResponse> for BitcoinTransaction {
             })
             .collect();
 
-        BitcoinTransaction {
+        BtcTransaction {
             txid: val.tx_hash,
             timestamp: Some(Utc.timestamp_opt(val.time_stamp, 0).unwrap()),
             fee_sat: Some(val.total_fees),

@@ -18,7 +18,7 @@ use crate::{
         errors::{BitcoinError, LightningError},
     },
     domains::{
-        bitcoin::{BitcoinOutput, BitcoinTransaction, BitcoinWallet, BtcAddressType, BtcNetwork},
+        bitcoin::{BitcoinOutput, BtcTransaction, BitcoinWallet, BtcAddressType, BtcNetwork},
         invoice::Invoice,
         payment::{Payment, PaymentStatus},
         system::HealthStatus,
@@ -368,7 +368,7 @@ impl BitcoinWallet for BreezClient {
         ))
     }
 
-    async fn get_transaction(&self, _txid: &str) -> Result<BitcoinTransaction, BitcoinError> {
+    async fn get_transaction(&self, _txid: &str) -> Result<BtcTransaction, BitcoinError> {
         Err(BitcoinError::Unsupported(
             "Transaction lookup is not yet implemented for Breez".to_string(),
         ))

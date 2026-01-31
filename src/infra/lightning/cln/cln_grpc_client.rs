@@ -22,7 +22,7 @@ use crate::{
     },
     domains::{
         bitcoin::{
-            BitcoinOutput, BitcoinTransaction, BitcoinTransactionOutput, BitcoinWallet, BtcAddressType, BtcNetwork,
+            BitcoinOutput, BtcTransaction, BtcTransactionOutput, BitcoinWallet, BtcAddressType, BtcNetwork,
         },
         invoice::Invoice,
         payment::{LnPayment, Payment, PaymentStatus},
@@ -340,7 +340,7 @@ impl BitcoinWallet for ClnGrpcClient {
         Ok(hex::encode(response.txid))
     }
 
-    async fn get_transaction(&self, txid: &str) -> Result<BitcoinTransaction, BitcoinError> {
+    async fn get_transaction(&self, txid: &str) -> Result<BtcTransaction, BitcoinError> {
         let mut client = self.client.clone();
 
         let response = client
@@ -358,7 +358,7 @@ impl BitcoinWallet for ClnGrpcClient {
         let outputs = transaction
             .outputs
             .into_iter()
-            .map(|output| BitcoinTransactionOutput {
+            .map(|output| BtcTransactionOutput {
                 output_index: output.index,
                 address: None,
                 amount_sat: (output.amount_msat.map(|a| a.msat).unwrap_or_default() / 1000),
@@ -366,7 +366,7 @@ impl BitcoinWallet for ClnGrpcClient {
             })
             .collect();
 
-        Ok(BitcoinTransaction {
+        Ok(BtcTransaction {
             txid: hex::encode(transaction.hash),
             timestamp: None,
             fee_sat: None,

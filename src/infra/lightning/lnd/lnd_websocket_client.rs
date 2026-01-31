@@ -13,7 +13,7 @@ use tokio_tungstenite::{connect_async_tls_with_config, Connector, MaybeTlsStream
 use tracing::{debug, error, warn};
 
 use crate::application::errors::LightningError;
-use crate::domains::bitcoin::{BitcoinTransaction, BtcNetwork};
+use crate::domains::bitcoin::{BtcTransaction, BtcNetwork};
 use crate::domains::event::EventUseCases;
 use crate::infra::lightning::lnd::lnd_types::{InvoiceResponse, TransactionResponse};
 
@@ -236,7 +236,7 @@ async fn process_transaction_message(
     if let Some(event) = value.get("result") {
         match serde_json::from_value::<TransactionResponse>(event.clone()) {
             Ok(transaction) => {
-                let transaction: BitcoinTransaction = transaction.into();
+                let transaction: BtcTransaction = transaction.into();
 
                 for output in transaction.outputs.iter() {
                     let output_event = transaction.output_event(output, network);

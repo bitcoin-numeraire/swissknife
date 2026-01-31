@@ -20,7 +20,7 @@ use crate::{
     },
     domains::{
         bitcoin::{
-            BitcoinOutput, BitcoinTransaction, BitcoinTransactionOutput, BitcoinWallet, BtcAddressType, BtcNetwork,
+            BitcoinWallet, BtcAddressType, BtcNetwork, BtcOutput, BtcOutputStatus, BtcTransaction, BtcTransactionOutput
         },
         invoice::Invoice,
         payment::{LnPayment, Payment, PaymentStatus},
@@ -28,7 +28,7 @@ use crate::{
     },
     infra::{
         config::config_rs::deserialize_duration,
-        lightning::{types::parse_network, LnClient},
+        lightning::{LnClient, types::parse_network},
     },
 };
 
@@ -164,6 +164,16 @@ impl ClnRestClient {
             BtcAddressType::P2wpkh => Some("bech32".to_string()),
             BtcAddressType::P2tr => Some("p2tr".to_string()),
             _ => None,
+        }
+    }
+
+    fn map_status(status: Option<&str>) -> BtcOutputStatus {
+        match status {
+            Some("unconfirmed") => BtcOutputStatus::Unconfirmed,
+            Some("confirmed") => BtcOutputStatus::Confirmed,
+            Some("spent") => BtcOutputStatus::Spent,
+            Some("immature") => BtcOutputStatus::Immature,
+            _ => BtcOutputStatus::default(),
         }
     }
 
@@ -361,7 +371,7 @@ impl BitcoinWallet for ClnRestClient {
         Ok(response.txid)
     }
 
-    async fn get_transaction(&self, txid: &str) -> Result<BitcoinTransaction, BitcoinError> {
+    async fn get_transaction(&self, txid: &str) -> Result<BtcTransaction, BitcoinError> {
         let response: ListTransactionsResponse = self
             .post_request("listtransactions", &ListTransactionsRequest {})
             .await
@@ -376,7 +386,7 @@ impl BitcoinWallet for ClnRestClient {
         let outputs = transaction
             .outputs
             .into_iter()
-            .map(|output| BitcoinTransactionOutput {
+            .map(|output| BtcTransactionOutput {
                 output_index: output.index,
                 address: None,
                 amount_sat: Self::parse_amount_msat(&output.amount_msat).unwrap_or_default() / 1000,
@@ -384,7 +394,7 @@ impl BitcoinWallet for ClnRestClient {
             })
             .collect();
 
-        Ok(BitcoinTransaction {
+        Ok(BtcTransaction {
             txid: transaction.hash,
             timestamp: None,
             fee_sat: None,
@@ -398,7 +408,7 @@ impl BitcoinWallet for ClnRestClient {
         txid: &str,
         output_index: Option<u32>,
         address: Option<&str>,
-    ) -> Result<Option<BitcoinOutput>, BitcoinError> {
+    ) -> Result<Option<BtcOutput>, BitcoinError> {
         let response = self
             .list_funds(Some(true))
             .await
@@ -418,14 +428,16 @@ impl BitcoinWallet for ClnRestClient {
             }
         });
 
-        Ok(output.map(|output| BitcoinOutput {
-            txid: output.txid,
+        Ok(output.map(|output| BtcOutput {
+            txid: output.txid.clone(),
             output_index: output.output,
-            address: output.address,
+            address: output.address.unwrap_or_default(),
             amount_sat: Self::parse_amount_msat(&output.amount_msat).unwrap_or_default() / 1000,
-            block_height: output.blockheight.unwrap_or_default(),
-            timestamp: None,
-            fee_sat: None,
+            block_height: output.blockheight,
+            network: self.network,
+            outpoint: format!("{}:{}", output.txid, output.output),
+            status: Self::map_status(output.status.as_deref()),
+            ..Default::default()
         }))
     }
 
