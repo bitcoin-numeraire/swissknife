@@ -91,11 +91,11 @@ pub struct ListPaysResponse {
 pub struct ListPaysPayment {
     pub status: String,
     pub payment_hash: String,
-    pub payment_preimage: Option<String>,
-    pub amount_msat: Option<String>,
-    pub amount_sent_msat: Option<String>,
-    pub created_at: Option<f64>,
-    pub completed_at: Option<f64>,
+    pub preimage: Option<String>,
+    pub amount_msat: Option<u64>,
+    pub amount_sent_msat: Option<u64>,
+    pub created_at: Option<u64>,
+    pub completed_at: Option<u64>,
 }
 
 #[derive(Debug, Serialize, Default)]

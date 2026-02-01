@@ -152,27 +152,6 @@ impl ClnRestClient {
 
         Ok(parse_network(&response.network))
     }
-
-    fn map_status(status: &str) -> BtcOutputStatus {
-        match status {
-            "unconfirmed" => BtcOutputStatus::Unconfirmed,
-            "confirmed" => BtcOutputStatus::Confirmed,
-            "spent" => BtcOutputStatus::Spent,
-            "immature" => BtcOutputStatus::Immature,
-            _ => BtcOutputStatus::default(),
-        }
-    }
-
-    pub async fn list_pays(&self, payment_hash: String) -> Result<ListPaysResponse, LightningError> {
-        self.post_request(
-            "listpays",
-            &ListPaysRequest {
-                payment_hash: Some(payment_hash),
-            },
-        )
-        .await
-        .map_err(|e| LightningError::Sync(e.to_string()))
-    }
 }
 
 #[async_trait]
@@ -244,7 +223,16 @@ impl LnClient for ClnRestClient {
     }
 
     async fn payment_by_hash(&self, payment_hash: String) -> Result<Option<Payment>, LightningError> {
-        let response = self.list_pays(payment_hash.clone()).await?;
+        let response = self
+            .post_request::<ListPaysResponse>(
+                "listpays",
+                &ListPaysRequest {
+                    payment_hash: Some(payment_hash.clone()),
+                },
+            )
+            .await
+            .map_err(|e| LightningError::PaymentByHash(e.to_string()))?;
+
         let payment = response
             .pays
             .into_iter()
@@ -254,21 +242,12 @@ impl LnClient for ClnRestClient {
             return Ok(None);
         };
 
-        let amount_msat = payment
-            .amount_msat
-            .as_ref()
-            .and_then(|amount| amount.trim_end_matches("msat").parse::<u64>().ok())
-            .unwrap_or_default();
-        let amount_sent_msat = payment
-            .amount_sent_msat
-            .as_ref()
-            .and_then(|amount| amount.trim_end_matches("msat").parse::<u64>().ok())
-            .unwrap_or(amount_msat);
-        let payment_time = payment.completed_at.or(payment.created_at).map(|timestamp| {
-            let seconds = timestamp as i64;
-            let nanos = ((timestamp - seconds as f64) * 1e9) as u32;
-            Utc.timestamp_opt(seconds, nanos).single().unwrap_or_else(Utc::now)
-        });
+        let amount_msat = payment.amount_msat.unwrap_or_default();
+        let amount_sent_msat = payment.amount_sent_msat.unwrap_or(amount_msat);
+        let payment_time = payment
+            .completed_at
+            .or(payment.created_at)
+            .and_then(|timestamp| Utc.timestamp_opt(timestamp as i64, 0).single());
 
         let status = if payment.status == "complete" {
             PaymentStatus::Settled
@@ -289,7 +268,7 @@ impl LnClient for ClnRestClient {
             },
             lightning: Some(LnPayment {
                 payment_hash: Some(payment_hash),
-                payment_preimage: payment.payment_preimage,
+                payment_preimage: payment.preimage,
                 ..Default::default()
             }),
             ..Default::default()
@@ -350,14 +329,15 @@ impl BitcoinWallet for ClnRestClient {
         let response: ListTransactionsResponse = self
             .post_request("listtransactions", &ListTransactionsRequest {})
             .await
-            .map_err(|e| BitcoinError::Transaction(e.to_string()))?;
+            .map_err(|e| BitcoinError::GetTransaction(e.to_string()))?;
 
         let transaction = response
             .transactions
             .into_iter()
             .find(|transaction| transaction.hash == txid)
-            .ok_or_else(|| BitcoinError::Transaction(format!("Transaction {txid} not found")))?;
+            .ok_or_else(|| BitcoinError::GetTransaction(format!("Transaction {txid} not found")))?;
 
+        // CLN does not provide output addresses, could determine with scriptpubkeys if needed
         let outputs = transaction
             .outputs
             .into_iter()
@@ -373,7 +353,7 @@ impl BitcoinWallet for ClnRestClient {
             txid: transaction.hash,
             block_height: Some(transaction.blockheight),
             outputs,
-            is_outgoing: false, // TODO: determine from CLN transaction data when needed
+            is_outgoing: false, // TODO: No way for now to determine this from CLN
         })
     }
 
@@ -408,15 +388,25 @@ impl BitcoinWallet for ClnRestClient {
             }
         });
 
-        Ok(output.map(|output| BtcOutput {
-            txid: output.txid.clone(),
-            output_index: output.output,
-            address: output.address.unwrap_or_default(),
-            amount_sat: output.amount_msat / 1000,
-            block_height: output.blockheight,
-            outpoint: format!("{}:{}", output.txid, output.output),
-            status: Self::map_status(&output.status),
-            ..Default::default()
+        Ok(output.map(|output| {
+            let status = match output.status.as_str() {
+                "unconfirmed" => BtcOutputStatus::Unconfirmed,
+                "confirmed" => BtcOutputStatus::Confirmed,
+                "spent" => BtcOutputStatus::Spent,
+                "immature" => BtcOutputStatus::Immature,
+                _ => BtcOutputStatus::default(),
+            };
+
+            BtcOutput {
+                txid: output.txid.clone(),
+                output_index: output.output,
+                address: output.address.unwrap_or_default(),
+                amount_sat: output.amount_msat / 1000,
+                block_height: output.blockheight,
+                outpoint: format!("{}:{}", output.txid, output.output),
+                status,
+                ..Default::default()
+            }
         }))
     }
 

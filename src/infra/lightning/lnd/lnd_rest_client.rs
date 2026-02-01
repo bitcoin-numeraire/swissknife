@@ -184,29 +184,6 @@ impl LndRestClient {
         Ok(result)
     }
 
-    pub async fn track_payment(&self, payment_hash: &str) -> Result<Option<TrackPaymentResponse>, LightningError> {
-        let endpoint = format!("v2/router/track/{}", payment_hash);
-        let payload = TrackPaymentRequest {
-            no_inflight_updates: true,
-        };
-
-        let result = self
-            .post_request_buffered::<TrackPaymentResponse>(&endpoint, &payload)
-            .await;
-
-        match result {
-            Ok(response) => Ok(Some(response)),
-            Err(err) => {
-                let err_msg = err.to_string();
-                if err_msg.contains("unable to find payment") || err_msg.contains("unknown payment") {
-                    Ok(None)
-                } else {
-                    Err(LightningError::Sync(err.to_string()))
-                }
-            }
-        }
-    }
-
     async fn network(&self) -> Result<BtcNetwork, LightningError> {
         let response: GetinfoResponse = self
             .get_request("v1/getinfo")
@@ -328,9 +305,26 @@ impl LnClient for LndRestClient {
     }
 
     async fn payment_by_hash(&self, payment_hash: String) -> Result<Option<Payment>, LightningError> {
-        let status = self.track_payment(&payment_hash).await?;
-        let Some(status) = status else {
-            return Ok(None);
+        let endpoint = format!("v2/router/track/{}", payment_hash);
+        let result = self
+            .post_request_buffered::<TrackPaymentResponse>(
+                &endpoint,
+                &TrackPaymentRequest {
+                    no_inflight_updates: true,
+                },
+            )
+            .await;
+
+        let status = match result {
+            Ok(response) => response,
+            Err(err) => {
+                let err_msg = err.to_string();
+                if err_msg.contains("unable to find payment") || err_msg.contains("unknown payment") {
+                    return Ok(None);
+                } else {
+                    return Err(LightningError::PaymentByHash(err.to_string()));
+                }
+            }
         };
 
         match status.status.as_str() {

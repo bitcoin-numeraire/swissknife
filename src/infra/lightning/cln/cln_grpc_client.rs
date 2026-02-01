@@ -27,7 +27,11 @@ use crate::{
     },
     infra::{
         config::config_rs::deserialize_duration,
-        lightning::{cln::cln::newaddr_request::NewaddrAddresstype, types::parse_network, LnClient},
+        lightning::{
+            cln::cln::{listpays_pays::ListpaysPaysStatus, newaddr_request::NewaddrAddresstype, ListpaysRequest},
+            types::parse_network,
+            LnClient,
+        },
     },
 };
 
@@ -208,43 +212,34 @@ impl LnClient for ClnGrpcClient {
         let mut client = self.client.clone();
 
         let response = client
-            .list_send_pays(cln::ListsendpaysRequest {
+            .list_pays(ListpaysRequest {
                 payment_hash: decode(payment_hash.clone()).ok(),
                 ..Default::default()
             })
             .await
-            .map_err(|e| LightningError::Pay(e.message().to_string()))?
+            .map_err(|e| LightningError::PaymentByHash(e.message().to_string()))?
             .into_inner();
 
-        let entry = response.payments.into_iter().find(|payment| {
-            matches!(
-                payment.status(),
-                cln::listsendpays_payments::ListsendpaysPaymentsStatus::Complete
-                    | cln::listsendpays_payments::ListsendpaysPaymentsStatus::Failed
-            )
-        });
+        let entry = response
+            .pays
+            .into_iter()
+            .find(|pay| matches!(pay.status(), ListpaysPaysStatus::Complete | ListpaysPaysStatus::Failed));
 
         let Some(entry) = entry else {
             return Ok(None);
         };
 
         let amount_msat = entry.amount_msat.as_ref().map(|a| a.msat).unwrap_or_default();
-        let amount_sent_msat = entry.amount_sent_msat.as_ref().map(|a| a.msat).unwrap_or_default();
-        let payment_time = entry.completed_at.or(Some(entry.created_at)).map(|value| {
-            let seconds = value as i64;
-            let nanos = ((value as f64 - seconds as f64) * 1e9) as u32;
-            Utc.timestamp_opt(seconds, nanos).single().unwrap_or_else(Utc::now)
-        });
+        let amount_sent_msat = entry.amount_sent_msat.as_ref().map(|a| a.msat).unwrap_or(amount_msat);
+        let payment_time = entry
+            .completed_at
+            .or(Some(entry.created_at))
+            .and_then(|timestamp| Utc.timestamp_opt(timestamp as i64, 0).single());
 
         let status = match entry.status() {
-            cln::listsendpays_payments::ListsendpaysPaymentsStatus::Complete => PaymentStatus::Settled,
-            cln::listsendpays_payments::ListsendpaysPaymentsStatus::Failed => PaymentStatus::Failed,
+            ListpaysPaysStatus::Complete => PaymentStatus::Settled,
+            ListpaysPaysStatus::Failed => PaymentStatus::Failed,
             _ => PaymentStatus::Pending,
-        };
-        let error = if status == PaymentStatus::Failed {
-            Some("Payment failed".to_string())
-        } else {
-            None
         };
 
         Ok(Some(Payment {
@@ -253,10 +248,14 @@ impl LnClient for ClnGrpcClient {
             amount_msat: amount_sent_msat,
             fee_msat: Some(amount_sent_msat.saturating_sub(amount_msat)),
             payment_time,
-            error,
+            error: if status == PaymentStatus::Failed {
+                Some("Payment failed".to_string())
+            } else {
+                None
+            },
             lightning: Some(LnPayment {
                 payment_hash: Some(payment_hash),
-                payment_preimage: entry.payment_preimage.as_ref().map(hex::encode),
+                payment_preimage: entry.preimage.as_ref().map(hex::encode),
                 ..Default::default()
             }),
             ..Default::default()

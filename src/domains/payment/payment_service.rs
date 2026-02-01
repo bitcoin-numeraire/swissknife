@@ -15,7 +15,7 @@ use crate::{
     },
     domains::{
         bitcoin::BitcoinWallet,
-        event::{EventUseCases, LnPayFailureEvent, LnPaySuccessEvent},
+        event::{BtcWithdrawalConfirmedEvent, EventUseCases, LnPayFailureEvent, LnPaySuccessEvent},
         invoice::{Invoice, InvoiceStatus},
         lnurl::{process_success_action, validate_lnurl_pay},
     },
@@ -629,9 +629,7 @@ impl PaymentsUseCases for PaymentService {
                     }
                 }
                 Ledger::Onchain => {
-                    // TODO: Remove once we create transactions locally before broadcasting
-                    // bitcoin metadata will always be present for onchain payments.
-                    let Some(bitcoin) = payment.bitcoin.clone() else {
+                    let Some(bitcoin) = payment.bitcoin.as_ref() else {
                         return Err(DataError::Inconsistency(format!(
                             "Missing bitcoin metadata on onchain payment with id: {}",
                             payment.id
@@ -639,23 +637,24 @@ impl PaymentsUseCases for PaymentService {
                         .into());
                     };
 
-                    // TODO: Remove once we create transactions locally before broadcasting
-                    // txid will always be present.
-                    let Some(txid) = bitcoin.txid.clone() else {
+                    let Some(txid) = bitcoin.txid.as_ref() else {
                         warn!(payment_id = %payment.id, "Missing transaction id; skipping sync");
                         continue;
                     };
 
-                    let output_index = bitcoin.output.as_ref().map(|output| output.output_index);
-                    let output = self
-                        .bitcoin_wallet
-                        .get_output(&txid, output_index, bitcoin.destination_address.as_deref(), true)
-                        .await?;
-                    let Some(output) = output else {
+                    let tx = self.bitcoin_wallet.get_transaction(txid).await?;
+                    let Some(block_height) = tx.block_height else {
+                        debug!(payment_id = %payment.id, "Transaction not yet confirmed; skipping sync");
                         continue;
                     };
 
-                    self.events.onchain_withdrawal(output.into()).await?;
+                    self.events
+                        .onchain_withdrawal_confirmed(BtcWithdrawalConfirmedEvent {
+                            txid: txid.clone(),
+                            block_height,
+                        })
+                        .await?;
+
                     synced += 1;
                 }
                 Ledger::Internal => {}
