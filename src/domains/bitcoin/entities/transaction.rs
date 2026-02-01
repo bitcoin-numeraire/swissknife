@@ -5,6 +5,8 @@ pub struct BtcTransaction {
     pub txid: String,
     pub block_height: Option<u32>,
     pub outputs: Vec<BtcTransactionOutput>,
+    /// True if we spent any of the inputs (outgoing tx), false if this is a deposit to our wallet
+    pub is_outgoing: bool,
 }
 
 impl BtcTransaction {

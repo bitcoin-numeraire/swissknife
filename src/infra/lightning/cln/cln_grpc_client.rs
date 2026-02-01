@@ -355,6 +355,7 @@ impl BitcoinWallet for ClnGrpcClient {
             txid: hex::encode(transaction.hash),
             block_height: Some(transaction.blockheight),
             outputs,
+            is_outgoing: false, // TODO: determine from CLN transaction data when needed
         })
     }
 

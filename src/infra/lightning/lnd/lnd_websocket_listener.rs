@@ -237,12 +237,23 @@ impl LndWebsocketListener {
                 Ok(transaction) => {
                     let transaction: BtcTransaction = transaction.into();
 
-                    for output in transaction.outputs.iter() {
-                        let output_event = transaction.output_event(output);
-                        let result = if output.is_ours {
-                            self.events.onchain_deposit(output_event, self.network.into()).await
+                    // Filter outputs based on transaction direction:
+                    // - Incoming tx (deposit): only process outputs that are ours
+                    // - Outgoing tx (withdrawal): only process outputs that are NOT ours (skip change)
+                    let relevant_outputs = transaction.outputs.iter().filter(|output| {
+                        if transaction.is_outgoing {
+                            !output.is_ours // Withdrawal destinations (not our change)
                         } else {
+                            output.is_ours // Deposits to our wallet
+                        }
+                    });
+
+                    for output in relevant_outputs {
+                        let output_event = transaction.output_event(output);
+                        let result = if transaction.is_outgoing {
                             self.events.onchain_withdrawal(output_event).await
+                        } else {
+                            self.events.onchain_deposit(output_event, self.network.into()).await
                         };
 
                         if let Err(err) = result {

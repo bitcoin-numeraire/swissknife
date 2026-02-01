@@ -204,8 +204,6 @@ impl ClnWebsocketListener {
                                             }
                                         }
                                         ("deposit", "external", Some("wallet")) => {
-                                            println!("withdrawal detected: {:?}", chain_mvt);
-
                                             if let Err(err) = events.onchain_withdrawal(chain_mvt.into()).await {
                                                 error!(%err, "Failed to process onchain withdrawal");
                                             }

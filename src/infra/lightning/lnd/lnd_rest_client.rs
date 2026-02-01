@@ -412,11 +412,12 @@ impl BitcoinWallet for LndRestClient {
     }
 
     async fn get_transaction(&self, txid: &str) -> Result<BtcTransaction, BitcoinError> {
-        let endpoint = format!("v2/wallet/transactions/{txid}");
+        let endpoint = format!("v2/wallet/tx?txid={}", txid);
+
         let response: TransactionResponse = self
             .get_request(&endpoint)
             .await
-            .map_err(|e| BitcoinError::Transaction(e.to_string()))?;
+            .map_err(|e| BitcoinError::GetTransaction(e.to_string()))?;
 
         Ok(response.into())
     }

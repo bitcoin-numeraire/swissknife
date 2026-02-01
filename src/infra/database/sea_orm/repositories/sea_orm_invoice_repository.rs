@@ -84,7 +84,11 @@ impl InvoiceRepository for SeaOrmInvoiceRepository {
             .apply_if(filter.status, |q, s| match s {
                 InvoiceStatus::Pending => q.filter(
                     Condition::all()
-                        .add(Expr::col(Column::ExpiresAt).gt(Utc::now()))
+                        .add(
+                            Condition::any()
+                                .add(Expr::col(Column::ExpiresAt).gt(Utc::now()))
+                                .add(Expr::col(Column::ExpiresAt).is_null()),
+                        )
                         .add(Expr::col(Column::PaymentTime).is_null()),
                 ),
                 InvoiceStatus::Settled => q.filter(Expr::col(Column::PaymentTime).is_not_null()),
@@ -173,7 +177,11 @@ impl InvoiceRepository for SeaOrmInvoiceRepository {
             .apply_if(filter.status, |q, status| match status {
                 InvoiceStatus::Pending => q.filter(
                     Condition::all()
-                        .add(Expr::col(Column::ExpiresAt).gt(Utc::now()))
+                        .add(
+                            Condition::any()
+                                .add(Expr::col(Column::ExpiresAt).gt(Utc::now()))
+                                .add(Expr::col(Column::ExpiresAt).is_null()),
+                        )
                         .add(Expr::col(Column::PaymentTime).is_null()),
                 ),
                 InvoiceStatus::Settled => q.filter(Expr::col(Column::PaymentTime).is_not_null()),

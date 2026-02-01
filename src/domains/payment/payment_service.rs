@@ -5,7 +5,7 @@ use breez_sdk_core::{parse, BitcoinAddressData, InputType, LNInvoice, LnUrlPayRe
 use chrono::Utc;
 use lightning_invoice::Bolt11Invoice;
 use serde_bolt::bitcoin::hashes::hex::ToHex;
-use tracing::{debug, info, trace};
+use tracing::{debug, info, trace, warn};
 use uuid::Uuid;
 
 use crate::{
@@ -622,16 +622,27 @@ impl PaymentsUseCases for PaymentService {
                                 .await?;
                             synced += 1;
                         }
-                        PaymentStatus::Pending => {}
+                        PaymentStatus::Pending => {
+                            debug!(payment_id = %payment.id, "Payment still pending; skipping sync");
+                            continue;
+                        }
                     }
                 }
                 Ledger::Onchain => {
+                    // TODO: Remove once we create transactions locally before broadcasting
+                    // bitcoin metadata will always be present for onchain payments.
                     let Some(bitcoin) = payment.bitcoin.clone() else {
-                        debug!(payment_id = %payment.id, "Missing bitcoin metadata; skipping sync");
-                        continue;
+                        return Err(DataError::Inconsistency(format!(
+                            "Missing bitcoin metadata on onchain payment with id: {}",
+                            payment.id
+                        ))
+                        .into());
                     };
+
+                    // TODO: Remove once we create transactions locally before broadcasting
+                    // txid will always be present.
                     let Some(txid) = bitcoin.txid.clone() else {
-                        debug!(payment_id = %payment.id, "Missing transaction id; skipping sync");
+                        warn!(payment_id = %payment.id, "Missing transaction id; skipping sync");
                         continue;
                     };
 

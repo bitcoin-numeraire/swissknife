@@ -201,6 +201,8 @@ pub struct TransactionResponse {
     pub tx_hash: String,
     pub block_height: u32,
     pub output_details: Vec<OutputDetailResponse>,
+    #[serde(default)]
+    pub previous_outpoints: Vec<PreviousOutpointResponse>,
 }
 
 #[serde_as]
@@ -214,8 +216,15 @@ pub struct OutputDetailResponse {
     pub is_our_address: bool,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct PreviousOutpointResponse {
+    pub is_our_output: bool,
+}
+
 impl From<TransactionResponse> for BtcTransaction {
     fn from(val: TransactionResponse) -> Self {
+        let is_outgoing = val.previous_outpoints.iter().any(|o| o.is_our_output);
+
         let outputs = val
             .output_details
             .into_iter()
@@ -231,6 +240,7 @@ impl From<TransactionResponse> for BtcTransaction {
             txid: val.tx_hash,
             block_height: Some(val.block_height),
             outputs,
+            is_outgoing,
         }
     }
 }
