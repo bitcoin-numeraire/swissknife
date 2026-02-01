@@ -654,7 +654,7 @@ impl PaymentsUseCases for PaymentService {
                             block_height,
                         })
                         .await?;
-
+                    
                     synced += 1;
                 }
                 Ledger::Internal => {}
