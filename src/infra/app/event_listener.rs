@@ -17,7 +17,6 @@ use crate::{
 pub struct EventListener {
     listener: Option<Arc<dyn EventsListener>>,
     services: Arc<AppServices>,
-    bitcoin_wallet: Arc<dyn BitcoinWallet>,
 }
 
 impl EventListener {
@@ -34,7 +33,7 @@ impl EventListener {
                     .clone()
                     .ok_or_else(|| ConfigError::MissingLightningProviderConfig(config.ln_provider.to_string()))?;
 
-                let listener = ClnGrpcListener::new(cln_config, services.event.clone(), bitcoin_wallet.clone());
+                let listener = ClnGrpcListener::new(cln_config, services.event.clone(), bitcoin_wallet).await?;
 
                 Some(Arc::new(listener) as Arc<dyn EventsListener>)
             }
@@ -44,8 +43,7 @@ impl EventListener {
                     .clone()
                     .ok_or_else(|| ConfigError::MissingLightningProviderConfig(config.ln_provider.to_string()))?;
 
-                let listener =
-                    ClnWebsocketListener::new(cln_config, services.event.clone(), bitcoin_wallet.clone()).await?;
+                let listener = ClnWebsocketListener::new(cln_config, services.event.clone(), bitcoin_wallet).await?;
 
                 Some(Arc::new(listener) as Arc<dyn EventsListener>)
             }
@@ -55,27 +53,19 @@ impl EventListener {
                     .clone()
                     .ok_or_else(|| ConfigError::MissingLightningProviderConfig(config.ln_provider.to_string()))?;
 
-                let listener =
-                    LndWebsocketListener::new(lnd_config, services.event.clone(), bitcoin_wallet.clone()).await?;
+                let listener = LndWebsocketListener::new(lnd_config, services.event.clone(), bitcoin_wallet).await?;
 
                 Some(Arc::new(listener) as Arc<dyn EventsListener>)
             }
         };
 
-        Ok(Self {
-            listener,
-            services,
-            bitcoin_wallet,
-        })
+        Ok(Self { listener, services })
     }
 
     pub async fn start(&self) -> Result<(), ApplicationError> {
         if let Some(listener) = self.listener.clone() {
-            let bitcoin_wallet = self.bitcoin_wallet.clone();
-            let events = self.services.event.clone();
-
             tokio::spawn(async move {
-                if let Err(err) = listener.listen(events, bitcoin_wallet).await {
+                if let Err(err) = listener.listen().await {
                     panic!("Critical: Lightning listener failed: {}", err);
                 }
             });

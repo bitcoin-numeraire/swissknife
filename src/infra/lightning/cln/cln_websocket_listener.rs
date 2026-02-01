@@ -263,11 +263,7 @@ impl ClnWebsocketListener {
 
 #[async_trait]
 impl EventsListener for ClnWebsocketListener {
-    async fn listen(
-        &self,
-        _events: Arc<dyn EventUseCases>,
-        _bitcoin_wallet: Arc<dyn BitcoinWallet>,
-    ) -> Result<(), LightningError> {
+    async fn listen(&self) -> Result<(), LightningError> {
         let client_builder = self
             .client_builder
             .lock()

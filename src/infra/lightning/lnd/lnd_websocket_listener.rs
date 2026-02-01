@@ -262,11 +262,7 @@ impl LndWebsocketListener {
 
 #[async_trait]
 impl EventsListener for LndWebsocketListener {
-    async fn listen(
-        &self,
-        _events: Arc<dyn EventUseCases>,
-        _bitcoin_wallet: Arc<dyn BitcoinWallet>,
-    ) -> Result<(), LightningError> {
+    async fn listen(&self) -> Result<(), LightningError> {
         tokio::try_join!(self.listen_invoices(), self.listen_transactions())?;
         Ok(())
     }
