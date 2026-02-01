@@ -46,6 +46,7 @@ impl EventUseCases for EventService {
         let invoice_option = self.store.invoice.find_by_payment_hash(&event.payment_hash).await?;
 
         if let Some(mut invoice) = invoice_option {
+            invoice.status = InvoiceStatus::Settled;
             invoice.fee_msat = Some(event.fee_msat);
             invoice.payment_time = Some(event.payment_time);
             invoice.amount_received_msat = Some(event.amount_received_msat);
