@@ -151,7 +151,7 @@ impl InvoiceUseCases for InvoiceService {
             })
             .await?;
 
-        let invoices = pending_invoices.into_iter().chain(expired_invoices.into_iter());
+        let invoices = pending_invoices.into_iter().chain(expired_invoices);
 
         let mut synced = 0;
 

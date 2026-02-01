@@ -91,7 +91,6 @@ impl From<ChainMovement> for BtcOutputEvent {
             address: None,
             amount_sat: mvt.output_msat / 1000,
             block_height: mvt.blockheight,
-            ..Default::default()
         }
     }
 }
