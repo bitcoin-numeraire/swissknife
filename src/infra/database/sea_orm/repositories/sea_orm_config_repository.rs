@@ -1,7 +1,7 @@
 use crate::{
     application::errors::DatabaseError,
     domains::system::ConfigRepository,
-    infra::database::sea_orm::models::config::{ActiveModel, Entity},
+    infra::database::sea_orm::models::{config::ActiveModel, prelude::Config},
 };
 use async_trait::async_trait;
 use sea_orm::{ActiveModelTrait, DatabaseConnection, EntityTrait, Set};
@@ -21,7 +21,7 @@ impl SeaOrmConfigRepository {
 #[async_trait]
 impl ConfigRepository for SeaOrmConfigRepository {
     async fn find(&self, key: &str) -> Result<Option<Value>, DatabaseError> {
-        let model = Entity::find_by_id(key)
+        let model = Config::find_by_id(key)
             .one(&self.db)
             .await
             .map_err(|e| DatabaseError::FindOne(e.to_string()))?;

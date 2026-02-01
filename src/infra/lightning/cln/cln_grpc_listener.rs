@@ -1,104 +1,105 @@
-use std::time::Duration;
+use std::{sync::Arc, time::Duration};
 
-use anyhow::{anyhow, Result};
-use hex::decode;
-use serde_bolt::bitcoin::hashes::hex::ToHex;
-use tokio::time::sleep;
+use anyhow::anyhow;
+use async_trait::async_trait;
+use tokio::{sync::Mutex, time::sleep};
 use tonic::{transport::Channel, Code};
-use tracing::{error, info, trace, warn};
+use tracing::{error, trace, warn};
 
 use crate::{
-    application::errors::ApplicationError,
-    domains::event::EventService,
-    infra::lightning::cln::cln::{waitanyinvoice_response::WaitanyinvoiceStatus, ListinvoicesRequest},
+    application::errors::{ApplicationError, LightningError},
+    domains::{bitcoin::BitcoinWallet, event::EventUseCases},
+    infra::lightning::EventsListener,
 };
 
-use super::cln::{node_client::NodeClient, WaitanyinvoiceRequest};
+use super::{
+    cln::{node_client::NodeClient, waitanyinvoice_response::WaitanyinvoiceStatus, WaitanyinvoiceRequest},
+    cln_grpc_client::{ClnClientConfig, ClnGrpcClient},
+};
 
-pub async fn listen_invoices(
-    mut client: NodeClient<Channel>,
-    events: EventService,
+pub struct ClnGrpcListener {
+    client: Mutex<NodeClient<Channel>>,
+    events: Arc<dyn EventUseCases>,
     retry_delay: Duration,
-) -> Result<()> {
-    // Temporary. get the latest settled invoice payment_hash as starting point for event listening
-    let last_settled_invoice = events.latest_settled_invoice().await?;
+}
 
-    let mut lastpay_index = match last_settled_invoice {
-        Some(invoice) => {
-            let payment_hash = invoice
-                .ln_invoice
-                .as_ref()
-                .and_then(|ln_invoice| decode(&ln_invoice.payment_hash).ok());
-            let invoices = client
-                .list_invoices(ListinvoicesRequest {
-                    payment_hash,
-                    ..Default::default()
-                })
-                .await?
-                .into_inner()
-                .invoices;
+impl ClnGrpcListener {
+    pub async fn new(
+        config: ClnClientConfig,
+        events: Arc<dyn EventUseCases>,
+        _wallet: Arc<dyn BitcoinWallet>,
+    ) -> Result<Self, LightningError> {
+        let client = ClnGrpcClient::connect(&config).await?;
 
-            invoices.into_iter().next().map(|invoice| invoice.pay_index())
-        }
-        None => Some(0),
-    };
+        Ok(Self {
+            client: Mutex::new(client),
+            events,
+            retry_delay: config.retry_delay,
+        })
+    }
+}
 
-    loop {
-        trace!(lastpay_index, "Waiting for new invoice...");
+#[async_trait]
+impl EventsListener for ClnGrpcListener {
+    async fn listen(&self) -> Result<(), LightningError> {
+        let mut lastpay_index = None;
 
-        match client
-            .wait_any_invoice(WaitanyinvoiceRequest {
-                lastpay_index,
-                timeout: None,
-            })
-            .await
-        {
-            Ok(response) => {
-                let invoice = response.into_inner();
+        loop {
+            trace!(lastpay_index, "Waiting for new invoice...");
 
-                match invoice.status() {
-                    WaitanyinvoiceStatus::Paid => {
-                        trace!("New InvoicePaid event received");
+            let result = {
+                let mut client = self.client.lock().await;
+                client
+                    .wait_any_invoice(WaitanyinvoiceRequest {
+                        lastpay_index,
+                        timeout: None,
+                    })
+                    .await
+            };
 
-                        loop {
-                            match events.invoice_paid(invoice.clone().into()).await {
-                                Ok(_) => break,
-                                Err(err) => match err {
-                                    ApplicationError::Database(db_err) => {
-                                        error!(%db_err, "Database error, retrying...");
-                                        sleep(retry_delay).await;
-                                    }
-                                    _ => {
-                                        warn!(%err, "Failed to process incoming payment");
-                                        break;
-                                    }
-                                },
+            match result {
+                Ok(response) => {
+                    let invoice = response.into_inner();
+
+                    match invoice.status() {
+                        WaitanyinvoiceStatus::Paid => {
+                            trace!("New InvoicePaid event received");
+
+                            loop {
+                                match self.events.invoice_paid(invoice.clone().into()).await {
+                                    Ok(_) => break,
+                                    Err(err) => match err {
+                                        ApplicationError::Database(db_err) => {
+                                            error!(%db_err, "Database error, retrying...");
+                                            sleep(self.retry_delay).await;
+                                        }
+                                        _ => {
+                                            warn!(%err, "Failed to process incoming payment");
+                                            break;
+                                        }
+                                    },
+                                }
                             }
+                            lastpay_index = invoice.pay_index;
                         }
-                        lastpay_index = invoice.pay_index;
-                    }
-                    WaitanyinvoiceStatus::Expired => {
-                        info!(
-                            payment_hash = invoice.payment_hash.to_hex(),
-                            "New InvoiceExpired event received"
-                        );
+                        WaitanyinvoiceStatus::Expired => {}
                     }
                 }
+                Err(err) => match err.code() {
+                    Code::Aborted
+                    | Code::Cancelled
+                    | Code::DeadlineExceeded
+                    | Code::Internal
+                    | Code::FailedPrecondition
+                    | Code::Unavailable => {
+                        error!(err = err.message(), "Error waiting for invoice. Retrying...");
+                        sleep(self.retry_delay).await;
+                    }
+                    _ => {
+                        return Err(LightningError::Listener(anyhow!(err.to_string()).to_string()));
+                    }
+                },
             }
-            Err(err) => match err.code() {
-                Code::Aborted
-                | Code::Cancelled
-                | Code::DeadlineExceeded
-                | Code::Internal
-                | Code::FailedPrecondition
-                | Code::Unavailable => {
-                    error!(err = err.message(), "Error waiting for invoice. Retrying...");
-                    sleep(retry_delay).await;
-                }
-                _ => {
-                    return Err(anyhow!(err.to_string()));
-                }
-            },
         }
     }
 }

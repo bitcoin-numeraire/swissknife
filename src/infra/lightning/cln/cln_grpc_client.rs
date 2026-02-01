@@ -1,6 +1,6 @@
 use std::{path::PathBuf, str::FromStr, time::Duration};
 
-use breez_sdk_core::ReverseSwapInfo;
+use chrono::{TimeZone, Utc};
 use hex::decode;
 use lightning_invoice::Bolt11Invoice;
 use serde::Deserialize;
@@ -15,16 +15,23 @@ use cln::{
 };
 
 use crate::{
-    application::errors::{BitcoinError, LightningError},
+    application::{
+        entities::Ledger,
+        errors::{BitcoinError, LightningError},
+    },
     domains::{
-        bitcoin::{BitcoinTransaction, BitcoinTransactionOutput, BitcoinWallet, BtcAddressType, BtcNetwork},
+        bitcoin::{BitcoinWallet, BtcAddressType, BtcNetwork, BtcOutput, BtcTransaction, BtcTransactionOutput},
         invoice::Invoice,
-        payment::Payment,
+        payment::{LnPayment, Payment, PaymentStatus},
         system::HealthStatus,
     },
     infra::{
         config::config_rs::deserialize_duration,
-        lightning::{cln::cln::newaddr_request::NewaddrAddresstype, types::parse_network, LnClient},
+        lightning::{
+            cln::cln::{listpays_pays::ListpaysPaysStatus, newaddr_request::NewaddrAddresstype, ListpaysRequest},
+            types::parse_network,
+            LnClient,
+        },
     },
 };
 
@@ -126,13 +133,6 @@ impl ClnGrpcClient {
 
         Ok(parse_network(&response.network))
     }
-
-    fn map_address_type(address_type: BtcAddressType) -> Option<i32> {
-        match address_type {
-            BtcAddressType::P2tr => Some(NewaddrAddresstype::P2tr as i32),
-            _ => Some(NewaddrAddresstype::Bech32 as i32),
-        }
-    }
 }
 
 #[async_trait]
@@ -208,6 +208,60 @@ impl LnClient for ClnGrpcClient {
         }
     }
 
+    async fn payment_by_hash(&self, payment_hash: String) -> Result<Option<Payment>, LightningError> {
+        let mut client = self.client.clone();
+
+        let response = client
+            .list_pays(ListpaysRequest {
+                payment_hash: decode(payment_hash.clone()).ok(),
+                ..Default::default()
+            })
+            .await
+            .map_err(|e| LightningError::PaymentByHash(e.message().to_string()))?
+            .into_inner();
+
+        let entry = response
+            .pays
+            .into_iter()
+            .find(|pay| matches!(pay.status(), ListpaysPaysStatus::Complete | ListpaysPaysStatus::Failed));
+
+        let Some(entry) = entry else {
+            return Ok(None);
+        };
+
+        let amount_msat = entry.amount_msat.as_ref().map(|a| a.msat).unwrap_or_default();
+        let amount_sent_msat = entry.amount_sent_msat.as_ref().map(|a| a.msat).unwrap_or(amount_msat);
+        let payment_time = entry
+            .completed_at
+            .or(Some(entry.created_at))
+            .and_then(|timestamp| Utc.timestamp_opt(timestamp as i64, 0).single());
+
+        let status = match entry.status() {
+            ListpaysPaysStatus::Complete => PaymentStatus::Settled,
+            ListpaysPaysStatus::Failed => PaymentStatus::Failed,
+            _ => PaymentStatus::Pending,
+        };
+
+        Ok(Some(Payment {
+            ledger: Ledger::Lightning,
+            status: status.clone(),
+            amount_msat: amount_sent_msat,
+            fee_msat: Some(amount_sent_msat.saturating_sub(amount_msat)),
+            payment_time,
+            error: if status == PaymentStatus::Failed {
+                Some("Payment failed".to_string())
+            } else {
+                None
+            },
+            lightning: Some(LnPayment {
+                payment_hash: Some(payment_hash),
+                payment_preimage: entry.preimage.as_ref().map(hex::encode),
+                ..Default::default()
+            }),
+            ..Default::default()
+        }))
+    }
+
     async fn health(&self) -> Result<HealthStatus, LightningError> {
         let mut client = self.client.clone();
 
@@ -218,17 +272,6 @@ impl LnClient for ClnGrpcClient {
 
         Ok(HealthStatus::Operational)
     }
-
-    async fn pay_onchain(
-        &self,
-        _amount_sat: u64,
-        _recipient_address: String,
-        _feerate: u32,
-    ) -> Result<ReverseSwapInfo, LightningError> {
-        Err(LightningError::Unsupported(
-            "Bitcoin payments are not implemented for CLN gRPC client".to_string(),
-        ))
-    }
 }
 
 #[async_trait]
@@ -236,9 +279,15 @@ impl BitcoinWallet for ClnGrpcClient {
     async fn new_address(&self, address_type: BtcAddressType) -> Result<String, BitcoinError> {
         let mut client = self.client.clone();
 
+        let address_type_param = match address_type {
+            BtcAddressType::P2wpkh => NewaddrAddresstype::Bech32,
+            BtcAddressType::P2tr => NewaddrAddresstype::P2tr,
+            _ => return Err(BitcoinError::AddressType(address_type.to_string())),
+        };
+
         let response = client
             .new_addr(NewaddrRequest {
-                addresstype: Self::map_address_type(address_type),
+                addresstype: Some(address_type_param as i32),
             })
             .await
             .map_err(|e| BitcoinError::Address(e.message().to_string()))?
@@ -275,7 +324,7 @@ impl BitcoinWallet for ClnGrpcClient {
         Ok(hex::encode(response.txid))
     }
 
-    async fn get_transaction(&self, txid: &str) -> Result<BitcoinTransaction, BitcoinError> {
+    async fn get_transaction(&self, txid: &str) -> Result<BtcTransaction, BitcoinError> {
         let mut client = self.client.clone();
 
         let response = client
@@ -293,7 +342,7 @@ impl BitcoinWallet for ClnGrpcClient {
         let outputs = transaction
             .outputs
             .into_iter()
-            .map(|output| BitcoinTransactionOutput {
+            .map(|output| BtcTransactionOutput {
                 output_index: output.index,
                 address: None,
                 amount_sat: (output.amount_msat.map(|a| a.msat).unwrap_or_default() / 1000),
@@ -301,13 +350,62 @@ impl BitcoinWallet for ClnGrpcClient {
             })
             .collect();
 
-        Ok(BitcoinTransaction {
+        Ok(BtcTransaction {
             txid: hex::encode(transaction.hash),
-            timestamp: None,
-            fee_sat: None,
-            block_height: transaction.blockheight,
+            block_height: Some(transaction.blockheight),
             outputs,
+            is_outgoing: false, // TODO: determine from CLN transaction data when needed
         })
+    }
+
+    async fn get_output(
+        &self,
+        txid: &str,
+        output_index: Option<u32>,
+        address: Option<&str>,
+        include_spent: bool,
+    ) -> Result<Option<BtcOutput>, BitcoinError> {
+        let mut client = self.client.clone();
+
+        let response = client
+            .list_funds(cln::ListfundsRequest {
+                spent: Some(include_spent),
+            })
+            .await
+            .map_err(|e| BitcoinError::GetOutput(e.message().to_string()))?
+            .into_inner();
+
+        let output = response.outputs.into_iter().find(|output| {
+            let output_txid = hex::encode(&output.txid);
+            if output_txid != txid {
+                return false;
+            }
+
+            if let Some(index) = output_index {
+                output.output == index
+            } else {
+                address
+                    .and_then(|target| output.address.as_deref().map(|addr| addr == target))
+                    .unwrap_or(false)
+            }
+        });
+
+        Ok(output.map(|output| {
+            let txid_hex = hex::encode(&output.txid);
+            let address_str = output.address.clone().unwrap_or_default();
+            let outpoint = format!("{}:{}", txid_hex, output.output);
+
+            BtcOutput {
+                txid: txid_hex,
+                output_index: output.output,
+                address: address_str,
+                amount_sat: output.amount_msat.map(|a| a.msat).unwrap_or_default() / 1000,
+                block_height: output.blockheight,
+                outpoint,
+                status: output.status().into(),
+                ..Default::default()
+            }
+        }))
     }
 
     fn network(&self) -> BtcNetwork {

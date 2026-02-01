@@ -2,8 +2,9 @@ use crate::{
     application::{entities::Ledger, errors::DatabaseError},
     domains::invoice::{Invoice, InvoiceFilter, InvoiceOrderBy, InvoiceRepository, InvoiceStatus},
     infra::database::sea_orm::models::{
-        btc_output,
-        invoice::{ActiveModel, Column, Entity, Model as InvoiceModel},
+        btc_output::Model as BtcOutputModel,
+        invoice::{ActiveModel, Column, Model as InvoiceModel},
+        prelude::{BtcOutput, Invoice as InvoiceEntity},
     },
 };
 use async_trait::async_trait;
@@ -20,7 +21,7 @@ pub struct SeaOrmInvoiceRepository {
 }
 
 impl SeaOrmInvoiceRepository {
-    fn map_with_output(model: InvoiceModel, btc_output: Option<btc_output::Model>) -> Invoice {
+    fn map_with_output(model: InvoiceModel, btc_output: Option<BtcOutputModel>) -> Invoice {
         let mut invoice: Invoice = model.into();
 
         if let Some(output) = btc_output {
@@ -39,8 +40,8 @@ impl SeaOrmInvoiceRepository {
 #[async_trait]
 impl InvoiceRepository for SeaOrmInvoiceRepository {
     async fn find(&self, id: Uuid) -> Result<Option<Invoice>, DatabaseError> {
-        let model = Entity::find_by_id(id)
-            .find_also_related(btc_output::Entity)
+        let model = InvoiceEntity::find_by_id(id)
+            .find_also_related(BtcOutput)
             .one(&self.db)
             .await
             .map_err(|e| DatabaseError::FindOne(e.to_string()))?;
@@ -49,9 +50,9 @@ impl InvoiceRepository for SeaOrmInvoiceRepository {
     }
 
     async fn find_by_payment_hash(&self, payment_hash: &str) -> Result<Option<Invoice>, DatabaseError> {
-        let model = Entity::find()
+        let model = InvoiceEntity::find()
             .filter(Column::PaymentHash.eq(payment_hash))
-            .find_also_related(btc_output::Entity)
+            .find_also_related(BtcOutput)
             .one(&self.db)
             .await
             .map_err(|e| DatabaseError::FindOne(e.to_string()))?;
@@ -60,9 +61,9 @@ impl InvoiceRepository for SeaOrmInvoiceRepository {
     }
 
     async fn find_by_btc_output_id(&self, btc_output_id: Uuid) -> Result<Option<Invoice>, DatabaseError> {
-        let model = Entity::find()
+        let model = InvoiceEntity::find()
             .filter(Column::BtcOutputId.eq(btc_output_id))
-            .find_also_related(btc_output::Entity)
+            .find_also_related(BtcOutput)
             .one(&self.db)
             .await
             .map_err(|e| DatabaseError::FindOne(e.to_string()))?;
@@ -77,13 +78,17 @@ impl InvoiceRepository for SeaOrmInvoiceRepository {
             InvoiceOrderBy::UpdatedAt => Column::UpdatedAt,
         };
 
-        let models = Entity::find()
+        let models = InvoiceEntity::find()
             .apply_if(filter.wallet_id, |q, wallet| q.filter(Column::WalletId.eq(wallet)))
             .apply_if(filter.ids, |q, ids| q.filter(Column::Id.is_in(ids)))
             .apply_if(filter.status, |q, s| match s {
                 InvoiceStatus::Pending => q.filter(
                     Condition::all()
-                        .add(Expr::col(Column::ExpiresAt).gt(Utc::now()))
+                        .add(
+                            Condition::any()
+                                .add(Expr::col(Column::ExpiresAt).gt(Utc::now()))
+                                .add(Expr::col(Column::ExpiresAt).is_null()),
+                        )
                         .add(Expr::col(Column::PaymentTime).is_null()),
                 ),
                 InvoiceStatus::Settled => q.filter(Expr::col(Column::PaymentTime).is_not_null()),
@@ -97,7 +102,7 @@ impl InvoiceRepository for SeaOrmInvoiceRepository {
             .order_by(order_by_column, filter.order_direction.into())
             .offset(filter.offset)
             .limit(filter.limit)
-            .find_also_related(btc_output::Entity)
+            .find_also_related(BtcOutput)
             .all(&self.db)
             .await
             .map_err(|e| DatabaseError::FindMany(e.to_string()))?;
@@ -166,13 +171,17 @@ impl InvoiceRepository for SeaOrmInvoiceRepository {
     }
 
     async fn delete_many(&self, filter: InvoiceFilter) -> Result<u64, DatabaseError> {
-        let result = Entity::delete_many()
+        let result = InvoiceEntity::delete_many()
             .apply_if(filter.wallet_id, |q, wallet| q.filter(Column::WalletId.eq(wallet)))
             .apply_if(filter.ids, |q, ids| q.filter(Column::Id.is_in(ids)))
             .apply_if(filter.status, |q, status| match status {
                 InvoiceStatus::Pending => q.filter(
                     Condition::all()
-                        .add(Expr::col(Column::ExpiresAt).gt(Utc::now()))
+                        .add(
+                            Condition::any()
+                                .add(Expr::col(Column::ExpiresAt).gt(Utc::now()))
+                                .add(Expr::col(Column::ExpiresAt).is_null()),
+                        )
                         .add(Expr::col(Column::PaymentTime).is_null()),
                 ),
                 InvoiceStatus::Settled => q.filter(Expr::col(Column::PaymentTime).is_not_null()),

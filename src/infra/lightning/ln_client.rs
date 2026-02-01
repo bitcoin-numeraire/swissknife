@@ -1,5 +1,4 @@
 use async_trait::async_trait;
-use breez_sdk_core::ReverseSwapInfo;
 
 use crate::{
     application::errors::LightningError,
@@ -9,12 +8,6 @@ use crate::{
 #[async_trait]
 pub trait LnClient: Sync + Send {
     async fn disconnect(&self) -> Result<(), LightningError>;
-    async fn pay_onchain(
-        &self,
-        amount_sat: u64,
-        recipient_address: String,
-        feerate: u32,
-    ) -> Result<ReverseSwapInfo, LightningError>;
     async fn invoice(
         &self,
         amount_msat: u64,
@@ -24,5 +17,6 @@ pub trait LnClient: Sync + Send {
     ) -> Result<Invoice, LightningError>;
     async fn pay(&self, bolt11: String, amount_msat: Option<u64>, label: String) -> Result<Payment, LightningError>;
     async fn invoice_by_hash(&self, payment_hash: String) -> Result<Option<Invoice>, LightningError>;
+    async fn payment_by_hash(&self, payment_hash: String) -> Result<Option<Payment>, LightningError>;
     async fn health(&self) -> Result<HealthStatus, LightningError>;
 }

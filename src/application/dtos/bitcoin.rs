@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
 
-use crate::domains::bitcoin::{BtcAddress, BtcAddressType, BtcNetwork, BtcOutput, BtcOutputStatus};
+use crate::domains::bitcoin::{BtcAddress, BtcAddressType, BtcOutput, BtcOutputStatus};
 
 /// New Invoice Request
 #[derive(Deserialize, ToSchema)]
@@ -62,15 +62,11 @@ pub struct BtcOutputResponse {
     pub amount_sat: u64,
     /// Status
     pub status: BtcOutputStatus,
-    /// Timestamp
-    pub timestamp: DateTime<Utc>,
 
     /// Block height
     #[serde(skip_serializing_if = "Option::is_none")]
     pub block_height: Option<u32>,
 
-    /// Network
-    pub network: BtcNetwork,
     /// Date of creation in database
     pub created_at: DateTime<Utc>,
 
@@ -87,9 +83,7 @@ impl From<BtcOutput> for BtcOutputResponse {
             address: output.address,
             amount_sat: output.amount_sat,
             status: output.status,
-            timestamp: output.timestamp,
             block_height: output.block_height,
-            network: output.network,
             created_at: output.created_at,
             updated_at: output.updated_at,
         }

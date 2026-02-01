@@ -4,7 +4,7 @@ use lightning_invoice::Bolt11Invoice;
 use serde::{Deserialize, Serialize};
 
 use crate::domains::{
-    bitcoin::{BitcoinTransaction, BitcoinTransactionOutput},
+    bitcoin::{BtcTransaction, BtcTransactionOutput},
     event::LnInvoicePaidEvent,
     payment::LnPayment,
 };
@@ -52,6 +52,29 @@ pub struct PayRequest {
     pub amt_msat: Option<u64>,
     pub timeout_seconds: u32,
     pub no_inflight_updates: bool,
+}
+
+#[derive(Debug, Serialize)]
+pub struct TrackPaymentRequest {
+    pub no_inflight_updates: bool,
+}
+
+#[serde_as]
+#[derive(Debug, Deserialize)]
+pub struct TrackPaymentResponse {
+    pub payment_hash: String,
+    pub payment_preimage: String,
+    #[serde_as(as = "Option<DisplayFromStr>")]
+    pub value_msat: Option<u64>,
+    #[serde_as(as = "Option<DisplayFromStr>")]
+    pub fee_msat: Option<u64>,
+    #[serde_as(as = "Option<DisplayFromStr>")]
+    pub creation_time_ns: Option<i64>,
+    #[serde_as(as = "Option<DisplayFromStr>")]
+    pub payment_time_ns: Option<i64>,
+    pub status: String,
+    #[serde(default)]
+    pub failure_reason: String,
 }
 
 #[derive(Deserialize)]
@@ -177,11 +200,9 @@ pub struct NewAddressResponse {
 pub struct TransactionResponse {
     pub tx_hash: String,
     pub block_height: u32,
-    #[serde_as(as = "DisplayFromStr")]
-    pub time_stamp: i64,
-    #[serde_as(as = "DisplayFromStr")]
-    pub total_fees: u64,
     pub output_details: Vec<OutputDetailResponse>,
+    #[serde(default)]
+    pub previous_outpoints: Vec<PreviousOutpointResponse>,
 }
 
 #[serde_as]
@@ -195,12 +216,19 @@ pub struct OutputDetailResponse {
     pub is_our_address: bool,
 }
 
-impl From<TransactionResponse> for BitcoinTransaction {
+#[derive(Debug, Deserialize)]
+pub struct PreviousOutpointResponse {
+    pub is_our_output: bool,
+}
+
+impl From<TransactionResponse> for BtcTransaction {
     fn from(val: TransactionResponse) -> Self {
+        let is_outgoing = val.previous_outpoints.iter().any(|o| o.is_our_output);
+
         let outputs = val
             .output_details
             .into_iter()
-            .map(|detail| BitcoinTransactionOutput {
+            .map(|detail| BtcTransactionOutput {
                 output_index: detail.output_index,
                 address: Some(detail.address),
                 amount_sat: detail.amount,
@@ -208,12 +236,11 @@ impl From<TransactionResponse> for BitcoinTransaction {
             })
             .collect();
 
-        BitcoinTransaction {
+        BtcTransaction {
             txid: val.tx_hash,
-            timestamp: Some(Utc.timestamp_opt(val.time_stamp, 0).unwrap()),
-            fee_sat: Some(val.total_fees),
-            block_height: val.block_height,
+            block_height: Some(val.block_height),
             outputs,
+            is_outgoing,
         }
     }
 }

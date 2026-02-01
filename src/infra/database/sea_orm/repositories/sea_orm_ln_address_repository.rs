@@ -9,7 +9,10 @@ use uuid::Uuid;
 
 use crate::application::errors::DatabaseError;
 use crate::domains::ln_address::{LnAddress, LnAddressFilter, LnAddressRepository};
-use crate::infra::database::sea_orm::models::ln_address::{ActiveModel, Column, Entity};
+use crate::infra::database::sea_orm::models::{
+    ln_address::{ActiveModel, Column},
+    prelude::LnAddress as LnAddressEntity,
+};
 
 #[derive(Clone)]
 pub struct SeaOrmLnAddressRepository {
@@ -25,7 +28,7 @@ impl SeaOrmLnAddressRepository {
 #[async_trait]
 impl LnAddressRepository for SeaOrmLnAddressRepository {
     async fn find(&self, id: Uuid) -> Result<Option<LnAddress>, DatabaseError> {
-        let model = Entity::find_by_id(id)
+        let model = LnAddressEntity::find_by_id(id)
             .one(&self.db)
             .await
             .map_err(|e| DatabaseError::FindOne(e.to_string()))?;
@@ -34,7 +37,7 @@ impl LnAddressRepository for SeaOrmLnAddressRepository {
     }
 
     async fn find_by_wallet_id(&self, wallet_id: Uuid) -> Result<Option<LnAddress>, DatabaseError> {
-        let model = Entity::find()
+        let model = LnAddressEntity::find()
             .filter(Column::WalletId.eq(wallet_id))
             .one(&self.db)
             .await
@@ -44,7 +47,7 @@ impl LnAddressRepository for SeaOrmLnAddressRepository {
     }
 
     async fn find_by_username(&self, username: &str) -> Result<Option<LnAddress>, DatabaseError> {
-        let model = Entity::find()
+        let model = LnAddressEntity::find()
             .filter(Column::Username.eq(username))
             .one(&self.db)
             .await
@@ -54,7 +57,7 @@ impl LnAddressRepository for SeaOrmLnAddressRepository {
     }
 
     async fn find_many(&self, filter: LnAddressFilter) -> Result<Vec<LnAddress>, DatabaseError> {
-        let models = Entity::find()
+        let models = LnAddressEntity::find()
             .apply_if(filter.wallet_id, |q, id| q.filter(Column::WalletId.eq(id)))
             .apply_if(filter.username, |q, username| q.filter(Column::Username.eq(username)))
             .apply_if(filter.ids, |q, ids| q.filter(Column::Id.is_in(ids)))
@@ -115,7 +118,7 @@ impl LnAddressRepository for SeaOrmLnAddressRepository {
     }
 
     async fn delete_many(&self, filter: LnAddressFilter) -> Result<u64, DatabaseError> {
-        let result = Entity::delete_many()
+        let result = LnAddressEntity::delete_many()
             .apply_if(filter.wallet_id, |q, id| q.filter(Column::WalletId.eq(id)))
             .apply_if(filter.ids, |q, ids| q.filter(Column::Id.is_in(ids)))
             .apply_if(filter.username, |q, username| q.filter(Column::Username.eq(username)))

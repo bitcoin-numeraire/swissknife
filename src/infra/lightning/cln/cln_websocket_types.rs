@@ -1,9 +1,11 @@
+use std::str::FromStr;
+
+use bitcoin::OutPoint;
 use chrono::{TimeZone, Utc};
 use serde::Deserialize;
 use serde_bolt::bitcoin::hashes::hex::ToHex;
 use serde_bolt::bitcoin::hashes::{sha256, Hash};
 
-use crate::domains::bitcoin::BtcNetwork;
 use crate::domains::event::{BtcOutputEvent, LnInvoicePaidEvent, LnPayFailureEvent, LnPaySuccessEvent};
 
 #[derive(Debug, Deserialize)]
@@ -36,12 +38,13 @@ pub struct SendPayFailureData {
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct ChainMovement {
+    pub account_id: String,
+    pub originating_account: Option<String>,
+    pub spending_txid: Option<String>,
     pub primary_tag: String,
     pub utxo: String,
     pub output_msat: u64,
-    pub debit_msat: u64,
-    pub timestamp: i64,
-    pub blockheight: u32,
+    pub blockheight: Option<u32>,
 }
 
 impl From<InvoicePayment> for LnInvoicePaidEvent {
@@ -79,25 +82,15 @@ impl From<SendPayFailure> for LnPayFailureEvent {
 }
 
 impl From<ChainMovement> for BtcOutputEvent {
-    fn from(val: ChainMovement) -> Self {
-        let parts = val.utxo.split(":").collect::<Vec<&str>>();
-        let txid = parts[0].to_string();
-        let output_index = parts[1].parse::<u32>().expect("invalid output index");
-        let mut fee_sat = None;
-
-        if val.primary_tag == "withdrawal" {
-            fee_sat = Some((val.debit_msat - val.output_msat) / 1000);
-        }
+    fn from(mvt: ChainMovement) -> Self {
+        let outpoint = OutPoint::from_str(&mvt.utxo).expect("invalid outpoint format");
 
         BtcOutputEvent {
-            txid,
-            output_index,
+            txid: outpoint.txid.to_string(),
+            output_index: outpoint.vout,
             address: None,
-            amount_sat: val.output_msat / 1000,
-            timestamp: Utc.timestamp_opt(val.timestamp, 0).unwrap(),
-            fee_sat,
-            block_height: val.blockheight,
-            network: BtcNetwork::default(),
+            amount_sat: mvt.output_msat / 1000,
+            block_height: mvt.blockheight,
         }
     }
 }

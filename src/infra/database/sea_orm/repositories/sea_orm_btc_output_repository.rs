@@ -6,7 +6,10 @@ use uuid::Uuid;
 use crate::{
     application::errors::DatabaseError,
     domains::bitcoin::{BtcOutput, BtcOutputRepository},
-    infra::database::sea_orm::models::btc_output::{ActiveModel, Column, Entity},
+    infra::database::sea_orm::models::{
+        btc_output::{ActiveModel, Column},
+        prelude::BtcOutput as BtcOutputEntity,
+    },
 };
 
 #[derive(Clone)]
@@ -23,17 +26,8 @@ impl SeaOrmBitcoinOutputRepository {
 #[async_trait]
 impl BtcOutputRepository for SeaOrmBitcoinOutputRepository {
     async fn find_by_outpoint(&self, outpoint: &str) -> Result<Option<BtcOutput>, DatabaseError> {
-        let model = Entity::find()
+        let model = BtcOutputEntity::find()
             .filter(Column::Outpoint.eq(outpoint))
-            .one(&self.db)
-            .await
-            .map_err(|e| DatabaseError::FindOne(e.to_string()))?;
-
-        Ok(model.map(Into::into))
-    }
-
-    async fn find(&self, id: Uuid) -> Result<Option<BtcOutput>, DatabaseError> {
-        let model = Entity::find_by_id(id)
             .one(&self.db)
             .await
             .map_err(|e| DatabaseError::FindOne(e.to_string()))?;
@@ -50,9 +44,7 @@ impl BtcOutputRepository for SeaOrmBitcoinOutputRepository {
                 address: Set(output.address.clone()),
                 amount_sat: Set(output.amount_sat as i64),
                 status: Set(output.status.to_string()),
-                timestamp: Set(output.timestamp.naive_utc()),
                 block_height: Set(output.block_height.map(|h| h as i32)),
-                network: Set(output.network.to_string()),
                 updated_at: Set(Some(Utc::now().naive_utc())),
                 ..Default::default()
             };
@@ -66,16 +58,14 @@ impl BtcOutputRepository for SeaOrmBitcoinOutputRepository {
         }
 
         let model = ActiveModel {
-            id: Set(output.id),
+            id: Set(Uuid::new_v4()),
             outpoint: Set(output.outpoint.clone()),
             txid: Set(output.txid.clone()),
             output_index: Set(output.output_index as i32),
             address: Set(output.address.clone()),
             amount_sat: Set(output.amount_sat as i64),
             status: Set(output.status.to_string()),
-            timestamp: Set(output.timestamp.naive_utc()),
             block_height: Set(output.block_height.map(|h| h as i32)),
-            network: Set(output.network.to_string()),
             ..Default::default()
         };
 

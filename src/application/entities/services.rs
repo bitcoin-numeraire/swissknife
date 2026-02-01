@@ -1,8 +1,10 @@
+use std::sync::Arc;
+
 use crate::{
     application::{dtos::AppConfig, entities::AppAdapters},
     domains::{
         bitcoin::{BitcoinService, BitcoinUseCases},
-        event::EventService,
+        event::{EventService, EventUseCases},
         invoice::{InvoiceService, InvoiceUseCases},
         ln_address::{LnAddressService, LnAddressUseCases},
         lnurl::{LnUrlService, LnUrlUseCases},
@@ -25,7 +27,7 @@ pub struct AppServices {
     pub nostr: Box<dyn NostrUseCases>,
     pub api_key: Box<dyn ApiKeyUseCases>,
     pub bitcoin: Box<dyn BitcoinUseCases>,
-    pub event: EventService,
+    pub event: Arc<dyn EventUseCases>,
 }
 
 impl AppServices {
@@ -35,7 +37,6 @@ impl AppServices {
             host,
             invoice_expiry,
             fee_buffer,
-            ln_provider,
             auth_provider,
             bitcoin_address_type,
             ..
@@ -49,18 +50,21 @@ impl AppServices {
             ..
         } = adapters;
 
+        let event = Arc::new(EventService::new(store.clone()));
         let payments = PaymentService::new(
             store.clone(),
             ln_client.clone(),
             bitcoin_wallet.clone(),
             domain.clone(),
             fee_buffer.unwrap_or_default(),
+            event.clone(),
         );
         let invoices = InvoiceService::new(
             store.clone(),
             ln_client.clone(),
+            bitcoin_wallet.clone(),
             invoice_expiry.as_secs() as u32,
-            ln_provider,
+            event.clone(),
         );
         let lnurl = LnUrlService::new(
             store.clone(),
@@ -76,7 +80,6 @@ impl AppServices {
         let nostr = NostrService::new(store.clone());
         let api_key = ApiKeyService::new(store.clone());
         let bitcoin = BitcoinService::new(store.clone(), bitcoin_wallet, bitcoin_address_type);
-        let event = EventService::new(store.clone());
 
         AppServices {
             invoice: Box::new(invoices),
