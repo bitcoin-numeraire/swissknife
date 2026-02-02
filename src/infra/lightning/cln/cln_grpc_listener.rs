@@ -118,19 +118,15 @@ impl ClnGrpcListener {
                                 };
 
                                 match invoice.status() {
-                                    WaitinvoiceStatus::Paid => {
-                                        trace!("New InvoicePaid event received");
-
-                                        loop {
-                                            match self.events.invoice_paid(invoice.clone().into()).await {
-                                                Ok(_) => break,
-                                                Err(err) => {
-                                                    warn!(%err, "Failed to process incoming payment");
-                                                    break;
-                                                }
+                                    WaitinvoiceStatus::Paid => loop {
+                                        match self.events.invoice_paid(invoice.clone().into()).await {
+                                            Ok(_) => break,
+                                            Err(err) => {
+                                                warn!(%err, "Failed to process incoming payment");
+                                                break;
                                             }
                                         }
-                                    }
+                                    },
                                     WaitinvoiceStatus::Expired => {}
                                 }
                             }
