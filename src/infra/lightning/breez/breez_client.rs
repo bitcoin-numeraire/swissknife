@@ -17,7 +17,7 @@ use crate::{
         errors::{BitcoinError, LightningError},
     },
     domains::{
-        bitcoin::{BitcoinWallet, BtcAddressType, BtcNetwork, BtcOutput, BtcTransaction},
+        bitcoin::{BitcoinWallet, BtcAddressType, BtcNetwork, BtcOutput, BtcPreparedTransaction, BtcTransaction},
         invoice::Invoice,
         payment::{Payment, PaymentStatus},
         system::HealthStatus,
@@ -320,6 +320,30 @@ impl BitcoinWallet for BreezClient {
     async fn send(&self, _address: String, _amount_sat: u64, _fee_rate: Option<u32>) -> Result<String, BitcoinError> {
         Err(BitcoinError::Unsupported(
             "Direct bitcoin sends are not yet implemented for Breez".to_string(),
+        ))
+    }
+
+    async fn prepare_send(
+        &self,
+        _address: String,
+        _amount_sat: u64,
+        _fee_rate: Option<u32>,
+        _lock_id: Option<String>,
+    ) -> Result<BtcPreparedTransaction, BitcoinError> {
+        Err(BitcoinError::Unsupported(
+            "Preparing bitcoin transactions is not yet implemented for Breez".to_string(),
+        ))
+    }
+
+    async fn broadcast_transaction(&self, _prepared: &BtcPreparedTransaction) -> Result<String, BitcoinError> {
+        Err(BitcoinError::Unsupported(
+            "Broadcasting bitcoin transactions is not yet implemented for Breez".to_string(),
+        ))
+    }
+
+    async fn release_prepared_transaction(&self, _prepared: &BtcPreparedTransaction) -> Result<(), BitcoinError> {
+        Err(BitcoinError::Unsupported(
+            "Releasing prepared bitcoin transactions is not yet implemented for Breez".to_string(),
         ))
     }
 

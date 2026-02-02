@@ -1,3 +1,4 @@
+pub mod bitcoin_utils;
 pub mod breez;
 pub mod cln;
 mod listener;

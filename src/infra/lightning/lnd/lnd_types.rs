@@ -2,13 +2,14 @@ use base64::{prelude::BASE64_STANDARD, Engine};
 use chrono::{TimeZone, Utc};
 use lightning_invoice::Bolt11Invoice;
 use serde::{Deserialize, Serialize};
+use serde_with::{serde_as, DisplayFromStr};
+use std::collections::HashMap;
 
 use crate::domains::{
     bitcoin::{BtcTransaction, BtcTransactionOutput},
     event::LnInvoicePaidEvent,
     payment::LnPayment,
 };
-use serde_with::{serde_as, DisplayFromStr};
 use std::str::FromStr;
 
 use crate::{
@@ -193,6 +194,83 @@ pub struct SendCoinsResponse {
 #[derive(Debug, Deserialize)]
 pub struct NewAddressResponse {
     pub address: String,
+}
+
+#[derive(Debug, Serialize, Default)]
+pub struct FundPsbtRequest {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub raw: Option<TxTemplate>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sat_per_vbyte: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub min_confs: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub spend_unconfirmed: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub custom_lock_id: Option<String>,
+}
+
+#[derive(Debug, Serialize, Default)]
+pub struct TxTemplate {
+    pub outputs: HashMap<String, u64>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct FundPsbtResponse {
+    pub funded_psbt: String,
+    #[serde(default)]
+    pub locked_utxos: Vec<UtxoLease>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct FinalizePsbtRequest {
+    pub funded_psbt: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct FinalizePsbtResponse {
+    pub signed_psbt: String,
+    pub raw_final_tx: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct PublishTransactionRequest {
+    pub tx_hex: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct PublishTransactionResponse {
+    #[serde(default)]
+    pub publish_error: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ReleaseOutputRequest {
+    pub id: String,
+    pub outpoint: OutPoint,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ReleaseOutputResponse {
+    pub status: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct UtxoLease {
+    pub id: String,
+    pub outpoint: OutPoint,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct OutPoint {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub txid_str: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub txid_bytes: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub output_index: Option<i64>,
 }
 
 #[serde_as]

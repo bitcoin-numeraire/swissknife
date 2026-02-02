@@ -118,8 +118,14 @@ impl PaymentRepository for SeaOrmPaymentRepository {
             })
             .unwrap_or_default();
 
+        let payment_id = if payment.id == Uuid::default() {
+            Uuid::new_v4()
+        } else {
+            payment.id
+        };
+
         let model = ActiveModel {
-            id: Set(Uuid::new_v4()),
+            id: Set(payment_id),
             wallet_id: Set(payment.wallet_id),
             ln_address: Set(ln_address),
             btc_address: Set(btc_address),

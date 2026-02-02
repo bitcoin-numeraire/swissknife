@@ -1,10 +1,11 @@
 use std::{str::FromStr, sync::Arc};
 
 use async_trait::async_trait;
+use base64::{engine::general_purpose::STANDARD, Engine};
 use breez_sdk_core::{parse, BitcoinAddressData, InputType, LNInvoice, LnUrlPayRequestData, SuccessAction};
 use chrono::Utc;
 use lightning_invoice::Bolt11Invoice;
-use serde_bolt::bitcoin::hashes::hex::ToHex;
+use serde_bolt::bitcoin::hashes::{hex::ToHex, sha256, Hash};
 use tracing::{debug, info, trace, warn};
 use uuid::Uuid;
 
@@ -53,6 +54,11 @@ impl PaymentService {
             fee_buffer,
             events,
         }
+    }
+
+    fn lock_id_for_payment(payment_id: Uuid) -> String {
+        let hash = sha256::Hash::hash(payment_id.as_bytes());
+        STANDARD.encode(hash)
     }
 }
 
@@ -211,28 +217,51 @@ impl PaymentService {
                 return Ok(internal_payment);
             }
 
-            let pending_payment = self
+            let payment_id = Uuid::new_v4();
+            let lock_id = Some(Self::lock_id_for_payment(payment_id));
+            let prepared_tx = self
+                .bitcoin_wallet
+                .prepare_send(data.address.clone(), amount, None, lock_id)
+                .await?;
+
+            let fee_msat = prepared_tx.fee_sat.saturating_mul(1000);
+            let pending_payment = match self
                 .insert_payment(
                     Payment {
+                        id: payment_id,
                         wallet_id,
                         amount_msat,
+                        fee_msat: Some(fee_msat),
                         status: PaymentStatus::Pending,
                         ledger: Ledger::Onchain,
                         currency: data.network.into(),
                         description,
                         bitcoin: Some(BtcPayment {
                             destination_address: Some(data.address.clone()),
+                            txid: Some(prepared_tx.txid.clone()),
                             ..Default::default()
                         }),
                         ..Default::default()
                     },
-                    self.fee_buffer,
+                    0.0,
                 )
-                .await?;
+                .await
+            {
+                Ok(payment) => payment,
+                Err(error) => {
+                    if let Err(release_err) = self.bitcoin_wallet.release_prepared_transaction(&prepared_tx).await {
+                        warn!(%release_err, "Failed to release prepared bitcoin transaction");
+                    }
+                    return Err(error);
+                }
+            };
 
-            let txid = match self.bitcoin_wallet.send(data.address.clone(), amount, None).await {
+            let txid = match self.bitcoin_wallet.broadcast_transaction(&prepared_tx).await {
                 Ok(txid) => txid,
                 Err(error) => {
+                    if let Err(release_err) = self.bitcoin_wallet.release_prepared_transaction(&prepared_tx).await {
+                        warn!(%release_err, "Failed to release prepared bitcoin transaction");
+                    }
                     let mut failed_payment = pending_payment.clone();
                     failed_payment.status = PaymentStatus::Failed;
                     failed_payment.error = Some(error.to_string());
@@ -242,13 +271,15 @@ impl PaymentService {
                 }
             };
 
-            let mut updated_payment = pending_payment.clone();
-            let bitcoin = updated_payment.bitcoin.get_or_insert_with(Default::default);
-            bitcoin.txid = Some(txid);
+            if pending_payment.bitcoin.as_ref().and_then(|b| b.txid.as_deref()) != Some(txid.as_str()) {
+                let mut updated_payment = pending_payment.clone();
+                let bitcoin = updated_payment.bitcoin.get_or_insert_with(Default::default);
+                bitcoin.txid = Some(txid);
+                let payment = self.store.payment.update(updated_payment).await?;
+                return Ok(payment);
+            }
 
-            let payment = self.store.payment.update(updated_payment).await?;
-
-            Ok(payment)
+            Ok(pending_payment)
         } else {
             Err(DataError::Validation("Amount must be defined for zero-amount invoices.".to_string()).into())
         }
@@ -413,9 +444,14 @@ impl PaymentService {
             .await?
             .available_msat as f64;
 
-        let required_balance = payment.amount_msat as f64 * (1.0 + fee_buffer);
-        if balance < required_balance {
-            return Err(DataError::InsufficientFunds(required_balance).into());
+        let required_balance_msat = if let Some(fee_msat) = payment.fee_msat {
+            (payment.amount_msat.saturating_add(fee_msat)) as f64
+        } else {
+            payment.amount_msat as f64 * (1.0 + fee_buffer)
+        };
+
+        if balance < required_balance_msat {
+            return Err(DataError::InsufficientFunds(required_balance_msat).into());
         }
 
         let pending_payment = self.store.payment.insert(Some(&txn), payment).await?;

@@ -151,6 +151,45 @@ pub struct WithdrawResponse {
     pub txid: String,
 }
 
+#[derive(Debug, Serialize)]
+pub struct TxPrepareRequest {
+    pub outputs: Vec<TxPrepareOutput>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub feerate: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct TxPrepareOutput {
+    pub address: String,
+    pub amount: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct TxPrepareResponse {
+    pub psbt: String,
+    pub txid: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct TxSendRequest {
+    pub txid: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct TxSendResponse {
+    pub txid: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct TxDiscardRequest {
+    pub txid: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct TxDiscardResponse {
+    pub txid: String,
+}
+
 #[derive(Debug, Deserialize)]
 pub struct ListInvoicesInvoice {
     bolt11: Option<String>,
