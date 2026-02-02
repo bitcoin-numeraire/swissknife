@@ -1,6 +1,5 @@
 use std::{sync::Arc, time::Duration};
 
-use anyhow::anyhow;
 use async_trait::async_trait;
 use chrono::{TimeZone, Utc};
 use tokio::time::sleep;
@@ -8,10 +7,7 @@ use tonic::{transport::Channel, Code};
 use tracing::{error, trace, warn};
 
 use crate::{
-    application::{
-        entities::Currency,
-        errors::{ApplicationError, LightningError},
-    },
+    application::{entities::Currency, errors::LightningError},
     domains::{
         bitcoin::BitcoinWallet,
         event::{BtcOutputEvent, BtcWithdrawalConfirmedEvent, EventUseCases, LnPayFailureEvent, LnPaySuccessEvent},
@@ -24,10 +20,11 @@ use super::{
         listchainmoves_chainmoves::ListchainmovesChainmovesPrimaryTag,
         listchainmoves_request::ListchainmovesIndex,
         node_client::NodeClient,
+        wait_invoices::WaitInvoicesStatus,
         wait_request::{WaitIndexname, WaitSubsystem},
         wait_sendpays::WaitSendpaysStatus,
-        waitanyinvoice_response::WaitanyinvoiceStatus,
-        ListchainmovesRequest, WaitRequest, WaitanyinvoiceRequest, WaitsendpayRequest,
+        waitinvoice_response::WaitinvoiceStatus,
+        ListchainmovesRequest, WaitRequest, WaitinvoiceRequest, WaitsendpayRequest,
     },
     cln_grpc_client::{ClnClientConfig, ClnGrpcClient},
 };
@@ -55,64 +52,101 @@ impl ClnGrpcListener {
         })
     }
 
+    /// Handles a gRPC error by sleeping and returning Ok(()) for retryable errors,
+    /// or returning Err for fatal errors.
+    async fn handle_grpc_error(&self, err: tonic::Status, context: &str) -> Result<(), LightningError> {
+        match err.code() {
+            Code::Aborted
+            | Code::Cancelled
+            | Code::DeadlineExceeded
+            | Code::Internal
+            | Code::FailedPrecondition
+            | Code::Unavailable => {
+                error!(err = err.message(), "{}. Retrying...", context);
+                sleep(self.retry_delay).await;
+                Ok(())
+            }
+            _ => Err(LightningError::Listener(err.to_string())),
+        }
+    }
+
     async fn listen_invoices(&self) -> Result<(), LightningError> {
-        let mut lastpay_index = None;
+        let mut next_index = 0_u64;
 
         loop {
-            trace!(lastpay_index, "Waiting for new invoice...");
+            trace!(next_index, "Waiting for invoice update...");
 
             let result = {
                 let mut client = self.client.clone();
                 client
-                    .wait_any_invoice(WaitanyinvoiceRequest {
-                        lastpay_index,
-                        timeout: None,
+                    .wait(WaitRequest {
+                        subsystem: WaitSubsystem::Invoices as i32,
+                        indexname: WaitIndexname::Updated as i32,
+                        nextvalue: next_index,
                     })
                     .await
             };
 
             match result {
                 Ok(response) => {
-                    let invoice = response.into_inner();
+                    let response = response.into_inner();
+                    let updated_index = response.updated;
 
-                    match invoice.status() {
-                        WaitanyinvoiceStatus::Paid => {
-                            trace!("New InvoicePaid event received");
+                    if let Some(invoices) = response.invoices {
+                        match invoices.status() {
+                            WaitInvoicesStatus::Paid => {
+                                let Some(label) = invoices.label.clone() else {
+                                    warn!("Invoice update missing label");
+                                    if let Some(index) = updated_index {
+                                        next_index = index.saturating_add(1);
+                                    }
+                                    continue;
+                                };
 
-                            loop {
-                                match self.events.invoice_paid(invoice.clone().into()).await {
-                                    Ok(_) => break,
-                                    Err(err) => match err {
-                                        ApplicationError::Database(db_err) => {
-                                            error!(%db_err, "Database error, retrying...");
-                                            sleep(self.retry_delay).await;
+                                let invoice = loop {
+                                    let result = {
+                                        let mut client = self.client.clone();
+                                        client.wait_invoice(WaitinvoiceRequest { label: label.clone() }).await
+                                    };
+
+                                    match result {
+                                        Ok(response) => break response.into_inner(),
+                                        Err(err) => {
+                                            self.handle_grpc_error(err, "Error waiting for invoice").await?;
                                         }
-                                        _ => {
-                                            warn!(%err, "Failed to process incoming payment");
-                                            break;
+                                    }
+                                };
+
+                                match invoice.status() {
+                                    WaitinvoiceStatus::Paid => {
+                                        trace!("New InvoicePaid event received");
+
+                                        loop {
+                                            match self.events.invoice_paid(invoice.clone().into()).await {
+                                                Ok(_) => break,
+                                                Err(err) => {
+                                                    warn!(%err, "Failed to process incoming payment");
+                                                    break;
+                                                }
+                                            }
                                         }
-                                    },
+                                    }
+                                    WaitinvoiceStatus::Expired => {}
                                 }
                             }
-                            lastpay_index = invoice.pay_index;
+                            WaitInvoicesStatus::Expired | WaitInvoicesStatus::Unpaid => {}
                         }
-                        WaitanyinvoiceStatus::Expired => {}
+                    } else if next_index != 0 {
+                        warn!("Invoice wait response missing invoice details");
+                    }
+
+                    if let Some(index) = updated_index {
+                        next_index = index.saturating_add(1);
                     }
                 }
-                Err(err) => match err.code() {
-                    Code::Aborted
-                    | Code::Cancelled
-                    | Code::DeadlineExceeded
-                    | Code::Internal
-                    | Code::FailedPrecondition
-                    | Code::Unavailable => {
-                        error!(err = err.message(), "Error waiting for invoice. Retrying...");
-                        sleep(self.retry_delay).await;
-                    }
-                    _ => {
-                        return Err(LightningError::Listener(anyhow!(err.to_string()).to_string()));
-                    }
-                },
+                Err(err) => {
+                    self.handle_grpc_error(err, "Error waiting for invoice").await?;
+                }
             }
         }
     }
@@ -121,6 +155,8 @@ impl ClnGrpcListener {
         let mut next_index = 0_u64;
 
         loop {
+            trace!(next_index, "Waiting for new sendpay update...");
+
             let result = {
                 let mut client = self.client.clone();
                 client
@@ -165,25 +201,14 @@ impl ClnGrpcListener {
                         }
                     }
 
-                    let updated_index = response.updated.or(response.created).or(response.deleted);
+                    let updated_index = response.updated;
                     if let Some(index) = updated_index {
                         next_index = index.saturating_add(1);
                     }
                 }
-                Err(err) => match err.code() {
-                    Code::Aborted
-                    | Code::Cancelled
-                    | Code::DeadlineExceeded
-                    | Code::Internal
-                    | Code::FailedPrecondition
-                    | Code::Unavailable => {
-                        error!(err = err.message(), "Error waiting for sendpay updates. Retrying...");
-                        sleep(self.retry_delay).await;
-                    }
-                    _ => {
-                        return Err(LightningError::Listener(anyhow!(err.to_string()).to_string()));
-                    }
-                },
+                Err(err) => {
+                    self.handle_grpc_error(err, "Error waiting for sendpay updates").await?;
+                }
             }
         }
     }
@@ -192,6 +217,8 @@ impl ClnGrpcListener {
         let mut next_index = 0_u64;
 
         loop {
+            trace!(next_index, "Waiting for new chainmove...");
+
             let result = {
                 let mut client = self.client.clone();
                 client
@@ -220,20 +247,9 @@ impl ClnGrpcListener {
                         }
                     }
                 }
-                Err(err) => match err.code() {
-                    Code::Aborted
-                    | Code::Cancelled
-                    | Code::DeadlineExceeded
-                    | Code::Internal
-                    | Code::FailedPrecondition
-                    | Code::Unavailable => {
-                        error!(err = err.message(), "Error waiting for chainmoves. Retrying...");
-                        sleep(self.retry_delay).await;
-                    }
-                    _ => {
-                        return Err(LightningError::Listener(anyhow!(err.to_string()).to_string()));
-                    }
-                },
+                Err(err) => {
+                    self.handle_grpc_error(err, "Error waiting for chainmoves").await?;
+                }
             }
         }
     }

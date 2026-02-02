@@ -16,7 +16,7 @@ use crate::{
 
 use super::cln::{
     listinvoices_invoices::ListinvoicesInvoicesStatus, pay_response::PayStatus, ListinvoicesInvoices, PayResponse,
-    WaitanyinvoiceResponse,
+    WaitinvoiceResponse,
 };
 
 impl From<PayResponse> for Payment {
@@ -72,8 +72,8 @@ impl From<ListinvoicesInvoices> for Invoice {
     }
 }
 
-impl From<WaitanyinvoiceResponse> for LnInvoicePaidEvent {
-    fn from(val: WaitanyinvoiceResponse) -> Self {
+impl From<WaitinvoiceResponse> for LnInvoicePaidEvent {
+    fn from(val: WaitinvoiceResponse) -> Self {
         LnInvoicePaidEvent {
             payment_hash: val.payment_hash.to_hex(),
             amount_received_msat: val.amount_received_msat.as_ref().unwrap().msat,
