@@ -1,4 +1,4 @@
-use std::{path::PathBuf, time::Duration};
+use std::{collections::HashMap, path::PathBuf, time::Duration};
 
 use anyhow::anyhow;
 use chrono::TimeZone;
@@ -27,7 +27,7 @@ use crate::{
     },
     infra::{
         config::config_rs::deserialize_duration,
-        lightning::{bitcoin_utils::psbt_fee_sat, bitcoin_utils::txid_from_raw_tx, types::parse_network, LnClient},
+        lightning::{bitcoin_utils::parse_psbt, types::parse_network, LnClient},
     },
 };
 use async_trait::async_trait;
@@ -171,27 +171,6 @@ impl LndRestClient {
 
         let result = response.json::<T>().await?;
         Ok(result)
-    }
-
-    async fn release_locked_utxos(&self, locked_utxos: &[BtcLockedUtxo]) -> Result<(), BitcoinError> {
-        for utxo in locked_utxos {
-            let _response: ReleaseOutputResponse = self
-                .post_request(
-                    "v2/wallet/utxos/release",
-                    &ReleaseOutputRequest {
-                        id: utxo.id.clone(),
-                        outpoint: OutPoint {
-                            txid_str: Some(utxo.txid.clone()),
-                            txid_bytes: None,
-                            output_index: Some(utxo.output_index as i64),
-                        },
-                    },
-                )
-                .await
-                .map_err(|e| BitcoinError::Transaction(e.to_string()))?;
-        }
-
-        Ok(())
     }
 
     async fn get_request<T>(&self, endpoint: &str) -> anyhow::Result<T>
@@ -413,47 +392,29 @@ impl BitcoinWallet for LndRestClient {
         Ok(response.address)
     }
 
-    async fn send(&self, address: String, amount_sat: u64, fee_rate: Option<u32>) -> Result<String, BitcoinError> {
-        let response: SendCoinsResponse = self
-            .post_request(
-                "v1/transactions",
-                &SendCoinsRequest {
-                    addr: address,
-                    amount: amount_sat as i64,
-                    sat_per_vbyte: fee_rate.map(|f| f as u64),
-                },
-            )
-            .await
-            .map_err(|e| BitcoinError::Transaction(e.to_string()))?;
-
-        Ok(response.txid)
-    }
-
-    async fn prepare_send(
+    async fn prepare_transaction(
         &self,
         address: String,
         amount_sat: u64,
-        fee_rate: Option<u32>,
-        lock_id: Option<String>,
+        fee_rate_sat_vb: Option<u32>,
     ) -> Result<BtcPreparedTransaction, BitcoinError> {
-        let mut outputs = std::collections::HashMap::new();
+        let mut outputs = HashMap::new();
         outputs.insert(address, amount_sat);
 
-        let fund_response: FundPsbtResponse = self
+        let response: FundPsbtResponse = self
             .post_request(
                 "v2/wallet/psbt/fund",
                 &FundPsbtRequest {
-                    raw: Some(TxTemplate { outputs }),
-                    sat_per_vbyte: fee_rate.map(|rate| rate as u64),
-                    min_confs: Some(1),
-                    spend_unconfirmed: Some(false),
-                    custom_lock_id: lock_id,
+                    raw: TxTemplate { outputs },
+                    sat_per_vbyte: fee_rate_sat_vb,
+                    min_confs: 1,
+                    spend_unconfirmed: false,
                 },
             )
             .await
-            .map_err(|e| BitcoinError::Transaction(e.to_string()))?;
+            .map_err(|e| BitcoinError::PrepareTransaction(e.to_string()))?;
 
-        let locked_utxos: Vec<BtcLockedUtxo> = fund_response
+        let locked_utxos: Vec<BtcLockedUtxo> = response
             .locked_utxos
             .into_iter()
             .filter_map(|lease| {
@@ -467,63 +428,61 @@ impl BitcoinWallet for LndRestClient {
             })
             .collect();
 
-        let fee_sat = psbt_fee_sat(&fund_response.funded_psbt)?;
-
-        let finalize_response: FinalizePsbtResponse = match self
-            .post_request(
-                "v2/wallet/psbt/finalize",
-                &FinalizePsbtRequest {
-                    funded_psbt: fund_response.funded_psbt.clone(),
-                },
-            )
-            .await
-        {
-            Ok(response) => response,
-            Err(error) => {
-                self.release_locked_utxos(&locked_utxos).await?;
-                return Err(BitcoinError::Transaction(error.to_string()));
-            }
-        };
-
-        let raw_tx = STANDARD
-            .decode(finalize_response.raw_final_tx)
-            .map_err(|e| BitcoinError::Transaction(format!("Failed to decode raw tx: {e}")))?;
-        let txid = txid_from_raw_tx(&raw_tx)?;
+        let psbt = parse_psbt(&response.funded_psbt)?;
+        let fee = psbt.fee().map_err(|e| BitcoinError::ParsePsbt(e.to_string()))?;
 
         Ok(BtcPreparedTransaction {
-            txid,
-            fee_sat,
-            raw_tx: Some(raw_tx),
+            txid: psbt.unsigned_tx.compute_txid().to_string(),
+            fee_sat: fee.to_sat(),
+            psbt,
             locked_utxos,
         })
     }
 
-    async fn broadcast_transaction(&self, prepared: &BtcPreparedTransaction) -> Result<String, BitcoinError> {
-        let raw_tx = prepared
-            .raw_tx
-            .as_ref()
-            .ok_or_else(|| BitcoinError::Transaction("Prepared transaction missing raw tx".to_string()))?;
+    async fn sign_send_transaction(&self, prepared: &BtcPreparedTransaction) -> Result<(), BitcoinError> {
+        let tx_hex = prepared.psbt.serialize_hex();
 
-        let response: PublishTransactionResponse = self
-            .post_request(
-                "v2/wallet/tx",
-                &PublishTransactionRequest {
-                    tx_hex: STANDARD.encode(raw_tx),
-                    label: None,
+        if let Err(e) = self
+            .post_request::<FinalizePsbtResponse>(
+                "v2/wallet/psbt/finalize",
+                &FinalizePsbtRequest {
+                    funded_psbt: tx_hex.clone(),
                 },
             )
             .await
-            .map_err(|e| BitcoinError::Transaction(e.to_string()))?;
-
-        if !response.publish_error.is_empty() {
-            return Err(BitcoinError::Transaction(response.publish_error));
+        {
+            self.release_prepared_transaction(prepared).await?;
+            return Err(BitcoinError::FinalizeTransaction(e.to_string()));
         }
 
-        Ok(prepared.txid.clone())
+        let response: PublishTransactionResponse = self
+            .post_request("v2/wallet/tx", &PublishTransactionRequest { tx_hex })
+            .await
+            .map_err(|e| BitcoinError::BroadcastTransaction(e.to_string()))?;
+
+        if !response.publish_error.is_empty() {
+            return Err(BitcoinError::BroadcastTransaction(response.publish_error));
+        }
+
+        Ok(())
     }
 
     async fn release_prepared_transaction(&self, prepared: &BtcPreparedTransaction) -> Result<(), BitcoinError> {
-        self.release_locked_utxos(&prepared.locked_utxos).await?;
+        for utxo in &prepared.locked_utxos {
+            self.post_request::<ReleaseOutputResponse>(
+                "v2/wallet/utxos/release",
+                &ReleaseOutputRequest {
+                    id: utxo.id.clone(),
+                    outpoint: OutPoint {
+                        txid_str: Some(utxo.txid.clone()),
+                        output_index: Some(utxo.output_index as i64),
+                    },
+                },
+            )
+            .await
+            .map_err(|e| BitcoinError::ReleaseTransaction(e.to_string()))?;
+        }
+
         Ok(())
     }
 

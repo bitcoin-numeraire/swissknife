@@ -139,34 +139,22 @@ pub struct NewAddrResponse {
 }
 
 #[derive(Debug, Serialize)]
-pub struct WithdrawRequest {
-    pub destination: String,
-    pub satoshi: u64,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub feerate: Option<String>,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct WithdrawResponse {
-    pub txid: String,
-}
-
-#[derive(Debug, Serialize)]
 pub struct TxPrepareRequest {
     pub outputs: Vec<TxPrepareOutput>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub feerate: Option<String>,
+    pub feerate: Option<u32>,
 }
 
 #[derive(Debug, Serialize)]
 pub struct TxPrepareOutput {
     pub address: String,
-    pub amount: String,
+    pub amount: u64,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct TxPrepareResponse {
     pub psbt: String,
+
+    #[allow(dead_code)]
     pub txid: String,
 }
 
@@ -177,6 +165,7 @@ pub struct TxSendRequest {
 
 #[derive(Debug, Deserialize)]
 pub struct TxSendResponse {
+    #[allow(dead_code)]
     pub txid: String,
 }
 
@@ -187,6 +176,7 @@ pub struct TxDiscardRequest {
 
 #[derive(Debug, Deserialize)]
 pub struct TxDiscardResponse {
+    #[allow(dead_code)]
     pub txid: String,
 }
 

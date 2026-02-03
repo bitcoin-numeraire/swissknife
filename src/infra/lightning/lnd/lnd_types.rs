@@ -178,19 +178,6 @@ pub struct ErrorResponse {
     pub message: String,
 }
 
-#[derive(Debug, Serialize)]
-pub struct SendCoinsRequest {
-    pub addr: String,
-    pub amount: i64,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub sat_per_vbyte: Option<u64>,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct SendCoinsResponse {
-    pub txid: String,
-}
-
 #[derive(Debug, Deserialize)]
 pub struct NewAddressResponse {
     pub address: String,
@@ -198,16 +185,10 @@ pub struct NewAddressResponse {
 
 #[derive(Debug, Serialize, Default)]
 pub struct FundPsbtRequest {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub raw: Option<TxTemplate>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub sat_per_vbyte: Option<u64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub min_confs: Option<i32>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub spend_unconfirmed: Option<bool>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub custom_lock_id: Option<String>,
+    pub raw: TxTemplate,
+    pub sat_per_vbyte: Option<u32>,
+    pub min_confs: u32,
+    pub spend_unconfirmed: bool,
 }
 
 #[derive(Debug, Serialize, Default)]
@@ -227,6 +208,7 @@ pub struct FinalizePsbtRequest {
     pub funded_psbt: String,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 pub struct FinalizePsbtResponse {
     pub signed_psbt: String,
@@ -236,8 +218,6 @@ pub struct FinalizePsbtResponse {
 #[derive(Debug, Serialize)]
 pub struct PublishTransactionRequest {
     pub tx_hex: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub label: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -252,6 +232,7 @@ pub struct ReleaseOutputRequest {
     pub outpoint: OutPoint,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 pub struct ReleaseOutputResponse {
     pub status: String,
@@ -265,11 +246,7 @@ pub struct UtxoLease {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct OutPoint {
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub txid_str: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub txid_bytes: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub output_index: Option<i64>,
 }
 

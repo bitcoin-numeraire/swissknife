@@ -317,25 +317,18 @@ impl BitcoinWallet for BreezClient {
         ))
     }
 
-    async fn send(&self, _address: String, _amount_sat: u64, _fee_rate: Option<u32>) -> Result<String, BitcoinError> {
-        Err(BitcoinError::Unsupported(
-            "Direct bitcoin sends are not yet implemented for Breez".to_string(),
-        ))
-    }
-
-    async fn prepare_send(
+    async fn prepare_transaction(
         &self,
         _address: String,
         _amount_sat: u64,
         _fee_rate: Option<u32>,
-        _lock_id: Option<String>,
     ) -> Result<BtcPreparedTransaction, BitcoinError> {
         Err(BitcoinError::Unsupported(
             "Preparing bitcoin transactions is not yet implemented for Breez".to_string(),
         ))
     }
 
-    async fn broadcast_transaction(&self, _prepared: &BtcPreparedTransaction) -> Result<String, BitcoinError> {
+    async fn sign_send_transaction(&self, _prepared: &BtcPreparedTransaction) -> Result<(), BitcoinError> {
         Err(BitcoinError::Unsupported(
             "Broadcasting bitcoin transactions is not yet implemented for Breez".to_string(),
         ))

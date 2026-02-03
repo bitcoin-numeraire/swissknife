@@ -1,5 +1,7 @@
 use std::{path::PathBuf, str::FromStr, time::Duration};
 
+use base64::{engine::general_purpose::STANDARD, Engine};
+use bitcoin::Psbt;
 use chrono::{TimeZone, Utc};
 use lightning_invoice::Bolt11Invoice;
 use reqwest::{
@@ -28,7 +30,7 @@ use crate::{
     },
     infra::{
         config::config_rs::deserialize_duration,
-        lightning::{bitcoin_utils::psbt_fee_sat, cln::ListFundsResponse, types::parse_network, LnClient},
+        lightning::{cln::ListFundsResponse, types::parse_network, LnClient},
     },
 };
 
@@ -37,7 +39,6 @@ use super::{
     ListInvoicesRequest, ListInvoicesResponse, ListPaysRequest, ListPaysResponse, ListTransactionsRequest,
     ListTransactionsResponse, NewAddrRequest, NewAddrResponse, PayRequest, PayResponse, TxDiscardRequest,
     TxDiscardResponse, TxPrepareOutput, TxPrepareRequest, TxPrepareResponse, TxSendRequest, TxSendResponse,
-    WithdrawRequest, WithdrawResponse,
 };
 
 #[derive(Clone, Debug, Deserialize)]
@@ -311,28 +312,11 @@ impl BitcoinWallet for ClnRestClient {
             .ok_or_else(|| BitcoinError::Address("No address returned by CLN".to_string()))
     }
 
-    async fn send(&self, address: String, amount_sat: u64, fee_rate: Option<u32>) -> Result<String, BitcoinError> {
-        let response: WithdrawResponse = self
-            .post_request(
-                "withdraw",
-                &WithdrawRequest {
-                    destination: address,
-                    satoshi: amount_sat,
-                    feerate: fee_rate.map(|rate| format!("{rate}perkb")),
-                },
-            )
-            .await
-            .map_err(|e| BitcoinError::Transaction(e.to_string()))?;
-
-        Ok(response.txid)
-    }
-
-    async fn prepare_send(
+    async fn prepare_transaction(
         &self,
         address: String,
         amount_sat: u64,
-        fee_rate: Option<u32>,
-        _lock_id: Option<String>,
+        fee_rate_sat_vb: Option<u32>,
     ) -> Result<BtcPreparedTransaction, BitcoinError> {
         let response: TxPrepareResponse = self
             .post_request(
@@ -340,48 +324,43 @@ impl BitcoinWallet for ClnRestClient {
                 &TxPrepareRequest {
                     outputs: vec![TxPrepareOutput {
                         address,
-                        amount: format!("{amount_sat}sat"),
+                        amount: amount_sat,
                     }],
-                    feerate: fee_rate.map(|rate| format!("{rate}perkb")),
+                    feerate: fee_rate_sat_vb.map(|rate| rate * 1000), // Convert sat/vbyte to perkb
                 },
             )
             .await
-            .map_err(|e| BitcoinError::Transaction(e.to_string()))?;
+            .map_err(|e| BitcoinError::PrepareTransaction(e.to_string()))?;
 
-        let fee_sat = psbt_fee_sat(&response.psbt)?;
+        let psbt_bytes = STANDARD
+            .decode(response.psbt)
+            .map_err(|e| BitcoinError::ParsePsbt(e.to_string()))?;
+        let psbt = Psbt::deserialize(&psbt_bytes).map_err(|e| BitcoinError::ParsePsbt(e.to_string()))?;
+        let fee = psbt.fee().map_err(|e| BitcoinError::ParsePsbt(e.to_string()))?;
 
         Ok(BtcPreparedTransaction {
-            txid: response.txid,
-            fee_sat,
-            raw_tx: None,
+            txid: psbt.unsigned_tx.compute_txid().to_string(),
+            fee_sat: fee.to_sat(),
+            psbt,
             locked_utxos: Vec::new(),
         })
     }
 
-    async fn broadcast_transaction(&self, prepared: &BtcPreparedTransaction) -> Result<String, BitcoinError> {
-        let response: TxSendResponse = self
-            .post_request(
-                "txsend",
-                &TxSendRequest {
-                    txid: prepared.txid.clone(),
-                },
-            )
+    async fn sign_send_transaction(&self, prepared: &BtcPreparedTransaction) -> Result<(), BitcoinError> {
+        let txid = prepared.psbt.unsigned_tx.compute_txid();
+        self.post_request::<TxSendResponse>("txsend", &TxSendRequest { txid: txid.to_string() })
             .await
-            .map_err(|e| BitcoinError::Transaction(e.to_string()))?;
+            .map_err(|e| BitcoinError::FinalizeTransaction(e.to_string()))?;
 
-        Ok(response.txid)
+        Ok(())
     }
 
     async fn release_prepared_transaction(&self, prepared: &BtcPreparedTransaction) -> Result<(), BitcoinError> {
+        let txid = prepared.psbt.unsigned_tx.compute_txid();
         let _response: TxDiscardResponse = self
-            .post_request(
-                "txdiscard",
-                &TxDiscardRequest {
-                    txid: prepared.txid.clone(),
-                },
-            )
+            .post_request("txdiscard", &TxDiscardRequest { txid: txid.to_string() })
             .await
-            .map_err(|e| BitcoinError::Transaction(e.to_string()))?;
+            .map_err(|e| BitcoinError::ReleaseTransaction(e.to_string()))?;
 
         Ok(())
     }

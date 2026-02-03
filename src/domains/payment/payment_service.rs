@@ -1,11 +1,10 @@
 use std::{str::FromStr, sync::Arc};
 
 use async_trait::async_trait;
-use base64::{engine::general_purpose::STANDARD, Engine};
 use breez_sdk_core::{parse, BitcoinAddressData, InputType, LNInvoice, LnUrlPayRequestData, SuccessAction};
 use chrono::Utc;
 use lightning_invoice::Bolt11Invoice;
-use serde_bolt::bitcoin::hashes::{hex::ToHex, sha256, Hash};
+use serde_bolt::bitcoin::hashes::hex::ToHex;
 use tracing::{debug, info, trace, warn};
 use uuid::Uuid;
 
@@ -54,11 +53,6 @@ impl PaymentService {
             fee_buffer,
             events,
         }
-    }
-
-    fn lock_id_for_payment(payment_id: Uuid) -> String {
-        let hash = sha256::Hash::hash(payment_id.as_bytes());
-        STANDARD.encode(hash)
     }
 }
 
@@ -217,21 +211,17 @@ impl PaymentService {
                 return Ok(internal_payment);
             }
 
-            let payment_id = Uuid::new_v4();
-            let lock_id = Some(Self::lock_id_for_payment(payment_id));
             let prepared_tx = self
                 .bitcoin_wallet
-                .prepare_send(data.address.clone(), amount, None, lock_id)
+                .prepare_transaction(data.address.clone(), amount, None)
                 .await?;
 
-            let fee_msat = prepared_tx.fee_sat.saturating_mul(1000);
             let pending_payment = match self
                 .insert_payment(
                     Payment {
-                        id: payment_id,
                         wallet_id,
                         amount_msat,
-                        fee_msat: Some(fee_msat),
+                        fee_msat: Some(prepared_tx.fee_sat.saturating_mul(1000)),
                         status: PaymentStatus::Pending,
                         ledger: Ledger::Onchain,
                         currency: data.network.into(),
@@ -249,35 +239,27 @@ impl PaymentService {
             {
                 Ok(payment) => payment,
                 Err(error) => {
-                    if let Err(release_err) = self.bitcoin_wallet.release_prepared_transaction(&prepared_tx).await {
-                        warn!(%release_err, "Failed to release prepared bitcoin transaction");
+                    if let Err(err) = self.bitcoin_wallet.release_prepared_transaction(&prepared_tx).await {
+                        warn!(txid = prepared_tx.txid.clone(), %err,
+                            "Failed while inserting. Please release the tx manually or wait for lease expiration.");
                     }
                     return Err(error);
                 }
             };
 
-            let txid = match self.bitcoin_wallet.broadcast_transaction(&prepared_tx).await {
-                Ok(txid) => txid,
-                Err(error) => {
-                    if let Err(release_err) = self.bitcoin_wallet.release_prepared_transaction(&prepared_tx).await {
-                        warn!(%release_err, "Failed to release prepared bitcoin transaction");
-                    }
-                    let mut failed_payment = pending_payment.clone();
-                    failed_payment.status = PaymentStatus::Failed;
-                    failed_payment.error = Some(error.to_string());
-                    self.store.payment.update(failed_payment).await?;
-
-                    return Err(error.into());
+            if let Err(error) = self.bitcoin_wallet.sign_send_transaction(&prepared_tx).await {
+                if let Err(err) = self.bitcoin_wallet.release_prepared_transaction(&prepared_tx).await {
+                    warn!(txid = prepared_tx.txid, %err,
+                            "Failed while signing and sending. Please release the tx manually or wait for lease expiration.");
                 }
-            };
 
-            if pending_payment.bitcoin.as_ref().and_then(|b| b.txid.as_deref()) != Some(txid.as_str()) {
-                let mut updated_payment = pending_payment.clone();
-                let bitcoin = updated_payment.bitcoin.get_or_insert_with(Default::default);
-                bitcoin.txid = Some(txid);
-                let payment = self.store.payment.update(updated_payment).await?;
-                return Ok(payment);
-            }
+                let mut failed_payment = pending_payment.clone();
+                failed_payment.status = PaymentStatus::Failed;
+                failed_payment.error = Some(error.to_string());
+                self.store.payment.update(failed_payment).await?;
+
+                return Err(error.into());
+            };
 
             Ok(pending_payment)
         } else {
