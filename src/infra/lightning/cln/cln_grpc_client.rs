@@ -1,6 +1,5 @@
 use std::{path::PathBuf, str::FromStr, time::Duration};
 
-use bitcoin::hashes::Hash;
 use chrono::{TimeZone, Utc};
 use hex::decode;
 use lightning_invoice::Bolt11Invoice;
@@ -33,7 +32,9 @@ use crate::{
         config::config_rs::deserialize_duration,
         lightning::{
             bitcoin_utils::parse_psbt,
-            cln::cln::{listpays_pays::ListpaysPaysStatus, newaddr_request::NewaddrAddresstype, ListpaysRequest},
+            cln::cln::{
+                feerate, listpays_pays::ListpaysPaysStatus, newaddr_request::NewaddrAddresstype, ListpaysRequest,
+            },
             types::parse_network,
             LnClient,
         },
@@ -259,7 +260,7 @@ impl LnClient for ClnGrpcClient {
                 None
             },
             lightning: Some(LnPayment {
-                payment_hash: Some(payment_hash),
+                payment_hash,
                 payment_preimage: entry.preimage.as_ref().map(hex::encode),
                 ..Default::default()
             }),
@@ -312,7 +313,7 @@ impl BitcoinWallet for ClnGrpcClient {
     ) -> Result<BtcPreparedTransaction, BitcoinError> {
         let mut client = self.client.clone();
         let feerate = fee_rate.map(|rate| Feerate {
-            style: Some(cln::feerate::Style::Perkb(rate * 1000)),
+            style: Some(feerate::Style::Perkb(rate * 1000)),
         });
 
         let response = client
@@ -337,18 +338,17 @@ impl BitcoinWallet for ClnGrpcClient {
         Ok(BtcPreparedTransaction {
             txid: psbt.unsigned_tx.compute_txid().to_string(),
             fee_sat: fee.to_sat(),
-            psbt,
+            psbt: response.psbt,
             locked_utxos: Vec::new(),
         })
     }
 
     async fn sign_send_transaction(&self, prepared: &BtcPreparedTransaction) -> Result<(), BitcoinError> {
         let mut client = self.client.clone();
-        let txid = prepared.psbt.unsigned_tx.compute_txid();
 
         client
             .tx_send(TxsendRequest {
-                txid: txid.as_byte_array().to_vec(),
+                txid: prepared.txid.as_bytes().to_vec(),
             })
             .await
             .map_err(|e| BitcoinError::FinalizeTransaction(e.message().to_string()))?
@@ -359,11 +359,10 @@ impl BitcoinWallet for ClnGrpcClient {
 
     async fn release_prepared_transaction(&self, prepared: &BtcPreparedTransaction) -> Result<(), BitcoinError> {
         let mut client = self.client.clone();
-        let txid = prepared.psbt.unsigned_tx.compute_txid();
 
         client
             .tx_discard(TxdiscardRequest {
-                txid: txid.as_byte_array().to_vec(),
+                txid: prepared.txid.as_bytes().to_vec(),
             })
             .await
             .map_err(|e| BitcoinError::FinalizeTransaction(e.message().to_string()))?;

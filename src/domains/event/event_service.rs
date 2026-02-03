@@ -222,13 +222,12 @@ impl EventUseCases for EventService {
 
         let status = Self::output_status(event.block_height);
 
-        let Some(destination_address) = updated_payment
+        let destination_address = updated_payment
             .bitcoin
             .as_ref()
-            .and_then(|b| b.destination_address.clone())
-        else {
-            return Err(DataError::Inconsistency("Destination address not found.".into()).into());
-        };
+            .ok_or_else(|| DataError::Inconsistency("Bitcoin data not found.".into()))?
+            .address
+            .clone();
 
         let btc_output = BtcOutput {
             outpoint: outpoint.clone(),

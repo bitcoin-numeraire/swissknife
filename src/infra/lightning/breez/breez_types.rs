@@ -49,7 +49,7 @@ impl From<BreezPayment> for Payment {
             payment_time: Some(Utc.timestamp_opt(val.payment_time, 0).unwrap()),
             description: val.description,
             lightning: Some(LnPayment {
-                payment_hash: Some(val.id),
+                payment_hash: val.id,
                 payment_preimage: match val.details {
                     PaymentDetails::Ln { data } => Some(data.payment_preimage),
                     _ => None,

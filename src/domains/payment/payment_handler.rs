@@ -15,7 +15,10 @@ use crate::{
             BAD_REQUEST_EXAMPLE, FORBIDDEN_EXAMPLE, INTERNAL_EXAMPLE, NOT_FOUND_EXAMPLE, UNAUTHORIZED_EXAMPLE,
             UNPROCESSABLE_EXAMPLE,
         },
-        dtos::{BtcPaymentResponse, ErrorResponse, LnPaymentResponse, PaymentResponse, SendPaymentRequest},
+        dtos::{
+            BtcPaymentResponse, ErrorResponse, InternalPaymentResponse, LnPaymentResponse, PaymentResponse,
+            SendPaymentRequest,
+        },
         entities::AppServices,
         errors::ApplicationError,
     },
@@ -35,6 +38,7 @@ use super::{PaymentFilter, PaymentStatus};
         PaymentResponse,
         LnPaymentResponse,
         BtcPaymentResponse,
+        InternalPaymentResponse,
         SendPaymentRequest,
         PaymentStatus,
         LnUrlSuccessAction

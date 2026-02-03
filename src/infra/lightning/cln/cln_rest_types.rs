@@ -144,15 +144,28 @@ pub struct TxPrepareRequest {
     pub feerate: Option<u32>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug)]
 pub struct TxPrepareOutput {
     pub address: String,
     pub amount: u64,
 }
 
+impl Serialize for TxPrepareOutput {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeMap;
+        let mut map = serializer.serialize_map(Some(1))?;
+        map.serialize_entry(&self.address, &self.amount)?;
+        map.end()
+    }
+}
+
 #[derive(Debug, Deserialize)]
 pub struct TxPrepareResponse {
     pub psbt: String,
+    pub unsigned_tx: String,
 
     #[allow(dead_code)]
     pub txid: String,
@@ -208,7 +221,7 @@ impl From<PayResponse> for Payment {
             payment_time: Some(Utc.timestamp_opt(seconds, nanoseconds).unwrap()),
             error,
             lightning: Some(LnPayment {
-                payment_hash: Some(val.payment_hash),
+                payment_hash: val.payment_hash,
                 payment_preimage: Some(val.payment_preimage),
                 ..Default::default()
             }),

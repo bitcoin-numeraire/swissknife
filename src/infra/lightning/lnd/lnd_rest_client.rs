@@ -1,7 +1,7 @@
 use std::{collections::HashMap, path::PathBuf, time::Duration};
 
 use anyhow::anyhow;
-use chrono::TimeZone;
+use chrono::{TimeZone, Utc};
 use futures_util::StreamExt;
 use reqwest::{
     header::{HeaderMap, HeaderValue},
@@ -338,9 +338,9 @@ impl LnClient for LndRestClient {
                     status: PaymentStatus::Settled,
                     amount_msat: status.value_msat.unwrap_or_default(),
                     fee_msat: status.fee_msat,
-                    payment_time: Some(chrono::Utc.timestamp_nanos(payment_time_ns)),
+                    payment_time: Some(Utc.timestamp_nanos(payment_time_ns)),
                     lightning: Some(LnPayment {
-                        payment_hash: Some(status.payment_hash),
+                        payment_hash: status.payment_hash,
                         payment_preimage: Some(status.payment_preimage),
                         ..Default::default()
                     }),
@@ -354,7 +354,7 @@ impl LnClient for LndRestClient {
                 amount_msat: status.value_msat.unwrap_or_default(),
                 fee_msat: status.fee_msat,
                 lightning: Some(LnPayment {
-                    payment_hash: Some(status.payment_hash),
+                    payment_hash: status.payment_hash,
                     ..Default::default()
                 }),
                 ..Default::default()
@@ -401,12 +401,15 @@ impl BitcoinWallet for LndRestClient {
         let mut outputs = HashMap::new();
         outputs.insert(address, amount_sat);
 
+        let target_conf = if fee_rate_sat_vb.is_none() { Some(1) } else { None };
+
         let response: FundPsbtResponse = self
             .post_request(
                 "v2/wallet/psbt/fund",
                 &FundPsbtRequest {
                     raw: TxTemplate { outputs },
                     sat_per_vbyte: fee_rate_sat_vb,
+                    target_conf,
                     min_confs: 1,
                     spend_unconfirmed: false,
                 },
@@ -434,29 +437,29 @@ impl BitcoinWallet for LndRestClient {
         Ok(BtcPreparedTransaction {
             txid: psbt.unsigned_tx.compute_txid().to_string(),
             fee_sat: fee.to_sat(),
-            psbt,
+            psbt: response.funded_psbt,
             locked_utxos,
         })
     }
 
     async fn sign_send_transaction(&self, prepared: &BtcPreparedTransaction) -> Result<(), BitcoinError> {
-        let tx_hex = prepared.psbt.serialize_hex();
-
-        if let Err(e) = self
+        let finalize_response = self
             .post_request::<FinalizePsbtResponse>(
                 "v2/wallet/psbt/finalize",
                 &FinalizePsbtRequest {
-                    funded_psbt: tx_hex.clone(),
+                    funded_psbt: prepared.psbt.clone(),
                 },
             )
             .await
-        {
-            self.release_prepared_transaction(prepared).await?;
-            return Err(BitcoinError::FinalizeTransaction(e.to_string()));
-        }
+            .map_err(|e| BitcoinError::FinalizeTransaction(e.to_string()))?;
 
         let response: PublishTransactionResponse = self
-            .post_request("v2/wallet/tx", &PublishTransactionRequest { tx_hex })
+            .post_request(
+                "v2/wallet/tx",
+                &PublishTransactionRequest {
+                    tx_hex: finalize_response.raw_final_tx,
+                },
+            )
             .await
             .map_err(|e| BitcoinError::BroadcastTransaction(e.to_string()))?;
 

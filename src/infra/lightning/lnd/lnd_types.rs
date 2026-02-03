@@ -117,7 +117,7 @@ impl From<PayResponse> for Payment {
             fee_msat: Some(val.fee_msat),
             payment_time: Some(Utc.timestamp_nanos(val.creation_time_ns)),
             lightning: Some(LnPayment {
-                payment_hash: Some(val.payment_hash),
+                payment_hash: val.payment_hash,
                 payment_preimage: Some(val.payment_preimage),
                 ..Default::default()
             }),
@@ -189,6 +189,7 @@ pub struct FundPsbtRequest {
     pub sat_per_vbyte: Option<u32>,
     pub min_confs: u32,
     pub spend_unconfirmed: bool,
+    pub target_conf: Option<u32>,
 }
 
 #[derive(Debug, Serialize, Default)]
@@ -203,18 +204,19 @@ pub struct FundPsbtResponse {
     pub locked_utxos: Vec<UtxoLease>,
 }
 
+#[serde_as]
 #[derive(Debug, Serialize)]
 pub struct FinalizePsbtRequest {
     pub funded_psbt: String,
 }
 
-#[allow(dead_code)]
+#[serde_as]
 #[derive(Debug, Deserialize)]
 pub struct FinalizePsbtResponse {
-    pub signed_psbt: String,
     pub raw_final_tx: String,
 }
 
+#[serde_as]
 #[derive(Debug, Serialize)]
 pub struct PublishTransactionRequest {
     pub tx_hex: String,

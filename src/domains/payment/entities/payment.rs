@@ -27,12 +27,13 @@ pub struct Payment {
     pub updated_at: Option<DateTime<Utc>>,
     pub lightning: Option<LnPayment>,
     pub bitcoin: Option<BtcPayment>,
+    pub internal: Option<InternalPayment>,
 }
 
 #[derive(Clone, Debug, Default)]
 pub struct LnPayment {
     pub ln_address: Option<String>,
-    pub payment_hash: Option<String>,
+    pub payment_hash: String,
     pub payment_preimage: Option<String>,
     pub metadata: Option<String>,
     pub success_action: Option<LnUrlSuccessAction>,
@@ -40,10 +41,17 @@ pub struct LnPayment {
 
 #[derive(Clone, Debug, Default)]
 pub struct BtcPayment {
-    pub destination_address: Option<String>,
-    pub txid: Option<String>,
+    pub address: String,
+    pub txid: String,
     pub output_id: Option<Uuid>,
     pub output: Option<BtcOutput>,
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct InternalPayment {
+    pub ln_address: Option<String>,
+    pub btc_address: Option<String>,
+    pub payment_hash: Option<String>,
 }
 
 #[derive(Clone, Debug, EnumString, Display, Deserialize, Serialize, PartialEq, Eq, Default, ToSchema)]

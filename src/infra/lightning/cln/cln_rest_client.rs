@@ -270,7 +270,7 @@ impl LnClient for ClnRestClient {
                 None
             },
             lightning: Some(LnPayment {
-                payment_hash: Some(payment_hash),
+                payment_hash: payment_hash,
                 payment_preimage: payment.preimage,
                 ..Default::default()
             }),
@@ -333,7 +333,7 @@ impl BitcoinWallet for ClnRestClient {
             .map_err(|e| BitcoinError::PrepareTransaction(e.to_string()))?;
 
         let psbt_bytes = STANDARD
-            .decode(response.psbt)
+            .decode(response.psbt.clone())
             .map_err(|e| BitcoinError::ParsePsbt(e.to_string()))?;
         let psbt = Psbt::deserialize(&psbt_bytes).map_err(|e| BitcoinError::ParsePsbt(e.to_string()))?;
         let fee = psbt.fee().map_err(|e| BitcoinError::ParsePsbt(e.to_string()))?;
@@ -341,24 +341,32 @@ impl BitcoinWallet for ClnRestClient {
         Ok(BtcPreparedTransaction {
             txid: psbt.unsigned_tx.compute_txid().to_string(),
             fee_sat: fee.to_sat(),
-            psbt,
+            psbt: response.psbt,
             locked_utxos: Vec::new(),
         })
     }
 
     async fn sign_send_transaction(&self, prepared: &BtcPreparedTransaction) -> Result<(), BitcoinError> {
-        let txid = prepared.psbt.unsigned_tx.compute_txid();
-        self.post_request::<TxSendResponse>("txsend", &TxSendRequest { txid: txid.to_string() })
-            .await
-            .map_err(|e| BitcoinError::FinalizeTransaction(e.to_string()))?;
+        self.post_request::<TxSendResponse>(
+            "txsend",
+            &TxSendRequest {
+                txid: prepared.txid.clone(),
+            },
+        )
+        .await
+        .map_err(|e| BitcoinError::FinalizeTransaction(e.to_string()))?;
 
         Ok(())
     }
 
     async fn release_prepared_transaction(&self, prepared: &BtcPreparedTransaction) -> Result<(), BitcoinError> {
-        let txid = prepared.psbt.unsigned_tx.compute_txid();
         let _response: TxDiscardResponse = self
-            .post_request("txdiscard", &TxDiscardRequest { txid: txid.to_string() })
+            .post_request(
+                "txdiscard",
+                &TxDiscardRequest {
+                    txid: prepared.txid.clone(),
+                },
+            )
             .await
             .map_err(|e| BitcoinError::ReleaseTransaction(e.to_string()))?;
 

@@ -1,5 +1,3 @@
-use bitcoin::Psbt;
-
 use crate::domains::event::BtcOutputEvent;
 
 #[derive(Clone, Debug)]
@@ -35,7 +33,7 @@ pub struct BtcTransactionOutput {
 pub struct BtcPreparedTransaction {
     pub txid: String,
     pub fee_sat: u64,
-    pub psbt: Psbt,
+    pub psbt: String,
     pub locked_utxos: Vec<BtcLockedUtxo>,
 }
 

@@ -8,7 +8,7 @@ use crate::{
         bitcoin::{BtcAddress, BtcOutput},
         invoice::{Invoice, InvoiceStatus, LnInvoice},
         ln_address::LnAddress,
-        payment::{BtcPayment, LnPayment, Payment},
+        payment::{BtcPayment, InternalPayment, LnPayment, Payment},
         user::ApiKey,
         wallet::{Contact, Wallet},
     },
@@ -72,30 +72,35 @@ impl From<PaymentModel> for Payment {
     fn from(model: PaymentModel) -> Self {
         let ledger = model.ledger.parse().expect(ASSERTION_MSG);
 
-        let lightning = (ledger == Ledger::Lightning
-            || model.ln_address.is_some()
-            || model.payment_preimage.is_some()
-            || model.metadata.is_some()
-            || model.success_action.is_some()
-            || (model.payment_hash.is_some()
-                && model.btc_address.is_none()
-                && model.btc_output_id.is_none()
-                && ledger != Ledger::Onchain))
-            .then(|| LnPayment {
-                ln_address: model.ln_address,
-                payment_hash: model.payment_hash.clone(),
-                payment_preimage: model.payment_preimage,
-                metadata: model.metadata,
-                success_action: serde_json::from_value(model.success_action.unwrap_or_default()).ok(),
-            });
+        let lightning = (ledger == Ledger::Lightning).then(|| LnPayment {
+            ln_address: model.ln_address.clone(),
+            payment_hash: model
+                .payment_hash
+                .clone()
+                .expect("payment_hash should exist for Lightning payment"),
+            payment_preimage: model.payment_preimage.clone(),
+            metadata: model.metadata.clone(),
+            success_action: serde_json::from_value(model.success_action.clone().unwrap_or_default()).ok(),
+        });
 
-        let bitcoin = (model.btc_address.is_some() || model.btc_output_id.is_some() || ledger == Ledger::Onchain)
-            .then_some(BtcPayment {
-                destination_address: model.btc_address,
-                txid: model.payment_hash,
-                output_id: model.btc_output_id,
-                output: None,
-            });
+        let bitcoin = (ledger == Ledger::Onchain).then(|| BtcPayment {
+            address: model
+                .btc_address
+                .clone()
+                .expect("destination address should exist for On-chain payment"),
+            txid: model
+                .payment_hash
+                .clone()
+                .expect("payment_hash (txid) should exist for On-chain payment"),
+            output_id: model.btc_output_id,
+            output: None,
+        });
+
+        let internal = (ledger == Ledger::Internal).then(|| InternalPayment {
+            ln_address: model.ln_address.clone(),
+            btc_address: model.btc_address.clone(),
+            payment_hash: model.payment_hash.clone(),
+        });
 
         Payment {
             id: model.id,
@@ -112,6 +117,7 @@ impl From<PaymentModel> for Payment {
             updated_at: model.updated_at.map(|t| t.and_utc()),
             lightning,
             bitcoin,
+            internal,
         }
     }
 }
