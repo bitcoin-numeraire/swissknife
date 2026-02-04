@@ -39,7 +39,7 @@ impl From<PayResponse> for Payment {
             payment_time: Some(Utc.timestamp_opt(seconds, nanoseconds).unwrap()),
             error,
             lightning: Some(LnPayment {
-                payment_hash: Some(val.payment_hash.to_hex()),
+                payment_hash: val.payment_hash.to_hex(),
                 payment_preimage: Some(val.payment_preimage.to_hex()),
                 ..Default::default()
             }),

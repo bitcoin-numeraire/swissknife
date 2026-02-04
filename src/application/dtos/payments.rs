@@ -4,13 +4,10 @@ use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::{
-    application::{
-        dtos::BtcOutputResponse,
-        entities::{Currency, Ledger},
-    },
+    application::entities::{Currency, Ledger},
     domains::{
         lnurl::LnUrlSuccessAction,
-        payment::{BtcPayment, LnPayment, Payment, PaymentStatus},
+        payment::{BtcPayment, InternalPayment, LnPayment, Payment, PaymentStatus},
     },
 };
 
@@ -81,6 +78,10 @@ pub struct PaymentResponse {
     /// Bitcoin on-chain payment details
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bitcoin: Option<BtcPaymentResponse>,
+
+    /// Internal payment details
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub internal: Option<InternalPaymentResponse>,
 }
 
 #[derive(Serialize, ToSchema)]
@@ -91,9 +92,8 @@ pub struct LnPaymentResponse {
     pub ln_address: Option<String>,
 
     /// Payment hash
-    #[serde(skip_serializing_if = "Option::is_none")]
     #[schema(example = "b587c7f76339e3fb87ad2b...")]
-    pub payment_hash: Option<String>,
+    pub payment_hash: String,
 
     /// Payment Preimage
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -111,16 +111,32 @@ pub struct LnPaymentResponse {
 #[derive(Serialize, ToSchema)]
 pub struct BtcPaymentResponse {
     /// Destination Bitcoin address. Populated for Bitcoin onchain payments.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub destination_address: Option<String>,
+    pub address: String,
 
     /// Transaction ID for on-chain payments.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub txid: Option<String>,
+    pub txid: String,
 
-    /// Bitcoin Output
+    /// Bitcoin block height where the transaction was confirmed.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub output: Option<BtcOutputResponse>,
+    pub block_height: Option<u32>,
+}
+
+#[derive(Serialize, ToSchema)]
+pub struct InternalPaymentResponse {
+    /// Lightning Address. Populated for internal LN Address payments
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(example = "hello@numeraire.tech")]
+    pub ln_address: Option<String>,
+
+    /// Bitcoin Address. Populated for internal Bitcoin address payments
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(example = "bc1q...")]
+    pub btc_address: Option<String>,
+
+    /// Payment hash. Populated for internal bolt11 payments
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(example = "b587c7f76339e3fb87ad2b...")]
+    pub payment_hash: Option<String>,
 }
 
 impl From<Payment> for PaymentResponse {
@@ -140,6 +156,7 @@ impl From<Payment> for PaymentResponse {
             updated_at: payment.updated_at,
             lightning: payment.lightning.map(Into::into),
             bitcoin: payment.bitcoin.map(Into::into),
+            internal: payment.internal.map(Into::into),
         }
     }
 }
@@ -159,9 +176,19 @@ impl From<LnPayment> for LnPaymentResponse {
 impl From<BtcPayment> for BtcPaymentResponse {
     fn from(payment: BtcPayment) -> Self {
         BtcPaymentResponse {
-            destination_address: payment.destination_address,
+            address: payment.address,
             txid: payment.txid,
-            output: payment.output.map(Into::into),
+            block_height: payment.block_height,
+        }
+    }
+}
+
+impl From<InternalPayment> for InternalPaymentResponse {
+    fn from(payment: InternalPayment) -> Self {
+        InternalPaymentResponse {
+            ln_address: payment.ln_address,
+            btc_address: payment.btc_address,
+            payment_hash: payment.payment_hash,
         }
     }
 }

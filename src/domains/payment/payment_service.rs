@@ -15,14 +15,14 @@ use crate::{
     },
     domains::{
         bitcoin::BitcoinWallet,
-        event::{BtcWithdrawalConfirmedEvent, EventUseCases, LnPayFailureEvent, LnPaySuccessEvent},
+        event::{EventUseCases, LnPayFailureEvent, LnPaySuccessEvent, OnchainWithdrawalEvent},
         invoice::{Invoice, InvoiceStatus},
         lnurl::{process_success_action, validate_lnurl_pay},
     },
     infra::lightning::LnClient,
 };
 
-use super::{BtcPayment, LnPayment, Payment, PaymentFilter, PaymentStatus, PaymentsUseCases};
+use super::{BtcPayment, InternalPayment, LnPayment, Payment, PaymentFilter, PaymentStatus, PaymentsUseCases};
 
 const DEFAULT_INTERNAL_INVOICE_DESCRIPTION: &str = "Numeraire Invoice";
 const DEFAULT_INTERNAL_PAYMENT_DESCRIPTION: &str = "Payment to Numeraire";
@@ -95,7 +95,6 @@ impl PaymentService {
                 self.store
                     .invoice
                     .insert(Invoice {
-                        id: Uuid::new_v4(),
                         wallet_id: retrieved_address.wallet_id,
                         ln_address_id: Some(retrieved_address.id),
                         ledger: Ledger::Internal,
@@ -124,9 +123,10 @@ impl PaymentService {
                             payment_time: Some(curr_time),
                             ledger: Ledger::Internal,
                             currency: Currency::Bitcoin,
-                            lightning: Some(LnPayment {
+                            internal: Some(InternalPayment {
                                 ln_address: Some(input),
-                                ..Default::default()
+                                btc_address: None,
+                                payment_hash: None,
                             }),
                             ..Default::default()
                         },
@@ -170,7 +170,6 @@ impl PaymentService {
                 self.store
                     .invoice
                     .insert(Invoice {
-                        id: Uuid::new_v4(),
                         wallet_id: recipient_address.wallet_id,
                         ln_address_id: None,
                         description: description.clone(),
@@ -196,9 +195,10 @@ impl PaymentService {
                             ledger: Ledger::Internal,
                             currency: data.network.into(),
                             description: description.clone(),
-                            bitcoin: Some(BtcPayment {
-                                destination_address: Some(data.address),
-                                ..Default::default()
+                            internal: Some(InternalPayment {
+                                ln_address: None,
+                                btc_address: Some(data.address),
+                                payment_hash: None,
                             }),
                             fee_msat: Some(0),
                             payment_time: Some(timestamp),
@@ -211,46 +211,59 @@ impl PaymentService {
                 return Ok(internal_payment);
             }
 
-            let pending_payment = self
+            let prepared_tx = self
+                .bitcoin_wallet
+                .prepare_transaction(data.address.clone(), amount, None)
+                .await?;
+
+            let pending_payment = match self
                 .insert_payment(
                     Payment {
                         wallet_id,
                         amount_msat,
+                        fee_msat: Some(prepared_tx.fee_sat.saturating_mul(1000)),
                         status: PaymentStatus::Pending,
                         ledger: Ledger::Onchain,
                         currency: data.network.into(),
                         description,
                         bitcoin: Some(BtcPayment {
-                            destination_address: Some(data.address.clone()),
+                            address: data.address,
+                            txid: prepared_tx.txid.clone(),
                             ..Default::default()
                         }),
                         ..Default::default()
                     },
-                    self.fee_buffer,
+                    0.0,
                 )
-                .await?;
-
-            let txid = match self.bitcoin_wallet.send(data.address.clone(), amount, None).await {
-                Ok(txid) => txid,
+                .await
+            {
+                Ok(payment) => payment,
                 Err(error) => {
-                    let mut failed_payment = pending_payment.clone();
-                    failed_payment.status = PaymentStatus::Failed;
-                    failed_payment.error = Some(error.to_string());
-                    self.store.payment.update(failed_payment).await?;
-
-                    return Err(error.into());
+                    if let Err(err) = self.bitcoin_wallet.release_prepared_transaction(&prepared_tx).await {
+                        warn!(txid = prepared_tx.txid.clone(), %err,
+                            "Failed while inserting. Please release the tx manually or wait for lease expiration.");
+                    }
+                    return Err(error);
                 }
             };
 
-            let mut updated_payment = pending_payment.clone();
-            let bitcoin = updated_payment.bitcoin.get_or_insert_with(Default::default);
-            bitcoin.txid = Some(txid);
+            if let Err(error) = self.bitcoin_wallet.sign_send_transaction(&prepared_tx).await {
+                if let Err(err) = self.bitcoin_wallet.release_prepared_transaction(&prepared_tx).await {
+                    warn!(txid = prepared_tx.txid, %err,
+                            "Failed while signing and sending. Please release the tx manually or wait for lease expiration.");
+                }
 
-            let payment = self.store.payment.update(updated_payment).await?;
+                let mut failed_payment = pending_payment.clone();
+                failed_payment.status = PaymentStatus::Failed;
+                failed_payment.error = Some(error.to_string());
+                self.store.payment.update(failed_payment).await?;
 
-            Ok(payment)
+                return Err(error.into());
+            };
+
+            Ok(pending_payment)
         } else {
-            Err(DataError::Validation("Amount must be defined for zero-amount invoices.".to_string()).into())
+            Err(DataError::Validation("Amount must be defined for on-chain transactions.".to_string()).into())
         }
     }
 
@@ -296,9 +309,10 @@ impl PaymentService {
                                     payment_time: Some(Utc::now()),
                                     ledger: Ledger::Internal,
                                     currency: invoice.network.into(),
-                                    lightning: Some(LnPayment {
+                                    internal: Some(InternalPayment {
+                                        ln_address: None,
+                                        btc_address: None,
                                         payment_hash: Some(invoice.payment_hash),
-                                        ..Default::default()
                                     }),
                                     ..Default::default()
                                 },
@@ -330,7 +344,7 @@ impl PaymentService {
                         currency: invoice.network.into(),
                         description: comment,
                         lightning: Some(LnPayment {
-                            payment_hash: Some(invoice.payment_hash),
+                            payment_hash: invoice.payment_hash,
                             ..Default::default()
                         }),
                         ..Default::default()
@@ -383,12 +397,10 @@ impl PaymentService {
                     currency: Currency::Bitcoin,
                     lightning: Some(LnPayment {
                         ln_address: data.ln_address.clone(),
-                        payment_hash: Some(
-                            Bolt11Invoice::from_str(&cb.pr)
-                                .expect("should not fail or malformed callback")
-                                .payment_hash()
-                                .to_hex(),
-                        ),
+                        payment_hash: Bolt11Invoice::from_str(&cb.pr)
+                            .expect("should not fail or malformed callback")
+                            .payment_hash()
+                            .to_hex(),
                         ..Default::default()
                     }),
                     ..Default::default()
@@ -413,9 +425,14 @@ impl PaymentService {
             .await?
             .available_msat as f64;
 
-        let required_balance = payment.amount_msat as f64 * (1.0 + fee_buffer);
-        if balance < required_balance {
-            return Err(DataError::InsufficientFunds(required_balance).into());
+        let required_balance_msat = if let Some(fee_msat) = payment.fee_msat {
+            (payment.amount_msat.saturating_add(fee_msat)) as f64
+        } else {
+            payment.amount_msat as f64 * (1.0 + fee_buffer)
+        };
+
+        if balance < required_balance_msat {
+            return Err(DataError::InsufficientFunds(required_balance_msat).into());
         }
 
         let pending_payment = self.store.payment.insert(Some(&txn), payment).await?;
@@ -579,14 +596,14 @@ impl PaymentsUseCases for PaymentService {
         for payment in pending_payments {
             match payment.ledger {
                 Ledger::Lightning => {
-                    let Some(payment_hash) = payment
-                        .lightning
-                        .as_ref()
-                        .and_then(|lightning| lightning.payment_hash.clone())
-                    else {
-                        debug!(payment_id = %payment.id, "Missing lightning payment hash; skipping sync");
-                        continue;
+                    let Some(lightning) = payment.lightning.as_ref() else {
+                        return Err(DataError::Inconsistency(format!(
+                            "Missing lightning metadata on lightning payment with id: {}",
+                            payment.id
+                        ))
+                        .into());
                     };
+                    let payment_hash = lightning.payment_hash.clone();
 
                     let Some(node_payment) = self.ln_client.payment_by_hash(payment_hash.clone()).await? else {
                         continue;
@@ -620,6 +637,7 @@ impl PaymentsUseCases for PaymentService {
                             self.events
                                 .failed_payment(LnPayFailureEvent { payment_hash, reason })
                                 .await?;
+
                             synced += 1;
                         }
                         PaymentStatus::Pending => {
@@ -637,21 +655,16 @@ impl PaymentsUseCases for PaymentService {
                         .into());
                     };
 
-                    let Some(txid) = bitcoin.txid.as_ref() else {
-                        warn!(payment_id = %payment.id, "Missing transaction id; skipping sync");
-                        continue;
-                    };
-
-                    let tx = self.bitcoin_wallet.get_transaction(txid).await?;
-                    let Some(block_height) = tx.block_height else {
-                        debug!(payment_id = %payment.id, "Transaction not yet confirmed; skipping sync");
+                    let Some(tx) = self.bitcoin_wallet.get_transaction(&bitcoin.txid).await? else {
+                        warn!(payment_id = %payment.id, "Transaction not found, it was either removed from mempool, \
+                            never broadcast or backend was switched. Please investigate manually.");
                         continue;
                     };
 
                     self.events
-                        .onchain_withdrawal_confirmed(BtcWithdrawalConfirmedEvent {
-                            txid: txid.clone(),
-                            block_height,
+                        .onchain_withdrawal(OnchainWithdrawalEvent {
+                            txid: bitcoin.txid.clone(),
+                            block_height: tx.block_height,
                         })
                         .await?;
 

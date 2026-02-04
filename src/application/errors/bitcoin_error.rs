@@ -9,8 +9,20 @@ pub enum BitcoinError {
     #[error("Unsupported address type: {0}")]
     AddressType(String),
 
-    #[error("Failed to send bitcoin transaction: {0}")]
-    Transaction(String),
+    #[error("Failed to prepare/fund bitcoin transaction: {0}")]
+    PrepareTransaction(String),
+
+    #[error("Failed to parse bitcoin PSBT: {0}")]
+    ParsePsbt(String),
+
+    #[error("Failed to sign and send bitcoin transaction: {0}")]
+    FinalizeTransaction(String),
+
+    #[error("Failed to broadcast bitcoin transaction: {0}")]
+    BroadcastTransaction(String),
+
+    #[error("Failed to release prepared bitcoin transaction: {0}")]
+    ReleaseTransaction(String),
 
     #[error("Failed to get bitcoin output: {0}")]
     GetOutput(String),

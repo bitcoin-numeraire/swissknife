@@ -1,17 +1,20 @@
 use std::{path::PathBuf, str::FromStr, time::Duration};
 
+use bitcoin::{Address, Network, ScriptBuf};
 use chrono::{TimeZone, Utc};
 use hex::decode;
 use lightning_invoice::Bolt11Invoice;
+use psbt_v2::v2::Psbt;
 use serde::Deserialize;
+use serde_bolt::bitcoin::hashes::hex::ToHex;
 use tokio::{fs, io};
 use tonic::transport::{Certificate, Channel, ClientTlsConfig, Identity};
 use uuid::Uuid;
 
 use async_trait::async_trait;
 use cln::{
-    node_client::NodeClient, Amount, AmountOrAll, Feerate, GetinfoRequest, ListinvoicesRequest, NewaddrRequest,
-    PayRequest, WithdrawRequest,
+    node_client::NodeClient, Amount, Feerate, GetinfoRequest, ListinvoicesRequest, NewaddrRequest, OutputDesc,
+    PayRequest, TxdiscardRequest, TxprepareRequest, TxsendRequest,
 };
 
 use crate::{
@@ -20,7 +23,10 @@ use crate::{
         errors::{BitcoinError, LightningError},
     },
     domains::{
-        bitcoin::{BitcoinWallet, BtcAddressType, BtcNetwork, BtcOutput, BtcTransaction, BtcTransactionOutput},
+        bitcoin::{
+            BitcoinWallet, BtcAddressType, BtcNetwork, BtcOutput, BtcPreparedTransaction, BtcTransaction,
+            BtcTransactionOutput,
+        },
         invoice::Invoice,
         payment::{LnPayment, Payment, PaymentStatus},
         system::HealthStatus,
@@ -28,7 +34,9 @@ use crate::{
     infra::{
         config::config_rs::deserialize_duration,
         lightning::{
-            cln::cln::{listpays_pays::ListpaysPaysStatus, newaddr_request::NewaddrAddresstype, ListpaysRequest},
+            cln::cln::{
+                feerate, listpays_pays::ListpaysPaysStatus, newaddr_request::NewaddrAddresstype, ListpaysRequest,
+            },
             types::parse_network,
             LnClient,
         },
@@ -254,7 +262,7 @@ impl LnClient for ClnGrpcClient {
                 None
             },
             lightning: Some(LnPayment {
-                payment_hash: Some(payment_hash),
+                payment_hash,
                 payment_preimage: entry.preimage.as_ref().map(hex::encode),
                 ..Default::default()
             }),
@@ -299,63 +307,120 @@ impl BitcoinWallet for ClnGrpcClient {
             .ok_or_else(|| BitcoinError::Address("No address returned by CLN".to_string()))
     }
 
-    async fn send(&self, address: String, amount_sat: u64, fee_rate: Option<u32>) -> Result<String, BitcoinError> {
+    async fn prepare_transaction(
+        &self,
+        address: String,
+        amount_sat: u64,
+        fee_rate: Option<u32>,
+    ) -> Result<BtcPreparedTransaction, BitcoinError> {
         let mut client = self.client.clone();
         let feerate = fee_rate.map(|rate| Feerate {
-            style: Some(cln::feerate::Style::Perkb(rate * 1000)),
+            style: Some(feerate::Style::Perkb(rate * 1000)),
         });
 
         let response = client
-            .withdraw(WithdrawRequest {
-                destination: address,
-                satoshi: Some(AmountOrAll {
-                    value: Some(cln::amount_or_all::Value::Amount(Amount {
-                        msat: amount_sat * 1000,
-                    })),
-                }),
+            .tx_prepare(TxprepareRequest {
+                feerate,
                 minconf: None,
                 utxos: vec![],
-                feerate,
+                outputs: vec![OutputDesc {
+                    address,
+                    amount: Some(Amount {
+                        msat: amount_sat * 1000,
+                    }),
+                }],
             })
             .await
-            .map_err(|e| BitcoinError::Transaction(e.message().to_string()))?
+            .map_err(|e| BitcoinError::PrepareTransaction(e.message().to_string()))?
             .into_inner();
 
-        Ok(hex::encode(response.txid))
+        let psbt = Psbt::from_str(&response.psbt).map_err(|e| BitcoinError::ParsePsbt(e.to_string()))?;
+        let fee = psbt.fee().map_err(|e| BitcoinError::ParsePsbt(e.to_string()))?;
+
+        Ok(BtcPreparedTransaction {
+            txid: response.txid.to_hex(),
+            fee_sat: fee.to_sat(),
+            psbt: response.psbt,
+            locked_utxos: Vec::new(),
+        })
     }
 
-    async fn get_transaction(&self, txid: &str) -> Result<BtcTransaction, BitcoinError> {
+    async fn sign_send_transaction(&self, prepared: &BtcPreparedTransaction) -> Result<(), BitcoinError> {
+        let mut client = self.client.clone();
+
+        let txid = hex::decode(prepared.txid.clone()).map_err(|e| BitcoinError::FinalizeTransaction(e.to_string()))?;
+
+        client
+            .tx_send(TxsendRequest { txid })
+            .await
+            .map_err(|e| BitcoinError::FinalizeTransaction(e.message().to_string()))?
+            .into_inner();
+
+        Ok(())
+    }
+
+    async fn release_prepared_transaction(&self, prepared: &BtcPreparedTransaction) -> Result<(), BitcoinError> {
+        let mut client = self.client.clone();
+
+        let txid = hex::decode(prepared.txid.clone()).map_err(|e| BitcoinError::FinalizeTransaction(e.to_string()))?;
+
+        client
+            .tx_discard(TxdiscardRequest { txid })
+            .await
+            .map_err(|e| BitcoinError::FinalizeTransaction(e.message().to_string()))?;
+
+        Ok(())
+    }
+
+    async fn get_transaction(&self, txid: &str) -> Result<Option<BtcTransaction>, BitcoinError> {
         let mut client = self.client.clone();
 
         let response = client
             .list_transactions(cln::ListtransactionsRequest {})
             .await
-            .map_err(|e| BitcoinError::Transaction(e.message().to_string()))?
+            .map_err(|e| BitcoinError::GetTransaction(e.message().to_string()))?
             .into_inner();
 
-        let transaction = response
+        let Some(transaction) = response
             .transactions
             .into_iter()
             .find(|transaction| hex::encode(&transaction.hash) == txid)
-            .ok_or_else(|| BitcoinError::Transaction(format!("Transaction {txid} not found")))?;
+        else {
+            return Ok(None);
+        };
 
-        let outputs = transaction
+        let network = match self.network {
+            BtcNetwork::Bitcoin => Network::Bitcoin,
+            BtcNetwork::Testnet | BtcNetwork::Testnet4 => Network::Testnet,
+            BtcNetwork::Regtest => Network::Regtest,
+            BtcNetwork::Signet => Network::Signet,
+            BtcNetwork::Simnet => Network::Regtest, // Simnet uses regtest address format
+        };
+
+        let outputs: Result<Vec<_>, BitcoinError> = transaction
             .outputs
             .into_iter()
-            .map(|output| BtcTransactionOutput {
-                output_index: output.index,
-                address: None,
-                amount_sat: (output.amount_msat.map(|a| a.msat).unwrap_or_default() / 1000),
-                is_ours: false,
+            .map(|output| {
+                let script = ScriptBuf::from_bytes(output.script_pub_key.to_vec());
+                let address =
+                    Address::from_script(&script, network).map_err(|e| BitcoinError::GetTransaction(e.to_string()))?;
+
+                Ok(BtcTransactionOutput {
+                    output_index: output.index,
+                    address: address.to_string(),
+                    amount_sat: (output.amount_msat.map(|a| a.msat).unwrap_or_default() / 1000),
+                    is_ours: false,
+                })
             })
             .collect();
+        let outputs = outputs?;
 
-        Ok(BtcTransaction {
-            txid: hex::encode(transaction.hash),
+        Ok(Some(BtcTransaction {
+            txid: transaction.hash.to_hex(),
             block_height: Some(transaction.blockheight),
             outputs,
             is_outgoing: false, // TODO: determine from CLN transaction data when needed
-        })
+        }))
     }
 
     async fn get_output(

@@ -10,9 +10,8 @@ use crate::{
     application::errors::DatabaseError,
     domains::payment::{Payment, PaymentFilter, PaymentRepository},
     infra::database::sea_orm::models::{
-        btc_output::Model as BtcOutputModel,
-        payment::{ActiveModel, Column, Model as PaymentModel},
-        prelude::{BtcOutput, Payment as PaymentEntity},
+        payment::{ActiveModel, Column},
+        prelude::Payment as PaymentEntity,
     },
 };
 
@@ -22,18 +21,6 @@ pub struct SeaOrmPaymentRepository {
 }
 
 impl SeaOrmPaymentRepository {
-    fn map_with_output(model: PaymentModel, btc_output: Option<BtcOutputModel>) -> Payment {
-        let mut payment: Payment = model.into();
-
-        if let Some(output) = btc_output {
-            let bitcoin = payment.bitcoin.get_or_insert_with(Default::default);
-            bitcoin.output_id = Some(output.id);
-            bitcoin.output = Some(output.into());
-        }
-
-        payment
-    }
-
     pub fn new(db: DatabaseConnection) -> Self {
         Self { db }
     }
@@ -43,23 +30,21 @@ impl SeaOrmPaymentRepository {
 impl PaymentRepository for SeaOrmPaymentRepository {
     async fn find(&self, id: Uuid) -> Result<Option<Payment>, DatabaseError> {
         let model = PaymentEntity::find_by_id(id)
-            .find_also_related(BtcOutput)
             .one(&self.db)
             .await
             .map_err(|e| DatabaseError::FindOne(e.to_string()))?;
 
-        Ok(model.map(|(payment, btc_output)| Self::map_with_output(payment, btc_output)))
+        Ok(model.map(Into::into))
     }
 
     async fn find_by_payment_hash(&self, payment_hash: &str) -> Result<Option<Payment>, DatabaseError> {
         let model = PaymentEntity::find()
             .filter(Column::PaymentHash.eq(payment_hash))
-            .find_also_related(BtcOutput)
             .one(&self.db)
             .await
             .map_err(|e| DatabaseError::FindOne(e.to_string()))?;
 
-        Ok(model.map(|(payment, btc_output)| Self::map_with_output(payment, btc_output)))
+        Ok(model.map(Into::into))
     }
 
     async fn find_many(&self, filter: PaymentFilter) -> Result<Vec<Payment>, DatabaseError> {
@@ -77,15 +62,11 @@ impl PaymentRepository for SeaOrmPaymentRepository {
             .order_by(Column::CreatedAt, filter.order_direction.into())
             .offset(filter.offset)
             .limit(filter.limit)
-            .find_also_related(BtcOutput)
             .all(&self.db)
             .await
             .map_err(|e| DatabaseError::FindMany(e.to_string()))?;
 
-        Ok(models
-            .into_iter()
-            .map(|(payment, btc_output)| Self::map_with_output(payment, btc_output))
-            .collect())
+        Ok(models.into_iter().map(Into::into).collect())
     }
 
     async fn insert(&self, txn: Option<&DatabaseTransaction>, payment: Payment) -> Result<Payment, DatabaseError> {
@@ -95,7 +76,7 @@ impl PaymentRepository for SeaOrmPaymentRepository {
             .map(|lightning| {
                 (
                     lightning.ln_address.clone(),
-                    lightning.payment_hash.clone(),
+                    Some(lightning.payment_hash.clone()),
                     lightning.payment_preimage.clone(),
                     lightning.metadata.clone(),
                     lightning
@@ -104,37 +85,49 @@ impl PaymentRepository for SeaOrmPaymentRepository {
                         .and_then(|action| serde_json::to_value(action).ok()),
                 )
             })
-            .unwrap_or_default();
+            .unwrap_or((None, None, None, None, None));
 
-        let (btc_address, btc_txid, btc_output_id) = payment
+        let (btc_address, btc_txid, block_height) = payment
             .bitcoin
             .as_ref()
             .map(|bitcoin| {
                 (
-                    bitcoin.destination_address.clone(),
-                    bitcoin.txid.clone(),
-                    bitcoin.output_id,
+                    Some(bitcoin.address.clone()),
+                    Some(bitcoin.txid.clone()),
+                    bitcoin.block_height,
                 )
             })
-            .unwrap_or_default();
+            .unwrap_or((None, None, None));
+
+        let (internal_ln_address, internal_btc_address, internal_payment_hash) = payment
+            .internal
+            .as_ref()
+            .map(|internal| {
+                (
+                    internal.ln_address.clone(),
+                    internal.btc_address.clone(),
+                    internal.payment_hash.clone(),
+                )
+            })
+            .unwrap_or((None, None, None));
 
         let model = ActiveModel {
             id: Set(Uuid::new_v4()),
             wallet_id: Set(payment.wallet_id),
-            ln_address: Set(ln_address),
-            btc_address: Set(btc_address),
+            ln_address: Set(ln_address.or(internal_ln_address)),
+            btc_address: Set(btc_address.or(internal_btc_address)),
             amount_msat: Set(payment.amount_msat as i64),
             status: Set(payment.status.to_string()),
             ledger: Set(payment.ledger.to_string()),
             currency: Set(payment.currency.to_string()),
             fee_msat: Set(payment.fee_msat.map(|v| v as i64)),
             payment_time: Set(payment.payment_time.map(|t| t.naive_utc())),
-            payment_hash: Set(payment_hash.or(btc_txid)),
+            payment_hash: Set(payment_hash.or(btc_txid).or(internal_payment_hash)),
             description: Set(payment.description),
             metadata: Set(metadata),
             success_action: Set(success_action),
             payment_preimage: Set(payment_preimage),
-            btc_output_id: Set(btc_output_id),
+            btc_block_height: Set(block_height.map(|h| h as i32)),
             ..Default::default()
         };
 
@@ -155,7 +148,7 @@ impl PaymentRepository for SeaOrmPaymentRepository {
             .map(|lightning| {
                 (
                     lightning.ln_address.clone(),
-                    lightning.payment_hash.clone(),
+                    Some(lightning.payment_hash.clone()),
                     lightning.payment_preimage.clone(),
                     lightning.metadata.clone(),
                     lightning
@@ -164,38 +157,55 @@ impl PaymentRepository for SeaOrmPaymentRepository {
                         .and_then(|action| serde_json::to_value(action).ok()),
                 )
             })
-            .unwrap_or_default();
+            .unwrap_or((None, None, None, None, None));
 
-        let ln_address = match ln_address {
-            Some(address) => Set(Some(address)),
-            None => ActiveValue::NotSet,
-        };
-
-        let (btc_address, btc_txid, btc_output_id) = payment
+        let (btc_address, btc_txid, block_height) = payment
             .bitcoin
             .as_ref()
             .map(|bitcoin| {
                 (
-                    bitcoin.destination_address.clone(),
-                    bitcoin.txid.clone(),
-                    bitcoin.output_id,
+                    Some(bitcoin.address.clone()),
+                    Some(bitcoin.txid.clone()),
+                    bitcoin.block_height,
                 )
             })
-            .unwrap_or_default();
+            .unwrap_or((None, None, None));
+
+        let (internal_ln_address, internal_btc_address, internal_payment_hash) = payment
+            .internal
+            .as_ref()
+            .map(|internal| {
+                (
+                    internal.ln_address.clone(),
+                    internal.btc_address.clone(),
+                    internal.payment_hash.clone(),
+                )
+            })
+            .unwrap_or((None, None, None));
+
+        let ln_address = match ln_address.or(internal_ln_address) {
+            Some(address) => Set(Some(address)),
+            None => ActiveValue::NotSet,
+        };
+
+        let btc_address = match btc_address.or(internal_btc_address) {
+            Some(address) => Set(Some(address)),
+            None => ActiveValue::NotSet,
+        };
 
         let model = ActiveModel {
             id: Unchanged(payment.id),
             status: Set(payment.status.to_string()),
             fee_msat: Set(payment.fee_msat.map(|v| v as i64)),
             payment_time: Set(payment.payment_time.map(|t| t.naive_utc())),
-            payment_hash: Set(payment_hash.or(btc_txid)),
+            payment_hash: Set(payment_hash.or(btc_txid).or(internal_payment_hash)),
             payment_preimage: Set(payment_preimage),
             error: Set(payment.error),
             amount_msat: Set(payment.amount_msat as i64),
             metadata: Set(metadata),
             ln_address,
-            btc_address: Set(btc_address),
-            btc_output_id: Set(btc_output_id),
+            btc_address,
+            btc_block_height: Set(block_height.map(|h| h as i32)),
             success_action: Set(success_action),
             updated_at: Set(Some(Utc::now().naive_utc())),
             ..Default::default()

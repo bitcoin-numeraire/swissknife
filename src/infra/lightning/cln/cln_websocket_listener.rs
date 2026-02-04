@@ -17,10 +17,7 @@ use tracing::{error, info, trace, warn};
 
 use crate::{
     application::errors::LightningError,
-    domains::{
-        bitcoin::BitcoinWallet,
-        event::{BtcWithdrawalConfirmedEvent, EventUseCases},
-    },
+    domains::{bitcoin::BitcoinWallet, event::EventUseCases},
     infra::lightning::EventsListener,
 };
 
@@ -163,12 +160,8 @@ impl ClnWebsocketListener {
 
                             match serde_json::from_value::<ChainMovement>(event.clone()) {
                                 Ok(chain_mvt) => {
-                                    match (
-                                        chain_mvt.primary_tag.as_str(),
-                                        chain_mvt.account_id.as_str(),
-                                        chain_mvt.originating_account.as_deref(),
-                                    ) {
-                                        ("deposit", "wallet", _) => {
+                                    match (chain_mvt.primary_tag.as_str(), chain_mvt.account_id.as_str()) {
+                                        ("deposit", "wallet") => {
                                             let outpoint = match OutPoint::from_str(&chain_mvt.utxo) {
                                                 Ok(outpoint) => outpoint,
                                                 Err(err) => {
@@ -203,37 +196,14 @@ impl ClnWebsocketListener {
                                                 warn!(%err, "Failed to process onchain deposit");
                                             }
                                         }
-                                        ("deposit", "external", Some("wallet")) => {
+                                        ("withdrawal", "wallet") => {
+                                            if chain_mvt.spending_txid.is_none() {
+                                                trace!("Withdrawal missing spending txid");
+                                                continue;
+                                            };
+
                                             if let Err(err) = events.onchain_withdrawal(chain_mvt.into()).await {
                                                 error!(%err, "Failed to process onchain withdrawal");
-                                            }
-                                        }
-                                        ("withdrawal", "wallet", _) => {
-                                            let block_height = match chain_mvt.blockheight {
-                                                Some(height) if height > 0 => Some(height),
-                                                _ => None,
-                                            };
-
-                                            let Some(height) = block_height else {
-                                                error!(
-                                                    txid = chain_mvt.spending_txid.as_deref().unwrap_or_default(),
-                                                    "Withdrawal confirmation without block height"
-                                                );
-                                                continue;
-                                            };
-
-                                            let Some(spending_txid) = chain_mvt.spending_txid.as_deref() else {
-                                                error!("Withdrawal confirmation missing spending txid");
-                                                continue;
-                                            };
-
-                                            let confirm_event = BtcWithdrawalConfirmedEvent {
-                                                txid: spending_txid.to_string(),
-                                                block_height: height,
-                                            };
-
-                                            if let Err(err) = events.onchain_withdrawal_confirmed(confirm_event).await {
-                                                error!(%err, "Failed to process onchain withdrawal confirmation");
                                             }
                                         }
                                         _ => {

@@ -2,13 +2,14 @@ use base64::{prelude::BASE64_STANDARD, Engine};
 use chrono::{TimeZone, Utc};
 use lightning_invoice::Bolt11Invoice;
 use serde::{Deserialize, Serialize};
+use serde_with::{serde_as, DisplayFromStr};
+use std::collections::HashMap;
 
 use crate::domains::{
     bitcoin::{BtcTransaction, BtcTransactionOutput},
     event::LnInvoicePaidEvent,
     payment::LnPayment,
 };
-use serde_with::{serde_as, DisplayFromStr};
 use std::str::FromStr;
 
 use crate::{
@@ -116,7 +117,7 @@ impl From<PayResponse> for Payment {
             fee_msat: Some(val.fee_msat),
             payment_time: Some(Utc.timestamp_nanos(val.creation_time_ns)),
             lightning: Some(LnPayment {
-                payment_hash: Some(val.payment_hash),
+                payment_hash: val.payment_hash,
                 payment_preimage: Some(val.payment_preimage),
                 ..Default::default()
             }),
@@ -177,22 +178,78 @@ pub struct ErrorResponse {
     pub message: String,
 }
 
-#[derive(Debug, Serialize)]
-pub struct SendCoinsRequest {
-    pub addr: String,
-    pub amount: i64,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub sat_per_vbyte: Option<u64>,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct SendCoinsResponse {
-    pub txid: String,
-}
-
 #[derive(Debug, Deserialize)]
 pub struct NewAddressResponse {
     pub address: String,
+}
+
+#[derive(Debug, Serialize, Default)]
+pub struct FundPsbtRequest {
+    pub raw: TxTemplate,
+    pub sat_per_vbyte: Option<u32>,
+    pub min_confs: u32,
+    pub spend_unconfirmed: bool,
+    pub target_conf: Option<u32>,
+}
+
+#[derive(Debug, Serialize, Default)]
+pub struct TxTemplate {
+    pub outputs: HashMap<String, u64>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct FundPsbtResponse {
+    pub funded_psbt: String,
+    #[serde(default)]
+    pub locked_utxos: Vec<UtxoLease>,
+}
+
+#[serde_as]
+#[derive(Debug, Serialize)]
+pub struct FinalizePsbtRequest {
+    pub funded_psbt: String,
+}
+
+#[serde_as]
+#[derive(Debug, Deserialize)]
+pub struct FinalizePsbtResponse {
+    pub raw_final_tx: String,
+}
+
+#[serde_as]
+#[derive(Debug, Serialize)]
+pub struct PublishTransactionRequest {
+    pub tx_hex: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct PublishTransactionResponse {
+    #[serde(default)]
+    pub publish_error: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ReleaseOutputRequest {
+    pub id: String,
+    pub outpoint: OutPoint,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Deserialize)]
+pub struct ReleaseOutputResponse {
+    pub status: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct UtxoLease {
+    pub id: String,
+    pub outpoint: OutPoint,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct OutPoint {
+    pub txid_str: Option<String>,
+    pub output_index: Option<i64>,
 }
 
 #[serde_as]
@@ -230,7 +287,7 @@ impl From<TransactionResponse> for BtcTransaction {
             .into_iter()
             .map(|detail| BtcTransactionOutput {
                 output_index: detail.output_index,
-                address: Some(detail.address),
+                address: detail.address,
                 amount_sat: detail.amount,
                 is_ours: detail.is_our_address,
             })

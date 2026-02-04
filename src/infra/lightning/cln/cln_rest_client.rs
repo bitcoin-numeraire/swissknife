@@ -1,7 +1,9 @@
 use std::{path::PathBuf, str::FromStr, time::Duration};
 
+use bitcoin::{Address, Network, ScriptBuf};
 use chrono::{TimeZone, Utc};
 use lightning_invoice::Bolt11Invoice;
+use psbt_v2::v2::Psbt;
 use reqwest::{
     header::{HeaderMap, HeaderValue},
     Certificate, Client,
@@ -19,7 +21,8 @@ use crate::{
     },
     domains::{
         bitcoin::{
-            BitcoinWallet, BtcAddressType, BtcNetwork, BtcOutput, BtcOutputStatus, BtcTransaction, BtcTransactionOutput,
+            BitcoinWallet, BtcAddressType, BtcNetwork, BtcOutput, BtcOutputStatus, BtcPreparedTransaction,
+            BtcTransaction, BtcTransactionOutput,
         },
         invoice::Invoice,
         payment::{LnPayment, Payment, PaymentStatus},
@@ -34,8 +37,8 @@ use crate::{
 use super::{
     ErrorResponse, GetinfoRequest, GetinfoResponse, InvoiceRequest, InvoiceResponse, ListFundsRequest,
     ListInvoicesRequest, ListInvoicesResponse, ListPaysRequest, ListPaysResponse, ListTransactionsRequest,
-    ListTransactionsResponse, NewAddrRequest, NewAddrResponse, PayRequest, PayResponse, WithdrawRequest,
-    WithdrawResponse,
+    ListTransactionsResponse, NewAddrRequest, NewAddrResponse, PayRequest, PayResponse, TxDiscardRequest,
+    TxDiscardResponse, TxPrepareOutput, TxPrepareRequest, TxPrepareResponse, TxSendRequest, TxSendResponse,
 };
 
 #[derive(Clone, Debug, Deserialize)]
@@ -267,7 +270,7 @@ impl LnClient for ClnRestClient {
                 None
             },
             lightning: Some(LnPayment {
-                payment_hash: Some(payment_hash),
+                payment_hash: payment_hash,
                 payment_preimage: payment.preimage,
                 ..Default::default()
             }),
@@ -309,52 +312,112 @@ impl BitcoinWallet for ClnRestClient {
             .ok_or_else(|| BitcoinError::Address("No address returned by CLN".to_string()))
     }
 
-    async fn send(&self, address: String, amount_sat: u64, fee_rate: Option<u32>) -> Result<String, BitcoinError> {
-        let response: WithdrawResponse = self
+    async fn prepare_transaction(
+        &self,
+        address: String,
+        amount_sat: u64,
+        fee_rate_sat_vb: Option<u32>,
+    ) -> Result<BtcPreparedTransaction, BitcoinError> {
+        let response: TxPrepareResponse = self
             .post_request(
-                "withdraw",
-                &WithdrawRequest {
-                    destination: address,
-                    satoshi: amount_sat,
-                    feerate: fee_rate.map(|rate| format!("{rate}perkb")),
+                "txprepare",
+                &TxPrepareRequest {
+                    outputs: vec![TxPrepareOutput {
+                        address,
+                        amount: amount_sat,
+                    }],
+                    feerate: fee_rate_sat_vb.map(|rate| rate * 1000), // Convert sat/vbyte to perkb
                 },
             )
             .await
-            .map_err(|e| BitcoinError::Transaction(e.to_string()))?;
+            .map_err(|e| BitcoinError::PrepareTransaction(e.to_string()))?;
 
-        Ok(response.txid)
+        let psbt = Psbt::from_str(&response.psbt).map_err(|e| BitcoinError::ParsePsbt(e.to_string()))?;
+        let fee = psbt.fee().map_err(|e| BitcoinError::ParsePsbt(e.to_string()))?;
+
+        Ok(BtcPreparedTransaction {
+            txid: response.txid,
+            fee_sat: fee.to_sat(),
+            psbt: response.psbt,
+            locked_utxos: Vec::new(),
+        })
     }
 
-    async fn get_transaction(&self, txid: &str) -> Result<BtcTransaction, BitcoinError> {
+    async fn sign_send_transaction(&self, prepared: &BtcPreparedTransaction) -> Result<(), BitcoinError> {
+        self.post_request::<TxSendResponse>(
+            "txsend",
+            &TxSendRequest {
+                txid: prepared.txid.clone(),
+            },
+        )
+        .await
+        .map_err(|e| BitcoinError::FinalizeTransaction(e.to_string()))?;
+
+        Ok(())
+    }
+
+    async fn release_prepared_transaction(&self, prepared: &BtcPreparedTransaction) -> Result<(), BitcoinError> {
+        let _response: TxDiscardResponse = self
+            .post_request(
+                "txdiscard",
+                &TxDiscardRequest {
+                    txid: prepared.txid.clone(),
+                },
+            )
+            .await
+            .map_err(|e| BitcoinError::ReleaseTransaction(e.to_string()))?;
+
+        Ok(())
+    }
+
+    async fn get_transaction(&self, txid: &str) -> Result<Option<BtcTransaction>, BitcoinError> {
         let response: ListTransactionsResponse = self
             .post_request("listtransactions", &ListTransactionsRequest {})
             .await
             .map_err(|e| BitcoinError::GetTransaction(e.to_string()))?;
 
-        let transaction = response
+        let Some(transaction) = response
             .transactions
             .into_iter()
             .find(|transaction| transaction.hash == txid)
-            .ok_or_else(|| BitcoinError::GetTransaction(format!("Transaction {txid} not found")))?;
+        else {
+            return Ok(None);
+        };
 
-        // CLN does not provide output addresses, could determine with scriptpubkeys if needed
-        let outputs = transaction
+        let network = match self.network {
+            BtcNetwork::Bitcoin => Network::Bitcoin,
+            BtcNetwork::Testnet | BtcNetwork::Testnet4 => Network::Testnet,
+            BtcNetwork::Regtest => Network::Regtest,
+            BtcNetwork::Signet => Network::Signet,
+            BtcNetwork::Simnet => Network::Regtest,
+        };
+
+        let outputs: Result<Vec<_>, BitcoinError> = transaction
             .outputs
             .into_iter()
-            .map(|output| BtcTransactionOutput {
-                output_index: output.index,
-                address: None,
-                amount_sat: output.amount_msat / 1000,
-                is_ours: false,
+            .map(|output| {
+                let script_bytes =
+                    hex::decode(&output.script_pub_key).map_err(|e| BitcoinError::GetTransaction(e.to_string()))?;
+                let script = ScriptBuf::from_bytes(script_bytes);
+                let address =
+                    Address::from_script(&script, network).map_err(|e| BitcoinError::GetTransaction(e.to_string()))?;
+
+                Ok(BtcTransactionOutput {
+                    output_index: output.index,
+                    address: address.to_string(),
+                    amount_sat: output.amount_msat / 1000,
+                    is_ours: false,
+                })
             })
             .collect();
+        let outputs = outputs?;
 
-        Ok(BtcTransaction {
+        Ok(Some(BtcTransaction {
             txid: transaction.hash,
             block_height: Some(transaction.blockheight),
             outputs,
             is_outgoing: false, // TODO: No way for now to determine this from CLN
-        })
+        }))
     }
 
     async fn get_output(

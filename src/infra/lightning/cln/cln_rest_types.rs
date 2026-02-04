@@ -75,6 +75,9 @@ pub struct ListTransactionsTransaction {
 pub struct ListTransactionsOutput {
     pub index: u32,
     pub amount_msat: u64,
+
+    #[serde(rename = "scriptPubKey")]
+    pub script_pub_key: String,
 }
 
 #[derive(Debug, Serialize, Default)]
@@ -139,15 +142,54 @@ pub struct NewAddrResponse {
 }
 
 #[derive(Debug, Serialize)]
-pub struct WithdrawRequest {
-    pub destination: String,
-    pub satoshi: u64,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub feerate: Option<String>,
+pub struct TxPrepareRequest {
+    pub outputs: Vec<TxPrepareOutput>,
+    pub feerate: Option<u32>,
+}
+
+#[derive(Debug)]
+pub struct TxPrepareOutput {
+    pub address: String,
+    pub amount: u64,
+}
+
+impl Serialize for TxPrepareOutput {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeMap;
+        let mut map = serializer.serialize_map(Some(1))?;
+        map.serialize_entry(&self.address, &self.amount)?;
+        map.end()
+    }
 }
 
 #[derive(Debug, Deserialize)]
-pub struct WithdrawResponse {
+pub struct TxPrepareResponse {
+    pub psbt: String,
+    pub txid: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct TxSendRequest {
+    pub txid: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct TxSendResponse {
+    #[allow(dead_code)]
+    pub txid: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct TxDiscardRequest {
+    pub txid: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct TxDiscardResponse {
+    #[allow(dead_code)]
     pub txid: String,
 }
 
@@ -179,7 +221,7 @@ impl From<PayResponse> for Payment {
             payment_time: Some(Utc.timestamp_opt(seconds, nanoseconds).unwrap()),
             error,
             lightning: Some(LnPayment {
-                payment_hash: Some(val.payment_hash),
+                payment_hash: val.payment_hash,
                 payment_preimage: Some(val.payment_preimage),
                 ..Default::default()
             }),

@@ -16,7 +16,7 @@ pub enum DataError {
     Validation(String),
 
     // TODO: Might make sense to move to a different error type such as AccountError
-    #[error("Insufficient funds (including fee buffer). Required: {0} mSats.")]
+    #[error("Insufficient funds. Required: {0} mSats.")]
     InsufficientFunds(f64),
 
     #[error("Data inconsistency: {0}. Please contact support.")]

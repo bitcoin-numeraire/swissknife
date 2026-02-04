@@ -249,11 +249,12 @@ impl LndWebsocketListener {
                     });
 
                     for output in relevant_outputs {
-                        let output_event = transaction.output_event(output);
                         let result = if transaction.is_outgoing {
-                            self.events.onchain_withdrawal(output_event).await
+                            self.events.onchain_withdrawal(transaction.withdrawal_event()).await
                         } else {
-                            self.events.onchain_deposit(output_event, self.network.into()).await
+                            self.events
+                                .onchain_deposit(transaction.deposit_event(output), self.network.into())
+                                .await
                         };
 
                         if let Err(err) = result {

@@ -2,6 +2,7 @@ use std::{sync::Arc, time::Duration};
 
 use async_trait::async_trait;
 use chrono::{TimeZone, Utc};
+use serde_bolt::bitcoin::hashes::hex::ToHex;
 use tokio::time::sleep;
 use tonic::{transport::Channel, Code};
 use tracing::{error, trace, warn};
@@ -10,7 +11,7 @@ use crate::{
     application::{entities::Currency, errors::LightningError},
     domains::{
         bitcoin::BitcoinWallet,
-        event::{BtcOutputEvent, BtcWithdrawalConfirmedEvent, EventUseCases, LnPayFailureEvent, LnPaySuccessEvent},
+        event::{EventUseCases, LnPayFailureEvent, LnPaySuccessEvent, OnchainWithdrawalEvent},
     },
     infra::lightning::EventsListener,
 };
@@ -357,47 +358,20 @@ impl ClnGrpcListener {
                         warn!(%err, "Failed to process onchain deposit");
                     }
                 }
-                (ListchainmovesChainmovesPrimaryTag::Deposit, "external", Some("wallet")) => {
-                    let Some((txid, outnum)) = outpoint.clone() else {
-                        warn!("Withdrawal chainmove missing outpoint");
+                (ListchainmovesChainmovesPrimaryTag::Deposit, "external", Some("wallet"))
+                | (ListchainmovesChainmovesPrimaryTag::Withdrawal, "wallet", _) => {
+                    let Some(spending_txid) = chainmove.spending_txid else {
+                        warn!("Withdrawal chainmove missing spending_txid");
                         continue;
                     };
 
-                    let output_event = BtcOutputEvent {
-                        txid,
-                        output_index: outnum,
-                        address: None,
-                        amount_sat: chainmove
-                            .output_msat
-                            .as_ref()
-                            .map(|amount| amount.msat)
-                            .unwrap_or_default()
-                            / 1000,
+                    let event = OnchainWithdrawalEvent {
+                        txid: spending_txid.to_hex(),
                         block_height: Some(chainmove.blockheight),
                     };
 
-                    if let Err(err) = self.events.onchain_withdrawal(output_event).await {
+                    if let Err(err) = self.events.onchain_withdrawal(event).await {
                         warn!(%err, "Failed to process onchain withdrawal");
-                    }
-                }
-                (ListchainmovesChainmovesPrimaryTag::Withdrawal, "wallet", _) => {
-                    let Some(spending_txid) = chainmove.spending_txid.as_ref() else {
-                        warn!("Withdrawal chainmove missing spending txid");
-                        continue;
-                    };
-
-                    if chainmove.blockheight == 0 {
-                        trace!("Withdrawal chainmove without block height, skipping confirmation");
-                        continue;
-                    }
-
-                    let confirm_event = BtcWithdrawalConfirmedEvent {
-                        txid: hex::encode(spending_txid),
-                        block_height: chainmove.blockheight,
-                    };
-
-                    if let Err(err) = self.events.onchain_withdrawal_confirmed(confirm_event).await {
-                        warn!(%err, "Failed to process onchain withdrawal confirmation");
                     }
                 }
                 _ => {

@@ -1,7 +1,7 @@
-use std::{path::PathBuf, time::Duration};
+use std::{collections::HashMap, path::PathBuf, time::Duration};
 
 use anyhow::anyhow;
-use chrono::TimeZone;
+use chrono::{TimeZone, Utc};
 use futures_util::StreamExt;
 use reqwest::{
     header::{HeaderMap, HeaderValue},
@@ -17,14 +17,17 @@ use crate::{
         errors::{BitcoinError, LightningError},
     },
     domains::{
-        bitcoin::{BitcoinWallet, BtcAddressType, BtcNetwork, BtcOutput, BtcOutputStatus, BtcTransaction},
+        bitcoin::{
+            BitcoinWallet, BtcAddressType, BtcLockedUtxo, BtcNetwork, BtcOutput, BtcOutputStatus,
+            BtcPreparedTransaction, BtcTransaction,
+        },
         invoice::Invoice,
         payment::{LnPayment, Payment, PaymentStatus},
         system::HealthStatus,
     },
     infra::{
         config::config_rs::deserialize_duration,
-        lightning::{types::parse_network, LnClient},
+        lightning::{bitcoin_utils::parse_psbt, types::parse_network, LnClient},
     },
 };
 use async_trait::async_trait;
@@ -335,9 +338,9 @@ impl LnClient for LndRestClient {
                     status: PaymentStatus::Settled,
                     amount_msat: status.value_msat.unwrap_or_default(),
                     fee_msat: status.fee_msat,
-                    payment_time: Some(chrono::Utc.timestamp_nanos(payment_time_ns)),
+                    payment_time: Some(Utc.timestamp_nanos(payment_time_ns)),
                     lightning: Some(LnPayment {
-                        payment_hash: Some(status.payment_hash),
+                        payment_hash: status.payment_hash,
                         payment_preimage: Some(status.payment_preimage),
                         ..Default::default()
                     }),
@@ -351,7 +354,7 @@ impl LnClient for LndRestClient {
                 amount_msat: status.value_msat.unwrap_or_default(),
                 fee_msat: status.fee_msat,
                 lightning: Some(LnPayment {
-                    payment_hash: Some(status.payment_hash),
+                    payment_hash: status.payment_hash,
                     ..Default::default()
                 }),
                 ..Default::default()
@@ -389,31 +392,118 @@ impl BitcoinWallet for LndRestClient {
         Ok(response.address)
     }
 
-    async fn send(&self, address: String, amount_sat: u64, fee_rate: Option<u32>) -> Result<String, BitcoinError> {
-        let response: SendCoinsResponse = self
+    async fn prepare_transaction(
+        &self,
+        address: String,
+        amount_sat: u64,
+        fee_rate_sat_vb: Option<u32>,
+    ) -> Result<BtcPreparedTransaction, BitcoinError> {
+        let mut outputs = HashMap::new();
+        outputs.insert(address, amount_sat);
+
+        let target_conf = if fee_rate_sat_vb.is_none() { Some(1) } else { None };
+
+        let response: FundPsbtResponse = self
             .post_request(
-                "v1/transactions",
-                &SendCoinsRequest {
-                    addr: address,
-                    amount: amount_sat as i64,
-                    sat_per_vbyte: fee_rate.map(|f| f as u64),
+                "v2/wallet/psbt/fund",
+                &FundPsbtRequest {
+                    raw: TxTemplate { outputs },
+                    sat_per_vbyte: fee_rate_sat_vb,
+                    target_conf,
+                    min_confs: 1,
+                    spend_unconfirmed: false,
                 },
             )
             .await
-            .map_err(|e| BitcoinError::Transaction(e.to_string()))?;
+            .map_err(|e| BitcoinError::PrepareTransaction(e.to_string()))?;
 
-        Ok(response.txid)
+        let locked_utxos: Vec<BtcLockedUtxo> = response
+            .locked_utxos
+            .into_iter()
+            .filter_map(|lease| {
+                let txid = lease.outpoint.txid_str?;
+                let output_index = lease.outpoint.output_index? as u32;
+                Some(BtcLockedUtxo {
+                    id: lease.id,
+                    txid,
+                    output_index,
+                })
+            })
+            .collect();
+
+        let psbt = parse_psbt(&response.funded_psbt)?;
+        let fee = psbt.fee().map_err(|e| BitcoinError::ParsePsbt(e.to_string()))?;
+
+        Ok(BtcPreparedTransaction {
+            txid: psbt.unsigned_tx.compute_txid().to_string(),
+            fee_sat: fee.to_sat(),
+            psbt: response.funded_psbt,
+            locked_utxos,
+        })
     }
 
-    async fn get_transaction(&self, txid: &str) -> Result<BtcTransaction, BitcoinError> {
+    async fn sign_send_transaction(&self, prepared: &BtcPreparedTransaction) -> Result<(), BitcoinError> {
+        let finalize_response = self
+            .post_request::<FinalizePsbtResponse>(
+                "v2/wallet/psbt/finalize",
+                &FinalizePsbtRequest {
+                    funded_psbt: prepared.psbt.clone(),
+                },
+            )
+            .await
+            .map_err(|e| BitcoinError::FinalizeTransaction(e.to_string()))?;
+
+        let response: PublishTransactionResponse = self
+            .post_request(
+                "v2/wallet/tx",
+                &PublishTransactionRequest {
+                    tx_hex: finalize_response.raw_final_tx,
+                },
+            )
+            .await
+            .map_err(|e| BitcoinError::BroadcastTransaction(e.to_string()))?;
+
+        if !response.publish_error.is_empty() {
+            return Err(BitcoinError::BroadcastTransaction(response.publish_error));
+        }
+
+        Ok(())
+    }
+
+    async fn release_prepared_transaction(&self, prepared: &BtcPreparedTransaction) -> Result<(), BitcoinError> {
+        for utxo in &prepared.locked_utxos {
+            self.post_request::<ReleaseOutputResponse>(
+                "v2/wallet/utxos/release",
+                &ReleaseOutputRequest {
+                    id: utxo.id.clone(),
+                    outpoint: OutPoint {
+                        txid_str: Some(utxo.txid.clone()),
+                        output_index: Some(utxo.output_index as i64),
+                    },
+                },
+            )
+            .await
+            .map_err(|e| BitcoinError::ReleaseTransaction(e.to_string()))?;
+        }
+
+        Ok(())
+    }
+
+    async fn get_transaction(&self, txid: &str) -> Result<Option<BtcTransaction>, BitcoinError> {
         let endpoint = format!("v2/wallet/tx?txid={}", txid);
 
-        let response: TransactionResponse = self
-            .get_request(&endpoint)
-            .await
-            .map_err(|e| BitcoinError::GetTransaction(e.to_string()))?;
-
-        Ok(response.into())
+        match self.get_request::<TransactionResponse>(&endpoint).await {
+            Ok(response) => Ok(Some(response.into())),
+            Err(e) => {
+                let error_msg = e.to_string();
+                // LND returns "not found" or similar error when transaction doesn't exist
+                if error_msg.to_lowercase().contains("not found") || error_msg.to_lowercase().contains("unknown") {
+                    Ok(None)
+                } else {
+                    Err(BitcoinError::GetTransaction(error_msg))
+                }
+            }
+        }
     }
 
     async fn get_output(
@@ -423,18 +513,19 @@ impl BitcoinWallet for LndRestClient {
         address: Option<&str>,
         _include_spent: bool,
     ) -> Result<Option<BtcOutput>, BitcoinError> {
-        let transaction = self.get_transaction(txid).await?;
+        let Some(transaction) = self.get_transaction(txid).await? else {
+            return Ok(None);
+        };
+
         let output = transaction.outputs.iter().find(|output| match output_index {
             Some(index) => output.output_index == index,
-            None => address
-                .and_then(|target| output.address.as_deref().map(|addr| addr == target))
-                .unwrap_or(false),
+            None => address.map(|target| output.address == target).unwrap_or(false),
         });
 
         Ok(output.map(|output| BtcOutput {
             txid: transaction.txid.clone(),
             output_index: output.output_index,
-            address: output.address.clone().unwrap_or_default(),
+            address: output.address.clone(),
             amount_sat: output.amount_sat,
             block_height: transaction.block_height,
             outpoint: format!("{}:{}", transaction.txid, output.output_index),
