@@ -160,12 +160,8 @@ impl ClnWebsocketListener {
 
                             match serde_json::from_value::<ChainMovement>(event.clone()) {
                                 Ok(chain_mvt) => {
-                                    match (
-                                        chain_mvt.primary_tag.as_str(),
-                                        chain_mvt.account_id.as_str(),
-                                        chain_mvt.originating_account.as_deref(),
-                                    ) {
-                                        ("deposit", "wallet", _) => {
+                                    match (chain_mvt.primary_tag.as_str(), chain_mvt.account_id.as_str()) {
+                                        ("deposit", "wallet") => {
                                             let outpoint = match OutPoint::from_str(&chain_mvt.utxo) {
                                                 Ok(outpoint) => outpoint,
                                                 Err(err) => {
@@ -200,7 +196,7 @@ impl ClnWebsocketListener {
                                                 warn!(%err, "Failed to process onchain deposit");
                                             }
                                         }
-                                        ("deposit", "external", Some("wallet")) | ("withdrawal", "wallet", _) => {
+                                        ("withdrawal", "wallet") => {
                                             if let Err(err) = events.onchain_withdrawal(chain_mvt.into()).await {
                                                 error!(%err, "Failed to process onchain withdrawal");
                                             }

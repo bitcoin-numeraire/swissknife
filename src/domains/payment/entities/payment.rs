@@ -7,7 +7,6 @@ use uuid::Uuid;
 
 use crate::{
     application::entities::{Currency, Ledger, OrderDirection},
-    domains::bitcoin::BtcOutput,
     domains::lnurl::LnUrlSuccessAction,
 };
 
@@ -43,8 +42,7 @@ pub struct LnPayment {
 pub struct BtcPayment {
     pub address: String,
     pub txid: String,
-    pub output_id: Option<Uuid>,
-    pub output: Option<BtcOutput>,
+    pub block_height: Option<u32>,
 }
 
 #[derive(Clone, Debug, Default)]

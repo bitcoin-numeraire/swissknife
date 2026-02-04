@@ -4,10 +4,7 @@ use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::{
-    application::{
-        dtos::BtcOutputResponse,
-        entities::{Currency, Ledger},
-    },
+    application::entities::{Currency, Ledger},
     domains::{
         lnurl::LnUrlSuccessAction,
         payment::{BtcPayment, InternalPayment, LnPayment, Payment, PaymentStatus},
@@ -119,9 +116,9 @@ pub struct BtcPaymentResponse {
     /// Transaction ID for on-chain payments.
     pub txid: String,
 
-    /// Bitcoin Output
+    /// Bitcoin block height where the transaction was confirmed.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub output: Option<BtcOutputResponse>,
+    pub block_height: Option<u32>,
 }
 
 #[derive(Serialize, ToSchema)]
@@ -181,7 +178,7 @@ impl From<BtcPayment> for BtcPaymentResponse {
         BtcPaymentResponse {
             address: payment.address,
             txid: payment.txid,
-            output: payment.output.map(Into::into),
+            block_height: payment.block_height,
         }
     }
 }

@@ -92,8 +92,7 @@ impl From<PaymentModel> for Payment {
                 .payment_hash
                 .clone()
                 .expect("payment_hash (txid) should exist for On-chain payment"),
-            output_id: model.btc_output_id,
-            output: None,
+            block_height: model.btc_block_height.map(|h| h as u32),
         });
 
         let internal = (ledger == Ledger::Internal).then(|| InternalPayment {

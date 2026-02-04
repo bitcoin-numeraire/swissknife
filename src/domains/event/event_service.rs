@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use chrono::Utc;
-use tracing::{debug, info, trace, warn};
+use tracing::{debug, info, trace};
 
 use crate::{
     application::{
@@ -9,7 +9,10 @@ use crate::{
     },
     domains::{
         bitcoin::{BtcOutput, BtcOutputStatus},
-        event::{BtcOutputEvent, EventUseCases, LnInvoicePaidEvent, LnPayFailureEvent, LnPaySuccessEvent},
+        event::{
+            EventUseCases, LnInvoicePaidEvent, LnPayFailureEvent, LnPaySuccessEvent, OnchainDepositEvent,
+            OnchainWithdrawalEvent,
+        },
         invoice::{Invoice, InvoiceStatus},
         payment::PaymentStatus,
     },
@@ -111,15 +114,11 @@ impl EventUseCases for EventService {
         return Err(DataError::NotFound("Lightning payment not found.".into()).into());
     }
 
-    async fn onchain_deposit(&self, event: BtcOutputEvent, currency: Currency) -> Result<(), ApplicationError> {
+    async fn onchain_deposit(&self, event: OnchainDepositEvent, currency: Currency) -> Result<(), ApplicationError> {
         let outpoint = format!("{}:{}", event.txid, event.output_index);
         trace!(%outpoint, "Processing onchain deposit event");
 
-        let Some(address) = event.address.clone() else {
-            warn!(txid = %event.txid, "Output address not found, skipping");
-            return Ok(());
-        };
-
+        let address = event.address;
         let status = Self::output_status(event.block_height);
         let output = BtcOutput {
             outpoint: outpoint.clone(),
@@ -189,63 +188,31 @@ impl EventUseCases for EventService {
         Ok(())
     }
 
-    async fn onchain_withdrawal(&self, event: BtcOutputEvent) -> Result<(), ApplicationError> {
-        let outpoint = format!("{}:{}", event.txid, event.output_index);
-        trace!(outpoint = outpoint.clone(), "Processing onchain withdrawal event");
+    async fn onchain_withdrawal(&self, event: OnchainWithdrawalEvent) -> Result<(), ApplicationError> {
+        trace!(txid = %event.txid, block_height = event.block_height, "Processing onchain withdrawal event");
 
-        let Some(payment) = self.store.payment.find_by_payment_hash(&event.txid).await? else {
-            trace!(
-                outpoint = outpoint.clone(),
-                "Ignoring bitcoin output not matching any known payment"
-            );
+        let block_height = match event.block_height {
+            Some(height) if height > 0 => height,
+            _ => {
+                trace!(txid = %event.txid, "Bitcoin transaction not yet confirmed, ignoring for now");
+                return Ok(());
+            }
+        };
+
+        let Some(mut payment) = self.store.payment.find_by_payment_hash(&event.txid).await? else {
+            trace!(txid = %event.txid, "Ignoring bitcoin output not matching any known payment");
             return Ok(());
         };
 
-        let status = Self::output_status(event.block_height);
-        let is_confirmed = status == BtcOutputStatus::Confirmed;
+        payment.status = PaymentStatus::Settled;
+        payment.payment_time = Some(Utc::now());
 
-        let payment_status: PaymentStatus = if is_confirmed {
-            PaymentStatus::Settled
-        } else {
-            payment.status.clone()
-        };
+        let bitcoin = payment.bitcoin.get_or_insert_with(Default::default);
+        bitcoin.block_height = Some(block_height);
 
-        let mut updated_payment = payment;
-        updated_payment.status = payment_status;
+        let stored_payment = self.store.payment.update(payment).await?;
 
-        if is_confirmed && updated_payment.payment_time.is_none() {
-            updated_payment.payment_time = Some(Utc::now());
-        }
-
-        let address = updated_payment
-            .bitcoin
-            .as_ref()
-            .ok_or_else(|| DataError::Inconsistency("Bitcoin data not found.".into()))?
-            .address
-            .clone();
-
-        let btc_output = BtcOutput {
-            outpoint: outpoint.clone(),
-            txid: event.txid.clone(),
-            output_index: event.output_index,
-            address,
-            amount_sat: event.amount_sat,
-            status,
-            block_height: event.block_height,
-            ..Default::default()
-        };
-
-        let stored_output = self.store.btc_output.upsert(btc_output).await?;
-        let bitcoin = updated_payment.bitcoin.get_or_insert_with(Default::default);
-        bitcoin.output = Some(stored_output.clone());
-
-        if bitcoin.output_id.is_none() {
-            bitcoin.output_id = Some(stored_output.id);
-        }
-
-        self.store.payment.update(updated_payment).await?;
-
-        info!(%outpoint, "Onchain withdrawal processed");
+        info!(payment_id = %stored_payment.id, txid = %event.txid, "Onchain withdrawal processed");
         Ok(())
     }
 }

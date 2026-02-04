@@ -15,7 +15,7 @@ use crate::{
     },
     domains::{
         bitcoin::BitcoinWallet,
-        event::{BtcOutputEvent, EventUseCases, LnPayFailureEvent, LnPaySuccessEvent},
+        event::{EventUseCases, LnPayFailureEvent, LnPaySuccessEvent, OnchainWithdrawalEvent},
         invoice::{Invoice, InvoiceStatus},
         lnurl::{process_success_action, validate_lnurl_pay},
     },
@@ -661,22 +661,8 @@ impl PaymentsUseCases for PaymentService {
                         continue;
                     };
 
-                    let output = tx
-                        .outputs
-                        .iter()
-                        .find(|output| output.address == bitcoin.address.clone())
-                        .ok_or_else(|| {
-                            DataError::Inconsistency(format!(
-                                "Transaction {} exists but output to address {} not found",
-                                bitcoin.txid, bitcoin.address
-                            ))
-                        })?;
-
                     self.events
-                        .onchain_withdrawal(BtcOutputEvent {
-                            address: Some(bitcoin.address.clone()),
-                            amount_sat: payment.amount_msat / 1000,
-                            output_index: output.output_index,
+                        .onchain_withdrawal(OnchainWithdrawalEvent {
                             txid: bitcoin.txid.clone(),
                             block_height: tx.block_height,
                         })

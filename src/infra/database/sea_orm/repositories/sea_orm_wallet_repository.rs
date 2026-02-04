@@ -44,7 +44,6 @@ impl WalletRepository for SeaOrmWalletRepository {
                 let balance = self.get_balance(None, id).await?;
                 let payments_with_output = Payment::find()
                     .filter(PaymentColumn::WalletId.eq(id))
-                    .find_also_related(BtcOutput)
                     .all(&self.db)
                     .await
                     .map_err(|e| DatabaseError::FindRelated(e.to_string()))?;
@@ -63,16 +62,7 @@ impl WalletRepository for SeaOrmWalletRepository {
 
                 let mut wallet: Wallet = model.into();
                 wallet.balance = balance;
-                wallet.payments = payments_with_output
-                    .into_iter()
-                    .map(|(payment_model, output_model)| {
-                        let mut payment: crate::domains::payment::Payment = payment_model.into();
-                        if let Some(ref mut bitcoin) = payment.bitcoin {
-                            bitcoin.output = output_model.map(Into::into);
-                        }
-                        payment
-                    })
-                    .collect();
+                wallet.payments = payments_with_output.into_iter().map(Into::into).collect();
                 wallet.invoices = invoices_with_output
                     .into_iter()
                     .map(|(invoice_model, output_model)| {
