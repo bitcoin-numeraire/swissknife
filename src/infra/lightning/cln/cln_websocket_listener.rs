@@ -197,6 +197,11 @@ impl ClnWebsocketListener {
                                             }
                                         }
                                         ("withdrawal", "wallet") => {
+                                            if chain_mvt.spending_txid.is_none() {
+                                                trace!("Withdrawal missing spending txid");
+                                                continue;
+                                            };
+
                                             if let Err(err) = events.onchain_withdrawal(chain_mvt.into()).await {
                                                 error!(%err, "Failed to process onchain withdrawal");
                                             }
