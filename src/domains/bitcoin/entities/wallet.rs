@@ -16,7 +16,7 @@ pub trait BitcoinWallet: Sync + Send {
     ) -> Result<BtcPreparedTransaction, BitcoinError>;
     async fn sign_send_transaction(&self, prepared: &BtcPreparedTransaction) -> Result<(), BitcoinError>;
     async fn release_prepared_transaction(&self, prepared: &BtcPreparedTransaction) -> Result<(), BitcoinError>;
-    async fn get_transaction(&self, txid: &str) -> Result<BtcTransaction, BitcoinError>;
+    async fn get_transaction(&self, txid: &str) -> Result<Option<BtcTransaction>, BitcoinError>;
     async fn get_output(
         &self,
         txid: &str,

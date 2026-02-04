@@ -9,12 +9,6 @@ pub struct BtcOutputEvent {
     pub block_height: Option<u32>,
 }
 
-#[derive(Debug, Clone)]
-pub struct BtcWithdrawalConfirmedEvent {
-    pub txid: String,
-    pub block_height: u32,
-}
-
 impl From<BtcOutput> for BtcOutputEvent {
     fn from(output: BtcOutput) -> Self {
         BtcOutputEvent {

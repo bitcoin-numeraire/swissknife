@@ -10,7 +10,7 @@ use crate::{
     application::{entities::Currency, errors::LightningError},
     domains::{
         bitcoin::BitcoinWallet,
-        event::{BtcOutputEvent, BtcWithdrawalConfirmedEvent, EventUseCases, LnPayFailureEvent, LnPaySuccessEvent},
+        event::{BtcOutputEvent, EventUseCases, LnPayFailureEvent, LnPaySuccessEvent},
     },
     infra::lightning::EventsListener,
 };
@@ -357,7 +357,8 @@ impl ClnGrpcListener {
                         warn!(%err, "Failed to process onchain deposit");
                     }
                 }
-                (ListchainmovesChainmovesPrimaryTag::Deposit, "external", Some("wallet")) => {
+                (ListchainmovesChainmovesPrimaryTag::Deposit, "external", Some("wallet"))
+                | (ListchainmovesChainmovesPrimaryTag::Withdrawal, "wallet", _) => {
                     let Some((txid, outnum)) = outpoint.clone() else {
                         warn!("Withdrawal chainmove missing outpoint");
                         continue;
@@ -378,26 +379,6 @@ impl ClnGrpcListener {
 
                     if let Err(err) = self.events.onchain_withdrawal(output_event).await {
                         warn!(%err, "Failed to process onchain withdrawal");
-                    }
-                }
-                (ListchainmovesChainmovesPrimaryTag::Withdrawal, "wallet", _) => {
-                    let Some(spending_txid) = chainmove.spending_txid.as_ref() else {
-                        warn!("Withdrawal chainmove missing spending txid");
-                        continue;
-                    };
-
-                    if chainmove.blockheight == 0 {
-                        trace!("Withdrawal chainmove without block height, skipping confirmation");
-                        continue;
-                    }
-
-                    let confirm_event = BtcWithdrawalConfirmedEvent {
-                        txid: hex::encode(spending_txid),
-                        block_height: chainmove.blockheight,
-                    };
-
-                    if let Err(err) = self.events.onchain_withdrawal_confirmed(confirm_event).await {
-                        warn!(%err, "Failed to process onchain withdrawal confirmation");
                     }
                 }
                 _ => {

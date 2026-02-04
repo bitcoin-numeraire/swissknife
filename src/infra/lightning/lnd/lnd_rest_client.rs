@@ -489,15 +489,21 @@ impl BitcoinWallet for LndRestClient {
         Ok(())
     }
 
-    async fn get_transaction(&self, txid: &str) -> Result<BtcTransaction, BitcoinError> {
+    async fn get_transaction(&self, txid: &str) -> Result<Option<BtcTransaction>, BitcoinError> {
         let endpoint = format!("v2/wallet/tx?txid={}", txid);
 
-        let response: TransactionResponse = self
-            .get_request(&endpoint)
-            .await
-            .map_err(|e| BitcoinError::GetTransaction(e.to_string()))?;
-
-        Ok(response.into())
+        match self.get_request::<TransactionResponse>(&endpoint).await {
+            Ok(response) => Ok(Some(response.into())),
+            Err(e) => {
+                let error_msg = e.to_string();
+                // LND returns "not found" or similar error when transaction doesn't exist
+                if error_msg.to_lowercase().contains("not found") || error_msg.to_lowercase().contains("unknown") {
+                    Ok(None)
+                } else {
+                    Err(BitcoinError::GetTransaction(error_msg))
+                }
+            }
+        }
     }
 
     async fn get_output(
@@ -507,18 +513,19 @@ impl BitcoinWallet for LndRestClient {
         address: Option<&str>,
         _include_spent: bool,
     ) -> Result<Option<BtcOutput>, BitcoinError> {
-        let transaction = self.get_transaction(txid).await?;
+        let Some(transaction) = self.get_transaction(txid).await? else {
+            return Ok(None);
+        };
+
         let output = transaction.outputs.iter().find(|output| match output_index {
             Some(index) => output.output_index == index,
-            None => address
-                .and_then(|target| output.address.as_deref().map(|addr| addr == target))
-                .unwrap_or(false),
+            None => address.map(|target| output.address == target).unwrap_or(false),
         });
 
         Ok(output.map(|output| BtcOutput {
             txid: transaction.txid.clone(),
             output_index: output.output_index,
-            address: output.address.clone().unwrap_or_default(),
+            address: output.address.clone(),
             amount_sat: output.amount_sat,
             block_height: transaction.block_height,
             outpoint: format!("{}:{}", transaction.txid, output.output_index),

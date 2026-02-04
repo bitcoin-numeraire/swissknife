@@ -830,11 +830,12 @@ dependencies = [
 
 [[package]]
 name = "bitcoin"
-version = "0.32.8"
+version = "0.32.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1e499f9fc0407f50fe98af744ab44fa67d409f76b6772e1689ec8485eb0c0f66"
+checksum = "ea507acc1cd80fc084ace38544bbcf7ced7c2aa65b653b102de0ce718df668f6"
 dependencies = [
  "base58ck",
+ "base64 0.21.7",
  "bech32 0.11.1",
  "bitcoin-internals",
  "bitcoin-io",
@@ -3091,7 +3092,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "90ab9f6ea77e20e3129235e62a2e6bd64ed932363df104e864ee65ccffb54a8f"
 dependencies = [
  "bech32 0.9.1",
- "bitcoin 0.32.8",
+ "bitcoin 0.32.2",
  "lightning-types",
 ]
 
@@ -3102,7 +3103,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1083b8d9137000edf3bfcb1ff011c0d25e0cdd2feb98cc21d6765e64a494148f"
 dependencies = [
  "bech32 0.9.1",
- "bitcoin 0.32.8",
+ "bitcoin 0.32.2",
  "hex-conservative",
 ]
 
@@ -3371,7 +3372,7 @@ dependencies = [
  "base64 0.22.1",
  "bech32 0.11.1",
  "bip39",
- "bitcoin 0.32.8",
+ "bitcoin 0.32.2",
  "cbc",
  "chacha20",
  "chacha20poly1305",
@@ -4377,6 +4378,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "52c2c1bf36ddb1a1c396b3601a3cec27c2462e45f07c386894ec3ccf5332bd16"
 dependencies = [
  "prost 0.13.5",
+]
+
+[[package]]
+name = "psbt-v2"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6fe7c9e2c9b10be2937d134e9c30d1eb92c79836235751da06c7ccf88bc66dfa"
+dependencies = [
+ "bitcoin 0.32.2",
+ "bitcoin-internals",
 ]
 
 [[package]]
@@ -6124,7 +6135,7 @@ dependencies = [
  "base64 0.22.1",
  "bcrypt",
  "bip39",
- "bitcoin 0.32.8",
+ "bitcoin 0.32.2",
  "breez-sdk-core",
  "bytes",
  "chrono",
@@ -6140,6 +6151,7 @@ dependencies = [
  "native-tls",
  "nostr-sdk",
  "prost 0.13.5",
+ "psbt-v2",
  "rand 0.8.5",
  "regex",
  "reqwest 0.12.28",

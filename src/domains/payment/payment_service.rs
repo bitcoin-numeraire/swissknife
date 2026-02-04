@@ -15,7 +15,7 @@ use crate::{
     },
     domains::{
         bitcoin::BitcoinWallet,
-        event::{BtcWithdrawalConfirmedEvent, EventUseCases, LnPayFailureEvent, LnPaySuccessEvent},
+        event::{BtcOutputEvent, EventUseCases, LnPayFailureEvent, LnPaySuccessEvent},
         invoice::{Invoice, InvoiceStatus},
         lnurl::{process_success_action, validate_lnurl_pay},
     },
@@ -655,23 +655,34 @@ impl PaymentsUseCases for PaymentService {
                         .into());
                     };
 
-                    let tx = self.bitcoin_wallet.get_transaction(&bitcoin.txid).await?;
+                    let Some(tx) = self.bitcoin_wallet.get_transaction(&bitcoin.txid).await? else {
+                        warn!(payment_id = %payment.id, "Transaction not found, it was either removed from mempool, \
+                            never broadcast or backend was switched. Please investigate manually.");
+                        continue;
+                    };
 
-                    match tx.block_height {
-                        Some(h) if h > 0 => {
-                            self.events
-                                .onchain_withdrawal_confirmed(BtcWithdrawalConfirmedEvent {
-                                    txid: bitcoin.txid.clone(),
-                                    block_height: h,
-                                })
-                                .await?;
-                            synced += 1;
-                        }
-                        _ => {
-                            trace!(payment_id = %payment.id, "Transaction still pending");
-                            continue;
-                        }
-                    }
+                    let output = tx
+                        .outputs
+                        .iter()
+                        .find(|output| output.address == bitcoin.address.clone())
+                        .ok_or_else(|| {
+                            DataError::Inconsistency(format!(
+                                "Transaction {} exists but output to address {} not found",
+                                bitcoin.txid, bitcoin.address
+                            ))
+                        })?;
+
+                    self.events
+                        .onchain_withdrawal(BtcOutputEvent {
+                            address: Some(bitcoin.address.clone()),
+                            amount_sat: payment.amount_msat / 1000,
+                            output_index: output.output_index,
+                            txid: bitcoin.txid.clone(),
+                            block_height: tx.block_height,
+                        })
+                        .await?;
+
+                    synced += 1;
                 }
                 Ledger::Internal => {}
             }

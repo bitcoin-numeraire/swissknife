@@ -340,7 +340,7 @@ impl BitcoinWallet for BreezClient {
         ))
     }
 
-    async fn get_transaction(&self, _txid: &str) -> Result<BtcTransaction, BitcoinError> {
+    async fn get_transaction(&self, _txid: &str) -> Result<Option<BtcTransaction>, BitcoinError> {
         Err(BitcoinError::Unsupported(
             "Transaction lookup is not yet implemented for Breez".to_string(),
         ))

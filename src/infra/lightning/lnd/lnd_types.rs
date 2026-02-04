@@ -287,7 +287,7 @@ impl From<TransactionResponse> for BtcTransaction {
             .into_iter()
             .map(|detail| BtcTransactionOutput {
                 output_index: detail.output_index,
-                address: Some(detail.address),
+                address: detail.address,
                 amount_sat: detail.amount,
                 is_ours: detail.is_our_address,
             })

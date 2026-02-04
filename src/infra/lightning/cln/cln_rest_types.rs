@@ -75,6 +75,9 @@ pub struct ListTransactionsTransaction {
 pub struct ListTransactionsOutput {
     pub index: u32,
     pub amount_msat: u64,
+
+    #[serde(rename = "scriptPubKey")]
+    pub script_pub_key: String,
 }
 
 #[derive(Debug, Serialize, Default)]
@@ -165,9 +168,6 @@ impl Serialize for TxPrepareOutput {
 #[derive(Debug, Deserialize)]
 pub struct TxPrepareResponse {
     pub psbt: String,
-    pub unsigned_tx: String,
-
-    #[allow(dead_code)]
     pub txid: String,
 }
 

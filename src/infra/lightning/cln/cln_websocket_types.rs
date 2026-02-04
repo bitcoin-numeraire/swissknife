@@ -40,7 +40,6 @@ pub struct SendPayFailureData {
 pub struct ChainMovement {
     pub account_id: String,
     pub originating_account: Option<String>,
-    pub spending_txid: Option<String>,
     pub primary_tag: String,
     pub utxo: String,
     pub output_msat: u64,
