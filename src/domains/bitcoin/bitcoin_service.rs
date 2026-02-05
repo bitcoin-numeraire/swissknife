@@ -126,22 +126,9 @@ impl BitcoinUseCases for BitcoinService {
     }
 
     async fn sync(&self) -> Result<u32, ApplicationError> {
-        let has_addresses = !self
-            .store
-            .btc_address
-            .find_many(BtcAddressFilter {
-                limit: Some(1),
-                ..Default::default()
-            })
-            .await?
-            .is_empty();
-
-        if !has_addresses {
-            return Ok(0);
-        }
+        trace!("Synchronizing on-chain bitcoin transactions");
 
         let mut cursor = self.system.get_onchain_cursor().await?;
-
         if cursor.is_none() {
             let output_height = self.store.btc_output.max_block_height().await?;
             let payment_height = self.store.payment.max_btc_block_height().await?;
@@ -149,20 +136,20 @@ impl BitcoinUseCases for BitcoinService {
             cursor = Some(OnchainSyncCursor::BlockHeight(start_height));
         }
 
-        let result = self.wallet.sync_onchain(cursor).await?;
+        let result = self.wallet.synchronize(cursor).await?;
         let currency: Currency = self.wallet.network().into();
 
-        let mut processed = 0;
+        let mut synced = 0;
 
         for transaction in result.events {
             match transaction {
                 OnchainTransaction::Deposit(output) => {
                     self.events.onchain_deposit(output.into(), currency.clone()).await?;
-                    processed += 1;
+                    synced += 1;
                 }
                 OnchainTransaction::Withdrawal(event) => {
                     self.events.onchain_withdrawal(event).await?;
-                    processed += 1;
+                    synced += 1;
                 }
             }
         }
@@ -171,6 +158,7 @@ impl BitcoinUseCases for BitcoinService {
             self.system.set_onchain_cursor(next_cursor).await?;
         }
 
-        Ok(processed)
+        debug!(synced, "On-chain bitcoin transactions synchronized successfully");
+        Ok(synced)
     }
 }

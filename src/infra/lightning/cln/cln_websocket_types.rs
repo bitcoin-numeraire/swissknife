@@ -3,7 +3,7 @@ use serde::Deserialize;
 use serde_bolt::bitcoin::hashes::hex::ToHex;
 use serde_bolt::bitcoin::hashes::{sha256, Hash};
 
-use crate::domains::event::{LnInvoicePaidEvent, LnPayFailureEvent, LnPaySuccessEvent, OnchainWithdrawalEvent};
+use crate::domains::event::{LnInvoicePaidEvent, LnPayFailureEvent, LnPaySuccessEvent};
 
 #[derive(Debug, Deserialize)]
 pub struct InvoicePayment {
@@ -31,15 +31,6 @@ pub struct SendPayFailure {
 pub struct SendPayFailureData {
     pub payment_hash: String,
     pub status: String,
-}
-
-#[derive(Debug, Deserialize, Clone)]
-pub struct ChainMovement {
-    pub account_id: String,
-    pub spending_txid: Option<String>,
-    pub primary_tag: String,
-    pub utxo: String,
-    pub blockheight: Option<u32>,
 }
 
 impl From<InvoicePayment> for LnInvoicePaidEvent {
@@ -72,15 +63,6 @@ impl From<SendPayFailure> for LnPayFailureEvent {
         LnPayFailureEvent {
             reason: val.message,
             payment_hash: val.data.payment_hash,
-        }
-    }
-}
-
-impl From<ChainMovement> for OnchainWithdrawalEvent {
-    fn from(mvt: ChainMovement) -> Self {
-        OnchainWithdrawalEvent {
-            txid: mvt.spending_txid.expect("spending txid is required"),
-            block_height: mvt.blockheight,
         }
     }
 }

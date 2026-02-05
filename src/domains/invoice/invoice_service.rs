@@ -122,7 +122,7 @@ impl InvoiceUseCases for InvoiceService {
     }
 
     async fn sync(&self) -> Result<u32, ApplicationError> {
-        trace!("Syncing pending and expired invoices...");
+        trace!("Synchronizing pending and expired invoices...");
 
         let pending_invoices = self
             .store
@@ -151,37 +151,31 @@ impl InvoiceUseCases for InvoiceService {
         let mut synced = 0;
 
         for invoice in invoices {
-            match invoice.ledger {
-                Ledger::Lightning => {
-                    let Some(ln_invoice) = invoice.ln_invoice.as_ref() else {
-                        debug!(invoice_id = %invoice.id, "Missing lightning invoice details; skipping sync");
-                        continue;
-                    };
-                    let payment_hash = ln_invoice.payment_hash.clone();
-                    let Some(node_invoice) = self.ln_client.invoice_by_hash(payment_hash.clone()).await? else {
-                        continue;
-                    };
-                    if node_invoice.status != InvoiceStatus::Settled {
-                        continue;
-                    }
-
-                    let payment_time = node_invoice.payment_time.unwrap_or_else(Utc::now);
-                    let event = LnInvoicePaidEvent {
-                        payment_hash,
-                        amount_received_msat: node_invoice.amount_received_msat.unwrap_or_default(),
-                        fee_msat: node_invoice.fee_msat.unwrap_or_default(),
-                        payment_time,
-                    };
-
-                    self.events.invoice_paid(event).await?;
-                    synced += 1;
-                }
-                Ledger::Onchain => {}
-                Ledger::Internal => {}
+            let Some(ln_invoice) = invoice.ln_invoice.as_ref() else {
+                debug!(invoice_id = %invoice.id, "Missing lightning invoice details; skipping sync");
+                continue;
+            };
+            let payment_hash = ln_invoice.payment_hash.clone();
+            let Some(node_invoice) = self.ln_client.invoice_by_hash(payment_hash.clone()).await? else {
+                continue;
+            };
+            if node_invoice.status != InvoiceStatus::Settled {
+                continue;
             }
+
+            let payment_time = node_invoice.payment_time.unwrap_or_else(Utc::now);
+            let event = LnInvoicePaidEvent {
+                payment_hash,
+                amount_received_msat: node_invoice.amount_received_msat.unwrap_or_default(),
+                fee_msat: node_invoice.fee_msat.unwrap_or_default(),
+                payment_time,
+            };
+
+            self.events.invoice_paid(event).await?;
+            synced += 1;
         }
 
-        debug!(synced, "Pending and expired invoices synced successfully");
+        debug!(synced, "Pending and expired invoices synchronized successfully");
         Ok(synced)
     }
 }

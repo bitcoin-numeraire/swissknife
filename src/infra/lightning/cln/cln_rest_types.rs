@@ -82,11 +82,8 @@ pub struct ListTransactionsOutput {
 
 #[derive(Debug, Serialize, Default)]
 pub struct ListChainMovesRequest {
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub index: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub start: Option<u64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub limit: Option<u64>,
 }
 

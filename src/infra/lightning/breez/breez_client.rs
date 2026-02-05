@@ -349,7 +349,7 @@ impl BitcoinWallet for BreezClient {
         ))
     }
 
-    async fn sync_onchain(&self, _cursor: Option<OnchainSyncCursor>) -> Result<OnchainSyncBatch, BitcoinError> {
+    async fn synchronize(&self, _cursor: Option<OnchainSyncCursor>) -> Result<OnchainSyncBatch, BitcoinError> {
         Ok(OnchainSyncBatch::default())
     }
 

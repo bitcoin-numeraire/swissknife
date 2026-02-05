@@ -1,10 +1,13 @@
 use async_trait::async_trait;
-use serde_json;
+use serde_json::{self, from_value, to_value};
 use std::sync::Arc;
 use tracing::{debug, error, info, trace};
 
 use crate::{
-    application::{entities::AppStore, errors::ApplicationError},
+    application::{
+        entities::AppStore,
+        errors::{ApplicationError, DataError},
+    },
     domains::{bitcoin::OnchainSyncCursor, user::PASSWORD_HASH_KEY},
     infra::lightning::LnClient,
 };
@@ -84,19 +87,25 @@ impl SystemUseCases for SystemService {
     }
 
     async fn get_onchain_cursor(&self) -> Result<Option<OnchainSyncCursor>, ApplicationError> {
-        let value = self.store.config.find(ONCHAIN_CURSOR_KEY).await?;
-        let Some(value) = value else {
+        trace!("Retrieving onchain sync cursor");
+
+        let Some(value) = self.store.config.find(ONCHAIN_CURSOR_KEY).await? else {
             return Ok(None);
         };
-        let cursor = serde_json::from_value(value)
-            .map_err(|e| crate::application::errors::DataError::Malformed(e.to_string()))?;
+
+        let cursor = from_value(value).map_err(|e| DataError::Malformed(e.to_string()))?;
+
+        debug!("Onchain sync cursor retrieved successfully");
         Ok(Some(cursor))
     }
 
     async fn set_onchain_cursor(&self, cursor: OnchainSyncCursor) -> Result<(), ApplicationError> {
-        let value = serde_json::to_value(cursor)
-            .map_err(|e| crate::application::errors::DataError::Malformed(e.to_string()))?;
+        trace!("Setting onchain sync cursor: {:?}", cursor);
+
+        let value = to_value(cursor).map_err(|e| DataError::Malformed(e.to_string()))?;
         self.store.config.upsert(ONCHAIN_CURSOR_KEY, value).await?;
+
+        debug!("Onchain sync cursor updated successfully");
         Ok(())
     }
 }

@@ -580,7 +580,7 @@ impl PaymentsUseCases for PaymentService {
     }
 
     async fn sync(&self) -> Result<u32, ApplicationError> {
-        trace!("Syncing pending payments...");
+        trace!("Synchronizing pending payments...");
 
         let pending_payments = self
             .store
@@ -595,64 +595,58 @@ impl PaymentsUseCases for PaymentService {
         let mut synced = 0;
 
         for payment in pending_payments {
-            match payment.ledger {
-                Ledger::Lightning => {
-                    let Some(lightning) = payment.lightning.as_ref() else {
-                        return Err(DataError::Inconsistency(format!(
-                            "Missing lightning metadata on lightning payment with id: {}",
-                            payment.id
-                        ))
-                        .into());
+            let Some(lightning) = payment.lightning.as_ref() else {
+                return Err(DataError::Inconsistency(format!(
+                    "Missing lightning metadata on lightning payment with id: {}",
+                    payment.id
+                ))
+                .into());
+            };
+            let payment_hash = lightning.payment_hash.clone();
+
+            let Some(node_payment) = self.ln_client.payment_by_hash(payment_hash.clone()).await? else {
+                continue;
+            };
+
+            match node_payment.status {
+                PaymentStatus::Settled => {
+                    let payment_time = node_payment.payment_time.unwrap_or_else(Utc::now);
+                    let payment_preimage = node_payment
+                        .lightning
+                        .as_ref()
+                        .and_then(|lightning| lightning.payment_preimage.clone())
+                        .unwrap_or_default();
+
+                    let event = LnPaySuccessEvent {
+                        amount_msat: node_payment.amount_msat,
+                        fees_msat: node_payment.fee_msat.unwrap_or_default(),
+                        payment_hash: payment_hash.clone(),
+                        payment_preimage,
+                        payment_time,
                     };
-                    let payment_hash = lightning.payment_hash.clone();
 
-                    let Some(node_payment) = self.ln_client.payment_by_hash(payment_hash.clone()).await? else {
-                        continue;
-                    };
-
-                    match node_payment.status {
-                        PaymentStatus::Settled => {
-                            let payment_time = node_payment.payment_time.unwrap_or_else(Utc::now);
-                            let payment_preimage = node_payment
-                                .lightning
-                                .as_ref()
-                                .and_then(|lightning| lightning.payment_preimage.clone())
-                                .unwrap_or_default();
-
-                            let event = LnPaySuccessEvent {
-                                amount_msat: node_payment.amount_msat,
-                                fees_msat: node_payment.fee_msat.unwrap_or_default(),
-                                payment_hash: payment_hash.clone(),
-                                payment_preimage,
-                                payment_time,
-                            };
-
-                            self.events.outgoing_payment(event).await?;
-                            synced += 1;
-                        }
-                        PaymentStatus::Failed => {
-                            let reason = node_payment
-                                .error
-                                .clone()
-                                .unwrap_or_else(|| "Payment failed".to_string());
-                            self.events
-                                .failed_payment(LnPayFailureEvent { payment_hash, reason })
-                                .await?;
-
-                            synced += 1;
-                        }
-                        PaymentStatus::Pending => {
-                            debug!(payment_id = %payment.id, "Payment still pending; skipping sync");
-                            continue;
-                        }
-                    }
+                    self.events.outgoing_payment(event).await?;
+                    synced += 1;
                 }
-                Ledger::Onchain => {}
-                Ledger::Internal => {}
+                PaymentStatus::Failed => {
+                    let reason = node_payment
+                        .error
+                        .clone()
+                        .unwrap_or_else(|| "Payment failed".to_string());
+                    self.events
+                        .failed_payment(LnPayFailureEvent { payment_hash, reason })
+                        .await?;
+
+                    synced += 1;
+                }
+                PaymentStatus::Pending => {
+                    debug!(payment_id = %payment.id, "Payment still pending; skipping sync");
+                    continue;
+                }
             }
         }
 
-        debug!(synced, "Pending payments synced successfully");
+        debug!(synced, "Pending payments synchronized successfully");
         Ok(synced)
     }
 }

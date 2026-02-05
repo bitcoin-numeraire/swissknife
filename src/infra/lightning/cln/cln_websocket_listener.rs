@@ -1,11 +1,9 @@
 use std::{
     path::PathBuf,
-    str::FromStr,
     sync::{Arc, Mutex},
 };
 
 use async_trait::async_trait;
-use bitcoin::OutPoint;
 use futures_util::{future::BoxFuture, FutureExt};
 use native_tls::{Certificate, TlsConnector};
 use rust_socketio::{
@@ -13,15 +11,18 @@ use rust_socketio::{
     Payload, TransportType,
 };
 use tokio::fs;
-use tracing::{error, info, trace, warn};
+use tracing::{error, info, warn};
 
 use crate::{
-    application::errors::LightningError,
-    domains::{bitcoin::BitcoinWallet, event::EventUseCases},
+    application::{
+        entities::{AppServices, Currency},
+        errors::LightningError,
+    },
+    domains::bitcoin::{BitcoinWallet, OnchainSyncCursor, OnchainTransaction},
     infra::lightning::EventsListener,
 };
 
-use super::cln_websocket_types::{ChainMovement, InvoicePayment, SendPayFailure, SendPaySuccess};
+use super::cln_websocket_types::{InvoicePayment, SendPayFailure, SendPaySuccess};
 use super::ClnRestClientConfig;
 
 pub struct ClnWebsocketListener {
@@ -31,11 +32,16 @@ pub struct ClnWebsocketListener {
 impl ClnWebsocketListener {
     pub async fn new(
         config: ClnRestClientConfig,
-        events: Arc<dyn EventUseCases>,
+        services: Arc<AppServices>,
         wallet: Arc<dyn BitcoinWallet>,
     ) -> Result<Self, LightningError> {
-        let message_events = events.clone();
-        let message_wallet = wallet.clone();
+        let initial_cursor = services
+            .system
+            .get_onchain_cursor()
+            .await
+            .map_err(|e| LightningError::Listener(e.to_string()))?;
+        let cursor = Arc::new(tokio::sync::Mutex::new(initial_cursor));
+
         let mut client_builder = ClientBuilder::new(config.endpoint.clone())
             .transport_type(TransportType::Websocket)
             .reconnect_on_disconnect(true)
@@ -48,7 +54,7 @@ impl ClnWebsocketListener {
             .on("close", on_close)
             .on("error", on_error)
             .on("message", move |payload, _: Client| {
-                Self::on_message(message_events.clone(), message_wallet.clone(), payload)
+                Self::on_message(services.clone(), wallet.clone(), cursor.clone(), payload)
             });
 
         if let Some(ca_cert_path) = &config.ca_cert_path {
@@ -78,8 +84,9 @@ impl ClnWebsocketListener {
     }
 
     fn on_message(
-        events: Arc<dyn EventUseCases>,
+        services: Arc<AppServices>,
         wallet: Arc<dyn BitcoinWallet>,
+        cursor: Arc<tokio::sync::Mutex<Option<OnchainSyncCursor>>>,
         payload: Payload,
     ) -> BoxFuture<'static, ()> {
         async move {
@@ -89,7 +96,7 @@ impl ClnWebsocketListener {
                         if let Some(event) = value.get("invoice_payment") {
                             match serde_json::from_value::<InvoicePayment>(event.clone()) {
                                 Ok(invoice_payment) => {
-                                    if let Err(err) = events.invoice_paid(invoice_payment.into()).await {
+                                    if let Err(err) = services.event.invoice_paid(invoice_payment.into()).await {
                                         warn!(%err, "Failed to process incoming payment");
                                     }
                                 }
@@ -114,7 +121,7 @@ impl ClnWebsocketListener {
                                         return;
                                     }
 
-                                    if let Err(err) = events.outgoing_payment(sendpay_success.into()).await {
+                                    if let Err(err) = services.event.outgoing_payment(sendpay_success.into()).await {
                                         warn!(%err, "Failed to process outgoing payment");
                                     }
                                 }
@@ -137,7 +144,7 @@ impl ClnWebsocketListener {
                                         // return;
                                     }
 
-                                    if let Err(err) = events.failed_payment(sendpay_failure.into()).await {
+                                    if let Err(err) = services.event.failed_payment(sendpay_failure.into()).await {
                                         warn!(%err, "Failed to process failed outgoing payment");
                                     }
                                 }
@@ -148,75 +155,48 @@ impl ClnWebsocketListener {
                         }
 
                         if let Some(event) = value.get("coin_movement") {
-                            // Only attempt to cast into CoinMovement if "type" == "chain_mvt"
                             if let Some(movement_type) = event.get("type").and_then(|t| t.as_str()) {
                                 if movement_type != "chain_mvt" {
                                     continue;
                                 }
                             } else {
-                                // If there's no type field, skip this event
                                 continue;
                             }
 
-                            match serde_json::from_value::<ChainMovement>(event.clone()) {
-                                Ok(chain_mvt) => {
-                                    match (chain_mvt.primary_tag.as_str(), chain_mvt.account_id.as_str()) {
-                                        ("deposit", "wallet") => {
-                                            let outpoint = match OutPoint::from_str(&chain_mvt.utxo) {
-                                                Ok(outpoint) => outpoint,
-                                                Err(err) => {
-                                                    error!(?err, utxo = chain_mvt.utxo, "Invalid outpoint format");
-                                                    continue;
-                                                }
-                                            };
+                            let mut cursor_guard = cursor.lock().await;
+                            let currency: Currency = wallet.network().into();
 
-                                            let output = match wallet
-                                                .get_output(
-                                                    &outpoint.txid.to_string(),
-                                                    Some(outpoint.vout),
-                                                    None,
-                                                    false,
-                                                )
-                                                .await
-                                            {
-                                                Ok(Some(out)) => out,
-                                                Ok(None) => {
-                                                    trace!(%outpoint, "Output not found in wallet, skipping");
-                                                    continue;
+                            match wallet.synchronize(cursor_guard.clone()).await {
+                                Ok(batch) => {
+                                    for transaction in batch.events {
+                                        match transaction {
+                                            OnchainTransaction::Deposit(output) => {
+                                                if let Err(err) = services
+                                                    .event
+                                                    .onchain_deposit(output.into(), currency.clone())
+                                                    .await
+                                                {
+                                                    warn!(%err, "Failed to process onchain deposit");
                                                 }
-                                                Err(err) => {
-                                                    error!(%err, "Failed to get output from wallet");
-                                                    continue;
+                                            }
+                                            OnchainTransaction::Withdrawal(event) => {
+                                                if let Err(err) = services.event.onchain_withdrawal(event).await {
+                                                    error!(%err, "Failed to process onchain withdrawal");
                                                 }
-                                            };
-
-                                            if let Err(err) =
-                                                events.onchain_deposit(output.into(), wallet.network().into()).await
-                                            {
-                                                warn!(%err, "Failed to process onchain deposit");
                                             }
                                         }
-                                        ("withdrawal", "wallet") => {
-                                            if chain_mvt.spending_txid.is_none() {
-                                                trace!("Withdrawal missing spending txid");
-                                                continue;
-                                            };
+                                    }
 
-                                            if let Err(err) = events.onchain_withdrawal(chain_mvt.into()).await {
-                                                error!(%err, "Failed to process onchain withdrawal");
-                                            }
+                                    if let Some(next_cursor) = batch.next_cursor {
+                                        if let Err(err) = services.system.set_onchain_cursor(next_cursor.clone()).await
+                                        {
+                                            warn!(%err, "Failed to persist chainmoves cursor");
                                         }
-                                        _ => {
-                                            trace!(
-                                                tag = %chain_mvt.primary_tag,
-                                                account_id = %chain_mvt.account_id,
-                                                "Unsupported coin_movement event"
-                                            );
-                                        }
+                                        *cursor_guard = Some(next_cursor);
                                     }
                                 }
                                 Err(err) => {
-                                    error!(%err, "Failed to parse coin_movement event");
+                                    error!(%err, "Failed to synchronize onchain transactions");
                                 }
                             }
                         }

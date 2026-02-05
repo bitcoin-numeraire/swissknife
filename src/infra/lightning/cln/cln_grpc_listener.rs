@@ -340,15 +340,14 @@ impl ClnGrpcListener {
 
             let primary_tag = chainmove.primary_tag();
             let account_id = chainmove.account_id.as_str();
-            let originating_account = chainmove.originating_account.as_deref();
 
             let outpoint = chainmove
                 .utxo
                 .as_ref()
                 .map(|utxo| (hex::encode(&utxo.txid), utxo.outnum));
 
-            match (primary_tag, account_id, originating_account) {
-                (ListchainmovesChainmovesPrimaryTag::Deposit, "wallet", _) => {
+            match (primary_tag, account_id) {
+                (ListchainmovesChainmovesPrimaryTag::Deposit, "wallet") => {
                     let Some((txid, outnum)) = outpoint.clone() else {
                         warn!("Deposit chainmove missing outpoint");
                         continue;
@@ -370,8 +369,7 @@ impl ClnGrpcListener {
                         warn!(%err, "Failed to process onchain deposit");
                     }
                 }
-                (ListchainmovesChainmovesPrimaryTag::Deposit, "external", Some("wallet"))
-                | (ListchainmovesChainmovesPrimaryTag::Withdrawal, "wallet", _) => {
+                (ListchainmovesChainmovesPrimaryTag::Withdrawal, "wallet") => {
                     let Some(spending_txid) = chainmove.spending_txid else {
                         warn!("Withdrawal chainmove missing spending_txid");
                         continue;
@@ -386,14 +384,7 @@ impl ClnGrpcListener {
                         warn!(%err, "Failed to process onchain withdrawal");
                     }
                 }
-                _ => {
-                    trace!(
-                        primary_tag = ?primary_tag,
-                        account_id = account_id,
-                        originating_account = originating_account.unwrap_or_default(),
-                        "Unsupported chainmove event"
-                    );
-                }
+                _ => {}
             }
         }
 

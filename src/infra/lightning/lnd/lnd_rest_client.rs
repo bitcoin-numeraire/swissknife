@@ -521,7 +521,7 @@ impl BitcoinWallet for LndRestClient {
         }
     }
 
-    async fn sync_onchain(&self, cursor: Option<OnchainSyncCursor>) -> Result<OnchainSyncBatch, BitcoinError> {
+    async fn synchronize(&self, cursor: Option<OnchainSyncCursor>) -> Result<OnchainSyncBatch, BitcoinError> {
         let start_height = match cursor {
             Some(OnchainSyncCursor::BlockHeight(height)) => Some(height),
             _ => None,

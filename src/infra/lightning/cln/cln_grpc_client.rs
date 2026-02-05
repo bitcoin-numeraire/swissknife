@@ -423,7 +423,7 @@ impl BitcoinWallet for ClnGrpcClient {
         }))
     }
 
-    async fn sync_onchain(&self, cursor: Option<OnchainSyncCursor>) -> Result<OnchainSyncBatch, BitcoinError> {
+    async fn synchronize(&self, cursor: Option<OnchainSyncCursor>) -> Result<OnchainSyncBatch, BitcoinError> {
         let mut client = self.client.clone();
         let start_index = match cursor {
             Some(OnchainSyncCursor::CreatedIndex(index)) => index,
