@@ -10,4 +10,9 @@ pub trait SystemUseCases: Send + Sync {
     fn version(&self) -> VersionInfo;
     async fn setup_check(&self) -> Result<SetupInfo, ApplicationError>;
     async fn mark_welcome_complete(&self) -> Result<(), ApplicationError>;
+    async fn get_onchain_cursor(&self) -> Result<Option<crate::domains::bitcoin::OnchainSyncCursor>, ApplicationError>;
+    async fn set_onchain_cursor(
+        &self,
+        cursor: crate::domains::bitcoin::OnchainSyncCursor,
+    ) -> Result<(), ApplicationError>;
 }

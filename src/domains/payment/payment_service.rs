@@ -15,7 +15,7 @@ use crate::{
     },
     domains::{
         bitcoin::BitcoinWallet,
-        event::{EventUseCases, LnPayFailureEvent, LnPaySuccessEvent, OnchainWithdrawalEvent},
+        event::{EventUseCases, LnPayFailureEvent, LnPaySuccessEvent},
         invoice::{Invoice, InvoiceStatus},
         lnurl::{process_success_action, validate_lnurl_pay},
     },
@@ -587,6 +587,7 @@ impl PaymentsUseCases for PaymentService {
             .payment
             .find_many(PaymentFilter {
                 status: Some(PaymentStatus::Pending),
+                ledger: Some(Ledger::Lightning),
                 ..Default::default()
             })
             .await?;
@@ -646,30 +647,7 @@ impl PaymentsUseCases for PaymentService {
                         }
                     }
                 }
-                Ledger::Onchain => {
-                    let Some(bitcoin) = payment.bitcoin.as_ref() else {
-                        return Err(DataError::Inconsistency(format!(
-                            "Missing bitcoin metadata on onchain payment with id: {}",
-                            payment.id
-                        ))
-                        .into());
-                    };
-
-                    let Some(tx) = self.bitcoin_wallet.get_transaction(&bitcoin.txid).await? else {
-                        warn!(payment_id = %payment.id, "Transaction not found, it was either removed from mempool, \
-                            never broadcast or backend was switched. Please investigate manually.");
-                        continue;
-                    };
-
-                    self.events
-                        .onchain_withdrawal(OnchainWithdrawalEvent {
-                            txid: bitcoin.txid.clone(),
-                            block_height: tx.block_height,
-                        })
-                        .await?;
-
-                    synced += 1;
-                }
+                Ledger::Onchain => {}
                 Ledger::Internal => {}
             }
         }

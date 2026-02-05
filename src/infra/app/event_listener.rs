@@ -33,7 +33,7 @@ impl EventListener {
                     .clone()
                     .ok_or_else(|| ConfigError::MissingLightningProviderConfig(config.ln_provider.to_string()))?;
 
-                let listener = ClnGrpcListener::new(cln_config, services.event.clone(), bitcoin_wallet).await?;
+                let listener = ClnGrpcListener::new(cln_config, services.clone(), bitcoin_wallet).await?;
 
                 Some(Arc::new(listener) as Arc<dyn EventsListener>)
             }
@@ -64,14 +64,19 @@ impl EventListener {
 
     pub async fn start(&self) -> Result<(), ApplicationError> {
         if let Some(listener) = self.listener.clone() {
+            let listener_task = listener.clone();
             tokio::spawn(async move {
-                if let Err(err) = listener.listen().await {
+                if let Err(err) = listener_task.listen().await {
                     panic!("Critical: Lightning listener failed: {}", err);
                 }
             });
         }
 
-        tokio::try_join!(self.services.invoice.sync(), self.services.payment.sync())?;
+        tokio::try_join!(
+            self.services.invoice.sync(),
+            self.services.payment.sync(),
+            self.services.bitcoin.sync()
+        )?;
 
         Ok(())
     }

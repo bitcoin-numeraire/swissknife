@@ -29,4 +29,5 @@ pub trait BtcAddressRepository: Send + Sync {
 pub trait BtcOutputRepository: Send + Sync {
     async fn find_by_outpoint(&self, outpoint: &str) -> Result<Option<BtcOutput>, DatabaseError>;
     async fn upsert(&self, output: BtcOutput) -> Result<BtcOutput, DatabaseError>;
+    async fn max_block_height(&self) -> Result<Option<u32>, DatabaseError>;
 }

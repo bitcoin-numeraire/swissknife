@@ -1,6 +1,9 @@
 use async_trait::async_trait;
 use chrono::Utc;
-use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set, Unchanged};
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, FromQueryResult, QueryFilter, QuerySelect, Set,
+    Unchanged,
+};
 use uuid::Uuid;
 
 use crate::{
@@ -75,5 +78,22 @@ impl BtcOutputRepository for SeaOrmBitcoinOutputRepository {
             .map_err(|e| DatabaseError::Insert(e.to_string()))?;
 
         Ok(model.into())
+    }
+
+    async fn max_block_height(&self) -> Result<Option<u32>, DatabaseError> {
+        #[derive(FromQueryResult)]
+        struct MaxBlockHeight {
+            max: Option<i32>,
+        }
+
+        let result = BtcOutputEntity::find()
+            .select_only()
+            .column_as(Column::BlockHeight.max(), "max")
+            .into_model::<MaxBlockHeight>()
+            .one(&self.db)
+            .await
+            .map_err(|e| DatabaseError::FindOne(e.to_string()))?;
+
+        Ok(result.and_then(|row| row.max).map(|value| value as u32))
     }
 }

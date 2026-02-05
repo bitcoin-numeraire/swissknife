@@ -25,7 +25,7 @@ use crate::{
     domains::{
         bitcoin::{
             BitcoinWallet, BtcAddressType, BtcNetwork, BtcOutput, BtcPreparedTransaction, BtcTransaction,
-            BtcTransactionOutput,
+            BtcTransactionOutput, OnchainSyncBatch, OnchainSyncCursor, OnchainTransaction,
         },
         invoice::Invoice,
         payment::{LnPayment, Payment, PaymentStatus},
@@ -421,6 +421,104 @@ impl BitcoinWallet for ClnGrpcClient {
             outputs,
             is_outgoing: false, // TODO: determine from CLN transaction data when needed
         }))
+    }
+
+    async fn sync_onchain(&self, cursor: Option<OnchainSyncCursor>) -> Result<OnchainSyncBatch, BitcoinError> {
+        let mut client = self.client.clone();
+        let start_index = match cursor {
+            Some(OnchainSyncCursor::CreatedIndex(index)) => index,
+            _ => 0,
+        };
+
+        let funds = client
+            .list_funds(cln::ListfundsRequest { spent: Some(true) })
+            .await
+            .map_err(|e| BitcoinError::GetOutput(e.message().to_string()))?
+            .into_inner();
+        let mut outputs_by_outpoint = std::collections::HashMap::new();
+        for output in funds.outputs {
+            let txid_hex = hex::encode(&output.txid);
+            let address_str = output.address.clone().unwrap_or_default();
+            let outpoint = format!("{}:{}", txid_hex, output.output);
+            outputs_by_outpoint.insert(
+                outpoint.clone(),
+                BtcOutput {
+                    txid: txid_hex,
+                    output_index: output.output,
+                    address: address_str,
+                    amount_sat: output.amount_msat.map(|a| a.msat).unwrap_or_default() / 1000,
+                    block_height: output.blockheight,
+                    outpoint,
+                    status: output.status().into(),
+                    ..Default::default()
+                },
+            );
+        }
+
+        let response = client
+            .list_chain_moves(cln::ListchainmovesRequest {
+                index: Some(cln::listchainmoves_request::ListchainmovesIndex::Created as i32),
+                start: Some(start_index),
+                limit: None,
+            })
+            .await
+            .map_err(|e| BitcoinError::GetTransaction(e.message().to_string()))?
+            .into_inner();
+
+        let mut max_index = start_index;
+        let mut events = Vec::new();
+
+        for chainmove in response.chainmoves {
+            max_index = max_index.max(chainmove.created_index);
+
+            let primary_tag = chainmove.primary_tag();
+            let account_id = chainmove.account_id.as_str();
+            let originating_account = chainmove.originating_account.as_deref();
+
+            let outpoint = chainmove
+                .utxo
+                .as_ref()
+                .map(|utxo| (hex::encode(&utxo.txid), utxo.outnum));
+
+            match (primary_tag, account_id, originating_account) {
+                (cln::listchainmoves_chainmoves::ListchainmovesChainmovesPrimaryTag::Deposit, "wallet", _) => {
+                    let Some((txid, outnum)) = outpoint.clone() else {
+                        continue;
+                    };
+
+                    let outpoint_key = format!("{}:{}", txid, outnum);
+                    if let Some(output) = outputs_by_outpoint.get(&outpoint_key) {
+                        events.push(OnchainTransaction::Deposit(output.clone()));
+                    }
+                }
+                (
+                    cln::listchainmoves_chainmoves::ListchainmovesChainmovesPrimaryTag::Deposit,
+                    "external",
+                    Some("wallet"),
+                )
+                | (cln::listchainmoves_chainmoves::ListchainmovesChainmovesPrimaryTag::Withdrawal, "wallet", _) => {
+                    let Some(spending_txid) = chainmove.spending_txid else {
+                        continue;
+                    };
+
+                    events.push(OnchainTransaction::Withdrawal(
+                        crate::domains::event::OnchainWithdrawalEvent {
+                            txid: spending_txid.to_hex(),
+                            block_height: Some(chainmove.blockheight),
+                        },
+                    ));
+                }
+                _ => {}
+            }
+        }
+
+        let next_cursor = if max_index > start_index {
+            Some(OnchainSyncCursor::CreatedIndex(max_index.saturating_add(1)))
+        } else {
+            None
+        };
+
+        Ok(OnchainSyncBatch { events, next_cursor })
     }
 
     async fn get_output(

@@ -21,10 +21,8 @@ use crate::{
     infra::lightning::EventsListener,
 };
 
-use super::{
-    cln_websocket_types::{ChainMovement, InvoicePayment, SendPayFailure, SendPaySuccess},
-    ClnRestClientConfig,
-};
+use super::cln_websocket_types::{ChainMovement, InvoicePayment, SendPayFailure, SendPaySuccess};
+use super::ClnRestClientConfig;
 
 pub struct ClnWebsocketListener {
     client_builder: Mutex<Option<ClientBuilder>>,
@@ -36,6 +34,8 @@ impl ClnWebsocketListener {
         events: Arc<dyn EventUseCases>,
         wallet: Arc<dyn BitcoinWallet>,
     ) -> Result<Self, LightningError> {
+        let message_events = events.clone();
+        let message_wallet = wallet.clone();
         let mut client_builder = ClientBuilder::new(config.endpoint.clone())
             .transport_type(TransportType::Websocket)
             .reconnect_on_disconnect(true)
@@ -48,7 +48,7 @@ impl ClnWebsocketListener {
             .on("close", on_close)
             .on("error", on_error)
             .on("message", move |payload, _: Client| {
-                Self::on_message(events.clone(), wallet.clone(), payload)
+                Self::on_message(message_events.clone(), message_wallet.clone(), payload)
             });
 
         if let Some(ca_cert_path) = &config.ca_cert_path {

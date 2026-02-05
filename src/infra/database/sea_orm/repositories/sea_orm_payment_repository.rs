@@ -1,8 +1,8 @@
 use async_trait::async_trait;
 use chrono::Utc;
 use sea_orm::{
-    ActiveModelTrait, ActiveValue, ColumnTrait, DatabaseConnection, DatabaseTransaction, EntityTrait, QueryFilter,
-    QueryOrder, QuerySelect, QueryTrait, Set, Unchanged,
+    ActiveModelTrait, ActiveValue, ColumnTrait, DatabaseConnection, DatabaseTransaction, EntityTrait, FromQueryResult,
+    QueryFilter, QueryOrder, QuerySelect, QueryTrait, Set, Unchanged,
 };
 use uuid::Uuid;
 
@@ -235,5 +235,22 @@ impl PaymentRepository for SeaOrmPaymentRepository {
             .map_err(|e| DatabaseError::Delete(e.to_string()))?;
 
         Ok(result.rows_affected)
+    }
+
+    async fn max_btc_block_height(&self) -> Result<Option<u32>, DatabaseError> {
+        #[derive(FromQueryResult)]
+        struct MaxBlockHeight {
+            max: Option<i32>,
+        }
+
+        let result = PaymentEntity::find()
+            .select_only()
+            .column_as(Column::BtcBlockHeight.max(), "max")
+            .into_model::<MaxBlockHeight>()
+            .one(&self.db)
+            .await
+            .map_err(|e| DatabaseError::FindOne(e.to_string()))?;
+
+        Ok(result.and_then(|row| row.max).map(|value| value as u32))
     }
 }

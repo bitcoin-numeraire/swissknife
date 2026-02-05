@@ -1,4 +1,26 @@
+use serde::{Deserialize, Serialize};
+
+use crate::domains::bitcoin::BtcOutput;
 use crate::domains::event::{OnchainDepositEvent, OnchainWithdrawalEvent};
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(tag = "kind", content = "value", rename_all = "snake_case")]
+pub enum OnchainSyncCursor {
+    BlockHeight(u32),
+    CreatedIndex(u64),
+}
+
+#[derive(Clone, Debug)]
+pub enum OnchainTransaction {
+    Deposit(BtcOutput),
+    Withdrawal(OnchainWithdrawalEvent),
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct OnchainSyncBatch {
+    pub events: Vec<OnchainTransaction>,
+    pub next_cursor: Option<OnchainSyncCursor>,
+}
 
 #[derive(Clone, Debug)]
 pub struct BtcTransaction {

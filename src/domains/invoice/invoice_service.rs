@@ -10,10 +10,7 @@ use crate::{
         entities::{AppStore, Ledger},
         errors::{ApplicationError, DataError},
     },
-    domains::{
-        bitcoin::BitcoinWallet,
-        event::{EventUseCases, LnInvoicePaidEvent},
-    },
+    domains::event::{EventUseCases, LnInvoicePaidEvent},
     infra::lightning::LnClient,
 };
 
@@ -24,7 +21,6 @@ const DEFAULT_INVOICE_DESCRIPTION: &str = "Numeraire Invoice";
 pub struct InvoiceService {
     store: AppStore,
     ln_client: Arc<dyn LnClient>,
-    bitcoin_wallet: Arc<dyn BitcoinWallet>,
     invoice_expiry: u32,
     events: Arc<dyn EventUseCases>,
 }
@@ -33,14 +29,12 @@ impl InvoiceService {
     pub fn new(
         store: AppStore,
         ln_client: Arc<dyn LnClient>,
-        bitcoin_wallet: Arc<dyn BitcoinWallet>,
         invoice_expiry: u32,
         events: Arc<dyn EventUseCases>,
     ) -> Self {
         InvoiceService {
             store,
             ln_client,
-            bitcoin_wallet,
             invoice_expiry,
             events,
         }
@@ -135,6 +129,7 @@ impl InvoiceUseCases for InvoiceService {
             .invoice
             .find_many(InvoiceFilter {
                 status: Some(InvoiceStatus::Pending),
+                ledger: Some(Ledger::Lightning),
                 ..Default::default()
             })
             .await?;
@@ -181,33 +176,7 @@ impl InvoiceUseCases for InvoiceService {
                     self.events.invoice_paid(event).await?;
                     synced += 1;
                 }
-                Ledger::Onchain => {
-                    let Some(stored_output) = invoice.bitcoin_output.clone() else {
-                        return Err(DataError::Inconsistency(format!(
-                            "Bitcoin output not found on onchain invoice with id: {}",
-                            invoice.id
-                        ))
-                        .into());
-                    };
-
-                    let output = self
-                        .bitcoin_wallet
-                        .get_output(
-                            &stored_output.txid,
-                            Some(stored_output.output_index),
-                            Some(&stored_output.address),
-                            true,
-                        )
-                        .await?;
-                    let Some(output) = output else {
-                        continue;
-                    };
-
-                    self.events
-                        .onchain_deposit(output.into(), self.bitcoin_wallet.network().into())
-                        .await?;
-                    synced += 1;
-                }
+                Ledger::Onchain => {}
                 Ledger::Internal => {}
             }
         }

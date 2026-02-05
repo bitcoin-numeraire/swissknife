@@ -1,16 +1,18 @@
 use async_trait::async_trait;
+use serde_json;
 use std::sync::Arc;
 use tracing::{debug, error, info, trace};
 
 use crate::{
     application::{entities::AppStore, errors::ApplicationError},
-    domains::user::PASSWORD_HASH_KEY,
+    domains::{bitcoin::OnchainSyncCursor, user::PASSWORD_HASH_KEY},
     infra::lightning::LnClient,
 };
 
 use super::{HealthCheck, HealthStatus, SetupInfo, SystemUseCases, VersionInfo};
 
 const WELCOME_COMPLETE_KEY: &str = "welcome_complete";
+const ONCHAIN_CURSOR_KEY: &str = "onchain_sync_cursor";
 
 pub struct SystemService {
     store: AppStore,
@@ -78,6 +80,23 @@ impl SystemUseCases for SystemService {
         self.store.config.insert(WELCOME_COMPLETE_KEY, true.into()).await?;
 
         info!("Welcome flow marked as complete successfully");
+        Ok(())
+    }
+
+    async fn get_onchain_cursor(&self) -> Result<Option<OnchainSyncCursor>, ApplicationError> {
+        let value = self.store.config.find(ONCHAIN_CURSOR_KEY).await?;
+        let Some(value) = value else {
+            return Ok(None);
+        };
+        let cursor = serde_json::from_value(value)
+            .map_err(|e| crate::application::errors::DataError::Malformed(e.to_string()))?;
+        Ok(Some(cursor))
+    }
+
+    async fn set_onchain_cursor(&self, cursor: OnchainSyncCursor) -> Result<(), ApplicationError> {
+        let value = serde_json::to_value(cursor)
+            .map_err(|e| crate::application::errors::DataError::Malformed(e.to_string()))?;
+        self.store.config.upsert(ONCHAIN_CURSOR_KEY, value).await?;
         Ok(())
     }
 }

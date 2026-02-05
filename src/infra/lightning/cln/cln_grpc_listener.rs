@@ -7,15 +7,6 @@ use tokio::time::sleep;
 use tonic::{transport::Channel, Code};
 use tracing::{error, trace, warn};
 
-use crate::{
-    application::{entities::Currency, errors::LightningError},
-    domains::{
-        bitcoin::BitcoinWallet,
-        event::{EventUseCases, LnPayFailureEvent, LnPaySuccessEvent, OnchainWithdrawalEvent},
-    },
-    infra::lightning::EventsListener,
-};
-
 use super::{
     cln::{
         listchainmoves_chainmoves::ListchainmovesChainmovesPrimaryTag,
@@ -29,27 +20,41 @@ use super::{
     },
     cln_grpc_client::{ClnClientConfig, ClnGrpcClient},
 };
+use crate::{
+    application::{
+        entities::{AppServices, Currency},
+        errors::LightningError,
+    },
+    domains::{
+        bitcoin::{BitcoinWallet, OnchainSyncCursor},
+        event::{EventUseCases, LnPayFailureEvent, LnPaySuccessEvent, OnchainWithdrawalEvent},
+        system::SystemUseCases,
+    },
+    infra::lightning::EventsListener,
+};
 
 pub struct ClnGrpcListener {
     client: NodeClient<Channel>,
     events: Arc<dyn EventUseCases>,
     wallet: Arc<dyn BitcoinWallet>,
     retry_delay: Duration,
+    system: Arc<dyn SystemUseCases>,
 }
 
 impl ClnGrpcListener {
     pub async fn new(
         config: ClnClientConfig,
-        events: Arc<dyn EventUseCases>,
+        services: Arc<AppServices>,
         wallet: Arc<dyn BitcoinWallet>,
     ) -> Result<Self, LightningError> {
         let client = ClnGrpcClient::connect(&config).await?;
 
         Ok(Self {
             client,
-            events,
+            events: services.event.clone(),
             wallet,
             retry_delay: config.retry_delay,
+            system: services.system.clone(),
         })
     }
 
@@ -234,6 +239,13 @@ impl ClnGrpcListener {
                     match self.handle_chainmoves(created_index).await {
                         Ok(max_index) => {
                             next_index = max_index.saturating_add(1);
+                            if let Err(err) = self
+                                .system
+                                .set_onchain_cursor(OnchainSyncCursor::CreatedIndex(next_index))
+                                .await
+                            {
+                                warn!(%err, "Failed to persist chainmoves cursor");
+                            }
                         }
                         Err(err) => {
                             warn!(%err, "Failed to process onchain chainmoves");

@@ -262,6 +262,11 @@ pub struct TransactionResponse {
     pub previous_outpoints: Vec<PreviousOutpointResponse>,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct GetTransactionsResponse {
+    pub transactions: Vec<TransactionResponse>,
+}
+
 #[serde_as]
 #[derive(Debug, Deserialize)]
 pub struct OutputDetailResponse {

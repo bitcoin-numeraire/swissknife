@@ -19,7 +19,7 @@ use crate::{
     domains::{
         bitcoin::{
             BitcoinWallet, BtcAddressType, BtcLockedUtxo, BtcNetwork, BtcOutput, BtcOutputStatus,
-            BtcPreparedTransaction, BtcTransaction,
+            BtcPreparedTransaction, BtcTransaction, OnchainSyncBatch, OnchainSyncCursor, OnchainTransaction,
         },
         invoice::Invoice,
         payment::{LnPayment, Payment, PaymentStatus},
@@ -65,6 +65,7 @@ pub struct LndRestClient {
 }
 
 const USER_AGENT: &str = "Numeraire Swissknife/1.0";
+const LND_REORG_BUFFER_BLOCKS: u32 = 2;
 
 impl LndRestClient {
     pub async fn new(config: LndRestClientConfig) -> Result<Self, LightningError> {
@@ -204,6 +205,20 @@ impl LndRestClient {
         Err(LightningError::NodeInfo(
             "No chain information returned by LND".to_string(),
         ))
+    }
+
+    async fn fetch_transactions(&self, start_height: Option<u32>) -> Result<Vec<BtcTransaction>, LightningError> {
+        let mut endpoint = "v1/transactions".to_string();
+        if let Some(start_height) = start_height {
+            endpoint = format!("{}?start_height={}", endpoint, start_height);
+        }
+
+        let response: GetTransactionsResponse = self
+            .get_request(&endpoint)
+            .await
+            .map_err(|e| LightningError::Listener(e.to_string()))?;
+
+        Ok(response.transactions.into_iter().map(Into::into).collect())
     }
 }
 
@@ -504,6 +519,59 @@ impl BitcoinWallet for LndRestClient {
                 }
             }
         }
+    }
+
+    async fn sync_onchain(&self, cursor: Option<OnchainSyncCursor>) -> Result<OnchainSyncBatch, BitcoinError> {
+        let start_height = match cursor {
+            Some(OnchainSyncCursor::BlockHeight(height)) => Some(height),
+            _ => None,
+        };
+        let transactions = self
+            .fetch_transactions(start_height)
+            .await
+            .map_err(|e| BitcoinError::GetTransaction(e.to_string()))?;
+
+        let mut result = Vec::new();
+
+        let mut max_height: Option<u32> = None;
+
+        for transaction in transactions {
+            if let Some(height) = transaction.block_height {
+                max_height = Some(max_height.map_or(height, |current| current.max(height)));
+            }
+            if transaction.is_outgoing {
+                for _output in transaction.outputs.iter().filter(|output| !output.is_ours) {
+                    result.push(OnchainTransaction::Withdrawal(transaction.withdrawal_event()));
+                }
+            } else {
+                for output in transaction.outputs.iter().filter(|output| output.is_ours) {
+                    result.push(OnchainTransaction::Deposit(BtcOutput {
+                        txid: transaction.txid.clone(),
+                        output_index: output.output_index,
+                        address: output.address.clone(),
+                        amount_sat: output.amount_sat,
+                        block_height: transaction.block_height,
+                        outpoint: format!("{}:{}", transaction.txid, output.output_index),
+                        status: if transaction.block_height.is_some() && transaction.block_height.unwrap() > 0 {
+                            BtcOutputStatus::Confirmed
+                        } else {
+                            BtcOutputStatus::Unconfirmed
+                        },
+                        ..Default::default()
+                    }));
+                }
+            }
+        }
+
+        let next_cursor = max_height.map(|height| {
+            let buffered = height.saturating_sub(LND_REORG_BUFFER_BLOCKS);
+            OnchainSyncCursor::BlockHeight(buffered)
+        });
+
+        Ok(OnchainSyncBatch {
+            events: result,
+            next_cursor,
+        })
     }
 
     async fn get_output(
