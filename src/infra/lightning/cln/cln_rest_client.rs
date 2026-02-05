@@ -1,4 +1,4 @@
-use std::{path::PathBuf, str::FromStr, time::Duration};
+use std::{collections::HashMap, path::PathBuf, str::FromStr, time::Duration};
 
 use bitcoin::{Address, Network, OutPoint, ScriptBuf};
 use chrono::{TimeZone, Utc};
@@ -24,6 +24,7 @@ use crate::{
             BitcoinWallet, BtcAddressType, BtcNetwork, BtcOutput, BtcOutputStatus, BtcPreparedTransaction,
             BtcTransaction, BtcTransactionOutput, OnchainSyncBatch, OnchainSyncCursor, OnchainTransaction,
         },
+        event::OnchainWithdrawalEvent,
         invoice::Invoice,
         payment::{LnPayment, Payment, PaymentStatus},
         system::HealthStatus,
@@ -155,23 +156,6 @@ impl ClnRestClient {
             .map_err(|e| LightningError::NodeInfo(e.to_string()))?;
 
         Ok(parse_network(&response.network))
-    }
-
-    pub async fn list_chain_moves(
-        &self,
-        start_index: u64,
-        limit: Option<u64>,
-    ) -> Result<ListChainMovesResponse, LightningError> {
-        self.post_request(
-            "listchainmoves",
-            &ListChainMovesRequest {
-                index: Some("created".to_string()),
-                start: Some(start_index),
-                limit,
-            },
-        )
-        .await
-        .map_err(|e| LightningError::Listener(e.to_string()))
     }
 }
 
@@ -443,36 +427,64 @@ impl BitcoinWallet for ClnRestClient {
             Some(OnchainSyncCursor::CreatedIndex(index)) => index,
             _ => 0,
         };
-        let funds: ListFundsResponse = self
-            .post_request("listfunds", &ListFundsRequest { spent: Some(true) })
-            .await
-            .map_err(|e| BitcoinError::GetOutput(e.to_string()))?;
-        let mut outputs_by_outpoint = std::collections::HashMap::new();
-        for output in funds.outputs {
-            let outpoint = format!("{}:{}", output.txid, output.output);
-            let status = match output.status.as_str() {
-                "confirmed" => BtcOutputStatus::Confirmed,
-                "spent" | "unconfirmed" => BtcOutputStatus::Unconfirmed,
-                _ => BtcOutputStatus::Unconfirmed,
-            };
-            outputs_by_outpoint.insert(
-                outpoint,
-                BtcOutput {
-                    txid: output.txid.clone(),
-                    output_index: output.output,
-                    address: output.address.unwrap_or_default(),
-                    amount_sat: output.amount_msat / 1000,
-                    block_height: output.blockheight,
-                    outpoint: format!("{}:{}", output.txid, output.output),
-                    status,
-                    ..Default::default()
+
+        let response: ListChainMovesResponse = self
+            .post_request(
+                "listchainmoves",
+                &ListChainMovesRequest {
+                    index: Some("created".to_string()),
+                    start: Some(start_index),
+                    limit: None,
                 },
-            );
-        }
-        let response = self
-            .list_chain_moves(start_index, None)
+            )
             .await
-            .map_err(|e| BitcoinError::GetTransaction(e.to_string()))?;
+            .map_err(|e| BitcoinError::Synchronize(e.to_string()))?;
+
+        if response.chainmoves.is_empty() {
+            return Ok(OnchainSyncBatch {
+                events: Vec::new(),
+                next_cursor: None,
+            });
+        }
+
+        let has_deposits = response
+            .chainmoves
+            .iter()
+            .any(|m| m.primary_tag == "deposit" && m.account_id == "wallet");
+
+        let outputs_by_outpoint = if has_deposits {
+            let funds: ListFundsResponse = self
+                .post_request("listfunds", &ListFundsRequest { spent: Some(true) })
+                .await
+                .map_err(|e| BitcoinError::GetOutput(e.to_string()))?;
+
+            let mut map = HashMap::new();
+            for output in funds.outputs {
+                let outpoint = format!("{}:{}", output.txid, output.output);
+                let status = match output.status.as_str() {
+                    "confirmed" => BtcOutputStatus::Confirmed,
+                    "spent" | "unconfirmed" => BtcOutputStatus::Unconfirmed,
+                    _ => BtcOutputStatus::Unconfirmed,
+                };
+
+                map.insert(
+                    outpoint,
+                    BtcOutput {
+                        txid: output.txid.clone(),
+                        output_index: output.output,
+                        address: output.address.unwrap_or_default(),
+                        amount_sat: output.amount_msat / 1000,
+                        block_height: output.blockheight,
+                        outpoint: format!("{}:{}", output.txid, output.output),
+                        status,
+                        ..Default::default()
+                    },
+                );
+            }
+            map
+        } else {
+            HashMap::new()
+        };
 
         let mut max_index = start_index;
         let mut events = Vec::new();
@@ -480,33 +492,25 @@ impl BitcoinWallet for ClnRestClient {
         for chainmove in response.chainmoves {
             max_index = max_index.max(chainmove.created_index);
 
-            match (
-                chainmove.primary_tag.as_str(),
-                chainmove.account_id.as_str(),
-                chainmove.originating_account.as_deref(),
-            ) {
-                ("deposit", "wallet", _) => {
-                    let Some(utxo) = chainmove.utxo.as_deref() else {
-                        continue;
-                    };
-
-                    let outpoint = OutPoint::from_str(utxo).map_err(|e| BitcoinError::GetTransaction(e.to_string()))?;
+            match (chainmove.primary_tag.as_str(), chainmove.account_id.as_str()) {
+                ("deposit", "wallet") => {
+                    let outpoint =
+                        OutPoint::from_str(&chainmove.utxo).map_err(|e| BitcoinError::Synchronize(e.to_string()))?;
                     let key = format!("{}:{}", outpoint.txid, outpoint.vout);
+
                     if let Some(output) = outputs_by_outpoint.get(&key) {
                         events.push(OnchainTransaction::Deposit(output.clone()));
                     }
                 }
-                ("deposit", "external", Some("wallet")) | ("withdrawal", "wallet", _) => {
+                ("withdrawal", "wallet") => {
                     let Some(spending_txid) = chainmove.spending_txid.clone() else {
                         continue;
                     };
 
-                    events.push(OnchainTransaction::Withdrawal(
-                        crate::domains::event::OnchainWithdrawalEvent {
-                            txid: spending_txid,
-                            block_height: chainmove.blockheight,
-                        },
-                    ));
+                    events.push(OnchainTransaction::Withdrawal(OnchainWithdrawalEvent {
+                        txid: spending_txid,
+                        block_height: chainmove.blockheight,
+                    }));
                 }
                 _ => {}
             }

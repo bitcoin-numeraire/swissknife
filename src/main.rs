@@ -25,8 +25,6 @@ async fn main() {
     #[cfg(debug_assertions)]
     dotenv().ok();
 
-    info!("Numeraire SwissKnife version: {}", env!("CARGO_PKG_VERSION"));
-
     // Load config and logger
     let config = match load_config() {
         Ok(c) => c,
@@ -36,6 +34,8 @@ async fn main() {
         }
     };
     setup_tracing(config.logging.clone());
+
+    info!("Numeraire SwissKnife version: {}", env!("CARGO_PKG_VERSION"));
 
     let adapters = match AppAdapters::new(config.clone()).await {
         Ok(state) => state,

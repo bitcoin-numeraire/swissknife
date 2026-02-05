@@ -97,8 +97,7 @@ pub struct ListChainMove {
     pub created_index: u64,
     pub primary_tag: String,
     pub account_id: String,
-    pub originating_account: Option<String>,
-    pub utxo: Option<String>,
+    pub utxo: String,
     pub spending_txid: Option<String>,
     pub blockheight: Option<u32>,
 }

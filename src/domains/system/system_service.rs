@@ -95,17 +95,17 @@ impl SystemUseCases for SystemService {
 
         let cursor = from_value(value).map_err(|e| DataError::Malformed(e.to_string()))?;
 
-        debug!("Onchain sync cursor retrieved successfully");
+        debug!(?cursor, "Onchain sync cursor retrieved successfully");
         Ok(Some(cursor))
     }
 
     async fn set_onchain_cursor(&self, cursor: OnchainSyncCursor) -> Result<(), ApplicationError> {
-        trace!("Setting onchain sync cursor: {:?}", cursor);
+        trace!("Setting onchain sync cursor");
 
-        let value = to_value(cursor).map_err(|e| DataError::Malformed(e.to_string()))?;
+        let value = to_value(cursor.clone()).map_err(|e| DataError::Malformed(e.to_string()))?;
         self.store.config.upsert(ONCHAIN_CURSOR_KEY, value).await?;
 
-        debug!("Onchain sync cursor updated successfully");
+        debug!(?cursor, "Onchain sync cursor updated successfully");
         Ok(())
     }
 }

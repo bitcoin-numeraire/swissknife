@@ -126,7 +126,7 @@ impl BitcoinUseCases for BitcoinService {
     }
 
     async fn sync(&self) -> Result<u32, ApplicationError> {
-        trace!("Synchronizing on-chain bitcoin transactions");
+        trace!("Synchronizing on-chain bitcoin transactions...");
 
         let mut cursor = self.system.get_onchain_cursor().await?;
         if cursor.is_none() {
@@ -144,12 +144,14 @@ impl BitcoinUseCases for BitcoinService {
         for transaction in result.events {
             match transaction {
                 OnchainTransaction::Deposit(output) => {
-                    self.events.onchain_deposit(output.into(), currency.clone()).await?;
-                    synced += 1;
+                    if self.events.onchain_deposit(output.into(), currency.clone()).await? {
+                        synced += 1;
+                    }
                 }
                 OnchainTransaction::Withdrawal(event) => {
-                    self.events.onchain_withdrawal(event).await?;
-                    synced += 1;
+                    if self.events.onchain_withdrawal(event).await? {
+                        synced += 1;
+                    }
                 }
             }
         }

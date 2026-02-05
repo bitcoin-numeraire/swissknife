@@ -176,7 +176,7 @@ impl ClnWebsocketListener {
                                                     .onchain_deposit(output.into(), currency.clone())
                                                     .await
                                                 {
-                                                    warn!(%err, "Failed to process onchain deposit");
+                                                    error!(%err, "Failed to process onchain deposit");
                                                 }
                                             }
                                             OnchainTransaction::Withdrawal(event) => {

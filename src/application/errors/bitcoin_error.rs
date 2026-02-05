@@ -30,6 +30,9 @@ pub enum BitcoinError {
     #[error("Failed to get bitcoin transaction: {0}")]
     GetTransaction(String),
 
+    #[error("Failed to synchronize bitcoin transactions: {0}")]
+    Synchronize(String),
+
     #[error("Unsupported bitcoin operation: {0}")]
     Unsupported(String),
 }
