@@ -114,7 +114,7 @@ impl EventUseCases for EventService {
         return Err(DataError::NotFound("Lightning payment not found.".into()).into());
     }
 
-    async fn onchain_deposit(&self, event: OnchainDepositEvent, currency: Currency) -> Result<(), ApplicationError> {
+    async fn onchain_deposit(&self, event: OnchainDepositEvent, currency: Currency) -> Result<bool, ApplicationError> {
         let outpoint = format!("{}:{}", event.txid, event.output_index);
         trace!(%outpoint, "Processing onchain deposit event");
 
@@ -134,7 +134,7 @@ impl EventUseCases for EventService {
         let Some(btc_address) = self.store.btc_address.find_by_address(&address).await? else {
             trace!(%address, outpoint = outpoint.clone(),
                 "Ignoring bitcoin output not matching any known wallet address");
-            return Ok(());
+            return Ok(false);
         };
 
         let stored_output = self.store.btc_output.upsert(output.clone()).await?;
@@ -186,23 +186,23 @@ impl EventUseCases for EventService {
                 "New onchain deposit processed");
         }
 
-        Ok(())
+        Ok(true)
     }
 
-    async fn onchain_withdrawal(&self, event: OnchainWithdrawalEvent) -> Result<(), ApplicationError> {
+    async fn onchain_withdrawal(&self, event: OnchainWithdrawalEvent) -> Result<bool, ApplicationError> {
         trace!(txid = %event.txid, block_height = event.block_height, "Processing onchain withdrawal event");
 
         let block_height = match event.block_height {
             Some(height) if height > 0 => height,
             _ => {
                 trace!(txid = %event.txid, "Bitcoin transaction not yet confirmed, ignoring for now");
-                return Ok(());
+                return Ok(false);
             }
         };
 
         let Some(mut payment) = self.store.payment.find_by_payment_hash(&event.txid).await? else {
             trace!(txid = %event.txid, "Ignoring bitcoin output not matching any known payment");
-            return Ok(());
+            return Ok(false);
         };
 
         payment.status = PaymentStatus::Settled;
@@ -214,6 +214,6 @@ impl EventUseCases for EventService {
         let stored_payment = self.store.payment.update(payment).await?;
 
         info!(payment_id = %stored_payment.id, txid = %event.txid, "Onchain withdrawal processed");
-        Ok(())
+        Ok(true)
     }
 }

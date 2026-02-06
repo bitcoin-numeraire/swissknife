@@ -23,7 +23,7 @@ pub struct AppServices {
     pub lnurl: Box<dyn LnUrlUseCases>,
     pub ln_address: Box<dyn LnAddressUseCases>,
     pub auth: Box<dyn AuthUseCases>,
-    pub system: Box<dyn SystemUseCases>,
+    pub system: Arc<dyn SystemUseCases>,
     pub nostr: Box<dyn NostrUseCases>,
     pub api_key: Box<dyn ApiKeyUseCases>,
     pub bitcoin: Box<dyn BitcoinUseCases>,
@@ -62,7 +62,6 @@ impl AppServices {
         let invoices = InvoiceService::new(
             store.clone(),
             ln_client.clone(),
-            bitcoin_wallet.clone(),
             invoice_expiry.as_secs() as u32,
             event.clone(),
         );
@@ -76,10 +75,16 @@ impl AppServices {
         let ln_address = LnAddressService::new(store.clone());
         let wallet = WalletService::new(store.clone());
         let auth = AuthService::new(jwt_authenticator, store.clone(), auth_provider);
-        let system = SystemService::new(store.clone(), ln_client.clone());
+        let system = Arc::new(SystemService::new(store.clone(), ln_client.clone()));
         let nostr = NostrService::new(store.clone());
         let api_key = ApiKeyService::new(store.clone());
-        let bitcoin = BitcoinService::new(store.clone(), bitcoin_wallet, bitcoin_address_type);
+        let bitcoin = BitcoinService::new(
+            store.clone(),
+            bitcoin_wallet,
+            bitcoin_address_type,
+            event.clone(),
+            system.clone(),
+        );
 
         AppServices {
             invoice: Box::new(invoices),
@@ -88,7 +93,7 @@ impl AppServices {
             lnurl: Box::new(lnurl),
             ln_address: Box::new(ln_address),
             auth: Box::new(auth),
-            system: Box::new(system),
+            system,
             nostr: Box::new(nostr),
             api_key: Box::new(api_key),
             bitcoin: Box::new(bitcoin),

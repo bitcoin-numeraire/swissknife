@@ -46,4 +46,22 @@ impl ConfigRepository for SeaOrmConfigRepository {
 
         Ok(())
     }
+
+    async fn upsert(&self, key: &str, value: Value) -> Result<(), DatabaseError> {
+        if let Some(existing) = Config::find_by_id(key)
+            .one(&self.db)
+            .await
+            .map_err(|e| DatabaseError::FindOne(e.to_string()))?
+        {
+            let mut active_model: ActiveModel = existing.into();
+            active_model.value = Set(Some(value));
+            active_model
+                .update(&self.db)
+                .await
+                .map_err(|e| DatabaseError::Update(e.to_string()))?;
+            return Ok(());
+        }
+
+        self.insert(key, value).await
+    }
 }

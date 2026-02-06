@@ -10,10 +10,7 @@ use crate::{
         entities::{AppStore, Ledger},
         errors::{ApplicationError, DataError},
     },
-    domains::{
-        bitcoin::BitcoinWallet,
-        event::{EventUseCases, LnInvoicePaidEvent},
-    },
+    domains::event::{EventUseCases, LnInvoicePaidEvent},
     infra::lightning::LnClient,
 };
 
@@ -24,7 +21,6 @@ const DEFAULT_INVOICE_DESCRIPTION: &str = "Numeraire Invoice";
 pub struct InvoiceService {
     store: AppStore,
     ln_client: Arc<dyn LnClient>,
-    bitcoin_wallet: Arc<dyn BitcoinWallet>,
     invoice_expiry: u32,
     events: Arc<dyn EventUseCases>,
 }
@@ -33,14 +29,12 @@ impl InvoiceService {
     pub fn new(
         store: AppStore,
         ln_client: Arc<dyn LnClient>,
-        bitcoin_wallet: Arc<dyn BitcoinWallet>,
         invoice_expiry: u32,
         events: Arc<dyn EventUseCases>,
     ) -> Self {
         InvoiceService {
             store,
             ln_client,
-            bitcoin_wallet,
             invoice_expiry,
             events,
         }
@@ -128,13 +122,14 @@ impl InvoiceUseCases for InvoiceService {
     }
 
     async fn sync(&self) -> Result<u32, ApplicationError> {
-        trace!("Syncing pending and expired invoices...");
+        trace!("Synchronizing pending and expired invoices...");
 
         let pending_invoices = self
             .store
             .invoice
             .find_many(InvoiceFilter {
                 status: Some(InvoiceStatus::Pending),
+                ledger: Some(Ledger::Lightning),
                 ..Default::default()
             })
             .await?;
@@ -156,63 +151,31 @@ impl InvoiceUseCases for InvoiceService {
         let mut synced = 0;
 
         for invoice in invoices {
-            match invoice.ledger {
-                Ledger::Lightning => {
-                    let Some(ln_invoice) = invoice.ln_invoice.as_ref() else {
-                        debug!(invoice_id = %invoice.id, "Missing lightning invoice details; skipping sync");
-                        continue;
-                    };
-                    let payment_hash = ln_invoice.payment_hash.clone();
-                    let Some(node_invoice) = self.ln_client.invoice_by_hash(payment_hash.clone()).await? else {
-                        continue;
-                    };
-                    if node_invoice.status != InvoiceStatus::Settled {
-                        continue;
-                    }
-
-                    let payment_time = node_invoice.payment_time.unwrap_or_else(Utc::now);
-                    let event = LnInvoicePaidEvent {
-                        payment_hash,
-                        amount_received_msat: node_invoice.amount_received_msat.unwrap_or_default(),
-                        fee_msat: node_invoice.fee_msat.unwrap_or_default(),
-                        payment_time,
-                    };
-
-                    self.events.invoice_paid(event).await?;
-                    synced += 1;
-                }
-                Ledger::Onchain => {
-                    let Some(stored_output) = invoice.bitcoin_output.clone() else {
-                        return Err(DataError::Inconsistency(format!(
-                            "Bitcoin output not found on onchain invoice with id: {}",
-                            invoice.id
-                        ))
-                        .into());
-                    };
-
-                    let output = self
-                        .bitcoin_wallet
-                        .get_output(
-                            &stored_output.txid,
-                            Some(stored_output.output_index),
-                            Some(&stored_output.address),
-                            true,
-                        )
-                        .await?;
-                    let Some(output) = output else {
-                        continue;
-                    };
-
-                    self.events
-                        .onchain_deposit(output.into(), self.bitcoin_wallet.network().into())
-                        .await?;
-                    synced += 1;
-                }
-                Ledger::Internal => {}
+            let Some(ln_invoice) = invoice.ln_invoice.as_ref() else {
+                debug!(invoice_id = %invoice.id, "Missing lightning invoice details; skipping sync");
+                continue;
+            };
+            let payment_hash = ln_invoice.payment_hash.clone();
+            let Some(node_invoice) = self.ln_client.invoice_by_hash(payment_hash.clone()).await? else {
+                continue;
+            };
+            if node_invoice.status != InvoiceStatus::Settled {
+                continue;
             }
+
+            let payment_time = node_invoice.payment_time.unwrap_or_else(Utc::now);
+            let event = LnInvoicePaidEvent {
+                payment_hash,
+                amount_received_msat: node_invoice.amount_received_msat.unwrap_or_default(),
+                fee_msat: node_invoice.fee_msat.unwrap_or_default(),
+                payment_time,
+            };
+
+            self.events.invoice_paid(event).await?;
+            synced += 1;
         }
 
-        debug!(synced, "Pending and expired invoices synced successfully");
+        debug!(synced, "Pending and expired invoices synchronized successfully");
         Ok(synced)
     }
 }

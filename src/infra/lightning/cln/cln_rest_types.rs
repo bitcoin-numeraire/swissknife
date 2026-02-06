@@ -81,6 +81,28 @@ pub struct ListTransactionsOutput {
 }
 
 #[derive(Debug, Serialize, Default)]
+pub struct ListChainMovesRequest {
+    pub index: Option<String>,
+    pub start: Option<u64>,
+    pub limit: Option<u64>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ListChainMovesResponse {
+    pub chainmoves: Vec<ListChainMove>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ListChainMove {
+    pub created_index: u64,
+    pub primary_tag: String,
+    pub account_id: String,
+    pub utxo: String,
+    pub spending_txid: Option<String>,
+    pub blockheight: Option<u32>,
+}
+
+#[derive(Debug, Serialize, Default)]
 pub struct ListPaysRequest {
     pub payment_hash: Option<String>,
 }

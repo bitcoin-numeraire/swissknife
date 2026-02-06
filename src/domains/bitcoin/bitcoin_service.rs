@@ -6,10 +6,14 @@ use uuid::Uuid;
 
 use crate::{
     application::{
-        entities::AppStore,
+        entities::{AppStore, Currency},
         errors::{ApplicationError, DataError},
     },
-    domains::bitcoin::{BitcoinWallet, BtcAddressFilter},
+    domains::{
+        bitcoin::{BitcoinWallet, BtcAddressFilter, OnchainSyncCursor, OnchainTransaction},
+        event::EventUseCases,
+        system::SystemUseCases,
+    },
 };
 
 use super::{BitcoinUseCases, BtcAddress, BtcAddressType};
@@ -18,14 +22,24 @@ pub struct BitcoinService {
     store: AppStore,
     wallet: Arc<dyn BitcoinWallet>,
     address_type: BtcAddressType,
+    events: Arc<dyn EventUseCases>,
+    system: Arc<dyn SystemUseCases>,
 }
 
 impl BitcoinService {
-    pub fn new(store: AppStore, wallet: Arc<dyn BitcoinWallet>, address_type: BtcAddressType) -> Self {
+    pub fn new(
+        store: AppStore,
+        wallet: Arc<dyn BitcoinWallet>,
+        address_type: BtcAddressType,
+        events: Arc<dyn EventUseCases>,
+        system: Arc<dyn SystemUseCases>,
+    ) -> Self {
         Self {
             store,
             wallet,
             address_type,
+            events,
+            system,
         }
     }
 }
@@ -109,5 +123,44 @@ impl BitcoinUseCases for BitcoinService {
 
         info!(?filter, n_deleted, "Bitcoin addresses deleted successfully");
         Ok(n_deleted)
+    }
+
+    async fn sync(&self) -> Result<u32, ApplicationError> {
+        trace!("Synchronizing on-chain bitcoin transactions...");
+
+        let mut cursor = self.system.get_onchain_cursor().await?;
+        if cursor.is_none() {
+            let output_height = self.store.btc_output.max_block_height().await?;
+            let payment_height = self.store.payment.max_btc_block_height().await?;
+            let start_height = output_height.or(payment_height).unwrap_or(0);
+            cursor = Some(OnchainSyncCursor::BlockHeight(start_height));
+        }
+
+        let result = self.wallet.synchronize(cursor).await?;
+        let currency: Currency = self.wallet.network().into();
+
+        let mut synced = 0;
+
+        for transaction in result.events {
+            match transaction {
+                OnchainTransaction::Deposit(output) => {
+                    if self.events.onchain_deposit(output.into(), currency.clone()).await? {
+                        synced += 1;
+                    }
+                }
+                OnchainTransaction::Withdrawal(event) => {
+                    if self.events.onchain_withdrawal(event).await? {
+                        synced += 1;
+                    }
+                }
+            }
+        }
+
+        if let Some(next_cursor) = result.next_cursor {
+            self.system.set_onchain_cursor(next_cursor).await?;
+        }
+
+        debug!(synced, "On-chain bitcoin transactions synchronized successfully");
+        Ok(synced)
     }
 }

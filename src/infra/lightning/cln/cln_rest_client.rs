@@ -1,6 +1,6 @@
-use std::{path::PathBuf, str::FromStr, time::Duration};
+use std::{collections::HashMap, path::PathBuf, str::FromStr, time::Duration};
 
-use bitcoin::{Address, Network, ScriptBuf};
+use bitcoin::{Address, Network, OutPoint, ScriptBuf};
 use chrono::{TimeZone, Utc};
 use lightning_invoice::Bolt11Invoice;
 use psbt_v2::v2::Psbt;
@@ -22,8 +22,9 @@ use crate::{
     domains::{
         bitcoin::{
             BitcoinWallet, BtcAddressType, BtcNetwork, BtcOutput, BtcOutputStatus, BtcPreparedTransaction,
-            BtcTransaction, BtcTransactionOutput,
+            BtcTransaction, BtcTransactionOutput, OnchainSyncBatch, OnchainSyncCursor, OnchainTransaction,
         },
+        event::OnchainWithdrawalEvent,
         invoice::Invoice,
         payment::{LnPayment, Payment, PaymentStatus},
         system::HealthStatus,
@@ -35,10 +36,11 @@ use crate::{
 };
 
 use super::{
-    ErrorResponse, GetinfoRequest, GetinfoResponse, InvoiceRequest, InvoiceResponse, ListFundsRequest,
-    ListInvoicesRequest, ListInvoicesResponse, ListPaysRequest, ListPaysResponse, ListTransactionsRequest,
-    ListTransactionsResponse, NewAddrRequest, NewAddrResponse, PayRequest, PayResponse, TxDiscardRequest,
-    TxDiscardResponse, TxPrepareOutput, TxPrepareRequest, TxPrepareResponse, TxSendRequest, TxSendResponse,
+    ErrorResponse, GetinfoRequest, GetinfoResponse, InvoiceRequest, InvoiceResponse, ListChainMovesRequest,
+    ListChainMovesResponse, ListFundsRequest, ListInvoicesRequest, ListInvoicesResponse, ListPaysRequest,
+    ListPaysResponse, ListTransactionsRequest, ListTransactionsResponse, NewAddrRequest, NewAddrResponse, PayRequest,
+    PayResponse, TxDiscardRequest, TxDiscardResponse, TxPrepareOutput, TxPrepareRequest, TxPrepareResponse,
+    TxSendRequest, TxSendResponse,
 };
 
 #[derive(Clone, Debug, Deserialize)]
@@ -270,7 +272,7 @@ impl LnClient for ClnRestClient {
                 None
             },
             lightning: Some(LnPayment {
-                payment_hash: payment_hash,
+                payment_hash,
                 payment_preimage: payment.preimage,
                 ..Default::default()
             }),
@@ -418,6 +420,109 @@ impl BitcoinWallet for ClnRestClient {
             outputs,
             is_outgoing: false, // TODO: No way for now to determine this from CLN
         }))
+    }
+
+    async fn synchronize(&self, cursor: Option<OnchainSyncCursor>) -> Result<OnchainSyncBatch, BitcoinError> {
+        let start_index = match cursor {
+            Some(OnchainSyncCursor::CreatedIndex(index)) => index,
+            _ => 0,
+        };
+
+        let response: ListChainMovesResponse = self
+            .post_request(
+                "listchainmoves",
+                &ListChainMovesRequest {
+                    index: Some("created".to_string()),
+                    start: Some(start_index),
+                    limit: None,
+                },
+            )
+            .await
+            .map_err(|e| BitcoinError::Synchronize(e.to_string()))?;
+
+        if response.chainmoves.is_empty() {
+            return Ok(OnchainSyncBatch {
+                events: Vec::new(),
+                next_cursor: None,
+            });
+        }
+
+        let has_deposits = response
+            .chainmoves
+            .iter()
+            .any(|m| m.primary_tag == "deposit" && m.account_id == "wallet");
+
+        let outputs_by_outpoint = if has_deposits {
+            let funds: ListFundsResponse = self
+                .post_request("listfunds", &ListFundsRequest { spent: Some(true) })
+                .await
+                .map_err(|e| BitcoinError::GetOutput(e.to_string()))?;
+
+            let mut map = HashMap::new();
+            for output in funds.outputs {
+                let outpoint = format!("{}:{}", output.txid, output.output);
+                let status = match output.status.as_str() {
+                    "confirmed" => BtcOutputStatus::Confirmed,
+                    "spent" | "unconfirmed" => BtcOutputStatus::Unconfirmed,
+                    _ => BtcOutputStatus::Unconfirmed,
+                };
+
+                map.insert(
+                    outpoint,
+                    BtcOutput {
+                        txid: output.txid.clone(),
+                        output_index: output.output,
+                        address: output.address.unwrap_or_default(),
+                        amount_sat: output.amount_msat / 1000,
+                        block_height: output.blockheight,
+                        outpoint: format!("{}:{}", output.txid, output.output),
+                        status,
+                        ..Default::default()
+                    },
+                );
+            }
+            map
+        } else {
+            HashMap::new()
+        };
+
+        let mut max_index = start_index;
+        let mut events = Vec::new();
+
+        for chainmove in response.chainmoves {
+            max_index = max_index.max(chainmove.created_index);
+
+            match (chainmove.primary_tag.as_str(), chainmove.account_id.as_str()) {
+                ("deposit", "wallet") => {
+                    let outpoint =
+                        OutPoint::from_str(&chainmove.utxo).map_err(|e| BitcoinError::Synchronize(e.to_string()))?;
+                    let key = format!("{}:{}", outpoint.txid, outpoint.vout);
+
+                    if let Some(output) = outputs_by_outpoint.get(&key) {
+                        events.push(OnchainTransaction::Deposit(output.clone()));
+                    }
+                }
+                ("withdrawal", "wallet") => {
+                    let Some(spending_txid) = chainmove.spending_txid.clone() else {
+                        continue;
+                    };
+
+                    events.push(OnchainTransaction::Withdrawal(OnchainWithdrawalEvent {
+                        txid: spending_txid,
+                        block_height: chainmove.blockheight,
+                    }));
+                }
+                _ => {}
+            }
+        }
+
+        let next_cursor = if max_index > start_index {
+            Some(OnchainSyncCursor::CreatedIndex(max_index.saturating_add(1)))
+        } else {
+            None
+        };
+
+        Ok(OnchainSyncBatch { events, next_cursor })
     }
 
     async fn get_output(

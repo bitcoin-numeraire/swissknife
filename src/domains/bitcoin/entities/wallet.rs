@@ -2,7 +2,10 @@ use async_trait::async_trait;
 
 use crate::{
     application::errors::BitcoinError,
-    domains::bitcoin::{BtcAddressType, BtcNetwork, BtcOutput, BtcPreparedTransaction, BtcTransaction},
+    domains::bitcoin::{
+        BtcAddressType, BtcNetwork, BtcOutput, BtcPreparedTransaction, BtcTransaction, OnchainSyncBatch,
+        OnchainSyncCursor,
+    },
 };
 
 #[async_trait]
@@ -17,6 +20,7 @@ pub trait BitcoinWallet: Sync + Send {
     async fn sign_send_transaction(&self, prepared: &BtcPreparedTransaction) -> Result<(), BitcoinError>;
     async fn release_prepared_transaction(&self, prepared: &BtcPreparedTransaction) -> Result<(), BitcoinError>;
     async fn get_transaction(&self, txid: &str) -> Result<Option<BtcTransaction>, BitcoinError>;
+    async fn synchronize(&self, cursor: Option<OnchainSyncCursor>) -> Result<OnchainSyncBatch, BitcoinError>;
     async fn get_output(
         &self,
         txid: &str,

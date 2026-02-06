@@ -7,15 +7,6 @@ use tokio::time::sleep;
 use tonic::{transport::Channel, Code};
 use tracing::{error, trace, warn};
 
-use crate::{
-    application::{entities::Currency, errors::LightningError},
-    domains::{
-        bitcoin::BitcoinWallet,
-        event::{EventUseCases, LnPayFailureEvent, LnPaySuccessEvent, OnchainWithdrawalEvent},
-    },
-    infra::lightning::EventsListener,
-};
-
 use super::{
     cln::{
         listchainmoves_chainmoves::ListchainmovesChainmovesPrimaryTag,
@@ -29,10 +20,21 @@ use super::{
     },
     cln_grpc_client::{ClnClientConfig, ClnGrpcClient},
 };
+use crate::{
+    application::{
+        entities::{AppServices, Currency},
+        errors::LightningError,
+    },
+    domains::{
+        bitcoin::{BitcoinWallet, OnchainSyncCursor},
+        event::{LnPayFailureEvent, LnPaySuccessEvent, OnchainWithdrawalEvent},
+    },
+    infra::lightning::EventsListener,
+};
 
 pub struct ClnGrpcListener {
     client: NodeClient<Channel>,
-    events: Arc<dyn EventUseCases>,
+    services: Arc<AppServices>,
     wallet: Arc<dyn BitcoinWallet>,
     retry_delay: Duration,
 }
@@ -40,14 +42,14 @@ pub struct ClnGrpcListener {
 impl ClnGrpcListener {
     pub async fn new(
         config: ClnClientConfig,
-        events: Arc<dyn EventUseCases>,
+        services: Arc<AppServices>,
         wallet: Arc<dyn BitcoinWallet>,
     ) -> Result<Self, LightningError> {
         let client = ClnGrpcClient::connect(&config).await?;
 
         Ok(Self {
             client,
-            events,
+            services,
             wallet,
             retry_delay: config.retry_delay,
         })
@@ -120,7 +122,8 @@ impl ClnGrpcListener {
 
                                 match invoice.status() {
                                     WaitinvoiceStatus::Paid => {
-                                        if let Err(err) = self.events.invoice_paid(invoice.clone().into()).await {
+                                        if let Err(err) = self.services.event.invoice_paid(invoice.clone().into()).await
+                                        {
                                             warn!(%err, "Failed to process incoming payment");
                                         }
                                     }
@@ -186,7 +189,7 @@ impl ClnGrpcListener {
                                     reason: "Payment failed".to_string(),
                                     payment_hash,
                                 };
-                                if let Err(err) = self.events.failed_payment(failure_event).await {
+                                if let Err(err) = self.services.event.failed_payment(failure_event).await {
                                     warn!(%err, "Failed to process failed outgoing payment");
                                 }
                             }
@@ -207,7 +210,25 @@ impl ClnGrpcListener {
     }
 
     async fn listen_chainmoves(&self) -> Result<(), LightningError> {
-        let mut next_index = 0_u64;
+        // First sync the bitcoin transactions so the cursor is up to date
+        // and we have processed all previous onchain events.
+        self.services
+            .bitcoin
+            .sync()
+            .await
+            .map_err(|e| LightningError::Listener(e.to_string()))?;
+
+        let mut next_index = self
+            .services
+            .system
+            .get_onchain_cursor()
+            .await
+            .map_err(|e| LightningError::Listener(e.to_string()))?
+            .map(|c| match c {
+                OnchainSyncCursor::CreatedIndex(index) => index,
+                _ => 0,
+            })
+            .unwrap_or(0);
 
         loop {
             trace!(next_index, "Waiting for new chainmove...");
@@ -234,6 +255,14 @@ impl ClnGrpcListener {
                     match self.handle_chainmoves(created_index).await {
                         Ok(max_index) => {
                             next_index = max_index.saturating_add(1);
+                            if let Err(err) = self
+                                .services
+                                .system
+                                .set_onchain_cursor(OnchainSyncCursor::CreatedIndex(next_index))
+                                .await
+                            {
+                                warn!(%err, "Failed to persist chainmoves cursor");
+                            }
                         }
                         Err(err) => {
                             warn!(%err, "Failed to process onchain chainmoves");
@@ -301,7 +330,8 @@ impl ClnGrpcListener {
             payment_time,
         };
 
-        self.events
+        self.services
+            .event
             .outgoing_payment(success_event)
             .await
             .map_err(|err| LightningError::Listener(err.to_string()))
@@ -328,15 +358,14 @@ impl ClnGrpcListener {
 
             let primary_tag = chainmove.primary_tag();
             let account_id = chainmove.account_id.as_str();
-            let originating_account = chainmove.originating_account.as_deref();
 
             let outpoint = chainmove
                 .utxo
                 .as_ref()
                 .map(|utxo| (hex::encode(&utxo.txid), utxo.outnum));
 
-            match (primary_tag, account_id, originating_account) {
-                (ListchainmovesChainmovesPrimaryTag::Deposit, "wallet", _) => {
+            match (primary_tag, account_id) {
+                (ListchainmovesChainmovesPrimaryTag::Deposit, "wallet") => {
                     let Some((txid, outnum)) = outpoint.clone() else {
                         warn!("Deposit chainmove missing outpoint");
                         continue;
@@ -354,12 +383,16 @@ impl ClnGrpcListener {
                         }
                     };
 
-                    if let Err(err) = self.events.onchain_deposit(output.into(), currency.clone()).await {
+                    if let Err(err) = self
+                        .services
+                        .event
+                        .onchain_deposit(output.into(), currency.clone())
+                        .await
+                    {
                         warn!(%err, "Failed to process onchain deposit");
                     }
                 }
-                (ListchainmovesChainmovesPrimaryTag::Deposit, "external", Some("wallet"))
-                | (ListchainmovesChainmovesPrimaryTag::Withdrawal, "wallet", _) => {
+                (ListchainmovesChainmovesPrimaryTag::Withdrawal, "wallet") => {
                     let Some(spending_txid) = chainmove.spending_txid else {
                         warn!("Withdrawal chainmove missing spending_txid");
                         continue;
@@ -370,18 +403,11 @@ impl ClnGrpcListener {
                         block_height: Some(chainmove.blockheight),
                     };
 
-                    if let Err(err) = self.events.onchain_withdrawal(event).await {
+                    if let Err(err) = self.services.event.onchain_withdrawal(event).await {
                         warn!(%err, "Failed to process onchain withdrawal");
                     }
                 }
-                _ => {
-                    trace!(
-                        primary_tag = ?primary_tag,
-                        account_id = account_id,
-                        originating_account = originating_account.unwrap_or_default(),
-                        "Unsupported chainmove event"
-                    );
-                }
+                _ => {}
             }
         }
 

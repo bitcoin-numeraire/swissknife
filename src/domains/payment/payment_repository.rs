@@ -14,4 +14,5 @@ pub trait PaymentRepository: Send + Sync {
     async fn insert(&self, txn: Option<&DatabaseTransaction>, payment: Payment) -> Result<Payment, DatabaseError>;
     async fn update(&self, payment: Payment) -> Result<Payment, DatabaseError>;
     async fn delete_many(&self, filter: PaymentFilter) -> Result<u64, DatabaseError>;
+    async fn max_btc_block_height(&self) -> Result<Option<u32>, DatabaseError>;
 }
