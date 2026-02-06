@@ -212,7 +212,16 @@ impl ClnGrpcListener {
     }
 
     async fn listen_chainmoves(&self) -> Result<(), LightningError> {
-        let mut next_index = 0_u64;
+        let cursor = self
+            .system
+            .get_onchain_cursor()
+            .await
+            .map_err(|e| LightningError::Listener(e.to_string()))?;
+
+        let mut next_index = match cursor {
+            Some(OnchainSyncCursor::CreatedIndex(index)) => index,
+            _ => 0,
+        };
 
         loop {
             trace!(next_index, "Waiting for new chainmove...");
