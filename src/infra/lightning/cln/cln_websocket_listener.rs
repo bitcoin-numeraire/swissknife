@@ -10,7 +10,7 @@ use rust_socketio::{
     asynchronous::{Client, ClientBuilder},
     Payload, TransportType,
 };
-use tokio::fs;
+use tokio::{fs, sync};
 use tracing::{error, info, warn};
 
 use crate::{
@@ -27,6 +27,8 @@ use super::ClnRestClientConfig;
 
 pub struct ClnWebsocketListener {
     client_builder: Mutex<Option<ClientBuilder>>,
+    services: Arc<AppServices>,
+    wallet: Arc<dyn BitcoinWallet>,
 }
 
 impl ClnWebsocketListener {
@@ -35,13 +37,6 @@ impl ClnWebsocketListener {
         services: Arc<AppServices>,
         wallet: Arc<dyn BitcoinWallet>,
     ) -> Result<Self, LightningError> {
-        let initial_cursor = services
-            .system
-            .get_onchain_cursor()
-            .await
-            .map_err(|e| LightningError::Listener(e.to_string()))?;
-        let cursor = Arc::new(tokio::sync::Mutex::new(initial_cursor));
-
         let mut client_builder = ClientBuilder::new(config.endpoint.clone())
             .transport_type(TransportType::Websocket)
             .reconnect_on_disconnect(true)
@@ -52,10 +47,7 @@ impl ClnWebsocketListener {
             )
             .on("open", on_open)
             .on("close", on_close)
-            .on("error", on_error)
-            .on("message", move |payload, _: Client| {
-                Self::on_message(services.clone(), wallet.clone(), cursor.clone(), payload)
-            });
+            .on("error", on_error);
 
         if let Some(ca_cert_path) = &config.ca_cert_path {
             let ca_certificate = read_ca(ca_cert_path)
@@ -80,6 +72,8 @@ impl ClnWebsocketListener {
 
         Ok(Self {
             client_builder: Mutex::new(Some(client_builder)),
+            services,
+            wallet,
         })
     }
 
@@ -212,14 +206,35 @@ impl ClnWebsocketListener {
 #[async_trait]
 impl EventsListener for ClnWebsocketListener {
     async fn listen(&self) -> Result<(), LightningError> {
-        let client_builder = self
+        let mut client_builder = self
             .client_builder
             .lock()
             .map_err(|_| LightningError::Listener("Failed to lock client builder".to_string()))?
             .take()
             .ok_or_else(|| LightningError::Listener("Listener already started".to_string()))?;
 
-        let _client = client_builder
+        self.services
+            .bitcoin
+            .sync()
+            .await
+            .map_err(|e| LightningError::Listener(e.to_string()))?;
+
+        let initial_cursor = self
+            .services
+            .system
+            .get_onchain_cursor()
+            .await
+            .map_err(|e| LightningError::Listener(e.to_string()))?;
+        let cursor = Arc::new(sync::Mutex::new(initial_cursor));
+
+        let wallet = self.wallet.clone();
+        let services = self.services.clone();
+
+        client_builder = client_builder.on("message", move |payload, _: Client| {
+            Self::on_message(services.clone(), wallet.clone(), cursor.clone(), payload)
+        });
+
+        client_builder
             .connect()
             .await
             .map_err(|e| LightningError::ConnectWebsocket(e.to_string()))?;

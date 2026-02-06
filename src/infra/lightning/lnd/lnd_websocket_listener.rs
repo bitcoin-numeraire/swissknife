@@ -14,9 +14,9 @@ use tokio_tungstenite::tungstenite::ClientRequestBuilder;
 use tokio_tungstenite::{connect_async_tls_with_config, Connector, MaybeTlsStream, WebSocketStream};
 use tracing::{debug, error, warn};
 
+use crate::application::entities::AppServices;
 use crate::application::errors::LightningError;
-use crate::domains::bitcoin::{BitcoinWallet, BtcNetwork, BtcTransaction};
-use crate::domains::event::EventUseCases;
+use crate::domains::bitcoin::{BitcoinWallet, BtcNetwork, BtcTransaction, OnchainSyncCursor};
 use crate::infra::lightning::EventsListener;
 
 use super::lnd_rest_client::read_macaroon;
@@ -26,14 +26,14 @@ use super::LndRestClientConfig;
 pub struct LndWebsocketListener {
     config: LndRestClientConfig,
     macaroon: String,
-    events: Arc<dyn EventUseCases>,
+    services: Arc<AppServices>,
     network: BtcNetwork,
 }
 
 impl LndWebsocketListener {
     pub async fn new(
         config: LndRestClientConfig,
-        events: Arc<dyn EventUseCases>,
+        services: Arc<AppServices>,
         wallet: Arc<dyn BitcoinWallet>,
     ) -> Result<Self, LightningError> {
         let macaroon = read_macaroon(&config.macaroon_path)
@@ -45,7 +45,7 @@ impl LndWebsocketListener {
         Ok(Self {
             config,
             macaroon,
-            events,
+            services,
             network,
         })
     }
@@ -76,6 +76,12 @@ impl LndWebsocketListener {
     }
 
     async fn listen_transactions(&self) -> Result<(), LightningError> {
+        self.services
+            .bitcoin
+            .sync()
+            .await
+            .map_err(|e| LightningError::Listener(e.to_string()))?;
+
         let max_reconnect_delay = self.config.ws_max_reconnect_delay;
         let mut reconnect_delay = self.config.ws_min_reconnect_delay;
 
@@ -215,7 +221,7 @@ impl LndWebsocketListener {
             match serde_json::from_value::<InvoiceResponse>(event.clone()) {
                 Ok(invoice) => {
                     if invoice.state.as_str() == "SETTLED" {
-                        if let Err(err) = self.events.invoice_paid(invoice.into()).await {
+                        if let Err(err) = self.services.event.invoice_paid(invoice.into()).await {
                             warn!(%err, "Failed to process incoming payment");
                         }
                     }
@@ -261,15 +267,30 @@ impl LndWebsocketListener {
 
         for output in relevant_outputs {
             let result = if transaction.is_outgoing {
-                self.events.onchain_withdrawal(transaction.withdrawal_event()).await
+                self.services
+                    .event
+                    .onchain_withdrawal(transaction.withdrawal_event())
+                    .await
             } else {
-                self.events
+                self.services
+                    .event
                     .onchain_deposit(transaction.deposit_event(output), self.network.into())
                     .await
             };
 
             if let Err(err) = result {
                 error!(%err, "Failed to process onchain transaction");
+            }
+        }
+
+        if let Some(block_height) = transaction.block_height.filter(|&h| h > 0) {
+            if let Err(err) = self
+                .services
+                .system
+                .set_onchain_cursor(OnchainSyncCursor::BlockHeight(block_height))
+                .await
+            {
+                warn!(%err, "Failed to persist onchain cursor");
             }
         }
     }

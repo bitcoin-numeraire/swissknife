@@ -1,4 +1,4 @@
-use std::{path::PathBuf, str::FromStr, time::Duration};
+use std::{collections::HashMap, path::PathBuf, str::FromStr, time::Duration};
 
 use bitcoin::{Address, Network, ScriptBuf};
 use chrono::{TimeZone, Utc};
@@ -25,8 +25,9 @@ use crate::{
     domains::{
         bitcoin::{
             BitcoinWallet, BtcAddressType, BtcNetwork, BtcOutput, BtcPreparedTransaction, BtcTransaction,
-            BtcTransactionOutput, OnchainSyncBatch, OnchainSyncCursor,
+            BtcTransactionOutput, OnchainSyncBatch, OnchainSyncCursor, OnchainTransaction,
         },
+        event::OnchainWithdrawalEvent,
         invoice::Invoice,
         payment::{LnPayment, Payment, PaymentStatus},
         system::HealthStatus,
@@ -35,7 +36,9 @@ use crate::{
         config::config_rs::deserialize_duration,
         lightning::{
             cln::cln::{
-                feerate, listpays_pays::ListpaysPaysStatus, newaddr_request::NewaddrAddresstype, ListpaysRequest,
+                feerate, listchainmoves_chainmoves::ListchainmovesChainmovesPrimaryTag,
+                listchainmoves_request::ListchainmovesIndex, listpays_pays::ListpaysPaysStatus,
+                newaddr_request::NewaddrAddresstype, ListchainmovesRequest, ListpaysRequest,
             },
             types::parse_network,
             LnClient,
@@ -423,12 +426,112 @@ impl BitcoinWallet for ClnGrpcClient {
         }))
     }
 
-    async fn synchronize(&self, _cursor: Option<OnchainSyncCursor>) -> Result<OnchainSyncBatch, BitcoinError> {
-        // No-op: the CLN gRPC listener handles both catch-up and real-time events
-        Ok(OnchainSyncBatch {
-            events: Vec::new(),
-            next_cursor: None,
-        })
+    async fn synchronize(&self, cursor: Option<OnchainSyncCursor>) -> Result<OnchainSyncBatch, BitcoinError> {
+        let mut client = self.client.clone();
+        let start_index = match cursor {
+            Some(OnchainSyncCursor::CreatedIndex(index)) => index,
+            _ => 0,
+        };
+
+        let response = client
+            .list_chain_moves(ListchainmovesRequest {
+                index: Some(ListchainmovesIndex::Created as i32),
+                start: Some(start_index),
+                limit: None,
+            })
+            .await
+            .map_err(|e| BitcoinError::Synchronize(e.message().to_string()))?
+            .into_inner();
+
+        if response.chainmoves.is_empty() {
+            return Ok(OnchainSyncBatch {
+                events: Vec::new(),
+                next_cursor: None,
+            });
+        }
+
+        let has_deposits = response
+            .chainmoves
+            .iter()
+            .any(|m| m.primary_tag() == ListchainmovesChainmovesPrimaryTag::Deposit && m.account_id == "wallet");
+
+        let outputs_by_outpoint = if has_deposits {
+            let funds = client
+                .list_funds(cln::ListfundsRequest { spent: Some(true) })
+                .await
+                .map_err(|e| BitcoinError::Synchronize(e.message().to_string()))?
+                .into_inner();
+
+            let mut map = HashMap::new();
+            for output in funds.outputs {
+                let txid_hex = hex::encode(&output.txid);
+                let address_str = output.address.clone().unwrap_or_default();
+                let outpoint = format!("{}:{}", txid_hex, output.output);
+                map.insert(
+                    outpoint.clone(),
+                    BtcOutput {
+                        txid: txid_hex,
+                        output_index: output.output,
+                        address: address_str,
+                        amount_sat: output.amount_msat.map(|a| a.msat).unwrap_or_default() / 1000,
+                        block_height: output.blockheight,
+                        outpoint,
+                        status: output.status().into(),
+                        ..Default::default()
+                    },
+                );
+            }
+            map
+        } else {
+            HashMap::new()
+        };
+
+        let mut max_index = start_index;
+        let mut events = Vec::new();
+
+        for chainmove in response.chainmoves {
+            max_index = max_index.max(chainmove.created_index);
+
+            let primary_tag = chainmove.primary_tag();
+            let account_id = chainmove.account_id.as_str();
+
+            let outpoint = chainmove
+                .utxo
+                .as_ref()
+                .map(|utxo| (hex::encode(&utxo.txid), utxo.outnum));
+
+            match (primary_tag, account_id) {
+                (ListchainmovesChainmovesPrimaryTag::Deposit, "wallet") => {
+                    let Some((txid, outnum)) = outpoint.clone() else {
+                        continue;
+                    };
+
+                    let outpoint_key = format!("{}:{}", txid, outnum);
+                    if let Some(output) = outputs_by_outpoint.get(&outpoint_key) {
+                        events.push(OnchainTransaction::Deposit(output.clone()));
+                    }
+                }
+                (ListchainmovesChainmovesPrimaryTag::Withdrawal, "wallet") => {
+                    let Some(spending_txid) = chainmove.spending_txid else {
+                        continue;
+                    };
+
+                    events.push(OnchainTransaction::Withdrawal(OnchainWithdrawalEvent {
+                        txid: spending_txid.to_hex(),
+                        block_height: Some(chainmove.blockheight),
+                    }));
+                }
+                _ => {}
+            }
+        }
+
+        let next_cursor = if max_index > start_index {
+            Some(OnchainSyncCursor::CreatedIndex(max_index.saturating_add(1)))
+        } else {
+            None
+        };
+
+        Ok(OnchainSyncBatch { events, next_cursor })
     }
 
     async fn get_output(

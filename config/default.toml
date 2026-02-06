@@ -60,6 +60,7 @@ payment_timeout = "60s"
 fee_limit_msat = 25000
 ws_min_reconnect_delay = "1s"
 ws_max_reconnect_delay = "30s"
+reorg_buffer_blocks = "2"
 
 # Logging
 [logging]

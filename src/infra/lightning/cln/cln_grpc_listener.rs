@@ -27,18 +27,16 @@ use crate::{
     },
     domains::{
         bitcoin::{BitcoinWallet, OnchainSyncCursor},
-        event::{EventUseCases, LnPayFailureEvent, LnPaySuccessEvent, OnchainWithdrawalEvent},
-        system::SystemUseCases,
+        event::{LnPayFailureEvent, LnPaySuccessEvent, OnchainWithdrawalEvent},
     },
     infra::lightning::EventsListener,
 };
 
 pub struct ClnGrpcListener {
     client: NodeClient<Channel>,
-    events: Arc<dyn EventUseCases>,
+    services: Arc<AppServices>,
     wallet: Arc<dyn BitcoinWallet>,
     retry_delay: Duration,
-    system: Arc<dyn SystemUseCases>,
 }
 
 impl ClnGrpcListener {
@@ -51,10 +49,9 @@ impl ClnGrpcListener {
 
         Ok(Self {
             client,
-            events: services.event.clone(),
+            services,
             wallet,
             retry_delay: config.retry_delay,
-            system: services.system.clone(),
         })
     }
 
@@ -125,7 +122,8 @@ impl ClnGrpcListener {
 
                                 match invoice.status() {
                                     WaitinvoiceStatus::Paid => {
-                                        if let Err(err) = self.events.invoice_paid(invoice.clone().into()).await {
+                                        if let Err(err) = self.services.event.invoice_paid(invoice.clone().into()).await
+                                        {
                                             warn!(%err, "Failed to process incoming payment");
                                         }
                                     }
@@ -191,7 +189,7 @@ impl ClnGrpcListener {
                                     reason: "Payment failed".to_string(),
                                     payment_hash,
                                 };
-                                if let Err(err) = self.events.failed_payment(failure_event).await {
+                                if let Err(err) = self.services.event.failed_payment(failure_event).await {
                                     warn!(%err, "Failed to process failed outgoing payment");
                                 }
                             }
@@ -212,16 +210,25 @@ impl ClnGrpcListener {
     }
 
     async fn listen_chainmoves(&self) -> Result<(), LightningError> {
-        let cursor = self
-            .system
-            .get_onchain_cursor()
+        // First sync the bitcoin transactions so the cursor is up to date
+        // and we have processed all previous onchain events.
+        self.services
+            .bitcoin
+            .sync()
             .await
             .map_err(|e| LightningError::Listener(e.to_string()))?;
 
-        let mut next_index = match cursor {
-            Some(OnchainSyncCursor::CreatedIndex(index)) => index,
-            _ => 0,
-        };
+        let mut next_index = self
+            .services
+            .system
+            .get_onchain_cursor()
+            .await
+            .map_err(|e| LightningError::Listener(e.to_string()))?
+            .map(|c| match c {
+                OnchainSyncCursor::CreatedIndex(index) => index,
+                _ => 0,
+            })
+            .unwrap_or(0);
 
         loop {
             trace!(next_index, "Waiting for new chainmove...");
@@ -249,6 +256,7 @@ impl ClnGrpcListener {
                         Ok(max_index) => {
                             next_index = max_index.saturating_add(1);
                             if let Err(err) = self
+                                .services
                                 .system
                                 .set_onchain_cursor(OnchainSyncCursor::CreatedIndex(next_index))
                                 .await
@@ -322,7 +330,8 @@ impl ClnGrpcListener {
             payment_time,
         };
 
-        self.events
+        self.services
+            .event
             .outgoing_payment(success_event)
             .await
             .map_err(|err| LightningError::Listener(err.to_string()))
@@ -374,7 +383,12 @@ impl ClnGrpcListener {
                         }
                     };
 
-                    if let Err(err) = self.events.onchain_deposit(output.into(), currency.clone()).await {
+                    if let Err(err) = self
+                        .services
+                        .event
+                        .onchain_deposit(output.into(), currency.clone())
+                        .await
+                    {
                         warn!(%err, "Failed to process onchain deposit");
                     }
                 }
@@ -389,7 +403,7 @@ impl ClnGrpcListener {
                         block_height: Some(chainmove.blockheight),
                     };
 
-                    if let Err(err) = self.events.onchain_withdrawal(event).await {
+                    if let Err(err) = self.services.event.onchain_withdrawal(event).await {
                         warn!(%err, "Failed to process onchain withdrawal");
                     }
                 }

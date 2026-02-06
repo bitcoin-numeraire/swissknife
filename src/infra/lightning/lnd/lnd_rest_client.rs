@@ -54,6 +54,7 @@ pub struct LndRestClientConfig {
     pub ws_max_reconnect_delay: Duration,
     pub ca_cert_path: Option<String>,
     pub macaroon_path: String,
+    pub reorg_buffer_blocks: u32,
 }
 
 pub struct LndRestClient {
@@ -62,10 +63,10 @@ pub struct LndRestClient {
     fee_limit_msat: u64,
     retry_for: u32,
     network: BtcNetwork,
+    reorg_buffer_blocks: u32,
 }
 
 const USER_AGENT: &str = "Numeraire Swissknife/1.0";
-const LND_REORG_BUFFER_BLOCKS: u32 = 2;
 
 impl LndRestClient {
     pub async fn new(config: LndRestClientConfig) -> Result<Self, LightningError> {
@@ -106,6 +107,7 @@ impl LndRestClient {
             fee_limit_msat: config.fee_limit_msat,
             retry_for: config.payment_timeout.as_secs() as u32,
             network: BtcNetwork::default(),
+            reorg_buffer_blocks: config.reorg_buffer_blocks,
         };
 
         let network = lnd_client.network().await?;
@@ -564,7 +566,7 @@ impl BitcoinWallet for LndRestClient {
         }
 
         let next_cursor = max_height.map(|height| {
-            let buffered = height.saturating_sub(LND_REORG_BUFFER_BLOCKS);
+            let buffered = height.saturating_sub(self.reorg_buffer_blocks);
             OnchainSyncCursor::BlockHeight(buffered)
         });
 

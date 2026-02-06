@@ -53,7 +53,7 @@ impl EventListener {
                     .clone()
                     .ok_or_else(|| ConfigError::MissingLightningProviderConfig(config.ln_provider.to_string()))?;
 
-                let listener = LndWebsocketListener::new(lnd_config, services.event.clone(), bitcoin_wallet).await?;
+                let listener = LndWebsocketListener::new(lnd_config, services.clone(), bitcoin_wallet).await?;
 
                 Some(Arc::new(listener) as Arc<dyn EventsListener>)
             }
@@ -71,11 +71,7 @@ impl EventListener {
             });
         }
 
-        tokio::try_join!(
-            self.services.invoice.sync(),
-            self.services.payment.sync(),
-            self.services.bitcoin.sync()
-        )?;
+        tokio::try_join!(self.services.invoice.sync(), self.services.payment.sync())?;
 
         Ok(())
     }
