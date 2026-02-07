@@ -1,4 +1,4 @@
-use std::{path::PathBuf, str::FromStr, time::Duration};
+use std::{error::Error as StdError, path::PathBuf, str::FromStr, time::Duration};
 
 use async_trait::async_trait;
 use chrono::{TimeZone, Utc};
@@ -105,6 +105,14 @@ impl LndGrpcClient {
     }
 
     pub async fn connect(config: &LndGrpcClientConfig) -> Result<LndChannel, LightningError> {
+        let endpoint_uri = config
+            .endpoint
+            .parse::<http::Uri>()
+            .map_err(|e| LightningError::ParseConfig(format!("Invalid gRPC endpoint URI: {}", e)))?;
+        let tls_domain = endpoint_uri
+            .host()
+            .ok_or_else(|| LightningError::ParseConfig("Missing host in gRPC endpoint URI".to_string()))?;
+
         let tls_cert = fs::read(PathBuf::from(&config.cert_path))
             .await
             .map_err(|e| LightningError::ReadCertificates(e.to_string()))?;
@@ -112,7 +120,7 @@ impl LndGrpcClient {
 
         let tls_config = ClientTlsConfig::new()
             .ca_certificate(ca_certificate)
-            .domain_name("localhost");
+            .domain_name(tls_domain);
 
         let channel = Channel::from_shared(config.endpoint.clone())
             .map_err(|e| LightningError::ParseConfig(e.to_string()))?
@@ -120,7 +128,14 @@ impl LndGrpcClient {
             .map_err(|e| LightningError::ParseConfig(e.to_string()))?
             .connect()
             .await
-            .map_err(|e| LightningError::Connect(e.to_string()))?;
+            .map_err(|e| {
+                LightningError::Connect(format!(
+                    "{} (endpoint: {}, cert_path: {})",
+                    Self::format_transport_error(&e),
+                    config.endpoint,
+                    config.cert_path
+                ))
+            })?;
 
         let macaroon = read_macaroon(&config.macaroon_path)
             .await
@@ -136,6 +151,17 @@ impl LndGrpcClient {
                 macaroon: macaroon_value,
             },
         ))
+    }
+
+    fn format_transport_error(err: &tonic::transport::Error) -> String {
+        let mut message = err.to_string();
+        let mut source = err.source();
+        while let Some(next) = source {
+            message.push_str(": ");
+            message.push_str(&next.to_string());
+            source = next.source();
+        }
+        message
     }
 
     async fn network(&self) -> Result<BtcNetwork, LightningError> {
