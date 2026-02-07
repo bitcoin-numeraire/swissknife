@@ -9,7 +9,7 @@ use crate::{
     domains::bitcoin::BitcoinWallet,
     infra::lightning::{
         cln::{ClnGrpcListener, ClnWebsocketListener},
-        lnd::LndWebsocketListener,
+        lnd::{LndGrpcListener, LndWebsocketListener},
         EventsListener,
     },
 };
@@ -54,6 +54,16 @@ impl EventListener {
                     .ok_or_else(|| ConfigError::MissingLightningProviderConfig(config.ln_provider.to_string()))?;
 
                 let listener = LndWebsocketListener::new(lnd_config, services.clone(), bitcoin_wallet).await?;
+
+                Some(Arc::new(listener) as Arc<dyn EventsListener>)
+            }
+            LightningProvider::LndGrpc => {
+                let lnd_grpc_config = config
+                    .lnd_grpc_config
+                    .clone()
+                    .ok_or_else(|| ConfigError::MissingLightningProviderConfig(config.ln_provider.to_string()))?;
+
+                let listener = LndGrpcListener::new(lnd_grpc_config, services.clone(), bitcoin_wallet).await?;
 
                 Some(Arc::new(listener) as Arc<dyn EventsListener>)
             }

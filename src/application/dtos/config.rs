@@ -13,7 +13,7 @@ use crate::{
         lightning::{
             breez::BreezClientConfig,
             cln::{ClnClientConfig, ClnRestClientConfig},
-            lnd::LndRestClientConfig,
+            lnd::{LndGrpcClientConfig, LndRestClientConfig},
         },
         logging::tracing::TracingLoggerConfig,
     },
@@ -38,6 +38,7 @@ pub struct AppConfig {
     pub breez_config: Option<BreezClientConfig>,
     pub cln_grpc_config: Option<ClnClientConfig>,
     pub cln_rest_config: Option<ClnRestClientConfig>,
+    pub lnd_grpc_config: Option<LndGrpcClientConfig>,
     pub lnd_config: Option<LndRestClientConfig>,
     pub web: AxumServerConfig,
     pub logging: TracingLoggerConfig,
@@ -67,6 +68,7 @@ pub enum LightningProvider {
     Breez,
     ClnGrpc,
     ClnRest,
+    LndGrpc,
     Lnd,
 }
 

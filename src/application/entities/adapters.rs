@@ -16,7 +16,7 @@ use crate::{
         lightning::{
             breez::{BreezClient, BreezListener},
             cln::{ClnGrpcClient, ClnRestClient},
-            lnd::LndRestClient,
+            lnd::{LndGrpcClient, LndRestClient},
             LnClient,
         },
     },
@@ -153,6 +153,26 @@ async fn get_ln_client(config: AppConfig, store: AppStore) -> Result<LightningAd
 
             let ln_client = Arc::new(LndRestClient::new(lnd_config.clone()).await?);
             let bitcoin_wallet = ln_client.clone();
+
+            Ok(LightningAdapter {
+                ln_client,
+                bitcoin_wallet,
+            })
+        }
+        LightningProvider::LndGrpc => {
+            let lnd_grpc_config = config
+                .lnd_grpc_config
+                .clone()
+                .ok_or_else(|| ConfigError::MissingLightningProviderConfig(config.ln_provider.to_string()))?;
+            let lnd_rest_config = config
+                .lnd_config
+                .clone()
+                .ok_or_else(|| ConfigError::MissingLightningProviderConfig("lnd_config".to_string()))?;
+
+            debug!(config = ?lnd_grpc_config, "Lightning provider: LND gRPC");
+
+            let ln_client = Arc::new(LndGrpcClient::new(lnd_grpc_config).await?);
+            let bitcoin_wallet = Arc::new(LndRestClient::new(lnd_rest_config).await?);
 
             Ok(LightningAdapter {
                 ln_client,
