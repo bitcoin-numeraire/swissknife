@@ -47,13 +47,13 @@ impl EventListener {
 
                 Some(Arc::new(listener) as Arc<dyn EventsListener>)
             }
-            LightningProvider::Lnd => {
-                let lnd_config = config
-                    .lnd_config
+            LightningProvider::LndRest => {
+                let lnd_rest_config = config
+                    .lnd_rest_config
                     .clone()
                     .ok_or_else(|| ConfigError::MissingLightningProviderConfig(config.ln_provider.to_string()))?;
 
-                let listener = LndWebsocketListener::new(lnd_config, services.clone(), bitcoin_wallet).await?;
+                let listener = LndWebsocketListener::new(lnd_rest_config, services.clone(), bitcoin_wallet).await?;
 
                 Some(Arc::new(listener) as Arc<dyn EventsListener>)
             }

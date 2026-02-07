@@ -39,7 +39,7 @@ pub struct AppConfig {
     pub cln_grpc_config: Option<ClnClientConfig>,
     pub cln_rest_config: Option<ClnRestClientConfig>,
     pub lnd_grpc_config: Option<LndGrpcClientConfig>,
-    pub lnd_config: Option<LndRestClientConfig>,
+    pub lnd_rest_config: Option<LndRestClientConfig>,
     pub web: AxumServerConfig,
     pub logging: TracingLoggerConfig,
 }
@@ -69,7 +69,7 @@ pub enum LightningProvider {
     ClnGrpc,
     ClnRest,
     LndGrpc,
-    Lnd,
+    LndRest,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, EnumString, Display, PartialEq, Eq, Default)]

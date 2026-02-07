@@ -3,7 +3,7 @@ use std::{sync::Arc, time::Duration};
 use async_trait::async_trait;
 use chrono::{TimeZone, Utc};
 use tokio::time::sleep;
-use tonic_lnd::{connect, lnrpc, tonic::Code, tonic::Status, LightningClient};
+use tonic::{Code, Status};
 use tracing::{error, warn};
 
 use crate::{
@@ -12,16 +12,23 @@ use crate::{
         bitcoin::{BitcoinWallet, BtcTransaction, BtcTransactionOutput, OnchainSyncCursor},
         event::LnInvoicePaidEvent,
     },
-    infra::lightning::EventsListener,
+    infra::lightning::{
+        lnd::{
+            lnrpc::{self, lightning_client::LightningClient},
+            LndChannel, LndGrpcClient,
+        },
+        EventsListener,
+    },
 };
 
 use super::LndGrpcClientConfig;
 
 pub struct LndGrpcListener {
-    client: LightningClient,
+    client: LightningClient<LndChannel>,
     services: Arc<AppServices>,
     network: crate::domains::bitcoin::BtcNetwork,
     retry_delay: Duration,
+    reorg_buffer_blocks: u32,
 }
 
 impl LndGrpcListener {
@@ -30,15 +37,14 @@ impl LndGrpcListener {
         services: Arc<AppServices>,
         wallet: Arc<dyn BitcoinWallet>,
     ) -> Result<Self, LightningError> {
-        let mut client = connect(config.endpoint.clone(), &config.cert_path, &config.macaroon_path)
-            .await
-            .map_err(|e| LightningError::Connect(e.to_string()))?;
+        let channel = LndGrpcClient::connect(&config).await?;
 
         Ok(Self {
-            client: client.lightning().clone(),
+            client: LightningClient::new(channel),
             services,
             network: wallet.network(),
             retry_delay: config.retry_delay,
+            reorg_buffer_blocks: config.reorg_buffer_blocks,
         })
     }
 
@@ -84,17 +90,29 @@ impl LndGrpcListener {
     }
 
     async fn listen_transactions(&self) -> Result<(), LightningError> {
-        self.services
-            .bitcoin
-            .sync()
+        let mut start_height = self
+            .services
+            .system
+            .get_onchain_cursor()
             .await
-            .map_err(|e| LightningError::Listener(e.to_string()))?;
+            .map_err(|e| LightningError::Listener(e.to_string()))?
+            .map(|c| match c {
+                OnchainSyncCursor::BlockHeight(h) => {
+                    let rewind_height = h.saturating_sub(self.reorg_buffer_blocks);
+                    i32::try_from(rewind_height).unwrap_or(i32::MAX)
+                }
+                _ => 0,
+            })
+            .unwrap_or(0);
 
         loop {
             let result = {
                 let mut client = self.client.clone();
                 client
-                    .subscribe_transactions(lnrpc::GetTransactionsRequest::default())
+                    .subscribe_transactions(lnrpc::GetTransactionsRequest {
+                        start_height,
+                        ..Default::default()
+                    })
                     .await
             };
 
@@ -107,6 +125,13 @@ impl LndGrpcListener {
                         .map_err(|e| LightningError::Listener(format!("Failed to read transaction stream: {}", e)))?
                     {
                         let transaction = Self::map_transaction(transaction);
+
+                        if let Some(block_height) = transaction.block_height {
+                            let rewind_height = block_height.saturating_sub(self.reorg_buffer_blocks);
+                            let rewind_height = i32::try_from(rewind_height).unwrap_or(i32::MAX);
+                            start_height = start_height.max(rewind_height);
+                        }
+
                         self.handle_transaction(transaction).await;
                     }
                 }
