@@ -1,0 +1,249 @@
+use std::{sync::Arc, time::Duration};
+
+use async_trait::async_trait;
+use chrono::{TimeZone, Utc};
+use tokio::time::sleep;
+use tonic::{Code, Status};
+use tracing::{error, warn};
+
+use crate::{
+    application::{entities::AppServices, errors::LightningError},
+    domains::{
+        bitcoin::{BitcoinWallet, BtcTransaction, BtcTransactionOutput, OnchainSyncCursor},
+        event::LnInvoicePaidEvent,
+    },
+    infra::lightning::{
+        lnd::{
+            lnrpc::{self, lightning_client::LightningClient},
+            LndChannel, LndGrpcClient,
+        },
+        EventsListener,
+    },
+};
+
+use super::LndGrpcClientConfig;
+
+pub struct LndGrpcListener {
+    client: LightningClient<LndChannel>,
+    services: Arc<AppServices>,
+    network: crate::domains::bitcoin::BtcNetwork,
+    retry_delay: Duration,
+    reorg_buffer_blocks: u32,
+}
+
+impl LndGrpcListener {
+    pub async fn new(
+        config: LndGrpcClientConfig,
+        services: Arc<AppServices>,
+        wallet: Arc<dyn BitcoinWallet>,
+    ) -> Result<Self, LightningError> {
+        let channel = LndGrpcClient::connect(&config).await?;
+
+        Ok(Self {
+            client: LightningClient::new(channel),
+            services,
+            network: wallet.network(),
+            retry_delay: config.retry_delay,
+            reorg_buffer_blocks: config.reorg_buffer_blocks,
+        })
+    }
+
+    async fn handle_grpc_error(&self, err: Status, context: &str) -> Result<(), LightningError> {
+        match err.code() {
+            Code::Aborted
+            | Code::Cancelled
+            | Code::DeadlineExceeded
+            | Code::Internal
+            | Code::FailedPrecondition
+            | Code::Unavailable => {
+                error!(err = err.message(), "{}. Retrying...", context);
+                sleep(self.retry_delay).await;
+                Ok(())
+            }
+            _ => Err(LightningError::Listener(err.to_string())),
+        }
+    }
+
+    async fn listen_invoices(&self) -> Result<(), LightningError> {
+        loop {
+            let result = {
+                let mut client = self.client.clone();
+                client.subscribe_invoices(lnrpc::InvoiceSubscription::default()).await
+            };
+
+            match result {
+                Ok(response) => {
+                    let mut stream = response.into_inner();
+                    while let Some(invoice) = stream
+                        .message()
+                        .await
+                        .map_err(|e| LightningError::Listener(format!("Failed to read invoice stream: {}", e)))?
+                    {
+                        self.handle_invoice(invoice).await;
+                    }
+                }
+                Err(err) => {
+                    self.handle_grpc_error(err, "Error subscribing to invoices").await?;
+                }
+            }
+        }
+    }
+
+    async fn listen_transactions(&self) -> Result<(), LightningError> {
+        let mut start_height = self
+            .services
+            .system
+            .get_onchain_cursor()
+            .await
+            .map_err(|e| LightningError::Listener(e.to_string()))?
+            .map(|c| match c {
+                OnchainSyncCursor::BlockHeight(h) => {
+                    let rewind_height = h.saturating_sub(self.reorg_buffer_blocks);
+                    i32::try_from(rewind_height).unwrap_or(i32::MAX)
+                }
+                _ => 0,
+            })
+            .unwrap_or(0);
+
+        loop {
+            let result = {
+                let mut client = self.client.clone();
+                client
+                    .subscribe_transactions(lnrpc::GetTransactionsRequest {
+                        start_height,
+                        ..Default::default()
+                    })
+                    .await
+            };
+
+            match result {
+                Ok(response) => {
+                    let mut stream = response.into_inner();
+                    while let Some(transaction) = stream
+                        .message()
+                        .await
+                        .map_err(|e| LightningError::Listener(format!("Failed to read transaction stream: {}", e)))?
+                    {
+                        let transaction = Self::map_transaction(transaction);
+
+                        if let Some(block_height) = transaction.block_height {
+                            let rewind_height = block_height.saturating_sub(self.reorg_buffer_blocks);
+                            let rewind_height = i32::try_from(rewind_height).unwrap_or(i32::MAX);
+                            start_height = start_height.max(rewind_height);
+                        }
+
+                        self.handle_transaction(transaction).await;
+                    }
+                }
+                Err(err) => {
+                    self.handle_grpc_error(err, "Error subscribing to transactions").await?;
+                }
+            }
+        }
+    }
+
+    async fn handle_invoice(&self, invoice: lnrpc::Invoice) {
+        if invoice.state() != lnrpc::invoice::InvoiceState::Settled {
+            return;
+        }
+
+        if invoice.r_hash.is_empty() {
+            warn!("Invoice update missing payment hash");
+            return;
+        }
+
+        let payment_time = Utc.timestamp_opt(invoice.settle_date, 0).unwrap();
+        let event = LnInvoicePaidEvent {
+            payment_hash: hex::encode(invoice.r_hash),
+            amount_received_msat: invoice.amt_paid_msat as u64,
+            fee_msat: 0,
+            payment_time,
+        };
+
+        if let Err(err) = self.services.event.invoice_paid(event).await {
+            warn!(%err, "Failed to process incoming payment");
+        }
+    }
+
+    fn map_transaction(transaction: lnrpc::Transaction) -> BtcTransaction {
+        let is_outgoing = transaction
+            .previous_outpoints
+            .iter()
+            .any(|outpoint| outpoint.is_our_output);
+
+        let outputs = transaction
+            .output_details
+            .into_iter()
+            .filter_map(|detail| {
+                let output_index = u32::try_from(detail.output_index).ok()?;
+                let amount = u64::try_from(detail.amount).ok()?;
+                Some(BtcTransactionOutput {
+                    output_index,
+                    address: detail.address,
+                    amount_sat: amount,
+                    is_ours: detail.is_our_address,
+                })
+            })
+            .collect();
+
+        let block_height = if transaction.block_height > 0 {
+            Some(transaction.block_height as u32)
+        } else {
+            None
+        };
+
+        BtcTransaction {
+            txid: transaction.tx_hash,
+            block_height,
+            outputs,
+            is_outgoing,
+        }
+    }
+
+    async fn handle_transaction(&self, transaction: BtcTransaction) {
+        let relevant_outputs = transaction.outputs.iter().filter(|output| {
+            if transaction.is_outgoing {
+                !output.is_ours
+            } else {
+                output.is_ours
+            }
+        });
+
+        for output in relevant_outputs {
+            let result = if transaction.is_outgoing {
+                self.services
+                    .event
+                    .onchain_withdrawal(transaction.withdrawal_event())
+                    .await
+            } else {
+                self.services
+                    .event
+                    .onchain_deposit(transaction.deposit_event(output), self.network.into())
+                    .await
+            };
+
+            if let Err(err) = result {
+                error!(%err, "Failed to process onchain transaction");
+            }
+        }
+
+        if let Some(block_height) = transaction.block_height.filter(|&h| h > 0) {
+            if let Err(err) = self
+                .services
+                .system
+                .set_onchain_cursor(OnchainSyncCursor::BlockHeight(block_height))
+                .await
+            {
+                warn!(%err, "Failed to persist onchain cursor");
+            }
+        }
+    }
+}
+
+#[async_trait]
+impl EventsListener for LndGrpcListener {
+    async fn listen(&self) -> Result<(), LightningError> {
+        tokio::try_join!(self.listen_invoices(), self.listen_transactions())?;
+        Ok(())
+    }
+}

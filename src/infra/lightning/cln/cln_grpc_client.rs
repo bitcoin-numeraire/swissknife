@@ -48,6 +48,7 @@ use crate::{
 
 use self::cln::InvoiceRequest;
 
+#[allow(dead_code, clippy::all)]
 pub mod cln {
     tonic::include_proto!("cln");
 }
