@@ -210,14 +210,6 @@ impl ClnGrpcListener {
     }
 
     async fn listen_chainmoves(&self) -> Result<(), LightningError> {
-        // First sync the bitcoin transactions so the cursor is up to date
-        // and we have processed all previous onchain events.
-        self.services
-            .bitcoin
-            .sync()
-            .await
-            .map_err(|e| LightningError::Listener(e.to_string()))?;
-
         let mut next_index = self
             .services
             .system
