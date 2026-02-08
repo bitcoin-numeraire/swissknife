@@ -128,14 +128,7 @@ impl LndGrpcClient {
             .map_err(|e| LightningError::ParseConfig(e.to_string()))?
             .connect()
             .await
-            .map_err(|e| {
-                LightningError::Connect(format!(
-                    "{} (endpoint: {}, cert_path: {})",
-                    Self::format_transport_error(&e),
-                    config.endpoint,
-                    config.cert_path
-                ))
-            })?;
+            .map_err(|e| LightningError::Connect(Self::format_transport_error(&e)))?;
 
         let macaroon = read_macaroon(&config.macaroon_path)
             .await

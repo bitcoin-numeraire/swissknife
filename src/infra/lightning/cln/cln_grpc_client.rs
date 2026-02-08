@@ -1,4 +1,4 @@
-use std::{collections::HashMap, path::PathBuf, str::FromStr, time::Duration};
+use std::{collections::HashMap, error::Error as StdError, path::PathBuf, str::FromStr, time::Duration};
 
 use bitcoin::{Address, Network, ScriptBuf};
 use chrono::{TimeZone, Utc};
@@ -96,6 +96,14 @@ impl ClnGrpcClient {
     }
 
     pub async fn connect(config: &ClnClientConfig) -> Result<NodeClient<Channel>, LightningError> {
+        let endpoint_uri = config
+            .endpoint
+            .parse::<http::Uri>()
+            .map_err(|e| LightningError::ParseConfig(format!("Invalid gRPC endpoint URI: {}", e)))?;
+        let tls_domain = endpoint_uri
+            .host()
+            .ok_or_else(|| LightningError::ParseConfig("Missing host in gRPC endpoint URI".to_string()))?;
+
         let (identity, ca_certificate) = Self::read_certificates(&config.certs_dir)
             .await
             .map_err(|e| LightningError::ReadCertificates(e.to_string()))?;
@@ -103,7 +111,7 @@ impl ClnGrpcClient {
         let tls_config = ClientTlsConfig::new()
             .identity(identity)
             .ca_certificate(ca_certificate)
-            .domain_name("localhost"); // Use localhost if you are not sure about the domain name
+            .domain_name(tls_domain);
 
         let endpoint = Channel::from_shared(config.endpoint.clone())
             .map_err(|e| LightningError::ParseConfig(e.to_string()))?
@@ -113,9 +121,20 @@ impl ClnGrpcClient {
         let channel = endpoint
             .connect()
             .await
-            .map_err(|e| LightningError::Connect(e.to_string()))?;
+            .map_err(|e| LightningError::Connect(Self::format_transport_error(&e)))?;
 
         Ok(NodeClient::new(channel))
+    }
+
+    fn format_transport_error(err: &tonic::transport::Error) -> String {
+        let mut message = err.to_string();
+        let mut source = err.source();
+        while let Some(next) = source {
+            message.push_str(": ");
+            message.push_str(&next.to_string());
+            source = next.source();
+        }
+        message
     }
 
     async fn read_certificates(certs_dir: &str) -> io::Result<(Identity, Certificate)> {
