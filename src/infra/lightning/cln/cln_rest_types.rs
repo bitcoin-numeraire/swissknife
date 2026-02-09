@@ -2,7 +2,6 @@ use chrono::{TimeZone, Utc};
 use lightning_invoice::Bolt11Invoice;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
-use uuid::Uuid;
 
 use crate::{
     application::entities::Ledger,
@@ -15,7 +14,7 @@ use crate::{
 #[derive(Debug, Serialize)]
 pub struct InvoiceRequest {
     pub description: String,
-    pub label: Uuid,
+    pub label: String,
     pub expiry: u64,
     pub amount_msat: u64,
     pub deschashonly: Option<bool>,
@@ -55,6 +54,16 @@ pub struct ListInvoicesRequest {
 pub struct ListInvoicesResponse {
     pub invoices: Vec<ListInvoicesInvoice>,
 }
+
+#[derive(Debug, Serialize)]
+pub struct DelInvoiceRequest {
+    pub label: String,
+    pub status: String,
+    pub desconly: Option<bool>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct DelInvoiceResponse {}
 
 #[derive(Debug, Serialize, Default)]
 pub struct ListTransactionsRequest {}

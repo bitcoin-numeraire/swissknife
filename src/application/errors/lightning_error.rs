@@ -45,6 +45,9 @@ pub enum LightningError {
     #[error("Failed to send payment: {0}")]
     Pay(String),
 
+    #[error("Failed to cancel invoice: {0}")]
+    CancelInvoice(String),
+
     #[error("Unexpected stream payload: {0}")]
     UnexpectedStreamPayload(String),
 

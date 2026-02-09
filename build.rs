@@ -18,6 +18,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .build_server(false)
         .compile_protos(
             &[
+                "src/infra/lightning/lnd/proto/invoices.proto",
                 "src/infra/lightning/lnd/proto/lightning.proto",
                 "src/infra/lightning/lnd/proto/router.proto",
                 "src/infra/lightning/lnd/proto/walletkit.proto",

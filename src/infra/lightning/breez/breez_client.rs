@@ -240,6 +240,7 @@ impl LnClient for BreezClient {
         &self,
         amount_msat: u64,
         description: String,
+        _label: String,
         expiry: u32,
         deschashonly: bool,
     ) -> Result<Invoice, LightningError> {
@@ -301,6 +302,12 @@ impl LnClient for BreezClient {
             };
             mapped
         }))
+    }
+
+    async fn cancel_invoice(&self, _payment_hash: String, _label: String) -> Result<(), LightningError> {
+        Err(LightningError::CancelInvoice(
+            "Invoice cancellation is not supported for Breez".to_string(),
+        ))
     }
 
     async fn health(&self) -> Result<HealthStatus, LightningError> {

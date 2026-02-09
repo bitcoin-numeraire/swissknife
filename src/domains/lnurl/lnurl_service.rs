@@ -2,6 +2,7 @@ use std::{sync::Arc, vec};
 
 use async_trait::async_trait;
 use tracing::{debug, info};
+use uuid::Uuid;
 
 use crate::{
     application::{
@@ -101,10 +102,18 @@ impl LnUrlUseCases for LnUrlService {
             return Err(DataError::NotFound("Lightning address not found.".to_string()).into());
         }
 
+        let invoice_id = Uuid::new_v4();
         let mut invoice = self
             .ln_client
-            .invoice(amount, self.metadata(&username), self.invoice_expiry, true)
+            .invoice(
+                amount,
+                self.metadata(&username),
+                invoice_id.to_string(),
+                self.invoice_expiry,
+                true,
+            )
             .await?;
+        invoice.id = invoice_id;
         invoice.wallet_id.clone_from(&ln_address.wallet_id);
         invoice.ln_address_id = Some(ln_address.id);
         invoice.description = Some(comment.unwrap_or(format!("Payment to {}@{}", username, self.domain)));

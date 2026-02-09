@@ -52,15 +52,18 @@ impl InvoiceUseCases for InvoiceService {
     ) -> Result<Invoice, ApplicationError> {
         debug!(%wallet_id, "Generating invoice");
 
+        let invoice_id = Uuid::new_v4();
         let mut invoice = self
             .ln_client
             .invoice(
                 amount,
                 description.unwrap_or(DEFAULT_INVOICE_DESCRIPTION.to_string()),
+                invoice_id.to_string(),
                 expiry.unwrap_or(self.invoice_expiry),
                 false,
             )
             .await?;
+        invoice.id = invoice_id;
         invoice.wallet_id.clone_from(&wallet_id);
 
         let invoice = self.store.invoice.insert(invoice).await?;

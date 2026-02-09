@@ -60,6 +60,14 @@ pub struct TrackPaymentRequest {
     pub no_inflight_updates: bool,
 }
 
+#[derive(Debug, Serialize)]
+pub struct CancelInvoiceRequest {
+    pub payment_hash: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct CancelInvoiceResponse {}
+
 #[serde_as]
 #[derive(Debug, Deserialize)]
 pub struct TrackPaymentResponse {
@@ -98,6 +106,9 @@ pub struct PayResponse {
     pub status: String,
     pub failure_reason: String,
 }
+
+#[derive(Debug, Deserialize)]
+pub struct DeleteCanceledInvoiceResponse {}
 
 #[derive(Debug, Deserialize)]
 pub struct GetinfoResponse {
