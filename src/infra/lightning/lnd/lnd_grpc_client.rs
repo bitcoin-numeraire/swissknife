@@ -1,4 +1,4 @@
-use std::{error::Error as StdError, path::PathBuf, str::FromStr, time::Duration};
+use std::{collections::HashMap, error::Error as StdError, path::PathBuf, str::FromStr, time::Duration};
 
 use async_trait::async_trait;
 use base64::{engine::general_purpose::STANDARD, Engine as _};
@@ -37,7 +37,15 @@ use crate::{
         config::config_rs::deserialize_duration,
         lightning::{
             bitcoin_utils::parse_psbt,
-            lnd::lnrpc::{invoice::InvoiceState, PaymentFailureReason},
+            lnd::{
+                lnrpc::{
+                    invoice::InvoiceState, AddressType, GetTransactionsRequest, NewAddressRequest, PaymentFailureReason,
+                },
+                walletrpc::{
+                    fund_psbt_request::{Fees, Template},
+                    GetTransactionRequest, TxTemplate,
+                },
+            },
             types::parse_network,
             LnClient,
         },
@@ -64,6 +72,11 @@ pub mod walletrpc {
 #[allow(dead_code, clippy::all)]
 pub mod signrpc {
     tonic::include_proto!("signrpc");
+}
+
+#[allow(dead_code, clippy::all)]
+pub mod invoicesrpc {
+    tonic::include_proto!("invoicesrpc");
 }
 
 #[derive(Clone)]
@@ -110,6 +123,7 @@ impl LndGrpcClient {
 
         let mut lnd_client = Self {
             client: LightningClient::new(channel.clone()),
+            invoices: InvoicesClient::new(channel.clone()),
             router: RouterClient::new(channel.clone()),
             wallet: WalletKitClient::new(channel),
             fee_limit_msat: config.fee_limit_msat,
@@ -320,7 +334,7 @@ impl LnClient for LndGrpcClient {
     }
 
     async fn pay(&self, bolt11: String, amount_msat: Option<u64>, _label: String) -> Result<Payment, LightningError> {
-        let request = SendPaymentRequest {
+        let request = routerrpc::SendPaymentRequest {
             payment_request: bolt11,
             amt_msat: amount_msat.map(|v| v as i64).unwrap_or_default(),
             fee_limit_msat: self.fee_limit_msat as i64,
@@ -353,7 +367,7 @@ impl LnClient for LndGrpcClient {
 
     async fn invoice_by_hash(&self, payment_hash: String) -> Result<Option<Invoice>, LightningError> {
         let hash_bytes = hex::decode(payment_hash).map_err(|e| LightningError::InvoiceByHash(e.to_string()))?;
-        let request = PaymentHash {
+        let request = lnrpc::PaymentHash {
             r_hash: hash_bytes,
             ..Default::default()
         };
@@ -375,7 +389,7 @@ impl LnClient for LndGrpcClient {
 
         let mut router = self.router.clone();
         let result = router
-            .track_payment_v2(TrackPaymentRequest {
+            .track_payment_v2(routerrpc::TrackPaymentRequest {
                 payment_hash: hash_bytes,
                 no_inflight_updates: true,
             })
@@ -402,7 +416,7 @@ impl LnClient for LndGrpcClient {
         let hash_bytes = hex::decode(&payment_hash).map_err(|e| LightningError::CancelInvoice(e.to_string()))?;
         let mut invoices = self.invoices.clone();
         invoices
-            .cancel_invoice(CancelInvoiceMsg {
+            .cancel_invoice(invoicesrpc::CancelInvoiceMsg {
                 payment_hash: hash_bytes,
             })
             .await
@@ -410,7 +424,7 @@ impl LnClient for LndGrpcClient {
 
         let mut client = self.client.clone();
         client
-            .delete_canceled_invoice(DelCanceledInvoiceReq {
+            .delete_canceled_invoice(lnrpc::DelCanceledInvoiceReq {
                 invoice_hash: payment_hash,
             })
             .await
@@ -422,7 +436,7 @@ impl LnClient for LndGrpcClient {
     async fn health(&self) -> Result<HealthStatus, LightningError> {
         let mut client = self.client.clone();
         client
-            .get_info(GetInfoRequest {})
+            .get_info(lnrpc::GetInfoRequest {})
             .await
             .map_err(|e| LightningError::HealthCheck(e.message().to_string()))?;
 
@@ -436,14 +450,14 @@ impl BitcoinWallet for LndGrpcClient {
         let mut client = self.client.clone();
 
         let address_type_param = match address_type {
-            BtcAddressType::P2sh => lnrpc::AddressType::NestedPubkeyHash,
-            BtcAddressType::P2tr => lnrpc::AddressType::TaprootPubkey,
-            BtcAddressType::P2wpkh => lnrpc::AddressType::WitnessPubkeyHash,
+            BtcAddressType::P2sh => AddressType::NestedPubkeyHash,
+            BtcAddressType::P2tr => AddressType::TaprootPubkey,
+            BtcAddressType::P2wpkh => AddressType::WitnessPubkeyHash,
             _ => return Err(BitcoinError::AddressType(address_type.to_string())),
         };
 
         let response = client
-            .new_address(lnrpc::NewAddressRequest {
+            .new_address(NewAddressRequest {
                 r#type: address_type_param as i32,
                 account: String::new(),
             })
@@ -461,18 +475,18 @@ impl BitcoinWallet for LndGrpcClient {
         fee_rate: Option<u32>,
     ) -> Result<BtcPreparedTransaction, BitcoinError> {
         let mut wallet = self.wallet.clone();
-        let mut outputs = std::collections::HashMap::new();
+        let mut outputs = HashMap::new();
         outputs.insert(address, amount_sat);
 
         let target_conf = if fee_rate.is_none() { Some(1) } else { None };
         let fees = match fee_rate {
-            Some(rate) => Some(walletrpc::fund_psbt_request::Fees::SatPerVbyte(rate as u64)),
-            None => target_conf.map(walletrpc::fund_psbt_request::Fees::TargetConf),
+            Some(rate) => Some(Fees::SatPerVbyte(rate as u64)),
+            None => target_conf.map(Fees::TargetConf),
         };
 
         let response = wallet
             .fund_psbt(walletrpc::FundPsbtRequest {
-                template: Some(walletrpc::fund_psbt_request::Template::Raw(walletrpc::TxTemplate {
+                template: Some(Template::Raw(TxTemplate {
                     inputs: Vec::new(),
                     outputs,
                 })),
@@ -573,7 +587,7 @@ impl BitcoinWallet for LndGrpcClient {
     async fn get_transaction(&self, txid: &str) -> Result<Option<BtcTransaction>, BitcoinError> {
         let mut wallet = self.wallet.clone();
         let response = wallet
-            .get_transaction(walletrpc::GetTransactionRequest { txid: txid.to_string() })
+            .get_transaction(GetTransactionRequest { txid: txid.to_string() })
             .await;
 
         match response {
@@ -593,7 +607,7 @@ impl BitcoinWallet for LndGrpcClient {
 
         let mut client = self.client.clone();
         let response = client
-            .get_transactions(lnrpc::GetTransactionsRequest {
+            .get_transactions(GetTransactionsRequest {
                 start_height: start_height.unwrap_or_default() as i32,
                 end_height: -1,
                 account: String::new(),
