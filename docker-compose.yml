@@ -24,7 +24,7 @@ services:
       - "log_destination=stderr" # Send logs to stderr
 
   pgadmin:
-    image: dpage/pgadmin4:9.11
+    image: dpage/pgadmin4:9.12
     environment:
       PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-pgadmin4@pgadmin.org}
       PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:-admin}
