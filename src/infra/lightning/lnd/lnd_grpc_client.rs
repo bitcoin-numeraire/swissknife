@@ -1,6 +1,7 @@
 use std::{error::Error as StdError, path::PathBuf, str::FromStr, time::Duration};
 
 use async_trait::async_trait;
+use base64::{engine::general_purpose::STANDARD, Engine as _};
 use chrono::{TimeZone, Utc};
 use lightning_invoice::Bolt11Invoice;
 use serde::Deserialize;
@@ -14,6 +15,7 @@ use tonic::{
 
 use lnrpc::lightning_client::LightningClient;
 use routerrpc::router_client::RouterClient;
+use walletrpc::wallet_kit_client::WalletKitClient;
 
 use crate::{
     application::{
@@ -22,8 +24,9 @@ use crate::{
     },
     domains::{
         bitcoin::{
-            BitcoinWallet, BtcAddressType, BtcNetwork, BtcOutput, BtcPreparedTransaction, BtcTransaction,
-            OnchainSyncBatch, OnchainSyncCursor,
+            BitcoinWallet, BtcAddressType, BtcLockedUtxo, BtcNetwork, BtcOutput, BtcOutputStatus,
+            BtcPreparedTransaction, BtcTransaction, BtcTransactionOutput, OnchainSyncBatch, OnchainSyncCursor,
+            OnchainTransaction,
         },
         invoice::{Invoice, InvoiceStatus},
         payment::{LnPayment, Payment, PaymentStatus},
@@ -32,6 +35,7 @@ use crate::{
     infra::{
         config::config_rs::deserialize_duration,
         lightning::{
+            bitcoin_utils::parse_psbt,
             lnd::lnrpc::{invoice::InvoiceState, PaymentFailureReason},
             types::parse_network,
             LnClient,
@@ -49,6 +53,16 @@ pub mod lnrpc {
 #[allow(dead_code, clippy::all)]
 pub mod routerrpc {
     tonic::include_proto!("routerrpc");
+}
+
+#[allow(dead_code, clippy::all)]
+pub mod walletrpc {
+    tonic::include_proto!("walletrpc");
+}
+
+#[allow(dead_code, clippy::all)]
+pub mod signrpc {
+    tonic::include_proto!("signrpc");
 }
 
 #[derive(Clone)]
@@ -81,8 +95,10 @@ pub struct LndGrpcClientConfig {
 pub struct LndGrpcClient {
     client: LightningClient<LndChannel>,
     router: RouterClient<LndChannel>,
+    wallet: WalletKitClient<LndChannel>,
     fee_limit_msat: u64,
     payment_timeout: Duration,
+    reorg_buffer_blocks: u32,
     network: BtcNetwork,
 }
 
@@ -92,9 +108,11 @@ impl LndGrpcClient {
 
         let mut lnd_client = Self {
             client: LightningClient::new(channel.clone()),
-            router: RouterClient::new(channel),
+            router: RouterClient::new(channel.clone()),
+            wallet: WalletKitClient::new(channel),
             fee_limit_msat: config.fee_limit_msat,
             payment_timeout: config.payment_timeout,
+            reorg_buffer_blocks: config.reorg_buffer_blocks,
             network: BtcNetwork::default(),
         };
 
@@ -234,6 +252,31 @@ impl LndGrpcClient {
             ..Default::default()
         }
     }
+
+    fn transaction_from_lnrpc(transaction: lnrpc::Transaction) -> BtcTransaction {
+        let is_outgoing = transaction
+            .previous_outpoints
+            .iter()
+            .any(|outpoint| outpoint.is_our_output);
+
+        let outputs = transaction
+            .output_details
+            .into_iter()
+            .map(|detail| BtcTransactionOutput {
+                output_index: detail.output_index as u32,
+                address: detail.address,
+                amount_sat: detail.amount as u64,
+                is_ours: detail.is_our_address,
+            })
+            .collect();
+
+        BtcTransaction {
+            txid: transaction.tx_hash,
+            block_height: Some(transaction.block_height as u32),
+            outputs,
+            is_outgoing,
+        }
+    }
 }
 
 #[async_trait]
@@ -366,7 +409,25 @@ impl LnClient for LndGrpcClient {
 #[async_trait]
 impl BitcoinWallet for LndGrpcClient {
     async fn new_address(&self, address_type: BtcAddressType) -> Result<String, BitcoinError> {
-        todo!("")
+        let mut client = self.client.clone();
+
+        let address_type_param = match address_type {
+            BtcAddressType::P2sh => lnrpc::AddressType::NestedPubkeyHash,
+            BtcAddressType::P2tr => lnrpc::AddressType::TaprootPubkey,
+            BtcAddressType::P2wpkh => lnrpc::AddressType::WitnessPubkeyHash,
+            _ => return Err(BitcoinError::AddressType(address_type.to_string())),
+        };
+
+        let response = client
+            .new_address(lnrpc::NewAddressRequest {
+                r#type: address_type_param as i32,
+                account: String::new(),
+            })
+            .await
+            .map_err(|e| BitcoinError::Address(e.message().to_string()))?
+            .into_inner();
+
+        Ok(response.address)
     }
 
     async fn prepare_transaction(
@@ -375,23 +436,196 @@ impl BitcoinWallet for LndGrpcClient {
         amount_sat: u64,
         fee_rate: Option<u32>,
     ) -> Result<BtcPreparedTransaction, BitcoinError> {
-        todo!("")
+        let mut wallet = self.wallet.clone();
+        let mut outputs = std::collections::HashMap::new();
+        outputs.insert(address, amount_sat);
+
+        let target_conf = if fee_rate.is_none() { Some(1) } else { None };
+        let fees = match fee_rate {
+            Some(rate) => Some(walletrpc::fund_psbt_request::Fees::SatPerVbyte(rate as u64)),
+            None => target_conf.map(walletrpc::fund_psbt_request::Fees::TargetConf),
+        };
+
+        let response = wallet
+            .fund_psbt(walletrpc::FundPsbtRequest {
+                template: Some(walletrpc::fund_psbt_request::Template::Raw(walletrpc::TxTemplate {
+                    inputs: Vec::new(),
+                    outputs,
+                })),
+                fees,
+                min_confs: 1,
+                spend_unconfirmed: false,
+                ..Default::default()
+            })
+            .await
+            .map_err(|e| BitcoinError::PrepareTransaction(e.message().to_string()))?
+            .into_inner();
+
+        let psbt_base64 = STANDARD.encode(&response.funded_psbt);
+        let psbt = parse_psbt(&psbt_base64)?;
+        let fee = psbt.fee().map_err(|e| BitcoinError::ParsePsbt(e.to_string()))?;
+
+        let locked_utxos = response
+            .locked_utxos
+            .into_iter()
+            .filter_map(|lease| {
+                let outpoint = lease.outpoint?;
+                let txid = if !outpoint.txid_str.is_empty() {
+                    outpoint.txid_str
+                } else if !outpoint.txid_bytes.is_empty() {
+                    hex::encode(outpoint.txid_bytes)
+                } else {
+                    return None;
+                };
+
+                Some(BtcLockedUtxo {
+                    id: hex::encode(lease.id),
+                    txid,
+                    output_index: outpoint.output_index,
+                })
+            })
+            .collect();
+
+        Ok(BtcPreparedTransaction {
+            txid: psbt.unsigned_tx.compute_txid().to_string(),
+            fee_sat: fee.to_sat(),
+            psbt: psbt_base64,
+            locked_utxos,
+        })
     }
 
     async fn sign_send_transaction(&self, prepared: &BtcPreparedTransaction) -> Result<(), BitcoinError> {
-        todo!("")
+        let mut wallet = self.wallet.clone();
+        let psbt_bytes = STANDARD
+            .decode(&prepared.psbt)
+            .map_err(|e| BitcoinError::FinalizeTransaction(e.to_string()))?;
+
+        let finalize_response = wallet
+            .finalize_psbt(walletrpc::FinalizePsbtRequest {
+                funded_psbt: psbt_bytes,
+                account: String::new(),
+            })
+            .await
+            .map_err(|e| BitcoinError::FinalizeTransaction(e.message().to_string()))?
+            .into_inner();
+
+        let response = wallet
+            .publish_transaction(walletrpc::Transaction {
+                tx_hex: finalize_response.raw_final_tx,
+                label: String::new(),
+            })
+            .await
+            .map_err(|e| BitcoinError::BroadcastTransaction(e.message().to_string()))?
+            .into_inner();
+
+        if !response.publish_error.is_empty() {
+            return Err(BitcoinError::BroadcastTransaction(response.publish_error));
+        }
+
+        Ok(())
     }
 
     async fn release_prepared_transaction(&self, prepared: &BtcPreparedTransaction) -> Result<(), BitcoinError> {
-        todo!("")
+        let mut wallet = self.wallet.clone();
+
+        for utxo in &prepared.locked_utxos {
+            let id_bytes = hex::decode(&utxo.id).map_err(|e| BitcoinError::ReleaseTransaction(e.to_string()))?;
+            wallet
+                .release_output(walletrpc::ReleaseOutputRequest {
+                    id: id_bytes,
+                    outpoint: Some(lnrpc::OutPoint {
+                        txid_bytes: Vec::new(),
+                        txid_str: utxo.txid.clone(),
+                        output_index: utxo.output_index,
+                    }),
+                })
+                .await
+                .map_err(|e| BitcoinError::ReleaseTransaction(e.message().to_string()))?;
+        }
+
+        Ok(())
     }
 
     async fn get_transaction(&self, txid: &str) -> Result<Option<BtcTransaction>, BitcoinError> {
-        todo!("")
+        let mut wallet = self.wallet.clone();
+        let response = wallet
+            .get_transaction(walletrpc::GetTransactionRequest { txid: txid.to_string() })
+            .await;
+
+        match response {
+            Ok(response) => Ok(Some(Self::transaction_from_lnrpc(response.into_inner()))),
+            Err(err) => match err.code() {
+                Code::NotFound => Ok(None),
+                _ => Err(BitcoinError::GetTransaction(err.message().to_string())),
+            },
+        }
     }
 
     async fn synchronize(&self, cursor: Option<OnchainSyncCursor>) -> Result<OnchainSyncBatch, BitcoinError> {
-        todo!("")
+        let start_height = match cursor {
+            Some(OnchainSyncCursor::BlockHeight(height)) => Some(height),
+            _ => None,
+        };
+
+        let mut client = self.client.clone();
+        let response = client
+            .get_transactions(lnrpc::GetTransactionsRequest {
+                start_height: start_height.unwrap_or_default() as i32,
+                end_height: -1,
+                account: String::new(),
+                index_offset: 0,
+                max_transactions: 0,
+            })
+            .await
+            .map_err(|e| BitcoinError::Synchronize(e.message().to_string()))?
+            .into_inner();
+        let transactions = response
+            .transactions
+            .into_iter()
+            .map(Self::transaction_from_lnrpc)
+            .collect::<Vec<_>>();
+
+        let mut result = Vec::new();
+        let mut max_height: Option<u32> = None;
+
+        for transaction in transactions {
+            if let Some(height) = transaction.block_height {
+                max_height = Some(max_height.map_or(height, |current| current.max(height)));
+            }
+
+            if transaction.is_outgoing {
+                for _output in transaction.outputs.iter().filter(|output| !output.is_ours) {
+                    result.push(OnchainTransaction::Withdrawal(transaction.withdrawal_event()));
+                }
+            } else {
+                for output in transaction.outputs.iter().filter(|output| output.is_ours) {
+                    result.push(OnchainTransaction::Deposit(BtcOutput {
+                        txid: transaction.txid.clone(),
+                        output_index: output.output_index,
+                        address: output.address.clone(),
+                        amount_sat: output.amount_sat,
+                        block_height: transaction.block_height,
+                        outpoint: format!("{}:{}", transaction.txid, output.output_index),
+                        status: if transaction.block_height.is_some() && transaction.block_height.unwrap() > 0 {
+                            BtcOutputStatus::Confirmed
+                        } else {
+                            BtcOutputStatus::Unconfirmed
+                        },
+                        ..Default::default()
+                    }));
+                }
+            }
+        }
+
+        let next_cursor = max_height.map(|height| {
+            let buffered = height.saturating_sub(self.reorg_buffer_blocks);
+            OnchainSyncCursor::BlockHeight(buffered)
+        });
+
+        Ok(OnchainSyncBatch {
+            events: result,
+            next_cursor,
+        })
     }
 
     async fn get_output(
@@ -401,7 +635,30 @@ impl BitcoinWallet for LndGrpcClient {
         address: Option<&str>,
         include_spent: bool,
     ) -> Result<Option<BtcOutput>, BitcoinError> {
-        todo!("")
+        let _ = include_spent;
+        let Some(transaction) = self.get_transaction(txid).await? else {
+            return Ok(None);
+        };
+
+        let output = transaction.outputs.iter().find(|output| match output_index {
+            Some(index) => output.output_index == index,
+            None => address.map(|target| output.address == target).unwrap_or(false),
+        });
+
+        Ok(output.map(|output| BtcOutput {
+            txid: transaction.txid.clone(),
+            output_index: output.output_index,
+            address: output.address.clone(),
+            amount_sat: output.amount_sat,
+            block_height: transaction.block_height,
+            outpoint: format!("{}:{}", transaction.txid, output.output_index),
+            status: if transaction.block_height.is_some() && transaction.block_height.unwrap() > 0 {
+                BtcOutputStatus::Confirmed
+            } else {
+                BtcOutputStatus::Unconfirmed
+            },
+            ..Default::default()
+        }))
     }
 
     fn network(&self) -> BtcNetwork {

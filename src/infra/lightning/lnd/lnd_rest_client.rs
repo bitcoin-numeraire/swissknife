@@ -531,7 +531,7 @@ impl BitcoinWallet for LndRestClient {
         let transactions = self
             .fetch_transactions(start_height)
             .await
-            .map_err(|e| BitcoinError::GetTransaction(e.to_string()))?;
+            .map_err(|e| BitcoinError::Synchronize(e.to_string()))?;
 
         let mut result = Vec::new();
 
