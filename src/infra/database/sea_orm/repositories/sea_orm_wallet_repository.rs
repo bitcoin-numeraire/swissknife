@@ -128,11 +128,28 @@ impl WalletRepository for SeaOrmWalletRepository {
             .map_err(|e| DatabaseError::FindMany(e.to_string()))?;
 
         // Get payment aggregates grouped by wallet_id
+        let settled_payment_status = PaymentStatus::Settled.to_string();
+        let pending_payment_status = PaymentStatus::Pending.to_string();
+
         let payment_aggs = Payment::find()
             .select_only()
             .column(PaymentColumn::WalletId)
-            .column_as(Expr::cust("CAST(SUM(payment.amount_msat) AS BIGINT)"), "sent_msat")
-            .column_as(Expr::cust("CAST(SUM(payment.fee_msat) AS BIGINT)"), "fees_paid_msat")
+            .column_as(
+                Expr::cust(format!(
+                    "CAST(SUM(CASE WHEN payment.status IN ('{settled_status}', '{pending_status}') THEN payment.amount_msat ELSE 0 END) AS BIGINT)",
+                    settled_status = settled_payment_status,
+                    pending_status = pending_payment_status
+                )),
+                "sent_msat",
+            )
+            .column_as(
+                Expr::cust(format!(
+                    "CAST(SUM(CASE WHEN payment.status IN ('{settled_status}', '{pending_status}') THEN COALESCE(payment.fee_msat, 0) ELSE 0 END) AS BIGINT)",
+                    settled_status = settled_payment_status,
+                    pending_status = pending_payment_status
+                )),
+                "fees_paid_msat",
+            )
             .column_as(PaymentColumn::Id.count(), "n_payments")
             .column_as(Expr::col(PaymentColumn::LnAddress).count_distinct(), "n_contacts")
             .group_by(PaymentColumn::WalletId)

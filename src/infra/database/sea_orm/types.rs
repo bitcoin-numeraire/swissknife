@@ -57,7 +57,7 @@ impl From<InvoiceModel> for Invoice {
             ledger: model.ledger.parse().expect(ASSERTION_MSG),
             currency: model.currency.parse().expect(ASSERTION_MSG),
             status,
-            fee_msat: None,
+            fee_msat: model.fee_msat.map(|v| v as u64),
             payment_time: model.payment_time.map(|t| t.and_utc()),
             created_at: model.created_at.and_utc(),
             updated_at: model.updated_at.map(|t| t.and_utc()),
