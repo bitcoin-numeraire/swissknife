@@ -114,8 +114,14 @@ impl InvoiceRepository for SeaOrmInvoiceRepository {
     }
 
     async fn insert(&self, invoice: Invoice) -> Result<Invoice, DatabaseError> {
+        let id = if invoice.id.is_nil() {
+            Uuid::new_v4()
+        } else {
+            invoice.id
+        };
+
         let mut model = ActiveModel {
-            id: Set(Uuid::new_v4()),
+            id: Set(id),
             wallet_id: Set(invoice.wallet_id),
             ln_address_id: Set(invoice.ln_address_id),
             description: Set(invoice.description),

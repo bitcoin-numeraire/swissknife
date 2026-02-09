@@ -1,5 +1,6 @@
 use std::{collections::HashMap, path::PathBuf, str::FromStr, time::Duration};
 
+use async_trait::async_trait;
 use bitcoin::{Address, Network, OutPoint, ScriptBuf};
 use chrono::{TimeZone, Utc};
 use lightning_invoice::Bolt11Invoice;
@@ -10,9 +11,6 @@ use reqwest::{
 };
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use tokio::fs;
-use uuid::Uuid;
-
-use async_trait::async_trait;
 
 use crate::{
     application::{
@@ -36,11 +34,11 @@ use crate::{
 };
 
 use super::{
-    ErrorResponse, GetinfoRequest, GetinfoResponse, InvoiceRequest, InvoiceResponse, ListChainMovesRequest,
-    ListChainMovesResponse, ListFundsRequest, ListInvoicesRequest, ListInvoicesResponse, ListPaysRequest,
-    ListPaysResponse, ListTransactionsRequest, ListTransactionsResponse, NewAddrRequest, NewAddrResponse, PayRequest,
-    PayResponse, TxDiscardRequest, TxDiscardResponse, TxPrepareOutput, TxPrepareRequest, TxPrepareResponse,
-    TxSendRequest, TxSendResponse,
+    DelInvoiceRequest, DelInvoiceResponse, ErrorResponse, GetinfoRequest, GetinfoResponse, InvoiceRequest,
+    InvoiceResponse, ListChainMovesRequest, ListChainMovesResponse, ListFundsRequest, ListInvoicesRequest,
+    ListInvoicesResponse, ListPaysRequest, ListPaysResponse, ListTransactionsRequest, ListTransactionsResponse,
+    NewAddrRequest, NewAddrResponse, PayRequest, PayResponse, TxDiscardRequest, TxDiscardResponse, TxPrepareOutput,
+    TxPrepareRequest, TxPrepareResponse, TxSendRequest, TxSendResponse,
 };
 
 #[derive(Clone, Debug, Deserialize)]
@@ -169,6 +167,7 @@ impl LnClient for ClnRestClient {
         &self,
         amount_msat: u64,
         description: String,
+        label: String,
         expiry: u32,
         deschashonly: bool,
     ) -> Result<Invoice, LightningError> {
@@ -178,7 +177,7 @@ impl LnClient for ClnRestClient {
                 &InvoiceRequest {
                     description,
                     expiry: expiry as u64,
-                    label: Uuid::new_v4(),
+                    label,
                     amount_msat,
                     deschashonly: Some(deschashonly),
                 },
@@ -278,6 +277,21 @@ impl LnClient for ClnRestClient {
             }),
             ..Default::default()
         }))
+    }
+
+    async fn cancel_invoice(&self, _payment_hash: String, label: String) -> Result<(), LightningError> {
+        self.post_request::<DelInvoiceResponse>(
+            "delinvoice",
+            &DelInvoiceRequest {
+                label,
+                status: "unpaid".to_string(),
+                desconly: None,
+            },
+        )
+        .await
+        .map_err(|e| LightningError::CancelInvoice(e.to_string()))?;
+
+        Ok(())
     }
 
     async fn health(&self) -> Result<HealthStatus, LightningError> {
@@ -456,7 +470,7 @@ impl BitcoinWallet for ClnRestClient {
             let funds: ListFundsResponse = self
                 .post_request("listfunds", &ListFundsRequest { spent: Some(true) })
                 .await
-                .map_err(|e| BitcoinError::GetOutput(e.to_string()))?;
+                .map_err(|e| BitcoinError::Synchronize(e.to_string()))?;
 
             let mut map = HashMap::new();
             for output in funds.outputs {
