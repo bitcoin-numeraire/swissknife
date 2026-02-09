@@ -12,6 +12,7 @@ use tonic::{
     Code, Request, Status,
 };
 
+use invoicesrpc::invoices_client::InvoicesClient;
 use lnrpc::lightning_client::LightningClient;
 use routerrpc::router_client::RouterClient;
 
@@ -51,6 +52,11 @@ pub mod routerrpc {
     tonic::include_proto!("routerrpc");
 }
 
+#[allow(dead_code, clippy::all)]
+pub mod invoicesrpc {
+    tonic::include_proto!("invoicesrpc");
+}
+
 #[derive(Clone)]
 pub(crate) struct MacaroonInterceptor {
     macaroon: tonic::metadata::AsciiMetadataValue,
@@ -80,6 +86,7 @@ pub struct LndGrpcClientConfig {
 
 pub struct LndGrpcClient {
     client: LightningClient<LndChannel>,
+    invoices: InvoicesClient<LndChannel>,
     router: RouterClient<LndChannel>,
     fee_limit_msat: u64,
     payment_timeout: Duration,
@@ -92,6 +99,7 @@ impl LndGrpcClient {
 
         let mut lnd_client = Self {
             client: LightningClient::new(channel.clone()),
+            invoices: InvoicesClient::new(channel.clone()),
             router: RouterClient::new(channel),
             fee_limit_msat: config.fee_limit_msat,
             payment_timeout: config.payment_timeout,
@@ -246,6 +254,7 @@ impl LnClient for LndGrpcClient {
         &self,
         amount_msat: u64,
         description: String,
+        _label: String,
         expiry: u32,
         deschashonly: bool,
     ) -> Result<Invoice, LightningError> {
@@ -350,6 +359,27 @@ impl LnClient for LndGrpcClient {
                 _ => Err(LightningError::PaymentByHash(err.message().to_string())),
             },
         }
+    }
+
+    async fn cancel_invoice(&self, payment_hash: String, _label: String) -> Result<(), LightningError> {
+        let hash_bytes = hex::decode(&payment_hash).map_err(|e| LightningError::CancelInvoice(e.to_string()))?;
+        let mut invoices = self.invoices.clone();
+        invoices
+            .cancel_invoice(invoicesrpc::CancelInvoiceMsg {
+                payment_hash: hash_bytes,
+            })
+            .await
+            .map_err(|e| LightningError::CancelInvoice(e.message().to_string()))?;
+
+        let mut client = self.client.clone();
+        client
+            .delete_canceled_invoice(lnrpc::DelCanceledInvoiceReq {
+                invoice_hash: payment_hash,
+            })
+            .await
+            .map_err(|e| LightningError::CancelInvoice(e.message().to_string()))?;
+
+        Ok(())
     }
 
     async fn health(&self) -> Result<HealthStatus, LightningError> {

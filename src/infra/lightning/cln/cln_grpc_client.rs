@@ -1,7 +1,12 @@
 use std::{collections::HashMap, error::Error as StdError, path::PathBuf, str::FromStr, time::Duration};
 
+use async_trait::async_trait;
 use bitcoin::{Address, Network, ScriptBuf};
 use chrono::{TimeZone, Utc};
+use cln::{
+    node_client::NodeClient, Amount, Feerate, GetinfoRequest, ListinvoicesRequest, NewaddrRequest, OutputDesc,
+    PayRequest, TxdiscardRequest, TxprepareRequest, TxsendRequest,
+};
 use hex::decode;
 use lightning_invoice::Bolt11Invoice;
 use psbt_v2::v2::Psbt;
@@ -9,13 +14,6 @@ use serde::Deserialize;
 use serde_bolt::bitcoin::hashes::hex::ToHex;
 use tokio::{fs, io};
 use tonic::transport::{Certificate, Channel, ClientTlsConfig, Identity};
-use uuid::Uuid;
-
-use async_trait::async_trait;
-use cln::{
-    node_client::NodeClient, Amount, Feerate, GetinfoRequest, ListinvoicesRequest, NewaddrRequest, OutputDesc,
-    PayRequest, TxdiscardRequest, TxprepareRequest, TxsendRequest,
-};
 
 use crate::{
     application::{
@@ -176,6 +174,7 @@ impl LnClient for ClnGrpcClient {
         &self,
         amount_msat: u64,
         description: String,
+        label: String,
         expiry: u32,
         deschashonly: bool,
     ) -> Result<Invoice, LightningError> {
@@ -185,7 +184,7 @@ impl LnClient for ClnGrpcClient {
             .invoice(InvoiceRequest {
                 description,
                 expiry: Some(expiry as u64),
-                label: Uuid::new_v4().to_string(),
+                label,
                 deschashonly: Some(deschashonly),
                 amount_msat: Some(cln::AmountOrAny {
                     value: Some(cln::amount_or_any::Value::Amount(cln::Amount { msat: amount_msat })),
@@ -291,6 +290,20 @@ impl LnClient for ClnGrpcClient {
             }),
             ..Default::default()
         }))
+    }
+
+    async fn cancel_invoice(&self, _payment_hash: String, label: String) -> Result<(), LightningError> {
+        let mut client = self.client.clone();
+        client
+            .del_invoice(cln::DelinvoiceRequest {
+                label,
+                status: cln::delinvoice_request::DelinvoiceStatus::Unpaid as i32,
+                desconly: None,
+            })
+            .await
+            .map_err(|e| LightningError::CancelInvoice(e.message().to_string()))?;
+
+        Ok(())
     }
 
     async fn health(&self) -> Result<HealthStatus, LightningError> {

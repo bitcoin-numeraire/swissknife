@@ -298,6 +298,7 @@ impl PaymentService {
                         // Internal payment
                         debug!(%wallet_id, %amount, ledger="Internal", "Sending bolt11 payment");
 
+                        let payment_hash = invoice.payment_hash.clone();
                         let internal_payment = self
                             .insert_payment(
                                 Payment {
@@ -312,7 +313,7 @@ impl PaymentService {
                                     internal: Some(InternalPayment {
                                         ln_address: None,
                                         btc_address: None,
-                                        payment_hash: Some(invoice.payment_hash),
+                                        payment_hash: Some(payment_hash.clone()),
                                     }),
                                     ..Default::default()
                                 },
@@ -320,11 +321,25 @@ impl PaymentService {
                             )
                             .await?;
 
+                        let invoice_id = retrieved_invoice.id;
                         retrieved_invoice.fee_msat = Some(0);
                         retrieved_invoice.payment_time = internal_payment.payment_time;
                         retrieved_invoice.amount_received_msat = Some(amount);
                         retrieved_invoice.ledger = Ledger::Internal;
                         self.store.invoice.update(retrieved_invoice).await?;
+
+                        if let Err(err) = self
+                            .ln_client
+                            .cancel_invoice(payment_hash.clone(), invoice_id.to_string())
+                            .await
+                        {
+                            warn!(
+                                %wallet_id,
+                                payment_hash = %payment_hash,
+                                %err,
+                                "Failed to cancel node invoice after internal payment"
+                            );
+                        }
 
                         return Ok(internal_payment);
                     }

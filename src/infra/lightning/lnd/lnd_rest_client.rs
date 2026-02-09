@@ -190,6 +190,20 @@ impl LndRestClient {
         Ok(result)
     }
 
+    async fn delete_request<T>(&self, endpoint: &str) -> anyhow::Result<T>
+    where
+        T: DeserializeOwned,
+    {
+        let url = format!("https://{}/{}", self.base_url, endpoint);
+        let request = self.client.delete(url);
+
+        let response = request.send().await?;
+        let response = Self::check_response_status(response).await?;
+
+        let result = response.json::<T>().await?;
+        Ok(result)
+    }
+
     async fn network(&self) -> Result<BtcNetwork, LightningError> {
         let response: GetinfoResponse = self
             .get_request("v1/getinfo")
@@ -252,6 +266,7 @@ impl LnClient for LndRestClient {
         &self,
         amount_msat: u64,
         description: String,
+        _label: String,
         expiry: u32,
         deschashonly: bool,
     ) -> Result<Invoice, LightningError> {
@@ -378,6 +393,24 @@ impl LnClient for LndRestClient {
             })),
             _ => Ok(None),
         }
+    }
+
+    async fn cancel_invoice(&self, payment_hash: String, _label: String) -> Result<(), LightningError> {
+        let hash_bytes = hex::decode(&payment_hash).map_err(|e| LightningError::CancelInvoice(e.to_string()))?;
+        let payload = CancelInvoiceRequest {
+            payment_hash: STANDARD.encode(hash_bytes),
+        };
+
+        self.post_request::<CancelInvoiceResponse>("v2/invoices/cancel", &payload)
+            .await
+            .map_err(|e| LightningError::CancelInvoice(e.to_string()))?;
+
+        let endpoint = format!("v1/invoices?invoice_hash={}", payment_hash);
+        self.delete_request::<DeleteCanceledInvoiceResponse>(&endpoint)
+            .await
+            .map_err(|e| LightningError::CancelInvoice(e.to_string()))?;
+
+        Ok(())
     }
 
     async fn health(&self) -> Result<HealthStatus, LightningError> {
