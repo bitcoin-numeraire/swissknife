@@ -470,7 +470,7 @@ impl BitcoinWallet for ClnRestClient {
             let funds: ListFundsResponse = self
                 .post_request("listfunds", &ListFundsRequest { spent: Some(true) })
                 .await
-                .map_err(|e| BitcoinError::GetOutput(e.to_string()))?;
+                .map_err(|e| BitcoinError::Synchronize(e.to_string()))?;
 
             let mut map = HashMap::new();
             for output in funds.outputs {

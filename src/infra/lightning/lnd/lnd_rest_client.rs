@@ -222,20 +222,6 @@ impl LndRestClient {
             "No chain information returned by LND".to_string(),
         ))
     }
-
-    async fn fetch_transactions(&self, start_height: Option<u32>) -> Result<Vec<BtcTransaction>, LightningError> {
-        let mut endpoint = "v1/transactions".to_string();
-        if let Some(start_height) = start_height {
-            endpoint = format!("{}?start_height={}", endpoint, start_height);
-        }
-
-        let response: GetTransactionsResponse = self
-            .get_request(&endpoint)
-            .await
-            .map_err(|e| LightningError::Listener(e.to_string()))?;
-
-        Ok(response.transactions.into_iter().map(Into::into).collect())
-    }
 }
 
 pub(crate) async fn read_macaroon(path: &str) -> anyhow::Result<String> {
@@ -558,13 +544,21 @@ impl BitcoinWallet for LndRestClient {
 
     async fn synchronize(&self, cursor: Option<OnchainSyncCursor>) -> Result<OnchainSyncBatch, BitcoinError> {
         let start_height = match cursor {
-            Some(OnchainSyncCursor::BlockHeight(height)) => Some(height),
+            Some(OnchainSyncCursor::BlockHeight(height)) => Some(height.saturating_sub(self.reorg_buffer_blocks)),
             _ => None,
         };
-        let transactions = self
-            .fetch_transactions(start_height)
+
+        let mut endpoint = "v1/transactions".to_string();
+        if let Some(start_height) = start_height {
+            endpoint = format!("{}?start_height={}", endpoint, start_height);
+        }
+
+        let response: GetTransactionsResponse = self
+            .get_request(&endpoint)
             .await
-            .map_err(|e| BitcoinError::GetTransaction(e.to_string()))?;
+            .map_err(|e| BitcoinError::Synchronize(e.to_string()))?;
+
+        let transactions: Vec<BtcTransaction> = response.transactions.into_iter().map(Into::into).collect();
 
         let mut result = Vec::new();
 
@@ -598,10 +592,7 @@ impl BitcoinWallet for LndRestClient {
             }
         }
 
-        let next_cursor = max_height.map(|height| {
-            let buffered = height.saturating_sub(self.reorg_buffer_blocks);
-            OnchainSyncCursor::BlockHeight(buffered)
-        });
+        let next_cursor = max_height.map(OnchainSyncCursor::BlockHeight);
 
         Ok(OnchainSyncBatch {
             events: result,
