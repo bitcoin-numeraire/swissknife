@@ -544,7 +544,7 @@ impl BitcoinWallet for LndRestClient {
 
     async fn synchronize(&self, cursor: Option<OnchainSyncCursor>) -> Result<OnchainSyncBatch, BitcoinError> {
         let start_height = match cursor {
-            Some(OnchainSyncCursor::BlockHeight(height)) => Some(height),
+            Some(OnchainSyncCursor::BlockHeight(height)) => Some(height.saturating_sub(self.reorg_buffer_blocks)),
             _ => None,
         };
 
@@ -592,10 +592,7 @@ impl BitcoinWallet for LndRestClient {
             }
         }
 
-        let next_cursor = max_height.map(|height| {
-            let buffered = height.saturating_sub(self.reorg_buffer_blocks);
-            OnchainSyncCursor::BlockHeight(buffered)
-        });
+        let next_cursor = max_height.map(OnchainSyncCursor::BlockHeight);
 
         Ok(OnchainSyncBatch {
             events: result,

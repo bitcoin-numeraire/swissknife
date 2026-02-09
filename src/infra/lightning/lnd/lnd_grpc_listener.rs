@@ -28,7 +28,6 @@ pub struct LndGrpcListener {
     services: Arc<AppServices>,
     network: crate::domains::bitcoin::BtcNetwork,
     retry_delay: Duration,
-    reorg_buffer_blocks: u32,
 }
 
 impl LndGrpcListener {
@@ -44,7 +43,6 @@ impl LndGrpcListener {
             services,
             network: wallet.network(),
             retry_delay: config.retry_delay,
-            reorg_buffer_blocks: config.reorg_buffer_blocks,
         })
     }
 
@@ -90,29 +88,17 @@ impl LndGrpcListener {
     }
 
     async fn listen_transactions(&self) -> Result<(), LightningError> {
-        let mut start_height = self
-            .services
-            .system
-            .get_onchain_cursor()
+        self.services
+            .bitcoin
+            .sync()
             .await
-            .map_err(|e| LightningError::Listener(e.to_string()))?
-            .map(|c| match c {
-                OnchainSyncCursor::BlockHeight(h) => {
-                    let rewind_height = h.saturating_sub(self.reorg_buffer_blocks);
-                    i32::try_from(rewind_height).unwrap_or(i32::MAX)
-                }
-                _ => 0,
-            })
-            .unwrap_or(0);
+            .map_err(|e| LightningError::Listener(e.to_string()))?;
 
         loop {
             let result = {
                 let mut client = self.client.clone();
                 client
-                    .subscribe_transactions(lnrpc::GetTransactionsRequest {
-                        start_height,
-                        ..Default::default()
-                    })
+                    .subscribe_transactions(lnrpc::GetTransactionsRequest::default())
                     .await
             };
 
@@ -125,13 +111,6 @@ impl LndGrpcListener {
                         .map_err(|e| LightningError::Listener(format!("Failed to read transaction stream: {}", e)))?
                     {
                         let transaction = Self::map_transaction(transaction);
-
-                        if let Some(block_height) = transaction.block_height {
-                            let rewind_height = block_height.saturating_sub(self.reorg_buffer_blocks);
-                            let rewind_height = i32::try_from(rewind_height).unwrap_or(i32::MAX);
-                            start_height = start_height.max(rewind_height);
-                        }
-
                         self.handle_transaction(transaction).await;
                     }
                 }

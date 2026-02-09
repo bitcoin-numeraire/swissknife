@@ -601,14 +601,14 @@ impl BitcoinWallet for LndGrpcClient {
 
     async fn synchronize(&self, cursor: Option<OnchainSyncCursor>) -> Result<OnchainSyncBatch, BitcoinError> {
         let start_height = match cursor {
-            Some(OnchainSyncCursor::BlockHeight(height)) => Some(height),
-            _ => None,
+            Some(OnchainSyncCursor::BlockHeight(height)) => height.saturating_sub(self.reorg_buffer_blocks),
+            _ => 0,
         };
 
         let mut client = self.client.clone();
         let response = client
             .get_transactions(GetTransactionsRequest {
-                start_height: start_height.unwrap_or_default() as i32,
+                start_height: start_height as i32,
                 end_height: -1,
                 account: String::new(),
                 index_offset: 0,
@@ -655,10 +655,7 @@ impl BitcoinWallet for LndGrpcClient {
             }
         }
 
-        let next_cursor = max_height.map(|height| {
-            let buffered = height.saturating_sub(self.reorg_buffer_blocks);
-            OnchainSyncCursor::BlockHeight(buffered)
-        });
+        let next_cursor = max_height.map(OnchainSyncCursor::BlockHeight);
 
         Ok(OnchainSyncBatch {
             events: result,
