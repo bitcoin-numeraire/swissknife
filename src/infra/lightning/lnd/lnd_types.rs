@@ -108,9 +108,7 @@ pub struct PayResponse {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct DeleteCanceledInvoiceResponse {
-    pub status: String,
-}
+pub struct DeleteCanceledInvoiceResponse {}
 
 #[derive(Debug, Deserialize)]
 pub struct GetinfoResponse {

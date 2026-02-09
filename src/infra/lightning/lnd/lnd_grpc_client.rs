@@ -33,7 +33,13 @@ use crate::{
     infra::{
         config::config_rs::deserialize_duration,
         lightning::{
-            lnd::lnrpc::{invoice::InvoiceState, PaymentFailureReason},
+            lnd::{
+                invoicesrpc::CancelInvoiceMsg,
+                lnrpc::{
+                    invoice::InvoiceState, DelCanceledInvoiceReq, GetInfoRequest, PaymentFailureReason, PaymentHash,
+                },
+                routerrpc::{SendPaymentRequest, TrackPaymentRequest},
+            },
             types::parse_network,
             LnClient,
         },
@@ -283,7 +289,7 @@ impl LnClient for LndGrpcClient {
     }
 
     async fn pay(&self, bolt11: String, amount_msat: Option<u64>, _label: String) -> Result<Payment, LightningError> {
-        let request = routerrpc::SendPaymentRequest {
+        let request = SendPaymentRequest {
             payment_request: bolt11,
             amt_msat: amount_msat.map(|v| v as i64).unwrap_or_default(),
             fee_limit_msat: self.fee_limit_msat as i64,
@@ -316,7 +322,7 @@ impl LnClient for LndGrpcClient {
 
     async fn invoice_by_hash(&self, payment_hash: String) -> Result<Option<Invoice>, LightningError> {
         let hash_bytes = hex::decode(payment_hash).map_err(|e| LightningError::InvoiceByHash(e.to_string()))?;
-        let request = lnrpc::PaymentHash {
+        let request = PaymentHash {
             r_hash: hash_bytes,
             ..Default::default()
         };
@@ -338,7 +344,7 @@ impl LnClient for LndGrpcClient {
 
         let mut router = self.router.clone();
         let result = router
-            .track_payment_v2(routerrpc::TrackPaymentRequest {
+            .track_payment_v2(TrackPaymentRequest {
                 payment_hash: hash_bytes,
                 no_inflight_updates: true,
             })
@@ -365,7 +371,7 @@ impl LnClient for LndGrpcClient {
         let hash_bytes = hex::decode(&payment_hash).map_err(|e| LightningError::CancelInvoice(e.to_string()))?;
         let mut invoices = self.invoices.clone();
         invoices
-            .cancel_invoice(invoicesrpc::CancelInvoiceMsg {
+            .cancel_invoice(CancelInvoiceMsg {
                 payment_hash: hash_bytes,
             })
             .await
@@ -373,7 +379,7 @@ impl LnClient for LndGrpcClient {
 
         let mut client = self.client.clone();
         client
-            .delete_canceled_invoice(lnrpc::DelCanceledInvoiceReq {
+            .delete_canceled_invoice(DelCanceledInvoiceReq {
                 invoice_hash: payment_hash,
             })
             .await
@@ -385,7 +391,7 @@ impl LnClient for LndGrpcClient {
     async fn health(&self) -> Result<HealthStatus, LightningError> {
         let mut client = self.client.clone();
         client
-            .get_info(lnrpc::GetInfoRequest {})
+            .get_info(GetInfoRequest {})
             .await
             .map_err(|e| LightningError::HealthCheck(e.message().to_string()))?;
 

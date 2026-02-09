@@ -34,9 +34,10 @@ use crate::{
         config::config_rs::deserialize_duration,
         lightning::{
             cln::cln::{
-                feerate, listchainmoves_chainmoves::ListchainmovesChainmovesPrimaryTag,
+                delinvoice_request::DelinvoiceStatus, feerate,
+                listchainmoves_chainmoves::ListchainmovesChainmovesPrimaryTag,
                 listchainmoves_request::ListchainmovesIndex, listpays_pays::ListpaysPaysStatus,
-                newaddr_request::NewaddrAddresstype, ListchainmovesRequest, ListpaysRequest,
+                newaddr_request::NewaddrAddresstype, DelinvoiceRequest, ListchainmovesRequest, ListpaysRequest,
             },
             types::parse_network,
             LnClient,
@@ -295,9 +296,9 @@ impl LnClient for ClnGrpcClient {
     async fn cancel_invoice(&self, _payment_hash: String, label: String) -> Result<(), LightningError> {
         let mut client = self.client.clone();
         client
-            .del_invoice(cln::DelinvoiceRequest {
+            .del_invoice(DelinvoiceRequest {
                 label,
-                status: cln::delinvoice_request::DelinvoiceStatus::Unpaid as i32,
+                status: DelinvoiceStatus::Unpaid as i32,
                 desconly: None,
             })
             .await
