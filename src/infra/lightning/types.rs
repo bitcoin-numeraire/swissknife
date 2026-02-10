@@ -1,5 +1,5 @@
 use chrono::{TimeZone, Utc};
-use lightning_invoice::{Bolt11Invoice, Bolt11InvoiceDescription, Currency as LNInvoiceCurrency};
+use lightning_invoice::{Bolt11Invoice, Bolt11InvoiceDescriptionRef, Currency as LNInvoiceCurrency};
 use serde_bolt::bitcoin::hashes::hex::ToHex;
 
 use crate::{
@@ -29,16 +29,16 @@ impl From<Bolt11Invoice> for Invoice {
             amount_msat: val.amount_milli_satoshis(),
             timestamp,
             description: match val.description() {
-                Bolt11InvoiceDescription::Direct(msg) => Some(msg.to_string()),
-                Bolt11InvoiceDescription::Hash(_) => None,
+                Bolt11InvoiceDescriptionRef::Direct(msg) => Some(msg.to_string()),
+                Bolt11InvoiceDescriptionRef::Hash(_) => None,
             },
             ln_invoice: Some(LnInvoice {
                 bolt11: val.to_string(),
                 payment_hash: val.payment_hash().to_hex(),
                 payee_pubkey,
                 description_hash: match val.description() {
-                    Bolt11InvoiceDescription::Direct(_) => None,
-                    Bolt11InvoiceDescription::Hash(h) => Some(h.0.to_string()),
+                    Bolt11InvoiceDescriptionRef::Direct(_) => None,
+                    Bolt11InvoiceDescriptionRef::Hash(h) => Some(h.0.to_string()),
                 },
                 payment_secret: val.payment_secret().0.to_hex(),
                 min_final_cltv_expiry_delta: val.min_final_cltv_expiry_delta(),

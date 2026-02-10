@@ -1,7 +1,7 @@
 use chrono::Utc;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    tonic_build::configure()
+    tonic_prost_build::configure()
         .protoc_arg("--experimental_allow_proto3_optional")
         .build_server(false)
         .compile_protos(
@@ -13,7 +13,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         std::env::var("OUT_DIR").unwrap()
     );
 
-    tonic_build::configure()
+    tonic_prost_build::configure()
         .protoc_arg("--experimental_allow_proto3_optional")
         .build_server(false)
         .compile_protos(

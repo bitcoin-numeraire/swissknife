@@ -545,7 +545,7 @@ impl PaymentsUseCases for PaymentService {
         let payment = if self.is_internal_payment(&input) {
             self.send_internal(input, amount_msat, comment, wallet_id).await
         } else {
-            let input_type = parse(&input)
+            let input_type = parse(&input, None)
                 .await
                 .map_err(|err| DataError::Validation(err.to_string()))?;
 
@@ -555,7 +555,7 @@ impl PaymentsUseCases for PaymentService {
                     self.send_bitcoin(address, amount_sat, comment, wallet_id).await
                 }
                 InputType::Bolt11 { invoice } => self.send_bolt11(invoice, amount_msat, comment, wallet_id).await,
-                InputType::LnUrlPay { data } => self.send_lnurl_pay(data, amount_msat, comment, wallet_id).await,
+                InputType::LnUrlPay { data, .. } => self.send_lnurl_pay(data, amount_msat, comment, wallet_id).await,
                 InputType::LnUrlError { data } => Err(DataError::Validation(data.reason).into()),
                 _ => Err(DataError::Validation("Unsupported payment input".to_string()).into()),
             }
