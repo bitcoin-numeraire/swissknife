@@ -53,5 +53,4 @@ pub enum LightningError {
 
     #[error("Failed to retrieve healthcheck: {0}")]
     HealthCheck(String),
-
 }

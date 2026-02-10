@@ -96,7 +96,6 @@ impl BreezClient {
 
         Ok((client_key, client_crt))
     }
-
 }
 
 #[async_trait]
