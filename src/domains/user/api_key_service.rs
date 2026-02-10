@@ -1,8 +1,6 @@
 use async_trait::async_trait;
 use base64::{prelude::BASE64_STANDARD, Engine};
 use chrono::{Duration, Utc};
-use rand::rngs::OsRng;
-use rand::RngCore;
 use serde_bolt::bitcoin::hashes::{sha256, Hash};
 use tracing::{debug, info, trace};
 use uuid::Uuid;
@@ -49,8 +47,7 @@ impl ApiKeyUseCases for ApiKeyService {
         };
 
         // Generate a new API key
-        let mut bytes = [0u8; 32];
-        OsRng.fill_bytes(&mut bytes);
+        let bytes: [u8; 32] = rand::random();
         let api_key_plain = BASE64_STANDARD.encode(bytes);
         let key_hash = sha256::Hash::hash(&bytes).to_vec();
 

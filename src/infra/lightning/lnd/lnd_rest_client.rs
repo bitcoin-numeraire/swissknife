@@ -2,7 +2,6 @@ use std::{collections::HashMap, path::PathBuf, time::Duration};
 
 use anyhow::anyhow;
 use chrono::{TimeZone, Utc};
-use futures_util::StreamExt;
 use reqwest::{
     header::{HeaderMap, HeaderValue},
     Certificate, Client, Response,
@@ -134,13 +133,7 @@ impl LndRestClient {
         let response = request.send().await?;
         let response = Self::check_response_status(response).await?;
 
-        // Buffer the stream
-        let mut buffer = Vec::new();
-        let mut stream = response.bytes_stream();
-
-        while let Some(chunk) = stream.next().await {
-            buffer.extend_from_slice(&chunk?);
-        }
+        let buffer = response.bytes().await?;
 
         // Deserialize the full response from the buffered data
         let result = serde_json::from_slice::<T>(&buffer)?;

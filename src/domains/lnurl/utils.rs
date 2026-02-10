@@ -40,9 +40,9 @@ pub async fn validate_lnurl_pay(
     let callback_resp: CallbackResponse = serde_json::from_str(&callback_resp_text)?;
     if let Some(ref sa) = callback_resp.success_action {
         match sa {
-            SuccessAction::Aes(data) => data.validate()?,
-            SuccessAction::Message(data) => data.validate()?,
-            SuccessAction::Url(data) => {
+            SuccessAction::Aes { data } => data.validate()?,
+            SuccessAction::Message { data } => data.validate()?,
+            SuccessAction::Url { data } => {
                 data.validate(req, false)?;
             }
         }
@@ -97,7 +97,7 @@ fn validate_invoice(user_amount_msat: u64, bolt11: &str) -> Result<()> {
 pub fn process_success_action(sa: SuccessAction, payment_preimage: &str) -> Option<LnUrlSuccessAction> {
     match sa {
         // For AES, we decrypt the contents on the fly
-        SuccessAction::Aes(data) => {
+        SuccessAction::Aes { data } => {
             let preimage = sha256::Hash::from_str(payment_preimage);
 
             match preimage {
@@ -125,12 +125,12 @@ pub fn process_success_action(sa: SuccessAction, payment_preimage: &str) -> Opti
                 }
             }
         }
-        SuccessAction::Message(data) => Some(LnUrlSuccessAction {
+        SuccessAction::Message { data } => Some(LnUrlSuccessAction {
             tag: "message".to_string(),
             message: Some(data.message),
             ..Default::default()
         }),
-        SuccessAction::Url(data) => Some(LnUrlSuccessAction {
+        SuccessAction::Url { data } => Some(LnUrlSuccessAction {
             tag: "url".to_string(),
             description: Some(data.description),
             url: Some(data.url),
