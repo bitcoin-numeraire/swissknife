@@ -36,12 +36,6 @@ pub enum LightningError {
     #[error("Failed to get Lightning node info: {0}")]
     NodeInfo(String),
 
-    #[error("Failed to get LSP info: {0}")]
-    LSPInfo(String),
-
-    #[error("Failed to list LSPs: {0}")]
-    ListLSPs(String),
-
     #[error("Failed to send payment: {0}")]
     Pay(String),
 
@@ -57,30 +51,7 @@ pub enum LightningError {
     #[error("Failed to get payment by hash: {0}")]
     PaymentByHash(String),
 
-    #[error("Failed to close LSP channels: {0}")]
-    CloseLSPChannels(String),
-
-    #[error("Failed to redeem on-chain: {0}")]
-    RedeemOnChain(String),
-
-    #[error("Unsupported Lightning operation: {0}")]
-    Unsupported(String),
-
-    #[error("Failed to connect to LSP: {0}")]
-    ConnectLSP(String),
-
     #[error("Failed to retrieve healthcheck: {0}")]
     HealthCheck(String),
 
-    #[error("Failed to sync node: {0}")]
-    Sync(String),
-
-    #[error("Failed to backup node state: {0}")]
-    Backup(String),
-
-    #[error("Failed to sign message: {0}")]
-    SignMessage(String),
-
-    #[error("Failed to check message signature: {0}")]
-    CheckMessage(String),
 }
