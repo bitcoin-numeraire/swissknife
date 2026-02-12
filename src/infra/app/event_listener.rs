@@ -26,7 +26,7 @@ impl EventListener {
         services: Arc<AppServices>,
     ) -> Result<Self, ApplicationError> {
         let listener = match config.ln_provider {
-            LightningProvider::Breez => None,
+            LightningProvider::BreezLiquid => None,
             LightningProvider::ClnGrpc => {
                 let cln_config = config
                     .cln_grpc_config

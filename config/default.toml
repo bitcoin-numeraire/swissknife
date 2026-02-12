@@ -4,7 +4,7 @@ domain = "numeraire.tech"
 host = "https://api.numeraire.tech"
 fee_buffer = 0.02
 bitcoin_address_type = "p2wpkh"
-ln_provider = "breez"
+ln_provider = "breezliquid"
 auth_provider = "jwt"
 dashboard_dir = "/var/www/swissknife-dashboard"
 
@@ -14,13 +14,12 @@ addr = "0.0.0.0:3000"
 request_timeout = "60s"
 
 # Breez Lightning provider
-[breez_config]
+[breez_liquid_config]
 working_dir = "storage/breez"
-certs_dir = "certs/greenlight"
 log_in_file = false
-restore_only = true
 api_key = "CHANGE_ME" # Recommended to use secret instead
-seed = "CHANGE_ME" # Recommended to use secret instead
+mnemonic = "CHANGE_ME" # Recommended to use secret instead
+network = "bitcoin"
 
 # Core Lightning provider
 [cln_grpc_config]

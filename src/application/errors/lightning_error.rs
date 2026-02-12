@@ -9,9 +9,6 @@ pub enum LightningError {
     #[error("Failed to parse config: {0}")]
     ParseConfig(String),
 
-    #[error("Failed to parse mnemonic seed: {0}")]
-    ParseSeed(String),
-
     #[error("Failed to read certificates: {0}")]
     ReadCertificates(String),
 

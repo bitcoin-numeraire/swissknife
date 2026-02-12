@@ -1,6 +1,6 @@
-mod breez_client;
-mod breez_listener;
-mod breez_types;
+mod breez_liquid_client;
+mod breez_liquid_listener;
+mod breez_liquid_types;
 
-pub use breez_client::*;
-pub use breez_listener::BreezListener;
+pub use breez_liquid_client::*;
+pub use breez_liquid_listener::BreezListener;
