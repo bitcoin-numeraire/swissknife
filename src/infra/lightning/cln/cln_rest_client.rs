@@ -4,7 +4,6 @@ use async_trait::async_trait;
 use bitcoin::{Address, Network, OutPoint, ScriptBuf};
 use chrono::{TimeZone, Utc};
 use lightning_invoice::Bolt11Invoice;
-use psbt_v2::v2::Psbt;
 use reqwest::{
     header::{HeaderMap, HeaderValue},
     Certificate, Client,
@@ -29,7 +28,7 @@ use crate::{
     },
     infra::{
         config::config_rs::deserialize_duration,
-        lightning::{cln::ListFundsResponse, types::parse_network, LnClient},
+        lightning::{bitcoin_utils::parse_psbt, cln::ListFundsResponse, types::parse_network, LnClient},
     },
 };
 
@@ -37,8 +36,9 @@ use super::{
     DelInvoiceRequest, DelInvoiceResponse, ErrorResponse, GetinfoRequest, GetinfoResponse, InvoiceRequest,
     InvoiceResponse, ListChainMovesRequest, ListChainMovesResponse, ListFundsRequest, ListInvoicesRequest,
     ListInvoicesResponse, ListPaysRequest, ListPaysResponse, ListTransactionsRequest, ListTransactionsResponse,
-    NewAddrRequest, NewAddrResponse, PayRequest, PayResponse, TxDiscardRequest, TxDiscardResponse, TxPrepareOutput,
-    TxPrepareRequest, TxPrepareResponse, TxSendRequest, TxSendResponse,
+    NewAddrRequest, NewAddrResponse, PayRequest, PayResponse, SetPsbtVersionRequest, SetPsbtVersionResponse,
+    TxDiscardRequest, TxDiscardResponse, TxPrepareOutput, TxPrepareRequest, TxPrepareResponse, TxSendRequest,
+    TxSendResponse,
 };
 
 #[derive(Clone, Debug, Deserialize)]
@@ -348,7 +348,18 @@ impl BitcoinWallet for ClnRestClient {
             .await
             .map_err(|e| BitcoinError::PrepareTransaction(e.to_string()))?;
 
-        let psbt = Psbt::from_str(&response.psbt).map_err(|e| BitcoinError::ParsePsbt(e.to_string()))?;
+        let set_psbt_version_response: SetPsbtVersionResponse = self
+            .post_request(
+                "setpsbtversion",
+                &SetPsbtVersionRequest {
+                    psbt: response.psbt.clone(),
+                    version: 0,
+                },
+            )
+            .await
+            .map_err(|e| BitcoinError::PrepareTransaction(e.to_string()))?;
+
+        let psbt = parse_psbt(&set_psbt_version_response.psbt)?;
         let fee = psbt.fee().map_err(|e| BitcoinError::ParsePsbt(e.to_string()))?;
 
         Ok(BtcPreparedTransaction {

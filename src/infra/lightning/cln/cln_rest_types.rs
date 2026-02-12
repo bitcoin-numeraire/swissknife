@@ -203,6 +203,17 @@ pub struct TxPrepareResponse {
 }
 
 #[derive(Debug, Serialize)]
+pub struct SetPsbtVersionRequest {
+    pub psbt: String,
+    pub version: u32,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct SetPsbtVersionResponse {
+    pub psbt: String,
+}
+
+#[derive(Debug, Serialize)]
 pub struct TxSendRequest {
     pub txid: String,
 }

@@ -5,11 +5,10 @@ use bitcoin::{Address, Network, ScriptBuf};
 use chrono::{TimeZone, Utc};
 use cln::{
     node_client::NodeClient, Amount, Feerate, GetinfoRequest, ListinvoicesRequest, NewaddrRequest, OutputDesc,
-    PayRequest, TxdiscardRequest, TxprepareRequest, TxsendRequest,
+    PayRequest, SetpsbtversionRequest, TxdiscardRequest, TxprepareRequest, TxsendRequest,
 };
 use hex::decode;
 use lightning_invoice::Bolt11Invoice;
-use psbt_v2::v2::Psbt;
 use serde::Deserialize;
 use serde_bolt::bitcoin::hashes::hex::ToHex;
 use tokio::{fs, io};
@@ -33,6 +32,7 @@ use crate::{
     infra::{
         config::config_rs::deserialize_duration,
         lightning::{
+            bitcoin_utils::parse_psbt,
             cln::cln::{
                 delinvoice_request::DelinvoiceStatus, feerate,
                 listchainmoves_chainmoves::ListchainmovesChainmovesPrimaryTag,
@@ -371,7 +371,16 @@ impl BitcoinWallet for ClnGrpcClient {
             .map_err(|e| BitcoinError::PrepareTransaction(e.message().to_string()))?
             .into_inner();
 
-        let psbt = Psbt::from_str(&response.psbt).map_err(|e| BitcoinError::ParsePsbt(e.to_string()))?;
+        let psbt_v0 = client
+            .set_psbt_version(SetpsbtversionRequest {
+                psbt: response.psbt.clone(),
+                version: 0,
+            })
+            .await
+            .map_err(|e| BitcoinError::PrepareTransaction(e.message().to_string()))?
+            .into_inner();
+
+        let psbt = parse_psbt(&psbt_v0.psbt)?;
         let fee = psbt.fee().map_err(|e| BitcoinError::ParsePsbt(e.to_string()))?;
 
         Ok(BtcPreparedTransaction {
