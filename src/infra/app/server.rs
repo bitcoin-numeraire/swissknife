@@ -75,7 +75,7 @@ impl Server {
 
     fn well_known_router() -> Router<Arc<AppServices>> {
         Router::new()
-            .route("/lnurlp/:username", get(lnurl::well_known))
+            .route("/lnurlp/{username}", get(lnurl::well_known))
             .route("/nostr.json", get(nostr::well_known_nostr))
     }
 }

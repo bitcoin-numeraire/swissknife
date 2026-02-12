@@ -45,8 +45,8 @@ pub fn router() -> Router<Arc<AppServices>> {
     Router::new()
         .route("/", post(generate_invoice))
         .route("/", get(list_invoices))
-        .route("/:id", get(get_invoice))
-        .route("/:id", delete(delete_invoice))
+        .route("/{id}", get(get_invoice))
+        .route("/{id}", delete(delete_invoice))
         .route("/", delete(delete_invoices))
 }
 

@@ -26,7 +26,7 @@ use super::LnURLPayRequest;
 pub struct LnURLHandler;
 
 pub fn router() -> Router<Arc<AppServices>> {
-    Router::new().route("/:username/callback", get(callback))
+    Router::new().route("/{username}/callback", get(callback))
 }
 
 /// Well-known endpoint

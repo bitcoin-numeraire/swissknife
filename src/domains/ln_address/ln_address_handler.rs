@@ -40,9 +40,9 @@ pub fn router() -> Router<Arc<AppServices>> {
     Router::new()
         .route("/", get(list_addresses))
         .route("/", post(register_address))
-        .route("/:id", get(get_address))
-        .route("/:id", put(update_address))
-        .route("/:id", delete(delete_address))
+        .route("/{id}", get(get_address))
+        .route("/{id}", put(update_address))
+        .route("/{id}", delete(delete_address))
         .route("/", delete(delete_addresses))
 }
 

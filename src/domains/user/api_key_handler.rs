@@ -39,8 +39,8 @@ pub fn api_key_router() -> Router<Arc<AppServices>> {
     Router::new()
         .route("/", post(create_api_key))
         .route("/", get(list_api_keys))
-        .route("/:id", get(get_api_key))
-        .route("/:id", delete(revoke_api_key))
+        .route("/{id}", get(get_api_key))
+        .route("/{id}", delete(revoke_api_key))
         .route("/", delete(revoke_api_keys))
 }
 
