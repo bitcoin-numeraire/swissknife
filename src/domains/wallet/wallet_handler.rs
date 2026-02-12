@@ -40,8 +40,8 @@ pub fn router() -> Router<Arc<AppServices>> {
         .route("/", post(register_wallet))
         .route("/", get(list_wallets))
         .route("/overviews", get(list_wallet_overviews))
-        .route("/:id", get(get_wallet))
-        .route("/:id", delete(delete_wallet))
+        .route("/{id}", get(get_wallet))
+        .route("/{id}", delete(delete_wallet))
         .route("/", delete(delete_wallets))
 }
 

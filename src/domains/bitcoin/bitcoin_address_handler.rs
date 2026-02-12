@@ -40,8 +40,8 @@ pub fn router() -> Router<Arc<AppServices>> {
     Router::new()
         .route("/", post(generate_btc_address))
         .route("/", get(list_btc_addresses))
-        .route("/:id", get(get_btc_address))
-        .route("/:id", delete(delete_btc_address))
+        .route("/{id}", get(get_btc_address))
+        .route("/{id}", delete(delete_btc_address))
         .route("/", delete(delete_btc_addresses))
 }
 

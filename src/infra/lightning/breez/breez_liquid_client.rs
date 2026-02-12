@@ -1,25 +1,24 @@
 use serde::Deserialize;
-use std::{fs, io, path::PathBuf, sync::Arc};
+use std::sync::Arc;
 
 use async_trait::async_trait;
-use bip39::Mnemonic;
-use breez_sdk_core::{
-    BreezServices, ConnectRequest, EnvironmentType, GreenlightCredentials, GreenlightNodeConfig, NodeConfig,
-    ReceivePaymentRequest, SendPaymentRequest,
+use breez_sdk_liquid::{
+    model::{
+        ConnectRequest, GetPaymentRequest, LiquidNetwork, PayAmount, PaymentMethod, PrepareReceiveRequest,
+        PrepareSendRequest, ReceiveAmount, ReceivePaymentRequest, SendPaymentRequest,
+    },
+    sdk::LiquidSdk,
 };
 
 use crate::{
-    application::{
-        entities::Ledger,
-        errors::{BitcoinError, LightningError},
-    },
+    application::errors::{BitcoinError, LightningError},
     domains::{
         bitcoin::{
             BitcoinWallet, BtcAddressType, BtcNetwork, BtcOutput, BtcPreparedTransaction, BtcTransaction,
             OnchainSyncBatch, OnchainSyncCursor,
         },
         invoice::Invoice,
-        payment::{Payment, PaymentStatus},
+        payment::Payment,
         system::HealthStatus,
     },
     infra::lightning::{breez::BreezListener, LnClient},
@@ -29,72 +28,47 @@ use crate::{
 pub struct BreezClientConfig {
     pub api_key: String,
     pub working_dir: String,
-    pub certs_dir: String,
-    pub seed: String,
+    pub mnemonic: String,
+    pub passphrase: Option<String>,
     pub log_in_file: bool,
-    pub restore_only: bool,
+    pub network: String,
 }
 
-const DEFAULT_CLIENT_CERT_FILENAME: &str = "client.crt";
-const DEFAULT_CLIENT_KEY_FILENAME: &str = "client-key.pem";
-
 pub struct BreezClient {
-    api_key: String,
-    sdk: Arc<BreezServices>,
+    sdk: Arc<LiquidSdk>,
 }
 
 impl BreezClient {
     pub async fn new(config: BreezClientConfig, listener: BreezListener) -> Result<Self, LightningError> {
         if config.log_in_file {
-            BreezServices::init_logging(&config.working_dir, None)
-                .map_err(|e| LightningError::Logging(e.to_string()))?;
+            LiquidSdk::init_logging(&config.working_dir, None).map_err(|e| LightningError::Logging(e.to_string()))?;
         }
 
-        let (client_key, client_crt) = Self::read_certificates(PathBuf::from(&config.certs_dir))
-            .map_err(|e| LightningError::ReadCertificates(e.to_string()))?;
+        let network = match config.network.to_lowercase().as_str() {
+            "bitcoin" => LiquidNetwork::Mainnet,
+            "testnet" => LiquidNetwork::Testnet,
+            "regtest" => LiquidNetwork::Regtest,
+            _ => return Err(LightningError::ParseConfig("Invalid network".to_string())),
+        };
 
-        let mut breez_config = BreezServices::default_config(
-            EnvironmentType::Production,
-            config.api_key.clone(),
-            NodeConfig::Greenlight {
-                config: GreenlightNodeConfig {
-                    partner_credentials: Some(GreenlightCredentials {
-                        developer_cert: client_crt,
-                        developer_key: client_key,
-                    }),
-                    invite_code: None,
-                },
-            },
-        );
-        breez_config.working_dir.clone_from(&config.working_dir);
+        let mut sdk_config = LiquidSdk::default_config(network, Some(config.api_key.clone()))
+            .map_err(|e| LightningError::ParseConfig(e.to_string()))?;
+        sdk_config.working_dir = config.working_dir.clone();
 
-        let seed = Mnemonic::parse(config.seed).map_err(|e| LightningError::ParseSeed(e.to_string()))?;
-
-        let sdk = BreezServices::connect(
-            ConnectRequest {
-                config: breez_config.clone(),
-                seed: seed.to_seed("").to_vec(),
-                restore_only: Some(config.restore_only),
-            },
-            Box::new(listener),
-        )
+        let sdk = LiquidSdk::connect(ConnectRequest {
+            config: sdk_config,
+            mnemonic: Some(config.mnemonic.clone()),
+            passphrase: config.passphrase,
+            seed: None,
+        })
         .await
         .map_err(|e| LightningError::Connect(e.to_string()))?;
 
-        Ok(Self {
-            api_key: config.api_key,
-            sdk,
-        })
-    }
+        sdk.add_event_listener(Box::new(listener))
+            .await
+            .map_err(|e| LightningError::Listener(e.to_string()))?;
 
-    fn read_certificates(cert_dir: PathBuf) -> io::Result<(Vec<u8>, Vec<u8>)> {
-        let key_path = cert_dir.join(DEFAULT_CLIENT_KEY_FILENAME);
-        let crt_path = cert_dir.join(DEFAULT_CLIENT_CERT_FILENAME);
-
-        let client_key = fs::read(key_path)?;
-        let client_crt = fs::read(crt_path)?;
-
-        Ok((client_key, client_crt))
+        Ok(Self { sdk })
     }
 }
 
@@ -111,33 +85,61 @@ impl LnClient for BreezClient {
         &self,
         amount_msat: u64,
         description: String,
-        _label: String,
+        label: String,
         expiry: u32,
         deschashonly: bool,
     ) -> Result<Invoice, LightningError> {
-        let response = self
+        let payer_amount_sat = (amount_msat / 1000).max(1);
+        let prepare = self
             .sdk
-            .receive_payment(ReceivePaymentRequest {
-                amount_msat,
-                description,
-                use_description_hash: Some(deschashonly),
-                expiry: Some(expiry),
-                ..Default::default()
+            .prepare_receive_payment(&PrepareReceiveRequest {
+                payment_method: PaymentMethod::Bolt11Invoice,
+                amount: Some(ReceiveAmount::Bitcoin { payer_amount_sat }),
             })
             .await
             .map_err(|e| LightningError::Invoice(e.to_string()))?;
 
-        Ok(response.ln_invoice.into())
+        let response = self
+            .sdk
+            .receive_payment(&ReceivePaymentRequest {
+                prepare_response: prepare,
+                description: Some(description),
+                use_description_hash: Some(deschashonly),
+                payer_note: if label.is_empty() { None } else { Some(label) },
+            })
+            .await
+            .map_err(|e| LightningError::Invoice(e.to_string()))?;
+
+        let parsed =
+            LiquidSdk::parse_invoice(&response.destination).map_err(|e| LightningError::Invoice(e.to_string()))?;
+        let mut invoice: Invoice = parsed.into();
+        if expiry > 0 {
+            invoice.ln_invoice = invoice.ln_invoice.map(|mut ln| {
+                ln.expiry = std::time::Duration::from_secs(expiry as u64);
+                ln
+            });
+        }
+        Ok(invoice)
     }
 
     async fn pay(&self, bolt11: String, amount_msat: Option<u64>, label: String) -> Result<Payment, LightningError> {
+        let prepare = self
+            .sdk
+            .prepare_send_payment(&PrepareSendRequest {
+                destination: bolt11,
+                amount: amount_msat.map(|msat| PayAmount::Bitcoin {
+                    receiver_amount_sat: (msat / 1000).max(1),
+                }),
+            })
+            .await
+            .map_err(|e| LightningError::Pay(e.to_string()))?;
+
         let response = self
             .sdk
-            .send_payment(SendPaymentRequest {
-                bolt11,
-                amount_msat,
-                label: Some(label),
-                use_trampoline: false,
+            .send_payment(&SendPaymentRequest {
+                prepare_response: prepare,
+                use_asset_fees: None,
+                payer_note: if label.is_empty() { None } else { Some(label) },
             })
             .await
             .map_err(|e| LightningError::Pay(e.to_string()))?;
@@ -148,7 +150,7 @@ impl LnClient for BreezClient {
     async fn invoice_by_hash(&self, payment_hash: String) -> Result<Option<Invoice>, LightningError> {
         let response = self
             .sdk
-            .payment_by_hash(payment_hash)
+            .get_payment(&GetPaymentRequest::PaymentHash { payment_hash })
             .await
             .map_err(|e| LightningError::InvoiceByHash(e.to_string()))?;
 
@@ -158,21 +160,11 @@ impl LnClient for BreezClient {
     async fn payment_by_hash(&self, payment_hash: String) -> Result<Option<Payment>, LightningError> {
         let response = self
             .sdk
-            .payment_by_hash(payment_hash)
+            .get_payment(&GetPaymentRequest::PaymentHash { payment_hash })
             .await
             .map_err(|e| LightningError::Pay(e.to_string()))?;
 
-        Ok(response.map(|payment| {
-            let status = payment.status;
-            let mut mapped: Payment = payment.into();
-            mapped.ledger = Ledger::Lightning;
-            mapped.status = match status {
-                breez_sdk_core::PaymentStatus::Complete => PaymentStatus::Settled,
-                breez_sdk_core::PaymentStatus::Failed => PaymentStatus::Failed,
-                breez_sdk_core::PaymentStatus::Pending => PaymentStatus::Pending,
-            };
-            mapped
-        }))
+        Ok(response.map(Into::into))
     }
 
     async fn cancel_invoice(&self, _payment_hash: String, _label: String) -> Result<(), LightningError> {
@@ -182,11 +174,11 @@ impl LnClient for BreezClient {
     }
 
     async fn health(&self) -> Result<HealthStatus, LightningError> {
-        let response = BreezServices::service_health_check(self.api_key.clone())
+        self.sdk
+            .get_info()
             .await
             .map_err(|e| LightningError::HealthCheck(e.to_string()))?;
-
-        Ok(response.status.into())
+        Ok(HealthStatus::Operational)
     }
 }
 

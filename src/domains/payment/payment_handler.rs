@@ -54,8 +54,8 @@ pub fn router() -> Router<Arc<AppServices>> {
     Router::new()
         .route("/", post(pay))
         .route("/", get(list_payments))
-        .route("/:id", get(get_payment))
-        .route("/:id", delete(delete_payment))
+        .route("/{id}", get(get_payment))
+        .route("/{id}", delete(delete_payment))
         .route("/", delete(delete_payments))
 }
 
