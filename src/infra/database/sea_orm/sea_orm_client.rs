@@ -2,7 +2,6 @@ use std::time::Duration;
 
 use sea_orm::{ConnectOptions, Database, DatabaseConnection};
 use serde::Deserialize;
-use tracing::{debug, trace};
 
 use crate::application::errors::DatabaseError;
 use crate::infra::config::config_rs::deserialize_duration;
@@ -52,11 +51,9 @@ impl SeaORMClient {
             .await
             .map_err(|e| DatabaseError::Connect(e.to_string()))?;
 
-        trace!("Executing migrations...");
         Migrator::up(&db_conn, None)
             .await
             .map_err(|e| DatabaseError::Migrations(e.to_string()))?;
-        debug!("Migrations executed successfully");
 
         Ok(db_conn)
     }

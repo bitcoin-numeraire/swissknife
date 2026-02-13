@@ -15,8 +15,7 @@ request_timeout = "60s"
 
 # Breez Lightning provider
 [breez_liquid_config]
-working_dir = "storage/breez"
-log_in_file = false
+working_dir = "storage"
 api_key = "CHANGE_ME" # Recommended to use secret instead
 mnemonic = "CHANGE_ME" # Recommended to use secret instead
 network = "bitcoin"
@@ -78,7 +77,9 @@ line_number = false
 thread_ids = false
 thread_names = false
 level = "info"
-filter = "swissknife=info"
+# Optional `tracing` env-filter directives. When empty/missing, `level` is used globally.
+# Example: "swissknife=debug,breez_sdk_liquid=debug,lwk_wollet=info"
+filter = "warn,swissknife=info,sea_orm_migration=info"
 file = false
 
 # Authentication

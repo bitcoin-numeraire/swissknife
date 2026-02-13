@@ -30,30 +30,38 @@ pub struct BreezClientConfig {
     pub working_dir: String,
     pub mnemonic: String,
     pub passphrase: Option<String>,
-    pub log_in_file: bool,
     pub network: String,
+    pub sync_service_url: Option<String>,
 }
 
 pub struct BreezClient {
     sdk: Arc<LiquidSdk>,
+    network: BtcNetwork,
 }
 
 impl BreezClient {
     pub async fn new(config: BreezClientConfig, listener: BreezListener) -> Result<Self, LightningError> {
-        if config.log_in_file {
-            LiquidSdk::init_logging(&config.working_dir, None).map_err(|e| LightningError::Logging(e.to_string()))?;
-        }
-
         let network = match config.network.to_lowercase().as_str() {
-            "bitcoin" => LiquidNetwork::Mainnet,
-            "testnet" => LiquidNetwork::Testnet,
-            "regtest" => LiquidNetwork::Regtest,
+            "bitcoin" => (LiquidNetwork::Mainnet, BtcNetwork::Bitcoin),
+            "testnet" => (LiquidNetwork::Testnet, BtcNetwork::Testnet),
+            "regtest" => (LiquidNetwork::Regtest, BtcNetwork::Regtest),
             _ => return Err(LightningError::ParseConfig("Invalid network".to_string())),
         };
+        let (liquid_network, btc_network) = network;
 
-        let mut sdk_config = LiquidSdk::default_config(network, Some(config.api_key.clone()))
+        let mut sdk_config = LiquidSdk::default_config(liquid_network, Some(config.api_key.clone()))
             .map_err(|e| LightningError::ParseConfig(e.to_string()))?;
+
         sdk_config.working_dir = config.working_dir.clone();
+
+        if let Some(sync_service_url) = config
+            .sync_service_url
+            .as_deref()
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+        {
+            sdk_config.sync_service_url = Some(sync_service_url.to_string());
+        }
 
         let sdk = LiquidSdk::connect(ConnectRequest {
             config: sdk_config,
@@ -68,7 +76,10 @@ impl BreezClient {
             .await
             .map_err(|e| LightningError::Listener(e.to_string()))?;
 
-        Ok(Self { sdk })
+        Ok(Self {
+            sdk,
+            network: btc_network,
+        })
     }
 }
 
@@ -236,6 +247,6 @@ impl BitcoinWallet for BreezClient {
     }
 
     fn network(&self) -> BtcNetwork {
-        BtcNetwork::default()
+        self.network
     }
 }

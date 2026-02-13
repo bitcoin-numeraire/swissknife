@@ -2,7 +2,6 @@ use std::sync::Arc;
 
 use http::StatusCode;
 use tower_http::timeout::TimeoutLayer;
-use tracing::debug;
 
 use crate::{
     application::{
@@ -66,11 +65,6 @@ async fn get_authenticator(config: AppConfig) -> Result<Arc<dyn JWTAuthenticator
                 .clone()
                 .ok_or_else(|| ConfigError::MissingAuthProviderConfig(config.auth_provider.to_string()))?;
 
-            debug!(
-                config = ?oauth2_config,
-                "Auth provider: OAuth2"
-            );
-
             let authenticator = OAuth2Authenticator::new(oauth2_config.clone()).await?;
             Ok(Arc::new(authenticator) as Arc<dyn JWTAuthenticator>)
         }
@@ -79,11 +73,6 @@ async fn get_authenticator(config: AppConfig) -> Result<Arc<dyn JWTAuthenticator
                 .jwt
                 .clone()
                 .ok_or_else(|| ConfigError::MissingAuthProviderConfig(config.auth_provider.to_string()))?;
-
-            debug!(
-                config = ?jwt_config,
-                "Auth provider: Local JWT"
-            );
 
             let authenticator = LocalAuthenticator::new(jwt_config.clone()).await?;
             Ok(Arc::new(authenticator) as Arc<dyn JWTAuthenticator>)
@@ -98,8 +87,6 @@ async fn get_ln_client(config: AppConfig, store: AppStore) -> Result<LightningAd
                 .breez_liquid_config
                 .clone()
                 .ok_or_else(|| ConfigError::MissingLightningProviderConfig(config.ln_provider.to_string()))?;
-
-            debug!(config = ?breez_config,"Lightning provider: Breez");
 
             let events = EventService::new(store);
             let ln_listener = BreezListener::new(events);
@@ -117,8 +104,6 @@ async fn get_ln_client(config: AppConfig, store: AppStore) -> Result<LightningAd
                 .clone()
                 .ok_or_else(|| ConfigError::MissingLightningProviderConfig(config.ln_provider.to_string()))?;
 
-            debug!(config = ?cln_config, "Lightning provider: Core Lightning gRPC");
-
             let ln_client = Arc::new(ClnGrpcClient::new(cln_config.clone()).await?);
             let bitcoin_wallet = ln_client.clone();
 
@@ -132,8 +117,6 @@ async fn get_ln_client(config: AppConfig, store: AppStore) -> Result<LightningAd
                 .cln_rest_config
                 .clone()
                 .ok_or_else(|| ConfigError::MissingLightningProviderConfig(config.ln_provider.to_string()))?;
-
-            debug!(config = ?cln_config, "Lightning provider: Core Lightning REST");
 
             let ln_client = Arc::new(ClnRestClient::new(cln_config.clone()).await?);
             let bitcoin_wallet = ln_client.clone();
@@ -149,8 +132,6 @@ async fn get_ln_client(config: AppConfig, store: AppStore) -> Result<LightningAd
                 .clone()
                 .ok_or_else(|| ConfigError::MissingLightningProviderConfig(config.ln_provider.to_string()))?;
 
-            debug!(config = ?lnd_rest_config, "Lightning provider: LND REST");
-
             let ln_client = Arc::new(LndRestClient::new(lnd_rest_config.clone()).await?);
             let bitcoin_wallet = ln_client.clone();
 
@@ -164,8 +145,6 @@ async fn get_ln_client(config: AppConfig, store: AppStore) -> Result<LightningAd
                 .lnd_grpc_config
                 .clone()
                 .ok_or_else(|| ConfigError::MissingLightningProviderConfig(config.ln_provider.to_string()))?;
-
-            debug!(config = ?lnd_grpc_config, "Lightning provider: LND gRPC");
 
             let ln_client = Arc::new(LndGrpcClient::new(lnd_grpc_config).await?);
             let bitcoin_wallet = ln_client.clone();
