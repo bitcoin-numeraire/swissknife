@@ -4,10 +4,9 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use breez_sdk_liquid::{
     model::{
-        ConnectRequest, GetPaymentRequest, LiquidNetwork, ListPaymentDetails, ListPaymentsRequest, PayAmount,
-        PayOnchainRequest, PaymentDetails, PaymentMethod, PaymentState, PaymentType, PreparePayOnchainRequest,
-        PreparePayOnchainResponse, PrepareReceiveRequest, PrepareSendRequest, ReceiveAmount, ReceivePaymentRequest,
-        SendPaymentRequest,
+        ConnectRequest, GetPaymentRequest, LiquidNetwork, PayAmount, PayOnchainRequest, PaymentMethod,
+        PreparePayOnchainRequest, PreparePayOnchainResponse, PrepareReceiveRequest, PrepareSendRequest, ReceiveAmount,
+        ReceivePaymentRequest, SendPaymentRequest,
     },
     sdk::LiquidSdk,
 };
@@ -183,14 +182,14 @@ impl LnClient for BreezClient {
             .sdk
             .get_payment(&GetPaymentRequest::PaymentHash { payment_hash })
             .await
-            .map_err(|e| LightningError::Pay(e.to_string()))?;
+            .map_err(|e| LightningError::PaymentByHash(e.to_string()))?;
 
         Ok(response.map(Into::into))
     }
 
     async fn cancel_invoice(&self, _payment_hash: String, _label: String) -> Result<(), LightningError> {
-        Err(LightningError::CancelInvoice(
-            "Invoice cancellation is not supported for Breez".to_string(),
+        Err(LightningError::Unsupported(
+            "Invoice cancellation for Breez".to_string(),
         ))
     }
 
@@ -199,6 +198,7 @@ impl LnClient for BreezClient {
             .get_info()
             .await
             .map_err(|e| LightningError::HealthCheck(e.to_string()))?;
+
         Ok(HealthStatus::Operational)
     }
 }
@@ -206,9 +206,31 @@ impl LnClient for BreezClient {
 #[async_trait]
 impl BitcoinWallet for BreezClient {
     async fn new_address(&self, _address_type: BtcAddressType) -> Result<String, BitcoinError> {
-        Err(BitcoinError::Unsupported(
-            "Breez Liquid does not expose a direct Bitcoin deposit address API".to_string(),
-        ))
+        // Fail if type is not Taproot? 
+
+        let prepare = self
+            .sdk
+            .prepare_receive_payment(&PrepareReceiveRequest {
+                payment_method: PaymentMethod::BitcoinAddress,
+                amount: None,
+            })
+            .await
+            .map_err(|e| BitcoinError::Address(e.to_string()))?;
+
+        let response = self
+            .sdk
+            .receive_payment(&ReceivePaymentRequest {
+                prepare_response: prepare,
+                description: None,
+                use_description_hash: None,
+                payer_note: None,
+            })
+            .await
+            .map_err(|e| BitcoinError::Address(e.to_string()))?;
+
+        println!("{:?}", response);
+
+        Ok(response.destination)
     }
 
     async fn prepare_transaction(
@@ -267,166 +289,30 @@ impl BitcoinWallet for BreezClient {
         Ok(())
     }
 
-    async fn get_transaction(&self, txid: &str) -> Result<Option<BtcTransaction>, BitcoinError> {
-        let payments = self
-            .sdk
-            .list_payments(&ListPaymentsRequest {
-                details: Some(ListPaymentDetails::Bitcoin { address: None }),
-                ..Default::default()
-            })
-            .await
-            .map_err(|e| BitcoinError::GetTransaction(e.to_string()))?;
-
-        let payment = payments.into_iter().find(|payment| {
-            payment.tx_id.as_deref() == Some(txid)
-                || matches!(
-                    &payment.details,
-                    PaymentDetails::Bitcoin {
-                        lockup_tx_id,
-                        claim_tx_id,
-                        refund_tx_id,
-                        ..
-                    } if lockup_tx_id.as_deref() == Some(txid)
-                        || claim_tx_id.as_deref() == Some(txid)
-                        || refund_tx_id.as_deref() == Some(txid)
-                )
-        });
-
-        Ok(payment.and_then(|payment| {
-            let payment_type = payment.payment_type;
-            let amount_sat = payment.amount_sat;
-            let txid_for_payment = payment.tx_id.clone();
-
-            match payment.details {
-                PaymentDetails::Bitcoin {
-                    lockup_tx_id,
-                    claim_tx_id,
-                    refund_tx_id,
-                    bitcoin_address,
-                    ..
-                } => {
-                    let resolved_txid = txid_for_payment
-                        .or(lockup_tx_id)
-                        .or(claim_tx_id)
-                        .or(refund_tx_id)
-                        .unwrap_or_else(|| txid.to_string());
-
-                    Some(BtcTransaction {
-                        txid: resolved_txid,
-                        block_height: None,
-                        outputs: vec![crate::domains::bitcoin::BtcTransactionOutput {
-                            output_index: 0,
-                            address: bitcoin_address,
-                            amount_sat,
-                            is_ours: payment_type == PaymentType::Receive,
-                        }],
-                        is_outgoing: payment_type == PaymentType::Send,
-                    })
-                }
-                _ => None,
-            }
-        }))
+    async fn get_transaction(&self, _txid: &str) -> Result<Option<BtcTransaction>, BitcoinError> {
+        Err(BitcoinError::Unsupported("Get transaction for Breez".to_string()))
     }
 
     async fn synchronize(&self, cursor: Option<OnchainSyncCursor>) -> Result<OnchainSyncBatch, BitcoinError> {
-        let offset = match cursor {
-            Some(OnchainSyncCursor::CreatedIndex(index)) => index as u32,
-            _ => 0,
-        };
-
-        let payments = self
-            .sdk
-            .list_payments(&ListPaymentsRequest {
-                offset: Some(offset),
-                limit: Some(100),
-                details: Some(ListPaymentDetails::Bitcoin { address: None }),
-                sort_ascending: Some(true),
-                ..Default::default()
-            })
+        self.sdk
+            .sync(true)
             .await
             .map_err(|e| BitcoinError::Synchronize(e.to_string()))?;
 
-        let mut events = Vec::new();
-        for payment in &payments {
-            let (txid, address) = match &payment.details {
-                PaymentDetails::Bitcoin {
-                    lockup_tx_id,
-                    claim_tx_id,
-                    refund_tx_id,
-                    bitcoin_address,
-                    ..
-                } => (
-                    payment
-                        .tx_id
-                        .clone()
-                        .or_else(|| lockup_tx_id.clone())
-                        .or_else(|| claim_tx_id.clone())
-                        .or_else(|| refund_tx_id.clone()),
-                    bitcoin_address.clone(),
-                ),
-                _ => continue,
-            };
-
-            let Some(txid) = txid else {
-                continue;
-            };
-
-            match payment.payment_type {
-                PaymentType::Receive => events.push(crate::domains::bitcoin::OnchainTransaction::Deposit(BtcOutput {
-                    txid: txid.clone(),
-                    output_index: 0,
-                    address,
-                    amount_sat: payment.amount_sat,
-                    outpoint: format!("{}:{}", txid, 0),
-                    status: if payment.status == PaymentState::Complete {
-                        crate::domains::bitcoin::BtcOutputStatus::Confirmed
-                    } else {
-                        crate::domains::bitcoin::BtcOutputStatus::Unconfirmed
-                    },
-                    ..Default::default()
-                })),
-                PaymentType::Send => events.push(crate::domains::bitcoin::OnchainTransaction::Withdrawal(
-                    crate::domains::event::OnchainWithdrawalEvent {
-                        txid,
-                        block_height: None,
-                    },
-                )),
-            }
-        }
-
-        let next_cursor = if payments.is_empty() {
-            None
-        } else {
-            Some(OnchainSyncCursor::CreatedIndex(offset as u64 + payments.len() as u64))
-        };
-
-        Ok(OnchainSyncBatch { events, next_cursor })
+        Ok(OnchainSyncBatch {
+            events: vec![],
+            next_cursor: cursor,
+        })
     }
 
     async fn get_output(
         &self,
-        txid: &str,
-        output_index: Option<u32>,
-        address: Option<&str>,
+        _txid: &str,
+        _output_index: Option<u32>,
+        _address: Option<&str>,
         _include_spent: bool,
     ) -> Result<Option<BtcOutput>, BitcoinError> {
-        let Some(transaction) = self.get_transaction(txid).await? else {
-            return Ok(None);
-        };
-
-        let output = transaction.outputs.iter().find(|output| match output_index {
-            Some(index) => output.output_index == index,
-            None => address.map(|target| output.address == target).unwrap_or(false),
-        });
-
-        Ok(output.map(|output| BtcOutput {
-            txid: transaction.txid.clone(),
-            output_index: output.output_index,
-            address: output.address.clone(),
-            amount_sat: output.amount_sat,
-            outpoint: format!("{}:{}", transaction.txid, output.output_index),
-            ..Default::default()
-        }))
+        Err(BitcoinError::Unsupported("Get output for Breez".to_string()))
     }
 
     fn network(&self) -> BtcNetwork {
