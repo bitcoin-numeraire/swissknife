@@ -1,11 +1,13 @@
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
 use async_trait::async_trait;
 use breez_sdk_liquid::{
     model::{
-        ConnectRequest, GetPaymentRequest, LiquidNetwork, PayAmount, PaymentMethod, PrepareReceiveRequest,
-        PrepareSendRequest, ReceiveAmount, ReceivePaymentRequest, SendPaymentRequest,
+        ConnectRequest, GetPaymentRequest, LiquidNetwork, ListPaymentDetails, ListPaymentsRequest, PayAmount,
+        PayOnchainRequest, PaymentDetails, PaymentMethod, PaymentState, PaymentType, PreparePayOnchainRequest,
+        PreparePayOnchainResponse, PrepareReceiveRequest, PrepareSendRequest, ReceiveAmount, ReceivePaymentRequest,
+        SendPaymentRequest,
     },
     sdk::LiquidSdk,
 };
@@ -36,6 +38,15 @@ pub struct BreezClientConfig {
 
 pub struct BreezClient {
     sdk: Arc<LiquidSdk>,
+    network: BtcNetwork,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+struct BreezPreparedTransaction {
+    address: String,
+    receiver_amount_sat: u64,
+    claim_fees_sat: u64,
+    total_fees_sat: u64,
 }
 
 impl BreezClient {
@@ -45,13 +56,13 @@ impl BreezClient {
         }
 
         let network = match config.network.to_lowercase().as_str() {
-            "bitcoin" => LiquidNetwork::Mainnet,
-            "testnet" => LiquidNetwork::Testnet,
-            "regtest" => LiquidNetwork::Regtest,
+            "bitcoin" => (LiquidNetwork::Mainnet, BtcNetwork::Bitcoin),
+            "testnet" => (LiquidNetwork::Testnet, BtcNetwork::Testnet),
+            "regtest" => (LiquidNetwork::Regtest, BtcNetwork::Regtest),
             _ => return Err(LightningError::ParseConfig("Invalid network".to_string())),
         };
 
-        let mut sdk_config = LiquidSdk::default_config(network, Some(config.api_key.clone()))
+        let mut sdk_config = LiquidSdk::default_config(network.0, Some(config.api_key.clone()))
             .map_err(|e| LightningError::ParseConfig(e.to_string()))?;
         sdk_config.working_dir = config.working_dir.clone();
 
@@ -68,7 +79,10 @@ impl BreezClient {
             .await
             .map_err(|e| LightningError::Listener(e.to_string()))?;
 
-        Ok(Self { sdk })
+        Ok(Self {
+            sdk,
+            network: network.1,
+        })
     }
 }
 
@@ -186,56 +200,229 @@ impl LnClient for BreezClient {
 impl BitcoinWallet for BreezClient {
     async fn new_address(&self, _address_type: BtcAddressType) -> Result<String, BitcoinError> {
         Err(BitcoinError::Unsupported(
-            "Bitcoin address generation is not yet implemented for Breez".to_string(),
+            "Breez Liquid does not expose a direct Bitcoin deposit address API".to_string(),
         ))
     }
 
     async fn prepare_transaction(
         &self,
-        _address: String,
-        _amount_sat: u64,
-        _fee_rate: Option<u32>,
+        address: String,
+        amount_sat: u64,
+        fee_rate: Option<u32>,
     ) -> Result<BtcPreparedTransaction, BitcoinError> {
-        Err(BitcoinError::Unsupported(
-            "Preparing bitcoin transactions is not yet implemented for Breez".to_string(),
-        ))
+        let prepare_response = self
+            .sdk
+            .prepare_pay_onchain(&PreparePayOnchainRequest {
+                amount: PayAmount::Bitcoin {
+                    receiver_amount_sat: amount_sat,
+                },
+                fee_rate_sat_per_vbyte: fee_rate,
+            })
+            .await
+            .map_err(|e| BitcoinError::PrepareTransaction(e.to_string()))?;
+
+        let serialized = serde_json::to_string(&BreezPreparedTransaction {
+            address,
+            receiver_amount_sat: prepare_response.receiver_amount_sat,
+            claim_fees_sat: prepare_response.claim_fees_sat,
+            total_fees_sat: prepare_response.total_fees_sat,
+        })
+        .map_err(|e| BitcoinError::PrepareTransaction(e.to_string()))?;
+
+        Ok(BtcPreparedTransaction {
+            txid: format!("breez-onchain-{}", prepare_response.receiver_amount_sat),
+            fee_sat: prepare_response.total_fees_sat,
+            psbt: serialized,
+            locked_utxos: Vec::new(),
+        })
     }
 
-    async fn sign_send_transaction(&self, _prepared: &BtcPreparedTransaction) -> Result<(), BitcoinError> {
-        Err(BitcoinError::Unsupported(
-            "Broadcasting bitcoin transactions is not yet implemented for Breez".to_string(),
-        ))
+    async fn sign_send_transaction(&self, prepared: &BtcPreparedTransaction) -> Result<(), BitcoinError> {
+        let prepared_data: BreezPreparedTransaction =
+            serde_json::from_str(&prepared.psbt).map_err(|e| BitcoinError::FinalizeTransaction(e.to_string()))?;
+
+        self.sdk
+            .pay_onchain(&PayOnchainRequest {
+                address: prepared_data.address,
+                prepare_response: PreparePayOnchainResponse {
+                    receiver_amount_sat: prepared_data.receiver_amount_sat,
+                    claim_fees_sat: prepared_data.claim_fees_sat,
+                    total_fees_sat: prepared_data.total_fees_sat,
+                },
+            })
+            .await
+            .map_err(|e| BitcoinError::BroadcastTransaction(e.to_string()))?;
+
+        Ok(())
     }
 
     async fn release_prepared_transaction(&self, _prepared: &BtcPreparedTransaction) -> Result<(), BitcoinError> {
-        Err(BitcoinError::Unsupported(
-            "Releasing prepared bitcoin transactions is not yet implemented for Breez".to_string(),
-        ))
+        Ok(())
     }
 
-    async fn get_transaction(&self, _txid: &str) -> Result<Option<BtcTransaction>, BitcoinError> {
-        Err(BitcoinError::Unsupported(
-            "Transaction lookup is not yet implemented for Breez".to_string(),
-        ))
+    async fn get_transaction(&self, txid: &str) -> Result<Option<BtcTransaction>, BitcoinError> {
+        let payments = self
+            .sdk
+            .list_payments(&ListPaymentsRequest {
+                details: Some(ListPaymentDetails::Bitcoin { address: None }),
+                ..Default::default()
+            })
+            .await
+            .map_err(|e| BitcoinError::GetTransaction(e.to_string()))?;
+
+        let payment = payments.into_iter().find(|payment| {
+            payment.tx_id.as_deref() == Some(txid)
+                || matches!(
+                    &payment.details,
+                    PaymentDetails::Bitcoin {
+                        lockup_tx_id,
+                        claim_tx_id,
+                        refund_tx_id,
+                        ..
+                    } if lockup_tx_id.as_deref() == Some(txid)
+                        || claim_tx_id.as_deref() == Some(txid)
+                        || refund_tx_id.as_deref() == Some(txid)
+                )
+        });
+
+        Ok(payment.and_then(|payment| {
+            let payment_type = payment.payment_type;
+            let amount_sat = payment.amount_sat;
+            let txid_for_payment = payment.tx_id.clone();
+
+            match payment.details {
+                PaymentDetails::Bitcoin {
+                    lockup_tx_id,
+                    claim_tx_id,
+                    refund_tx_id,
+                    bitcoin_address,
+                    ..
+                } => {
+                    let resolved_txid = txid_for_payment
+                        .or(lockup_tx_id)
+                        .or(claim_tx_id)
+                        .or(refund_tx_id)
+                        .unwrap_or_else(|| txid.to_string());
+
+                    Some(BtcTransaction {
+                        txid: resolved_txid,
+                        block_height: None,
+                        outputs: vec![crate::domains::bitcoin::BtcTransactionOutput {
+                            output_index: 0,
+                            address: bitcoin_address,
+                            amount_sat,
+                            is_ours: payment_type == PaymentType::Receive,
+                        }],
+                        is_outgoing: payment_type == PaymentType::Send,
+                    })
+                }
+                _ => None,
+            }
+        }))
     }
 
-    async fn synchronize(&self, _cursor: Option<OnchainSyncCursor>) -> Result<OnchainSyncBatch, BitcoinError> {
-        Ok(OnchainSyncBatch::default())
+    async fn synchronize(&self, cursor: Option<OnchainSyncCursor>) -> Result<OnchainSyncBatch, BitcoinError> {
+        let offset = match cursor {
+            Some(OnchainSyncCursor::CreatedIndex(index)) => index as u32,
+            _ => 0,
+        };
+
+        let payments = self
+            .sdk
+            .list_payments(&ListPaymentsRequest {
+                offset: Some(offset),
+                limit: Some(100),
+                details: Some(ListPaymentDetails::Bitcoin { address: None }),
+                sort_ascending: Some(true),
+                ..Default::default()
+            })
+            .await
+            .map_err(|e| BitcoinError::Synchronize(e.to_string()))?;
+
+        let mut events = Vec::new();
+        for payment in &payments {
+            let (txid, address) = match &payment.details {
+                PaymentDetails::Bitcoin {
+                    lockup_tx_id,
+                    claim_tx_id,
+                    refund_tx_id,
+                    bitcoin_address,
+                    ..
+                } => (
+                    payment
+                        .tx_id
+                        .clone()
+                        .or_else(|| lockup_tx_id.clone())
+                        .or_else(|| claim_tx_id.clone())
+                        .or_else(|| refund_tx_id.clone()),
+                    bitcoin_address.clone(),
+                ),
+                _ => continue,
+            };
+
+            let Some(txid) = txid else {
+                continue;
+            };
+
+            match payment.payment_type {
+                PaymentType::Receive => events.push(crate::domains::bitcoin::OnchainTransaction::Deposit(BtcOutput {
+                    txid: txid.clone(),
+                    output_index: 0,
+                    address,
+                    amount_sat: payment.amount_sat,
+                    outpoint: format!("{}:{}", txid, 0),
+                    status: if payment.status == PaymentState::Complete {
+                        crate::domains::bitcoin::BtcOutputStatus::Confirmed
+                    } else {
+                        crate::domains::bitcoin::BtcOutputStatus::Unconfirmed
+                    },
+                    ..Default::default()
+                })),
+                PaymentType::Send => events.push(crate::domains::bitcoin::OnchainTransaction::Withdrawal(
+                    crate::domains::event::OnchainWithdrawalEvent {
+                        txid,
+                        block_height: None,
+                    },
+                )),
+            }
+        }
+
+        let next_cursor = if payments.is_empty() {
+            None
+        } else {
+            Some(OnchainSyncCursor::CreatedIndex(offset as u64 + payments.len() as u64))
+        };
+
+        Ok(OnchainSyncBatch { events, next_cursor })
     }
 
     async fn get_output(
         &self,
-        _txid: &str,
-        _output_index: Option<u32>,
-        _address: Option<&str>,
+        txid: &str,
+        output_index: Option<u32>,
+        address: Option<&str>,
         _include_spent: bool,
     ) -> Result<Option<BtcOutput>, BitcoinError> {
-        Err(BitcoinError::Unsupported(
-            "Output lookup is not yet implemented for Breez".to_string(),
-        ))
+        let Some(transaction) = self.get_transaction(txid).await? else {
+            return Ok(None);
+        };
+
+        let output = transaction.outputs.iter().find(|output| match output_index {
+            Some(index) => output.output_index == index,
+            None => address.map(|target| output.address == target).unwrap_or(false),
+        });
+
+        Ok(output.map(|output| BtcOutput {
+            txid: transaction.txid.clone(),
+            output_index: output.output_index,
+            address: output.address.clone(),
+            amount_sat: output.amount_sat,
+            outpoint: format!("{}:{}", transaction.txid, output.output_index),
+            ..Default::default()
+        }))
     }
 
     fn network(&self) -> BtcNetwork {
-        BtcNetwork::default()
+        self.network
     }
 }
