@@ -13,7 +13,7 @@ use crate::{
         database::sea_orm::SeaORMClient,
         jwt::{local::LocalAuthenticator, oauth2::OAuth2Authenticator, JWTAuthenticator},
         lightning::{
-            breez::{BreezClient, BreezListener},
+            breez::BreezClient,
             cln::{ClnGrpcClient, ClnRestClient},
             lnd::{LndGrpcClient, LndRestClient},
             LnClient,
@@ -89,8 +89,7 @@ async fn get_ln_client(config: AppConfig, store: AppStore) -> Result<LightningAd
                 .ok_or_else(|| ConfigError::MissingLightningProviderConfig(config.ln_provider.to_string()))?;
 
             let events = EventService::new(store);
-            let ln_listener = BreezListener::new(events);
-            let ln_client = Arc::new(BreezClient::new(breez_config.clone(), ln_listener).await?);
+            let ln_client = Arc::new(BreezClient::new(breez_config.clone(), events).await?);
             let bitcoin_wallet = ln_client.clone();
 
             Ok(LightningAdapter {

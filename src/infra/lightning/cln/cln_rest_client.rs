@@ -370,7 +370,7 @@ impl BitcoinWallet for ClnRestClient {
         })
     }
 
-    async fn sign_send_transaction(&self, prepared: &BtcPreparedTransaction) -> Result<(), BitcoinError> {
+    async fn sign_send_transaction(&self, prepared: &BtcPreparedTransaction) -> Result<Option<String>, BitcoinError> {
         self.post_request::<TxSendResponse>(
             "txsend",
             &TxSendRequest {
@@ -380,7 +380,7 @@ impl BitcoinWallet for ClnRestClient {
         .await
         .map_err(|e| BitcoinError::FinalizeTransaction(e.to_string()))?;
 
-        Ok(())
+        Ok(None)
     }
 
     async fn release_prepared_transaction(&self, prepared: &BtcPreparedTransaction) -> Result<(), BitcoinError> {

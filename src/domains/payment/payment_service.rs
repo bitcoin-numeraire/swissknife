@@ -247,18 +247,30 @@ impl PaymentService {
                 }
             };
 
-            if let Err(error) = self.bitcoin_wallet.sign_send_transaction(&prepared_tx).await {
-                if let Err(err) = self.bitcoin_wallet.release_prepared_transaction(&prepared_tx).await {
-                    warn!(txid = prepared_tx.txid, %err,
-                            "Failed while signing and sending. Please release the tx manually or wait for lease expiration.");
+            match self.bitcoin_wallet.sign_send_transaction(&prepared_tx).await {
+                Ok(resolved_txid) => {
+                    // If sign_send returned a txid (e.g. swap_id from Breez), update the payment
+                    // record so withdrawal events can be matched by this identifier.
+                    if let Some(txid) = resolved_txid {
+                        let mut updated_payment = pending_payment.clone();
+                        let bitcoin = updated_payment.bitcoin.get_or_insert_with(Default::default);
+                        bitcoin.txid = txid;
+                        self.store.payment.update(updated_payment).await?;
+                    }
                 }
+                Err(error) => {
+                    if let Err(err) = self.bitcoin_wallet.release_prepared_transaction(&prepared_tx).await {
+                        warn!(txid = prepared_tx.txid, %err,
+                            "Failed while signing and sending. Please release the tx manually or wait for lease expiration.");
+                    }
 
-                let mut failed_payment = pending_payment.clone();
-                failed_payment.status = PaymentStatus::Failed;
-                failed_payment.error = Some(error.to_string());
-                self.store.payment.update(failed_payment).await?;
+                    let mut failed_payment = pending_payment.clone();
+                    failed_payment.status = PaymentStatus::Failed;
+                    failed_payment.error = Some(error.to_string());
+                    self.store.payment.update(failed_payment).await?;
 
-                return Err(error.into());
+                    return Err(error.into());
+                }
             };
 
             Ok(pending_payment)

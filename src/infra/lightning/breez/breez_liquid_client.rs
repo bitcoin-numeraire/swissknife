@@ -4,9 +4,9 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use breez_sdk_liquid::{
     model::{
-        ConnectRequest, GetPaymentRequest, LiquidNetwork, PayAmount, PayOnchainRequest, PaymentMethod,
-        PreparePayOnchainRequest, PreparePayOnchainResponse, PrepareReceiveRequest, PrepareSendRequest, ReceiveAmount,
-        ReceivePaymentRequest, SendPaymentRequest,
+        ConnectRequest, GetPaymentRequest, LiquidNetwork, PayAmount, PayOnchainRequest, PaymentDetails,
+        PaymentMethod, PreparePayOnchainRequest, PreparePayOnchainResponse, PrepareReceiveRequest,
+        PrepareSendRequest, ReceiveAmount, ReceivePaymentRequest, SendPaymentRequest,
     },
     sdk::LiquidSdk,
 };
@@ -18,12 +18,15 @@ use crate::{
             BitcoinWallet, BtcAddressType, BtcNetwork, BtcOutput, BtcPreparedTransaction, BtcTransaction,
             OnchainSyncBatch, OnchainSyncCursor,
         },
+        event::EventService,
         invoice::Invoice,
         payment::Payment,
         system::HealthStatus,
     },
-    infra::lightning::{breez::BreezListener, LnClient},
+    infra::lightning::LnClient,
 };
+
+use super::breez_liquid_listener::BreezListener;
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct BreezClientConfig {
@@ -49,7 +52,7 @@ struct BreezPreparedTransaction {
 }
 
 impl BreezClient {
-    pub async fn new(config: BreezClientConfig, listener: BreezListener) -> Result<Self, LightningError> {
+    pub async fn new(config: BreezClientConfig, events: EventService) -> Result<Self, LightningError> {
         let network = match config.network.to_lowercase().as_str() {
             "bitcoin" => (LiquidNetwork::Mainnet, BtcNetwork::Bitcoin),
             "testnet" => (LiquidNetwork::Testnet, BtcNetwork::Testnet),
@@ -57,6 +60,7 @@ impl BreezClient {
             _ => return Err(LightningError::ParseConfig("Invalid network".to_string())),
         };
         let (liquid_network, btc_network) = network;
+        let listener = BreezListener::new(events, btc_network.into());
 
         let mut sdk_config = LiquidSdk::default_config(liquid_network, Some(config.api_key.clone()))
             .map_err(|e| LightningError::ParseConfig(e.to_string()))?;
@@ -188,9 +192,7 @@ impl LnClient for BreezClient {
     }
 
     async fn cancel_invoice(&self, _payment_hash: String, _label: String) -> Result<(), LightningError> {
-        Err(LightningError::Unsupported(
-            "Invoice cancellation for Breez".to_string(),
-        ))
+        Ok(())
     }
 
     async fn health(&self) -> Result<HealthStatus, LightningError> {
@@ -205,8 +207,12 @@ impl LnClient for BreezClient {
 
 #[async_trait]
 impl BitcoinWallet for BreezClient {
-    async fn new_address(&self, _address_type: BtcAddressType) -> Result<String, BitcoinError> {
-        // Fail if type is not Taproot? 
+    async fn new_address(&self, address_type: BtcAddressType) -> Result<String, BitcoinError> {
+        if address_type != BtcAddressType::P2tr {
+            return Err(BitcoinError::AddressType(format!(
+                "Breez Liquid only supports Taproot (P2TR) addresses, got: {address_type}"
+            )));
+        }
 
         let prepare = self
             .sdk
@@ -228,9 +234,11 @@ impl BitcoinWallet for BreezClient {
             .await
             .map_err(|e| BitcoinError::Address(e.to_string()))?;
 
-        println!("{:?}", response);
+        // The destination is a BIP21 URI (e.g. "bitcoin:bc1p...?amount=...&label=...").
+        // Extract the plain Bitcoin address for storage and matching.
+        let address = parse_bip21_address(&response.destination);
 
-        Ok(response.destination)
+        Ok(address)
     }
 
     async fn prepare_transaction(
@@ -266,11 +274,12 @@ impl BitcoinWallet for BreezClient {
         })
     }
 
-    async fn sign_send_transaction(&self, prepared: &BtcPreparedTransaction) -> Result<(), BitcoinError> {
+    async fn sign_send_transaction(&self, prepared: &BtcPreparedTransaction) -> Result<Option<String>, BitcoinError> {
         let prepared_data: BreezPreparedTransaction =
             serde_json::from_str(&prepared.psbt).map_err(|e| BitcoinError::FinalizeTransaction(e.to_string()))?;
 
-        self.sdk
+        let response = self
+            .sdk
             .pay_onchain(&PayOnchainRequest {
                 address: prepared_data.address,
                 prepare_response: PreparePayOnchainResponse {
@@ -282,7 +291,15 @@ impl BitcoinWallet for BreezClient {
             .await
             .map_err(|e| BitcoinError::BroadcastTransaction(e.to_string()))?;
 
-        Ok(())
+        // Extract the swap_id from the payment details as the canonical identifier for this
+        // chain swap. The real Bitcoin txid (claim_tx_id) is only available after the swap
+        // completes asynchronously, so swap_id is used to track the payment until then.
+        let txid = match &response.payment.details {
+            PaymentDetails::Bitcoin { swap_id, .. } => Some(swap_id.clone()),
+            _ => response.payment.tx_id.clone(),
+        };
+
+        Ok(txid)
     }
 
     async fn release_prepared_transaction(&self, _prepared: &BtcPreparedTransaction) -> Result<(), BitcoinError> {
@@ -318,4 +335,16 @@ impl BitcoinWallet for BreezClient {
     fn network(&self) -> BtcNetwork {
         self.network
     }
+}
+
+/// Extracts the plain Bitcoin address from a BIP21 URI.
+/// e.g. "bitcoin:bc1p...?amount=0.001&label=..." → "bc1p..."
+/// If the input is not a BIP21 URI, returns it as-is.
+fn parse_bip21_address(destination: &str) -> String {
+    let stripped = destination
+        .strip_prefix("bitcoin:")
+        .or_else(|| destination.strip_prefix("BITCOIN:"))
+        .unwrap_or(destination);
+
+    stripped.split('?').next().unwrap_or(stripped).to_string()
 }

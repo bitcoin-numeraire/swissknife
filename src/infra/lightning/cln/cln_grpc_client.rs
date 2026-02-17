@@ -391,7 +391,7 @@ impl BitcoinWallet for ClnGrpcClient {
         })
     }
 
-    async fn sign_send_transaction(&self, prepared: &BtcPreparedTransaction) -> Result<(), BitcoinError> {
+    async fn sign_send_transaction(&self, prepared: &BtcPreparedTransaction) -> Result<Option<String>, BitcoinError> {
         let mut client = self.client.clone();
 
         let txid = hex::decode(prepared.txid.clone()).map_err(|e| BitcoinError::FinalizeTransaction(e.to_string()))?;
@@ -402,7 +402,7 @@ impl BitcoinWallet for ClnGrpcClient {
             .map_err(|e| BitcoinError::FinalizeTransaction(e.message().to_string()))?
             .into_inner();
 
-        Ok(())
+        Ok(None)
     }
 
     async fn release_prepared_transaction(&self, prepared: &BtcPreparedTransaction) -> Result<(), BitcoinError> {
