@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
 use anyhow::{anyhow, Result};
-use breez_sdk_liquid::{CallbackResponse, LnUrlPayRequestData, SuccessAction};
+use breez_sdk_spark::{CallbackResponse, LnUrlPayRequestData, SuccessAction};
 use lightning_invoice::Bolt11Invoice;
 use reqwest::Url;
 use serde_bolt::bitcoin::hashes::{sha256, Hash};

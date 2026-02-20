@@ -82,9 +82,9 @@ async fn get_authenticator(config: AppConfig) -> Result<Arc<dyn JWTAuthenticator
 
 async fn get_ln_client(config: AppConfig, store: AppStore) -> Result<LightningAdapter, ApplicationError> {
     match config.ln_provider {
-        LightningProvider::BreezLiquid => {
+        LightningProvider::BreezSpark => {
             let breez_config = config
-                .breez_liquid_config
+                .breez_spark_config
                 .clone()
                 .ok_or_else(|| ConfigError::MissingLightningProviderConfig(config.ln_provider.to_string()))?;
 

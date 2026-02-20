@@ -1,5 +1,5 @@
-mod breez_liquid_client;
-mod breez_liquid_listener;
-mod breez_liquid_types;
+mod breez_spark_client;
+mod breez_spark_listener;
+mod breez_spark_types;
 
-pub use breez_liquid_client::*;
+pub use breez_spark_client::*;

@@ -4,7 +4,7 @@ domain = "numeraire.tech"
 host = "https://api.numeraire.tech"
 fee_buffer = 0.02
 bitcoin_address_type = "p2wpkh"
-ln_provider = "breezliquid"
+ln_provider = "breezspark"
 auth_provider = "jwt"
 dashboard_dir = "/var/www/swissknife-dashboard"
 
@@ -13,12 +13,16 @@ dashboard_dir = "/var/www/swissknife-dashboard"
 addr = "0.0.0.0:3000"
 request_timeout = "60s"
 
-# Breez Lightning provider
-[breez_liquid_config]
+# Breez Spark Lightning provider
+[breez_spark_config]
 working_dir = "storage"
 api_key = "CHANGE_ME" # Recommended to use secret instead
 mnemonic = "CHANGE_ME" # Recommended to use secret instead
-network = "bitcoin"
+network = "bitcoin" # "bitcoin" (mainnet) or "regtest" only — Spark has no testnet
+sync_interval_secs = 30
+prefer_spark_over_lightning = false
+# real_time_sync_server_url = "" # Optional: custom real-time sync server
+# lnurl_domain = "" # Optional: custom LNURL domain
 
 # Core Lightning provider
 [cln_grpc_config]
@@ -78,7 +82,7 @@ thread_ids = false
 thread_names = false
 level = "info"
 # Optional `tracing` env-filter directives. When empty/missing, `level` is used globally.
-# Example: "swissknife=debug,breez_sdk_liquid=debug,lwk_wollet=info"
+# Example: "swissknife=debug,breez_sdk_spark=debug"
 filter = "warn,swissknife=info,sea_orm_migration=info"
 file = false
 

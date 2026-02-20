@@ -1,10 +1,9 @@
 use std::{str::FromStr, sync::Arc};
 
 use async_trait::async_trait;
-use breez_sdk_liquid::{parse, BitcoinAddressData, InputType, LNInvoice, LnUrlPayRequestData, SuccessAction};
+use breez_sdk_spark::{parse_input, BitcoinAddressData, Bolt11InvoiceDetails, InputType, LnUrlPayRequestData, SuccessAction};
 use chrono::Utc;
 use lightning_invoice::Bolt11Invoice;
-use serde_bolt::bitcoin::hashes::hex::ToHex;
 use tracing::{debug, info, trace, warn};
 use uuid::Uuid;
 
@@ -281,19 +280,23 @@ impl PaymentService {
 
     async fn send_bolt11(
         &self,
-        invoice: LNInvoice,
+        bolt11_details: Bolt11InvoiceDetails,
         amount_msat: Option<u64>,
         comment: Option<String>,
         wallet_id: Uuid,
     ) -> Result<Payment, ApplicationError> {
-        let specified_amount = invoice.amount_msat.or(amount_msat);
+        let specified_amount = bolt11_details.amount_msat.or(amount_msat);
         if specified_amount == Some(0) {
             return Err(DataError::Validation("Amount must be greater than zero.".to_string()).into());
         }
 
         if let Some(amount) = specified_amount {
             // Check if internal payment
-            let invoice_opt = self.store.invoice.find_by_payment_hash(&invoice.payment_hash).await?;
+            let invoice_opt = self
+                .store
+                .invoice
+                .find_by_payment_hash(&bolt11_details.payment_hash)
+                .await?;
             if let Some(mut retrieved_invoice) = invoice_opt {
                 if retrieved_invoice.wallet_id == wallet_id {
                     return Err(DataError::Validation("Cannot pay for own invoice.".to_string()).into());
@@ -310,18 +313,18 @@ impl PaymentService {
                         // Internal payment
                         debug!(%wallet_id, %amount, ledger="Internal", "Sending bolt11 payment");
 
-                        let payment_hash = invoice.payment_hash.clone();
+                        let payment_hash = bolt11_details.payment_hash.clone();
                         let internal_payment = self
                             .insert_payment(
                                 Payment {
                                     wallet_id,
                                     amount_msat: amount,
                                     status: PaymentStatus::Settled,
-                                    description: invoice.description,
+                                    description: bolt11_details.description,
                                     fee_msat: Some(0),
                                     payment_time: Some(Utc::now()),
                                     ledger: Ledger::Internal,
-                                    currency: invoice.network.into(),
+                                    currency: bolt11_details.network.into(),
                                     internal: Some(InternalPayment {
                                         ln_address: None,
                                         btc_address: None,
@@ -358,7 +361,7 @@ impl PaymentService {
                 }
             }
 
-            // External  payment
+            // External payment
             debug!(%wallet_id, %amount, ledger="Lightning", "Sending bolt11 payment");
 
             let pending_payment = self
@@ -368,10 +371,10 @@ impl PaymentService {
                         amount_msat: amount,
                         status: PaymentStatus::Pending,
                         ledger: Ledger::Lightning,
-                        currency: invoice.network.into(),
+                        currency: bolt11_details.network.into(),
                         description: comment,
                         lightning: Some(LnPayment {
-                            payment_hash: invoice.payment_hash,
+                            payment_hash: bolt11_details.payment_hash,
                             ..Default::default()
                         }),
                         ..Default::default()
@@ -383,8 +386,8 @@ impl PaymentService {
             let result = self
                 .ln_client
                 .pay(
-                    invoice.bolt11.clone(),
-                    if invoice.amount_msat.is_some() {
+                    bolt11_details.invoice.bolt11.clone(),
+                    if bolt11_details.amount_msat.is_some() {
                         None
                     } else {
                         Some(amount)
@@ -427,7 +430,7 @@ impl PaymentService {
                         payment_hash: Bolt11Invoice::from_str(&cb.pr)
                             .expect("should not fail or malformed callback")
                             .payment_hash()
-                            .to_hex(),
+                            .to_string(),
                         ..Default::default()
                     }),
                     ..Default::default()
@@ -557,7 +560,7 @@ impl PaymentsUseCases for PaymentService {
         let payment = if self.is_internal_payment(&input) {
             self.send_internal(input, amount_msat, comment, wallet_id).await
         } else {
-            let input_type = parse(&input, None)
+            let input_type = parse_input(&input, None)
                 .await
                 .map_err(|err| DataError::Validation(err.to_string()))?;
 

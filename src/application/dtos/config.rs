@@ -35,7 +35,7 @@ pub struct AppConfig {
     pub bitcoin_address_type: BtcAddressType,
     pub ln_provider: LightningProvider,
     pub database: SeaOrmConfig,
-    pub breez_liquid_config: Option<BreezClientConfig>,
+    pub breez_spark_config: Option<BreezClientConfig>,
     pub cln_grpc_config: Option<ClnClientConfig>,
     pub cln_rest_config: Option<ClnRestClientConfig>,
     pub lnd_grpc_config: Option<LndGrpcClientConfig>,
@@ -65,7 +65,7 @@ where
 #[strum(serialize_all = "lowercase")]
 pub enum LightningProvider {
     #[default]
-    BreezLiquid,
+    BreezSpark,
     ClnGrpc,
     ClnRest,
     LndGrpc,

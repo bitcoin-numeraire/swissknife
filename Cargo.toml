@@ -19,15 +19,15 @@ serde_json = "1.0.149"
 serde_bolt = "0.3.5"
 serde_with = "3.16.1"
 tokio = { version = "1.49", features = ["macros", "rt-multi-thread", "signal", "net", "sync", "time", "fs", "io-util"] }
-breez-sdk-liquid = { git = "https://github.com/breez/breez-sdk-liquid", tag = "0.11.13" }
+breez-sdk-spark = { git = "https://github.com/breez/spark-sdk", tag = "0.9.0" }
 bip39 = { version = "*", features = ["rand_core"] }
 config = { version = "0.15.19", features = ["yaml", "json", "toml"] }
 dotenv = "0.15.0"
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.22", features = ["json", "env-filter"] }
 jsonwebtoken = { version = "10.3.0", features = ["rust_crypto"] } 
-reqwest = { version = "=0.12.18", features = ["json"] }
-uuid = { version = "1.20.0", features = ["v4", "serde"] }
+reqwest = { version = "0.12.28", features = ["json"] }
+uuid = { version = "1.21.0", features = ["v4", "serde"] }
 chrono = "0.4.43"
 thiserror = "2.0.18"
 tower-http = { version = "0.6.8", features = [
@@ -48,20 +48,20 @@ sea-orm = { version = "1.1.19", features = [
 ] }
 strum = "0.27"
 strum_macros = "0.27"
-tonic = { version = "0.14.3", features = ["tls-ring"] }
-tonic-prost = "0.14.3"
+tonic = { version = "0.14.5", features = ["tls-ring"] }
+tonic-prost = "0.14.5"
 prost = "0.14.3"
 lightning-invoice = "0.34.0"
 hex = "0.4.3"
-anyhow = "1.0.101"
-futures-util = "0.3.31"
+anyhow = "1.0.102"
+futures-util = "0.3.32"
 humantime = "2.3.0"
 rust_socketio = { version = "0.6.0", features = ["async"] }
 bcrypt = "0.18.0"
 migration = { path = "migration" }
 utoipa = { version = "5.4.0", features = ["axum_extras", "chrono", "uuid"] }
 utoipa-scalar = { version = "0.3.0", features = ["axum"] }
-native-tls = "0.2.14"
+native-tls = "0.2.18"
 nostr-sdk = "0.44.1"
 rand = "0.10.0"
 base64 = "0.22.1"
@@ -78,11 +78,9 @@ sqlx-macros-core = { git = "https://github.com/darioAnongba/sqlx", rev = "aef65d
 sqlx-mysql = { git = "https://github.com/darioAnongba/sqlx", rev = "aef65d604b28967fa9549f2ccd80de254b066d34", package = "sqlx-mysql" }
 sqlx-postgres = { git = "https://github.com/darioAnongba/sqlx", rev = "aef65d604b28967fa9549f2ccd80de254b066d34", package = "sqlx-postgres" }
 sqlx-sqlite = { git = "https://github.com/darioAnongba/sqlx", rev = "aef65d604b28967fa9549f2ccd80de254b066d34", package = "sqlx-sqlite" }
-libsqlite3-sys = { git = "https://github.com/breez/rusqlite", branch = "rusqlite-v0.38.0", package = "libsqlite3-sys" }
-secp256k1-zkp = { git = "https://github.com/breez/rust-secp256k1-zkp.git", rev = "eac2e479255a6e32b5588bc25ee53c642fdd8395" }
 
 [build-dependencies]
-tonic-prost-build = "0.14.3"
+tonic-prost-build = "0.14.5"
 chrono = "0.4.43"
 
 [profile.release]
