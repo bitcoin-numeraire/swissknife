@@ -52,11 +52,11 @@ impl SeaORMClient {
             .await
             .map_err(|e| DatabaseError::Connect(e.to_string()))?;
 
-        trace!("Executing migrations...");
+        trace!("Running database migrations");
         Migrator::up(&db_conn, None)
             .await
             .map_err(|e| DatabaseError::Migrations(e.to_string()))?;
-        debug!("Migrations executed successfully");
+        debug!("Database migrations completed successfully");
 
         Ok(db_conn)
     }

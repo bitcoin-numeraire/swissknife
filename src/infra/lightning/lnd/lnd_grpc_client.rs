@@ -532,7 +532,7 @@ impl BitcoinWallet for LndGrpcClient {
         })
     }
 
-    async fn sign_send_transaction(&self, prepared: &BtcPreparedTransaction) -> Result<(), BitcoinError> {
+    async fn sign_send_transaction(&self, prepared: &BtcPreparedTransaction) -> Result<Option<String>, BitcoinError> {
         let mut wallet = self.wallet.clone();
         let psbt_bytes = STANDARD
             .decode(&prepared.psbt)
@@ -560,7 +560,7 @@ impl BitcoinWallet for LndGrpcClient {
             return Err(BitcoinError::BroadcastTransaction(response.publish_error));
         }
 
-        Ok(())
+        Ok(None)
     }
 
     async fn release_prepared_transaction(&self, prepared: &BtcPreparedTransaction) -> Result<(), BitcoinError> {

@@ -3,9 +3,6 @@ use utoipa::ToSchema;
 
 #[derive(Debug, Error, ToSchema)]
 pub enum LightningError {
-    #[error("Failed to initialize logging: {0}")]
-    Logging(String),
-
     #[error("Failed to parse config: {0}")]
     ParseConfig(String),
 

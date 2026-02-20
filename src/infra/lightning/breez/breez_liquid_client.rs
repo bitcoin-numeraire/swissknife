@@ -1,11 +1,12 @@
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
 use async_trait::async_trait;
 use breez_sdk_liquid::{
     model::{
-        ConnectRequest, GetPaymentRequest, LiquidNetwork, PayAmount, PaymentMethod, PrepareReceiveRequest,
-        PrepareSendRequest, ReceiveAmount, ReceivePaymentRequest, SendPaymentRequest,
+        ConnectRequest, GetPaymentRequest, LiquidNetwork, PayAmount, PayOnchainRequest, PaymentDetails, PaymentMethod,
+        PreparePayOnchainRequest, PreparePayOnchainResponse, PrepareReceiveRequest, PrepareSendRequest, ReceiveAmount,
+        ReceivePaymentRequest, SendPaymentRequest,
     },
     sdk::LiquidSdk,
 };
@@ -17,12 +18,15 @@ use crate::{
             BitcoinWallet, BtcAddressType, BtcNetwork, BtcOutput, BtcPreparedTransaction, BtcTransaction,
             OnchainSyncBatch, OnchainSyncCursor,
         },
+        event::EventService,
         invoice::Invoice,
         payment::Payment,
         system::HealthStatus,
     },
-    infra::lightning::{breez::BreezListener, LnClient},
+    infra::lightning::LnClient,
 };
+
+use super::breez_liquid_listener::BreezListener;
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct BreezClientConfig {
@@ -30,30 +34,47 @@ pub struct BreezClientConfig {
     pub working_dir: String,
     pub mnemonic: String,
     pub passphrase: Option<String>,
-    pub log_in_file: bool,
     pub network: String,
+    pub sync_service_url: Option<String>,
 }
 
 pub struct BreezClient {
     sdk: Arc<LiquidSdk>,
+    network: BtcNetwork,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+struct BreezPreparedTransaction {
+    address: String,
+    receiver_amount_sat: u64,
+    claim_fees_sat: u64,
+    total_fees_sat: u64,
 }
 
 impl BreezClient {
-    pub async fn new(config: BreezClientConfig, listener: BreezListener) -> Result<Self, LightningError> {
-        if config.log_in_file {
-            LiquidSdk::init_logging(&config.working_dir, None).map_err(|e| LightningError::Logging(e.to_string()))?;
-        }
-
+    pub async fn new(config: BreezClientConfig, events: EventService) -> Result<Self, LightningError> {
         let network = match config.network.to_lowercase().as_str() {
-            "bitcoin" => LiquidNetwork::Mainnet,
-            "testnet" => LiquidNetwork::Testnet,
-            "regtest" => LiquidNetwork::Regtest,
+            "bitcoin" => (LiquidNetwork::Mainnet, BtcNetwork::Bitcoin),
+            "testnet" => (LiquidNetwork::Testnet, BtcNetwork::Testnet),
+            "regtest" => (LiquidNetwork::Regtest, BtcNetwork::Regtest),
             _ => return Err(LightningError::ParseConfig("Invalid network".to_string())),
         };
+        let (liquid_network, btc_network) = network;
+        let listener = BreezListener::new(events, btc_network.into());
 
-        let mut sdk_config = LiquidSdk::default_config(network, Some(config.api_key.clone()))
+        let mut sdk_config = LiquidSdk::default_config(liquid_network, Some(config.api_key.clone()))
             .map_err(|e| LightningError::ParseConfig(e.to_string()))?;
+
         sdk_config.working_dir = config.working_dir.clone();
+
+        if let Some(sync_service_url) = config
+            .sync_service_url
+            .as_deref()
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+        {
+            sdk_config.sync_service_url = Some(sync_service_url.to_string());
+        }
 
         let sdk = LiquidSdk::connect(ConnectRequest {
             config: sdk_config,
@@ -68,7 +89,10 @@ impl BreezClient {
             .await
             .map_err(|e| LightningError::Listener(e.to_string()))?;
 
-        Ok(Self { sdk })
+        Ok(Self {
+            sdk,
+            network: btc_network,
+        })
     }
 }
 
@@ -162,15 +186,13 @@ impl LnClient for BreezClient {
             .sdk
             .get_payment(&GetPaymentRequest::PaymentHash { payment_hash })
             .await
-            .map_err(|e| LightningError::Pay(e.to_string()))?;
+            .map_err(|e| LightningError::PaymentByHash(e.to_string()))?;
 
         Ok(response.map(Into::into))
     }
 
     async fn cancel_invoice(&self, _payment_hash: String, _label: String) -> Result<(), LightningError> {
-        Err(LightningError::CancelInvoice(
-            "Invoice cancellation is not supported for Breez".to_string(),
-        ))
+        Ok(())
     }
 
     async fn health(&self) -> Result<HealthStatus, LightningError> {
@@ -178,49 +200,126 @@ impl LnClient for BreezClient {
             .get_info()
             .await
             .map_err(|e| LightningError::HealthCheck(e.to_string()))?;
+
         Ok(HealthStatus::Operational)
     }
 }
 
 #[async_trait]
 impl BitcoinWallet for BreezClient {
-    async fn new_address(&self, _address_type: BtcAddressType) -> Result<String, BitcoinError> {
-        Err(BitcoinError::Unsupported(
-            "Bitcoin address generation is not yet implemented for Breez".to_string(),
-        ))
+    async fn new_address(&self, address_type: BtcAddressType) -> Result<String, BitcoinError> {
+        if address_type != BtcAddressType::P2tr {
+            return Err(BitcoinError::AddressType(format!(
+                "Breez Liquid only supports Taproot (P2TR) addresses, got: {address_type}"
+            )));
+        }
+
+        let prepare = self
+            .sdk
+            .prepare_receive_payment(&PrepareReceiveRequest {
+                payment_method: PaymentMethod::BitcoinAddress,
+                amount: None,
+            })
+            .await
+            .map_err(|e| BitcoinError::Address(e.to_string()))?;
+
+        let response = self
+            .sdk
+            .receive_payment(&ReceivePaymentRequest {
+                prepare_response: prepare,
+                description: None,
+                use_description_hash: None,
+                payer_note: None,
+            })
+            .await
+            .map_err(|e| BitcoinError::Address(e.to_string()))?;
+
+        // The destination is a BIP21 URI (e.g. "bitcoin:bc1p...?amount=...&label=...").
+        // Extract the plain Bitcoin address for storage and matching.
+        let address = parse_bip21_address(&response.destination);
+
+        Ok(address)
     }
 
     async fn prepare_transaction(
         &self,
-        _address: String,
-        _amount_sat: u64,
-        _fee_rate: Option<u32>,
+        address: String,
+        amount_sat: u64,
+        fee_rate: Option<u32>,
     ) -> Result<BtcPreparedTransaction, BitcoinError> {
-        Err(BitcoinError::Unsupported(
-            "Preparing bitcoin transactions is not yet implemented for Breez".to_string(),
-        ))
+        let prepare_response = self
+            .sdk
+            .prepare_pay_onchain(&PreparePayOnchainRequest {
+                amount: PayAmount::Bitcoin {
+                    receiver_amount_sat: amount_sat,
+                },
+                fee_rate_sat_per_vbyte: fee_rate,
+            })
+            .await
+            .map_err(|e| BitcoinError::PrepareTransaction(e.to_string()))?;
+
+        let serialized = serde_json::to_string(&BreezPreparedTransaction {
+            address,
+            receiver_amount_sat: prepare_response.receiver_amount_sat,
+            claim_fees_sat: prepare_response.claim_fees_sat,
+            total_fees_sat: prepare_response.total_fees_sat,
+        })
+        .map_err(|e| BitcoinError::PrepareTransaction(e.to_string()))?;
+
+        Ok(BtcPreparedTransaction {
+            txid: format!("breez-onchain-{}", prepare_response.receiver_amount_sat),
+            fee_sat: prepare_response.total_fees_sat,
+            psbt: serialized,
+            locked_utxos: Vec::new(),
+        })
     }
 
-    async fn sign_send_transaction(&self, _prepared: &BtcPreparedTransaction) -> Result<(), BitcoinError> {
-        Err(BitcoinError::Unsupported(
-            "Broadcasting bitcoin transactions is not yet implemented for Breez".to_string(),
-        ))
+    async fn sign_send_transaction(&self, prepared: &BtcPreparedTransaction) -> Result<Option<String>, BitcoinError> {
+        let prepared_data: BreezPreparedTransaction =
+            serde_json::from_str(&prepared.psbt).map_err(|e| BitcoinError::FinalizeTransaction(e.to_string()))?;
+
+        let response = self
+            .sdk
+            .pay_onchain(&PayOnchainRequest {
+                address: prepared_data.address,
+                prepare_response: PreparePayOnchainResponse {
+                    receiver_amount_sat: prepared_data.receiver_amount_sat,
+                    claim_fees_sat: prepared_data.claim_fees_sat,
+                    total_fees_sat: prepared_data.total_fees_sat,
+                },
+            })
+            .await
+            .map_err(|e| BitcoinError::BroadcastTransaction(e.to_string()))?;
+
+        // Extract the swap_id from the payment details as the canonical identifier for this
+        // chain swap. The real Bitcoin txid (claim_tx_id) is only available after the swap
+        // completes asynchronously, so swap_id is used to track the payment until then.
+        let txid = match &response.payment.details {
+            PaymentDetails::Bitcoin { swap_id, .. } => Some(swap_id.clone()),
+            _ => response.payment.tx_id.clone(),
+        };
+
+        Ok(txid)
     }
 
     async fn release_prepared_transaction(&self, _prepared: &BtcPreparedTransaction) -> Result<(), BitcoinError> {
-        Err(BitcoinError::Unsupported(
-            "Releasing prepared bitcoin transactions is not yet implemented for Breez".to_string(),
-        ))
+        Ok(())
     }
 
     async fn get_transaction(&self, _txid: &str) -> Result<Option<BtcTransaction>, BitcoinError> {
-        Err(BitcoinError::Unsupported(
-            "Transaction lookup is not yet implemented for Breez".to_string(),
-        ))
+        Err(BitcoinError::Unsupported("Get transaction for Breez".to_string()))
     }
 
-    async fn synchronize(&self, _cursor: Option<OnchainSyncCursor>) -> Result<OnchainSyncBatch, BitcoinError> {
-        Ok(OnchainSyncBatch::default())
+    async fn synchronize(&self, cursor: Option<OnchainSyncCursor>) -> Result<OnchainSyncBatch, BitcoinError> {
+        self.sdk
+            .sync(true)
+            .await
+            .map_err(|e| BitcoinError::Synchronize(e.to_string()))?;
+
+        Ok(OnchainSyncBatch {
+            events: vec![],
+            next_cursor: cursor,
+        })
     }
 
     async fn get_output(
@@ -230,12 +329,22 @@ impl BitcoinWallet for BreezClient {
         _address: Option<&str>,
         _include_spent: bool,
     ) -> Result<Option<BtcOutput>, BitcoinError> {
-        Err(BitcoinError::Unsupported(
-            "Output lookup is not yet implemented for Breez".to_string(),
-        ))
+        Err(BitcoinError::Unsupported("Get output for Breez".to_string()))
     }
 
     fn network(&self) -> BtcNetwork {
-        BtcNetwork::default()
+        self.network
     }
+}
+
+/// Extracts the plain Bitcoin address from a BIP21 URI.
+/// e.g. "bitcoin:bc1p...?amount=0.001&label=..." → "bc1p..."
+/// If the input is not a BIP21 URI, returns it as-is.
+fn parse_bip21_address(destination: &str) -> String {
+    let stripped = destination
+        .strip_prefix("bitcoin:")
+        .or_else(|| destination.strip_prefix("BITCOIN:"))
+        .unwrap_or(destination);
+
+    stripped.split('?').next().unwrap_or(stripped).to_string()
 }

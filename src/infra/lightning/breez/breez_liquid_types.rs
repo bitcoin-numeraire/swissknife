@@ -9,7 +9,9 @@ use serde_bolt::bitcoin::hashes::hex::ToHex;
 use crate::{
     application::entities::{Currency, Ledger},
     domains::{
-        event::{LnInvoicePaidEvent, LnPayFailureEvent, LnPaySuccessEvent},
+        event::{
+            LnInvoicePaidEvent, LnPayFailureEvent, LnPaySuccessEvent, OnchainDepositEvent, OnchainWithdrawalEvent,
+        },
         invoice::{Invoice, InvoiceStatus, LnInvoice},
         payment::{LnPayment, Payment, PaymentStatus},
     },
@@ -200,4 +202,75 @@ impl From<PaymentType> for Ledger {
     fn from(_val: PaymentType) -> Self {
         Ledger::Lightning
     }
+}
+
+// -- Bitcoin onchain event helpers --
+
+fn get_swap_id(details: &PaymentDetails) -> Option<String> {
+    match details {
+        PaymentDetails::Bitcoin { swap_id, .. } => Some(swap_id.clone()),
+        _ => None,
+    }
+}
+
+fn get_bitcoin_address(details: &PaymentDetails) -> Option<String> {
+    match details {
+        PaymentDetails::Bitcoin { bitcoin_address, .. } => Some(bitcoin_address.clone()),
+        _ => None,
+    }
+}
+
+/// Returns true if the payment details are for a Bitcoin chain swap.
+pub fn is_bitcoin_payment(details: &PaymentDetails) -> bool {
+    matches!(details, PaymentDetails::Bitcoin { .. })
+}
+
+/// Converts a Breez Payment (Bitcoin Send) into an OnchainWithdrawalEvent.
+/// Uses the swap_id as the txid identifier to match the payment stored during send_bitcoin.
+pub fn to_withdrawal_event(payment: &BreezPayment) -> Option<OnchainWithdrawalEvent> {
+    let swap_id = get_swap_id(&payment.details)?;
+
+    // PaymentSucceeded from Breez means the chain swap is complete and the Bitcoin
+    // claim tx is confirmed. We use block_height=1 as a sentinel since Breez doesn't
+    // provide the actual Bitcoin block height.
+    let block_height = match payment.status {
+        PaymentState::Complete => Some(1),
+        _ => None,
+    };
+
+    Some(OnchainWithdrawalEvent {
+        txid: swap_id,
+        block_height,
+    })
+}
+
+/// Converts a Breez Payment (Bitcoin Receive) into an OnchainDepositEvent.
+/// Uses the swap_id as the txid since this is a chain swap, not a direct UTXO.
+pub fn to_deposit_event(payment: &BreezPayment) -> Option<OnchainDepositEvent> {
+    let swap_id = get_swap_id(&payment.details)?;
+    let address = get_bitcoin_address(&payment.details)?;
+
+    let block_height = match payment.status {
+        PaymentState::Complete => Some(1),
+        _ => None,
+    };
+
+    Some(OnchainDepositEvent {
+        txid: swap_id,
+        output_index: 0,
+        address,
+        amount_sat: payment.amount_sat,
+        block_height,
+    })
+}
+
+/// Converts a Breez Bitcoin payment failure into an LnPayFailureEvent.
+/// Uses the swap_id as the payment_hash to match the stored payment.
+pub fn to_bitcoin_failure_event(payment: &BreezPayment) -> Option<LnPayFailureEvent> {
+    let swap_id = get_swap_id(&payment.details)?;
+
+    Some(LnPayFailureEvent {
+        reason: format!("Bitcoin chain swap failed with status: {:?}", payment.status),
+        payment_hash: swap_id,
+    })
 }

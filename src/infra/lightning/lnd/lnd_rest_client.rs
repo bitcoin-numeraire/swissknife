@@ -471,7 +471,7 @@ impl BitcoinWallet for LndRestClient {
         })
     }
 
-    async fn sign_send_transaction(&self, prepared: &BtcPreparedTransaction) -> Result<(), BitcoinError> {
+    async fn sign_send_transaction(&self, prepared: &BtcPreparedTransaction) -> Result<Option<String>, BitcoinError> {
         let finalize_response = self
             .post_request::<FinalizePsbtResponse>(
                 "v2/wallet/psbt/finalize",
@@ -496,7 +496,7 @@ impl BitcoinWallet for LndRestClient {
             return Err(BitcoinError::BroadcastTransaction(response.publish_error));
         }
 
-        Ok(())
+        Ok(None)
     }
 
     async fn release_prepared_transaction(&self, prepared: &BtcPreparedTransaction) -> Result<(), BitcoinError> {
