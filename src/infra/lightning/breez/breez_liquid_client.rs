@@ -4,9 +4,9 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use breez_sdk_liquid::{
     model::{
-        ConnectRequest, GetPaymentRequest, LiquidNetwork, PayAmount, PayOnchainRequest, PaymentDetails,
-        PaymentMethod, PreparePayOnchainRequest, PreparePayOnchainResponse, PrepareReceiveRequest,
-        PrepareSendRequest, ReceiveAmount, ReceivePaymentRequest, SendPaymentRequest,
+        ConnectRequest, GetPaymentRequest, LiquidNetwork, PayAmount, PayOnchainRequest, PaymentDetails, PaymentMethod,
+        PreparePayOnchainRequest, PreparePayOnchainResponse, PrepareReceiveRequest, PrepareSendRequest, ReceiveAmount,
+        ReceivePaymentRequest, SendPaymentRequest,
     },
     sdk::LiquidSdk,
 };

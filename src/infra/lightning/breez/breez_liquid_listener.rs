@@ -124,15 +124,11 @@ impl EventListener for BreezListener {
             SdkEvent::PaymentRefunded { details } => {
                 trace!(payment_type = ?details.payment_type, "PaymentRefunded event (not handled)");
             }
-            SdkEvent::Synced => {
-                trace!("Breez SDK synced");
-            }
             SdkEvent::SyncFailed { error } => {
                 warn!(%error, "Breez SDK sync failed");
             }
-            SdkEvent::DataSynced { did_pull_new_records } => {
-                trace!(did_pull_new_records, "Breez SDK data synced");
-            }
+            SdkEvent::Synced => {}
+            SdkEvent::DataSynced { .. } => {}
         }
     }
 }

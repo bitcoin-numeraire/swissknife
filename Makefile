@@ -37,7 +37,7 @@ down:
 shutdown:
 	@$(COMPOSE) down -v
 	@rm -f storage/swissknife.db
-	@rm -f storage/**/storage.db
+	@rm -f storage/regtest
 
 install-tools:
 	@cargo install cargo-watch
