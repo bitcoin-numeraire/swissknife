@@ -1,20 +1,34 @@
 use std::str::FromStr;
 
+use aes::cipher::{block_padding::Pkcs7, BlockDecryptMut, KeyIvInit};
 use anyhow::{anyhow, Result};
-use breez_sdk_spark::{CallbackResponse, LnUrlPayRequestData, SuccessAction};
+use base64::{prelude::BASE64_STANDARD, Engine};
+use breez_sdk_spark::{LnurlPayRequestDetails, SuccessAction};
 use lightning_invoice::Bolt11Invoice;
 use reqwest::Url;
+use serde::Deserialize;
 use serde_bolt::bitcoin::hashes::{sha256, Hash};
 use tracing::{trace, warn};
+
+type Aes256CbcDec = cbc::Decryptor<aes::Aes256>;
 
 use crate::domains::lnurl::LnUrlErrorData;
 
 use super::LnUrlSuccessAction;
 
+/// Local struct matching the LNURL-pay callback JSON response.
+/// The Spark SDK's `CallbackResponse` is internal and not re-exported.
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct CallbackResponse {
+    pub pr: String,
+    pub success_action: Option<SuccessAction>,
+}
+
 pub async fn validate_lnurl_pay(
     user_amount_msat: u64,
     comment: &Option<String>,
-    req: &LnUrlPayRequestData,
+    req: &LnurlPayRequestDetails,
 ) -> Result<CallbackResponse> {
     trace!(?req, "Validating LNURL pay request");
 
@@ -36,34 +50,64 @@ pub async fn validate_lnurl_pay(
         return Err(anyhow!(err.reason));
     }
 
-    // Here it's fine to use the CallbackResponse struct from the Breez SDK
     let callback_resp: CallbackResponse = serde_json::from_str(&callback_resp_text)?;
     if let Some(ref sa) = callback_resp.success_action {
-        match sa {
-            SuccessAction::Aes { data } => data.validate()?,
-            SuccessAction::Message { data } => data.validate()?,
-            SuccessAction::Url { data } => {
-                data.validate(req, false)?;
-            }
-        }
+        validate_success_action(sa)?;
     }
 
     validate_invoice(user_amount_msat, &callback_resp.pr)?;
     Ok(callback_resp)
 }
 
-fn validate_user_input(user_amount_msat: u64, comment: &Option<String>, req: &LnUrlPayRequestData) -> Result<()> {
+fn validate_success_action(sa: &SuccessAction) -> Result<()> {
+    match sa {
+        SuccessAction::Aes { data } => {
+            if data.description.len() > 144 {
+                return Err(anyhow!(
+                    "AES action description length is larger than the maximum allowed"
+                ));
+            }
+            if data.ciphertext.len() > 4096 {
+                return Err(anyhow!(
+                    "AES action ciphertext length is larger than the maximum allowed"
+                ));
+            }
+            if data.iv.len() != 24 {
+                return Err(anyhow!("AES action IV must be exactly 24 characters"));
+            }
+            Ok(())
+        }
+        SuccessAction::Message { data } => {
+            if data.message.len() > 144 {
+                return Err(anyhow!(
+                    "Success action message is longer than the maximum allowed length"
+                ));
+            }
+            Ok(())
+        }
+        SuccessAction::Url { data } => {
+            if data.description.len() > 144 {
+                return Err(anyhow!(
+                    "Success action description is longer than the maximum allowed length"
+                ));
+            }
+            Ok(())
+        }
+    }
+}
+
+fn validate_user_input(user_amount_msat: u64, comment: &Option<String>, req: &LnurlPayRequestDetails) -> Result<()> {
     if user_amount_msat < req.min_sendable {
         return Err(anyhow!(format!(
             "Amount is smaller than the minimum allowed: {} sats",
-            req.min_sendable_sats()
+            req.min_sendable / 1000
         )));
     }
 
     if user_amount_msat > req.max_sendable {
         return Err(anyhow!(format!(
             "Amount is bigger than the maximum allowed: {} sats",
-            req.max_sendable_sats()
+            req.max_sendable / 1000
         )));
     }
 
@@ -103,7 +147,8 @@ pub fn process_success_action(sa: SuccessAction, payment_preimage: &str) -> Opti
             match preimage {
                 Ok(preimage) => {
                     let preimage_arr: [u8; 32] = preimage.into_inner();
-                    let plaintext = match data.decrypt(&preimage_arr) {
+
+                    let plaintext = match decrypt_aes_success_action(&preimage_arr, &data.iv, &data.ciphertext) {
                         Ok(plaintext) => plaintext,
                         Err(err) => {
                             warn!(%err, payment_preimage, "Failed to decrypt success action AES data");
@@ -137,4 +182,12 @@ pub fn process_success_action(sa: SuccessAction, payment_preimage: &str) -> Opti
             ..Default::default()
         }),
     }
+}
+
+/// AES-256-CBC decrypt for LNURL success action (LUD-10).
+fn decrypt_aes_success_action(key: &[u8; 32], iv_b64: &str, ciphertext_b64: &str) -> Result<String> {
+    let iv = BASE64_STANDARD.decode(iv_b64)?;
+    let ciphertext = BASE64_STANDARD.decode(ciphertext_b64)?;
+    let plaintext = Aes256CbcDec::new_from_slices(key, &iv)?.decrypt_padded_vec_mut::<Pkcs7>(&ciphertext)?;
+    Ok(String::from_utf8(plaintext)?)
 }

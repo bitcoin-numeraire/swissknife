@@ -6,8 +6,8 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use breez_sdk_spark::{
     connect, default_config, BreezSdk, ConnectRequest, GetInfoRequest, ListPaymentsRequest, Network as SparkNetwork,
-    PaymentDetails as SparkPaymentDetails, PrepareSendPaymentRequest, PrepareSendPaymentResponse,
-    ReceivePaymentMethod, ReceivePaymentRequest, Seed, SendPaymentRequest,
+    PaymentDetails as SparkPaymentDetails, PrepareSendPaymentRequest, PrepareSendPaymentResponse, ReceivePaymentMethod,
+    ReceivePaymentRequest, Seed, SendPaymentRequest,
 };
 use chrono::TimeZone;
 use lightning_invoice::Bolt11Invoice;
@@ -86,12 +86,7 @@ impl BreezClient {
         {
             sdk_config.real_time_sync_server_url = Some(url.to_string());
         }
-        if let Some(domain) = config
-            .lnurl_domain
-            .as_deref()
-            .map(str::trim)
-            .filter(|v| !v.is_empty())
-        {
+        if let Some(domain) = config.lnurl_domain.as_deref().map(str::trim).filter(|v| !v.is_empty()) {
             sdk_config.lnurl_domain = Some(domain.to_string());
         }
 
@@ -106,7 +101,7 @@ impl BreezClient {
         .await
         .map_err(|e| LightningError::Connect(e.to_string()))?;
 
-        sdk.add_event_listener(Box::new(listener));
+        sdk.add_event_listener(Box::new(listener)).await;
 
         Ok(Self {
             sdk,
@@ -161,11 +156,11 @@ impl LnClient for BreezClient {
         let expires_at = created_at + chrono::Duration::from_std(expiry_duration).unwrap_or_default();
 
         let description_text = match parsed.description() {
-            lightning_invoice::Bolt11InvoiceDescription::Direct(desc) => Some(desc.to_string()),
-            lightning_invoice::Bolt11InvoiceDescription::Hash(_) => None,
+            lightning_invoice::Bolt11InvoiceDescriptionRef::Direct(desc) => Some(desc.to_string()),
+            lightning_invoice::Bolt11InvoiceDescriptionRef::Hash(_) => None,
         };
         let description_hash = match parsed.description() {
-            lightning_invoice::Bolt11InvoiceDescription::Hash(hash) => Some(hash.0.to_string()),
+            lightning_invoice::Bolt11InvoiceDescriptionRef::Hash(hash) => Some(hash.0.to_string()),
             _ => None,
         };
 
@@ -257,7 +252,7 @@ impl LnClient for BreezClient {
 
     async fn health(&self) -> Result<HealthStatus, LightningError> {
         self.sdk
-            .get_info(GetInfoRequest::default())
+            .get_info(GetInfoRequest { ensure_synced: None })
             .await
             .map_err(|e| LightningError::HealthCheck(e.to_string()))?;
 
@@ -308,10 +303,7 @@ impl BitcoinWallet for BreezClient {
         let total_amount = prepare_response.amount as u64;
         let fee_sat = total_amount.saturating_sub(amount_sat);
 
-        self.pending_sends
-            .lock()
-            .await
-            .insert(key.clone(), prepare_response);
+        self.pending_sends.lock().await.insert(key.clone(), prepare_response);
 
         Ok(BtcPreparedTransaction {
             txid: format!("breez-withdraw-{key}"),
@@ -322,16 +314,9 @@ impl BitcoinWallet for BreezClient {
     }
 
     async fn sign_send_transaction(&self, prepared: &BtcPreparedTransaction) -> Result<Option<String>, BitcoinError> {
-        let prepare_response = self
-            .pending_sends
-            .lock()
-            .await
-            .remove(&prepared.psbt)
-            .ok_or_else(|| {
-                BitcoinError::FinalizeTransaction(
-                    "Prepared transaction not found or already consumed".to_string(),
-                )
-            })?;
+        let prepare_response = self.pending_sends.lock().await.remove(&prepared.psbt).ok_or_else(|| {
+            BitcoinError::FinalizeTransaction("Prepared transaction not found or already consumed".to_string())
+        })?;
 
         let response = self
             .sdk
@@ -358,16 +343,14 @@ impl BitcoinWallet for BreezClient {
     }
 
     async fn get_transaction(&self, _txid: &str) -> Result<Option<BtcTransaction>, BitcoinError> {
-        Err(BitcoinError::Unsupported(
-            "Get transaction for Breez Spark".to_string(),
-        ))
+        Err(BitcoinError::Unsupported("Get transaction for Breez Spark".to_string()))
     }
 
     async fn synchronize(&self, cursor: Option<OnchainSyncCursor>) -> Result<OnchainSyncBatch, BitcoinError> {
         // Spark SDK auto-syncs based on sync_interval_secs.
         // Triggering get_info ensures latest state is available.
         self.sdk
-            .get_info(GetInfoRequest::default())
+            .get_info(GetInfoRequest { ensure_synced: None })
             .await
             .map_err(|e| BitcoinError::Synchronize(e.to_string()))?;
 
@@ -384,9 +367,7 @@ impl BitcoinWallet for BreezClient {
         _address: Option<&str>,
         _include_spent: bool,
     ) -> Result<Option<BtcOutput>, BitcoinError> {
-        Err(BitcoinError::Unsupported(
-            "Get output for Breez Spark".to_string(),
-        ))
+        Err(BitcoinError::Unsupported("Get output for Breez Spark".to_string()))
     }
 
     fn network(&self) -> BtcNetwork {

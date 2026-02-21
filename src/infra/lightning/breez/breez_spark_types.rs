@@ -1,14 +1,15 @@
 use breez_sdk_spark::{
     BitcoinNetwork as SparkBitcoinNetwork, Network as SparkNetwork, Payment as SparkPayment,
     PaymentDetails as SparkPaymentDetails, PaymentMethod as SparkPaymentMethod, PaymentStatus as SparkPaymentStatus,
-    SparkHtlcDetails,
 };
 use chrono::{TimeZone, Utc};
 
 use crate::{
     application::entities::{Currency, Ledger},
     domains::{
-        event::{LnInvoicePaidEvent, LnPayFailureEvent, LnPaySuccessEvent, OnchainDepositEvent, OnchainWithdrawalEvent},
+        event::{
+            LnInvoicePaidEvent, LnPayFailureEvent, LnPaySuccessEvent, OnchainDepositEvent, OnchainWithdrawalEvent,
+        },
         invoice::{Invoice, InvoiceStatus},
         payment::{LnPayment, Payment, PaymentStatus},
     },
@@ -62,8 +63,7 @@ fn get_ln_address(details: &Option<SparkPaymentDetails>) -> Option<String> {
 fn get_lnurl_metadata(details: &Option<SparkPaymentDetails>) -> Option<String> {
     match details {
         Some(SparkPaymentDetails::Lightning {
-            lnurl_receive_metadata,
-            ..
+            lnurl_receive_metadata, ..
         }) => lnurl_receive_metadata
             .as_ref()
             .and_then(|m| serde_json::to_string(m).ok()),

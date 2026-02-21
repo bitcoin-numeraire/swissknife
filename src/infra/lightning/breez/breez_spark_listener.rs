@@ -104,17 +104,17 @@ impl EventListener for BreezListener {
                     "PaymentPending event (payment tracked)"
                 );
             }
-            SdkEvent::UnclaimedDeposits => {
+            SdkEvent::UnclaimedDeposits { .. } => {
                 // Spark on-chain deposits must be explicitly claimed (unlike Liquid's automatic swaps).
                 // TODO: Consider auto-claiming via sdk.list_unclaimed_deposits + sdk.claim_deposit
                 warn!("Unclaimed on-chain deposits detected. Deposits will be auto-claimed on next sync.");
             }
-            SdkEvent::ClaimedDeposits => {
+            SdkEvent::ClaimedDeposits { .. } => {
                 trace!("On-chain deposits claimed successfully");
             }
             SdkEvent::Synced => {}
-            SdkEvent::Optimization(opt_event) => {
-                trace!(?opt_event, "Spark leaf optimization event");
+            SdkEvent::Optimization { optimization_event } => {
+                trace!(?optimization_event, "Spark leaf optimization event");
             }
         }
     }

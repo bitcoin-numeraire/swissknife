@@ -1,7 +1,9 @@
 use std::{str::FromStr, sync::Arc};
 
 use async_trait::async_trait;
-use breez_sdk_spark::{parse_input, BitcoinAddressData, Bolt11InvoiceDetails, InputType, LnUrlPayRequestData, SuccessAction};
+use breez_sdk_spark::{
+    parse_input, BitcoinAddressDetails, Bolt11InvoiceDetails, InputType, LnurlPayRequestDetails, SuccessAction,
+};
 use chrono::Utc;
 use lightning_invoice::Bolt11Invoice;
 use tracing::{debug, info, trace, warn};
@@ -145,19 +147,19 @@ impl PaymentService {
 
     async fn send_bitcoin(
         &self,
-        data: BitcoinAddressData,
+        data: BitcoinAddressDetails,
         amount_sat: Option<u64>,
         comment: Option<String>,
         wallet_id: Uuid,
     ) -> Result<Payment, ApplicationError> {
-        let specified_amount = data.amount_sat.or(amount_sat);
+        let specified_amount = amount_sat;
         if specified_amount == Some(0) {
             return Err(DataError::Validation("Amount must be greater than zero.".to_string()).into());
         }
 
         if let Some(amount) = specified_amount {
             let amount_msat = amount * 1000;
-            let description: Option<String> = comment.or(data.message);
+            let description: Option<String> = comment;
 
             if let Some(recipient_address) = self.store.btc_address.find_by_address(&data.address).await? {
                 if recipient_address.wallet_id == wallet_id {
@@ -404,7 +406,7 @@ impl PaymentService {
 
     async fn send_lnurl_pay(
         &self,
-        data: LnUrlPayRequestData,
+        data: LnurlPayRequestDetails,
         amount_msat: Option<u64>,
         comment: Option<String>,
         wallet_id: Uuid,
@@ -426,7 +428,7 @@ impl PaymentService {
                     ledger: Ledger::Lightning,
                     currency: Currency::Bitcoin,
                     lightning: Some(LnPayment {
-                        ln_address: data.ln_address.clone(),
+                        ln_address: data.address.clone(),
                         payment_hash: Bolt11Invoice::from_str(&cb.pr)
                             .expect("should not fail or malformed callback")
                             .payment_hash()
@@ -565,13 +567,12 @@ impl PaymentsUseCases for PaymentService {
                 .map_err(|err| DataError::Validation(err.to_string()))?;
 
             match input_type {
-                InputType::BitcoinAddress { address } => {
+                InputType::BitcoinAddress(address) => {
                     let amount_sat = amount_msat.map(|amount| amount / 1000);
                     self.send_bitcoin(address, amount_sat, comment, wallet_id).await
                 }
-                InputType::Bolt11 { invoice } => self.send_bolt11(invoice, amount_msat, comment, wallet_id).await,
-                InputType::LnUrlPay { data, .. } => self.send_lnurl_pay(data, amount_msat, comment, wallet_id).await,
-                InputType::LnUrlError { data } => Err(DataError::Validation(data.reason).into()),
+                InputType::Bolt11Invoice(invoice) => self.send_bolt11(invoice, amount_msat, comment, wallet_id).await,
+                InputType::LnurlPay(data) => self.send_lnurl_pay(data, amount_msat, comment, wallet_id).await,
                 _ => Err(DataError::Validation("Unsupported payment input".to_string()).into()),
             }
         }?;
