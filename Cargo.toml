@@ -19,8 +19,8 @@ serde_json = "1.0.149"
 serde_bolt = "0.3.5"
 serde_with = "3.16.1"
 tokio = { version = "1.49", features = ["macros", "rt-multi-thread", "signal", "net", "sync", "time", "fs", "io-util"] }
-breez-sdk-liquid = { git = "https://github.com/breez/breez-sdk-liquid", tag = "0.11.13" }
-bip39 = { version = "*", features = ["rand_core"] }
+bip21 = { version = "0.5.0", features = ["std"] }
+lnurl = { package = "lnurl-rs", version = "0.9.0", default-features = false, features = ["async"] }
 config = { version = "0.15.19", features = ["yaml", "json", "toml"] }
 dotenv = "0.15.0"
 tracing = "0.1.44"
@@ -69,17 +69,6 @@ tokio-tungstenite = { version = "0.28.0", features = ["native-tls"] }
 http = "1.4.0"
 bytes = "1.11.1"
 bitcoin = "=0.32.8"
-
-[patch.crates-io]
-sqlx = { git = "https://github.com/darioAnongba/sqlx", rev = "aef65d604b28967fa9549f2ccd80de254b066d34", package = "sqlx" }
-sqlx-core = { git = "https://github.com/darioAnongba/sqlx", rev = "aef65d604b28967fa9549f2ccd80de254b066d34", package = "sqlx-core" }
-sqlx-macros = { git = "https://github.com/darioAnongba/sqlx", rev = "aef65d604b28967fa9549f2ccd80de254b066d34", package = "sqlx-macros" }
-sqlx-macros-core = { git = "https://github.com/darioAnongba/sqlx", rev = "aef65d604b28967fa9549f2ccd80de254b066d34", package = "sqlx-macros-core" }
-sqlx-mysql = { git = "https://github.com/darioAnongba/sqlx", rev = "aef65d604b28967fa9549f2ccd80de254b066d34", package = "sqlx-mysql" }
-sqlx-postgres = { git = "https://github.com/darioAnongba/sqlx", rev = "aef65d604b28967fa9549f2ccd80de254b066d34", package = "sqlx-postgres" }
-sqlx-sqlite = { git = "https://github.com/darioAnongba/sqlx", rev = "aef65d604b28967fa9549f2ccd80de254b066d34", package = "sqlx-sqlite" }
-libsqlite3-sys = { git = "https://github.com/breez/rusqlite", branch = "rusqlite-v0.38.0", package = "libsqlite3-sys" }
-secp256k1-zkp = { git = "https://github.com/breez/rust-secp256k1-zkp.git", rev = "eac2e479255a6e32b5588bc25ee53c642fdd8395" }
 
 [build-dependencies]
 tonic-prost-build = "0.14.3"

@@ -8,12 +8,11 @@ use crate::{
         dtos::{AppConfig, AuthProvider, LightningProvider},
         errors::{ApplicationError, ConfigError},
     },
-    domains::{bitcoin::BitcoinWallet, event::EventService},
+    domains::bitcoin::BitcoinWallet,
     infra::{
         database::sea_orm::SeaORMClient,
         jwt::{local::LocalAuthenticator, oauth2::OAuth2Authenticator, JWTAuthenticator},
         lightning::{
-            breez::BreezClient,
             cln::{ClnGrpcClient, ClnRestClient},
             lnd::{LndGrpcClient, LndRestClient},
             LnClient,
@@ -40,7 +39,7 @@ impl AppAdapters {
         let db_conn = SeaORMClient::connect(database).await?;
         let store = AppStore::new_sea_orm(db_conn);
         let jwt_authenticator = get_authenticator(config.clone()).await?;
-        let lightning = get_ln_client(config, store.clone()).await?;
+        let lightning = get_ln_client(config).await?;
 
         Ok(AppAdapters {
             store,
@@ -80,23 +79,8 @@ async fn get_authenticator(config: AppConfig) -> Result<Arc<dyn JWTAuthenticator
     }
 }
 
-async fn get_ln_client(config: AppConfig, store: AppStore) -> Result<LightningAdapter, ApplicationError> {
+async fn get_ln_client(config: AppConfig) -> Result<LightningAdapter, ApplicationError> {
     match config.ln_provider {
-        LightningProvider::BreezLiquid => {
-            let breez_config = config
-                .breez_liquid_config
-                .clone()
-                .ok_or_else(|| ConfigError::MissingLightningProviderConfig(config.ln_provider.to_string()))?;
-
-            let events = EventService::new(store);
-            let ln_client = Arc::new(BreezClient::new(breez_config.clone(), events).await?);
-            let bitcoin_wallet = ln_client.clone();
-
-            Ok(LightningAdapter {
-                ln_client,
-                bitcoin_wallet,
-            })
-        }
         LightningProvider::ClnGrpc => {
             let cln_config = config
                 .cln_grpc_config

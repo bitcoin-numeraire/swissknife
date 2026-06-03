@@ -15,7 +15,7 @@ use crate::{
 };
 
 pub struct EventListener {
-    listener: Option<Arc<dyn EventsListener>>,
+    listener: Arc<dyn EventsListener>,
     services: Arc<AppServices>,
 }
 
@@ -26,7 +26,6 @@ impl EventListener {
         services: Arc<AppServices>,
     ) -> Result<Self, ApplicationError> {
         let listener = match config.ln_provider {
-            LightningProvider::BreezLiquid => None,
             LightningProvider::ClnGrpc => {
                 let cln_config = config
                     .cln_grpc_config
@@ -35,7 +34,7 @@ impl EventListener {
 
                 let listener = ClnGrpcListener::new(cln_config, services.clone(), bitcoin_wallet).await?;
 
-                Some(Arc::new(listener) as Arc<dyn EventsListener>)
+                Arc::new(listener) as Arc<dyn EventsListener>
             }
             LightningProvider::ClnRest => {
                 let cln_config = config
@@ -45,7 +44,7 @@ impl EventListener {
 
                 let listener = ClnWebsocketListener::new(cln_config, services.clone(), bitcoin_wallet).await?;
 
-                Some(Arc::new(listener) as Arc<dyn EventsListener>)
+                Arc::new(listener) as Arc<dyn EventsListener>
             }
             LightningProvider::LndRest => {
                 let lnd_rest_config = config
@@ -55,7 +54,7 @@ impl EventListener {
 
                 let listener = LndWebsocketListener::new(lnd_rest_config, services.clone(), bitcoin_wallet).await?;
 
-                Some(Arc::new(listener) as Arc<dyn EventsListener>)
+                Arc::new(listener) as Arc<dyn EventsListener>
             }
             LightningProvider::LndGrpc => {
                 let lnd_grpc_config = config
@@ -65,7 +64,7 @@ impl EventListener {
 
                 let listener = LndGrpcListener::new(lnd_grpc_config, services.clone(), bitcoin_wallet).await?;
 
-                Some(Arc::new(listener) as Arc<dyn EventsListener>)
+                Arc::new(listener) as Arc<dyn EventsListener>
             }
         };
 
@@ -73,13 +72,12 @@ impl EventListener {
     }
 
     pub async fn start(&self) -> Result<(), ApplicationError> {
-        if let Some(listener) = self.listener.clone() {
-            tokio::spawn(async move {
-                if let Err(err) = listener.listen().await {
-                    panic!("Critical: Lightning listener failed: {}", err);
-                }
-            });
-        }
+        let listener = self.listener.clone();
+        tokio::spawn(async move {
+            if let Err(err) = listener.listen().await {
+                panic!("Critical: Lightning listener failed: {}", err);
+            }
+        });
 
         tokio::try_join!(self.services.invoice.sync(), self.services.payment.sync())?;
 

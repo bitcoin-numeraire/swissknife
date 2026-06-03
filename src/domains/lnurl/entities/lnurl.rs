@@ -39,9 +39,54 @@ pub struct LnURLPayRequest {
     pub nostr_pubkey: Option<PublicKey>,
 }
 
-#[derive(Deserialize, Debug, Serialize)]
-pub struct LnUrlErrorData {
-    pub reason: String,
+#[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LnUrlPayRequestData {
+    pub callback: String,
+    pub min_sendable: u64,
+    pub max_sendable: u64,
+    pub metadata: String,
+    pub tag: String,
+    #[serde(default)]
+    pub comment_allowed: u16,
+    #[serde(default)]
+    pub ln_address: Option<String>,
+}
+
+impl LnUrlPayRequestData {
+    pub fn min_sendable_sats(&self) -> u64 {
+        self.min_sendable / 1000
+    }
+
+    pub fn max_sendable_sats(&self) -> u64 {
+        self.max_sendable / 1000
+    }
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LnUrlPayCallbackResponse {
+    pub pr: String,
+    pub success_action: Option<LnUrlPaySuccessAction>,
+    #[serde(default)]
+    pub disposable: Option<bool>,
+    #[serde(default)]
+    pub routes: Option<Vec<String>>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(tag = "tag", rename_all = "camelCase")]
+pub enum LnUrlPaySuccessAction {
+    #[serde(rename = "message")]
+    Message { message: String },
+    #[serde(rename = "url")]
+    Url { description: String, url: String },
+    #[serde(rename = "aes")]
+    Aes {
+        description: String,
+        ciphertext: String,
+        iv: String,
+    },
 }
 
 #[derive(Debug)]

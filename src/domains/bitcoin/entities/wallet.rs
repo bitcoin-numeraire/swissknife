@@ -19,7 +19,7 @@ pub trait BitcoinWallet: Sync + Send {
     ) -> Result<BtcPreparedTransaction, BitcoinError>;
 
     /// Signs and broadcasts the prepared transaction. Returns an optional txid
-    /// if the real txid is only known after broadcast (e.g. Breez chain swaps).
+    /// if the real txid is only known after broadcast.
     async fn sign_send_transaction(&self, prepared: &BtcPreparedTransaction) -> Result<Option<String>, BitcoinError>;
     async fn release_prepared_transaction(&self, prepared: &BtcPreparedTransaction) -> Result<(), BitcoinError>;
     async fn get_transaction(&self, txid: &str) -> Result<Option<BtcTransaction>, BitcoinError>;

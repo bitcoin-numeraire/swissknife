@@ -11,7 +11,6 @@ use crate::{
         database::sea_orm::SeaOrmConfig,
         jwt::{local::JwtConfig, oauth2::OAuth2Config},
         lightning::{
-            breez::BreezClientConfig,
             cln::{ClnClientConfig, ClnRestClientConfig},
             lnd::{LndGrpcClientConfig, LndRestClientConfig},
         },
@@ -35,7 +34,6 @@ pub struct AppConfig {
     pub bitcoin_address_type: BtcAddressType,
     pub ln_provider: LightningProvider,
     pub database: SeaOrmConfig,
-    pub breez_liquid_config: Option<BreezClientConfig>,
     pub cln_grpc_config: Option<ClnClientConfig>,
     pub cln_rest_config: Option<ClnRestClientConfig>,
     pub lnd_grpc_config: Option<LndGrpcClientConfig>,
@@ -61,11 +59,10 @@ where
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, EnumString, Display, PartialEq, Eq, Default)]
-#[serde(rename_all = "lowercase")]
-#[strum(serialize_all = "lowercase")]
+#[serde(rename_all = "snake_case")]
+#[strum(serialize_all = "snake_case")]
 pub enum LightningProvider {
     #[default]
-    BreezLiquid,
     ClnGrpc,
     ClnRest,
     LndGrpc,

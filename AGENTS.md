@@ -81,7 +81,7 @@ make shutdown                  # Stop and remove volumes
 - `app/` - AppState initialization and Axum server setup
 - `axum/` - Axum configuration and types
 - `database/sea_orm/` - Sea-ORM client and models
-- `lightning/` - Lightning node clients (Breez, CLN gRPC/REST, LND)
+- `lightning/` - Lightning node clients (CLN gRPC/REST, LND gRPC/REST)
 - `jwt/` - Authentication (local JWT, OAuth2)
 - `logging/` - Tracing setup
 
@@ -99,10 +99,10 @@ Set `RUN_MODE=development|production` to select config profile.
 ### Lightning Providers
 
 Configured via `ln_provider` in config:
-- `breez` - Breez SDK
 - `cln_grpc` - Core Lightning gRPC
 - `cln_rest` - Core Lightning REST
-- `lnd` - LND REST
+- `lnd_grpc` - LND gRPC
+- `lnd_rest` - LND REST
 
 ### API Routes (server.rs)
 

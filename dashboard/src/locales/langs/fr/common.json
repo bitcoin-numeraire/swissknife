@@ -279,30 +279,6 @@
     "missing_lightning_address_nostr": "Tu dois d'abord enregistrer une adresse Lightning avant de pouvoir lier ton compte Nostr.",
     "success_lightning_address_registration": "Adresse Lightning enregistrée avec succès"
   },
-  "breez_node_view": {
-    "node": "Nœud",
-    "admin": "Admin",
-    "node_management": "Gestion des nœuds",
-    "total_balance": "Solde total",
-    "total_balance_tooltip": "Somme des soldes Lightning et on-chain",
-    "total_received": "Total reçu",
-    "total_received_tooltip": "Somme de toutes les factures réglées",
-    "total_sent": "Total envoyé",
-    "total_sent_tooltip": "Somme de tous les paiements réglés",
-    "current_balance": "Solde actuel",
-    "registered_ln_addresses": "{{count}} enregistrées",
-    "available_lsps": "LSPs disponibles",
-    "lsp_table_labels": {
-      "details": "Détails",
-      "id": "ID",
-      "host": "Hôte",
-      "base_fee": "Frais de base",
-      "fee_rate": "Taux de frais",
-      "timelock_delta": "Délai Timelock",
-      "min_htlc": "Min HTLC",
-      "status": "Statut"
-    }
-  },
   "node_view": {
     "heading": "Nœud Lightning",
     "admin": "Admin",
@@ -335,30 +311,6 @@
   },
   "latest_ln_addresses": {
     "card_title": "Dernières addresses LN"
-  },
-  "lsp_list": {
-    "title": "LSPs disponibles",
-    "subheader": "Liste des fournisseurs de services Lightning disponibles",
-    "copy_pubkey": "Copier la clé publique",
-    "copy_host": "Copier l'hôte",
-    "connect": "Se connecter",
-    "close_channels": "Fermer les channels",
-    "active": "Actif",
-    "inactive": "Inactif",
-    "confirm_connect": {
-      "title": "Se connecter",
-      "content": "Es-tu sûr de vouloir te connecter à {{name}}?",
-      "connect_button": "Se connecter"
-    },
-    "confirm_close_channels": {
-      "title": "Fermer les channels",
-      "content": "Es-tu sûr de vouloir fermer tous les channels avec {{name}}? Les fonds seront retournés à ton portefeuille on-chain, et tu pourras les récupérer après la fin du processus de fermeture.",
-      "close_button": "Fermer les channels"
-    },
-    "closing_dialog": {
-      "title": "Transactions de fermeture",
-      "content": "Merci de copier les identifiants de transaction suivants. Tu en auras besoin pour suivre tes fonds jusqu'à la fin du processus de fermeture."
-    }
   },
   "sign_message": {
     "title": "Signer le message",

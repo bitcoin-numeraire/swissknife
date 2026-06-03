@@ -1,7 +1,6 @@
 use std::{str::FromStr, sync::Arc};
 
 use async_trait::async_trait;
-use breez_sdk_liquid::{parse, BitcoinAddressData, InputType, LNInvoice, LnUrlPayRequestData, SuccessAction};
 use chrono::Utc;
 use lightning_invoice::Bolt11Invoice;
 use serde_bolt::bitcoin::hashes::hex::ToHex;
@@ -17,12 +16,15 @@ use crate::{
         bitcoin::BitcoinWallet,
         event::{EventUseCases, LnPayFailureEvent, LnPaySuccessEvent},
         invoice::{Invoice, InvoiceStatus},
-        lnurl::{process_success_action, validate_lnurl_pay},
+        lnurl::{process_success_action, validate_lnurl_pay, LnUrlPayRequestData, LnUrlPaySuccessAction},
     },
     infra::lightning::LnClient,
 };
 
-use super::{BtcPayment, InternalPayment, LnPayment, Payment, PaymentFilter, PaymentStatus, PaymentsUseCases};
+use super::{
+    payment_input::{parse_payment_input, BitcoinAddressData, ParsedBolt11Invoice, PaymentInput},
+    BtcPayment, InternalPayment, LnPayment, Payment, PaymentFilter, PaymentStatus, PaymentsUseCases,
+};
 
 const DEFAULT_INTERNAL_INVOICE_DESCRIPTION: &str = "Numeraire Invoice";
 const DEFAULT_INTERNAL_PAYMENT_DESCRIPTION: &str = "Payment to Numeraire";
@@ -249,7 +251,7 @@ impl PaymentService {
 
             match self.bitcoin_wallet.sign_send_transaction(&prepared_tx).await {
                 Ok(resolved_txid) => {
-                    // If sign_send returned a txid (e.g. swap_id from Breez), update the payment
+                    // If sign_send returned a resolved txid, update the payment
                     // record so withdrawal events can be matched by this identifier.
                     if let Some(txid) = resolved_txid {
                         let mut updated_payment = pending_payment.clone();
@@ -281,7 +283,7 @@ impl PaymentService {
 
     async fn send_bolt11(
         &self,
-        invoice: LNInvoice,
+        invoice: ParsedBolt11Invoice,
         amount_msat: Option<u64>,
         comment: Option<String>,
         wallet_id: Uuid,
@@ -321,7 +323,7 @@ impl PaymentService {
                                     fee_msat: Some(0),
                                     payment_time: Some(Utc::now()),
                                     ledger: Ledger::Internal,
-                                    currency: invoice.network.into(),
+                                    currency: invoice.currency.clone(),
                                     internal: Some(InternalPayment {
                                         ln_address: None,
                                         btc_address: None,
@@ -368,7 +370,7 @@ impl PaymentService {
                         amount_msat: amount,
                         status: PaymentStatus::Pending,
                         ledger: Ledger::Lightning,
-                        currency: invoice.network.into(),
+                        currency: invoice.currency.clone(),
                         description: comment,
                         lightning: Some(LnPayment {
                             payment_hash: invoice.payment_hash,
@@ -475,7 +477,7 @@ impl PaymentService {
         &self,
         mut pending_payment: Payment,
         result: Result<Payment, LightningError>,
-        success_action: Option<SuccessAction>,
+        success_action: Option<LnUrlPaySuccessAction>,
     ) -> Result<Payment, ApplicationError> {
         match result {
             Ok(mut settled_payment) => {
@@ -557,19 +559,15 @@ impl PaymentsUseCases for PaymentService {
         let payment = if self.is_internal_payment(&input) {
             self.send_internal(input, amount_msat, comment, wallet_id).await
         } else {
-            let input_type = parse(&input, None)
-                .await
-                .map_err(|err| DataError::Validation(err.to_string()))?;
+            let input_type = parse_payment_input(&input).await.map_err(DataError::Validation)?;
 
             match input_type {
-                InputType::BitcoinAddress { address } => {
+                PaymentInput::BitcoinAddress(address) => {
                     let amount_sat = amount_msat.map(|amount| amount / 1000);
                     self.send_bitcoin(address, amount_sat, comment, wallet_id).await
                 }
-                InputType::Bolt11 { invoice } => self.send_bolt11(invoice, amount_msat, comment, wallet_id).await,
-                InputType::LnUrlPay { data, .. } => self.send_lnurl_pay(data, amount_msat, comment, wallet_id).await,
-                InputType::LnUrlError { data } => Err(DataError::Validation(data.reason).into()),
-                _ => Err(DataError::Validation("Unsupported payment input".to_string()).into()),
+                PaymentInput::Bolt11(invoice) => self.send_bolt11(invoice, amount_msat, comment, wallet_id).await,
+                PaymentInput::LnUrlPay(data) => self.send_lnurl_pay(data, amount_msat, comment, wallet_id).await,
             }
         }?;
 
