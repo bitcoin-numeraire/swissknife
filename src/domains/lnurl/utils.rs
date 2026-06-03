@@ -1,19 +1,18 @@
 use std::str::FromStr;
 
-use aes::Aes256;
+use ::lnurl::{
+    pay::{AesParams as LnurlAesParams, PayResponse as LnurlPayResponse, SuccessAction as LnurlSuccessAction},
+    AsyncClient as LnurlClient, Tag as LnurlTag,
+};
 use anyhow::{anyhow, Result};
-use base64::{engine::general_purpose::STANDARD, Engine as _};
-use cbc::cipher::{block_padding::Pkcs7, BlockDecryptMut, KeyIvInit};
 use lightning_invoice::Bolt11Invoice;
 use reqwest::Url;
 use serde_bolt::bitcoin::hashes::{sha256, Hash};
 use tracing::{trace, warn};
 
-use crate::domains::lnurl::{LnUrlErrorData, LnUrlPayCallbackResponse, LnUrlPayRequestData, LnUrlPaySuccessAction};
+use crate::domains::lnurl::{LnUrlPayCallbackResponse, LnUrlPayRequestData, LnUrlPaySuccessAction};
 
 use super::LnUrlSuccessAction;
-
-type Aes256CbcDec = cbc::Decryptor<Aes256>;
 
 pub async fn validate_lnurl_pay(
     user_amount_msat: u64,
@@ -22,97 +21,46 @@ pub async fn validate_lnurl_pay(
 ) -> Result<LnUrlPayCallbackResponse> {
     trace!(?req, "Validating LNURL pay request");
 
-    validate_user_input(user_amount_msat, comment, req)?;
-
-    let amount_msat = user_amount_msat.to_string();
-    let mut url = Url::from_str(&req.callback)?;
-
-    url.query_pairs_mut().append_pair("amount", &amount_msat);
-    if let Some(comment) = comment {
-        url.query_pairs_mut().append_pair("comment", comment);
-    }
-
-    // TODO: Instantiate and reuse the client instead of using reqwest::get
-    let response = reqwest::get(url).await?;
-    let callback_resp_text = response.text().await?;
-
-    if let Ok(err) = serde_json::from_str::<LnUrlErrorData>(&callback_resp_text) {
-        return Err(anyhow!(err.reason));
-    }
-
-    let callback_resp: LnUrlPayCallbackResponse = serde_json::from_str(&callback_resp_text)?;
-    if let Some(ref sa) = callback_resp.success_action {
-        validate_success_action(sa)?;
-    }
+    let pay = lnurl_pay_response_from_request(req);
+    let client = LnurlClient::from_client(reqwest::Client::new());
+    let callback_resp = client
+        .get_invoice(&pay, user_amount_msat, None, comment.as_deref())
+        .await
+        .map_err(|err| anyhow!(err.to_string()))?;
 
     validate_invoice(user_amount_msat, &callback_resp.pr)?;
-    Ok(callback_resp)
+
+    let success_action = callback_resp
+        .success_action()
+        .map(|success_action| convert_success_action(success_action, &req.callback))
+        .transpose()?;
+
+    Ok(LnUrlPayCallbackResponse {
+        pr: callback_resp.pr,
+        success_action,
+        disposable: None,
+        routes: None,
+    })
 }
 
-fn validate_user_input(user_amount_msat: u64, comment: &Option<String>, req: &LnUrlPayRequestData) -> Result<()> {
-    if user_amount_msat < req.min_sendable {
-        return Err(anyhow!(format!(
-            "Amount is smaller than the minimum allowed: {} sats",
-            req.min_sendable_sats()
-        )));
+fn lnurl_pay_response_from_request(req: &LnUrlPayRequestData) -> LnurlPayResponse {
+    LnurlPayResponse {
+        callback: req.callback.clone(),
+        max_sendable: req.max_sendable,
+        min_sendable: req.min_sendable,
+        tag: LnurlTag::PayRequest,
+        metadata: req.metadata.clone(),
+        comment_allowed: Some(req.comment_allowed.into()),
+        allows_nostr: None,
+        nostr_pubkey: None,
     }
-
-    if user_amount_msat > req.max_sendable {
-        return Err(anyhow!(format!(
-            "Amount is bigger than the maximum allowed: {} sats",
-            req.max_sendable_sats()
-        )));
-    }
-
-    match comment {
-        None => Ok(()),
-        Some(msg) => match msg.len() <= req.comment_allowed as usize {
-            true => Ok(()),
-            false => Err(anyhow!(format!(
-                "Comment is longer than the maximum allowed length: {}",
-                req.comment_allowed
-            ))),
-        },
-    }
-}
-
-fn validate_success_action(success_action: &LnUrlPaySuccessAction) -> Result<()> {
-    match success_action {
-        LnUrlPaySuccessAction::Message { message } => {
-            if message.is_empty() {
-                return Err(anyhow!("LNURL success action message cannot be empty"));
-            }
-        }
-        LnUrlPaySuccessAction::Url { description, url } => {
-            if description.is_empty() {
-                return Err(anyhow!("LNURL success action URL description cannot be empty"));
-            }
-            Url::parse(url)?;
-        }
-        LnUrlPaySuccessAction::Aes {
-            description,
-            ciphertext,
-            iv,
-        } => {
-            if description.is_empty() {
-                return Err(anyhow!("LNURL success action AES description cannot be empty"));
-            }
-            STANDARD.decode(ciphertext)?;
-            let iv = STANDARD.decode(iv)?;
-            if iv.len() != 16 {
-                return Err(anyhow!("LNURL success action AES IV must be 16 bytes"));
-            }
-        }
-    }
-
-    Ok(())
 }
 
 fn validate_invoice(user_amount_msat: u64, bolt11: &str) -> Result<()> {
     let invoice = Bolt11Invoice::from_str(bolt11).map_err(|e| anyhow!(e.to_string()))?;
 
     match invoice.amount_milli_satoshis() {
-        None => Err(anyhow!("Missing amount from invoice".to_string(),)),
+        None => Err(anyhow!("Missing amount from invoice".to_string())),
         Some(invoice_amount_msat) => match invoice_amount_msat == user_amount_msat {
             true => Ok(()),
             false => Err(anyhow!(format!(
@@ -123,13 +71,83 @@ fn validate_invoice(user_amount_msat: u64, bolt11: &str) -> Result<()> {
     }
 }
 
+fn convert_success_action(success_action: LnurlSuccessAction, callback_url: &str) -> Result<LnUrlPaySuccessAction> {
+    match success_action {
+        LnurlSuccessAction::Message(message) => {
+            validate_lud09_text_len("Success action message", &message)?;
+            Ok(LnUrlPaySuccessAction::Message { message })
+        }
+        LnurlSuccessAction::Url { url, description } => {
+            validate_lud09_text_len("Success action description", &description)?;
+            validate_success_action_url(callback_url, &url)?;
+            Ok(LnUrlPaySuccessAction::Url {
+                description,
+                url: url.to_string(),
+            })
+        }
+        LnurlSuccessAction::AES(params) => {
+            validate_aes_success_action(&params)?;
+            Ok(LnUrlPaySuccessAction::Aes {
+                description: params.description,
+                ciphertext: params.ciphertext,
+                iv: params.iv,
+            })
+        }
+        LnurlSuccessAction::Unknown(params) => {
+            Err(anyhow!(format!("Unsupported LNURL success action tag: {}", params.tag)))
+        }
+    }
+}
+
+fn validate_lud09_text_len(field: &str, value: &str) -> Result<()> {
+    if value.len() > 144 {
+        return Err(anyhow!(format!("{field} is longer than the maximum allowed length")));
+    }
+
+    Ok(())
+}
+
+fn validate_aes_success_action(params: &LnurlAesParams) -> Result<()> {
+    validate_lud09_text_len("AES action description", &params.description)?;
+    if params.ciphertext.len() > 4096 {
+        return Err(anyhow!(
+            "AES action ciphertext is longer than the maximum allowed length"
+        ));
+    }
+    if params.iv.len() != 24 {
+        return Err(anyhow!("AES action IV has unexpected length"));
+    }
+
+    // `lnurl-rs` performs the base64/AES decode during `decrypt`. We keep the
+    // length checks above here because they are LUD-09/LUD-10 input guards.
+    Ok(())
+}
+
+fn validate_success_action_url(callback_url: &str, action_url: &Url) -> Result<()> {
+    let callback = Url::parse(callback_url)?;
+    let callback_domain = callback
+        .domain()
+        .ok_or_else(|| anyhow!("Could not determine LNURL callback domain"))?;
+    let action_domain = action_url
+        .domain()
+        .ok_or_else(|| anyhow!("Could not determine success action URL domain"))?;
+
+    if callback_domain != action_domain {
+        return Err(anyhow!(
+            "Success action URL has different domain than the callback domain"
+        ));
+    }
+
+    Ok(())
+}
+
 pub fn process_success_action(sa: LnUrlPaySuccessAction, payment_preimage: &str) -> Option<LnUrlSuccessAction> {
     match sa {
         LnUrlPaySuccessAction::Aes {
             description,
             ciphertext,
             iv,
-        } => decrypt_success_action(&ciphertext, &iv, payment_preimage).map(|plaintext| LnUrlSuccessAction {
+        } => decrypt_success_action(ciphertext, iv, payment_preimage).map(|plaintext| LnUrlSuccessAction {
             tag: "message".to_string(),
             message: Some(plaintext),
             description: Some(description),
@@ -149,7 +167,7 @@ pub fn process_success_action(sa: LnUrlPaySuccessAction, payment_preimage: &str)
     }
 }
 
-fn decrypt_success_action(ciphertext: &str, iv: &str, payment_preimage: &str) -> Option<String> {
+fn decrypt_success_action(ciphertext: String, iv: String, payment_preimage: &str) -> Option<String> {
     let preimage = match sha256::Hash::from_str(payment_preimage) {
         Ok(preimage) => preimage,
         Err(err) => {
@@ -159,36 +177,16 @@ fn decrypt_success_action(ciphertext: &str, iv: &str, payment_preimage: &str) ->
     };
     let preimage_arr: [u8; 32] = preimage.into_inner();
 
-    let ciphertext = match STANDARD.decode(ciphertext) {
-        Ok(ciphertext) => ciphertext,
-        Err(err) => {
-            warn!(%err, "Failed to decode LNURL success action AES ciphertext");
-            return None;
-        }
-    };
-    let iv = match STANDARD.decode(iv) {
-        Ok(iv) => iv,
-        Err(err) => {
-            warn!(%err, "Failed to decode LNURL success action AES IV");
-            return None;
-        }
+    let aes_params = LnurlAesParams {
+        description: String::new(),
+        ciphertext,
+        iv,
     };
 
-    let plaintext = match Aes256CbcDec::new_from_slices(&preimage_arr, &iv)
-        .ok()?
-        .decrypt_padded_vec_mut::<Pkcs7>(&ciphertext)
-    {
-        Ok(plaintext) => plaintext,
-        Err(err) => {
-            warn!(%err, payment_preimage, "Failed to decrypt success action AES data");
-            return None;
-        }
-    };
-
-    match String::from_utf8(plaintext) {
+    match aes_params.decrypt(&preimage_arr) {
         Ok(plaintext) => Some(plaintext),
         Err(err) => {
-            warn!(%err, "LNURL success action AES plaintext is not UTF-8");
+            warn!(%err, payment_preimage, "Failed to decrypt LNURL success action AES data");
             None
         }
     }

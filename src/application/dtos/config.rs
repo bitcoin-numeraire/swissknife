@@ -59,21 +59,13 @@ where
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, EnumString, Display, PartialEq, Eq, Default)]
-#[serde(rename_all = "lowercase")]
-#[strum(serialize_all = "lowercase")]
+#[serde(rename_all = "snake_case")]
+#[strum(serialize_all = "snake_case")]
 pub enum LightningProvider {
     #[default]
-    #[serde(rename = "cln_grpc", alias = "clngrpc")]
-    #[strum(serialize = "cln_grpc", serialize = "clngrpc")]
     ClnGrpc,
-    #[serde(rename = "cln_rest", alias = "clnrest")]
-    #[strum(serialize = "cln_rest", serialize = "clnrest")]
     ClnRest,
-    #[serde(rename = "lnd_grpc", alias = "lndgrpc")]
-    #[strum(serialize = "lnd_grpc", serialize = "lndgrpc")]
     LndGrpc,
-    #[serde(rename = "lnd_rest", alias = "lndrest", alias = "lnd")]
-    #[strum(serialize = "lnd_rest", serialize = "lndrest", serialize = "lnd")]
     LndRest,
 }
 
