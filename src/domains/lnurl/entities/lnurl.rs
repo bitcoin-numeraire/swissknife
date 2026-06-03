@@ -39,11 +39,6 @@ pub struct LnURLPayRequest {
     pub nostr_pubkey: Option<PublicKey>,
 }
 
-#[derive(Deserialize, Debug, Serialize)]
-pub struct LnUrlErrorData {
-    pub reason: String,
-}
-
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LnUrlPayRequestData {
