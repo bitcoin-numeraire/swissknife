@@ -1,6 +1,5 @@
 use chrono::{TimeZone, Utc};
 use lightning_invoice::Bolt11Invoice;
-use serde_bolt::bitcoin::hashes::hex::ToHex;
 use std::str::FromStr;
 
 use crate::{
@@ -39,8 +38,8 @@ impl From<PayResponse> for Payment {
             payment_time: Some(Utc.timestamp_opt(seconds, nanoseconds).unwrap()),
             error,
             lightning: Some(LnPayment {
-                payment_hash: val.payment_hash.to_hex(),
-                payment_preimage: Some(val.payment_preimage.to_hex()),
+                payment_hash: hex::encode(val.payment_hash),
+                payment_preimage: Some(hex::encode(val.payment_preimage)),
                 ..Default::default()
             }),
             ..Default::default()
@@ -75,7 +74,7 @@ impl From<ListinvoicesInvoices> for Invoice {
 impl From<WaitinvoiceResponse> for LnInvoicePaidEvent {
     fn from(val: WaitinvoiceResponse) -> Self {
         LnInvoicePaidEvent {
-            payment_hash: val.payment_hash.to_hex(),
+            payment_hash: hex::encode(val.payment_hash),
             amount_received_msat: val.amount_received_msat.as_ref().unwrap().msat,
             fee_msat: 0,
             payment_time: Utc.timestamp_opt(val.paid_at() as i64, 0).unwrap(),

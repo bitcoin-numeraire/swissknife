@@ -1,6 +1,5 @@
 use chrono::{TimeZone, Utc};
 use serde::Deserialize;
-use serde_bolt::bitcoin::hashes::hex::ToHex;
 use serde_bolt::bitcoin::hashes::{sha256, Hash};
 
 use crate::domains::event::{LnInvoicePaidEvent, LnPayFailureEvent, LnPaySuccessEvent};
@@ -36,7 +35,7 @@ pub struct SendPayFailureData {
 impl From<InvoicePayment> for LnInvoicePaidEvent {
     fn from(val: InvoicePayment) -> Self {
         let preimage = hex::decode(val.preimage.clone()).expect("should be hex string");
-        let payment_hash = sha256::Hash::hash(&preimage).to_hex();
+        let payment_hash = sha256::Hash::hash(&preimage).to_string();
         LnInvoicePaidEvent {
             payment_hash,
             amount_received_msat: val.msat,

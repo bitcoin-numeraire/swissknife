@@ -11,7 +11,7 @@ use anyhow::{anyhow, Result};
 use lightning_invoice::Bolt11Invoice;
 use reqwest::Url;
 use serde::Deserialize;
-use serde_bolt::bitcoin::hashes::{sha256, Hash};
+use serde_bolt::bitcoin::hashes::sha256;
 use tracing::{trace, warn};
 
 use crate::domains::lnurl::{LnUrlPayCallbackResponse, LnUrlPayRequestData, LnUrlPaySuccessAction};
@@ -226,7 +226,7 @@ fn decrypt_success_action(ciphertext: String, iv: String, payment_preimage: &str
             return None;
         }
     };
-    let preimage_arr: [u8; 32] = preimage.into_inner();
+    let preimage_arr: [u8; 32] = preimage.to_byte_array();
 
     let aes_params = LnurlAesParams {
         description: String::new(),

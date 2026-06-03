@@ -2,7 +2,6 @@ use std::{sync::Arc, time::Duration};
 
 use async_trait::async_trait;
 use chrono::{TimeZone, Utc};
-use serde_bolt::bitcoin::hashes::hex::ToHex;
 use tokio::time::sleep;
 use tonic::{transport::Channel, Code};
 use tracing::{error, trace, warn};
@@ -391,7 +390,7 @@ impl ClnGrpcListener {
                     };
 
                     let event = OnchainWithdrawalEvent {
-                        txid: spending_txid.to_hex(),
+                        txid: hex::encode(spending_txid),
                         block_height: Some(chainmove.blockheight),
                     };
 

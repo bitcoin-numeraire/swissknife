@@ -1,6 +1,5 @@
 use chrono::{TimeZone, Utc};
 use lightning_invoice::{Bolt11Invoice, Bolt11InvoiceDescriptionRef, Currency as LNInvoiceCurrency};
-use serde_bolt::bitcoin::hashes::hex::ToHex;
 
 use crate::{
     application::entities::{Currency, Ledger},
@@ -13,8 +12,8 @@ use crate::{
 impl From<Bolt11Invoice> for Invoice {
     fn from(val: Bolt11Invoice) -> Self {
         let payee_pubkey: String = match val.payee_pub_key() {
-            Some(key) => key.to_hex(),
-            None => val.recover_payee_pub_key().to_hex(),
+            Some(key) => key.to_string(),
+            None => val.recover_payee_pub_key().to_string(),
         };
 
         let timestamp = Utc
@@ -34,13 +33,13 @@ impl From<Bolt11Invoice> for Invoice {
             },
             ln_invoice: Some(LnInvoice {
                 bolt11: val.to_string(),
-                payment_hash: val.payment_hash().to_hex(),
+                payment_hash: val.payment_hash().to_string(),
                 payee_pubkey,
                 description_hash: match val.description() {
                     Bolt11InvoiceDescriptionRef::Direct(_) => None,
                     Bolt11InvoiceDescriptionRef::Hash(h) => Some(h.0.to_string()),
                 },
-                payment_secret: val.payment_secret().0.to_hex(),
+                payment_secret: hex::encode(val.payment_secret().0),
                 min_final_cltv_expiry_delta: val.min_final_cltv_expiry_delta(),
                 expiry: val.expiry_time(),
                 expires_at: timestamp + val.expiry_time(),

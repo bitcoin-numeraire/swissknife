@@ -49,7 +49,7 @@ impl ApiKeyUseCases for ApiKeyService {
         // Generate a new API key
         let bytes: [u8; 32] = rand::random();
         let api_key_plain = BASE64_STANDARD.encode(bytes);
-        let key_hash = sha256::Hash::hash(&bytes).to_vec();
+        let key_hash = sha256::Hash::hash(&bytes).to_byte_array().to_vec();
 
         let api_key = ApiKey {
             user_id: request.user_id.expect("user_id should be defined"),

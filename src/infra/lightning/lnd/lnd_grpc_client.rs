@@ -317,7 +317,7 @@ impl LnClient for LndGrpcClient {
         };
 
         if deschashonly {
-            let hash = sha256::Hash::hash(description.as_bytes()).into_inner().to_vec();
+            let hash = sha256::Hash::hash(description.as_bytes()).to_byte_array().to_vec();
             request.description_hash = hash;
         }
 

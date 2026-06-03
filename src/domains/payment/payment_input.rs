@@ -11,7 +11,6 @@ use bip21::{
 use bitcoin::{address::NetworkUnchecked, Address, Network as BitcoinNetwork};
 use lightning_invoice::{Bolt11Invoice, Bolt11InvoiceDescriptionRef, Currency as Bolt11Currency, ParseOrSemanticError};
 use reqwest::Url;
-use serde_bolt::bitcoin::hashes::hex::ToHex;
 use thiserror::Error;
 
 use crate::{
@@ -133,7 +132,7 @@ fn parsed_bolt11_from_invoice(bolt11: String, invoice: Bolt11Invoice) -> Result<
     Ok(ParsedBolt11Invoice {
         bolt11,
         amount_msat: invoice.amount_milli_satoshis(),
-        payment_hash: invoice.payment_hash().to_hex(),
+        payment_hash: invoice.payment_hash().to_string(),
         description,
         currency: currency_from_bolt11(invoice.currency()),
     })
