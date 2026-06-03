@@ -1,5 +1,6 @@
 mod entities;
 mod payment_handler;
+mod payment_input;
 mod payment_repository;
 mod payment_service;
 mod payment_use_cases;

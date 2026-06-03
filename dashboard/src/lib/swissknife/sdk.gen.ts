@@ -38,30 +38,16 @@ import {
 
 import type {
   PayData,
-  SwapData,
-  SyncData,
   PayError,
-  SwapError,
-  SyncError,
   SignInData,
   SignUpData,
-  BackupData,
-  RedeemData,
   SignInError,
   SignUpError,
-  BackupError,
-  LspInfoData,
-  RedeemError,
   PayResponse,
   CallbackData,
-  NodeInfoData,
-  LspInfoError,
-  ListLspsData,
   WellKnownData,
   CallbackError,
   GetApiKeyData,
-  NodeInfoError,
-  ListLspsError,
   WalletPayData,
   GetWalletData,
   WellKnownError,
@@ -69,9 +55,6 @@ import type {
   SignUpResponse,
   GetInvoiceData,
   GetAddressData,
-  BackupResponse,
-  ConnectLspData,
-  RedeemResponse,
   WalletPayError,
   GetPaymentData,
   SetupCheckData,
@@ -80,8 +63,6 @@ import type {
   SignInResponse2,
   GetInvoiceError,
   GetAddressError,
-  ConnectLspError,
-  SignMessageData,
   GetPaymentError,
   HealthCheckData,
   SetupCheckError,
@@ -91,9 +72,6 @@ import type {
   CreateApiKeyData,
   RevokeApiKeyData,
   ListInvoicesData,
-  CheckMessageData,
-  ListLspsResponse,
-  SignMessageError,
   ListContactsData,
   ListPaymentsData,
   HealthCheckError,
@@ -110,7 +88,6 @@ import type {
   ListAddressesData,
   DeleteAddressData,
   UpdateAddressData,
-  CheckMessageError,
   GetUserWalletData,
   ListContactsError,
   WalletPayResponse,
@@ -152,8 +129,6 @@ import type {
   GenerateInvoiceError,
   DeleteAddressesError,
   RegisterAddressError,
-  CloseLspChannelsData,
-  SignMessageResponse2,
   GetWalletApiKeyError,
   GetWalletBalanceData,
   ListContactsResponse,
@@ -166,8 +141,6 @@ import type {
   RevokeApiKeysResponse,
   ListAddressesResponse,
   UpdateAddressResponse,
-  CheckMessageResponse2,
-  CloseLspChannelsError,
   GetUserWalletResponse,
   ListWalletApiKeysData,
   GetWalletBalanceError,
@@ -199,7 +172,6 @@ import type {
   ListWalletPaymentsError,
   MarkWelcomeCompleteData,
   ListWalletOverviewsData,
-  CloseLspChannelsResponse,
   RevokeWalletApiKeysError,
   GetWalletBalanceResponse,
   NewWalletInvoiceResponse,
@@ -515,158 +487,6 @@ export const updateAddress = <ThrowOnError extends boolean = false>(
     },
     url: '/v1/lightning-addresses/{id}',
     responseTransformer: updateAddressResponseTransformer,
-  });
-
-/**
- * Backup node channels
- * Returns the static channel backup file contaning the channel information needed to recover funds for a Core Lightning node. See [the documentation](https://docs.corelightning.org/docs/backup#static-channel-backup)
- */
-export const backup = <ThrowOnError extends boolean = false>(
-  options?: Options<BackupData, ThrowOnError>
-) =>
-  (options?.client ?? client).get<BackupResponse, BackupError, ThrowOnError>({
-    ...options,
-    url: '/v1/lightning-node/backup',
-  });
-
-/**
- * Verify Signature
- * Verifies the validity of a signature against a node's public key. Returns `true` if valid.
- */
-export const checkMessage = <ThrowOnError extends boolean = false>(
-  options: Options<CheckMessageData, ThrowOnError>
-) =>
-  (options?.client ?? client).post<CheckMessageResponse2, CheckMessageError, ThrowOnError>({
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...options?.headers,
-    },
-    url: '/v1/lightning-node/check-message',
-  });
-
-/**
- * Close LSP channels
- * Returns the list of transaction IDs for the lightning channel closures. The funds are deposited in your on-chain addresses and can be redeemed
- */
-export const closeLspChannels = <ThrowOnError extends boolean = false>(
-  options?: Options<CloseLspChannelsData, ThrowOnError>
-) =>
-  (options?.client ?? client).post<CloseLspChannelsResponse, CloseLspChannelsError, ThrowOnError>({
-    ...options,
-    url: '/v1/lightning-node/close-channels',
-  });
-
-/**
- * Connect LSP
- * Connects to an LSP from the list of available LSPs by its ID. Returns an  empty body
- */
-export const connectLsp = <ThrowOnError extends boolean = false>(
-  options: Options<ConnectLspData, ThrowOnError>
-) =>
-  (options?.client ?? client).post<unknown, ConnectLspError, ThrowOnError>({
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...options?.headers,
-    },
-    url: '/v1/lightning-node/connect-lsp',
-  });
-
-/**
- * Get node info
- * Returns the Core Lightning node info hosted on [Greenlight (Blockstream)](https://blockstream.com/lightning/greenlight/) infrastructure
- */
-export const nodeInfo = <ThrowOnError extends boolean = false>(
-  options?: Options<NodeInfoData, ThrowOnError>
-) =>
-  (options?.client ?? client).get<unknown, NodeInfoError, ThrowOnError>({
-    ...options,
-    url: '/v1/lightning-node/info',
-  });
-
-/**
- * Get LSP info
- * Returns the info of the current Breez partner LSP connected to the Core Lightning node.
- */
-export const lspInfo = <ThrowOnError extends boolean = false>(
-  options?: Options<LspInfoData, ThrowOnError>
-) =>
-  (options?.client ?? client).get<unknown, LspInfoError, ThrowOnError>({
-    ...options,
-    url: '/v1/lightning-node/lsp-info',
-  });
-
-/**
- * List LSPs
- * Returns the list of available LSPs for the node.
- */
-export const listLsps = <ThrowOnError extends boolean = false>(
-  options?: Options<ListLspsData, ThrowOnError>
-) =>
-  (options?.client ?? client).get<ListLspsResponse, ListLspsError, ThrowOnError>({
-    ...options,
-    url: '/v1/lightning-node/lsps',
-  });
-
-/**
- * Redeem BTC
- * Redeems your whole on-chain BTC balance to an address of your choice. Returns the transaction ID.
- */
-export const redeem = <ThrowOnError extends boolean = false>(
-  options: Options<RedeemData, ThrowOnError>
-) =>
-  (options?.client ?? client).post<RedeemResponse, RedeemError, ThrowOnError>({
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...options?.headers,
-    },
-    url: '/v1/lightning-node/redeem',
-  });
-
-/**
- * Sign message
- * Signs a message using the node's key. Returns a zbase encoded signature
- */
-export const signMessage = <ThrowOnError extends boolean = false>(
-  options: Options<SignMessageData, ThrowOnError>
-) =>
-  (options?.client ?? client).post<SignMessageResponse2, SignMessageError, ThrowOnError>({
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...options?.headers,
-    },
-    url: '/v1/lightning-node/sign-message',
-  });
-
-/**
- * Swap BTC
- * Pays BTC on-chain via Swap service. Meaning that the funds are sent through Lightning and swaps to the recipient on-chain address
- */
-export const swap = <ThrowOnError extends boolean = false>(
-  options: Options<SwapData, ThrowOnError>
-) =>
-  (options?.client ?? client).post<unknown, SwapError, ThrowOnError>({
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...options?.headers,
-    },
-    url: '/v1/lightning-node/swap',
-  });
-
-/**
- * Sync node
- * Syncs the local state with the remote node state.
- */
-export const sync = <ThrowOnError extends boolean = false>(
-  options?: Options<SyncData, ThrowOnError>
-) =>
-  (options?.client ?? client).post<unknown, SyncError, ThrowOnError>({
-    ...options,
-    url: '/v1/lightning-node/sync',
   });
 
 /**

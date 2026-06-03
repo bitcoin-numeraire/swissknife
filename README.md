@@ -34,7 +34,7 @@ Numeraire SwissKnife ships with a [Dashboard](https://github.com/bitcoin-numerai
 
 ## Lightning Providers
 
-SwissKnife allows direct Lightning integration, supporting the most used node implementations and well-known providers:
+SwissKnife allows direct Lightning integration with self-hosted node implementations:
 
 - [`LND`](https://github.com/lightningnetwork/lnd)
   - Run your own node
@@ -42,10 +42,6 @@ SwissKnife allows direct Lightning integration, supporting the most used node im
 - [`Core Lightning`](https://corelightning.org/):
   - Run your own node
   - Manage your own liquidity.
-- [`Breez SDK (Liquid)`](https://breez.technology):
-  - Nodeless integration via Breez Liquid SDK
-  - Lightning send/receive and Bitcoin swaps supported
-  - Note: direct Bitcoin address generation and raw PSBT flows are not exposed by this provider
 
 ## Installation
 
@@ -103,10 +99,8 @@ Extended documentation is available [here](https://docs.numeraire.tech/swissknif
 
 #### Lightning providers
 
-- [x] [`Breez SDK (Liquid)`](https://breez.technology)
-  - Nodeless
-- [ ] [`Breez SDK (Spark)`](https://www.lightspark.com/)
-  - Nodeless
+- [x] [`Core Lightning`](https://corelightning.org/)
+- [x] [`LND`](https://github.com/lightningnetwork/lnd)
 
 #### Smart contracts
 

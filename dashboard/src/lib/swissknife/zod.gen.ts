@@ -43,10 +43,6 @@ export const zCheckMessageResponse = z.object({
   is_valid: z.boolean(),
 });
 
-export const zConnectLSPRequest = z.object({
-  lsp_id: z.string(),
-});
-
 export const zContact = z.object({
   contact_since: z.string().datetime(),
   ln_address: z.string(),

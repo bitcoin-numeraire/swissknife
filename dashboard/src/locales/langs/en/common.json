@@ -281,28 +281,6 @@
     "missing_lightning_address_nostr": "You first need to register a Lightning Address before you can link it to your Nostr account.",
     "success_lightning_address_registration": "Lightning Address registered successfully"
   },
-  "breez_node_view": {
-    "node": "Node",
-    "total_balance": "Total balance",
-    "total_balance_tooltip": "Sum of Lightning and on-chain balances",
-    "total_received": "Total Received",
-    "total_received_tooltip": "Sum of all settled invoices",
-    "total_sent": "Total Sent",
-    "total_sent_tooltip": "Sum of all settled payments",
-    "current_balance": "Current Balance",
-    "registered_ln_addresses": "{{count}} registered",
-    "available_lsps": "Available LSPs",
-    "lsp_table_labels": {
-      "details": "Details",
-      "id": "ID",
-      "host": "Host",
-      "base_fee": "Base fee",
-      "fee_rate": "Fee rate",
-      "timelock_delta": "Timelock Delta",
-      "min_htlc": "Min HTLC",
-      "status": "Status"
-    }
-  },
   "node_view": {
     "heading": "Lightning Node",
     "volume": "Volume",
@@ -333,30 +311,6 @@
   },
   "latest_ln_addresses": {
     "card_title": "Latest LN Addresses"
-  },
-  "lsp_list": {
-    "title": "Available LSPs",
-    "subheader": "List of available Lightning Service Providers",
-    "copy_pubkey": "Copy Pubkey",
-    "copy_host": "Copy Host",
-    "connect": "Connect",
-    "close_channels": "Close Channels",
-    "active": "Active",
-    "inactive": "Inactive",
-    "confirm_connect": {
-      "title": "Connect",
-      "content": "Are you sure you want to connect to {{name}}?",
-      "connect_button": "Connect"
-    },
-    "confirm_close_channels": {
-      "title": "Close Channels",
-      "content": "Are you sure you want to close all channels with {{name}}? Funds will be returned to your on-chain wallet, and you will be able to redeem them after the closing process is completed.",
-      "close_button": "Close Channels"
-    },
-    "closing_dialog": {
-      "title": "Closing transactions",
-      "content": "Please copy the following transaction IDs. You will need them to keep track of your funds until the closing process is completed."
-    }
   },
   "sign_message": {
     "title": "Sign Message",

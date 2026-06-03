@@ -11,7 +11,6 @@ use crate::{
         database::sea_orm::SeaOrmConfig,
         jwt::{local::JwtConfig, oauth2::OAuth2Config},
         lightning::{
-            breez::BreezClientConfig,
             cln::{ClnClientConfig, ClnRestClientConfig},
             lnd::{LndGrpcClientConfig, LndRestClientConfig},
         },
@@ -35,7 +34,6 @@ pub struct AppConfig {
     pub bitcoin_address_type: BtcAddressType,
     pub ln_provider: LightningProvider,
     pub database: SeaOrmConfig,
-    pub breez_liquid_config: Option<BreezClientConfig>,
     pub cln_grpc_config: Option<ClnClientConfig>,
     pub cln_rest_config: Option<ClnRestClientConfig>,
     pub lnd_grpc_config: Option<LndGrpcClientConfig>,
@@ -65,10 +63,17 @@ where
 #[strum(serialize_all = "lowercase")]
 pub enum LightningProvider {
     #[default]
-    BreezLiquid,
+    #[serde(rename = "cln_grpc", alias = "clngrpc")]
+    #[strum(serialize = "cln_grpc", serialize = "clngrpc")]
     ClnGrpc,
+    #[serde(rename = "cln_rest", alias = "clnrest")]
+    #[strum(serialize = "cln_rest", serialize = "clnrest")]
     ClnRest,
+    #[serde(rename = "lnd_grpc", alias = "lndgrpc")]
+    #[strum(serialize = "lnd_grpc", serialize = "lndgrpc")]
     LndGrpc,
+    #[serde(rename = "lnd_rest", alias = "lndrest", alias = "lnd")]
+    #[strum(serialize = "lnd_rest", serialize = "lndrest", serialize = "lnd")]
     LndRest,
 }
 

@@ -4,7 +4,7 @@ domain = "numeraire.tech"
 host = "https://api.numeraire.tech"
 fee_buffer = 0.02
 bitcoin_address_type = "p2wpkh"
-ln_provider = "breezliquid"
+ln_provider = "cln_grpc"
 auth_provider = "jwt"
 dashboard_dir = "/var/www/swissknife-dashboard"
 
@@ -12,13 +12,6 @@ dashboard_dir = "/var/www/swissknife-dashboard"
 [web]
 addr = "0.0.0.0:3000"
 request_timeout = "60s"
-
-# Breez Lightning provider
-[breez_liquid_config]
-working_dir = "storage"
-api_key = "CHANGE_ME" # Recommended to use secret instead
-mnemonic = "CHANGE_ME" # Recommended to use secret instead
-network = "bitcoin"
 
 # Core Lightning provider
 [cln_grpc_config]
@@ -78,7 +71,7 @@ thread_ids = false
 thread_names = false
 level = "info"
 # Optional `tracing` env-filter directives. When empty/missing, `level` is used globally.
-# Example: "swissknife=debug,breez_sdk_liquid=debug,lwk_wollet=info"
+# Example: "swissknife=debug"
 filter = "warn,swissknife=info,sea_orm_migration=info"
 file = false
 

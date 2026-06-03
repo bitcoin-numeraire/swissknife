@@ -1,21 +1,25 @@
 use std::str::FromStr;
 
+use aes::Aes256;
 use anyhow::{anyhow, Result};
-use breez_sdk_liquid::{CallbackResponse, LnUrlPayRequestData, SuccessAction};
+use base64::{engine::general_purpose::STANDARD, Engine as _};
+use cbc::cipher::{block_padding::Pkcs7, BlockDecryptMut, KeyIvInit};
 use lightning_invoice::Bolt11Invoice;
 use reqwest::Url;
 use serde_bolt::bitcoin::hashes::{sha256, Hash};
 use tracing::{trace, warn};
 
-use crate::domains::lnurl::LnUrlErrorData;
+use crate::domains::lnurl::{LnUrlErrorData, LnUrlPayCallbackResponse, LnUrlPayRequestData, LnUrlPaySuccessAction};
 
 use super::LnUrlSuccessAction;
+
+type Aes256CbcDec = cbc::Decryptor<Aes256>;
 
 pub async fn validate_lnurl_pay(
     user_amount_msat: u64,
     comment: &Option<String>,
     req: &LnUrlPayRequestData,
-) -> Result<CallbackResponse> {
+) -> Result<LnUrlPayCallbackResponse> {
     trace!(?req, "Validating LNURL pay request");
 
     validate_user_input(user_amount_msat, comment, req)?;
@@ -36,16 +40,9 @@ pub async fn validate_lnurl_pay(
         return Err(anyhow!(err.reason));
     }
 
-    // Here it's fine to use the CallbackResponse struct from the Breez SDK
-    let callback_resp: CallbackResponse = serde_json::from_str(&callback_resp_text)?;
+    let callback_resp: LnUrlPayCallbackResponse = serde_json::from_str(&callback_resp_text)?;
     if let Some(ref sa) = callback_resp.success_action {
-        match sa {
-            SuccessAction::Aes { data } => data.validate()?,
-            SuccessAction::Message { data } => data.validate()?,
-            SuccessAction::Url { data } => {
-                data.validate(req, false)?;
-            }
-        }
+        validate_success_action(sa)?;
     }
 
     validate_invoice(user_amount_msat, &callback_resp.pr)?;
@@ -79,6 +76,38 @@ fn validate_user_input(user_amount_msat: u64, comment: &Option<String>, req: &Ln
     }
 }
 
+fn validate_success_action(success_action: &LnUrlPaySuccessAction) -> Result<()> {
+    match success_action {
+        LnUrlPaySuccessAction::Message { message } => {
+            if message.is_empty() {
+                return Err(anyhow!("LNURL success action message cannot be empty"));
+            }
+        }
+        LnUrlPaySuccessAction::Url { description, url } => {
+            if description.is_empty() {
+                return Err(anyhow!("LNURL success action URL description cannot be empty"));
+            }
+            Url::parse(url)?;
+        }
+        LnUrlPaySuccessAction::Aes {
+            description,
+            ciphertext,
+            iv,
+        } => {
+            if description.is_empty() {
+                return Err(anyhow!("LNURL success action AES description cannot be empty"));
+            }
+            STANDARD.decode(ciphertext)?;
+            let iv = STANDARD.decode(iv)?;
+            if iv.len() != 16 {
+                return Err(anyhow!("LNURL success action AES IV must be 16 bytes"));
+            }
+        }
+    }
+
+    Ok(())
+}
+
 fn validate_invoice(user_amount_msat: u64, bolt11: &str) -> Result<()> {
     let invoice = Bolt11Invoice::from_str(bolt11).map_err(|e| anyhow!(e.to_string()))?;
 
@@ -94,47 +123,73 @@ fn validate_invoice(user_amount_msat: u64, bolt11: &str) -> Result<()> {
     }
 }
 
-pub fn process_success_action(sa: SuccessAction, payment_preimage: &str) -> Option<LnUrlSuccessAction> {
+pub fn process_success_action(sa: LnUrlPaySuccessAction, payment_preimage: &str) -> Option<LnUrlSuccessAction> {
     match sa {
-        // For AES, we decrypt the contents on the fly
-        SuccessAction::Aes { data } => {
-            let preimage = sha256::Hash::from_str(payment_preimage);
-
-            match preimage {
-                Ok(preimage) => {
-                    let preimage_arr: [u8; 32] = preimage.into_inner();
-                    let plaintext = match data.decrypt(&preimage_arr) {
-                        Ok(plaintext) => plaintext,
-                        Err(err) => {
-                            warn!(%err, payment_preimage, "Failed to decrypt success action AES data");
-                            return None;
-                        }
-                    };
-
-                    // See https://github.com/lnurl/luds/blob/luds/10.md. Decrypted AES is to be displayed like a message
-                    Some(LnUrlSuccessAction {
-                        tag: "message".to_string(),
-                        message: Some(plaintext),
-                        description: Some(data.description),
-                        ..Default::default()
-                    })
-                }
-                Err(err) => {
-                    warn!(%err, payment_preimage, "Invalid payment preimage");
-                    None
-                }
-            }
-        }
-        SuccessAction::Message { data } => Some(LnUrlSuccessAction {
+        LnUrlPaySuccessAction::Aes {
+            description,
+            ciphertext,
+            iv,
+        } => decrypt_success_action(&ciphertext, &iv, payment_preimage).map(|plaintext| LnUrlSuccessAction {
             tag: "message".to_string(),
-            message: Some(data.message),
+            message: Some(plaintext),
+            description: Some(description),
             ..Default::default()
         }),
-        SuccessAction::Url { data } => Some(LnUrlSuccessAction {
+        LnUrlPaySuccessAction::Message { message } => Some(LnUrlSuccessAction {
+            tag: "message".to_string(),
+            message: Some(message),
+            ..Default::default()
+        }),
+        LnUrlPaySuccessAction::Url { description, url } => Some(LnUrlSuccessAction {
             tag: "url".to_string(),
-            description: Some(data.description),
-            url: Some(data.url),
+            description: Some(description),
+            url: Some(url),
             ..Default::default()
         }),
+    }
+}
+
+fn decrypt_success_action(ciphertext: &str, iv: &str, payment_preimage: &str) -> Option<String> {
+    let preimage = match sha256::Hash::from_str(payment_preimage) {
+        Ok(preimage) => preimage,
+        Err(err) => {
+            warn!(%err, payment_preimage, "Invalid payment preimage");
+            return None;
+        }
+    };
+    let preimage_arr: [u8; 32] = preimage.into_inner();
+
+    let ciphertext = match STANDARD.decode(ciphertext) {
+        Ok(ciphertext) => ciphertext,
+        Err(err) => {
+            warn!(%err, "Failed to decode LNURL success action AES ciphertext");
+            return None;
+        }
+    };
+    let iv = match STANDARD.decode(iv) {
+        Ok(iv) => iv,
+        Err(err) => {
+            warn!(%err, "Failed to decode LNURL success action AES IV");
+            return None;
+        }
+    };
+
+    let plaintext = match Aes256CbcDec::new_from_slices(&preimage_arr, &iv)
+        .ok()?
+        .decrypt_padded_vec_mut::<Pkcs7>(&ciphertext)
+    {
+        Ok(plaintext) => plaintext,
+        Err(err) => {
+            warn!(%err, payment_preimage, "Failed to decrypt success action AES data");
+            return None;
+        }
+    };
+
+    match String::from_utf8(plaintext) {
+        Ok(plaintext) => Some(plaintext),
+        Err(err) => {
+            warn!(%err, "LNURL success action AES plaintext is not UTF-8");
+            None
+        }
     }
 }
