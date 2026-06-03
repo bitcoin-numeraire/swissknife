@@ -11,7 +11,7 @@ use anyhow::{anyhow, Result};
 use lightning_invoice::Bolt11Invoice;
 use reqwest::Url;
 use serde::Deserialize;
-use serde_bolt::bitcoin::hashes::sha256;
+use serde_bolt::bitcoin::hashes::{sha256, Hash};
 use tracing::{trace, warn};
 
 use crate::domains::lnurl::{LnUrlPayCallbackResponse, LnUrlPayRequestData, LnUrlPaySuccessAction};

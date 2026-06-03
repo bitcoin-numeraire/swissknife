@@ -383,7 +383,7 @@ impl BitcoinWallet for ClnGrpcClient {
         let fee = psbt.fee().map_err(|e| BitcoinError::ParsePsbt(e.to_string()))?;
 
         Ok(BtcPreparedTransaction {
-            txid: hex::encode(response.txid),
+            txid: hex::encode(&response.txid),
             fee_sat: fee.to_sat(),
             psbt: response.psbt,
             locked_utxos: Vec::new(),
