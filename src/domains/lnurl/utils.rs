@@ -1,12 +1,16 @@
 use std::str::FromStr;
 
 use ::lnurl::{
-    pay::{AesParams as LnurlAesParams, PayResponse as LnurlPayResponse, SuccessAction as LnurlSuccessAction},
-    AsyncClient as LnurlClient, Tag as LnurlTag,
+    pay::{
+        AesParams as LnurlAesParams, LnURLPayInvoice, PayResponse as LnurlPayResponse,
+        SuccessAction as LnurlSuccessAction,
+    },
+    Tag as LnurlTag,
 };
 use anyhow::{anyhow, Result};
 use lightning_invoice::Bolt11Invoice;
 use reqwest::Url;
+use serde::Deserialize;
 use serde_bolt::bitcoin::hashes::{sha256, Hash};
 use tracing::{trace, warn};
 
@@ -22,11 +26,8 @@ pub async fn validate_lnurl_pay(
     trace!(?req, "Validating LNURL pay request");
 
     let pay = lnurl_pay_response_from_request(req);
-    let client = LnurlClient::from_client(reqwest::Client::new());
-    let callback_resp = client
-        .get_invoice(&pay, user_amount_msat, None, comment.as_deref())
-        .await
-        .map_err(|err| anyhow!(err.to_string()))?;
+    let callback_resp =
+        fetch_lnurl_pay_invoice(reqwest::Client::new(), &pay, user_amount_msat, comment.as_deref()).await?;
 
     validate_invoice(user_amount_msat, &callback_resp.pr)?;
 
@@ -54,6 +55,56 @@ fn lnurl_pay_response_from_request(req: &LnUrlPayRequestData) -> LnurlPayRespons
         allows_nostr: None,
         nostr_pubkey: None,
     }
+}
+
+async fn fetch_lnurl_pay_invoice(
+    client: reqwest::Client,
+    pay: &LnurlPayResponse,
+    msats: u64,
+    comment: Option<&str>,
+) -> Result<LnURLPayInvoice> {
+    let url = lnurl_pay_callback_url(pay, msats, comment)?;
+    let response_text = client.get(url).send().await?.error_for_status()?.text().await?;
+    parse_lnurl_pay_invoice_response(&response_text)
+}
+
+fn lnurl_pay_callback_url(pay: &LnurlPayResponse, msats: u64, comment: Option<&str>) -> Result<Url> {
+    if msats < pay.min_sendable || msats > pay.max_sendable {
+        return Err(anyhow!("Invalid LNURL payment amount"));
+    }
+
+    if let (Some(comment), Some(max_length)) = (comment, pay.comment_allowed) {
+        if comment.len() > max_length as usize {
+            return Err(anyhow!("Invalid LNURL comment"));
+        }
+    }
+
+    let amount = msats.to_string();
+    let mut url = Url::parse(&pay.callback)?;
+    {
+        let mut query = url.query_pairs_mut();
+        query.append_pair("amount", &amount);
+        if let Some(comment) = comment {
+            query.append_pair("comment", comment);
+        }
+    }
+
+    Ok(url)
+}
+
+#[derive(Deserialize)]
+struct LnUrlCallbackErrorResponse {
+    status: String,
+    reason: String,
+}
+
+fn parse_lnurl_pay_invoice_response(response_text: &str) -> Result<LnURLPayInvoice> {
+    match serde_json::from_str::<LnUrlCallbackErrorResponse>(response_text) {
+        Ok(err) if err.status.eq_ignore_ascii_case("ERROR") => return Err(anyhow!(err.reason)),
+        _ => {}
+    }
+
+    Ok(serde_json::from_str(response_text)?)
 }
 
 fn validate_invoice(user_amount_msat: u64, bolt11: &str) -> Result<()> {
@@ -189,5 +240,65 @@ fn decrypt_success_action(ciphertext: String, iv: String, payment_preimage: &str
             warn!(%err, payment_preimage, "Failed to decrypt LNURL success action AES data");
             None
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn pay_response(callback: &str) -> LnurlPayResponse {
+        LnurlPayResponse {
+            callback: callback.to_string(),
+            max_sendable: 10_000,
+            min_sendable: 1_000,
+            tag: LnurlTag::PayRequest,
+            metadata: "[]".to_string(),
+            comment_allowed: Some(144),
+            allows_nostr: None,
+            nostr_pubkey: None,
+        }
+    }
+
+    #[test]
+    fn lnurl_pay_callback_url_percent_encodes_comment() {
+        let url = lnurl_pay_callback_url(
+            &pay_response("https://example.com/lnurl/callback?existing=1"),
+            2_000,
+            Some("thanks & sats + #freedom"),
+        )
+        .unwrap();
+
+        let query_pairs = url.query_pairs().into_owned().collect::<Vec<_>>();
+        assert_eq!(
+            query_pairs,
+            vec![
+                ("existing".to_string(), "1".to_string()),
+                ("amount".to_string(), "2000".to_string()),
+                ("comment".to_string(), "thanks & sats + #freedom".to_string()),
+            ]
+        );
+        assert!(url.as_str().contains("comment=thanks+%26+sats+%2B+%23freedom"));
+    }
+
+    #[test]
+    fn lnurl_pay_callback_url_rejects_invalid_amount() {
+        let err = lnurl_pay_callback_url(&pay_response("https://example.com/callback"), 999, None).unwrap_err();
+        assert!(err.to_string().contains("Invalid LNURL payment amount"));
+    }
+
+    #[test]
+    fn lnurl_pay_callback_url_rejects_too_long_comment() {
+        let mut pay = pay_response("https://example.com/callback");
+        pay.comment_allowed = Some(3);
+
+        let err = lnurl_pay_callback_url(&pay, 2_000, Some("four")).unwrap_err();
+        assert!(err.to_string().contains("Invalid LNURL comment"));
+    }
+
+    #[test]
+    fn parse_lnurl_pay_invoice_response_preserves_lnurl_error_reason() {
+        let err = parse_lnurl_pay_invoice_response(r#"{"status":"ERROR","reason":"bad comment"}"#).unwrap_err();
+        assert!(err.to_string().contains("bad comment"));
     }
 }
