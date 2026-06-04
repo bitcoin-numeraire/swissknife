@@ -3,7 +3,6 @@ use std::{str::FromStr, sync::Arc};
 use async_trait::async_trait;
 use chrono::Utc;
 use lightning_invoice::Bolt11Invoice;
-use serde_bolt::bitcoin::hashes::hex::ToHex;
 use tracing::{debug, info, trace, warn};
 use uuid::Uuid;
 
@@ -429,7 +428,7 @@ impl PaymentService {
                         payment_hash: Bolt11Invoice::from_str(&cb.pr)
                             .expect("should not fail or malformed callback")
                             .payment_hash()
-                            .to_hex(),
+                            .to_string(),
                         ..Default::default()
                     }),
                     ..Default::default()

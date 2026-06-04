@@ -10,7 +10,6 @@ use cln::{
 use hex::decode;
 use lightning_invoice::Bolt11Invoice;
 use serde::Deserialize;
-use serde_bolt::bitcoin::hashes::hex::ToHex;
 use tokio::{fs, io};
 use tonic::transport::{Certificate, Channel, ClientTlsConfig, Identity};
 
@@ -384,7 +383,7 @@ impl BitcoinWallet for ClnGrpcClient {
         let fee = psbt.fee().map_err(|e| BitcoinError::ParsePsbt(e.to_string()))?;
 
         Ok(BtcPreparedTransaction {
-            txid: response.txid.to_hex(),
+            txid: hex::encode(&response.txid),
             fee_sat: fee.to_sat(),
             psbt: response.psbt,
             locked_utxos: Vec::new(),
@@ -462,7 +461,7 @@ impl BitcoinWallet for ClnGrpcClient {
         let outputs = outputs?;
 
         Ok(Some(BtcTransaction {
-            txid: transaction.hash.to_hex(),
+            txid: hex::encode(transaction.hash),
             block_height: Some(transaction.blockheight),
             outputs,
             is_outgoing: false, // TODO: determine from CLN transaction data when needed
@@ -560,7 +559,7 @@ impl BitcoinWallet for ClnGrpcClient {
                     };
 
                     events.push(OnchainTransaction::Withdrawal(OnchainWithdrawalEvent {
-                        txid: spending_txid.to_hex(),
+                        txid: hex::encode(spending_txid),
                         block_height: Some(chainmove.blockheight),
                     }));
                 }

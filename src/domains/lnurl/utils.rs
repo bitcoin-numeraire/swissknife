@@ -226,7 +226,7 @@ fn decrypt_success_action(ciphertext: String, iv: String, payment_preimage: &str
             return None;
         }
     };
-    let preimage_arr: [u8; 32] = preimage.into_inner();
+    let preimage_arr: [u8; 32] = preimage.to_byte_array();
 
     let aes_params = LnurlAesParams {
         description: String::new(),

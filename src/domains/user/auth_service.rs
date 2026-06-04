@@ -120,7 +120,7 @@ impl AuthUseCases for AuthService {
     async fn authenticate_api_key(&self, token: Vec<u8>) -> Result<User, ApplicationError> {
         trace!("Start API Key authentication");
 
-        let key_hash = sha256::Hash::hash(&token).to_vec();
+        let key_hash = sha256::Hash::hash(&token).to_byte_array().to_vec();
         let api_key_opt = self.store.api_key.find_by_key_hash(key_hash).await?;
 
         let api_key = match api_key_opt {

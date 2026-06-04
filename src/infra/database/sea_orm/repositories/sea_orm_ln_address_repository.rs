@@ -84,7 +84,7 @@ impl LnAddressRepository for SeaOrmLnAddressRepository {
             wallet_id: Set(wallet_id),
             username: Set(username.to_owned()),
             allows_nostr: Set(allows_nostr),
-            nostr_pubkey: Set(nostr_pubkey.map(|k| k.to_hex())),
+            nostr_pubkey: Set(nostr_pubkey.map(|k| k.to_string())),
             active: Set(true),
             ..Default::default()
         };
@@ -103,7 +103,7 @@ impl LnAddressRepository for SeaOrmLnAddressRepository {
             wallet_id: Unchanged(ln_address.wallet_id),
             username: Set(ln_address.username),
             allows_nostr: Set(ln_address.allows_nostr),
-            nostr_pubkey: Set(ln_address.nostr_pubkey.map(|k| k.to_hex())),
+            nostr_pubkey: Set(ln_address.nostr_pubkey.map(|k| k.to_string())),
             active: Set(ln_address.active),
             updated_at: Set(Some(Utc::now().naive_utc())),
             ..Default::default()
