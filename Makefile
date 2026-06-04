@@ -72,7 +72,7 @@ deps-outdated:
 	@cargo outdated
 
 lint:
-	@cargo clippy --workspace --all-targets -- --no-deps
+	@cargo clippy --workspace --all-targets --no-deps -- -D warnings
 
 fmt:
 	@cargo fmt --all -- --check

@@ -39,8 +39,6 @@ pub async fn validate_lnurl_pay(
     Ok(LnUrlPayCallbackResponse {
         pr: callback_resp.pr,
         success_action,
-        disposable: None,
-        routes: None,
     })
 }
 
