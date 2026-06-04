@@ -24,3 +24,44 @@ impl User {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn has_permission_returns_true_only_for_assigned_permissions() {
+        let user = User {
+            permissions: vec![Permission::ReadWallet, Permission::ReadApiKey],
+            ..Default::default()
+        };
+
+        assert!(user.has_permission(Permission::ReadWallet));
+        assert!(user.has_permission(Permission::ReadApiKey));
+        assert!(!user.has_permission(Permission::WriteWallet));
+    }
+
+    #[test]
+    fn check_permission_allows_assigned_permission() {
+        let user = User {
+            permissions: vec![Permission::WriteApiKey],
+            ..Default::default()
+        };
+
+        assert!(user.check_permission(Permission::WriteApiKey).is_ok());
+    }
+
+    #[test]
+    fn check_permission_returns_missing_permission_error() {
+        let user = User {
+            permissions: vec![Permission::ReadWallet],
+            ..Default::default()
+        };
+
+        let err = user.check_permission(Permission::WriteWallet).unwrap_err();
+        assert!(matches!(
+            err,
+            AuthorizationError::MissingPermission(Permission::WriteWallet)
+        ));
+    }
+}

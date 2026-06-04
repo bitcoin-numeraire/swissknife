@@ -674,3 +674,23 @@ impl PaymentsUseCases for PaymentService {
         Ok(synced)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn validate_amount_accepts_positive_amount() {
+        assert_eq!(PaymentService::validate_amount(Some(1)).unwrap(), 1);
+        assert_eq!(PaymentService::validate_amount(Some(42_000)).unwrap(), 42_000);
+    }
+
+    #[test]
+    fn validate_amount_rejects_missing_or_zero_amount() {
+        for amount in [None, Some(0)] {
+            let err = PaymentService::validate_amount(amount).unwrap_err();
+            assert!(matches!(err, ApplicationError::Data(DataError::Validation(_))));
+            assert!(err.to_string().contains("Amount must be greater than zero"));
+        }
+    }
+}
