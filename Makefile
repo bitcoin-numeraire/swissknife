@@ -5,7 +5,7 @@ SWISSKNIFE_SERVICE := swissknife
 SWISSKNIFE_SERVER_SERVICE := swissknife-server
 IMAGE_NAME := swissknife:latest
 
-.PHONY: watch up up-postgres up-pgadmin shutdown down generate-certs build-docker build-docker-server build-docker-dashboard run-docker lint fmt fmt-fix deps-upgrade deps-outdated install-tools generate-models new-migration
+.PHONY: watch up up-swissknife up-server up-postgres up-pgadmin shutdown down generate-certs build build-docker build-docker-server build-docker-dashboard run-docker lint fmt fmt-fix test test-unit test-integration check deps-upgrade deps-outdated install-tools generate-models new-migration run-migrations fresh-migrations
 
 watch:
 	@cargo watch -x run
@@ -80,6 +80,24 @@ fmt:
 fmt-fix:
 	@cargo fmt --all
 
+build:
+	@cargo build --workspace --all-targets
+
+test:
+	@cargo test --workspace --all-targets
+
+test-unit:
+	@cargo test --workspace --bins
+
+test-integration:
+	@if find tests -mindepth 1 -name '*.rs' 2>/dev/null | grep -q .; then \
+		cargo test --workspace --tests; \
+	else \
+		echo "No integration tests found under tests/"; \
+	fi
+
+check: fmt lint build test
+
 new-migration:
 	@sea-orm-cli migrate generate $(name)
 
@@ -87,4 +105,4 @@ run-migrations:
 	@sea-orm-cli migrate up
 
 fresh-migrations:
-	@sea-orm-cli migrate fresh 
+	@sea-orm-cli migrate fresh

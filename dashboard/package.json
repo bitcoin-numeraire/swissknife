@@ -21,6 +21,7 @@
     "re:build-npm": "npm run clean && npm install && npm run build",
     "tsc:dev": "yarn dev & yarn tsc:watch",
     "tsc:watch": "tsc --noEmit --watch",
+    "typecheck": "tsc --noEmit",
     "tsc:print": "npx tsc --showConfig",
     "openapi-ts": "rm -rf src/lib/swissknife && openapi-ts"
   },
