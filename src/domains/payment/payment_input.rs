@@ -283,3 +283,53 @@ fn currency_from_bolt11(currency: Bolt11Currency) -> Currency {
         Bolt11Currency::Signet => Currency::Signet,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const MAINNET_ADDRESS: &str = "1BoatSLRHtKNngkdXEeobR76b53LETtpyT";
+
+    #[test]
+    fn strip_lightning_scheme_removes_supported_prefixes() {
+        assert_eq!(strip_lightning_scheme("lightning:lnbc1example"), "lnbc1example");
+        assert_eq!(strip_lightning_scheme("LIGHTNING:lnbc1example"), "lnbc1example");
+        assert_eq!(strip_lightning_scheme("lnbc1example"), "lnbc1example");
+    }
+
+    #[test]
+    fn validate_lnurl_endpoint_accepts_http_and_https() {
+        assert!(validate_lnurl_endpoint("http://example.com/.well-known/lnurlp/alice").is_ok());
+        assert!(validate_lnurl_endpoint("https://example.com/.well-known/lnurlp/alice").is_ok());
+    }
+
+    #[test]
+    fn validate_lnurl_endpoint_rejects_unsupported_scheme() {
+        let err = validate_lnurl_endpoint("ftp://example.com/lnurlp/alice").unwrap_err();
+        assert_eq!(err, "Unsupported LNURL scheme: ftp");
+    }
+
+    #[test]
+    fn parse_bitcoin_address_value_detects_network() {
+        let data = parse_bitcoin_address_value(MAINNET_ADDRESS).unwrap();
+
+        assert_eq!(data.address, MAINNET_ADDRESS);
+        assert_eq!(data.network, BtcNetwork::Bitcoin);
+        assert_eq!(data.amount_sat, None);
+        assert_eq!(data.message, None);
+    }
+
+    #[test]
+    fn parse_bitcoin_uri_preserves_amount_and_message() {
+        let input = format!("bitcoin:{MAINNET_ADDRESS}?amount=0.00000123&message=hello%20there");
+
+        let PaymentInput::BitcoinAddress(data) = parse_bitcoin_payment_input(&input).unwrap() else {
+            panic!("expected bitcoin address payment input");
+        };
+
+        assert_eq!(data.address, MAINNET_ADDRESS);
+        assert_eq!(data.network, BtcNetwork::Bitcoin);
+        assert_eq!(data.amount_sat, Some(123));
+        assert_eq!(data.message, Some("hello there".to_string()));
+    }
+}

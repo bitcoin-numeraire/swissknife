@@ -173,3 +173,36 @@ fn validate_username(username: &str) -> Result<(), DataError> {
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn validate_username_accepts_supported_email_local_part_characters() {
+        assert!(validate_username("alice").is_ok());
+        assert!(validate_username("alice.123_+-").is_ok());
+        assert!(validate_username("a".repeat(MAX_USERNAME_LENGTH).as_str()).is_ok());
+    }
+
+    #[test]
+    fn validate_username_rejects_empty_or_too_long_usernames() {
+        let empty_err = validate_username("").unwrap_err();
+        assert!(matches!(empty_err, DataError::Validation(_)));
+        assert!(empty_err.to_string().contains("Invalid username length"));
+
+        let too_long = "a".repeat(MAX_USERNAME_LENGTH + 1);
+        let too_long_err = validate_username(&too_long).unwrap_err();
+        assert!(matches!(too_long_err, DataError::Validation(_)));
+        assert!(too_long_err.to_string().contains("Invalid username length"));
+    }
+
+    #[test]
+    fn validate_username_rejects_unsupported_characters() {
+        for username in ["Alice", "alice bob", "alice@example", "alice:123"] {
+            let err = validate_username(username).unwrap_err();
+            assert!(matches!(err, DataError::Validation(_)));
+            assert!(err.to_string().contains("Invalid username format"));
+        }
+    }
+}
