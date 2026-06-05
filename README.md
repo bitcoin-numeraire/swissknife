@@ -88,6 +88,12 @@ All images support both `linux/amd64` and `linux/arm64` architectures.
 
 Extended documentation is available [here](https://docs.numeraire.tech/swissknife)
 
+Developer documentation:
+
+- [Contributing](docs/CONTRIBUTING.md)
+- [Developer guidelines](docs/DEVELOPER_GUIDELINES.md)
+- [Code of conduct](docs/CODE_OF_CONDUCT.md)
+
 ## Work In Progress (WIP)
 
 #### Features

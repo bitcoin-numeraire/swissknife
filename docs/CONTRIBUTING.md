@@ -1,6 +1,6 @@
 # Contributing
 
-Swissknife is implemetend in Rust. The local development infrastructure uses `Docker`and `Docker Compose`. To run the project locally, simply run:
+SwissKnife is implemented in Rust. The local development infrastructure uses `Docker` and `Docker Compose`. To run the project locally, run:
 
 ```bash
 make install-tools

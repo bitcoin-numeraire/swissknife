@@ -1,6 +1,20 @@
-# Testing
+# Developer Guidelines
 
-This project separates unit, integration, and end-to-end tests by scope.
+This document defines backend development conventions for SwissKnife. It should be used together with `AGENTS.md`, `README.md`, and the Makefile.
+
+## Architecture
+
+SwissKnife follows a clean architecture direction:
+
+- handlers deal with API concerns and delegate business work
+- services and use cases own orchestration and business rules
+- repositories expose data access contracts
+- infrastructure modules implement repository, database, Lightning, wallet, authentication, server, and external adapter details
+- DTOs belong at API boundaries, while domain entities belong in business logic
+
+Keep dependencies pointing inward. Domain code should depend on traits and application errors, not on concrete infrastructure implementations.
+
+Do not add infrastructure shortcuts to make unit tests easier. If a service is hard to test because of `AppStore`, database transactions, or dependency construction, handle that with a dedicated design/refactor PR instead of adding test-only production seams.
 
 ## Unit Tests
 
@@ -57,6 +71,8 @@ Use this naming convention:
 - context module: `when_*`, `with_*`, or `without_*`
 - test function: expected behavior, for example `returns_amount`, `rejects_zero`, or `propagates_error`
 
+Use this full hierarchy for components that orchestrate logic, branch on meaningful state, enforce permissions, or coordinate dependencies. For very small pure helpers, keep tests compact while preserving clear method and behavior names.
+
 ### Coverage Expectations
 
 For each service method or business function, cover:
@@ -90,6 +106,10 @@ Prefer `.with(...)` or `.withf(...)` plus `.times(...)` for interactions that ar
 Do not add test-only `AppStore` constructors or transaction shortcuts to make unit tests pass. Services that currently depend on `AppStore` should get repository-backed unit tests after the store and transaction boundary is refactored.
 
 Until then, unit tests should target pure service logic and services whose dependencies can be injected cleanly without changing production behavior.
+
+## Coverage
+
+Coverage tooling should be added in a dedicated PR. That PR should define the command, CI job, report format, and any minimum thresholds together so coverage is introduced as a coherent workflow.
 
 ## Integration Tests
 
