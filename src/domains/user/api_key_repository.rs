@@ -5,6 +5,7 @@ use crate::application::errors::DatabaseError;
 
 use super::{ApiKey, ApiKeyFilter};
 
+#[cfg_attr(test, mockall::automock)]
 #[async_trait]
 pub trait ApiKeyRepository: Send + Sync {
     async fn find(&self, id: Uuid) -> Result<Option<ApiKey>, DatabaseError>;

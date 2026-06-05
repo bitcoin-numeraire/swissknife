@@ -5,6 +5,7 @@ use crate::application::errors::ApplicationError;
 
 use super::{Balance, Contact, Wallet, WalletFilter, WalletOverview};
 
+#[cfg_attr(test, mockall::automock)]
 #[async_trait]
 pub trait WalletUseCases: Send + Sync {
     async fn register(&self, user_id: String) -> Result<Wallet, ApplicationError>;

@@ -5,6 +5,7 @@ use crate::{application::errors::DatabaseError, domains::bitcoin::BtcAddressFilt
 
 use super::{BtcAddress, BtcAddressType, BtcOutput};
 
+#[cfg_attr(test, mockall::automock)]
 #[async_trait]
 pub trait BtcAddressRepository: Send + Sync {
     async fn find(&self, id: Uuid) -> Result<Option<BtcAddress>, DatabaseError>;
@@ -25,6 +26,7 @@ pub trait BtcAddressRepository: Send + Sync {
     async fn delete_many(&self, filter: BtcAddressFilter) -> Result<u64, DatabaseError>;
 }
 
+#[cfg_attr(test, mockall::automock)]
 #[async_trait]
 pub trait BtcOutputRepository: Send + Sync {
     async fn find_by_outpoint(&self, outpoint: &str) -> Result<Option<BtcOutput>, DatabaseError>;

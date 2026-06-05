@@ -5,6 +5,7 @@ use crate::{application::entities::Currency, domains::event::OnchainWithdrawalEv
 
 use super::{LnInvoicePaidEvent, LnPayFailureEvent, LnPaySuccessEvent, OnchainDepositEvent};
 
+#[cfg_attr(test, mockall::automock)]
 #[async_trait]
 pub trait EventUseCases: Send + Sync {
     async fn invoice_paid(&self, event: LnInvoicePaidEvent) -> Result<(), ApplicationError>;

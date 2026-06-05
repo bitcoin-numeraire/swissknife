@@ -663,11 +663,11 @@ impl BitcoinWallet for LndGrpcClient {
         })
     }
 
-    async fn get_output(
+    async fn get_output<'a>(
         &self,
         txid: &str,
         output_index: Option<u32>,
-        address: Option<&str>,
+        address: Option<&'a str>,
         include_spent: bool,
     ) -> Result<Option<BtcOutput>, BitcoinError> {
         let _ = include_spent;

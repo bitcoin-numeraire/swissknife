@@ -19,6 +19,17 @@ use crate::{
     },
 };
 
+#[cfg(test)]
+use crate::domains::{
+    bitcoin::{MockBtcAddressRepository, MockBtcOutputRepository},
+    invoice::MockInvoiceRepository,
+    ln_address::MockLnAddressRepository,
+    payment::MockPaymentRepository,
+    system::MockConfigRepository,
+    user::MockApiKeyRepository,
+    wallet::MockWalletRepository,
+};
+
 #[derive(Clone)]
 pub struct AppStore {
     db_conn: DatabaseConnection,
@@ -57,11 +68,71 @@ impl AppStore {
     }
 }
 
+/// Test-only builder for AppStore service tests.
+///
+/// Configure the public generated mocks, then call `build` to move them into
+/// the `Arc<dyn ...>` fields expected by services.
+#[cfg(test)]
+pub struct AppStoreMockBuilder {
+    pub ln_address: MockLnAddressRepository,
+    pub payment: MockPaymentRepository,
+    pub invoice: MockInvoiceRepository,
+    pub wallet: MockWalletRepository,
+    pub api_key: MockApiKeyRepository,
+    pub config: MockConfigRepository,
+    pub btc_address: MockBtcAddressRepository,
+    pub btc_output: MockBtcOutputRepository,
+}
+
+#[cfg(test)]
+impl Default for AppStoreMockBuilder {
+    fn default() -> Self {
+        Self {
+            ln_address: MockLnAddressRepository::new(),
+            payment: MockPaymentRepository::new(),
+            invoice: MockInvoiceRepository::new(),
+            wallet: MockWalletRepository::new(),
+            api_key: MockApiKeyRepository::new(),
+            config: MockConfigRepository::new(),
+            btc_address: MockBtcAddressRepository::new(),
+            btc_output: MockBtcOutputRepository::new(),
+        }
+    }
+}
+
+#[cfg(test)]
+impl AppStoreMockBuilder {
+    pub fn build(self) -> AppStore {
+        AppStore {
+            db_conn: DatabaseConnection::Disconnected,
+            ln_address: Arc::new(self.ln_address),
+            payment: Arc::new(self.payment),
+            invoice: Arc::new(self.invoice),
+            wallet: Arc::new(self.wallet),
+            api_key: Arc::new(self.api_key),
+            config: Arc::new(self.config),
+            btc_address: Arc::new(self.btc_address),
+            btc_output: Arc::new(self.btc_output),
+        }
+    }
+}
+
 impl AppStore {
-    pub async fn begin(&self) -> Result<DatabaseTransaction, DatabaseError> {
+    #[cfg(test)]
+    pub fn mock() -> AppStoreMockBuilder {
+        AppStoreMockBuilder::default()
+    }
+
+    pub async fn begin(&self) -> Result<Option<DatabaseTransaction>, DatabaseError> {
+        #[cfg(test)]
+        if matches!(self.db_conn, DatabaseConnection::Disconnected) {
+            return Ok(None);
+        }
+
         self.db_conn
             .begin()
             .await
+            .map(Some)
             .map_err(|e| DatabaseError::Transaction(e.to_string()))
     }
 

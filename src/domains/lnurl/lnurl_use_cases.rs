@@ -4,6 +4,7 @@ use crate::application::errors::ApplicationError;
 
 use super::{LnURLPayRequest, LnUrlCallback};
 
+#[cfg_attr(test, mockall::automock)]
 #[async_trait]
 pub trait LnUrlUseCases: Send + Sync {
     async fn lnurlp(&self, username: String) -> Result<LnURLPayRequest, ApplicationError>;

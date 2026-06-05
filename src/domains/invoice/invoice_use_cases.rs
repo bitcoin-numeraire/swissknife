@@ -6,6 +6,7 @@ use crate::application::errors::ApplicationError;
 
 use super::{Invoice, InvoiceFilter};
 
+#[cfg_attr(test, mockall::automock)]
 #[async_trait]
 pub trait InvoiceUseCases: Send + Sync {
     async fn invoice(
