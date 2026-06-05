@@ -14,7 +14,7 @@ SwissKnife follows a clean architecture direction:
 
 Keep dependencies pointing inward. Domain code should depend on traits and application errors, not on concrete infrastructure implementations.
 
-Do not add infrastructure shortcuts to make unit tests easier. If a service is hard to test because of `AppStore`, database transactions, or dependency construction, handle that with a dedicated design/refactor PR instead of adding test-only production seams.
+Do not add infrastructure shortcuts or test-only production seams to make unit tests easier. If a component is hard to test, improve the production design instead.
 
 ## Unit Tests
 
@@ -73,7 +73,7 @@ Use this naming convention:
 
 Use this full hierarchy for components that orchestrate logic, branch on meaningful state, enforce permissions, or coordinate dependencies. For very small pure helpers, keep tests compact while preserving clear method and behavior names.
 
-### Coverage Expectations
+### Behavior Expectations
 
 For each service method or business function, cover:
 
@@ -101,16 +101,6 @@ dependency
 
 Prefer `.with(...)` or `.withf(...)` plus `.times(...)` for interactions that are part of the behavior being tested. Avoid hand-written mocks unless `mockall` cannot express the dependency.
 
-### AppStore
-
-Do not add test-only `AppStore` constructors or transaction shortcuts to make unit tests pass. Services that currently depend on `AppStore` should get repository-backed unit tests after the store and transaction boundary is refactored.
-
-Until then, unit tests should target pure service logic and services whose dependencies can be injected cleanly without changing production behavior.
-
-## Coverage
-
-Coverage tooling should be added in a dedicated PR. That PR should define the command, CI job, report format, and any minimum thresholds together so coverage is introduced as a coherent workflow.
-
 ## Integration Tests
 
 Integration tests treat SwissKnife as a black box and exercise public APIs with reproducible dependencies. These tests may use real Postgres, SQLite, Lightning nodes in regtest, or mocked external servers, depending on the capability being tested.
@@ -119,4 +109,4 @@ Integration tests should be concise and capability-focused. They should not comb
 
 ## End-to-End Tests
 
-End-to-end tests cover complete user stories across the deployed system and dashboard. They are out of scope for the current unit-test work.
+End-to-end tests cover complete user stories across the deployed system and dashboard.

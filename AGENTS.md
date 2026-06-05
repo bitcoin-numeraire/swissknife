@@ -65,7 +65,7 @@ make shutdown                  # Stop and remove volumes
 
 **application/** - Shared application concerns
 - `dtos/` - Data transfer objects for API requests/responses
-- `entities/` - App-wide entities (AppStore, AppServices, LnNodeClient)
+- `entities/` - App-wide entities and service wiring
 - `errors/` - Error types (ApplicationError, AuthenticationError, etc.)
 - `docs/` - OpenAPI documentation
 
@@ -143,7 +143,7 @@ Configured via `ln_provider` in config:
 - Check for proper use of `async`/`await` and avoid blocking operations in async contexts
 - Ensure `Clone` and `Copy` are only derived when necessary
 - Validate that database transactions are properly scoped
-- Follow `docs/DEVELOPER_GUIDELINES.md` for architecture, unit-test structure, mock usage, and coverage expectations
+- Follow `docs/DEVELOPER_GUIDELINES.md` for architecture, unit-test structure, mock usage, and behavior expectations
 
 ### Architecture
 - Handlers should only handle HTTP concerns; business logic belongs in services
