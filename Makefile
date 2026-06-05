@@ -5,7 +5,7 @@ SWISSKNIFE_SERVICE := swissknife
 SWISSKNIFE_SERVER_SERVICE := swissknife-server
 IMAGE_NAME := swissknife:latest
 
-.PHONY: watch up up-swissknife up-server up-postgres up-pgadmin shutdown down generate-certs build build-docker build-docker-server build-docker-dashboard run-docker lint fmt fmt-fix test test-unit test-integration check deps-upgrade deps-outdated install-tools generate-models new-migration run-migrations fresh-migrations
+.PHONY: watch up up-swissknife up-server up-postgres up-pgadmin shutdown down generate-certs build build-docker build-docker-server build-docker-dashboard run-docker lint lint-changelog fmt fmt-fix test test-unit test-integration check deps-upgrade deps-outdated install-tools generate-models new-migration run-migrations fresh-migrations
 
 watch:
 	@cargo watch -x run
@@ -74,6 +74,9 @@ deps-outdated:
 lint:
 	@cargo clippy --workspace --all-targets -- --no-deps
 
+lint-changelog:
+	@python3 scripts/check_changelog.py
+
 fmt:
 	@cargo fmt --all -- --check
 
@@ -96,7 +99,7 @@ test-integration:
 		echo "No integration tests found under tests/"; \
 	fi
 
-check: fmt lint build test
+check: lint-changelog fmt lint build test
 
 new-migration:
 	@sea-orm-cli migrate generate $(name)

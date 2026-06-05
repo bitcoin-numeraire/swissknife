@@ -15,6 +15,16 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  changelog:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Validate changelog
+        run: make lint-changelog
+
   fmt:
     runs-on: ubuntu-latest
 
