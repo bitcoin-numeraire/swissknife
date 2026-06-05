@@ -18,9 +18,6 @@ pub enum LightningError {
     #[error("Failed to connect to Lightning node websocket server: {0}")]
     ConnectWebsocket(String),
 
-    #[error("Failed to disconnect from Lightning node: {0}")]
-    Disconnect(String),
-
     #[error("Lightning event listener failure: {0}")]
     Listener(String),
 

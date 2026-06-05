@@ -72,7 +72,7 @@ deps-outdated:
 	@cargo outdated
 
 lint:
-	@cargo clippy --workspace --all-targets -- --no-deps
+	@cargo clippy --workspace --all-targets --no-deps -- -D warnings
 
 lint-changelog:
 	@python3 scripts/check_changelog.py
