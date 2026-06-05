@@ -15,6 +15,21 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  changelog:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Validate changelog
+        uses: mindsers/changelog-reader-action@v2.4.0
+        with:
+          path: ./CHANGELOG.md
+          version: Unreleased
+          validation_level: error
+          validation_depth: 100
+
   fmt:
     runs-on: ubuntu-latest
 
