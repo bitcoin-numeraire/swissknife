@@ -23,7 +23,12 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Validate changelog
-        run: make lint-changelog
+        uses: mindsers/changelog-reader-action@v2.4.0
+        with:
+          path: ./CHANGELOG.md
+          version: Unreleased
+          validation_level: error
+          validation_depth: 100
 
   fmt:
     runs-on: ubuntu-latest
