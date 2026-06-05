@@ -135,11 +135,9 @@ impl PaymentService {
                     )
                     .await?;
 
-                if let Some(txn) = txn {
-                    txn.commit()
-                        .await
-                        .map_err(|e| DatabaseError::Transaction(e.to_string()))?;
-                }
+                txn.commit()
+                    .await
+                    .map_err(|e| DatabaseError::Transaction(e.to_string()))?;
 
                 Ok(internal_payment)
             }
@@ -451,7 +449,7 @@ impl PaymentService {
         let balance = self
             .store
             .wallet
-            .get_balance(txn.as_ref(), payment.wallet_id)
+            .get_balance(Some(&txn), payment.wallet_id)
             .await?
             .available_msat as f64;
 
@@ -465,13 +463,11 @@ impl PaymentService {
             return Err(DataError::InsufficientFunds(required_balance_msat).into());
         }
 
-        let pending_payment = self.store.payment.insert(txn.as_ref(), payment).await?;
+        let pending_payment = self.store.payment.insert(Some(&txn), payment).await?;
 
-        if let Some(txn) = txn {
-            txn.commit()
-                .await
-                .map_err(|e| DatabaseError::Transaction(e.to_string()))?;
-        }
+        txn.commit()
+            .await
+            .map_err(|e| DatabaseError::Transaction(e.to_string()))?;
 
         Ok(pending_payment)
     }
@@ -681,19 +677,6 @@ impl PaymentsUseCases for PaymentService {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
-
-    use crate::{
-        application::entities::AppStore,
-        domains::{
-            bitcoin::MockBitcoinWallet,
-            event::MockEventUseCases,
-            payment::MockPaymentRepository,
-            wallet::{Balance, MockWalletRepository},
-        },
-        infra::lightning::MockLnClient,
-    };
-
     use super::*;
 
     #[test]
@@ -709,60 +692,5 @@ mod tests {
             assert!(matches!(err, ApplicationError::Data(DataError::Validation(_))));
             assert!(err.to_string().contains("Amount must be greater than zero"));
         }
-    }
-
-    #[tokio::test]
-    async fn insert_payment_uses_mocked_store_without_database_transaction() {
-        let wallet_id = Uuid::new_v4();
-
-        let mut wallet = MockWalletRepository::new();
-        wallet
-            .expect_get_balance()
-            .withf(move |txn, id| txn.is_none() && *id == wallet_id)
-            .times(1)
-            .returning(|_, _| {
-                Ok(Balance {
-                    available_msat: 10_000,
-                    ..Default::default()
-                })
-            });
-
-        let mut payments = MockPaymentRepository::new();
-        payments
-            .expect_insert()
-            .withf(move |txn, payment| txn.is_none() && payment.wallet_id == wallet_id && payment.amount_msat == 1_000)
-            .times(1)
-            .returning(|_, payment| Ok(payment));
-
-        let mut store = AppStore::mock();
-        store.wallet = wallet;
-        store.payment = payments;
-
-        let service = PaymentService::new(
-            store.build(),
-            Arc::new(MockLnClient::new()),
-            Arc::new(MockBitcoinWallet::new()),
-            "numeraire.tech".to_string(),
-            0.0,
-            Arc::new(MockEventUseCases::new()),
-        );
-
-        let payment = service
-            .insert_payment(
-                Payment {
-                    wallet_id,
-                    amount_msat: 1_000,
-                    ledger: Ledger::Lightning,
-                    currency: Currency::Bitcoin,
-                    status: PaymentStatus::Pending,
-                    ..Default::default()
-                },
-                0.0,
-            )
-            .await
-            .unwrap();
-
-        assert_eq!(payment.wallet_id, wallet_id);
-        assert_eq!(payment.amount_msat, 1_000);
     }
 }
