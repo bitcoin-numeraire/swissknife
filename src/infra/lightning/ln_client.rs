@@ -5,6 +5,7 @@ use crate::{
     domains::{invoice::Invoice, payment::Payment, system::HealthStatus},
 };
 
+#[cfg_attr(test, mockall::automock)]
 #[async_trait]
 pub trait LnClient: Sync + Send {
     async fn disconnect(&self) -> Result<(), LightningError>;

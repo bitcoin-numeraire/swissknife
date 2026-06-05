@@ -5,6 +5,7 @@ use crate::application::{dtos::CreateApiKeyRequest, errors::ApplicationError};
 
 use super::{ApiKey, ApiKeyFilter, User};
 
+#[cfg_attr(test, mockall::automock)]
 #[async_trait]
 pub trait AuthUseCases: Send + Sync {
     async fn sign_up(&self, password: String) -> Result<String, ApplicationError>;
@@ -13,6 +14,7 @@ pub trait AuthUseCases: Send + Sync {
     async fn authenticate_api_key(&self, token: Vec<u8>) -> Result<User, ApplicationError>;
 }
 
+#[cfg_attr(test, mockall::automock)]
 #[async_trait]
 pub trait ApiKeyUseCases: Send + Sync {
     async fn generate(&self, user: User, request: CreateApiKeyRequest) -> Result<ApiKey, ApplicationError>;

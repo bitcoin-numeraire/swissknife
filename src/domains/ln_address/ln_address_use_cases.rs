@@ -7,6 +7,7 @@ use crate::application::{dtos::UpdateLnAddressRequest, errors::ApplicationError}
 
 use super::{LnAddress, LnAddressFilter};
 
+#[cfg_attr(test, mockall::automock)]
 #[async_trait]
 pub trait LnAddressUseCases: Send + Sync {
     async fn register(

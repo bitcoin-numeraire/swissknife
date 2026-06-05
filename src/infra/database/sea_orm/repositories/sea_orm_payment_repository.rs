@@ -69,7 +69,11 @@ impl PaymentRepository for SeaOrmPaymentRepository {
         Ok(models.into_iter().map(Into::into).collect())
     }
 
-    async fn insert(&self, txn: Option<&DatabaseTransaction>, payment: Payment) -> Result<Payment, DatabaseError> {
+    async fn insert<'a>(
+        &self,
+        txn: Option<&'a DatabaseTransaction>,
+        payment: Payment,
+    ) -> Result<Payment, DatabaseError> {
         let (ln_address, payment_hash, payment_preimage, metadata, success_action) = payment
             .lightning
             .as_ref()

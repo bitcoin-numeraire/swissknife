@@ -679,18 +679,41 @@ impl PaymentsUseCases for PaymentService {
 mod tests {
     use super::*;
 
-    #[test]
-    fn validate_amount_accepts_positive_amount() {
-        assert_eq!(PaymentService::validate_amount(Some(1)).unwrap(), 1);
-        assert_eq!(PaymentService::validate_amount(Some(42_000)).unwrap(), 42_000);
-    }
+    mod validate_amount {
+        use super::*;
 
-    #[test]
-    fn validate_amount_rejects_missing_or_zero_amount() {
-        for amount in [None, Some(0)] {
+        fn assert_validation_error(amount: Option<u64>) {
             let err = PaymentService::validate_amount(amount).unwrap_err();
             assert!(matches!(err, ApplicationError::Data(DataError::Validation(_))));
             assert!(err.to_string().contains("Amount must be greater than zero"));
+        }
+
+        mod with_positive_amount {
+            use super::*;
+
+            #[test]
+            fn returns_amount() {
+                assert_eq!(PaymentService::validate_amount(Some(1)).unwrap(), 1);
+                assert_eq!(PaymentService::validate_amount(Some(42_000)).unwrap(), 42_000);
+            }
+        }
+
+        mod without_amount {
+            use super::*;
+
+            #[test]
+            fn rejects_missing_amount() {
+                assert_validation_error(None);
+            }
+        }
+
+        mod with_zero_amount {
+            use super::*;
+
+            #[test]
+            fn rejects_zero() {
+                assert_validation_error(Some(0));
+            }
         }
     }
 }

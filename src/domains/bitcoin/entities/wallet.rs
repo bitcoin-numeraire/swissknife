@@ -8,6 +8,7 @@ use crate::{
     },
 };
 
+#[cfg_attr(test, mockall::automock)]
 #[async_trait]
 pub trait BitcoinWallet: Sync + Send {
     async fn new_address(&self, address_type: BtcAddressType) -> Result<String, BitcoinError>;
@@ -24,11 +25,11 @@ pub trait BitcoinWallet: Sync + Send {
     async fn release_prepared_transaction(&self, prepared: &BtcPreparedTransaction) -> Result<(), BitcoinError>;
     async fn get_transaction(&self, txid: &str) -> Result<Option<BtcTransaction>, BitcoinError>;
     async fn synchronize(&self, cursor: Option<OnchainSyncCursor>) -> Result<OnchainSyncBatch, BitcoinError>;
-    async fn get_output(
+    async fn get_output<'a>(
         &self,
         txid: &str,
         output_index: Option<u32>,
-        address: Option<&str>,
+        address: Option<&'a str>,
         include_spent: bool,
     ) -> Result<Option<BtcOutput>, BitcoinError>;
     fn network(&self) -> BtcNetwork;

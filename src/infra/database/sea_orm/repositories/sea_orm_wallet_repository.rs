@@ -219,7 +219,7 @@ impl WalletRepository for SeaOrmWalletRepository {
         Ok(model.into())
     }
 
-    async fn get_balance(&self, txn: Option<&DatabaseTransaction>, id: Uuid) -> Result<Balance, DatabaseError> {
+    async fn get_balance<'a>(&self, txn: Option<&'a DatabaseTransaction>, id: Uuid) -> Result<Balance, DatabaseError> {
         let received = Invoice::find()
             .filter(InvoiceColumn::WalletId.eq(id))
             .select_only()

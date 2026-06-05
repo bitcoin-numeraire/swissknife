@@ -8,6 +8,7 @@ use crate::{
 
 use super::BtcAddress;
 
+#[cfg_attr(test, mockall::automock)]
 #[async_trait]
 pub trait BitcoinUseCases: Send + Sync {
     async fn new_deposit_address(

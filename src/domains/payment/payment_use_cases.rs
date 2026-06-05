@@ -5,6 +5,7 @@ use crate::application::errors::ApplicationError;
 
 use super::{Payment, PaymentFilter};
 
+#[cfg_attr(test, mockall::automock)]
 #[async_trait]
 pub trait PaymentsUseCases: Send + Sync {
     async fn pay(

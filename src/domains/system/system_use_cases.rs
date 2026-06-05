@@ -4,6 +4,7 @@ use crate::{application::errors::ApplicationError, domains::bitcoin::OnchainSync
 
 use super::{HealthCheck, SetupInfo, VersionInfo};
 
+#[cfg_attr(test, mockall::automock)]
 #[async_trait]
 pub trait SystemUseCases: Send + Sync {
     async fn health_check(&self) -> HealthCheck;
