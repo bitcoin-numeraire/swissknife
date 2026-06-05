@@ -92,6 +92,7 @@ Developer documentation:
 
 - [Contributing](docs/CONTRIBUTING.md)
 - [Developer guidelines](docs/DEVELOPER_GUIDELINES.md)
+- [Architecture decisions](docs/adr/0001-appstore-uow-wallet-reservations.md)
 - [Code of conduct](docs/CODE_OF_CONDUCT.md)
 
 ## Work In Progress (WIP)
