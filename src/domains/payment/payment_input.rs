@@ -167,11 +167,6 @@ fn parse_bitcoin_payment_input(input: &str) -> Result<PaymentInput, String> {
     bitcoin_address_data_from_unchecked(uri.address, amount_sat, message).map(PaymentInput::BitcoinAddress)
 }
 
-fn parse_bitcoin_address_value(address: &str) -> Result<BitcoinAddressData, String> {
-    let unchecked = Address::from_str(address).map_err(|err| err.to_string())?;
-    bitcoin_address_data_from_unchecked(unchecked, None, None)
-}
-
 fn bitcoin_address_data_from_unchecked(
     unchecked: Address<NetworkUnchecked>,
     amount_sat: Option<u64>,
@@ -261,7 +256,6 @@ fn lnurl_pay_request_data_from_response(
         min_sendable: pay.min_sendable,
         max_sendable: pay.max_sendable,
         metadata: pay.metadata,
-        tag: pay.tag.to_string(),
         comment_allowed,
         ln_address,
     })
@@ -310,8 +304,10 @@ mod tests {
     }
 
     #[test]
-    fn parse_bitcoin_address_value_detects_network() {
-        let data = parse_bitcoin_address_value(MAINNET_ADDRESS).unwrap();
+    fn parse_bitcoin_address_input_detects_network() {
+        let PaymentInput::BitcoinAddress(data) = parse_bitcoin_payment_input(MAINNET_ADDRESS).unwrap() else {
+            panic!("expected bitcoin address payment input");
+        };
 
         assert_eq!(data.address, MAINNET_ADDRESS);
         assert_eq!(data.network, BtcNetwork::Bitcoin);

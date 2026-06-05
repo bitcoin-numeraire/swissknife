@@ -31,9 +31,9 @@ impl NostrUseCases for NostrService {
             .await?
             .ok_or_else(|| DataError::NotFound("Nostr ID not found.".to_string()))?;
 
-        if ln_address.allows_nostr && ln_address.nostr_pubkey.is_some() {
+        if let (true, Some(nostr_pubkey)) = (ln_address.allows_nostr, ln_address.nostr_pubkey) {
             debug!(username, "Nostr identifier fetched successfully");
-            Ok(ln_address.nostr_pubkey.unwrap())
+            Ok(nostr_pubkey)
         } else {
             debug!(username, "Nostr identifier not enabled");
             Err(DataError::NotFound("Nostr ID not found.".to_string()).into())
