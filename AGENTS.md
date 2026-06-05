@@ -143,6 +143,7 @@ Configured via `ln_provider` in config:
 - Check for proper use of `async`/`await` and avoid blocking operations in async contexts
 - Ensure `Clone` and `Copy` are only derived when necessary
 - Validate that database transactions are properly scoped
+- Follow `TESTING.md` for unit-test structure, mock usage, and coverage expectations
 
 ### Architecture
 - Handlers should only handle HTTP concerns; business logic belongs in services

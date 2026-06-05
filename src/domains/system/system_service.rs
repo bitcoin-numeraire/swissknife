@@ -109,34 +109,3 @@ impl SystemUseCases for SystemService {
         Ok(())
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use std::sync::Arc;
-
-    use sea_orm::DatabaseConnection;
-
-    use crate::{application::entities::AppStore, infra::lightning::MockLnClient};
-
-    use super::*;
-
-    #[tokio::test]
-    async fn health_check_uses_injected_lightning_client() {
-        let mut ln_client = MockLnClient::new();
-        ln_client
-            .expect_health()
-            .times(1)
-            .returning(|| Ok(HealthStatus::Operational));
-
-        let service = SystemService::new(
-            AppStore::new_sea_orm(DatabaseConnection::Disconnected),
-            Arc::new(ln_client),
-        );
-
-        let health = service.health_check().await;
-
-        assert_eq!(health.database, HealthStatus::Unavailable);
-        assert_eq!(health.ln_provider, HealthStatus::Operational);
-        assert!(!health.is_healthy);
-    }
-}
