@@ -83,7 +83,7 @@ impl WalletUseCases for WalletService {
     async fn get_balance(&self, id: Uuid) -> Result<Balance, ApplicationError> {
         trace!(%id, "Fetching balance");
 
-        let balance = self.store.wallet.get_balance(None, id).await?;
+        let balance = self.store.wallet.get_balance(id).await?;
 
         debug!(%id, "Balance fetched successfully");
         Ok(balance)

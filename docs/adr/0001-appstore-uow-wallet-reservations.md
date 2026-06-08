@@ -40,7 +40,7 @@ It also violates the intended dependency direction. `application/entities/store.
 
 ### Transactions leak into repository ports
 
-`PaymentRepository::insert` and `WalletRepository::get_balance` currently accept `Option<&DatabaseTransaction>`. That imports SeaORM into domain/application-facing repository traits.
+Before #238, `PaymentRepository::insert` and `WalletRepository::get_balance` accepted `Option<&DatabaseTransaction>`. That imported SeaORM into domain/application-facing repository traits.
 
 Repository ports should describe data capabilities, not concrete transaction handles. Transaction mechanics should be hidden behind application-level Unit-of-Work ports implemented by infrastructure.
 

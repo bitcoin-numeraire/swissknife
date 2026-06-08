@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use sea_orm::{
-    sea_query::Expr, ActiveModelTrait, ActiveValue::Set, ColumnTrait, DatabaseConnection, DatabaseTransaction,
-    EntityTrait, ModelTrait, QueryFilter, QueryOrder, QuerySelect, QueryTrait,
+    sea_query::Expr, ActiveModelTrait, ActiveValue::Set, ColumnTrait, ConnectionTrait, DatabaseConnection,
+    DatabaseTransaction, EntityTrait, ModelTrait, QueryFilter, QueryOrder, QuerySelect, QueryTrait,
 };
 use uuid::Uuid;
 
@@ -29,6 +29,57 @@ impl SeaOrmWalletRepository {
     pub fn new(db: DatabaseConnection) -> Self {
         Self { db }
     }
+
+    pub(crate) async fn get_balance_in_transaction(
+        &self,
+        txn: &DatabaseTransaction,
+        id: Uuid,
+    ) -> Result<Balance, DatabaseError> {
+        self.get_balance_with(txn, id).await
+    }
+
+    async fn get_balance_with<C>(&self, connection: &C, id: Uuid) -> Result<Balance, DatabaseError>
+    where
+        C: ConnectionTrait,
+    {
+        let received = Invoice::find()
+            .filter(InvoiceColumn::WalletId.eq(id))
+            .select_only()
+            .column_as(
+                Expr::cust("CAST(SUM(invoice.amount_received_msat) AS BIGINT)"),
+                "received_msat",
+            )
+            .into_tuple::<Option<i64>>()
+            .one(connection)
+            .await
+            .map_err(|e| DatabaseError::FindOne(e.to_string()))?
+            .unwrap_or(None);
+
+        let (sent_msat, fees_paid_msat) = Payment::find()
+            .filter(PaymentColumn::WalletId.eq(id))
+            .filter(
+                PaymentColumn::Status.is_in([PaymentStatus::Settled.to_string(), PaymentStatus::Pending.to_string()]),
+            )
+            .select_only()
+            .column_as(Expr::cust("CAST(SUM(payment.amount_msat) AS BIGINT)"), "sent_msat")
+            .column_as(Expr::cust("CAST(SUM(payment.fee_msat) AS BIGINT)"), "fees_paid_msat")
+            .into_tuple::<(Option<i64>, Option<i64>)>()
+            .one(connection)
+            .await
+            .map_err(|e| DatabaseError::FindOne(e.to_string()))?
+            .unwrap_or((None, None));
+
+        let received_msat_i64 = received.unwrap_or(0);
+        let sent_msat_i64 = sent_msat.unwrap_or(0);
+        let fees_paid_msat_i64 = fees_paid_msat.unwrap_or(0);
+
+        Ok(Balance {
+            received_msat: received_msat_i64 as u64,
+            sent_msat: sent_msat_i64 as u64,
+            fees_paid_msat: fees_paid_msat_i64 as u64,
+            available_msat: received_msat_i64 - (sent_msat_i64 + fees_paid_msat_i64),
+        })
+    }
 }
 
 #[async_trait]
@@ -41,7 +92,7 @@ impl WalletRepository for SeaOrmWalletRepository {
 
         match model_opt {
             Some(model) => {
-                let balance = self.get_balance(None, id).await?;
+                let balance = self.get_balance_with(&self.db, id).await?;
                 let payments_with_output = Payment::find()
                     .filter(PaymentColumn::WalletId.eq(id))
                     .all(&self.db)
@@ -219,49 +270,8 @@ impl WalletRepository for SeaOrmWalletRepository {
         Ok(model.into())
     }
 
-    async fn get_balance<'a>(&self, txn: Option<&'a DatabaseTransaction>, id: Uuid) -> Result<Balance, DatabaseError> {
-        let received = Invoice::find()
-            .filter(InvoiceColumn::WalletId.eq(id))
-            .select_only()
-            .column_as(
-                Expr::cust("CAST(SUM(invoice.amount_received_msat) AS BIGINT)"),
-                "received_msat",
-            )
-            .into_tuple::<Option<i64>>();
-
-        let sent = Payment::find()
-            .filter(PaymentColumn::WalletId.eq(id))
-            .filter(
-                PaymentColumn::Status.is_in([PaymentStatus::Settled.to_string(), PaymentStatus::Pending.to_string()]),
-            )
-            .select_only()
-            .column_as(Expr::cust("CAST(SUM(payment.amount_msat) AS BIGINT)"), "sent_msat")
-            .column_as(Expr::cust("CAST(SUM(payment.fee_msat) AS BIGINT)"), "fees_paid_msat")
-            .into_tuple::<(Option<i64>, Option<i64>)>();
-
-        let (received_res, sent_res) = match txn {
-            Some(txn) => (received.one(txn).await, sent.one(txn).await),
-            None => (received.one(&self.db).await, sent.one(&self.db).await),
-        };
-
-        let received = received_res
-            .map_err(|e| DatabaseError::FindOne(e.to_string()))?
-            .unwrap_or(None);
-
-        let (sent_msat, fees_paid_msat) = sent_res
-            .map_err(|e| DatabaseError::FindOne(e.to_string()))?
-            .unwrap_or((None, None));
-
-        let received_msat_i64 = received.unwrap_or(0);
-        let sent_msat_i64 = sent_msat.unwrap_or(0);
-        let fees_paid_msat_i64 = fees_paid_msat.unwrap_or(0);
-
-        Ok(Balance {
-            received_msat: received_msat_i64 as u64,
-            sent_msat: sent_msat_i64 as u64,
-            fees_paid_msat: fees_paid_msat_i64 as u64,
-            available_msat: received_msat_i64 - (sent_msat_i64 + fees_paid_msat_i64),
-        })
+    async fn get_balance(&self, id: Uuid) -> Result<Balance, DatabaseError> {
+        self.get_balance_with(&self.db, id).await
     }
 
     async fn find_contacts(&self, id: Uuid) -> Result<Vec<Contact>, DatabaseError> {

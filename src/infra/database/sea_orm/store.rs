@@ -11,9 +11,8 @@ use crate::{
         errors::{ApplicationError, DataError, DatabaseError},
     },
     domains::{
-        payment::{Payment, PaymentRepository, PaymentUnitOfWork},
+        payment::{Payment, PaymentUnitOfWork},
         system::HealthProbe,
-        wallet::WalletRepository,
     },
 };
 
@@ -122,7 +121,7 @@ impl PaymentUnitOfWork for SeaOrmPaymentUnitOfWork {
         let payment_repo = SeaOrmPaymentRepository::new(self.db.clone());
 
         let balance = wallet_repo
-            .get_balance(Some(&txn), payment.wallet_id)
+            .get_balance_in_transaction(&txn, payment.wallet_id)
             .await?
             .available_msat as f64;
 
@@ -136,7 +135,7 @@ impl PaymentUnitOfWork for SeaOrmPaymentUnitOfWork {
             return Err(DataError::InsufficientFunds(required_balance_msat).into());
         }
 
-        let pending_payment = payment_repo.insert(Some(&txn), payment).await?;
+        let pending_payment = payment_repo.insert_in_transaction(&txn, payment).await?;
 
         txn.commit()
             .await

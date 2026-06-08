@@ -1,8 +1,8 @@
 use async_trait::async_trait;
 use chrono::Utc;
 use sea_orm::{
-    ActiveModelTrait, ActiveValue, ColumnTrait, DatabaseConnection, DatabaseTransaction, EntityTrait, FromQueryResult,
-    QueryFilter, QueryOrder, QuerySelect, QueryTrait, Set, Unchanged,
+    ActiveModelTrait, ActiveValue, ColumnTrait, ConnectionTrait, DatabaseConnection, DatabaseTransaction, EntityTrait,
+    FromQueryResult, QueryFilter, QueryOrder, QuerySelect, QueryTrait, Set, Unchanged,
 };
 use uuid::Uuid;
 
@@ -24,56 +24,19 @@ impl SeaOrmPaymentRepository {
     pub fn new(db: DatabaseConnection) -> Self {
         Self { db }
     }
-}
 
-#[async_trait]
-impl PaymentRepository for SeaOrmPaymentRepository {
-    async fn find(&self, id: Uuid) -> Result<Option<Payment>, DatabaseError> {
-        let model = PaymentEntity::find_by_id(id)
-            .one(&self.db)
-            .await
-            .map_err(|e| DatabaseError::FindOne(e.to_string()))?;
-
-        Ok(model.map(Into::into))
-    }
-
-    async fn find_by_payment_hash(&self, payment_hash: &str) -> Result<Option<Payment>, DatabaseError> {
-        let model = PaymentEntity::find()
-            .filter(Column::PaymentHash.eq(payment_hash))
-            .one(&self.db)
-            .await
-            .map_err(|e| DatabaseError::FindOne(e.to_string()))?;
-
-        Ok(model.map(Into::into))
-    }
-
-    async fn find_many(&self, filter: PaymentFilter) -> Result<Vec<Payment>, DatabaseError> {
-        let models = PaymentEntity::find()
-            .apply_if(filter.wallet_id, |q, wallet| q.filter(Column::WalletId.eq(wallet)))
-            .apply_if(filter.ids, |q, ids| q.filter(Column::Id.is_in(ids)))
-            .apply_if(filter.status, |q, s| q.filter(Column::Status.eq(s.to_string())))
-            .apply_if(filter.ledger, |q, l| q.filter(Column::Ledger.eq(l.to_string())))
-            .apply_if(filter.ln_addresses, |q, ln_addresses| {
-                q.filter(Column::LnAddress.is_in(ln_addresses))
-            })
-            .apply_if(filter.btc_addresses, |q, btc_addresses| {
-                q.filter(Column::BtcAddress.is_in(btc_addresses))
-            })
-            .order_by(Column::CreatedAt, filter.order_direction.into())
-            .offset(filter.offset)
-            .limit(filter.limit)
-            .all(&self.db)
-            .await
-            .map_err(|e| DatabaseError::FindMany(e.to_string()))?;
-
-        Ok(models.into_iter().map(Into::into).collect())
-    }
-
-    async fn insert<'a>(
+    pub(crate) async fn insert_in_transaction(
         &self,
-        txn: Option<&'a DatabaseTransaction>,
+        txn: &DatabaseTransaction,
         payment: Payment,
     ) -> Result<Payment, DatabaseError> {
+        self.insert_with(txn, payment).await
+    }
+
+    async fn insert_with<C>(&self, connection: &C, payment: Payment) -> Result<Payment, DatabaseError>
+    where
+        C: ConnectionTrait,
+    {
         let (ln_address, payment_hash, payment_preimage, metadata, success_action) = payment
             .lightning
             .as_ref()
@@ -135,14 +98,60 @@ impl PaymentRepository for SeaOrmPaymentRepository {
             ..Default::default()
         };
 
-        let result = match txn {
-            Some(txn) => model.insert(txn).await,
-            None => model.insert(&self.db).await,
-        };
-
-        let model = result.map_err(|e| DatabaseError::Insert(e.to_string()))?;
+        let model = model
+            .insert(connection)
+            .await
+            .map_err(|e| DatabaseError::Insert(e.to_string()))?;
 
         Ok(model.into())
+    }
+}
+
+#[async_trait]
+impl PaymentRepository for SeaOrmPaymentRepository {
+    async fn find(&self, id: Uuid) -> Result<Option<Payment>, DatabaseError> {
+        let model = PaymentEntity::find_by_id(id)
+            .one(&self.db)
+            .await
+            .map_err(|e| DatabaseError::FindOne(e.to_string()))?;
+
+        Ok(model.map(Into::into))
+    }
+
+    async fn find_by_payment_hash(&self, payment_hash: &str) -> Result<Option<Payment>, DatabaseError> {
+        let model = PaymentEntity::find()
+            .filter(Column::PaymentHash.eq(payment_hash))
+            .one(&self.db)
+            .await
+            .map_err(|e| DatabaseError::FindOne(e.to_string()))?;
+
+        Ok(model.map(Into::into))
+    }
+
+    async fn find_many(&self, filter: PaymentFilter) -> Result<Vec<Payment>, DatabaseError> {
+        let models = PaymentEntity::find()
+            .apply_if(filter.wallet_id, |q, wallet| q.filter(Column::WalletId.eq(wallet)))
+            .apply_if(filter.ids, |q, ids| q.filter(Column::Id.is_in(ids)))
+            .apply_if(filter.status, |q, s| q.filter(Column::Status.eq(s.to_string())))
+            .apply_if(filter.ledger, |q, l| q.filter(Column::Ledger.eq(l.to_string())))
+            .apply_if(filter.ln_addresses, |q, ln_addresses| {
+                q.filter(Column::LnAddress.is_in(ln_addresses))
+            })
+            .apply_if(filter.btc_addresses, |q, btc_addresses| {
+                q.filter(Column::BtcAddress.is_in(btc_addresses))
+            })
+            .order_by(Column::CreatedAt, filter.order_direction.into())
+            .offset(filter.offset)
+            .limit(filter.limit)
+            .all(&self.db)
+            .await
+            .map_err(|e| DatabaseError::FindMany(e.to_string()))?;
+
+        Ok(models.into_iter().map(Into::into).collect())
+    }
+
+    async fn insert(&self, payment: Payment) -> Result<Payment, DatabaseError> {
+        self.insert_with(&self.db, payment).await
     }
 
     async fn update(&self, payment: Payment) -> Result<Payment, DatabaseError> {
