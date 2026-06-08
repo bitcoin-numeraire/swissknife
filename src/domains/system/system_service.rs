@@ -35,6 +35,7 @@ impl SystemUseCases for SystemService {
 
         let database = self
             .store
+            .health
             .ping()
             .await
             .map(|_| HealthStatus::Operational)
@@ -107,5 +108,42 @@ impl SystemUseCases for SystemService {
 
         debug!(?cursor, "Onchain sync cursor updated successfully");
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use crate::{application::entities::MockAppStoreBuilder, infra::lightning::MockLnClient};
+
+    use super::*;
+
+    mod health_check {
+        use super::*;
+
+        mod when_dependencies_are_operational {
+            use super::*;
+
+            #[tokio::test]
+            async fn reports_system_healthy() {
+                let mut store = MockAppStoreBuilder::new();
+                store.health.expect_ping().times(1).returning(|| Ok(()));
+
+                let mut ln_client = MockLnClient::new();
+                ln_client
+                    .expect_health()
+                    .times(1)
+                    .returning(|| Ok(HealthStatus::Operational));
+
+                let service = SystemService::new(store.build(), Arc::new(ln_client));
+
+                let health = service.health_check().await;
+
+                assert_eq!(health.database, HealthStatus::Operational);
+                assert_eq!(health.ln_provider, HealthStatus::Operational);
+                assert!(health.is_healthy);
+            }
+        }
     }
 }

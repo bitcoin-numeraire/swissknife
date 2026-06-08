@@ -1,27 +1,17 @@
 use std::sync::Arc;
 
-use sea_orm::{DatabaseConnection, DatabaseTransaction, TransactionTrait};
-
-use crate::{
-    application::errors::DatabaseError,
-    domains::{
-        bitcoin::{BtcAddressRepository, BtcOutputRepository},
-        invoice::InvoiceRepository,
-        ln_address::LnAddressRepository,
-        payment::PaymentRepository,
-        system::ConfigRepository,
-        user::ApiKeyRepository,
-        wallet::WalletRepository,
-    },
-    infra::database::sea_orm::{
-        SeaOrmApiKeyRepository, SeaOrmBitcoinAddressRepository, SeaOrmBitcoinOutputRepository, SeaOrmConfigRepository,
-        SeaOrmInvoiceRepository, SeaOrmLnAddressRepository, SeaOrmPaymentRepository, SeaOrmWalletRepository,
-    },
+use crate::domains::{
+    bitcoin::{BtcAddressRepository, BtcOutputRepository},
+    invoice::InvoiceRepository,
+    ln_address::LnAddressRepository,
+    payment::{PaymentRepository, PaymentUnitOfWork},
+    system::{ConfigRepository, HealthProbe},
+    user::ApiKeyRepository,
+    wallet::WalletRepository,
 };
 
 #[derive(Clone)]
 pub struct AppStore {
-    db_conn: DatabaseConnection,
     pub ln_address: Arc<dyn LnAddressRepository>,
     pub payment: Arc<dyn PaymentRepository>,
     pub invoice: Arc<dyn InvoiceRepository>,
@@ -30,45 +20,89 @@ pub struct AppStore {
     pub config: Arc<dyn ConfigRepository>,
     pub btc_address: Arc<dyn BtcAddressRepository>,
     pub btc_output: Arc<dyn BtcOutputRepository>,
+    pub health: Arc<dyn HealthProbe>,
+    pub payment_uow: Arc<dyn PaymentUnitOfWork>,
 }
 
 impl AppStore {
-    pub fn new_sea_orm(db_conn: DatabaseConnection) -> Self {
-        let ln_address_repo = SeaOrmLnAddressRepository::new(db_conn.clone());
-        let payment_repo = SeaOrmPaymentRepository::new(db_conn.clone());
-        let invoice_repo = SeaOrmInvoiceRepository::new(db_conn.clone());
-        let wallet_repo = SeaOrmWalletRepository::new(db_conn.clone());
-        let api_key_repo = SeaOrmApiKeyRepository::new(db_conn.clone());
-        let config_repo = SeaOrmConfigRepository::new(db_conn.clone());
-        let btc_address_repo = SeaOrmBitcoinAddressRepository::new(db_conn.clone());
-        let btc_output_repo = SeaOrmBitcoinOutputRepository::new(db_conn.clone());
-
-        AppStore {
-            db_conn,
-            ln_address: Arc::new(ln_address_repo),
-            payment: Arc::new(payment_repo),
-            invoice: Arc::new(invoice_repo),
-            wallet: Arc::new(wallet_repo),
-            api_key: Arc::new(api_key_repo),
-            config: Arc::new(config_repo),
-            btc_address: Arc::new(btc_address_repo),
-            btc_output: Arc::new(btc_output_repo),
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        ln_address: Arc<dyn LnAddressRepository>,
+        payment: Arc<dyn PaymentRepository>,
+        invoice: Arc<dyn InvoiceRepository>,
+        wallet: Arc<dyn WalletRepository>,
+        api_key: Arc<dyn ApiKeyRepository>,
+        config: Arc<dyn ConfigRepository>,
+        btc_address: Arc<dyn BtcAddressRepository>,
+        btc_output: Arc<dyn BtcOutputRepository>,
+        health: Arc<dyn HealthProbe>,
+        payment_uow: Arc<dyn PaymentUnitOfWork>,
+    ) -> Self {
+        Self {
+            ln_address,
+            payment,
+            invoice,
+            wallet,
+            api_key,
+            config,
+            btc_address,
+            btc_output,
+            health,
+            payment_uow,
         }
     }
 }
 
-impl AppStore {
-    pub async fn begin(&self) -> Result<DatabaseTransaction, DatabaseError> {
-        self.db_conn
-            .begin()
-            .await
-            .map_err(|e| DatabaseError::Transaction(e.to_string()))
+#[cfg(test)]
+pub struct MockAppStoreBuilder {
+    pub ln_address: crate::domains::ln_address::MockLnAddressRepository,
+    pub payment: crate::domains::payment::MockPaymentRepository,
+    pub invoice: crate::domains::invoice::MockInvoiceRepository,
+    pub wallet: crate::domains::wallet::MockWalletRepository,
+    pub api_key: crate::domains::user::MockApiKeyRepository,
+    pub config: crate::domains::system::MockConfigRepository,
+    pub btc_address: crate::domains::bitcoin::MockBtcAddressRepository,
+    pub btc_output: crate::domains::bitcoin::MockBtcOutputRepository,
+    pub health: crate::domains::system::MockHealthProbe,
+    pub payment_uow: crate::domains::payment::MockPaymentUnitOfWork,
+}
+
+#[cfg(test)]
+impl MockAppStoreBuilder {
+    pub fn new() -> Self {
+        Self {
+            ln_address: crate::domains::ln_address::MockLnAddressRepository::new(),
+            payment: crate::domains::payment::MockPaymentRepository::new(),
+            invoice: crate::domains::invoice::MockInvoiceRepository::new(),
+            wallet: crate::domains::wallet::MockWalletRepository::new(),
+            api_key: crate::domains::user::MockApiKeyRepository::new(),
+            config: crate::domains::system::MockConfigRepository::new(),
+            btc_address: crate::domains::bitcoin::MockBtcAddressRepository::new(),
+            btc_output: crate::domains::bitcoin::MockBtcOutputRepository::new(),
+            health: crate::domains::system::MockHealthProbe::new(),
+            payment_uow: crate::domains::payment::MockPaymentUnitOfWork::new(),
+        }
     }
 
-    pub async fn ping(&self) -> Result<(), DatabaseError> {
-        self.db_conn
-            .ping()
-            .await
-            .map_err(|e| DatabaseError::Ping(e.to_string()))
+    pub fn build(self) -> AppStore {
+        AppStore::new(
+            Arc::new(self.ln_address),
+            Arc::new(self.payment),
+            Arc::new(self.invoice),
+            Arc::new(self.wallet),
+            Arc::new(self.api_key),
+            Arc::new(self.config),
+            Arc::new(self.btc_address),
+            Arc::new(self.btc_output),
+            Arc::new(self.health),
+            Arc::new(self.payment_uow),
+        )
+    }
+}
+
+#[cfg(test)]
+impl Default for MockAppStoreBuilder {
+    fn default() -> Self {
+        Self::new()
     }
 }

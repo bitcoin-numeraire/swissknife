@@ -1,7 +1,9 @@
+mod config;
 mod models;
 mod repositories;
-mod sea_orm_client;
+mod store;
 mod types;
 
+pub use config::*;
 pub use repositories::*;
-pub use sea_orm_client::*;
+pub use store::*;

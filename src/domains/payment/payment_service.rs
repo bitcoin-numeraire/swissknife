@@ -9,7 +9,7 @@ use uuid::Uuid;
 use crate::{
     application::{
         entities::{AppStore, Currency, Ledger},
-        errors::{ApplicationError, DataError, DatabaseError, LightningError},
+        errors::{ApplicationError, DataError, LightningError},
     },
     domains::{
         bitcoin::BitcoinWallet,
@@ -92,7 +92,6 @@ impl PaymentService {
 
                 let curr_time = Utc::now();
 
-                let txn = self.store.begin().await?;
                 self.store
                     .invoice
                     .insert(Invoice {
@@ -114,6 +113,8 @@ impl PaymentService {
                     .await?;
 
                 let internal_payment = self
+                    .store
+                    .payment_uow
                     .insert_payment(
                         Payment {
                             wallet_id,
@@ -134,10 +135,6 @@ impl PaymentService {
                         0.0,
                     )
                     .await?;
-
-                txn.commit()
-                    .await
-                    .map_err(|e| DatabaseError::Transaction(e.to_string()))?;
 
                 Ok(internal_payment)
             }
@@ -188,6 +185,8 @@ impl PaymentService {
                     .await?;
 
                 let internal_payment = self
+                    .store
+                    .payment_uow
                     .insert_payment(
                         Payment {
                             wallet_id,
@@ -218,6 +217,8 @@ impl PaymentService {
                 .await?;
 
             let pending_payment = match self
+                .store
+                .payment_uow
                 .insert_payment(
                     Payment {
                         wallet_id,
@@ -313,6 +314,8 @@ impl PaymentService {
 
                         let payment_hash = invoice.payment_hash.clone();
                         let internal_payment = self
+                            .store
+                            .payment_uow
                             .insert_payment(
                                 Payment {
                                     wallet_id,
@@ -363,6 +366,8 @@ impl PaymentService {
             debug!(%wallet_id, %amount, ledger="Lightning", "Sending bolt11 payment");
 
             let pending_payment = self
+                .store
+                .payment_uow
                 .insert_payment(
                     Payment {
                         wallet_id,
@@ -415,6 +420,8 @@ impl PaymentService {
             .map_err(|e| DataError::Validation(e.to_string()))?;
 
         let pending_payment = self
+            .store
+            .payment_uow
             .insert_payment(
                 Payment {
                     wallet_id,
@@ -441,35 +448,6 @@ impl PaymentService {
 
         self.handle_processed_payment(pending_payment, result, cb.success_action)
             .await
-    }
-
-    async fn insert_payment(&self, payment: Payment, fee_buffer: f64) -> Result<Payment, ApplicationError> {
-        let txn = self.store.begin().await?;
-
-        let balance = self
-            .store
-            .wallet
-            .get_balance(Some(&txn), payment.wallet_id)
-            .await?
-            .available_msat as f64;
-
-        let required_balance_msat = if let Some(fee_msat) = payment.fee_msat {
-            (payment.amount_msat.saturating_add(fee_msat)) as f64
-        } else {
-            payment.amount_msat as f64 * (1.0 + fee_buffer)
-        };
-
-        if balance < required_balance_msat {
-            return Err(DataError::InsufficientFunds(required_balance_msat).into());
-        }
-
-        let pending_payment = self.store.payment.insert(Some(&txn), payment).await?;
-
-        txn.commit()
-            .await
-            .map_err(|e| DatabaseError::Transaction(e.to_string()))?;
-
-        Ok(pending_payment)
     }
 
     async fn handle_processed_payment(
