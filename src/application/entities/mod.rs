@@ -8,4 +8,6 @@ pub use adapters::*;
 pub use ordering::*;
 pub use services::*;
 pub use store::AppStore;
+#[cfg(test)]
+pub use store::StoreMocks;
 pub use transaction::*;
