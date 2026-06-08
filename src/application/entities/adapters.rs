@@ -10,7 +10,7 @@ use crate::{
     },
     domains::bitcoin::BitcoinWallet,
     infra::{
-        database::sea_orm::{sea_orm_store, SeaORMClient},
+        database::sea_orm::SeaOrmStore,
         jwt::{local::LocalAuthenticator, oauth2::OAuth2Authenticator, JWTAuthenticator},
         lightning::{
             cln::{ClnGrpcClient, ClnRestClient},
@@ -36,8 +36,7 @@ impl AppAdapters {
         let AppConfig { web, database, .. } = config.clone();
 
         let timeout_layer = TimeoutLayer::with_status_code(StatusCode::REQUEST_TIMEOUT, web.request_timeout);
-        let db_conn = SeaORMClient::connect(database).await?;
-        let store = sea_orm_store(db_conn);
+        let store = SeaOrmStore::connect(database).await?;
         let jwt_authenticator = get_authenticator(config.clone()).await?;
         let lightning = get_ln_client(config).await?;
 

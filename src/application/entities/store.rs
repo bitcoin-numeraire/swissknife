@@ -54,7 +54,7 @@ impl AppStore {
 }
 
 #[cfg(test)]
-pub struct StoreMocks {
+pub struct MockAppStoreBuilder {
     pub ln_address: crate::domains::ln_address::MockLnAddressRepository,
     pub payment: crate::domains::payment::MockPaymentRepository,
     pub invoice: crate::domains::invoice::MockInvoiceRepository,
@@ -68,7 +68,7 @@ pub struct StoreMocks {
 }
 
 #[cfg(test)]
-impl StoreMocks {
+impl MockAppStoreBuilder {
     pub fn new() -> Self {
         Self {
             ln_address: crate::domains::ln_address::MockLnAddressRepository::new(),
@@ -84,7 +84,7 @@ impl StoreMocks {
         }
     }
 
-    pub fn store(self) -> AppStore {
+    pub fn build(self) -> AppStore {
         AppStore::new(
             Arc::new(self.ln_address),
             Arc::new(self.payment),
@@ -101,31 +101,8 @@ impl StoreMocks {
 }
 
 #[cfg(test)]
-impl Default for StoreMocks {
+impl Default for MockAppStoreBuilder {
     fn default() -> Self {
         Self::new()
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    mod test_support {
-        use crate::application::entities::StoreMocks;
-
-        #[test]
-        fn builds_store_from_generated_mocks_without_database() {
-            let store = StoreMocks::new().store();
-
-            let _ = store.ln_address.clone();
-            let _ = store.payment.clone();
-            let _ = store.invoice.clone();
-            let _ = store.wallet.clone();
-            let _ = store.api_key.clone();
-            let _ = store.config.clone();
-            let _ = store.btc_address.clone();
-            let _ = store.btc_output.clone();
-            let _ = store.health.clone();
-            let _ = store.payment_uow.clone();
-        }
     }
 }

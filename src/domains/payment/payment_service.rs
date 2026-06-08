@@ -113,6 +113,8 @@ impl PaymentService {
                     .await?;
 
                 let internal_payment = self
+                    .store
+                    .payment_uow
                     .insert_payment(
                         Payment {
                             wallet_id,
@@ -183,6 +185,8 @@ impl PaymentService {
                     .await?;
 
                 let internal_payment = self
+                    .store
+                    .payment_uow
                     .insert_payment(
                         Payment {
                             wallet_id,
@@ -213,6 +217,8 @@ impl PaymentService {
                 .await?;
 
             let pending_payment = match self
+                .store
+                .payment_uow
                 .insert_payment(
                     Payment {
                         wallet_id,
@@ -308,6 +314,8 @@ impl PaymentService {
 
                         let payment_hash = invoice.payment_hash.clone();
                         let internal_payment = self
+                            .store
+                            .payment_uow
                             .insert_payment(
                                 Payment {
                                     wallet_id,
@@ -358,6 +366,8 @@ impl PaymentService {
             debug!(%wallet_id, %amount, ledger="Lightning", "Sending bolt11 payment");
 
             let pending_payment = self
+                .store
+                .payment_uow
                 .insert_payment(
                     Payment {
                         wallet_id,
@@ -410,6 +420,8 @@ impl PaymentService {
             .map_err(|e| DataError::Validation(e.to_string()))?;
 
         let pending_payment = self
+            .store
+            .payment_uow
             .insert_payment(
                 Payment {
                     wallet_id,
@@ -436,10 +448,6 @@ impl PaymentService {
 
         self.handle_processed_payment(pending_payment, result, cb.success_action)
             .await
-    }
-
-    async fn insert_payment(&self, payment: Payment, fee_buffer: f64) -> Result<Payment, ApplicationError> {
-        self.store.payment_uow.insert_payment(payment, fee_buffer).await
     }
 
     async fn handle_processed_payment(

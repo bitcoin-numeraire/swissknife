@@ -135,14 +135,23 @@ Production construction moves to infrastructure, for example:
 
 ```rust
 // src/infra/database/sea_orm/store.rs
-pub fn sea_orm_store(db: DatabaseConnection) -> AppStore {
-    AppStore {
-        payment: Arc::new(SeaOrmPaymentRepository::new(db.clone())),
-        wallet: Arc::new(SeaOrmWalletRepository::new(db.clone())),
-        // ...
-        payment_uow: Arc::new(SeaOrmPaymentUnitOfWork::new(db.clone())),
-        event_uow: Arc::new(SeaOrmEventProjectionUnitOfWork::new(db.clone())),
-        health: Arc::new(SeaOrmHealthProbe::new(db)),
+pub struct SeaOrmStore;
+
+impl SeaOrmStore {
+    pub async fn connect(config: SeaOrmConfig) -> Result<AppStore, DatabaseError> {
+        let db = connect_and_migrate(config).await?;
+        Ok(Self::from_connection(db))
+    }
+
+    pub fn from_connection(db: DatabaseConnection) -> AppStore {
+        AppStore {
+            payment: Arc::new(SeaOrmPaymentRepository::new(db.clone())),
+            wallet: Arc::new(SeaOrmWalletRepository::new(db.clone())),
+            // ...
+            payment_uow: Arc::new(SeaOrmPaymentUnitOfWork::new(db.clone())),
+            event_uow: Arc::new(SeaOrmEventProjectionUnitOfWork::new(db.clone())),
+            health: Arc::new(SeaOrmHealthProbe::new(db)),
+        }
     }
 }
 ```
@@ -355,17 +364,23 @@ Retry classification must happen while raw database error codes are still availa
 
 Service unit tests should use generated `mockall` mocks and should not start real databases or Lightning/Bitcoin nodes.
 
-After `AppStore` becomes pure, tests can build services with a `StoreMocks` helper:
+After `AppStore` becomes pure, tests can build services with a mock AppStore builder. The builder should keep the mocks configurable until the test has installed expectations, then consume itself into an `AppStore`:
 
 ```rust
 #[cfg(test)]
-pub struct StoreMocks {
+pub struct MockAppStoreBuilder {
     pub payment: MockPaymentRepository,
     pub wallet: MockWalletRepository,
     pub invoice: MockInvoiceRepository,
     pub payment_uow: MockPaymentUnitOfWork,
     pub health: MockHealthProbe,
     // ...
+}
+
+impl MockAppStoreBuilder {
+    pub fn build(self) -> AppStore {
+        // Wrap configured mocks in Arc<dyn ...> fields.
+    }
 }
 ```
 

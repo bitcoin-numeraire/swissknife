@@ -115,7 +115,7 @@ impl SystemUseCases for SystemService {
 mod tests {
     use std::sync::Arc;
 
-    use crate::{application::entities::StoreMocks, infra::lightning::MockLnClient};
+    use crate::{application::entities::MockAppStoreBuilder, infra::lightning::MockLnClient};
 
     use super::*;
 
@@ -127,8 +127,8 @@ mod tests {
 
             #[tokio::test]
             async fn reports_system_healthy() {
-                let mut store_mocks = StoreMocks::new();
-                store_mocks.health.expect_ping().times(1).returning(|| Ok(()));
+                let mut store = MockAppStoreBuilder::new();
+                store.health.expect_ping().times(1).returning(|| Ok(()));
 
                 let mut ln_client = MockLnClient::new();
                 ln_client
@@ -136,7 +136,7 @@ mod tests {
                     .times(1)
                     .returning(|| Ok(HealthStatus::Operational));
 
-                let service = SystemService::new(store_mocks.store(), Arc::new(ln_client));
+                let service = SystemService::new(store.build(), Arc::new(ln_client));
 
                 let health = service.health_check().await;
 
