@@ -182,3 +182,249 @@ impl InvoiceUseCases for InvoiceService {
         Ok(synced)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        application::{
+            entities::MockAppStoreBuilder,
+            errors::{DatabaseError, LightningError},
+        },
+        domains::{event::MockEventUseCases, invoice::LnInvoice},
+        infra::lightning::MockLnClient,
+    };
+
+    use super::*;
+
+    const EXPIRY: u32 = 3_600;
+
+    fn service(store: MockAppStoreBuilder, ln_client: MockLnClient, events: MockEventUseCases) -> InvoiceService {
+        InvoiceService::new(store.build(), Arc::new(ln_client), EXPIRY, Arc::new(events))
+    }
+
+    fn lightning_invoice(payment_hash: &str, status: InvoiceStatus) -> Invoice {
+        Invoice {
+            id: Uuid::new_v4(),
+            ledger: Ledger::Lightning,
+            status,
+            ln_invoice: Some(LnInvoice {
+                payment_hash: payment_hash.to_string(),
+                ..Default::default()
+            }),
+            ..Default::default()
+        }
+    }
+
+    mod invoice {
+        use super::*;
+
+        mod with_defaults {
+            use super::*;
+
+            #[tokio::test]
+            async fn requests_node_invoice_and_persists_it() {
+                let wallet_id = Uuid::new_v4();
+
+                let mut ln_client = MockLnClient::new();
+                ln_client
+                    .expect_invoice()
+                    .withf(|amount, description, _label, expiry, deschashonly| {
+                        *amount == 1_000
+                            && description == DEFAULT_INVOICE_DESCRIPTION
+                            && *expiry == EXPIRY
+                            && !deschashonly
+                    })
+                    .times(1)
+                    .returning(|amount, _, _, _, _| {
+                        Ok(Invoice {
+                            amount_msat: Some(amount),
+                            ..Default::default()
+                        })
+                    });
+
+                let mut store = MockAppStoreBuilder::new();
+                store
+                    .invoice
+                    .expect_insert()
+                    .withf(move |invoice| invoice.wallet_id == wallet_id)
+                    .times(1)
+                    .returning(Ok);
+
+                let service = service(store, ln_client, MockEventUseCases::new());
+
+                let invoice = service.invoice(wallet_id, 1_000, None, None).await.unwrap();
+
+                assert_eq!(invoice.wallet_id, wallet_id);
+            }
+        }
+
+        mod when_node_invoice_generation_fails {
+            use super::*;
+
+            #[tokio::test]
+            async fn propagates_lightning_error() {
+                let mut ln_client = MockLnClient::new();
+                ln_client
+                    .expect_invoice()
+                    .times(1)
+                    .returning(|_, _, _, _, _| Err(LightningError::Invoice("node down".to_string())));
+
+                let service = service(MockAppStoreBuilder::new(), ln_client, MockEventUseCases::new());
+
+                let err = service.invoice(Uuid::new_v4(), 1_000, None, None).await.unwrap_err();
+
+                assert!(matches!(err, ApplicationError::Lightning(_)));
+            }
+        }
+
+        mod when_persistence_fails {
+            use super::*;
+
+            #[tokio::test]
+            async fn propagates_database_error() {
+                let mut ln_client = MockLnClient::new();
+                ln_client
+                    .expect_invoice()
+                    .times(1)
+                    .returning(|_, _, _, _, _| Ok(Invoice::default()));
+
+                let mut store = MockAppStoreBuilder::new();
+                store
+                    .invoice
+                    .expect_insert()
+                    .times(1)
+                    .returning(|_| Err(DatabaseError::Insert("boom".to_string())));
+
+                let service = service(store, ln_client, MockEventUseCases::new());
+
+                let err = service.invoice(Uuid::new_v4(), 1_000, None, None).await.unwrap_err();
+
+                assert!(matches!(err, ApplicationError::Database(DatabaseError::Insert(_))));
+            }
+        }
+    }
+
+    mod get {
+        use super::*;
+
+        mod when_missing {
+            use super::*;
+
+            #[tokio::test]
+            async fn returns_not_found() {
+                let mut store = MockAppStoreBuilder::new();
+                store.invoice.expect_find().times(1).returning(|_| Ok(None));
+
+                let service = service(store, MockLnClient::new(), MockEventUseCases::new());
+
+                let err = service.get(Uuid::new_v4()).await.unwrap_err();
+
+                assert!(matches!(err, ApplicationError::Data(DataError::NotFound(_))));
+            }
+        }
+    }
+
+    mod delete {
+        use super::*;
+
+        mod when_nothing_is_removed {
+            use super::*;
+
+            #[tokio::test]
+            async fn returns_not_found() {
+                let mut store = MockAppStoreBuilder::new();
+                store.invoice.expect_delete_many().times(1).returning(|_| Ok(0));
+
+                let service = service(store, MockLnClient::new(), MockEventUseCases::new());
+
+                let err = service.delete(Uuid::new_v4()).await.unwrap_err();
+
+                assert!(matches!(err, ApplicationError::Data(DataError::NotFound(_))));
+            }
+        }
+    }
+
+    mod sync {
+        use super::*;
+
+        mod when_a_pending_invoice_is_settled_on_the_node {
+            use super::*;
+
+            #[tokio::test]
+            async fn fires_invoice_paid_event_and_counts_it() {
+                let mut store = MockAppStoreBuilder::new();
+                store.invoice.expect_find_many().times(2).returning(|filter| {
+                    if filter.status == Some(InvoiceStatus::Pending) {
+                        Ok(vec![lightning_invoice("ph1", InvoiceStatus::Pending)])
+                    } else {
+                        Ok(vec![])
+                    }
+                });
+
+                let mut ln_client = MockLnClient::new();
+                ln_client
+                    .expect_invoice_by_hash()
+                    .withf(|payment_hash| payment_hash == "ph1")
+                    .times(1)
+                    .returning(|_| {
+                        Ok(Some(Invoice {
+                            status: InvoiceStatus::Settled,
+                            amount_received_msat: Some(2_000),
+                            fee_msat: Some(1),
+                            ..Default::default()
+                        }))
+                    });
+
+                let mut events = MockEventUseCases::new();
+                events
+                    .expect_invoice_paid()
+                    .withf(|event| event.payment_hash == "ph1" && event.amount_received_msat == 2_000)
+                    .times(1)
+                    .returning(|_| Ok(()));
+
+                let service = service(store, ln_client, events);
+
+                assert_eq!(service.sync().await.unwrap(), 1);
+            }
+        }
+
+        mod when_invoice_has_no_lightning_details {
+            use super::*;
+
+            #[tokio::test]
+            async fn skips_without_querying_the_node() {
+                let mut store = MockAppStoreBuilder::new();
+                store.invoice.expect_find_many().times(2).returning(|filter| {
+                    if filter.status == Some(InvoiceStatus::Pending) {
+                        Ok(vec![Invoice {
+                            ledger: Ledger::Lightning,
+                            ln_invoice: None,
+                            ..Default::default()
+                        }])
+                    } else {
+                        Ok(vec![])
+                    }
+                });
+
+                // invoice_by_hash and invoice_paid are intentionally not expected.
+                let service = service(store, MockLnClient::new(), MockEventUseCases::new());
+
+                assert_eq!(service.sync().await.unwrap(), 0);
+            }
+        }
+
+        mod when_there_is_nothing_pending {
+            use super::*;
+
+            #[tokio::test]
+            async fn returns_zero() {
+                let mut store = MockAppStoreBuilder::new();
+                store.invoice.expect_find_many().times(2).returning(|_| Ok(vec![]));
+
+                let service = service(store, MockLnClient::new(), MockEventUseCases::new());
+
+                assert_eq!(service.sync().await.unwrap(), 0);
+            }
+        }
+    }
+}

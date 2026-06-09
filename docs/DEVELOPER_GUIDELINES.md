@@ -110,3 +110,29 @@ Integration tests should be concise and capability-focused. They should not comb
 ## End-to-End Tests
 
 End-to-end tests cover complete user stories across the deployed system and dashboard.
+
+## Coverage
+
+Backend coverage is measured with [`cargo-llvm-cov`](https://github.com/taiki-e/cargo-llvm-cov),
+which uses LLVM source-based coverage and works on both macOS and Linux.
+
+Install it once (also pulled in by `make install-tools`):
+
+```bash
+cargo install cargo-llvm-cov
+rustup component add llvm-tools-preview
+```
+
+Then, from `swissknife/`:
+
+```bash
+make coverage       # line/region/function summary in the terminal
+make coverage-html  # browsable report at target/llvm-cov/html/index.html
+make coverage-lcov  # lcov.info for CI or editor integrations
+```
+
+Coverage is a guide for finding untested branches, not a hard gate. Prefer
+meaningful behavior coverage (validation, conditional branches, error
+propagation) over chasing a percentage. Infrastructure and database adapters are
+expected to be exercised by integration tests rather than unit tests, so they
+will show lower unit coverage by design.

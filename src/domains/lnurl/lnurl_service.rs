@@ -135,3 +135,177 @@ impl LnUrlUseCases for LnUrlService {
         Ok(lnurlp_invoice)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use chrono::Utc;
+
+    use crate::{
+        application::entities::MockAppStoreBuilder,
+        domains::{
+            invoice::{Invoice, LnInvoice},
+            ln_address::LnAddress,
+        },
+        infra::lightning::MockLnClient,
+    };
+
+    use super::*;
+
+    fn service(store: MockAppStoreBuilder, ln_client: MockLnClient) -> LnUrlService {
+        LnUrlService::new(
+            store.build(),
+            Arc::new(ln_client),
+            3_600,
+            "numeraire.tech".to_string(),
+            "https://numeraire.tech".to_string(),
+        )
+    }
+
+    fn ln_address(active: bool) -> LnAddress {
+        LnAddress {
+            id: Uuid::new_v4(),
+            wallet_id: Uuid::new_v4(),
+            username: "alice".to_string(),
+            active,
+            allows_nostr: false,
+            nostr_pubkey: None,
+            created_at: Utc::now(),
+            updated_at: None,
+        }
+    }
+
+    mod lnurlp {
+        use super::*;
+
+        mod when_address_is_active {
+            use super::*;
+
+            #[tokio::test]
+            async fn returns_pay_request_metadata() {
+                let mut store = MockAppStoreBuilder::new();
+                store
+                    .ln_address
+                    .expect_find_by_username()
+                    .withf(|username| username == "alice")
+                    .times(1)
+                    .returning(|_| Ok(Some(ln_address(true))));
+
+                let request = service(store, MockLnClient::new())
+                    .lnurlp("alice".to_string())
+                    .await
+                    .unwrap();
+
+                assert_eq!(request.tag, "payRequest");
+                assert_eq!(request.min_sendable, MIN_SENDABLE);
+                assert_eq!(request.max_sendable, MAX_SENDABLE);
+                assert!(request.callback.contains("alice"));
+            }
+        }
+
+        mod when_address_is_inactive {
+            use super::*;
+
+            #[tokio::test]
+            async fn returns_not_found() {
+                let mut store = MockAppStoreBuilder::new();
+                store
+                    .ln_address
+                    .expect_find_by_username()
+                    .times(1)
+                    .returning(|_| Ok(Some(ln_address(false))));
+
+                let err = service(store, MockLnClient::new())
+                    .lnurlp("alice".to_string())
+                    .await
+                    .unwrap_err();
+
+                assert!(matches!(err, ApplicationError::Data(DataError::NotFound(_))));
+            }
+        }
+
+        mod when_address_is_missing {
+            use super::*;
+
+            #[tokio::test]
+            async fn returns_not_found() {
+                let mut store = MockAppStoreBuilder::new();
+                store
+                    .ln_address
+                    .expect_find_by_username()
+                    .times(1)
+                    .returning(|_| Ok(None));
+
+                let err = service(store, MockLnClient::new())
+                    .lnurlp("alice".to_string())
+                    .await
+                    .unwrap_err();
+
+                assert!(matches!(err, ApplicationError::Data(DataError::NotFound(_))));
+            }
+        }
+    }
+
+    mod lnurlp_callback {
+        use super::*;
+
+        mod when_address_is_active {
+            use super::*;
+
+            #[tokio::test]
+            async fn issues_and_persists_an_invoice() {
+                let mut store = MockAppStoreBuilder::new();
+                store
+                    .ln_address
+                    .expect_find_by_username()
+                    .times(1)
+                    .returning(|_| Ok(Some(ln_address(true))));
+                store.invoice.expect_insert().times(1).returning(Ok);
+
+                let mut ln_client = MockLnClient::new();
+                ln_client
+                    .expect_invoice()
+                    .withf(|_, _, _, _, deschashonly| *deschashonly)
+                    .times(1)
+                    .returning(|_, _, _, _, _| {
+                        Ok(Invoice {
+                            ln_invoice: Some(LnInvoice {
+                                bolt11: "lnbc1example".to_string(),
+                                ..Default::default()
+                            }),
+                            ..Default::default()
+                        })
+                    });
+
+                let callback = service(store, ln_client)
+                    .lnurlp_callback("alice".to_string(), 2_000, None)
+                    .await
+                    .unwrap();
+
+                assert_eq!(callback.pr, "lnbc1example");
+                assert!(callback.success_action.is_some());
+            }
+        }
+
+        mod when_address_is_inactive {
+            use super::*;
+
+            #[tokio::test]
+            async fn returns_not_found_without_calling_the_node() {
+                let mut store = MockAppStoreBuilder::new();
+                store
+                    .ln_address
+                    .expect_find_by_username()
+                    .times(1)
+                    .returning(|_| Ok(Some(ln_address(false))));
+
+                // ln_client.invoice is intentionally not expected.
+                let err = service(store, MockLnClient::new())
+                    .lnurlp_callback("alice".to_string(), 2_000, None)
+                    .await
+                    .unwrap_err();
+
+                assert!(matches!(err, ApplicationError::Data(DataError::NotFound(_))));
+            }
+        }
+    }
+}

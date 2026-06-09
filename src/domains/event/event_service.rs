@@ -217,3 +217,381 @@ impl EventUseCases for EventService {
         Ok(true)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use chrono::Utc;
+    use uuid::Uuid;
+
+    use crate::{
+        application::entities::MockAppStoreBuilder,
+        domains::{bitcoin::BtcAddress, payment::Payment},
+    };
+
+    use super::*;
+
+    fn service(store: MockAppStoreBuilder) -> EventService {
+        EventService::new(store.build())
+    }
+
+    fn btc_address(used: bool) -> BtcAddress {
+        BtcAddress {
+            id: Uuid::new_v4(),
+            wallet_id: Uuid::new_v4(),
+            address: "bc1qknown".to_string(),
+            used,
+            address_type: crate::domains::bitcoin::BtcAddressType::P2wpkh,
+            created_at: Utc::now(),
+            updated_at: None,
+        }
+    }
+
+    mod invoice_paid {
+        use super::*;
+
+        mod when_invoice_exists {
+            use super::*;
+
+            #[tokio::test]
+            async fn settles_the_invoice() {
+                let mut store = MockAppStoreBuilder::new();
+                store.invoice.expect_find_by_payment_hash().times(1).returning(|_| {
+                    Ok(Some(Invoice {
+                        status: InvoiceStatus::Pending,
+                        ..Default::default()
+                    }))
+                });
+                store
+                    .invoice
+                    .expect_update()
+                    .withf(|invoice| {
+                        invoice.status == InvoiceStatus::Settled && invoice.amount_received_msat == Some(2_000)
+                    })
+                    .times(1)
+                    .returning(Ok);
+
+                let event = LnInvoicePaidEvent {
+                    payment_hash: "ph".to_string(),
+                    amount_received_msat: 2_000,
+                    fee_msat: 1,
+                    payment_time: Utc::now(),
+                };
+
+                assert!(service(store).invoice_paid(event).await.is_ok());
+            }
+        }
+
+        mod when_invoice_is_missing {
+            use super::*;
+
+            #[tokio::test]
+            async fn returns_not_found() {
+                let mut store = MockAppStoreBuilder::new();
+                store
+                    .invoice
+                    .expect_find_by_payment_hash()
+                    .times(1)
+                    .returning(|_| Ok(None));
+
+                let event = LnInvoicePaidEvent {
+                    payment_hash: "ph".to_string(),
+                    amount_received_msat: 2_000,
+                    fee_msat: 1,
+                    payment_time: Utc::now(),
+                };
+
+                let err = service(store).invoice_paid(event).await.unwrap_err();
+
+                assert!(matches!(err, ApplicationError::Data(DataError::NotFound(_))));
+            }
+        }
+    }
+
+    mod outgoing_payment {
+        use super::*;
+
+        fn event() -> LnPaySuccessEvent {
+            LnPaySuccessEvent {
+                amount_msat: 1_000,
+                fees_msat: 1,
+                payment_hash: "ph".to_string(),
+                payment_preimage: "preimage".to_string(),
+                payment_time: Utc::now(),
+            }
+        }
+
+        mod when_payment_is_pending {
+            use super::*;
+
+            #[tokio::test]
+            async fn settles_it_with_preimage() {
+                let mut store = MockAppStoreBuilder::new();
+                store.payment.expect_find_by_payment_hash().times(1).returning(|_| {
+                    Ok(Some(Payment {
+                        status: PaymentStatus::Pending,
+                        ..Default::default()
+                    }))
+                });
+                store
+                    .payment
+                    .expect_update()
+                    .withf(|payment| {
+                        payment.status == PaymentStatus::Settled
+                            && payment
+                                .lightning
+                                .as_ref()
+                                .and_then(|lightning| lightning.payment_preimage.as_deref())
+                                == Some("preimage")
+                    })
+                    .times(1)
+                    .returning(Ok);
+
+                assert!(service(store).outgoing_payment(event()).await.is_ok());
+            }
+        }
+
+        mod when_payment_is_already_settled {
+            use super::*;
+
+            #[tokio::test]
+            async fn is_idempotent_and_does_not_update() {
+                let mut store = MockAppStoreBuilder::new();
+                store.payment.expect_find_by_payment_hash().times(1).returning(|_| {
+                    Ok(Some(Payment {
+                        status: PaymentStatus::Settled,
+                        ..Default::default()
+                    }))
+                });
+                // update is intentionally not expected.
+
+                assert!(service(store).outgoing_payment(event()).await.is_ok());
+            }
+        }
+
+        mod when_payment_is_missing {
+            use super::*;
+
+            #[tokio::test]
+            async fn returns_not_found() {
+                let mut store = MockAppStoreBuilder::new();
+                store
+                    .payment
+                    .expect_find_by_payment_hash()
+                    .times(1)
+                    .returning(|_| Ok(None));
+
+                let err = service(store).outgoing_payment(event()).await.unwrap_err();
+
+                assert!(matches!(err, ApplicationError::Data(DataError::NotFound(_))));
+            }
+        }
+    }
+
+    mod failed_payment {
+        use super::*;
+
+        fn event() -> LnPayFailureEvent {
+            LnPayFailureEvent {
+                reason: "no route".to_string(),
+                payment_hash: "ph".to_string(),
+            }
+        }
+
+        mod when_payment_is_pending {
+            use super::*;
+
+            #[tokio::test]
+            async fn marks_it_failed_with_reason() {
+                let mut store = MockAppStoreBuilder::new();
+                store.payment.expect_find_by_payment_hash().times(1).returning(|_| {
+                    Ok(Some(Payment {
+                        status: PaymentStatus::Pending,
+                        ..Default::default()
+                    }))
+                });
+                store
+                    .payment
+                    .expect_update()
+                    .withf(|payment| {
+                        payment.status == PaymentStatus::Failed && payment.error.as_deref() == Some("no route")
+                    })
+                    .times(1)
+                    .returning(Ok);
+
+                assert!(service(store).failed_payment(event()).await.is_ok());
+            }
+        }
+
+        mod when_payment_is_already_failed {
+            use super::*;
+
+            #[tokio::test]
+            async fn is_idempotent_and_does_not_update() {
+                let mut store = MockAppStoreBuilder::new();
+                store.payment.expect_find_by_payment_hash().times(1).returning(|_| {
+                    Ok(Some(Payment {
+                        status: PaymentStatus::Failed,
+                        ..Default::default()
+                    }))
+                });
+
+                assert!(service(store).failed_payment(event()).await.is_ok());
+            }
+        }
+    }
+
+    mod onchain_deposit {
+        use super::*;
+
+        mod when_address_is_unknown {
+            use super::*;
+
+            #[tokio::test]
+            async fn ignores_the_output() {
+                let mut store = MockAppStoreBuilder::new();
+                store
+                    .btc_address
+                    .expect_find_by_address()
+                    .times(1)
+                    .returning(|_| Ok(None));
+
+                let processed = service(store)
+                    .onchain_deposit(OnchainDepositEvent::default(), Currency::Regtest)
+                    .await
+                    .unwrap();
+
+                assert!(!processed);
+            }
+        }
+
+        mod when_address_is_known_and_confirmed {
+            use super::*;
+
+            #[tokio::test]
+            async fn creates_a_settled_deposit_invoice() {
+                let mut store = MockAppStoreBuilder::new();
+                store
+                    .btc_address
+                    .expect_find_by_address()
+                    .times(1)
+                    .returning(|_| Ok(Some(btc_address(false))));
+                store.btc_output.expect_upsert().times(1).returning(|output| {
+                    Ok(BtcOutput {
+                        id: Uuid::new_v4(),
+                        status: BtcOutputStatus::Confirmed,
+                        amount_sat: 1_000,
+                        ..output
+                    })
+                });
+                // Address was unused, so it must be flagged as used.
+                store.btc_address.expect_mark_used().times(1).returning(|_| Ok(()));
+                store
+                    .invoice
+                    .expect_find_by_btc_output_id()
+                    .times(1)
+                    .returning(|_| Ok(None));
+                store
+                    .invoice
+                    .expect_insert()
+                    .withf(|invoice| {
+                        invoice.ledger == Ledger::Onchain
+                            && invoice.amount_received_msat == Some(1_000_000)
+                            && invoice.payment_time.is_some()
+                    })
+                    .times(1)
+                    .returning(Ok);
+
+                let event = OnchainDepositEvent {
+                    txid: "txid".to_string(),
+                    output_index: 0,
+                    address: "bc1qknown".to_string(),
+                    amount_sat: 1_000,
+                    block_height: Some(800_000),
+                };
+
+                let processed = service(store).onchain_deposit(event, Currency::Bitcoin).await.unwrap();
+
+                assert!(processed);
+            }
+        }
+    }
+
+    mod onchain_withdrawal {
+        use super::*;
+
+        mod when_transaction_is_unconfirmed {
+            use super::*;
+
+            #[tokio::test]
+            async fn ignores_it() {
+                // No store calls expected for an unconfirmed transaction.
+                let event = OnchainWithdrawalEvent {
+                    txid: "txid".to_string(),
+                    block_height: None,
+                };
+
+                let processed = service(MockAppStoreBuilder::new())
+                    .onchain_withdrawal(event)
+                    .await
+                    .unwrap();
+
+                assert!(!processed);
+            }
+        }
+
+        mod when_payment_is_unknown {
+            use super::*;
+
+            #[tokio::test]
+            async fn ignores_it() {
+                let mut store = MockAppStoreBuilder::new();
+                store
+                    .payment
+                    .expect_find_by_payment_hash()
+                    .times(1)
+                    .returning(|_| Ok(None));
+
+                let event = OnchainWithdrawalEvent {
+                    txid: "txid".to_string(),
+                    block_height: Some(800_000),
+                };
+
+                let processed = service(store).onchain_withdrawal(event).await.unwrap();
+
+                assert!(!processed);
+            }
+        }
+
+        mod when_payment_matches {
+            use super::*;
+
+            #[tokio::test]
+            async fn settles_the_payment_with_block_height() {
+                let mut store = MockAppStoreBuilder::new();
+                store
+                    .payment
+                    .expect_find_by_payment_hash()
+                    .times(1)
+                    .returning(|_| Ok(Some(Payment::default())));
+                store
+                    .payment
+                    .expect_update()
+                    .withf(|payment| {
+                        payment.status == PaymentStatus::Settled
+                            && payment.bitcoin.as_ref().and_then(|bitcoin| bitcoin.block_height) == Some(800_000)
+                    })
+                    .times(1)
+                    .returning(Ok);
+
+                let event = OnchainWithdrawalEvent {
+                    txid: "txid".to_string(),
+                    block_height: Some(800_000),
+                };
+
+                let processed = service(store).onchain_withdrawal(event).await.unwrap();
+
+                assert!(processed);
+            }
+        }
+    }
+}

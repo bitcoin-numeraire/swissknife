@@ -186,3 +186,104 @@ async fn revoke_api_keys(
     let n_revoked = services.api_key.revoke_many(query_params).await?;
     Ok(n_revoked.into())
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::{application::entities::MockAppServicesBuilder, domains::user::ApiKey};
+
+    use super::*;
+
+    fn user(permissions: Vec<Permission>) -> User {
+        User {
+            id: "alice".to_string(),
+            wallet_id: Uuid::new_v4(),
+            permissions,
+        }
+    }
+
+    fn create_request() -> CreateApiKeyRequest {
+        CreateApiKeyRequest {
+            user_id: Some("alice".to_string()),
+            name: "primary".to_string(),
+            permissions: vec![Permission::ReadWallet],
+            description: None,
+            expiry: None,
+        }
+    }
+
+    mod create_api_key {
+        use super::*;
+
+        mod without_the_write_permission {
+            use super::*;
+
+            #[tokio::test]
+            async fn is_forbidden_and_does_not_call_the_service() {
+                let services = MockAppServicesBuilder::new().build();
+
+                let result = create_api_key(State(Arc::new(services)), user(vec![]), Json(create_request())).await;
+
+                assert!(matches!(result, Err(ApplicationError::Authorization(_))));
+            }
+        }
+
+        mod with_the_write_permission {
+            use super::*;
+
+            #[tokio::test]
+            async fn delegates_to_the_service() {
+                let mut builder = MockAppServicesBuilder::new();
+                builder
+                    .api_key
+                    .expect_generate()
+                    .times(1)
+                    .returning(|_, _| Ok(ApiKey::default()));
+
+                let result = create_api_key(
+                    State(Arc::new(builder.build())),
+                    user(vec![Permission::WriteApiKey]),
+                    Json(create_request()),
+                )
+                .await;
+
+                assert!(result.is_ok());
+            }
+        }
+    }
+
+    mod get_api_key {
+        use super::*;
+
+        mod without_the_read_permission {
+            use super::*;
+
+            #[tokio::test]
+            async fn is_forbidden() {
+                let services = MockAppServicesBuilder::new().build();
+
+                let result = get_api_key(State(Arc::new(services)), user(vec![]), Path(Uuid::new_v4())).await;
+
+                assert!(matches!(result, Err(ApplicationError::Authorization(_))));
+            }
+        }
+    }
+
+    mod revoke_api_key {
+        use super::*;
+
+        mod without_the_write_permission {
+            use super::*;
+
+            #[tokio::test]
+            async fn is_forbidden() {
+                let services = MockAppServicesBuilder::new().build();
+
+                let err = revoke_api_key(State(Arc::new(services)), user(vec![]), Path(Uuid::new_v4()))
+                    .await
+                    .unwrap_err();
+
+                assert!(matches!(err, ApplicationError::Authorization(_)));
+            }
+        }
+    }
+}

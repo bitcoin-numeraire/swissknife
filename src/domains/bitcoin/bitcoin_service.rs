@@ -164,3 +164,246 @@ impl BitcoinUseCases for BitcoinService {
         Ok(synced)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use chrono::Utc;
+
+    use crate::{
+        application::entities::MockAppStoreBuilder,
+        domains::{
+            bitcoin::{BtcNetwork, BtcOutput, MockBitcoinWallet, OnchainSyncBatch, OnchainTransaction},
+            event::{MockEventUseCases, OnchainWithdrawalEvent},
+            system::MockSystemUseCases,
+        },
+    };
+
+    use super::*;
+
+    fn service(
+        store: MockAppStoreBuilder,
+        wallet: MockBitcoinWallet,
+        events: MockEventUseCases,
+        system: MockSystemUseCases,
+    ) -> BitcoinService {
+        BitcoinService::new(
+            store.build(),
+            Arc::new(wallet),
+            BtcAddressType::P2wpkh,
+            Arc::new(events),
+            Arc::new(system),
+        )
+    }
+
+    fn btc_address(wallet_id: Uuid, address: &str) -> BtcAddress {
+        BtcAddress {
+            id: Uuid::new_v4(),
+            wallet_id,
+            address: address.to_string(),
+            used: false,
+            address_type: BtcAddressType::P2wpkh,
+            created_at: Utc::now(),
+            updated_at: None,
+        }
+    }
+
+    mod new_deposit_address {
+        use super::*;
+
+        mod when_an_unused_address_exists {
+            use super::*;
+
+            #[tokio::test]
+            async fn reuses_it_without_deriving_a_new_one() {
+                let wallet_id = Uuid::new_v4();
+
+                let mut store = MockAppStoreBuilder::new();
+                store
+                    .btc_address
+                    .expect_find_by_wallet_unused()
+                    .withf(move |id, address_type| *id == wallet_id && *address_type == BtcAddressType::P2wpkh)
+                    .times(1)
+                    .returning(move |wallet_id, _| Ok(Some(btc_address(wallet_id, "bc1qreused"))));
+
+                // wallet.new_address and btc_address.insert are intentionally not expected.
+                let service = service(
+                    store,
+                    MockBitcoinWallet::new(),
+                    MockEventUseCases::new(),
+                    MockSystemUseCases::new(),
+                );
+
+                let address = service.new_deposit_address(wallet_id, None).await.unwrap();
+
+                assert_eq!(address.address, "bc1qreused");
+            }
+        }
+
+        mod when_no_unused_address_exists {
+            use super::*;
+
+            #[tokio::test]
+            async fn derives_and_persists_a_new_address() {
+                let wallet_id = Uuid::new_v4();
+
+                let mut store = MockAppStoreBuilder::new();
+                store
+                    .btc_address
+                    .expect_find_by_wallet_unused()
+                    .times(1)
+                    .returning(|_, _| Ok(None));
+                store
+                    .btc_address
+                    .expect_insert()
+                    .withf(|_, address, _| address == "bc1qfresh")
+                    .times(1)
+                    .returning(|wallet_id, address, _| Ok(btc_address(wallet_id, address)));
+
+                let mut wallet = MockBitcoinWallet::new();
+                wallet
+                    .expect_new_address()
+                    .times(1)
+                    .returning(|_| Ok("bc1qfresh".to_string()));
+
+                let service = service(store, wallet, MockEventUseCases::new(), MockSystemUseCases::new());
+
+                let address = service.new_deposit_address(wallet_id, None).await.unwrap();
+
+                assert_eq!(address.address, "bc1qfresh");
+            }
+        }
+    }
+
+    mod get_address {
+        use super::*;
+
+        mod when_missing {
+            use super::*;
+
+            #[tokio::test]
+            async fn returns_not_found() {
+                let mut store = MockAppStoreBuilder::new();
+                store.btc_address.expect_find().times(1).returning(|_| Ok(None));
+
+                let service = service(
+                    store,
+                    MockBitcoinWallet::new(),
+                    MockEventUseCases::new(),
+                    MockSystemUseCases::new(),
+                );
+
+                let err = service.get_address(Uuid::new_v4()).await.unwrap_err();
+
+                assert!(matches!(err, ApplicationError::Data(DataError::NotFound(_))));
+            }
+        }
+    }
+
+    mod delete_address {
+        use super::*;
+
+        mod when_nothing_is_removed {
+            use super::*;
+
+            #[tokio::test]
+            async fn returns_not_found() {
+                let mut store = MockAppStoreBuilder::new();
+                store.btc_address.expect_delete_many().times(1).returning(|_| Ok(0));
+
+                let service = service(
+                    store,
+                    MockBitcoinWallet::new(),
+                    MockEventUseCases::new(),
+                    MockSystemUseCases::new(),
+                );
+
+                let err = service.delete_address(Uuid::new_v4()).await.unwrap_err();
+
+                assert!(matches!(err, ApplicationError::Data(DataError::NotFound(_))));
+            }
+        }
+    }
+
+    mod sync {
+        use super::*;
+
+        mod with_an_existing_cursor_and_mixed_events {
+            use super::*;
+
+            #[tokio::test]
+            async fn projects_each_event_and_advances_the_cursor() {
+                let mut system = MockSystemUseCases::new();
+                system
+                    .expect_get_onchain_cursor()
+                    .times(1)
+                    .returning(|| Ok(Some(OnchainSyncCursor::BlockHeight(100))));
+                system
+                    .expect_set_onchain_cursor()
+                    .withf(|cursor| *cursor == OnchainSyncCursor::BlockHeight(200))
+                    .times(1)
+                    .returning(|_| Ok(()));
+
+                let mut wallet = MockBitcoinWallet::new();
+                wallet.expect_network().returning(|| BtcNetwork::Regtest);
+                wallet.expect_synchronize().times(1).returning(|_| {
+                    Ok(OnchainSyncBatch {
+                        events: vec![
+                            OnchainTransaction::Deposit(BtcOutput {
+                                amount_sat: 1_000,
+                                ..Default::default()
+                            }),
+                            OnchainTransaction::Withdrawal(OnchainWithdrawalEvent {
+                                txid: "txid".to_string(),
+                                block_height: Some(200),
+                            }),
+                        ],
+                        next_cursor: Some(OnchainSyncCursor::BlockHeight(200)),
+                    })
+                });
+
+                let mut events = MockEventUseCases::new();
+                events.expect_onchain_deposit().times(1).returning(|_, _| Ok(true));
+                events.expect_onchain_withdrawal().times(1).returning(|_| Ok(true));
+
+                let service = service(MockAppStoreBuilder::new(), wallet, events, system);
+
+                assert_eq!(service.sync().await.unwrap(), 2);
+            }
+        }
+
+        mod without_a_cursor {
+            use super::*;
+
+            #[tokio::test]
+            async fn seeds_the_start_height_from_stored_data() {
+                let mut system = MockSystemUseCases::new();
+                system.expect_get_onchain_cursor().times(1).returning(|| Ok(None));
+                // No next cursor is returned, so set_onchain_cursor must not be called.
+
+                let mut store = MockAppStoreBuilder::new();
+                store
+                    .btc_output
+                    .expect_max_block_height()
+                    .times(1)
+                    .returning(|| Ok(Some(50)));
+                store
+                    .payment
+                    .expect_max_btc_block_height()
+                    .times(1)
+                    .returning(|| Ok(None));
+
+                let mut wallet = MockBitcoinWallet::new();
+                wallet.expect_network().returning(|| BtcNetwork::Regtest);
+                wallet
+                    .expect_synchronize()
+                    .withf(|cursor| *cursor == Some(OnchainSyncCursor::BlockHeight(50)))
+                    .times(1)
+                    .returning(|_| Ok(OnchainSyncBatch::default()));
+
+                let service = service(store, wallet, MockEventUseCases::new(), system);
+
+                assert_eq!(service.sync().await.unwrap(), 0);
+            }
+        }
+    }
+}

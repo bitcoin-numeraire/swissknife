@@ -101,3 +101,64 @@ impl AppServices {
         }
     }
 }
+
+/// Test-only builder that assembles an [`AppServices`] from generated `mockall`
+/// use-case mocks, mirroring `MockAppStoreBuilder`. Configure expectations on the
+/// public mock fields, then call [`MockAppServicesBuilder::build`] to obtain an
+/// `AppServices` suitable for handler unit tests.
+#[cfg(test)]
+pub struct MockAppServicesBuilder {
+    pub invoice: crate::domains::invoice::MockInvoiceUseCases,
+    pub payment: crate::domains::payment::MockPaymentsUseCases,
+    pub wallet: crate::domains::wallet::MockWalletUseCases,
+    pub lnurl: crate::domains::lnurl::MockLnUrlUseCases,
+    pub ln_address: crate::domains::ln_address::MockLnAddressUseCases,
+    pub auth: crate::domains::user::MockAuthUseCases,
+    pub system: crate::domains::system::MockSystemUseCases,
+    pub nostr: crate::domains::nostr::MockNostrUseCases,
+    pub api_key: crate::domains::user::MockApiKeyUseCases,
+    pub bitcoin: crate::domains::bitcoin::MockBitcoinUseCases,
+    pub event: crate::domains::event::MockEventUseCases,
+}
+
+#[cfg(test)]
+impl MockAppServicesBuilder {
+    pub fn new() -> Self {
+        Self {
+            invoice: crate::domains::invoice::MockInvoiceUseCases::new(),
+            payment: crate::domains::payment::MockPaymentsUseCases::new(),
+            wallet: crate::domains::wallet::MockWalletUseCases::new(),
+            lnurl: crate::domains::lnurl::MockLnUrlUseCases::new(),
+            ln_address: crate::domains::ln_address::MockLnAddressUseCases::new(),
+            auth: crate::domains::user::MockAuthUseCases::new(),
+            system: crate::domains::system::MockSystemUseCases::new(),
+            nostr: crate::domains::nostr::MockNostrUseCases::new(),
+            api_key: crate::domains::user::MockApiKeyUseCases::new(),
+            bitcoin: crate::domains::bitcoin::MockBitcoinUseCases::new(),
+            event: crate::domains::event::MockEventUseCases::new(),
+        }
+    }
+
+    pub fn build(self) -> AppServices {
+        AppServices {
+            invoice: Box::new(self.invoice),
+            payment: Box::new(self.payment),
+            wallet: Box::new(self.wallet),
+            lnurl: Box::new(self.lnurl),
+            ln_address: Box::new(self.ln_address),
+            auth: Box::new(self.auth),
+            system: Arc::new(self.system),
+            nostr: Box::new(self.nostr),
+            api_key: Box::new(self.api_key),
+            bitcoin: Box::new(self.bitcoin),
+            event: Arc::new(self.event),
+        }
+    }
+}
+
+#[cfg(test)]
+impl Default for MockAppServicesBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}

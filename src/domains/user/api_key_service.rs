@@ -120,3 +120,249 @@ impl ApiKeyUseCases for ApiKeyService {
         Ok(n_deleted)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        application::{entities::MockAppStoreBuilder, errors::DatabaseError},
+        domains::user::Permission,
+    };
+
+    use super::*;
+
+    fn user_with(permissions: Vec<Permission>) -> User {
+        User {
+            id: "alice".to_string(),
+            wallet_id: Uuid::new_v4(),
+            permissions,
+        }
+    }
+
+    fn create_request(permissions: Vec<Permission>, expiry: Option<u32>) -> CreateApiKeyRequest {
+        CreateApiKeyRequest {
+            user_id: Some("alice".to_string()),
+            name: "primary".to_string(),
+            permissions,
+            description: None,
+            expiry,
+        }
+    }
+
+    mod generate {
+        use super::*;
+
+        mod with_permitted_permissions_and_no_expiry {
+            use super::*;
+
+            #[tokio::test]
+            async fn inserts_key_and_returns_plaintext_secret() {
+                let mut store = MockAppStoreBuilder::new();
+                store
+                    .api_key
+                    .expect_insert()
+                    .withf(|api_key| {
+                        api_key.user_id == "alice"
+                            && api_key.permissions == vec![Permission::ReadWallet]
+                            && api_key.expires_at.is_none()
+                            && !api_key.key_hash.is_empty()
+                    })
+                    .times(1)
+                    .returning(Ok);
+
+                let service = ApiKeyService::new(store.build());
+
+                let api_key = service
+                    .generate(
+                        user_with(vec![Permission::ReadWallet, Permission::WriteWallet]),
+                        create_request(vec![Permission::ReadWallet], None),
+                    )
+                    .await
+                    .unwrap();
+
+                // The plaintext secret is only attached on creation.
+                assert!(api_key.key.is_some());
+            }
+        }
+
+        mod with_expiry_within_the_limit {
+            use super::*;
+
+            #[tokio::test]
+            async fn sets_an_expiration() {
+                let mut store = MockAppStoreBuilder::new();
+                store
+                    .api_key
+                    .expect_insert()
+                    .withf(|api_key| api_key.expires_at.is_some())
+                    .times(1)
+                    .returning(Ok);
+
+                let service = ApiKeyService::new(store.build());
+
+                let api_key = service
+                    .generate(
+                        user_with(vec![Permission::ReadWallet]),
+                        create_request(vec![Permission::ReadWallet], Some(3_600)),
+                    )
+                    .await
+                    .unwrap();
+
+                assert!(api_key.expires_at.is_some());
+            }
+        }
+
+        mod with_permissions_beyond_the_user {
+            use super::*;
+
+            #[tokio::test]
+            async fn rejects_with_validation_error() {
+                // No insert expected: the request must be rejected before persistence.
+                let service = ApiKeyService::new(MockAppStoreBuilder::new().build());
+
+                let err = service
+                    .generate(
+                        user_with(vec![Permission::ReadWallet]),
+                        create_request(vec![Permission::WriteWallet], None),
+                    )
+                    .await
+                    .unwrap_err();
+
+                assert!(matches!(err, ApplicationError::Data(DataError::Validation(_))));
+            }
+        }
+
+        mod with_expiry_beyond_the_limit {
+            use super::*;
+
+            #[tokio::test]
+            async fn rejects_with_validation_error() {
+                let service = ApiKeyService::new(MockAppStoreBuilder::new().build());
+
+                let err = service
+                    .generate(
+                        user_with(vec![Permission::ReadWallet]),
+                        create_request(vec![Permission::ReadWallet], Some(MAX_ALLOWED_EXPIRY_SECONDS + 1)),
+                    )
+                    .await
+                    .unwrap_err();
+
+                assert!(matches!(err, ApplicationError::Data(DataError::Validation(_))));
+            }
+        }
+
+        mod when_insert_fails {
+            use super::*;
+
+            #[tokio::test]
+            async fn propagates_database_error() {
+                let mut store = MockAppStoreBuilder::new();
+                store
+                    .api_key
+                    .expect_insert()
+                    .times(1)
+                    .returning(|_| Err(DatabaseError::Insert("boom".to_string())));
+
+                let service = ApiKeyService::new(store.build());
+
+                let err = service
+                    .generate(
+                        user_with(vec![Permission::ReadWallet]),
+                        create_request(vec![Permission::ReadWallet], None),
+                    )
+                    .await
+                    .unwrap_err();
+
+                assert!(matches!(err, ApplicationError::Database(DatabaseError::Insert(_))));
+            }
+        }
+    }
+
+    mod get {
+        use super::*;
+
+        mod when_found {
+            use super::*;
+
+            #[tokio::test]
+            async fn returns_api_key() {
+                let id = Uuid::new_v4();
+
+                let mut store = MockAppStoreBuilder::new();
+                store.api_key.expect_find().times(1).returning(move |id| {
+                    Ok(Some(ApiKey {
+                        id,
+                        ..Default::default()
+                    }))
+                });
+
+                let service = ApiKeyService::new(store.build());
+
+                assert_eq!(service.get(id).await.unwrap().id, id);
+            }
+        }
+
+        mod when_missing {
+            use super::*;
+
+            #[tokio::test]
+            async fn returns_not_found() {
+                let mut store = MockAppStoreBuilder::new();
+                store.api_key.expect_find().times(1).returning(|_| Ok(None));
+
+                let service = ApiKeyService::new(store.build());
+
+                let err = service.get(Uuid::new_v4()).await.unwrap_err();
+
+                assert!(matches!(err, ApplicationError::Data(DataError::NotFound(_))));
+            }
+        }
+    }
+
+    mod revoke {
+        use super::*;
+
+        mod when_a_key_is_removed {
+            use super::*;
+
+            #[tokio::test]
+            async fn succeeds() {
+                let mut store = MockAppStoreBuilder::new();
+                store.api_key.expect_delete_many().times(1).returning(|_| Ok(1));
+
+                let service = ApiKeyService::new(store.build());
+
+                assert!(service.revoke(Uuid::new_v4()).await.is_ok());
+            }
+        }
+
+        mod when_nothing_is_removed {
+            use super::*;
+
+            #[tokio::test]
+            async fn returns_not_found() {
+                let mut store = MockAppStoreBuilder::new();
+                store.api_key.expect_delete_many().times(1).returning(|_| Ok(0));
+
+                let service = ApiKeyService::new(store.build());
+
+                let err = service.revoke(Uuid::new_v4()).await.unwrap_err();
+
+                assert!(matches!(err, ApplicationError::Data(DataError::NotFound(_))));
+            }
+        }
+    }
+
+    mod revoke_many {
+        use super::*;
+
+        #[tokio::test]
+        async fn returns_revoked_count() {
+            let mut store = MockAppStoreBuilder::new();
+            store.api_key.expect_delete_many().times(1).returning(|_| Ok(4));
+
+            let service = ApiKeyService::new(store.build());
+
+            assert_eq!(service.revoke_many(ApiKeyFilter::default()).await.unwrap(), 4);
+        }
+    }
+}

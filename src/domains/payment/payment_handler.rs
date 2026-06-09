@@ -210,3 +210,155 @@ async fn delete_payments(
     let n_deleted = services.payment.delete_many(query_params).await?;
     Ok(n_deleted.into())
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::{application::entities::MockAppServicesBuilder, domains::payment::Payment};
+
+    use super::*;
+
+    fn user(permissions: Vec<Permission>) -> User {
+        User {
+            id: "alice".to_string(),
+            wallet_id: Uuid::new_v4(),
+            permissions,
+        }
+    }
+
+    fn send_request(wallet_id: Option<Uuid>) -> SendPaymentRequest {
+        SendPaymentRequest {
+            wallet_id,
+            input: "bob@numeraire.tech".to_string(),
+            amount_msat: Some(1_000),
+            comment: None,
+        }
+    }
+
+    mod pay {
+        use super::*;
+
+        mod without_the_write_permission {
+            use super::*;
+
+            #[tokio::test]
+            async fn is_forbidden_and_does_not_call_the_service() {
+                // No expect_pay installed: any call to the use case panics.
+                let services = MockAppServicesBuilder::new().build();
+
+                let result = pay(State(Arc::new(services)), user(vec![]), Json(send_request(None))).await;
+
+                assert!(matches!(result, Err(ApplicationError::Authorization(_))));
+            }
+        }
+
+        mod when_wallet_id_is_omitted {
+            use super::*;
+
+            #[tokio::test]
+            async fn defaults_to_the_authenticated_users_wallet() {
+                let caller = user(vec![Permission::WriteLnTransaction]);
+                let expected_wallet = caller.wallet_id;
+
+                let mut builder = MockAppServicesBuilder::new();
+                builder
+                    .payment
+                    .expect_pay()
+                    .withf(move |_, _, _, wallet_id| *wallet_id == expected_wallet)
+                    .times(1)
+                    .returning(|_, _, _, _| Ok(Payment::default()));
+
+                let result = pay(State(Arc::new(builder.build())), caller, Json(send_request(None))).await;
+
+                assert!(result.is_ok());
+            }
+        }
+
+        mod when_wallet_id_is_provided {
+            use super::*;
+
+            #[tokio::test]
+            async fn uses_the_explicit_wallet_id() {
+                let explicit = Uuid::new_v4();
+
+                let mut builder = MockAppServicesBuilder::new();
+                builder
+                    .payment
+                    .expect_pay()
+                    .withf(move |_, _, _, wallet_id| *wallet_id == explicit)
+                    .times(1)
+                    .returning(|_, _, _, _| Ok(Payment::default()));
+
+                let result = pay(
+                    State(Arc::new(builder.build())),
+                    user(vec![Permission::WriteLnTransaction]),
+                    Json(send_request(Some(explicit))),
+                )
+                .await;
+
+                assert!(result.is_ok());
+            }
+        }
+    }
+
+    mod get_payment {
+        use super::*;
+
+        mod without_the_read_permission {
+            use super::*;
+
+            #[tokio::test]
+            async fn is_forbidden() {
+                let services = MockAppServicesBuilder::new().build();
+
+                let result = get_payment(State(Arc::new(services)), user(vec![]), Path(Uuid::new_v4())).await;
+
+                assert!(matches!(result, Err(ApplicationError::Authorization(_))));
+            }
+        }
+
+        mod with_the_read_permission {
+            use super::*;
+
+            #[tokio::test]
+            async fn returns_the_payment() {
+                let id = Uuid::new_v4();
+
+                let mut builder = MockAppServicesBuilder::new();
+                builder
+                    .payment
+                    .expect_get()
+                    .withf(move |queried| *queried == id)
+                    .times(1)
+                    .returning(|_| Ok(Payment::default()));
+
+                let result = get_payment(
+                    State(Arc::new(builder.build())),
+                    user(vec![Permission::ReadLnTransaction]),
+                    Path(id),
+                )
+                .await;
+
+                assert!(result.is_ok());
+            }
+        }
+    }
+
+    mod delete_payment {
+        use super::*;
+
+        mod without_the_write_permission {
+            use super::*;
+
+            #[tokio::test]
+            async fn is_forbidden() {
+                let services = MockAppServicesBuilder::new().build();
+
+                let err = delete_payment(State(Arc::new(services)), user(vec![]), Path(Uuid::new_v4()))
+                    .await
+                    .unwrap_err();
+
+                assert!(matches!(err, ApplicationError::Authorization(_)));
+            }
+        }
+    }
+}
