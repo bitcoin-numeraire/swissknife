@@ -299,4 +299,134 @@ mod tests {
         let err = parse_lnurl_pay_invoice_response(r#"{"status":"ERROR","reason":"bad comment"}"#).unwrap_err();
         assert!(err.to_string().contains("bad comment"));
     }
+
+    // A 24-character string is the expected length of a base64-encoded 16-byte IV.
+    const VALID_IV: &str = "123456789012345678901234";
+
+    fn aes_params(iv: &str) -> LnurlAesParams {
+        LnurlAesParams {
+            description: "description".to_string(),
+            ciphertext: "ciphertext".to_string(),
+            iv: iv.to_string(),
+        }
+    }
+
+    #[test]
+    fn validate_aes_success_action_accepts_valid_params() {
+        assert!(validate_aes_success_action(&aes_params(VALID_IV)).is_ok());
+    }
+
+    #[test]
+    fn validate_aes_success_action_rejects_wrong_iv_length() {
+        let err = validate_aes_success_action(&aes_params("tooshort")).unwrap_err();
+        assert!(err.to_string().contains("IV"));
+    }
+
+    #[test]
+    fn validate_aes_success_action_rejects_oversized_ciphertext() {
+        let mut params = aes_params(VALID_IV);
+        params.ciphertext = "a".repeat(4097);
+
+        let err = validate_aes_success_action(&params).unwrap_err();
+        assert!(err.to_string().contains("ciphertext"));
+    }
+
+    #[test]
+    fn validate_success_action_url_accepts_matching_domain() {
+        let action = Url::parse("https://example.com/success").unwrap();
+        assert!(validate_success_action_url("https://example.com/callback", &action).is_ok());
+    }
+
+    #[test]
+    fn validate_success_action_url_rejects_cross_domain() {
+        let action = Url::parse("https://evil.com/success").unwrap();
+        let err = validate_success_action_url("https://example.com/callback", &action).unwrap_err();
+        assert!(err.to_string().contains("different domain"));
+    }
+
+    #[test]
+    fn convert_success_action_maps_message() {
+        match convert_success_action(
+            LnurlSuccessAction::Message("thanks".to_string()),
+            "https://example.com/cb",
+        )
+        .unwrap()
+        {
+            LnUrlPaySuccessAction::Message { message } => assert_eq!(message, "thanks"),
+            other => panic!("expected message, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn convert_success_action_rejects_overlong_message() {
+        let action = LnurlSuccessAction::Message("a".repeat(145));
+        assert!(convert_success_action(action, "https://example.com/cb").is_err());
+    }
+
+    #[test]
+    fn convert_success_action_maps_matching_url() {
+        let action = LnurlSuccessAction::Url {
+            url: Url::parse("https://example.com/x").unwrap(),
+            description: "description".to_string(),
+        };
+
+        let result = convert_success_action(action, "https://example.com/cb").unwrap();
+
+        assert!(matches!(result, LnUrlPaySuccessAction::Url { .. }));
+    }
+
+    #[test]
+    fn convert_success_action_rejects_cross_domain_url() {
+        let action = LnurlSuccessAction::Url {
+            url: Url::parse("https://evil.com/x").unwrap(),
+            description: "description".to_string(),
+        };
+
+        assert!(convert_success_action(action, "https://example.com/cb").is_err());
+    }
+
+    #[test]
+    fn process_success_action_maps_message() {
+        let action = process_success_action(
+            LnUrlPaySuccessAction::Message {
+                message: "hi".to_string(),
+            },
+            "preimage",
+        )
+        .unwrap();
+
+        assert_eq!(action.tag, "message");
+        assert_eq!(action.message.as_deref(), Some("hi"));
+    }
+
+    #[test]
+    fn process_success_action_maps_url() {
+        let action = process_success_action(
+            LnUrlPaySuccessAction::Url {
+                description: "description".to_string(),
+                url: "https://example.com".to_string(),
+            },
+            "preimage",
+        )
+        .unwrap();
+
+        assert_eq!(action.tag, "url");
+        assert_eq!(action.url.as_deref(), Some("https://example.com"));
+    }
+
+    #[test]
+    fn process_success_action_returns_none_for_aes_with_invalid_preimage() {
+        let action = LnUrlPaySuccessAction::Aes {
+            description: "description".to_string(),
+            ciphertext: "ciphertext".to_string(),
+            iv: "iv".to_string(),
+        };
+
+        assert!(process_success_action(action, "not-a-valid-preimage").is_none());
+    }
+
+    #[test]
+    fn decrypt_success_action_returns_none_for_invalid_preimage() {
+        assert!(decrypt_success_action("ciphertext".to_string(), "iv".to_string(), "not-hex").is_none());
+    }
 }
