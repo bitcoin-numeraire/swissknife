@@ -115,9 +115,19 @@ impl SystemUseCases for SystemService {
 mod tests {
     use std::sync::Arc;
 
-    use crate::{application::entities::MockAppStoreBuilder, infra::lightning::MockLnClient};
+    use crate::{
+        application::{
+            entities::MockAppStoreBuilder,
+            errors::{DatabaseError, LightningError},
+        },
+        infra::lightning::MockLnClient,
+    };
 
     use super::*;
+
+    fn service(store: MockAppStoreBuilder, ln_client: MockLnClient) -> SystemService {
+        SystemService::new(store.build(), Arc::new(ln_client))
+    }
 
     mod health_check {
         use super::*;
@@ -136,14 +146,219 @@ mod tests {
                     .times(1)
                     .returning(|| Ok(HealthStatus::Operational));
 
-                let service = SystemService::new(store.build(), Arc::new(ln_client));
-
-                let health = service.health_check().await;
+                let health = service(store, ln_client).health_check().await;
 
                 assert_eq!(health.database, HealthStatus::Operational);
                 assert_eq!(health.ln_provider, HealthStatus::Operational);
                 assert!(health.is_healthy);
             }
+        }
+
+        mod when_database_is_down {
+            use super::*;
+
+            #[tokio::test]
+            async fn reports_database_unavailable_and_unhealthy() {
+                let mut store = MockAppStoreBuilder::new();
+                store
+                    .health
+                    .expect_ping()
+                    .times(1)
+                    .returning(|| Err(DatabaseError::Ping("down".to_string())));
+
+                let mut ln_client = MockLnClient::new();
+                ln_client
+                    .expect_health()
+                    .times(1)
+                    .returning(|| Ok(HealthStatus::Operational));
+
+                let health = service(store, ln_client).health_check().await;
+
+                assert_eq!(health.database, HealthStatus::Unavailable);
+                assert_eq!(health.ln_provider, HealthStatus::Operational);
+                assert!(!health.is_healthy);
+            }
+        }
+
+        mod when_lightning_provider_is_down {
+            use super::*;
+
+            #[tokio::test]
+            async fn reports_provider_unavailable_and_unhealthy() {
+                let mut store = MockAppStoreBuilder::new();
+                store.health.expect_ping().times(1).returning(|| Ok(()));
+
+                let mut ln_client = MockLnClient::new();
+                ln_client
+                    .expect_health()
+                    .times(1)
+                    .returning(|| Err(LightningError::HealthCheck("down".to_string())));
+
+                let health = service(store, ln_client).health_check().await;
+
+                assert_eq!(health.database, HealthStatus::Operational);
+                assert_eq!(health.ln_provider, HealthStatus::Unavailable);
+                assert!(!health.is_healthy);
+            }
+        }
+    }
+
+    mod setup_check {
+        use super::*;
+
+        #[tokio::test]
+        async fn reports_completion_flags_from_config() {
+            let mut store = MockAppStoreBuilder::new();
+            // welcome_complete present, password_hash absent.
+            store.config.expect_find().times(2).returning(|key| {
+                if key == WELCOME_COMPLETE_KEY {
+                    Ok(Some(true.into()))
+                } else {
+                    Ok(None)
+                }
+            });
+
+            let service = service(store, MockLnClient::new());
+
+            let info = service.setup_check().await.unwrap();
+
+            assert!(info.welcome_complete);
+            assert!(!info.sign_up_complete);
+        }
+    }
+
+    mod mark_welcome_complete {
+        use super::*;
+
+        mod when_not_yet_completed {
+            use super::*;
+
+            #[tokio::test]
+            async fn inserts_the_flag() {
+                let mut store = MockAppStoreBuilder::new();
+                store.config.expect_find().times(1).returning(|_| Ok(None));
+                store
+                    .config
+                    .expect_insert()
+                    .withf(|key, value| key == WELCOME_COMPLETE_KEY && value == &serde_json::Value::Bool(true))
+                    .times(1)
+                    .returning(|_, _| Ok(()));
+
+                let service = service(store, MockLnClient::new());
+
+                assert!(service.mark_welcome_complete().await.is_ok());
+            }
+        }
+
+        mod when_already_completed {
+            use super::*;
+
+            #[tokio::test]
+            async fn is_idempotent_and_does_not_insert() {
+                let mut store = MockAppStoreBuilder::new();
+                store.config.expect_find().times(1).returning(|_| Ok(Some(true.into())));
+                // insert is intentionally not expected.
+
+                let service = service(store, MockLnClient::new());
+
+                assert!(service.mark_welcome_complete().await.is_ok());
+            }
+        }
+    }
+
+    mod get_onchain_cursor {
+        use super::*;
+
+        mod when_present_and_valid {
+            use super::*;
+
+            #[tokio::test]
+            async fn returns_the_cursor() {
+                let mut store = MockAppStoreBuilder::new();
+                store
+                    .config
+                    .expect_find()
+                    .times(1)
+                    .returning(|_| Ok(Some(serde_json::to_value(OnchainSyncCursor::BlockHeight(42)).unwrap())));
+
+                let service = service(store, MockLnClient::new());
+
+                let cursor = service.get_onchain_cursor().await.unwrap();
+
+                assert_eq!(cursor, Some(OnchainSyncCursor::BlockHeight(42)));
+            }
+        }
+
+        mod when_absent {
+            use super::*;
+
+            #[tokio::test]
+            async fn returns_none() {
+                let mut store = MockAppStoreBuilder::new();
+                store.config.expect_find().times(1).returning(|_| Ok(None));
+
+                let service = service(store, MockLnClient::new());
+
+                assert_eq!(service.get_onchain_cursor().await.unwrap(), None);
+            }
+        }
+
+        mod when_stored_value_is_malformed {
+            use super::*;
+
+            #[tokio::test]
+            async fn returns_malformed_error() {
+                let mut store = MockAppStoreBuilder::new();
+                store
+                    .config
+                    .expect_find()
+                    .times(1)
+                    .returning(|_| Ok(Some(serde_json::Value::String("not a cursor".to_string()))));
+
+                let service = service(store, MockLnClient::new());
+
+                let err = service.get_onchain_cursor().await.unwrap_err();
+
+                assert!(matches!(err, ApplicationError::Data(DataError::Malformed(_))));
+            }
+        }
+    }
+
+    mod set_onchain_cursor {
+        use super::*;
+
+        #[tokio::test]
+        async fn upserts_the_serialized_cursor() {
+            let mut store = MockAppStoreBuilder::new();
+            store
+                .config
+                .expect_upsert()
+                .withf(|key, value| {
+                    key == ONCHAIN_CURSOR_KEY
+                        && *value == serde_json::to_value(OnchainSyncCursor::BlockHeight(7)).unwrap()
+                })
+                .times(1)
+                .returning(|_, _| Ok(()));
+
+            let service = service(store, MockLnClient::new());
+
+            assert!(service
+                .set_onchain_cursor(OnchainSyncCursor::BlockHeight(7))
+                .await
+                .is_ok());
+        }
+    }
+
+    mod version {
+        use super::*;
+
+        #[tokio::test]
+        async fn returns_cargo_package_version() {
+            let service = service(MockAppStoreBuilder::new(), MockLnClient::new());
+
+            let version = service.version();
+
+            assert_eq!(version.version, env!("CARGO_PKG_VERSION"));
         }
     }
 }

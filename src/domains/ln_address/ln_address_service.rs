@@ -176,33 +176,424 @@ fn validate_username(username: &str) -> Result<(), DataError> {
 
 #[cfg(test)]
 mod tests {
+    use chrono::Utc;
+
+    use crate::application::{entities::MockAppStoreBuilder, errors::DatabaseError};
+
     use super::*;
 
-    #[test]
-    fn validate_username_accepts_supported_email_local_part_characters() {
-        assert!(validate_username("alice").is_ok());
-        assert!(validate_username("alice.123_+-").is_ok());
-        assert!(validate_username("a".repeat(MAX_USERNAME_LENGTH).as_str()).is_ok());
+    fn ln_address_fixture(id: Uuid, wallet_id: Uuid, username: &str) -> LnAddress {
+        LnAddress {
+            id,
+            wallet_id,
+            username: username.to_string(),
+            active: true,
+            allows_nostr: false,
+            nostr_pubkey: None,
+            created_at: Utc::now(),
+            updated_at: None,
+        }
     }
 
-    #[test]
-    fn validate_username_rejects_empty_or_too_long_usernames() {
-        let empty_err = validate_username("").unwrap_err();
-        assert!(matches!(empty_err, DataError::Validation(_)));
-        assert!(empty_err.to_string().contains("Invalid username length"));
-
-        let too_long = "a".repeat(MAX_USERNAME_LENGTH + 1);
-        let too_long_err = validate_username(&too_long).unwrap_err();
-        assert!(matches!(too_long_err, DataError::Validation(_)));
-        assert!(too_long_err.to_string().contains("Invalid username length"));
+    fn update_request(username: Option<&str>) -> UpdateLnAddressRequest {
+        UpdateLnAddressRequest {
+            username: username.map(str::to_string),
+            active: None,
+            allows_nostr: None,
+            nostr_pubkey: None,
+        }
     }
 
-    #[test]
-    fn validate_username_rejects_unsupported_characters() {
-        for username in ["Alice", "alice bob", "alice@example", "alice:123"] {
-            let err = validate_username(username).unwrap_err();
-            assert!(matches!(err, DataError::Validation(_)));
-            assert!(err.to_string().contains("Invalid username format"));
+    mod validate_username {
+        use super::*;
+
+        #[test]
+        fn accepts_supported_email_local_part_characters() {
+            assert!(validate_username("alice").is_ok());
+            assert!(validate_username("alice.123_+-").is_ok());
+            assert!(validate_username("a".repeat(MAX_USERNAME_LENGTH).as_str()).is_ok());
+        }
+
+        #[test]
+        fn rejects_empty_or_too_long_usernames() {
+            let empty_err = validate_username("").unwrap_err();
+            assert!(matches!(empty_err, DataError::Validation(_)));
+            assert!(empty_err.to_string().contains("Invalid username length"));
+
+            let too_long = "a".repeat(MAX_USERNAME_LENGTH + 1);
+            let too_long_err = validate_username(&too_long).unwrap_err();
+            assert!(matches!(too_long_err, DataError::Validation(_)));
+            assert!(too_long_err.to_string().contains("Invalid username length"));
+        }
+
+        #[test]
+        fn rejects_unsupported_characters() {
+            for username in ["Alice", "alice bob", "alice@example", "alice:123"] {
+                let err = validate_username(username).unwrap_err();
+                assert!(matches!(err, DataError::Validation(_)));
+                assert!(err.to_string().contains("Invalid username format"));
+            }
+        }
+    }
+
+    mod register {
+        use super::*;
+
+        mod with_valid_new_username {
+            use super::*;
+
+            #[tokio::test]
+            async fn lowercases_username_and_inserts() {
+                let wallet_id = Uuid::new_v4();
+
+                let mut store = MockAppStoreBuilder::new();
+                store
+                    .ln_address
+                    .expect_find_by_wallet_id()
+                    .times(1)
+                    .returning(|_| Ok(None));
+                store
+                    .ln_address
+                    .expect_find_by_username()
+                    .withf(|username| username == "alice")
+                    .times(1)
+                    .returning(|_| Ok(None));
+                store
+                    .ln_address
+                    .expect_insert()
+                    .withf(|_, username, _, _| username == "alice")
+                    .times(1)
+                    .returning(|wallet_id, username, _, _| Ok(ln_address_fixture(Uuid::new_v4(), wallet_id, username)));
+
+                let service = LnAddressService::new(store.build());
+
+                let ln_address = service
+                    .register(wallet_id, "Alice".to_string(), false, None)
+                    .await
+                    .unwrap();
+
+                assert_eq!(ln_address.username, "alice");
+                assert_eq!(ln_address.wallet_id, wallet_id);
+            }
+        }
+
+        mod with_invalid_username {
+            use super::*;
+
+            #[tokio::test]
+            async fn rejects_without_touching_the_store() {
+                // No store expectations are installed, so any repository call panics.
+                let service = LnAddressService::new(MockAppStoreBuilder::new().build());
+
+                let err = service
+                    .register(Uuid::new_v4(), "invalid username".to_string(), false, None)
+                    .await
+                    .unwrap_err();
+
+                assert!(matches!(err, ApplicationError::Data(DataError::Validation(_))));
+            }
+        }
+
+        mod when_wallet_already_has_an_address {
+            use super::*;
+
+            #[tokio::test]
+            async fn returns_conflict() {
+                let wallet_id = Uuid::new_v4();
+
+                let mut store = MockAppStoreBuilder::new();
+                store
+                    .ln_address
+                    .expect_find_by_wallet_id()
+                    .times(1)
+                    .returning(move |_| Ok(Some(ln_address_fixture(Uuid::new_v4(), wallet_id, "existing"))));
+
+                let service = LnAddressService::new(store.build());
+
+                let err = service
+                    .register(wallet_id, "alice".to_string(), false, None)
+                    .await
+                    .unwrap_err();
+
+                assert!(matches!(err, ApplicationError::Data(DataError::Conflict(_))));
+                assert!(err.to_string().contains("Duplicate User ID"));
+            }
+        }
+
+        mod when_username_is_taken {
+            use super::*;
+
+            #[tokio::test]
+            async fn returns_conflict() {
+                let mut store = MockAppStoreBuilder::new();
+                store
+                    .ln_address
+                    .expect_find_by_wallet_id()
+                    .times(1)
+                    .returning(|_| Ok(None));
+                store
+                    .ln_address
+                    .expect_find_by_username()
+                    .times(1)
+                    .returning(|_| Ok(Some(ln_address_fixture(Uuid::new_v4(), Uuid::new_v4(), "alice"))));
+
+                let service = LnAddressService::new(store.build());
+
+                let err = service
+                    .register(Uuid::new_v4(), "alice".to_string(), false, None)
+                    .await
+                    .unwrap_err();
+
+                assert!(matches!(err, ApplicationError::Data(DataError::Conflict(_))));
+                assert!(err.to_string().contains("Duplicate username"));
+            }
+        }
+
+        mod when_lookup_fails {
+            use super::*;
+
+            #[tokio::test]
+            async fn propagates_database_error() {
+                let mut store = MockAppStoreBuilder::new();
+                store
+                    .ln_address
+                    .expect_find_by_wallet_id()
+                    .times(1)
+                    .returning(|_| Err(DatabaseError::FindOne("boom".to_string())));
+
+                let service = LnAddressService::new(store.build());
+
+                let err = service
+                    .register(Uuid::new_v4(), "alice".to_string(), false, None)
+                    .await
+                    .unwrap_err();
+
+                assert!(matches!(err, ApplicationError::Database(DatabaseError::FindOne(_))));
+            }
+        }
+    }
+
+    mod get {
+        use super::*;
+
+        mod when_found {
+            use super::*;
+
+            #[tokio::test]
+            async fn returns_address() {
+                let id = Uuid::new_v4();
+
+                let mut store = MockAppStoreBuilder::new();
+                store
+                    .ln_address
+                    .expect_find()
+                    .withf(move |queried| *queried == id)
+                    .times(1)
+                    .returning(move |id| Ok(Some(ln_address_fixture(id, Uuid::new_v4(), "alice"))));
+
+                let service = LnAddressService::new(store.build());
+
+                let ln_address = service.get(id).await.unwrap();
+
+                assert_eq!(ln_address.id, id);
+            }
+        }
+
+        mod when_missing {
+            use super::*;
+
+            #[tokio::test]
+            async fn returns_not_found() {
+                let mut store = MockAppStoreBuilder::new();
+                store.ln_address.expect_find().times(1).returning(|_| Ok(None));
+
+                let service = LnAddressService::new(store.build());
+
+                let err = service.get(Uuid::new_v4()).await.unwrap_err();
+
+                assert!(matches!(err, ApplicationError::Data(DataError::NotFound(_))));
+            }
+        }
+    }
+
+    mod list {
+        use super::*;
+
+        #[tokio::test]
+        async fn returns_addresses_from_the_repository() {
+            let mut store = MockAppStoreBuilder::new();
+            store
+                .ln_address
+                .expect_find_many()
+                .times(1)
+                .returning(|_| Ok(vec![ln_address_fixture(Uuid::new_v4(), Uuid::new_v4(), "alice")]));
+
+            let service = LnAddressService::new(store.build());
+
+            let addresses = service.list(LnAddressFilter::default()).await.unwrap();
+
+            assert_eq!(addresses.len(), 1);
+        }
+    }
+
+    mod update {
+        use super::*;
+
+        mod when_address_is_missing {
+            use super::*;
+
+            #[tokio::test]
+            async fn returns_not_found() {
+                let mut store = MockAppStoreBuilder::new();
+                store.ln_address.expect_find().times(1).returning(|_| Ok(None));
+
+                let service = LnAddressService::new(store.build());
+
+                let err = service
+                    .update(Uuid::new_v4(), update_request(Some("bob")))
+                    .await
+                    .unwrap_err();
+
+                assert!(matches!(err, ApplicationError::Data(DataError::NotFound(_))));
+            }
+        }
+
+        mod with_a_new_unique_username {
+            use super::*;
+
+            #[tokio::test]
+            async fn validates_uniqueness_and_persists() {
+                let id = Uuid::new_v4();
+
+                let mut store = MockAppStoreBuilder::new();
+                store
+                    .ln_address
+                    .expect_find()
+                    .times(1)
+                    .returning(move |id| Ok(Some(ln_address_fixture(id, Uuid::new_v4(), "alice"))));
+                store
+                    .ln_address
+                    .expect_find_by_username()
+                    .withf(|username| username == "bob")
+                    .times(1)
+                    .returning(|_| Ok(None));
+                store
+                    .ln_address
+                    .expect_update()
+                    .withf(|ln_address| ln_address.username == "bob")
+                    .times(1)
+                    .returning(Ok);
+
+                let service = LnAddressService::new(store.build());
+
+                let updated = service.update(id, update_request(Some("Bob"))).await.unwrap();
+
+                assert_eq!(updated.username, "bob");
+            }
+        }
+
+        mod when_username_is_unchanged {
+            use super::*;
+
+            #[tokio::test]
+            async fn skips_uniqueness_check() {
+                let mut store = MockAppStoreBuilder::new();
+                store
+                    .ln_address
+                    .expect_find()
+                    .times(1)
+                    .returning(|id| Ok(Some(ln_address_fixture(id, Uuid::new_v4(), "alice"))));
+                // find_by_username is intentionally not expected: an unchanged
+                // username must not trigger a uniqueness lookup.
+                store.ln_address.expect_update().times(1).returning(Ok);
+
+                let service = LnAddressService::new(store.build());
+
+                let updated = service
+                    .update(Uuid::new_v4(), update_request(Some("alice")))
+                    .await
+                    .unwrap();
+
+                assert_eq!(updated.username, "alice");
+            }
+        }
+
+        mod when_new_username_is_taken {
+            use super::*;
+
+            #[tokio::test]
+            async fn returns_conflict() {
+                let mut store = MockAppStoreBuilder::new();
+                store
+                    .ln_address
+                    .expect_find()
+                    .times(1)
+                    .returning(|id| Ok(Some(ln_address_fixture(id, Uuid::new_v4(), "alice"))));
+                store
+                    .ln_address
+                    .expect_find_by_username()
+                    .times(1)
+                    .returning(|_| Ok(Some(ln_address_fixture(Uuid::new_v4(), Uuid::new_v4(), "bob"))));
+
+                let service = LnAddressService::new(store.build());
+
+                let err = service
+                    .update(Uuid::new_v4(), update_request(Some("bob")))
+                    .await
+                    .unwrap_err();
+
+                assert!(matches!(err, ApplicationError::Data(DataError::Conflict(_))));
+            }
+        }
+    }
+
+    mod delete {
+        use super::*;
+
+        mod when_a_row_is_removed {
+            use super::*;
+
+            #[tokio::test]
+            async fn succeeds() {
+                let mut store = MockAppStoreBuilder::new();
+                store.ln_address.expect_delete_many().times(1).returning(|_| Ok(1));
+
+                let service = LnAddressService::new(store.build());
+
+                assert!(service.delete(Uuid::new_v4()).await.is_ok());
+            }
+        }
+
+        mod when_nothing_is_removed {
+            use super::*;
+
+            #[tokio::test]
+            async fn returns_not_found() {
+                let mut store = MockAppStoreBuilder::new();
+                store.ln_address.expect_delete_many().times(1).returning(|_| Ok(0));
+
+                let service = LnAddressService::new(store.build());
+
+                let err = service.delete(Uuid::new_v4()).await.unwrap_err();
+
+                assert!(matches!(err, ApplicationError::Data(DataError::NotFound(_))));
+            }
+        }
+    }
+
+    mod delete_many {
+        use super::*;
+
+        #[tokio::test]
+        async fn returns_deleted_count() {
+            let mut store = MockAppStoreBuilder::new();
+            store.ln_address.expect_delete_many().times(1).returning(|_| Ok(3));
+
+            let service = LnAddressService::new(store.build());
+
+            let deleted = service.delete_many(LnAddressFilter::default()).await.unwrap();
+
+            assert_eq!(deleted, 3);
         }
     }
 }

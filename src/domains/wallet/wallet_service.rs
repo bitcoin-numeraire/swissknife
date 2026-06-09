@@ -127,3 +127,258 @@ impl WalletUseCases for WalletService {
         Ok(n_deleted)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::application::{entities::MockAppStoreBuilder, errors::DatabaseError};
+
+    use super::*;
+
+    fn wallet_fixture(id: Uuid, user_id: &str) -> Wallet {
+        Wallet {
+            id,
+            user_id: user_id.to_string(),
+            ..Default::default()
+        }
+    }
+
+    mod register {
+        use super::*;
+
+        mod with_a_valid_new_user_id {
+            use super::*;
+
+            #[tokio::test]
+            async fn inserts_and_returns_wallet() {
+                let mut store = MockAppStoreBuilder::new();
+                store
+                    .wallet
+                    .expect_find_by_user_id()
+                    .withf(|user_id| user_id == "alice")
+                    .times(1)
+                    .returning(|_| Ok(None));
+                store
+                    .wallet
+                    .expect_insert()
+                    .withf(|user_id| user_id == "alice")
+                    .times(1)
+                    .returning(|user_id| Ok(wallet_fixture(Uuid::new_v4(), user_id)));
+
+                let service = WalletService::new(store.build());
+
+                let wallet = service.register("alice".to_string()).await.unwrap();
+
+                assert_eq!(wallet.user_id, "alice");
+            }
+        }
+
+        mod with_an_invalid_length {
+            use super::*;
+
+            #[tokio::test]
+            async fn rejects_empty_user_id() {
+                let service = WalletService::new(MockAppStoreBuilder::new().build());
+
+                let err = service.register(String::new()).await.unwrap_err();
+
+                assert!(matches!(err, ApplicationError::Data(DataError::Validation(_))));
+            }
+
+            #[tokio::test]
+            async fn rejects_too_long_user_id() {
+                let service = WalletService::new(MockAppStoreBuilder::new().build());
+
+                let err = service.register("a".repeat(MAX_USER_LENGTH + 1)).await.unwrap_err();
+
+                assert!(matches!(err, ApplicationError::Data(DataError::Validation(_))));
+            }
+        }
+
+        mod with_an_invalid_format {
+            use super::*;
+
+            #[tokio::test]
+            async fn rejects_disallowed_characters() {
+                let service = WalletService::new(MockAppStoreBuilder::new().build());
+
+                let err = service.register("alice bob".to_string()).await.unwrap_err();
+
+                assert!(matches!(err, ApplicationError::Data(DataError::Validation(_))));
+                assert!(err.to_string().contains("Invalid user_id format"));
+            }
+        }
+
+        mod when_user_id_already_exists {
+            use super::*;
+
+            #[tokio::test]
+            async fn returns_conflict() {
+                let mut store = MockAppStoreBuilder::new();
+                store
+                    .wallet
+                    .expect_find_by_user_id()
+                    .times(1)
+                    .returning(|user_id| Ok(Some(wallet_fixture(Uuid::new_v4(), user_id))));
+
+                let service = WalletService::new(store.build());
+
+                let err = service.register("alice".to_string()).await.unwrap_err();
+
+                assert!(matches!(err, ApplicationError::Data(DataError::Conflict(_))));
+            }
+        }
+    }
+
+    mod get {
+        use super::*;
+
+        mod when_found {
+            use super::*;
+
+            #[tokio::test]
+            async fn returns_wallet() {
+                let id = Uuid::new_v4();
+
+                let mut store = MockAppStoreBuilder::new();
+                store
+                    .wallet
+                    .expect_find()
+                    .withf(move |queried| *queried == id)
+                    .times(1)
+                    .returning(|id| Ok(Some(wallet_fixture(id, "alice"))));
+
+                let service = WalletService::new(store.build());
+
+                assert_eq!(service.get(id).await.unwrap().id, id);
+            }
+        }
+
+        mod when_missing {
+            use super::*;
+
+            #[tokio::test]
+            async fn returns_not_found() {
+                let mut store = MockAppStoreBuilder::new();
+                store.wallet.expect_find().times(1).returning(|_| Ok(None));
+
+                let service = WalletService::new(store.build());
+
+                let err = service.get(Uuid::new_v4()).await.unwrap_err();
+
+                assert!(matches!(err, ApplicationError::Data(DataError::NotFound(_))));
+            }
+        }
+    }
+
+    mod get_balance {
+        use super::*;
+
+        #[tokio::test]
+        async fn returns_balance_from_the_repository() {
+            let id = Uuid::new_v4();
+
+            let mut store = MockAppStoreBuilder::new();
+            store
+                .wallet
+                .expect_get_balance()
+                .withf(move |queried| *queried == id)
+                .times(1)
+                .returning(|_| {
+                    Ok(Balance {
+                        available_msat: 5_000,
+                        ..Default::default()
+                    })
+                });
+
+            let service = WalletService::new(store.build());
+
+            assert_eq!(service.get_balance(id).await.unwrap().available_msat, 5_000);
+        }
+
+        #[tokio::test]
+        async fn propagates_database_error() {
+            let mut store = MockAppStoreBuilder::new();
+            store
+                .wallet
+                .expect_get_balance()
+                .times(1)
+                .returning(|_| Err(DatabaseError::FindOne("boom".to_string())));
+
+            let service = WalletService::new(store.build());
+
+            let err = service.get_balance(Uuid::new_v4()).await.unwrap_err();
+
+            assert!(matches!(err, ApplicationError::Database(DatabaseError::FindOne(_))));
+        }
+    }
+
+    mod list_overviews {
+        use super::*;
+
+        #[tokio::test]
+        async fn returns_overviews() {
+            let mut store = MockAppStoreBuilder::new();
+            store
+                .wallet
+                .expect_find_many_overview()
+                .times(1)
+                .returning(|| Ok(vec![WalletOverview::default()]));
+
+            let service = WalletService::new(store.build());
+
+            assert_eq!(service.list_overviews().await.unwrap().len(), 1);
+        }
+    }
+
+    mod list_contacts {
+        use super::*;
+
+        #[tokio::test]
+        async fn returns_contacts() {
+            let mut store = MockAppStoreBuilder::new();
+            store
+                .wallet
+                .expect_find_contacts()
+                .times(1)
+                .returning(|_| Ok(vec![Contact::default()]));
+
+            let service = WalletService::new(store.build());
+
+            assert_eq!(service.list_contacts(Uuid::new_v4()).await.unwrap().len(), 1);
+        }
+    }
+
+    mod delete {
+        use super::*;
+
+        mod when_a_row_is_removed {
+            use super::*;
+
+            #[tokio::test]
+            async fn succeeds() {
+                let mut store = MockAppStoreBuilder::new();
+                store.wallet.expect_delete_many().times(1).returning(|_| Ok(1));
+
+                let service = WalletService::new(store.build());
+
+                assert!(service.delete(Uuid::new_v4()).await.is_ok());
+            }
+        }
+
+        mod when_nothing_is_removed {
+            use super::*;
+
+            #[tokio::test]
+            async fn returns_not_found() {
+                let mut store = MockAppStoreBuilder::new();
+                store.wallet.expect_delete_many().times(1).returning(|_| Ok(0));
+
+                let service = WalletService::new(store.build());
+
+                let err = service.delete(Uuid::new_v4()).await.unwrap_err();
+
+                assert!(matches!(err, ApplicationError::Data(DataError::NotFound(_))));
+            }
+        }
+    }
+}
