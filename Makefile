@@ -102,7 +102,7 @@ test-integration:
 # coverage. Use `coverage-html` for a browsable report and `coverage-lcov` to
 # emit an lcov.info file for CI or editor integrations.
 coverage:
-	@cargo llvm-cov --workspace --bins --summary-only
+	@cargo llvm-cov --workspace --bins
 
 coverage-html:
 	@cargo llvm-cov --workspace --bins --html
