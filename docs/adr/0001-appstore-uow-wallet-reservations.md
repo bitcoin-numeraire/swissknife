@@ -188,7 +188,7 @@ pub trait WalletRepository: Send + Sync {
 }
 ```
 
-SeaORM implementations may share helpers generic over `sea_orm::ConnectionTrait` so normal repositories can call helpers with `&DatabaseConnection` and Unit-of-Work implementations can call the same helpers with `&DatabaseTransaction`. That generic helper detail stays in infra.
+SeaORM repositories should be generic over the concrete connection handle they are constructed with. Production store wiring constructs them with `DatabaseConnection`; Unit-of-Work implementations construct the same repositories with `&DatabaseTransaction` and call the normal repository trait methods. Any generic connection adapter stays in infra.
 
 ### 4. Use focused Unit-of-Work ports with named atomic operations
 

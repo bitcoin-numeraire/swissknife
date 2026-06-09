@@ -1,10 +1,12 @@
 use async_trait::async_trait;
 use chrono::Utc;
 use sea_orm::{
-    ActiveModelTrait, ActiveValue, ColumnTrait, ConnectionTrait, DatabaseConnection, DatabaseTransaction, EntityTrait,
-    FromQueryResult, QueryFilter, QueryOrder, QuerySelect, QueryTrait, Set, Unchanged,
+    ActiveModelTrait, ActiveValue, ColumnTrait, DatabaseConnection, EntityTrait, FromQueryResult, QueryFilter,
+    QueryOrder, QuerySelect, QueryTrait, Set, Unchanged,
 };
 use uuid::Uuid;
+
+use super::SeaOrmConnection;
 
 use crate::{
     application::errors::DatabaseError,
@@ -16,27 +18,16 @@ use crate::{
 };
 
 #[derive(Clone)]
-pub struct SeaOrmPaymentRepository {
-    pub db: DatabaseConnection,
+pub struct SeaOrmPaymentRepository<C = DatabaseConnection> {
+    db: C,
 }
 
-impl SeaOrmPaymentRepository {
-    pub fn new(db: DatabaseConnection) -> Self {
+impl<C> SeaOrmPaymentRepository<C> {
+    pub fn new(db: C) -> Self {
         Self { db }
     }
 
-    pub(crate) async fn insert_in_transaction(
-        &self,
-        txn: &DatabaseTransaction,
-        payment: Payment,
-    ) -> Result<Payment, DatabaseError> {
-        self.insert_with(txn, payment).await
-    }
-
-    async fn insert_with<C>(&self, connection: &C, payment: Payment) -> Result<Payment, DatabaseError>
-    where
-        C: ConnectionTrait,
-    {
+    fn active_model_for_insert(payment: Payment) -> ActiveModel {
         let (ln_address, payment_hash, payment_preimage, metadata, success_action) = payment
             .lightning
             .as_ref()
@@ -78,7 +69,7 @@ impl SeaOrmPaymentRepository {
             })
             .unwrap_or((None, None, None));
 
-        let model = ActiveModel {
+        ActiveModel {
             id: Set(Uuid::new_v4()),
             wallet_id: Set(payment.wallet_id),
             ln_address: Set(ln_address.or(internal_ln_address)),
@@ -96,22 +87,18 @@ impl SeaOrmPaymentRepository {
             payment_preimage: Set(payment_preimage),
             btc_block_height: Set(block_height.map(|h| h as i32)),
             ..Default::default()
-        };
-
-        let model = model
-            .insert(connection)
-            .await
-            .map_err(|e| DatabaseError::Insert(e.to_string()))?;
-
-        Ok(model.into())
+        }
     }
 }
 
 #[async_trait]
-impl PaymentRepository for SeaOrmPaymentRepository {
+impl<C> PaymentRepository for SeaOrmPaymentRepository<C>
+where
+    C: SeaOrmConnection,
+{
     async fn find(&self, id: Uuid) -> Result<Option<Payment>, DatabaseError> {
         let model = PaymentEntity::find_by_id(id)
-            .one(&self.db)
+            .one(self.db.connection())
             .await
             .map_err(|e| DatabaseError::FindOne(e.to_string()))?;
 
@@ -121,7 +108,7 @@ impl PaymentRepository for SeaOrmPaymentRepository {
     async fn find_by_payment_hash(&self, payment_hash: &str) -> Result<Option<Payment>, DatabaseError> {
         let model = PaymentEntity::find()
             .filter(Column::PaymentHash.eq(payment_hash))
-            .one(&self.db)
+            .one(self.db.connection())
             .await
             .map_err(|e| DatabaseError::FindOne(e.to_string()))?;
 
@@ -143,7 +130,7 @@ impl PaymentRepository for SeaOrmPaymentRepository {
             .order_by(Column::CreatedAt, filter.order_direction.into())
             .offset(filter.offset)
             .limit(filter.limit)
-            .all(&self.db)
+            .all(self.db.connection())
             .await
             .map_err(|e| DatabaseError::FindMany(e.to_string()))?;
 
@@ -151,7 +138,12 @@ impl PaymentRepository for SeaOrmPaymentRepository {
     }
 
     async fn insert(&self, payment: Payment) -> Result<Payment, DatabaseError> {
-        self.insert_with(&self.db, payment).await
+        let model = Self::active_model_for_insert(payment)
+            .insert(self.db.connection())
+            .await
+            .map_err(|e| DatabaseError::Insert(e.to_string()))?;
+
+        Ok(model.into())
     }
 
     async fn update(&self, payment: Payment) -> Result<Payment, DatabaseError> {
@@ -225,7 +217,7 @@ impl PaymentRepository for SeaOrmPaymentRepository {
         };
 
         let model = model
-            .update(&self.db)
+            .update(self.db.connection())
             .await
             .map_err(|e| DatabaseError::Update(e.to_string()))?;
 
@@ -243,7 +235,7 @@ impl PaymentRepository for SeaOrmPaymentRepository {
             .apply_if(filter.btc_addresses, |q, btc_addresses| {
                 q.filter(Column::BtcAddress.is_in(btc_addresses))
             })
-            .exec(&self.db)
+            .exec(self.db.connection())
             .await
             .map_err(|e| DatabaseError::Delete(e.to_string()))?;
 
@@ -260,7 +252,7 @@ impl PaymentRepository for SeaOrmPaymentRepository {
             .select_only()
             .column_as(Column::BtcBlockHeight.max(), "max")
             .into_model::<MaxBlockHeight>()
-            .one(&self.db)
+            .one(self.db.connection())
             .await
             .map_err(|e| DatabaseError::FindOne(e.to_string()))?;
 

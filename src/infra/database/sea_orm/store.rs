@@ -11,8 +11,9 @@ use crate::{
         errors::{ApplicationError, DataError, DatabaseError},
     },
     domains::{
-        payment::{Payment, PaymentUnitOfWork},
+        payment::{Payment, PaymentRepository, PaymentUnitOfWork},
         system::HealthProbe,
+        wallet::WalletRepository,
     },
 };
 
@@ -117,25 +118,24 @@ impl PaymentUnitOfWork for SeaOrmPaymentUnitOfWork {
             .await
             .map_err(|e| DatabaseError::Transaction(e.to_string()))?;
 
-        let wallet_repo = SeaOrmWalletRepository::new(self.db.clone());
-        let payment_repo = SeaOrmPaymentRepository::new(self.db.clone());
+        let pending_payment = {
+            let wallet_repo = SeaOrmWalletRepository::new(&txn);
+            let payment_repo = SeaOrmPaymentRepository::new(&txn);
 
-        let balance = wallet_repo
-            .get_balance_in_transaction(&txn, payment.wallet_id)
-            .await?
-            .available_msat as f64;
+            let balance = wallet_repo.get_balance(payment.wallet_id).await?.available_msat as f64;
 
-        let required_balance_msat = if let Some(fee_msat) = payment.fee_msat {
-            (payment.amount_msat.saturating_add(fee_msat)) as f64
-        } else {
-            payment.amount_msat as f64 * (1.0 + fee_buffer)
+            let required_balance_msat = if let Some(fee_msat) = payment.fee_msat {
+                (payment.amount_msat.saturating_add(fee_msat)) as f64
+            } else {
+                payment.amount_msat as f64 * (1.0 + fee_buffer)
+            };
+
+            if balance < required_balance_msat {
+                return Err(DataError::InsufficientFunds(required_balance_msat).into());
+            }
+
+            payment_repo.insert(payment).await?
         };
-
-        if balance < required_balance_msat {
-            return Err(DataError::InsufficientFunds(required_balance_msat).into());
-        }
-
-        let pending_payment = payment_repo.insert_in_transaction(&txn, payment).await?;
 
         txn.commit()
             .await

@@ -1,9 +1,11 @@
 use async_trait::async_trait;
 use sea_orm::{
-    sea_query::Expr, ActiveModelTrait, ActiveValue::Set, ColumnTrait, ConnectionTrait, DatabaseConnection,
-    DatabaseTransaction, EntityTrait, ModelTrait, QueryFilter, QueryOrder, QuerySelect, QueryTrait,
+    sea_query::Expr, ActiveModelTrait, ActiveValue::Set, ColumnTrait, DatabaseConnection, EntityTrait, ModelTrait,
+    QueryFilter, QueryOrder, QuerySelect, QueryTrait,
 };
 use uuid::Uuid;
+
+use super::SeaOrmConnection;
 
 use crate::{
     application::errors::DatabaseError,
@@ -21,92 +23,44 @@ use crate::{
 };
 
 #[derive(Clone)]
-pub struct SeaOrmWalletRepository {
-    pub db: DatabaseConnection,
+pub struct SeaOrmWalletRepository<C = DatabaseConnection> {
+    db: C,
 }
 
-impl SeaOrmWalletRepository {
-    pub fn new(db: DatabaseConnection) -> Self {
+impl<C> SeaOrmWalletRepository<C> {
+    pub fn new(db: C) -> Self {
         Self { db }
-    }
-
-    pub(crate) async fn get_balance_in_transaction(
-        &self,
-        txn: &DatabaseTransaction,
-        id: Uuid,
-    ) -> Result<Balance, DatabaseError> {
-        self.get_balance_with(txn, id).await
-    }
-
-    async fn get_balance_with<C>(&self, connection: &C, id: Uuid) -> Result<Balance, DatabaseError>
-    where
-        C: ConnectionTrait,
-    {
-        let received = Invoice::find()
-            .filter(InvoiceColumn::WalletId.eq(id))
-            .select_only()
-            .column_as(
-                Expr::cust("CAST(SUM(invoice.amount_received_msat) AS BIGINT)"),
-                "received_msat",
-            )
-            .into_tuple::<Option<i64>>()
-            .one(connection)
-            .await
-            .map_err(|e| DatabaseError::FindOne(e.to_string()))?
-            .unwrap_or(None);
-
-        let (sent_msat, fees_paid_msat) = Payment::find()
-            .filter(PaymentColumn::WalletId.eq(id))
-            .filter(
-                PaymentColumn::Status.is_in([PaymentStatus::Settled.to_string(), PaymentStatus::Pending.to_string()]),
-            )
-            .select_only()
-            .column_as(Expr::cust("CAST(SUM(payment.amount_msat) AS BIGINT)"), "sent_msat")
-            .column_as(Expr::cust("CAST(SUM(payment.fee_msat) AS BIGINT)"), "fees_paid_msat")
-            .into_tuple::<(Option<i64>, Option<i64>)>()
-            .one(connection)
-            .await
-            .map_err(|e| DatabaseError::FindOne(e.to_string()))?
-            .unwrap_or((None, None));
-
-        let received_msat_i64 = received.unwrap_or(0);
-        let sent_msat_i64 = sent_msat.unwrap_or(0);
-        let fees_paid_msat_i64 = fees_paid_msat.unwrap_or(0);
-
-        Ok(Balance {
-            received_msat: received_msat_i64 as u64,
-            sent_msat: sent_msat_i64 as u64,
-            fees_paid_msat: fees_paid_msat_i64 as u64,
-            available_msat: received_msat_i64 - (sent_msat_i64 + fees_paid_msat_i64),
-        })
     }
 }
 
 #[async_trait]
-impl WalletRepository for SeaOrmWalletRepository {
+impl<C> WalletRepository for SeaOrmWalletRepository<C>
+where
+    C: SeaOrmConnection,
+{
     async fn find(&self, id: Uuid) -> Result<Option<Wallet>, DatabaseError> {
         let model_opt = WalletEntity::find_by_id(id)
-            .one(&self.db)
+            .one(self.db.connection())
             .await
             .map_err(|e| DatabaseError::FindOne(e.to_string()))?;
 
         match model_opt {
             Some(model) => {
-                let balance = self.get_balance_with(&self.db, id).await?;
+                let balance = self.get_balance(id).await?;
                 let payments_with_output = Payment::find()
                     .filter(PaymentColumn::WalletId.eq(id))
-                    .all(&self.db)
+                    .all(self.db.connection())
                     .await
                     .map_err(|e| DatabaseError::FindRelated(e.to_string()))?;
                 let invoices_with_output = Invoice::find()
                     .filter(InvoiceColumn::WalletId.eq(id))
                     .find_also_related(BtcOutput)
-                    .all(&self.db)
+                    .all(self.db.connection())
                     .await
                     .map_err(|e| DatabaseError::FindRelated(e.to_string()))?;
                 let ln_address = model
                     .find_related(LnAddress)
-                    .one(&self.db)
+                    .one(self.db.connection())
                     .await
                     .map_err(|e| DatabaseError::FindRelated(e.to_string()))?;
                 let contacts = self.find_contacts(id).await?;
@@ -134,7 +88,7 @@ impl WalletRepository for SeaOrmWalletRepository {
     async fn find_by_user_id(&self, user_id: &str) -> Result<Option<Wallet>, DatabaseError> {
         let model = WalletEntity::find()
             .filter(Column::UserId.eq(user_id))
-            .one(&self.db)
+            .one(self.db.connection())
             .await
             .map_err(|e| DatabaseError::FindOne(e.to_string()))?;
 
@@ -148,7 +102,7 @@ impl WalletRepository for SeaOrmWalletRepository {
             .order_by(Column::CreatedAt, filter.order_direction.into())
             .offset(filter.offset)
             .limit(filter.limit)
-            .all(&self.db)
+            .all(self.db.connection())
             .await
             .map_err(|e| DatabaseError::FindMany(e.to_string()))?;
 
@@ -159,7 +113,7 @@ impl WalletRepository for SeaOrmWalletRepository {
         // Get all wallets with their ln_address (1-to-1 relation)
         let wallets_with_ln = WalletEntity::find()
             .find_also_related(LnAddress)
-            .all(&self.db)
+            .all(self.db.connection())
             .await
             .map_err(|e| DatabaseError::FindMany(e.to_string()))?;
 
@@ -174,7 +128,7 @@ impl WalletRepository for SeaOrmWalletRepository {
             .column_as(InvoiceColumn::Id.count(), "n_invoices")
             .group_by(InvoiceColumn::WalletId)
             .into_tuple::<(Uuid, Option<i64>, i64)>()
-            .all(&self.db)
+            .all(self.db.connection())
             .await
             .map_err(|e| DatabaseError::FindMany(e.to_string()))?;
 
@@ -205,7 +159,7 @@ impl WalletRepository for SeaOrmWalletRepository {
             .column_as(Expr::col(PaymentColumn::LnAddress).count_distinct(), "n_contacts")
             .group_by(PaymentColumn::WalletId)
             .into_tuple::<(Uuid, Option<i64>, Option<i64>, i64, i64)>()
-            .all(&self.db)
+            .all(self.db.connection())
             .await
             .map_err(|e| DatabaseError::FindMany(e.to_string()))?;
 
@@ -263,7 +217,7 @@ impl WalletRepository for SeaOrmWalletRepository {
         };
 
         let model = model
-            .insert(&self.db)
+            .insert(self.db.connection())
             .await
             .map_err(|e| DatabaseError::Insert(e.to_string()))?;
 
@@ -271,7 +225,43 @@ impl WalletRepository for SeaOrmWalletRepository {
     }
 
     async fn get_balance(&self, id: Uuid) -> Result<Balance, DatabaseError> {
-        self.get_balance_with(&self.db, id).await
+        let received = Invoice::find()
+            .filter(InvoiceColumn::WalletId.eq(id))
+            .select_only()
+            .column_as(
+                Expr::cust("CAST(SUM(invoice.amount_received_msat) AS BIGINT)"),
+                "received_msat",
+            )
+            .into_tuple::<Option<i64>>()
+            .one(self.db.connection())
+            .await
+            .map_err(|e| DatabaseError::FindOne(e.to_string()))?
+            .unwrap_or(None);
+
+        let (sent_msat, fees_paid_msat) = Payment::find()
+            .filter(PaymentColumn::WalletId.eq(id))
+            .filter(
+                PaymentColumn::Status.is_in([PaymentStatus::Settled.to_string(), PaymentStatus::Pending.to_string()]),
+            )
+            .select_only()
+            .column_as(Expr::cust("CAST(SUM(payment.amount_msat) AS BIGINT)"), "sent_msat")
+            .column_as(Expr::cust("CAST(SUM(payment.fee_msat) AS BIGINT)"), "fees_paid_msat")
+            .into_tuple::<(Option<i64>, Option<i64>)>()
+            .one(self.db.connection())
+            .await
+            .map_err(|e| DatabaseError::FindOne(e.to_string()))?
+            .unwrap_or((None, None));
+
+        let received_msat_i64 = received.unwrap_or(0);
+        let sent_msat_i64 = sent_msat.unwrap_or(0);
+        let fees_paid_msat_i64 = fees_paid_msat.unwrap_or(0);
+
+        Ok(Balance {
+            received_msat: received_msat_i64 as u64,
+            sent_msat: sent_msat_i64 as u64,
+            fees_paid_msat: fees_paid_msat_i64 as u64,
+            available_msat: received_msat_i64 - (sent_msat_i64 + fees_paid_msat_i64),
+        })
     }
 
     async fn find_contacts(&self, id: Uuid) -> Result<Vec<Contact>, DatabaseError> {
@@ -285,7 +275,7 @@ impl WalletRepository for SeaOrmWalletRepository {
             .group_by(PaymentColumn::LnAddress)
             .order_by_asc(PaymentColumn::LnAddress)
             .into_model::<ContactModel>()
-            .all(&self.db)
+            .all(self.db.connection())
             .await
             .map_err(|e| DatabaseError::FindMany(e.to_string()))?;
 
@@ -297,7 +287,7 @@ impl WalletRepository for SeaOrmWalletRepository {
         let result = WalletEntity::delete_many()
             .apply_if(filter.user_id, |q, user| q.filter(Column::UserId.eq(user)))
             .apply_if(filter.ids, |q, ids| q.filter(Column::Id.is_in(ids)))
-            .exec(&self.db)
+            .exec(self.db.connection())
             .await
             .map_err(|e| DatabaseError::Delete(e.to_string()))?;
 
