@@ -28,3 +28,6 @@ certs/
 # Local storage files
 storage/*
 deps/lightningd
+
+# Code coverage
+lcov.info

@@ -5,7 +5,7 @@ SWISSKNIFE_SERVICE := swissknife
 SWISSKNIFE_SERVER_SERVICE := swissknife-server
 IMAGE_NAME := swissknife:latest
 
-.PHONY: watch up up-swissknife up-server up-postgres up-pgadmin shutdown down generate-certs build build-docker build-docker-server build-docker-dashboard run-docker lint fmt fmt-fix test test-unit test-integration check deps-upgrade deps-outdated install-tools generate-models new-migration run-migrations fresh-migrations
+.PHONY: watch up up-swissknife up-server up-postgres up-pgadmin shutdown down generate-certs build build-docker build-docker-server build-docker-dashboard run-docker lint fmt fmt-fix test test-unit test-integration coverage coverage-html coverage-lcov check deps-upgrade deps-outdated install-tools generate-models new-migration run-migrations fresh-migrations
 
 watch:
 	@cargo watch -x run
@@ -44,6 +44,7 @@ install-tools:
 	@cargo install sea-orm-cli
 	@cargo install cargo-edit
 	@cargo install cargo-outdated
+	@cargo install cargo-llvm-cov
 
 generate-models:
 	@sea-orm-cli generate entity --output-dir src/infra/database/sea_orm/models
@@ -95,6 +96,20 @@ test-integration:
 	else \
 		echo "No integration tests found under tests/"; \
 	fi
+
+# Code coverage via cargo-llvm-cov (install with `make install-tools`).
+# Coverage runs the unit-test suite (`--bins`) and reports line/region/function
+# coverage. Use `coverage-html` for a browsable report and `coverage-lcov` to
+# emit an lcov.info file for CI or editor integrations.
+coverage:
+	@cargo llvm-cov --workspace --bins --summary-only
+
+coverage-html:
+	@cargo llvm-cov --workspace --bins --html
+	@echo "HTML coverage report generated at target/llvm-cov/html/index.html"
+
+coverage-lcov:
+	@cargo llvm-cov --workspace --bins --lcov --output-path lcov.info
 
 check: fmt lint build test
 
