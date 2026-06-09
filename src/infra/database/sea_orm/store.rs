@@ -118,24 +118,22 @@ impl PaymentUnitOfWork for SeaOrmPaymentUnitOfWork {
             .await
             .map_err(|e| DatabaseError::Transaction(e.to_string()))?;
 
-        let pending_payment = {
-            let wallet_repo = SeaOrmWalletRepository::new(&txn);
-            let payment_repo = SeaOrmPaymentRepository::new(&txn);
+        let wallet_repo = SeaOrmWalletRepository::new(&txn);
+        let payment_repo = SeaOrmPaymentRepository::new(&txn);
 
-            let balance = wallet_repo.get_balance(payment.wallet_id).await?.available_msat as f64;
+        let balance = wallet_repo.get_balance(payment.wallet_id).await?.available_msat as f64;
 
-            let required_balance_msat = if let Some(fee_msat) = payment.fee_msat {
-                (payment.amount_msat.saturating_add(fee_msat)) as f64
-            } else {
-                payment.amount_msat as f64 * (1.0 + fee_buffer)
-            };
-
-            if balance < required_balance_msat {
-                return Err(DataError::InsufficientFunds(required_balance_msat).into());
-            }
-
-            payment_repo.insert(payment).await?
+        let required_balance_msat = if let Some(fee_msat) = payment.fee_msat {
+            (payment.amount_msat.saturating_add(fee_msat)) as f64
+        } else {
+            payment.amount_msat as f64 * (1.0 + fee_buffer)
         };
+
+        if balance < required_balance_msat {
+            return Err(DataError::InsufficientFunds(required_balance_msat).into());
+        }
+
+        let pending_payment = payment_repo.insert(payment).await?;
 
         txn.commit()
             .await

@@ -26,69 +26,6 @@ impl<C> SeaOrmPaymentRepository<C> {
     pub fn new(db: C) -> Self {
         Self { db }
     }
-
-    fn active_model_for_insert(payment: Payment) -> ActiveModel {
-        let (ln_address, payment_hash, payment_preimage, metadata, success_action) = payment
-            .lightning
-            .as_ref()
-            .map(|lightning| {
-                (
-                    lightning.ln_address.clone(),
-                    Some(lightning.payment_hash.clone()),
-                    lightning.payment_preimage.clone(),
-                    lightning.metadata.clone(),
-                    lightning
-                        .success_action
-                        .clone()
-                        .and_then(|action| serde_json::to_value(action).ok()),
-                )
-            })
-            .unwrap_or((None, None, None, None, None));
-
-        let (btc_address, btc_txid, block_height) = payment
-            .bitcoin
-            .as_ref()
-            .map(|bitcoin| {
-                (
-                    Some(bitcoin.address.clone()),
-                    Some(bitcoin.txid.clone()),
-                    bitcoin.block_height,
-                )
-            })
-            .unwrap_or((None, None, None));
-
-        let (internal_ln_address, internal_btc_address, internal_payment_hash) = payment
-            .internal
-            .as_ref()
-            .map(|internal| {
-                (
-                    internal.ln_address.clone(),
-                    internal.btc_address.clone(),
-                    internal.payment_hash.clone(),
-                )
-            })
-            .unwrap_or((None, None, None));
-
-        ActiveModel {
-            id: Set(Uuid::new_v4()),
-            wallet_id: Set(payment.wallet_id),
-            ln_address: Set(ln_address.or(internal_ln_address)),
-            btc_address: Set(btc_address.or(internal_btc_address)),
-            amount_msat: Set(payment.amount_msat as i64),
-            status: Set(payment.status.to_string()),
-            ledger: Set(payment.ledger.to_string()),
-            currency: Set(payment.currency.to_string()),
-            fee_msat: Set(payment.fee_msat.map(|v| v as i64)),
-            payment_time: Set(payment.payment_time.map(|t| t.naive_utc())),
-            payment_hash: Set(payment_hash.or(btc_txid).or(internal_payment_hash)),
-            description: Set(payment.description),
-            metadata: Set(metadata),
-            success_action: Set(success_action),
-            payment_preimage: Set(payment_preimage),
-            btc_block_height: Set(block_height.map(|h| h as i32)),
-            ..Default::default()
-        }
-    }
 }
 
 #[async_trait]
@@ -138,10 +75,69 @@ where
     }
 
     async fn insert(&self, payment: Payment) -> Result<Payment, DatabaseError> {
-        let model = Self::active_model_for_insert(payment)
-            .insert(self.db.connection())
-            .await
-            .map_err(|e| DatabaseError::Insert(e.to_string()))?;
+        let (ln_address, payment_hash, payment_preimage, metadata, success_action) = payment
+            .lightning
+            .as_ref()
+            .map(|lightning| {
+                (
+                    lightning.ln_address.clone(),
+                    Some(lightning.payment_hash.clone()),
+                    lightning.payment_preimage.clone(),
+                    lightning.metadata.clone(),
+                    lightning
+                        .success_action
+                        .clone()
+                        .and_then(|action| serde_json::to_value(action).ok()),
+                )
+            })
+            .unwrap_or((None, None, None, None, None));
+
+        let (btc_address, btc_txid, block_height) = payment
+            .bitcoin
+            .as_ref()
+            .map(|bitcoin| {
+                (
+                    Some(bitcoin.address.clone()),
+                    Some(bitcoin.txid.clone()),
+                    bitcoin.block_height,
+                )
+            })
+            .unwrap_or((None, None, None));
+
+        let (internal_ln_address, internal_btc_address, internal_payment_hash) = payment
+            .internal
+            .as_ref()
+            .map(|internal| {
+                (
+                    internal.ln_address.clone(),
+                    internal.btc_address.clone(),
+                    internal.payment_hash.clone(),
+                )
+            })
+            .unwrap_or((None, None, None));
+
+        let model = ActiveModel {
+            id: Set(Uuid::new_v4()),
+            wallet_id: Set(payment.wallet_id),
+            ln_address: Set(ln_address.or(internal_ln_address)),
+            btc_address: Set(btc_address.or(internal_btc_address)),
+            amount_msat: Set(payment.amount_msat as i64),
+            status: Set(payment.status.to_string()),
+            ledger: Set(payment.ledger.to_string()),
+            currency: Set(payment.currency.to_string()),
+            fee_msat: Set(payment.fee_msat.map(|v| v as i64)),
+            payment_time: Set(payment.payment_time.map(|t| t.naive_utc())),
+            payment_hash: Set(payment_hash.or(btc_txid).or(internal_payment_hash)),
+            description: Set(payment.description),
+            metadata: Set(metadata),
+            success_action: Set(success_action),
+            payment_preimage: Set(payment_preimage),
+            btc_block_height: Set(block_height.map(|h| h as i32)),
+            ..Default::default()
+        }
+        .insert(self.db.connection())
+        .await
+        .map_err(|e| DatabaseError::Insert(e.to_string()))?;
 
         Ok(model.into())
     }
