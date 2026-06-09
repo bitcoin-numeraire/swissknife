@@ -149,3 +149,348 @@ impl AuthUseCases for AuthService {
         Ok(user)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use uuid::Uuid;
+
+    use crate::{
+        application::entities::MockAppStoreBuilder,
+        domains::{
+            user::{ApiKey, AuthClaims},
+            wallet::Wallet,
+        },
+        infra::jwt::MockJWTAuthenticator,
+    };
+
+    use super::*;
+
+    fn service(jwt: MockJWTAuthenticator, store: MockAppStoreBuilder, provider: AuthProvider) -> AuthService {
+        AuthService::new(Arc::new(jwt), store.build(), provider)
+    }
+
+    fn claims(sub: &str) -> AuthClaims {
+        AuthClaims {
+            exp: 0,
+            iat: 0,
+            sub: sub.to_string(),
+            permissions: vec![Permission::ReadWallet],
+        }
+    }
+
+    fn wallet_fixture(id: Uuid, user_id: &str) -> Wallet {
+        Wallet {
+            id,
+            user_id: user_id.to_string(),
+            ..Default::default()
+        }
+    }
+
+    mod sign_up {
+        use super::*;
+
+        mod when_provider_is_not_jwt {
+            use super::*;
+
+            #[tokio::test]
+            async fn returns_unsupported_operation() {
+                let service = service(
+                    MockJWTAuthenticator::new(),
+                    MockAppStoreBuilder::new(),
+                    AuthProvider::OAuth2,
+                );
+
+                let err = service.sign_up("password".to_string()).await.unwrap_err();
+
+                assert!(matches!(
+                    err,
+                    ApplicationError::Authentication(AuthenticationError::UnsupportedOperation)
+                ));
+            }
+        }
+
+        mod when_admin_already_exists {
+            use super::*;
+
+            #[tokio::test]
+            async fn returns_conflict() {
+                let mut store = MockAppStoreBuilder::new();
+                store
+                    .config
+                    .expect_find()
+                    .times(1)
+                    .returning(|_| Ok(Some("existing-hash".into())));
+
+                let service = service(MockJWTAuthenticator::new(), store, AuthProvider::Jwt);
+
+                let err = service.sign_up("password".to_string()).await.unwrap_err();
+
+                assert!(matches!(err, ApplicationError::Data(DataError::Conflict(_))));
+            }
+        }
+
+        mod when_first_admin {
+            use super::*;
+
+            #[tokio::test]
+            async fn persists_hash_and_returns_token() {
+                let mut store = MockAppStoreBuilder::new();
+                store.config.expect_find().times(1).returning(|_| Ok(None));
+                store
+                    .config
+                    .expect_insert()
+                    .withf(|key, _| key == PASSWORD_HASH_KEY)
+                    .times(1)
+                    .returning(|_, _| Ok(()));
+
+                let mut jwt = MockJWTAuthenticator::new();
+                jwt.expect_encode().times(1).returning(|_, _| Ok("token".to_string()));
+
+                let service = service(jwt, store, AuthProvider::Jwt);
+
+                let token = service.sign_up("password".to_string()).await.unwrap();
+
+                assert_eq!(token, "token");
+            }
+        }
+    }
+
+    mod sign_in {
+        use super::*;
+
+        mod when_credentials_are_missing {
+            use super::*;
+
+            #[tokio::test]
+            async fn returns_not_found() {
+                let mut store = MockAppStoreBuilder::new();
+                store.config.expect_find().times(1).returning(|_| Ok(None));
+
+                let service = service(MockJWTAuthenticator::new(), store, AuthProvider::Jwt);
+
+                let err = service.sign_in("password".to_string()).await.unwrap_err();
+
+                assert!(matches!(err, ApplicationError::Data(DataError::NotFound(_))));
+            }
+        }
+
+        mod with_a_wrong_password {
+            use super::*;
+
+            #[tokio::test]
+            async fn returns_invalid_credentials() {
+                let stored_hash = hash("correct", 4).unwrap();
+
+                let mut store = MockAppStoreBuilder::new();
+                store
+                    .config
+                    .expect_find()
+                    .times(1)
+                    .returning(move |_| Ok(Some(stored_hash.clone().into())));
+
+                let service = service(MockJWTAuthenticator::new(), store, AuthProvider::Jwt);
+
+                let err = service.sign_in("wrong".to_string()).await.unwrap_err();
+
+                assert!(matches!(
+                    err,
+                    ApplicationError::Authentication(AuthenticationError::InvalidCredentials)
+                ));
+            }
+        }
+
+        mod with_the_correct_password {
+            use super::*;
+
+            #[tokio::test]
+            async fn returns_token() {
+                let stored_hash = hash("correct", 4).unwrap();
+
+                let mut store = MockAppStoreBuilder::new();
+                store
+                    .config
+                    .expect_find()
+                    .times(1)
+                    .returning(move |_| Ok(Some(stored_hash.clone().into())));
+
+                let mut jwt = MockJWTAuthenticator::new();
+                jwt.expect_encode().times(1).returning(|_, _| Ok("token".to_string()));
+
+                let service = service(jwt, store, AuthProvider::Jwt);
+
+                let token = service.sign_in("correct".to_string()).await.unwrap();
+
+                assert_eq!(token, "token");
+            }
+        }
+
+        mod when_stored_hash_is_not_a_string {
+            use super::*;
+
+            #[tokio::test]
+            async fn returns_inconsistency() {
+                let mut store = MockAppStoreBuilder::new();
+                store
+                    .config
+                    .expect_find()
+                    .times(1)
+                    .returning(|_| Ok(Some(serde_json::json!(42))));
+
+                let service = service(MockJWTAuthenticator::new(), store, AuthProvider::Jwt);
+
+                let err = service.sign_in("password".to_string()).await.unwrap_err();
+
+                assert!(matches!(err, ApplicationError::Data(DataError::Inconsistency(_))));
+            }
+        }
+    }
+
+    mod authenticate_jwt {
+        use super::*;
+
+        mod when_wallet_exists {
+            use super::*;
+
+            #[tokio::test]
+            async fn returns_user_for_existing_wallet() {
+                let wallet_id = Uuid::new_v4();
+
+                let mut jwt = MockJWTAuthenticator::new();
+                jwt.expect_decode().times(1).returning(|_| Ok(claims("alice")));
+
+                let mut store = MockAppStoreBuilder::new();
+                store
+                    .wallet
+                    .expect_find_by_user_id()
+                    .withf(|user_id| user_id == "alice")
+                    .times(1)
+                    .returning(move |user_id| Ok(Some(wallet_fixture(wallet_id, user_id))));
+
+                let service = service(jwt, store, AuthProvider::Jwt);
+
+                let user = service.authenticate_jwt("token").await.unwrap();
+
+                assert_eq!(user.id, "alice");
+                assert_eq!(user.wallet_id, wallet_id);
+            }
+        }
+
+        mod when_wallet_is_missing {
+            use super::*;
+
+            #[tokio::test]
+            async fn provisions_a_wallet_on_first_login() {
+                let mut jwt = MockJWTAuthenticator::new();
+                jwt.expect_decode().times(1).returning(|_| Ok(claims("alice")));
+
+                let mut store = MockAppStoreBuilder::new();
+                store.wallet.expect_find_by_user_id().times(1).returning(|_| Ok(None));
+                store
+                    .wallet
+                    .expect_insert()
+                    .withf(|user_id| user_id == "alice")
+                    .times(1)
+                    .returning(|user_id| Ok(wallet_fixture(Uuid::new_v4(), user_id)));
+
+                let service = service(jwt, store, AuthProvider::Jwt);
+
+                let user = service.authenticate_jwt("token").await.unwrap();
+
+                assert_eq!(user.id, "alice");
+            }
+        }
+
+        mod when_token_is_invalid {
+            use super::*;
+
+            #[tokio::test]
+            async fn propagates_authentication_error() {
+                let mut jwt = MockJWTAuthenticator::new();
+                jwt.expect_decode()
+                    .times(1)
+                    .returning(|_| Err(AuthenticationError::InvalidCredentials));
+
+                let service = service(jwt, MockAppStoreBuilder::new(), AuthProvider::Jwt);
+
+                let err = service.authenticate_jwt("token").await.unwrap_err();
+
+                assert!(matches!(err, ApplicationError::Authentication(_)));
+            }
+        }
+    }
+
+    mod authenticate_api_key {
+        use super::*;
+
+        mod when_key_is_unknown {
+            use super::*;
+
+            #[tokio::test]
+            async fn returns_invalid_credentials() {
+                let mut store = MockAppStoreBuilder::new();
+                store.api_key.expect_find_by_key_hash().times(1).returning(|_| Ok(None));
+
+                let service = service(MockJWTAuthenticator::new(), store, AuthProvider::Jwt);
+
+                let err = service.authenticate_api_key(vec![1, 2, 3]).await.unwrap_err();
+
+                assert!(matches!(
+                    err,
+                    ApplicationError::Authentication(AuthenticationError::InvalidCredentials)
+                ));
+            }
+        }
+
+        mod when_key_and_wallet_exist {
+            use super::*;
+
+            #[tokio::test]
+            async fn returns_user_with_api_key_permissions() {
+                let wallet_id = Uuid::new_v4();
+
+                let mut store = MockAppStoreBuilder::new();
+                store.api_key.expect_find_by_key_hash().times(1).returning(|_| {
+                    Ok(Some(ApiKey {
+                        user_id: "alice".to_string(),
+                        permissions: vec![Permission::ReadWallet],
+                        ..Default::default()
+                    }))
+                });
+                store
+                    .wallet
+                    .expect_find_by_user_id()
+                    .times(1)
+                    .returning(move |user_id| Ok(Some(wallet_fixture(wallet_id, user_id))));
+
+                let service = service(MockJWTAuthenticator::new(), store, AuthProvider::Jwt);
+
+                let user = service.authenticate_api_key(vec![1, 2, 3]).await.unwrap();
+
+                assert_eq!(user.wallet_id, wallet_id);
+                assert_eq!(user.permissions, vec![Permission::ReadWallet]);
+            }
+        }
+
+        mod when_key_exists_without_wallet {
+            use super::*;
+
+            #[tokio::test]
+            async fn returns_inconsistency() {
+                let mut store = MockAppStoreBuilder::new();
+                store.api_key.expect_find_by_key_hash().times(1).returning(|_| {
+                    Ok(Some(ApiKey {
+                        user_id: "alice".to_string(),
+                        ..Default::default()
+                    }))
+                });
+                store.wallet.expect_find_by_user_id().times(1).returning(|_| Ok(None));
+
+                let service = service(MockJWTAuthenticator::new(), store, AuthProvider::Jwt);
+
+                let err = service.authenticate_api_key(vec![1, 2, 3]).await.unwrap_err();
+
+                assert!(matches!(err, ApplicationError::Data(DataError::Inconsistency(_))));
+            }
+        }
+    }
+}
