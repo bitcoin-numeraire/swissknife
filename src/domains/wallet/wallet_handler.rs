@@ -213,3 +213,85 @@ async fn delete_wallets(
     let n_deleted = services.wallet.delete_many(query_params).await?;
     Ok(n_deleted.into())
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::{application::entities::MockAppServicesBuilder, domains::wallet::Wallet};
+
+    use super::*;
+
+    fn user(permissions: Vec<Permission>) -> User {
+        User {
+            id: "alice".to_string(),
+            wallet_id: Uuid::new_v4(),
+            permissions,
+        }
+    }
+
+    mod register_wallet {
+        use super::*;
+
+        mod without_the_write_permission {
+            use super::*;
+
+            #[tokio::test]
+            async fn is_forbidden_and_does_not_call_the_service() {
+                let services = MockAppServicesBuilder::new().build();
+
+                let result = register_wallet(
+                    State(Arc::new(services)),
+                    user(vec![]),
+                    Json(RegisterWalletRequest {
+                        user_id: "bob".to_string(),
+                    }),
+                )
+                .await;
+
+                assert!(matches!(result, Err(ApplicationError::Authorization(_))));
+            }
+        }
+
+        mod with_the_write_permission {
+            use super::*;
+
+            #[tokio::test]
+            async fn delegates_to_the_service() {
+                let mut builder = MockAppServicesBuilder::new();
+                builder
+                    .wallet
+                    .expect_register()
+                    .withf(|user_id| user_id == "bob")
+                    .times(1)
+                    .returning(|_| Ok(Wallet::default()));
+
+                let result = register_wallet(
+                    State(Arc::new(builder.build())),
+                    user(vec![Permission::WriteWallet]),
+                    Json(RegisterWalletRequest {
+                        user_id: "bob".to_string(),
+                    }),
+                )
+                .await;
+
+                assert!(result.is_ok());
+            }
+        }
+    }
+
+    mod get_wallet {
+        use super::*;
+
+        mod without_the_read_permission {
+            use super::*;
+
+            #[tokio::test]
+            async fn is_forbidden() {
+                let services = MockAppServicesBuilder::new().build();
+
+                let result = get_wallet(State(Arc::new(services)), user(vec![]), Path(Uuid::new_v4())).await;
+
+                assert!(matches!(result, Err(ApplicationError::Authorization(_))));
+            }
+        }
+    }
+}

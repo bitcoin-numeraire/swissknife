@@ -79,3 +79,60 @@ async fn sign_in(
     let token = services.auth.sign_in(payload.password).await?;
     Ok(SignInResponse { token }.into())
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::application::{entities::MockAppServicesBuilder, errors::DataError};
+
+    use super::*;
+
+    mod sign_up {
+        use super::*;
+
+        #[tokio::test]
+        async fn returns_the_issued_token() {
+            let mut builder = MockAppServicesBuilder::new();
+            builder
+                .auth
+                .expect_sign_up()
+                .withf(|password| password == "secret")
+                .times(1)
+                .returning(|_| Ok("token".to_string()));
+
+            let result = sign_up(
+                State(Arc::new(builder.build())),
+                Json(SignUpRequest {
+                    password: "secret".to_string(),
+                }),
+            )
+            .await;
+
+            let Json(response) = result.unwrap();
+            assert_eq!(response.token, "token");
+        }
+    }
+
+    mod sign_in {
+        use super::*;
+
+        #[tokio::test]
+        async fn propagates_service_errors() {
+            let mut builder = MockAppServicesBuilder::new();
+            builder
+                .auth
+                .expect_sign_in()
+                .times(1)
+                .returning(|_| Err(DataError::NotFound("missing".to_string()).into()));
+
+            let result = sign_in(
+                State(Arc::new(builder.build())),
+                Json(SignInRequest {
+                    password: "secret".to_string(),
+                }),
+            )
+            .await;
+
+            assert!(matches!(result, Err(ApplicationError::Data(DataError::NotFound(_)))));
+        }
+    }
+}

@@ -190,3 +190,98 @@ async fn delete_btc_addresses(
     let n_deleted = services.bitcoin.delete_many_addresses(query_params).await?;
     Ok(n_deleted.into())
 }
+
+#[cfg(test)]
+mod tests {
+    use chrono::Utc;
+
+    use crate::{application::entities::MockAppServicesBuilder, domains::bitcoin::BtcAddress};
+
+    use super::*;
+
+    fn user(permissions: Vec<Permission>) -> User {
+        User {
+            id: "alice".to_string(),
+            wallet_id: Uuid::new_v4(),
+            permissions,
+        }
+    }
+
+    fn btc_address(wallet_id: Uuid) -> BtcAddress {
+        BtcAddress {
+            id: Uuid::new_v4(),
+            wallet_id,
+            address: "bcrt1qexample".to_string(),
+            used: false,
+            address_type: BtcAddressType::P2wpkh,
+            created_at: Utc::now(),
+            updated_at: None,
+        }
+    }
+
+    mod generate_btc_address {
+        use super::*;
+
+        mod without_the_write_permission {
+            use super::*;
+
+            #[tokio::test]
+            async fn is_forbidden_and_does_not_call_the_service() {
+                let services = MockAppServicesBuilder::new().build();
+
+                let payload = NewBtcAddressRequest {
+                    wallet_id: None,
+                    address_type: None,
+                };
+
+                let result = generate_btc_address(State(Arc::new(services)), user(vec![]), Json(payload)).await;
+
+                assert!(matches!(result, Err(ApplicationError::Authorization(_))));
+            }
+        }
+
+        mod when_wallet_id_is_omitted {
+            use super::*;
+
+            #[tokio::test]
+            async fn defaults_to_the_authenticated_users_wallet() {
+                let caller = user(vec![Permission::WriteBtcAddress]);
+                let expected_wallet = caller.wallet_id;
+
+                let mut builder = MockAppServicesBuilder::new();
+                builder
+                    .bitcoin
+                    .expect_new_deposit_address()
+                    .withf(move |wallet_id, _| *wallet_id == expected_wallet)
+                    .times(1)
+                    .returning(|wallet_id, _| Ok(btc_address(wallet_id)));
+
+                let payload = NewBtcAddressRequest {
+                    wallet_id: None,
+                    address_type: None,
+                };
+
+                let result = generate_btc_address(State(Arc::new(builder.build())), caller, Json(payload)).await;
+
+                assert!(result.is_ok());
+            }
+        }
+    }
+
+    mod get_btc_address {
+        use super::*;
+
+        mod without_the_read_permission {
+            use super::*;
+
+            #[tokio::test]
+            async fn is_forbidden() {
+                let services = MockAppServicesBuilder::new().build();
+
+                let result = get_btc_address(State(Arc::new(services)), user(vec![]), Path(Uuid::new_v4())).await;
+
+                assert!(matches!(result, Err(ApplicationError::Authorization(_))));
+            }
+        }
+    }
+}

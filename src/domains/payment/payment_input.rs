@@ -328,4 +328,76 @@ mod tests {
         assert_eq!(data.amount_sat, Some(123));
         assert_eq!(data.message, Some("hello there".to_string()));
     }
+
+    #[test]
+    fn currency_from_bolt11_maps_every_network() {
+        assert_eq!(currency_from_bolt11(Bolt11Currency::Bitcoin), Currency::Bitcoin);
+        assert_eq!(
+            currency_from_bolt11(Bolt11Currency::BitcoinTestnet),
+            Currency::BitcoinTestnet
+        );
+        assert_eq!(currency_from_bolt11(Bolt11Currency::Regtest), Currency::Regtest);
+        assert_eq!(currency_from_bolt11(Bolt11Currency::Simnet), Currency::Simnet);
+        assert_eq!(currency_from_bolt11(Bolt11Currency::Signet), Currency::Signet);
+    }
+
+    #[test]
+    fn looks_like_lnurl_detects_lnurl_http_and_lightning_addresses() {
+        assert!(looks_like_lnurl("lnurl1example"));
+        assert!(looks_like_lnurl("LIGHTNING:lnurl1example"));
+        assert!(looks_like_lnurl("http://example.com/lnurlp/alice"));
+        assert!(looks_like_lnurl("https://example.com/lnurlp/alice"));
+        assert!(looks_like_lnurl("alice@example.com"));
+    }
+
+    #[test]
+    fn looks_like_lnurl_rejects_plain_text_and_addresses() {
+        assert!(!looks_like_lnurl("hello there"));
+        assert!(!looks_like_lnurl(MAINNET_ADDRESS));
+        assert!(!looks_like_lnurl(""));
+    }
+
+    #[test]
+    fn lnurl_endpoint_resolves_a_lightning_address() {
+        let (url, ln_address) = lnurl_endpoint("alice@example.com").unwrap();
+
+        assert!(url.contains("example.com"));
+        assert!(url.contains("alice"));
+        assert_eq!(ln_address, Some("alice@example.com".to_string()));
+    }
+
+    #[test]
+    fn lnurl_endpoint_accepts_a_raw_https_url() {
+        let (url, ln_address) = lnurl_endpoint("https://example.com/.well-known/lnurlp/alice").unwrap();
+
+        assert_eq!(url, "https://example.com/.well-known/lnurlp/alice");
+        assert_eq!(ln_address, None);
+    }
+
+    #[test]
+    fn lnurl_endpoint_rejects_unsupported_scheme() {
+        assert!(lnurl_endpoint("ftp://example.com/lnurlp/alice").is_err());
+    }
+
+    #[tokio::test]
+    async fn parse_payment_input_rejects_empty_input() {
+        let err = parse_payment_input("   ").await.unwrap_err();
+        assert!(err.contains("cannot be empty"));
+    }
+
+    #[tokio::test]
+    async fn parse_payment_input_detects_a_bitcoin_address() {
+        let PaymentInput::BitcoinAddress(data) = parse_payment_input(MAINNET_ADDRESS).await.unwrap() else {
+            panic!("expected bitcoin address payment input");
+        };
+        assert_eq!(data.network, BtcNetwork::Bitcoin);
+    }
+
+    #[tokio::test]
+    async fn parse_payment_input_rejects_unsupported_input() {
+        // Spaces ensure this is neither a bolt11, a bitcoin address, nor a
+        // lightning address, so no network resolution is attempted.
+        let err = parse_payment_input("*** not a payment ***").await.unwrap_err();
+        assert!(err.contains("Unsupported payment input"));
+    }
 }
