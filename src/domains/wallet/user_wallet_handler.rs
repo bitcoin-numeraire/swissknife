@@ -717,3 +717,143 @@ async fn revoke_wallet_api_keys(
     let n_revoked = services.api_key.revoke_many(filter).await?;
     Ok(n_revoked.into())
 }
+
+#[cfg(test)]
+mod tests {
+    use chrono::Utc;
+
+    use crate::{
+        application::entities::MockAppServicesBuilder,
+        domains::{
+            bitcoin::{BtcAddress, BtcAddressType},
+            payment::Payment,
+            wallet::Wallet,
+        },
+    };
+
+    use super::*;
+
+    // The /v1/me endpoints take no permission gate; instead every call must be
+    // scoped to the authenticated user's wallet. These tests lock that invariant.
+    fn user() -> User {
+        User {
+            id: "alice".to_string(),
+            wallet_id: Uuid::new_v4(),
+            permissions: vec![],
+        }
+    }
+
+    fn btc_address(wallet_id: Uuid) -> BtcAddress {
+        BtcAddress {
+            id: Uuid::new_v4(),
+            wallet_id,
+            address: "bcrt1qexample".to_string(),
+            used: false,
+            address_type: BtcAddressType::P2wpkh,
+            created_at: Utc::now(),
+            updated_at: None,
+        }
+    }
+
+    mod get_user_wallet {
+        use super::*;
+
+        #[tokio::test]
+        async fn fetches_the_authenticated_users_wallet() {
+            let caller = user();
+            let wallet_id = caller.wallet_id;
+
+            let mut builder = MockAppServicesBuilder::new();
+            builder
+                .wallet
+                .expect_get()
+                .withf(move |id| *id == wallet_id)
+                .times(1)
+                .returning(|_| Ok(Wallet::default()));
+
+            let result = get_user_wallet(State(Arc::new(builder.build())), caller).await;
+
+            assert!(result.is_ok());
+        }
+    }
+
+    mod wallet_pay {
+        use super::*;
+
+        #[tokio::test]
+        async fn ignores_payload_wallet_id_and_uses_the_authenticated_user() {
+            let caller = user();
+            let own_wallet = caller.wallet_id;
+            let attacker_wallet = Uuid::new_v4();
+
+            let mut builder = MockAppServicesBuilder::new();
+            builder
+                .payment
+                .expect_pay()
+                // Anti-IDOR: must use the caller's wallet, never the one in the body.
+                .withf(move |_, _, _, wallet_id| *wallet_id == own_wallet)
+                .times(1)
+                .returning(|_, _, _, _| Ok(Payment::default()));
+
+            let payload = SendPaymentRequest {
+                wallet_id: Some(attacker_wallet),
+                input: "bob@numeraire.tech".to_string(),
+                amount_msat: Some(1_000),
+                comment: None,
+            };
+
+            let result = wallet_pay(State(Arc::new(builder.build())), caller, Json(payload)).await;
+
+            assert!(result.is_ok());
+        }
+    }
+
+    mod new_wallet_btc_address {
+        use super::*;
+
+        #[tokio::test]
+        async fn scopes_address_derivation_to_the_authenticated_user() {
+            let caller = user();
+            let wallet_id = caller.wallet_id;
+
+            let mut builder = MockAppServicesBuilder::new();
+            builder
+                .bitcoin
+                .expect_new_deposit_address()
+                .withf(move |id, _| *id == wallet_id)
+                .times(1)
+                .returning(|id, _| Ok(btc_address(id)));
+
+            let payload = NewBtcAddressRequest {
+                wallet_id: Some(Uuid::new_v4()),
+                address_type: None,
+            };
+
+            let result = new_wallet_btc_address(State(Arc::new(builder.build())), caller, Json(payload)).await;
+
+            assert!(result.is_ok());
+        }
+    }
+
+    mod get_wallet_address {
+        use super::*;
+
+        #[tokio::test]
+        async fn lists_only_the_authenticated_users_addresses() {
+            let caller = user();
+            let wallet_id = caller.wallet_id;
+
+            let mut builder = MockAppServicesBuilder::new();
+            builder
+                .ln_address
+                .expect_list()
+                .withf(move |filter| filter.wallet_id == Some(wallet_id))
+                .times(1)
+                .returning(|_| Ok(vec![]));
+
+            let result = get_wallet_address(State(Arc::new(builder.build())), caller).await;
+
+            assert!(result.is_ok());
+        }
+    }
+}
