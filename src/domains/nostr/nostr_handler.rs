@@ -45,3 +45,54 @@ pub async fn well_known_nostr(
     let pubkey = services.nostr.get_pubkey(query_params.name.clone()).await?;
     Ok(NostrNIP05Response::new(query_params.name, pubkey).into())
 }
+
+#[cfg(test)]
+mod tests {
+    use nostr_sdk::PublicKey;
+
+    use crate::application::{entities::MockAppServicesBuilder, errors::DataError};
+
+    use super::*;
+
+    // Generator point x-coordinate: a valid x-only (Schnorr) public key.
+    const VALID_PUBKEY_HEX: &str = "79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798";
+
+    fn query(name: &str) -> NostrNIP05QueryParams {
+        NostrNIP05QueryParams { name: name.to_string() }
+    }
+
+    mod well_known_nostr {
+        use super::*;
+
+        #[tokio::test]
+        async fn forwards_the_name_and_returns_the_pubkey() {
+            let pubkey = PublicKey::from_hex(VALID_PUBKEY_HEX).unwrap();
+
+            let mut builder = MockAppServicesBuilder::new();
+            builder
+                .nostr
+                .expect_get_pubkey()
+                .withf(|name| name == "alice")
+                .times(1)
+                .returning(move |_| Ok(pubkey));
+
+            let result = well_known_nostr(Query(query("alice")), State(Arc::new(builder.build()))).await;
+
+            assert!(result.is_ok());
+        }
+
+        #[tokio::test]
+        async fn propagates_not_found() {
+            let mut builder = MockAppServicesBuilder::new();
+            builder
+                .nostr
+                .expect_get_pubkey()
+                .times(1)
+                .returning(|_| Err(DataError::NotFound("missing".to_string()).into()));
+
+            let result = well_known_nostr(Query(query("alice")), State(Arc::new(builder.build()))).await;
+
+            assert!(matches!(result, Err(ApplicationError::Data(DataError::NotFound(_)))));
+        }
+    }
+}

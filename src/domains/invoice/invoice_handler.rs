@@ -200,3 +200,89 @@ async fn delete_invoices(
     let n_deleted = services.invoice.delete_many(query_params).await?;
     Ok(n_deleted.into())
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::{application::entities::MockAppServicesBuilder, domains::invoice::Invoice};
+
+    use super::*;
+
+    fn user(permissions: Vec<Permission>) -> User {
+        User {
+            id: "alice".to_string(),
+            wallet_id: Uuid::new_v4(),
+            permissions,
+        }
+    }
+
+    fn new_invoice_request(wallet_id: Option<Uuid>) -> NewInvoiceRequest {
+        NewInvoiceRequest {
+            wallet_id,
+            amount_msat: 1_000,
+            description: None,
+            expiry: None,
+        }
+    }
+
+    mod generate_invoice {
+        use super::*;
+
+        mod without_the_write_permission {
+            use super::*;
+
+            #[tokio::test]
+            async fn is_forbidden_and_does_not_call_the_service() {
+                let services = MockAppServicesBuilder::new().build();
+
+                let result =
+                    generate_invoice(State(Arc::new(services)), user(vec![]), Json(new_invoice_request(None))).await;
+
+                assert!(matches!(result, Err(ApplicationError::Authorization(_))));
+            }
+        }
+
+        mod when_wallet_id_is_omitted {
+            use super::*;
+
+            #[tokio::test]
+            async fn defaults_to_the_authenticated_users_wallet() {
+                let caller = user(vec![Permission::WriteLnTransaction]);
+                let expected_wallet = caller.wallet_id;
+
+                let mut builder = MockAppServicesBuilder::new();
+                builder
+                    .invoice
+                    .expect_invoice()
+                    .withf(move |wallet_id, _, _, _| *wallet_id == expected_wallet)
+                    .times(1)
+                    .returning(|_, _, _, _| Ok(Invoice::default()));
+
+                let result = generate_invoice(
+                    State(Arc::new(builder.build())),
+                    caller,
+                    Json(new_invoice_request(None)),
+                )
+                .await;
+
+                assert!(result.is_ok());
+            }
+        }
+    }
+
+    mod get_invoice {
+        use super::*;
+
+        mod without_the_read_permission {
+            use super::*;
+
+            #[tokio::test]
+            async fn is_forbidden() {
+                let services = MockAppServicesBuilder::new().build();
+
+                let result = get_invoice(State(Arc::new(services)), user(vec![]), Path(Uuid::new_v4())).await;
+
+                assert!(matches!(result, Err(ApplicationError::Authorization(_))));
+            }
+        }
+    }
+}

@@ -79,3 +79,58 @@ async fn callback(
         .await?;
     Ok(Json(callback.into()))
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::application::{entities::MockAppServicesBuilder, errors::DataError};
+
+    use super::*;
+
+    mod well_known {
+        use super::*;
+
+        #[tokio::test]
+        async fn forwards_the_username_and_propagates_not_found() {
+            let mut builder = MockAppServicesBuilder::new();
+            builder
+                .lnurl
+                .expect_lnurlp()
+                .withf(|username| username == "alice")
+                .times(1)
+                .returning(|_| Err(DataError::NotFound("missing".to_string()).into()));
+
+            let result = well_known(Path("alice".to_string()), State(Arc::new(builder.build()))).await;
+
+            assert!(matches!(result, Err(ApplicationError::Data(DataError::NotFound(_)))));
+        }
+    }
+
+    mod callback {
+        use super::*;
+
+        #[tokio::test]
+        async fn forwards_amount_and_comment_to_the_service() {
+            let mut builder = MockAppServicesBuilder::new();
+            builder
+                .lnurl
+                .expect_lnurlp_callback()
+                .withf(|username, amount, comment| {
+                    username == "alice" && *amount == 2_000 && comment.as_deref() == Some("thanks")
+                })
+                .times(1)
+                .returning(|_, _, _| Err(DataError::NotFound("missing".to_string()).into()));
+
+            let result = callback(
+                Path("alice".to_string()),
+                Query(LNUrlpInvoiceQueryParams {
+                    amount: 2_000,
+                    comment: Some("thanks".to_string()),
+                }),
+                State(Arc::new(builder.build())),
+            )
+            .await;
+
+            assert!(matches!(result, Err(ApplicationError::Data(DataError::NotFound(_)))));
+        }
+    }
+}

@@ -131,3 +131,42 @@ async fn mark_welcome_complete(
     services.system.mark_welcome_complete().await?;
     Ok(StatusCode::NO_CONTENT)
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::application::entities::MockAppServicesBuilder;
+
+    use super::*;
+
+    mod health_check {
+        use super::*;
+
+        #[tokio::test]
+        async fn returns_200_when_healthy() {
+            let mut builder = MockAppServicesBuilder::new();
+            builder
+                .system
+                .expect_health_check()
+                .times(1)
+                .returning(|| HealthCheck::new(HealthStatus::Operational, HealthStatus::Operational));
+
+            let response = health_check(State(Arc::new(builder.build()))).await.into_response();
+
+            assert_eq!(response.status(), StatusCode::OK);
+        }
+
+        #[tokio::test]
+        async fn returns_503_when_a_dependency_is_unavailable() {
+            let mut builder = MockAppServicesBuilder::new();
+            builder
+                .system
+                .expect_health_check()
+                .times(1)
+                .returning(|| HealthCheck::new(HealthStatus::Unavailable, HealthStatus::Operational));
+
+            let response = health_check(State(Arc::new(builder.build()))).await.into_response();
+
+            assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+        }
+    }
+}

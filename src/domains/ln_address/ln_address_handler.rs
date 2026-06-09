@@ -228,3 +228,100 @@ async fn delete_addresses(
     let n_deleted = services.ln_address.delete_many(query_params).await?;
     Ok(n_deleted.into())
 }
+
+#[cfg(test)]
+mod tests {
+    use chrono::Utc;
+
+    use crate::application::{dtos::RegisterLnAddressRequest, entities::MockAppServicesBuilder};
+
+    use super::*;
+
+    fn user(permissions: Vec<Permission>) -> User {
+        User {
+            id: "alice".to_string(),
+            wallet_id: Uuid::new_v4(),
+            permissions,
+        }
+    }
+
+    fn ln_address(wallet_id: Uuid) -> LnAddress {
+        LnAddress {
+            id: Uuid::new_v4(),
+            wallet_id,
+            username: "alice".to_string(),
+            active: true,
+            allows_nostr: false,
+            nostr_pubkey: None,
+            created_at: Utc::now(),
+            updated_at: None,
+        }
+    }
+
+    fn register_request(wallet_id: Option<Uuid>) -> RegisterLnAddressRequest {
+        RegisterLnAddressRequest {
+            wallet_id,
+            username: "alice".to_string(),
+            allows_nostr: false,
+            nostr_pubkey: None,
+        }
+    }
+
+    mod register_address {
+        use super::*;
+
+        mod without_the_write_permission {
+            use super::*;
+
+            #[tokio::test]
+            async fn is_forbidden_and_does_not_call_the_service() {
+                let services = MockAppServicesBuilder::new().build();
+
+                let result =
+                    register_address(State(Arc::new(services)), user(vec![]), Json(register_request(None))).await;
+
+                assert!(matches!(result, Err(ApplicationError::Authorization(_))));
+            }
+        }
+
+        mod when_wallet_id_is_omitted {
+            use super::*;
+
+            #[tokio::test]
+            async fn defaults_to_the_authenticated_users_wallet() {
+                let caller = user(vec![Permission::WriteLnAddress]);
+                let expected_wallet = caller.wallet_id;
+
+                let mut builder = MockAppServicesBuilder::new();
+                builder
+                    .ln_address
+                    .expect_register()
+                    .withf(move |wallet_id, _, _, _| *wallet_id == expected_wallet)
+                    .times(1)
+                    .returning(|wallet_id, _, _, _| Ok(ln_address(wallet_id)));
+
+                let result =
+                    register_address(State(Arc::new(builder.build())), caller, Json(register_request(None))).await;
+
+                assert!(result.is_ok());
+            }
+        }
+    }
+
+    mod get_address {
+        use super::*;
+
+        mod without_the_read_permission {
+            use super::*;
+
+            #[tokio::test]
+            async fn is_forbidden() {
+                let services = MockAppServicesBuilder::new().build();
+
+                let result = get_address(State(Arc::new(services)), user(vec![]), Path(Uuid::new_v4())).await;
+
+                assert!(matches!(result, Err(ApplicationError::Authorization(_))));
+            }
+        }
+    }
+}
