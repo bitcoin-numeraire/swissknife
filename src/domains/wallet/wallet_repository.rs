@@ -1,5 +1,4 @@
 use async_trait::async_trait;
-use sea_orm::DatabaseTransaction;
 use uuid::Uuid;
 
 use crate::application::errors::DatabaseError;
@@ -14,7 +13,7 @@ pub trait WalletRepository: Send + Sync {
     async fn find_many(&self, filter: WalletFilter) -> Result<Vec<Wallet>, DatabaseError>;
     async fn find_many_overview(&self) -> Result<Vec<WalletOverview>, DatabaseError>;
     async fn insert(&self, user_id: &str) -> Result<Wallet, DatabaseError>;
-    async fn get_balance<'a>(&self, txn: Option<&'a DatabaseTransaction>, id: Uuid) -> Result<Balance, DatabaseError>;
+    async fn get_balance(&self, id: Uuid) -> Result<Balance, DatabaseError>;
     async fn find_contacts(&self, id: Uuid) -> Result<Vec<Contact>, DatabaseError>;
     async fn delete_many(&self, filter: WalletFilter) -> Result<u64, DatabaseError>;
 }

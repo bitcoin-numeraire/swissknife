@@ -1,10 +1,12 @@
 use async_trait::async_trait;
 use chrono::Utc;
 use sea_orm::{
-    ActiveModelTrait, ActiveValue, ColumnTrait, DatabaseConnection, DatabaseTransaction, EntityTrait, FromQueryResult,
-    QueryFilter, QueryOrder, QuerySelect, QueryTrait, Set, Unchanged,
+    ActiveModelTrait, ActiveValue, ColumnTrait, DatabaseConnection, EntityTrait, FromQueryResult, QueryFilter,
+    QueryOrder, QuerySelect, QueryTrait, Set, Unchanged,
 };
 use uuid::Uuid;
+
+use super::SeaOrmConnection;
 
 use crate::{
     application::errors::DatabaseError,
@@ -16,21 +18,24 @@ use crate::{
 };
 
 #[derive(Clone)]
-pub struct SeaOrmPaymentRepository {
-    pub db: DatabaseConnection,
+pub struct SeaOrmPaymentRepository<C = DatabaseConnection> {
+    db: C,
 }
 
-impl SeaOrmPaymentRepository {
-    pub fn new(db: DatabaseConnection) -> Self {
+impl<C> SeaOrmPaymentRepository<C> {
+    pub fn new(db: C) -> Self {
         Self { db }
     }
 }
 
 #[async_trait]
-impl PaymentRepository for SeaOrmPaymentRepository {
+impl<C> PaymentRepository for SeaOrmPaymentRepository<C>
+where
+    C: SeaOrmConnection,
+{
     async fn find(&self, id: Uuid) -> Result<Option<Payment>, DatabaseError> {
         let model = PaymentEntity::find_by_id(id)
-            .one(&self.db)
+            .one(self.db.connection())
             .await
             .map_err(|e| DatabaseError::FindOne(e.to_string()))?;
 
@@ -40,7 +45,7 @@ impl PaymentRepository for SeaOrmPaymentRepository {
     async fn find_by_payment_hash(&self, payment_hash: &str) -> Result<Option<Payment>, DatabaseError> {
         let model = PaymentEntity::find()
             .filter(Column::PaymentHash.eq(payment_hash))
-            .one(&self.db)
+            .one(self.db.connection())
             .await
             .map_err(|e| DatabaseError::FindOne(e.to_string()))?;
 
@@ -62,18 +67,14 @@ impl PaymentRepository for SeaOrmPaymentRepository {
             .order_by(Column::CreatedAt, filter.order_direction.into())
             .offset(filter.offset)
             .limit(filter.limit)
-            .all(&self.db)
+            .all(self.db.connection())
             .await
             .map_err(|e| DatabaseError::FindMany(e.to_string()))?;
 
         Ok(models.into_iter().map(Into::into).collect())
     }
 
-    async fn insert<'a>(
-        &self,
-        txn: Option<&'a DatabaseTransaction>,
-        payment: Payment,
-    ) -> Result<Payment, DatabaseError> {
+    async fn insert(&self, payment: Payment) -> Result<Payment, DatabaseError> {
         let (ln_address, payment_hash, payment_preimage, metadata, success_action) = payment
             .lightning
             .as_ref()
@@ -133,14 +134,10 @@ impl PaymentRepository for SeaOrmPaymentRepository {
             payment_preimage: Set(payment_preimage),
             btc_block_height: Set(block_height.map(|h| h as i32)),
             ..Default::default()
-        };
-
-        let result = match txn {
-            Some(txn) => model.insert(txn).await,
-            None => model.insert(&self.db).await,
-        };
-
-        let model = result.map_err(|e| DatabaseError::Insert(e.to_string()))?;
+        }
+        .insert(self.db.connection())
+        .await
+        .map_err(|e| DatabaseError::Insert(e.to_string()))?;
 
         Ok(model.into())
     }
@@ -216,7 +213,7 @@ impl PaymentRepository for SeaOrmPaymentRepository {
         };
 
         let model = model
-            .update(&self.db)
+            .update(self.db.connection())
             .await
             .map_err(|e| DatabaseError::Update(e.to_string()))?;
 
@@ -234,7 +231,7 @@ impl PaymentRepository for SeaOrmPaymentRepository {
             .apply_if(filter.btc_addresses, |q, btc_addresses| {
                 q.filter(Column::BtcAddress.is_in(btc_addresses))
             })
-            .exec(&self.db)
+            .exec(self.db.connection())
             .await
             .map_err(|e| DatabaseError::Delete(e.to_string()))?;
 
@@ -251,7 +248,7 @@ impl PaymentRepository for SeaOrmPaymentRepository {
             .select_only()
             .column_as(Column::BtcBlockHeight.max(), "max")
             .into_model::<MaxBlockHeight>()
-            .one(&self.db)
+            .one(self.db.connection())
             .await
             .map_err(|e| DatabaseError::FindOne(e.to_string()))?;
 

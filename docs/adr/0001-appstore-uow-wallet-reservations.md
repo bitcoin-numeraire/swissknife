@@ -40,7 +40,7 @@ It also violates the intended dependency direction. `application/entities/store.
 
 ### Transactions leak into repository ports
 
-`PaymentRepository::insert` and `WalletRepository::get_balance` currently accept `Option<&DatabaseTransaction>`. That imports SeaORM into domain/application-facing repository traits.
+Before #238, `PaymentRepository::insert` and `WalletRepository::get_balance` accepted `Option<&DatabaseTransaction>`. That imported SeaORM into domain/application-facing repository traits.
 
 Repository ports should describe data capabilities, not concrete transaction handles. Transaction mechanics should be hidden behind application-level Unit-of-Work ports implemented by infrastructure.
 
@@ -188,7 +188,7 @@ pub trait WalletRepository: Send + Sync {
 }
 ```
 
-SeaORM implementations may share helpers generic over `sea_orm::ConnectionTrait` so normal repositories can call helpers with `&DatabaseConnection` and Unit-of-Work implementations can call the same helpers with `&DatabaseTransaction`. That generic helper detail stays in infra.
+SeaORM repositories should be generic over the concrete connection handle they are constructed with. Production store wiring constructs them with `DatabaseConnection`; Unit-of-Work implementations construct the same repositories with `&DatabaseTransaction` and call the normal repository trait methods. Any generic connection adapter stays in infra.
 
 ### 4. Use focused Unit-of-Work ports with named atomic operations
 

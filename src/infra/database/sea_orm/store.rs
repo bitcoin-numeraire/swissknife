@@ -118,13 +118,10 @@ impl PaymentUnitOfWork for SeaOrmPaymentUnitOfWork {
             .await
             .map_err(|e| DatabaseError::Transaction(e.to_string()))?;
 
-        let wallet_repo = SeaOrmWalletRepository::new(self.db.clone());
-        let payment_repo = SeaOrmPaymentRepository::new(self.db.clone());
+        let wallet_repo = SeaOrmWalletRepository::new(&txn);
+        let payment_repo = SeaOrmPaymentRepository::new(&txn);
 
-        let balance = wallet_repo
-            .get_balance(Some(&txn), payment.wallet_id)
-            .await?
-            .available_msat as f64;
+        let balance = wallet_repo.get_balance(payment.wallet_id).await?.available_msat as f64;
 
         let required_balance_msat = if let Some(fee_msat) = payment.fee_msat {
             (payment.amount_msat.saturating_add(fee_msat)) as f64
@@ -136,7 +133,7 @@ impl PaymentUnitOfWork for SeaOrmPaymentUnitOfWork {
             return Err(DataError::InsufficientFunds(required_balance_msat).into());
         }
 
-        let pending_payment = payment_repo.insert(Some(&txn), payment).await?;
+        let pending_payment = payment_repo.insert(payment).await?;
 
         txn.commit()
             .await
