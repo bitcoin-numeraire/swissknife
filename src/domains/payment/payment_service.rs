@@ -567,8 +567,18 @@ impl PaymentsUseCases for PaymentService {
     async fn delete(&self, id: Uuid) -> Result<(), ApplicationError> {
         debug!(%id, "Deleting payment");
 
-        let n_deleted = self
+        let payment = self
             .store
+            .payment
+            .find(id)
+            .await?
+            .ok_or_else(|| DataError::NotFound("Payment not found.".to_string()))?;
+
+        if payment.status == PaymentStatus::Pending {
+            return Err(DataError::Validation("Cannot delete a pending payment.".to_string()).into());
+        }
+
+        self.store
             .payment
             .delete_many(PaymentFilter {
                 ids: Some(vec![id]),
@@ -576,16 +586,17 @@ impl PaymentsUseCases for PaymentService {
             })
             .await?;
 
-        if n_deleted == 0 {
-            return Err(DataError::NotFound("Payment not found.".to_string()).into());
-        }
-
-        info!(%id, "Payments deleted successfully");
+        info!(%id, "Payment deleted successfully");
         Ok(())
     }
 
     async fn delete_many(&self, filter: PaymentFilter) -> Result<u64, ApplicationError> {
         debug!(?filter, "Deleting payments");
+
+        let payments = self.store.payment.find_many(filter.clone()).await?;
+        if payments.iter().any(|payment| payment.status == PaymentStatus::Pending) {
+            return Err(DataError::Validation("Cannot delete pending payments.".to_string()).into());
+        }
 
         let n_deleted = self.store.payment.delete_many(filter.clone()).await?;
 
@@ -1588,13 +1599,13 @@ mod tests {
     mod delete {
         use super::*;
 
-        mod when_nothing_is_removed {
+        mod when_the_payment_is_missing {
             use super::*;
 
             #[tokio::test]
             async fn returns_not_found() {
                 let mut store = MockAppStoreBuilder::new();
-                store.payment.expect_delete_many().times(1).returning(|_| Ok(0));
+                store.payment.expect_find().times(1).returning(|_| Ok(None));
 
                 let service = service(
                     store,
@@ -1606,6 +1617,86 @@ mod tests {
                 let err = service.delete(Uuid::new_v4()).await.unwrap_err();
 
                 assert!(matches!(err, ApplicationError::Data(DataError::NotFound(_))));
+            }
+        }
+
+        mod when_the_payment_is_pending {
+            use super::*;
+
+            #[tokio::test]
+            async fn is_rejected_without_deleting() {
+                let mut store = MockAppStoreBuilder::new();
+                store.payment.expect_find().times(1).returning(|id| {
+                    Ok(Some(Payment {
+                        id,
+                        status: PaymentStatus::Pending,
+                        ..Default::default()
+                    }))
+                });
+                // delete_many is intentionally not expected: a pending payment must not be deleted.
+
+                let service = service(
+                    store,
+                    MockLnClient::new(),
+                    MockBitcoinWallet::new(),
+                    MockEventUseCases::new(),
+                );
+
+                let err = service.delete(Uuid::new_v4()).await.unwrap_err();
+
+                assert!(matches!(err, ApplicationError::Data(DataError::Validation(_))));
+            }
+        }
+
+        mod when_the_payment_is_settled {
+            use super::*;
+
+            #[tokio::test]
+            async fn deletes_it() {
+                let mut store = MockAppStoreBuilder::new();
+                store.payment.expect_find().times(1).returning(|id| {
+                    Ok(Some(Payment {
+                        id,
+                        status: PaymentStatus::Settled,
+                        ..Default::default()
+                    }))
+                });
+                store.payment.expect_delete_many().times(1).returning(|_| Ok(1));
+
+                let service = service(
+                    store,
+                    MockLnClient::new(),
+                    MockBitcoinWallet::new(),
+                    MockEventUseCases::new(),
+                );
+
+                assert!(service.delete(Uuid::new_v4()).await.is_ok());
+            }
+        }
+
+        mod when_a_filtered_delete_matches_a_pending_payment {
+            use super::*;
+
+            #[tokio::test]
+            async fn is_rejected_without_deleting() {
+                let mut store = MockAppStoreBuilder::new();
+                store.payment.expect_find_many().times(1).returning(|_| {
+                    Ok(vec![Payment {
+                        status: PaymentStatus::Pending,
+                        ..Default::default()
+                    }])
+                });
+
+                let service = service(
+                    store,
+                    MockLnClient::new(),
+                    MockBitcoinWallet::new(),
+                    MockEventUseCases::new(),
+                );
+
+                let err = service.delete_many(PaymentFilter::default()).await.unwrap_err();
+
+                assert!(matches!(err, ApplicationError::Data(DataError::Validation(_))));
             }
         }
     }
