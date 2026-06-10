@@ -3,32 +3,16 @@
 use sea_orm::entity::prelude::*;
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
-#[sea_orm(table_name = "payment")]
+#[sea_orm(table_name = "wallet_balance")]
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
-    pub id: Uuid,
     pub wallet_id: Uuid,
-    pub ln_address: Option<String>,
-    #[sea_orm(unique)]
-    pub payment_hash: Option<String>,
-    #[sea_orm(unique)]
-    pub payment_preimage: Option<String>,
-    pub error: Option<String>,
-    pub amount_msat: i64,
-    pub fee_msat: Option<i64>,
-    pub payment_time: Option<DateTime>,
-    pub status: String,
-    pub ledger: String,
+    #[sea_orm(primary_key, auto_increment = false)]
     pub currency: String,
-    pub description: Option<String>,
-    pub metadata: Option<String>,
-    #[sea_orm(column_type = "JsonBinary", nullable)]
-    pub success_action: Option<Json>,
+    pub available_amount: i64,
+    pub reserved_amount: i64,
     pub created_at: DateTime,
     pub updated_at: Option<DateTime>,
-    pub btc_address: Option<String>,
-    pub btc_block_height: Option<i32>,
-    pub reserved_amount: i64,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
