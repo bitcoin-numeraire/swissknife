@@ -107,6 +107,7 @@ impl From<PaymentModel> for Payment {
             error: model.error,
             amount_msat: model.amount_msat as u64,
             fee_msat: model.fee_msat.map(|v| v as u64),
+            reserved_amount: model.reserved_amount as u64,
             payment_time: model.payment_time.map(|t| t.and_utc()),
             status: model.status.parse().expect(ASSERTION_MSG),
             ledger,

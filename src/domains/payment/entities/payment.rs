@@ -17,6 +17,7 @@ pub struct Payment {
     pub error: Option<String>,
     pub amount_msat: u64,
     pub fee_msat: Option<u64>,
+    pub reserved_amount: u64,
     pub ledger: Ledger,
     pub currency: Currency,
     pub payment_time: Option<DateTime<Utc>>,
