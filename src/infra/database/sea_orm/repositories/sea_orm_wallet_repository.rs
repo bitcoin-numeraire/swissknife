@@ -17,8 +17,9 @@ use crate::{
         contact::ContactModel,
         invoice::Column as InvoiceColumn,
         payment::Column as PaymentColumn,
-        prelude::{BtcOutput, Invoice, LnAddress, Payment, Wallet as WalletEntity},
+        prelude::{BtcOutput, Invoice, LnAddress, Payment, Wallet as WalletEntity, WalletBalance},
         wallet::{ActiveModel, Column},
+        wallet_balance::Column as WalletBalanceColumn,
     },
 };
 
@@ -163,6 +164,24 @@ where
             .await
             .map_err(|e| DatabaseError::FindMany(e.to_string()))?;
 
+        // Materialized balance aggregates grouped by wallet_id
+        let balance_aggs = WalletBalance::find()
+            .select_only()
+            .column(WalletBalanceColumn::WalletId)
+            .column_as(
+                Expr::cust("CAST(SUM(wallet_balance.available_amount) AS BIGINT)"),
+                "available_msat",
+            )
+            .column_as(
+                Expr::cust("CAST(SUM(wallet_balance.reserved_amount) AS BIGINT)"),
+                "reserved_msat",
+            )
+            .group_by(WalletBalanceColumn::WalletId)
+            .into_tuple::<(Uuid, Option<i64>, Option<i64>)>()
+            .all(self.db.connection())
+            .await
+            .map_err(|e| DatabaseError::FindMany(e.to_string()))?;
+
         // Convert to HashMaps for efficient lookup
         let invoice_map: std::collections::HashMap<_, _> = invoice_aggs
             .into_iter()
@@ -171,6 +190,10 @@ where
         let payment_map: std::collections::HashMap<_, _> = payment_aggs
             .into_iter()
             .map(|(id, sent, fees, count, contacts)| (id, (sent, fees, count, contacts)))
+            .collect();
+        let balance_map: std::collections::HashMap<_, _> = balance_aggs
+            .into_iter()
+            .map(|(id, available, reserved)| (id, (available, reserved)))
             .collect();
 
         // Combine the results
@@ -184,19 +207,20 @@ where
                     .get(&wallet_id)
                     .map(|(s, f, np, nc)| (*s, *f, *np, *nc))
                     .unwrap_or((None, None, 0, 0));
-
-                let received_msat_i64 = received_msat.unwrap_or(0);
-                let sent_msat_i64 = sent_msat.unwrap_or(0);
-                let fees_paid_msat_i64 = fees_paid_msat.unwrap_or(0);
+                let (available_msat, reserved_msat) = balance_map
+                    .get(&wallet_id)
+                    .map(|(a, r)| (*a, *r))
+                    .unwrap_or((None, None));
 
                 WalletOverview {
                     id: wallet_model.id,
                     user_id: wallet_model.user_id,
                     balance: Balance {
-                        received_msat: received_msat_i64 as u64,
-                        sent_msat: sent_msat_i64 as u64,
-                        fees_paid_msat: fees_paid_msat_i64 as u64,
-                        available_msat: received_msat_i64 - (sent_msat_i64 + fees_paid_msat_i64),
+                        received_msat: received_msat.unwrap_or(0) as u64,
+                        sent_msat: sent_msat.unwrap_or(0) as u64,
+                        fees_paid_msat: fees_paid_msat.unwrap_or(0) as u64,
+                        reserved_msat: reserved_msat.unwrap_or(0) as u64,
+                        available_msat: available_msat.unwrap_or(0),
                     },
                     n_payments: n_payments as u32,
                     n_invoices: n_invoices as u32,
@@ -240,9 +264,7 @@ where
 
         let (sent_msat, fees_paid_msat) = Payment::find()
             .filter(PaymentColumn::WalletId.eq(id))
-            .filter(
-                PaymentColumn::Status.is_in([PaymentStatus::Settled.to_string(), PaymentStatus::Pending.to_string()]),
-            )
+            .filter(PaymentColumn::Status.eq(PaymentStatus::Settled.to_string()))
             .select_only()
             .column_as(Expr::cust("CAST(SUM(payment.amount_msat) AS BIGINT)"), "sent_msat")
             .column_as(Expr::cust("CAST(SUM(payment.fee_msat) AS BIGINT)"), "fees_paid_msat")
@@ -252,15 +274,29 @@ where
             .map_err(|e| DatabaseError::FindOne(e.to_string()))?
             .unwrap_or((None, None));
 
-        let received_msat_i64 = received.unwrap_or(0);
-        let sent_msat_i64 = sent_msat.unwrap_or(0);
-        let fees_paid_msat_i64 = fees_paid_msat.unwrap_or(0);
+        let (available_msat, reserved_msat) = WalletBalance::find()
+            .filter(WalletBalanceColumn::WalletId.eq(id))
+            .select_only()
+            .column_as(
+                Expr::cust("CAST(SUM(wallet_balance.available_amount) AS BIGINT)"),
+                "available_msat",
+            )
+            .column_as(
+                Expr::cust("CAST(SUM(wallet_balance.reserved_amount) AS BIGINT)"),
+                "reserved_msat",
+            )
+            .into_tuple::<(Option<i64>, Option<i64>)>()
+            .one(self.db.connection())
+            .await
+            .map_err(|e| DatabaseError::FindOne(e.to_string()))?
+            .unwrap_or((None, None));
 
         Ok(Balance {
-            received_msat: received_msat_i64 as u64,
-            sent_msat: sent_msat_i64 as u64,
-            fees_paid_msat: fees_paid_msat_i64 as u64,
-            available_msat: received_msat_i64 - (sent_msat_i64 + fees_paid_msat_i64),
+            received_msat: received.unwrap_or(0) as u64,
+            sent_msat: sent_msat.unwrap_or(0) as u64,
+            fees_paid_msat: fees_paid_msat.unwrap_or(0) as u64,
+            reserved_msat: reserved_msat.unwrap_or(0) as u64,
+            available_msat: available_msat.unwrap_or(0),
         })
     }
 
