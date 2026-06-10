@@ -78,4 +78,6 @@ pub(crate) enum Payment {
     // Bitcoin L1 support (added in m20251224_162550)
     BtcAddress,
     BtcBlockHeight,
+    // Wallet balance reservations (added in m20260609_143600)
+    ReservedAmount,
 }

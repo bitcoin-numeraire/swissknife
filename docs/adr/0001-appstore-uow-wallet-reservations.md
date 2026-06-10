@@ -9,7 +9,7 @@
 
 ## Summary
 
-SwissKnife should split dependency injection from database transaction mechanics and introduce a durable, asset-scoped wallet balance/reservation model before the next production-facing release.
+SwissKnife should split dependency injection from database transaction mechanics and introduce a durable, currency-scoped wallet balance/reservation model before the next production-facing release.
 
 The target architecture is:
 
@@ -17,7 +17,7 @@ The target architecture is:
 2. SeaORM store construction moves to the infrastructure layer.
 3. Domain/application repository traits stop exposing `sea_orm::DatabaseTransaction`.
 4. Payment-critical multi-write flows use named `PaymentUnitOfWork` methods rather than service-visible transactions.
-5. Wallet balance safety moves from aggregate `SUM()` checks to a materialized wallet+asset balance/reservation model with atomic conditional updates that work on Postgres and SQLite.
+5. Wallet balance safety moves from aggregate `SUM()` checks to a materialized wallet+currency balance/reservation model with atomic conditional updates that work on Postgres and SQLite.
 6. Event projection receives a separate focused Unit-of-Work after the payment-critical path is corrected.
 
 This keeps the business layer responsible for policy decisions while infrastructure owns transaction mechanics and database-specific execution.
@@ -60,13 +60,13 @@ Under Postgres `READ COMMITTED`, two concurrent transactions can both read the s
 
 For company/server deployments, Postgres is the urgent correctness target. A balance invariant should not rely on aggregate reads plus implicit isolation behavior.
 
-### Balance rows must be future-compatible with multiple assets
+### Balance rows must be keyed by currency
 
-SwissKnife is BTC-only today, but the accounting model should not assume that a wallet has exactly one spendable unit forever. Taproot Assets support will require users to hold more than one asset, either as one wallet with multiple asset balances or as multiple wallets whose balances are asset-specific.
+The `Currency` enum already distinguishes networks (`Bitcoin`, `BitcoinTestnet`, `Regtest`, `Simnet`, `Signet`), and those are not interchangeable units — mainnet sats cannot be netted against testnet sats. A balance is therefore denominated in a currency, exactly like a payment or an invoice (both of which already carry `currency`).
 
-The reservation invariant is the same in both product shapes: reserve/debit/credit exactly one wallet+asset account. Therefore the materialized balance row must include an explicit asset identity. `wallet_id` alone should not be the primary key of `wallet_balance`.
+The reservation invariant is per currency: reserve/debit/credit exactly one wallet+currency account. The materialized balance row must include the currency, so `wallet_id` alone is not the primary key of `wallet_balance`; the key is `(wallet_id, currency)`.
 
-For the first BTC-only implementation, that asset identity can be a canonical BTC/network key derived from the existing `Currency` enum. It should still be present in the schema and APIs at the accounting boundary so that Taproot Assets can add new asset rows later instead of replacing a wallet-wide balance table.
+If a wallet ever needs to hold more than one currency at once, the cleaner long-term model is to split today's user-scoped `wallet` into a `user` plus one single-currency `wallet` per currency — balance columns then live directly on the wallet and payments/invoices point at the currency-specific wallet. That split is deferred until multi-currency is a real requirement; until then `(wallet_id, currency)` on a side table is the minimal correct shape and is equivalent to it.
 
 ## Verified note on `fee_buffer`
 
@@ -256,31 +256,26 @@ The Unit-of-Work owns mechanics:
 
 Use a separate `EventProjectionUnitOfWork` for onchain event projection. Do not grow one global Unit-of-Work trait into another god object.
 
-### 5. Introduce an asset-scoped wallet balance/reservation model
+### 5. Introduce a currency-scoped wallet balance/reservation model
 
-Add a materialized balance table keyed by wallet and asset, for example:
+Add a materialized balance table keyed by wallet and currency, for example:
 
 ```text
 wallet_balance
 - wallet_id UUID NOT NULL, foreign key to wallet(id)
-- asset_key TEXT NOT NULL
+- currency TEXT NOT NULL
 - available_amount BIGINT NOT NULL
 - reserved_amount BIGINT NOT NULL DEFAULT 0
 - created_at TIMESTAMP NOT NULL
 - updated_at TIMESTAMP NULL
-- primary key or unique index on (wallet_id, asset_key)
+- primary key or unique index on (wallet_id, currency)
 ```
 
-`asset_key` is intentionally generic in this ADR. The first implementation can use a canonical BTC/network key, but the shape must leave room for Taproot Asset identities later. If a richer `asset` table is introduced, `asset_key` can become `asset_id` / foreign key without changing the accounting invariant.
+`currency` stores the existing `Currency` enum string — the same value already carried by `payment` and `invoice`. It distinguishes networks today and is the natural denomination key; see "Balance rows must be keyed by currency" for why no separate synthetic asset key is introduced.
 
-Amounts should be stored in the smallest integer unit defined for that asset. For BTC/Lightning this is currently millisatoshis. Avoid making a future multi-asset table semantically depend on BTC-only column names such as `available_msat`; if the first implementation keeps `_msat` names for minimal BTC-only churn, treat that as an explicit intermediate step and keep the asset identity in place.
+Amounts are stored in the smallest integer unit for the currency (millisatoshis for BTC/Lightning). The columns are named `available_amount` / `reserved_amount` rather than `_msat` so the BTC unit is not baked into the schema.
 
-Also persist the reservation amount attached to a pending outgoing payment. The implementation can choose one of these shapes:
-
-- add `reserved_amount` plus the same asset identity to `payment`; or
-- add a dedicated asset-scoped `payment_reservation` / ledger-reservation table.
-
-For 0.2.0, prefer the smallest schema that keeps accounting correct and auditable.
+Also persist the reservation amount attached to a pending outgoing payment. The first implementation adds `reserved_amount` to `payment`; a dedicated reservation/ledger table remains a later option if reconciliation needs outgrow the single column.
 
 The core reserve operation is an atomic conditional update:
 
@@ -289,13 +284,13 @@ UPDATE wallet_balance
 SET available_amount = available_amount - :reserve_amount,
     reserved_amount = reserved_amount + :reserve_amount
 WHERE wallet_id = :wallet_id
-  AND asset_key = :asset_key
+  AND currency = :currency
   AND available_amount >= :reserve_amount;
 ```
 
 The operation succeeds only when `rows_affected == 1`. If no row is updated, return `DataError::InsufficientFunds`.
 
-Every reservation, debit, credit, payment, invoice, and reconciliation query must carry the same asset identity. Do not reserve BTC and settle a Taproot Asset row, and do not aggregate balances across assets unless the API is explicitly presenting a portfolio view.
+Every reservation, debit, credit, payment, invoice, and reconciliation query must carry the same currency. Do not reserve one currency and settle another, and do not aggregate balances across currencies unless the API is explicitly presenting a portfolio view.
 
 #### Outgoing payment lifecycle
 
@@ -335,15 +330,15 @@ When an invoice becomes settled from Lightning or onchain event handling, credit
 
 The migration should support both SQLite and Postgres.
 
-1. Create the new balance/reservation table and any reservation column/table.
-2. Create at least one balance row for every wallet and supported asset. Initially this means the canonical BTC asset row for each wallet.
-3. Backfill from existing data:
-   - `received_amount`: settled invoices with `amount_received_msat` for the canonical BTC asset;
-   - `spent_amount`: settled payments amount plus known fee for the canonical BTC asset;
-   - `reserved_amount`: pending outgoing payments amount plus known fee/reservation where available for the canonical BTC asset;
+1. Create the new balance/reservation table and the `payment.reserved_amount` column.
+2. Backfill one balance row per `(wallet_id, currency)` that actually appears in `invoice`/`payment`. Do not hardcode a `Bitcoin` row for every wallet — that is wrong on testnet/regtest/signet. Wallets with no activity get their row lazily on first use during the cutover.
+3. Backfill from existing data, grouped by `(wallet_id, currency)`:
+   - `received_amount`: settled invoices' `amount_received_msat`;
+   - `spent_amount`: settled payments amount plus known fee;
+   - `reserved_amount`: pending outgoing payments amount plus known fee;
    - `available_amount = received_amount - spent_amount - reserved_amount`.
 4. For existing pending payments without an explicit reserved amount, use the persisted amount and known fee if present. Do not silently apply the old `fee_buffer` during backfill unless the implementation explicitly documents that policy and persists the resulting reservation.
-5. Add creation logic so every new wallet gets the default BTC balance row in the same transaction as the wallet row, and so future supported assets can create additional rows without changing the wallet table.
+5. During the cutover, ensure every new wallet gets its balance row for the deployment currency in the same transaction as the wallet row.
 6. Add reconciliation tests comparing the new materialized balance with the old aggregate calculation on fixture data.
 
 The migration should fail loudly if backfilled balances would be negative in a way the new model cannot represent. That indicates existing inconsistent data requiring manual reconciliation.
@@ -403,7 +398,7 @@ Cover at least:
 
 - insufficient funds cannot reserve/create outgoing payment;
 - two concurrent outgoing payments cannot overdraw a wallet;
-- two reservations for different assets do not affect each other's available balance;
+- two reservations for different currencies do not affect each other's available balance;
 - failed external payment releases reservation;
 - settled external payment adjusts reservation to actual fee;
 - internal payment with a new receiver invoice is atomic;
@@ -415,12 +410,11 @@ Cover at least:
 
 1. #236: make `AppStore` a pure trait container and move SeaORM store construction into infra.
 2. #238: remove SeaORM transaction types from repository traits.
-3. #237: add asset-scoped wallet balance/reservation schema and backfill.
-4. #239: implement `PaymentUnitOfWork` and refactor payment flows onto it.
-5. #240: add SQLite/Postgres integration and concurrency tests.
-6. #241: add `EventProjectionUnitOfWork` for onchain deposit projections.
+3. #237: add the currency-scoped `wallet_balance` schema, the `payment.reserved_amount` column, and the backfill — **behavior-neutral**. `get_balance` keeps reading the existing aggregate; no flow maintains the table yet. A reconciliation check proves the backfill matches the aggregate.
+4. The materialized-balance **cutover** (one PR): add a `WalletBalanceRepository`, maintain the table in every money-moving flow (outgoing reserve/settle/fail, internal debit+credit, incoming credit) through the focused Unit-of-Work ports, and switch reads to the table. This **cannot be split per-flow**: once the table is authoritative for the spend check, every inflow must also maintain it or `available` drifts low and legitimate payments are wrongly rejected. (This absorbs what were previously sketched as separate #239 / #241 steps.)
+5. #240: add SQLite/Postgres integration and concurrency tests, including the reconciliation and double-credit cases.
 
-These can be separate PRs, but the payment-critical accounting pieces should land before cutting a production/company-facing release that depends on Postgres correctness.
+These are separate PRs, but the cutover must land before cutting a production/company-facing release that depends on Postgres correctness.
 
 ## Consequences
 
@@ -432,7 +426,7 @@ These can be separate PRs, but the payment-critical accounting pieces should lan
 - Postgres deployments get a real overdraft-prevention invariant.
 - SQLite remains supported through the same conditional-update model.
 - Fee reservation becomes explicit instead of hidden behind an ambiguous `fee_buffer` admission check.
-- The balance/reservation model can support Taproot Assets later by adding asset rows instead of replacing a wallet-wide BTC-only row.
+- The balance is denominated by currency; multi-currency support later is a `user` + per-currency `wallet` split rather than a wallet-wide rewrite.
 
 ### Costs
 
@@ -443,8 +437,14 @@ These can be separate PRs, but the payment-critical accounting pieces should lan
 
 ## Open decisions for implementation
 
-- Whether to remove `fee_buffer` entirely for 0.2.0 or replace it with a documented explicit fee-reservation policy.
-- The exact asset identity representation for the first implementation: reuse/extend the existing `Currency` enum, introduce a lightweight `asset_key`, or add a richer `asset` table. The invariant must remain keyed by wallet+asset either way.
-- Whether reservation data belongs on `payment.reserved_amount` plus asset identity or in a separate asset-scoped reservation/ledger table.
-- Whether to expose balance reconciliation/admin tooling in the first implementation PR or defer it.
+Resolved:
+
+- Balance identity is the existing `Currency` enum string, keyed `(wallet_id, currency)`. No synthetic `asset_key` and no separate `asset` table.
+- Reservation data lives on `payment.reserved_amount`; a separate reservation/ledger table is deferred.
+- #237 is behavior-neutral schema + backfill; the materialized-balance cutover (all flows + read-switch) is one later PR, because it cannot be split per-flow without drift.
+
+Still open:
+
+- Whether to remove `fee_buffer` entirely or replace it with a documented explicit fee-reservation policy (decided in the cutover).
+- Whether to expose balance reconciliation/admin tooling in the cutover or defer it.
 - Whether Postgres integration tests should be mandatory in all PR CI or initially run in a separate workflow.
