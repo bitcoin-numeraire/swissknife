@@ -15,12 +15,14 @@ use sea_orm::{
 };
 use uuid::Uuid;
 
+use super::SeaOrmConnection;
+
 #[derive(Clone)]
-pub struct SeaOrmInvoiceRepository {
-    pub db: DatabaseConnection,
+pub struct SeaOrmInvoiceRepository<C = DatabaseConnection> {
+    db: C,
 }
 
-impl SeaOrmInvoiceRepository {
+impl<C> SeaOrmInvoiceRepository<C> {
     fn map_with_output(model: InvoiceModel, btc_output: Option<BtcOutputModel>) -> Invoice {
         let mut invoice: Invoice = model.into();
 
@@ -32,17 +34,20 @@ impl SeaOrmInvoiceRepository {
         invoice
     }
 
-    pub fn new(db: DatabaseConnection) -> Self {
+    pub fn new(db: C) -> Self {
         Self { db }
     }
 }
 
 #[async_trait]
-impl InvoiceRepository for SeaOrmInvoiceRepository {
+impl<C> InvoiceRepository for SeaOrmInvoiceRepository<C>
+where
+    C: SeaOrmConnection,
+{
     async fn find(&self, id: Uuid) -> Result<Option<Invoice>, DatabaseError> {
         let model = InvoiceEntity::find_by_id(id)
             .find_also_related(BtcOutput)
-            .one(&self.db)
+            .one(self.db.connection())
             .await
             .map_err(|e| DatabaseError::FindOne(e.to_string()))?;
 
@@ -53,7 +58,7 @@ impl InvoiceRepository for SeaOrmInvoiceRepository {
         let model = InvoiceEntity::find()
             .filter(Column::PaymentHash.eq(payment_hash))
             .find_also_related(BtcOutput)
-            .one(&self.db)
+            .one(self.db.connection())
             .await
             .map_err(|e| DatabaseError::FindOne(e.to_string()))?;
 
@@ -64,7 +69,7 @@ impl InvoiceRepository for SeaOrmInvoiceRepository {
         let model = InvoiceEntity::find()
             .filter(Column::BtcOutputId.eq(btc_output_id))
             .find_also_related(BtcOutput)
-            .one(&self.db)
+            .one(self.db.connection())
             .await
             .map_err(|e| DatabaseError::FindOne(e.to_string()))?;
 
@@ -103,7 +108,7 @@ impl InvoiceRepository for SeaOrmInvoiceRepository {
             .offset(filter.offset)
             .limit(filter.limit)
             .find_also_related(BtcOutput)
-            .all(&self.db)
+            .all(self.db.connection())
             .await
             .map_err(|e| DatabaseError::FindMany(e.to_string()))?;
 
@@ -148,7 +153,7 @@ impl InvoiceRepository for SeaOrmInvoiceRepository {
         }
 
         let result = model
-            .insert(&self.db)
+            .insert(self.db.connection())
             .await
             .map_err(|e| DatabaseError::Insert(e.to_string()))?;
 
@@ -169,7 +174,7 @@ impl InvoiceRepository for SeaOrmInvoiceRepository {
         };
 
         let result = model
-            .update(&self.db)
+            .update(self.db.connection())
             .await
             .map_err(|e| DatabaseError::Update(e.to_string()))?;
 
@@ -198,7 +203,7 @@ impl InvoiceRepository for SeaOrmInvoiceRepository {
                 ),
             })
             .apply_if(filter.ledger, |q, l| q.filter(Column::Ledger.eq(l.to_string())))
-            .exec(&self.db)
+            .exec(self.db.connection())
             .await
             .map_err(|e| DatabaseError::Delete(e.to_string()))?;
 

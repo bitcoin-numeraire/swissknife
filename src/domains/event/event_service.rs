@@ -78,7 +78,7 @@ impl EventUseCases for EventService {
             let lightning = payment_retrieved.lightning.get_or_insert_with(Default::default);
             lightning.payment_preimage = Some(event.payment_preimage);
 
-            let payment = self.store.payment.update(payment_retrieved).await?;
+            let payment = self.store.payment_uow.settle(payment_retrieved).await?;
 
             info!(id = %payment.id, payment_status = %payment.status,
                 "Outgoing Lightning payment processed successfully");
@@ -103,7 +103,7 @@ impl EventUseCases for EventService {
             payment_retrieved.status = PaymentStatus::Failed;
             payment_retrieved.error = Some(event.reason);
 
-            let payment = self.store.payment.update(payment_retrieved).await?;
+            let payment = self.store.payment_uow.fail(payment_retrieved).await?;
 
             info!(id = %payment.id,payment_status = %payment.status,
                 "Outgoing Lightning payment processed successfully");
@@ -211,7 +211,7 @@ impl EventUseCases for EventService {
         let bitcoin = payment.bitcoin.get_or_insert_with(Default::default);
         bitcoin.block_height = Some(block_height);
 
-        let stored_payment = self.store.payment.update(payment).await?;
+        let stored_payment = self.store.payment_uow.settle(payment).await?;
 
         info!(payment_id = %stored_payment.id, txid = %event.txid, "Onchain withdrawal processed");
         Ok(true)

@@ -4,12 +4,13 @@ use sea_orm::{DatabaseConnection, TransactionTrait};
 use crate::{
     application::errors::{ApplicationError, DataError, DatabaseError},
     domains::{
+        invoice::{Invoice, InvoiceRepository},
         payment::{Payment, PaymentRepository, PaymentUnitOfWork},
-        wallet::{WalletBalanceRepository, WalletRepository},
+        wallet::WalletBalanceRepository,
     },
 };
 
-use super::{SeaOrmPaymentRepository, SeaOrmWalletBalanceRepository, SeaOrmWalletRepository};
+use super::{SeaOrmInvoiceRepository, SeaOrmPaymentRepository, SeaOrmWalletBalanceRepository};
 
 #[derive(Clone)]
 pub struct SeaOrmPaymentUnitOfWork {
@@ -24,38 +25,6 @@ impl SeaOrmPaymentUnitOfWork {
 
 #[async_trait]
 impl PaymentUnitOfWork for SeaOrmPaymentUnitOfWork {
-    // TODO(cutover): removed once all send flows use `reserve`/`settle`/`fail`.
-    async fn insert_payment(&self, payment: Payment, fee_buffer: f64) -> Result<Payment, ApplicationError> {
-        let txn = self
-            .db
-            .begin()
-            .await
-            .map_err(|e| DatabaseError::Transaction(e.to_string()))?;
-
-        let wallet_repo = SeaOrmWalletRepository::new(&txn);
-        let payment_repo = SeaOrmPaymentRepository::new(&txn);
-
-        let balance = wallet_repo.get_balance(payment.wallet_id).await?.available_msat as f64;
-
-        let required_balance_msat = if let Some(fee_msat) = payment.fee_msat {
-            (payment.amount_msat.saturating_add(fee_msat)) as f64
-        } else {
-            payment.amount_msat as f64 * (1.0 + fee_buffer)
-        };
-
-        if balance < required_balance_msat {
-            return Err(DataError::InsufficientFunds(required_balance_msat).into());
-        }
-
-        let pending_payment = payment_repo.insert(payment).await?;
-
-        txn.commit()
-            .await
-            .map_err(|e| DatabaseError::Transaction(e.to_string()))?;
-
-        Ok(pending_payment)
-    }
-
     async fn reserve(&self, mut payment: Payment, reserve_amount_msat: u64) -> Result<Payment, ApplicationError> {
         let txn = self
             .db
@@ -131,6 +100,43 @@ impl PaymentUnitOfWork for SeaOrmPaymentUnitOfWork {
         payment.reserved_amount = 0;
 
         let payment = SeaOrmPaymentRepository::new(&txn).update(payment).await?;
+
+        txn.commit()
+            .await
+            .map_err(|e| DatabaseError::Transaction(e.to_string()))?;
+
+        Ok(payment)
+    }
+
+    async fn settle_internal(&self, mut payment: Payment, invoice: Invoice) -> Result<Payment, ApplicationError> {
+        let txn = self
+            .db
+            .begin()
+            .await
+            .map_err(|e| DatabaseError::Transaction(e.to_string()))?;
+
+        let balance_repo = SeaOrmWalletBalanceRepository::new(&txn);
+
+        // Debit the sender first so an underfunded sender fails before the receiver is credited.
+        let debit_msat = payment.amount_msat.saturating_add(payment.fee_msat.unwrap_or_default());
+        if debit_msat > 0 && !balance_repo.debit(payment.wallet_id, &payment.currency, debit_msat).await? {
+            return Err(DataError::InsufficientFunds(debit_msat as f64).into());
+        }
+        payment.reserved_amount = 0;
+        let payment = SeaOrmPaymentRepository::new(&txn).insert(payment).await?;
+
+        if let Some(received_msat) = invoice.amount_received_msat {
+            balance_repo
+                .credit(invoice.wallet_id, &invoice.currency, received_msat)
+                .await?;
+        }
+
+        let invoice_repo = SeaOrmInvoiceRepository::new(&txn);
+        if invoice.id.is_nil() {
+            invoice_repo.insert(invoice).await?;
+        } else {
+            invoice_repo.update(invoice).await?;
+        }
 
         txn.commit()
             .await
