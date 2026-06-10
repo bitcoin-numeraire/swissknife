@@ -150,14 +150,17 @@ impl EventUseCases for EventService {
 
         if let Some(mut invoice) = existing_invoice {
             invoice.status = status;
-            if is_confirmed {
-                invoice.payment_time = Some(Utc::now());
-                invoice.amount_received_msat = Some(stored_output.amount_sat.saturating_mul(1000));
-            }
             invoice.btc_output_id = Some(stored_output.id);
             invoice.bitcoin_output = Some(stored_output.clone());
 
-            self.store.invoice.update(invoice.clone()).await?;
+            if is_confirmed {
+                invoice.payment_time = Some(Utc::now());
+                invoice.amount_received_msat = Some(stored_output.amount_sat.saturating_mul(1000));
+                // Settle and credit the receiver atomically; idempotent if the event is replayed.
+                self.store.event_uow.settle_incoming_invoice(invoice.clone()).await?;
+            } else {
+                self.store.invoice.update(invoice.clone()).await?;
+            }
 
             info!(invoice_id = %invoice.id, outpoint = outpoint.clone(), address = %btc_address.address,
                 "Existing onchain deposit processed");
@@ -180,7 +183,12 @@ impl EventUseCases for EventService {
                 ..Default::default()
             };
 
-            let stored_invoice = self.store.invoice.insert(invoice.clone()).await?;
+            let stored_invoice = if is_confirmed {
+                // Insert the settled deposit and credit the receiver atomically.
+                self.store.event_uow.settle_incoming_invoice(invoice.clone()).await?
+            } else {
+                self.store.invoice.insert(invoice.clone()).await?
+            };
 
             info!(invoice_id = %stored_invoice.id, outpoint = %outpoint.clone(), address = %btc_address.address,
                 "New onchain deposit processed");
@@ -491,8 +499,8 @@ mod tests {
                     .times(1)
                     .returning(|_| Ok(None));
                 store
-                    .invoice
-                    .expect_insert()
+                    .event_uow
+                    .expect_settle_incoming_invoice()
                     .withf(|invoice| {
                         invoice.ledger == Ledger::Onchain
                             && invoice.amount_received_msat == Some(1_000_000)
