@@ -67,6 +67,27 @@ impl PaymentService {
         Ok(amount)
     }
 
+    /// Amount to reserve for an outgoing payment: `amount + fee` when the fee is known, otherwise
+    /// `ceil(amount * (1 + fee_buffer))` as headroom for unknown Lightning routing fees.
+    fn reserve_amount_msat(amount_msat: u64, fee_msat: Option<u64>, fee_buffer: f64) -> Result<u64, ApplicationError> {
+        if let Some(fee_msat) = fee_msat {
+            return amount_msat
+                .checked_add(fee_msat)
+                .ok_or_else(|| DataError::Validation("Payment amount plus fee overflows".to_string()).into());
+        }
+
+        if !fee_buffer.is_finite() || fee_buffer < 0.0 {
+            return Err(DataError::Validation("Fee buffer must be a finite non-negative value".to_string()).into());
+        }
+
+        let reserve_amount = (amount_msat as f64 * (1.0 + fee_buffer)).ceil();
+        if reserve_amount > u64::MAX as f64 {
+            return Err(DataError::Validation("Payment reserve amount exceeds integer range".to_string()).into());
+        }
+
+        Ok(reserve_amount as u64)
+    }
+
     async fn send_internal(
         &self,
         input: String,
@@ -92,49 +113,41 @@ impl PaymentService {
 
                 let curr_time = Utc::now();
 
-                self.store
-                    .invoice
-                    .insert(Invoice {
-                        wallet_id: retrieved_address.wallet_id,
-                        ln_address_id: Some(retrieved_address.id),
-                        ledger: Ledger::Internal,
-                        currency: Currency::Bitcoin,
-                        description: comment
-                            .clone()
-                            .or(DEFAULT_INTERNAL_INVOICE_DESCRIPTION.to_string().into()),
-                        amount_msat: Some(amount),
-                        amount_received_msat: Some(amount),
-                        timestamp: curr_time,
-                        status: InvoiceStatus::Settled,
-                        fee_msat: Some(0),
-                        payment_time: Some(curr_time),
-                        ..Default::default()
-                    })
-                    .await?;
+                let invoice = Invoice {
+                    wallet_id: retrieved_address.wallet_id,
+                    ln_address_id: Some(retrieved_address.id),
+                    ledger: Ledger::Internal,
+                    currency: Currency::Bitcoin,
+                    description: comment
+                        .clone()
+                        .or(DEFAULT_INTERNAL_INVOICE_DESCRIPTION.to_string().into()),
+                    amount_msat: Some(amount),
+                    amount_received_msat: Some(amount),
+                    timestamp: curr_time,
+                    status: InvoiceStatus::Settled,
+                    fee_msat: Some(0),
+                    payment_time: Some(curr_time),
+                    ..Default::default()
+                };
 
-                let internal_payment = self
-                    .store
-                    .payment_uow
-                    .insert_payment(
-                        Payment {
-                            wallet_id,
-                            amount_msat: amount,
-                            status: PaymentStatus::Settled,
-                            description: comment.or(DEFAULT_INTERNAL_PAYMENT_DESCRIPTION.to_string().into()),
-                            fee_msat: Some(0),
-                            payment_time: Some(curr_time),
-                            ledger: Ledger::Internal,
-                            currency: Currency::Bitcoin,
-                            internal: Some(InternalPayment {
-                                ln_address: Some(input),
-                                btc_address: None,
-                                payment_hash: None,
-                            }),
-                            ..Default::default()
-                        },
-                        0.0,
-                    )
-                    .await?;
+                let payment = Payment {
+                    wallet_id,
+                    amount_msat: amount,
+                    status: PaymentStatus::Settled,
+                    description: comment.or(DEFAULT_INTERNAL_PAYMENT_DESCRIPTION.to_string().into()),
+                    fee_msat: Some(0),
+                    payment_time: Some(curr_time),
+                    ledger: Ledger::Internal,
+                    currency: Currency::Bitcoin,
+                    internal: Some(InternalPayment {
+                        ln_address: Some(input),
+                        btc_address: None,
+                        payment_hash: None,
+                    }),
+                    ..Default::default()
+                };
+
+                let internal_payment = self.store.payment_uow.settle_internal(payment, invoice).await?;
 
                 Ok(internal_payment)
             }
@@ -165,48 +178,40 @@ impl PaymentService {
 
                 let timestamp = Utc::now();
 
-                self.store
-                    .invoice
-                    .insert(Invoice {
-                        wallet_id: recipient_address.wallet_id,
-                        ln_address_id: None,
-                        description: description.clone(),
-                        amount_msat: Some(amount_msat),
-                        amount_received_msat: Some(amount_msat),
-                        timestamp,
-                        status: InvoiceStatus::Settled,
-                        ledger: Ledger::Internal,
-                        currency: data.network.into(),
-                        fee_msat: Some(0),
-                        payment_time: Some(timestamp),
-                        btc_output_id: None,
-                        ..Default::default()
-                    })
-                    .await?;
+                let invoice = Invoice {
+                    wallet_id: recipient_address.wallet_id,
+                    ln_address_id: None,
+                    description: description.clone(),
+                    amount_msat: Some(amount_msat),
+                    amount_received_msat: Some(amount_msat),
+                    timestamp,
+                    status: InvoiceStatus::Settled,
+                    ledger: Ledger::Internal,
+                    currency: data.network.into(),
+                    fee_msat: Some(0),
+                    payment_time: Some(timestamp),
+                    btc_output_id: None,
+                    ..Default::default()
+                };
 
-                let internal_payment = self
-                    .store
-                    .payment_uow
-                    .insert_payment(
-                        Payment {
-                            wallet_id,
-                            amount_msat,
-                            status: PaymentStatus::Settled,
-                            ledger: Ledger::Internal,
-                            currency: data.network.into(),
-                            description: description.clone(),
-                            internal: Some(InternalPayment {
-                                ln_address: None,
-                                btc_address: Some(data.address),
-                                payment_hash: None,
-                            }),
-                            fee_msat: Some(0),
-                            payment_time: Some(timestamp),
-                            ..Default::default()
-                        },
-                        0.0,
-                    )
-                    .await?;
+                let payment = Payment {
+                    wallet_id,
+                    amount_msat,
+                    status: PaymentStatus::Settled,
+                    ledger: Ledger::Internal,
+                    currency: data.network.into(),
+                    description: description.clone(),
+                    internal: Some(InternalPayment {
+                        ln_address: None,
+                        btc_address: Some(data.address),
+                        payment_hash: None,
+                    }),
+                    fee_msat: Some(0),
+                    payment_time: Some(timestamp),
+                    ..Default::default()
+                };
+
+                let internal_payment = self.store.payment_uow.settle_internal(payment, invoice).await?;
 
                 return Ok(internal_payment);
             }
@@ -216,10 +221,13 @@ impl PaymentService {
                 .prepare_transaction(data.address.clone(), amount, None)
                 .await?;
 
+            let reserve_amount =
+                Self::reserve_amount_msat(amount_msat, Some(prepared_tx.fee_sat.saturating_mul(1000)), 0.0)?;
+
             let pending_payment = match self
                 .store
                 .payment_uow
-                .insert_payment(
+                .reserve(
                     Payment {
                         wallet_id,
                         amount_msat,
@@ -235,7 +243,7 @@ impl PaymentService {
                         }),
                         ..Default::default()
                     },
-                    0.0,
+                    reserve_amount,
                 )
                 .await
             {
@@ -269,7 +277,7 @@ impl PaymentService {
                     let mut failed_payment = pending_payment.clone();
                     failed_payment.status = PaymentStatus::Failed;
                     failed_payment.error = Some(error.to_string());
-                    self.store.payment.update(failed_payment).await?;
+                    self.store.payment_uow.fail(failed_payment).await?;
 
                     return Err(error.into());
                 }
@@ -313,36 +321,36 @@ impl PaymentService {
                         debug!(%wallet_id, %amount, ledger="Internal", "Sending bolt11 payment");
 
                         let payment_hash = invoice.payment_hash.clone();
+                        let curr_time = Utc::now();
+                        let invoice_id = retrieved_invoice.id;
+
+                        retrieved_invoice.fee_msat = Some(0);
+                        retrieved_invoice.payment_time = Some(curr_time);
+                        retrieved_invoice.amount_received_msat = Some(amount);
+                        retrieved_invoice.ledger = Ledger::Internal;
+
+                        let payment = Payment {
+                            wallet_id,
+                            amount_msat: amount,
+                            status: PaymentStatus::Settled,
+                            description: invoice.description,
+                            fee_msat: Some(0),
+                            payment_time: Some(curr_time),
+                            ledger: Ledger::Internal,
+                            currency: invoice.currency.clone(),
+                            internal: Some(InternalPayment {
+                                ln_address: None,
+                                btc_address: None,
+                                payment_hash: Some(payment_hash.clone()),
+                            }),
+                            ..Default::default()
+                        };
+
                         let internal_payment = self
                             .store
                             .payment_uow
-                            .insert_payment(
-                                Payment {
-                                    wallet_id,
-                                    amount_msat: amount,
-                                    status: PaymentStatus::Settled,
-                                    description: invoice.description,
-                                    fee_msat: Some(0),
-                                    payment_time: Some(Utc::now()),
-                                    ledger: Ledger::Internal,
-                                    currency: invoice.currency.clone(),
-                                    internal: Some(InternalPayment {
-                                        ln_address: None,
-                                        btc_address: None,
-                                        payment_hash: Some(payment_hash.clone()),
-                                    }),
-                                    ..Default::default()
-                                },
-                                0.0,
-                            )
+                            .settle_internal(payment, retrieved_invoice)
                             .await?;
-
-                        let invoice_id = retrieved_invoice.id;
-                        retrieved_invoice.fee_msat = Some(0);
-                        retrieved_invoice.payment_time = internal_payment.payment_time;
-                        retrieved_invoice.amount_received_msat = Some(amount);
-                        retrieved_invoice.ledger = Ledger::Internal;
-                        self.store.invoice.update(retrieved_invoice).await?;
 
                         if let Err(err) = self
                             .ln_client
@@ -368,7 +376,7 @@ impl PaymentService {
             let pending_payment = self
                 .store
                 .payment_uow
-                .insert_payment(
+                .reserve(
                     Payment {
                         wallet_id,
                         amount_msat: amount,
@@ -382,7 +390,7 @@ impl PaymentService {
                         }),
                         ..Default::default()
                     },
-                    self.fee_buffer,
+                    Self::reserve_amount_msat(amount, None, self.fee_buffer)?,
                 )
                 .await?;
 
@@ -422,7 +430,7 @@ impl PaymentService {
         let pending_payment = self
             .store
             .payment_uow
-            .insert_payment(
+            .reserve(
                 Payment {
                     wallet_id,
                     amount_msat: amount,
@@ -440,7 +448,7 @@ impl PaymentService {
                     }),
                     ..Default::default()
                 },
-                self.fee_buffer,
+                Self::reserve_amount_msat(amount, None, self.fee_buffer)?,
             )
             .await?;
 
@@ -459,6 +467,10 @@ impl PaymentService {
         match result {
             Ok(mut settled_payment) => {
                 settled_payment.id = pending_payment.id;
+                settled_payment.wallet_id = pending_payment.wallet_id;
+                settled_payment.currency = pending_payment.currency.clone();
+                settled_payment.ledger = pending_payment.ledger.clone();
+                settled_payment.reserved_amount = pending_payment.reserved_amount;
                 settled_payment.status = PaymentStatus::Settled;
 
                 let success_action = match (
@@ -477,14 +489,14 @@ impl PaymentService {
                     lightning.success_action = Some(success_action);
                 }
 
-                let payment = self.store.payment.update(settled_payment).await?;
+                let payment = self.store.payment_uow.settle(settled_payment).await?;
 
                 Ok(payment)
             }
             Err(error) => {
                 pending_payment.status = PaymentStatus::Failed;
                 pending_payment.error = Some(error.to_string());
-                self.store.payment.update(pending_payment).await?;
+                self.store.payment_uow.fail(pending_payment).await?;
 
                 Err(error.into())
             }
