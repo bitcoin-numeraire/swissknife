@@ -333,8 +333,8 @@ mod tests {
                     }))
                 });
                 store
-                    .payment
-                    .expect_update()
+                    .payment_uow
+                    .expect_settle()
                     .withf(|payment| {
                         payment.status == PaymentStatus::Settled
                             && payment
@@ -410,8 +410,8 @@ mod tests {
                     }))
                 });
                 store
-                    .payment
-                    .expect_update()
+                    .payment_uow
+                    .expect_fail()
                     .withf(|payment| {
                         payment.status == PaymentStatus::Failed && payment.error.as_deref() == Some("no route")
                     })
@@ -574,8 +574,8 @@ mod tests {
                     .times(1)
                     .returning(|_| Ok(Some(Payment::default())));
                 store
-                    .payment
-                    .expect_update()
+                    .payment_uow
+                    .expect_settle()
                     .withf(|payment| {
                         payment.status == PaymentStatus::Settled
                             && payment.bitcoin.as_ref().and_then(|bitcoin| bitcoin.block_height) == Some(800_000)

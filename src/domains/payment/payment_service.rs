@@ -826,15 +826,14 @@ mod tests {
                     .times(1)
                     .returning(move |_| Ok(Some(ln_address(recipient, true))));
                 store
-                    .invoice
-                    .expect_insert()
-                    .withf(move |invoice| invoice.wallet_id == recipient && invoice.status == InvoiceStatus::Settled)
-                    .times(1)
-                    .returning(Ok);
-                store
                     .payment_uow
-                    .expect_insert_payment()
-                    .withf(|payment, fee_buffer| payment.ledger == Ledger::Internal && *fee_buffer < f64::EPSILON)
+                    .expect_settle_internal()
+                    .withf(move |payment, invoice| {
+                        payment.ledger == Ledger::Internal
+                            && invoice.wallet_id == recipient
+                            && invoice.ledger == Ledger::Internal
+                            && invoice.status == InvoiceStatus::Settled
+                    })
                     .times(1)
                     .returning(|payment, _| Ok(payment));
 
@@ -980,10 +979,10 @@ mod tests {
                     .expect_find_by_username()
                     .times(1)
                     .returning(move |_| Ok(Some(ln_address(recipient, true))));
-                store.invoice.expect_insert().times(1).returning(Ok);
                 store
                     .payment_uow
-                    .expect_insert_payment()
+                    .expect_settle_internal()
+                    .withf(|payment, _| payment.ledger == Ledger::Internal)
                     .times(1)
                     .returning(|payment, _| Ok(payment));
 
@@ -1064,14 +1063,13 @@ mod tests {
                     .times(1)
                     .returning(move |_| Ok(Some(btc_address(recipient))));
                 store
-                    .invoice
-                    .expect_insert()
-                    .withf(move |invoice| invoice.wallet_id == recipient && invoice.ledger == Ledger::Internal)
-                    .times(1)
-                    .returning(Ok);
-                store
                     .payment_uow
-                    .expect_insert_payment()
+                    .expect_settle_internal()
+                    .withf(move |payment, invoice| {
+                        payment.ledger == Ledger::Internal
+                            && invoice.wallet_id == recipient
+                            && invoice.ledger == Ledger::Internal
+                    })
                     .times(1)
                     .returning(|payment, _| Ok(payment));
 
@@ -1135,8 +1133,12 @@ mod tests {
                     .returning(|_| Ok(None));
                 store
                     .payment_uow
-                    .expect_insert_payment()
-                    .withf(|payment, _| payment.status == PaymentStatus::Pending && payment.ledger == Ledger::Onchain)
+                    .expect_reserve()
+                    .withf(|payment, reserve_amount_msat| {
+                        payment.status == PaymentStatus::Pending
+                            && payment.ledger == Ledger::Onchain
+                            && *reserve_amount_msat == payment.amount_msat + payment.fee_msat.unwrap_or(0)
+                    })
                     .times(1)
                     .returning(|payment, _| Ok(payment));
 
@@ -1172,7 +1174,7 @@ mod tests {
                     .returning(|_| Ok(None));
                 store
                     .payment_uow
-                    .expect_insert_payment()
+                    .expect_reserve()
                     .times(1)
                     .returning(|_, _| Err(DataError::InsufficientFunds(1_000.0).into()));
 
@@ -1211,12 +1213,12 @@ mod tests {
                     .returning(|_| Ok(None));
                 store
                     .payment_uow
-                    .expect_insert_payment()
+                    .expect_reserve()
                     .times(1)
                     .returning(|payment, _| Ok(payment));
                 store
-                    .payment
-                    .expect_update()
+                    .payment_uow
+                    .expect_fail()
                     .withf(|payment| payment.status == PaymentStatus::Failed)
                     .times(1)
                     .returning(Ok);
@@ -1272,16 +1274,10 @@ mod tests {
                     });
                 store
                     .payment_uow
-                    .expect_insert_payment()
-                    .withf(|payment, _| payment.ledger == Ledger::Internal)
+                    .expect_settle_internal()
+                    .withf(|payment, invoice| payment.ledger == Ledger::Internal && invoice.ledger == Ledger::Internal)
                     .times(1)
                     .returning(|payment, _| Ok(payment));
-                store
-                    .invoice
-                    .expect_update()
-                    .withf(move |invoice| invoice.ledger == Ledger::Internal)
-                    .times(1)
-                    .returning(Ok);
 
                 let mut ln_client = MockLnClient::new();
                 ln_client.expect_cancel_invoice().times(1).returning(|_, _| Ok(()));
@@ -1408,13 +1404,15 @@ mod tests {
                     .returning(|_| Ok(None));
                 store
                     .payment_uow
-                    .expect_insert_payment()
-                    .withf(|payment, fee_buffer| payment.ledger == Ledger::Lightning && *fee_buffer > 0.0)
+                    .expect_reserve()
+                    .withf(|payment, reserve_amount_msat| {
+                        payment.ledger == Ledger::Lightning && *reserve_amount_msat > payment.amount_msat
+                    })
                     .times(1)
                     .returning(|payment, _| Ok(payment));
                 store
-                    .payment
-                    .expect_update()
+                    .payment_uow
+                    .expect_settle()
                     .withf(|payment| payment.status == PaymentStatus::Settled)
                     .times(1)
                     .returning(Ok);
@@ -1455,12 +1453,12 @@ mod tests {
                     .returning(|_| Ok(None));
                 store
                     .payment_uow
-                    .expect_insert_payment()
+                    .expect_reserve()
                     .times(1)
                     .returning(|payment, _| Ok(payment));
                 store
-                    .payment
-                    .expect_update()
+                    .payment_uow
+                    .expect_fail()
                     .withf(|payment| payment.status == PaymentStatus::Failed)
                     .times(1)
                     .returning(Ok);
@@ -1495,8 +1493,8 @@ mod tests {
 
                 let mut store = MockAppStoreBuilder::new();
                 store
-                    .payment
-                    .expect_update()
+                    .payment_uow
+                    .expect_settle()
                     .withf(move |payment| payment.id == pending_id && payment.status == PaymentStatus::Settled)
                     .times(1)
                     .returning(Ok);
@@ -1534,8 +1532,8 @@ mod tests {
             async fn persists_failure_and_returns_error() {
                 let mut store = MockAppStoreBuilder::new();
                 store
-                    .payment
-                    .expect_update()
+                    .payment_uow
+                    .expect_fail()
                     .withf(|payment| payment.status == PaymentStatus::Failed && payment.error.is_some())
                     .times(1)
                     .returning(Ok);

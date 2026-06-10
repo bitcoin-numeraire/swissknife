@@ -64,11 +64,17 @@ impl PaymentUnitOfWork for SeaOrmPaymentUnitOfWork {
                 .release(payment.wallet_id, &payment.currency, payment.reserved_amount)
                 .await?
         {
-            return Err(DataError::Inconsistency(format!("Reserved balance missing for payment {}", payment.id)).into());
+            return Err(
+                DataError::Inconsistency(format!("Reserved balance missing for payment {}", payment.id)).into(),
+            );
         }
 
         let actual_msat = payment.amount_msat.saturating_add(payment.fee_msat.unwrap_or_default());
-        if actual_msat > 0 && !balance_repo.debit(payment.wallet_id, &payment.currency, actual_msat).await? {
+        if actual_msat > 0
+            && !balance_repo
+                .debit(payment.wallet_id, &payment.currency, actual_msat)
+                .await?
+        {
             return Err(DataError::InsufficientFunds(actual_msat as f64).into());
         }
         payment.reserved_amount = 0;
@@ -95,7 +101,9 @@ impl PaymentUnitOfWork for SeaOrmPaymentUnitOfWork {
                 .release(payment.wallet_id, &payment.currency, payment.reserved_amount)
                 .await?
         {
-            return Err(DataError::Inconsistency(format!("Reserved balance missing for payment {}", payment.id)).into());
+            return Err(
+                DataError::Inconsistency(format!("Reserved balance missing for payment {}", payment.id)).into(),
+            );
         }
         payment.reserved_amount = 0;
 
@@ -119,7 +127,11 @@ impl PaymentUnitOfWork for SeaOrmPaymentUnitOfWork {
 
         // Debit the sender first so an underfunded sender fails before the receiver is credited.
         let debit_msat = payment.amount_msat.saturating_add(payment.fee_msat.unwrap_or_default());
-        if debit_msat > 0 && !balance_repo.debit(payment.wallet_id, &payment.currency, debit_msat).await? {
+        if debit_msat > 0
+            && !balance_repo
+                .debit(payment.wallet_id, &payment.currency, debit_msat)
+                .await?
+        {
             return Err(DataError::InsufficientFunds(debit_msat as f64).into());
         }
         payment.reserved_amount = 0;
