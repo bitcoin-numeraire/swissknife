@@ -16,6 +16,7 @@ mod m20251224_162550_btc_fields_to_payment;
 mod m20260113_222755_fix_invoice_payment_hash_unique;
 mod m20260609_143600_wallet_balance_table;
 mod m20260609_143601_backfill_wallet_balances;
+mod m20260611_120000_rebackfill_wallet_balances;
 
 pub struct Migrator;
 
@@ -39,6 +40,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260113_222755_fix_invoice_payment_hash_unique::Migration),
             Box::new(m20260609_143600_wallet_balance_table::Migration),
             Box::new(m20260609_143601_backfill_wallet_balances::Migration),
+            Box::new(m20260611_120000_rebackfill_wallet_balances::Migration),
         ]
     }
 }
