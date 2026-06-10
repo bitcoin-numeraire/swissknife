@@ -2,25 +2,18 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use migration::{Migrator, MigratorTrait};
-use sea_orm::{ConnectOptions, Database, DatabaseConnection, TransactionTrait};
+use sea_orm::{ConnectOptions, Database, DatabaseConnection};
 use tracing::{debug, trace};
 
 use crate::{
-    application::{
-        entities::AppStore,
-        errors::{ApplicationError, DataError, DatabaseError},
-    },
-    domains::{
-        payment::{Payment, PaymentRepository, PaymentUnitOfWork},
-        system::HealthProbe,
-        wallet::WalletRepository,
-    },
+    application::{entities::AppStore, errors::DatabaseError},
+    domains::system::HealthProbe,
 };
 
 use super::{
     SeaOrmApiKeyRepository, SeaOrmBitcoinAddressRepository, SeaOrmBitcoinOutputRepository, SeaOrmConfig,
     SeaOrmConfigRepository, SeaOrmInvoiceRepository, SeaOrmLnAddressRepository, SeaOrmPaymentRepository,
-    SeaOrmWalletRepository,
+    SeaOrmPaymentUnitOfWork, SeaOrmWalletRepository,
 };
 
 pub struct SeaOrmStore;
@@ -95,50 +88,5 @@ impl SeaOrmHealthProbe {
 impl HealthProbe for SeaOrmHealthProbe {
     async fn ping(&self) -> Result<(), DatabaseError> {
         self.db.ping().await.map_err(|e| DatabaseError::Ping(e.to_string()))
-    }
-}
-
-#[derive(Clone)]
-pub struct SeaOrmPaymentUnitOfWork {
-    db: DatabaseConnection,
-}
-
-impl SeaOrmPaymentUnitOfWork {
-    pub fn new(db: DatabaseConnection) -> Self {
-        Self { db }
-    }
-}
-
-#[async_trait]
-impl PaymentUnitOfWork for SeaOrmPaymentUnitOfWork {
-    async fn insert_payment(&self, payment: Payment, fee_buffer: f64) -> Result<Payment, ApplicationError> {
-        let txn = self
-            .db
-            .begin()
-            .await
-            .map_err(|e| DatabaseError::Transaction(e.to_string()))?;
-
-        let wallet_repo = SeaOrmWalletRepository::new(&txn);
-        let payment_repo = SeaOrmPaymentRepository::new(&txn);
-
-        let balance = wallet_repo.get_balance(payment.wallet_id).await?.available_msat as f64;
-
-        let required_balance_msat = if let Some(fee_msat) = payment.fee_msat {
-            (payment.amount_msat.saturating_add(fee_msat)) as f64
-        } else {
-            payment.amount_msat as f64 * (1.0 + fee_buffer)
-        };
-
-        if balance < required_balance_msat {
-            return Err(DataError::InsufficientFunds(required_balance_msat).into());
-        }
-
-        let pending_payment = payment_repo.insert(payment).await?;
-
-        txn.commit()
-            .await
-            .map_err(|e| DatabaseError::Transaction(e.to_string()))?;
-
-        Ok(pending_payment)
     }
 }
