@@ -275,7 +275,7 @@ impl LnClient for ClnGrpcClient {
         Ok(Some(Payment {
             ledger: Ledger::Lightning,
             status: status.clone(),
-            amount_msat: amount_sent_msat,
+            amount_msat,
             fee_msat: Some(amount_sent_msat.saturating_sub(amount_msat)),
             payment_time,
             error: if status == PaymentStatus::Failed {
