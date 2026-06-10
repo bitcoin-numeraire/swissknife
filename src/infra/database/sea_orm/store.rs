@@ -12,8 +12,8 @@ use crate::{
 
 use super::{
     SeaOrmApiKeyRepository, SeaOrmBitcoinAddressRepository, SeaOrmBitcoinOutputRepository, SeaOrmConfig,
-    SeaOrmConfigRepository, SeaOrmInvoiceRepository, SeaOrmLnAddressRepository, SeaOrmPaymentRepository,
-    SeaOrmPaymentUnitOfWork, SeaOrmWalletRepository,
+    SeaOrmConfigRepository, SeaOrmEventProjectionUnitOfWork, SeaOrmInvoiceRepository, SeaOrmLnAddressRepository,
+    SeaOrmPaymentRepository, SeaOrmPaymentUnitOfWork, SeaOrmWalletRepository,
 };
 
 pub struct SeaOrmStore;
@@ -35,7 +35,8 @@ impl SeaOrmStore {
             Arc::new(SeaOrmBitcoinAddressRepository::new(db_conn.clone())),
             Arc::new(SeaOrmBitcoinOutputRepository::new(db_conn.clone())),
             Arc::new(SeaOrmHealthProbe::new(db_conn.clone())),
-            Arc::new(SeaOrmPaymentUnitOfWork::new(db_conn)),
+            Arc::new(SeaOrmPaymentUnitOfWork::new(db_conn.clone())),
+            Arc::new(SeaOrmEventProjectionUnitOfWork::new(db_conn)),
         )
     }
 
