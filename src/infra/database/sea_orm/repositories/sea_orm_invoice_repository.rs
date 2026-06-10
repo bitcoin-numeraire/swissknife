@@ -181,6 +181,27 @@ where
         Ok(result.into())
     }
 
+    async fn settle(&self, invoice: &Invoice) -> Result<bool, DatabaseError> {
+        let result = InvoiceEntity::update_many()
+            .col_expr(
+                Column::PaymentTime,
+                Expr::value(invoice.payment_time.map(|t| t.naive_utc())),
+            )
+            .col_expr(Column::FeeMsat, Expr::value(invoice.fee_msat.map(|v| v as i64)))
+            .col_expr(
+                Column::AmountReceivedMsat,
+                Expr::value(invoice.amount_received_msat.map(|v| v as i64)),
+            )
+            .col_expr(Column::UpdatedAt, Expr::value(Some(Utc::now().naive_utc())))
+            .filter(Column::Id.eq(invoice.id))
+            .filter(Column::PaymentTime.is_null())
+            .exec(self.db.connection())
+            .await
+            .map_err(|e| DatabaseError::Update(e.to_string()))?;
+
+        Ok(result.rows_affected == 1)
+    }
+
     async fn delete_many(&self, filter: InvoiceFilter) -> Result<u64, DatabaseError> {
         let result = InvoiceEntity::delete_many()
             .apply_if(filter.wallet_id, |q, wallet| q.filter(Column::WalletId.eq(wallet)))

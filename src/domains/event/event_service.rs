@@ -51,7 +51,7 @@ impl EventUseCases for EventService {
             invoice.payment_time = Some(event.payment_time);
             invoice.amount_received_msat = Some(event.amount_received_msat);
 
-            invoice = self.store.invoice.update(invoice).await?;
+            invoice = self.store.event_uow.settle_incoming_invoice(invoice).await?;
 
             info!(id = %invoice.id, "Incoming Lightning payment processed successfully");
             return Ok(());
@@ -262,8 +262,8 @@ mod tests {
                     }))
                 });
                 store
-                    .invoice
-                    .expect_update()
+                    .event_uow
+                    .expect_settle_incoming_invoice()
                     .withf(|invoice| {
                         invoice.status == InvoiceStatus::Settled && invoice.amount_received_msat == Some(2_000)
                     })

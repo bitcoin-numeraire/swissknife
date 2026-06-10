@@ -4,6 +4,7 @@ use sea_orm::{DatabaseConnection, TransactionTrait};
 use crate::{
     application::errors::{ApplicationError, DataError, DatabaseError},
     domains::{
+        event::EventProjectionUnitOfWork,
         invoice::{Invoice, InvoiceRepository},
         payment::{Payment, PaymentRepository, PaymentUnitOfWork},
         wallet::WalletBalanceRepository,
@@ -155,5 +156,58 @@ impl PaymentUnitOfWork for SeaOrmPaymentUnitOfWork {
             .map_err(|e| DatabaseError::Transaction(e.to_string()))?;
 
         Ok(payment)
+    }
+}
+
+#[derive(Clone)]
+pub struct SeaOrmEventProjectionUnitOfWork {
+    db: DatabaseConnection,
+}
+
+impl SeaOrmEventProjectionUnitOfWork {
+    pub fn new(db: DatabaseConnection) -> Self {
+        Self { db }
+    }
+}
+
+#[async_trait]
+impl EventProjectionUnitOfWork for SeaOrmEventProjectionUnitOfWork {
+    async fn settle_incoming_invoice(&self, invoice: Invoice) -> Result<Invoice, ApplicationError> {
+        let txn = self
+            .db
+            .begin()
+            .await
+            .map_err(|e| DatabaseError::Transaction(e.to_string()))?;
+
+        let invoice_repo = SeaOrmInvoiceRepository::new(&txn);
+
+        // Conditional settle applies once; a replayed event finds it already settled and skips the credit.
+        if !invoice_repo.settle(&invoice).await? {
+            let existing = invoice_repo
+                .find(invoice.id)
+                .await?
+                .ok_or_else(|| DataError::NotFound("Invoice not found.".to_string()))?;
+            txn.commit()
+                .await
+                .map_err(|e| DatabaseError::Transaction(e.to_string()))?;
+            return Ok(existing);
+        }
+
+        if let Some(received_msat) = invoice.amount_received_msat {
+            SeaOrmWalletBalanceRepository::new(&txn)
+                .credit(invoice.wallet_id, &invoice.currency, received_msat)
+                .await?;
+        }
+
+        let settled = invoice_repo
+            .find(invoice.id)
+            .await?
+            .ok_or_else(|| DataError::NotFound("Invoice not found.".to_string()))?;
+
+        txn.commit()
+            .await
+            .map_err(|e| DatabaseError::Transaction(e.to_string()))?;
+
+        Ok(settled)
     }
 }

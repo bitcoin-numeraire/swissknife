@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use crate::domains::{
     bitcoin::{BtcAddressRepository, BtcOutputRepository},
+    event::EventProjectionUnitOfWork,
     invoice::InvoiceRepository,
     ln_address::LnAddressRepository,
     payment::{PaymentRepository, PaymentUnitOfWork},
@@ -22,6 +23,7 @@ pub struct AppStore {
     pub btc_output: Arc<dyn BtcOutputRepository>,
     pub health: Arc<dyn HealthProbe>,
     pub payment_uow: Arc<dyn PaymentUnitOfWork>,
+    pub event_uow: Arc<dyn EventProjectionUnitOfWork>,
 }
 
 impl AppStore {
@@ -37,6 +39,7 @@ impl AppStore {
         btc_output: Arc<dyn BtcOutputRepository>,
         health: Arc<dyn HealthProbe>,
         payment_uow: Arc<dyn PaymentUnitOfWork>,
+        event_uow: Arc<dyn EventProjectionUnitOfWork>,
     ) -> Self {
         Self {
             ln_address,
@@ -49,6 +52,7 @@ impl AppStore {
             btc_output,
             health,
             payment_uow,
+            event_uow,
         }
     }
 }
@@ -65,6 +69,7 @@ pub struct MockAppStoreBuilder {
     pub btc_output: crate::domains::bitcoin::MockBtcOutputRepository,
     pub health: crate::domains::system::MockHealthProbe,
     pub payment_uow: crate::domains::payment::MockPaymentUnitOfWork,
+    pub event_uow: crate::domains::event::MockEventProjectionUnitOfWork,
 }
 
 #[cfg(test)]
@@ -81,6 +86,7 @@ impl MockAppStoreBuilder {
             btc_output: crate::domains::bitcoin::MockBtcOutputRepository::new(),
             health: crate::domains::system::MockHealthProbe::new(),
             payment_uow: crate::domains::payment::MockPaymentUnitOfWork::new(),
+            event_uow: crate::domains::event::MockEventProjectionUnitOfWork::new(),
         }
     }
 
@@ -96,6 +102,7 @@ impl MockAppStoreBuilder {
             Arc::new(self.btc_output),
             Arc::new(self.health),
             Arc::new(self.payment_uow),
+            Arc::new(self.event_uow),
         )
     }
 }
