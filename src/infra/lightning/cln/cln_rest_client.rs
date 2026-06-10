@@ -262,7 +262,7 @@ impl LnClient for ClnRestClient {
         Ok(Some(Payment {
             ledger: Ledger::Lightning,
             status,
-            amount_msat: amount_sent_msat,
+            amount_msat,
             fee_msat: Some(amount_sent_msat.saturating_sub(amount_msat)),
             payment_time,
             error: if payment.status == "failed" {

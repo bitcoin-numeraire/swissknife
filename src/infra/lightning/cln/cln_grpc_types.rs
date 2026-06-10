@@ -33,7 +33,7 @@ impl From<PayResponse> for Payment {
 
         Payment {
             ledger: Ledger::Lightning,
-            amount_msat: val.amount_sent_msat.unwrap().msat,
+            amount_msat: val.amount_msat.unwrap().msat,
             fee_msat: Some(val.amount_sent_msat.unwrap().msat - val.amount_msat.unwrap().msat),
             payment_time: Some(Utc.timestamp_opt(seconds, nanoseconds).unwrap()),
             error,
