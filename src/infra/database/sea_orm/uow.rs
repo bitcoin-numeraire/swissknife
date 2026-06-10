@@ -180,29 +180,34 @@ impl EventProjectionUnitOfWork for SeaOrmEventProjectionUnitOfWork {
             .map_err(|e| DatabaseError::Transaction(e.to_string()))?;
 
         let invoice_repo = SeaOrmInvoiceRepository::new(&txn);
+        let balance_repo = SeaOrmWalletBalanceRepository::new(&txn);
 
-        // Conditional settle applies once; a replayed event finds it already settled and skips the credit.
-        if !invoice_repo.settle(&invoice).await? {
-            let existing = invoice_repo
+        let settled = if invoice.id.is_nil() {
+            // New, already-settled incoming invoice (e.g. an on-chain deposit first seen confirmed).
+            if let Some(received_msat) = invoice.amount_received_msat {
+                balance_repo
+                    .credit(invoice.wallet_id, &invoice.currency, received_msat)
+                    .await?;
+            }
+            invoice_repo.insert(invoice).await?
+        } else if invoice_repo.settle(&invoice).await? {
+            // Pending invoice settled now: credit the receiver exactly once.
+            if let Some(received_msat) = invoice.amount_received_msat {
+                balance_repo
+                    .credit(invoice.wallet_id, &invoice.currency, received_msat)
+                    .await?;
+            }
+            invoice_repo
                 .find(invoice.id)
                 .await?
-                .ok_or_else(|| DataError::NotFound("Invoice not found.".to_string()))?;
-            txn.commit()
-                .await
-                .map_err(|e| DatabaseError::Transaction(e.to_string()))?;
-            return Ok(existing);
-        }
-
-        if let Some(received_msat) = invoice.amount_received_msat {
-            SeaOrmWalletBalanceRepository::new(&txn)
-                .credit(invoice.wallet_id, &invoice.currency, received_msat)
-                .await?;
-        }
-
-        let settled = invoice_repo
-            .find(invoice.id)
-            .await?
-            .ok_or_else(|| DataError::NotFound("Invoice not found.".to_string()))?;
+                .ok_or_else(|| DataError::NotFound("Invoice not found.".to_string()))?
+        } else {
+            // Already settled: idempotent replay, no credit.
+            invoice_repo
+                .find(invoice.id)
+                .await?
+                .ok_or_else(|| DataError::NotFound("Invoice not found.".to_string()))?
+        };
 
         txn.commit()
             .await
