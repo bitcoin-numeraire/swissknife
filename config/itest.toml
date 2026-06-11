@@ -1,0 +1,79 @@
+# Integration-test configuration overlay (loaded when RUN_MODE=itest, on top of
+# config/default.toml). It holds the *static* settings for the dockerized
+# regtest stack. The per-instance *dynamic* values are injected by the test
+# harness via SWISSKNIFE_* env vars, and only those:
+#
+#   SWISSKNIFE_WEB__ADDR              ephemeral 127.0.0.1:<port>
+#   SWISSKNIFE_DATABASE__URL          per-instance sqlite file / postgres db
+#   SWISSKNIFE_LN_PROVIDER            the matrix backend under test
+#   SWISSKNIFE_CLN_REST_CONFIG__RUNE  the generated rune (cln_rest only)
+#
+# Relative cert/macaroon paths resolve because the harness runs the binary with
+# its cwd set to the repository root.
+
+domain = "localhost"
+host = "http://localhost"
+invoice_expiry = "1h"
+dashboard_dir = ""
+
+[logging]
+format = "json"
+ansi = false
+level = "info"
+filter = "warn,swissknife=info,sea_orm_migration=warn"
+file = false
+
+[jwt]
+token_expiry = "1h"
+secret = "integration-test-secret"
+
+[database]
+max_connections = 20
+min_connections = 0
+connect_timeout = "10s"
+
+[lnd_grpc_config]
+endpoint = "https://127.0.0.1:10009"
+cert_path = "tests/itest/runtime/lnd/ca.cert"
+macaroon_path = "tests/itest/runtime/lnd/data/chain/bitcoin/regtest/admin.macaroon"
+fee_limit_msat = 25000
+payment_timeout = "10s"
+retry_delay = "1s"
+reorg_buffer_blocks = 2
+
+[lnd_rest_config]
+host = "127.0.0.1:8080"
+macaroon_path = "tests/itest/runtime/lnd/data/chain/bitcoin/regtest/admin.macaroon"
+ca_cert_path = "tests/itest/runtime/lnd/ca.cert"
+connect_timeout = "5s"
+timeout = "30s"
+connection_verbose = false
+accept_invalid_certs = true
+accept_invalid_hostnames = true
+fee_limit_msat = 25000
+payment_timeout = "10s"
+ws_min_reconnect_delay = "1s"
+ws_max_reconnect_delay = "5s"
+reorg_buffer_blocks = 2
+
+[cln_grpc_config]
+endpoint = "https://localhost:11002"
+certs_dir = "tests/itest/runtime/cln/regtest"
+maxfeepercent = 0.5
+payment_timeout = "10s"
+payment_exemptfee = 5000
+retry_delay = "1s"
+
+[cln_rest_config]
+endpoint = "https://127.0.0.1:3010"
+rune = "INJECTED_VIA_ENV"
+connect_timeout = "5s"
+timeout = "30s"
+connection_verbose = false
+accept_invalid_certs = true
+accept_invalid_hostnames = true
+maxfeepercent = 0.5
+payment_timeout = "10s"
+payment_exemptfee = 5000
+ws_min_reconnect_delay = "1s"
+ws_max_reconnect_delay = "5s"
