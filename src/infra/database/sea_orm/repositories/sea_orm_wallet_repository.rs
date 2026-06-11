@@ -134,9 +134,9 @@ where
             .await
             .map_err(|e| DatabaseError::FindMany(e.to_string()))?;
 
-        // Get payment aggregates grouped by wallet_id
+        // Money totals count settled payments only (pending is surfaced via reserved_msat below),
+        // matching get_balance; counts below still include every payment.
         let settled_payment_status = PaymentStatus::Settled.to_string();
-        let pending_payment_status = PaymentStatus::Pending.to_string();
 
         let payment_aggs = Payment::find()
             .filter(PaymentColumn::Currency.eq(currency.to_string()))
@@ -144,17 +144,15 @@ where
             .column(PaymentColumn::WalletId)
             .column_as(
                 Expr::cust(format!(
-                    "CAST(SUM(CASE WHEN payment.status IN ('{settled_status}', '{pending_status}') THEN payment.amount_msat ELSE 0 END) AS BIGINT)",
-                    settled_status = settled_payment_status,
-                    pending_status = pending_payment_status
+                    "CAST(SUM(CASE WHEN payment.status = '{settled_status}' THEN payment.amount_msat ELSE 0 END) AS BIGINT)",
+                    settled_status = settled_payment_status
                 )),
                 "sent_msat",
             )
             .column_as(
                 Expr::cust(format!(
-                    "CAST(SUM(CASE WHEN payment.status IN ('{settled_status}', '{pending_status}') THEN COALESCE(payment.fee_msat, 0) ELSE 0 END) AS BIGINT)",
-                    settled_status = settled_payment_status,
-                    pending_status = pending_payment_status
+                    "CAST(SUM(CASE WHEN payment.status = '{settled_status}' THEN COALESCE(payment.fee_msat, 0) ELSE 0 END) AS BIGINT)",
+                    settled_status = settled_payment_status
                 )),
                 "fees_paid_msat",
             )
@@ -166,21 +164,14 @@ where
             .await
             .map_err(|e| DatabaseError::FindMany(e.to_string()))?;
 
-        // Materialized balance aggregates grouped by wallet_id
-        let balance_aggs = WalletBalance::find()
+        // One row per wallet for this currency (PK is (wallet_id, currency)); no aggregation needed.
+        let balance_rows = WalletBalance::find()
             .filter(WalletBalanceColumn::Currency.eq(currency.to_string()))
             .select_only()
             .column(WalletBalanceColumn::WalletId)
-            .column_as(
-                Expr::cust("CAST(SUM(wallet_balance.available_amount) AS BIGINT)"),
-                "available_msat",
-            )
-            .column_as(
-                Expr::cust("CAST(SUM(wallet_balance.reserved_amount) AS BIGINT)"),
-                "reserved_msat",
-            )
-            .group_by(WalletBalanceColumn::WalletId)
-            .into_tuple::<(Uuid, Option<i64>, Option<i64>)>()
+            .column(WalletBalanceColumn::AvailableAmount)
+            .column(WalletBalanceColumn::ReservedAmount)
+            .into_tuple::<(Uuid, i64, i64)>()
             .all(self.db.connection())
             .await
             .map_err(|e| DatabaseError::FindMany(e.to_string()))?;
@@ -194,7 +185,7 @@ where
             .into_iter()
             .map(|(id, sent, fees, count, contacts)| (id, (sent, fees, count, contacts)))
             .collect();
-        let balance_map: std::collections::HashMap<_, _> = balance_aggs
+        let balance_map: std::collections::HashMap<_, _> = balance_rows
             .into_iter()
             .map(|(id, available, reserved)| (id, (available, reserved)))
             .collect();
@@ -210,10 +201,8 @@ where
                     .get(&wallet_id)
                     .map(|(s, f, np, nc)| (*s, *f, *np, *nc))
                     .unwrap_or((None, None, 0, 0));
-                let (available_msat, reserved_msat) = balance_map
-                    .get(&wallet_id)
-                    .map(|(a, r)| (*a, *r))
-                    .unwrap_or((None, None));
+                let (available_msat, reserved_msat) =
+                    balance_map.get(&wallet_id).map(|(a, r)| (*a, *r)).unwrap_or((0, 0));
 
                 WalletOverview {
                     id: wallet_model.id,
@@ -222,8 +211,8 @@ where
                         received_msat: received_msat.unwrap_or(0) as u64,
                         sent_msat: sent_msat.unwrap_or(0) as u64,
                         fees_paid_msat: fees_paid_msat.unwrap_or(0) as u64,
-                        reserved_msat: reserved_msat.unwrap_or(0) as u64,
-                        available_msat: available_msat.unwrap_or(0),
+                        reserved_msat: reserved_msat as u64,
+                        available_msat,
                     },
                     n_payments: n_payments as u32,
                     n_invoices: n_invoices as u32,
@@ -279,30 +268,25 @@ where
             .map_err(|e| DatabaseError::FindOne(e.to_string()))?
             .unwrap_or((None, None));
 
+        // At most one row per wallet for this currency (PK is (wallet_id, currency)).
         let (available_msat, reserved_msat) = WalletBalance::find()
             .filter(WalletBalanceColumn::WalletId.eq(id))
             .filter(WalletBalanceColumn::Currency.eq(currency.to_string()))
             .select_only()
-            .column_as(
-                Expr::cust("CAST(SUM(wallet_balance.available_amount) AS BIGINT)"),
-                "available_msat",
-            )
-            .column_as(
-                Expr::cust("CAST(SUM(wallet_balance.reserved_amount) AS BIGINT)"),
-                "reserved_msat",
-            )
-            .into_tuple::<(Option<i64>, Option<i64>)>()
+            .column(WalletBalanceColumn::AvailableAmount)
+            .column(WalletBalanceColumn::ReservedAmount)
+            .into_tuple::<(i64, i64)>()
             .one(self.db.connection())
             .await
             .map_err(|e| DatabaseError::FindOne(e.to_string()))?
-            .unwrap_or((None, None));
+            .unwrap_or((0, 0));
 
         Ok(Balance {
             received_msat: received.unwrap_or(0) as u64,
             sent_msat: sent_msat.unwrap_or(0) as u64,
             fees_paid_msat: fees_paid_msat.unwrap_or(0) as u64,
-            reserved_msat: reserved_msat.unwrap_or(0) as u64,
-            available_msat: available_msat.unwrap_or(0),
+            reserved_msat: reserved_msat as u64,
+            available_msat,
         })
     }
 
