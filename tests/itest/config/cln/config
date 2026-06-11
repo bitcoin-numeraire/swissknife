@@ -1,0 +1,18 @@
+# Core Lightning — integration regtest node.
+# Mounted read-only at /etc/cln/config; node data, gRPC certs and the rune live
+# in the (gitignored) runtime volume under the lightning-dir (/root/.lightning).
+# The network is set via the LIGHTNINGD_NETWORK env var in docker-compose.
+alias=swissknife-itest-cln
+log-level=info
+bitcoin-rpcconnect=bitcoind
+bitcoin-rpcport=18443
+bitcoin-rpcuser=regtest
+bitcoin-rpcpassword=regtest
+bitcoin-retry-timeout=120
+bind-addr=0.0.0.0:9736
+grpc-host=0.0.0.0
+grpc-port=11002
+clnrest-host=0.0.0.0
+clnrest-port=3010
+clnrest-protocol=https
+developer

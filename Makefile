@@ -4,8 +4,16 @@ PGADMIN_SERVICE := pgadmin
 SWISSKNIFE_SERVICE := swissknife
 SWISSKNIFE_SERVER_SERVICE := swissknife-server
 IMAGE_NAME := swissknife:latest
+ITEST_PROJECT ?= swissknife-itest
+ITEST_COMPOSE = docker compose -p $(ITEST_PROJECT) -f tests/itest/docker-compose.yml
+ITEST_DATABASE ?= sqlite
+ITEST_PROVIDER ?= lnd_grpc
+# Per-instance dynamics read by the harness; everything static lives in config/itest.toml.
+ITEST_ENV = SWISSKNIFE_ITEST_COMPOSE_PROJECT=$(ITEST_PROJECT) \
+	SWISSKNIFE_ITEST_DATABASE=$(ITEST_DATABASE) \
+	SWISSKNIFE_ITEST_PROVIDER=$(ITEST_PROVIDER)
 
-.PHONY: watch up up-swissknife up-server up-postgres up-pgadmin shutdown down generate-certs build build-docker build-docker-server build-docker-dashboard run-docker lint fmt fmt-fix test test-unit test-integration coverage coverage-html coverage-lcov check deps-upgrade deps-outdated install-tools generate-models new-migration run-migrations fresh-migrations
+.PHONY: watch up up-swissknife up-server up-postgres up-pgadmin shutdown down generate-certs build build-docker build-docker-server build-docker-dashboard run-docker lint fmt fmt-fix test test-unit test-integration itest-up itest-down itest-shutdown itest-logs coverage coverage-html coverage-lcov clean check deps-upgrade deps-outdated install-tools generate-models new-migration run-migrations fresh-migrations
 
 watch:
 	@cargo watch -x run
@@ -73,7 +81,7 @@ deps-outdated:
 	@cargo outdated
 
 lint:
-	@cargo clippy --workspace --all-targets --no-deps -- -D warnings
+	@cargo clippy --workspace --all-targets --features itest --no-deps -- -D warnings
 
 fmt:
 	@cargo fmt --all -- --check
@@ -82,7 +90,7 @@ fmt-fix:
 	@cargo fmt --all
 
 build:
-	@cargo build --workspace --all-targets
+	@cargo build --workspace --all-targets --features itest
 
 test:
 	@cargo test --workspace --all-targets
@@ -90,17 +98,30 @@ test:
 test-unit:
 	@cargo test --workspace --bins
 
-test-integration:
-	@if find tests -mindepth 1 -name '*.rs' 2>/dev/null | grep -q .; then \
-		cargo test --workspace --tests; \
-	else \
-		echo "No integration tests found under tests/"; \
-	fi
+# Run the integration suite for one (database, provider) cell. Brings
+# the regtest stack up first (idempotent); override the cell via
+# ITEST_DATABASE / ITEST_PROVIDER (e.g. `make test-integration ITEST_PROVIDER=cln_grpc`).
+test-integration: itest-up
+	@$(ITEST_ENV) cargo test --features itest --test api
 
-# Code coverage via cargo-llvm-cov (install with `make install-tools`).
-# Coverage runs the unit-test suite (`--bins`) and reports line/region/function
-# coverage. Use `coverage-html` for a browsable report and `coverage-lcov` to
-# emit an lcov.info file for CI or editor integrations.
+# Bring up the regtest dependency stack (bitcoind + LND + CLN + Postgres).
+itest-up:
+	@SWISSKNIFE_ITEST_COMPOSE_PROJECT=$(ITEST_PROJECT) tests/itest/scripts/bootstrap.sh
+
+# Stop the dependency stack, keeping volumes.
+itest-down:
+	@$(ITEST_COMPOSE) down
+
+# Stop the dependency stack and delete all integration runtime/artifacts.
+itest-shutdown:
+	@$(ITEST_COMPOSE) down -v
+	@rm -rf tests/itest/runtime target/itest lcov.info
+
+# Collect dependency logs into target/itest/dependency-logs.
+itest-logs:
+	@SWISSKNIFE_ITEST_COMPOSE_PROJECT=$(ITEST_PROJECT) tests/itest/scripts/collect-logs.sh target/itest/dependency-logs
+
+# Unit-test coverage via cargo-llvm-cov (install with `make install-tools`).
 coverage:
 	@cargo llvm-cov --workspace --bins
 
@@ -108,8 +129,20 @@ coverage-html:
 	@cargo llvm-cov --workspace --bins --html
 	@echo "HTML coverage report generated at target/llvm-cov/html/index.html"
 
-coverage-lcov:
-	@cargo llvm-cov --workspace --bins --lcov --output-path lcov.info
+# Combined unit + integration coverage -> lcov.info. Requires the regtest stack
+# (brought up here); merges the unit tests with the integration suite, including
+# the spawned binary's coverage.
+coverage-lcov: itest-up
+	@cargo llvm-cov clean --workspace
+	@cargo llvm-cov --no-report --workspace --bins
+	@$(ITEST_ENV) cargo llvm-cov --no-report --features itest --test api
+	@cargo llvm-cov report --lcov --output-path lcov.info
+
+# Remove build artifacts, coverage output, and integration runtime/artifacts.
+clean:
+	@cargo clean
+	@rm -f lcov.info
+	@find . -name '*.profraw' -delete
 
 check: fmt lint build test
 

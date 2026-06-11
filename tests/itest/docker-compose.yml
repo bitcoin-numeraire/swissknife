@@ -1,0 +1,77 @@
+name: swissknife-itest
+
+# Dependency stack for the integration tests. Each daemon is
+# configured from a checked-in file under ./config/<daemon>/ (mounted
+# read-only), not inline flags; ./runtime/ holds the generated, gitignored
+# state (chain data, certs, macaroons, runes) and is populated by
+# scripts/bootstrap.sh.
+
+services:
+  postgres:
+    image: postgres:18.1
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./runtime/postgres:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+  bitcoind:
+    image: bitcoin/bitcoin:31.0
+    command: ["-conf=/etc/bitcoin/bitcoin.conf"]
+    volumes:
+      - ./config/bitcoin/bitcoin.conf:/etc/bitcoin/bitcoin.conf:ro
+      - ./runtime/bitcoin:/home/bitcoin/.bitcoin
+    ports:
+      - "18443:18443"
+      - "18444:18444"
+      - "28332:28332"
+      - "28333:28333"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "bitcoin-cli -regtest -rpcuser=regtest -rpcpassword=regtest getblockchaininfo >/dev/null 2>&1",
+        ]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+  lnd:
+    image: lightninglabs/lnd:v0.21.0-beta
+    depends_on:
+      bitcoind:
+        condition: service_healthy
+    command: ["--configfile=/etc/lnd/lnd.conf"]
+    volumes:
+      - ./config/lnd/lnd.conf:/etc/lnd/lnd.conf:ro
+      - ./runtime/lnd:/root/.lnd
+    ports:
+      - "10009:10009"
+      - "8080:8080"
+      - "9735:9735"
+
+  cln:
+    image: elementsproject/lightningd:v26.06.1
+    depends_on:
+      bitcoind:
+        condition: service_healthy
+    # The image entrypoint injects --network from this var ahead of --conf, and
+    # the CLI flag wins over the config file, so the network must be set here.
+    environment:
+      LIGHTNINGD_NETWORK: regtest
+    command: ["--conf=/etc/cln/config"]
+    volumes:
+      - ./config/cln/config:/etc/cln/config:ro
+      - ./runtime/cln:/root/.lightning
+    ports:
+      - "11002:11002"
+      - "3010:3010"
+      - "9736:9736"
