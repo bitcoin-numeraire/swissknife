@@ -8,7 +8,7 @@ use uuid::Uuid;
 use super::SeaOrmConnection;
 
 use crate::{
-    application::errors::DatabaseError,
+    application::{entities::Currency, errors::DatabaseError},
     domains::{
         payment::PaymentStatus,
         wallet::{Balance, Contact, Wallet, WalletFilter, WalletOverview, WalletRepository},
@@ -39,7 +39,7 @@ impl<C> WalletRepository for SeaOrmWalletRepository<C>
 where
     C: SeaOrmConnection,
 {
-    async fn find(&self, id: Uuid) -> Result<Option<Wallet>, DatabaseError> {
+    async fn find(&self, id: Uuid, currency: &Currency) -> Result<Option<Wallet>, DatabaseError> {
         let model_opt = WalletEntity::find_by_id(id)
             .one(self.db.connection())
             .await
@@ -47,7 +47,7 @@ where
 
         match model_opt {
             Some(model) => {
-                let balance = self.get_balance(id).await?;
+                let balance = self.get_balance(id, currency).await?;
                 let payments_with_output = Payment::find()
                     .filter(PaymentColumn::WalletId.eq(id))
                     .all(self.db.connection())
@@ -110,7 +110,7 @@ where
         Ok(models.into_iter().map(Into::into).collect())
     }
 
-    async fn find_many_overview(&self) -> Result<Vec<WalletOverview>, DatabaseError> {
+    async fn find_many_overview(&self, currency: &Currency) -> Result<Vec<WalletOverview>, DatabaseError> {
         // Get all wallets with their ln_address (1-to-1 relation)
         let wallets_with_ln = WalletEntity::find()
             .find_also_related(LnAddress)
@@ -120,6 +120,7 @@ where
 
         // Get invoice aggregates grouped by wallet_id
         let invoice_aggs = Invoice::find()
+            .filter(InvoiceColumn::Currency.eq(currency.to_string()))
             .select_only()
             .column(InvoiceColumn::WalletId)
             .column_as(
@@ -138,6 +139,7 @@ where
         let pending_payment_status = PaymentStatus::Pending.to_string();
 
         let payment_aggs = Payment::find()
+            .filter(PaymentColumn::Currency.eq(currency.to_string()))
             .select_only()
             .column(PaymentColumn::WalletId)
             .column_as(
@@ -166,6 +168,7 @@ where
 
         // Materialized balance aggregates grouped by wallet_id
         let balance_aggs = WalletBalance::find()
+            .filter(WalletBalanceColumn::Currency.eq(currency.to_string()))
             .select_only()
             .column(WalletBalanceColumn::WalletId)
             .column_as(
@@ -248,9 +251,10 @@ where
         Ok(model.into())
     }
 
-    async fn get_balance(&self, id: Uuid) -> Result<Balance, DatabaseError> {
+    async fn get_balance(&self, id: Uuid, currency: &Currency) -> Result<Balance, DatabaseError> {
         let received = Invoice::find()
             .filter(InvoiceColumn::WalletId.eq(id))
+            .filter(InvoiceColumn::Currency.eq(currency.to_string()))
             .select_only()
             .column_as(
                 Expr::cust("CAST(SUM(invoice.amount_received_msat) AS BIGINT)"),
@@ -264,6 +268,7 @@ where
 
         let (sent_msat, fees_paid_msat) = Payment::find()
             .filter(PaymentColumn::WalletId.eq(id))
+            .filter(PaymentColumn::Currency.eq(currency.to_string()))
             .filter(PaymentColumn::Status.eq(PaymentStatus::Settled.to_string()))
             .select_only()
             .column_as(Expr::cust("CAST(SUM(payment.amount_msat) AS BIGINT)"), "sent_msat")
@@ -276,6 +281,7 @@ where
 
         let (available_msat, reserved_msat) = WalletBalance::find()
             .filter(WalletBalanceColumn::WalletId.eq(id))
+            .filter(WalletBalanceColumn::Currency.eq(currency.to_string()))
             .select_only()
             .column_as(
                 Expr::cust("CAST(SUM(wallet_balance.available_amount) AS BIGINT)"),

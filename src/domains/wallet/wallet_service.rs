@@ -1,5 +1,5 @@
 use crate::application::{
-    entities::AppStore,
+    entities::{AppStore, Currency},
     errors::{ApplicationError, DataError},
 };
 use async_trait::async_trait;
@@ -11,11 +11,12 @@ use super::{Balance, Contact, Wallet, WalletFilter, WalletOverview, WalletUseCas
 
 pub struct WalletService {
     store: AppStore,
+    currency: Currency,
 }
 
 impl WalletService {
-    pub fn new(store: AppStore) -> Self {
-        WalletService { store }
+    pub fn new(store: AppStore, currency: Currency) -> Self {
+        WalletService { store, currency }
     }
 }
 
@@ -54,7 +55,7 @@ impl WalletUseCases for WalletService {
         let wallet = self
             .store
             .wallet
-            .find(id)
+            .find(id, &self.currency)
             .await?
             .ok_or_else(|| DataError::NotFound("Wallet not found.".to_string()))?;
 
@@ -74,7 +75,7 @@ impl WalletUseCases for WalletService {
     async fn list_overviews(&self) -> Result<Vec<WalletOverview>, ApplicationError> {
         trace!("Listing wallet overviews");
 
-        let overviews = self.store.wallet.find_many_overview().await?;
+        let overviews = self.store.wallet.find_many_overview(&self.currency).await?;
 
         debug!("Wallet overviews listed successfully");
         Ok(overviews)
@@ -83,7 +84,7 @@ impl WalletUseCases for WalletService {
     async fn get_balance(&self, id: Uuid) -> Result<Balance, ApplicationError> {
         trace!(%id, "Fetching balance");
 
-        let balance = self.store.wallet.get_balance(id).await?;
+        let balance = self.store.wallet.get_balance(id, &self.currency).await?;
 
         debug!(%id, "Balance fetched successfully");
         Ok(balance)
@@ -164,7 +165,7 @@ mod tests {
                     .times(1)
                     .returning(|user_id| Ok(wallet_fixture(Uuid::new_v4(), user_id)));
 
-                let service = WalletService::new(store.build());
+                let service = WalletService::new(store.build(), Currency::Regtest);
 
                 let wallet = service.register("alice".to_string()).await.unwrap();
 
@@ -177,7 +178,7 @@ mod tests {
 
             #[tokio::test]
             async fn rejects_empty_user_id() {
-                let service = WalletService::new(MockAppStoreBuilder::new().build());
+                let service = WalletService::new(MockAppStoreBuilder::new().build(), Currency::Regtest);
 
                 let err = service.register(String::new()).await.unwrap_err();
 
@@ -186,7 +187,7 @@ mod tests {
 
             #[tokio::test]
             async fn rejects_too_long_user_id() {
-                let service = WalletService::new(MockAppStoreBuilder::new().build());
+                let service = WalletService::new(MockAppStoreBuilder::new().build(), Currency::Regtest);
 
                 let err = service.register("a".repeat(MAX_USER_LENGTH + 1)).await.unwrap_err();
 
@@ -199,7 +200,7 @@ mod tests {
 
             #[tokio::test]
             async fn rejects_disallowed_characters() {
-                let service = WalletService::new(MockAppStoreBuilder::new().build());
+                let service = WalletService::new(MockAppStoreBuilder::new().build(), Currency::Regtest);
 
                 let err = service.register("alice bob".to_string()).await.unwrap_err();
 
@@ -220,7 +221,7 @@ mod tests {
                     .times(1)
                     .returning(|user_id| Ok(Some(wallet_fixture(Uuid::new_v4(), user_id))));
 
-                let service = WalletService::new(store.build());
+                let service = WalletService::new(store.build(), Currency::Regtest);
 
                 let err = service.register("alice".to_string()).await.unwrap_err();
 
@@ -243,11 +244,11 @@ mod tests {
                 store
                     .wallet
                     .expect_find()
-                    .withf(move |queried| *queried == id)
+                    .withf(move |queried, _| *queried == id)
                     .times(1)
-                    .returning(|id| Ok(Some(wallet_fixture(id, "alice"))));
+                    .returning(|id, _| Ok(Some(wallet_fixture(id, "alice"))));
 
-                let service = WalletService::new(store.build());
+                let service = WalletService::new(store.build(), Currency::Regtest);
 
                 assert_eq!(service.get(id).await.unwrap().id, id);
             }
@@ -259,9 +260,9 @@ mod tests {
             #[tokio::test]
             async fn returns_not_found() {
                 let mut store = MockAppStoreBuilder::new();
-                store.wallet.expect_find().times(1).returning(|_| Ok(None));
+                store.wallet.expect_find().times(1).returning(|_, _| Ok(None));
 
-                let service = WalletService::new(store.build());
+                let service = WalletService::new(store.build(), Currency::Regtest);
 
                 let err = service.get(Uuid::new_v4()).await.unwrap_err();
 
@@ -281,16 +282,16 @@ mod tests {
             store
                 .wallet
                 .expect_get_balance()
-                .withf(move |queried| *queried == id)
+                .withf(move |queried, _| *queried == id)
                 .times(1)
-                .returning(|_| {
+                .returning(|_, _| {
                     Ok(Balance {
                         available_msat: 5_000,
                         ..Default::default()
                     })
                 });
 
-            let service = WalletService::new(store.build());
+            let service = WalletService::new(store.build(), Currency::Regtest);
 
             assert_eq!(service.get_balance(id).await.unwrap().available_msat, 5_000);
         }
@@ -302,9 +303,9 @@ mod tests {
                 .wallet
                 .expect_get_balance()
                 .times(1)
-                .returning(|_| Err(DatabaseError::FindOne("boom".to_string())));
+                .returning(|_, _| Err(DatabaseError::FindOne("boom".to_string())));
 
-            let service = WalletService::new(store.build());
+            let service = WalletService::new(store.build(), Currency::Regtest);
 
             let err = service.get_balance(Uuid::new_v4()).await.unwrap_err();
 
@@ -322,9 +323,9 @@ mod tests {
                 .wallet
                 .expect_find_many_overview()
                 .times(1)
-                .returning(|| Ok(vec![WalletOverview::default()]));
+                .returning(|_| Ok(vec![WalletOverview::default()]));
 
-            let service = WalletService::new(store.build());
+            let service = WalletService::new(store.build(), Currency::Regtest);
 
             assert_eq!(service.list_overviews().await.unwrap().len(), 1);
         }
@@ -342,7 +343,7 @@ mod tests {
                 .times(1)
                 .returning(|_| Ok(vec![Contact::default()]));
 
-            let service = WalletService::new(store.build());
+            let service = WalletService::new(store.build(), Currency::Regtest);
 
             assert_eq!(service.list_contacts(Uuid::new_v4()).await.unwrap().len(), 1);
         }
@@ -359,7 +360,7 @@ mod tests {
                 let mut store = MockAppStoreBuilder::new();
                 store.wallet.expect_delete_many().times(1).returning(|_| Ok(1));
 
-                let service = WalletService::new(store.build());
+                let service = WalletService::new(store.build(), Currency::Regtest);
 
                 assert!(service.delete(Uuid::new_v4()).await.is_ok());
             }
@@ -373,7 +374,7 @@ mod tests {
                 let mut store = MockAppStoreBuilder::new();
                 store.wallet.expect_delete_many().times(1).returning(|_| Ok(0));
 
-                let service = WalletService::new(store.build());
+                let service = WalletService::new(store.build(), Currency::Regtest);
 
                 let err = service.delete(Uuid::new_v4()).await.unwrap_err();
 

@@ -25,6 +25,7 @@ impl From<Bolt11Invoice> for Invoice {
 
         Invoice {
             ledger: Ledger::Lightning,
+            currency: val.currency().into(),
             amount_msat: val.amount_milli_satoshis(),
             timestamp,
             description: match val.description() {
