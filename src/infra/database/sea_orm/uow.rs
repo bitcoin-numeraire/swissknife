@@ -129,8 +129,13 @@ impl PaymentUnitOfWork for SeaOrmPaymentUnitOfWork {
             .map_err(|e| DatabaseError::Transaction(e.to_string()))?;
 
         let balance_repo = SeaOrmWalletBalanceRepository::new(&txn);
+        let invoice_repo = SeaOrmInvoiceRepository::new(&txn);
 
-        // Debit the sender first so an underfunded sender fails before the receiver is credited.
+        let existing_invoice = !invoice.id.is_nil();
+        if existing_invoice && !invoice_repo.settle(&invoice).await? {
+            return Err(DataError::Conflict("Invoice has already been paid.".to_string()).into());
+        }
+
         let debit_msat = payment.amount_msat.saturating_add(payment.fee_msat.unwrap_or_default());
         if debit_msat > 0
             && !balance_repo
@@ -142,17 +147,19 @@ impl PaymentUnitOfWork for SeaOrmPaymentUnitOfWork {
         payment.reserved_amount = 0;
         let payment = SeaOrmPaymentRepository::new(&txn).insert(payment).await?;
 
-        if let Some(received_msat) = invoice.amount_received_msat {
-            balance_repo
-                .credit(invoice.wallet_id, &invoice.currency, received_msat)
-                .await?;
-        }
-
-        let invoice_repo = SeaOrmInvoiceRepository::new(&txn);
         if invoice.id.is_nil() {
+            if let Some(received_msat) = invoice.amount_received_msat {
+                balance_repo
+                    .credit(invoice.wallet_id, &invoice.currency, received_msat)
+                    .await?;
+            }
             invoice_repo.insert(invoice).await?;
         } else {
-            invoice_repo.update(invoice).await?;
+            if let Some(received_msat) = invoice.amount_received_msat {
+                balance_repo
+                    .credit(invoice.wallet_id, &invoice.currency, received_msat)
+                    .await?;
+            }
         }
 
         txn.commit()
