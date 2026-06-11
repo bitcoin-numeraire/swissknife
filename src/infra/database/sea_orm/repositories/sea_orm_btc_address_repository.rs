@@ -6,6 +6,8 @@ use sea_orm::{
 };
 use uuid::Uuid;
 
+use super::SeaOrmConnection;
+
 use crate::{
     application::errors::DatabaseError,
     domains::bitcoin::{BtcAddress, BtcAddressFilter, BtcAddressRepository, BtcAddressType},
@@ -16,21 +18,24 @@ use crate::{
 };
 
 #[derive(Clone)]
-pub struct SeaOrmBitcoinAddressRepository {
-    pub db: DatabaseConnection,
+pub struct SeaOrmBitcoinAddressRepository<C = DatabaseConnection> {
+    db: C,
 }
 
-impl SeaOrmBitcoinAddressRepository {
-    pub fn new(db: DatabaseConnection) -> Self {
+impl<C> SeaOrmBitcoinAddressRepository<C> {
+    pub fn new(db: C) -> Self {
         Self { db }
     }
 }
 
 #[async_trait]
-impl BtcAddressRepository for SeaOrmBitcoinAddressRepository {
+impl<C> BtcAddressRepository for SeaOrmBitcoinAddressRepository<C>
+where
+    C: SeaOrmConnection,
+{
     async fn find(&self, id: Uuid) -> Result<Option<BtcAddress>, DatabaseError> {
         let model = BtcAddressEntity::find_by_id(id)
-            .one(&self.db)
+            .one(self.db.connection())
             .await
             .map_err(|e| DatabaseError::FindOne(e.to_string()))?;
 
@@ -47,7 +52,7 @@ impl BtcAddressRepository for SeaOrmBitcoinAddressRepository {
             .filter(Column::Used.eq(false))
             .filter(Column::AddressType.eq(address_type.to_string()))
             .order_by_desc(Column::CreatedAt)
-            .one(&self.db)
+            .one(self.db.connection())
             .await
             .map_err(|e| DatabaseError::FindOne(e.to_string()))?;
 
@@ -57,7 +62,7 @@ impl BtcAddressRepository for SeaOrmBitcoinAddressRepository {
     async fn find_by_address(&self, address: &str) -> Result<Option<BtcAddress>, DatabaseError> {
         let model = BtcAddressEntity::find()
             .filter(Column::Address.eq(address))
-            .one(&self.db)
+            .one(self.db.connection())
             .await
             .map_err(|e| DatabaseError::FindOne(e.to_string()))?;
 
@@ -76,7 +81,7 @@ impl BtcAddressRepository for SeaOrmBitcoinAddressRepository {
             .order_by(Column::CreatedAt, filter.order_direction.into())
             .offset(filter.offset)
             .limit(filter.limit)
-            .all(&self.db)
+            .all(self.db.connection())
             .await
             .map_err(|e| DatabaseError::FindMany(e.to_string()))?;
 
@@ -99,7 +104,7 @@ impl BtcAddressRepository for SeaOrmBitcoinAddressRepository {
         };
 
         let model = model
-            .insert(&self.db)
+            .insert(self.db.connection())
             .await
             .map_err(|e| DatabaseError::Insert(e.to_string()))?;
 
@@ -115,7 +120,7 @@ impl BtcAddressRepository for SeaOrmBitcoinAddressRepository {
         };
 
         active_model
-            .update(&self.db)
+            .update(self.db.connection())
             .await
             .map_err(|e| DatabaseError::Update(e.to_string()))?;
 
@@ -127,7 +132,7 @@ impl BtcAddressRepository for SeaOrmBitcoinAddressRepository {
             .apply_if(filter.wallet_id, |q, id| q.filter(Column::WalletId.eq(id)))
             .apply_if(filter.ids, |q, ids| q.filter(Column::Id.is_in(ids)))
             .apply_if(filter.address, |q, address| q.filter(Column::Address.eq(address)))
-            .exec(&self.db)
+            .exec(self.db.connection())
             .await
             .map_err(|e| DatabaseError::Delete(e.to_string()))?;
 
