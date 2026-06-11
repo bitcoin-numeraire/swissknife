@@ -120,6 +120,7 @@ impl EventUseCases for EventService {
 
         let address = event.address;
         let status = Self::output_status(event.block_height);
+        let is_confirmed = status == BtcOutputStatus::Confirmed;
         let output = BtcOutput {
             outpoint: outpoint.clone(),
             txid: event.txid.clone(),
@@ -132,68 +133,33 @@ impl EventUseCases for EventService {
         };
 
         let Some(btc_address) = self.store.btc_address.find_by_address(&address).await? else {
-            trace!(%address, outpoint = outpoint.clone(),
-                "Ignoring bitcoin output not matching any known wallet address");
+            trace!(%address, %outpoint, "Ignoring bitcoin output not matching any known wallet address");
             return Ok(false);
         };
 
-        let stored_output = self.store.btc_output.upsert(output.clone()).await?;
+        let amount_msat = event.amount_sat.saturating_mul(1000);
+        let now = Utc::now();
+        let deposit_invoice = Invoice {
+            wallet_id: btc_address.wallet_id,
+            description: Some(DEFAULT_DEPOSIT_DESCRIPTION.to_string()),
+            amount_msat: Some(amount_msat),
+            amount_received_msat: is_confirmed.then_some(amount_msat),
+            timestamp: now,
+            ledger: Ledger::Onchain,
+            currency,
+            payment_time: is_confirmed.then_some(now),
+            ..Default::default()
+        };
 
-        if !btc_address.used {
-            self.store.btc_address.mark_used(btc_address.id).await?;
-        }
+        // Output upsert, address mark-used, and invoice settle/insert (+ balance credit when
+        // confirmed) are applied atomically; idempotent if the event is replayed.
+        let invoice = self
+            .store
+            .event_uow
+            .project_onchain_deposit(output, btc_address, deposit_invoice)
+            .await?;
 
-        let existing_invoice = self.store.invoice.find_by_btc_output_id(stored_output.id).await?;
-        let status: InvoiceStatus = stored_output.status.into();
-
-        let is_confirmed = stored_output.status == BtcOutputStatus::Confirmed;
-
-        if let Some(mut invoice) = existing_invoice {
-            invoice.status = status;
-            invoice.btc_output_id = Some(stored_output.id);
-            invoice.bitcoin_output = Some(stored_output.clone());
-
-            if is_confirmed {
-                invoice.payment_time = Some(Utc::now());
-                invoice.amount_received_msat = Some(stored_output.amount_sat.saturating_mul(1000));
-                // Settle and credit the receiver atomically; idempotent if the event is replayed.
-                self.store.event_uow.settle_incoming_invoice(invoice.clone()).await?;
-            } else {
-                self.store.invoice.update(invoice.clone()).await?;
-            }
-
-            info!(invoice_id = %invoice.id, outpoint = outpoint.clone(), address = %btc_address.address,
-                "Existing onchain deposit processed");
-        } else {
-            let amount_msat = stored_output.amount_sat.saturating_mul(1000);
-            let payment_time = if is_confirmed { Some(Utc::now()) } else { None };
-            let amount_received_msat = if is_confirmed { Some(amount_msat) } else { None };
-
-            let invoice = Invoice {
-                wallet_id: btc_address.wallet_id,
-                description: Some(DEFAULT_DEPOSIT_DESCRIPTION.to_string()),
-                amount_msat: Some(amount_msat),
-                amount_received_msat,
-                timestamp: Utc::now(),
-                ledger: Ledger::Onchain,
-                currency,
-                payment_time,
-                btc_output_id: Some(stored_output.id),
-                bitcoin_output: Some(stored_output.clone()),
-                ..Default::default()
-            };
-
-            let stored_invoice = if is_confirmed {
-                // Insert the settled deposit and credit the receiver atomically.
-                self.store.event_uow.settle_incoming_invoice(invoice.clone()).await?
-            } else {
-                self.store.invoice.insert(invoice.clone()).await?
-            };
-
-            info!(invoice_id = %stored_invoice.id, outpoint = %outpoint.clone(), address = %btc_address.address,
-                "New onchain deposit processed");
-        }
-
+        info!(invoice_id = %invoice.id, %outpoint, %address, "Onchain deposit processed");
         Ok(true)
     }
 
@@ -476,38 +442,23 @@ mod tests {
             use super::*;
 
             #[tokio::test]
-            async fn creates_a_settled_deposit_invoice() {
+            async fn projects_a_settled_deposit_invoice() {
                 let mut store = MockAppStoreBuilder::new();
                 store
                     .btc_address
                     .expect_find_by_address()
                     .times(1)
                     .returning(|_| Ok(Some(btc_address(false))));
-                store.btc_output.expect_upsert().times(1).returning(|output| {
-                    Ok(BtcOutput {
-                        id: Uuid::new_v4(),
-                        status: BtcOutputStatus::Confirmed,
-                        amount_sat: 1_000,
-                        ..output
-                    })
-                });
-                // Address was unused, so it must be flagged as used.
-                store.btc_address.expect_mark_used().times(1).returning(|_| Ok(()));
-                store
-                    .invoice
-                    .expect_find_by_btc_output_id()
-                    .times(1)
-                    .returning(|_| Ok(None));
                 store
                     .event_uow
-                    .expect_settle_incoming_invoice()
-                    .withf(|invoice| {
+                    .expect_project_onchain_deposit()
+                    .withf(|_output, _address, invoice| {
                         invoice.ledger == Ledger::Onchain
                             && invoice.amount_received_msat == Some(1_000_000)
                             && invoice.payment_time.is_some()
                     })
                     .times(1)
-                    .returning(Ok);
+                    .returning(|_, _, invoice| Ok(invoice));
 
                 let event = OnchainDepositEvent {
                     txid: "txid".to_string(),
@@ -515,6 +466,42 @@ mod tests {
                     address: "bc1qknown".to_string(),
                     amount_sat: 1_000,
                     block_height: Some(800_000),
+                };
+
+                let processed = service(store).onchain_deposit(event, Currency::Bitcoin).await.unwrap();
+
+                assert!(processed);
+            }
+        }
+
+        mod when_address_is_known_and_unconfirmed {
+            use super::*;
+
+            #[tokio::test]
+            async fn projects_a_pending_deposit_invoice() {
+                let mut store = MockAppStoreBuilder::new();
+                store
+                    .btc_address
+                    .expect_find_by_address()
+                    .times(1)
+                    .returning(|_| Ok(Some(btc_address(false))));
+                store
+                    .event_uow
+                    .expect_project_onchain_deposit()
+                    .withf(|_output, _address, invoice| {
+                        invoice.ledger == Ledger::Onchain
+                            && invoice.amount_received_msat.is_none()
+                            && invoice.payment_time.is_none()
+                    })
+                    .times(1)
+                    .returning(|_, _, invoice| Ok(invoice));
+
+                let event = OnchainDepositEvent {
+                    txid: "txid".to_string(),
+                    output_index: 0,
+                    address: "bc1qknown".to_string(),
+                    amount_sat: 1_000,
+                    block_height: None,
                 };
 
                 let processed = service(store).onchain_deposit(event, Currency::Bitcoin).await.unwrap();

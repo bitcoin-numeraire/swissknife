@@ -6,6 +6,8 @@ use sea_orm::{
 };
 use uuid::Uuid;
 
+use super::SeaOrmConnection;
+
 use crate::{
     application::errors::DatabaseError,
     domains::bitcoin::{BtcOutput, BtcOutputRepository},
@@ -16,22 +18,25 @@ use crate::{
 };
 
 #[derive(Clone)]
-pub struct SeaOrmBitcoinOutputRepository {
-    pub db: DatabaseConnection,
+pub struct SeaOrmBitcoinOutputRepository<C = DatabaseConnection> {
+    db: C,
 }
 
-impl SeaOrmBitcoinOutputRepository {
-    pub fn new(db: DatabaseConnection) -> Self {
+impl<C> SeaOrmBitcoinOutputRepository<C> {
+    pub fn new(db: C) -> Self {
         Self { db }
     }
 }
 
 #[async_trait]
-impl BtcOutputRepository for SeaOrmBitcoinOutputRepository {
+impl<C> BtcOutputRepository for SeaOrmBitcoinOutputRepository<C>
+where
+    C: SeaOrmConnection,
+{
     async fn find_by_outpoint(&self, outpoint: &str) -> Result<Option<BtcOutput>, DatabaseError> {
         let model = BtcOutputEntity::find()
             .filter(Column::Outpoint.eq(outpoint))
-            .one(&self.db)
+            .one(self.db.connection())
             .await
             .map_err(|e| DatabaseError::FindOne(e.to_string()))?;
 
@@ -53,7 +58,7 @@ impl BtcOutputRepository for SeaOrmBitcoinOutputRepository {
             };
 
             let model = active_model
-                .update(&self.db)
+                .update(self.db.connection())
                 .await
                 .map_err(|e| DatabaseError::Update(e.to_string()))?;
 
@@ -73,7 +78,7 @@ impl BtcOutputRepository for SeaOrmBitcoinOutputRepository {
         };
 
         let model = model
-            .insert(&self.db)
+            .insert(self.db.connection())
             .await
             .map_err(|e| DatabaseError::Insert(e.to_string()))?;
 
@@ -90,7 +95,7 @@ impl BtcOutputRepository for SeaOrmBitcoinOutputRepository {
             .select_only()
             .column_as(Column::BlockHeight.max(), "max")
             .into_model::<MaxBlockHeight>()
-            .one(&self.db)
+            .one(self.db.connection())
             .await
             .map_err(|e| DatabaseError::FindOne(e.to_string()))?;
 
