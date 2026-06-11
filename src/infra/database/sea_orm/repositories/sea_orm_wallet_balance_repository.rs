@@ -47,7 +47,10 @@ where
         WalletBalance::insert(model)
             .on_conflict(
                 OnConflict::columns([Column::WalletId, Column::Currency])
-                    .value(Column::AvailableAmount, Expr::col(Column::AvailableAmount).add(amount))
+                    .value(
+                        Column::AvailableAmount,
+                        Expr::col((WalletBalance, Column::AvailableAmount)).add(amount),
+                    )
                     .value(Column::UpdatedAt, Expr::value(Utc::now().naive_utc()))
                     .to_owned(),
             )
