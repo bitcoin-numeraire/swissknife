@@ -8,7 +8,7 @@ use uuid::Uuid;
 
 use crate::{
     application::{
-        entities::{AppStore, Currency, Ledger},
+        entities::{AppStore, Ledger},
         errors::{ApplicationError, DataError, LightningError},
     },
     domains::{
@@ -112,12 +112,13 @@ impl PaymentService {
                 }
 
                 let curr_time = Utc::now();
+                let network = self.bitcoin_wallet.network();
 
                 let invoice = Invoice {
                     wallet_id: retrieved_address.wallet_id,
                     ln_address_id: Some(retrieved_address.id),
                     ledger: Ledger::Internal,
-                    currency: Currency::Bitcoin,
+                    currency: network.into(),
                     description: comment
                         .clone()
                         .or(DEFAULT_INTERNAL_INVOICE_DESCRIPTION.to_string().into()),
@@ -138,7 +139,7 @@ impl PaymentService {
                     fee_msat: Some(0),
                     payment_time: Some(curr_time),
                     ledger: Ledger::Internal,
-                    currency: Currency::Bitcoin,
+                    currency: network.into(),
                     internal: Some(InternalPayment {
                         ln_address: Some(input),
                         btc_address: None,
@@ -437,7 +438,7 @@ impl PaymentService {
                     status: PaymentStatus::Pending,
                     description: comment.clone(),
                     ledger: Ledger::Lightning,
-                    currency: Currency::Bitcoin,
+                    currency: self.bitcoin_wallet.network().into(),
                     lightning: Some(LnPayment {
                         ln_address: data.ln_address.clone(),
                         payment_hash: Bolt11Invoice::from_str(&cb.pr)
@@ -679,7 +680,10 @@ impl PaymentsUseCases for PaymentService {
 #[cfg(test)]
 mod tests {
     use crate::{
-        application::{entities::MockAppStoreBuilder, errors::BitcoinError},
+        application::{
+            entities::{Currency, MockAppStoreBuilder},
+            errors::BitcoinError,
+        },
         domains::{
             bitcoin::{BtcAddress, BtcAddressType, BtcNetwork, BtcPreparedTransaction, MockBitcoinWallet},
             event::MockEventUseCases,
@@ -848,12 +852,10 @@ mod tests {
                     .times(1)
                     .returning(|payment, _| Ok(payment));
 
-                let service = service(
-                    store,
-                    MockLnClient::new(),
-                    MockBitcoinWallet::new(),
-                    MockEventUseCases::new(),
-                );
+                let mut bitcoin_wallet = MockBitcoinWallet::new();
+                bitcoin_wallet.expect_network().returning(|| BtcNetwork::Regtest);
+
+                let service = service(store, MockLnClient::new(), bitcoin_wallet, MockEventUseCases::new());
 
                 let payment = service
                     .send_internal("bob@numeraire.tech".to_string(), Some(1_000), None, sender)
@@ -997,12 +999,10 @@ mod tests {
                     .times(1)
                     .returning(|payment, _| Ok(payment));
 
-                let service = service(
-                    store,
-                    MockLnClient::new(),
-                    MockBitcoinWallet::new(),
-                    MockEventUseCases::new(),
-                );
+                let mut bitcoin_wallet = MockBitcoinWallet::new();
+                bitcoin_wallet.expect_network().returning(|| BtcNetwork::Regtest);
+
+                let service = service(store, MockLnClient::new(), bitcoin_wallet, MockEventUseCases::new());
 
                 let payment = service
                     .pay("bob@numeraire.tech".to_string(), Some(1_000), None, Uuid::new_v4())
