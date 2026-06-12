@@ -4,9 +4,10 @@ use std::time::Duration;
 use serde_json::json;
 use uuid::Uuid;
 
+use swissknife_types::{Balance, BtcAddress, Wallet};
+
 use super::chain;
 use super::client::Auth;
-use super::models::{Balance, BtcAddress, WalletResponse};
 use super::wait::wait_until;
 use super::TestApp;
 
@@ -23,7 +24,7 @@ impl TestApp {
     /// Register a fresh wallet (its own user id) and return it. Behavioural
     /// tests use their own wallet so balances stay isolated on the shared
     /// instance.
-    pub async fn create_wallet(&self, token: &str, label: &str) -> WalletResponse {
+    pub async fn create_wallet(&self, token: &str, label: &str) -> Wallet {
         let res = self
             .api()
             .post("/v1/wallets", Auth::Bearer(token), json!({ "user_id": unique(label) }))
@@ -39,7 +40,7 @@ impl TestApp {
             .get(&format!("/v1/wallets/{wallet_id}"), Auth::Bearer(token))
             .await;
         assert_eq!(res.status.as_u16(), 200, "get wallet {wallet_id} failed: {}", res.body);
-        res.parse::<WalletResponse>().balance
+        res.parse::<Wallet>().balance
     }
 
     /// Fund `wallet_id` via an on-chain deposit and wait for SwissKnife to

@@ -10,7 +10,7 @@ use uuid::Uuid;
 use crate::{BtcOutput, Currency, Ledger, OrderDirection};
 
 /// An incoming payment request, over Lightning and/or on-chain.
-#[derive(Clone, Debug, Default, Serialize, ToSchema)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, ToSchema)]
 pub struct Invoice {
     /// Internal ID
     pub id: Uuid,
@@ -66,7 +66,7 @@ pub struct Invoice {
 
 /// Lightning-specific details of an invoice.
 #[serde_as]
-#[derive(Clone, Debug, Default, Serialize, ToSchema)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, ToSchema)]
 pub struct LnInvoice {
     /// Payment hash
     #[schema(example = "b587c7f76339e3fb87ad2b...")]

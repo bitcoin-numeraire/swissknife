@@ -4,7 +4,7 @@ use utoipa::{IntoParams, ToSchema};
 
 /// LNURL-pay callback response. Carries the invoice to pay and how to behave on
 /// success. Wire shape follows LUD-06 (camelCase fields).
-#[derive(Debug, Clone, Serialize, ToSchema)]
+#[derive(Debug, Clone, Deserialize, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct LnUrlCallback {
     /// bech32-serialized Lightning invoice
@@ -38,7 +38,7 @@ pub struct LnUrlSuccessAction {
 }
 
 /// LNURL-pay `payRequest` response served at the well-known endpoint (LUD-06).
-#[derive(Debug, Serialize, ToSchema)]
+#[derive(Debug, Deserialize, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct LnURLPayRequest {
     /// The URL from LN SERVICE to accept the pay request
