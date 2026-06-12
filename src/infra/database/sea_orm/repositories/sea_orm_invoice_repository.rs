@@ -195,6 +195,7 @@ where
                 Column::AmountReceivedMsat,
                 Expr::value(invoice.amount_received_msat.map(|v| v as i64)),
             )
+            .col_expr(Column::Ledger, Expr::value(invoice.ledger.to_string()))
             .col_expr(Column::UpdatedAt, Expr::value(Some(Utc::now().naive_utc())))
             .filter(Column::Id.eq(invoice.id))
             .filter(Column::PaymentTime.is_null())
