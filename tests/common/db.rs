@@ -45,7 +45,9 @@ impl TestDatabase {
             .unwrap_or_else(|_| "postgres://postgres:postgres@127.0.0.1:5432".to_string());
         let name = format!("itest_{}", std::process::id());
 
-        let admin = Database::connect(&admin_url).await.expect("connect to postgres admin db");
+        let admin = Database::connect(&admin_url)
+            .await
+            .expect("connect to postgres admin db");
         for stmt in [
             format!("DROP DATABASE IF EXISTS \"{name}\" WITH (FORCE)"),
             format!("CREATE DATABASE \"{name}\""),

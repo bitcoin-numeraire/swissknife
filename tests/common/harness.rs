@@ -100,7 +100,9 @@ impl TestApp {
             command.env("SWISSKNIFE_CLN_REST_CONFIG__RUNE", read_cln_rune(&root));
         }
 
-        let child = command.spawn().expect("spawn swissknife binary (run `make build` first)");
+        let child = command
+            .spawn()
+            .expect("spawn swissknife binary (run `make build` first)");
         SPAWNED.lock().expect("spawned registry lock").push(child);
 
         let api = ApiClient::new(base_url.clone());

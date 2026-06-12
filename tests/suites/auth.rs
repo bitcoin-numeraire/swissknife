@@ -42,7 +42,11 @@ mod sign_up {
         app.admin_token().await; // first admin already created
         let res = app
             .api()
-            .post("/v1/auth/sign-up", Auth::None, json!({ "password": "another-password" }))
+            .post(
+                "/v1/auth/sign-up",
+                Auth::None,
+                json!({ "password": "another-password" }),
+            )
             .await;
         assert_error(&res, StatusCode::CONFLICT);
     }
