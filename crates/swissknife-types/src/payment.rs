@@ -1,10 +1,11 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use serde_with::{serde_as, DisplayFromStr};
 use strum_macros::{Display, EnumString};
-use utoipa::ToSchema;
+use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
 
-use crate::{Currency, Ledger, LnUrlSuccessAction};
+use crate::{Currency, Ledger, LnUrlSuccessAction, OrderDirection};
 
 /// An outgoing payment, over Lightning, on-chain, or internal to the instance.
 #[derive(Clone, Debug, Default, Serialize, ToSchema)]
@@ -133,4 +134,54 @@ pub enum PaymentStatus {
     Pending,
     Settled,
     Failed,
+}
+
+/// Send Payment Request
+#[derive(Debug, Deserialize, Clone, ToSchema)]
+pub struct SendPaymentRequest {
+    /// Wallet ID. Will be populated with your own ID by default
+    pub wallet_id: Option<Uuid>,
+
+    /// Recipient. Can be a Bolt11 invoice, LNURL or LN Address. Keysend and On-chain payments not yet supported
+    #[schema(example = "hello@numeraire.tech")]
+    pub input: String,
+
+    /// Amount in millisatoshis. Only necessary if the input does not specify an amount (empty Bolt11, LNURL or LN Address)
+    pub amount_msat: Option<u64>,
+    /// Comment of the payment. Visible by the recipient for LNURL payments
+    pub comment: Option<String>,
+}
+
+/// Payment query filter.
+#[serde_as]
+#[derive(Clone, Debug, Deserialize, Serialize, Default, IntoParams, ToSchema)]
+pub struct PaymentFilter {
+    /// Total amount of results to return
+    #[serde_as(as = "Option<DisplayFromStr>")]
+    pub limit: Option<u64>,
+
+    /// Offset where to start returning results
+    #[serde_as(as = "Option<DisplayFromStr>")]
+    pub offset: Option<u64>,
+
+    /// List of IDs
+    pub ids: Option<Vec<Uuid>>,
+    /// Wallet ID. Automatically populated with your ID
+    pub wallet_id: Option<Uuid>,
+    /// Status
+    pub status: Option<PaymentStatus>,
+    /// Ledger
+    pub ledger: Option<Ledger>,
+
+    /// Lightning addresses
+    #[schema(example = "donations@numeraire.tech")]
+    pub ln_addresses: Option<Vec<String>>,
+
+    /// Bitcoin addresses
+    #[schema(example = "bc1q...")]
+    pub btc_addresses: Option<Vec<String>>,
+
+    /// Direction of the ordering of results
+    #[serde(default)]
+    pub order_direction: OrderDirection,
 }

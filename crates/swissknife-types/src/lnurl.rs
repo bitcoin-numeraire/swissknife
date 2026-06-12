@@ -1,5 +1,6 @@
+use nostr::PublicKey;
 use serde::{Deserialize, Serialize};
-use utoipa::ToSchema;
+use utoipa::{IntoParams, ToSchema};
 
 /// LNURL-pay callback response. Carries the invoice to pay and how to behave on
 /// success. Wire shape follows LUD-06 (camelCase fields).
@@ -34,4 +35,51 @@ pub struct LnUrlSuccessAction {
     /// URL for the user to open on success
     #[serde(skip_serializing_if = "Option::is_none")]
     pub url: Option<String>,
+}
+
+/// LNURL-pay `payRequest` response served at the well-known endpoint (LUD-06).
+#[derive(Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct LnURLPayRequest {
+    /// The URL from LN SERVICE to accept the pay request
+    #[schema(example = "https://numeraire.tech/lnurlp/dario_nakamoto/callback")]
+    pub callback: String,
+
+    /// Max amount in milli-satoshis LN SERVICE is willing to receive
+    #[schema(example = 1000000000)]
+    pub max_sendable: u64,
+
+    /// Min amount in milli-satoshis LN SERVICE is willing to receive, can not be less than 1 or more than `maxSendable`
+    #[schema(example = 1000)]
+    pub min_sendable: u64,
+
+    /// Metadata json which must be presented as raw string here, this is required to pass signature verification at a later step
+    #[schema(
+        example = "[[\"text/plain\",\"dario_nakamoto never refuses sats\"],[\"text/identifier\",\"dario_nakamoto@numeraire.tech\"]]"
+    )]
+    pub metadata: String,
+
+    /// Optional number of characters accepted for the `comment` query parameter on subsequent callback, defaults to 0 if not provided. (no comment allowed). See <https://github.com/lnurl/luds/blob/luds/12.md>
+    #[schema(example = 255)]
+    pub comment_allowed: u16,
+
+    /// Type of LNURL
+    #[schema(example = "payRequest")]
+    pub tag: String,
+
+    /// Nostr enabled
+    pub allows_nostr: bool,
+
+    /// Nostr public key
+    #[schema(value_type = Option<String>, example = "d9c2ec59a98c...")]
+    pub nostr_pubkey: Option<PublicKey>,
+}
+
+/// LNURL-pay callback query parameters
+#[derive(Debug, Deserialize, IntoParams)]
+pub struct LNUrlpInvoiceQueryParams {
+    /// Amount in millisatoshis
+    pub amount: u64,
+    /// Optional comment for the recipient
+    pub comment: Option<String>,
 }

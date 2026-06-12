@@ -1,7 +1,6 @@
 use thiserror::Error;
-use utoipa::ToSchema;
 
-#[derive(Debug, Error, ToSchema)]
+#[derive(Debug, Error)]
 pub enum WebServerError {
     #[error("Failed to create TCP listener: {0}")]
     Listener(String),

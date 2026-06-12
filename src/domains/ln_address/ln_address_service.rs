@@ -11,7 +11,7 @@ use crate::{
         entities::AppStore,
         errors::{ApplicationError, DataError},
     },
-    domains::ln_address::entities::{LnAddress, LnAddressFilter},
+    domains::ln_address::{LnAddress, LnAddressFilter},
 };
 
 use super::LnAddressUseCases;

@@ -1,7 +1,6 @@
 use thiserror::Error;
-use utoipa::ToSchema;
 
-#[derive(Debug, Error, ToSchema)]
+#[derive(Debug, Error)]
 pub enum LightningError {
     #[error("Failed to parse config: {0}")]
     ParseConfig(String),

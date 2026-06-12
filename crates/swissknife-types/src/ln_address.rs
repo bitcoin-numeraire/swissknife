@@ -1,8 +1,11 @@
 use chrono::{DateTime, Utc};
 use nostr::PublicKey;
-use serde::Serialize;
-use utoipa::ToSchema;
+use serde::{Deserialize, Serialize};
+use serde_with::{serde_as, DisplayFromStr};
+use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
+
+use crate::OrderDirection;
 
 /// Lightning Address
 #[derive(Clone, Debug, Serialize, ToSchema)]
@@ -26,4 +29,64 @@ pub struct LnAddress {
     #[serde(skip_serializing_if = "Option::is_none")]
     /// Date of update in database
     pub updated_at: Option<DateTime<Utc>>,
+}
+
+/// Register Lightning Address Request
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct RegisterLnAddressRequest {
+    /// Wallet ID. Will be populated with your own ID by default
+    pub wallet_id: Option<Uuid>,
+
+    /// Username such as `username@domain`
+    pub username: String,
+
+    /// Nostr enabled
+    #[serde(default)]
+    pub allows_nostr: bool,
+
+    /// Nostr public key
+    #[schema(value_type = Option<String>, example = "npub1m8pwckdf3...")]
+    pub nostr_pubkey: Option<PublicKey>,
+}
+
+/// Update Lightning Address Request
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct UpdateLnAddressRequest {
+    /// Username such as `username@domain`
+    pub username: Option<String>,
+
+    /// Active status
+    #[serde(default)]
+    pub active: Option<bool>,
+
+    /// Nostr enabled
+    #[serde(default)]
+    pub allows_nostr: Option<bool>,
+
+    /// Nostr public key
+    #[schema(value_type = Option<String>, example = "npub1m8pwckdf3...")]
+    pub nostr_pubkey: Option<PublicKey>,
+}
+
+/// Lightning address query filter.
+#[serde_as]
+#[derive(Clone, Debug, Deserialize, Serialize, Default, IntoParams)]
+pub struct LnAddressFilter {
+    /// Total amount of results to return
+    #[serde_as(as = "Option<DisplayFromStr>")]
+    pub limit: Option<u64>,
+    /// Offset where to start returning results
+    #[serde_as(as = "Option<DisplayFromStr>")]
+    pub offset: Option<u64>,
+    /// List of IDs
+    pub ids: Option<Vec<Uuid>>,
+    /// wallet ID. Automatically populated with your ID
+    pub wallet_id: Option<Uuid>,
+    /// Username
+    pub username: Option<String>,
+    /// Active
+    pub active: Option<bool>,
+    /// Direction of the ordering of results
+    #[serde(default)]
+    pub order_direction: OrderDirection,
 }

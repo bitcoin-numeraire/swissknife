@@ -1,7 +1,6 @@
 use thiserror::Error;
-use utoipa::ToSchema;
 
-#[derive(Debug, Error, ToSchema)]
+#[derive(Debug, Error)]
 pub enum AuthenticationError {
     #[error("Failed to fetch JWKS: {0}")]
     Jwks(String),

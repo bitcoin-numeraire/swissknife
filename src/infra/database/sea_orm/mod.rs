@@ -9,3 +9,5 @@ pub use config::*;
 pub use repositories::*;
 pub use store::*;
 pub use uow::*;
+
+pub(crate) use types::sea_order;

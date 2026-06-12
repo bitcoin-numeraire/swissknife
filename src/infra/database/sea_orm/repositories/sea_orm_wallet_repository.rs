@@ -100,7 +100,10 @@ where
         let models = WalletEntity::find()
             .apply_if(filter.user_id, |q, user| q.filter(Column::UserId.eq(user)))
             .apply_if(filter.ids, |q, ids| q.filter(Column::Id.is_in(ids)))
-            .order_by(Column::CreatedAt, filter.order_direction.into())
+            .order_by(
+                Column::CreatedAt,
+                crate::infra::database::sea_orm::sea_order(&filter.order_direction),
+            )
             .offset(filter.offset)
             .limit(filter.limit)
             .all(self.db.connection())

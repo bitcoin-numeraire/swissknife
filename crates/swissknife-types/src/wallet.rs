@@ -1,9 +1,10 @@
 use chrono::{DateTime, Utc};
-use serde::Serialize;
-use utoipa::ToSchema;
+use serde::{Deserialize, Serialize};
+use serde_with::{serde_as, DisplayFromStr};
+use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
 
-use crate::{Invoice, LnAddress, Payment};
+use crate::{Invoice, LnAddress, OrderDirection, Payment};
 
 /// A wallet's balance, in millisatoshis.
 #[derive(Debug, Clone, Serialize, Default, ToSchema)]
@@ -86,4 +87,30 @@ pub struct WalletOverview {
     #[serde(skip_serializing_if = "Option::is_none")]
     /// Date of update in database
     pub updated_at: Option<DateTime<Utc>>,
+}
+
+/// Register Wallet Request
+#[derive(Debug, Deserialize, Clone, ToSchema)]
+pub struct RegisterWalletRequest {
+    /// User ID. Should ideally be registered in your Auth provider.
+    pub user_id: String,
+}
+
+/// Wallet query filter.
+#[serde_as]
+#[derive(Clone, Debug, Deserialize, Serialize, Default, IntoParams)]
+pub struct WalletFilter {
+    /// Total amount of results to return
+    #[serde_as(as = "Option<DisplayFromStr>")]
+    pub limit: Option<u64>,
+    /// Offset where to start returning results
+    #[serde_as(as = "Option<DisplayFromStr>")]
+    pub offset: Option<u64>,
+    /// List of IDs
+    pub ids: Option<Vec<Uuid>>,
+    /// User ID. Automatically populated with your ID
+    pub user_id: Option<String>,
+    /// Direction of the ordering of results
+    #[serde(default)]
+    pub order_direction: OrderDirection,
 }

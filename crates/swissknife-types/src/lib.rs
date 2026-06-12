@@ -7,31 +7,33 @@
 //! app's use cases.
 
 mod api_key;
+mod auth;
 mod bitcoin;
+mod error;
 mod invoice;
 mod ln_address;
 mod lnurl;
 mod network;
+mod nostr;
 mod payment;
 mod permission;
-mod request;
-mod response;
+mod query;
+mod system;
 mod transaction;
 mod wallet;
 
-pub use api_key::ApiKey;
-pub use bitcoin::{BtcAddress, BtcAddressType, BtcOutput, BtcOutputStatus};
-pub use invoice::{Invoice, InvoiceStatus, LnInvoice};
-pub use ln_address::LnAddress;
-pub use lnurl::{LnUrlCallback, LnUrlSuccessAction};
+pub use api_key::{ApiKey, ApiKeyFilter, CreateApiKeyRequest};
+pub use auth::{SignInRequest, SignInResponse, SignUpRequest};
+pub use bitcoin::{BtcAddress, BtcAddressFilter, BtcAddressType, BtcOutput, BtcOutputStatus, NewBtcAddressRequest};
+pub use error::ErrorResponse;
+pub use invoice::{Invoice, InvoiceFilter, InvoiceOrderBy, InvoiceStatus, LnInvoice, NewInvoiceRequest};
+pub use ln_address::{LnAddress, LnAddressFilter, RegisterLnAddressRequest, UpdateLnAddressRequest};
+pub use lnurl::{LNUrlpInvoiceQueryParams, LnURLPayRequest, LnUrlCallback, LnUrlSuccessAction};
 pub use network::BtcNetwork;
-pub use payment::{BtcPayment, InternalPayment, LnPayment, Payment, PaymentStatus};
+pub use nostr::{NostrNIP05QueryParams, NostrNIP05Response};
+pub use payment::{BtcPayment, InternalPayment, LnPayment, Payment, PaymentFilter, PaymentStatus, SendPaymentRequest};
 pub use permission::Permission;
-pub use request::{
-    CreateApiKeyRequest, LNUrlpInvoiceQueryParams, NewBtcAddressRequest, NewInvoiceRequest, NostrNIP05QueryParams,
-    RegisterLnAddressRequest, RegisterWalletRequest, SendPaymentRequest, SignInRequest, SignUpRequest,
-    UpdateLnAddressRequest,
-};
-pub use response::{ErrorResponse, NostrNIP05Response, SignInResponse};
+pub use query::OrderDirection;
+pub use system::{HealthCheck, HealthStatus, SetupInfo, VersionInfo};
 pub use transaction::{Currency, Ledger};
-pub use wallet::{Balance, Contact, Wallet, WalletOverview};
+pub use wallet::{Balance, Contact, RegisterWalletRequest, Wallet, WalletFilter, WalletOverview};
