@@ -139,16 +139,16 @@ impl From<PayResponse> for Payment {
 
 impl From<AddInvoiceResponse> for Invoice {
     fn from(val: AddInvoiceResponse) -> Self {
-        Bolt11Invoice::from_str(&val.payment_request)
-            .expect("should be valid BOLT11")
-            .into()
+        crate::infra::lightning::types::invoice_from_bolt11(
+            Bolt11Invoice::from_str(&val.payment_request).expect("should be valid BOLT11"),
+        )
     }
 }
 
 impl From<InvoiceResponse> for Invoice {
     fn from(val: InvoiceResponse) -> Self {
         let bolt11 = Bolt11Invoice::from_str(&val.payment_request).expect("should be valid BOLT11");
-        let mut invoice: Invoice = bolt11.into();
+        let mut invoice: Invoice = crate::infra::lightning::types::invoice_from_bolt11(bolt11);
 
         match val.state.as_str() {
             "SETTLED" => {

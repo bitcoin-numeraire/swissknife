@@ -9,44 +9,44 @@ use crate::{
     },
 };
 
-impl From<Bolt11Invoice> for Invoice {
-    fn from(val: Bolt11Invoice) -> Self {
-        let payee_pubkey: String = match val.payee_pub_key() {
-            Some(key) => key.to_string(),
-            None => val.recover_payee_pub_key().to_string(),
-        };
+// Foreign source (lightning_invoice) -> api-types target, so a free function
+// rather than a `From` impl (orphan rule).
+pub(crate) fn invoice_from_bolt11(val: Bolt11Invoice) -> Invoice {
+    let payee_pubkey: String = match val.payee_pub_key() {
+        Some(key) => key.to_string(),
+        None => val.recover_payee_pub_key().to_string(),
+    };
 
-        let timestamp = Utc
-            .timestamp_opt(
-                val.duration_since_epoch().as_secs() as i64,
-                val.duration_since_epoch().subsec_nanos(),
-            )
-            .unwrap();
+    let timestamp = Utc
+        .timestamp_opt(
+            val.duration_since_epoch().as_secs() as i64,
+            val.duration_since_epoch().subsec_nanos(),
+        )
+        .unwrap();
 
-        Invoice {
-            ledger: Ledger::Lightning,
-            currency: currency_from_ln_invoice(val.currency()),
-            amount_msat: val.amount_milli_satoshis(),
-            timestamp,
-            description: match val.description() {
-                Bolt11InvoiceDescriptionRef::Direct(msg) => Some(msg.to_string()),
-                Bolt11InvoiceDescriptionRef::Hash(_) => None,
+    Invoice {
+        ledger: Ledger::Lightning,
+        currency: currency_from_ln_invoice(val.currency()),
+        amount_msat: val.amount_milli_satoshis(),
+        timestamp,
+        description: match val.description() {
+            Bolt11InvoiceDescriptionRef::Direct(msg) => Some(msg.to_string()),
+            Bolt11InvoiceDescriptionRef::Hash(_) => None,
+        },
+        ln_invoice: Some(LnInvoice {
+            bolt11: val.to_string(),
+            payment_hash: val.payment_hash().to_string(),
+            payee_pubkey,
+            description_hash: match val.description() {
+                Bolt11InvoiceDescriptionRef::Direct(_) => None,
+                Bolt11InvoiceDescriptionRef::Hash(h) => Some(h.0.to_string()),
             },
-            ln_invoice: Some(LnInvoice {
-                bolt11: val.to_string(),
-                payment_hash: val.payment_hash().to_string(),
-                payee_pubkey,
-                description_hash: match val.description() {
-                    Bolt11InvoiceDescriptionRef::Direct(_) => None,
-                    Bolt11InvoiceDescriptionRef::Hash(h) => Some(h.0.to_string()),
-                },
-                payment_secret: hex::encode(val.payment_secret().0),
-                min_final_cltv_expiry_delta: val.min_final_cltv_expiry_delta(),
-                expiry: val.expiry_time(),
-                expires_at: timestamp + val.expiry_time(),
-            }),
-            ..Default::default()
-        }
+            payment_secret: hex::encode(val.payment_secret().0),
+            min_final_cltv_expiry_delta: val.min_final_cltv_expiry_delta(),
+            expiry: val.expiry_time(),
+            expires_at: timestamp + val.expiry_time(),
+        }),
+        ..Default::default()
     }
 }
 

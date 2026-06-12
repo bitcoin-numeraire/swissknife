@@ -1,33 +1,11 @@
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
-use strum_macros::{Display, EnumString};
-use utoipa::{IntoParams, ToSchema};
+use utoipa::IntoParams;
 use uuid::Uuid;
 
 use crate::application::entities::OrderDirection;
 
-#[derive(Clone, Debug)]
-pub struct BtcAddress {
-    pub id: Uuid,
-    pub wallet_id: Uuid,
-    pub address: String,
-    pub used: bool,
-    pub address_type: BtcAddressType,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: Option<DateTime<Utc>>,
-}
-
-#[derive(Clone, Debug, Copy, Deserialize, Serialize, EnumString, Display, PartialEq, Eq, Default, ToSchema)]
-#[serde(rename_all = "lowercase")]
-#[strum(serialize_all = "lowercase")]
-pub enum BtcAddressType {
-    P2pkh,
-    P2sh,
-    #[default]
-    P2wpkh,
-    P2tr,
-}
+pub use swissknife_api_types::{BtcAddress, BtcAddressType};
 
 #[serde_as]
 #[derive(Clone, Debug, Deserialize, Serialize, Default, IntoParams)]

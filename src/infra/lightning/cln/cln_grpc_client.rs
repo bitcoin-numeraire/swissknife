@@ -197,7 +197,7 @@ impl LnClient for ClnGrpcClient {
         let bolt11 = Bolt11Invoice::from_str(&response.into_inner().bolt11)
             .map_err(|e| LightningError::Invoice(e.to_string()))?;
 
-        Ok(bolt11.into())
+        Ok(crate::infra::lightning::types::invoice_from_bolt11(bolt11))
     }
 
     async fn pay(&self, bolt11: String, amount_msat: Option<u64>, label: String) -> Result<Payment, LightningError> {
