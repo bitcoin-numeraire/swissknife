@@ -9,8 +9,10 @@ use axum::{
 };
 use utoipa::OpenApi;
 
+use swissknife_types::ErrorResponse;
+
 use crate::{
-    application::{docs::INTERNAL_EXAMPLE, dtos::ErrorResponse, entities::AppServices, errors::ApplicationError},
+    application::{docs::INTERNAL_EXAMPLE, entities::AppServices, errors::ApplicationError},
     infra::axum::Json,
 };
 

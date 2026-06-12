@@ -3,7 +3,9 @@ use async_trait::async_trait;
 use nostr_sdk::PublicKey;
 use uuid::Uuid;
 
-use crate::application::{dtos::UpdateLnAddressRequest, errors::ApplicationError};
+use swissknife_types::UpdateLnAddressRequest;
+
+use crate::application::errors::ApplicationError;
 
 use super::{LnAddress, LnAddressFilter};
 

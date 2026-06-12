@@ -3,10 +3,11 @@ use std::sync::Arc;
 use axum::{extract::State, routing::post, Router};
 use utoipa::OpenApi;
 
+use swissknife_types::{ErrorResponse, SignInRequest, SignInResponse, SignUpRequest};
+
 use crate::{
     application::{
         docs::{BAD_REQUEST_EXAMPLE, CONFLICT_EXAMPLE, NOT_FOUND_EXAMPLE, UNAUTHORIZED_EXAMPLE, UNSUPPORTED_EXAMPLE},
-        dtos::{ErrorResponse, SignInRequest, SignInResponse, SignUpRequest},
         entities::AppServices,
         errors::ApplicationError,
     },

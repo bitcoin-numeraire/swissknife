@@ -1,7 +1,9 @@
 use async_trait::async_trait;
 use uuid::Uuid;
 
-use crate::application::{dtos::CreateApiKeyRequest, errors::ApplicationError};
+use swissknife_types::CreateApiKeyRequest;
+
+use crate::application::errors::ApplicationError;
 
 use super::{ApiKey, ApiKeyFilter, User};
 

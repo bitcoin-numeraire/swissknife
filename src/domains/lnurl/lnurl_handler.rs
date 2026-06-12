@@ -3,22 +3,23 @@ use std::sync::Arc;
 use axum::{extract::State, routing::get, Router};
 use utoipa::OpenApi;
 
+use swissknife_types::{ErrorResponse, LNUrlpInvoiceQueryParams};
+
 use crate::{
     application::{
         docs::{BAD_REQUEST_EXAMPLE, INTERNAL_EXAMPLE, NOT_FOUND_EXAMPLE, UNPROCESSABLE_EXAMPLE},
-        dtos::{ErrorResponse, LNUrlpInvoiceQueryParams, LnUrlCallbackResponse},
         entities::AppServices,
         errors::ApplicationError,
     },
     infra::axum::{Json, Path, Query},
 };
 
-use super::LnURLPayRequest;
+use super::{LnURLPayRequest, LnUrlCallback};
 
 #[derive(OpenApi)]
 #[openapi(
     paths(well_known, callback),
-    components(schemas(LnURLPayRequest, LnUrlCallbackResponse)),
+    components(schemas(LnURLPayRequest, LnUrlCallback)),
     tags(
         (name = "LNURL", description = "Public LNURL endpoints as defined in the [protocol specification](https://github.com/lnurl/luds). Allows any active Lightning Address to receive payments")
     ),
@@ -61,7 +62,7 @@ pub async fn well_known(
     context_path = "/lnurlp",
     params(LNUrlpInvoiceQueryParams),
     responses(
-        (status = 200, description = "Found", body = LnUrlCallbackResponse),
+        (status = 200, description = "Found", body = LnUrlCallback),
         (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
         (status = 404, description = "Not Found", body = ErrorResponse, example = json!(NOT_FOUND_EXAMPLE)),
         (status = 422, description = "Unprocessable Entity", body = ErrorResponse, example = json!(UNPROCESSABLE_EXAMPLE)),
@@ -72,12 +73,12 @@ async fn callback(
     Path(username): Path<String>,
     Query(query_params): Query<LNUrlpInvoiceQueryParams>,
     State(services): State<Arc<AppServices>>,
-) -> Result<Json<LnUrlCallbackResponse>, ApplicationError> {
+) -> Result<Json<LnUrlCallback>, ApplicationError> {
     let callback = services
         .lnurl
         .lnurlp_callback(username, query_params.amount, query_params.comment)
         .await?;
-    Ok(Json(callback.into()))
+    Ok(Json(callback))
 }
 
 #[cfg(test)]

@@ -5,8 +5,9 @@ use serde_bolt::bitcoin::hashes::{sha256, Hash};
 use tracing::{debug, info, trace};
 use uuid::Uuid;
 
+use swissknife_types::CreateApiKeyRequest;
+
 use crate::application::{
-    dtos::CreateApiKeyRequest,
     entities::AppStore,
     errors::{ApplicationError, DataError},
 };
