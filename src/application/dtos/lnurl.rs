@@ -4,7 +4,7 @@ use utoipa::ToSchema;
 
 use crate::domains::lnurl::LnUrlCallback;
 
-pub use swissknife_api_types::LNUrlpInvoiceQueryParams;
+pub use swissknife_types::LNUrlpInvoiceQueryParams;
 
 #[derive(Debug, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]

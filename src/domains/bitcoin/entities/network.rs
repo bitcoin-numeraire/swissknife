@@ -1,1 +1,1 @@
-pub use swissknife_api_types::BtcNetwork;
+pub use swissknife_types::BtcNetwork;

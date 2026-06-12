@@ -5,7 +5,7 @@ use uuid::Uuid;
 
 use crate::application::entities::OrderDirection;
 
-pub use swissknife_api_types::{Wallet, WalletOverview};
+pub use swissknife_types::{Wallet, WalletOverview};
 
 #[serde_as]
 #[derive(Clone, Debug, Deserialize, Serialize, Default, IntoParams)]

@@ -4,7 +4,7 @@ use nostr_sdk::PublicKey;
 use serde::Serialize;
 use utoipa::ToSchema;
 
-pub use swissknife_api_types::NostrNIP05QueryParams;
+pub use swissknife_types::NostrNIP05QueryParams;
 
 #[derive(Debug, Serialize, ToSchema)]
 pub struct NostrNIP05Response {

@@ -5,7 +5,7 @@ use uuid::Uuid;
 
 use crate::application::entities::OrderDirection;
 
-pub use swissknife_api_types::{BtcAddress, BtcAddressType};
+pub use swissknife_types::{BtcAddress, BtcAddressType};
 
 #[serde_as]
 #[derive(Clone, Debug, Deserialize, Serialize, Default, IntoParams)]

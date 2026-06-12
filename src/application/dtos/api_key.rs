@@ -1,1 +1,1 @@
-pub use swissknife_api_types::CreateApiKeyRequest;
+pub use swissknife_types::CreateApiKeyRequest;

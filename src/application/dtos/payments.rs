@@ -1,1 +1,1 @@
-pub use swissknife_api_types::SendPaymentRequest;
+pub use swissknife_types::SendPaymentRequest;

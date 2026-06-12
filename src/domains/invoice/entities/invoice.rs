@@ -5,7 +5,7 @@ use uuid::Uuid;
 
 use crate::application::entities::{Ledger, OrderDirection};
 
-pub use swissknife_api_types::{Invoice, InvoiceStatus, LnInvoice};
+pub use swissknife_types::{Invoice, InvoiceStatus, LnInvoice};
 
 #[serde_as]
 #[derive(Clone, Debug, Deserialize, Serialize, Default, IntoParams, ToSchema)]

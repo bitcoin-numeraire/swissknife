@@ -1,1 +1,1 @@
-pub use swissknife_api_types::{Currency, Ledger};
+pub use swissknife_types::{Currency, Ledger};

@@ -1,1 +1,1 @@
-pub use swissknife_api_types::RegisterWalletRequest;
+pub use swissknife_types::RegisterWalletRequest;

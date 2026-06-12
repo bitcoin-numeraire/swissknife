@@ -1,1 +1,1 @@
-pub use swissknife_api_types::Balance;
+pub use swissknife_types::Balance;

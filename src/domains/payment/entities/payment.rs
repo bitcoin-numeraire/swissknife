@@ -5,7 +5,7 @@ use uuid::Uuid;
 
 use crate::application::entities::{Ledger, OrderDirection};
 
-pub use swissknife_api_types::{BtcPayment, InternalPayment, LnPayment, Payment, PaymentStatus};
+pub use swissknife_types::{BtcPayment, InternalPayment, LnPayment, Payment, PaymentStatus};
 
 #[serde_as]
 #[derive(Clone, Debug, Deserialize, Serialize, Default, IntoParams, ToSchema)]
