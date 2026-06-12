@@ -17,7 +17,7 @@ invoice_expiry = "1h"
 dashboard_dir = ""
 
 [logging]
-format = "json"
+format = "compact"
 ansi = false
 level = "info"
 filter = "warn,swissknife=info,sea_orm_migration=warn"
