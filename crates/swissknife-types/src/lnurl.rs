@@ -17,6 +17,7 @@ pub struct LnUrlCallback {
     pub routes: Vec<String>,
 }
 
+/// LNURL success action shown to the payer after a successful payment (LUD-09).
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema, Default)]
 pub struct LnUrlSuccessAction {
     /// Action type. One of `url` or `message`

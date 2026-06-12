@@ -9,6 +9,7 @@ use uuid::Uuid;
 
 use crate::{BtcOutput, Currency, Ledger};
 
+/// An incoming payment request, over Lightning and/or on-chain.
 #[derive(Clone, Debug, Default, Serialize, ToSchema)]
 pub struct Invoice {
     /// Internal ID
@@ -63,6 +64,7 @@ pub struct Invoice {
     pub bitcoin_output: Option<BtcOutput>,
 }
 
+/// Lightning-specific details of an invoice.
 #[serde_as]
 #[derive(Clone, Debug, Default, Serialize, ToSchema)]
 pub struct LnInvoice {
@@ -99,6 +101,7 @@ pub struct LnInvoice {
     pub expires_at: DateTime<Utc>,
 }
 
+/// Lifecycle status of an invoice.
 #[derive(Clone, Debug, EnumString, Deserialize, Serialize, Display, PartialEq, Eq, Default, ToSchema)]
 pub enum InvoiceStatus {
     #[default]

@@ -4,6 +4,7 @@ use utoipa::ToSchema;
 
 use crate::Currency;
 
+/// A Bitcoin network.
 #[derive(Clone, Debug, Copy, EnumString, Deserialize, Serialize, Display, PartialEq, Eq, Default, ToSchema)]
 pub enum BtcNetwork {
     #[default]

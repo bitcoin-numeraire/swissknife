@@ -6,6 +6,7 @@ use uuid::Uuid;
 
 use crate::{Currency, Ledger, LnUrlSuccessAction};
 
+/// An outgoing payment, over Lightning, on-chain, or internal to the instance.
 #[derive(Clone, Debug, Default, Serialize, ToSchema)]
 pub struct Payment {
     /// Internal ID
@@ -67,6 +68,7 @@ pub struct Payment {
     pub internal: Option<InternalPayment>,
 }
 
+/// Lightning-specific details of a payment.
 #[derive(Clone, Debug, Default, Serialize, ToSchema)]
 pub struct LnPayment {
     /// Lightning Address. Populated when sending to a LN Address
@@ -91,6 +93,7 @@ pub struct LnPayment {
     pub success_action: Option<LnUrlSuccessAction>,
 }
 
+/// On-chain Bitcoin details of a payment.
 #[derive(Clone, Debug, Default, Serialize, ToSchema)]
 pub struct BtcPayment {
     /// Destination Bitcoin address. Populated for Bitcoin onchain payments.
@@ -104,6 +107,7 @@ pub struct BtcPayment {
     pub block_height: Option<u32>,
 }
 
+/// Details of a payment settled internally between wallets on the same instance.
 #[derive(Clone, Debug, Default, Serialize, ToSchema)]
 pub struct InternalPayment {
     /// Lightning Address. Populated for internal LN Address payments
@@ -122,6 +126,7 @@ pub struct InternalPayment {
     pub payment_hash: Option<String>,
 }
 
+/// Lifecycle status of a payment.
 #[derive(Clone, Debug, EnumString, Display, Deserialize, Serialize, PartialEq, Eq, Default, ToSchema)]
 pub enum PaymentStatus {
     #[default]

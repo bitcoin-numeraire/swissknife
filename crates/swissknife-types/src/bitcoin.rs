@@ -26,6 +26,7 @@ pub struct BtcAddress {
     pub updated_at: Option<DateTime<Utc>>,
 }
 
+/// Bitcoin address script type.
 #[derive(Clone, Debug, Copy, Deserialize, Serialize, EnumString, Display, PartialEq, Eq, Default, ToSchema)]
 #[serde(rename_all = "lowercase")]
 #[strum(serialize_all = "lowercase")]
@@ -66,6 +67,7 @@ pub struct BtcOutput {
     pub updated_at: Option<DateTime<Utc>>,
 }
 
+/// Confirmation status of an on-chain output.
 #[derive(Clone, Debug, Copy, EnumString, Deserialize, Serialize, Display, PartialEq, Eq, Default, ToSchema)]
 pub enum BtcOutputStatus {
     #[default]

@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 use strum_macros::{Display, EnumString, VariantNames};
 use utoipa::ToSchema;
 
+/// An API access scope granted to a JWT or API key.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, EnumString, Display, VariantNames, Serialize, Deserialize, ToSchema)]
 pub enum Permission {
     #[serde(rename = "read:wallet")]
