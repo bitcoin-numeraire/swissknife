@@ -1,6 +1,6 @@
 # Core Lightning — integration regtest node.
 # Mounted read-only at /etc/cln/config; node data, gRPC certs and the rune live
-# in the (gitignored) runtime volume under the lightning-dir (/root/.lightning).
+# in the lightning-dir (/root/.lightning), backed by a Docker named volume.
 # The network is set via the LIGHTNINGD_NETWORK env var in docker-compose.
 alias=swissknife-itest-cln
 log-level=info

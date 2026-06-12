@@ -1,9 +1,11 @@
 name: swissknife-itest
 
-# Dependency stack for the integration tests. Each daemon is
-# configured from a checked-in file under ./config/<daemon>/ (mounted
-# read-only), not inline flags; ./runtime/ holds the generated, gitignored
-# state (chain data, certs, macaroons, runes) and is populated by
+# Dependency stack for the integration tests. Each daemon is configured from a
+# checked-in file under ./config/<daemon>/ (mounted read-only), not inline
+# flags. All daemon state lives in Docker-managed named volumes (declared at the
+# bottom of this file), so nothing daemon-owned is written to the host tree. The
+# few credentials the host-run binary needs (LND cert/macaroon, CLN gRPC certs
+# and rune) are copied out of the containers into ./runtime/ by
 # scripts/bootstrap.sh.
 
 services:
@@ -16,7 +18,7 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - ./runtime/postgres:/var/lib/postgresql
+      - postgres-data:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
       interval: 2s
@@ -28,7 +30,7 @@ services:
     command: ["-conf=/etc/bitcoin/bitcoin.conf"]
     volumes:
       - ./config/bitcoin/bitcoin.conf:/etc/bitcoin/bitcoin.conf:ro
-      - ./runtime/bitcoin:/home/bitcoin/.bitcoin
+      - bitcoin-data:/home/bitcoin/.bitcoin
     ports:
       - "18443:18443"
       - "18444:18444"
@@ -52,7 +54,11 @@ services:
     command: ["--configfile=/etc/lnd/lnd.conf"]
     volumes:
       - ./config/lnd/lnd.conf:/etc/lnd/lnd.conf:ro
-      - ./runtime/lnd:/root/.lnd
+      - lnd-data:/root/.lnd
+      # Host-generated TLS cert/key (bootstrap.sh). The host-run binary verifies
+      # against the matching CA, so no root-owned cert is pulled back out.
+      - ./runtime/lnd/tls.cert:/root/.lnd/tls.cert
+      - ./runtime/lnd/tls.key:/root/.lnd/tls.key
     ports:
       - "10009:10009"
       - "8080:8080"
@@ -63,15 +69,25 @@ services:
     depends_on:
       bitcoind:
         condition: service_healthy
-    # The image entrypoint injects --network from this var ahead of --conf, and
-    # the CLI flag wins over the config file, so the network must be set here.
     environment:
       LIGHTNINGD_NETWORK: regtest
     command: ["--conf=/etc/cln/config"]
     volumes:
       - ./config/cln/config:/etc/cln/config:ro
-      - ./runtime/cln:/root/.lightning
+      - cln-data:/root/.lightning
+      - ./runtime/cln/regtest/ca.pem:/root/.lightning/regtest/ca.pem
+      - ./runtime/cln/regtest/ca-key.pem:/root/.lightning/regtest/ca-key.pem
+      - ./runtime/cln/regtest/server.pem:/root/.lightning/regtest/server.pem
+      - ./runtime/cln/regtest/server-key.pem:/root/.lightning/regtest/server-key.pem
+      - ./runtime/cln/regtest/client.pem:/root/.lightning/regtest/client.pem
+      - ./runtime/cln/regtest/client-key.pem:/root/.lightning/regtest/client-key.pem
     ports:
       - "11002:11002"
       - "3010:3010"
       - "9736:9736"
+
+volumes:
+  postgres-data:
+  bitcoin-data:
+  lnd-data:
+  cln-data:
