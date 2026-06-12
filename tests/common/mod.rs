@@ -6,6 +6,7 @@
 
 pub mod assertions;
 pub mod client;
+pub mod counterparty;
 pub mod db;
 pub mod fixtures;
 pub mod harness;
