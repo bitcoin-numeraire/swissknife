@@ -38,16 +38,26 @@ pub struct Contact {
     pub contact_since: DateTime<Utc>,
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, ToSchema)]
 pub struct Wallet {
+    /// Internal ID
     pub id: Uuid,
+    /// User ID. Populated from the Authentication method,  such as JWT subject
     pub user_id: String,
+    /// Lightning Address
     pub ln_address: Option<LnAddress>,
+    /// User Balance
     pub balance: Balance,
+    /// List of payments
     pub payments: Vec<Payment>,
+    /// List of Invoices
     pub invoices: Vec<Invoice>,
+    /// List of contacts
     pub contacts: Vec<Contact>,
+    /// Date of creation in database
     pub created_at: DateTime<Utc>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    /// Date of update in database
     pub updated_at: Option<DateTime<Utc>>,
 }
 

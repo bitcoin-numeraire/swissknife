@@ -6,14 +6,23 @@ use uuid::Uuid;
 
 use crate::InvoiceStatus;
 
-#[derive(Clone, Debug)]
+/// Bitcoin Address
+#[derive(Clone, Debug, Serialize, ToSchema)]
 pub struct BtcAddress {
+    /// Internal ID
     pub id: Uuid,
+    /// Wallet ID
     pub wallet_id: Uuid,
+    /// Current deposit address
     pub address: String,
+    /// Whether the address has already been used on-chain
     pub used: bool,
+    /// Address type
     pub address_type: BtcAddressType,
+    /// Date of creation in database
     pub created_at: DateTime<Utc>,
+    /// Date of update in database
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub updated_at: Option<DateTime<Utc>>,
 }
 
@@ -28,17 +37,32 @@ pub enum BtcAddressType {
     P2tr,
 }
 
-#[derive(Clone, Debug, Default)]
+/// Bitcoin Output
+#[derive(Clone, Debug, Default, Serialize, ToSchema)]
 pub struct BtcOutput {
+    /// Internal ID
     pub id: Uuid,
+    /// Outpoint
     pub outpoint: String,
+    /// Transaction ID. Internal only.
+    #[serde(skip)]
     pub txid: String,
+    /// Output index. Internal only.
+    #[serde(skip)]
     pub output_index: u32,
+    /// Address
     pub address: String,
+    /// Amount in satoshis
     pub amount_sat: u64,
+    /// Status
     pub status: BtcOutputStatus,
+    /// Block height
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub block_height: Option<u32>,
+    /// Date of creation in database
     pub created_at: DateTime<Utc>,
+    /// Date of update in database
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub updated_at: Option<DateTime<Utc>>,
 }
 

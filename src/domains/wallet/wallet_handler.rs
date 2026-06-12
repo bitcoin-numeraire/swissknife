@@ -15,19 +15,19 @@ use crate::{
             BAD_REQUEST_EXAMPLE, FORBIDDEN_EXAMPLE, INTERNAL_EXAMPLE, NOT_FOUND_EXAMPLE, UNAUTHORIZED_EXAMPLE,
             UNPROCESSABLE_EXAMPLE,
         },
-        dtos::{ErrorResponse, RegisterWalletRequest, WalletResponse},
+        dtos::{ErrorResponse, RegisterWalletRequest},
         entities::AppServices,
         errors::ApplicationError,
     },
     domains::user::{Permission, User},
 };
 
-use super::{WalletFilter, WalletOverview};
+use super::{Wallet, WalletFilter, WalletOverview};
 
 #[derive(OpenApi)]
 #[openapi(
     paths(register_wallet, list_wallets, list_wallet_overviews, get_wallet, delete_wallet, delete_wallets),
-    components(schemas(WalletOverview, RegisterWalletRequest)),
+    components(schemas(Wallet, WalletOverview, RegisterWalletRequest)),
     tags(
         (name = "Wallets", description = "Wallet management endpoints. Require `read:wallet` or `write:wallet` permissions.")
     ),
@@ -55,7 +55,7 @@ pub fn router() -> Router<Arc<AppServices>> {
     context_path = CONTEXT_PATH,
     request_body = RegisterWalletRequest,
     responses(
-        (status = 200, description = "Wallet Created", body = WalletResponse),
+        (status = 200, description = "Wallet Created", body = Wallet),
         (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
         (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
         (status = 403, description = "Forbidden", body = ErrorResponse, example = json!(FORBIDDEN_EXAMPLE)),
@@ -67,11 +67,11 @@ async fn register_wallet(
     State(services): State<Arc<AppServices>>,
     user: User,
     Json(payload): Json<RegisterWalletRequest>,
-) -> Result<Json<WalletResponse>, ApplicationError> {
+) -> Result<Json<Wallet>, ApplicationError> {
     user.check_permission(Permission::WriteWallet)?;
 
     let wallet = services.wallet.register(payload.user_id).await?;
-    Ok(Json(wallet.into()))
+    Ok(Json(wallet))
 }
 
 /// List wallets
@@ -83,7 +83,7 @@ async fn register_wallet(
     tag = "Wallets",
     context_path = CONTEXT_PATH,
     responses(
-        (status = 200, description = "Success", body = Vec<WalletResponse>),
+        (status = 200, description = "Success", body = Vec<Wallet>),
         (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
         (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
         (status = 403, description = "Forbidden", body = ErrorResponse, example = json!(FORBIDDEN_EXAMPLE)),
@@ -94,13 +94,12 @@ async fn list_wallets(
     State(services): State<Arc<AppServices>>,
     user: User,
     Query(filter): Query<WalletFilter>,
-) -> Result<Json<Vec<WalletResponse>>, ApplicationError> {
+) -> Result<Json<Vec<Wallet>>, ApplicationError> {
     user.check_permission(Permission::ReadWallet)?;
 
     let wallets = services.wallet.list(filter).await?;
-    let response: Vec<WalletResponse> = wallets.into_iter().map(Into::into).collect();
 
-    Ok(response.into())
+    Ok(Json(wallets))
 }
 
 /// List wallet overviews
@@ -139,7 +138,7 @@ async fn list_wallet_overviews(
     tag = "Wallets",
     context_path = CONTEXT_PATH,
     responses(
-        (status = 200, description = "Found", body = WalletResponse),
+        (status = 200, description = "Found", body = Wallet),
         (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
         (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
         (status = 403, description = "Forbidden", body = ErrorResponse, example = json!(FORBIDDEN_EXAMPLE)),
@@ -151,11 +150,11 @@ async fn get_wallet(
     State(services): State<Arc<AppServices>>,
     user: User,
     Path(id): Path<Uuid>,
-) -> Result<Json<WalletResponse>, ApplicationError> {
+) -> Result<Json<Wallet>, ApplicationError> {
     user.check_permission(Permission::ReadWallet)?;
 
     let wallet = services.wallet.get(id).await?;
-    Ok(Json(wallet.into()))
+    Ok(Json(wallet))
 }
 
 /// Delete a wallet

@@ -14,26 +14,24 @@ use crate::{
             BAD_REQUEST_EXAMPLE, FORBIDDEN_EXAMPLE, INTERNAL_EXAMPLE, NOT_FOUND_EXAMPLE, UNAUTHORIZED_EXAMPLE,
             UNPROCESSABLE_EXAMPLE,
         },
-        dtos::{
-            BtcAddressResponse, BtcOutputResponse, ErrorResponse, InvoiceResponse, LnInvoiceResponse, NewInvoiceRequest,
-        },
+        dtos::{ErrorResponse, NewInvoiceRequest},
         entities::AppServices,
         errors::ApplicationError,
     },
     domains::{
-        bitcoin::{BtcNetwork, BtcOutputStatus},
+        bitcoin::{BtcAddress, BtcNetwork, BtcOutput, BtcOutputStatus},
         user::{Permission, User},
     },
     infra::axum::{Json, Path, Query},
 };
 
-use super::{InvoiceFilter, InvoiceOrderBy, InvoiceStatus};
+use super::{Invoice, InvoiceFilter, InvoiceOrderBy, InvoiceStatus, LnInvoice};
 
 #[derive(OpenApi)]
 #[openapi(
     paths(generate_invoice, list_invoices, get_invoice, delete_invoice, delete_invoices),
-    components(schemas(InvoiceResponse, NewInvoiceRequest, InvoiceStatus, LnInvoiceResponse, InvoiceOrderBy, BtcOutputResponse,
-        BtcOutputStatus, BtcNetwork, BtcAddressResponse)),
+    components(schemas(Invoice, NewInvoiceRequest, InvoiceStatus, LnInvoice, InvoiceOrderBy, BtcOutput,
+        BtcOutputStatus, BtcNetwork, BtcAddress)),
     tags(
         (name = "Invoices", description = "Invoice management endpoints. Require `read:transaction` or `write:transaction` permissions.")
     ),
@@ -60,7 +58,7 @@ pub fn router() -> Router<Arc<AppServices>> {
     context_path = CONTEXT_PATH,
     request_body = NewInvoiceRequest,
     responses(
-        (status = 200, description = "Invoice Created", body = InvoiceResponse),
+        (status = 200, description = "Invoice Created", body = Invoice),
         (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
         (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
         (status = 403, description = "Forbidden", body = ErrorResponse, example = json!(FORBIDDEN_EXAMPLE)),
@@ -72,7 +70,7 @@ async fn generate_invoice(
     State(services): State<Arc<AppServices>>,
     user: User,
     Json(payload): Json<NewInvoiceRequest>,
-) -> Result<Json<InvoiceResponse>, ApplicationError> {
+) -> Result<Json<Invoice>, ApplicationError> {
     user.check_permission(Permission::WriteLnTransaction)?;
 
     let invoice = services
@@ -84,7 +82,7 @@ async fn generate_invoice(
             payload.expiry,
         )
         .await?;
-    Ok(Json(invoice.into()))
+    Ok(Json(invoice))
 }
 
 /// Find an invoice
@@ -96,7 +94,7 @@ async fn generate_invoice(
     tag = "Invoices",
     context_path = CONTEXT_PATH,
     responses(
-        (status = 200, description = "Found", body = InvoiceResponse),
+        (status = 200, description = "Found", body = Invoice),
         (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
         (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
         (status = 403, description = "Forbidden", body = ErrorResponse, example = json!(FORBIDDEN_EXAMPLE)),
@@ -108,11 +106,11 @@ async fn get_invoice(
     State(services): State<Arc<AppServices>>,
     user: User,
     Path(id): Path<Uuid>,
-) -> Result<Json<InvoiceResponse>, ApplicationError> {
+) -> Result<Json<Invoice>, ApplicationError> {
     user.check_permission(Permission::ReadLnTransaction)?;
 
     let invoice = services.invoice.get(id).await?;
-    Ok(Json(invoice.into()))
+    Ok(Json(invoice))
 }
 
 /// List invoices
@@ -125,7 +123,7 @@ async fn get_invoice(
     context_path = CONTEXT_PATH,
     params(InvoiceFilter),
     responses(
-        (status = 200, description = "Success", body = Vec<InvoiceResponse>),
+        (status = 200, description = "Success", body = Vec<Invoice>),
         (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
         (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
         (status = 403, description = "Forbidden", body = ErrorResponse, example = json!(FORBIDDEN_EXAMPLE)),
@@ -136,13 +134,12 @@ async fn list_invoices(
     State(services): State<Arc<AppServices>>,
     user: User,
     Query(filter): Query<InvoiceFilter>,
-) -> Result<Json<Vec<InvoiceResponse>>, ApplicationError> {
+) -> Result<Json<Vec<Invoice>>, ApplicationError> {
     user.check_permission(Permission::ReadLnTransaction)?;
 
     let invoices = services.invoice.list(filter).await?;
-    let response: Vec<InvoiceResponse> = invoices.into_iter().map(Into::into).collect();
 
-    Ok(response.into())
+    Ok(Json(invoices))
 }
 
 /// Delete an invoice

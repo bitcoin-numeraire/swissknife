@@ -15,10 +15,7 @@ use crate::{
             BAD_REQUEST_EXAMPLE, FORBIDDEN_EXAMPLE, INTERNAL_EXAMPLE, NOT_FOUND_EXAMPLE, UNAUTHORIZED_EXAMPLE,
             UNPROCESSABLE_EXAMPLE,
         },
-        dtos::{
-            BtcPaymentResponse, ErrorResponse, InternalPaymentResponse, LnPaymentResponse, PaymentResponse,
-            SendPaymentRequest,
-        },
+        dtos::{ErrorResponse, SendPaymentRequest},
         entities::AppServices,
         errors::ApplicationError,
     },
@@ -29,16 +26,16 @@ use crate::{
     infra::axum::{Json, Path},
 };
 
-use super::{PaymentFilter, PaymentStatus};
+use super::{BtcPayment, InternalPayment, LnPayment, Payment, PaymentFilter, PaymentStatus};
 
 #[derive(OpenApi)]
 #[openapi(
     paths(pay, get_payment, list_payments, delete_payment, delete_payments),
     components(schemas(
-        PaymentResponse,
-        LnPaymentResponse,
-        BtcPaymentResponse,
-        InternalPaymentResponse,
+        Payment,
+        LnPayment,
+        BtcPayment,
+        InternalPayment,
         SendPaymentRequest,
         PaymentStatus,
         LnUrlSuccessAction
@@ -69,7 +66,7 @@ pub fn router() -> Router<Arc<AppServices>> {
     context_path = CONTEXT_PATH,
     request_body = SendPaymentRequest,
     responses(
-        (status = 200, description = "Payment Sent", body = PaymentResponse),
+        (status = 200, description = "Payment Sent", body = Payment),
         (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
         (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
         (status = 403, description = "Forbidden", body = ErrorResponse, example = json!(FORBIDDEN_EXAMPLE)),
@@ -81,7 +78,7 @@ async fn pay(
     State(services): State<Arc<AppServices>>,
     user: User,
     Json(payload): Json<SendPaymentRequest>,
-) -> Result<Json<PaymentResponse>, ApplicationError> {
+) -> Result<Json<Payment>, ApplicationError> {
     user.check_permission(Permission::WriteLnTransaction)?;
 
     let payment = services
@@ -94,7 +91,7 @@ async fn pay(
         )
         .await?;
 
-    Ok(Json(payment.into()))
+    Ok(Json(payment))
 }
 
 /// Find a payment
@@ -106,7 +103,7 @@ async fn pay(
     tag = "Payments",
     context_path = CONTEXT_PATH,
     responses(
-        (status = 200, description = "Found", body = PaymentResponse),
+        (status = 200, description = "Found", body = Payment),
         (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
         (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
         (status = 403, description = "Forbidden", body = ErrorResponse, example = json!(FORBIDDEN_EXAMPLE)),
@@ -118,11 +115,11 @@ async fn get_payment(
     State(services): State<Arc<AppServices>>,
     user: User,
     Path(id): Path<Uuid>,
-) -> Result<Json<PaymentResponse>, ApplicationError> {
+) -> Result<Json<Payment>, ApplicationError> {
     user.check_permission(Permission::ReadLnTransaction)?;
 
     let payment = services.payment.get(id).await?;
-    Ok(Json(payment.into()))
+    Ok(Json(payment))
 }
 
 /// List payments
@@ -135,7 +132,7 @@ async fn get_payment(
     context_path = CONTEXT_PATH,
     params(PaymentFilter),
     responses(
-        (status = 200, description = "Success", body = Vec<PaymentResponse>),
+        (status = 200, description = "Success", body = Vec<Payment>),
         (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
         (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
         (status = 403, description = "Forbidden", body = ErrorResponse, example = json!(FORBIDDEN_EXAMPLE)),
@@ -146,13 +143,12 @@ async fn list_payments(
     State(services): State<Arc<AppServices>>,
     user: User,
     Query(query_params): Query<PaymentFilter>,
-) -> Result<Json<Vec<PaymentResponse>>, ApplicationError> {
+) -> Result<Json<Vec<Payment>>, ApplicationError> {
     user.check_permission(Permission::ReadLnTransaction)?;
 
     let payments = services.payment.list(query_params).await?;
-    let response: Vec<PaymentResponse> = payments.into_iter().map(Into::into).collect();
 
-    Ok(response.into())
+    Ok(Json(payments))
 }
 
 /// Delete a payment

@@ -12,23 +12,23 @@ use crate::{
     application::{
         docs::{BAD_REQUEST_EXAMPLE, INTERNAL_EXAMPLE, NOT_FOUND_EXAMPLE, UNAUTHORIZED_EXAMPLE, UNPROCESSABLE_EXAMPLE},
         dtos::{
-            ApiKeyResponse, BtcAddressResponse, CreateApiKeyRequest, ErrorResponse, InvoiceResponse,
-            NewBtcAddressRequest, NewInvoiceRequest, PaymentResponse, RegisterLnAddressRequest, SendPaymentRequest,
-            UpdateLnAddressRequest, WalletLnAddressResponse, WalletResponse,
+            CreateApiKeyRequest, ErrorResponse, NewBtcAddressRequest, NewInvoiceRequest, RegisterLnAddressRequest,
+            SendPaymentRequest, UpdateLnAddressRequest, WalletLnAddressResponse,
         },
         entities::AppServices,
         errors::{ApplicationError, DataError},
     },
     domains::{
-        invoice::{InvoiceFilter, InvoiceStatus},
+        bitcoin::BtcAddress,
+        invoice::{Invoice, InvoiceFilter, InvoiceStatus},
         ln_address::{LnAddress, LnAddressFilter},
-        payment::{PaymentFilter, PaymentStatus},
-        user::{ApiKeyFilter, User},
+        payment::{Payment, PaymentFilter, PaymentStatus},
+        user::{ApiKey, ApiKeyFilter, User},
     },
     infra::axum::{Json, Path, Query},
 };
 
-use super::{Balance, Contact};
+use super::{Balance, Contact, Wallet};
 
 #[derive(OpenApi)]
 #[openapi(
@@ -41,7 +41,7 @@ use super::{Balance, Contact};
         list_contacts,
         create_wallet_api_key, list_wallet_api_keys, get_wallet_api_key, revoke_wallet_api_key, revoke_wallet_api_keys,
     ),
-    components(schemas(WalletResponse, Balance, Contact, WalletLnAddressResponse, BtcAddressResponse)),
+    components(schemas(Wallet, Balance, Contact, WalletLnAddressResponse, BtcAddress)),
     tags(
         (name = "User Wallet", description = "User Wallet endpoints. Available to any authenticated user.")
     ),
@@ -83,7 +83,7 @@ pub fn user_router() -> Router<Arc<AppServices>> {
     tag = "User Wallet",
     context_path = CONTEXT_PATH,
     responses(
-        (status = 200, description = "Found", body = WalletResponse),
+        (status = 200, description = "Found", body = Wallet),
         (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
         (status = 404, description = "Not Found", body = ErrorResponse, example = json!(NOT_FOUND_EXAMPLE)),
         (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
@@ -92,9 +92,9 @@ pub fn user_router() -> Router<Arc<AppServices>> {
 async fn get_user_wallet(
     State(services): State<Arc<AppServices>>,
     user: User,
-) -> Result<Json<WalletResponse>, ApplicationError> {
+) -> Result<Json<Wallet>, ApplicationError> {
     let wallet = services.wallet.get(user.wallet_id).await?;
-    Ok(Json(wallet.into()))
+    Ok(Json(wallet))
 }
 
 /// Generate a new Bitcoin address.
@@ -107,7 +107,7 @@ async fn get_user_wallet(
     context_path = CONTEXT_PATH,
     request_body = NewBtcAddressRequest,
     responses(
-        (status = 200, description = "Bitcoin Address Created", body = BtcAddressResponse),
+        (status = 200, description = "Bitcoin Address Created", body = BtcAddress),
         (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
         (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
         (status = 422, description = "Unprocessable Entity", body = ErrorResponse, example = json!(UNPROCESSABLE_EXAMPLE)),
@@ -118,12 +118,12 @@ async fn new_wallet_btc_address(
     State(services): State<Arc<AppServices>>,
     user: User,
     Json(payload): Json<NewBtcAddressRequest>,
-) -> Result<Json<BtcAddressResponse>, ApplicationError> {
+) -> Result<Json<BtcAddress>, ApplicationError> {
     let address = services
         .bitcoin
         .new_deposit_address(user.wallet_id, payload.address_type)
         .await?;
-    Ok(Json(address.into()))
+    Ok(Json(address))
 }
 
 /// Send payment
@@ -136,7 +136,7 @@ async fn new_wallet_btc_address(
     context_path = CONTEXT_PATH,
     request_body = SendPaymentRequest,
     responses(
-        (status = 200, description = "Payment Sent", body = PaymentResponse),
+        (status = 200, description = "Payment Sent", body = Payment),
         (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
         (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
         (status = 422, description = "Unprocessable Entity", body = ErrorResponse, example = json!(UNPROCESSABLE_EXAMPLE)),
@@ -147,13 +147,13 @@ async fn wallet_pay(
     State(services): State<Arc<AppServices>>,
     user: User,
     Json(payload): Json<SendPaymentRequest>,
-) -> Result<Json<PaymentResponse>, ApplicationError> {
+) -> Result<Json<Payment>, ApplicationError> {
     let payment = services
         .payment
         .pay(payload.input, payload.amount_msat, payload.comment, user.wallet_id)
         .await?;
 
-    Ok(Json(payment.into()))
+    Ok(Json(payment))
 }
 
 /// Get wallet balance
@@ -188,7 +188,7 @@ async fn get_wallet_balance(
     context_path = CONTEXT_PATH,
     request_body = NewInvoiceRequest,
     responses(
-        (status = 200, description = "Invoice Created", body = InvoiceResponse),
+        (status = 200, description = "Invoice Created", body = Invoice),
         (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
         (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
         (status = 422, description = "Unprocessable Entity", body = ErrorResponse, example = json!(UNPROCESSABLE_EXAMPLE)),
@@ -199,13 +199,13 @@ async fn new_wallet_invoice(
     State(services): State<Arc<AppServices>>,
     user: User,
     Json(payload): Json<NewInvoiceRequest>,
-) -> Result<Json<InvoiceResponse>, ApplicationError> {
+) -> Result<Json<Invoice>, ApplicationError> {
     let invoice = services
         .invoice
         .invoice(user.wallet_id, payload.amount_msat, payload.description, payload.expiry)
         .await?;
 
-    Ok(Json(invoice.into()))
+    Ok(Json(invoice))
 }
 
 /// Get LN Address
@@ -357,7 +357,7 @@ async fn delete_wallet_address(State(services): State<Arc<AppServices>>, user: U
     context_path = CONTEXT_PATH,
     params(PaymentFilter),
     responses(
-        (status = 200, description = "Success", body = Vec<PaymentResponse>),
+        (status = 200, description = "Success", body = Vec<Payment>),
         (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
         (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
         (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
@@ -367,13 +367,11 @@ async fn list_wallet_payments(
     State(services): State<Arc<AppServices>>,
     user: User,
     Query(mut query_params): Query<PaymentFilter>,
-) -> Result<Json<Vec<PaymentResponse>>, ApplicationError> {
+) -> Result<Json<Vec<Payment>>, ApplicationError> {
     query_params.wallet_id = Some(user.wallet_id);
     let payments = services.payment.list(query_params).await?;
 
-    let response: Vec<PaymentResponse> = payments.into_iter().map(Into::into).collect();
-
-    Ok(response.into())
+    Ok(Json(payments))
 }
 
 /// Find a payment
@@ -385,7 +383,7 @@ async fn list_wallet_payments(
     tag = "User Wallet",
     context_path = CONTEXT_PATH,
     responses(
-        (status = 200, description = "Found", body = PaymentResponse),
+        (status = 200, description = "Found", body = Payment),
         (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
         (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
         (status = 404, description = "Not Found", body = ErrorResponse, example = json!(NOT_FOUND_EXAMPLE)),
@@ -396,7 +394,7 @@ async fn get_wallet_payment(
     State(services): State<Arc<AppServices>>,
     user: User,
     Path(id): Path<Uuid>,
-) -> Result<Json<PaymentResponse>, ApplicationError> {
+) -> Result<Json<Payment>, ApplicationError> {
     let payments = services
         .payment
         .list(PaymentFilter {
@@ -411,7 +409,7 @@ async fn get_wallet_payment(
         .cloned()
         .ok_or_else(|| DataError::NotFound("Payment not found.".to_string()))?;
 
-    Ok(Json(payment.into()))
+    Ok(Json(payment))
 }
 
 /// List invoices
@@ -424,7 +422,7 @@ async fn get_wallet_payment(
     context_path = CONTEXT_PATH,
     params(InvoiceFilter),
     responses(
-        (status = 200, description = "Success", body = Vec<InvoiceResponse>),
+        (status = 200, description = "Success", body = Vec<Invoice>),
         (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
         (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
         (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
@@ -434,13 +432,11 @@ async fn list_wallet_invoices(
     State(services): State<Arc<AppServices>>,
     user: User,
     Query(mut query_params): Query<InvoiceFilter>,
-) -> Result<Json<Vec<InvoiceResponse>>, ApplicationError> {
+) -> Result<Json<Vec<Invoice>>, ApplicationError> {
     query_params.wallet_id = Some(user.wallet_id);
     let invoices = services.invoice.list(query_params).await?;
 
-    let response: Vec<InvoiceResponse> = invoices.into_iter().map(Into::into).collect();
-
-    Ok(response.into())
+    Ok(Json(invoices))
 }
 
 /// Find an invoice
@@ -452,7 +448,7 @@ async fn list_wallet_invoices(
     tag = "User Wallet",
     context_path = CONTEXT_PATH,
     responses(
-        (status = 200, description = "Found", body = InvoiceResponse),
+        (status = 200, description = "Found", body = Invoice),
         (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
         (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
         (status = 404, description = "Not Found", body = ErrorResponse, example = json!(NOT_FOUND_EXAMPLE)),
@@ -463,7 +459,7 @@ async fn get_wallet_invoice(
     State(services): State<Arc<AppServices>>,
     user: User,
     Path(id): Path<Uuid>,
-) -> Result<Json<InvoiceResponse>, ApplicationError> {
+) -> Result<Json<Invoice>, ApplicationError> {
     let invoices = services
         .invoice
         .list(InvoiceFilter {
@@ -478,7 +474,7 @@ async fn get_wallet_invoice(
         .cloned()
         .ok_or_else(|| DataError::NotFound("Invoice not found.".to_string()))?;
 
-    Ok(Json(invoice.into()))
+    Ok(Json(invoice))
 }
 
 /// List contacts
@@ -572,7 +568,7 @@ async fn delete_failed_payments(
     context_path = CONTEXT_PATH,
     request_body = CreateApiKeyRequest,
     responses(
-        (status = 200, description = "API Key Created", body = ApiKeyResponse),
+        (status = 200, description = "API Key Created", body = ApiKey),
         (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
         (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
         (status = 422, description = "Unprocessable Entity", body = ErrorResponse, example = json!(UNPROCESSABLE_EXAMPLE)),
@@ -583,10 +579,10 @@ async fn create_wallet_api_key(
     State(services): State<Arc<AppServices>>,
     user: User,
     Json(mut payload): Json<CreateApiKeyRequest>,
-) -> Result<Json<ApiKeyResponse>, ApplicationError> {
+) -> Result<Json<ApiKey>, ApplicationError> {
     payload.user_id = Some(user.id.clone());
     let api_key = services.api_key.generate(user, payload).await?;
-    Ok(Json(api_key.into()))
+    Ok(Json(api_key))
 }
 
 /// Find an API Key
@@ -598,7 +594,7 @@ async fn create_wallet_api_key(
     tag = "User Wallet",
     context_path = CONTEXT_PATH,
     responses(
-        (status = 200, description = "Found", body = ApiKeyResponse),
+        (status = 200, description = "Found", body = ApiKey),
         (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
         (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
         (status = 404, description = "Not Found", body = ErrorResponse, example = json!(NOT_FOUND_EXAMPLE)),
@@ -609,7 +605,7 @@ async fn get_wallet_api_key(
     State(services): State<Arc<AppServices>>,
     user: User,
     Path(id): Path<Uuid>,
-) -> Result<Json<ApiKeyResponse>, ApplicationError> {
+) -> Result<Json<ApiKey>, ApplicationError> {
     let api_keys = services
         .api_key
         .list(ApiKeyFilter {
@@ -624,7 +620,7 @@ async fn get_wallet_api_key(
         .cloned()
         .ok_or_else(|| DataError::NotFound("API Key not found.".to_string()))?;
 
-    Ok(Json(api_key.into()))
+    Ok(Json(api_key))
 }
 
 /// List API Keys
@@ -637,7 +633,7 @@ async fn get_wallet_api_key(
     context_path = CONTEXT_PATH,
     params(ApiKeyFilter),
     responses(
-        (status = 200, description = "Success", body = Vec<ApiKeyResponse>),
+        (status = 200, description = "Success", body = Vec<ApiKey>),
         (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
         (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
         (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
@@ -647,12 +643,11 @@ async fn list_wallet_api_keys(
     State(services): State<Arc<AppServices>>,
     user: User,
     Query(mut filter): Query<ApiKeyFilter>,
-) -> Result<Json<Vec<ApiKeyResponse>>, ApplicationError> {
+) -> Result<Json<Vec<ApiKey>>, ApplicationError> {
     filter.user_id = Some(user.id);
     let api_keys = services.api_key.list(filter).await?;
-    let response: Vec<ApiKeyResponse> = api_keys.into_iter().map(Into::into).collect();
 
-    Ok(response.into())
+    Ok(Json(api_keys))
 }
 
 /// Revoke an API Key

@@ -4676,6 +4676,7 @@ dependencies = [
  "chrono",
  "nostr",
  "serde",
+ "serde_with",
  "strum 0.28.0",
  "strum_macros",
  "utoipa",
