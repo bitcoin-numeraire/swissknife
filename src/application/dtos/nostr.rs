@@ -1,15 +1,10 @@
 use std::collections::HashMap;
 
 use nostr_sdk::PublicKey;
-use serde::{Deserialize, Serialize};
-use utoipa::{IntoParams, ToSchema};
+use serde::Serialize;
+use utoipa::ToSchema;
 
-#[derive(Debug, Deserialize, IntoParams)]
-pub struct NostrNIP05QueryParams {
-    /// Username to query
-    #[serde(default)]
-    pub name: String,
-}
+pub use swissknife_api_types::NostrNIP05QueryParams;
 
 #[derive(Debug, Serialize, ToSchema)]
 pub struct NostrNIP05Response {

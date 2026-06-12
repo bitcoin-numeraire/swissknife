@@ -1,20 +1,11 @@
 use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use utoipa::ToSchema;
 use uuid::Uuid;
 
-use crate::domains::bitcoin::{BtcAddress, BtcAddressType, BtcOutput, BtcOutputStatus};
+use crate::domains::bitcoin::{BtcAddress, BtcOutput, BtcOutputStatus};
 
-/// New Invoice Request
-#[derive(Deserialize, ToSchema)]
-pub struct NewBtcAddressRequest {
-    /// User ID. Will be populated with your own ID by default
-    pub wallet_id: Option<Uuid>,
-
-    /// Address type
-    #[serde(rename = "type")]
-    pub address_type: Option<BtcAddressType>,
-}
+pub use swissknife_api_types::NewBtcAddressRequest;
 
 #[derive(Debug, Serialize, ToSchema)]
 pub struct BtcAddressResponse {
