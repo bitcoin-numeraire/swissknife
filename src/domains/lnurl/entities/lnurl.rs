@@ -2,7 +2,7 @@ use nostr_sdk::PublicKey;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-pub use swissknife_api_types::{LnUrlCallback, LnUrlSuccessAction};
+pub use swissknife_types::{LnUrlCallback, LnUrlSuccessAction};
 
 #[derive(Debug, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]

@@ -1,1 +1,1 @@
-pub use swissknife_api_types::Contact;
+pub use swissknife_types::Contact;

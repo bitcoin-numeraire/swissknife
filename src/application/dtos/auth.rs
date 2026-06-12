@@ -1,7 +1,7 @@
 use serde::Serialize;
 use utoipa::ToSchema;
 
-pub use swissknife_api_types::{SignInRequest, SignUpRequest};
+pub use swissknife_types::{SignInRequest, SignUpRequest};
 
 /// Sign In Response
 #[derive(Debug, Serialize, ToSchema)]

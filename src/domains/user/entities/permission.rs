@@ -1,1 +1,1 @@
-pub use swissknife_api_types::Permission;
+pub use swissknife_types::Permission;

@@ -1,1 +1,1 @@
-pub use swissknife_api_types::NewInvoiceRequest;
+pub use swissknife_types::NewInvoiceRequest;

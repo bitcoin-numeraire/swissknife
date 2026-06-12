@@ -1,1 +1,1 @@
-pub use swissknife_api_types::NewBtcAddressRequest;
+pub use swissknife_types::NewBtcAddressRequest;

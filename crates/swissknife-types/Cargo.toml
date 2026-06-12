@@ -1,5 +1,5 @@
 [package]
-name = "swissknife-api-types"
+name = "swissknife-types"
 version = "0.1.7"
 edition = "2021"
 authors = ["Dario Anongba Varela <dario.varela@numeraire.tech>"]

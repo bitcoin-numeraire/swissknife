@@ -3,7 +3,7 @@ use utoipa::ToSchema;
 
 use crate::domains::ln_address::LnAddress;
 
-pub use swissknife_api_types::{RegisterLnAddressRequest, UpdateLnAddressRequest};
+pub use swissknife_types::{RegisterLnAddressRequest, UpdateLnAddressRequest};
 
 #[derive(Debug, Serialize, ToSchema)]
 pub struct WalletLnAddressResponse {

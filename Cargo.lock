@@ -4654,7 +4654,7 @@ dependencies = [
  "serde_with",
  "strum 0.28.0",
  "strum_macros",
- "swissknife-api-types",
+ "swissknife-types",
  "thiserror 2.0.18",
  "tokio",
  "tokio-tungstenite 0.29.0",
@@ -4670,7 +4670,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "swissknife-api-types"
+name = "swissknife-types"
 version = "0.1.7"
 dependencies = [
  "chrono",

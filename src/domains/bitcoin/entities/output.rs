@@ -1,1 +1,1 @@
-pub use swissknife_api_types::{BtcOutput, BtcOutputStatus};
+pub use swissknife_types::{BtcOutput, BtcOutputStatus};
