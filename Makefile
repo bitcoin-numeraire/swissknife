@@ -114,10 +114,10 @@ coverage-lcov:
 check: fmt lint build test
 
 new-migration:
-	@sea-orm-cli migrate generate $(name)
+	@sea-orm-cli migrate -d crates/migration generate $(name)
 
 run-migrations:
-	@sea-orm-cli migrate up
+	@sea-orm-cli migrate -d crates/migration up
 
 fresh-migrations:
-	@sea-orm-cli migrate fresh
+	@sea-orm-cli migrate -d crates/migration fresh
