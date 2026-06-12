@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use serde_with::{serde_as, DurationSeconds};
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -14,18 +14,7 @@ use crate::{
     domains::invoice::{Invoice, InvoiceStatus, LnInvoice},
 };
 
-/// New Invoice Request
-#[derive(Deserialize, ToSchema)]
-pub struct NewInvoiceRequest {
-    /// User ID. Will be populated with your own ID by default
-    pub wallet_id: Option<Uuid>,
-    /// Amount in millisatoshis
-    pub amount_msat: u64,
-    /// Description of the invoice. Visible by the payer
-    pub description: Option<String>,
-    /// Expiration time in seconds
-    pub expiry: Option<u32>,
-}
+pub use swissknife_api_types::NewInvoiceRequest;
 
 #[derive(Serialize, ToSchema)]
 pub struct InvoiceResponse {

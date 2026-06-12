@@ -1,24 +1,11 @@
 use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::domains::user::{ApiKey, Permission};
 
-/// Create API Key Request
-#[derive(Deserialize, ToSchema)]
-pub struct CreateApiKeyRequest {
-    /// User ID. Will be populated with your own ID by default
-    pub user_id: Option<String>,
-    /// API key name
-    pub name: String,
-    /// List of permissions for this API key
-    pub permissions: Vec<Permission>,
-    /// API key description
-    pub description: Option<String>,
-    /// Expiration time in seconds
-    pub expiry: Option<u32>,
-}
+pub use swissknife_api_types::CreateApiKeyRequest;
 
 /// API Key Response
 #[derive(Serialize, ToSchema)]

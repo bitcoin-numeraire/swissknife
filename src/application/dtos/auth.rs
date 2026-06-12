@@ -1,21 +1,7 @@
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use utoipa::ToSchema;
 
-/// Sign Up Request
-#[derive(Debug, Deserialize, ToSchema)]
-pub struct SignUpRequest {
-    /// User password
-    #[schema(example = "password")]
-    pub password: String,
-}
-
-/// Sign In Request
-#[derive(Debug, Deserialize, ToSchema)]
-pub struct SignInRequest {
-    /// User password
-    #[schema(example = "password")]
-    pub password: String,
-}
+pub use swissknife_api_types::{SignInRequest, SignUpRequest};
 
 /// Sign In Response
 #[derive(Debug, Serialize, ToSchema)]

@@ -1,16 +1,10 @@
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use serde_json::Value;
-use utoipa::{IntoParams, ToSchema};
+use utoipa::ToSchema;
 
 use crate::domains::lnurl::LnUrlCallback;
 
-#[derive(Debug, Deserialize, IntoParams)]
-pub struct LNUrlpInvoiceQueryParams {
-    /// Amount in millisatoshis
-    pub amount: u64,
-    /// Optional comment for the recipient
-    pub comment: Option<String>,
-}
+pub use swissknife_api_types::LNUrlpInvoiceQueryParams;
 
 #[derive(Debug, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]

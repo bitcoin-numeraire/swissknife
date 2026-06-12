@@ -1,5 +1,5 @@
 use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use utoipa::ToSchema;
 use uuid::Uuid;
 
@@ -11,21 +11,7 @@ use crate::{
     },
 };
 
-/// Send Payment Request
-#[derive(Debug, Deserialize, Clone, ToSchema)]
-pub struct SendPaymentRequest {
-    /// Wallet ID. Will be populated with your own ID by default
-    pub wallet_id: Option<Uuid>,
-
-    /// Recipient. Can be a Bolt11 invoice, LNURL or LN Address. Keysend and On-chain payments not yet supported
-    #[schema(example = "hello@numeraire.tech")]
-    pub input: String,
-
-    /// Amount in millisatoshis. Only necessary if the input does not specify an amount (empty Bolt11, LNURL or LN Address)
-    pub amount_msat: Option<u64>,
-    /// Comment of the payment. Visible by the recipient for LNURL payments
-    pub comment: Option<String>,
-}
+pub use swissknife_api_types::SendPaymentRequest;
 
 #[derive(Serialize, ToSchema)]
 pub struct PaymentResponse {

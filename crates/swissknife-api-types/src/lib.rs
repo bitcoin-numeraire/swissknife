@@ -13,6 +13,7 @@ mod lnurl;
 mod network;
 mod payment;
 mod permission;
+mod request;
 mod transaction;
 mod wallet;
 
@@ -24,5 +25,10 @@ pub use lnurl::{LnUrlCallback, LnUrlSuccessAction};
 pub use network::BtcNetwork;
 pub use payment::{BtcPayment, InternalPayment, LnPayment, Payment, PaymentStatus};
 pub use permission::Permission;
+pub use request::{
+    CreateApiKeyRequest, LNUrlpInvoiceQueryParams, NewBtcAddressRequest, NewInvoiceRequest, NostrNIP05QueryParams,
+    RegisterLnAddressRequest, RegisterWalletRequest, SendPaymentRequest, SignInRequest, SignUpRequest,
+    UpdateLnAddressRequest,
+};
 pub use transaction::{Currency, Ledger};
 pub use wallet::{Balance, Contact, Wallet, WalletOverview};
