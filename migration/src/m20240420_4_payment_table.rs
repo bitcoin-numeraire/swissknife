@@ -56,6 +56,8 @@ impl MigrationTrait for Migration {
 }
 
 #[derive(DeriveIden)]
+// Variants map to SQL column names via `DeriveIden`, so the `Payment` prefix is required.
+#[allow(clippy::enum_variant_names)]
 pub(crate) enum Payment {
     Table,
     Id,
