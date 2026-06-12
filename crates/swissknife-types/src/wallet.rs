@@ -5,6 +5,7 @@ use uuid::Uuid;
 
 use crate::{Invoice, LnAddress, Payment};
 
+/// A wallet's balance, in millisatoshis.
 #[derive(Debug, Clone, Serialize, Default, ToSchema)]
 pub struct Balance {
     /// Total amount received
@@ -28,6 +29,7 @@ pub struct Balance {
     pub available_msat: i64,
 }
 
+/// A counterparty the wallet has paid, with the date of first contact.
 #[derive(Debug, Clone, Serialize, Default, ToSchema)]
 pub struct Contact {
     /// Lightning Address
@@ -38,6 +40,7 @@ pub struct Contact {
     pub contact_since: DateTime<Utc>,
 }
 
+/// A user wallet with its balance and linked payments, invoices and contacts.
 #[derive(Debug, Clone, Default, Serialize, ToSchema)]
 pub struct Wallet {
     /// Internal ID
@@ -61,6 +64,7 @@ pub struct Wallet {
     pub updated_at: Option<DateTime<Utc>>,
 }
 
+/// A lightweight wallet summary with counts in place of the full lists.
 #[derive(Debug, Clone, Default, Serialize, ToSchema)]
 pub struct WalletOverview {
     /// Internal ID

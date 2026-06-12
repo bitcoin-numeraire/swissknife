@@ -5,8 +5,9 @@ edition = "2021"
 authors = ["Dario Anongba Varela <dario.varela@numeraire.tech>"]
 rust-version = "1.96"
 license = "MIT"
-description = "Shared API/contract types (entities, enums, requests) for Numeraire SwissKnife."
+description = "Shared API/contract types (entities, enums, requests, responses) for Numeraire SwissKnife."
 repository = "https://github.com/bitcoin-numeraire/swissknife"
+readme = "README.md"
 
 [dependencies]
 serde = { version = "1.0.228", features = ["derive"] }
