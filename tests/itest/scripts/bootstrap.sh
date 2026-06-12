@@ -231,9 +231,73 @@ ensure_cln_ready() {
   fi
 }
 
+ensure_lnd_synced() {
+  local miner_addr
+  miner_addr=$(bitcoin_cli -rpcwallet=miner getnewaddress)
+  local deadline=$((SECONDS + 120))
+  until lnd_cli getinfo 2>/dev/null \
+    | python3 -c 'import sys,json; sys.exit(0 if json.load(sys.stdin).get("synced_to_chain") else 1)' 2>/dev/null; do
+    if (( SECONDS >= deadline )); then
+      echo "LND did not sync to chain" >&2
+      return 1
+    fi
+    # In regtest LND reports synced_to_chain only after a fresh block; nudge it.
+    bitcoin_cli -rpcwallet=miner generatetoaddress 1 "${miner_addr}" >/dev/null 2>&1 || true
+    sleep 2
+  done
+}
+
+# Open a single LND <-> CLN channel with pushed liquidity. Whichever node is
+# under test, the other acts as a counterparty with both inbound and outbound
+# liquidity, so real invoice/pay/receive flows work for every provider.
+ensure_channel() {
+  local existing
+  existing=$(lnd_cli listchannels 2>/dev/null \
+    | python3 -c 'import sys,json; print(len(json.load(sys.stdin).get("channels",[])))' 2>/dev/null || echo 0)
+  if [[ "${existing}" -ge 1 ]]; then
+    return
+  fi
+
+  ensure_lnd_synced
+
+  local lnd_addr miner_addr
+  lnd_addr=$(lnd_cli newaddress p2wkh | python3 -c 'import sys,json; print(json.load(sys.stdin)["address"])')
+  miner_addr=$(bitcoin_cli -rpcwallet=miner getnewaddress "channel funding" bech32)
+  bitcoin_cli -rpcwallet=miner sendtoaddress "${lnd_addr}" 1 >/dev/null
+  bitcoin_cli -rpcwallet=miner generatetoaddress 6 "${miner_addr}" >/dev/null
+
+  local deadline=$((SECONDS + 120))
+  until [[ "$(lnd_cli walletbalance 2>/dev/null \
+    | python3 -c 'import sys,json; print(json.load(sys.stdin).get("confirmed_balance","0"))' 2>/dev/null || echo 0)" != "0" ]]; do
+    if (( SECONDS >= deadline )); then
+      echo "LND on-chain funds did not confirm" >&2
+      return 1
+    fi
+    bitcoin_cli -rpcwallet=miner generatetoaddress 1 "${miner_addr}" >/dev/null 2>&1 || true
+    sleep 2
+  done
+
+  local cln_id
+  cln_id=$(cln_cli getinfo | python3 -c 'import sys,json; print(json.load(sys.stdin)["id"])')
+  lnd_cli connect "${cln_id}@cln:9736" >/dev/null 2>&1 || true
+  lnd_cli openchannel --node_key="${cln_id}" --local_amt=5000000 --push_amt=2500000 >/dev/null
+
+  deadline=$((SECONDS + 180))
+  until [[ "$(lnd_cli listchannels 2>/dev/null \
+    | python3 -c 'import sys,json; print(sum(1 for c in json.load(sys.stdin).get("channels",[]) if c.get("active")))' 2>/dev/null || echo 0)" -ge 1 ]]; do
+    if (( SECONDS >= deadline )); then
+      echo "LND<->CLN channel did not become active" >&2
+      return 1
+    fi
+    bitcoin_cli -rpcwallet=miner generatetoaddress 1 "${miner_addr}" >/dev/null
+    sleep 2
+  done
+}
+
 wait_for_bitcoind
 ensure_bitcoin_wallet
 ensure_lnd_wallet
 ensure_cln_ready
+ensure_channel
 
 echo "Swissknife integration dependencies are ready."
