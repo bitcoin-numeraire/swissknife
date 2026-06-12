@@ -12,7 +12,7 @@ use utoipa::OpenApi;
 use swissknife_types::ErrorResponse;
 
 use crate::{
-    application::{docs::INTERNAL_EXAMPLE, entities::AppServices, errors::ApplicationError},
+    application::{composition::AppServices, docs::INTERNAL_EXAMPLE, errors::ApplicationError},
     infra::axum::Json,
 };
 
@@ -136,7 +136,7 @@ async fn mark_welcome_complete(
 
 #[cfg(test)]
 mod tests {
-    use crate::application::entities::MockAppServicesBuilder;
+    use crate::application::composition::MockAppServicesBuilder;
 
     use super::*;
 

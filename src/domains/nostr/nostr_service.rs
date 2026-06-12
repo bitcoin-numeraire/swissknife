@@ -3,7 +3,7 @@ use nostr_sdk::PublicKey;
 use tracing::{debug, trace};
 
 use crate::application::{
-    entities::AppStore,
+    composition::AppStore,
     errors::{ApplicationError, DataError},
 };
 
@@ -47,7 +47,7 @@ mod tests {
     use uuid::Uuid;
 
     use crate::{
-        application::{entities::MockAppStoreBuilder, errors::DatabaseError},
+        application::{composition::MockAppStoreBuilder, errors::DatabaseError},
         domains::ln_address::LnAddress,
     };
 

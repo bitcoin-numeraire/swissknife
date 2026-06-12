@@ -1,5 +1,5 @@
 use crate::application::{
-    entities::{AppStore, Currency},
+    composition::{AppStore, Currency},
     errors::{ApplicationError, DataError},
 };
 use async_trait::async_trait;
@@ -131,7 +131,7 @@ impl WalletUseCases for WalletService {
 
 #[cfg(test)]
 mod tests {
-    use crate::application::{entities::MockAppStoreBuilder, errors::DatabaseError};
+    use crate::application::{composition::MockAppStoreBuilder, errors::DatabaseError};
 
     use super::*;
 

@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use crate::{
-    application::{dtos::AppConfig, entities::AppAdapters},
+    application::{composition::AppAdapters, composition::AppConfig},
     domains::{
         bitcoin::{BitcoinService, BitcoinUseCases},
         event::{EventService, EventUseCases},

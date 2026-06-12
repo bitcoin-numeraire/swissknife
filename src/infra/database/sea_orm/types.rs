@@ -3,7 +3,7 @@ use std::time::Duration;
 use chrono::Utc;
 
 use crate::{
-    application::entities::Ledger,
+    application::composition::Ledger,
     domains::{
         bitcoin::{BtcAddress, BtcOutput},
         invoice::{Invoice, InvoiceStatus, LnInvoice},

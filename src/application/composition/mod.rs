@@ -1,8 +1,10 @@
 mod adapters;
+mod config;
 mod services;
 mod store;
 
 pub use adapters::*;
+pub use config::*;
 pub use services::*;
 pub use store::AppStore;
 #[cfg(test)]

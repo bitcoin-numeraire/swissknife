@@ -3,7 +3,7 @@ use lightning_invoice::Bolt11Invoice;
 use std::str::FromStr;
 
 use crate::{
-    application::entities::Ledger,
+    application::composition::Ledger,
     domains::{
         bitcoin::BtcOutputStatus,
         event::LnInvoicePaidEvent,

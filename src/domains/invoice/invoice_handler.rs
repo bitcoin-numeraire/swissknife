@@ -12,11 +12,11 @@ use swissknife_types::{ErrorResponse, NewInvoiceRequest};
 
 use crate::{
     application::{
+        composition::AppServices,
         docs::{
             BAD_REQUEST_EXAMPLE, FORBIDDEN_EXAMPLE, INTERNAL_EXAMPLE, NOT_FOUND_EXAMPLE, UNAUTHORIZED_EXAMPLE,
             UNPROCESSABLE_EXAMPLE,
         },
-        entities::AppServices,
         errors::ApplicationError,
     },
     domains::{
@@ -201,7 +201,7 @@ async fn delete_invoices(
 
 #[cfg(test)]
 mod tests {
-    use crate::{application::entities::MockAppServicesBuilder, domains::invoice::Invoice};
+    use crate::{application::composition::MockAppServicesBuilder, domains::invoice::Invoice};
 
     use super::*;
 

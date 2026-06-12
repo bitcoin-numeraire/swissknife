@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use uuid::Uuid;
 
-use crate::application::{entities::Currency, errors::DatabaseError};
+use crate::application::{composition::Currency, errors::DatabaseError};
 
 use super::{Balance, Contact, Wallet, WalletFilter, WalletOverview};
 

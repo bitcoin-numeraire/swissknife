@@ -8,7 +8,7 @@ use uuid::Uuid;
 
 use crate::{
     application::{
-        entities::{AppStore, Ledger},
+        composition::{AppStore, Ledger},
         errors::{ApplicationError, DataError, LightningError},
     },
     domains::{
@@ -681,7 +681,7 @@ impl PaymentsUseCases for PaymentService {
 mod tests {
     use crate::{
         application::{
-            entities::{Currency, MockAppStoreBuilder},
+            composition::{Currency, MockAppStoreBuilder},
             errors::BitcoinError,
         },
         domains::{

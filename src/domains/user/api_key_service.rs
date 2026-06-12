@@ -8,7 +8,7 @@ use uuid::Uuid;
 use swissknife_types::CreateApiKeyRequest;
 
 use crate::application::{
-    entities::AppStore,
+    composition::AppStore,
     errors::{ApplicationError, DataError},
 };
 
@@ -125,7 +125,7 @@ impl ApiKeyUseCases for ApiKeyService {
 #[cfg(test)]
 mod tests {
     use crate::{
-        application::{entities::MockAppStoreBuilder, errors::DatabaseError},
+        application::{composition::MockAppStoreBuilder, errors::DatabaseError},
         domains::user::Permission,
     };
 

@@ -20,7 +20,7 @@ use walletrpc::wallet_kit_client::WalletKitClient;
 
 use crate::{
     application::{
-        entities::Ledger,
+        composition::Ledger,
         errors::{BitcoinError, LightningError},
     },
     domains::{

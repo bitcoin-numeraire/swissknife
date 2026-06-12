@@ -13,11 +13,11 @@ use swissknife_types::{ErrorResponse, SendPaymentRequest};
 
 use crate::{
     application::{
+        composition::AppServices,
         docs::{
             BAD_REQUEST_EXAMPLE, FORBIDDEN_EXAMPLE, INTERNAL_EXAMPLE, NOT_FOUND_EXAMPLE, UNAUTHORIZED_EXAMPLE,
             UNPROCESSABLE_EXAMPLE,
         },
-        entities::AppServices,
         errors::ApplicationError,
     },
     domains::{
@@ -210,7 +210,7 @@ async fn delete_payments(
 
 #[cfg(test)]
 mod tests {
-    use crate::{application::entities::MockAppServicesBuilder, domains::payment::Payment};
+    use crate::{application::composition::MockAppServicesBuilder, domains::payment::Payment};
 
     use super::*;
 

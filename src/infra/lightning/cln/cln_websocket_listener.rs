@@ -15,7 +15,7 @@ use tracing::{error, info, warn};
 
 use crate::{
     application::{
-        entities::{AppServices, Currency},
+        composition::{AppServices, Currency},
         errors::LightningError,
     },
     domains::bitcoin::{BitcoinWallet, OnchainSyncCursor, OnchainTransaction},

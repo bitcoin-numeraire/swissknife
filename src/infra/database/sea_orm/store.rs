@@ -6,7 +6,7 @@ use sea_orm::{ConnectOptions, Database, DatabaseConnection};
 use tracing::{debug, trace};
 
 use crate::{
-    application::{entities::AppStore, errors::DatabaseError},
+    application::{composition::AppStore, errors::DatabaseError},
     domains::system::HealthProbe,
 };
 

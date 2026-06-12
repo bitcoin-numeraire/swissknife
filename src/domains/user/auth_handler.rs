@@ -7,8 +7,8 @@ use swissknife_types::{ErrorResponse, SignInRequest, SignInResponse, SignUpReque
 
 use crate::{
     application::{
+        composition::AppServices,
         docs::{BAD_REQUEST_EXAMPLE, CONFLICT_EXAMPLE, NOT_FOUND_EXAMPLE, UNAUTHORIZED_EXAMPLE, UNSUPPORTED_EXAMPLE},
-        entities::AppServices,
         errors::ApplicationError,
     },
     infra::axum::Json,
@@ -83,7 +83,7 @@ async fn sign_in(
 
 #[cfg(test)]
 mod tests {
-    use crate::application::{entities::MockAppServicesBuilder, errors::DataError};
+    use crate::application::{composition::MockAppServicesBuilder, errors::DataError};
 
     use super::*;
 

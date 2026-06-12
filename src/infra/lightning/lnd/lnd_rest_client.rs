@@ -12,7 +12,7 @@ use tokio::fs;
 
 use crate::{
     application::{
-        entities::Ledger,
+        composition::Ledger,
         errors::{BitcoinError, LightningError},
     },
     domains::{

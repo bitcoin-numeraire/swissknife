@@ -15,7 +15,7 @@ use tonic::transport::{Certificate, Channel, ClientTlsConfig, Identity};
 
 use crate::{
     application::{
-        entities::Ledger,
+        composition::Ledger,
         errors::{BitcoinError, LightningError},
     },
     domains::{

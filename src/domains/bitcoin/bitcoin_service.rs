@@ -6,7 +6,7 @@ use uuid::Uuid;
 
 use crate::{
     application::{
-        entities::{AppStore, Currency},
+        composition::{AppStore, Currency},
         errors::{ApplicationError, DataError},
     },
     domains::{
@@ -170,7 +170,7 @@ mod tests {
     use chrono::Utc;
 
     use crate::{
-        application::entities::MockAppStoreBuilder,
+        application::composition::MockAppStoreBuilder,
         domains::{
             bitcoin::{BtcNetwork, BtcOutput, MockBitcoinWallet, OnchainSyncBatch, OnchainTransaction},
             event::{MockEventUseCases, OnchainWithdrawalEvent},

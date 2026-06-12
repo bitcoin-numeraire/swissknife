@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 use crate::{
     application::{
-        entities::{AppStore, Ledger},
+        composition::{AppStore, Ledger},
         errors::{ApplicationError, DataError},
     },
     domains::event::{EventUseCases, LnInvoicePaidEvent},
@@ -187,7 +187,7 @@ impl InvoiceUseCases for InvoiceService {
 mod tests {
     use crate::{
         application::{
-            entities::MockAppStoreBuilder,
+            composition::MockAppStoreBuilder,
             errors::{DatabaseError, LightningError},
         },
         domains::{event::MockEventUseCases, invoice::LnInvoice},
