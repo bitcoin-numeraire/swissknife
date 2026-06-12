@@ -1,5 +1,4 @@
 use thiserror::Error;
-use utoipa::ToSchema;
 
 use crate::application::errors::BitcoinError;
 
@@ -7,7 +6,7 @@ use super::{
     AuthenticationError, AuthorizationError, ConfigError, DataError, DatabaseError, LightningError, WebServerError,
 };
 
-#[derive(Debug, Error, ToSchema)]
+#[derive(Debug, Error)]
 pub enum ApplicationError {
     #[error(transparent)]
     Config(#[from] ConfigError),

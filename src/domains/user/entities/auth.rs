@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use super::permission::Permission;
+use super::Permission;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct AuthClaims {

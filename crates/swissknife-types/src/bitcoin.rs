@@ -1,10 +1,11 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use serde_with::{serde_as, DisplayFromStr};
 use strum_macros::{Display, EnumString};
-use utoipa::ToSchema;
+use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
 
-use crate::InvoiceStatus;
+use crate::{InvoiceStatus, OrderDirection};
 
 /// Bitcoin Address
 #[derive(Clone, Debug, Serialize, ToSchema)]
@@ -86,4 +87,41 @@ impl From<BtcOutputStatus> for InvoiceStatus {
             BtcOutputStatus::Immature => InvoiceStatus::Pending,
         }
     }
+}
+
+/// New Bitcoin Address Request
+#[derive(Deserialize, ToSchema)]
+pub struct NewBtcAddressRequest {
+    /// User ID. Will be populated with your own ID by default
+    pub wallet_id: Option<Uuid>,
+
+    /// Address type
+    #[serde(rename = "type")]
+    pub address_type: Option<BtcAddressType>,
+}
+
+/// Bitcoin address query filter.
+#[serde_as]
+#[derive(Clone, Debug, Deserialize, Serialize, Default, IntoParams)]
+pub struct BtcAddressFilter {
+    /// Total amount of results to return
+    #[serde_as(as = "Option<DisplayFromStr>")]
+    pub limit: Option<u64>,
+    /// Offset where to start returning results
+    #[serde_as(as = "Option<DisplayFromStr>")]
+    pub offset: Option<u64>,
+    /// List of IDs
+    pub ids: Option<Vec<Uuid>>,
+    /// Wallet ID. Automatically populated with your ID
+    pub wallet_id: Option<Uuid>,
+    /// Address
+    pub address: Option<String>,
+    /// Status
+    pub address_type: Option<BtcAddressType>,
+    /// Whether the address has been used
+    pub used: Option<bool>,
+
+    /// Direction of the ordering of results
+    #[serde(default)]
+    pub order_direction: OrderDirection,
 }

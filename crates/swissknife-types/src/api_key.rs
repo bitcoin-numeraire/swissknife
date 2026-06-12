@@ -1,9 +1,10 @@
 use chrono::{DateTime, Utc};
-use serde::Serialize;
-use utoipa::ToSchema;
+use serde::{Deserialize, Serialize};
+use serde_with::{serde_as, DisplayFromStr};
+use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
 
-use crate::Permission;
+use crate::{OrderDirection, Permission};
 
 /// API Key
 #[derive(Clone, Debug, Default, Serialize, ToSchema)]
@@ -28,4 +29,38 @@ pub struct ApiKey {
     pub created_at: DateTime<Utc>,
     /// Date of expiration
     pub expires_at: Option<DateTime<Utc>>,
+}
+
+/// Create API Key Request
+#[derive(Deserialize, ToSchema)]
+pub struct CreateApiKeyRequest {
+    /// User ID. Will be populated with your own ID by default
+    pub user_id: Option<String>,
+    /// API key name
+    pub name: String,
+    /// List of permissions for this API key
+    pub permissions: Vec<Permission>,
+    /// API key description
+    pub description: Option<String>,
+    /// Expiration time in seconds
+    pub expiry: Option<u32>,
+}
+
+/// API key query filter.
+#[serde_as]
+#[derive(Clone, Debug, Deserialize, Serialize, Default, IntoParams)]
+pub struct ApiKeyFilter {
+    /// Total amount of results to return
+    #[serde_as(as = "Option<DisplayFromStr>")]
+    pub limit: Option<u64>,
+    /// Offset where to start returning results
+    #[serde_as(as = "Option<DisplayFromStr>")]
+    pub offset: Option<u64>,
+    /// List of IDs
+    pub ids: Option<Vec<Uuid>>,
+    /// User ID. Automatically populated with your ID
+    pub user_id: Option<String>,
+    /// Direction of the ordering of results
+    #[serde(default)]
+    pub order_direction: OrderDirection,
 }

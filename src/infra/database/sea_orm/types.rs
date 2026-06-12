@@ -14,6 +14,9 @@ use crate::{
     },
 };
 
+use sea_orm::Order;
+use swissknife_types::OrderDirection;
+
 use super::models::{
     api_key::Model as ApiKeyModel, btc_address::Model as BitcoinAddressModel, btc_output::Model as BitcoinOutputModel,
     contact::ContactModel, invoice::Model as InvoiceModel, ln_address::Model as LnAddressModel,
@@ -21,6 +24,15 @@ use super::models::{
 };
 
 const ASSERTION_MSG: &str = "should parse successfully by assertion";
+
+/// Maps the API ordering direction to sea-orm's `Order`. A free function rather
+/// than a `From` impl because both types are foreign here (orphan rule).
+pub fn sea_order(direction: &OrderDirection) -> Order {
+    match direction {
+        OrderDirection::Asc => Order::Asc,
+        OrderDirection::Desc => Order::Desc,
+    }
+}
 
 impl From<InvoiceModel> for Invoice {
     fn from(model: InvoiceModel) -> Self {

@@ -104,7 +104,10 @@ where
                 ),
             })
             .apply_if(filter.ledger, |q, l| q.filter(Column::Ledger.eq(l.to_string())))
-            .order_by(order_by_column, filter.order_direction.into())
+            .order_by(
+                order_by_column,
+                crate::infra::database::sea_orm::sea_order(&filter.order_direction),
+            )
             .offset(filter.offset)
             .limit(filter.limit)
             .find_also_related(BtcOutput)

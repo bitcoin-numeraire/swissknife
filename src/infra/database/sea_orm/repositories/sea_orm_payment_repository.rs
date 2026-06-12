@@ -64,7 +64,10 @@ where
             .apply_if(filter.btc_addresses, |q, btc_addresses| {
                 q.filter(Column::BtcAddress.is_in(btc_addresses))
             })
-            .order_by(Column::CreatedAt, filter.order_direction.into())
+            .order_by(
+                Column::CreatedAt,
+                crate::infra::database::sea_orm::sea_order(&filter.order_direction),
+            )
             .offset(filter.offset)
             .limit(filter.limit)
             .all(self.db.connection())

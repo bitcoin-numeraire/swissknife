@@ -4,7 +4,7 @@ use uuid::Uuid;
 
 use crate::{
     application::errors::DatabaseError,
-    domains::ln_address::entities::{LnAddress, LnAddressFilter},
+    domains::ln_address::{LnAddress, LnAddressFilter},
 };
 
 #[cfg_attr(test, mockall::automock)]

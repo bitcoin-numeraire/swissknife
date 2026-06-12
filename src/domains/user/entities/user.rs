@@ -2,7 +2,7 @@ use uuid::Uuid;
 
 use crate::application::errors::AuthorizationError;
 
-use super::permission::Permission;
+use super::Permission;
 
 #[derive(Clone, Debug, Default)]
 pub struct User {

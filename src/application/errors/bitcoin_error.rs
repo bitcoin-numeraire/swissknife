@@ -1,7 +1,6 @@
 use thiserror::Error;
-use utoipa::ToSchema;
 
-#[derive(Debug, Error, ToSchema)]
+#[derive(Debug, Error)]
 pub enum BitcoinError {
     #[error("Failed to get bitcoin address: {0}")]
     Address(String),

@@ -2,12 +2,12 @@ use std::time::Duration;
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use serde_with::{serde_as, DurationSeconds};
+use serde_with::{serde_as, DisplayFromStr, DurationSeconds};
 use strum_macros::{Display, EnumString};
-use utoipa::ToSchema;
+use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
 
-use crate::{BtcOutput, Currency, Ledger};
+use crate::{BtcOutput, Currency, Ledger, OrderDirection};
 
 /// An incoming payment request, over Lightning and/or on-chain.
 #[derive(Clone, Debug, Default, Serialize, ToSchema)]
@@ -108,4 +108,52 @@ pub enum InvoiceStatus {
     Pending,
     Settled,
     Expired,
+}
+
+/// New Invoice Request
+#[derive(Deserialize, ToSchema)]
+pub struct NewInvoiceRequest {
+    /// User ID. Will be populated with your own ID by default
+    pub wallet_id: Option<Uuid>,
+    /// Amount in millisatoshis
+    pub amount_msat: u64,
+    /// Description of the invoice. Visible by the payer
+    pub description: Option<String>,
+    /// Expiration time in seconds
+    pub expiry: Option<u32>,
+}
+
+/// Invoice query filter.
+#[serde_as]
+#[derive(Clone, Debug, Deserialize, Serialize, Default, IntoParams, ToSchema)]
+pub struct InvoiceFilter {
+    /// Total amount of results to return
+    #[serde_as(as = "Option<DisplayFromStr>")]
+    pub limit: Option<u64>,
+    /// Offset where to start returning results
+    #[serde_as(as = "Option<DisplayFromStr>")]
+    pub offset: Option<u64>,
+    /// List of IDs
+    pub ids: Option<Vec<Uuid>>,
+    /// Wallet ID. Automatically populated with your ID
+    pub wallet_id: Option<Uuid>,
+    /// Status
+    pub status: Option<InvoiceStatus>,
+    /// Ledger
+    pub ledger: Option<Ledger>,
+    /// Order by
+    #[serde(default)]
+    pub order_by: InvoiceOrderBy,
+    /// Direction of the ordering of results
+    #[serde(default)]
+    pub order_direction: OrderDirection,
+}
+
+/// Field to order invoices by.
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq, Default, ToSchema)]
+pub enum InvoiceOrderBy {
+    #[default]
+    CreatedAt,
+    PaymentTime,
+    UpdatedAt,
 }
