@@ -276,7 +276,7 @@ impl From<ListInvoicesInvoice> for Invoice {
     fn from(val: ListInvoicesInvoice) -> Self {
         let bolt11_str = val.bolt11.clone().unwrap();
         let bolt11 = Bolt11Invoice::from_str(&bolt11_str).unwrap();
-        let mut invoice: Invoice = bolt11.into();
+        let mut invoice: Invoice = crate::infra::lightning::types::invoice_from_bolt11(bolt11);
 
         match val.status.as_str() {
             "paid" => {

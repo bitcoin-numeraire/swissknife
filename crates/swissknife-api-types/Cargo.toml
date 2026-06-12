@@ -15,3 +15,4 @@ strum_macros = "0.28"
 utoipa = { version = "5.5.0", features = ["chrono", "uuid"] }
 chrono = { version = "0.4.44", features = ["serde"] }
 uuid = { version = "1.23.2", features = ["v4", "serde"] }
+nostr = "0.44"

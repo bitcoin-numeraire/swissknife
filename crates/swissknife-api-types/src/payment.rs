@@ -1,0 +1,58 @@
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
+use strum_macros::{Display, EnumString};
+use utoipa::ToSchema;
+use uuid::Uuid;
+
+use crate::{Currency, Ledger, LnUrlSuccessAction};
+
+#[derive(Clone, Debug, Default)]
+pub struct Payment {
+    pub id: Uuid,
+    pub wallet_id: Uuid,
+    pub error: Option<String>,
+    pub amount_msat: u64,
+    pub fee_msat: Option<u64>,
+    pub reserved_amount: u64,
+    pub ledger: Ledger,
+    pub currency: Currency,
+    pub payment_time: Option<DateTime<Utc>>,
+    pub status: PaymentStatus,
+    pub description: Option<String>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: Option<DateTime<Utc>>,
+    pub lightning: Option<LnPayment>,
+    pub bitcoin: Option<BtcPayment>,
+    pub internal: Option<InternalPayment>,
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct LnPayment {
+    pub ln_address: Option<String>,
+    pub payment_hash: String,
+    pub payment_preimage: Option<String>,
+    pub metadata: Option<String>,
+    pub success_action: Option<LnUrlSuccessAction>,
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct BtcPayment {
+    pub address: String,
+    pub txid: String,
+    pub block_height: Option<u32>,
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct InternalPayment {
+    pub ln_address: Option<String>,
+    pub btc_address: Option<String>,
+    pub payment_hash: Option<String>,
+}
+
+#[derive(Clone, Debug, EnumString, Display, Deserialize, Serialize, PartialEq, Eq, Default, ToSchema)]
+pub enum PaymentStatus {
+    #[default]
+    Pending,
+    Settled,
+    Failed,
+}

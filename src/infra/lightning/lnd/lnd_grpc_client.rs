@@ -212,7 +212,7 @@ impl LndGrpcClient {
     fn invoice_from_lnrpc(&self, response: lnrpc::Invoice) -> Result<Invoice, LightningError> {
         let bolt11 =
             Bolt11Invoice::from_str(&response.payment_request).map_err(|e| LightningError::Invoice(e.to_string()))?;
-        let mut invoice: Invoice = bolt11.into();
+        let mut invoice: Invoice = crate::infra::lightning::types::invoice_from_bolt11(bolt11);
 
         match response.state() {
             InvoiceState::Settled => {
@@ -330,7 +330,7 @@ impl LnClient for LndGrpcClient {
 
         let bolt11 =
             Bolt11Invoice::from_str(&response.payment_request).map_err(|e| LightningError::Invoice(e.to_string()))?;
-        Ok(bolt11.into())
+        Ok(crate::infra::lightning::types::invoice_from_bolt11(bolt11))
     }
 
     async fn pay(&self, bolt11: String, amount_msat: Option<u64>, _label: String) -> Result<Payment, LightningError> {

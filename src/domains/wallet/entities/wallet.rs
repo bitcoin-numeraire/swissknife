@@ -1,51 +1,11 @@
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
-use utoipa::{IntoParams, ToSchema};
+use utoipa::IntoParams;
 use uuid::Uuid;
 
-use crate::{
-    application::entities::OrderDirection,
-    domains::{invoice::Invoice, ln_address::LnAddress, payment::Payment},
-};
+use crate::application::entities::OrderDirection;
 
-use super::{Balance, Contact};
-
-#[derive(Debug, Clone, Default)]
-pub struct Wallet {
-    pub id: Uuid,
-    pub user_id: String,
-    pub ln_address: Option<LnAddress>,
-    pub balance: Balance,
-    pub payments: Vec<Payment>,
-    pub invoices: Vec<Invoice>,
-    pub contacts: Vec<Contact>,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: Option<DateTime<Utc>>,
-}
-
-#[derive(Debug, Clone, Default, Serialize, ToSchema)]
-pub struct WalletOverview {
-    /// Internal ID
-    pub id: Uuid,
-    /// User ID. Populated from the Authentication method,  such as JWT subject
-    pub user_id: String,
-    /// Lightning Address
-    pub ln_address: Option<LnAddress>,
-    /// User Balance
-    pub balance: Balance,
-    /// Number of payments
-    pub n_payments: u32,
-    /// Number of invoices
-    pub n_invoices: u32,
-    /// Number of contacts
-    pub n_contacts: u32,
-    /// Date of creation in database
-    pub created_at: DateTime<Utc>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    /// Date of update in database
-    pub updated_at: Option<DateTime<Utc>>,
-}
+pub use swissknife_api_types::{Wallet, WalletOverview};
 
 #[serde_as]
 #[derive(Clone, Debug, Deserialize, Serialize, Default, IntoParams)]

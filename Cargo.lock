@@ -4674,6 +4674,7 @@ name = "swissknife-api-types"
 version = "0.1.7"
 dependencies = [
  "chrono",
+ "nostr",
  "serde",
  "strum 0.28.0",
  "strum_macros",
