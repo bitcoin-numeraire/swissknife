@@ -16,12 +16,14 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  # API behaviour against real backends. The suite is provider-agnostic today,
-  # so it runs across all four Lightning adapters on sqlite (to exercise each
-  # adapter's connection and config) plus one postgres cell (migrations +
-  # persistence). The full provider matrix is reserved for the lightning
-  # protocol suites once they land — we deliberately do not run the whole suite
-  # across every (db, provider) combination.
+  # The full suite runs across a matrix that covers each dependency dimension
+  # without the redundant cross-product: all four Lightning adapters on sqlite,
+  # plus one postgres cell. Storage behaviour is independent of the Lightning
+  # provider (and vice-versa), so every test gets both-DB and all-adapter
+  # coverage from these cells while the omitted cross cells (e.g. postgres x
+  # cln_rest) would add no surface. We deliberately do not tier tests by
+  # dependency — that classification is leaky, since one test can touch both
+  # storage and the provider at once.
   integration:
     runs-on: ubuntu-latest
     timeout-minutes: 45

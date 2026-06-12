@@ -1,22 +1,17 @@
-//! Real Lightning flows over the LND<->CLN channel — the `lightning` tier.
-//! These reach the LN provider, so they belong on the provider matrix.
+//! Real Lightning flows over the LND<->CLN channel. These reach the LN
+//! provider, so they run across the provider matrix. Each test uses its own
+//! wallet for balance isolation.
 
 use std::time::Duration;
 
 use reqwest::StatusCode;
 use serde_json::json;
-use tokio::time::{sleep, Instant};
 
 use crate::common::counterparty::Counterparty;
-use crate::common::{app, assert_status, Auth, TestApp};
-
-const SETTLE_TIMEOUT: Duration = Duration::from_secs(45);
-
-async fn available_msat(app: &TestApp, token: &str) -> i64 {
-    let res = app.api().get("/v1/me/balance", Auth::Bearer(token)).await;
-    assert_status(&res, StatusCode::OK);
-    res.body["available_msat"].as_i64().unwrap_or_default()
-}
+use crate::common::fixtures::unique;
+use crate::common::models::{InvoiceResponse, PaymentResponse};
+use crate::common::wait::wait_until;
+use crate::common::{app, assert_status, Auth};
 
 mod receive {
     use super::*;
@@ -25,40 +20,71 @@ mod receive {
     async fn a_counterparty_payment_credits_the_wallet() {
         let app = app().await;
         let token = app.admin_token().await;
-        let amount_msat = 250_000_000_i64; // 250k sat, well within channel liquidity
+        let wallet = app.create_wallet(token, "ln-receive").await;
+        let amount_msat = 250_000_000u64;
 
-        let before = available_msat(app, token).await;
-
-        // SwissKnife issues a real invoice on the node under test.
+        // SwissKnife issues a real invoice for the wallet.
         let res = app
             .api()
             .post(
-                "/v1/me/invoices",
+                "/v1/invoices",
                 Auth::Bearer(token),
-                json!({ "amount_msat": amount_msat, "description": "itest receive" }),
+                json!({ "wallet_id": wallet.id, "amount_msat": amount_msat, "description": "itest receive" }),
             )
             .await;
         assert_status(&res, StatusCode::OK);
-        let bolt11 = res.body["ln_invoice"]["bolt11"]
-            .as_str()
+        let bolt11 = res
+            .parse::<InvoiceResponse>()
+            .ln_invoice
             .expect("invoice has a bolt11")
-            .to_string();
+            .bolt11;
 
         // The counterparty pays it over the channel.
         Counterparty::for_provider(&app.provider).pay(&bolt11);
 
-        // SwissKnife's event listener should detect the settlement and credit the wallet.
-        let started = Instant::now();
-        loop {
-            let now = available_msat(app, token).await;
-            if now >= before + amount_msat {
-                break;
-            }
-            assert!(
-                started.elapsed() < SETTLE_TIMEOUT,
-                "wallet was not credited after receiving a payment (before={before}, now={now})"
-            );
-            sleep(Duration::from_millis(500)).await;
-        }
+        // The event listener should detect settlement and credit the wallet.
+        wait_until(Duration::from_secs(45), "wallet credited after receiving", || async {
+            app.wallet_balance(token, wallet.id).await.available_msat >= amount_msat as i64
+        })
+        .await;
+    }
+}
+
+mod send {
+    use super::*;
+
+    #[tokio::test]
+    async fn pays_a_counterparty_invoice_and_debits_the_wallet() {
+        let app = app().await;
+        let token = app.admin_token().await;
+        let wallet = app.create_wallet(token, "ln-send").await;
+
+        app.fund_onchain(token, wallet.id, 1_000_000).await;
+        let before = app.wallet_balance(token, wallet.id).await.available_msat;
+
+        let amount_msat = 100_000_000u64;
+        let bolt11 = Counterparty::for_provider(&app.provider).invoice(amount_msat, &unique("cp-invoice"));
+
+        let res = app
+            .api()
+            .post(
+                "/v1/payments",
+                Auth::Bearer(token),
+                json!({ "wallet_id": wallet.id, "input": bolt11 }),
+            )
+            .await;
+        assert_status(&res, StatusCode::OK);
+        let payment = res.parse::<PaymentResponse>();
+        assert_eq!(payment.status, "Settled", "payment not settled: {payment:?}");
+        assert_eq!(payment.amount_msat, amount_msat);
+
+        // The wallet is debited by the amount plus the routing fee.
+        let fee = payment.fee_msat.unwrap_or_default() as i64;
+        let after = app.wallet_balance(token, wallet.id).await.available_msat;
+        assert_eq!(
+            after,
+            before - amount_msat as i64 - fee,
+            "wallet should be debited by amount + fee (before={before}, fee={fee})"
+        );
     }
 }
