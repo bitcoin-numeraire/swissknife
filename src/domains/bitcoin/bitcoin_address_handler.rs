@@ -14,12 +14,12 @@ use crate::{
             BAD_REQUEST_EXAMPLE, FORBIDDEN_EXAMPLE, INTERNAL_EXAMPLE, NOT_FOUND_EXAMPLE, UNAUTHORIZED_EXAMPLE,
             UNPROCESSABLE_EXAMPLE,
         },
-        dtos::{BtcAddressResponse, ErrorResponse, NewBtcAddressRequest},
+        dtos::{ErrorResponse, NewBtcAddressRequest},
         entities::AppServices,
         errors::ApplicationError,
     },
     domains::{
-        bitcoin::{BtcAddressFilter, BtcAddressType, BtcNetwork},
+        bitcoin::{BtcAddress, BtcAddressFilter, BtcAddressType, BtcNetwork},
         user::{Permission, User},
     },
     infra::axum::{Json, Path, Query},
@@ -28,7 +28,7 @@ use crate::{
 #[derive(OpenApi)]
 #[openapi(
     paths(generate_btc_address, list_btc_addresses, get_btc_address, delete_btc_address, delete_btc_addresses),
-    components(schemas(NewBtcAddressRequest, BtcAddressResponse, BtcNetwork, BtcAddressResponse, BtcAddressType)),
+    components(schemas(NewBtcAddressRequest, BtcAddress, BtcNetwork, BtcAddressType)),
     tags(
         (name = "Bitcoin Addresses", description = "Bitcoin Address management endpoints. Require `read:btc_address` or `write:btc_address` permissions.")
     ),
@@ -55,7 +55,7 @@ pub fn router() -> Router<Arc<AppServices>> {
     context_path = CONTEXT_PATH,
     request_body = NewBtcAddressRequest,
     responses(
-        (status = 200, description = "Bitcoin Address Created", body = BtcAddressResponse),
+        (status = 200, description = "Bitcoin Address Created", body = BtcAddress),
         (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
         (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
         (status = 403, description = "Forbidden", body = ErrorResponse, example = json!(FORBIDDEN_EXAMPLE)),
@@ -67,14 +67,14 @@ async fn generate_btc_address(
     State(services): State<Arc<AppServices>>,
     user: User,
     Json(payload): Json<NewBtcAddressRequest>,
-) -> Result<Json<BtcAddressResponse>, ApplicationError> {
+) -> Result<Json<BtcAddress>, ApplicationError> {
     user.check_permission(Permission::WriteBtcAddress)?;
 
     let address = services
         .bitcoin
         .new_deposit_address(payload.wallet_id.unwrap_or(user.wallet_id), payload.address_type)
         .await?;
-    Ok(Json(address.into()))
+    Ok(Json(address))
 }
 
 /// Find a Bitcoin address
@@ -86,7 +86,7 @@ async fn generate_btc_address(
     tag = "Bitcoin Addresses",
     context_path = CONTEXT_PATH,
     responses(
-        (status = 200, description = "Found", body = BtcAddressResponse),
+        (status = 200, description = "Found", body = BtcAddress),
         (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
         (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
         (status = 403, description = "Forbidden", body = ErrorResponse, example = json!(FORBIDDEN_EXAMPLE)),
@@ -98,11 +98,11 @@ async fn get_btc_address(
     State(services): State<Arc<AppServices>>,
     user: User,
     Path(id): Path<Uuid>,
-) -> Result<Json<BtcAddressResponse>, ApplicationError> {
+) -> Result<Json<BtcAddress>, ApplicationError> {
     user.check_permission(Permission::ReadBtcAddress)?;
 
     let address = services.bitcoin.get_address(id).await?;
-    Ok(Json(address.into()))
+    Ok(Json(address))
 }
 
 /// List Bitcoin addresses
@@ -115,7 +115,7 @@ async fn get_btc_address(
     context_path = CONTEXT_PATH,
     params(BtcAddressFilter),
     responses(
-        (status = 200, description = "Success", body = Vec<BtcAddressResponse>),
+        (status = 200, description = "Success", body = Vec<BtcAddress>),
         (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
         (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
         (status = 403, description = "Forbidden", body = ErrorResponse, example = json!(FORBIDDEN_EXAMPLE)),
@@ -126,13 +126,12 @@ async fn list_btc_addresses(
     State(services): State<Arc<AppServices>>,
     user: User,
     Query(filter): Query<BtcAddressFilter>,
-) -> Result<Json<Vec<BtcAddressResponse>>, ApplicationError> {
+) -> Result<Json<Vec<BtcAddress>>, ApplicationError> {
     user.check_permission(Permission::ReadBtcAddress)?;
 
     let addresses = services.bitcoin.list_addresses(filter).await?;
-    let response: Vec<BtcAddressResponse> = addresses.into_iter().map(Into::into).collect();
 
-    Ok(response.into())
+    Ok(Json(addresses))
 }
 
 /// Delete a Bitcoin address
