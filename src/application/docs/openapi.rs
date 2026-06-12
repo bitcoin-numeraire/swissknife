@@ -1,8 +1,7 @@
+use swissknife_types::ErrorResponse;
+
 use crate::{
-    application::{
-        dtos::ErrorResponse,
-        entities::{Currency, Ledger, OrderDirection},
-    },
+    application::entities::{Currency, Ledger, OrderDirection},
     domains::{
         bitcoin::BtcAddressHandler,
         invoice::InvoiceHandler,

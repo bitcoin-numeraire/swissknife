@@ -9,13 +9,14 @@ use axum_extra::extract::Query;
 use utoipa::OpenApi;
 use uuid::Uuid;
 
+use swissknife_types::{CreateApiKeyRequest, ErrorResponse};
+
 use crate::{
     application::{
         docs::{
             BAD_REQUEST_EXAMPLE, FORBIDDEN_EXAMPLE, INTERNAL_EXAMPLE, NOT_FOUND_EXAMPLE, UNAUTHORIZED_EXAMPLE,
             UNPROCESSABLE_EXAMPLE,
         },
-        dtos::{CreateApiKeyRequest, ErrorResponse},
         entities::AppServices,
         errors::ApplicationError,
     },

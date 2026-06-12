@@ -8,13 +8,14 @@ use axum::{
 use utoipa::OpenApi;
 use uuid::Uuid;
 
+use swissknife_types::{ErrorResponse, NewBtcAddressRequest};
+
 use crate::{
     application::{
         docs::{
             BAD_REQUEST_EXAMPLE, FORBIDDEN_EXAMPLE, INTERNAL_EXAMPLE, NOT_FOUND_EXAMPLE, UNAUTHORIZED_EXAMPLE,
             UNPROCESSABLE_EXAMPLE,
         },
-        dtos::{ErrorResponse, NewBtcAddressRequest},
         entities::AppServices,
         errors::ApplicationError,
     },

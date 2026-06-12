@@ -9,13 +9,14 @@ use axum_extra::extract::Query;
 use utoipa::OpenApi;
 use uuid::Uuid;
 
+use swissknife_types::{ErrorResponse, RegisterLnAddressRequest, UpdateLnAddressRequest};
+
 use crate::{
     application::{
         docs::{
             BAD_REQUEST_EXAMPLE, FORBIDDEN_EXAMPLE, INTERNAL_EXAMPLE, NOT_FOUND_EXAMPLE, UNAUTHORIZED_EXAMPLE,
             UNPROCESSABLE_EXAMPLE,
         },
-        dtos::{ErrorResponse, RegisterLnAddressRequest, UpdateLnAddressRequest},
         entities::AppServices,
         errors::ApplicationError,
     },
@@ -233,7 +234,9 @@ async fn delete_addresses(
 mod tests {
     use chrono::Utc;
 
-    use crate::application::{dtos::RegisterLnAddressRequest, entities::MockAppServicesBuilder};
+    use swissknife_types::RegisterLnAddressRequest;
+
+    use crate::application::entities::MockAppServicesBuilder;
 
     use super::*;
 

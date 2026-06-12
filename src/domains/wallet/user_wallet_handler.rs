@@ -8,13 +8,14 @@ use axum::{
 use utoipa::OpenApi;
 use uuid::Uuid;
 
+use swissknife_types::{
+    CreateApiKeyRequest, ErrorResponse, NewBtcAddressRequest, NewInvoiceRequest, RegisterLnAddressRequest,
+    SendPaymentRequest, UpdateLnAddressRequest,
+};
+
 use crate::{
     application::{
         docs::{BAD_REQUEST_EXAMPLE, INTERNAL_EXAMPLE, NOT_FOUND_EXAMPLE, UNAUTHORIZED_EXAMPLE, UNPROCESSABLE_EXAMPLE},
-        dtos::{
-            CreateApiKeyRequest, ErrorResponse, NewBtcAddressRequest, NewInvoiceRequest, RegisterLnAddressRequest,
-            SendPaymentRequest, UpdateLnAddressRequest, WalletLnAddressResponse,
-        },
         entities::AppServices,
         errors::{ApplicationError, DataError},
     },
@@ -41,7 +42,7 @@ use super::{Balance, Contact, Wallet};
         list_contacts,
         create_wallet_api_key, list_wallet_api_keys, get_wallet_api_key, revoke_wallet_api_key, revoke_wallet_api_keys,
     ),
-    components(schemas(Wallet, Balance, Contact, WalletLnAddressResponse, BtcAddress)),
+    components(schemas(Wallet, Balance, Contact, LnAddress, BtcAddress)),
     tags(
         (name = "User Wallet", description = "User Wallet endpoints. Available to any authenticated user.")
     ),
@@ -217,7 +218,7 @@ async fn new_wallet_invoice(
     tag = "User Wallet",
     context_path = CONTEXT_PATH,
     responses(
-        (status = 200, description = "Found", body = WalletLnAddressResponse),
+        (status = 200, description = "Found", body = Option<LnAddress>),
         (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
         (status = 404, description = "Not Found", body = ErrorResponse, example = json!(NOT_FOUND_EXAMPLE)),
         (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
@@ -226,7 +227,7 @@ async fn new_wallet_invoice(
 async fn get_wallet_address(
     State(services): State<Arc<AppServices>>,
     user: User,
-) -> Result<Json<WalletLnAddressResponse>, ApplicationError> {
+) -> Result<Json<Option<LnAddress>>, ApplicationError> {
     let ln_addresses = services
         .ln_address
         .list(LnAddressFilter {
@@ -235,9 +236,7 @@ async fn get_wallet_address(
         })
         .await?;
 
-    let ln_address = ln_addresses.first().cloned();
-
-    Ok(WalletLnAddressResponse { ln_address }.into())
+    Ok(Json(ln_addresses.into_iter().next()))
 }
 
 /// Register LN Address

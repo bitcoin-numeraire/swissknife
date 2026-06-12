@@ -5,9 +5,10 @@ use axum::{
 };
 use tracing::{debug, error, trace, warn};
 
-use crate::application::{
-    dtos::ErrorResponse,
-    errors::{ApplicationError, AuthenticationError, AuthorizationError, BitcoinError, DataError, LightningError},
+use swissknife_types::ErrorResponse;
+
+use crate::application::errors::{
+    ApplicationError, AuthenticationError, AuthorizationError, BitcoinError, DataError, LightningError,
 };
 
 const INTERNAL_SERVER_ERROR_MSG: &str = "Internal server error, Please contact your administrator or try later";

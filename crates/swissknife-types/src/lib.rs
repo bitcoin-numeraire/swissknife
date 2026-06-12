@@ -1,9 +1,10 @@
 //! Shared API/contract types for Numeraire SwissKnife.
 //!
-//! These are pure data — entities, enums, and request types — and are the
-//! single source of truth for the backend, the integration tests, and external
-//! clients/SDKs. They carry their own serde + `utoipa::ToSchema` annotations so
-//! the wire shape lives with the type; behaviour stays in the app's use cases.
+//! These are pure data — entities, shared enums, and request/response types —
+//! and are the single source of truth for the backend, the integration tests,
+//! and external clients/SDKs. They carry their own serde + `utoipa::ToSchema`
+//! annotations so the wire shape lives with the type; behaviour stays in the
+//! app's use cases.
 
 mod api_key;
 mod bitcoin;
@@ -14,6 +15,7 @@ mod network;
 mod payment;
 mod permission;
 mod request;
+mod response;
 mod transaction;
 mod wallet;
 
@@ -30,5 +32,6 @@ pub use request::{
     RegisterLnAddressRequest, RegisterWalletRequest, SendPaymentRequest, SignInRequest, SignUpRequest,
     UpdateLnAddressRequest,
 };
+pub use response::{ErrorResponse, NostrNIP05Response, SignInResponse};
 pub use transaction::{Currency, Ledger};
 pub use wallet::{Balance, Contact, Wallet, WalletOverview};

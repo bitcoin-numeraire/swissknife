@@ -4,9 +4,10 @@ use regex::Regex;
 use tracing::{debug, info, trace};
 use uuid::Uuid;
 
+use swissknife_types::UpdateLnAddressRequest;
+
 use crate::{
     application::{
-        dtos::UpdateLnAddressRequest,
         entities::AppStore,
         errors::{ApplicationError, DataError},
     },

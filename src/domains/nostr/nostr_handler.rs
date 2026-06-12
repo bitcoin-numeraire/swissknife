@@ -3,10 +3,11 @@ use std::sync::Arc;
 use axum::extract::State;
 use utoipa::OpenApi;
 
+use swissknife_types::{ErrorResponse, NostrNIP05QueryParams, NostrNIP05Response};
+
 use crate::{
     application::{
         docs::{INTERNAL_EXAMPLE, NOT_FOUND_EXAMPLE},
-        dtos::{ErrorResponse, NostrNIP05QueryParams, NostrNIP05Response},
         entities::AppServices,
         errors::ApplicationError,
     },
