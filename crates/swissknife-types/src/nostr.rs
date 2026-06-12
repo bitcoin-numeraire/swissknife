@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use nostr::PublicKey;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 
 /// Nostr NIP-05 query parameters
@@ -13,7 +13,7 @@ pub struct NostrNIP05QueryParams {
 }
 
 /// Nostr NIP-05 response. Maps each queried name to its hex-encoded public key.
-#[derive(Debug, serde::Serialize, ToSchema)]
+#[derive(Debug, Deserialize, Serialize, ToSchema)]
 pub struct NostrNIP05Response {
     /// Found names, keyed by username and valued by hex-encoded public key
     pub names: HashMap<String, String>,

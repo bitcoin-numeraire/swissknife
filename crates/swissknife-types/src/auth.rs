@@ -18,7 +18,7 @@ pub struct SignInRequest {
 }
 
 /// Sign In Response
-#[derive(Debug, Serialize, ToSchema)]
+#[derive(Debug, Deserialize, Serialize, ToSchema)]
 pub struct SignInResponse {
     /// JWT token
     #[schema(example = "eyJ0eXAiOiJKV1QiLCJhbGciOiJ...")]

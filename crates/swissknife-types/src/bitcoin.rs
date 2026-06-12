@@ -8,7 +8,7 @@ use uuid::Uuid;
 use crate::{InvoiceStatus, OrderDirection};
 
 /// Bitcoin Address
-#[derive(Clone, Debug, Serialize, ToSchema)]
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 pub struct BtcAddress {
     /// Internal ID
     pub id: Uuid,
@@ -40,7 +40,7 @@ pub enum BtcAddressType {
 }
 
 /// Bitcoin Output
-#[derive(Clone, Debug, Default, Serialize, ToSchema)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, ToSchema)]
 pub struct BtcOutput {
     /// Internal ID
     pub id: Uuid,

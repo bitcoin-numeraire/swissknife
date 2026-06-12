@@ -7,9 +7,10 @@ use std::time::Duration;
 use reqwest::StatusCode;
 use serde_json::json;
 
+use swissknife_types::{Invoice, Payment, PaymentStatus};
+
 use crate::common::counterparty::Counterparty;
 use crate::common::fixtures::unique;
-use crate::common::models::{InvoiceResponse, PaymentResponse};
 use crate::common::wait::wait_until;
 use crate::common::{app, assert_status, Auth};
 
@@ -33,11 +34,7 @@ mod receive {
             )
             .await;
         assert_status(&res, StatusCode::OK);
-        let bolt11 = res
-            .parse::<InvoiceResponse>()
-            .ln_invoice
-            .expect("invoice has a bolt11")
-            .bolt11;
+        let bolt11 = res.parse::<Invoice>().ln_invoice.expect("invoice has a bolt11").bolt11;
 
         // The counterparty pays it over the channel.
         Counterparty::for_provider(&app.provider).pay(&bolt11);
@@ -74,8 +71,12 @@ mod send {
             )
             .await;
         assert_status(&res, StatusCode::OK);
-        let payment = res.parse::<PaymentResponse>();
-        assert_eq!(payment.status, "Settled", "payment not settled: {payment:?}");
+        let payment = res.parse::<Payment>();
+        assert_eq!(
+            payment.status,
+            PaymentStatus::Settled,
+            "payment not settled: {payment:?}"
+        );
         assert_eq!(payment.amount_msat, amount_msat);
 
         // The wallet is debited by the amount plus the routing fee.

@@ -11,7 +11,6 @@ pub mod counterparty;
 pub mod db;
 pub mod fixtures;
 pub mod harness;
-pub mod models;
 pub mod wait;
 
 pub use assertions::{assert_error, assert_status};

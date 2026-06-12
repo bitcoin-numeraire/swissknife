@@ -8,7 +8,7 @@ use uuid::Uuid;
 use crate::OrderDirection;
 
 /// Lightning Address
-#[derive(Clone, Debug, Serialize, ToSchema)]
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 pub struct LnAddress {
     /// Internal ID
     pub id: Uuid,

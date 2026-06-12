@@ -7,7 +7,7 @@ use uuid::Uuid;
 use crate::{OrderDirection, Permission};
 
 /// API Key
-#[derive(Clone, Debug, Default, Serialize, ToSchema)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, ToSchema)]
 pub struct ApiKey {
     /// Internal ID
     pub id: Uuid,

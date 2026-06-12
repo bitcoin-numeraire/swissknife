@@ -1,9 +1,9 @@
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use strum_macros::{Display, EnumString};
 use utoipa::ToSchema;
 
 /// App health information, fine-grained by dependency.
-#[derive(Debug, Serialize, ToSchema)]
+#[derive(Debug, Deserialize, Serialize, ToSchema)]
 pub struct HealthCheck {
     /// Health of the database
     pub database: HealthStatus,
@@ -14,7 +14,7 @@ pub struct HealthCheck {
 }
 
 /// Health of a single system dependency.
-#[derive(Clone, Debug, EnumString, Serialize, Display, PartialEq, Eq, ToSchema)]
+#[derive(Clone, Debug, EnumString, Deserialize, Serialize, Display, PartialEq, Eq, ToSchema)]
 pub enum HealthStatus {
     Operational,
     Unavailable,
@@ -33,7 +33,7 @@ impl HealthCheck {
 }
 
 /// App setup info.
-#[derive(Debug, Serialize, ToSchema)]
+#[derive(Debug, Deserialize, Serialize, ToSchema)]
 pub struct SetupInfo {
     /// Whether the welcome flow has been completed
     pub welcome_complete: bool,
@@ -42,7 +42,7 @@ pub struct SetupInfo {
 }
 
 /// App version info.
-#[derive(Debug, Serialize, ToSchema)]
+#[derive(Debug, Deserialize, Serialize, ToSchema)]
 pub struct VersionInfo {
     /// Current version of the software
     #[schema(example = "0.0.1")]
