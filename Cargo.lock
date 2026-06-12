@@ -4654,6 +4654,7 @@ dependencies = [
  "serde_with",
  "strum 0.28.0",
  "strum_macros",
+ "swissknife-api-types",
  "thiserror 2.0.18",
  "tokio",
  "tokio-tungstenite 0.29.0",
@@ -4665,6 +4666,18 @@ dependencies = [
  "tracing-subscriber",
  "utoipa",
  "utoipa-scalar",
+ "uuid",
+]
+
+[[package]]
+name = "swissknife-api-types"
+version = "0.1.7"
+dependencies = [
+ "chrono",
+ "serde",
+ "strum 0.28.0",
+ "strum_macros",
+ "utoipa",
  "uuid",
 ]
 
