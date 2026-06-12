@@ -20,6 +20,20 @@ pub struct TestResponse {
     pub body: Value,
 }
 
+impl TestResponse {
+    /// Deserialize the body into a typed model (see `common::models`),
+    /// panicking with context on mismatch.
+    pub fn parse<T: serde::de::DeserializeOwned>(&self) -> T {
+        serde_json::from_value(self.body.clone()).unwrap_or_else(|e| {
+            panic!(
+                "failed to decode response as {}: {e}\nbody: {}",
+                std::any::type_name::<T>(),
+                self.body
+            )
+        })
+    }
+}
+
 /// Thin HTTP client bound to one running SwissKnife instance. Cheap to create,
 /// so each test makes its own (avoids sharing a `reqwest::Client` across the
 /// per-test Tokio runtimes).

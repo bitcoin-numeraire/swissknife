@@ -5,11 +5,14 @@
 #![allow(dead_code)]
 
 pub mod assertions;
+pub mod chain;
 pub mod client;
 pub mod counterparty;
 pub mod db;
 pub mod fixtures;
 pub mod harness;
+pub mod models;
+pub mod wait;
 
 pub use assertions::{assert_error, assert_status};
 pub use client::Auth;
