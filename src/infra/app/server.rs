@@ -2,8 +2,8 @@ use std::sync::Arc;
 
 use crate::{
     application::{
+        composition::{AppAdapters, AppServices},
         docs::merged_openapi,
-        entities::{AppAdapters, AppServices},
         errors::WebServerError,
     },
     domains::{bitcoin, invoice, ln_address, lnurl, nostr, payment, system, user, wallet},

@@ -5,7 +5,7 @@ use tower_http::timeout::TimeoutLayer;
 
 use crate::{
     application::{
-        dtos::{AppConfig, AuthProvider, LightningProvider},
+        composition::{AppConfig, AuthProvider, LightningProvider},
         errors::{ApplicationError, ConfigError},
     },
     domains::bitcoin::BitcoinWallet,

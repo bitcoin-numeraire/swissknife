@@ -7,7 +7,7 @@ use tonic::{Code, Status};
 use tracing::{error, warn};
 
 use crate::{
-    application::{entities::AppServices, errors::LightningError},
+    application::{composition::AppServices, errors::LightningError},
     domains::{
         bitcoin::{BitcoinWallet, BtcTransaction, BtcTransactionOutput, OnchainSyncCursor},
         event::LnInvoicePaidEvent,

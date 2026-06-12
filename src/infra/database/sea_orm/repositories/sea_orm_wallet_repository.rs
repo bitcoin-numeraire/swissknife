@@ -8,7 +8,7 @@ use uuid::Uuid;
 use super::SeaOrmConnection;
 
 use crate::{
-    application::{entities::Currency, errors::DatabaseError},
+    application::{composition::Currency, errors::DatabaseError},
     domains::{
         payment::PaymentStatus,
         wallet::{Balance, Contact, Wallet, WalletFilter, WalletOverview, WalletRepository},

@@ -13,11 +13,11 @@ use swissknife_types::{ErrorResponse, RegisterWalletRequest};
 
 use crate::{
     application::{
+        composition::AppServices,
         docs::{
             BAD_REQUEST_EXAMPLE, FORBIDDEN_EXAMPLE, INTERNAL_EXAMPLE, NOT_FOUND_EXAMPLE, UNAUTHORIZED_EXAMPLE,
             UNPROCESSABLE_EXAMPLE,
         },
-        entities::AppServices,
         errors::ApplicationError,
     },
     domains::user::{Permission, User},
@@ -216,7 +216,7 @@ async fn delete_wallets(
 
 #[cfg(test)]
 mod tests {
-    use crate::{application::entities::MockAppServicesBuilder, domains::wallet::Wallet};
+    use crate::{application::composition::MockAppServicesBuilder, domains::wallet::Wallet};
 
     use super::*;
 

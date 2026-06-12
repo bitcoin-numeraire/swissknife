@@ -1,5 +1,5 @@
 use crate::{
-    application::{entities::Ledger, errors::DatabaseError},
+    application::{composition::Ledger, errors::DatabaseError},
     domains::invoice::{Invoice, InvoiceFilter, InvoiceOrderBy, InvoiceRepository, InvoiceStatus},
     infra::database::sea_orm::models::{
         btc_output::Model as BtcOutputModel,

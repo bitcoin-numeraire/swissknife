@@ -21,7 +21,7 @@ use super::{
 };
 use crate::{
     application::{
-        entities::{AppServices, Currency},
+        composition::{AppServices, Currency},
         errors::LightningError,
     },
     domains::{

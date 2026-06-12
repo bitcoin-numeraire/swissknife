@@ -13,11 +13,11 @@ use swissknife_types::{CreateApiKeyRequest, ErrorResponse};
 
 use crate::{
     application::{
+        composition::AppServices,
         docs::{
             BAD_REQUEST_EXAMPLE, FORBIDDEN_EXAMPLE, INTERNAL_EXAMPLE, NOT_FOUND_EXAMPLE, UNAUTHORIZED_EXAMPLE,
             UNPROCESSABLE_EXAMPLE,
         },
-        entities::AppServices,
         errors::ApplicationError,
     },
     infra::axum::{Json, Path},
@@ -189,7 +189,7 @@ async fn revoke_api_keys(
 
 #[cfg(test)]
 mod tests {
-    use crate::{application::entities::MockAppServicesBuilder, domains::user::ApiKey};
+    use crate::{application::composition::MockAppServicesBuilder, domains::user::ApiKey};
 
     use super::*;
 

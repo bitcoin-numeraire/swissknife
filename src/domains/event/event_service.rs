@@ -4,7 +4,7 @@ use tracing::{debug, info, trace};
 
 use crate::{
     application::{
-        entities::{AppStore, Currency, Ledger},
+        composition::{AppStore, Currency, Ledger},
         errors::{ApplicationError, DataError},
     },
     domains::{
@@ -198,7 +198,7 @@ mod tests {
     use uuid::Uuid;
 
     use crate::{
-        application::entities::MockAppStoreBuilder,
+        application::composition::MockAppStoreBuilder,
         domains::{bitcoin::BtcAddress, payment::Payment},
     };
 

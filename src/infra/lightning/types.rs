@@ -2,7 +2,7 @@ use chrono::{TimeZone, Utc};
 use lightning_invoice::{Bolt11Invoice, Bolt11InvoiceDescriptionRef, Currency as LNInvoiceCurrency};
 
 use crate::{
-    application::entities::{Currency, Ledger},
+    application::composition::{Currency, Ledger},
     domains::{
         bitcoin::BtcNetwork,
         invoice::{Invoice, LnInvoice},

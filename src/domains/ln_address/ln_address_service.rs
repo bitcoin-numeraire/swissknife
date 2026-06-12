@@ -8,7 +8,7 @@ use swissknife_types::UpdateLnAddressRequest;
 
 use crate::{
     application::{
-        entities::AppStore,
+        composition::AppStore,
         errors::{ApplicationError, DataError},
     },
     domains::ln_address::{LnAddress, LnAddressFilter},
@@ -179,7 +179,7 @@ fn validate_username(username: &str) -> Result<(), DataError> {
 mod tests {
     use chrono::Utc;
 
-    use crate::application::{entities::MockAppStoreBuilder, errors::DatabaseError};
+    use crate::application::{composition::MockAppStoreBuilder, errors::DatabaseError};
 
     use super::*;
 

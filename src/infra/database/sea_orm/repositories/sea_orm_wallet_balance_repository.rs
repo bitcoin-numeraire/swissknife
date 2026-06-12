@@ -9,7 +9,7 @@ use uuid::Uuid;
 use super::SeaOrmConnection;
 
 use crate::{
-    application::{entities::Currency, errors::DatabaseError},
+    application::{composition::Currency, errors::DatabaseError},
     domains::wallet::WalletBalanceRepository,
     infra::database::sea_orm::models::{
         prelude::WalletBalance,

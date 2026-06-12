@@ -5,7 +5,7 @@ use tracing::{debug, error, info, trace};
 
 use crate::{
     application::{
-        entities::AppStore,
+        composition::AppStore,
         errors::{ApplicationError, DataError},
     },
     domains::{bitcoin::OnchainSyncCursor, user::PASSWORD_HASH_KEY},
@@ -117,7 +117,7 @@ mod tests {
 
     use crate::{
         application::{
-            entities::MockAppStoreBuilder,
+            composition::MockAppStoreBuilder,
             errors::{DatabaseError, LightningError},
         },
         infra::lightning::MockLnClient,

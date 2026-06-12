@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 
 use crate::application::errors::ApplicationError;
-use crate::{application::entities::Currency, domains::event::OnchainWithdrawalEvent};
+use crate::{application::composition::Currency, domains::event::OnchainWithdrawalEvent};
 
 use super::{LnInvoicePaidEvent, LnPayFailureEvent, LnPaySuccessEvent, OnchainDepositEvent};
 

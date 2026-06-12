@@ -7,8 +7,8 @@ use swissknife_types::{ErrorResponse, LNUrlpInvoiceQueryParams};
 
 use crate::{
     application::{
+        composition::AppServices,
         docs::{BAD_REQUEST_EXAMPLE, INTERNAL_EXAMPLE, NOT_FOUND_EXAMPLE, UNPROCESSABLE_EXAMPLE},
-        entities::AppServices,
         errors::ApplicationError,
     },
     infra::axum::{Json, Path, Query},
@@ -83,7 +83,7 @@ async fn callback(
 
 #[cfg(test)]
 mod tests {
-    use crate::application::{entities::MockAppServicesBuilder, errors::DataError};
+    use crate::application::{composition::MockAppServicesBuilder, errors::DataError};
 
     use super::*;
 

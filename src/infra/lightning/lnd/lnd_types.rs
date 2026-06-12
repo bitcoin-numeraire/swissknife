@@ -13,7 +13,7 @@ use crate::domains::{
 use std::str::FromStr;
 
 use crate::{
-    application::entities::Ledger,
+    application::composition::Ledger,
     domains::{
         invoice::{Invoice, InvoiceStatus},
         payment::Payment,

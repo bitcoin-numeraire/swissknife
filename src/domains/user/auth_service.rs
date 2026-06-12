@@ -8,8 +8,8 @@ use tracing::{debug, info, trace};
 
 use crate::{
     application::{
-        dtos::AuthProvider,
-        entities::AppStore,
+        composition::AppStore,
+        composition::AuthProvider,
         errors::{ApplicationError, AuthenticationError, DataError},
     },
     infra::jwt::JWTAuthenticator,
@@ -155,7 +155,7 @@ mod tests {
     use uuid::Uuid;
 
     use crate::{
-        application::entities::MockAppStoreBuilder,
+        application::composition::MockAppStoreBuilder,
         domains::{
             user::{ApiKey, AuthClaims},
             wallet::Wallet,

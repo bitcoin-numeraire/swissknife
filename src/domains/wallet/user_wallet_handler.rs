@@ -15,8 +15,8 @@ use swissknife_types::{
 
 use crate::{
     application::{
+        composition::AppServices,
         docs::{BAD_REQUEST_EXAMPLE, INTERNAL_EXAMPLE, NOT_FOUND_EXAMPLE, UNAUTHORIZED_EXAMPLE, UNPROCESSABLE_EXAMPLE},
-        entities::AppServices,
         errors::{ApplicationError, DataError},
     },
     domains::{
@@ -717,7 +717,7 @@ mod tests {
     use chrono::Utc;
 
     use crate::{
-        application::entities::MockAppServicesBuilder,
+        application::composition::MockAppServicesBuilder,
         domains::{
             bitcoin::{BtcAddress, BtcAddressType},
             payment::Payment,

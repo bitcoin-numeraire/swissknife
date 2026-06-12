@@ -12,7 +12,7 @@ use tokio::signal::{
 };
 use tracing::{debug, error, info};
 
-use crate::application::entities::{AppAdapters, AppServices};
+use crate::application::composition::{AppAdapters, AppServices};
 use crate::infra::{
     app::{EventListener, Server},
     config::config_rs::load_config,

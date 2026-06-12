@@ -4,7 +4,7 @@ use config::{Config, Environment, File};
 use humantime::parse_duration;
 use serde::{Deserialize, Deserializer};
 
-use crate::application::{dtos::AppConfig, errors::ConfigError};
+use crate::application::{composition::AppConfig, errors::ConfigError};
 
 const ENV_PREFIX: &str = "swissknife";
 const DEFAULT_RUN_MODE: &str = "development";

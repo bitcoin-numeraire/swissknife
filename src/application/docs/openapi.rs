@@ -1,7 +1,7 @@
 use swissknife_types::{ErrorResponse, OrderDirection};
 
 use crate::{
-    application::entities::{Currency, Ledger},
+    application::composition::{Currency, Ledger},
     domains::{
         bitcoin::BtcAddressHandler,
         invoice::InvoiceHandler,

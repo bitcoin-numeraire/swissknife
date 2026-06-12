@@ -2,8 +2,8 @@ use std::sync::Arc;
 
 use crate::{
     application::{
-        dtos::{AppConfig, LightningProvider},
-        entities::AppServices,
+        composition::AppServices,
+        composition::{AppConfig, LightningProvider},
         errors::{ApplicationError, ConfigError},
     },
     domains::bitcoin::BitcoinWallet,

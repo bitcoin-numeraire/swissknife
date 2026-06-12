@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use uuid::Uuid;
 
-use crate::application::{entities::Currency, errors::DatabaseError};
+use crate::application::{composition::Currency, errors::DatabaseError};
 
 #[cfg_attr(test, mockall::automock)]
 #[async_trait]

@@ -6,7 +6,7 @@ use uuid::Uuid;
 
 use crate::{
     application::{
-        entities::AppStore,
+        composition::AppStore,
         errors::{ApplicationError, DataError},
     },
     infra::lightning::LnClient,
@@ -141,7 +141,7 @@ mod tests {
     use chrono::Utc;
 
     use crate::{
-        application::entities::MockAppStoreBuilder,
+        application::composition::MockAppStoreBuilder,
         domains::{
             invoice::{Invoice, LnInvoice},
             ln_address::LnAddress,

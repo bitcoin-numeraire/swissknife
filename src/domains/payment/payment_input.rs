@@ -14,7 +14,7 @@ use reqwest::Url;
 use thiserror::Error;
 
 use crate::{
-    application::entities::Currency,
+    application::composition::Currency,
     domains::{bitcoin::BtcNetwork, lnurl::LnUrlPayRequestData},
 };
 

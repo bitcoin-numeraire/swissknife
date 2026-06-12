@@ -8,7 +8,7 @@ use axum_extra::{
 use base64::{prelude::BASE64_STANDARD, Engine};
 
 use crate::application::{
-    entities::AppServices,
+    composition::AppServices,
     errors::{ApplicationError, AuthenticationError},
 };
 

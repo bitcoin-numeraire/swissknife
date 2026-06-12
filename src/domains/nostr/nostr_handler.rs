@@ -7,8 +7,8 @@ use swissknife_types::{ErrorResponse, NostrNIP05QueryParams, NostrNIP05Response}
 
 use crate::{
     application::{
+        composition::AppServices,
         docs::{INTERNAL_EXAMPLE, NOT_FOUND_EXAMPLE},
-        entities::AppServices,
         errors::ApplicationError,
     },
     infra::axum::{Json, Query},
@@ -51,7 +51,7 @@ pub async fn well_known_nostr(
 mod tests {
     use nostr_sdk::PublicKey;
 
-    use crate::application::{entities::MockAppServicesBuilder, errors::DataError};
+    use crate::application::{composition::MockAppServicesBuilder, errors::DataError};
 
     use super::*;
 

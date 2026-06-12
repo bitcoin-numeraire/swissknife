@@ -12,11 +12,11 @@ use swissknife_types::{ErrorResponse, NewBtcAddressRequest};
 
 use crate::{
     application::{
+        composition::AppServices,
         docs::{
             BAD_REQUEST_EXAMPLE, FORBIDDEN_EXAMPLE, INTERNAL_EXAMPLE, NOT_FOUND_EXAMPLE, UNAUTHORIZED_EXAMPLE,
             UNPROCESSABLE_EXAMPLE,
         },
-        entities::AppServices,
         errors::ApplicationError,
     },
     domains::{
@@ -195,7 +195,7 @@ async fn delete_btc_addresses(
 mod tests {
     use chrono::Utc;
 
-    use crate::{application::entities::MockAppServicesBuilder, domains::bitcoin::BtcAddress};
+    use crate::{application::composition::MockAppServicesBuilder, domains::bitcoin::BtcAddress};
 
     use super::*;
 
