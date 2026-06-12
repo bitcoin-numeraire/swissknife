@@ -25,7 +25,7 @@ impl From<Bolt11Invoice> for Invoice {
 
         Invoice {
             ledger: Ledger::Lightning,
-            currency: val.currency().into(),
+            currency: currency_from_ln_invoice(val.currency()),
             amount_msat: val.amount_milli_satoshis(),
             timestamp,
             description: match val.description() {
@@ -50,15 +50,15 @@ impl From<Bolt11Invoice> for Invoice {
     }
 }
 
-impl From<LNInvoiceCurrency> for Currency {
-    fn from(val: LNInvoiceCurrency) -> Self {
-        match val {
-            LNInvoiceCurrency::Bitcoin => Currency::Bitcoin,
-            LNInvoiceCurrency::Regtest => Currency::Regtest,
-            LNInvoiceCurrency::Signet => Currency::Signet,
-            LNInvoiceCurrency::BitcoinTestnet => Currency::BitcoinTestnet,
-            LNInvoiceCurrency::Simnet => Currency::Simnet,
-        }
+// Foreign-to-foreign conversion (lightning_invoice -> api-types), so it lives
+// as a free function here rather than a `From` impl (orphan rule).
+fn currency_from_ln_invoice(val: LNInvoiceCurrency) -> Currency {
+    match val {
+        LNInvoiceCurrency::Bitcoin => Currency::Bitcoin,
+        LNInvoiceCurrency::Regtest => Currency::Regtest,
+        LNInvoiceCurrency::Signet => Currency::Signet,
+        LNInvoiceCurrency::BitcoinTestnet => Currency::BitcoinTestnet,
+        LNInvoiceCurrency::Simnet => Currency::Simnet,
     }
 }
 

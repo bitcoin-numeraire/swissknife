@@ -1,3 +1,7 @@
+[workspace]
+members = ["migration", "crates/swissknife-api-types"]
+resolver = "2"
+
 [package]
 name = "swissknife"
 version = "0.1.7"
@@ -59,6 +63,7 @@ humantime = "2.3.0"
 rust_socketio = { version = "0.6.0", features = ["async"] }
 bcrypt = "0.19.1"
 migration = { path = "migration" }
+swissknife-api-types = { path = "crates/swissknife-api-types" }
 utoipa = { version = "5.5.0", features = ["axum_extras", "chrono", "uuid"] }
 utoipa-scalar = { version = "0.3.0", features = ["axum"] }
 native-tls = "0.2.18"
