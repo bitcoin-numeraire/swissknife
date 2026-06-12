@@ -85,7 +85,7 @@ codegen-units = 1
 strip = true
 
 [features]
-# Enables the black-box integration suite (tests/api.rs). Off by default so a
+# Enables the integration suite (tests/api.rs). Off by default so a
 # plain `cargo test` runs only unit tests; the itest harness needs the regtest
 # docker stack (see tests/itest/). Run with `make test-integration`.
 itest = []

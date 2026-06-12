@@ -1,0 +1,111 @@
+name: Integration Tests
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  # API behaviour against real backends. The suite is provider-agnostic today,
+  # so it runs across all four Lightning adapters on sqlite (to exercise each
+  # adapter's connection and config) plus one postgres cell (migrations +
+  # persistence). The full provider matrix is reserved for the lightning
+  # protocol suites once they land — we deliberately do not run the whole suite
+  # across every (db, provider) combination.
+  integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    strategy:
+      fail-fast: false
+      matrix:
+        provider: [lnd_grpc, lnd_rest, cln_grpc, cln_rest]
+        database: [sqlite]
+        include:
+          - provider: lnd_grpc
+            database: postgres
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Install protoc
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@1.96.0
+
+      - name: Cache Rust dependencies
+        uses: swatinem/rust-cache@v2
+
+      - name: Integration tests (${{ matrix.database }} / ${{ matrix.provider }})
+        run: |
+          make test-integration \
+            ITEST_DATABASE=${{ matrix.database }} \
+            ITEST_PROVIDER=${{ matrix.provider }} \
+            ITEST_PROJECT=swissknife-itest-${{ matrix.database }}-${{ matrix.provider }}
+
+      - name: Collect dependency logs
+        if: failure()
+        run: |
+          make itest-logs \
+            ITEST_PROJECT=swissknife-itest-${{ matrix.database }}-${{ matrix.provider }} || true
+
+      - name: Upload integration artifacts
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: itest-${{ matrix.database }}-${{ matrix.provider }}
+          path: target/itest
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Stop dependencies
+        if: always()
+        run: |
+          make itest-down \
+            ITEST_PROJECT=swissknife-itest-${{ matrix.database }}-${{ matrix.provider }} || true
+
+  # Combined unit + integration coverage (lnd_grpc / sqlite), uploaded as lcov.
+  coverage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Install protoc
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: llvm-tools-preview
+
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@cargo-llvm-cov
+
+      - name: Cache Rust dependencies
+        uses: swatinem/rust-cache@v2
+
+      - name: Merged unit + integration coverage
+        run: make coverage-lcov
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v5
+        with:
+          name: coverage-lcov
+          path: lcov.info
+          if-no-files-found: error
+          retention-days: 14
