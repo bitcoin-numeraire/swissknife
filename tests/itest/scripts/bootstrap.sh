@@ -10,59 +10,74 @@ LND_REST_URL="https://127.0.0.1:${SWISSKNIFE_ITEST_LND_REST_PORT:-8080}"
 
 COMPOSE=(docker compose -p "${PROJECT}" -f "${COMPOSE_FILE}")
 
-mkdir -p "${ITEST_DIR}/runtime"/{bitcoin,cln,lnd,postgres}
-printf "%s\n" "${LND_PASSWORD}" >"${ITEST_DIR}/runtime/lnd/password.txt"
-chmod 0600 "${ITEST_DIR}/runtime/lnd/password.txt"
+# Daemon state lives in Docker named volumes (see docker-compose.yml). runtime/
+# holds only what the host-run binary needs, and nothing is copied back out of a
+# container: the TLS/gRPC certs are generated here and mounted into the daemons
+# (so the binary reads the very same host-owned files), while the two
+# wallet-derived credentials — LND's macaroon and CLN's rune — are minted over
+# RPC once the nodes are up. Start from a clean slate.
+RUNTIME_DIR="${ITEST_DIR}/runtime"
+LND_DIR="${RUNTIME_DIR}/lnd"
+LND_MACAROON="${LND_DIR}/data/chain/bitcoin/regtest/admin.macaroon"
+CLN_CERTS_DIR="${RUNTIME_DIR}/cln/regtest"
+CLN_RUNE="${RUNTIME_DIR}/cln/rune"
+rm -rf "${RUNTIME_DIR}"
+mkdir -p "$(dirname "${LND_MACAROON}")" "${CLN_CERTS_DIR}"
 
+# LND serves TLS with an RSA cert carrying the SANs from lnd.conf; the binary
+# verifies LND against the CA we sign it with (config's lnd cert_path = ca.cert).
 ensure_lnd_tls_cert() {
-  local lnd_dir="${ITEST_DIR}/runtime/lnd"
-  local ca_cert="${lnd_dir}/ca.cert"
-  local ca_key="${lnd_dir}/ca.key"
-  local server_cert="${lnd_dir}/tls.cert"
-  local server_key="${lnd_dir}/tls.key"
-  local server_csr="${lnd_dir}/tls.csr"
-  local server_ext="${lnd_dir}/tls.ext"
+  local ca_cert="${LND_DIR}/ca.cert" ca_key="${LND_DIR}/ca.key"
+  local cert="${LND_DIR}/tls.cert" key="${LND_DIR}/tls.key"
+  local csr="${LND_DIR}/tls.csr" ext="${LND_DIR}/tls.ext"
 
-  if [[ -s "${ca_cert}" && -s "${ca_key}" && -s "${server_cert}" && -s "${server_key}" ]]; then
-    return
-  fi
-
-  rm -f "${ca_cert}" "${ca_key}" "${server_cert}" "${server_key}" "${server_csr}" "${server_ext}" "${lnd_dir}/ca.srl"
-
-  openssl req -x509 -newkey rsa:2048 -nodes \
-    -keyout "${ca_key}" \
-    -out "${ca_cert}" \
-    -days 3650 \
-    -subj "/CN=swissknife-itest-lnd-ca" \
+  openssl req -x509 -newkey rsa:2048 -nodes -keyout "${ca_key}" -out "${ca_cert}" \
+    -days 3650 -subj "/CN=swissknife-itest-lnd-ca" \
     -addext "basicConstraints=critical,CA:TRUE" \
     -addext "keyUsage=critical,keyCertSign,cRLSign" >/dev/null 2>&1
 
-  openssl req -newkey rsa:2048 -nodes \
-    -keyout "${server_key}" \
-    -out "${server_csr}" \
+  openssl req -newkey rsa:2048 -nodes -keyout "${key}" -out "${csr}" \
     -subj "/CN=localhost" >/dev/null 2>&1
-
-  cat >"${server_ext}" <<'EOF'
+  cat >"${ext}" <<'EOF'
 basicConstraints=critical,CA:FALSE
 keyUsage=critical,digitalSignature,keyEncipherment
 extendedKeyUsage=serverAuth
 subjectAltName=DNS:localhost,DNS:lnd,IP:127.0.0.1
 EOF
+  openssl x509 -req -in "${csr}" -CA "${ca_cert}" -CAkey "${ca_key}" -CAcreateserial \
+    -out "${cert}" -days 3650 -sha256 -extfile "${ext}" >/dev/null 2>&1
+  rm -f "${csr}" "${ext}" "${LND_DIR}/ca.srl"
+}
 
-  openssl x509 -req \
-    -in "${server_csr}" \
-    -CA "${ca_cert}" \
-    -CAkey "${ca_key}" \
-    -CAcreateserial \
-    -out "${server_cert}" \
-    -days 3650 \
-    -sha256 \
-    -extfile "${server_ext}" >/dev/null 2>&1
+# cln-grpc uses an EC (P-256) chain — a CA plus server and client leaf certs,
+# all carrying the cln/localhost SANs. Placed in the lightning-dir, CLN uses
+# them instead of minting its own (which would be root-owned 0700 and unreadable
+# by the host binary on Linux). Mirror the structure CLN itself produces.
+ensure_cln_grpc_certs() {
+  openssl ecparam -name prime256v1 -genkey -noout -out "${CLN_CERTS_DIR}/ca-key.pem" 2>/dev/null
+  openssl req -x509 -new -key "${CLN_CERTS_DIR}/ca-key.pem" -days 3650 \
+    -out "${CLN_CERTS_DIR}/ca.pem" -subj "/CN=cln Root CA" \
+    -addext "subjectAltName=DNS:cln,DNS:localhost" \
+    -addext "keyUsage=critical,keyCertSign" \
+    -addext "basicConstraints=critical,CA:TRUE" 2>/dev/null
 
-  rm -f "${server_csr}" "${server_ext}"
+  local role cn
+  for role in server client; do
+    [[ "${role}" == "server" ]] && cn="cln grpc Server" || cn="cln grpc Client"
+    openssl ecparam -name prime256v1 -genkey -noout -out "${CLN_CERTS_DIR}/${role}-key.pem" 2>/dev/null
+    openssl req -new -key "${CLN_CERTS_DIR}/${role}-key.pem" -out "${CLN_CERTS_DIR}/${role}.csr" \
+      -subj "/CN=${cn}" 2>/dev/null
+    printf 'subjectAltName=DNS:cln,DNS:localhost,IP:127.0.0.1\nkeyUsage=critical,digitalSignature,keyEncipherment,keyAgreement\n' \
+      >"${CLN_CERTS_DIR}/${role}.ext"
+    openssl x509 -req -in "${CLN_CERTS_DIR}/${role}.csr" -CA "${CLN_CERTS_DIR}/ca.pem" \
+      -CAkey "${CLN_CERTS_DIR}/ca-key.pem" -CAcreateserial -days 3650 -sha256 \
+      -out "${CLN_CERTS_DIR}/${role}.pem" -extfile "${CLN_CERTS_DIR}/${role}.ext" 2>/dev/null
+  done
+  rm -f "${CLN_CERTS_DIR}"/*.csr "${CLN_CERTS_DIR}"/*.ext "${CLN_CERTS_DIR}/ca.srl"
 }
 
 ensure_lnd_tls_cert
+ensure_cln_grpc_certs
 
 "${COMPOSE[@]}" up -d postgres bitcoind lnd cln
 
@@ -169,34 +184,28 @@ except urllib.error.HTTPError as exc:
 PY
 }
 
-wait_for_lnd_tls() {
-  local deadline=$((SECONDS + 120))
-  until [[ -f "${ITEST_DIR}/runtime/lnd/tls.cert" ]]; do
-    if (( SECONDS >= deadline )); then
-      echo "LND TLS certificate was not created" >&2
-      return 1
-    fi
-    sleep 1
-  done
-}
-
 ensure_lnd_wallet() {
-  wait_for_lnd_tls
-
   local deadline=$((SECONDS + 180))
   until lnd_cli getinfo >/dev/null 2>&1; do
-    if [[ ! -f "${ITEST_DIR}/runtime/lnd/data/chain/bitcoin/regtest/admin.macaroon" ]]; then
-      lnd_init_wallet >/dev/null 2>&1 || true
-    else
-      lnd_unlock_wallet >/dev/null 2>&1 || true
-    fi
-
     if (( SECONDS >= deadline )); then
       echo "LND wallet did not become ready" >&2
       return 1
     fi
+    # Fresh volume -> init (which also unlocks); reused volume -> unlock.
+    lnd_init_wallet >/dev/null 2>&1 || lnd_unlock_wallet >/dev/null 2>&1 || true
     sleep 2
   done
+
+  # The admin macaroon is wallet-derived (can't be pre-generated) and the
+  # adapter requires one. Bake an all-permissions macaroon over RPC and write it
+  # in raw-binary form where the binary expects it (read_macaroon reads bytes).
+  local perms="onchain:read onchain:write offchain:read offchain:write address:read address:write message:read message:write peers:read peers:write info:read info:write invoices:read invoices:write signer:read signer:write macaroon:read macaroon:write"
+  # bakemacaroon prints the macaroon as a bare hex string (not JSON).
+  local macaroon_hex
+  # shellcheck disable=SC2086 # perms must word-split into separate CLI args
+  macaroon_hex=$(lnd_cli bakemacaroon ${perms} | tr -d '[:space:]')
+  python3 -c 'import sys, binascii; open(sys.argv[1], "wb").write(binascii.unhexlify(sys.argv[2]))' \
+    "${LND_MACAROON}" "${macaroon_hex}"
 }
 
 ensure_cln_ready() {
@@ -209,23 +218,14 @@ ensure_cln_ready() {
     sleep 2
   done
 
-  local deadline_certs=$((SECONDS + 60))
-  until [[ -f "${ITEST_DIR}/runtime/cln/regtest/client.pem" && -f "${ITEST_DIR}/runtime/cln/regtest/client-key.pem" && -f "${ITEST_DIR}/runtime/cln/regtest/ca.pem" ]]; do
-    if (( SECONDS >= deadline_certs )); then
-      echo "CLN gRPC certificates were not created" >&2
-      return 1
-    fi
-    sleep 1
-  done
-
-  local rune_file="${ITEST_DIR}/runtime/cln/rune"
-  if [[ ! -s "${rune_file}" ]]; then
-    local rune_json
-    rune_json="$(cln_cli createrune)"
-    printf "%s\n" "${rune_json}" | sed -n 's/.*"rune"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' >"${rune_file}"
+  # The gRPC certs are host-generated and mounted in (ensure_cln_grpc_certs), so
+  # there is nothing to fetch here. The rune, like the macaroon, is node-derived:
+  # mint it over RPC and write it where the binary reads it (cln_rest only).
+  if [[ ! -s "${CLN_RUNE}" ]]; then
+    cln_cli createrune \
+      | sed -n 's/.*"rune"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' >"${CLN_RUNE}"
   fi
-
-  if [[ ! -s "${rune_file}" ]]; then
+  if [[ ! -s "${CLN_RUNE}" ]]; then
     echo "CLN rune was not created" >&2
     return 1
   fi
@@ -242,6 +242,26 @@ ensure_lnd_synced() {
       return 1
     fi
     # In regtest LND reports synced_to_chain only after a fresh block; nudge it.
+    bitcoin_cli -rpcwallet=miner generatetoaddress 1 "${miner_addr}" >/dev/null 2>&1 || true
+    sleep 2
+  done
+}
+
+# Wait until CLN has caught up to the chain tip. Opening a channel while CLN is
+# still in initial block download (blockheight 0) trips a `first_blocknum`
+# assertion in wallet_channel_save and aborts lightningd.
+wait_for_cln_synced() {
+  local target deadline miner_addr
+  target=$(bitcoin_cli getblockcount)
+  miner_addr=$(bitcoin_cli -rpcwallet=miner getnewaddress)
+  deadline=$((SECONDS + 120))
+  until [[ "$(cln_cli getinfo 2>/dev/null \
+    | python3 -c 'import sys,json; print(json.load(sys.stdin).get("blockheight",0))' 2>/dev/null || echo 0)" -ge "${target}" ]]; do
+    if (( SECONDS >= deadline )); then
+      echo "CLN did not sync to chain (target height ${target})" >&2
+      return 1
+    fi
+    # In regtest CLN stays in IBD until a fresh block arrives; nudge it (as for LND).
     bitcoin_cli -rpcwallet=miner generatetoaddress 1 "${miner_addr}" >/dev/null 2>&1 || true
     sleep 2
   done
@@ -276,6 +296,8 @@ ensure_channel() {
     bitcoin_cli -rpcwallet=miner generatetoaddress 1 "${miner_addr}" >/dev/null 2>&1 || true
     sleep 2
   done
+
+  wait_for_cln_synced
 
   local cln_id
   cln_id=$(cln_cli getinfo | python3 -c 'import sys,json; print(json.load(sys.stdin)["id"])')
