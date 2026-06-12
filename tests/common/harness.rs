@@ -29,11 +29,24 @@ static SPAWNED: Mutex<Vec<Child>> = Mutex::new(Vec::new());
 
 #[ctor::dtor]
 fn reap_spawned_instances() {
-    if let Ok(mut children) = SPAWNED.lock() {
-        for mut child in children.drain(..) {
-            let _ = child.kill();
-            let _ = child.wait();
+    let Ok(mut children) = SPAWNED.lock() else {
+        return;
+    };
+    // SIGTERM first so SwissKnife shuts down gracefully. A hard SIGKILL would
+    // stop the instrumented binary from running its atexit handler, dropping
+    // the coverage profile under `cargo llvm-cov`.
+    for child in children.iter_mut() {
+        let _ = std::process::Command::new("kill").arg(child.id().to_string()).status();
+    }
+    for mut child in children.drain(..) {
+        for _ in 0..50 {
+            if matches!(child.try_wait(), Ok(Some(_))) {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(100));
         }
+        let _ = child.kill(); // hard-kill any straggler that ignored SIGTERM
+        let _ = child.wait();
     }
 }
 
