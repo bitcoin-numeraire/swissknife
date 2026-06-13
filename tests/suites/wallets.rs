@@ -61,10 +61,15 @@ mod register_wallet {
     async fn rejects_a_malformed_body() {
         let app = app().await;
         let token = app.admin_token().await;
+        // NOTE: register_wallet uses the stock `axum::Json` extractor, which
+        // returns 422 + a plain-text body for a missing field — unlike most
+        // handlers' custom `infra::axum::Json` (400 Malformed + ErrorResponse).
+        // Asserting status only, since the body is not the standard shape here.
         let res = app.api().post("/v1/wallets", Auth::Bearer(token), json!({})).await;
-        assert!(
-            matches!(res.status, StatusCode::UNPROCESSABLE_ENTITY | StatusCode::BAD_REQUEST),
-            "expected 4xx for malformed body, got {} ({})",
+        assert_eq!(
+            res.status,
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "got {} ({})",
             res.status,
             res.body
         );
@@ -83,5 +88,48 @@ mod get_wallet {
             .get(&format!("/v1/wallets/{}", uuid::Uuid::new_v4()), Auth::Bearer(token))
             .await;
         assert_error(&res, StatusCode::NOT_FOUND);
+    }
+}
+
+mod list {
+    use super::*;
+
+    #[tokio::test]
+    async fn includes_the_registered_wallet() {
+        let app = app().await;
+        let token = app.admin_token().await;
+        let wallet = app.create_wallet(token, "wallet-list").await;
+
+        // A large limit keeps the wallet on the page regardless of how many
+        // others share the instance.
+        let res = app.api().get("/v1/wallets?limit=1000", Auth::Bearer(token)).await;
+        assert_status(&res, StatusCode::OK);
+        assert!(
+            res.parse::<Vec<Wallet>>().iter().any(|w| w.id == wallet.id),
+            "the registered wallet is listed"
+        );
+    }
+}
+
+mod delete {
+    use super::*;
+
+    #[tokio::test]
+    async fn deletes_a_wallet() {
+        let app = app().await;
+        let token = app.admin_token().await;
+        let wallet = app.create_wallet(token, "wallet-del").await;
+
+        let del = app
+            .api()
+            .delete(&format!("/v1/wallets/{}", wallet.id), Auth::Bearer(token))
+            .await;
+        assert_status(&del, StatusCode::OK);
+
+        let gone = app
+            .api()
+            .get(&format!("/v1/wallets/{}", wallet.id), Auth::Bearer(token))
+            .await;
+        assert_error(&gone, StatusCode::NOT_FOUND);
     }
 }
