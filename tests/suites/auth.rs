@@ -1,7 +1,8 @@
 //! `/v1/auth/*` (local JWT) plus auth-middleware enforcement on protected routes.
 
 use reqwest::StatusCode;
-use serde_json::json;
+
+use swissknife_types::{SignInRequest, SignInResponse, SignUpRequest};
 
 use crate::common::harness::ADMIN_PASSWORD;
 use crate::common::{app, assert_error, assert_status, Auth};
@@ -15,10 +16,16 @@ mod sign_in {
         app.admin_token().await; // ensure the admin exists
         let res = app
             .api()
-            .post("/v1/auth/sign-in", Auth::None, json!({ "password": ADMIN_PASSWORD }))
+            .post(
+                "/v1/auth/sign-in",
+                Auth::None,
+                SignInRequest {
+                    password: ADMIN_PASSWORD.to_string(),
+                },
+            )
             .await;
         assert_status(&res, StatusCode::OK);
-        assert!(res.body["token"].as_str().is_some(), "{}", res.body);
+        assert!(!res.parse::<SignInResponse>().token.is_empty(), "{}", res.body);
     }
 
     #[tokio::test]
@@ -27,7 +34,13 @@ mod sign_in {
         app.admin_token().await;
         let res = app
             .api()
-            .post("/v1/auth/sign-in", Auth::None, json!({ "password": "wrong-password" }))
+            .post(
+                "/v1/auth/sign-in",
+                Auth::None,
+                SignInRequest {
+                    password: "wrong-password".to_string(),
+                },
+            )
             .await;
         assert_error(&res, StatusCode::UNAUTHORIZED);
     }
@@ -45,7 +58,9 @@ mod sign_up {
             .post(
                 "/v1/auth/sign-up",
                 Auth::None,
-                json!({ "password": "another-password" }),
+                SignUpRequest {
+                    password: "another-password".to_string(),
+                },
             )
             .await;
         assert_error(&res, StatusCode::CONFLICT);
