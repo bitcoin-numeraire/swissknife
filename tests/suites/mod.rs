@@ -7,6 +7,7 @@ mod guards;
 mod invoices;
 mod lightning;
 mod ln_addresses;
+mod me;
 mod payments;
 mod system;
 mod wallets;

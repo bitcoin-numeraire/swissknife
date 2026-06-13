@@ -99,4 +99,43 @@ impl TestApp {
             .key
             .expect("a freshly created key returns its secret")
     }
+
+    /// Mint an API key for `user_id` via the admin endpoint with `permissions`,
+    /// returning its secret. The key authenticates as that user.
+    pub async fn user_api_key(&self, token: &str, user_id: &str, permissions: Vec<Permission>) -> String {
+        let res = self
+            .api()
+            .post(
+                "/v1/api-keys",
+                Auth::Bearer(token),
+                CreateApiKeyRequest {
+                    user_id: Some(user_id.to_string()),
+                    name: unique("user-key"),
+                    permissions,
+                    description: None,
+                    expiry: None,
+                },
+            )
+            .await;
+        assert_eq!(res.status.as_u16(), 200, "mint user key failed: {}", res.body);
+        res.parse::<ApiKey>()
+            .key
+            .expect("a freshly created key returns its secret")
+    }
+
+    /// Register a fresh wallet and a full-permission API key for it: a distinct
+    /// external user for exercising the `/me` endpoints.
+    pub async fn create_user(&self, token: &str, label: &str) -> TestUser {
+        let wallet = self.create_wallet(token, label).await;
+        let key = self
+            .user_api_key(token, &wallet.user_id, Permission::all_permissions())
+            .await;
+        TestUser { wallet, key }
+    }
+}
+
+/// A distinct user (own wallet) with an API-key credential, for `/me` tests.
+pub struct TestUser {
+    pub wallet: Wallet,
+    pub key: String,
 }
