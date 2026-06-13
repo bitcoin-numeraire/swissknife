@@ -6,6 +6,7 @@ mod bitcoin;
 mod guards;
 mod invoices;
 mod lightning;
+mod ln_addresses;
 mod payments;
 mod system;
 mod wallets;
