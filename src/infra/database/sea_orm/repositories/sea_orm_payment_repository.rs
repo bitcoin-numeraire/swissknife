@@ -225,11 +225,11 @@ where
         Ok(model.into())
     }
 
-    async fn try_transition(&self, id: Uuid, from: PaymentStatus, to: PaymentStatus) -> Result<bool, DatabaseError> {
+    async fn try_transition(&self, id: Uuid, from: &[PaymentStatus], to: PaymentStatus) -> Result<bool, DatabaseError> {
         let result = PaymentEntity::update_many()
             .col_expr(Column::Status, Expr::value(to.to_string()))
             .filter(Column::Id.eq(id))
-            .filter(Column::Status.eq(from.to_string()))
+            .filter(Column::Status.is_in(from.iter().map(|status| status.to_string())))
             .exec(self.db.connection())
             .await
             .map_err(|e| DatabaseError::Update(e.to_string()))?;
