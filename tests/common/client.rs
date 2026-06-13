@@ -1,4 +1,3 @@
-use base64::{engine::general_purpose::STANDARD, Engine as _};
 use reqwest::{Client, Method, StatusCode};
 use serde::Serialize;
 use serde_json::Value;
@@ -10,7 +9,9 @@ pub enum Auth<'a> {
     None,
     /// JWT, sent as `Authorization: Bearer <token>`.
     Bearer(&'a str),
-    /// API key, sent base64-encoded in the `api-key` header (as the middleware expects).
+    /// API key. The secret the API returns is already base64 (of the raw key
+    /// bytes), and the middleware base64-decodes the `api-key` header, so it is
+    /// sent verbatim rather than re-encoded.
     ApiKey(&'a str),
 }
 
@@ -66,7 +67,7 @@ impl ApiClient {
         req = match auth {
             Auth::None => req,
             Auth::Bearer(token) => req.bearer_auth(token),
-            Auth::ApiKey(key) => req.header("api-key", STANDARD.encode(key)),
+            Auth::ApiKey(key) => req.header("api-key", key),
         };
         if let Some(body) = body {
             req = req.json(&body);
