@@ -7,7 +7,7 @@ use crate::{
         bitcoin::{BtcAddress, BtcAddressRepository, BtcOutput, BtcOutputRepository},
         event::EventProjectionUnitOfWork,
         invoice::{Invoice, InvoiceRepository},
-        payment::{Payment, PaymentRepository, PaymentUnitOfWork},
+        payment::{Payment, PaymentRepository, PaymentStatus, PaymentUnitOfWork},
         wallet::WalletBalanceRepository,
     },
 };
@@ -62,6 +62,26 @@ impl PaymentUnitOfWork for SeaOrmPaymentUnitOfWork {
             .await
             .map_err(|e| DatabaseError::Transaction(e.to_string()))?;
 
+        let payment_repo = SeaOrmPaymentRepository::new(&txn);
+
+        // Single-winner: the synchronous pay result and the success event can
+        // both reach this for the same payment. Only the one that wins the
+        // Pending->Settled transition runs the balance side effects; the other
+        // returns the already-settled payment untouched.
+        if !payment_repo
+            .try_transition(payment.id, PaymentStatus::Pending, PaymentStatus::Settled)
+            .await?
+        {
+            let settled = payment_repo
+                .find(payment.id)
+                .await?
+                .ok_or_else(|| DataError::NotFound(format!("Payment {} not found", payment.id)))?;
+            txn.commit()
+                .await
+                .map_err(|e| DatabaseError::Transaction(e.to_string()))?;
+            return Ok(settled);
+        }
+
         let balance_repo = SeaOrmWalletBalanceRepository::new(&txn);
 
         if payment.reserved_amount > 0
@@ -84,7 +104,7 @@ impl PaymentUnitOfWork for SeaOrmPaymentUnitOfWork {
         }
         payment.reserved_amount = 0;
 
-        let payment = SeaOrmPaymentRepository::new(&txn).update(payment).await?;
+        let payment = payment_repo.update(payment).await?;
 
         txn.commit()
             .await
@@ -100,6 +120,25 @@ impl PaymentUnitOfWork for SeaOrmPaymentUnitOfWork {
             .await
             .map_err(|e| DatabaseError::Transaction(e.to_string()))?;
 
+        let payment_repo = SeaOrmPaymentRepository::new(&txn);
+
+        // Single-winner: only the caller that wins the Pending->Failed
+        // transition releases the reservation; a duplicate (sync result +
+        // failure event) returns the already-failed payment.
+        if !payment_repo
+            .try_transition(payment.id, PaymentStatus::Pending, PaymentStatus::Failed)
+            .await?
+        {
+            let failed = payment_repo
+                .find(payment.id)
+                .await?
+                .ok_or_else(|| DataError::NotFound(format!("Payment {} not found", payment.id)))?;
+            txn.commit()
+                .await
+                .map_err(|e| DatabaseError::Transaction(e.to_string()))?;
+            return Ok(failed);
+        }
+
         let balance_repo = SeaOrmWalletBalanceRepository::new(&txn);
         if payment.reserved_amount > 0
             && !balance_repo
@@ -112,7 +151,7 @@ impl PaymentUnitOfWork for SeaOrmPaymentUnitOfWork {
         }
         payment.reserved_amount = 0;
 
-        let payment = SeaOrmPaymentRepository::new(&txn).update(payment).await?;
+        let payment = payment_repo.update(payment).await?;
 
         txn.commit()
             .await
