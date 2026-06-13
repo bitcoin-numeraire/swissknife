@@ -61,18 +61,10 @@ mod register_wallet {
     async fn rejects_a_malformed_body() {
         let app = app().await;
         let token = app.admin_token().await;
-        // NOTE: register_wallet uses the stock `axum::Json` extractor, which
-        // returns 422 + a plain-text body for a missing field — unlike most
-        // handlers' custom `infra::axum::Json` (400 Malformed + ErrorResponse).
-        // Asserting status only, since the body is not the standard shape here.
+        // A missing required field fails JSON deserialization → 400 Malformed
+        // (the custom infra::axum::Json extractor; 422 is for use-case validation).
         let res = app.api().post("/v1/wallets", Auth::Bearer(token), json!({})).await;
-        assert_eq!(
-            res.status,
-            StatusCode::UNPROCESSABLE_ENTITY,
-            "got {} ({})",
-            res.status,
-            res.body
-        );
+        assert_error(&res, StatusCode::BAD_REQUEST);
     }
 }
 
