@@ -144,7 +144,11 @@ mod query {
             .await;
         assert_status(&res, StatusCode::OK);
         let invoices = res.parse::<Vec<Invoice>>();
-        assert_eq!(invoices.len(), 1, "the pending invoice is returned by the status filter");
+        assert_eq!(
+            invoices.len(),
+            1,
+            "the pending invoice is returned by the status filter"
+        );
         assert_eq!(invoices[0].id, invoice.id);
         assert_eq!(invoices[0].status, InvoiceStatus::Pending);
     }
@@ -160,7 +164,10 @@ mod query {
 
         let res = app
             .api()
-            .get(&format!("/v1/invoices?wallet_id={}&limit=2", wallet.id), Auth::Bearer(token))
+            .get(
+                &format!("/v1/invoices?wallet_id={}&limit=2", wallet.id),
+                Auth::Bearer(token),
+            )
             .await;
         assert_status(&res, StatusCode::OK);
         assert_eq!(res.parse::<Vec<Invoice>>().len(), 2, "limit caps the result count");

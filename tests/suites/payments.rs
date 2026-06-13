@@ -61,7 +61,11 @@ mod send {
         // Not a bolt11/LNURL/LN-address: parsing fails inside the use case (422).
         let res = app
             .api()
-            .post("/v1/payments", Auth::Bearer(token), pay(wallet.id, "notapaymentinput".to_string()))
+            .post(
+                "/v1/payments",
+                Auth::Bearer(token),
+                pay(wallet.id, "notapaymentinput".to_string()),
+            )
             .await;
         assert_error(&res, StatusCode::UNPROCESSABLE_ENTITY);
     }
