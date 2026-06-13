@@ -3,7 +3,9 @@ use std::time::Duration;
 
 use uuid::Uuid;
 
-use swissknife_types::{Balance, BtcAddress, NewBtcAddressRequest, RegisterWalletRequest, Wallet};
+use swissknife_types::{
+    ApiKey, Balance, BtcAddress, CreateApiKeyRequest, NewBtcAddressRequest, Permission, RegisterWalletRequest, Wallet,
+};
 
 use super::chain;
 use super::client::Auth;
@@ -71,5 +73,30 @@ impl TestApp {
             self.wallet_balance(token, wallet_id).await.available_msat >= target
         })
         .await;
+    }
+
+    /// Mint an API key for the caller's own wallet with exactly `permissions`,
+    /// via `/v1/me/api-keys` (which fills in the user). Returns the raw secret
+    /// for use as `Auth::ApiKey` — a credential narrower than the admin JWT, for
+    /// exercising permission enforcement.
+    pub async fn api_key(&self, token: &str, permissions: Vec<Permission>) -> String {
+        let res = self
+            .api()
+            .post(
+                "/v1/me/api-keys",
+                Auth::Bearer(token),
+                CreateApiKeyRequest {
+                    user_id: None,
+                    name: unique("key"),
+                    permissions,
+                    description: None,
+                    expiry: None,
+                },
+            )
+            .await;
+        assert_eq!(res.status.as_u16(), 200, "mint api key failed: {}", res.body);
+        res.parse::<ApiKey>()
+            .key
+            .expect("a freshly created key returns its secret")
     }
 }
