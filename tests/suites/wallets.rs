@@ -61,8 +61,6 @@ mod register_wallet {
     async fn rejects_a_malformed_body() {
         let app = app().await;
         let token = app.admin_token().await;
-        // A missing required field fails JSON deserialization → 400 Malformed
-        // (the custom infra::axum::Json extractor; 422 is for use-case validation).
         let res = app.api().post("/v1/wallets", Auth::Bearer(token), json!({})).await;
         assert_error(&res, StatusCode::BAD_REQUEST);
     }
