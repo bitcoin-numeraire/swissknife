@@ -47,13 +47,20 @@ impl ApiKeyUseCases for ApiKeyService {
             None => None,
         };
 
+        // The admin endpoint names an explicit user; only `/v1/me/api-keys`
+        // defaults it to the caller. A missing user_id here is a bad request,
+        // not a reason to panic.
+        let user_id = request
+            .user_id
+            .ok_or_else(|| DataError::Validation("user_id is required.".to_string()))?;
+
         // Generate a new API key
         let bytes: [u8; 32] = rand::random();
         let api_key_plain = BASE64_STANDARD.encode(bytes);
         let key_hash = sha256::Hash::hash(&bytes).to_byte_array().to_vec();
 
         let api_key = ApiKey {
-            user_id: request.user_id.expect("user_id should be defined"),
+            user_id,
             name: request.name,
             key_hash,
             permissions: request.permissions.clone(),
@@ -243,6 +250,29 @@ mod tests {
                     .generate(
                         user_with(vec![Permission::ReadWallet]),
                         create_request(vec![Permission::ReadWallet], Some(MAX_ALLOWED_EXPIRY_SECONDS + 1)),
+                    )
+                    .await
+                    .unwrap_err();
+
+                assert!(matches!(err, ApplicationError::Data(DataError::Validation(_))));
+            }
+        }
+
+        mod with_a_missing_user_id {
+            use super::*;
+
+            #[tokio::test]
+            async fn rejects_with_validation_error() {
+                // The admin endpoint must name a user; only `/me` defaults it.
+                let service = ApiKeyService::new(MockAppStoreBuilder::new().build());
+
+                let err = service
+                    .generate(
+                        user_with(vec![Permission::ReadWallet]),
+                        CreateApiKeyRequest {
+                            user_id: None,
+                            ..create_request(vec![Permission::ReadWallet], None)
+                        },
                     )
                     .await
                     .unwrap_err();
