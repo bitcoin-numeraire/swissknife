@@ -1,8 +1,8 @@
 use async_trait::async_trait;
 use chrono::Utc;
 use sea_orm::{
-    ActiveModelTrait, ActiveValue, ColumnTrait, DatabaseConnection, EntityTrait, FromQueryResult, QueryFilter,
-    QueryOrder, QuerySelect, QueryTrait, Set, Unchanged,
+    sea_query::Expr, ActiveModelTrait, ActiveValue, ColumnTrait, DatabaseConnection, EntityTrait, FromQueryResult,
+    QueryFilter, QueryOrder, QuerySelect, QueryTrait, Set, Unchanged,
 };
 use uuid::Uuid;
 
@@ -10,7 +10,7 @@ use super::SeaOrmConnection;
 
 use crate::{
     application::errors::DatabaseError,
-    domains::payment::{Payment, PaymentFilter, PaymentRepository},
+    domains::payment::{Payment, PaymentFilter, PaymentRepository, PaymentStatus},
     infra::database::sea_orm::models::{
         payment::{ActiveModel, Column},
         prelude::Payment as PaymentEntity,
@@ -223,6 +223,18 @@ where
             .map_err(|e| DatabaseError::Update(e.to_string()))?;
 
         Ok(model.into())
+    }
+
+    async fn try_transition(&self, id: Uuid, from: PaymentStatus, to: PaymentStatus) -> Result<bool, DatabaseError> {
+        let result = PaymentEntity::update_many()
+            .col_expr(Column::Status, Expr::value(to.to_string()))
+            .filter(Column::Id.eq(id))
+            .filter(Column::Status.eq(from.to_string()))
+            .exec(self.db.connection())
+            .await
+            .map_err(|e| DatabaseError::Update(e.to_string()))?;
+
+        Ok(result.rows_affected == 1)
     }
 
     async fn delete_many(&self, filter: PaymentFilter) -> Result<u64, DatabaseError> {
