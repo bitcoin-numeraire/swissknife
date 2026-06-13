@@ -91,7 +91,7 @@ where
                     Condition::all()
                         .add(
                             Condition::any()
-                                .add(Expr::col(Column::ExpiresAt).gt(Utc::now()))
+                                .add(Expr::col(Column::ExpiresAt).gt(Utc::now().naive_utc()))
                                 .add(Expr::col(Column::ExpiresAt).is_null()),
                         )
                         .add(Expr::col(Column::PaymentTime).is_null()),
@@ -99,7 +99,7 @@ where
                 InvoiceStatus::Settled => q.filter(Expr::col(Column::PaymentTime).is_not_null()),
                 InvoiceStatus::Expired => q.filter(
                     Condition::all()
-                        .add(Expr::col(Column::ExpiresAt).lte(Utc::now()))
+                        .add(Expr::col(Column::ExpiresAt).lte(Utc::now().naive_utc()))
                         .add(Expr::col(Column::PaymentTime).is_null()),
                 ),
             })
@@ -215,7 +215,7 @@ where
                     Condition::all()
                         .add(
                             Condition::any()
-                                .add(Expr::col(Column::ExpiresAt).gt(Utc::now()))
+                                .add(Expr::col(Column::ExpiresAt).gt(Utc::now().naive_utc()))
                                 .add(Expr::col(Column::ExpiresAt).is_null()),
                         )
                         .add(Expr::col(Column::PaymentTime).is_null()),
@@ -223,7 +223,7 @@ where
                 InvoiceStatus::Settled => q.filter(Expr::col(Column::PaymentTime).is_not_null()),
                 InvoiceStatus::Expired => q.filter(
                     Condition::all()
-                        .add(Expr::col(Column::ExpiresAt).lte(Utc::now()))
+                        .add(Expr::col(Column::ExpiresAt).lte(Utc::now().naive_utc()))
                         .add(Expr::col(Column::PaymentTime).is_null()),
                 ),
             })
