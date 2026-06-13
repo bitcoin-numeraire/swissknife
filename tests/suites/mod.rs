@@ -5,5 +5,6 @@ mod auth;
 mod bitcoin;
 mod invoices;
 mod lightning;
+mod payments;
 mod system;
 mod wallets;
