@@ -32,7 +32,7 @@ pub struct LnAddress {
 }
 
 /// Register Lightning Address Request
-#[derive(Debug, Deserialize, ToSchema)]
+#[derive(Debug, Deserialize, ToSchema, Serialize)]
 pub struct RegisterLnAddressRequest {
     /// Wallet ID. Will be populated with your own ID by default
     pub wallet_id: Option<Uuid>,
@@ -50,7 +50,7 @@ pub struct RegisterLnAddressRequest {
 }
 
 /// Update Lightning Address Request
-#[derive(Debug, Deserialize, ToSchema)]
+#[derive(Debug, Deserialize, ToSchema, Serialize)]
 pub struct UpdateLnAddressRequest {
     /// Username such as `username@domain`
     pub username: Option<String>,

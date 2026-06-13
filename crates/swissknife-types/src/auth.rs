@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 /// Sign Up Request
-#[derive(Debug, Deserialize, ToSchema)]
+#[derive(Debug, Deserialize, ToSchema, Serialize)]
 pub struct SignUpRequest {
     /// User password
     #[schema(example = "password")]
@@ -10,7 +10,7 @@ pub struct SignUpRequest {
 }
 
 /// Sign In Request
-#[derive(Debug, Deserialize, ToSchema)]
+#[derive(Debug, Deserialize, ToSchema, Serialize)]
 pub struct SignInRequest {
     /// User password
     #[schema(example = "password")]

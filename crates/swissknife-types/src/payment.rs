@@ -137,7 +137,7 @@ pub enum PaymentStatus {
 }
 
 /// Send Payment Request
-#[derive(Debug, Deserialize, Clone, ToSchema)]
+#[derive(Debug, Deserialize, Clone, ToSchema, Serialize)]
 pub struct SendPaymentRequest {
     /// Wallet ID. Will be populated with your own ID by default
     pub wallet_id: Option<Uuid>,
