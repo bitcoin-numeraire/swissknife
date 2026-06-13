@@ -32,7 +32,7 @@ pub struct ApiKey {
 }
 
 /// Create API Key Request
-#[derive(Deserialize, ToSchema)]
+#[derive(Deserialize, ToSchema, Serialize)]
 pub struct CreateApiKeyRequest {
     /// User ID. Will be populated with your own ID by default
     pub user_id: Option<String>,

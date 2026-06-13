@@ -90,7 +90,7 @@ pub struct WalletOverview {
 }
 
 /// Register Wallet Request
-#[derive(Debug, Deserialize, Clone, ToSchema)]
+#[derive(Debug, Deserialize, Clone, ToSchema, Serialize)]
 pub struct RegisterWalletRequest {
     /// User ID. Should ideally be registered in your Auth provider.
     pub user_id: String,

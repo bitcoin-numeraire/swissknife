@@ -111,7 +111,7 @@ pub enum InvoiceStatus {
 }
 
 /// New Invoice Request
-#[derive(Deserialize, ToSchema)]
+#[derive(Deserialize, ToSchema, Serialize)]
 pub struct NewInvoiceRequest {
     /// User ID. Will be populated with your own ID by default
     pub wallet_id: Option<Uuid>,
