@@ -15,13 +15,19 @@ COMPOSE=(docker compose -p "${PROJECT}" -f "${COMPOSE_FILE}")
 # container: the TLS/gRPC certs are generated here and mounted into the daemons
 # (so the binary reads the very same host-owned files), while the two
 # wallet-derived credentials — LND's macaroon and CLN's rune — are minted over
-# RPC once the nodes are up. Start from a clean slate.
+# RPC once the nodes are up.
+#
+# This must stay idempotent: `make test-integration` re-runs the bootstrap with
+# the stack already up. So existing certs are reused, never regenerated —
+# rewriting a cert under a daemon that loaded the original at boot would have it
+# serve a leaf the host CA no longer matches, and every RPC would fail the TLS
+# handshake. A true clean slate comes from `make itest-shutdown`, which wipes the
+# volumes and runtime/ together so node identity and certs stay in lockstep.
 RUNTIME_DIR="${ITEST_DIR}/runtime"
 LND_DIR="${RUNTIME_DIR}/lnd"
 LND_MACAROON="${LND_DIR}/data/chain/bitcoin/regtest/admin.macaroon"
 CLN_CERTS_DIR="${RUNTIME_DIR}/cln/regtest"
 CLN_RUNE="${RUNTIME_DIR}/cln/rune"
-rm -rf "${RUNTIME_DIR}"
 mkdir -p "$(dirname "${LND_MACAROON}")" "${CLN_CERTS_DIR}"
 
 # LND serves TLS with an RSA cert carrying the SANs from lnd.conf; the binary
@@ -30,6 +36,12 @@ ensure_lnd_tls_cert() {
   local ca_cert="${LND_DIR}/ca.cert" ca_key="${LND_DIR}/ca.key"
   local cert="${LND_DIR}/tls.cert" key="${LND_DIR}/tls.key"
   local csr="${LND_DIR}/tls.csr" ext="${LND_DIR}/tls.ext"
+
+  # Reuse certs already on disk (see the runtime/ note above); only mint a fresh
+  # chain when none exists, i.e. after `make itest-shutdown`.
+  if [[ -s "${cert}" && -s "${key}" && -s "${ca_cert}" ]]; then
+    return 0
+  fi
 
   openssl req -x509 -newkey rsa:2048 -nodes -keyout "${ca_key}" -out "${ca_cert}" \
     -days 3650 -subj "/CN=swissknife-itest-lnd-ca" \
@@ -54,6 +66,12 @@ EOF
 # them instead of minting its own (which would be root-owned 0700 and unreadable
 # by the host binary on Linux). Mirror the structure CLN itself produces.
 ensure_cln_grpc_certs() {
+  # Reuse certs already on disk (see the runtime/ note above); only mint a fresh
+  # chain when none exists, i.e. after `make itest-shutdown`.
+  if [[ -s "${CLN_CERTS_DIR}/ca.pem" && -s "${CLN_CERTS_DIR}/server.pem" && -s "${CLN_CERTS_DIR}/client.pem" ]]; then
+    return 0
+  fi
+
   openssl ecparam -name prime256v1 -genkey -noout -out "${CLN_CERTS_DIR}/ca-key.pem" 2>/dev/null
   openssl req -x509 -new -key "${CLN_CERTS_DIR}/ca-key.pem" -days 3650 \
     -out "${CLN_CERTS_DIR}/ca.pem" -subj "/CN=cln Root CA" \
