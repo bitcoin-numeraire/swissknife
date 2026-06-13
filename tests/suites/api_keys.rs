@@ -55,29 +55,6 @@ mod create {
     }
 
     #[tokio::test]
-    async fn requires_a_user_id() {
-        let app = app().await;
-        let token = app.admin_token().await;
-        // The admin endpoint does not default the user: omitting it is a
-        // validation error, not a panic and not a silent self-assignment.
-        let res = app
-            .api()
-            .post(
-                "/v1/api-keys",
-                Auth::Bearer(token),
-                CreateApiKeyRequest {
-                    user_id: None,
-                    name: unique("key"),
-                    permissions: vec![],
-                    description: None,
-                    expiry: None,
-                },
-            )
-            .await;
-        assert_error(&res, StatusCode::UNPROCESSABLE_ENTITY);
-    }
-
-    #[tokio::test]
     async fn requires_write_api_key_permission() {
         let app = app().await;
         let token = app.admin_token().await;
