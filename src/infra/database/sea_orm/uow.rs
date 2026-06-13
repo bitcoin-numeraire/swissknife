@@ -65,11 +65,19 @@ impl PaymentUnitOfWork for SeaOrmPaymentUnitOfWork {
         let payment_repo = SeaOrmPaymentRepository::new(&txn);
 
         // Single-winner: the synchronous pay result and the success event can
-        // both reach this for the same payment. Only the one that wins the
-        // Pending->Settled transition runs the balance side effects; the other
-        // returns the already-settled payment untouched.
+        // both reach this for the same payment, so only the caller that wins the
+        // transition to Settled runs the balance side effects. `Failed` is an
+        // accepted source: a premature error (e.g. an RPC timeout) can mark a
+        // payment failed and release its reservation while it is still in flight,
+        // and a later success must still settle and debit it. The
+        // `reserved_amount > 0` guard below skips the already-done release in that
+        // case, so the correction debits without double-releasing.
         if !payment_repo
-            .try_transition(payment.id, PaymentStatus::Pending, PaymentStatus::Settled)
+            .try_transition(
+                payment.id,
+                &[PaymentStatus::Pending, PaymentStatus::Failed],
+                PaymentStatus::Settled,
+            )
             .await?
         {
             let settled = payment_repo
@@ -122,11 +130,11 @@ impl PaymentUnitOfWork for SeaOrmPaymentUnitOfWork {
 
         let payment_repo = SeaOrmPaymentRepository::new(&txn);
 
-        // Single-winner: only the caller that wins the Pending->Failed
-        // transition releases the reservation; a duplicate (sync result +
-        // failure event) returns the already-failed payment.
+        // Single-winner, and only from Pending: a duplicate failure (sync result
+        // + failure event) returns the already-failed payment, and a payment that
+        // already settled is never moved back to Failed.
         if !payment_repo
-            .try_transition(payment.id, PaymentStatus::Pending, PaymentStatus::Failed)
+            .try_transition(payment.id, &[PaymentStatus::Pending], PaymentStatus::Failed)
             .await?
         {
             let failed = payment_repo
