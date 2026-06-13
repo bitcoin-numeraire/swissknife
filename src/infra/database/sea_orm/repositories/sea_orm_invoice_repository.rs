@@ -83,6 +83,7 @@ where
             InvoiceOrderBy::UpdatedAt => Column::UpdatedAt,
         };
 
+        let now = Utc::now().naive_utc();
         let models = InvoiceEntity::find()
             .apply_if(filter.wallet_id, |q, wallet| q.filter(Column::WalletId.eq(wallet)))
             .apply_if(filter.ids, |q, ids| q.filter(Column::Id.is_in(ids)))
@@ -91,7 +92,7 @@ where
                     Condition::all()
                         .add(
                             Condition::any()
-                                .add(Expr::col(Column::ExpiresAt).gt(Utc::now().naive_utc()))
+                                .add(Expr::col(Column::ExpiresAt).gt(now))
                                 .add(Expr::col(Column::ExpiresAt).is_null()),
                         )
                         .add(Expr::col(Column::PaymentTime).is_null()),
@@ -99,7 +100,7 @@ where
                 InvoiceStatus::Settled => q.filter(Expr::col(Column::PaymentTime).is_not_null()),
                 InvoiceStatus::Expired => q.filter(
                     Condition::all()
-                        .add(Expr::col(Column::ExpiresAt).lte(Utc::now().naive_utc()))
+                        .add(Expr::col(Column::ExpiresAt).lte(now))
                         .add(Expr::col(Column::PaymentTime).is_null()),
                 ),
             })
@@ -207,6 +208,7 @@ where
     }
 
     async fn delete_many(&self, filter: InvoiceFilter) -> Result<u64, DatabaseError> {
+        let now = Utc::now().naive_utc();
         let result = InvoiceEntity::delete_many()
             .apply_if(filter.wallet_id, |q, wallet| q.filter(Column::WalletId.eq(wallet)))
             .apply_if(filter.ids, |q, ids| q.filter(Column::Id.is_in(ids)))
@@ -215,7 +217,7 @@ where
                     Condition::all()
                         .add(
                             Condition::any()
-                                .add(Expr::col(Column::ExpiresAt).gt(Utc::now().naive_utc()))
+                                .add(Expr::col(Column::ExpiresAt).gt(now))
                                 .add(Expr::col(Column::ExpiresAt).is_null()),
                         )
                         .add(Expr::col(Column::PaymentTime).is_null()),
@@ -223,7 +225,7 @@ where
                 InvoiceStatus::Settled => q.filter(Expr::col(Column::PaymentTime).is_not_null()),
                 InvoiceStatus::Expired => q.filter(
                     Condition::all()
-                        .add(Expr::col(Column::ExpiresAt).lte(Utc::now().naive_utc()))
+                        .add(Expr::col(Column::ExpiresAt).lte(now))
                         .add(Expr::col(Column::PaymentTime).is_null()),
                 ),
             })
