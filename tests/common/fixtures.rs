@@ -69,7 +69,10 @@ impl TestApp {
         chain::mine(6).await;
 
         let target = sats as i64 * 1000;
-        wait_until(Duration::from_secs(90), "on-chain deposit credited", || async {
+        // Crediting goes through the deposit sync, which can lag under CI load
+        // when several deposits land at once (notably on the slower lnd_rest
+        // provider), so allow generous headroom.
+        wait_until(Duration::from_secs(180), "on-chain deposit credited", || async {
             self.wallet_balance(token, wallet_id).await.available_msat >= target
         })
         .await;
