@@ -1,5 +1,6 @@
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 use reqwest::{Client, Method, StatusCode};
+use serde::Serialize;
 use serde_json::Value;
 
 /// Credentials to attach to a request.
@@ -21,7 +22,7 @@ pub struct TestResponse {
 }
 
 impl TestResponse {
-    /// Deserialize the body into a typed model (see `common::models`),
+    /// Deserialize the body into a typed model (`swissknife_types`),
     /// panicking with context on mismatch.
     pub fn parse<T: serde::de::DeserializeOwned>(&self) -> T {
         serde_json::from_value(self.body.clone()).unwrap_or_else(|e| {
@@ -77,12 +78,12 @@ impl ApiClient {
         self.request(Method::GET, path, auth, None).await
     }
 
-    pub async fn post(&self, path: &str, auth: Auth<'_>, body: Value) -> TestResponse {
-        self.request(Method::POST, path, auth, Some(body)).await
+    pub async fn post(&self, path: &str, auth: Auth<'_>, body: impl Serialize) -> TestResponse {
+        self.request(Method::POST, path, auth, Some(to_value(body))).await
     }
 
-    pub async fn put(&self, path: &str, auth: Auth<'_>, body: Value) -> TestResponse {
-        self.request(Method::PUT, path, auth, Some(body)).await
+    pub async fn put(&self, path: &str, auth: Auth<'_>, body: impl Serialize) -> TestResponse {
+        self.request(Method::PUT, path, auth, Some(to_value(body))).await
     }
 
     pub async fn delete(&self, path: &str, auth: Auth<'_>) -> TestResponse {
@@ -99,4 +100,9 @@ async fn decode(resp: reqwest::Response) -> TestResponse {
         serde_json::from_str(&text).unwrap_or(Value::String(text))
     };
     TestResponse { status, body }
+}
+
+/// Serialize a typed request body (or a `json!` value) for sending.
+fn to_value(body: impl Serialize) -> Value {
+    serde_json::to_value(body).expect("request body should serialize")
 }

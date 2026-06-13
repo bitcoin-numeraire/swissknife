@@ -3,6 +3,8 @@
 use reqwest::StatusCode;
 use serde_json::json;
 
+use swissknife_types::{RegisterWalletRequest, Wallet};
+
 use crate::common::fixtures::unique;
 use crate::common::{app, assert_error, assert_status, Auth};
 
@@ -17,18 +19,26 @@ mod register_wallet {
 
         let res = app
             .api()
-            .post("/v1/wallets", Auth::Bearer(token), json!({ "user_id": user_id }))
+            .post(
+                "/v1/wallets",
+                Auth::Bearer(token),
+                RegisterWalletRequest {
+                    user_id: user_id.clone(),
+                },
+            )
             .await;
         assert_status(&res, StatusCode::OK);
-        let id = res.body["id"].as_str().expect("wallet id present");
-        uuid::Uuid::parse_str(id).expect("wallet id is a uuid");
-        assert_eq!(res.body["user_id"], user_id);
-        assert_eq!(res.body["balance"]["available_msat"], 0);
+        let wallet = res.parse::<Wallet>();
+        assert_eq!(wallet.user_id, user_id);
+        assert_eq!(wallet.balance.available_msat, 0);
 
         // Persisted: fetchable by id.
-        let got = app.api().get(&format!("/v1/wallets/{id}"), Auth::Bearer(token)).await;
+        let got = app
+            .api()
+            .get(&format!("/v1/wallets/{}", wallet.id), Auth::Bearer(token))
+            .await;
         assert_status(&got, StatusCode::OK);
-        assert_eq!(got.body["id"], id);
+        assert_eq!(got.parse::<Wallet>().id, wallet.id);
     }
 
     #[tokio::test]
@@ -36,7 +46,13 @@ mod register_wallet {
         let app = app().await;
         let res = app
             .api()
-            .post("/v1/wallets", Auth::None, json!({ "user_id": unique("wallet-user") }))
+            .post(
+                "/v1/wallets",
+                Auth::None,
+                RegisterWalletRequest {
+                    user_id: unique("wallet-user"),
+                },
+            )
             .await;
         assert_error(&res, StatusCode::UNAUTHORIZED);
     }

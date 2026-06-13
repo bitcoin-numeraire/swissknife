@@ -2,6 +2,8 @@
 
 use reqwest::StatusCode;
 
+use swissknife_types::{HealthCheck, HealthStatus, SetupInfo, VersionInfo};
+
 use crate::common::{app, assert_status, Auth};
 
 mod ready {
@@ -23,9 +25,10 @@ mod health {
         let app = app().await;
         let res = app.api().get("/v1/system/health", Auth::None).await;
         assert_status(&res, StatusCode::OK);
-        assert_eq!(res.body["is_healthy"], true, "{}", res.body);
-        assert_eq!(res.body["database"], "Operational", "{}", res.body);
-        assert_eq!(res.body["ln_provider"], "Operational", "{}", res.body);
+        let health = res.parse::<HealthCheck>();
+        assert!(health.is_healthy, "{health:?}");
+        assert_eq!(health.database, HealthStatus::Operational);
+        assert_eq!(health.ln_provider, HealthStatus::Operational);
     }
 }
 
@@ -37,7 +40,7 @@ mod version {
         let app = app().await;
         let res = app.api().get("/v1/system/version", Auth::None).await;
         assert_status(&res, StatusCode::OK);
-        assert!(res.body["version"].as_str().is_some(), "{}", res.body);
+        assert!(!res.parse::<VersionInfo>().version.is_empty(), "{}", res.body);
     }
 }
 
@@ -49,7 +52,7 @@ mod setup {
         let app = app().await;
         let res = app.api().get("/v1/system/setup", Auth::None).await;
         assert_status(&res, StatusCode::OK);
-        assert!(res.body["welcome_complete"].is_boolean(), "{}", res.body);
-        assert!(res.body["sign_up_complete"].is_boolean(), "{}", res.body);
+        let info = res.parse::<SetupInfo>();
+        assert!(info.sign_up_complete, "admin is created at startup: {info:?}");
     }
 }

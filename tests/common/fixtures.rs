@@ -1,10 +1,9 @@
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 
-use serde_json::json;
 use uuid::Uuid;
 
-use swissknife_types::{Balance, BtcAddress, Wallet};
+use swissknife_types::{Balance, BtcAddress, NewBtcAddressRequest, RegisterWalletRequest, Wallet};
 
 use super::chain;
 use super::client::Auth;
@@ -27,7 +26,11 @@ impl TestApp {
     pub async fn create_wallet(&self, token: &str, label: &str) -> Wallet {
         let res = self
             .api()
-            .post("/v1/wallets", Auth::Bearer(token), json!({ "user_id": unique(label) }))
+            .post(
+                "/v1/wallets",
+                Auth::Bearer(token),
+                RegisterWalletRequest { user_id: unique(label) },
+            )
             .await;
         assert_eq!(res.status.as_u16(), 200, "create_wallet failed: {}", res.body);
         res.parse()
@@ -51,7 +54,10 @@ impl TestApp {
             .post(
                 "/v1/bitcoin/addresses",
                 Auth::Bearer(token),
-                json!({ "wallet_id": wallet_id, "address_type": "p2wpkh" }),
+                NewBtcAddressRequest {
+                    wallet_id: Some(wallet_id),
+                    address_type: None,
+                },
             )
             .await;
         assert_eq!(res.status.as_u16(), 200, "new btc address failed: {}", res.body);

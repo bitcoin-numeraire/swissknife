@@ -5,9 +5,8 @@
 use std::time::Duration;
 
 use reqwest::StatusCode;
-use serde_json::json;
 
-use swissknife_types::{Invoice, Payment, PaymentStatus};
+use swissknife_types::{Invoice, NewInvoiceRequest, Payment, PaymentStatus, SendPaymentRequest};
 
 use crate::common::counterparty::Counterparty;
 use crate::common::fixtures::unique;
@@ -30,7 +29,12 @@ mod receive {
             .post(
                 "/v1/invoices",
                 Auth::Bearer(token),
-                json!({ "wallet_id": wallet.id, "amount_msat": amount_msat, "description": "itest receive" }),
+                NewInvoiceRequest {
+                    wallet_id: Some(wallet.id),
+                    amount_msat,
+                    description: Some("itest receive".to_string()),
+                    expiry: None,
+                },
             )
             .await;
         assert_status(&res, StatusCode::OK);
@@ -67,7 +71,12 @@ mod send {
             .post(
                 "/v1/payments",
                 Auth::Bearer(token),
-                json!({ "wallet_id": wallet.id, "input": bolt11 }),
+                SendPaymentRequest {
+                    wallet_id: Some(wallet.id),
+                    input: bolt11,
+                    amount_msat: None,
+                    comment: None,
+                },
             )
             .await;
         assert_status(&res, StatusCode::OK);
