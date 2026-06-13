@@ -3,6 +3,7 @@
 mod api_keys;
 mod auth;
 mod bitcoin;
+mod invoices;
 mod lightning;
 mod system;
 mod wallets;
