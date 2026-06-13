@@ -3,7 +3,7 @@ use std::sync::Arc;
 use axum::{
     extract::{Path, State},
     routing::{delete, get, post},
-    Json, Router,
+    Router,
 };
 use axum_extra::extract::Query;
 use utoipa::OpenApi;
@@ -21,6 +21,7 @@ use crate::{
         errors::ApplicationError,
     },
     domains::user::{Permission, User},
+    infra::axum::Json,
 };
 
 use super::{Wallet, WalletFilter, WalletOverview};
