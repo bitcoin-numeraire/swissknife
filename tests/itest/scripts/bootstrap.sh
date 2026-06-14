@@ -340,4 +340,11 @@ ensure_lnd_wallet
 ensure_cln_ready
 ensure_channel
 
+# Leave both nodes caught up to the chain tip so the first tests don't race a node
+# still syncing after the channel-funding blocks — a cold CLN trails the tip and
+# its `pay` times out "waiting for blockheight". The 1s bitcoind poll (see
+# docker-compose) then keeps them current as tests mine.
+ensure_lnd_synced
+wait_for_cln_synced
+
 echo "Swissknife integration dependencies are ready."
