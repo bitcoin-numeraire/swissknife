@@ -5,6 +5,9 @@ mod store;
 mod types;
 mod uow;
 
+#[cfg(all(test, feature = "itest"))]
+mod uow_tests;
+
 pub use config::*;
 pub use repositories::*;
 pub use store::*;
