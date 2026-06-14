@@ -71,10 +71,7 @@ services:
         condition: service_healthy
     environment:
       LIGHTNINGD_NETWORK: regtest
-    # Poll bitcoind every second so CLN tracks freshly-mined blocks. The default
-    # slow poll lags the tip under test chain churn, making a concurrent `pay`
-    # time out "waiting for blockheight".
-    command: ["--conf=/etc/cln/config", "--dev-bitcoind-poll=1"]
+    command: ["--conf=/etc/cln/config"]
     volumes:
       - ./config/cln/config:/etc/cln/config:ro
       - cln-data:/root/.lightning

@@ -16,3 +16,7 @@ clnrest-host=0.0.0.0
 clnrest-port=3010
 clnrest-protocol=https
 developer
+# Poll bitcoind every second so CLN tracks freshly-mined blocks. The default slow
+# poll lags the tip under test chain churn, making a concurrent `pay` time out
+# "waiting for blockheight". (A dev option; `developer` above enables it.)
+dev-bitcoind-poll=1
