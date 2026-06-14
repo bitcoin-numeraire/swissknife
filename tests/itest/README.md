@@ -88,9 +88,14 @@ failure, dependency logs are collected via `make itest-logs`.
 
 ## Status / TODO
 
-- Covered: system, auth (local JWT), wallet management, validation/auth/error paths,
-  and the persistence/Unit-of-Work balance invariants + concurrency (#240) on both DBs.
-- Pending: lightning invoice/pay/receive over a funded channel (needs an external
-  counterparty node in the topology), the full provider matrix, and OAuth2.
+- Covered, across the full LND/CLN × gRPC/REST provider matrix on both DBs: system,
+  auth (local JWT), wallet management, validation/auth/error paths; real Lightning
+  send/receive and on-chain deposit/withdrawal over the regtest stack; the public
+  LNURL-pay and Nostr NIP-05 endpoints (including an external payer settling via a
+  lightning address); a deterministic unroutable-payment failure (fail + reservation
+  release over a real backend); and the persistence/Unit-of-Work balance invariants +
+  concurrency (#240).
+- Pending (needs a mock server — deferred to follow-up PRs): paying *out* to an
+  external lightning address / LNURL / Nostr, and OAuth2/OIDC login.
 - Found while writing these tests: bitcoin-numeraire/swissknife#254 (wallet
   auto-provisioning on first login races under concurrency).
