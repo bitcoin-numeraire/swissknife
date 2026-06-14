@@ -257,7 +257,9 @@ impl LnClient for LndRestClient {
         };
 
         if deschashonly {
-            payload.description_hash = sha256::Hash::hash(description.as_bytes()).to_string();
+            // LND REST takes byte fields as base64 in JSON; a hex string would be
+            // base64-decoded into 48 bytes and rejected ("must be 32").
+            payload.description_hash = STANDARD.encode(sha256::Hash::hash(description.as_bytes()).to_byte_array());
         }
 
         let response: AddInvoiceResponse = self
