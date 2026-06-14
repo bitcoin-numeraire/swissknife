@@ -234,6 +234,86 @@ mod deposit {
     }
 }
 
+mod withdraw {
+    use super::*;
+
+    use crate::common::chain::{new_address, received_by_address};
+    use swissknife_types::{Ledger, Payment, PaymentStatus, SendPaymentRequest};
+
+    /// Paying an external (non-SwissKnife) address is a real broadcast, not an
+    /// internal settlement: the payment is created Pending, the reservation
+    /// debits the wallet, and the on-chain listener settles it on confirmation.
+    #[tokio::test]
+    async fn broadcasts_on_chain_and_settles_on_confirmation() {
+        let app = app().await;
+        let token = app.admin_token().await;
+        let wallet = app.create_wallet(token, "btc-withdraw").await;
+
+        // Fund the wallet on-chain so the node holds a spendable UTXO.
+        app.fund_onchain(token, wallet.id, 1_000_000).await;
+        let before = app.wallet_balance(token, wallet.id).await.available_msat;
+
+        let target = new_address().await;
+        let amount_msat = 200_000_000u64; // 200k sat
+
+        let res = app
+            .api()
+            .post(
+                "/v1/payments",
+                Auth::Bearer(token),
+                SendPaymentRequest {
+                    wallet_id: Some(wallet.id),
+                    input: target.clone(),
+                    amount_msat: Some(amount_msat),
+                    comment: None,
+                },
+            )
+            .await;
+        assert_status(&res, StatusCode::OK);
+        let payment = res.parse::<Payment>();
+        assert_eq!(
+            payment.ledger,
+            Ledger::Onchain,
+            "an external btc address is an on-chain send"
+        );
+        assert_eq!(payment.status, PaymentStatus::Pending, "broadcast, not yet confirmed");
+        let btc = payment
+            .bitcoin
+            .as_ref()
+            .expect("an on-chain payment carries bitcoin details");
+        assert_eq!(btc.address, target);
+        assert!(!btc.txid.is_empty(), "a broadcast transaction has a txid");
+
+        // The reservation debits the wallet immediately (amount + on-chain fee).
+        let reserved = app.wallet_balance(token, wallet.id).await.available_msat;
+        assert!(
+            reserved <= before - amount_msat as i64,
+            "the wallet is debited by at least the amount (before={before}, after={reserved})"
+        );
+
+        // Confirm the broadcast; the on-chain listener settles the payment.
+        mine(6).await;
+        wait_until(
+            Duration::from_secs(90),
+            "withdrawal settles on confirmation",
+            || async {
+                let res = app
+                    .api()
+                    .get(&format!("/v1/payments/{}", payment.id), Auth::Bearer(token))
+                    .await;
+                res.status.as_u16() == 200 && res.parse::<Payment>().status == PaymentStatus::Settled
+            },
+        )
+        .await;
+
+        // The sats actually landed at the external address on-chain.
+        assert!(
+            received_by_address(&target).await >= 200_000,
+            "the withdrawal was broadcast and confirmed on-chain"
+        );
+    }
+}
+
 mod delete {
     use super::*;
 
