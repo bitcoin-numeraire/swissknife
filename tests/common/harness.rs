@@ -93,7 +93,10 @@ impl TestApp {
             .env("RUN_MODE", "itest")
             .env("SWISSKNIFE_WEB__ADDR", format!("127.0.0.1:{port}"))
             .env("SWISSKNIFE_DATABASE__URL", db.url())
-            .env("SWISSKNIFE_LN_PROVIDER", &provider);
+            .env("SWISSKNIFE_LN_PROVIDER", &provider)
+            // Advertise this ephemeral server as the public host so the callback
+            // URL the LNURL well-known endpoint hands out is actually reachable.
+            .env("SWISSKNIFE_HOST", &base_url);
 
         // The CLN rune is generated at bootstrap and cannot be a file path.
         if provider == "cln_rest" {
