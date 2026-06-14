@@ -34,6 +34,25 @@ make itest-shutdown                # stop stack + delete runtime/artifacts
 `cargo test --features itest --test api` for the selected cell. A plain
 `cargo test` runs only unit tests (the suite is feature-gated).
 
+## Persistence (Unit-of-Work) tests
+
+The reservation/settlement balance invariants and their concurrency guarantees
+(bitcoin-numeraire/swissknife#240) are covered by in-crate tests that drive the
+Unit-of-Work types and their repositories against a **real** database — not the
+mock — so the conditional `UPDATE`s that serialize concurrent settlements are
+actually exercised. They live in
+[`src/infra/database/sea_orm/uow_tests.rs`](../../src/infra/database/sea_orm/uow_tests.rs),
+gated behind the same `itest` feature, and run on both backends:
+
+```bash
+make test-persistence ITEST_DATABASE=sqlite     # self-contained (temp sqlite file)
+make test-persistence ITEST_DATABASE=postgres   # brings up + waits on the compose Postgres
+```
+
+SQLite needs no services; the Postgres cell brings up (and health-waits on) the
+compose Postgres. Both run in CI. Each test provisions its own fresh database and
+applies the full migration set, so they are independent and parallel-safe.
+
 ## Configuration
 
 Everything static is in [`config/itest.toml`](../../config/itest.toml). The
@@ -69,7 +88,8 @@ failure, dependency logs are collected via `make itest-logs`.
 
 ## Status / TODO
 
-- Covered: system, auth (local JWT), wallet management, validation/auth/error paths.
+- Covered: system, auth (local JWT), wallet management, validation/auth/error paths,
+  and the persistence/Unit-of-Work balance invariants + concurrency (#240) on both DBs.
 - Pending: lightning invoice/pay/receive over a funded channel (needs an external
   counterparty node in the topology), the full provider matrix, and OAuth2.
 - Found while writing these tests: bitcoin-numeraire/swissknife#254 (wallet

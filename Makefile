@@ -13,7 +13,7 @@ ITEST_ENV = SWISSKNIFE_ITEST_COMPOSE_PROJECT=$(ITEST_PROJECT) \
 	SWISSKNIFE_ITEST_DATABASE=$(ITEST_DATABASE) \
 	SWISSKNIFE_ITEST_PROVIDER=$(ITEST_PROVIDER)
 
-.PHONY: watch up up-swissknife up-server up-postgres up-pgadmin shutdown down generate-certs build build-docker build-docker-server build-docker-dashboard run-docker lint fmt fmt-fix test test-unit test-integration itest-up itest-down itest-shutdown itest-logs coverage coverage-html coverage-lcov clean check deps-upgrade deps-outdated install-tools generate-models new-migration run-migrations fresh-migrations
+.PHONY: watch up up-swissknife up-server up-postgres up-pgadmin shutdown down generate-certs build build-docker build-docker-server build-docker-dashboard run-docker lint fmt fmt-fix test test-unit test-integration test-persistence itest-up itest-down itest-shutdown itest-logs coverage coverage-html coverage-lcov clean check deps-upgrade deps-outdated install-tools generate-models new-migration run-migrations fresh-migrations
 
 watch:
 	@cargo watch -x run
@@ -103,6 +103,14 @@ test-unit:
 # ITEST_DATABASE / ITEST_PROVIDER (e.g. `make test-integration ITEST_PROVIDER=cln_grpc`).
 test-integration: itest-up
 	@$(ITEST_ENV) cargo test --features itest --test api
+
+# Run the persistence / Unit-of-Work tests for one database cell: real-DB
+# coverage of the reservation/settlement balance invariants and concurrency.
+# SQLite is self-contained; postgres uses the dockerized PG. Override the cell
+# via ITEST_DATABASE (sqlite|postgres).
+test-persistence:
+	@if [ "$(ITEST_DATABASE)" = "postgres" ]; then $(ITEST_COMPOSE) up -d --wait postgres; fi
+	@$(ITEST_ENV) cargo test --features itest --bins uow_tests
 
 # Bring up the regtest dependency stack (bitcoind + LND + CLN + Postgres).
 itest-up:

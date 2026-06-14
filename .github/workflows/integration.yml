@@ -78,6 +78,41 @@ jobs:
           make itest-down \
             ITEST_PROJECT=swissknife-itest-${{ matrix.database }}-${{ matrix.provider }} || true
 
+  # DB-backed Unit-of-Work tests: reservation/settlement balance
+  # invariants and concurrency on both SQLite and Postgres.
+  persistence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    strategy:
+      fail-fast: false
+      matrix:
+        database: [sqlite, postgres]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Install protoc
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@1.96.0
+
+      - name: Cache Rust dependencies
+        uses: swatinem/rust-cache@v2
+
+      - name: Persistence (UoW) tests (${{ matrix.database }})
+        run: |
+          make test-persistence \
+            ITEST_DATABASE=${{ matrix.database }} \
+            ITEST_PROJECT=swissknife-persistence-${{ matrix.database }}
+
+      - name: Stop dependencies
+        if: always()
+        run: |
+          make itest-down ITEST_PROJECT=swissknife-persistence-${{ matrix.database }} || true
+
   # Combined unit + integration coverage (lnd_grpc / sqlite), uploaded as lcov.
   coverage:
     runs-on: ubuntu-latest
