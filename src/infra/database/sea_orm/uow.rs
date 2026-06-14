@@ -69,9 +69,7 @@ impl PaymentUnitOfWork for SeaOrmPaymentUnitOfWork {
         // transition to Settled runs the balance side effects. `Failed` is an
         // accepted source: a premature error (e.g. an RPC timeout) can mark a
         // payment failed and release its reservation while it is still in flight,
-        // and a later success must still settle and debit it. The
-        // `reserved_amount > 0` guard below skips the already-done release in that
-        // case, so the correction debits without double-releasing.
+        // and a later success must still settle and debit it.
         if !payment_repo
             .try_transition(
                 payment.id,
@@ -90,11 +88,22 @@ impl PaymentUnitOfWork for SeaOrmPaymentUnitOfWork {
             return Ok(settled);
         }
 
+        // Decide the release from the stored row, not the caller's payload: a
+        // premature `fail` racing this success can already have released the
+        // reservation (storing reserved_amount = 0) while the in-memory payload
+        // still carries the old nonzero amount. Releasing that stale amount would
+        // fail and roll back an actual settlement, leaving it marked failed.
+        let reserved_amount = payment_repo
+            .find(payment.id)
+            .await?
+            .ok_or_else(|| DataError::NotFound(format!("Payment {} not found", payment.id)))?
+            .reserved_amount;
+
         let balance_repo = SeaOrmWalletBalanceRepository::new(&txn);
 
-        if payment.reserved_amount > 0
+        if reserved_amount > 0
             && !balance_repo
-                .release(payment.wallet_id, &payment.currency, payment.reserved_amount)
+                .release(payment.wallet_id, &payment.currency, reserved_amount)
                 .await?
         {
             return Err(
@@ -111,6 +120,9 @@ impl PaymentUnitOfWork for SeaOrmPaymentUnitOfWork {
             return Err(DataError::InsufficientFunds(actual_msat as f64).into());
         }
         payment.reserved_amount = 0;
+        // A successful settlement carries no failure reason, even when correcting
+        // a payment that was prematurely marked failed.
+        payment.error = None;
 
         let payment = payment_repo.update(payment).await?;
 
