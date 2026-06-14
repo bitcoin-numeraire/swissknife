@@ -41,3 +41,17 @@ pub async fn mine(blocks: u64) {
     let address = address.as_str().expect("miner address");
     bitcoin_rpc("generatetoaddress", json!([blocks, address])).await;
 }
+
+/// A fresh miner-wallet address, external to SwissKnife — paying it is a real
+/// on-chain broadcast, not an internal settlement.
+pub async fn new_address() -> String {
+    let address = bitcoin_rpc("getnewaddress", json!(["itest-withdraw", "bech32"])).await;
+    address.as_str().expect("miner address").to_string()
+}
+
+/// Confirmed sats the miner wallet has received at `address`, to assert a
+/// withdrawal actually landed on-chain.
+pub async fn received_by_address(address: &str) -> u64 {
+    let btc = bitcoin_rpc("getreceivedbyaddress", json!([address, 1])).await;
+    (btc.as_f64().expect("getreceivedbyaddress amount") * 100_000_000.0).round() as u64
+}
