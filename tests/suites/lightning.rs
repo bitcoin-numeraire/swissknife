@@ -11,7 +11,7 @@ use swissknife_types::{Invoice, NewInvoiceRequest, Payment, PaymentStatus, SendP
 use crate::common::counterparty::Counterparty;
 use crate::common::fixtures::unique;
 use crate::common::wait::wait_until;
-use crate::common::{app, assert_status, Auth};
+use crate::common::{app, assert_error, assert_status, Auth};
 
 mod receive {
     use super::*;
@@ -95,6 +95,66 @@ mod send {
             after,
             before - amount_msat as i64 - fee,
             "wallet should be debited by amount + fee (before={before}, fee={fee})"
+        );
+    }
+}
+
+mod failure {
+    use super::*;
+
+    /// A payment whose amount exceeds the only channel's capacity (5,000,000 sat)
+    /// has no possible route, so the LN attempt fails. SwissKnife must mark it
+    /// failed and release the reservation, leaving the wallet whole — the invariant
+    /// the payment UoW enforces, exercised here over a real backend. Exceeding
+    /// channel *capacity* (not just current liquidity) keeps this deterministic
+    /// regardless of test order.
+    #[tokio::test]
+    async fn an_unroutable_payment_fails_and_releases_the_reservation() {
+        let app = app().await;
+        let token = app.admin_token().await;
+        let wallet = app.create_wallet(token, "ln-unroutable").await;
+
+        // Fund above channel capacity so the reserve passes and the failure is a
+        // routing failure, not insufficient funds.
+        app.fund_onchain(token, wallet.id, 10_000_000).await;
+        let before = app.wallet_balance(token, wallet.id).await.available_msat;
+
+        // 8M sat > 5M channel capacity: no route can carry it.
+        let amount_msat = 8_000_000_000u64;
+        let bolt11 = Counterparty::for_provider(&app.provider).invoice(amount_msat, &unique("cp-unroutable"));
+
+        let res = app
+            .api()
+            .post(
+                "/v1/payments",
+                Auth::Bearer(token),
+                SendPaymentRequest {
+                    wallet_id: Some(wallet.id),
+                    input: bolt11,
+                    amount_msat: None,
+                    comment: None,
+                },
+            )
+            .await;
+        // A failed Lightning payment is a client-facing 422 (LightningError::Pay).
+        assert_error(&res, StatusCode::UNPROCESSABLE_ENTITY);
+
+        // The reservation is released: the wallet is back where it started.
+        let after = app.wallet_balance(token, wallet.id).await.available_msat;
+        assert_eq!(after, before, "the failed payment released its reservation");
+
+        // And the attempt is recorded as a failed payment with a reason.
+        let payments = app
+            .api()
+            .get(&format!("/v1/payments?wallet_id={}", wallet.id), Auth::Bearer(token))
+            .await;
+        assert_status(&payments, StatusCode::OK);
+        assert!(
+            payments
+                .parse::<Vec<Payment>>()
+                .iter()
+                .any(|p| p.status == PaymentStatus::Failed && p.error.is_some()),
+            "the unroutable attempt is recorded as failed"
         );
     }
 }
