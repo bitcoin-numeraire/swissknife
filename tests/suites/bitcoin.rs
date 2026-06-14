@@ -312,6 +312,109 @@ mod withdraw {
             "the withdrawal was broadcast and confirmed on-chain"
         );
     }
+
+    /// Paying a deposit address owned by another SwissKnife wallet settles
+    /// internally — synchronous, no broadcast — and credits the recipient.
+    #[tokio::test]
+    async fn settles_internally_to_a_swissknife_address() {
+        let app = app().await;
+        let token = app.admin_token().await;
+        let payer = app.create_wallet(token, "btc-int-payer").await;
+        let payee = app.create_wallet(token, "btc-int-payee").await;
+        app.fund_onchain(token, payer.id, 1_000_000).await;
+
+        let payee_addr = post_address(app, token, Some(payee.id), None)
+            .await
+            .parse::<BtcAddress>()
+            .address;
+
+        let amount_msat = 300_000_000u64;
+        let res = app
+            .api()
+            .post(
+                "/v1/payments",
+                Auth::Bearer(token),
+                SendPaymentRequest {
+                    wallet_id: Some(payer.id),
+                    input: payee_addr,
+                    amount_msat: Some(amount_msat),
+                    comment: None,
+                },
+            )
+            .await;
+        assert_status(&res, StatusCode::OK);
+        let payment = res.parse::<Payment>();
+        assert_eq!(
+            payment.ledger,
+            Ledger::Internal,
+            "paying a SwissKnife-owned address settles internally"
+        );
+        assert_eq!(
+            payment.status,
+            PaymentStatus::Settled,
+            "internal settlement is synchronous"
+        );
+        assert!(
+            app.wallet_balance(token, payee.id).await.available_msat >= amount_msat as i64,
+            "the internal recipient is credited"
+        );
+    }
+
+    /// The ledger reservation guards the balance: an on-chain send beyond it is
+    /// rejected (422) before anything is broadcast. Fund the shared node wallet
+    /// through one wallet so the transaction can be built, then overdraw a
+    /// different, unfunded wallet — isolating the ledger reserve as the rejecter
+    /// rather than the node failing to fund the tx (which differs by backend).
+    #[tokio::test]
+    async fn rejects_a_withdrawal_beyond_the_balance() {
+        let app = app().await;
+        let token = app.admin_token().await;
+        let funded = app.create_wallet(token, "btc-od-funded").await;
+        app.fund_onchain(token, funded.id, 1_000_000).await;
+        let broke = app.create_wallet(token, "btc-od-broke").await;
+
+        let res = app
+            .api()
+            .post(
+                "/v1/payments",
+                Auth::Bearer(token),
+                SendPaymentRequest {
+                    wallet_id: Some(broke.id),
+                    input: new_address().await,
+                    amount_msat: Some(500_000_000),
+                    comment: None,
+                },
+            )
+            .await;
+        assert_error(&res, StatusCode::UNPROCESSABLE_ENTITY);
+    }
+
+    /// Paying your own deposit address is rejected.
+    #[tokio::test]
+    async fn rejects_paying_your_own_address() {
+        let app = app().await;
+        let token = app.admin_token().await;
+        let wallet = app.create_wallet(token, "btc-self").await;
+        let own = post_address(app, token, Some(wallet.id), None)
+            .await
+            .parse::<BtcAddress>()
+            .address;
+
+        let res = app
+            .api()
+            .post(
+                "/v1/payments",
+                Auth::Bearer(token),
+                SendPaymentRequest {
+                    wallet_id: Some(wallet.id),
+                    input: own,
+                    amount_msat: Some(100_000_000),
+                    comment: None,
+                },
+            )
+            .await;
+        assert_error(&res, StatusCode::UNPROCESSABLE_ENTITY);
+    }
 }
 
 mod delete {
