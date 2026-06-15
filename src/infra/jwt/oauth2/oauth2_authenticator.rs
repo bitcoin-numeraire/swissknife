@@ -54,6 +54,22 @@ struct OpenIdProviderMetadata {
     jwks_uri: String,
 }
 
+/// Per OpenID Connect Discovery, the `issuer` advertised in the metadata must be
+/// identical to the issuer used to fetch it. Enforcing this stops a rogue or
+/// misconfigured `.well-known` from substituting a different issuer (and its
+/// JWKS) that we would then trust. Hosted providers (e.g. Auth0) advertise the
+/// issuer with a trailing slash while we configure the bare origin, so the
+/// comparison normalizes trailing slashes.
+fn verify_discovered_issuer(configured_base: &str, discovered: &str) -> Result<(), AuthenticationError> {
+    if discovered.trim_end_matches('/') == configured_base.trim_end_matches('/') {
+        Ok(())
+    } else {
+        Err(AuthenticationError::Discovery(format!(
+            "issuer mismatch: discovery at {configured_base} advertised issuer {discovered:?}"
+        )))
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct OAuth2Authenticator {
     jwks: Arc<RwLock<JwkSet>>,
@@ -62,12 +78,16 @@ pub struct OAuth2Authenticator {
 
 impl OAuth2Authenticator {
     pub async fn new(config: OAuth2Config) -> Result<Self, AuthenticationError> {
-        let discovery_url = format!("{}/.well-known/openid-configuration", config.issuer_base());
+        let issuer_base = config.issuer_base();
+        let discovery_url = format!("{issuer_base}/.well-known/openid-configuration");
 
-        // Resolve the JWKS URI and canonical issuer.
+        // Resolve the JWKS URI and canonical issuer via OpenID discovery, then
+        // verify the advertised issuer matches the one we discovered from before
+        // trusting it (and the JWKS it points at) for token validation.
         let metadata = Self::fetch_discovery(&discovery_url)
             .await
-            .map_err(|e| AuthenticationError::Jwks(e.to_string()))?;
+            .map_err(|e| AuthenticationError::Discovery(e.to_string()))?;
+        verify_discovered_issuer(&issuer_base, &metadata.issuer)?;
 
         let jwks_uri = metadata.jwks_uri;
         let initial_jwks = Self::fetch_jwks(&jwks_uri)
@@ -197,6 +217,28 @@ mod tests {
                 );
                 assert_eq!(config("auth.example.com/").issuer_base(), "https://auth.example.com");
             }
+        }
+    }
+
+    mod discovered_issuer {
+        use super::*;
+
+        #[test]
+        fn accepts_an_exact_match() {
+            let issuer = "http://127.0.0.1:8090/default";
+            assert!(verify_discovered_issuer(issuer, issuer).is_ok());
+        }
+
+        #[test]
+        fn accepts_a_trailing_slash_difference() {
+            // Auth0 advertises its issuer with a trailing slash; we configure the bare origin.
+            assert!(verify_discovered_issuer("https://auth.example.com", "https://auth.example.com/").is_ok());
+        }
+
+        #[test]
+        fn rejects_a_different_issuer() {
+            let err = verify_discovered_issuer("https://auth.example.com", "https://evil.example.com/").unwrap_err();
+            assert!(matches!(err, AuthenticationError::Discovery(_)));
         }
     }
 

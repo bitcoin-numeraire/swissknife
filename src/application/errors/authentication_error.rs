@@ -5,6 +5,9 @@ pub enum AuthenticationError {
     #[error("Failed to fetch JWKS: {0}")]
     Jwks(String),
 
+    #[error("OpenID discovery failed: {0}")]
+    Discovery(String),
+
     #[error("Failed to decode JWT header: {0}")]
     DecodeJWTHeader(String),
 
