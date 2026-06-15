@@ -2,8 +2,14 @@
 
 Integration tests that exercise SwissKnife through its **public HTTP API only**.
 Each test runs against the real compiled binary, spawned by the harness against
-a dockerized regtest stack (bitcoind + LND + CLN + Postgres). Tests never call
-SwissKnife services or repositories directly.
+a dockerized regtest stack (bitcoind + LND + CLN + Postgres + a mock OpenID
+provider). Tests never call SwissKnife services or repositories directly.
+
+External dependencies that are not the point of a test — or where a test asserts
+the *outbound* request SwissKnife makes — are mocked: an external LNURL-pay
+service (`wiremock`, in-process per test) and an OpenID provider
+([`navikt/mock-oauth2-server`](https://github.com/navikt/mock-oauth2-server), a
+compose service). Everything else is a real backend in regtest.
 
 ## Layout
 
@@ -14,7 +20,7 @@ tests/
   suites/           one module per API domain; tests grouped + named like the
                     unit tests (`mod <endpoint> { fn <case> }`)
   itest/
-    config/         per-daemon config files (bitcoin/, lnd/, cln/), mounted read-only
+    config/         per-daemon config files (bitcoin/, lnd/, cln/, mock-oauth2/), mounted read-only
     docker-compose.yml
     scripts/        bootstrap.sh (bring up + init), collect-logs.sh
     runtime/        generated state — chain data, certs, macaroons, rune (gitignored)
@@ -69,11 +75,23 @@ The matrix dimensions are selected via `SWISSKNIFE_ITEST_DATABASE`
 (`sqlite` \| `postgres`) and `SWISSKNIFE_ITEST_PROVIDER`
 (`lnd_grpc` \| `lnd_rest` \| `cln_grpc` \| `cln_rest`).
 
+### OAuth2 / OIDC
+
+The `oauth2` suite spins up a *second* instance configured with
+`auth_provider = oauth2`, pointed at the dockerized mock OpenID provider. The
+binary and the tests reach the IdP at the same `127.0.0.1:<port>` (default
+`8090`, override with `SWISSKNIFE_ITEST_OAUTH2_PORT`), so the issuer SwissKnife
+discovers matches the `iss` the IdP stamps into tokens. Token claim sets are
+shaped per request `client_id` by `config/mock-oauth2/config.json`, whose
+audience must match the harness-set `SWISSKNIFE_OAUTH2__AUDIENCE`.
+
 ## Isolation model
 
-One shared SwissKnife instance per `(database, provider)` cell; tests isolate by
-creating uniquely-named entities and asserting on presence rather than global
-totals. The admin user is provisioned once during startup.
+One shared SwissKnife instance per `(database, provider)` cell (plus the shared
+OAuth2 instance once the oauth2 suite runs); each gets its own database. Tests
+isolate by creating uniquely-named entities and asserting on presence rather
+than global totals. The admin (JWT) and the OAuth2 subjects' wallets are
+provisioned once during startup.
 
 ## Coverage
 
@@ -85,17 +103,3 @@ make coverage-lcov     # merged unit + integration coverage -> lcov.info
 
 SwissKnife stdout/stderr per cell is written under `target/itest/`. On CI
 failure, dependency logs are collected via `make itest-logs`.
-
-## Status / TODO
-
-- Covered, across the full LND/CLN × gRPC/REST provider matrix on both DBs: system,
-  auth (local JWT), wallet management, validation/auth/error paths; real Lightning
-  send/receive and on-chain deposit/withdrawal over the regtest stack; the public
-  LNURL-pay and Nostr NIP-05 endpoints (including an external payer settling via a
-  lightning address); a deterministic unroutable-payment failure (fail + reservation
-  release over a real backend); and the persistence/Unit-of-Work balance invariants +
-  concurrency (#240).
-- Pending (needs a mock server — deferred to follow-up PRs): paying *out* to an
-  external lightning address / LNURL / Nostr, and OAuth2/OIDC login.
-- Found while writing these tests: bitcoin-numeraire/swissknife#254 (wallet
-  auto-provisioning on first login races under concurrency).

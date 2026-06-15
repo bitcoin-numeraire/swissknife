@@ -3,8 +3,10 @@
 //! Each test talks to a real, running SwissKnife instance through its public
 //! HTTP API only — never through internal services or repositories. The
 //! instance is the actual compiled binary, spawned by the harness against the
-//! dockerized regtest stack (bitcoind + LND + CLN + Postgres). See
-//! `tests/itest/README.md` for how to bring up the dependencies.
+//! dockerized regtest stack (bitcoind + LND + CLN + Postgres + a mock OpenID
+//! provider), with an in-process `wiremock` server standing in for external
+//! LNURL services. See `tests/itest/README.md` for how to bring up the
+//! dependencies.
 //!
 //! Layout:
 //!   common/   the harness — process spawn, HTTP client, fixtures, assertions

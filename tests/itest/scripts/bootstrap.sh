@@ -7,6 +7,7 @@ COMPOSE_FILE="${SWISSKNIFE_ITEST_COMPOSE_FILE:-${ITEST_DIR}/docker-compose.yml}"
 PROJECT="${SWISSKNIFE_ITEST_COMPOSE_PROJECT:-swissknife-itest}"
 LND_PASSWORD="${SWISSKNIFE_ITEST_LND_PASSWORD:-integration-password}"
 LND_REST_URL="https://127.0.0.1:${SWISSKNIFE_ITEST_LND_REST_PORT:-8080}"
+MOCK_OAUTH2_URL="http://127.0.0.1:${SWISSKNIFE_ITEST_OAUTH2_PORT:-8090}"
 
 COMPOSE=(docker compose -p "${PROJECT}" -f "${COMPOSE_FILE}")
 
@@ -97,7 +98,7 @@ ensure_cln_grpc_certs() {
 ensure_lnd_tls_cert
 ensure_cln_grpc_certs
 
-"${COMPOSE[@]}" up -d postgres bitcoind lnd cln
+"${COMPOSE[@]}" up -d postgres bitcoind lnd cln mock-oauth2-server
 
 bitcoin_cli() {
   "${COMPOSE[@]}" exec -T bitcoind bitcoin-cli -regtest -rpcuser=regtest -rpcpassword=regtest "$@"
@@ -109,6 +110,26 @@ lnd_cli() {
 
 cln_cli() {
   "${COMPOSE[@]}" exec -T cln lightning-cli --network=regtest "$@"
+}
+
+wait_for_mock_oauth2() {
+  # Host-side readiness probe (the image ships no shell for a compose
+  # healthcheck). `/isalive` returns 200 once the OIDC endpoints are servable.
+  local deadline=$((SECONDS + 60))
+  until python3 -c '
+import sys, urllib.request
+try:
+    with urllib.request.urlopen(sys.argv[1] + "/isalive", timeout=2) as r:
+        sys.exit(0 if r.status == 200 else 1)
+except Exception:
+    sys.exit(1)
+' "${MOCK_OAUTH2_URL}" >/dev/null 2>&1; do
+    if (( SECONDS >= deadline )); then
+      echo "mock-oauth2-server did not become ready" >&2
+      return 1
+    fi
+    sleep 1
+  done
 }
 
 wait_for_bitcoind() {
@@ -339,6 +360,7 @@ ensure_bitcoin_wallet
 ensure_lnd_wallet
 ensure_cln_ready
 ensure_channel
+wait_for_mock_oauth2
 
 # Leave both nodes caught up to the chain tip so the first tests don't race a node
 # still syncing after the channel-funding blocks — a cold CLN trails the tip and
