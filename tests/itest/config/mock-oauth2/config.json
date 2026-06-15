@@ -1,0 +1,49 @@
+{
+  "tokenCallbacks": [
+    {
+      "issuerId": "default",
+      "requestMappings": [
+        {
+          "requestParam": "client_id",
+          "match": "itest-full",
+          "claims": {
+            "sub": "itest-oauth2-full",
+            "aud": ["https://swissknife.itest/api"],
+            "permissions": [
+              "read:wallet",
+              "write:wallet",
+              "read:ln_address",
+              "write:ln_address",
+              "read:transaction",
+              "write:transaction",
+              "read:ln_node",
+              "write:ln_node",
+              "read:api_key",
+              "write:api_key",
+              "read:btc_address",
+              "write:btc_address"
+            ]
+          }
+        },
+        {
+          "requestParam": "client_id",
+          "match": "itest-readonly",
+          "claims": {
+            "sub": "itest-oauth2-readonly",
+            "aud": ["https://swissknife.itest/api"],
+            "permissions": ["read:wallet"]
+          }
+        },
+        {
+          "requestParam": "client_id",
+          "match": "itest-wrong-aud",
+          "claims": {
+            "sub": "itest-oauth2-wrong-aud",
+            "aud": ["https://wrong.audience.itest/api"],
+            "permissions": ["read:wallet"]
+          }
+        }
+      ]
+    }
+  ]
+}

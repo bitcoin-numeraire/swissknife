@@ -93,3 +93,4 @@ itest = []
 [dev-dependencies]
 mockall = "0.14.0"
 ctor = "0.2"
+wiremock = "0.6"

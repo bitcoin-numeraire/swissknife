@@ -67,60 +67,94 @@ pub struct TestApp {
     stderr_path: PathBuf,
 }
 
+/// The `(database, provider)` matrix cell under test, from env (defaults
+/// `sqlite` / `lnd_grpc`). Shared by every spawned instance.
+pub fn matrix_cell() -> (String, String) {
+    let database = env::var("SWISSKNIFE_ITEST_DATABASE").unwrap_or_else(|_| "sqlite".to_string());
+    let provider = env::var("SWISSKNIFE_ITEST_PROVIDER").unwrap_or_else(|_| "lnd_grpc".to_string());
+    (database, provider)
+}
+
+/// A spawned, ready SwissKnife instance: its base URL and log paths.
+pub struct Spawned {
+    pub base_url: String,
+    pub stdout_path: PathBuf,
+    pub stderr_path: PathBuf,
+}
+
+/// Spawn a SwissKnife instance against the regtest stack with `extra_env`
+/// layered on top of the per-instance dynamics, returning once it reports ready.
+///
+/// Only the per-instance dynamics are passed as env; everything else comes from
+/// config/itest.toml (RUN_MODE=itest). cwd=repo root so the config's relative
+/// cert/macaroon paths resolve. `label` names the per-instance database and log
+/// files, so distinct instances in one test process never collide. The child is
+/// registered for graceful reaping at process exit.
+pub async fn spawn_instance(database: &str, provider: &str, label: &str, extra_env: &[(&str, String)]) -> Spawned {
+    let root = repo_root();
+
+    let db = TestDatabase::provision(database, &root, label).await;
+    let port = free_port();
+    let base_url = format!("http://127.0.0.1:{port}");
+
+    let artifacts = root.join("target/itest");
+    fs::create_dir_all(&artifacts).expect("create itest artifact dir");
+    let stdout_path = artifacts.join(format!("swissknife-{label}.stdout.log"));
+    let stderr_path = artifacts.join(format!("swissknife-{label}.stderr.log"));
+
+    let mut command = Command::new(env!("CARGO_BIN_EXE_swissknife"));
+    command
+        .current_dir(&root)
+        .stdout(Stdio::from(File::create(&stdout_path).expect("create stdout log")))
+        .stderr(Stdio::from(File::create(&stderr_path).expect("create stderr log")))
+        .env("RUN_MODE", "itest")
+        .env("SWISSKNIFE_WEB__ADDR", format!("127.0.0.1:{port}"))
+        .env("SWISSKNIFE_DATABASE__URL", db.url())
+        .env("SWISSKNIFE_LN_PROVIDER", provider)
+        // Advertise this ephemeral server as the public host so the callback
+        // URL the LNURL well-known endpoint hands out is actually reachable.
+        .env("SWISSKNIFE_HOST", &base_url);
+
+    // The CLN rune is generated at bootstrap and cannot be a file path.
+    if provider == "cln_rest" {
+        command.env("SWISSKNIFE_CLN_REST_CONFIG__RUNE", read_cln_rune(&root));
+    }
+    for (key, value) in extra_env {
+        command.env(key, value);
+    }
+
+    let child = command
+        .spawn()
+        .expect("spawn swissknife binary (run `make build` first)");
+    SPAWNED.lock().expect("spawned registry lock").push(child);
+
+    let api = ApiClient::new(base_url.clone());
+    wait_until_ready(&api, &stdout_path, &stderr_path).await;
+
+    Spawned {
+        base_url,
+        stdout_path,
+        stderr_path,
+    }
+}
+
 impl TestApp {
     async fn start() -> TestApp {
-        let database = env::var("SWISSKNIFE_ITEST_DATABASE").unwrap_or_else(|_| "sqlite".to_string());
-        let provider = env::var("SWISSKNIFE_ITEST_PROVIDER").unwrap_or_else(|_| "lnd_grpc".to_string());
-        let root = repo_root();
-
-        let db = TestDatabase::provision(&database, &root).await;
-        let port = free_port();
-        let base_url = format!("http://127.0.0.1:{port}");
-
-        let artifacts = root.join("target/itest");
-        fs::create_dir_all(&artifacts).expect("create itest artifact dir");
-        let stdout_path = artifacts.join(format!("swissknife-{database}-{provider}.stdout.log"));
-        let stderr_path = artifacts.join(format!("swissknife-{database}-{provider}.stderr.log"));
-
-        // Only the per-instance dynamics are passed as env; everything else
-        // comes from config/itest.toml (RUN_MODE=itest). cwd=repo root so the
-        // config's relative cert/macaroon paths resolve.
-        let mut command = Command::new(env!("CARGO_BIN_EXE_swissknife"));
-        command
-            .current_dir(&root)
-            .stdout(Stdio::from(File::create(&stdout_path).expect("create stdout log")))
-            .stderr(Stdio::from(File::create(&stderr_path).expect("create stderr log")))
-            .env("RUN_MODE", "itest")
-            .env("SWISSKNIFE_WEB__ADDR", format!("127.0.0.1:{port}"))
-            .env("SWISSKNIFE_DATABASE__URL", db.url())
-            .env("SWISSKNIFE_LN_PROVIDER", &provider)
-            // Advertise this ephemeral server as the public host so the callback
-            // URL the LNURL well-known endpoint hands out is actually reachable.
-            .env("SWISSKNIFE_HOST", &base_url);
-
-        // The CLN rune is generated at bootstrap and cannot be a file path.
-        if provider == "cln_rest" {
-            command.env("SWISSKNIFE_CLN_REST_CONFIG__RUNE", read_cln_rune(&root));
-        }
-
-        let child = command
-            .spawn()
-            .expect("spawn swissknife binary (run `make build` first)");
-        SPAWNED.lock().expect("spawned registry lock").push(child);
-
-        let api = ApiClient::new(base_url.clone());
-        wait_until_ready(&api, &stdout_path, &stderr_path).await;
+        let (database, provider) = matrix_cell();
+        let label = format!("{database}-{provider}");
+        let spawned = spawn_instance(&database, &provider, &label, &[]).await;
 
         // Create the admin once, up front, so no test races on its creation.
+        let api = ApiClient::new(spawned.base_url.clone());
         let admin_jwt = bootstrap_admin(&api).await;
 
         TestApp {
-            base_url,
+            base_url: spawned.base_url,
             database,
             provider,
             admin_jwt,
-            stdout_path,
-            stderr_path,
+            stdout_path: spawned.stdout_path,
+            stderr_path: spawned.stderr_path,
         }
     }
 
