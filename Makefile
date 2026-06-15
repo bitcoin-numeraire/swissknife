@@ -164,7 +164,7 @@ COVERAGE_CELLS ?= sqlite:lnd_grpc sqlite:lnd_rest sqlite:cln_grpc sqlite:cln_res
 coverage-matrix: itest-up
 	@cargo llvm-cov clean --workspace
 	@cargo llvm-cov --no-report --workspace --features itest --bins
-	@SWISSKNIFE_ITEST_DATABASE=postgres cargo llvm-cov --no-report --features itest --bins uow_tests
+	@SWISSKNIFE_ITEST_DATABASE=postgres cargo llvm-cov --no-report --features itest --bins -- uow_tests
 	@for cell in $(COVERAGE_CELLS); do \
 		db=$${cell%%:*}; provider=$${cell##*:}; \
 		echo ">>> integration $$db/$$provider"; \
