@@ -20,7 +20,7 @@ ITEST_ENV = SWISSKNIFE_ITEST_COMPOSE_PROJECT=$(ITEST_PROJECT) \
 	SWISSKNIFE_ITEST_DATABASE=$(ITEST_DATABASE) \
 	SWISSKNIFE_ITEST_PROVIDER=$(ITEST_PROVIDER)
 
-.PHONY: watch up up-swissknife up-server up-postgres up-pgadmin shutdown down generate-certs build build-docker build-docker-server build-docker-dashboard run-docker lint fmt fmt-fix test test-unit test-integration test-persistence itest-up itest-down itest-shutdown itest-logs coverage coverage-html coverage-lcov clean check deps-upgrade deps-outdated install-tools generate-models new-migration run-migrations fresh-migrations
+.PHONY: watch up up-swissknife up-server up-postgres up-pgadmin shutdown down generate-certs build build-docker build-docker-server build-docker-dashboard run-docker lint fmt fmt-fix test test-unit test-integration test-persistence itest-up itest-down itest-shutdown itest-logs coverage coverage-html coverage-lcov coverage-matrix clean check deps-upgrade deps-outdated install-tools generate-models new-migration run-migrations fresh-migrations
 
 watch:
 	@cargo watch -x run
@@ -145,14 +145,34 @@ coverage-html:
 	@cargo llvm-cov --workspace --bins --html
 	@echo "HTML coverage report generated at target/llvm-cov/html/index.html"
 
-# Combined unit + integration coverage -> lcov.info. Requires the regtest stack
-# (brought up here); merges the unit tests with the integration suite, including
-# the spawned binary's coverage.
+# Combined unit + integration coverage for ONE cell -> lcov.info. Requires the
+# regtest stack (brought up here); merges unit + UoW (`--features itest` so the
+# itest-gated uow_tests are compiled) with the integration suite for the selected
+# (ITEST_DATABASE, ITEST_PROVIDER) cell, including the spawned binary's coverage.
 coverage-lcov: itest-up
 	@cargo llvm-cov clean --workspace
-	@cargo llvm-cov --no-report --workspace --bins
+	@cargo llvm-cov --no-report --workspace --features itest --bins
 	@$(ITEST_ENV) cargo llvm-cov --no-report --features itest --test api
 	@cargo llvm-cov report --lcov --output-path lcov.info
+
+# Full-matrix merged coverage: unit + UoW (both DBs) + the integration API suite
+# across every cell in COVERAGE_CELLS, merged into one report. This is the true
+# total — run it on Linux/CI (lnd_rest does not start under macOS native-tls).
+# Integration cells run serially (--test-threads=1) to avoid the SQLite write
+# contention in #267. Override COVERAGE_CELLS to add/drop cells.
+COVERAGE_CELLS ?= sqlite:lnd_grpc sqlite:lnd_rest sqlite:cln_grpc sqlite:cln_rest postgres:lnd_grpc
+coverage-matrix: itest-up
+	@cargo llvm-cov clean --workspace
+	@cargo llvm-cov --no-report --workspace --features itest --bins
+	@SWISSKNIFE_ITEST_DATABASE=postgres cargo llvm-cov --no-report --features itest --bins uow_tests
+	@for cell in $(COVERAGE_CELLS); do \
+		db=$${cell%%:*}; provider=$${cell##*:}; \
+		echo ">>> integration $$db/$$provider"; \
+		SWISSKNIFE_ITEST_COMPOSE_PROJECT=$(ITEST_PROJECT) SWISSKNIFE_ITEST_DATABASE=$$db SWISSKNIFE_ITEST_PROVIDER=$$provider \
+			cargo llvm-cov --no-report --features itest --test api -- --test-threads=1 || exit 1; \
+	done
+	@cargo llvm-cov report --lcov --output-path lcov.info
+	@cargo llvm-cov report
 
 # Remove build artifacts, coverage output, and integration runtime/artifacts.
 clean:

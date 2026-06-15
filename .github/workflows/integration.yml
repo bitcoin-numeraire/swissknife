@@ -113,10 +113,12 @@ jobs:
         run: |
           make itest-down ITEST_PROJECT=swissknife-persistence-${{ matrix.database }} || true
 
-  # Combined unit + integration coverage (lnd_grpc / sqlite), uploaded as lcov.
+  # Full-matrix merged coverage: unit + UoW (both DBs) + the integration suite
+  # across every provider x DB cell, merged into one report (printed to the job
+  # log and uploaded as lcov). This is the true total coverage.
   coverage:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 90
 
     steps:
       - name: Checkout repository
@@ -136,8 +138,8 @@ jobs:
       - name: Cache Rust dependencies
         uses: swatinem/rust-cache@v2
 
-      - name: Merged unit + integration coverage
-        run: make coverage-lcov
+      - name: Full-matrix merged coverage
+        run: make coverage-matrix
 
       - name: Upload coverage artifact
         uses: actions/upload-artifact@v7
