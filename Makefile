@@ -8,6 +8,13 @@ ITEST_PROJECT ?= swissknife-itest
 ITEST_COMPOSE = docker compose -p $(ITEST_PROJECT) -f tests/itest/docker-compose.yml
 ITEST_DATABASE ?= sqlite
 ITEST_PROVIDER ?= lnd_grpc
+# Optional test-name filter (TEST) and post-`--` args (TESTARGS) for the test
+# targets, so a single suite or test can be run locally, e.g.:
+#   make test-integration TEST=suites::oauth2
+#   make test-integration TEST=suites::lnurl_send::pay TESTARGS="--nocapture"
+#   make test-unit TEST=payment_service
+TEST ?=
+TESTARGS ?=
 # Per-instance dynamics read by the harness; everything static lives in config/itest.toml.
 ITEST_ENV = SWISSKNIFE_ITEST_COMPOSE_PROJECT=$(ITEST_PROJECT) \
 	SWISSKNIFE_ITEST_DATABASE=$(ITEST_DATABASE) \
@@ -96,21 +103,22 @@ test:
 	@cargo test --workspace --all-targets
 
 test-unit:
-	@cargo test --workspace --bins
+	@cargo test --workspace --bins $(TEST) -- $(TESTARGS)
 
 # Run the integration suite for one (database, provider) cell. Brings
 # the regtest stack up first (idempotent); override the cell via
 # ITEST_DATABASE / ITEST_PROVIDER (e.g. `make test-integration ITEST_PROVIDER=cln_grpc`).
+# Narrow to a suite/test with TEST=... and pass runner flags with TESTARGS=...
 test-integration: itest-up
-	@$(ITEST_ENV) cargo test --features itest --test api
+	@$(ITEST_ENV) cargo test --features itest --test api $(TEST) -- $(TESTARGS)
 
 # Run the persistence / Unit-of-Work tests for one database cell: real-DB
 # coverage of the reservation/settlement balance invariants and concurrency.
 # SQLite is self-contained; postgres uses the dockerized PG. Override the cell
-# via ITEST_DATABASE (sqlite|postgres).
+# via ITEST_DATABASE (sqlite|postgres); TEST defaults to the uow_tests module.
 test-persistence:
 	@if [ "$(ITEST_DATABASE)" = "postgres" ]; then $(ITEST_COMPOSE) up -d --wait postgres; fi
-	@$(ITEST_ENV) cargo test --features itest --bins uow_tests
+	@$(ITEST_ENV) cargo test --features itest --bins $(if $(TEST),$(TEST),uow_tests) -- $(TESTARGS)
 
 # Bring up the regtest dependency stack (bitcoind + LND + CLN + Postgres).
 itest-up:
