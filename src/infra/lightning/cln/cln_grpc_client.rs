@@ -59,8 +59,6 @@ pub struct ClnClientConfig {
     #[serde(deserialize_with = "deserialize_duration")]
     pub payment_timeout: Duration,
     pub payment_exemptfee: Option<u64>,
-    #[serde(deserialize_with = "deserialize_duration")]
-    pub retry_delay: Duration,
 }
 
 const DEFAULT_CLIENT_CERT_FILENAME: &str = "client.pem";

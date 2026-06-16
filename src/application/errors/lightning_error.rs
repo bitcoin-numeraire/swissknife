@@ -20,6 +20,9 @@ pub enum LightningError {
     #[error("Lightning event listener failure: {0}")]
     Listener(String),
 
+    #[error("Failed to process Lightning node event: {0}")]
+    EventProcessing(String),
+
     #[error("Failed to generate Lightning invoice: {0}")]
     Invoice(String),
 

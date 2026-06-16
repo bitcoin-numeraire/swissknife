@@ -1,4 +1,3 @@
-use std::cmp::min;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -8,8 +7,8 @@ use futures_util::StreamExt;
 use http::Uri;
 use native_tls::{Certificate, TlsConnector};
 use serde_json::Value;
+use tokio::fs;
 use tokio::net::TcpStream;
-use tokio::{fs, time::sleep};
 use tokio_tungstenite::tungstenite::ClientRequestBuilder;
 use tokio_tungstenite::{connect_async_tls_with_config, Connector, MaybeTlsStream, WebSocketStream};
 use tracing::{debug, error, warn};
@@ -50,29 +49,14 @@ impl LndWebsocketListener {
         })
     }
 
+    // Every error propagates out of `listen()`; the `EventListener` supervisor owns
+    // reconnection (re-running `sync()` from the un-advanced cursor). A clean disconnect
+    // is surfaced as an error so it takes the same reconnect path.
     async fn listen_invoices(&self) -> Result<(), LightningError> {
-        let max_reconnect_delay = self.config.ws_max_reconnect_delay;
-        let mut reconnect_delay = self.config.ws_min_reconnect_delay;
-
-        loop {
-            let result = self.connect_and_handle_invoices().await;
-
-            if let Err(err) = result {
-                match err {
-                    LightningError::ParseConfig(msg)
-                    | LightningError::ConnectWebsocket(msg)
-                    | LightningError::TLSConfig(msg)
-                    | LightningError::ReadCertificates(msg) => {
-                        return Err(LightningError::Listener(msg));
-                    }
-                    _ => {
-                        error!(%err, "WebSocket connection error");
-                        sleep(reconnect_delay).await;
-                        reconnect_delay = min(reconnect_delay * 2, max_reconnect_delay);
-                    }
-                }
-            }
-        }
+        self.connect_and_handle_invoices().await?;
+        Err(LightningError::ConnectWebsocket(
+            "LND invoice websocket disconnected".to_string(),
+        ))
     }
 
     async fn listen_transactions(&self) -> Result<(), LightningError> {
@@ -82,28 +66,10 @@ impl LndWebsocketListener {
             .await
             .map_err(|e| LightningError::Listener(e.to_string()))?;
 
-        let max_reconnect_delay = self.config.ws_max_reconnect_delay;
-        let mut reconnect_delay = self.config.ws_min_reconnect_delay;
-
-        loop {
-            let result = self.connect_and_handle_transactions().await;
-
-            if let Err(err) = result {
-                match err {
-                    LightningError::ParseConfig(msg)
-                    | LightningError::ConnectWebsocket(msg)
-                    | LightningError::TLSConfig(msg)
-                    | LightningError::ReadCertificates(msg) => {
-                        return Err(LightningError::Listener(msg));
-                    }
-                    _ => {
-                        error!(%err, "WebSocket connection error");
-                        sleep(reconnect_delay).await;
-                        reconnect_delay = min(reconnect_delay * 2, max_reconnect_delay);
-                    }
-                }
-            }
-        }
+        self.connect_and_handle_transactions().await?;
+        Err(LightningError::ConnectWebsocket(
+            "LND transaction websocket disconnected".to_string(),
+        ))
     }
 
     async fn connect_and_handle_invoices(&self) -> Result<(), LightningError> {
@@ -119,7 +85,7 @@ impl LndWebsocketListener {
 
         debug!("Connected to LND WebSocket server");
 
-        self.handle_invoice_messages(ws_stream).await;
+        self.handle_invoice_messages(ws_stream).await?;
 
         debug!("Disconnected from LND WebSocket server");
 
@@ -139,7 +105,7 @@ impl LndWebsocketListener {
 
         debug!("Connected to LND WebSocket transaction server");
 
-        self.handle_transaction_messages(ws_stream).await;
+        self.handle_transaction_messages(ws_stream).await?;
 
         debug!("Disconnected from LND WebSocket transaction server");
 
@@ -170,48 +136,54 @@ impl LndWebsocketListener {
         }
     }
 
-    async fn handle_invoice_messages(&self, mut ws_stream: WebSocketStream<MaybeTlsStream<TcpStream>>) {
+    async fn handle_invoice_messages(
+        &self,
+        mut ws_stream: WebSocketStream<MaybeTlsStream<TcpStream>>,
+    ) -> Result<(), LightningError> {
         while let Some(message) = ws_stream.next().await {
             match message {
                 Ok(msg) => {
                     if msg.is_text() {
                         let text = msg.into_text().unwrap();
+                        // Invoice parse/settlement errors are skippable (idempotent and re-synced
+                        // by invoice.sync()), so log and keep reading rather than dropping the stream.
                         if let Err(e) = self.process_invoice_message(&text).await {
                             error!(%e, "Failed to process message");
                         }
                     } else if msg.is_close() {
                         debug!("WebSocket closed");
-                        break;
+                        return Ok(());
                     }
                 }
-                Err(err) => {
-                    error!(%err, "Error receiving message");
-                    break;
-                }
+                Err(err) => return Err(LightningError::ConnectWebsocket(err.to_string())),
             }
         }
+
+        Ok(())
     }
 
-    async fn handle_transaction_messages(&self, mut ws_stream: WebSocketStream<MaybeTlsStream<TcpStream>>) {
+    async fn handle_transaction_messages(
+        &self,
+        mut ws_stream: WebSocketStream<MaybeTlsStream<TcpStream>>,
+    ) -> Result<(), LightningError> {
         while let Some(message) = ws_stream.next().await {
             match message {
                 Ok(msg) => {
                     if msg.is_text() {
                         let text = msg.into_text().unwrap();
-                        if let Err(e) = self.process_transaction_message(&text).await {
-                            error!(%e, "Failed to process transaction message");
-                        }
+                        // A failed deposit/withdrawal write propagates so the supervisor
+                        // reconnects and re-syncs; parse errors are skipped inside.
+                        self.process_transaction_message(&text).await?;
                     } else if msg.is_close() {
                         debug!("WebSocket closed");
-                        break;
+                        return Ok(());
                     }
                 }
-                Err(err) => {
-                    error!(%err, "Error receiving message");
-                    break;
-                }
+                Err(err) => return Err(LightningError::ConnectWebsocket(err.to_string())),
             }
         }
+
+        Ok(())
     }
 
     async fn process_invoice_message(&self, text: &str) -> anyhow::Result<()> {
@@ -235,14 +207,20 @@ impl LndWebsocketListener {
         Ok(())
     }
 
-    async fn process_transaction_message(&self, text: &str) -> anyhow::Result<()> {
-        let value: Value = serde_json::from_str(text)?;
+    async fn process_transaction_message(&self, text: &str) -> Result<(), LightningError> {
+        let value: Value = match serde_json::from_str(text) {
+            Ok(value) => value,
+            Err(err) => {
+                error!(%err, "Failed to parse transaction message");
+                return Ok(());
+            }
+        };
 
         if let Some(event) = value.get("result") {
             match serde_json::from_value::<TransactionResponse>(event.clone()) {
                 Ok(transaction) => {
                     let transaction: BtcTransaction = transaction.into();
-                    self.handle_transaction(transaction).await;
+                    self.handle_transaction(transaction).await?;
                 }
                 Err(err) => {
                     error!(%err, "Failed to parse SubscribeTransactions event");
@@ -253,7 +231,7 @@ impl LndWebsocketListener {
         Ok(())
     }
 
-    async fn handle_transaction(&self, transaction: BtcTransaction) {
+    async fn handle_transaction(&self, transaction: BtcTransaction) -> Result<(), LightningError> {
         // Filter outputs based on transaction direction:
         // - Incoming tx (deposit): only process outputs that are ours
         // - Outgoing tx (withdrawal): only process outputs that are NOT ours (skip change)
@@ -278,21 +256,21 @@ impl LndWebsocketListener {
                     .await
             };
 
-            if let Err(err) = result {
-                error!(%err, "Failed to process onchain transaction");
-            }
+            // Don't swallow: a failed write must not advance the cursor, or the deposit is
+            // lost. Propagating exits the listener so the supervisor reconnects and `sync()`
+            // reruns from the un-advanced cursor, reprocessing idempotently.
+            result.map_err(|e| LightningError::EventProcessing(e.to_string()))?;
         }
 
         if let Some(block_height) = transaction.block_height.filter(|&h| h > 0) {
-            if let Err(err) = self
-                .services
+            self.services
                 .system
                 .set_onchain_cursor(OnchainSyncCursor::BlockHeight(block_height))
                 .await
-            {
-                warn!(%err, "Failed to persist onchain cursor");
-            }
+                .map_err(|e| LightningError::Listener(e.to_string()))?;
         }
+
+        Ok(())
     }
 }
 

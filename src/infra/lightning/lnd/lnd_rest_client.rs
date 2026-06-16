@@ -47,10 +47,6 @@ pub struct LndRestClientConfig {
     pub fee_limit_msat: u64,
     #[serde(deserialize_with = "deserialize_duration")]
     pub payment_timeout: Duration,
-    #[serde(deserialize_with = "deserialize_duration")]
-    pub ws_min_reconnect_delay: Duration,
-    #[serde(deserialize_with = "deserialize_duration")]
-    pub ws_max_reconnect_delay: Duration,
     pub ca_cert_path: Option<String>,
     pub macaroon_path: String,
     pub reorg_buffer_blocks: u32,

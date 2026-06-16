@@ -101,8 +101,6 @@ pub struct LndGrpcClientConfig {
     pub fee_limit_msat: u64,
     #[serde(deserialize_with = "deserialize_duration")]
     pub payment_timeout: Duration,
-    #[serde(deserialize_with = "deserialize_duration")]
-    pub retry_delay: Duration,
     pub reorg_buffer_blocks: u32,
 }
 
