@@ -81,6 +81,16 @@ impl MockLnurl {
             .await;
     }
 
+    /// Mount the callback so it returns `bolt11` plus a `message` success action.
+    /// Raw JSON: `LnURLPayInvoice`'s success-action field is private with no setter.
+    pub async fn mount_callback_invoice_with_message(&self, bolt11: &str, message: &str) {
+        self.mount_get(
+            CALLBACK_PATH.to_string(),
+            json!({ "pr": bolt11, "successAction": { "tag": "message", "message": message } }),
+        )
+        .await;
+    }
+
     /// Mount the callback so it returns the LNURL error contract `{status, reason}`.
     pub async fn mount_callback_error(&self, reason: &str) {
         self.mount_get(

@@ -485,12 +485,19 @@ impl PaymentService {
                     _ => None,
                 };
 
-                if let Some(success_action) = success_action {
-                    let lightning = settled_payment.lightning.get_or_insert_with(Default::default);
-                    lightning.success_action = Some(success_action);
-                }
+                let mut payment = self.store.payment_uow.settle(settled_payment).await?;
 
-                let payment = self.store.payment_uow.settle(settled_payment).await?;
+                // The LNURL success action is known only on this synchronous path (it needs
+                // the callback action and the pay preimage). The async success listener can
+                // win the Settled transition and persist the row without it, so attach it and
+                // persist when the stored row is missing it — this path is its only source.
+                if let Some(success_action) = success_action {
+                    let lightning = payment.lightning.get_or_insert_with(Default::default);
+                    if lightning.success_action.is_none() {
+                        lightning.success_action = Some(success_action);
+                        payment = self.store.payment.update(payment).await?;
+                    }
+                }
 
                 Ok(payment)
             }
