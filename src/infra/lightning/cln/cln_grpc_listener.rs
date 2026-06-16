@@ -1,10 +1,9 @@
-use std::{sync::Arc, time::Duration};
+use std::sync::Arc;
 
 use async_trait::async_trait;
 use chrono::{TimeZone, Utc};
-use tokio::time::sleep;
-use tonic::{transport::Channel, Code};
-use tracing::{error, trace, warn};
+use tonic::transport::Channel;
+use tracing::{trace, warn};
 
 use super::{
     cln::{
@@ -35,7 +34,6 @@ pub struct ClnGrpcListener {
     client: NodeClient<Channel>,
     services: Arc<AppServices>,
     wallet: Arc<dyn BitcoinWallet>,
-    retry_delay: Duration,
 }
 
 impl ClnGrpcListener {
@@ -50,26 +48,7 @@ impl ClnGrpcListener {
             client,
             services,
             wallet,
-            retry_delay: config.retry_delay,
         })
-    }
-
-    /// Handles a gRPC error by sleeping and returning Ok(()) for retryable errors,
-    /// or returning Err for fatal errors.
-    async fn handle_grpc_error(&self, err: tonic::Status, context: &str) -> Result<(), LightningError> {
-        match err.code() {
-            Code::Aborted
-            | Code::Cancelled
-            | Code::DeadlineExceeded
-            | Code::Internal
-            | Code::FailedPrecondition
-            | Code::Unavailable => {
-                error!(err = err.message(), "{}. Retrying...", context);
-                sleep(self.retry_delay).await;
-                Ok(())
-            }
-            _ => Err(LightningError::Listener(err.to_string())),
-        }
     }
 
     async fn listen_invoices(&self) -> Result<(), LightningError> {
@@ -78,70 +57,56 @@ impl ClnGrpcListener {
         loop {
             trace!(next_index, "Waiting for invoice update...");
 
-            let result = {
-                let mut client = self.client.clone();
-                client
-                    .wait(WaitRequest {
-                        subsystem: WaitSubsystem::Invoices as i32,
-                        indexname: WaitIndexname::Updated as i32,
-                        nextvalue: next_index,
-                    })
-                    .await
-            };
+            let response = self
+                .client
+                .clone()
+                .wait(WaitRequest {
+                    subsystem: WaitSubsystem::Invoices as i32,
+                    indexname: WaitIndexname::Updated as i32,
+                    nextvalue: next_index,
+                })
+                .await
+                .map_err(|e| LightningError::Listener(e.to_string()))?
+                .into_inner();
 
-            match result {
-                Ok(response) => {
-                    let response = response.into_inner();
-                    let updated_index = response.updated;
+            let updated_index = response.updated;
 
-                    if let Some(invoices) = response.invoices {
-                        match invoices.status() {
-                            WaitInvoicesStatus::Paid => {
-                                let Some(label) = invoices.label.clone() else {
-                                    warn!("Invoice update missing label");
-                                    if let Some(index) = updated_index {
-                                        next_index = index.saturating_add(1);
-                                    }
-                                    continue;
-                                };
+            if let Some(invoices) = response.invoices {
+                match invoices.status() {
+                    WaitInvoicesStatus::Paid => {
+                        let Some(label) = invoices.label.clone() else {
+                            warn!("Invoice update missing label");
+                            if let Some(index) = updated_index {
+                                next_index = index.saturating_add(1);
+                            }
+                            continue;
+                        };
 
-                                let invoice = loop {
-                                    let result = {
-                                        let mut client = self.client.clone();
-                                        client.wait_invoice(WaitinvoiceRequest { label: label.clone() }).await
-                                    };
+                        let invoice = self
+                            .client
+                            .clone()
+                            .wait_invoice(WaitinvoiceRequest { label })
+                            .await
+                            .map_err(|e| LightningError::Listener(e.to_string()))?
+                            .into_inner();
 
-                                    match result {
-                                        Ok(response) => break response.into_inner(),
-                                        Err(err) => {
-                                            self.handle_grpc_error(err, "Error waiting for invoice").await?;
-                                        }
-                                    }
-                                };
-
-                                match invoice.status() {
-                                    WaitinvoiceStatus::Paid => {
-                                        if let Err(err) = self.services.event.invoice_paid(invoice.clone().into()).await
-                                        {
-                                            warn!(%err, "Failed to process incoming payment");
-                                        }
-                                    }
-                                    WaitinvoiceStatus::Expired => {}
+                        match invoice.status() {
+                            WaitinvoiceStatus::Paid => {
+                                if let Err(err) = self.services.event.invoice_paid(invoice.clone().into()).await {
+                                    warn!(%err, "Failed to process incoming payment");
                                 }
                             }
-                            WaitInvoicesStatus::Expired | WaitInvoicesStatus::Unpaid => {}
+                            WaitinvoiceStatus::Expired => {}
                         }
-                    } else if next_index != 0 {
-                        warn!("Invoice wait response missing invoice details");
                     }
+                    WaitInvoicesStatus::Expired | WaitInvoicesStatus::Unpaid => {}
+                }
+            } else if next_index != 0 {
+                warn!("Invoice wait response missing invoice details");
+            }
 
-                    if let Some(index) = updated_index {
-                        next_index = index.saturating_add(1);
-                    }
-                }
-                Err(err) => {
-                    self.handle_grpc_error(err, "Error waiting for invoice").await?;
-                }
+            if let Some(index) = updated_index {
+                next_index = index.saturating_add(1);
             }
         }
     }
@@ -152,58 +117,49 @@ impl ClnGrpcListener {
         loop {
             trace!(next_index, "Waiting for new sendpay update...");
 
-            let result = {
-                let mut client = self.client.clone();
-                client
-                    .wait(WaitRequest {
-                        subsystem: WaitSubsystem::Sendpays as i32,
-                        indexname: WaitIndexname::Updated as i32,
-                        nextvalue: next_index,
-                    })
-                    .await
-            };
+            let response = self
+                .client
+                .clone()
+                .wait(WaitRequest {
+                    subsystem: WaitSubsystem::Sendpays as i32,
+                    indexname: WaitIndexname::Updated as i32,
+                    nextvalue: next_index,
+                })
+                .await
+                .map_err(|e| LightningError::Listener(e.to_string()))?
+                .into_inner();
 
-            match result {
-                Ok(response) => {
-                    let response = response.into_inner();
+            if let Some(sendpays) = response.sendpays {
+                let Some(payment_hash_bytes) = sendpays.payment_hash.clone() else {
+                    warn!("Sendpay update missing payment hash");
+                    continue;
+                };
 
-                    if let Some(sendpays) = response.sendpays {
-                        let Some(payment_hash_bytes) = sendpays.payment_hash.clone() else {
-                            warn!("Sendpay update missing payment hash");
-                            continue;
-                        };
-
-                        let payment_hash = hex::encode(&payment_hash_bytes);
-                        match sendpays.status() {
-                            WaitSendpaysStatus::Complete => {
-                                if let Err(err) = self
-                                    .handle_sendpay_complete(payment_hash_bytes, sendpays.partid, sendpays.groupid)
-                                    .await
-                                {
-                                    warn!(%err, "Failed to process completed outgoing payment");
-                                }
-                            }
-                            WaitSendpaysStatus::Failed => {
-                                let failure_event = LnPayFailureEvent {
-                                    reason: "Payment failed".to_string(),
-                                    payment_hash,
-                                };
-                                if let Err(err) = self.services.event.failed_payment(failure_event).await {
-                                    warn!(%err, "Failed to process failed outgoing payment");
-                                }
-                            }
-                            WaitSendpaysStatus::Pending => {}
+                let payment_hash = hex::encode(&payment_hash_bytes);
+                match sendpays.status() {
+                    WaitSendpaysStatus::Complete => {
+                        if let Err(err) = self
+                            .handle_sendpay_complete(payment_hash_bytes, sendpays.partid, sendpays.groupid)
+                            .await
+                        {
+                            warn!(%err, "Failed to process completed outgoing payment");
                         }
                     }
-
-                    let updated_index = response.updated;
-                    if let Some(index) = updated_index {
-                        next_index = index.saturating_add(1);
+                    WaitSendpaysStatus::Failed => {
+                        let failure_event = LnPayFailureEvent {
+                            reason: "Payment failed".to_string(),
+                            payment_hash,
+                        };
+                        if let Err(err) = self.services.event.failed_payment(failure_event).await {
+                            warn!(%err, "Failed to process failed outgoing payment");
+                        }
                     }
+                    WaitSendpaysStatus::Pending => {}
                 }
-                Err(err) => {
-                    self.handle_grpc_error(err, "Error waiting for sendpay updates").await?;
-                }
+            }
+
+            if let Some(index) = response.updated {
+                next_index = index.saturating_add(1);
             }
         }
     }
@@ -224,46 +180,32 @@ impl ClnGrpcListener {
         loop {
             trace!(next_index, "Waiting for new chainmove...");
 
-            let result = {
-                let mut client = self.client.clone();
-                client
-                    .wait(WaitRequest {
-                        subsystem: WaitSubsystem::Chainmoves as i32,
-                        indexname: WaitIndexname::Created as i32,
-                        nextvalue: next_index,
-                    })
-                    .await
+            let response = self
+                .client
+                .clone()
+                .wait(WaitRequest {
+                    subsystem: WaitSubsystem::Chainmoves as i32,
+                    indexname: WaitIndexname::Created as i32,
+                    nextvalue: next_index,
+                })
+                .await
+                .map_err(|e| LightningError::Listener(e.to_string()))?
+                .into_inner();
+
+            let Some(created_index) = response.created else {
+                warn!("Chainmoves wait response missing created index");
+                continue;
             };
 
-            match result {
-                Ok(response) => {
-                    let response = response.into_inner();
-                    let Some(created_index) = response.created else {
-                        warn!("Chainmoves wait response missing created index");
-                        continue;
-                    };
-
-                    match self.handle_chainmoves(created_index).await {
-                        Ok(max_index) => {
-                            next_index = max_index.saturating_add(1);
-                            if let Err(err) = self
-                                .services
-                                .system
-                                .set_onchain_cursor(OnchainSyncCursor::CreatedIndex(next_index))
-                                .await
-                            {
-                                warn!(%err, "Failed to persist chainmoves cursor");
-                            }
-                        }
-                        Err(err) => {
-                            warn!(%err, "Failed to process onchain chainmoves");
-                        }
-                    }
-                }
-                Err(err) => {
-                    self.handle_grpc_error(err, "Error waiting for chainmoves").await?;
-                }
-            }
+            // A failed deposit/withdrawal write propagates out (cursor not advanced) so the
+            // supervisor reconnects and reprocesses from the un-advanced CreatedIndex.
+            let max_index = self.handle_chainmoves(created_index).await?;
+            next_index = max_index.saturating_add(1);
+            self.services
+                .system
+                .set_onchain_cursor(OnchainSyncCursor::CreatedIndex(next_index))
+                .await
+                .map_err(|e| LightningError::Listener(e.to_string()))?;
         }
     }
 
@@ -374,14 +316,13 @@ impl ClnGrpcListener {
                         }
                     };
 
-                    if let Err(err) = self
-                        .services
+                    // Propagate write failures so the cursor isn't advanced past a deposit we
+                    // failed to credit; the supervisor reconnects and reprocesses idempotently.
+                    self.services
                         .event
                         .onchain_deposit(output.into(), currency.clone())
                         .await
-                    {
-                        warn!(%err, "Failed to process onchain deposit");
-                    }
+                        .map_err(|e| LightningError::EventProcessing(e.to_string()))?;
                 }
                 (ListchainmovesChainmovesPrimaryTag::Withdrawal, "wallet") => {
                     let Some(spending_txid) = chainmove.spending_txid else {
@@ -394,9 +335,11 @@ impl ClnGrpcListener {
                         block_height: Some(chainmove.blockheight),
                     };
 
-                    if let Err(err) = self.services.event.onchain_withdrawal(event).await {
-                        warn!(%err, "Failed to process onchain withdrawal");
-                    }
+                    self.services
+                        .event
+                        .onchain_withdrawal(event)
+                        .await
+                        .map_err(|e| LightningError::EventProcessing(e.to_string()))?;
                 }
                 _ => {}
             }

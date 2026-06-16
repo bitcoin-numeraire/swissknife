@@ -1,10 +1,8 @@
-use std::{sync::Arc, time::Duration};
+use std::sync::Arc;
 
 use async_trait::async_trait;
 use chrono::{TimeZone, Utc};
-use tokio::time::sleep;
-use tonic::{Code, Status};
-use tracing::{error, warn};
+use tracing::warn;
 
 use crate::{
     application::{composition::AppServices, errors::LightningError},
@@ -27,7 +25,6 @@ pub struct LndGrpcListener {
     client: LightningClient<LndChannel>,
     services: Arc<AppServices>,
     network: crate::domains::bitcoin::BtcNetwork,
-    retry_delay: Duration,
 }
 
 impl LndGrpcListener {
@@ -42,49 +39,30 @@ impl LndGrpcListener {
             client: LightningClient::new(channel),
             services,
             network: wallet.network(),
-            retry_delay: config.retry_delay,
         })
     }
 
-    async fn handle_grpc_error(&self, err: Status, context: &str) -> Result<(), LightningError> {
-        match err.code() {
-            Code::Aborted
-            | Code::Cancelled
-            | Code::DeadlineExceeded
-            | Code::Internal
-            | Code::FailedPrecondition
-            | Code::Unavailable => {
-                error!(err = err.message(), "{}. Retrying...", context);
-                sleep(self.retry_delay).await;
-                Ok(())
-            }
-            _ => Err(LightningError::Listener(err.to_string())),
-        }
-    }
-
+    // Both streams propagate every error out of `listen()`; the `EventListener` supervisor
+    // owns reconnection (re-running `sync()` from the un-advanced cursor). A clean stream
+    // close is also surfaced as an error so it triggers the same reconnect path (issue #267).
     async fn listen_invoices(&self) -> Result<(), LightningError> {
-        loop {
-            let result = {
-                let mut client = self.client.clone();
-                client.subscribe_invoices(lnrpc::InvoiceSubscription::default()).await
-            };
+        let response = self
+            .client
+            .clone()
+            .subscribe_invoices(lnrpc::InvoiceSubscription::default())
+            .await
+            .map_err(|e| LightningError::Listener(e.to_string()))?;
 
-            match result {
-                Ok(response) => {
-                    let mut stream = response.into_inner();
-                    while let Some(invoice) = stream
-                        .message()
-                        .await
-                        .map_err(|e| LightningError::Listener(format!("Failed to read invoice stream: {}", e)))?
-                    {
-                        self.handle_invoice(invoice).await;
-                    }
-                }
-                Err(err) => {
-                    self.handle_grpc_error(err, "Error subscribing to invoices").await?;
-                }
-            }
+        let mut stream = response.into_inner();
+        while let Some(invoice) = stream
+            .message()
+            .await
+            .map_err(|e| LightningError::Listener(format!("Failed to read invoice stream: {}", e)))?
+        {
+            self.handle_invoice(invoice).await;
         }
+
+        Err(LightningError::Listener("LND invoice stream closed".to_string()))
     }
 
     async fn listen_transactions(&self) -> Result<(), LightningError> {
@@ -94,31 +72,24 @@ impl LndGrpcListener {
             .await
             .map_err(|e| LightningError::Listener(e.to_string()))?;
 
-        loop {
-            let result = {
-                let mut client = self.client.clone();
-                client
-                    .subscribe_transactions(lnrpc::GetTransactionsRequest::default())
-                    .await
-            };
+        let response = self
+            .client
+            .clone()
+            .subscribe_transactions(lnrpc::GetTransactionsRequest::default())
+            .await
+            .map_err(|e| LightningError::Listener(e.to_string()))?;
 
-            match result {
-                Ok(response) => {
-                    let mut stream = response.into_inner();
-                    while let Some(transaction) = stream
-                        .message()
-                        .await
-                        .map_err(|e| LightningError::Listener(format!("Failed to read transaction stream: {}", e)))?
-                    {
-                        let transaction = Self::map_transaction(transaction);
-                        self.handle_transaction(transaction).await;
-                    }
-                }
-                Err(err) => {
-                    self.handle_grpc_error(err, "Error subscribing to transactions").await?;
-                }
-            }
+        let mut stream = response.into_inner();
+        while let Some(transaction) = stream
+            .message()
+            .await
+            .map_err(|e| LightningError::Listener(format!("Failed to read transaction stream: {}", e)))?
+        {
+            let transaction = Self::map_transaction(transaction);
+            self.handle_transaction(transaction).await?;
         }
+
+        Err(LightningError::Listener("LND transaction stream closed".to_string()))
     }
 
     async fn handle_invoice(&self, invoice: lnrpc::Invoice) {
@@ -179,7 +150,7 @@ impl LndGrpcListener {
         }
     }
 
-    async fn handle_transaction(&self, transaction: BtcTransaction) {
+    async fn handle_transaction(&self, transaction: BtcTransaction) -> Result<(), LightningError> {
         let relevant_outputs = transaction.outputs.iter().filter(|output| {
             if transaction.is_outgoing {
                 !output.is_ours
@@ -201,21 +172,22 @@ impl LndGrpcListener {
                     .await
             };
 
-            if let Err(err) = result {
-                error!(%err, "Failed to process onchain transaction");
-            }
+            // Propagate write failures instead of swallowing them. The cursor must not
+            // advance past an event we failed to persist or the deposit is lost; bubbling
+            // the error exits the listener so the supervisor reconnects and `sync()` reruns
+            // from the un-advanced cursor, reprocessing idempotently.
+            result.map_err(|e| LightningError::EventProcessing(e.to_string()))?;
         }
 
         if let Some(block_height) = transaction.block_height.filter(|&h| h > 0) {
-            if let Err(err) = self
-                .services
+            self.services
                 .system
                 .set_onchain_cursor(OnchainSyncCursor::BlockHeight(block_height))
                 .await
-            {
-                warn!(%err, "Failed to persist onchain cursor");
-            }
+                .map_err(|e| LightningError::Listener(e.to_string()))?;
         }
+
+        Ok(())
     }
 }
 

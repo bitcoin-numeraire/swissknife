@@ -20,7 +20,6 @@ certs_dir = "certs/lightningd"
 maxfeepercent = 0.5
 payment_timeout = "60s"
 payment_exemptfee = 5000
-retry_delay = "5s"
 
 [cln_rest_config]
 endpoint = "http://localhost:3010"
@@ -49,8 +48,6 @@ accept_invalid_certs = false
 accept_invalid_hostnames = false
 payment_timeout = "60s"
 fee_limit_msat = 25000
-ws_min_reconnect_delay = "1s"
-ws_max_reconnect_delay = "30s"
 reorg_buffer_blocks = 2
 
 [lnd_grpc_config]
@@ -59,7 +56,6 @@ cert_path = "certs/lnd/tls.cert"
 macaroon_path = "certs/lnd/admin.macaroon"
 payment_timeout = "60s"
 fee_limit_msat = 25000
-retry_delay = "2s"
 reorg_buffer_blocks = 2
 
 # Logging
@@ -96,3 +92,6 @@ min_connections = 0
 acquire_timeout = "5s"
 connect_timeout = "30s"
 sqlx_logging = false
+# SQLite-only: how long a writer waits for the lock before failing with SQLITE_BUSY.
+# Ignored for Postgres.
+busy_timeout = "10s"

@@ -18,4 +18,8 @@ pub struct SeaOrmConfig {
     #[serde(deserialize_with = "deserialize_duration")]
     pub max_lifetime: Duration,
     pub sqlx_logging: Option<bool>,
+    /// SQLite-only: how long a writer waits for the lock before failing with
+    /// `SQLITE_BUSY`. Ignored for Postgres.
+    #[serde(deserialize_with = "deserialize_duration")]
+    pub busy_timeout: Duration,
 }

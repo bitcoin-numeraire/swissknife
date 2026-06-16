@@ -162,31 +162,34 @@ impl ClnWebsocketListener {
 
                             match wallet.synchronize(cursor_guard.clone()).await {
                                 Ok(batch) => {
+                                    let mut processed_all = true;
                                     for transaction in batch.events {
-                                        match transaction {
+                                        let result = match transaction {
                                             OnchainTransaction::Deposit(output) => {
-                                                if let Err(err) = services
-                                                    .event
-                                                    .onchain_deposit(output.into(), currency.clone())
-                                                    .await
-                                                {
-                                                    error!(%err, "Failed to process onchain deposit");
-                                                }
+                                                services.event.onchain_deposit(output.into(), currency.clone()).await
                                             }
                                             OnchainTransaction::Withdrawal(event) => {
-                                                if let Err(err) = services.event.onchain_withdrawal(event).await {
-                                                    error!(%err, "Failed to process onchain withdrawal");
-                                                }
+                                                services.event.onchain_withdrawal(event).await
                                             }
+                                        };
+
+                                        // Don't advance the cursor past a write we couldn't persist, or the
+                                        // deposit is lost. socket.io keeps the connection alive and re-syncs
+                                        // on the next chain event, reprocessing from the un-advanced cursor.
+                                        if let Err(err) = result {
+                                            error!(%err, "Failed to process onchain transaction; cursor not advanced");
+                                            processed_all = false;
+                                            break;
                                         }
                                     }
 
-                                    if let Some(next_cursor) = batch.next_cursor {
-                                        if let Err(err) = services.system.set_onchain_cursor(next_cursor.clone()).await
-                                        {
-                                            warn!(%err, "Failed to persist chainmoves cursor");
+                                    if processed_all {
+                                        if let Some(next_cursor) = batch.next_cursor {
+                                            match services.system.set_onchain_cursor(next_cursor.clone()).await {
+                                                Ok(()) => *cursor_guard = Some(next_cursor),
+                                                Err(err) => warn!(%err, "Failed to persist chainmoves cursor"),
+                                            }
                                         }
-                                        *cursor_guard = Some(next_cursor);
                                     }
                                 }
                                 Err(err) => {
@@ -234,10 +237,16 @@ impl EventsListener for ClnWebsocketListener {
             Self::on_message(services.clone(), wallet.clone(), cursor.clone(), payload)
         });
 
-        client_builder
+        // Hold the connected client: rust_socketio reconnects internally
+        // (reconnect_on_disconnect), so this listener owns its own recovery. Park the task
+        // for the process lifetime — returning would let the supervisor re-enter listen() on
+        // a builder already consumed by take() above, failing with "Listener already started".
+        let _client = client_builder
             .connect()
             .await
             .map_err(|e| LightningError::ConnectWebsocket(e.to_string()))?;
+
+        std::future::pending::<()>().await;
 
         Ok(())
     }
