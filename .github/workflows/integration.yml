@@ -116,7 +116,13 @@ jobs:
   # Full-matrix merged coverage: unit + UoW (both DBs) + the integration suite
   # across every provider x DB cell, merged into one report (printed to the job
   # log and uploaded as lcov). This is the true total coverage.
+  #
+  # It re-runs the whole suite under instrumentation, which duplicates the
+  # integration + persistence jobs above. Those are the PR gates and already
+  # cover every cell, so coverage runs only on pushes to main (and manual
+  # dispatch), not on every pull-request push.
   coverage:
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 90
 
