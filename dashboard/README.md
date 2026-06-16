@@ -1,6 +1,6 @@
 # Numeraire SwissKnife Dashboard
 
-NextJS dashboard connecting to the SwissKnife backend.
+Next.js dashboard connecting to the SwissKnife backend.
 
 ## Development
 

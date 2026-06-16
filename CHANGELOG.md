@@ -8,6 +8,8 @@ release notes when a tag is published.
 
 ## [Unreleased]
 
+This section is the source for the `v0.2.0` release notes.
+
 ### Added
 
 - Added Bitcoin on-chain wallet support for self-hosted CLN and LND setups,
@@ -17,6 +19,9 @@ release notes when a tag is published.
 - Added LND gRPC support for Lightning operations ([#205]).
 - Added support for base64-encoded Lightning macaroons in provider configuration
   ([#176]).
+- Added black-box integration tests for public API flows, regtest LND/CLN
+  providers, LNURL, OAuth2/OIDC, and SQLite/Postgres persistence and
+  concurrency coverage ([#240], [#267]).
 
 ### Changed
 
@@ -34,6 +39,8 @@ release notes when a tag is published.
 
 - Fixed incorrect balance computation in wallet overviews ([398e89f]).
 - Fixed LNURL payment callback encoding and error handling ([#224]).
+- Fixed on-chain deposit event handling so transient database write failures do
+  not silently drop credits ([#267]).
 
 ## [0.1.8] - 2025-11-03
 
@@ -59,4 +66,6 @@ release notes when a tag is published.
 [#212]: https://github.com/bitcoin-numeraire/swissknife/pull/212
 [#224]: https://github.com/bitcoin-numeraire/swissknife/pull/224
 [#226]: https://github.com/bitcoin-numeraire/swissknife/pull/226
+[#240]: https://github.com/bitcoin-numeraire/swissknife/issues/240
+[#267]: https://github.com/bitcoin-numeraire/swissknife/issues/267
 [398e89f]: https://github.com/bitcoin-numeraire/swissknife/commit/398e89f
