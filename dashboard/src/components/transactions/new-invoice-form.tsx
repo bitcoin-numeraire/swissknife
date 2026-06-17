@@ -113,7 +113,7 @@ export function NewInvoiceForm({
       let invoice;
       const reqBody: NewInvoiceRequest = {
         ...(body as NewInvoiceRequest),
-        amount_msat: (body!.amount_msat as number) * 1000,
+        amount_msat: Number(body!.amount_msat) * 1000,
       };
 
       if (isAdmin) {
