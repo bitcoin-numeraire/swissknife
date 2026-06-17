@@ -48,7 +48,8 @@ export function SettingsView() {
 
   const errors = [lnAddressError, apiKeysError];
   const isLoading = [lnAddressLoading, apiKeysLoading];
-  const data = [apiKeys, lnAddress];
+  // `lnAddress` is legitimately null when no address is registered.
+  const data = [apiKeys];
 
   const failed = shouldFail(errors, data, isLoading);
 

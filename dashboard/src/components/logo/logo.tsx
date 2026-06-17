@@ -5,19 +5,20 @@ import type { LinkProps } from '@mui/material/Link';
 import { mergeClasses } from 'minimal-shared/utils';
 
 import Link from '@mui/material/Link';
-import { styled, useTheme } from '@mui/material/styles';
+import { styled, useColorScheme } from '@mui/material/styles';
 
 import { RouterLink } from 'src/routes/components';
 
 import { CONFIG } from 'src/global-config';
+import { themeConfig } from 'src/theme/theme-config';
 
 import { logoClasses } from './classes';
 
 // ----------------------------------------------------------------------
 
 export type LogoProps = LinkProps & {
-  width?: number;
-  height?: number;
+  width?: number | string;
+  height?: number | string;
   isSingle?: boolean;
   disabled?: boolean;
 };
@@ -32,10 +33,14 @@ export function Logo({
   isSingle = false,
   ...other
 }: LogoProps) {
-  const theme = useTheme();
+  // Under MUI CSS variables, `theme.palette.mode` is not reactive — use the
+  // color scheme hook so the logo follows the active light/dark scheme.
+  const { mode, systemMode } = useColorScheme();
+  const resolvedMode = (mode === 'system' ? systemMode : mode) ?? themeConfig.defaultMode;
+  const isDark = resolvedMode === 'dark';
 
   const filename = isSingle ? 'logo_single' : 'logo_font';
-  const variant = theme.palette.mode === 'dark' ? filename : `${filename}_negative`;
+  const variant = isDark ? filename : `${filename}_negative`;
 
   return (
     <LogoRoot

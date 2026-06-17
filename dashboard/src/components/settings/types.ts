@@ -7,16 +7,18 @@ import type { ThemeColorPreset } from 'src/theme/with-settings';
 
 export type SettingsState = {
   version: string;
-  fontSize: number;
-  fontFamily: string;
-  compactLayout: boolean;
-  contrast: 'default' | 'high';
-  primaryColor: ThemeColorPreset;
   mode: ThemeConfig['defaultMode'];
-  navColor: 'integrate' | 'apparent';
   direction: ThemeConfig['direction'];
-  navLayout: 'vertical' | 'horizontal' | 'mini';
+  contrast: 'default' | 'high';
+  compactLayout: boolean;
   currency: CurrencyValue;
+  // Optional: omitted from defaultSettings so the settings drawer hides these controls
+  // (the dashboard intentionally exposes only dark mode, contrast, RTL and compact).
+  fontSize?: number;
+  fontFamily?: string;
+  navColor?: 'integrate' | 'apparent';
+  navLayout?: 'vertical' | 'horizontal' | 'mini';
+  primaryColor?: ThemeColorPreset;
 };
 
 export type SettingsContextValue = {

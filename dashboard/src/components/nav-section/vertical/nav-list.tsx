@@ -8,6 +8,8 @@ import { isActiveLink, isExternalLink } from 'minimal-shared/utils';
 
 import { usePathname } from 'src/routes/hooks';
 
+import { useTranslate } from 'src/locales';
+
 import { NavItem } from './nav-item';
 import { navSectionClasses } from '../styles';
 import { NavUl, NavLi, NavCollapse } from '../components';
@@ -23,6 +25,7 @@ export function NavList({
   enabledRootRedirect,
 }: NavListProps) {
   const pathname = usePathname();
+  const { t } = useTranslate();
   const navItemRef = useRef<HTMLButtonElement>(null);
 
   const isActive = isActiveLink(pathname, data.path, data.deepMatch ?? !!data.children);
@@ -49,7 +52,7 @@ export function NavList({
       path={data.path}
       icon={data.icon}
       info={data.info}
-      title={data.title}
+      title={t(data.title)}
       caption={data.caption}
       // state
       open={open}
