@@ -1,7 +1,7 @@
 'use client';
 
-import type { LanguageValue } from 'src/locales';
 import type { IconButtonProps } from '@mui/material/IconButton';
+import type { LanguageValue } from 'src/locales';
 
 import { m } from 'framer-motion';
 import { useCallback } from 'react';

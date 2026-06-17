@@ -1,7 +1,7 @@
 import type { Theme, SxProps } from '@mui/material';
 import type { StackProps } from '@mui/material/Stack';
-import type { IWalletTableFilters } from 'src/types/wallet';
 import type { UseSetStateReturn } from 'minimal-shared/hooks';
+import type { IWalletTableFilters } from 'src/types/wallet';
 
 import { useCallback } from 'react';
 

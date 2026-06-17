@@ -1,12 +1,11 @@
 import type { CardProps } from '@mui/material';
 import type { IFiatPrices } from 'src/types/bitcoin';
+import type { NewPaymentFormProps } from './new-payment-form';
 
 import Box from '@mui/material/Box';
 import { Card, CardHeader } from '@mui/material';
 
 import { NewPaymentForm } from './new-payment-form';
-
-import type { NewPaymentFormProps } from './new-payment-form';
 
 // ----------------------------------------------------------------------
 

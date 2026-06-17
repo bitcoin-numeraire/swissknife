@@ -1,7 +1,7 @@
-import type { Contact } from 'src/lib/swissknife';
 import type { CardProps } from '@mui/material/Card';
-import type { ChartProps } from 'src/components/chart';
+import type { Contact } from 'src/lib/swissknife';
 import type { IFiatPrices } from 'src/types/bitcoin';
+import type { ChartProps } from 'src/components/chart';
 
 import { mutate } from 'swr';
 import { useTabs, useBoolean } from 'minimal-shared/hooks';

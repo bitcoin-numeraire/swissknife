@@ -1,5 +1,5 @@
-import type { NavSectionProps } from 'src/components/nav-section';
 import type { Theme, SxProps, CSSObject, Breakpoint } from '@mui/material/styles';
+import type { NavSectionProps } from 'src/components/nav-section';
 
 import { varAlpha, mergeClasses } from 'minimal-shared/utils';
 

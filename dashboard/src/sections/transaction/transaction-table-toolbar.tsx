@@ -1,5 +1,5 @@
-import type { IDatePickerControl } from 'src/types/common';
 import type { SelectChangeEvent } from '@mui/material/Select';
+import type { IDatePickerControl } from 'src/types/common';
 import type { ITransactionTableFilters } from 'src/types/transaction';
 
 import { useCallback } from 'react';
@@ -152,11 +152,7 @@ export function TransactionTableToolbar({
           }}
         />
 
-        <Stack
-          direction="row"
-          spacing={2}
-          sx={{ width: 1, flexGrow: 1, alignItems: 'center' }}
-        >
+        <Stack direction="row" spacing={2} sx={{ width: 1, flexGrow: 1, alignItems: 'center' }}>
           <TextField
             fullWidth
             value={filters.state.name}

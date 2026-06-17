@@ -1,5 +1,5 @@
-import type { Contact } from 'src/lib/swissknife';
 import type { CardProps } from '@mui/material/Card';
+import type { Contact } from 'src/lib/swissknife';
 import type { IFiatPrices } from 'src/types/bitcoin';
 
 import { mutate } from 'swr';

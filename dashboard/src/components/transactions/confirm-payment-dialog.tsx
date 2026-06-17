@@ -1,6 +1,6 @@
-import type { IFiatPrices } from 'src/types/bitcoin';
 import type { InputProps } from '@mui/material/Input';
 import type { DialogProps } from '@mui/material/Dialog';
+import type { IFiatPrices } from 'src/types/bitcoin';
 import type { PaymentResponse, SendPaymentRequest } from 'src/lib/swissknife';
 
 import { m } from 'framer-motion';
@@ -288,12 +288,7 @@ export function ConfirmPaymentDialog({
 
           <DialogActions>
             <Button onClick={handleClose}>{t('cancel')}</Button>
-            <Button
-              type="submit"
-              loading={isSubmitting}
-              variant="contained"
-              disabled={!isValid}
-            >
+            <Button type="submit" loading={isSubmitting} variant="contained" disabled={!isValid}>
               {t('confirm_payment_dialog.confirm_send')}
             </Button>
           </DialogActions>

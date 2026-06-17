@@ -1,7 +1,7 @@
 import type { Theme, SxProps } from '@mui/material';
 import type { StackProps } from '@mui/material/Stack';
-import type { IApiKeyTableFilters } from 'src/types/apikey';
 import type { UseSetStateReturn } from 'minimal-shared/hooks';
+import type { IApiKeyTableFilters } from 'src/types/apikey';
 
 import { useCallback } from 'react';
 

@@ -1,6 +1,10 @@
 'use client';
 
 import type { Breakpoint } from '@mui/material/styles';
+import type { SimpleCompactContentProps } from './content';
+import type { MainSectionProps } from '../core/main-section';
+import type { HeaderSectionProps } from '../core/header-section';
+import type { LayoutSectionProps } from '../core/layout-section';
 
 import { merge } from 'es-toolkit';
 
@@ -20,11 +24,6 @@ import { MainSection } from '../core/main-section';
 import { LayoutSection } from '../core/layout-section';
 import { HeaderSection } from '../core/header-section';
 import { LanguagePopover } from '../components/language-popover';
-
-import type { SimpleCompactContentProps } from './content';
-import type { MainSectionProps } from '../core/main-section';
-import type { HeaderSectionProps } from '../core/header-section';
-import type { LayoutSectionProps } from '../core/layout-section';
 
 // ----------------------------------------------------------------------
 

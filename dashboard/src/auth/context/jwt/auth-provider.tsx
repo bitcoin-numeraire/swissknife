@@ -1,5 +1,7 @@
 'use client';
 
+import type { AuthState, DecodedToken } from '../../types';
+
 import { jwtDecode } from 'jwt-decode';
 import { useSetState } from 'minimal-shared/hooks';
 import { useMemo, useEffect, useCallback } from 'react';
@@ -7,8 +9,6 @@ import { useMemo, useEffect, useCallback } from 'react';
 import { JWT_STORAGE_KEY } from './constant';
 import { AuthContext } from '../auth-context';
 import { setSession, isValidToken } from './utils';
-
-import type { AuthState, DecodedToken } from '../../types';
 
 // ----------------------------------------------------------------------
 

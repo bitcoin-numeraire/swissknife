@@ -54,12 +54,7 @@ export function Logo({
       ]}
       {...other}
     >
-      <img
-        alt="Logo"
-        src={`${CONFIG.assetsDir}/logo/${variant}.svg`}
-        width="100%"
-        height="100%"
-      />
+      <img alt="Logo" src={`${CONFIG.assetsDir}/logo/${variant}.svg`} width="100%" height="100%" />
     </LogoRoot>
   );
 }

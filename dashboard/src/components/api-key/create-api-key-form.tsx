@@ -53,6 +53,7 @@ export function CreateApiKeyForm({ onSuccess, isAdmin }: Props) {
   const { t } = useTranslate();
   const { user } = useAuthContext();
   const [apiKey, setApiKey] = useState<ApiKeyResponse>();
+  const [now] = useState(() => Date.now());
 
   const methods = useForm({
     resolver: zodResolver(zCreateApiKeyRequest),
@@ -132,7 +133,7 @@ export function CreateApiKeyForm({ onSuccess, isAdmin }: Props) {
                 <div>
                   <Typography variant="body1">{option.label}</Typography>
                   <Typography variant="caption" color="text.secondary">
-                    Expires {fDate(Date.now() + option.value * 1000, 'DD MMMM YYYY')}
+                    Expires {fDate(now + option.value * 1000, 'DD MMMM YYYY')}
                   </Typography>
                 </div>
               </MenuItem>

@@ -1,6 +1,9 @@
 'use client';
 
 import type { Breakpoint } from '@mui/material/styles';
+import type { MainSectionProps } from '../core/main-section';
+import type { HeaderSectionProps } from '../core/header-section';
+import type { LayoutSectionProps } from '../core/layout-section';
 import type { NavSectionProps } from 'src/components/nav-section';
 
 import { merge } from 'es-toolkit';
@@ -36,10 +39,6 @@ import { navData as accountNavData } from '../nav-config-account';
 import { WorkspacesPopover } from '../components/workspaces-popover';
 import { navData as dashboardNavData } from '../nav-config-dashboard';
 import { dashboardLayoutVars, dashboardNavColorVars } from './css-vars';
-
-import type { MainSectionProps } from '../core/main-section';
-import type { HeaderSectionProps } from '../core/header-section';
-import type { LayoutSectionProps } from '../core/layout-section';
 
 // ----------------------------------------------------------------------
 

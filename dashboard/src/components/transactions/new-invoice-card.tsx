@@ -1,11 +1,10 @@
 import type { CardProps } from '@mui/material';
+import type { NewInvoiceFormProps } from './new-invoice-form';
 
 import Box from '@mui/material/Box';
 import { Card, CardHeader } from '@mui/material';
 
 import { NewInvoiceForm } from './new-invoice-form';
-
-import type { NewInvoiceFormProps } from './new-invoice-form';
 
 // ----------------------------------------------------------------------
 
