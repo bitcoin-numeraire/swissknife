@@ -3,11 +3,9 @@
 import type { Engine } from '@tsparticles/engine';
 import type { SlideData } from '../welcome-carousel';
 
-import React, { useEffect } from 'react';
 import { loadSlim } from '@tsparticles/slim';
-import { useBoolean } from 'minimal-shared/hooks';
 import { loadAbsorbersPlugin } from '@tsparticles/plugin-absorbers';
-import Particles, { initParticlesEngine } from '@tsparticles/react';
+import { Particles, ParticlesProvider, useParticlesProvider } from '@tsparticles/react';
 
 import { Box } from '@mui/material';
 
@@ -43,18 +41,19 @@ const slides: SlideData[] = [
   },
 ];
 
+async function initParticles(engine: Engine) {
+  await loadSlim(engine);
+  await loadAbsorbersPlugin(engine);
+}
+
+function ParticlesBackground() {
+  const { loaded } = useParticlesProvider();
+
+  return loaded ? <Box component={Particles} id="tsparticles" options={particleOptions} /> : null;
+}
+
 export function WelcomeView() {
   const router = useRouter();
-  const init = useBoolean(false);
-
-  useEffect(() => {
-    initParticlesEngine(async (engine: Engine) => {
-      await loadSlim(engine);
-      await loadAbsorbersPlugin(engine);
-    }).then(() => {
-      init.onTrue();
-    });
-  }, [init]);
 
   const handleWelcomeComplete = async () => {
     try {
@@ -66,20 +65,22 @@ export function WelcomeView() {
   };
 
   return (
-    <Box
-      sx={{
-        position: 'relative',
-        width: '100vw',
-        height: '100vh',
-        overflow: 'hidden',
-        display: 'flex',
-        alignItems: 'center',
-        textAlign: 'center',
-      }}
-    >
-      {init.value && <Box component={Particles} id="tsparticles" options={particleOptions} />}
+    <ParticlesProvider init={initParticles}>
+      <Box
+        sx={{
+          position: 'relative',
+          width: '100vw',
+          height: '100vh',
+          overflow: 'hidden',
+          display: 'flex',
+          alignItems: 'center',
+          textAlign: 'center',
+        }}
+      >
+        <ParticlesBackground />
 
-      <WelcomeCarousel data={slides} onComplete={handleWelcomeComplete} />
-    </Box>
+        <WelcomeCarousel data={slides} onComplete={handleWelcomeComplete} />
+      </Box>
+    </ParticlesProvider>
   );
 }
