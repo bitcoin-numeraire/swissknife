@@ -1,67 +1,30 @@
+import type { Theme, Components } from '@mui/material/styles';
 import type { SettingsState } from 'src/components/settings';
-import type {
-  Theme,
-  CSSObject,
-  Components,
-  ComponentsOverrides,
-  ComponentsPropsList,
-} from '@mui/material/styles';
 
-import type { ThemeOptions } from '../types';
+import { cardClasses } from '@mui/material/Card';
 
 // ----------------------------------------------------------------------
 
-type ComponentSlot<
-  Name extends keyof ComponentsOverrides<Theme>,
-  Slot extends keyof NonNullable<ComponentsOverrides<Theme>[Name]>,
-> = NonNullable<ComponentsOverrides<Theme>[Name]>[Slot];
-
-function getSlotStyles<
-  Name extends keyof ComponentsOverrides<Theme>,
-  Slot extends keyof NonNullable<ComponentsOverrides<Theme>[Name]>,
->(slot: ComponentSlot<Name, Slot>, props?: ComponentsPropsList[Name]): CSSObject {
-  const slotStyles = typeof slot === 'function' && props ? slot(props) : (slot ?? {});
-
-  return slotStyles;
-}
-
-// ----------------------------------------------------------------------
-
-export function updateComponentsWithSettings(
-  components?: Components<Theme>,
-  settingsState?: SettingsState
-): Pick<ThemeOptions, 'components'> {
-  const MuiCard: Components<Theme>['MuiCard'] = {
-    styleOverrides: {
-      root: (props) => {
-        const { theme } = props;
-
-        const rootStyles = getSlotStyles<'MuiCard', 'root'>(
-          components?.MuiCard?.styleOverrides?.root,
-          props
-        );
-
-        return {
-          ...rootStyles,
-          ...(settingsState?.contrast === 'hight' && {
-            boxShadow: theme.vars.customShadows.z1,
-          }),
-        };
-      },
-    },
-  };
-
+export function applySettingsToComponents(settingsState?: SettingsState): {
+  components: Components<Theme>;
+} {
   const MuiCssBaseline: Components<Theme>['MuiCssBaseline'] = {
-    styleOverrides: {
+    styleOverrides: (theme) => ({
       html: {
         fontSize: settingsState?.fontSize,
       },
-    },
+      body: {
+        [`& .${cardClasses.root}`]: {
+          ...(settingsState?.contrast === 'high' && {
+            '--card-shadow': theme.vars.customShadows.z1,
+          }),
+        },
+      },
+    }),
   };
 
   return {
     components: {
-      MuiCard,
       MuiCssBaseline,
     },
   };

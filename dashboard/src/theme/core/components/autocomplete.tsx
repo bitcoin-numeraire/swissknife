@@ -8,11 +8,11 @@ import { autocompleteClasses } from '@mui/material/Autocomplete';
 
 // ----------------------------------------------------------------------
 
-/**
- * Icons
- * https://icon-sets.iconify.design/eva/arrow-ios-downward-fill/
- */
+/* **********************************************************************
+ * ♉️ Custom icons
+ * **********************************************************************/
 const ArrowDownIcon = (props: SvgIconProps) => (
+  // https://icon-sets.iconify.design/eva/arrow-ios-downward-fill/
   <SvgIcon {...props}>
     <path
       fill="currentColor"
@@ -21,17 +21,15 @@ const ArrowDownIcon = (props: SvgIconProps) => (
   </SvgIcon>
 );
 
-// ----------------------------------------------------------------------
-
+/* **********************************************************************
+ * 🧩 Components
+ * **********************************************************************/
 const MuiAutocomplete: Components<Theme>['MuiAutocomplete'] = {
-  /** **************************************
-   * DEFAULT PROPS
-   *************************************** */
-  defaultProps: { popupIcon: <ArrowDownIcon /> },
-
-  /** **************************************
-   * STYLE
-   *************************************** */
+  // ▼▼▼▼▼▼▼▼ ⚙️ PROPS ▼▼▼▼▼▼▼▼
+  defaultProps: {
+    popupIcon: <ArrowDownIcon />,
+  },
+  // ▼▼▼▼▼▼▼▼ 🎨 STYLE ▼▼▼▼▼▼▼▼
   styleOverrides: {
     root: ({ theme }) => ({
       [`& span.${autocompleteClasses.tag}`]: {
@@ -46,15 +44,26 @@ const MuiAutocomplete: Components<Theme>['MuiAutocomplete'] = {
         backgroundColor: varAlpha(theme.vars.palette.grey['500Channel'], 0.16),
       },
     }),
-    paper: ({ theme }) => ({ ...theme.mixins.paperStyles(theme, { dropdown: true }) }),
+    paper: ({ theme }) => ({
+      ...theme.mixins.paperStyles(theme, { dropdown: true }),
+    }),
     listbox: ({ theme }) => ({
       padding: 0,
-      [`& .${autocompleteClasses.option}`]: { ...theme.mixins.menuItemStyles(theme) },
+      [`& .${autocompleteClasses.option}`]: {
+        ...theme.mixins.menuItemStyles(theme),
+      },
     }),
-    endAdornment: { [`& .${svgIconClasses.root}`]: { width: 18, height: 18 } },
+    endAdornment: {
+      [`& .${svgIconClasses.root}`]: {
+        fontSize: 18,
+      },
+    },
   },
 };
 
-// ----------------------------------------------------------------------
-
-export const autocomplete = { MuiAutocomplete };
+/* **********************************************************************
+ * 🚀 Export
+ * **********************************************************************/
+export const autocomplete: Components<Theme> = {
+  MuiAutocomplete,
+};

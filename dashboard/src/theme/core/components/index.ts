@@ -1,16 +1,18 @@
+import type { Theme, Components } from '@mui/material/styles';
+
 import { list } from './list';
 import { card } from './card';
 import { menu } from './menu';
 import { chip } from './chip';
 import { link } from './link';
-import { tabs } from './tabs';
 import { form } from './form';
+import { tabs } from './tabs';
 import { table } from './table';
 import { alert } from './alert';
 import { stack } from './stack';
-import { paper } from './paper';
 import { badge } from './badge';
 import { radio } from './radio';
+import { paper } from './paper';
 import { appBar } from './appbar';
 import { dialog } from './dialog';
 import { avatar } from './avatar';
@@ -31,9 +33,9 @@ import { progress } from './progress';
 import { timeline } from './timeline';
 import { checkbox } from './checkbox';
 import { accordion } from './accordion';
-import { textfield } from './textfield';
-import { typography } from './typography';
+import { textField } from './text-field';
 import { pagination } from './pagination';
+import { iconButton } from './button-icon';
 import { breadcrumbs } from './breadcrumbs';
 import { dataGrid } from './mui-x-data-grid';
 import { treeView } from './mui-x-tree-view';
@@ -44,11 +46,9 @@ import { datePicker } from './mui-x-date-picker';
 
 // ----------------------------------------------------------------------
 
-export const components = {
-  ...fab,
+export const components: Components<Theme> = {
   ...card,
   ...link,
-  ...form,
   ...tabs,
   ...chip,
   ...menu,
@@ -58,15 +58,10 @@ export const components = {
   ...table,
   ...alert,
   ...badge,
-  ...radio,
   ...dialog,
   ...appBar,
   ...avatar,
   ...drawer,
-  ...slider,
-  ...rating,
-  ...select,
-  ...button,
   ...stepper,
   ...tooltip,
   ...popover,
@@ -75,17 +70,27 @@ export const components = {
   ...timeline,
   ...backdrop,
   ...progress,
+  ...accordion,
+  ...pagination,
+  ...breadcrumbs,
+  // ➤➤ Forms ➤➤
+  ...form,
+  ...radio,
+  ...select,
+  ...slider,
+  ...rating,
   ...switches,
   ...checkbox,
+  ...textField,
+  ...autocomplete,
+  // ➤➤ Buttons ➤➤
+  ...fab,
+  ...button,
+  ...iconButton,
+  ...buttonGroup,
+  ...toggleButton,
+  // ➤➤ MUI X ➤➤
   ...treeView,
   ...dataGrid,
-  ...accordion,
-  ...textfield,
-  ...typography,
-  ...pagination,
   ...datePicker,
-  ...breadcrumbs,
-  ...buttonGroup,
-  ...autocomplete,
-  ...toggleButton,
 };

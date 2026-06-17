@@ -1,34 +1,34 @@
+import type { SchemesRecord } from '../types';
+
 import { varAlpha } from 'minimal-shared/utils';
 
 import { grey, info, error, common, primary, success, warning, secondary } from './palette';
 
-import type { ThemeColorScheme } from '../types';
-
 // ----------------------------------------------------------------------
 
 /**
- * TypeScript (type definition and extension)
+ * TypeScript extension for MUI theme augmentation.
  * @to {@link file://./../extend-theme-types.d.ts}
  */
 
-export interface CustomShadows {
-  z1?: string;
-  z4?: string;
-  z8?: string;
-  z12?: string;
-  z16?: string;
-  z20?: string;
-  z24?: string;
-  primary?: string;
-  secondary?: string;
-  info?: string;
-  success?: string;
-  warning?: string;
-  error?: string;
-  card?: string;
-  dialog?: string;
-  dropdown?: string;
-}
+export type CustomShadows = {
+  z1: string;
+  z4: string;
+  z8: string;
+  z12: string;
+  z16: string;
+  z20: string;
+  z24: string;
+  primary: string;
+  secondary: string;
+  info: string;
+  success: string;
+  warning: string;
+  error: string;
+  card: string;
+  dialog: string;
+  dropdown: string;
+};
 
 // ----------------------------------------------------------------------
 
@@ -59,7 +59,10 @@ function createCustomShadows(colorChannel: string): CustomShadows {
   };
 }
 
-export const customShadows: Record<ThemeColorScheme, CustomShadows> = {
+/* **********************************************************************
+ * 📦 Final
+ * **********************************************************************/
+export const customShadows: SchemesRecord<CustomShadows> = {
   light: createCustomShadows(grey['500Channel']),
   dark: createCustomShadows(common.blackChannel),
 };

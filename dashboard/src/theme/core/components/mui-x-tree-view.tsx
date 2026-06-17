@@ -3,15 +3,20 @@ import type { Theme, Components } from '@mui/material/styles';
 // ----------------------------------------------------------------------
 
 const MuiTreeItem: Components<Theme>['MuiTreeItem'] = {
-  /** **************************************
-   * STYLE
-   *************************************** */
+  // ▼▼▼▼▼▼▼▼ 🎨 STYLE ▼▼▼▼▼▼▼▼
   styleOverrides: {
-    label: ({ theme }) => ({ ...theme.typography.body2 }),
-    iconContainer: { width: 'auto' },
+    label: ({ theme }) => ({
+      ...theme.typography.body2,
+    }),
+    iconContainer: {
+      width: 18,
+    },
   },
 };
 
-// ----------------------------------------------------------------------
-
-export const treeView = { MuiTreeItem };
+/* **********************************************************************
+ * 🚀 Export
+ * **********************************************************************/
+export const treeView: Components<Theme> = {
+  MuiTreeItem,
+};

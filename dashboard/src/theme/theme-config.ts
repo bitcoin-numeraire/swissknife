@@ -1,26 +1,21 @@
-import type { CommonColors } from '@mui/material/styles/createPalette';
-
-import type { PaletteColorNoChannels } from './core/palette';
-import type { ThemeDirection, ThemeColorScheme, ThemeCssVariables } from './types';
+import type { Theme, Direction, CommonColors, ThemeProviderProps } from '@mui/material/styles';
+import type { ThemeCssVariables } from './types';
+import type { PaletteColorKey, PaletteColorNoChannels } from './core/palette';
 
 // ----------------------------------------------------------------------
 
-type ThemeConfig = {
+export type ThemeConfig = {
+  direction: Direction;
   classesPrefix: string;
-  modeStorageKey: string;
-  direction: ThemeDirection;
-  defaultMode: ThemeColorScheme;
   cssVariables: ThemeCssVariables;
+  defaultMode: ThemeProviderProps<Theme>['defaultMode'];
+  modeStorageKey: ThemeProviderProps<Theme>['modeStorageKey'];
   fontFamily: Record<'primary' | 'secondary', string>;
-  palette: Record<
-    'primary' | 'secondary' | 'info' | 'success' | 'warning' | 'error',
-    PaletteColorNoChannels
-  > & {
+  palette: Record<PaletteColorKey, PaletteColorNoChannels> & {
     common: Pick<CommonColors, 'black' | 'white'>;
-    grey: Record<
-      '50' | '100' | '200' | '300' | '400' | '500' | '600' | '700' | '800' | '900',
-      string
-    >;
+    grey: {
+      [K in 50 | 100 | 200 | 300 | 400 | 500 | 600 | 700 | 800 | 900 as `${K}`]: string;
+    };
   };
 };
 
@@ -28,10 +23,17 @@ export const themeConfig: ThemeConfig = {
   /** **************************************
    * Base
    *************************************** */
-  direction: 'ltr',
   defaultMode: 'dark',
   modeStorageKey: 'theme-mode',
+  direction: 'ltr',
   classesPrefix: 'numeraire',
+  /** **************************************
+   * Css variables
+   *************************************** */
+  cssVariables: {
+    cssVarPrefix: '',
+    colorSchemeSelector: 'data-color-scheme',
+  },
   /** **************************************
    * Typography
    *************************************** */
@@ -92,27 +94,20 @@ export const themeConfig: ThemeConfig = {
       contrastText: '#FFFFFF',
     },
     grey: {
-      '50': '#f9f9f9',
-      '100': '#f2f2f2',
-      '200': '#eaeaea',
-      '300': '#dadada',
-      '400': '#b6b6b6',
-      '500': '#979797',
-      '600': '#6e6e6e',
-      '700': '#3C3C3C',
-      '800': '#282828',
-      '900': '#1E1E1E',
+      50: '#f9f9f9',
+      100: '#f2f2f2',
+      200: '#eaeaea',
+      300: '#dadada',
+      400: '#b6b6b6',
+      500: '#979797',
+      600: '#6e6e6e',
+      700: '#3C3C3C',
+      800: '#282828',
+      900: '#1E1E1E',
     },
     common: {
       black: '#000000',
       white: '#FFFFFF',
     },
-  },
-  /** **************************************
-   * Css variables
-   *************************************** */
-  cssVariables: {
-    cssVarPrefix: '',
-    colorSchemeSelector: 'data-color-scheme',
   },
 };

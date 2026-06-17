@@ -6,10 +6,10 @@ import { radioClasses } from '@mui/material/Radio';
 
 // ----------------------------------------------------------------------
 
-/**
- * Icons
- */
-const RadioIcon = (props: SvgIconProps) => (
+/* **********************************************************************
+ * ♉️ Custom icons
+ * **********************************************************************/
+const Icon = (props: SvgIconProps) => (
   <SvgIcon {...props}>
     <path
       d="M12 2C13.9778 2 15.9112 2.58649 17.5557 3.6853C19.2002 4.78412 20.4819 6.3459 21.2388 8.17317C21.9957 10.0004 22.1937 12.0111 21.8079 13.9509C21.422 15.8907 20.4696 17.6725 19.0711 19.0711C17.6725 20.4696 15.8907 21.422 13.9509 21.8079C12.0111 22.1937 10.0004 21.9957 8.17317 21.2388C6.3459 20.4819 4.78412 19.2002 3.6853 17.5557C2.58649 15.9112 2 13.9778 2 12C2 6.477 6.477 2 12 2ZM12 3.5C9.74566 3.5 7.58365 4.39553 5.98959 5.98959C4.39553 7.58365 3.5 9.74566 3.5 12C3.5 14.2543 4.39553 16.4163 5.98959 18.0104C7.58365 19.6045 9.74566 20.5 12 20.5C14.2543 20.5 16.4163 19.6045 18.0104 18.0104C19.6045 16.4163 20.5 14.2543 20.5 12C20.5 9.74566 19.6045 7.58365 18.0104 5.98959C16.4163 4.39553 14.2543 3.5 12 3.5Z"
@@ -18,7 +18,7 @@ const RadioIcon = (props: SvgIconProps) => (
   </SvgIcon>
 );
 
-const RadioCheckedIcon = (props: SvgIconProps) => (
+const CheckedIcon = (props: SvgIconProps) => (
   <SvgIcon {...props}>
     <path
       fillRule="evenodd"
@@ -29,28 +29,37 @@ const RadioCheckedIcon = (props: SvgIconProps) => (
   </SvgIcon>
 );
 
-// ----------------------------------------------------------------------
-
+/* **********************************************************************
+ * 🧩 Components
+ * **********************************************************************/
 const MuiRadio: Components<Theme>['MuiRadio'] = {
-  /** **************************************
-   * DEFAULT PROPS
-   *************************************** */
-  defaultProps: { size: 'small', icon: <RadioIcon />, checkedIcon: <RadioCheckedIcon /> },
-
-  /** **************************************
-   * STYLE
-   *************************************** */
+  // ▼▼▼▼▼▼▼▼ ⚙️ PROPS ▼▼▼▼▼▼▼▼
+  defaultProps: {
+    size: 'small',
+    icon: <Icon />,
+    checkedIcon: <CheckedIcon />,
+  },
+  // ▼▼▼▼▼▼▼▼ 🎨 STYLE ▼▼▼▼▼▼▼▼
   styleOverrides: {
-    root: ({ ownerState, theme }) => ({
+    root: ({ theme }) => ({
       padding: theme.spacing(1),
-      ...(ownerState.color === 'default' && {
-        [`&.${radioClasses.checked}`]: { color: theme.vars.palette.text.primary },
-      }),
-      [`&.${radioClasses.disabled}`]: { color: theme.vars.palette.action.disabled },
+      variants: [
+        {
+          props: (props) => props.color === 'default',
+          style: {
+            [`&.${radioClasses.checked}`]: {
+              color: theme.vars.palette.text.primary,
+            },
+          },
+        },
+      ],
     }),
   },
 };
 
-// ----------------------------------------------------------------------
-
-export const radio = { MuiRadio };
+/* **********************************************************************
+ * 🚀 Export
+ * **********************************************************************/
+export const radio: Components<Theme> = {
+  MuiRadio,
+};

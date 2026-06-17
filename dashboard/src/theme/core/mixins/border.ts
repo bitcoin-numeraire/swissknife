@@ -3,16 +3,19 @@ import type { CSSObject } from '@mui/material/styles';
 // ----------------------------------------------------------------------
 
 /**
- * Generates a border gradient CSS object.
+ * Creates a CSS object for a gradient border.
  *
- * @param {BorderGradientProps} props - The properties for the border gradient.
- * @param {string} [props.color] - The gradient color.
- * @param {string} [props.padding='2px'] - The padding inside the border.
- * @returns {CSSObject} The CSS object for the border gradient.
+ * @param color - (Optional) The border color or CSS gradient definition. Defaults to `undefined`.
+ * @param padding - (Optional) Padding inside the border. Defaults to `'2px'`.
+ * @returns A CSS object with styles.
  *
  * @example
- * ...theme.mixins.borderGradient({ color: `to right, ${theme.vars.palette.primary.main}, ${alpha(theme.vars.palette.primary.mainChannel, 0.2)}`, padding: '4px' }),
+ * ...theme.mixins.borderGradient({
+ *   color: `to right, ${theme.vars.palette.primary.main}, ${varAlpha(theme.vars.palette.primary.mainChannel, 0.2)}`,
+ *   padding: '4px'
+ * })
  */
+
 export type BorderGradientProps = {
   color?: string;
   padding?: string;
