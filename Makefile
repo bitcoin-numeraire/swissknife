@@ -190,3 +190,9 @@ run-migrations:
 
 fresh-migrations:
 	@sea-orm-cli migrate -d crates/migration fresh
+
+# Regenerate the dashboard's checked-in OpenAPI spec from the utoipa annotations,
+# then regenerate the typed API client. Run after backend API changes.
+openapi:
+	@cargo test --quiet dump_openapi_spec -- --ignored
+	@cd dashboard && yarn openapi-ts
