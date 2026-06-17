@@ -1,8 +1,10 @@
+import type { z } from 'zod';
+
 import { mutate } from 'swr';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 
-import LoadingButton from '@mui/lab/LoadingButton';
+import Button from '@mui/material/Button';
 import { Card, Alert, Stack } from '@mui/material';
 
 import { npub } from 'src/utils/nostr';
@@ -30,7 +32,7 @@ type Props = {
 export function NostrDetails({ lnAddress }: Props) {
   const { t } = useTranslate();
 
-  const defaultValues = {
+  const defaultValues: z.infer<typeof zUpdateLnAddressRequest> = {
     nostr_pubkey: npub(lnAddress.nostr_pubkey),
     allows_nostr: lnAddress.allows_nostr || false,
   };
@@ -49,7 +51,8 @@ export function NostrDetails({ lnAddress }: Props) {
 
   const nostrPubkey = watch('nostr_pubkey');
 
-  const onSubmit = async (body: UpdateLnAddressRequest) => {
+  const onSubmit = handleSubmit(async (data) => {
+    const body = data as UpdateLnAddressRequest;
     try {
       await updateWalletAddress({
         body: {
@@ -63,11 +66,11 @@ export function NostrDetails({ lnAddress }: Props) {
     } catch (error) {
       handleActionError(error);
     }
-  };
+  });
 
   return (
     <Card sx={{ p: { xs: 1, sm: 3 }, maxWidth: { xs: '100%', md: '80%' }, mx: 'auto' }}>
-      <Form methods={methods} onSubmit={handleSubmit(onSubmit)}>
+      <Form methods={methods} onSubmit={onSubmit}>
         <Alert variant="outlined" severity="info" sx={{ mb: 4 }}>
           {t('nostr_details.alert', { lnAddress: displayLnAddress(lnAddress.username) })}
         </Alert>
@@ -82,7 +85,7 @@ export function NostrDetails({ lnAddress }: Props) {
 
           <RHFSwitch name="allows_nostr" labelPlacement="start" label="Visible on Nostr" />
 
-          <LoadingButton
+          <Button
             type="submit"
             variant="contained"
             color="inherit"
@@ -91,7 +94,7 @@ export function NostrDetails({ lnAddress }: Props) {
             disabled={!nostrPubkey || isSubmitting}
           >
             {t('nostr_details.register_button')}
-          </LoadingButton>
+          </Button>
         </Stack>
       </Form>
     </Card>

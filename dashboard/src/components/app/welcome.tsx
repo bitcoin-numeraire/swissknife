@@ -18,7 +18,7 @@ export function Welcome({ title, description, action, img, ...other }: Props) {
 
   return (
     <Stack
-      flexDirection={{ xs: 'column', md: 'row' }}
+      direction={{ xs: 'column', md: 'row' }}
       sx={{
         height: { md: 1 },
         borderRadius: 2,
@@ -28,10 +28,10 @@ export function Welcome({ title, description, action, img, ...other }: Props) {
       {...other}
     >
       <Stack
-        flexGrow={1}
-        justifyContent="center"
-        alignItems={{ xs: 'center', md: 'flex-start' }}
         sx={{
+          flexGrow: 1,
+          justifyContent: 'center',
+          alignItems: { xs: 'center', md: 'flex-start' },
           p: {
             xs: theme.spacing(5, 3, 0, 3),
             md: theme.spacing(5),
@@ -51,8 +51,8 @@ export function Welcome({ title, description, action, img, ...other }: Props) {
       {img && (
         <Stack
           component="span"
-          justifyContent="center"
           sx={{
+            justifyContent: 'center',
             p: { xs: 5, md: 3 },
             maxWidth: 480,
             mx: 'auto',

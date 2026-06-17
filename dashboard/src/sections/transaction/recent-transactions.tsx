@@ -97,7 +97,7 @@ export function RecentTransactions({ title, tableData, isAdmin, ...other }: Prop
         <>
           <Divider />
 
-          <Stack direction="row" spacing={2} justifyContent="flex-end" sx={{ p: 2 }}>
+          <Stack direction="row" spacing={2} sx={{ p: 2, justifyContent: 'flex-end' }}>
             <Tooltip title={t('recent_transactions.clean_failed_expired')} placement="top" arrow>
               <Box>
                 <CleanTransactionsButton

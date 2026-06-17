@@ -43,9 +43,11 @@ export function ContactList({ data, fiatPrices }: Props) {
 
   return (
     <Box
-      gap={3}
-      display="grid"
-      gridTemplateColumns={{ xs: 'repeat(1, 1fr)', sm: 'repeat(2, 1fr)', md: 'repeat(3, 1fr)' }}
+      sx={{
+        gap: 3,
+        display: 'grid',
+        gridTemplateColumns: { xs: 'repeat(1, 1fr)', sm: 'repeat(2, 1fr)', md: 'repeat(3, 1fr)' },
+      }}
     >
       {data.map((contact) => (
         <Card
@@ -59,11 +61,12 @@ export function ContactList({ data, fiatPrices }: Props) {
           <ListItemText
             primary={contact.ln_address}
             secondary={fFromNow(contact.contact_since)}
-            primaryTypographyProps={{ noWrap: true, typography: 'subtitle2' }}
-            secondaryTypographyProps={{
-              mt: 0.5,
-              noWrap: true,
-              typography: 'caption',
+            slotProps={{
+              primary: { noWrap: true, sx: { typography: 'subtitle2' } },
+              secondary: {
+                noWrap: true,
+                sx: { mt: 0.5, typography: 'caption' },
+              },
             }}
           />
 

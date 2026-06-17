@@ -1,4 +1,4 @@
-import type { NavGroupProps } from 'src/components/nav-section';
+import type { NavItemDataProps, NavGroupProps } from 'src/components/nav-section';
 
 import { paths } from 'src/routes/paths';
 
@@ -36,7 +36,18 @@ const ICONS = {
 
 // ----------------------------------------------------------------------
 
-export const navData: Array<NavGroupProps> = [
+// Swissknife-specific: nav items carry the API permissions required to view
+// them (consumed by the searchbar permission filtering).
+type NavItemWithPermissions = NavItemDataProps & {
+  permissions?: string[];
+  children?: NavItemWithPermissions[];
+};
+
+type NavGroupWithPermissions = Omit<NavGroupProps, 'items'> & {
+  items: NavItemWithPermissions[];
+};
+
+export const navData: Array<NavGroupWithPermissions> = [
   /**
    * User Wallet
    */

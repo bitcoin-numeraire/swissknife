@@ -48,8 +48,10 @@ export function ResultItem({ title, path, labels, href, sx, ...other }: Props) {
       {...other}
     >
       <ListItemText
-        primaryTypographyProps={{ typography: 'subtitle2', sx: { textTransform: 'capitalize' } }}
-        secondaryTypographyProps={{ typography: 'caption', noWrap: true }}
+        slotProps={{
+          primary: { sx: { typography: 'subtitle2', textTransform: 'capitalize' } },
+          secondary: { noWrap: true, sx: { typography: 'caption' } },
+        }}
         primary={title.map((part, index) => (
           <Box
             key={index}

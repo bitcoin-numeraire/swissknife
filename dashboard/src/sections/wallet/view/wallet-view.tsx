@@ -6,7 +6,7 @@ import { mutate } from 'swr';
 import { useMemo } from 'react';
 
 import Box from '@mui/material/Box';
-import Grid from '@mui/material/Grid2';
+import Grid from '@mui/material/Grid';
 
 import { shouldFail } from 'src/utils/errors';
 import {

@@ -44,7 +44,7 @@ export function AccountPopover({ data = [], sx, ...other }: AccountPopoverProps)
       open={open}
       anchorEl={anchorEl}
       onClose={onClose}
-      slotProps={{ paper: { sx: { p: 0, width: 200 } }, arrow: { offset: 20 } }}
+      slotProps={{ paper: { sx: { p: 0, width: 200 } } }}
     >
       <Box sx={{ p: 2, pb: 1.5 }}>
         <Typography variant="subtitle2" noWrap>

@@ -33,46 +33,46 @@ export function PaymentDetails({ payment, isAdmin }: Props) {
 
   const renderList = (
     <Grid container spacing={3} sx={{ my: 5 }}>
-      <Grid item xs={12} md={4} sm={6}>
+      <Grid size={{ xs: 12, md: 4, sm: 6 }}>
         <Title>{t('payment_details.amount_sent')}</Title>
         <SatsWithIcon
           amountMSats={payment.amount_msat - (payment.fee_msat || 0)}
           color="text.secondary"
         />
       </Grid>
-      <Grid item xs={12} md={4} sm={6}>
+      <Grid size={{ xs: 12, md: 4, sm: 6 }}>
         <Title>{t('payment_details.fees')}</Title>
         <SatsWithIcon amountMSats={payment.fee_msat || 0} color="text.secondary" />
       </Grid>
-      <Grid item xs={12} md={4} sm={6}>
+      <Grid size={{ xs: 12, md: 4, sm: 6 }}>
         <Title>{t('payment_details.total_amount')}</Title>
         <SatsWithIcon amountMSats={payment.amount_msat} color="text.secondary" />
       </Grid>
 
-      <Grid item xs={12}>
+      <Grid size={{ xs: 12 }}>
         <Divider sx={{ borderStyle: 'dashed' }} />
       </Grid>
 
-      <Grid item xs={12} sm={6}>
+      <Grid size={{ xs: 12, sm: 6 }}>
         <Title>{t('transaction_details.description')}</Title>
         <Typography color="textSecondary">{payment.description}</Typography>
       </Grid>
-      <Grid item xs={12} md={4} sm={6}>
+      <Grid size={{ xs: 12, md: 4, sm: 6 }}>
         <Title>{t('payment_details.lightning_address')}</Title>
         <Typography color="textSecondary">{payment.ln_address || 'N/A'}</Typography>
       </Grid>
 
-      <Grid item xs={12}>
+      <Grid size={{ xs: 12 }}>
         <Divider sx={{ borderStyle: 'dashed' }} />
       </Grid>
 
-      <Grid item xs={12} sm={6}>
+      <Grid size={{ xs: 12, sm: 6 }}>
         <Title>{t('transaction_details.creation_date')}</Title>
         <Typography color="textSecondary">
           {fDate(payment.created_at)} {fTime(payment.created_at)}
         </Typography>
       </Grid>
-      <Grid item xs={12} sm={6}>
+      <Grid size={{ xs: 12, sm: 6 }}>
         <Title>{t('transaction_details.settlement_date')}</Title>
         <Typography color="textSecondary">
           {fDate(payment.payment_time)} {fTime(payment.payment_time)}
@@ -81,11 +81,11 @@ export function PaymentDetails({ payment, isAdmin }: Props) {
 
       {payment.success_action && (
         <>
-          <Grid item xs={12}>
+          <Grid size={{ xs: 12 }}>
             <Divider sx={{ borderStyle: 'dashed' }} />
           </Grid>
 
-          <Grid item xs={12}>
+          <Grid size={{ xs: 12 }}>
             <Title>{t('payment_details.success_action')}</Title>
             <Typography color="textSecondary" sx={{ wordBreak: 'break-all' }}>
               <li>
@@ -109,11 +109,11 @@ export function PaymentDetails({ payment, isAdmin }: Props) {
 
       {payment.payment_hash && (
         <>
-          <Grid item xs={12}>
+          <Grid size={{ xs: 12 }}>
             <Divider sx={{ borderStyle: 'dashed' }} />
           </Grid>
 
-          <Grid item xs={12}>
+          <Grid size={{ xs: 12 }}>
             <Title>{t('transaction_details.payment_hash')}</Title>
             <Typography color="textSecondary" sx={{ wordBreak: 'break-all' }}>
               {payment.payment_hash}
@@ -124,11 +124,11 @@ export function PaymentDetails({ payment, isAdmin }: Props) {
 
       {payment.payment_preimage && (
         <>
-          <Grid item xs={12}>
+          <Grid size={{ xs: 12 }}>
             <Divider sx={{ borderStyle: 'dashed' }} />
           </Grid>
 
-          <Grid item xs={12}>
+          <Grid size={{ xs: 12 }}>
             <Title>{t('payment_details.payment_preimage')}</Title>
             <Typography color="textSecondary" sx={{ wordBreak: 'break-all' }}>
               {payment.payment_preimage}
@@ -139,11 +139,11 @@ export function PaymentDetails({ payment, isAdmin }: Props) {
 
       {payment.error && (
         <>
-          <Grid item xs={12}>
+          <Grid size={{ xs: 12 }}>
             <Divider sx={{ borderStyle: 'dashed' }} />
           </Grid>
 
-          <Grid item xs={12}>
+          <Grid size={{ xs: 12 }}>
             <Title>{t('payment_details.error_message')}</Title>
             <Typography color="textSecondary" sx={{ wordBreak: 'break-all' }}>
               {payment.error}
@@ -165,18 +165,20 @@ export function PaymentDetails({ payment, isAdmin }: Props) {
         sx={{ pt: 5, px: { xs: 2, sm: 5, md: 8 }, maxWidth: { xs: '100%', md: '80%' }, mx: 'auto' }}
       >
         <Box
-          rowGap={5}
-          display="grid"
-          alignItems="center"
-          gridTemplateColumns={{
-            xs: 'repeat(1, 1fr)',
-            sm: 'repeat(2, 1fr)',
+          sx={{
+            rowGap: 5,
+            display: 'grid',
+            alignItems: 'center',
+            gridTemplateColumns: {
+              xs: 'repeat(1, 1fr)',
+              sm: 'repeat(2, 1fr)',
+            },
           }}
         >
           <Typography variant="subtitle2">{payment.id.toUpperCase()}</Typography>
 
-          <Stack spacing={1} alignItems={{ xs: 'flex-start', md: 'flex-end' }}>
-            <Box display="flex" alignItems="center">
+          <Stack spacing={1} sx={{ alignItems: { xs: 'flex-start', md: 'flex-end' } }}>
+            <Box sx={{ display: 'flex', alignItems: 'center' }}>
               <Label
                 variant="soft"
                 color={
@@ -204,7 +206,7 @@ export function PaymentDetails({ payment, isAdmin }: Props) {
           </Stack>
 
           <Stack sx={{ typography: 'body2' }}>
-            <Typography fontWeight="bold" sx={{ mb: 1 }}>
+            <Typography sx={{ fontWeight: 'bold', mb: 1 }}>
               {t('payment_details.payment_from')}
             </Typography>
             {isAdmin ? (
@@ -230,8 +232,8 @@ type TitleProps = {
   children: React.ReactNode;
 };
 
-const Title = ({ children }: TitleProps): JSX.Element => (
-  <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
+const Title = ({ children }: TitleProps) => (
+  <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 'bold' }}>
     {children}
   </Typography>
 );

@@ -35,11 +35,11 @@ export function InvoiceDetails({ invoice, isAdmin }: Props) {
 
   const renderList = (
     <Grid container spacing={3} sx={{ my: 5 }}>
-      <Grid item xs={12} md={4} sm={6}>
+      <Grid size={{ xs: 12, md: 4, sm: 6 }}>
         <Title>{t('invoice_details.amount_requested')}</Title>
         <SatsWithIcon amountMSats={invoice.amount_msat || 0} color="text.secondary" />
       </Grid>
-      <Grid item xs={12} md={4} sm={6}>
+      <Grid size={{ xs: 12, md: 4, sm: 6 }}>
         <Title>{t('invoice_details.amount_received')}</Title>
         {invoice.status === 'Settled' && (
           <SatsWithIcon
@@ -48,57 +48,57 @@ export function InvoiceDetails({ invoice, isAdmin }: Props) {
           />
         )}
       </Grid>
-      <Grid item xs={12} md={4} sm={6}>
+      <Grid size={{ xs: 12, md: 4, sm: 6 }}>
         <Title>{t('invoice_details.fees')}</Title>
         <SatsWithIcon amountMSats={invoice.fee_msat || 0} color="text.secondary" />
       </Grid>
 
-      <Grid item xs={12}>
+      <Grid size={{ xs: 12 }}>
         <Divider sx={{ borderStyle: 'dashed' }} />
       </Grid>
 
-      <Grid item xs={12}>
+      <Grid size={{ xs: 12 }}>
         <Title>{t('transaction_details.description')}</Title>
         <Typography color="textSecondary">{invoice.description}</Typography>
       </Grid>
 
-      <Grid item xs={12}>
+      <Grid size={{ xs: 12 }}>
         <Divider sx={{ borderStyle: 'dashed' }} />
       </Grid>
 
-      <Grid item xs={12} md={4} sm={6}>
+      <Grid size={{ xs: 12, md: 4, sm: 6 }}>
         <Title>{t('transaction_details.creation_date')}</Title>
         <Typography color="textSecondary">
           {fDate(invoice.timestamp)} {fTime(invoice.timestamp)}
         </Typography>
       </Grid>
-      <Grid item xs={12} md={4} sm={6}>
+      <Grid size={{ xs: 12, md: 4, sm: 6 }}>
         <Title>{t('invoice_details.expiration_date')}</Title>
         <Typography color="textSecondary">
           {fDate(invoice.ln_invoice?.expires_at)} {fTime(invoice.ln_invoice?.expires_at)}
         </Typography>
       </Grid>
-      <Grid item xs={12} md={4} sm={6}>
+      <Grid size={{ xs: 12, md: 4, sm: 6 }}>
         <Title>{t('transaction_details.settlement_date')}</Title>
         <Typography color="textSecondary">
           {fDate(invoice.payment_time)} {fTime(invoice.payment_time)}
         </Typography>
       </Grid>
 
-      <Grid item xs={12}>
+      <Grid size={{ xs: 12 }}>
         <Divider sx={{ borderStyle: 'dashed' }} />
       </Grid>
 
-      <Grid item xs={12} md={4} sm={6}>
+      <Grid size={{ xs: 12, md: 4, sm: 6 }}>
         <Title>{t('transaction_details.ledger')}</Title>
         <Typography color="textSecondary">{invoice.ledger}</Typography>
       </Grid>
-      <Grid item xs={12} md={4} sm={6}>
+      <Grid size={{ xs: 12, md: 4, sm: 6 }}>
         <Title>{t('transaction_details.currency')}</Title>
         <Typography color="textSecondary">{invoice.currency}</Typography>
       </Grid>
       {invoice.ln_invoice && (
-        <Grid item xs={12} md={4} sm={6}>
+        <Grid size={{ xs: 12, md: 4, sm: 6 }}>
           <Title>{t('invoice_details.min_final_cltv_delta')}</Title>
           <Typography color="textSecondary">
             {invoice.ln_invoice?.min_final_cltv_expiry_delta}
@@ -108,11 +108,11 @@ export function InvoiceDetails({ invoice, isAdmin }: Props) {
 
       {invoice.ln_invoice && (
         <>
-          <Grid item xs={12}>
+          <Grid size={{ xs: 12 }}>
             <Divider sx={{ borderStyle: 'dashed' }} />
           </Grid>
 
-          <Grid item xs={12}>
+          <Grid size={{ xs: 12 }}>
             <Title>Bolt11</Title>
             <Typography color="textSecondary" sx={{ wordBreak: 'break-all' }}>
               {invoice.ln_invoice?.bolt11}
@@ -123,11 +123,11 @@ export function InvoiceDetails({ invoice, isAdmin }: Props) {
 
       {invoice.ln_invoice && (
         <>
-          <Grid item xs={12}>
+          <Grid size={{ xs: 12 }}>
             <Divider sx={{ borderStyle: 'dashed' }} />
           </Grid>
 
-          <Grid item xs={12}>
+          <Grid size={{ xs: 12 }}>
             <Title>{t('transaction_details.payment_hash')}</Title>
             <Typography color="textSecondary" sx={{ wordBreak: 'break-all' }}>
               {invoice.ln_invoice?.payment_hash}
@@ -138,11 +138,11 @@ export function InvoiceDetails({ invoice, isAdmin }: Props) {
 
       {invoice.ln_invoice && (
         <>
-          <Grid item xs={12}>
+          <Grid size={{ xs: 12 }}>
             <Divider sx={{ borderStyle: 'dashed' }} />
           </Grid>
 
-          <Grid item xs={12}>
+          <Grid size={{ xs: 12 }}>
             <Title>{t('invoice_details.payment_secret')}</Title>
             <Typography color="textSecondary" sx={{ wordBreak: 'break-all' }}>
               {invoice.ln_invoice?.payment_secret}
@@ -153,11 +153,11 @@ export function InvoiceDetails({ invoice, isAdmin }: Props) {
 
       {invoice.ln_invoice && (
         <>
-          <Grid item xs={12}>
+          <Grid size={{ xs: 12 }}>
             <Divider sx={{ my: 1, borderStyle: 'dashed' }} />
           </Grid>
 
-          <Grid item xs={12}>
+          <Grid size={{ xs: 12 }}>
             <Title>{t('invoice_details.payee_pubkey')}</Title>
             <Typography color="textSecondary">{invoice.ln_invoice?.payee_pubkey}</Typography>
           </Grid>
@@ -177,18 +177,20 @@ export function InvoiceDetails({ invoice, isAdmin }: Props) {
         sx={{ pt: 5, px: { xs: 2, sm: 5, md: 8 }, maxWidth: { xs: '100%', md: '80%' }, mx: 'auto' }}
       >
         <Box
-          rowGap={5}
-          display="grid"
-          alignItems="center"
-          gridTemplateColumns={{
-            xs: 'repeat(1, 1fr)',
-            sm: 'repeat(2, 1fr)',
+          sx={{
+            rowGap: 5,
+            display: 'grid',
+            alignItems: 'center',
+            gridTemplateColumns: {
+              xs: 'repeat(1, 1fr)',
+              sm: 'repeat(2, 1fr)',
+            },
           }}
         >
           <Typography variant="subtitle2">{invoice.id.toUpperCase()}</Typography>
 
-          <Stack spacing={1} alignItems={{ xs: 'flex-start', md: 'flex-end' }}>
-            <Box display="flex" alignItems="center">
+          <Stack spacing={1} sx={{ alignItems: { xs: 'flex-start', md: 'flex-end' } }}>
+            <Box sx={{ display: 'flex', alignItems: 'center' }}>
               <Label
                 variant="soft"
                 color={
@@ -216,7 +218,7 @@ export function InvoiceDetails({ invoice, isAdmin }: Props) {
           </Stack>
 
           <Stack sx={{ typography: 'body2' }}>
-            <Typography fontWeight="bold" sx={{ mb: 1 }}>
+            <Typography sx={{ fontWeight: 'bold', mb: 1 }}>
               {t('invoice_details.invoice_from')}
             </Typography>
             {isAdmin ? (
@@ -268,8 +270,8 @@ type TitleProps = {
   children: React.ReactNode;
 };
 
-const Title = ({ children }: TitleProps): JSX.Element => (
-  <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
+const Title = ({ children }: TitleProps) => (
+  <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 'bold' }}>
     {children}
   </Typography>
 );

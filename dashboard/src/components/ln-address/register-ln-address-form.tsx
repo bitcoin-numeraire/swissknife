@@ -4,7 +4,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 
 import { Stack } from '@mui/material';
-import { LoadingButton } from '@mui/lab';
+import Button from '@mui/material/Button';
 import InputAdornment from '@mui/material/InputAdornment';
 
 import { handleActionError } from 'src/utils/errors';
@@ -43,7 +43,8 @@ export function RegisterLnAddressForm({ onSuccess, isAdmin }: Props) {
     formState: { isSubmitting, isValid },
   } = methods;
 
-  const onSubmit = async (body: RegisterLnAddressRequest) => {
+  const onSubmit = handleSubmit(async (data) => {
+    const body = data as RegisterLnAddressRequest;
     try {
       if (isAdmin) {
         await registerAddress({ body });
@@ -56,10 +57,10 @@ export function RegisterLnAddressForm({ onSuccess, isAdmin }: Props) {
     } catch (error) {
       handleActionError(error);
     }
-  };
+  });
 
   return (
-    <Form methods={methods} onSubmit={handleSubmit(onSubmit)}>
+    <Form methods={methods} onSubmit={onSubmit}>
       <Stack spacing={3}>
         <RHFTextField
           variant="outlined"
@@ -69,14 +70,16 @@ export function RegisterLnAddressForm({ onSuccess, isAdmin }: Props) {
             const value = e.target.value.toLowerCase();
             methods.setValue('username', value, { shouldValidate: true });
           }}
-          InputProps={{
-            endAdornment: <InputAdornment position="end">@{CONFIG.domain}</InputAdornment>,
+          slotProps={{
+            input: {
+              endAdornment: <InputAdornment position="end">@{CONFIG.domain}</InputAdornment>,
+            },
           }}
         />
 
         {isAdmin && <WalletSelectDropdown />}
 
-        <LoadingButton
+        <Button
           type="submit"
           variant="contained"
           color="inherit"
@@ -85,7 +88,7 @@ export function RegisterLnAddressForm({ onSuccess, isAdmin }: Props) {
           disabled={!isValid}
         >
           {t('register')}
-        </LoadingButton>
+        </Button>
       </Stack>
     </Form>
   );

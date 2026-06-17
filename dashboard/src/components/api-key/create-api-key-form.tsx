@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm, FormProvider } from 'react-hook-form';
 
-import { LoadingButton } from '@mui/lab';
+import Button from '@mui/material/Button';
 import {
   Link,
   Stack,
@@ -70,14 +70,15 @@ export function CreateApiKeyForm({ onSuccess, isAdmin }: Props) {
     formState: { isSubmitting, isValid },
   } = methods;
 
-  const onSubmit = async (body: CreateApiKeyRequest) => {
+  const onSubmit = handleSubmit(async (data) => {
+    const body = data as CreateApiKeyRequest;
     try {
       if (isAdmin) {
-        const { data } = await createApiKey({ body });
-        setApiKey(data);
+        const { data: apiKeyData } = await createApiKey({ body });
+        setApiKey(apiKeyData);
       } else {
-        const { data } = await createWalletApiKey({ body });
-        setApiKey(data);
+        const { data: apiKeyData } = await createWalletApiKey({ body });
+        setApiKey(apiKeyData);
       }
       toast.success(t('create_api_key_form.create_success'));
       reset();
@@ -85,26 +86,28 @@ export function CreateApiKeyForm({ onSuccess, isAdmin }: Props) {
     } catch (error) {
       handleActionError(error);
     }
-  };
+  });
 
   return apiKey && apiKey.key ? (
     <Stack spacing={2}>
       <Alert severity="warning">{t('create_api_key_form.key_display_message')}</Alert>
       <TextField
         value={apiKey.key}
-        InputProps={{
-          readOnly: true,
-          endAdornment: (
-            <InputAdornment position="end">
-              <CopyButton value={apiKey.key} title={t('create_api_key_form.copy')} />
-            </InputAdornment>
-          ),
+        slotProps={{
+          input: {
+            readOnly: true,
+            endAdornment: (
+              <InputAdornment position="end">
+                <CopyButton value={apiKey.key} title={t('create_api_key_form.copy')} />
+              </InputAdornment>
+            ),
+          },
         }}
       />
     </Stack>
   ) : (
     <FormProvider {...methods}>
-      <form onSubmit={handleSubmit(onSubmit)}>
+      <form onSubmit={onSubmit}>
         <Stack spacing={3}>
           <RHFTextField
             autoFocus
@@ -160,7 +163,7 @@ export function CreateApiKeyForm({ onSuccess, isAdmin }: Props) {
 
           {isAdmin && <WalletSelectDropdown name="user_id" />}
 
-          <LoadingButton
+          <Button
             type="submit"
             variant="contained"
             color="inherit"
@@ -169,7 +172,7 @@ export function CreateApiKeyForm({ onSuccess, isAdmin }: Props) {
             disabled={!isValid}
           >
             {t('create_api_key_form.create_button')}
-          </LoadingButton>
+          </Button>
         </Stack>
       </form>
     </FormProvider>

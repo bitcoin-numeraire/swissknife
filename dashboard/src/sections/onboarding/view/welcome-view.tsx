@@ -1,7 +1,7 @@
 'use client';
 
 import type { Engine } from '@tsparticles/engine';
-import type { SlideData } from 'src/components/carousel';
+import type { SlideData } from '../welcome-carousel';
 
 import React, { useEffect } from 'react';
 import { loadSlim } from '@tsparticles/slim';
@@ -18,7 +18,7 @@ import { handleActionError } from 'src/utils/errors';
 
 import { markWelcomeComplete } from 'src/lib/swissknife';
 
-import { WelcomeCarousel } from 'src/components/carousel';
+import { WelcomeCarousel } from '../welcome-carousel';
 
 import particleOptions from '../particles';
 

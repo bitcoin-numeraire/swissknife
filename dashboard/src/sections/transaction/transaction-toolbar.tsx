@@ -59,10 +59,9 @@ export function TransactionToolbar({ transaction, transactionType, isAdmin }: Pr
     <Stack
       spacing={3}
       direction={{ xs: 'column', sm: 'row' }}
-      alignItems={{ xs: 'flex-end', sm: 'center' }}
-      sx={{ mb: { xs: 3, md: 5 } }}
+      sx={{ mb: { xs: 3, md: 5 }, alignItems: { xs: 'flex-end', sm: 'center' } }}
     >
-      <Stack direction="row" spacing={1} flexGrow={1} sx={{ width: 1 }}>
+      <Stack direction="row" spacing={1} sx={{ width: 1, flexGrow: 1 }}>
         {transactionType === TransactionType.INVOICE && (
           <CopyButton
             value={(transaction as InvoiceResponse).ln_invoice?.bolt11 || transaction.id}

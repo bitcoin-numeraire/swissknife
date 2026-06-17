@@ -1,5 +1,6 @@
 import type { Contact } from 'src/lib/swissknife';
 import type { CardProps } from '@mui/material/Card';
+import type { ChartProps } from 'src/components/chart';
 import type { IFiatPrices } from 'src/types/bitcoin';
 
 import { mutate } from 'swr';
@@ -44,7 +45,7 @@ type TabProps = {
   percent: number;
   total: number;
   color: string;
-  series: ApexAxisChartSeries;
+  series: ChartProps['series'];
 };
 
 export function BalanceOverview({
