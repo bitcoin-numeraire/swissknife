@@ -26,6 +26,14 @@ impl MigrationTrait for Migration {
 
         db.execute_unprepared(r#"DROP INDEX IF EXISTS "UNIQUE_bolt11""#).await?;
 
+        // Some production databases also carry lowercase partial indexes created
+        // out-of-band (never by a migration). Drop them so the schema converges to
+        // the migration-defined indexes below instead of coexisting redundantly.
+        db.execute_unprepared(r#"DROP INDEX IF EXISTS "unique_payment_hash""#)
+            .await?;
+
+        db.execute_unprepared(r#"DROP INDEX IF EXISTS "unique_bolt11""#).await?;
+
         // Recreate as unique indexes without NULLS NOT DISTINCT
         // This allows multiple NULL values (needed for onchain invoices)
         db.execute_unprepared(r#"CREATE UNIQUE INDEX "UNIQUE_payment_hash" ON invoice (payment_hash)"#)
