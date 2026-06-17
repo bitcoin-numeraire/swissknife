@@ -163,12 +163,12 @@ export function SettingsDrawer({ sx, defaultSettings }: SettingsDrawerProps) {
     >
       <PresetsOptions
         icon={<SvgIcon sx={{ width: 28, height: 28 }}>{settingIcons.siderbarDuotone}</SvgIcon>}
-        options={(Object.keys(primaryColorPresets) as SettingsState['primaryColor'][]).map(
-          (key) => ({
-            name: key,
-            value: primaryColorPresets[key].main,
-          })
-        )}
+        options={(
+          Object.keys(primaryColorPresets) as NonNullable<SettingsState['primaryColor']>[]
+        ).map((key) => ({
+          name: key,
+          value: primaryColorPresets[key].main,
+        }))}
         value={settings.state.primaryColor}
         onChangeOption={(newOption) => {
           settings.setState({ primaryColor: newOption });

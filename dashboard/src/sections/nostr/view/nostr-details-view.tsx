@@ -27,7 +27,8 @@ export function NostrDetailsView() {
   const errors = [lnAddressError];
   const isLoading = [lnAddressLoading];
 
-  const failed = shouldFail(errors, [lnAddress], isLoading);
+  // `lnAddress` is legitimately null when no address is registered.
+  const failed = shouldFail(errors, [], isLoading);
 
   return (
     <DashboardContent>

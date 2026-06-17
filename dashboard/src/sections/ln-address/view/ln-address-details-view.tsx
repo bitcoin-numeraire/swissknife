@@ -27,7 +27,9 @@ export function LnAddressDetailsView() {
   const errors = [lnAddressError];
   const loading = [lnAddressLoading];
 
-  const failed = shouldFail(errors, [lnAddress], loading);
+  // `lnAddress` is legitimately null when no address is registered (show the register flow),
+  // so it must not be treated as a failed fetch.
+  const failed = shouldFail(errors, [], loading);
 
   return (
     <DashboardContent>
