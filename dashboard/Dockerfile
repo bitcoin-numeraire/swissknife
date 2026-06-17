@@ -11,7 +11,7 @@ COPY package.json yarn.lock* package-lock.json* pnpm-lock.yaml* .yarnrc.yml* ./
 RUN --mount=type=cache,target=/root/.yarn \
     --mount=type=cache,target=/root/.npm \
     --mount=type=cache,target=/root/.local/share/pnpm/store \
-  if [ -f yarn.lock ]; then corepack enable && yarn --frozen-lockfile; \
+  if [ -f yarn.lock ]; then corepack enable && yarn install --immutable; \
   elif [ -f package-lock.json ]; then npm ci; \
   elif [ -f pnpm-lock.yaml ]; then corepack enable pnpm && pnpm i --frozen-lockfile; \
   else echo "Lockfile not found." && exit 1; \

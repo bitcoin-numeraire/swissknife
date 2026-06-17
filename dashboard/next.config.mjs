@@ -1,6 +1,3 @@
-// eslint-disable-next-line import/no-extraneous-dependencies
-import withPWA from 'next-pwa';
-
 // Use environment variable to determine build mode
 // - 'true' = static export (for bundling with backend)
 // - undefined/false = standalone (for standalone dashboard deployment)
@@ -15,17 +12,7 @@ const nextConfig = {
   env: {
     BUILD_STATIC_EXPORT: isStaticExport ? 'true' : 'false',
   },
-  modularizeImports: {
-    '@mui/icons-material': {
-      transform: '@mui/icons-material/{{member}}',
-    },
-    '@mui/material': {
-      transform: '@mui/material/{{member}}',
-    },
-    '@mui/lab': {
-      transform: '@mui/lab/{{member}}',
-    },
-  },
+  // Without --turbopack (next build with webpack)
   webpack(config) {
     config.module.rules.push({
       test: /\.svg$/,
@@ -34,12 +21,18 @@ const nextConfig = {
 
     return config;
   },
+  // With Turbopack (Next.js 16 default for dev and build)
+  turbopack: {
+    rules: {
+      '*.svg': {
+        loaders: ['@svgr/webpack'],
+        as: '*.js',
+      },
+    },
+  },
   // Default to 'standalone' for Node.js server
   // Override with 'export' when BUILD_STATIC_EXPORT=true (bundled with backend)
   output: isStaticExport ? 'export' : 'standalone',
 };
 
-export default withPWA({
-  dest: 'public',
-  disable: process.env.NODE_ENV === 'development',
-})(nextConfig);
+export default nextConfig;
