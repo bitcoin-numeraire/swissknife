@@ -1762,15 +1762,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@hey-api/client-fetch@npm:^0.13.1":
-  version: 0.13.1
-  resolution: "@hey-api/client-fetch@npm:0.13.1"
-  peerDependencies:
-    "@hey-api/openapi-ts": < 2
-  checksum: 10c0/2c144edd852475062ac2631a08e611d06d7c09b2cdf608ac02eb95de96df12fc83f49954f655733958f4279ab6cc5f179d2f8ba1c8e074bb0f476f51604a2623
-  languageName: node
-  linkType: hard
-
 "@hey-api/codegen-core@npm:0.9.0":
   version: 0.9.0
   resolution: "@hey-api/codegen-core@npm:0.9.0"
@@ -4272,13 +4263,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"classnames@npm:^2.5.1":
-  version: 2.5.1
-  resolution: "classnames@npm:2.5.1"
-  checksum: 10c0/afff4f77e62cea2d79c39962980bf316bacb0d7c49e13a21adaadb9221e1c6b9d3cdb829d8bb1b23c406f4e740507f37e1dcf506f7e3b7113d17c5bab787aa69
-  languageName: node
-  linkType: hard
-
 "client-only@npm:0.0.1":
   version: 0.0.1
   resolution: "client-only@npm:0.0.1"
@@ -4396,13 +4380,6 @@ __metadata:
     typescript:
       optional: true
   checksum: 10c0/0382a9ed13208f8bfc22ca2f62b364855207dffdb73dc26e150ade78c3093f1cf56172df2dd460c8caf2afa91c0ed4ec8a88c62f8f9cd1cf423d26506aa8797a
-  languageName: node
-  linkType: hard
-
-"country-flag-icons@npm:^1.6.14":
-  version: 1.6.17
-  resolution: "country-flag-icons@npm:1.6.17"
-  checksum: 10c0/1b9e8dc62380a08dbce50250b62c2f7807bf5ca2b72f29c14b26d30e4f9257f0536641d0d3e8276ae4fcf863e3e4b5729b1cb3c99d607ccd51e48568dfb3d0e4
   languageName: node
   linkType: hard
 
@@ -4791,15 +4768,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"embla-carousel-auto-height@npm:^8.6.0":
-  version: 8.6.0
-  resolution: "embla-carousel-auto-height@npm:8.6.0"
-  peerDependencies:
-    embla-carousel: 8.6.0
-  checksum: 10c0/13fefec92619a739fdb86ca65c629636e8a385933d4a8a185f4a5de30d309b44e401edb576dbb9a47e384a9b43a490ade23fa8f2d3b41d6b0f5c63da1a8dc210
-  languageName: node
-  linkType: hard
-
 "embla-carousel-auto-scroll@npm:^8.6.0":
   version: 8.6.0
   resolution: "embla-carousel-auto-scroll@npm:8.6.0"
@@ -4815,15 +4783,6 @@ __metadata:
   peerDependencies:
     embla-carousel: 8.6.0
   checksum: 10c0/d7e5cb79c1474b3d27621302e63dedf783a281ae0464b21b87183d58103f938d22be9f6a4735de4b1b19806606006da43f6151497df91c3edbbc99a4dae4a94f
-  languageName: node
-  linkType: hard
-
-"embla-carousel-fade@npm:^8.6.0":
-  version: 8.6.0
-  resolution: "embla-carousel-fade@npm:8.6.0"
-  peerDependencies:
-    embla-carousel: 8.6.0
-  checksum: 10c0/00b44b6bd8df7d6854c7ca00e46a25996d58904c790043067e85210b29972fe0a602f0d36e98a27043fd92c229d9f46069be178b8462b7fcedfe13b14d3009b5
   languageName: node
   linkType: hard
 
@@ -5938,23 +5897,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"input-format@npm:^0.3.14":
-  version: 0.3.14
-  resolution: "input-format@npm:0.3.14"
-  dependencies:
-    prop-types: "npm:^15.8.1"
-  peerDependencies:
-    react: ">=18.1.0"
-    react-dom: ">=18.1.0"
-  peerDependenciesMeta:
-    react:
-      optional: true
-    react-dom:
-      optional: true
-  checksum: 10c0/37bb23e0dd15223b2ac8a25b09bc26e4d613cbd93c040dcdb490a1661dd0782c2742ad819b9dbd4b154a9e09ce1a69046a78e4ee943171b7ec86b07b50324ad6
-  languageName: node
-  linkType: hard
-
 "internal-slot@npm:^1.0.7":
   version: 1.0.7
   resolution: "internal-slot@npm:1.0.7"
@@ -6549,13 +6491,6 @@ __metadata:
     prelude-ls: "npm:^1.2.1"
     type-check: "npm:~0.4.0"
   checksum: 10c0/effb03cad7c89dfa5bd4f6989364bfc79994c2042ec5966cb9b95990e2edee5cd8969ddf42616a0373ac49fac1403437deaf6e9050fbbaa3546093a59b9ac94e
-  languageName: node
-  linkType: hard
-
-"libphonenumber-js@npm:^1.13.4":
-  version: 1.13.6
-  resolution: "libphonenumber-js@npm:1.13.6"
-  checksum: 10c0/fcd6eef6a3c105da0e5674b1caa11983829b8ad6f71fee18147ae09a82e9d139d948a5e283cd2459ba9e07ebe85efd5523773fdbef997352105f2dc821a1b5fe
   languageName: node
   linkType: hard
 
@@ -7302,22 +7237,6 @@ __metadata:
   version: 19.2.7
   resolution: "react-is@npm:19.2.7"
   checksum: 10c0/419fe54d5bd7fdf5414a5bb7bd9a1e0e36f9fae28ffb4cb73290fbe342bde15d8584a90d1db62547f6aa03018dce517b178a041abb522136cd4b4b51b4e94c83
-  languageName: node
-  linkType: hard
-
-"react-phone-number-input@npm:^3.4.17":
-  version: 3.4.17
-  resolution: "react-phone-number-input@npm:3.4.17"
-  dependencies:
-    classnames: "npm:^2.5.1"
-    country-flag-icons: "npm:^1.6.14"
-    input-format: "npm:^0.3.14"
-    libphonenumber-js: "npm:^1.13.4"
-    prop-types: "npm:^15.8.1"
-  peerDependencies:
-    react: ">=16.8"
-    react-dom: ">=16.8"
-  checksum: 10c0/cbe1bea41a96e744d62763c8c22e5b171deae14e00693db0a0d7d96637c43883037a428f69d7d653eb0671b34145362a608dd2acc01c0668588d10446f3c003d
   languageName: node
   linkType: hard
 
@@ -8126,7 +8045,6 @@ __metadata:
     "@eslint/js": "npm:^9.39.2"
     "@fontsource-variable/inter": "npm:^5.2.8"
     "@fontsource-variable/public-sans": "npm:^5.2.7"
-    "@hey-api/client-fetch": "npm:^0.13.1"
     "@hey-api/openapi-ts": "npm:^0.98.2"
     "@hookform/resolvers": "npm:^5.2.2"
     "@iconify/react": "npm:^6.0.2"
@@ -8156,10 +8074,8 @@ __metadata:
     bech32: "npm:^2.0.0"
     dayjs: "npm:^1.11.20"
     embla-carousel: "npm:^8.6.0"
-    embla-carousel-auto-height: "npm:^8.6.0"
     embla-carousel-auto-scroll: "npm:^8.6.0"
     embla-carousel-autoplay: "npm:^8.6.0"
-    embla-carousel-fade: "npm:^8.6.0"
     embla-carousel-react: "npm:^8.6.0"
     es-toolkit: "npm:^1.46.1"
     eslint: "npm:^9.39.2"
@@ -8186,7 +8102,6 @@ __metadata:
     react-dom: "npm:^19.2.6"
     react-hook-form: "npm:^7.75.0"
     react-i18next: "npm:^17.0.7"
-    react-phone-number-input: "npm:^3.4.17"
     react-qrcode-logo: "npm:^4.1.0"
     simplebar-react: "npm:^3.3.2"
     sonner: "npm:^2.0.7"
