@@ -97,7 +97,7 @@ export function ConfirmPaymentDialog({
       let paymentResponse;
       const reqBody: SendPaymentRequest = {
         ...(body as SendPaymentRequest),
-        amount_msat: (body!.amount_msat as number) * 1000,
+        amount_msat: Number(body!.amount_msat) * 1000,
       };
 
       if (isAdmin) {
