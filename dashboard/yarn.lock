@@ -2363,18 +2363,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@mui/stylis-plugin-rtl@npm:^9.0.1":
-  version: 9.1.1
-  resolution: "@mui/stylis-plugin-rtl@npm:9.1.1"
-  dependencies:
-    "@babel/runtime": "npm:^7.29.2"
-    cssjanus: "npm:^2.3.0"
-  peerDependencies:
-    stylis: 4.x
-  checksum: 10c0/57effb2ebfa1194885ee234b9ec2a17f6942678a2eeb5054a3bb4cd7651daa48c15bea4006e98d3c26027a5bdd2174abf40f2b1bf52d425de5aa4629b1655346
-  languageName: node
-  linkType: hard
-
 "@mui/system@npm:^9.1.1":
   version: 9.1.1
   resolution: "@mui/system@npm:9.1.1"
@@ -3427,13 +3415,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/stylis@npm:^4.2.7":
-  version: 4.2.7
-  resolution: "@types/stylis@npm:4.2.7"
-  checksum: 10c0/01a9679addb3f63951a9c09729564e2205581f2db40875a28b25cc461efc52ba17a711cc50cdb5e7d3a67c5f2cd60580e078c8a69b8df7b67699d89060d2a977
-  languageName: node
-  linkType: hard
-
 "@typescript-eslint/eslint-plugin@npm:8.61.1":
   version: 8.61.1
   resolution: "@typescript-eslint/eslint-plugin@npm:8.61.1"
@@ -4431,13 +4412,6 @@ __metadata:
   version: 6.1.0
   resolution: "css-what@npm:6.1.0"
   checksum: 10c0/a09f5a6b14ba8dcf57ae9a59474722e80f20406c53a61e9aedb0eedc693b135113ffe2983f4efc4b5065ae639442e9ae88df24941ef159c218b231011d733746
-  languageName: node
-  linkType: hard
-
-"cssjanus@npm:^2.3.0":
-  version: 2.3.0
-  resolution: "cssjanus@npm:2.3.0"
-  checksum: 10c0/b410c6f31c80947cc4508f232bab13beb3de6c38f1824962d12ef64b754d0191230efc2211815bc144ddbf50e509d63d0f120fc2402f657762e1f6bd60edf6a3
   languageName: node
   linkType: hard
 
@@ -7987,13 +7961,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"stylis@npm:^4.4.0":
-  version: 4.4.0
-  resolution: "stylis@npm:4.4.0"
-  checksum: 10c0/259be096d90dfbfe903c8656dcb7591e52a421e577e950ef42ebd9ca02f387623a1165dd08761492fb6e92a7a562d62a53a694a10b0a2f6dcd7a0db107b4bf55
-  languageName: node
-  linkType: hard
-
 "supports-color@npm:^7.1.0":
   version: 7.2.0
   resolution: "supports-color@npm:7.2.0"
@@ -8051,7 +8018,6 @@ __metadata:
     "@mui/lab": "npm:^9.0.0-beta.3"
     "@mui/material": "npm:^9.0.1"
     "@mui/material-nextjs": "npm:^9.0.1"
-    "@mui/stylis-plugin-rtl": "npm:^9.0.1"
     "@mui/x-data-grid": "npm:^9.1.0"
     "@mui/x-date-pickers": "npm:^9.1.0"
     "@mui/x-tree-view": "npm:^9.1.0"
@@ -8066,7 +8032,6 @@ __metadata:
     "@types/nprogress": "npm:^0.2.3"
     "@types/react": "npm:^19.2.14"
     "@types/react-dom": "npm:^19.2.3"
-    "@types/stylis": "npm:^4.2.7"
     "@typescript-eslint/parser": "npm:^8.49.0"
     "@yudiel/react-qr-scanner": "npm:^2.6.0"
     apexcharts: "npm:^5.11.0"
@@ -8105,7 +8070,6 @@ __metadata:
     react-qrcode-logo: "npm:^4.1.0"
     simplebar-react: "npm:^3.3.2"
     sonner: "npm:^2.0.7"
-    stylis: "npm:^4.4.0"
     swr: "npm:^2.4.1"
     typescript: "npm:^5.9.3"
     typescript-eslint: "npm:^8.49.0"

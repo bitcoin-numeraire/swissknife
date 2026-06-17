@@ -20,12 +20,7 @@ export function applySettingsToTheme(
   theme: ThemeOptions,
   settingsState?: SettingsState
 ): ThemeOptions {
-  const {
-    direction,
-    fontFamily,
-    contrast = 'default',
-    primaryColor = 'default',
-  } = settingsState ?? {};
+  const { fontFamily, contrast = 'default', primaryColor = 'default' } = settingsState ?? {};
 
   const isDefaultContrast = contrast === 'default';
   const isDefaultPrimaryColor = primaryColor === 'default';
@@ -72,7 +67,6 @@ export function applySettingsToTheme(
 
   return {
     ...theme,
-    direction,
     colorSchemes: {
       light: updateColorScheme('light'),
       dark: updateColorScheme('dark'),

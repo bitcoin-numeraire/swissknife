@@ -41,7 +41,6 @@ export function SettingsDrawer({ sx, defaultSettings }: SettingsDrawerProps) {
     contrast: hasKeys(defaultSettings, ['contrast']),
     navColor: hasKeys(defaultSettings, ['navColor']),
     fontSize: hasKeys(defaultSettings, ['fontSize']),
-    direction: hasKeys(defaultSettings, ['direction']),
     navLayout: hasKeys(defaultSettings, ['navLayout']),
     fontFamily: hasKeys(defaultSettings, ['fontFamily']),
     primaryColor: hasKeys(defaultSettings, ['primaryColor']),
@@ -126,17 +125,6 @@ export function SettingsDrawer({ sx, defaultSettings }: SettingsDrawerProps) {
         settings.setState({
           contrast: settings.state.contrast === 'default' ? 'high' : 'default',
         });
-      }}
-    />
-  );
-
-  const renderDirection = () => (
-    <BaseOption
-      label="Right to left"
-      selected={settings.state.direction === 'rtl'}
-      icon={<SvgIcon>{settingIcons.alignRight}</SvgIcon>}
-      onChangeOption={() => {
-        settings.setState({ direction: settings.state.direction === 'ltr' ? 'rtl' : 'ltr' });
       }}
     />
   );
@@ -326,7 +314,6 @@ export function SettingsDrawer({ sx, defaultSettings }: SettingsDrawerProps) {
           <Box sx={{ gap: 2, display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)' }}>
             {visibility.mode && renderMode()}
             {visibility.contrast && renderContrast()}
-            {visibility.direction && renderDirection()}
             {visibility.compactLayout && renderCompactLayout()}
           </Box>
 

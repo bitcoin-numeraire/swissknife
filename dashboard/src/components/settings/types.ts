@@ -8,7 +8,6 @@ import type { ThemeColorPreset } from 'src/theme/with-settings';
 export type SettingsState = {
   version: string;
   mode: ThemeConfig['defaultMode'];
-  direction: ThemeConfig['direction'];
   contrast: 'default' | 'high';
   compactLayout: boolean;
   currency: CurrencyValue;

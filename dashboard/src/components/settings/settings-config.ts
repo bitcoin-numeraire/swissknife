@@ -10,7 +10,6 @@ export const ONBOARDING_COMPLETE_STORAGE_KEY = 'onboarding-complete';
 
 export const defaultSettings: SettingsState = {
   mode: themeConfig.defaultMode,
-  direction: themeConfig.direction,
   contrast: 'default',
   compactLayout: true,
   currency: 'USD',
