@@ -1,6 +1,7 @@
 'use client';
 
 import type { IconButtonProps } from '@mui/material/IconButton';
+import type { NotificationItemProps } from './notification-item';
 
 import { m } from 'framer-motion';
 import { useState, useCallback } from 'react';
@@ -23,8 +24,6 @@ import { CustomTabs } from 'src/components/custom-tabs';
 import { varTap, varHover, transitionTap } from 'src/components/animate';
 
 import { NotificationItem } from './notification-item';
-
-import type { NotificationItemProps } from './notification-item';
 
 // ----------------------------------------------------------------------
 

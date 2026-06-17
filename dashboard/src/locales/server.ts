@@ -1,8 +1,8 @@
+import type { LanguageValue } from './locales-config';
+
 import { cookies as getCookies } from 'next/headers';
 
 import { cookieName, fallbackLng } from './locales-config';
-
-import type { LanguageValue } from './locales-config';
 
 // ----------------------------------------------------------------------
 

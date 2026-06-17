@@ -51,10 +51,7 @@ export function SettingsApiKey({ apiKeys }: Props) {
 
   return (
     <Card sx={{ p: { xs: 1, sm: 3 }, mx: 'auto' }}>
-      <Stack
-        direction="row"
-        sx={{ mb: 3, alignItems: 'center', justifyContent: 'space-between' }}
-      >
+      <Stack direction="row" sx={{ mb: 3, alignItems: 'center', justifyContent: 'space-between' }}>
         <Typography variant="h5">{t('settings_api_key.title')}</Typography>
 
         <Button

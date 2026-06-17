@@ -1,4 +1,4 @@
-import type { NavItemDataProps, NavGroupProps } from 'src/components/nav-section';
+import type { NavGroupProps, NavItemDataProps } from 'src/components/nav-section';
 
 import { paths } from 'src/routes/paths';
 

@@ -18,9 +18,8 @@ import { handleActionError } from 'src/utils/errors';
 
 import { markWelcomeComplete } from 'src/lib/swissknife';
 
-import { WelcomeCarousel } from '../welcome-carousel';
-
 import particleOptions from '../particles';
+import { WelcomeCarousel } from '../welcome-carousel';
 
 const slides: SlideData[] = [
   { id: 'welcome', title: 'welcome.title', content: 'welcome.content' },

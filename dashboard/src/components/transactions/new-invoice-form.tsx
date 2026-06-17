@@ -1,5 +1,5 @@
-import type { IFiatPrices } from 'src/types/bitcoin';
 import type { InputProps } from '@mui/material/Input';
+import type { IFiatPrices } from 'src/types/bitcoin';
 import type { LnAddress, NewInvoiceRequest } from 'src/lib/swissknife';
 
 import { useForm } from 'react-hook-form';

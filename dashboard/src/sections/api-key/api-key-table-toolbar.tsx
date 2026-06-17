@@ -97,11 +97,7 @@ export function ApiKeyTableToolbar({ filters, onResetPage, dateError }: Props) {
           }}
         />
 
-        <Stack
-          direction="row"
-          spacing={2}
-          sx={{ width: 1, flexGrow: 1, alignItems: 'center' }}
-        >
+        <Stack direction="row" spacing={2} sx={{ width: 1, flexGrow: 1, alignItems: 'center' }}>
           <TextField
             fullWidth
             value={filters.state.name}

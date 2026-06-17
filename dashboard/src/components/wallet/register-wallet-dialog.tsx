@@ -1,4 +1,5 @@
 import type { DialogProps } from '@mui/material/Dialog';
+import type { NewWalletFormProps } from './register-wallet-form';
 
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
@@ -9,8 +10,6 @@ import DialogActions from '@mui/material/DialogActions';
 import { useTranslate } from 'src/locales';
 
 import { RegisterWalletForm } from './register-wallet-form';
-
-import type { NewWalletFormProps } from './register-wallet-form';
 
 // ----------------------------------------------------------------------
 

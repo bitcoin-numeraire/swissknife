@@ -1,6 +1,5 @@
-import type { InvoiceResponse, PaymentResponse } from 'src/lib/swissknife';
-
 import type { IDatePickerControl } from './common';
+import type { InvoiceResponse, PaymentResponse } from 'src/lib/swissknife';
 
 export type ITransaction =
   | (PaymentResponse & { transaction_type?: TransactionType })

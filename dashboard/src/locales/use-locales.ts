@@ -1,5 +1,7 @@
 'use client';
 
+import type { LanguageValue } from './locales-config';
+
 import dayjs from 'dayjs';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -8,8 +10,6 @@ import { useRouter } from 'src/routes/hooks';
 
 import { allLangs } from './all-langs';
 import { fallbackLng } from './locales-config';
-
-import type { LanguageValue } from './locales-config';
 
 // ----------------------------------------------------------------------
 

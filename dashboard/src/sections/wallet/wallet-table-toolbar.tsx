@@ -1,6 +1,6 @@
+import type { UseSetStateReturn } from 'minimal-shared/hooks';
 import type { IDatePickerControl } from 'src/types/common';
 import type { IWalletTableFilters } from 'src/types/wallet';
-import type { UseSetStateReturn } from 'minimal-shared/hooks';
 
 import { t } from 'i18next';
 import { useCallback } from 'react';

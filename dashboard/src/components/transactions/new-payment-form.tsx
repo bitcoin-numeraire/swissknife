@@ -1,7 +1,7 @@
-import type { Contact } from 'src/lib/swissknife';
-import type { IFiatPrices } from 'src/types/bitcoin';
 import type { DialogProps } from '@mui/material/Dialog';
 import type { IDetectedBarcode } from '@yudiel/react-qr-scanner';
+import type { Contact } from 'src/lib/swissknife';
+import type { IFiatPrices } from 'src/types/bitcoin';
 
 import { decode } from 'light-bolt11-decoder';
 import { useState, useCallback } from 'react';

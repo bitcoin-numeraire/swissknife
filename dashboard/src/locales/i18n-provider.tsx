@@ -1,5 +1,7 @@
 'use client';
 
+import type { LanguageValue } from './locales-config';
+
 import i18next from 'i18next';
 import { useMemo } from 'react';
 import { getStorage } from 'minimal-shared/utils';
@@ -10,8 +12,6 @@ import { initReactI18next, I18nextProvider as Provider } from 'react-i18next';
 import { CONFIG } from 'src/global-config';
 
 import { i18nOptions, fallbackLng } from './locales-config';
-
-import type { LanguageValue } from './locales-config';
 
 // ----------------------------------------------------------------------
 

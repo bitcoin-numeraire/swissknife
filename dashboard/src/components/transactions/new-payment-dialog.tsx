@@ -1,4 +1,5 @@
 import type { DialogProps } from '@mui/material/Dialog';
+import type { NewPaymentFormProps } from './new-payment-form';
 
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
@@ -9,8 +10,6 @@ import DialogActions from '@mui/material/DialogActions';
 import { useTranslate } from 'src/locales';
 
 import { NewPaymentForm } from './new-payment-form';
-
-import type { NewPaymentFormProps } from './new-payment-form';
 
 // ----------------------------------------------------------------------
 

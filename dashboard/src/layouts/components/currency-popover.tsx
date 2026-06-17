@@ -1,7 +1,7 @@
 'use client';
 
-import type { CurrencyValue } from 'src/types/currency';
 import type { IconButtonProps } from '@mui/material/IconButton';
+import type { CurrencyValue } from 'src/types/currency';
 
 import { m } from 'framer-motion';
 import { useCallback } from 'react';

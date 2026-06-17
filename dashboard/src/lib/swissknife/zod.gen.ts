@@ -11,24 +11,15 @@ export const zBalance = z.object({
     .max(BigInt('9223372036854775807'), {
       error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
     }),
-  fees_paid_msat: z.coerce
-    .bigint()
-    .gte(BigInt(0))
-    .max(BigInt('9223372036854775807'), {
-      error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
-    }),
-  received_msat: z.coerce
-    .bigint()
-    .gte(BigInt(0))
-    .max(BigInt('9223372036854775807'), {
-      error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
-    }),
-  sent_msat: z.coerce
-    .bigint()
-    .gte(BigInt(0))
-    .max(BigInt('9223372036854775807'), {
-      error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
-    }),
+  fees_paid_msat: z.coerce.bigint().gte(BigInt(0)).max(BigInt('9223372036854775807'), {
+    error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
+  }),
+  received_msat: z.coerce.bigint().gte(BigInt(0)).max(BigInt('9223372036854775807'), {
+    error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
+  }),
+  sent_msat: z.coerce.bigint().gte(BigInt(0)).max(BigInt('9223372036854775807'), {
+    error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
+  }),
 });
 
 export const zCheckMessageRequest = z.object({
@@ -92,12 +83,9 @@ export const zLnInvoiceResponse = z.object({
   description_hash: z.string().nullish(),
   expires_at: z.iso.datetime(),
   expiry: z.string(),
-  min_final_cltv_expiry_delta: z.coerce
-    .bigint()
-    .gte(BigInt(0))
-    .max(BigInt('9223372036854775807'), {
-      error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
-    }),
+  min_final_cltv_expiry_delta: z.coerce.bigint().gte(BigInt(0)).max(BigInt('9223372036854775807'), {
+    error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
+  }),
   payee_pubkey: z.string(),
   payment_hash: z.string(),
   payment_secret: z.string(),
@@ -146,19 +134,13 @@ export const zLnUrlPayRequest = z.object({
     .int()
     .gte(0)
     .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
-  maxSendable: z.coerce
-    .bigint()
-    .gte(BigInt(0))
-    .max(BigInt('9223372036854775807'), {
-      error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
-    }),
+  maxSendable: z.coerce.bigint().gte(BigInt(0)).max(BigInt('9223372036854775807'), {
+    error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
+  }),
   metadata: z.string(),
-  minSendable: z.coerce
-    .bigint()
-    .gte(BigInt(0))
-    .max(BigInt('9223372036854775807'), {
-      error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
-    }),
+  minSendable: z.coerce.bigint().gte(BigInt(0)).max(BigInt('9223372036854775807'), {
+    error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
+  }),
   nostrPubkey: z.string().nullish(),
   tag: z.string(),
 });
@@ -181,12 +163,9 @@ export const zLnUrlSuccessAction = z.object({
  * New Invoice Request
  */
 export const zNewInvoiceRequest = z.object({
-  amount_msat: z.coerce
-    .bigint()
-    .gte(BigInt(0))
-    .max(BigInt('9223372036854775807'), {
-      error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
-    }),
+  amount_msat: z.coerce.bigint().gte(BigInt(0)).max(BigInt('9223372036854775807'), {
+    error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
+  }),
   description: z.string().nullish(),
   expiry: z
     .int()
@@ -205,12 +184,9 @@ export const zOrderDirection = z.enum(['Asc', 'Desc']);
 export const zPaymentStatus = z.enum(['Pending', 'Settled', 'Failed']);
 
 export const zPaymentResponse = z.object({
-  amount_msat: z.coerce
-    .bigint()
-    .gte(BigInt(0))
-    .max(BigInt('9223372036854775807'), {
-      error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
-    }),
+  amount_msat: z.coerce.bigint().gte(BigInt(0)).max(BigInt('9223372036854775807'), {
+    error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
+  }),
   created_at: z.iso.datetime(),
   currency: zCurrency,
   description: z.string().nullish(),
@@ -307,12 +283,9 @@ export const zRegisterWalletRequest = z.object({
  * Send On-chain Payment Request
  */
 export const zSendOnchainPaymentRequest = z.object({
-  amount_msat: z.coerce
-    .bigint()
-    .gte(BigInt(0))
-    .max(BigInt('9223372036854775807'), {
-      error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
-    }),
+  amount_msat: z.coerce.bigint().gte(BigInt(0)).max(BigInt('9223372036854775807'), {
+    error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
+  }),
   feerate: z
     .int()
     .gte(0)
@@ -448,12 +421,9 @@ export const zCallbackPath = z.object({
 });
 
 export const zCallbackQuery = z.object({
-  amount: z.coerce
-    .bigint()
-    .gte(BigInt(0))
-    .max(BigInt('9223372036854775807'), {
-      error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
-    }),
+  amount: z.coerce.bigint().gte(BigInt(0)).max(BigInt('9223372036854775807'), {
+    error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
+  }),
   comment: z.string().nullish(),
 });
 
