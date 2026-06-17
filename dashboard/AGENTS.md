@@ -14,13 +14,13 @@ yarn openapi-ts                # Regenerate API client from OpenAPI spec
 yarn tsc:watch                 # Type-check in watch mode
 ```
 
-**Node 20.x required** (see `engines` in package.json).
+**Node 24.x and Yarn 4 (via corepack) required** (see `engines` / `packageManager` in package.json).
 
 ## Architecture
 
 ### App Router Structure (`src/app/`)
 
-Uses Next.js 14 App Router with route groups:
+Uses the Next.js 16 App Router (React 19, MUI v9) with route groups:
 - `(index)/` - Protected routes wrapped with AuthGuard
 - Auth pages at root level: `/login`, `/sign-up`, `/reset-password`, `/verify`
 
@@ -62,12 +62,31 @@ Main route sections:
 
 ### API Client
 
-Auto-generated from backend's OpenAPI spec at `src/lib/openapi.json`:
+Auto-generated (hey-api / `@hey-api/openapi-ts`) from the backend's OpenAPI spec checked in at `src/lib/openapi.json`:
+- `client.gen.ts` - configured fetch client instance (vendored; import `client` from here)
 - `sdk.gen.ts` - API endpoint functions
 - `types.gen.ts` - TypeScript types
 - `zod.gen.ts` - Zod validation schemas
+- `transformers.gen.ts` - response transformers (e.g. date strings → `Date`)
 
-Client configured in `src/global-config.ts` with base URL from `NEXT_PUBLIC_SERVER_URL`.
+Generator config lives in `openapi-ts.config.mjs`. The whole `src/lib/swissknife/` dir is **generated — do not edit by hand**, and is excluded from ESLint. Base URL / auth interceptors are set in `src/global-config.ts` and `src/auth/context/*` (base URL from `NEXT_PUBLIC_SERVER_URL`).
+
+Note: `@hey-api/transformers` is configured with `bigInt: false`, so `int64` fields (e.g. `amount_msat`) are emitted as `number`. See issue #274 for the bigint precision follow-up.
+
+### Regenerating the OpenAPI spec + client
+
+The spec is produced from the backend's **utoipa** annotations (`src/application/docs/openapi.rs::merged_openapi()`, also served live at `/docs`) — it is NOT hand-written. Run this whenever the backend API changes (new/changed routes, DTOs, enums):
+
+```bash
+# From the repo root (swissknife/) — regenerates BOTH the spec and the client:
+make openapi
+```
+
+That target runs two steps:
+1. `cargo test --quiet dump_openapi_spec -- --ignored` — writes the current backend spec to `dashboard/src/lib/openapi.json`. This is an `#[ignore]`d generation test in `src/application/docs/openapi.rs`, so it is skipped during normal `make test` and only runs on demand.
+2. `cd dashboard && yarn openapi-ts` — regenerates `src/lib/swissknife/` from that spec.
+
+The spec version tracks the backend crate version (`CARGO_PKG_VERSION`). Step 1 compiles the backend, so the Rust toolchain is required (see `swissknife/AGENTS.md`). To only regenerate the client from an already-updated spec, run `yarn openapi-ts` in `dashboard/`.
 
 ### Authentication Guards
 

@@ -115,3 +115,19 @@ impl Modify for SecurityAddon {
         components.add_security_scheme("jwt", SecurityScheme::Http(Http::new(HttpAuthScheme::Bearer)));
     }
 }
+
+#[cfg(test)]
+mod openapi_dump {
+    use super::merged_openapi;
+
+    /// Regenerates the dashboard's checked-in OpenAPI spec from the live utoipa
+    /// annotations. Generation tool, not an assertion: it is `#[ignore]`d so it
+    /// does not run during normal `make test`. Invoke on demand via `make openapi`
+    /// (or `cargo test dump_openapi_spec -- --ignored --exact`).
+    #[test]
+    #[ignore = "generation tool; run via `make openapi`"]
+    fn dump_openapi_spec() {
+        let json = merged_openapi().to_pretty_json().expect("serialize openapi");
+        std::fs::write("dashboard/src/lib/openapi.json", json).expect("write openapi.json");
+    }
+}
