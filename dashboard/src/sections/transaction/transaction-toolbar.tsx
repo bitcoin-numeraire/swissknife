@@ -1,4 +1,4 @@
-import type { InvoiceResponse } from 'src/lib/swissknife';
+import type { Invoice } from 'src/lib/swissknife';
 import type { ITransaction } from 'src/types/transaction';
 
 import { useCallback } from 'react';
@@ -64,7 +64,7 @@ export function TransactionToolbar({ transaction, transactionType, isAdmin }: Pr
       <Stack direction="row" spacing={1} sx={{ width: 1, flexGrow: 1 }}>
         {transactionType === TransactionType.INVOICE && (
           <CopyButton
-            value={(transaction as InvoiceResponse).ln_invoice?.bolt11 || transaction.id}
+            value={(transaction as Invoice).ln_invoice?.bolt11 || transaction.id}
             title={t('transaction_toolbar.copy_details')}
           />
         )}

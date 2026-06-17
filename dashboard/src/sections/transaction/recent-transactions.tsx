@@ -1,7 +1,7 @@
 import type { TFunction } from 'i18next';
 import type { CardProps } from '@mui/material/Card';
+import type { Invoice } from 'src/lib/swissknife';
 import type { ITransaction } from 'src/types/transaction';
-import type { InvoiceResponse } from 'src/lib/swissknife';
 
 import { mutate } from 'swr';
 import Link from 'next/link';
@@ -256,8 +256,8 @@ function RecentTransactionsRow({ row, isAdmin }: RecentTransactionsRowProps) {
 
         {transaction_type === TransactionType.INVOICE &&
           status === 'Pending' &&
-          (row as InvoiceResponse).ln_invoice && (
-            <CopyMenuItem value={(row as InvoiceResponse).ln_invoice!.bolt11} />
+          (row as Invoice).ln_invoice && (
+            <CopyMenuItem value={(row as Invoice).ln_invoice!.bolt11} />
           )}
       </CustomPopover>
     </>

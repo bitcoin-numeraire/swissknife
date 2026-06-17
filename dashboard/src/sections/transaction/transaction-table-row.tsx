@@ -1,5 +1,5 @@
 import type { ITransaction } from 'src/types/transaction';
-import type { InvoiceResponse, PaymentResponse } from 'src/lib/swissknife';
+import type { Invoice, Payment } from 'src/lib/swissknife';
 
 import { useBoolean, usePopover } from 'minimal-shared/hooks';
 
@@ -71,7 +71,7 @@ export function TransactionTableRow({
         <TableCell sx={{ display: 'flex', alignItems: 'center' }}>
           {transactionType === TransactionType.PAYMENT && (
             <Avatar alt={id} sx={{ mr: 2 }}>
-              {avatarLetter((row as PaymentResponse).ln_address || id)}
+              {avatarLetter((row as Payment).lightning?.ln_address || id)}
             </Avatar>
           )}
 
@@ -123,8 +123,8 @@ export function TransactionTableRow({
               '-'
             ) : (
               <ListItemText
-                primary={fDate((row as InvoiceResponse).ln_invoice?.expires_at)}
-                secondary={fTime((row as InvoiceResponse).ln_invoice?.expires_at)}
+                primary={fDate((row as Invoice).ln_invoice?.expires_at)}
+                secondary={fTime((row as Invoice).ln_invoice?.expires_at)}
                 slotProps={{
                   primary: { noWrap: true, sx: { typography: 'body2' } },
                   secondary: {
@@ -207,8 +207,8 @@ export function TransactionTableRow({
           </MenuItem>
           {transactionType === TransactionType.INVOICE &&
             status === 'Pending' &&
-            (row as InvoiceResponse).ln_invoice && (
-              <CopyMenuItem value={(row as InvoiceResponse).ln_invoice!.bolt11} />
+            (row as Invoice).ln_invoice && (
+              <CopyMenuItem value={(row as Invoice).ln_invoice!.bolt11} />
             )}
 
           {isAdmin && (

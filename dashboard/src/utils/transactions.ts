@@ -1,5 +1,5 @@
 import type { ITransaction } from 'src/types/transaction';
-import type { InvoiceResponse, PaymentResponse } from 'src/lib/swissknife';
+import type { Invoice, Payment } from 'src/lib/swissknife';
 
 import { sumBy } from 'es-toolkit';
 
@@ -7,10 +7,7 @@ import { TransactionType } from 'src/types/transaction';
 
 export const LEDGERS = ['Lightning', 'Internal', 'Onchain'];
 
-export function mergeAndSortTransactions(
-  invoices: InvoiceResponse[],
-  payments: PaymentResponse[]
-): ITransaction[] {
+export function mergeAndSortTransactions(invoices: Invoice[], payments: Payment[]): ITransaction[] {
   const invoicesWithType = invoices.map((invoice) => ({
     ...invoice,
     transaction_type: TransactionType.INVOICE,

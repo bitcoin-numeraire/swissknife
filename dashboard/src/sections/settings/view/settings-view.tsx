@@ -75,8 +75,8 @@ export function SettingsView() {
           </Tabs>
 
           {tabs.value === 'lnaddress' &&
-            (lnAddress?.ln_address ? (
-              <SettingsLnAddress lnAddress={lnAddress.ln_address} />
+            (lnAddress ? (
+              <SettingsLnAddress lnAddress={lnAddress} />
             ) : (
               <Welcome
                 description={t('register_ln_address.register_lightning_address_welcome')}

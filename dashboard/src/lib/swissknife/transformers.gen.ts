@@ -3,9 +3,11 @@
 import type {
   CreateApiKeyResponse,
   CreateWalletApiKeyResponse,
+  GenerateBtcAddressResponse,
   GenerateInvoiceResponse,
   GetAddressResponse,
   GetApiKeyResponse,
+  GetBtcAddressResponse,
   GetInvoiceResponse,
   GetPaymentResponse,
   GetUserWalletResponse,
@@ -16,6 +18,7 @@ import type {
   GetWalletResponse,
   ListAddressesResponse,
   ListApiKeysResponse,
+  ListBtcAddressesResponse,
   ListContactsResponse,
   ListInvoicesResponse,
   ListPaymentsResponse,
@@ -24,6 +27,7 @@ import type {
   ListWalletOverviewsResponse,
   ListWalletPaymentsResponse,
   ListWalletsResponse,
+  NewWalletBtcAddressResponse,
   NewWalletInvoiceResponse,
   PayResponse,
   RegisterAddressResponse,
@@ -34,7 +38,7 @@ import type {
   WalletPayResponse,
 } from './types.gen';
 
-const apiKeyResponseSchemaResponseTransformer = (data: any) => {
+const apiKeySchemaResponseTransformer = (data: any) => {
   data.created_at = new Date(data.created_at);
   if (data.expires_at) {
     data.expires_at = new Date(data.expires_at);
@@ -43,29 +47,69 @@ const apiKeyResponseSchemaResponseTransformer = (data: any) => {
 };
 
 export const listApiKeysResponseTransformer = async (data: any): Promise<ListApiKeysResponse> => {
-  data = data.map((item: any) => apiKeyResponseSchemaResponseTransformer(item));
+  data = data.map((item: any) => apiKeySchemaResponseTransformer(item));
   return data;
 };
 
 export const createApiKeyResponseTransformer = async (data: any): Promise<CreateApiKeyResponse> => {
-  data = apiKeyResponseSchemaResponseTransformer(data);
+  data = apiKeySchemaResponseTransformer(data);
   return data;
 };
 
 export const getApiKeyResponseTransformer = async (data: any): Promise<GetApiKeyResponse> => {
-  data = apiKeyResponseSchemaResponseTransformer(data);
+  data = apiKeySchemaResponseTransformer(data);
   return data;
 };
 
-const lnInvoiceResponseSchemaResponseTransformer = (data: any) => {
+const btcAddressSchemaResponseTransformer = (data: any) => {
+  data.created_at = new Date(data.created_at);
+  if (data.updated_at) {
+    data.updated_at = new Date(data.updated_at);
+  }
+  return data;
+};
+
+export const listBtcAddressesResponseTransformer = async (
+  data: any
+): Promise<ListBtcAddressesResponse> => {
+  data = data.map((item: any) => btcAddressSchemaResponseTransformer(item));
+  return data;
+};
+
+export const generateBtcAddressResponseTransformer = async (
+  data: any
+): Promise<GenerateBtcAddressResponse> => {
+  data = btcAddressSchemaResponseTransformer(data);
+  return data;
+};
+
+export const getBtcAddressResponseTransformer = async (
+  data: any
+): Promise<GetBtcAddressResponse> => {
+  data = btcAddressSchemaResponseTransformer(data);
+  return data;
+};
+
+const btcOutputSchemaResponseTransformer = (data: any) => {
+  data.created_at = new Date(data.created_at);
+  if (data.updated_at) {
+    data.updated_at = new Date(data.updated_at);
+  }
+  return data;
+};
+
+const lnInvoiceSchemaResponseTransformer = (data: any) => {
   data.expires_at = new Date(data.expires_at);
   return data;
 };
 
-const invoiceResponseSchemaResponseTransformer = (data: any) => {
+const invoiceSchemaResponseTransformer = (data: any) => {
+  if (data.bitcoin_output) {
+    data.bitcoin_output = btcOutputSchemaResponseTransformer(data.bitcoin_output);
+  }
   data.created_at = new Date(data.created_at);
   if (data.ln_invoice) {
-    data.ln_invoice = lnInvoiceResponseSchemaResponseTransformer(data.ln_invoice);
+    data.ln_invoice = lnInvoiceSchemaResponseTransformer(data.ln_invoice);
   }
   if (data.payment_time) {
     data.payment_time = new Date(data.payment_time);
@@ -78,19 +122,19 @@ const invoiceResponseSchemaResponseTransformer = (data: any) => {
 };
 
 export const listInvoicesResponseTransformer = async (data: any): Promise<ListInvoicesResponse> => {
-  data = data.map((item: any) => invoiceResponseSchemaResponseTransformer(item));
+  data = data.map((item: any) => invoiceSchemaResponseTransformer(item));
   return data;
 };
 
 export const generateInvoiceResponseTransformer = async (
   data: any
 ): Promise<GenerateInvoiceResponse> => {
-  data = invoiceResponseSchemaResponseTransformer(data);
+  data = invoiceSchemaResponseTransformer(data);
   return data;
 };
 
 export const getInvoiceResponseTransformer = async (data: any): Promise<GetInvoiceResponse> => {
-  data = invoiceResponseSchemaResponseTransformer(data);
+  data = invoiceSchemaResponseTransformer(data);
   return data;
 };
 
@@ -133,7 +177,7 @@ const contactSchemaResponseTransformer = (data: any) => {
   return data;
 };
 
-const paymentResponseSchemaResponseTransformer = (data: any) => {
+const paymentSchemaResponseTransformer = (data: any) => {
   data.created_at = new Date(data.created_at);
   if (data.payment_time) {
     data.payment_time = new Date(data.payment_time);
@@ -144,14 +188,14 @@ const paymentResponseSchemaResponseTransformer = (data: any) => {
   return data;
 };
 
-const walletResponseSchemaResponseTransformer = (data: any) => {
+const walletSchemaResponseTransformer = (data: any) => {
   data.contacts = data.contacts.map((item: any) => contactSchemaResponseTransformer(item));
   data.created_at = new Date(data.created_at);
-  data.invoices = data.invoices.map((item: any) => invoiceResponseSchemaResponseTransformer(item));
+  data.invoices = data.invoices.map((item: any) => invoiceSchemaResponseTransformer(item));
   if (data.ln_address) {
     data.ln_address = lnAddressSchemaResponseTransformer(data.ln_address);
   }
-  data.payments = data.payments.map((item: any) => paymentResponseSchemaResponseTransformer(item));
+  data.payments = data.payments.map((item: any) => paymentSchemaResponseTransformer(item));
   if (data.updated_at) {
     data.updated_at = new Date(data.updated_at);
   }
@@ -161,28 +205,35 @@ const walletResponseSchemaResponseTransformer = (data: any) => {
 export const getUserWalletResponseTransformer = async (
   data: any
 ): Promise<GetUserWalletResponse> => {
-  data = walletResponseSchemaResponseTransformer(data);
+  data = walletSchemaResponseTransformer(data);
   return data;
 };
 
 export const listWalletApiKeysResponseTransformer = async (
   data: any
 ): Promise<ListWalletApiKeysResponse> => {
-  data = data.map((item: any) => apiKeyResponseSchemaResponseTransformer(item));
+  data = data.map((item: any) => apiKeySchemaResponseTransformer(item));
   return data;
 };
 
 export const createWalletApiKeyResponseTransformer = async (
   data: any
 ): Promise<CreateWalletApiKeyResponse> => {
-  data = apiKeyResponseSchemaResponseTransformer(data);
+  data = apiKeySchemaResponseTransformer(data);
   return data;
 };
 
 export const getWalletApiKeyResponseTransformer = async (
   data: any
 ): Promise<GetWalletApiKeyResponse> => {
-  data = apiKeyResponseSchemaResponseTransformer(data);
+  data = apiKeySchemaResponseTransformer(data);
+  return data;
+};
+
+export const newWalletBtcAddressResponseTransformer = async (
+  data: any
+): Promise<NewWalletBtcAddressResponse> => {
+  data = btcAddressSchemaResponseTransformer(data);
   return data;
 };
 
@@ -194,35 +245,30 @@ export const listContactsResponseTransformer = async (data: any): Promise<ListCo
 export const listWalletInvoicesResponseTransformer = async (
   data: any
 ): Promise<ListWalletInvoicesResponse> => {
-  data = data.map((item: any) => invoiceResponseSchemaResponseTransformer(item));
+  data = data.map((item: any) => invoiceSchemaResponseTransformer(item));
   return data;
 };
 
 export const newWalletInvoiceResponseTransformer = async (
   data: any
 ): Promise<NewWalletInvoiceResponse> => {
-  data = invoiceResponseSchemaResponseTransformer(data);
+  data = invoiceSchemaResponseTransformer(data);
   return data;
 };
 
 export const getWalletInvoiceResponseTransformer = async (
   data: any
 ): Promise<GetWalletInvoiceResponse> => {
-  data = invoiceResponseSchemaResponseTransformer(data);
-  return data;
-};
-
-const walletLnAddressResponseSchemaResponseTransformer = (data: any) => {
-  if (data.ln_address) {
-    data.ln_address = lnAddressSchemaResponseTransformer(data.ln_address);
-  }
+  data = invoiceSchemaResponseTransformer(data);
   return data;
 };
 
 export const getWalletAddressResponseTransformer = async (
   data: any
 ): Promise<GetWalletAddressResponse> => {
-  data = walletLnAddressResponseSchemaResponseTransformer(data);
+  if (data) {
+    data = lnAddressSchemaResponseTransformer(data);
+  }
   return data;
 };
 
@@ -243,46 +289,46 @@ export const updateWalletAddressResponseTransformer = async (
 export const listWalletPaymentsResponseTransformer = async (
   data: any
 ): Promise<ListWalletPaymentsResponse> => {
-  data = data.map((item: any) => paymentResponseSchemaResponseTransformer(item));
+  data = data.map((item: any) => paymentSchemaResponseTransformer(item));
   return data;
 };
 
 export const walletPayResponseTransformer = async (data: any): Promise<WalletPayResponse> => {
-  data = paymentResponseSchemaResponseTransformer(data);
+  data = paymentSchemaResponseTransformer(data);
   return data;
 };
 
 export const getWalletPaymentResponseTransformer = async (
   data: any
 ): Promise<GetWalletPaymentResponse> => {
-  data = paymentResponseSchemaResponseTransformer(data);
+  data = paymentSchemaResponseTransformer(data);
   return data;
 };
 
 export const listPaymentsResponseTransformer = async (data: any): Promise<ListPaymentsResponse> => {
-  data = data.map((item: any) => paymentResponseSchemaResponseTransformer(item));
+  data = data.map((item: any) => paymentSchemaResponseTransformer(item));
   return data;
 };
 
 export const payResponseTransformer = async (data: any): Promise<PayResponse> => {
-  data = paymentResponseSchemaResponseTransformer(data);
+  data = paymentSchemaResponseTransformer(data);
   return data;
 };
 
 export const getPaymentResponseTransformer = async (data: any): Promise<GetPaymentResponse> => {
-  data = paymentResponseSchemaResponseTransformer(data);
+  data = paymentSchemaResponseTransformer(data);
   return data;
 };
 
 export const listWalletsResponseTransformer = async (data: any): Promise<ListWalletsResponse> => {
-  data = data.map((item: any) => walletResponseSchemaResponseTransformer(item));
+  data = data.map((item: any) => walletSchemaResponseTransformer(item));
   return data;
 };
 
 export const registerWalletResponseTransformer = async (
   data: any
 ): Promise<RegisterWalletResponse> => {
-  data = walletResponseSchemaResponseTransformer(data);
+  data = walletSchemaResponseTransformer(data);
   return data;
 };
 
@@ -305,6 +351,6 @@ export const listWalletOverviewsResponseTransformer = async (
 };
 
 export const getWalletResponseTransformer = async (data: any): Promise<GetWalletResponse> => {
-  data = walletResponseSchemaResponseTransformer(data);
+  data = walletSchemaResponseTransformer(data);
   return data;
 };

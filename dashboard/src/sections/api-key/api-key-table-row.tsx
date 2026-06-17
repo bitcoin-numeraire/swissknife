@@ -1,4 +1,4 @@
-import type { ApiKeyResponse } from 'src/lib/swissknife';
+import type { ApiKey } from 'src/lib/swissknife';
 
 import { useBoolean, usePopover } from 'minimal-shared/hooks';
 
@@ -25,7 +25,7 @@ import { CustomPopover } from 'src/components/custom-popover';
 // ----------------------------------------------------------------------
 
 type Props = {
-  row: ApiKeyResponse;
+  row: ApiKey;
   selected: boolean;
   onSelectRow: VoidFunction;
   onDeleteRow: () => Promise<void>;

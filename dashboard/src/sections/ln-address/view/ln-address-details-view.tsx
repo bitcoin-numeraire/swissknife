@@ -51,8 +51,8 @@ export function LnAddressDetailsView() {
             }}
           />
 
-          {lnAddress!.ln_address ? (
-            <LnAddressDetails lnAddress={lnAddress!.ln_address} />
+          {lnAddress ? (
+            <LnAddressDetails lnAddress={lnAddress} />
           ) : (
             <Welcome
               description={t('register_ln_address.register_lightning_address_welcome')}
