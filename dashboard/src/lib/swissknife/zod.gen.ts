@@ -2,6 +2,9 @@
 
 import * as z from 'zod';
 
+/**
+ * A wallet's balance, in millisatoshis.
+ */
 export const zBalance = z.object({
   available_msat: z.coerce
     .bigint()
@@ -17,40 +20,110 @@ export const zBalance = z.object({
   received_msat: z.coerce.bigint().gte(BigInt(0)).max(BigInt('9223372036854775807'), {
     error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
   }),
+  reserved_msat: z.coerce.bigint().gte(BigInt(0)).max(BigInt('9223372036854775807'), {
+    error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
+  }),
   sent_msat: z.coerce.bigint().gte(BigInt(0)).max(BigInt('9223372036854775807'), {
     error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
   }),
 });
 
-export const zCheckMessageRequest = z.object({
-  message: z.string(),
-  pubkey: z.string(),
-  signature: z.string(),
+/**
+ * Bitcoin address script type.
+ */
+export const zBtcAddressType = z.enum(['p2pkh', 'p2sh', 'p2wpkh', 'p2tr']);
+
+/**
+ * Bitcoin Address
+ */
+export const zBtcAddress = z.object({
+  address: z.string(),
+  address_type: zBtcAddressType,
+  created_at: z.iso.datetime(),
+  id: z.uuid(),
+  updated_at: z.iso.datetime().nullish(),
+  used: z.boolean(),
+  wallet_id: z.uuid(),
 });
 
-export const zCheckMessageResponse = z.object({
-  is_valid: z.boolean(),
+/**
+ * A Bitcoin network.
+ */
+export const zBtcNetwork = z.enum([
+  'Bitcoin',
+  'Testnet',
+  'Testnet4',
+  'Regtest',
+  'Simnet',
+  'Signet',
+]);
+
+/**
+ * Confirmation status of an on-chain output.
+ */
+export const zBtcOutputStatus = z.enum(['Unconfirmed', 'Confirmed', 'Spent', 'Immature']);
+
+/**
+ * Bitcoin Output
+ */
+export const zBtcOutput = z.object({
+  address: z.string(),
+  amount_sat: z.coerce.bigint().gte(BigInt(0)).max(BigInt('9223372036854775807'), {
+    error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
+  }),
+  block_height: z
+    .int()
+    .gte(0)
+    .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
+    .nullish(),
+  created_at: z.iso.datetime(),
+  id: z.uuid(),
+  outpoint: z.string(),
+  status: zBtcOutputStatus,
+  updated_at: z.iso.datetime().nullish(),
 });
 
+/**
+ * On-chain Bitcoin details of a payment.
+ */
+export const zBtcPayment = z.object({
+  address: z.string(),
+  block_height: z
+    .int()
+    .gte(0)
+    .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
+    .nullish(),
+  txid: z.string(),
+});
+
+/**
+ * A counterparty the wallet has paid, with the date of first contact.
+ */
 export const zContact = z.object({
   contact_since: z.iso.datetime(),
   ln_address: z.string(),
 });
 
+/**
+ * The currency and network a transaction is denominated in.
+ */
 export const zCurrency = z.enum(['Bitcoin', 'BitcoinTestnet', 'Regtest', 'Simnet', 'Signet']);
 
 /**
- * Application Error Response
+ * Application error response
  */
 export const zErrorResponse = z.object({
   reason: z.string(),
   status: z.string(),
 });
 
+/**
+ * Health of a single system dependency.
+ */
 export const zHealthStatus = z.enum(['Operational', 'Unavailable', 'Maintenance']);
 
 /**
- * App Health Information
+ * App health information, fine-grained by dependency.
  */
 export const zHealthCheck = z.object({
   database: zHealthStatus,
@@ -58,10 +131,28 @@ export const zHealthCheck = z.object({
   ln_provider: zHealthStatus,
 });
 
+/**
+ * Details of a payment settled internally between wallets on the same instance.
+ */
+export const zInternalPayment = z.object({
+  btc_address: z.string().nullish(),
+  ln_address: z.string().nullish(),
+  payment_hash: z.string().nullish(),
+});
+
+/**
+ * Field to order invoices by.
+ */
 export const zInvoiceOrderBy = z.enum(['CreatedAt', 'PaymentTime', 'UpdatedAt']);
 
+/**
+ * Lifecycle status of an invoice.
+ */
 export const zInvoiceStatus = z.enum(['Pending', 'Settled', 'Expired']);
 
+/**
+ * The ledger a transaction settles on.
+ */
 export const zLedger = z.enum(['Lightning', 'Internal', 'Onchain']);
 
 /**
@@ -78,11 +169,16 @@ export const zLnAddress = z.object({
   wallet_id: z.uuid(),
 });
 
-export const zLnInvoiceResponse = z.object({
+/**
+ * Lightning-specific details of an invoice.
+ */
+export const zLnInvoice = z.object({
   bolt11: z.string(),
   description_hash: z.string().nullish(),
   expires_at: z.iso.datetime(),
-  expiry: z.string(),
+  expiry: z.coerce.bigint().gte(BigInt(0)).max(BigInt('9223372036854775807'), {
+    error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
+  }),
   min_final_cltv_expiry_delta: z.coerce.bigint().gte(BigInt(0)).max(BigInt('9223372036854775807'), {
     error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
   }),
@@ -91,7 +187,10 @@ export const zLnInvoiceResponse = z.object({
   payment_secret: z.string(),
 });
 
-export const zInvoiceResponse = z.object({
+/**
+ * An incoming payment request, over Lightning and/or on-chain.
+ */
+export const zInvoice = z.object({
   amount_msat: z.coerce
     .bigint()
     .gte(BigInt(0))
@@ -106,6 +205,7 @@ export const zInvoiceResponse = z.object({
       error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
     })
     .nullish(),
+  bitcoin_output: zBtcOutput.nullish(),
   created_at: z.iso.datetime(),
   currency: zCurrency,
   description: z.string().nullish(),
@@ -119,7 +219,7 @@ export const zInvoiceResponse = z.object({
   id: z.uuid(),
   ledger: zLedger,
   ln_address_id: z.uuid().nullish(),
-  ln_invoice: zLnInvoiceResponse.nullish(),
+  ln_invoice: zLnInvoice.nullish(),
   payment_time: z.iso.datetime().nullish(),
   status: zInvoiceStatus,
   timestamp: z.iso.datetime(),
@@ -127,6 +227,9 @@ export const zInvoiceResponse = z.object({
   wallet_id: z.uuid(),
 });
 
+/**
+ * LNURL-pay `payRequest` response served at the well-known endpoint (LUD-06).
+ */
 export const zLnUrlPayRequest = z.object({
   allowsNostr: z.boolean(),
   callback: z.string(),
@@ -145,18 +248,44 @@ export const zLnUrlPayRequest = z.object({
   tag: z.string(),
 });
 
-export const zLnUrlCallbackResponse = z.object({
-  disposable: z.boolean().nullish(),
-  pr: z.string(),
-  routes: z.array(z.string()),
-  successAction: z.unknown().optional(),
-});
-
+/**
+ * LNURL success action shown to the payer after a successful payment (LUD-09).
+ */
 export const zLnUrlSuccessAction = z.object({
   description: z.string().nullish(),
   message: z.string().nullish(),
   tag: z.string(),
   url: z.string().nullish(),
+});
+
+/**
+ * Lightning-specific details of a payment.
+ */
+export const zLnPayment = z.object({
+  ln_address: z.string().nullish(),
+  metadata: z.string().nullish(),
+  payment_hash: z.string(),
+  payment_preimage: z.string().nullish(),
+  success_action: zLnUrlSuccessAction.nullish(),
+});
+
+/**
+ * LNURL-pay callback response. Carries the invoice to pay and how to behave on
+ * success. Wire shape follows LUD-06 (camelCase fields).
+ */
+export const zLnUrlCallback = z.object({
+  disposable: z.boolean().nullish(),
+  pr: z.string(),
+  routes: z.array(z.string()),
+  successAction: zLnUrlSuccessAction.nullish(),
+});
+
+/**
+ * New Bitcoin Address Request
+ */
+export const zNewBtcAddressRequest = z.object({
+  type: zBtcAddressType.nullish(),
+  wallet_id: z.uuid().nullish(),
 });
 
 /**
@@ -175,18 +304,31 @@ export const zNewInvoiceRequest = z.object({
   wallet_id: z.uuid().nullish(),
 });
 
+/**
+ * Nostr NIP-05 response. Maps each queried name to its hex-encoded public key.
+ */
 export const zNostrNip05Response = z.object({
   names: z.record(z.string(), z.string()),
 });
 
+/**
+ * Direction of result ordering for list endpoints.
+ */
 export const zOrderDirection = z.enum(['Asc', 'Desc']);
 
+/**
+ * Lifecycle status of a payment.
+ */
 export const zPaymentStatus = z.enum(['Pending', 'Settled', 'Failed']);
 
-export const zPaymentResponse = z.object({
+/**
+ * An outgoing payment, over Lightning, on-chain, or internal to the instance.
+ */
+export const zPayment = z.object({
   amount_msat: z.coerce.bigint().gte(BigInt(0)).max(BigInt('9223372036854775807'), {
     error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
   }),
+  bitcoin: zBtcPayment.nullish(),
   created_at: z.iso.datetime(),
   currency: zCurrency,
   description: z.string().nullish(),
@@ -199,18 +341,18 @@ export const zPaymentResponse = z.object({
     })
     .nullish(),
   id: z.uuid(),
+  internal: zInternalPayment.nullish(),
   ledger: zLedger,
-  ln_address: z.string().nullish(),
-  metadata: z.string().nullish(),
-  payment_hash: z.string().nullish(),
-  payment_preimage: z.string().nullish(),
+  lightning: zLnPayment.nullish(),
   payment_time: z.iso.datetime().nullish(),
   status: zPaymentStatus,
-  success_action: zLnUrlSuccessAction.nullish(),
   updated_at: z.iso.datetime().nullish(),
   wallet_id: z.uuid(),
 });
 
+/**
+ * An API access scope granted to a JWT or API key.
+ */
 export const zPermission = z.enum([
   'read:wallet',
   'write:wallet',
@@ -222,12 +364,14 @@ export const zPermission = z.enum([
   'write:ln_node',
   'read:api_key',
   'write:api_key',
+  'read:btc_address',
+  'write:btc_address',
 ]);
 
 /**
- * API Key Response
+ * API Key
  */
-export const zApiKeyResponse = z.object({
+export const zApiKey = z.object({
   created_at: z.iso.datetime(),
   description: z.string().nullish(),
   expires_at: z.iso.datetime().nullish(),
@@ -253,18 +397,9 @@ export const zCreateApiKeyRequest = z.object({
   user_id: z.string().nullish(),
 });
 
-export const zRedeemOnchainRequest = z.object({
-  feerate: z
-    .int()
-    .gte(0)
-    .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
-  to_address: z.string(),
-});
-
-export const zRedeemOnchainResponse = z.object({
-  txid: z.string(),
-});
-
+/**
+ * Register Lightning Address Request
+ */
 export const zRegisterLnAddressRequest = z.object({
   allows_nostr: z.boolean().optional(),
   nostr_pubkey: z.string().nullish(),
@@ -277,20 +412,6 @@ export const zRegisterLnAddressRequest = z.object({
  */
 export const zRegisterWalletRequest = z.object({
   user_id: z.string(),
-});
-
-/**
- * Send On-chain Payment Request
- */
-export const zSendOnchainPaymentRequest = z.object({
-  amount_msat: z.coerce.bigint().gte(BigInt(0)).max(BigInt('9223372036854775807'), {
-    error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
-  }),
-  feerate: z
-    .int()
-    .gte(0)
-    .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
-  recipient_address: z.string(),
 });
 
 /**
@@ -310,7 +431,7 @@ export const zSendPaymentRequest = z.object({
 });
 
 /**
- * App setup info
+ * App setup info.
  */
 export const zSetupInfo = z.object({
   sign_up_complete: z.boolean(),
@@ -331,14 +452,6 @@ export const zSignInResponse = z.object({
   token: z.string(),
 });
 
-export const zSignMessageRequest = z.object({
-  message: z.string(),
-});
-
-export const zSignMessageResponse = z.object({
-  signature: z.string(),
-});
-
 /**
  * Sign Up Request
  */
@@ -346,6 +459,9 @@ export const zSignUpRequest = z.object({
   password: z.string(),
 });
 
+/**
+ * Update Lightning Address Request
+ */
 export const zUpdateLnAddressRequest = z.object({
   active: z.boolean().nullish(),
   allows_nostr: z.boolean().nullish(),
@@ -354,17 +470,31 @@ export const zUpdateLnAddressRequest = z.object({
 });
 
 /**
- * App version info
+ * App version info.
  */
 export const zVersionInfo = z.object({
   build_time: z.string(),
   version: z.string(),
 });
 
-export const zWalletLnAddressResponse = z.object({
+/**
+ * A user wallet with its balance and linked payments, invoices and contacts.
+ */
+export const zWallet = z.object({
+  balance: zBalance,
+  contacts: z.array(zContact),
+  created_at: z.iso.datetime(),
+  id: z.uuid(),
+  invoices: z.array(zInvoice),
   ln_address: zLnAddress.nullish(),
+  payments: z.array(zPayment),
+  updated_at: z.iso.datetime().nullish(),
+  user_id: z.string(),
 });
 
+/**
+ * A lightweight wallet summary with counts in place of the full lists.
+ */
 export const zWalletOverview = z.object({
   balance: zBalance,
   created_at: z.iso.datetime(),
@@ -382,18 +512,6 @@ export const zWalletOverview = z.object({
     .int()
     .gte(0)
     .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
-  updated_at: z.iso.datetime().nullish(),
-  user_id: z.string(),
-});
-
-export const zWalletResponse = z.object({
-  balance: zBalance,
-  contacts: z.array(zContact),
-  created_at: z.iso.datetime(),
-  id: z.uuid(),
-  invoices: z.array(zInvoiceResponse),
-  ln_address: zLnAddress.nullish(),
-  payments: z.array(zPaymentResponse),
   updated_at: z.iso.datetime().nullish(),
   user_id: z.string(),
 });
@@ -430,7 +548,7 @@ export const zCallbackQuery = z.object({
 /**
  * Found
  */
-export const zCallbackResponse = zLnUrlCallbackResponse;
+export const zCallbackResponse = zLnUrlCallback;
 
 export const zRevokeApiKeysQuery = z.object({
   limit: z.coerce
@@ -485,14 +603,14 @@ export const zListApiKeysQuery = z.object({
 /**
  * Success
  */
-export const zListApiKeysResponse = z.array(zApiKeyResponse);
+export const zListApiKeysResponse = z.array(zApiKey);
 
 export const zCreateApiKeyBody = zCreateApiKeyRequest;
 
 /**
  * API Key Created
  */
-export const zCreateApiKeyResponse = zApiKeyResponse;
+export const zCreateApiKeyResponse = zApiKey;
 
 export const zRevokeApiKeyPath = z.object({
   id: z.uuid(),
@@ -505,7 +623,7 @@ export const zGetApiKeyPath = z.object({
 /**
  * Found
  */
-export const zGetApiKeyResponse = zApiKeyResponse;
+export const zGetApiKeyResponse = zApiKey;
 
 export const zSignInBody = zSignInRequest;
 
@@ -520,6 +638,87 @@ export const zSignUpBody = zSignUpRequest;
  * Admin user created
  */
 export const zSignUpResponse = zSignInResponse;
+
+export const zDeleteBtcAddressesQuery = z.object({
+  limit: z.coerce
+    .bigint()
+    .gte(BigInt(0))
+    .max(BigInt('9223372036854775807'), {
+      error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
+    })
+    .nullish(),
+  offset: z.coerce
+    .bigint()
+    .gte(BigInt(0))
+    .max(BigInt('9223372036854775807'), {
+      error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
+    })
+    .nullish(),
+  ids: z.array(z.uuid()).nullish(),
+  wallet_id: z.uuid().nullish(),
+  address: z.string().nullish(),
+  address_type: zBtcAddressType.nullish(),
+  used: z.boolean().nullish(),
+  order_direction: zOrderDirection.optional(),
+});
+
+/**
+ * Success
+ */
+export const zDeleteBtcAddressesResponse = z.coerce
+  .bigint()
+  .gte(BigInt(0))
+  .max(BigInt('9223372036854775807'), {
+    error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
+  });
+
+export const zListBtcAddressesQuery = z.object({
+  limit: z.coerce
+    .bigint()
+    .gte(BigInt(0))
+    .max(BigInt('9223372036854775807'), {
+      error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
+    })
+    .nullish(),
+  offset: z.coerce
+    .bigint()
+    .gte(BigInt(0))
+    .max(BigInt('9223372036854775807'), {
+      error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
+    })
+    .nullish(),
+  ids: z.array(z.uuid()).nullish(),
+  wallet_id: z.uuid().nullish(),
+  address: z.string().nullish(),
+  address_type: zBtcAddressType.nullish(),
+  used: z.boolean().nullish(),
+  order_direction: zOrderDirection.optional(),
+});
+
+/**
+ * Success
+ */
+export const zListBtcAddressesResponse = z.array(zBtcAddress);
+
+export const zGenerateBtcAddressBody = zNewBtcAddressRequest;
+
+/**
+ * Bitcoin Address Created
+ */
+export const zGenerateBtcAddressResponse = zBtcAddress;
+
+export const zDeleteBtcAddressPath = z.object({
+  id: z.uuid(),
+});
+
+export const zGetBtcAddressPath = z.object({
+  id: z.uuid(),
+});
+
+/**
+ * Found
+ */
+export const zGetBtcAddressResponse = zBtcAddress;
 
 export const zDeleteInvoicesQuery = z.object({
   limit: z.coerce
@@ -580,14 +779,14 @@ export const zListInvoicesQuery = z.object({
 /**
  * Success
  */
-export const zListInvoicesResponse = z.array(zInvoiceResponse);
+export const zListInvoicesResponse = z.array(zInvoice);
 
 export const zGenerateInvoiceBody = zNewInvoiceRequest;
 
 /**
  * Invoice Created
  */
-export const zGenerateInvoiceResponse = zInvoiceResponse;
+export const zGenerateInvoiceResponse = zInvoice;
 
 export const zDeleteInvoicePath = z.object({
   id: z.uuid(),
@@ -600,7 +799,7 @@ export const zGetInvoicePath = z.object({
 /**
  * Found
  */
-export const zGetInvoiceResponse = zInvoiceResponse;
+export const zGetInvoiceResponse = zInvoice;
 
 export const zDeleteAddressesQuery = z.object({
   limit: z.coerce
@@ -695,7 +894,7 @@ export const zUpdateAddressResponse = zLnAddress;
 /**
  * Found
  */
-export const zGetUserWalletResponse = zWalletResponse;
+export const zGetUserWalletResponse = zWallet;
 
 export const zRevokeWalletApiKeysQuery = z.object({
   limit: z.coerce
@@ -750,14 +949,14 @@ export const zListWalletApiKeysQuery = z.object({
 /**
  * Success
  */
-export const zListWalletApiKeysResponse = z.array(zApiKeyResponse);
+export const zListWalletApiKeysResponse = z.array(zApiKey);
 
 export const zCreateWalletApiKeyBody = zCreateApiKeyRequest;
 
 /**
  * API Key Created
  */
-export const zCreateWalletApiKeyResponse = zApiKeyResponse;
+export const zCreateWalletApiKeyResponse = zApiKey;
 
 export const zRevokeWalletApiKeyPath = z.object({
   id: z.uuid(),
@@ -770,12 +969,19 @@ export const zGetWalletApiKeyPath = z.object({
 /**
  * Found
  */
-export const zGetWalletApiKeyResponse = zApiKeyResponse;
+export const zGetWalletApiKeyResponse = zApiKey;
 
 /**
  * Found
  */
 export const zGetWalletBalanceResponse = zBalance;
+
+export const zNewWalletBtcAddressBody = zNewBtcAddressRequest;
+
+/**
+ * Bitcoin Address Created
+ */
+export const zNewWalletBtcAddressResponse = zBtcAddress;
 
 /**
  * Success
@@ -818,14 +1024,14 @@ export const zListWalletInvoicesQuery = z.object({
 /**
  * Success
  */
-export const zListWalletInvoicesResponse = z.array(zInvoiceResponse);
+export const zListWalletInvoicesResponse = z.array(zInvoice);
 
 export const zNewWalletInvoiceBody = zNewInvoiceRequest;
 
 /**
  * Invoice Created
  */
-export const zNewWalletInvoiceResponse = zInvoiceResponse;
+export const zNewWalletInvoiceResponse = zInvoice;
 
 export const zGetWalletInvoicePath = z.object({
   id: z.uuid(),
@@ -834,12 +1040,12 @@ export const zGetWalletInvoicePath = z.object({
 /**
  * Found
  */
-export const zGetWalletInvoiceResponse = zInvoiceResponse;
+export const zGetWalletInvoiceResponse = zInvoice;
 
 /**
  * Found
  */
-export const zGetWalletAddressResponse = zWalletLnAddressResponse;
+export const zGetWalletAddressResponse = zLnAddress.nullable();
 
 export const zRegisterWalletAddressBody = zRegisterLnAddressRequest;
 
@@ -884,20 +1090,22 @@ export const zListWalletPaymentsQuery = z.object({
   wallet_id: z.uuid().nullish(),
   status: zPaymentStatus.nullish(),
   ledger: zLedger.nullish(),
+  ln_addresses: z.array(z.string()).nullish(),
+  btc_addresses: z.array(z.string()).nullish(),
   order_direction: zOrderDirection.optional(),
 });
 
 /**
  * Success
  */
-export const zListWalletPaymentsResponse = z.array(zPaymentResponse);
+export const zListWalletPaymentsResponse = z.array(zPayment);
 
 export const zWalletPayBody = zSendPaymentRequest;
 
 /**
  * Payment Sent
  */
-export const zWalletPayResponse = zPaymentResponse;
+export const zWalletPayResponse = zPayment;
 
 export const zGetWalletPaymentPath = z.object({
   id: z.uuid(),
@@ -906,7 +1114,7 @@ export const zGetWalletPaymentPath = z.object({
 /**
  * Found
  */
-export const zGetWalletPaymentResponse = zPaymentResponse;
+export const zGetWalletPaymentResponse = zPayment;
 
 export const zDeletePaymentsQuery = z.object({
   limit: z.coerce
@@ -927,6 +1135,8 @@ export const zDeletePaymentsQuery = z.object({
   wallet_id: z.uuid().nullish(),
   status: zPaymentStatus.nullish(),
   ledger: zLedger.nullish(),
+  ln_addresses: z.array(z.string()).nullish(),
+  btc_addresses: z.array(z.string()).nullish(),
   order_direction: zOrderDirection.optional(),
 });
 
@@ -959,20 +1169,22 @@ export const zListPaymentsQuery = z.object({
   wallet_id: z.uuid().nullish(),
   status: zPaymentStatus.nullish(),
   ledger: zLedger.nullish(),
+  ln_addresses: z.array(z.string()).nullish(),
+  btc_addresses: z.array(z.string()).nullish(),
   order_direction: zOrderDirection.optional(),
 });
 
 /**
  * Success
  */
-export const zListPaymentsResponse = z.array(zPaymentResponse);
+export const zListPaymentsResponse = z.array(zPayment);
 
 export const zPayBody = zSendPaymentRequest;
 
 /**
  * Payment Sent
  */
-export const zPayResponse = zPaymentResponse;
+export const zPayResponse = zPayment;
 
 export const zDeletePaymentPath = z.object({
   id: z.uuid(),
@@ -985,7 +1197,7 @@ export const zGetPaymentPath = z.object({
 /**
  * Found
  */
-export const zGetPaymentResponse = zPaymentResponse;
+export const zGetPaymentResponse = zPayment;
 
 /**
  * OK
@@ -1045,14 +1257,14 @@ export const zDeleteWalletsResponse = z.coerce
 /**
  * Success
  */
-export const zListWalletsResponse = z.array(zWalletResponse);
+export const zListWalletsResponse = z.array(zWallet);
 
 export const zRegisterWalletBody = zRegisterWalletRequest;
 
 /**
  * Wallet Created
  */
-export const zRegisterWalletResponse = zWalletResponse;
+export const zRegisterWalletResponse = zWallet;
 
 /**
  * Success
@@ -1070,4 +1282,4 @@ export const zGetWalletPath = z.object({
 /**
  * Found
  */
-export const zGetWalletResponse = zWalletResponse;
+export const zGetWalletResponse = zWallet;

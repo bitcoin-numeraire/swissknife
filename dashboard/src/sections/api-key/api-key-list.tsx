@@ -1,7 +1,7 @@
 'use client';
 
 import type { IApiKeyTableFilters } from 'src/types/apikey';
-import type { ApiKeyResponse, ListApiKeysResponse } from 'src/lib/swissknife';
+import type { ApiKey, ListApiKeysResponse } from 'src/lib/swissknife';
 
 import { useState, useEffect, useCallback } from 'react';
 import { useBoolean, useSetState } from 'minimal-shared/hooks';
@@ -255,7 +255,7 @@ function applyFilter({
   filters,
   dateError,
 }: {
-  inputData: ApiKeyResponse[];
+  inputData: ApiKey[];
   comparator: (a: any, b: any) => number;
   filters: IApiKeyTableFilters;
   dateError: boolean;

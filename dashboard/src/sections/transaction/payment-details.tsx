@@ -1,4 +1,4 @@
-import type { PaymentResponse } from 'src/lib/swissknife';
+import type { Payment } from 'src/lib/swissknife';
 
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
@@ -23,13 +23,15 @@ import { TransactionToolbar } from './transaction-toolbar';
 // ----------------------------------------------------------------------
 
 type Props = {
-  payment: PaymentResponse;
+  payment: Payment;
   isAdmin?: boolean;
 };
 
 export function PaymentDetails({ payment, isAdmin }: Props) {
   const { t } = useTranslate();
   const { user } = useAuthContext();
+
+  const { ln_address, success_action, payment_hash, payment_preimage } = payment.lightning ?? {};
 
   const renderList = (
     <Grid container spacing={3} sx={{ my: 5 }}>
@@ -59,7 +61,7 @@ export function PaymentDetails({ payment, isAdmin }: Props) {
       </Grid>
       <Grid size={{ xs: 12, md: 4, sm: 6 }}>
         <Title>{t('payment_details.lightning_address')}</Title>
-        <Typography color="textSecondary">{payment.ln_address || 'N/A'}</Typography>
+        <Typography color="textSecondary">{ln_address || 'N/A'}</Typography>
       </Grid>
 
       <Grid size={{ xs: 12 }}>
@@ -79,7 +81,7 @@ export function PaymentDetails({ payment, isAdmin }: Props) {
         </Typography>
       </Grid>
 
-      {payment.success_action && (
+      {success_action && (
         <>
           <Grid size={{ xs: 12 }}>
             <Divider sx={{ borderStyle: 'dashed' }} />
@@ -89,16 +91,16 @@ export function PaymentDetails({ payment, isAdmin }: Props) {
             <Title>{t('payment_details.success_action')}</Title>
             <Typography color="textSecondary" sx={{ wordBreak: 'break-all' }}>
               <li>
-                {t('payment_details.message')}: {payment.success_action.message}
+                {t('payment_details.message')}: {success_action.message}
               </li>
               <li>
-                {t('payment_details.success_description')}: {payment.success_action.description}
+                {t('payment_details.success_description')}: {success_action.description}
               </li>
-              {payment.success_action.url && (
+              {success_action.url && (
                 <li>
                   URL:{' '}
-                  <Link href={payment.success_action.url} target="_blank" rel="noopener noreferrer">
-                    {payment.success_action.url}
+                  <Link href={success_action.url} target="_blank" rel="noopener noreferrer">
+                    {success_action.url}
                   </Link>
                 </li>
               )}
@@ -107,7 +109,7 @@ export function PaymentDetails({ payment, isAdmin }: Props) {
         </>
       )}
 
-      {payment.payment_hash && (
+      {payment_hash && (
         <>
           <Grid size={{ xs: 12 }}>
             <Divider sx={{ borderStyle: 'dashed' }} />
@@ -116,13 +118,13 @@ export function PaymentDetails({ payment, isAdmin }: Props) {
           <Grid size={{ xs: 12 }}>
             <Title>{t('transaction_details.payment_hash')}</Title>
             <Typography color="textSecondary" sx={{ wordBreak: 'break-all' }}>
-              {payment.payment_hash}
+              {payment_hash}
             </Typography>
           </Grid>
         </>
       )}
 
-      {payment.payment_preimage && (
+      {payment_preimage && (
         <>
           <Grid size={{ xs: 12 }}>
             <Divider sx={{ borderStyle: 'dashed' }} />
@@ -131,7 +133,7 @@ export function PaymentDetails({ payment, isAdmin }: Props) {
           <Grid size={{ xs: 12 }}>
             <Title>{t('payment_details.payment_preimage')}</Title>
             <Typography color="textSecondary" sx={{ wordBreak: 'break-all' }}>
-              {payment.payment_preimage}
+              {payment_preimage}
             </Typography>
           </Grid>
         </>

@@ -1,4 +1,4 @@
-import type { InvoiceResponse } from 'src/lib/swissknife';
+import type { Invoice } from 'src/lib/swissknife';
 
 import { QRCode } from 'react-qrcode-logo';
 
@@ -25,7 +25,7 @@ import { TransactionToolbar } from './transaction-toolbar';
 // ----------------------------------------------------------------------
 
 type Props = {
-  invoice: InvoiceResponse;
+  invoice: Invoice;
   isAdmin?: boolean;
 };
 

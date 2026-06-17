@@ -1,4 +1,4 @@
-import type { Permission, ApiKeyResponse, CreateApiKeyRequest } from 'src/lib/swissknife';
+import type { ApiKey, Permission, CreateApiKeyRequest } from 'src/lib/swissknife';
 
 import { useState } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -52,7 +52,7 @@ const permissionOptions = (permissions: Permission[]) =>
 export function CreateApiKeyForm({ onSuccess, isAdmin }: Props) {
   const { t } = useTranslate();
   const { user } = useAuthContext();
-  const [apiKey, setApiKey] = useState<ApiKeyResponse>();
+  const [apiKey, setApiKey] = useState<ApiKey>();
   const [now] = useState(() => Date.now());
 
   const methods = useForm({

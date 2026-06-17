@@ -5,9 +5,11 @@ import { client } from './client.gen';
 import {
   createApiKeyResponseTransformer,
   createWalletApiKeyResponseTransformer,
+  generateBtcAddressResponseTransformer,
   generateInvoiceResponseTransformer,
   getAddressResponseTransformer,
   getApiKeyResponseTransformer,
+  getBtcAddressResponseTransformer,
   getInvoiceResponseTransformer,
   getPaymentResponseTransformer,
   getUserWalletResponseTransformer,
@@ -18,6 +20,7 @@ import {
   getWalletResponseTransformer,
   listAddressesResponseTransformer,
   listApiKeysResponseTransformer,
+  listBtcAddressesResponseTransformer,
   listContactsResponseTransformer,
   listInvoicesResponseTransformer,
   listPaymentsResponseTransformer,
@@ -26,6 +29,7 @@ import {
   listWalletOverviewsResponseTransformer,
   listWalletPaymentsResponseTransformer,
   listWalletsResponseTransformer,
+  newWalletBtcAddressResponseTransformer,
   newWalletInvoiceResponseTransformer,
   payResponseTransformer,
   registerAddressResponseTransformer,
@@ -51,6 +55,12 @@ import type {
   DeleteAddressesErrors,
   DeleteAddressesResponses,
   DeleteAddressResponses,
+  DeleteBtcAddressData,
+  DeleteBtcAddressErrors,
+  DeleteBtcAddressesData,
+  DeleteBtcAddressesErrors,
+  DeleteBtcAddressesResponses,
+  DeleteBtcAddressResponses,
   DeleteExpiredInvoicesData,
   DeleteExpiredInvoicesErrors,
   DeleteExpiredInvoicesResponses,
@@ -78,6 +88,9 @@ import type {
   DeleteWalletsData,
   DeleteWalletsErrors,
   DeleteWalletsResponses,
+  GenerateBtcAddressData,
+  GenerateBtcAddressErrors,
+  GenerateBtcAddressResponses,
   GenerateInvoiceData,
   GenerateInvoiceErrors,
   GenerateInvoiceResponses,
@@ -87,6 +100,9 @@ import type {
   GetApiKeyData,
   GetApiKeyErrors,
   GetApiKeyResponses,
+  GetBtcAddressData,
+  GetBtcAddressErrors,
+  GetBtcAddressResponses,
   GetInvoiceData,
   GetInvoiceErrors,
   GetInvoiceResponses,
@@ -123,6 +139,9 @@ import type {
   ListApiKeysData,
   ListApiKeysErrors,
   ListApiKeysResponses,
+  ListBtcAddressesData,
+  ListBtcAddressesErrors,
+  ListBtcAddressesResponses,
   ListContactsData,
   ListContactsErrors,
   ListContactsResponses,
@@ -150,6 +169,9 @@ import type {
   MarkWelcomeCompleteData,
   MarkWelcomeCompleteErrors,
   MarkWelcomeCompleteResponses,
+  NewWalletBtcAddressData,
+  NewWalletBtcAddressErrors,
+  NewWalletBtcAddressResponses,
   NewWalletInvoiceData,
   NewWalletInvoiceErrors,
   NewWalletInvoiceResponses,
@@ -378,6 +400,95 @@ export const signUp = <ThrowOnError extends boolean = false>(
       'Content-Type': 'application/json',
       ...options.headers,
     },
+  });
+
+/**
+ * Delete Bitcoin addresses
+ *
+ * Deletes all the Bitcoin addresses given a filter. Returns the number of deleted addresses. Deleting an address can have an effect on the user balance
+ */
+export const deleteBtcAddresses = <ThrowOnError extends boolean = false>(
+  options?: Options<DeleteBtcAddressesData, ThrowOnError>
+): RequestResult<DeleteBtcAddressesResponses, DeleteBtcAddressesErrors, ThrowOnError> =>
+  (options?.client ?? client).delete<
+    DeleteBtcAddressesResponses,
+    DeleteBtcAddressesErrors,
+    ThrowOnError
+  >({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/bitcoin/addresses',
+    ...options,
+  });
+
+/**
+ * List Bitcoin addresses
+ *
+ * Returns all the Bitcoin addresses given a filter
+ */
+export const listBtcAddresses = <ThrowOnError extends boolean = false>(
+  options?: Options<ListBtcAddressesData, ThrowOnError>
+): RequestResult<ListBtcAddressesResponses, ListBtcAddressesErrors, ThrowOnError> =>
+  (options?.client ?? client).get<ListBtcAddressesResponses, ListBtcAddressesErrors, ThrowOnError>({
+    responseTransformer: listBtcAddressesResponseTransformer,
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/bitcoin/addresses',
+    ...options,
+  });
+
+/**
+ * Generate a new Bitcoin address
+ *
+ * Returns the generated Bitcoin address for the given user
+ */
+export const generateBtcAddress = <ThrowOnError extends boolean = false>(
+  options: Options<GenerateBtcAddressData, ThrowOnError>
+): RequestResult<GenerateBtcAddressResponses, GenerateBtcAddressErrors, ThrowOnError> =>
+  (options.client ?? client).post<
+    GenerateBtcAddressResponses,
+    GenerateBtcAddressErrors,
+    ThrowOnError
+  >({
+    responseTransformer: generateBtcAddressResponseTransformer,
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/bitcoin/addresses',
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
+
+/**
+ * Delete a Bitcoin address
+ *
+ * Deletes an Bitcoin address by ID. Returns an empty body. Deleting a Bitcoin address has an effect on the user balance
+ */
+export const deleteBtcAddress = <ThrowOnError extends boolean = false>(
+  options: Options<DeleteBtcAddressData, ThrowOnError>
+): RequestResult<DeleteBtcAddressResponses, DeleteBtcAddressErrors, ThrowOnError> =>
+  (options.client ?? client).delete<
+    DeleteBtcAddressResponses,
+    DeleteBtcAddressErrors,
+    ThrowOnError
+  >({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/bitcoin/addresses/{id}',
+    ...options,
+  });
+
+/**
+ * Find a Bitcoin address
+ *
+ * Returns the Bitcoin address by its ID.
+ */
+export const getBtcAddress = <ThrowOnError extends boolean = false>(
+  options: Options<GetBtcAddressData, ThrowOnError>
+): RequestResult<GetBtcAddressResponses, GetBtcAddressErrors, ThrowOnError> =>
+  (options.client ?? client).get<GetBtcAddressResponses, GetBtcAddressErrors, ThrowOnError>({
+    responseTransformer: getBtcAddressResponseTransformer,
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/bitcoin/addresses/{id}',
+    ...options,
   });
 
 /**
@@ -675,6 +786,29 @@ export const getWalletBalance = <ThrowOnError extends boolean = false>(
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/v1/me/balance',
     ...options,
+  });
+
+/**
+ * Generate a new Bitcoin address.
+ *
+ * Returns the Bitcoin address for the given address type. The returned address is the same until used.
+ */
+export const newWalletBtcAddress = <ThrowOnError extends boolean = false>(
+  options: Options<NewWalletBtcAddressData, ThrowOnError>
+): RequestResult<NewWalletBtcAddressResponses, NewWalletBtcAddressErrors, ThrowOnError> =>
+  (options.client ?? client).post<
+    NewWalletBtcAddressResponses,
+    NewWalletBtcAddressErrors,
+    ThrowOnError
+  >({
+    responseTransformer: newWalletBtcAddressResponseTransformer,
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/me/bitcoin/address',
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
   });
 
 /**

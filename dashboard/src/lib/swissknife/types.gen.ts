@@ -5,9 +5,9 @@ export type ClientOptions = {
 };
 
 /**
- * API Key Response
+ * API Key
  */
-export type ApiKeyResponse = {
+export type ApiKey = {
   /**
    * Date of creation in database
    */
@@ -42,9 +42,12 @@ export type ApiKeyResponse = {
   user_id: string;
 };
 
+/**
+ * A wallet's balance, in millisatoshis.
+ */
 export type Balance = {
   /**
-   * Amount available to spend
+   * Amount available to spend.
    */
   available_msat: number;
   /**
@@ -56,33 +59,155 @@ export type Balance = {
    */
   received_msat: number;
   /**
-   * Total amount sent
+   * Amount reserved for pending outgoing payments
+   */
+  reserved_msat: number;
+  /**
+   * Total amount sent (settled outgoing payments)
    */
   sent_msat: number;
 };
 
-export type CheckMessageRequest = {
+/**
+ * Bitcoin Address
+ */
+export type BtcAddress = {
   /**
-   * Original message
+   * Current deposit address
    */
-  message: string;
+  address: string;
   /**
-   * Node public key
+   * Address type
    */
-  pubkey: string;
+  address_type: BtcAddressType;
   /**
-   * zbase encoded signature
+   * Date of creation in database
    */
-  signature: string;
+  created_at: Date;
+  /**
+   * Internal ID
+   */
+  id: string;
+  /**
+   * Date of update in database
+   */
+  updated_at?: Date | null;
+  /**
+   * Whether the address has already been used on-chain
+   */
+  used: boolean;
+  /**
+   * Wallet ID
+   */
+  wallet_id: string;
 };
 
-export type CheckMessageResponse = {
+/**
+ * Bitcoin address script type.
+ */
+export const BtcAddressType = {
+  P2PKH: 'p2pkh',
+  P2SH: 'p2sh',
+  P2WPKH: 'p2wpkh',
+  P2TR: 'p2tr',
+} as const;
+
+/**
+ * Bitcoin address script type.
+ */
+export type BtcAddressType = (typeof BtcAddressType)[keyof typeof BtcAddressType];
+
+/**
+ * A Bitcoin network.
+ */
+export const BtcNetwork = {
+  BITCOIN: 'Bitcoin',
+  TESTNET: 'Testnet',
+  TESTNET4: 'Testnet4',
+  REGTEST: 'Regtest',
+  SIMNET: 'Simnet',
+  SIGNET: 'Signet',
+} as const;
+
+/**
+ * A Bitcoin network.
+ */
+export type BtcNetwork = (typeof BtcNetwork)[keyof typeof BtcNetwork];
+
+/**
+ * Bitcoin Output
+ */
+export type BtcOutput = {
   /**
-   * Signature validity
+   * Address
    */
-  is_valid: boolean;
+  address: string;
+  /**
+   * Amount in satoshis
+   */
+  amount_sat: number;
+  /**
+   * Block height
+   */
+  block_height?: number | null;
+  /**
+   * Date of creation in database
+   */
+  created_at: Date;
+  /**
+   * Internal ID
+   */
+  id: string;
+  /**
+   * Outpoint
+   */
+  outpoint: string;
+  /**
+   * Status
+   */
+  status: BtcOutputStatus;
+  /**
+   * Date of update in database
+   */
+  updated_at?: Date | null;
 };
 
+/**
+ * Confirmation status of an on-chain output.
+ */
+export const BtcOutputStatus = {
+  UNCONFIRMED: 'Unconfirmed',
+  CONFIRMED: 'Confirmed',
+  SPENT: 'Spent',
+  IMMATURE: 'Immature',
+} as const;
+
+/**
+ * Confirmation status of an on-chain output.
+ */
+export type BtcOutputStatus = (typeof BtcOutputStatus)[keyof typeof BtcOutputStatus];
+
+/**
+ * On-chain Bitcoin details of a payment.
+ */
+export type BtcPayment = {
+  /**
+   * Destination Bitcoin address. Populated for Bitcoin onchain payments.
+   */
+  address: string;
+  /**
+   * Bitcoin block height where the transaction was confirmed.
+   */
+  block_height?: number | null;
+  /**
+   * Transaction ID for on-chain payments.
+   */
+  txid: string;
+};
+
+/**
+ * A counterparty the wallet has paid, with the date of first contact.
+ */
 export type Contact = {
   /**
    * Date of first payment to this contact
@@ -120,6 +245,9 @@ export type CreateApiKeyRequest = {
   user_id?: string | null;
 };
 
+/**
+ * The currency and network a transaction is denominated in.
+ */
 export const Currency = {
   BITCOIN: 'Bitcoin',
   BITCOIN_TESTNET: 'BitcoinTestnet',
@@ -128,10 +256,13 @@ export const Currency = {
   SIGNET: 'Signet',
 } as const;
 
+/**
+ * The currency and network a transaction is denominated in.
+ */
 export type Currency = (typeof Currency)[keyof typeof Currency];
 
 /**
- * Application Error Response
+ * Application error response
  */
 export type ErrorResponse = {
   /**
@@ -145,7 +276,7 @@ export type ErrorResponse = {
 };
 
 /**
- * App Health Information
+ * App health information, fine-grained by dependency.
  */
 export type HealthCheck = {
   /**
@@ -162,23 +293,42 @@ export type HealthCheck = {
   ln_provider: HealthStatus;
 };
 
+/**
+ * Health of a single system dependency.
+ */
 export const HealthStatus = {
   OPERATIONAL: 'Operational',
   UNAVAILABLE: 'Unavailable',
   MAINTENANCE: 'Maintenance',
 } as const;
 
+/**
+ * Health of a single system dependency.
+ */
 export type HealthStatus = (typeof HealthStatus)[keyof typeof HealthStatus];
 
-export const InvoiceOrderBy = {
-  CREATED_AT: 'CreatedAt',
-  PAYMENT_TIME: 'PaymentTime',
-  UPDATED_AT: 'UpdatedAt',
-} as const;
+/**
+ * Details of a payment settled internally between wallets on the same instance.
+ */
+export type InternalPayment = {
+  /**
+   * Bitcoin Address. Populated for internal Bitcoin address payments
+   */
+  btc_address?: string | null;
+  /**
+   * Lightning Address. Populated for internal LN Address payments
+   */
+  ln_address?: string | null;
+  /**
+   * Payment hash. Populated for internal bolt11 payments
+   */
+  payment_hash?: string | null;
+};
 
-export type InvoiceOrderBy = (typeof InvoiceOrderBy)[keyof typeof InvoiceOrderBy];
-
-export type InvoiceResponse = {
+/**
+ * An incoming payment request, over Lightning and/or on-chain.
+ */
+export type Invoice = {
   /**
    * Amount requested in millisatoshis.
    */
@@ -187,6 +337,7 @@ export type InvoiceResponse = {
    * Amount received in millisatoshis.
    */
   amount_received_msat?: number | null;
+  bitcoin_output?: null | BtcOutput;
   /**
    * Date of creation in database
    */
@@ -215,7 +366,7 @@ export type InvoiceResponse = {
    * Lightning Address. Populated when invoice is generated as part of the LNURL protocol
    */
   ln_address_id?: string | null;
-  ln_invoice?: null | LnInvoiceResponse;
+  ln_invoice?: null | LnInvoice;
   /**
    * Payment time
    */
@@ -238,20 +389,46 @@ export type InvoiceResponse = {
   wallet_id: string;
 };
 
+/**
+ * Field to order invoices by.
+ */
+export const InvoiceOrderBy = {
+  CREATED_AT: 'CreatedAt',
+  PAYMENT_TIME: 'PaymentTime',
+  UPDATED_AT: 'UpdatedAt',
+} as const;
+
+/**
+ * Field to order invoices by.
+ */
+export type InvoiceOrderBy = (typeof InvoiceOrderBy)[keyof typeof InvoiceOrderBy];
+
+/**
+ * Lifecycle status of an invoice.
+ */
 export const InvoiceStatus = {
   PENDING: 'Pending',
   SETTLED: 'Settled',
   EXPIRED: 'Expired',
 } as const;
 
+/**
+ * Lifecycle status of an invoice.
+ */
 export type InvoiceStatus = (typeof InvoiceStatus)[keyof typeof InvoiceStatus];
 
+/**
+ * The ledger a transaction settles on.
+ */
 export const Ledger = {
   LIGHTNING: 'Lightning',
   INTERNAL: 'Internal',
   ONCHAIN: 'Onchain',
 } as const;
 
+/**
+ * The ledger a transaction settles on.
+ */
 export type Ledger = (typeof Ledger)[keyof typeof Ledger];
 
 /**
@@ -292,7 +469,10 @@ export type LnAddress = {
   wallet_id: string;
 };
 
-export type LnInvoiceResponse = {
+/**
+ * Lightning-specific details of an invoice.
+ */
+export type LnInvoice = {
   /**
    * Bolt11
    */
@@ -308,7 +488,7 @@ export type LnInvoiceResponse = {
   /**
    * Duration of expiry in seconds since creation
    */
-  expiry: string;
+  expiry: number;
   /**
    * The minimum number of blocks the final hop in the route should wait before allowing the payment to be claimed. This is a security measure to ensure that the payment can be settled properly
    */
@@ -327,6 +507,32 @@ export type LnInvoiceResponse = {
   payment_secret: string;
 };
 
+/**
+ * Lightning-specific details of a payment.
+ */
+export type LnPayment = {
+  /**
+   * Lightning Address. Populated when sending to a LN Address
+   */
+  ln_address?: string | null;
+  /**
+   * Metadata
+   */
+  metadata?: string | null;
+  /**
+   * Payment hash
+   */
+  payment_hash: string;
+  /**
+   * Payment Preimage
+   */
+  payment_preimage?: string | null;
+  success_action?: null | LnUrlSuccessAction;
+};
+
+/**
+ * LNURL-pay `payRequest` response served at the well-known endpoint (LUD-06).
+ */
 export type LnUrlPayRequest = {
   /**
    * Nostr enabled
@@ -362,7 +568,11 @@ export type LnUrlPayRequest = {
   tag: string;
 };
 
-export type LnUrlCallbackResponse = {
+/**
+ * LNURL-pay callback response. Carries the invoice to pay and how to behave on
+ * success. Wire shape follows LUD-06 (camelCase fields).
+ */
+export type LnUrlCallback = {
   /**
    * An optional flag to let a wallet know whether to persist the link from step 1, if null should be interpreted as true
    */
@@ -375,12 +585,12 @@ export type LnUrlCallbackResponse = {
    * array with payment routes, should be left empty if no routes are to be provided
    */
   routes: Array<string>;
-  /**
-   * An optional action to be executed after successfully paying an invoice
-   */
-  successAction?: unknown;
+  successAction?: null | LnUrlSuccessAction;
 };
 
+/**
+ * LNURL success action shown to the payer after a successful payment (LUD-09).
+ */
 export type LnUrlSuccessAction = {
   /**
    * Description
@@ -398,6 +608,17 @@ export type LnUrlSuccessAction = {
    * URL for the user to open on success
    */
   url?: string | null;
+};
+
+/**
+ * New Bitcoin Address Request
+ */
+export type NewBtcAddressRequest = {
+  type?: null | BtcAddressType;
+  /**
+   * User ID. Will be populated with your own ID by default
+   */
+  wallet_id?: string | null;
 };
 
 /**
@@ -422,24 +643,37 @@ export type NewInvoiceRequest = {
   wallet_id?: string | null;
 };
 
+/**
+ * Nostr NIP-05 response. Maps each queried name to its hex-encoded public key.
+ */
 export type NostrNip05Response = {
   /**
-   * Found names
+   * Found names, keyed by username and valued by hex-encoded public key
    */
   names: {
     [key: string]: string;
   };
 };
 
+/**
+ * Direction of result ordering for list endpoints.
+ */
 export const OrderDirection = { ASC: 'Asc', DESC: 'Desc' } as const;
 
+/**
+ * Direction of result ordering for list endpoints.
+ */
 export type OrderDirection = (typeof OrderDirection)[keyof typeof OrderDirection];
 
-export type PaymentResponse = {
+/**
+ * An outgoing payment, over Lightning, on-chain, or internal to the instance.
+ */
+export type Payment = {
   /**
    * Amount in millisatoshis.
    */
   amount_msat: number;
+  bitcoin?: null | BtcPayment;
   /**
    * Date of creation in database
    */
@@ -464,26 +698,12 @@ export type PaymentResponse = {
    * Internal ID
    */
   id: string;
+  internal?: null | InternalPayment;
   /**
    * Ledger
    */
   ledger: Ledger;
-  /**
-   * Lightning Address. Populated when sending to a LN Address
-   */
-  ln_address?: string | null;
-  /**
-   * Metadata
-   */
-  metadata?: string | null;
-  /**
-   * Payment hash
-   */
-  payment_hash?: string | null;
-  /**
-   * Payment Preimage
-   */
-  payment_preimage?: string | null;
+  lightning?: null | LnPayment;
   /**
    * Payment time
    */
@@ -492,7 +712,6 @@ export type PaymentResponse = {
    * Status
    */
   status: PaymentStatus;
-  success_action?: null | LnUrlSuccessAction;
   /**
    * Date of update in database
    */
@@ -503,14 +722,23 @@ export type PaymentResponse = {
   wallet_id: string;
 };
 
+/**
+ * Lifecycle status of a payment.
+ */
 export const PaymentStatus = {
   PENDING: 'Pending',
   SETTLED: 'Settled',
   FAILED: 'Failed',
 } as const;
 
+/**
+ * Lifecycle status of a payment.
+ */
 export type PaymentStatus = (typeof PaymentStatus)[keyof typeof PaymentStatus];
 
+/**
+ * An API access scope granted to a JWT or API key.
+ */
 export const Permission = {
   READ_WALLET: 'read:wallet',
   WRITE_WALLET: 'write:wallet',
@@ -522,28 +750,18 @@ export const Permission = {
   WRITE_LN_NODE: 'write:ln_node',
   READ_API_KEY: 'read:api_key',
   WRITE_API_KEY: 'write:api_key',
+  READ_BTC_ADDRESS: 'read:btc_address',
+  WRITE_BTC_ADDRESS: 'write:btc_address',
 } as const;
 
+/**
+ * An API access scope granted to a JWT or API key.
+ */
 export type Permission = (typeof Permission)[keyof typeof Permission];
 
-export type RedeemOnchainRequest = {
-  /**
-   * Fee rate in sats/vb
-   */
-  feerate: number;
-  /**
-   * Recipient BTC address
-   */
-  to_address: string;
-};
-
-export type RedeemOnchainResponse = {
-  /**
-   * Transaction ID
-   */
-  txid: string;
-};
-
+/**
+ * Register Lightning Address Request
+ */
 export type RegisterLnAddressRequest = {
   /**
    * Nostr enabled
@@ -574,24 +792,6 @@ export type RegisterWalletRequest = {
 };
 
 /**
- * Send On-chain Payment Request
- */
-export type SendOnchainPaymentRequest = {
-  /**
-   * Amount in millisatoshis
-   */
-  amount_msat: number;
-  /**
-   * Fee rate in sats/vb
-   */
-  feerate: number;
-  /**
-   * Recipient Bitcoin address
-   */
-  recipient_address: string;
-};
-
-/**
  * Send Payment Request
  */
 export type SendPaymentRequest = {
@@ -614,7 +814,7 @@ export type SendPaymentRequest = {
 };
 
 /**
- * App setup info
+ * App setup info.
  */
 export type SetupInfo = {
   /**
@@ -647,20 +847,6 @@ export type SignInResponse = {
   token: string;
 };
 
-export type SignMessageRequest = {
-  /**
-   * Message
-   */
-  message: string;
-};
-
-export type SignMessageResponse = {
-  /**
-   * zbase encoded signature
-   */
-  signature: string;
-};
-
 /**
  * Sign Up Request
  */
@@ -671,6 +857,9 @@ export type SignUpRequest = {
   password: string;
 };
 
+/**
+ * Update Lightning Address Request
+ */
 export type UpdateLnAddressRequest = {
   /**
    * Active status
@@ -691,7 +880,7 @@ export type UpdateLnAddressRequest = {
 };
 
 /**
- * App version info
+ * App version info.
  */
 export type VersionInfo = {
   /**
@@ -704,10 +893,48 @@ export type VersionInfo = {
   version: string;
 };
 
-export type WalletLnAddressResponse = {
+/**
+ * A user wallet with its balance and linked payments, invoices and contacts.
+ */
+export type Wallet = {
+  /**
+   * User Balance
+   */
+  balance: Balance;
+  /**
+   * List of contacts
+   */
+  contacts: Array<Contact>;
+  /**
+   * Date of creation in database
+   */
+  created_at: Date;
+  /**
+   * Internal ID
+   */
+  id: string;
+  /**
+   * List of Invoices
+   */
+  invoices: Array<Invoice>;
   ln_address?: null | LnAddress;
+  /**
+   * List of payments
+   */
+  payments: Array<Payment>;
+  /**
+   * Date of update in database
+   */
+  updated_at?: Date | null;
+  /**
+   * User ID. Populated from the Authentication method,  such as JWT subject
+   */
+  user_id: string;
 };
 
+/**
+ * A lightweight wallet summary with counts in place of the full lists.
+ */
 export type WalletOverview = {
   /**
    * User Balance
@@ -734,42 +961,6 @@ export type WalletOverview = {
    * Number of payments
    */
   n_payments: number;
-  /**
-   * Date of update in database
-   */
-  updated_at?: Date | null;
-  /**
-   * User ID. Populated from the Authentication method,  such as JWT subject
-   */
-  user_id: string;
-};
-
-export type WalletResponse = {
-  /**
-   * User Balance
-   */
-  balance: Balance;
-  /**
-   * List of contacts
-   */
-  contacts: Array<Contact>;
-  /**
-   * Date of creation in database
-   */
-  created_at: Date;
-  /**
-   * Internal ID
-   */
-  id: string;
-  /**
-   * Lit of Invoices
-   */
-  invoices: Array<InvoiceResponse>;
-  ln_address?: null | LnAddress;
-  /**
-   * List of payments
-   */
-  payments: Array<PaymentResponse>;
   /**
    * Date of update in database
    */
@@ -888,7 +1079,7 @@ export type CallbackResponses = {
   /**
    * Found
    */
-  200: LnUrlCallbackResponse;
+  200: LnUrlCallback;
 };
 
 export type CallbackResponse = CallbackResponses[keyof CallbackResponses];
@@ -1004,7 +1195,7 @@ export type ListApiKeysResponses = {
   /**
    * Success
    */
-  200: Array<ApiKeyResponse>;
+  200: Array<ApiKey>;
 };
 
 export type ListApiKeysResponse = ListApiKeysResponses[keyof ListApiKeysResponses];
@@ -1045,7 +1236,7 @@ export type CreateApiKeyResponses = {
   /**
    * API Key Created
    */
-  200: ApiKeyResponse;
+  200: ApiKey;
 };
 
 export type CreateApiKeyResponse = CreateApiKeyResponses[keyof CreateApiKeyResponses];
@@ -1129,7 +1320,7 @@ export type GetApiKeyResponses = {
   /**
    * Found
    */
-  200: ApiKeyResponse;
+  200: ApiKey;
 };
 
 export type GetApiKeyResponse = GetApiKeyResponses[keyof GetApiKeyResponses];
@@ -1207,6 +1398,273 @@ export type SignUpResponses = {
 };
 
 export type SignUpResponse = SignUpResponses[keyof SignUpResponses];
+
+export type DeleteBtcAddressesData = {
+  body?: never;
+  path?: never;
+  query?: {
+    /**
+     * Total amount of results to return
+     */
+    limit?: number | null;
+    /**
+     * Offset where to start returning results
+     */
+    offset?: number | null;
+    /**
+     * List of IDs
+     */
+    ids?: Array<string> | null;
+    /**
+     * Wallet ID. Automatically populated with your ID
+     */
+    wallet_id?: string | null;
+    /**
+     * Address
+     */
+    address?: string | null;
+    /**
+     * Status
+     */
+    address_type?: null | BtcAddressType;
+    /**
+     * Whether the address has been used
+     */
+    used?: boolean | null;
+    /**
+     * Direction of the ordering of results
+     */
+    order_direction?: OrderDirection;
+  };
+  url: '/v1/bitcoin/addresses';
+};
+
+export type DeleteBtcAddressesErrors = {
+  /**
+   * Bad Request
+   */
+  400: ErrorResponse;
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Forbidden
+   */
+  403: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
+
+export type DeleteBtcAddressesError = DeleteBtcAddressesErrors[keyof DeleteBtcAddressesErrors];
+
+export type DeleteBtcAddressesResponses = {
+  /**
+   * Success
+   */
+  200: number;
+};
+
+export type DeleteBtcAddressesResponse =
+  DeleteBtcAddressesResponses[keyof DeleteBtcAddressesResponses];
+
+export type ListBtcAddressesData = {
+  body?: never;
+  path?: never;
+  query?: {
+    /**
+     * Total amount of results to return
+     */
+    limit?: number | null;
+    /**
+     * Offset where to start returning results
+     */
+    offset?: number | null;
+    /**
+     * List of IDs
+     */
+    ids?: Array<string> | null;
+    /**
+     * Wallet ID. Automatically populated with your ID
+     */
+    wallet_id?: string | null;
+    /**
+     * Address
+     */
+    address?: string | null;
+    /**
+     * Status
+     */
+    address_type?: null | BtcAddressType;
+    /**
+     * Whether the address has been used
+     */
+    used?: boolean | null;
+    /**
+     * Direction of the ordering of results
+     */
+    order_direction?: OrderDirection;
+  };
+  url: '/v1/bitcoin/addresses';
+};
+
+export type ListBtcAddressesErrors = {
+  /**
+   * Bad Request
+   */
+  400: ErrorResponse;
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Forbidden
+   */
+  403: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
+
+export type ListBtcAddressesError = ListBtcAddressesErrors[keyof ListBtcAddressesErrors];
+
+export type ListBtcAddressesResponses = {
+  /**
+   * Success
+   */
+  200: Array<BtcAddress>;
+};
+
+export type ListBtcAddressesResponse = ListBtcAddressesResponses[keyof ListBtcAddressesResponses];
+
+export type GenerateBtcAddressData = {
+  body: NewBtcAddressRequest;
+  path?: never;
+  query?: never;
+  url: '/v1/bitcoin/addresses';
+};
+
+export type GenerateBtcAddressErrors = {
+  /**
+   * Bad Request
+   */
+  400: ErrorResponse;
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Forbidden
+   */
+  403: ErrorResponse;
+  /**
+   * Unprocessable Entity
+   */
+  422: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
+
+export type GenerateBtcAddressError = GenerateBtcAddressErrors[keyof GenerateBtcAddressErrors];
+
+export type GenerateBtcAddressResponses = {
+  /**
+   * Bitcoin Address Created
+   */
+  200: BtcAddress;
+};
+
+export type GenerateBtcAddressResponse =
+  GenerateBtcAddressResponses[keyof GenerateBtcAddressResponses];
+
+export type DeleteBtcAddressData = {
+  body?: never;
+  path: {
+    id: string;
+  };
+  query?: never;
+  url: '/v1/bitcoin/addresses/{id}';
+};
+
+export type DeleteBtcAddressErrors = {
+  /**
+   * Bad Request
+   */
+  400: ErrorResponse;
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Forbidden
+   */
+  403: ErrorResponse;
+  /**
+   * Not Found
+   */
+  404: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
+
+export type DeleteBtcAddressError = DeleteBtcAddressErrors[keyof DeleteBtcAddressErrors];
+
+export type DeleteBtcAddressResponses = {
+  /**
+   * Deleted
+   */
+  200: unknown;
+};
+
+export type GetBtcAddressData = {
+  body?: never;
+  path: {
+    id: string;
+  };
+  query?: never;
+  url: '/v1/bitcoin/addresses/{id}';
+};
+
+export type GetBtcAddressErrors = {
+  /**
+   * Bad Request
+   */
+  400: ErrorResponse;
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Forbidden
+   */
+  403: ErrorResponse;
+  /**
+   * Not Found
+   */
+  404: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
+
+export type GetBtcAddressError = GetBtcAddressErrors[keyof GetBtcAddressErrors];
+
+export type GetBtcAddressResponses = {
+  /**
+   * Found
+   */
+  200: BtcAddress;
+};
+
+export type GetBtcAddressResponse = GetBtcAddressResponses[keyof GetBtcAddressResponses];
 
 export type DeleteInvoicesData = {
   body?: never;
@@ -1343,7 +1801,7 @@ export type ListInvoicesResponses = {
   /**
    * Success
    */
-  200: Array<InvoiceResponse>;
+  200: Array<Invoice>;
 };
 
 export type ListInvoicesResponse = ListInvoicesResponses[keyof ListInvoicesResponses];
@@ -1384,7 +1842,7 @@ export type GenerateInvoiceResponses = {
   /**
    * Invoice Created
    */
-  200: InvoiceResponse;
+  200: Invoice;
 };
 
 export type GenerateInvoiceResponse = GenerateInvoiceResponses[keyof GenerateInvoiceResponses];
@@ -1468,7 +1926,7 @@ export type GetInvoiceResponses = {
   /**
    * Found
    */
-  200: InvoiceResponse;
+  200: Invoice;
 };
 
 export type GetInvoiceResponse = GetInvoiceResponses[keyof GetInvoiceResponses];
@@ -1805,7 +2263,7 @@ export type GetUserWalletResponses = {
   /**
    * Found
    */
-  200: WalletResponse;
+  200: Wallet;
 };
 
 export type GetUserWalletResponse = GetUserWalletResponses[keyof GetUserWalletResponses];
@@ -1914,7 +2372,7 @@ export type ListWalletApiKeysResponses = {
   /**
    * Success
    */
-  200: Array<ApiKeyResponse>;
+  200: Array<ApiKey>;
 };
 
 export type ListWalletApiKeysResponse =
@@ -1952,7 +2410,7 @@ export type CreateWalletApiKeyResponses = {
   /**
    * API Key Created
    */
-  200: ApiKeyResponse;
+  200: ApiKey;
 };
 
 export type CreateWalletApiKeyResponse =
@@ -2029,7 +2487,7 @@ export type GetWalletApiKeyResponses = {
   /**
    * Found
    */
-  200: ApiKeyResponse;
+  200: ApiKey;
 };
 
 export type GetWalletApiKeyResponse = GetWalletApiKeyResponses[keyof GetWalletApiKeyResponses];
@@ -2062,6 +2520,44 @@ export type GetWalletBalanceResponses = {
 };
 
 export type GetWalletBalanceResponse = GetWalletBalanceResponses[keyof GetWalletBalanceResponses];
+
+export type NewWalletBtcAddressData = {
+  body: NewBtcAddressRequest;
+  path?: never;
+  query?: never;
+  url: '/v1/me/bitcoin/address';
+};
+
+export type NewWalletBtcAddressErrors = {
+  /**
+   * Bad Request
+   */
+  400: ErrorResponse;
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Unprocessable Entity
+   */
+  422: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
+
+export type NewWalletBtcAddressError = NewWalletBtcAddressErrors[keyof NewWalletBtcAddressErrors];
+
+export type NewWalletBtcAddressResponses = {
+  /**
+   * Bitcoin Address Created
+   */
+  200: BtcAddress;
+};
+
+export type NewWalletBtcAddressResponse =
+  NewWalletBtcAddressResponses[keyof NewWalletBtcAddressResponses];
 
 export type ListContactsData = {
   body?: never;
@@ -2188,7 +2684,7 @@ export type ListWalletInvoicesResponses = {
   /**
    * Success
    */
-  200: Array<InvoiceResponse>;
+  200: Array<Invoice>;
 };
 
 export type ListWalletInvoicesResponse =
@@ -2226,7 +2722,7 @@ export type NewWalletInvoiceResponses = {
   /**
    * Invoice Created
    */
-  200: InvoiceResponse;
+  200: Invoice;
 };
 
 export type NewWalletInvoiceResponse = NewWalletInvoiceResponses[keyof NewWalletInvoiceResponses];
@@ -2265,7 +2761,7 @@ export type GetWalletInvoiceResponses = {
   /**
    * Found
    */
-  200: InvoiceResponse;
+  200: Invoice;
 };
 
 export type GetWalletInvoiceResponse = GetWalletInvoiceResponses[keyof GetWalletInvoiceResponses];
@@ -2333,7 +2829,7 @@ export type GetWalletAddressResponses = {
   /**
    * Found
    */
-  200: WalletLnAddressResponse;
+  200: null | LnAddress;
 };
 
 export type GetWalletAddressResponse = GetWalletAddressResponses[keyof GetWalletAddressResponses];
@@ -2479,6 +2975,14 @@ export type ListWalletPaymentsData = {
      */
     ledger?: null | Ledger;
     /**
+     * Lightning addresses
+     */
+    ln_addresses?: Array<string> | null;
+    /**
+     * Bitcoin addresses
+     */
+    btc_addresses?: Array<string> | null;
+    /**
      * Direction of the ordering of results
      */
     order_direction?: OrderDirection;
@@ -2507,7 +3011,7 @@ export type ListWalletPaymentsResponses = {
   /**
    * Success
    */
-  200: Array<PaymentResponse>;
+  200: Array<Payment>;
 };
 
 export type ListWalletPaymentsResponse =
@@ -2545,7 +3049,7 @@ export type WalletPayResponses = {
   /**
    * Payment Sent
    */
-  200: PaymentResponse;
+  200: Payment;
 };
 
 export type WalletPayResponse = WalletPayResponses[keyof WalletPayResponses];
@@ -2584,7 +3088,7 @@ export type GetWalletPaymentResponses = {
   /**
    * Found
    */
-  200: PaymentResponse;
+  200: Payment;
 };
 
 export type GetWalletPaymentResponse = GetWalletPaymentResponses[keyof GetWalletPaymentResponses];
@@ -2617,6 +3121,14 @@ export type DeletePaymentsData = {
      * Ledger
      */
     ledger?: null | Ledger;
+    /**
+     * Lightning addresses
+     */
+    ln_addresses?: Array<string> | null;
+    /**
+     * Bitcoin addresses
+     */
+    btc_addresses?: Array<string> | null;
     /**
      * Direction of the ordering of results
      */
@@ -2684,6 +3196,14 @@ export type ListPaymentsData = {
      */
     ledger?: null | Ledger;
     /**
+     * Lightning addresses
+     */
+    ln_addresses?: Array<string> | null;
+    /**
+     * Bitcoin addresses
+     */
+    btc_addresses?: Array<string> | null;
+    /**
      * Direction of the ordering of results
      */
     order_direction?: OrderDirection;
@@ -2716,7 +3236,7 @@ export type ListPaymentsResponses = {
   /**
    * Success
    */
-  200: Array<PaymentResponse>;
+  200: Array<Payment>;
 };
 
 export type ListPaymentsResponse = ListPaymentsResponses[keyof ListPaymentsResponses];
@@ -2757,7 +3277,7 @@ export type PayResponses = {
   /**
    * Payment Sent
    */
-  200: PaymentResponse;
+  200: Payment;
 };
 
 export type PayResponse = PayResponses[keyof PayResponses];
@@ -2841,7 +3361,7 @@ export type GetPaymentResponses = {
   /**
    * Found
    */
-  200: PaymentResponse;
+  200: Payment;
 };
 
 export type GetPaymentResponse = GetPaymentResponses[keyof GetPaymentResponses];
@@ -3044,7 +3564,7 @@ export type ListWalletsResponses = {
   /**
    * Success
    */
-  200: Array<WalletResponse>;
+  200: Array<Wallet>;
 };
 
 export type ListWalletsResponse = ListWalletsResponses[keyof ListWalletsResponses];
@@ -3085,7 +3605,7 @@ export type RegisterWalletResponses = {
   /**
    * Wallet Created
    */
-  200: WalletResponse;
+  200: Wallet;
 };
 
 export type RegisterWalletResponse = RegisterWalletResponses[keyof RegisterWalletResponses];
@@ -3207,7 +3727,7 @@ export type GetWalletResponses = {
   /**
    * Found
    */
-  200: WalletResponse;
+  200: Wallet;
 };
 
 export type GetWalletResponse = GetWalletResponses[keyof GetWalletResponses];

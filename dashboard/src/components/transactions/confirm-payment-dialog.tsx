@@ -1,7 +1,7 @@
 import type { InputProps } from '@mui/material/Input';
 import type { DialogProps } from '@mui/material/Dialog';
 import type { IFiatPrices } from 'src/types/bitcoin';
-import type { PaymentResponse, SendPaymentRequest } from 'src/lib/swissknife';
+import type { Payment, SendPaymentRequest } from 'src/lib/swissknife';
 
 import { m } from 'framer-motion';
 import { useForm } from 'react-hook-form';
@@ -69,7 +69,7 @@ export function ConfirmPaymentDialog({
   const { t } = useTranslate();
 
   const [autoWidth, setAutoWidth] = useState(24);
-  const [payment, setPayment] = useState<PaymentResponse | undefined>(undefined);
+  const [payment, setPayment] = useState<Payment | undefined>(undefined);
   const { state } = useSettingsContext();
 
   const methods = useForm({
@@ -205,10 +205,10 @@ export function ConfirmPaymentDialog({
                 {t('confirm_payment_dialog.success_message')} <Link>{truncateText(input, 30)}</Link>
               </SatsWithIcon>
 
-              {payment.success_action?.message && (
+              {payment.lightning?.success_action?.message && (
                 <Tooltip title={t('confirm_payment_dialog.message_from_recipient')} arrow>
                   <Box component={Typography}>
-                    <i>{payment.success_action.message}</i>
+                    <i>{payment.lightning?.success_action?.message}</i>
                   </Box>
                 </Tooltip>
               )}

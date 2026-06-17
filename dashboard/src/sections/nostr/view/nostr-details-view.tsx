@@ -51,8 +51,8 @@ export function NostrDetailsView() {
             }}
           />
 
-          {lnAddress?.ln_address ? (
-            <NostrDetails lnAddress={lnAddress.ln_address} />
+          {lnAddress ? (
+            <NostrDetails lnAddress={lnAddress} />
           ) : (
             <Welcome
               description={t('register_ln_address.missing_lightning_address_nostr')}

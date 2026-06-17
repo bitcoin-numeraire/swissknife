@@ -1,6 +1,6 @@
 import type { BoxProps } from '@mui/material/Box';
+import type { Wallet } from 'src/lib/swissknife';
 import type { IFiatPrices } from 'src/types/bitcoin';
-import type { WalletResponse } from 'src/lib/swissknife';
 
 import { mutate } from 'swr';
 import { useBoolean, usePopover } from 'minimal-shared/hooks';
@@ -27,7 +27,7 @@ import { CustomPopover } from 'src/components/custom-popover';
 // ----------------------------------------------------------------------
 
 type Props = BoxProps & {
-  wallet: WalletResponse;
+  wallet: Wallet;
   fiatPrices: IFiatPrices;
 };
 

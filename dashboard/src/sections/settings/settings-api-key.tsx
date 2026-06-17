@@ -16,8 +16,8 @@ import { handleActionError } from 'src/utils/errors';
 import { useTranslate } from 'src/locales';
 import { endpointKeys } from 'src/actions/keys';
 import {
+  type ApiKey,
   revokeWalletApiKey,
-  type ApiKeyResponse,
   type ListWalletApiKeysResponse,
 } from 'src/lib/swissknife';
 
@@ -100,7 +100,7 @@ export function SettingsApiKey({ apiKeys }: Props) {
 // ----------------------------------------------------------------------
 
 type CollapsibleTableRowProps = {
-  row: ApiKeyResponse;
+  row: ApiKey;
 };
 
 function CollapsibleTableRow({ row }: CollapsibleTableRowProps) {
