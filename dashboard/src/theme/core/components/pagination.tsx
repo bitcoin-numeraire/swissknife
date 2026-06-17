@@ -4,17 +4,15 @@ import { varAlpha } from 'minimal-shared/utils';
 
 import { paginationItemClasses } from '@mui/material/PaginationItem';
 
+import { colorKeys } from '../palette';
+
 // ----------------------------------------------------------------------
 
 /**
- * TypeScript (type definition and extension)
+ * TypeScript extension for MUI theme augmentation.
  * @to {@link file://./../../extend-theme-types.d.ts}
  */
-
-export type PaginationExtendVariant = {
-  soft: true;
-};
-
+export type PaginationExtendVariant = { soft: true };
 export type PaginationExtendColor = {
   info: true;
   success: true;
@@ -22,98 +20,101 @@ export type PaginationExtendColor = {
   error: true;
 };
 
-// ----------------------------------------------------------------------
+type PaginationItemVariants = ComponentsVariants<Theme>['MuiPaginationItem'];
 
-const COLORS = ['primary', 'secondary', 'info', 'success', 'warning', 'error'] as const;
+const baseColors = ['standard'] as const;
+const allColors = [...baseColors, ...colorKeys.palette] as const;
 
-// ----------------------------------------------------------------------
-
-const softVariant: Record<string, ComponentsVariants<Theme>['MuiPagination']> = {
-  colors: COLORS.map((color) => ({
-    props: ({ ownerState }) =>
-      !ownerState.disabled && ownerState.variant === 'soft' && ownerState.color === color,
+/* **********************************************************************
+ * 🗳️ Variants
+ * **********************************************************************/
+const textVariants = [
+  {
+    props: (props) => props.variant === 'text' && props.color === 'standard',
     style: ({ theme }) => ({
-      [`& .${paginationItemClasses.root}`]: {
-        [`&.${paginationItemClasses.selected}`]: {
-          fontWeight: theme.typography.fontWeightSemiBold,
-          color: theme.vars.palette[color].dark,
-          backgroundColor: varAlpha(theme.vars.palette[color].mainChannel, 0.08),
-          '&:hover': { backgroundColor: varAlpha(theme.vars.palette[color].mainChannel, 0.16) },
-          ...theme.applyStyles('dark', {
-            color: theme.vars.palette[color].light,
-          }),
-        },
+      [`&.${paginationItemClasses.selected}`]: {
+        ...theme.mixins.filledStyles(theme, 'inherit', { hover: true }),
       },
     }),
-  })),
-  standardColor: [
-    {
-      props: ({ ownerState }) => ownerState.variant === 'soft' && ownerState.color === 'standard',
-      style: ({ theme }) => ({
-        [`& .${paginationItemClasses.root}`]: {
-          [`&.${paginationItemClasses.selected}`]: {
-            fontWeight: theme.typography.fontWeightSemiBold,
-            backgroundColor: varAlpha(theme.vars.palette.grey['500Channel'], 0.08),
-            '&:hover': { backgroundColor: varAlpha(theme.vars.palette.grey['500Channel'], 0.16) },
-          },
-        },
-      }),
-    },
-  ],
-};
+  },
+] satisfies PaginationItemVariants;
 
-// ----------------------------------------------------------------------
-
-const MuiPagination: Components<Theme>['MuiPagination'] = {
-  /** **************************************
-   * STYLE
-   *************************************** */
-  styleOverrides: {
-    root: {
-      variants: [
-        // @variant soft
-        softVariant.standardColor,
-        softVariant.colors,
-      ].flat(),
-    },
-
-    /**
-     * @variant text
-     */
-    text: ({ ownerState, theme }) => ({
-      [`& .${paginationItemClasses.root}`]: {
-        [`&.${paginationItemClasses.selected}`]: {
-          fontWeight: theme.typography.fontWeightSemiBold,
-          ...(ownerState.color === 'standard' && {
-            color: theme.vars.palette.common.white,
-            backgroundColor: theme.vars.palette.text.primary,
-            '&:hover': { backgroundColor: theme.vars.palette.grey[700] },
-            ...theme.applyStyles('dark', {
-              color: theme.vars.palette.grey[800],
-              '&:hover': { backgroundColor: theme.vars.palette.grey[100] },
-            }),
-          }),
-        },
-      },
-    }),
-    /**
-     * @variant outlined
-     */
-    outlined: ({ ownerState, theme }) => ({
-      [`& .${paginationItemClasses.root}`]: {
-        borderColor: varAlpha(theme.vars.palette.grey['500Channel'], 0.24),
-        [`&.${paginationItemClasses.selected}`]: {
-          borderColor: 'currentColor',
-          fontWeight: theme.typography.fontWeightSemiBold,
-          ...(ownerState.color === 'standard' && {
-            backgroundColor: varAlpha(theme.vars.palette.grey['500Channel'], 0.08),
-          }),
+const outlinedVariants = [
+  {
+    props: (props) => props.variant === 'outlined',
+    style: ({ theme }) => ({
+      borderColor: theme.vars.palette.shared.buttonOutlined,
+      [`&.${paginationItemClasses.selected}`]: {
+        borderColor: 'currentColor',
+        backgroundColor: varAlpha('currentColor', theme.vars.palette.action.selectedOpacity),
+        '&:hover': {
+          backgroundColor: varAlpha(
+            'currentColor',
+            `calc(${theme.vars.palette.action.selectedOpacity} * 2)`
+          ),
         },
       },
     }),
   },
+  {
+    props: (props) => props.variant === 'outlined' && props.color === 'standard',
+    style: ({ theme }) => ({
+      [`&.${paginationItemClasses.selected}`]: {
+        backgroundColor: varAlpha(theme.vars.palette.grey['500Channel'], 0.08),
+        '&:hover': {
+          backgroundColor: varAlpha(theme.vars.palette.grey['500Channel'], 0.16),
+        },
+      },
+    }),
+  },
+] satisfies PaginationItemVariants;
+
+const softVariants = [
+  ...(allColors.map((colorKey) => ({
+    props: (props) => props.variant === 'soft' && props.color === colorKey,
+    style: ({ theme }) => {
+      const currentColor = colorKey === 'standard' ? 'inherit' : colorKey;
+
+      return {
+        [`&.${paginationItemClasses.selected}`]: {
+          ...theme.mixins.softStyles(theme, currentColor, { hover: true }),
+        },
+      };
+    },
+  })) satisfies PaginationItemVariants),
+] satisfies PaginationItemVariants;
+
+const disabledVariants = [
+  {
+    props: {},
+    style: ({ theme }) => ({
+      [`&.${paginationItemClasses.disabled}`]: {
+        [`&.${paginationItemClasses.selected}`]: {
+          backgroundColor: theme.vars.palette.action.disabledBackground,
+        },
+      },
+    }),
+  },
+] satisfies PaginationItemVariants;
+
+/* **********************************************************************
+ * 🧩 Components
+ * **********************************************************************/
+const MuiPaginationItem: Components<Theme>['MuiPaginationItem'] = {
+  // ▼▼▼▼▼▼▼▼ 🎨 STYLE ▼▼▼▼▼▼▼▼
+  styleOverrides: {
+    root: ({ theme }) => ({
+      [`&.${paginationItemClasses.selected}`]: {
+        fontWeight: theme.typography.fontWeightSemiBold,
+      },
+      variants: [...textVariants, ...outlinedVariants, ...softVariants, ...disabledVariants],
+    }),
+  },
 };
 
-// ----------------------------------------------------------------------
-
-export const pagination = { MuiPagination };
+/* **********************************************************************
+ * 🚀 Export
+ * **********************************************************************/
+export const pagination: Components<Theme> = {
+  MuiPaginationItem,
+};

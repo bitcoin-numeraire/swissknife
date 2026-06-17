@@ -1,30 +1,35 @@
-import type { ChipProps } from '@mui/material/Chip';
 import type { SvgIconProps } from '@mui/material/SvgIcon';
 import type { Theme, CSSObject, Components, ComponentsVariants } from '@mui/material/styles';
-
-import { varAlpha } from 'minimal-shared/utils';
 
 import SvgIcon from '@mui/material/SvgIcon';
 import { chipClasses } from '@mui/material/Chip';
 
+import { colorKeys } from '../palette';
+
 // ----------------------------------------------------------------------
 
 /**
- * TypeScript (type definition and extension)
+ * TypeScript extension for MUI theme augmentation.
  * @to {@link file://./../../extend-theme-types.d.ts}
  */
+export type ChipExtendVariant = { soft: true };
+export type ChipExtendColor = { black: true; white: true };
 
-export type ChipExtendVariant = {
-  soft: true;
+type ChipVariants = ComponentsVariants<Theme>['MuiChip'];
+
+const baseColors = ['default'] as const;
+const allColors = [...baseColors, ...colorKeys.palette, ...colorKeys.common] as const;
+
+const DIMENSIONS: Record<'small' | 'medium', CSSObject> = {
+  small: { borderRadius: '8px' },
+  medium: { borderRadius: '10px' },
 };
 
-// ----------------------------------------------------------------------
-
-/**
- * Icons
- * https://icon-sets.iconify.design/solar/close-circle-bold
- */
-const ChipDeleteIcon = (props: SvgIconProps) => (
+/* **********************************************************************
+ * ♉️ Custom icons
+ * **********************************************************************/
+const DeleteIcon = (props: SvgIconProps) => (
+  // https://icon-sets.iconify.design/solar/close-circle-bold/
   <SvgIcon {...props}>
     <path
       fill="currentColor"
@@ -35,145 +40,161 @@ const ChipDeleteIcon = (props: SvgIconProps) => (
   </SvgIcon>
 );
 
-// ----------------------------------------------------------------------
-
-const COLORS = ['primary', 'secondary', 'info', 'success', 'warning', 'error'] as const;
-
-type PaletteColor = (typeof COLORS)[number];
-
-// ----------------------------------------------------------------------
-
-function styleColors(ownerState: ChipProps, styles: (val: PaletteColor) => CSSObject) {
-  const outputStyle = COLORS.reduce((acc, color) => {
-    if (!ownerState.disabled && ownerState.color === color) {
-      acc = styles(color);
-    }
-    return acc;
-  }, {});
-
-  return outputStyle;
-}
-
-const softVariant: Record<string, ComponentsVariants<Theme>['MuiChip']> = {
-  colors: COLORS.map((color) => ({
-    props: ({ ownerState }) =>
-      !ownerState.disabled && ownerState.variant === 'soft' && ownerState.color === color,
+/* **********************************************************************
+ * 🗳️ Variants
+ * **********************************************************************/
+const filledVariants = [
+  {
+    props: (props) => props.variant === 'filled' && props.color === 'default',
     style: ({ theme }) => ({
-      color: theme.vars.palette[color].dark,
-      backgroundColor: varAlpha(theme.vars.palette[color].mainChannel, 0.16),
-      '&:hover': { backgroundColor: varAlpha(theme.vars.palette[color].mainChannel, 0.32) },
-      ...theme.applyStyles('dark', {
-        color: theme.vars.palette[color].light,
-      }),
+      ...theme.mixins.filledStyles(theme, 'inherit'),
+      [`&.${chipClasses.clickable}`]: {
+        ...theme.mixins.filledStyles(theme, 'inherit', { hover: true }),
+      },
     }),
-  })),
-  inheritColor: [
-    {
-      props: ({ ownerState }) => ownerState.variant === 'soft' && ownerState.color === 'default',
-      style: ({ theme }) => ({
-        backgroundColor: varAlpha(theme.vars.palette.grey['500Channel'], 0.16),
-        '&:hover': { backgroundColor: varAlpha(theme.vars.palette.grey['500Channel'], 0.32) },
-      }),
+  },
+  ...(colorKeys.common.map((colorKey) => ({
+    props: (props) => props.variant === 'filled' && props.color === colorKey,
+    style: ({ theme }) => ({
+      ...theme.mixins.filledStyles(theme, colorKey),
+      [`&.${chipClasses.clickable}`]: {
+        ...theme.mixins.filledStyles(theme, colorKey, { hover: true }),
+      },
+    }),
+  })) satisfies ChipVariants),
+] satisfies ChipVariants;
+
+const outlinedVariants = [
+  {
+    props: (props) => props.variant === 'outlined',
+    style: {
+      borderColor: 'currentColor',
     },
-  ],
-};
+  },
+  {
+    props: (props) => props.variant === 'outlined' && props.color === 'default',
+    style: ({ theme }) => ({
+      borderColor: theme.vars.palette.shared.buttonOutlined,
+    }),
+  },
+  ...(colorKeys.common.map((colorKey) => ({
+    props: (props) => props.variant === 'outlined' && props.color === colorKey,
+    style: ({ theme }) => ({
+      color: theme.vars.palette.common[colorKey],
+    }),
+  })) satisfies ChipVariants),
+] satisfies ChipVariants;
 
-// ----------------------------------------------------------------------
-
-const MuiChip: Components<Theme>['MuiChip'] = {
-  /** **************************************
-   * DEFAULT PROPS
-   *************************************** */
-  defaultProps: { deleteIcon: <ChipDeleteIcon /> },
-
-  /** **************************************
-   * STYLE
-   *************************************** */
-  styleOverrides: {
-    root: ({ ownerState, theme }) => {
-      const styled = {
-        colors: styleColors(ownerState, (color) => ({
-          [`& .${chipClasses.avatar}`]: {
-            color: theme.vars.palette[color].lighter,
-            backgroundColor: theme.vars.palette[color].dark,
-          },
-        })),
-        disabled: {
-          [`&.${chipClasses.disabled}`]: {
-            opacity: 1,
-            [`& .${chipClasses.avatar}`]: {
-              color: theme.vars.palette.action.disabled,
-              backgroundColor: theme.vars.palette.action.disabledBackground,
-            },
-            ...(ownerState.variant === 'outlined' && {
-              color: theme.vars.palette.action.disabled,
-              borderColor: theme.vars.palette.action.disabledBackground,
-            }),
-            ...(['filled', 'soft'].includes(ownerState.variant!) && {
-              color: theme.vars.palette.action.disabled,
-              backgroundColor: theme.vars.palette.action.disabledBackground,
-            }),
-          },
-        },
-      };
+const softVariants = [
+  ...(allColors.map((colorKey) => ({
+    props: (props) => props.variant === 'soft' && props.color === colorKey,
+    style: ({ theme }) => {
+      const currentColor = colorKey === 'default' ? 'inherit' : colorKey;
 
       return {
-        variants: [
-          // @variant soft
-          softVariant.inheritColor,
-          softVariant.colors,
-        ].flat(),
-        ...styled.colors,
-        ...styled.disabled,
+        ...theme.mixins.softStyles(theme, currentColor),
+        [`&.${chipClasses.clickable}`]: {
+          ...theme.mixins.softStyles(theme, currentColor, { hover: true }),
+        },
       };
     },
-    label: ({ theme }) => ({ fontWeight: theme.typography.fontWeightMedium }),
-    icon: { color: 'currentColor' },
+  })) satisfies ChipVariants),
+] satisfies ChipVariants;
+
+const avatarVariants = [
+  ...(colorKeys.common.map((colorKey) => ({
+    props: (props) => props.color === colorKey,
+    style: {
+      color: 'inherit',
+      backgroundColor: 'color-mix(in srgb, currentColor 24%, transparent)',
+    },
+  })) satisfies ChipVariants),
+  ...(colorKeys.palette.map((colorKey) => ({
+    props: (props) => props.color === colorKey,
+    style: ({ theme }) => ({
+      color: theme.vars.palette[colorKey].lighter,
+      backgroundColor: theme.vars.palette[colorKey].dark,
+    }),
+  })) satisfies ChipVariants),
+] satisfies ChipVariants;
+
+const sizeVariants = [
+  {
+    props: (props) => props.size === 'small',
+    style: { ...DIMENSIONS.small },
+  },
+  {
+    props: (props) => props.size === 'medium',
+    style: { ...DIMENSIONS.medium },
+  },
+] satisfies ChipVariants;
+
+const disabledVariants = [
+  {
+    props: {},
+    style: ({ theme }) => ({
+      [`&.${chipClasses.disabled}`]: {
+        opacity: 1,
+        color: theme.vars.palette.action.disabled,
+        [`&:not(.${chipClasses.outlined})`]: {
+          backgroundColor: theme.vars.palette.action.disabledBackground,
+        },
+        [`&.${chipClasses.outlined}`]: {
+          borderColor: theme.vars.palette.action.disabledBackground,
+        },
+        [`& .${chipClasses.avatar}`]: {
+          color: theme.vars.palette.action.disabled,
+          backgroundColor: theme.vars.palette.action.disabledBackground,
+          '& img': { opacity: theme.vars.palette.action.disabledOpacity },
+        },
+      },
+    }),
+  },
+] satisfies ChipVariants;
+
+/* **********************************************************************
+ * 🧩 Components
+ * **********************************************************************/
+const MuiChip: Components<Theme>['MuiChip'] = {
+  // ▼▼▼▼▼▼▼▼ ⚙️ PROPS ▼▼▼▼▼▼▼▼
+  defaultProps: {
+    deleteIcon: <DeleteIcon />,
+    variant: 'soft',
+  },
+  // ▼▼▼▼▼▼▼▼ 🎨 STYLE ▼▼▼▼▼▼▼▼
+  styleOverrides: {
+    root: {
+      variants: [
+        ...filledVariants,
+        ...outlinedVariants,
+        ...softVariants,
+        ...sizeVariants,
+        ...disabledVariants,
+      ],
+    },
+    label: ({ theme }) => ({
+      fontWeight: theme.typography.fontWeightMedium,
+    }),
+    avatar: {
+      variants: [...avatarVariants],
+    },
+    icon: {
+      color: 'currentColor',
+    },
     deleteIcon: {
       opacity: 0.48,
       color: 'currentColor',
-      '&:hover': { opacity: 1, color: 'currentColor' },
-    },
-    sizeMedium: ({ theme }) => ({ borderRadius: theme.shape.borderRadius * 1.25 }),
-    sizeSmall: ({ theme }) => ({ borderRadius: theme.shape.borderRadius }),
-    /**
-     * @variant filled
-     */
-    filled: ({ ownerState, theme }) => {
-      const styled = {
-        defaultColor: {
-          ...(!ownerState.disabled &&
-            ownerState.color === 'default' && {
-              color: theme.vars.palette.common.white,
-              backgroundColor: theme.vars.palette.text.primary,
-              [`& .${chipClasses.avatar}`]: { color: theme.vars.palette.text.primary },
-              '&:hover': { backgroundColor: theme.vars.palette.grey[700] },
-              ...theme.applyStyles('dark', {
-                color: theme.vars.palette.grey[800],
-                '&:hover': { backgroundColor: theme.vars.palette.grey[100] },
-              }),
-            }),
-        },
-      };
-      return { ...styled.defaultColor };
-    },
-    /**
-     * @variant outlined
-     */
-    outlined: ({ ownerState, theme }) => {
-      const styled = {
-        defaultColor: {
-          ...(!ownerState.disabled &&
-            ownerState.color === 'default' && {
-              borderColor: varAlpha(theme.vars.palette.grey['500Channel'], 0.32),
-            }),
-        },
-      };
-      return { ...styled.defaultColor };
+      '&:hover': {
+        opacity: 0.8,
+        color: 'currentColor',
+      },
     },
   },
 };
 
-// ----------------------------------------------------------------------
-
-export const chip = { MuiChip };
+/* **********************************************************************
+ * 🚀 Export
+ * **********************************************************************/
+export const chip: Components<Theme> = {
+  MuiChip,
+};

@@ -1,12 +1,12 @@
-import type { DefaultColorScheme } from '@mui/material/styles/createThemeWithVars';
 import type {
+  Theme,
   Shadows,
-  Direction,
+  Components,
   ColorSystemOptions,
   CssVarsThemeOptions,
+  SupportedColorScheme,
   ThemeOptions as MuiThemeOptions,
 } from '@mui/material/styles';
-
 import type { CustomShadows } from './core/custom-shadows';
 
 // ----------------------------------------------------------------------
@@ -18,20 +18,35 @@ import type { CustomShadows } from './core/custom-shadows';
  * @see https://github.com/mui/material-ui/blob/master/packages/mui-material/src/styles/createTheme.ts
  */
 
-export type ThemeColorScheme = DefaultColorScheme;
-export type ThemeDirection = Direction;
+export type ThemeColorScheme = SupportedColorScheme;
 export type ThemeCssVariables = Pick<
   CssVarsThemeOptions,
-  'colorSchemeSelector' | 'disableCssColorScheme' | 'cssVarPrefix' | 'shouldSkipGeneratingVar'
+  | 'cssVarPrefix'
+  | 'rootSelector'
+  | 'colorSchemeSelector'
+  | 'disableCssColorScheme'
+  | 'shouldSkipGeneratingVar'
 >;
 
-type ColorSchemeOptionsExtended = ColorSystemOptions & {
-  shadows?: Shadows;
-  customShadows?: CustomShadows;
+export type ColorSchemeOptionsExtended = ColorSystemOptions & {
+  shadows?: Partial<Shadows>;
+  customShadows?: Partial<CustomShadows>;
 };
 
+export type SchemesRecord<T> = Partial<Record<ThemeColorScheme, T>>;
+
 export type ThemeOptions = Omit<MuiThemeOptions, 'components'> &
-  Pick<CssVarsThemeOptions, 'defaultColorScheme' | 'components'> & {
-    colorSchemes?: Record<ThemeColorScheme, ColorSchemeOptionsExtended>;
+  Pick<CssVarsThemeOptions, 'defaultColorScheme'> & {
+    colorSchemes?: SchemesRecord<ColorSchemeOptionsExtended>;
     cssVariables?: ThemeCssVariables;
+    components?: Components<Theme>;
   };
+
+// ----------------------------------------------------------------------
+
+/**
+ * DeepPartial utility type that recursively makes all properties of T optional.
+ * This is useful for partial configurations and merging deeply nested objects.
+ * Supports objects, arrays, and primitive types.
+ */
+export type DeepPartial<T> = T extends object ? { [P in keyof T]?: DeepPartial<T[P]> } : T;

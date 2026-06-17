@@ -1,127 +1,173 @@
+import type { AvatarGroupClassKey } from '@mui/material/AvatarGroup';
 import type { Theme, Components, ComponentsVariants } from '@mui/material/styles';
+import type { PaletteColorKey } from '../palette';
 
-import { varAlpha } from 'minimal-shared/utils';
+import { parseCssVar } from 'minimal-shared/utils';
 
-import { avatarGroupClasses } from '@mui/material/AvatarGroup';
+import Box from '@mui/material/Box';
+
+import { colorKeys } from '../palette';
 
 // ----------------------------------------------------------------------
 
 /**
- * TypeScript (type definition and extension)
+ * TypeScript extension for MUI theme augmentation.
  * @to {@link file://./../../extend-theme-types.d.ts}
  */
-
-export type AvatarGroupExtendVariant = {
-  compact: true;
+export type AvatarGroupExtendVariant = { compact: true };
+export type AvatarExtendColor = {
+  color?: PaletteColorKey | 'default' | 'inherit';
 };
 
-// ----------------------------------------------------------------------
+type AvatarVariants = ComponentsVariants<Theme>['MuiAvatar'];
+type AvatarGroupVariants = ComponentsVariants<Theme>['MuiAvatarGroup'];
 
-const COLORS = ['primary', 'secondary', 'info', 'success', 'warning', 'error'] as const;
+const baseColors = ['default', 'inherit'] as const;
+const allColors = [...baseColors, ...colorKeys.palette] as const;
 
-type PaletteColor = (typeof COLORS)[number] | 'default';
+export function getAvatarColor(
+  inputValue?: string,
+  fallback: AvatarExtendColor['color'] = 'default'
+): string {
+  if (!inputValue?.trim()) {
+    return fallback;
+  }
 
-const colorByName = (name?: string): PaletteColor => {
-  const charAt = name?.charAt(0).toLowerCase();
+  const firstChar = inputValue.trim()[0].toLowerCase();
 
-  if (['a', 'c', 'f'].includes(charAt!)) return 'primary';
-  if (['e', 'd', 'h'].includes(charAt!)) return 'secondary';
-  if (['i', 'k', 'l'].includes(charAt!)) return 'info';
-  if (['m', 'n', 'p'].includes(charAt!)) return 'success';
-  if (['q', 's', 't'].includes(charAt!)) return 'warning';
-  if (['v', 'x', 'y'].includes(charAt!)) return 'error';
+  // Only handle alphabet characters a-z
+  if (!/[a-z]/.test(firstChar)) {
+    return fallback;
+  }
 
-  return 'default';
-};
+  const alphabetIndex = firstChar.charCodeAt(0) - 'a'.charCodeAt(0); // 0 for 'a', 25 for 'z'
+  const colorIndex = alphabetIndex % allColors.length;
 
-// ----------------------------------------------------------------------
+  return allColors[colorIndex] || fallback;
+}
 
-const avatarColors: Record<string, ComponentsVariants<Theme>['MuiAvatar']> = {
-  colors: COLORS.map((color) => ({
-    props: ({ ownerState }) => ownerState.color === color,
-    style: ({ theme }) => ({
-      color: theme.vars.palette[color].contrastText,
-      backgroundColor: theme.vars.palette[color].main,
-    }),
-  })),
-  defaultColor: [
-    {
-      props: ({ ownerState }) => ownerState.color === 'default',
-      style: ({ theme }) => ({
-        color: theme.vars.palette.text.secondary,
-        backgroundColor: varAlpha(theme.vars.palette.grey['500Channel'], 0.24),
-      }),
-    },
-  ],
-};
-
-const MuiAvatar: Components<Theme>['MuiAvatar'] = {
-  /** **************************************
-   * STYLE
-   *************************************** */
-  styleOverrides: {
-    root: { variants: [avatarColors.defaultColor, avatarColors.colors].flat() },
-    rounded: ({ theme }) => ({ borderRadius: theme.shape.borderRadius * 1.5 }),
-    colorDefault: ({ ownerState, theme }) => {
-      const color = colorByName(ownerState.alt);
-
-      return {
-        ...(!!ownerState.alt && {
-          ...(color !== 'default'
-            ? {
-                color: theme.vars.palette[color].contrastText,
-                backgroundColor: theme.vars.palette[color].main,
-              }
-            : {
-                color: theme.vars.palette.text.secondary,
-                backgroundColor: varAlpha(theme.vars.palette.grey['500Channel'], 0.24),
-              }),
-        }),
-      };
-    },
-  },
-};
-
-// ----------------------------------------------------------------------
-
-const MuiAvatarGroup: Components<Theme>['MuiAvatarGroup'] = {
-  /** **************************************
-   * DEFAULT PROPS
-   *************************************** */
-  defaultProps: { max: 4 },
-
-  /** **************************************
-   * STYLE
-   *************************************** */
-  styleOverrides: {
-    root: ({ ownerState }) => ({
-      justifyContent: 'flex-end',
-      ...(ownerState.variant === 'compact' && {
-        width: 40,
-        height: 40,
-        position: 'relative',
-        [`& .${avatarGroupClasses.avatar}`]: {
-          margin: 0,
-          width: 28,
-          height: 28,
-          position: 'absolute',
-          '&:first-of-type': { left: 0, bottom: 0, zIndex: 9 },
-          '&:last-of-type': { top: 0, right: 0 },
-        },
-      }),
-    }),
-    avatar: ({ theme }) => ({
-      fontSize: 16,
-      fontWeight: theme.typography.fontWeightSemiBold,
-      '&:first-of-type': {
-        fontSize: 12,
+const customRenderSurplus = (surplus: number) => (
+  <Box
+    component="span"
+    sx={[
+      (theme) => ({
+        width: 1,
+        height: 1,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        position: 'absolute',
         color: theme.vars.palette.primary.dark,
         backgroundColor: theme.vars.palette.primary.lighter,
+        fontSize: {
+          '@': theme.typography.pxToRem(11),
+          '@32': theme.typography.pxToRem(12),
+          '@36': theme.typography.pxToRem(13),
+          '@40': theme.typography.pxToRem(14),
+          '@64': theme.typography.pxToRem(18),
+        },
+      }),
+    ]}
+  >
+    +{surplus}
+  </Box>
+);
+
+/* **********************************************************************
+ * 🗳️ Variants
+ * **********************************************************************/
+const colorVariants = [
+  {
+    props: {},
+    style: ({ theme }) => ({
+      color: theme.vars.palette.action.active,
+      [parseCssVar(theme.vars.palette.Avatar.defaultBg)]: theme.vars.palette.grey[300],
+      ...theme.applyStyles('dark', {
+        [parseCssVar(theme.vars.palette.Avatar.defaultBg)]: theme.vars.palette.grey[700],
+      }),
+    }),
+  },
+  {
+    props: (props) =>
+      props.color === 'inherit' || (!!props.alt && getAvatarColor(props.alt) === 'inherit'),
+    style: ({ theme }) => ({
+      ...theme.mixins.filledStyles(theme, 'inherit'),
+    }),
+  },
+  ...(colorKeys.palette.map((colorKey) => ({
+    props: (props) =>
+      props.color === colorKey || (!!props.alt && getAvatarColor(props.alt) === colorKey),
+    style: ({ theme }) => ({
+      color: theme.vars.palette[colorKey].contrastText,
+      backgroundColor: theme.vars.palette[colorKey].main,
+    }),
+  })) satisfies AvatarVariants),
+] satisfies AvatarVariants;
+
+const avatarGroupVariants = {
+  root: [
+    {
+      props: (props) => props.variant === 'compact',
+      style: { width: 40, height: 40, position: 'relative' },
+    },
+  ],
+  avatar: [
+    {
+      props: (props) => props.variant === 'compact',
+      style: {
+        margin: 0,
+        width: 28,
+        height: 28,
+        position: 'absolute',
+        '&:first-of-type': { left: 0, bottom: 0, zIndex: 9 },
+        '&:last-of-type': { top: 0, right: 0 },
       },
+    },
+  ],
+} satisfies Record<AvatarGroupClassKey, AvatarGroupVariants>;
+
+/* **********************************************************************
+ * 🧩 Components
+ * **********************************************************************/
+const MuiAvatar: Components<Theme>['MuiAvatar'] = {
+  // ▼▼▼▼▼▼▼▼ 🎨 STYLE ▼▼▼▼▼▼▼▼
+  styleOverrides: {
+    root: ({ theme }) => ({
+      containerType: 'inline-size',
+      fontSize: theme.typography.pxToRem(18),
+      fontWeight: theme.typography.fontWeightMedium,
+    }),
+    colorDefault: {
+      variants: [...colorVariants],
+    },
+    rounded: ({ theme }) => ({
+      borderRadius: Number(theme.shape.borderRadius) * 1.5,
     }),
   },
 };
 
-// ----------------------------------------------------------------------
+const MuiAvatarGroup: Components<Theme>['MuiAvatarGroup'] = {
+  // ▼▼▼▼▼▼▼▼ ⚙️ PROPS ▼▼▼▼▼▼▼▼
+  defaultProps: {
+    max: 4,
+    renderSurplus: (surplus: number) => customRenderSurplus(surplus),
+  },
+  // ▼▼▼▼▼▼▼▼ 🎨 STYLE ▼▼▼▼▼▼▼▼
+  styleOverrides: {
+    root: {
+      justifyContent: 'flex-end',
+      variants: [...avatarGroupVariants.root],
+    },
+    avatar: {
+      variants: [...avatarGroupVariants.avatar],
+    },
+  },
+};
 
-export const avatar = { MuiAvatar, MuiAvatarGroup };
+/* **********************************************************************
+ * 🚀 Export
+ * **********************************************************************/
+export const avatar: Components<Theme> = {
+  MuiAvatar,
+  MuiAvatarGroup,
+};

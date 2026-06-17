@@ -3,25 +3,35 @@ import type { CSSObject } from '@mui/material/styles';
 // ----------------------------------------------------------------------
 
 /**
- * Generates a background gradient CSS object.
+ * Creates a CSS object for layered background gradients or images.
  *
- * @param {BgGradientProps} props - The properties for the background gradient.
- * @param {string[]} props.images - The background images or gradients.
- * @param {string[]} [props.sizes] - The sizes of the background images.
- * @param {string[]} [props.positions] - The positions of the background images.
- * @param {string[]} [props.repeats] - The repeat settings for the background images.
- * @returns {CSSObject} The CSS object for the background gradient.
+ * @param images - Gradient strings or image URLs.
+ * @param sizes - (Optional) Background sizes for each layer. Defaults to 'cover'.
+ * @param positions - (Optional) Background positions for each layer. Defaults to 'center'.
+ * @param repeats - (Optional) Background repeat settings for each layer. Defaults to 'no-repeat'.
+ * @returns A CSS object with styles.
  *
  * @example
+ * // With gradient and image overlay
  * ...theme.mixins.bgGradient({
  *   images: [
  *     `linear-gradient(0deg, ${varAlpha(theme.vars.palette.primary.darkerChannel, 0.8)}, ${varAlpha(theme.vars.palette.primary.darkerChannel, 0.8)})`,
- *     `url(/assets/background/overlay.png)`,
+ *     `url(/assets/overlay.png)`,
  *   ],
  *   sizes: ['cover', '80px 80px'],
  *   positions: ['center', 'top right'],
- * });
+ *   repeats: ['no-repeat', 'repeat']
+ * })
+ *
+ * @example
+ * // With a single gradient only
+ * ...theme.mixins.bgGradient({
+ *   images: [
+ *     `linear-gradient(0deg, ${varAlpha(theme.vars.palette.primary.darkerChannel, 0.8)}, ${varAlpha(theme.vars.palette.primary.darkerChannel, 0.8)})`,
+ *   ],
+ * })
  */
+
 export type BgGradientProps = {
   images: string[];
   sizes?: string[];
@@ -41,21 +51,28 @@ export function bgGradient({ sizes, repeats, images, positions }: BgGradientProp
 // ----------------------------------------------------------------------
 
 /**
- * Generates a background blur CSS object.
+ * Creates a CSS object for a blurred background effect with optional image overlay.
  *
- * @param {BgBlurProps} props - The properties for the background blur.
- * @param {string} props.color - The background color.
- * @param {number} [props.blur=6] - The blur intensity.
- * @param {string} [props.imgUrl] - The background image URL.
- * @returns {CSSObject} The CSS object for the background blur.
+ * @param color - Background color with optional transparency.
+ * @param blur - (Optional) Blur intensity in pixels. Defaults to 6.
+ * @param imgUrl - (Optional) Background image URL to apply the blur effect on.
+ * @returns A CSS object with styles.
  *
  * @example
+ * // With image overlay
  * ...theme.mixins.bgBlur({
  *   color: varAlpha(theme.vars.palette.background.paperChannel, 0.8),
- *   imgUrl: '/assets/background/overlay.png',
- *   blur: 6,
- * });
+ *   imgUrl: '/assets/overlay.png',
+ *   blur: 8,
+ * })
+ *
+ * @example
+ * // With color only
+ * ...theme.mixins.bgBlur({
+ *   color: varAlpha(theme.vars.palette.background.paperChannel, 0.8),
+ * })
  */
+
 export type BgBlurProps = {
   color: string;
   blur?: number;

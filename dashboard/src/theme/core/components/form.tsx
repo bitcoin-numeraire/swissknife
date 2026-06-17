@@ -1,53 +1,124 @@
 import type { Theme, Components } from '@mui/material/styles';
 
+import { formLabelClasses } from '@mui/material/FormLabel';
 import { inputLabelClasses } from '@mui/material/InputLabel';
+
+import { INPUT_PADDING, getInputTypography } from './text-field';
 
 // ----------------------------------------------------------------------
 
-const MuiFormLabel: Components<Theme>['MuiFormLabel'] = {
-  /** **************************************
-   * STYLE
-   *************************************** */
+const MuiFormControl: Components<Theme>['MuiFormControl'] = {
+  // ▼▼▼▼▼▼▼▼ ⚙️ PROPS ▼▼▼▼▼▼▼▼
+  defaultProps: {
+    variant: 'outlined',
+  },
+};
+
+/**
+ * Applies label styles to TextField and Select.
+ */
+const MuiInputLabel: Components<Theme>['MuiInputLabel'] = {
+  // ▼▼▼▼▼▼▼▼ 🎨 STYLE ▼▼▼▼▼▼▼▼
   styleOverrides: {
     root: ({ theme }) => ({
-      ...theme.typography.body2,
-      color: theme.vars.palette.text.disabled,
-      [`&.${inputLabelClasses.shrink}`]: {
-        ...theme.typography.body1,
-        fontWeight: 600,
-        color: theme.vars.palette.text.secondary,
-        [`&.${inputLabelClasses.focused}`]: { color: theme.vars.palette.text.primary },
-        [`&.${inputLabelClasses.error}`]: { color: theme.vars.palette.error.main },
-        [`&.${inputLabelClasses.disabled}`]: { color: theme.vars.palette.text.disabled },
-        [`&.${inputLabelClasses.filled}`]: { transform: 'translate(12px, 6px) scale(0.75)' },
-      },
+      variants: [
+        {
+          props: (props) => !props.shrink,
+          style: {
+            ...getInputTypography(theme, ['fontSize', 'lineHeight']),
+            color: theme.vars.palette.text.disabled,
+          },
+        },
+        {
+          props: (props) => !!props.shrink,
+          style: {
+            fontWeight: theme.typography.fontWeightSemiBold,
+            [`&.${inputLabelClasses.focused}:not(.${inputLabelClasses.error})`]: {
+              color: 'inherit',
+            },
+          },
+        },
+        {
+          props: (props) => !props.shrink && props.variant === 'outlined' && props.size === 'small',
+          style: {
+            transform: `translate(14px, ${INPUT_PADDING.outlined.small.paddingTop}px) scale(1)`,
+          },
+        },
+        {
+          props: (props) =>
+            !props.shrink && props.variant === 'outlined' && props.size === 'medium',
+          style: {
+            transform: `translate(14px, ${INPUT_PADDING.outlined.medium.paddingTop}px) scale(1)`,
+          },
+        },
+        {
+          props: (props) => !!props.shrink && props.variant === 'filled' && props.size === 'medium',
+          style: {
+            transform: 'translate(12px, 6px) scale(0.75)',
+          },
+        },
+      ],
     }),
   },
 };
 
-// ----------------------------------------------------------------------
-
-const MuiFormHelperText: Components<Theme>['MuiFormHelperText'] = {
-  /** **************************************
-   * DEFAULT PROPS
-   *************************************** */
-  defaultProps: { component: 'div' },
-
-  /** **************************************
-   * STYLE
-   *************************************** */
-  styleOverrides: { root: ({ theme }) => ({ marginTop: theme.spacing(1) }) },
+/**
+ * Applies label styles to Checkbox, RadioGroup, Switch.
+ */
+const MuiFormLabel: Components<Theme>['MuiFormLabel'] = {
+  //   // ▼▼▼▼▼▼▼▼ 🎨 STYLE ▼▼▼▼▼▼▼▼
+  styleOverrides: {
+    root: ({ theme }) => ({
+      [`&.${formLabelClasses.disabled}`]: {
+        color: theme.vars.palette.action.disabled,
+      },
+      variants: [
+        {
+          props: (props) => !props.error,
+          style: {
+            [`&.${formLabelClasses.focused}`]: {
+              color: theme.vars.palette.text.secondary,
+            },
+          },
+        },
+      ],
+    }),
+  },
 };
-
-// ----------------------------------------------------------------------
 
 const MuiFormControlLabel: Components<Theme>['MuiFormControlLabel'] = {
-  /** **************************************
-   * STYLE
-   *************************************** */
-  styleOverrides: { label: ({ theme }) => ({ ...theme.typography.body2 }) },
+  // ▼▼▼▼▼▼▼▼ 🎨 STYLE ▼▼▼▼▼▼▼▼
+  styleOverrides: {
+    label: ({ theme }) => ({
+      ...theme.typography.body2,
+    }),
+  },
 };
 
-// ----------------------------------------------------------------------
+const MuiFormHelperText: Components<Theme>['MuiFormHelperText'] = {
+  // ▼▼▼▼▼▼▼▼ ⚙️ PROPS ▼▼▼▼▼▼▼▼
+  defaultProps: {
+    component: 'div',
+  },
+  // ▼▼▼▼▼▼▼▼ 🎨 STYLE ▼▼▼▼▼▼▼▼
+  styleOverrides: {
+    root: ({ theme }) => ({
+      display: 'flex',
+      alignItems: 'center',
+      gap: theme.spacing(0.5),
+      margin: theme.spacing(0.75, 1.5, 0, 1.5),
+      '& > svg': { width: 16, height: 16 },
+    }),
+  },
+};
 
-export const form = { MuiFormLabel, MuiFormHelperText, MuiFormControlLabel };
+/* **********************************************************************
+ * 🚀 Export
+ * **********************************************************************/
+export const form: Components<Theme> = {
+  MuiFormLabel,
+  MuiInputLabel,
+  MuiFormControl,
+  MuiFormHelperText,
+  MuiFormControlLabel,
+};
