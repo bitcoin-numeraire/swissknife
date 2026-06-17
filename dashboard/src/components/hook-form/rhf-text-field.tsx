@@ -51,9 +51,12 @@ export function RHFTextField({
           slotProps={{
             ...slotProps,
             htmlInput: {
-              autoComplete: 'off',
               ...slotProps?.htmlInput,
-              ...(isNumberType && { inputMode: 'decimal', pattern: '[0-9]*\\.?[0-9]*' }),
+              ...(isNumberType && {
+                inputMode: 'decimal',
+                pattern: '[0-9]*\\.?[0-9]*',
+              }),
+              autoComplete: 'new-password', // Disable autocomplete and autofill
             },
           }}
           {...other}

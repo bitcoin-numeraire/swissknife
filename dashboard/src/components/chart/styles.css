@@ -1,5 +1,12 @@
 .apexcharts-canvas {
   /**
+  * Series
+  */
+  .apexcharts-series {
+    --apexcharts-focus-color: transparent;
+  }
+
+  /**
   * Tooltip
   */
   .apexcharts-tooltip {

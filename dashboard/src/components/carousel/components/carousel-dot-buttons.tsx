@@ -1,6 +1,9 @@
-import type { CSSObject } from '@mui/material/styles';
+'use client';
 
-import { varAlpha, mergeClasses } from 'minimal-shared/utils';
+import type { CSSObject } from '@mui/material/styles';
+import type { CarouselDotButtonsProps } from '../types';
+
+import { mergeClasses } from 'minimal-shared/utils';
 
 import Box from '@mui/material/Box';
 import { styled } from '@mui/material/styles';
@@ -8,9 +11,11 @@ import ButtonBase from '@mui/material/ButtonBase';
 
 import { carouselClasses } from '../classes';
 
-import type { CarouselDotButtonsProps } from '../types';
-
 // ----------------------------------------------------------------------
+
+const DOT_SIZES = { circular: 8, rounded: 8, number: 28 } as const;
+const DOT_GAPS = { rounded: 2, circular: 2, number: 6 } as const;
+const OUTER_PADDING = 12;
 
 export function CarouselDotButtons({
   sx,
@@ -23,55 +28,42 @@ export function CarouselDotButtons({
   variant = 'circular',
   ...other
 }: CarouselDotButtonsProps) {
-  const GAPS = { rounded: gap ?? 2, circular: gap ?? 2, number: gap ?? 6 };
-
-  const SIZES = {
-    circular: slotProps?.dot?.size ?? 18,
-    rounded: slotProps?.dot?.size ?? 18,
-    number: slotProps?.dot?.size ?? 28,
-  };
+  const dotGap = gap ?? DOT_GAPS[variant];
+  const dotSize = slotProps?.dot?.size ?? DOT_SIZES[variant];
+  const listItemHeight = variant === 'number' ? dotSize : dotSize + OUTER_PADDING;
 
   return (
     <Box
       component="ul"
       className={mergeClasses([carouselClasses.dots.root, className])}
       sx={[
-        () => ({
-          gap: `${GAPS[variant]}px`,
-          height: SIZES[variant],
+        {
           zIndex: 9,
           display: 'flex',
-          '& > li': {
-            display: 'inline-flex',
-          },
-        }),
+          gap: `${dotGap}px`,
+          height: listItemHeight,
+          '& > li': { display: 'inline-flex' },
+        },
         ...(Array.isArray(sx) ? sx : [sx]),
       ]}
       {...other}
     >
       {scrollSnaps.map((_, index) => {
-        const selected = index === selectedIndex;
+        const isSelected = index === selectedIndex;
 
         return (
           <li key={index}>
             <DotItem
               disableRipple
               aria-label={`dot-${index}`}
+              size={dotSize}
               variant={variant}
-              selected={selected}
+              selected={isSelected}
               className={mergeClasses(carouselClasses.dots.item, {
-                [carouselClasses.dots.itemSelected]: selected,
+                [carouselClasses.dots.itemSelected]: isSelected,
               })}
               onClick={() => onClickDot(index)}
-              sx={[
-                () => ({
-                  width: SIZES[variant],
-                  height: SIZES[variant],
-                }),
-                ...(Array.isArray(slotProps?.dot?.sx)
-                  ? (slotProps?.dot?.sx ?? [])
-                  : [slotProps?.dot?.sx]),
-              ]}
+              sx={slotProps?.dot?.sx}
             >
               {variant === 'number' && index + 1}
             </DotItem>
@@ -86,21 +78,23 @@ export function CarouselDotButtons({
 
 type DotItemProps = Pick<CarouselDotButtonsProps, 'variant'> & {
   selected?: boolean;
+  size?: number;
 };
 
 const DotItem = styled(ButtonBase, {
-  shouldForwardProp: (prop: string) => !['variant', 'selected', 'sx'].includes(prop),
-})<DotItemProps>(({ selected, theme }) => {
-  const dotStyles: CSSObject = {
-    width: 8,
-    height: 8,
+  shouldForwardProp: (prop: string) => !['size', 'variant', 'selected', 'sx'].includes(prop),
+})<DotItemProps>(({ size = 0, selected, theme }) => {
+  const wrapperSize = size + OUTER_PADDING;
+
+  const dotBaseStyles: CSSObject = {
+    width: size,
+    height: size,
     content: '""',
     opacity: 0.24,
-    borderRadius: '50%',
     backgroundColor: 'currentColor',
     transition: theme.transitions.create(['width', 'opacity'], {
       easing: theme.transitions.easing.sharp,
-      duration: theme.transitions.duration.short,
+      duration: theme.transitions.duration.shorter,
     }),
   };
 
@@ -108,35 +102,41 @@ const DotItem = styled(ButtonBase, {
     variants: [
       {
         props: { variant: 'circular' },
-        style: { '&::before': { ...dotStyles, ...(selected && { opacity: 1 }) } },
+        style: () => ({
+          width: wrapperSize,
+          height: wrapperSize,
+          '&::before': {
+            ...dotBaseStyles,
+            borderRadius: '50%',
+            ...(selected && { opacity: 1 }),
+          },
+        }),
       },
       {
         props: { variant: 'rounded' },
-        style: {
+        style: () => ({
+          width: wrapperSize,
+          height: wrapperSize,
           '&::before': {
-            ...dotStyles,
-            ...(selected && {
-              opacity: 1,
-              width: 'calc(100% - 4px)',
-              borderRadius: theme.shape.borderRadius,
-            }),
+            ...dotBaseStyles,
+            borderRadius: size / 2,
+            ...(selected && { opacity: 1, width: 'calc(100% - 4px)' }),
           },
-        },
+        }),
       },
       {
         props: { variant: 'number' },
         style: {
-          ...theme.typography.caption,
+          width: size,
+          height: size,
           borderRadius: '50%',
+          ...theme.typography.body2,
           color: theme.vars.palette.text.disabled,
-          border: `solid 1px ${varAlpha(theme.vars.palette.grey['500Channel'], 0.16)}`,
+          border: `solid 1px ${theme.vars.palette.shared.buttonOutlined}`,
           ...(selected && {
-            color: theme.vars.palette.common.white,
-            backgroundColor: theme.vars.palette.text.primary,
+            ...theme.mixins.filledStyles(theme, 'inherit'),
             fontWeight: theme.typography.fontWeightSemiBold,
-            ...theme.applyStyles('dark', {
-              color: theme.vars.palette.grey[800],
-            }),
+            borderColor: 'transparent',
           }),
         },
       },

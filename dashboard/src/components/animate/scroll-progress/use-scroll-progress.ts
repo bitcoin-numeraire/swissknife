@@ -10,7 +10,7 @@ import { useScroll } from 'framer-motion';
 export type UseScrollProgressReturn = {
   scrollXProgress: MotionValue<number>;
   scrollYProgress: MotionValue<number>;
-  elementRef: React.RefObject<HTMLDivElement>;
+  elementRef: React.RefObject<HTMLDivElement | null>;
 };
 
 export type UseScrollProgress = 'document' | 'container';

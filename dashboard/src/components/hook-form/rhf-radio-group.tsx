@@ -56,7 +56,7 @@ export function RHFRadioGroup({
               sx={[
                 { mb: 1, typography: 'body2' },
                 ...(Array.isArray(slotProps?.formLabel?.sx)
-                  ? (slotProps?.formLabel?.sx ?? [])
+                  ? slotProps.formLabel.sx
                   : [slotProps?.formLabel?.sx]),
               ]}
             >
@@ -72,10 +72,13 @@ export function RHFRadioGroup({
                 control={
                   <Radio
                     {...slotProps?.radio}
-                    inputProps={{
-                      id: `${option.label}-radio`,
-                      ...(!option.label && { 'aria-label': `${option.label} radio` }),
-                      ...slotProps?.radio?.inputProps,
+                    slotProps={{
+                      ...slotProps?.radio?.slotProps,
+                      input: {
+                        id: `${option.label}-radio`,
+                        ...(!option.label && { 'aria-label': `${option.label} radio` }),
+                        ...slotProps?.radio?.slotProps?.input,
+                      },
                     }}
                   />
                 }

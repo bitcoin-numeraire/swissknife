@@ -1,8 +1,9 @@
+'use client';
+
 import type { MotionProps } from 'framer-motion';
 import type { BoxProps } from '@mui/material/Box';
 
 import { m } from 'framer-motion';
-import { forwardRef } from 'react';
 
 import Box from '@mui/material/Box';
 
@@ -16,12 +17,15 @@ export type MotionContainerProps = BoxProps &
     action?: boolean;
   };
 
-export const MotionContainer = forwardRef<HTMLDivElement, MotionContainerProps>((props, ref) => {
-  const { animate, action = false, sx, children, ...other } = props;
-
+export function MotionContainer({
+  sx,
+  animate,
+  children,
+  action = false,
+  ...other
+}: MotionContainerProps) {
   return (
     <Box
-      ref={ref}
       component={m.div}
       variants={varContainer()}
       initial={action ? false : 'initial'}
@@ -33,4 +37,4 @@ export const MotionContainer = forwardRef<HTMLDivElement, MotionContainerProps>(
       {children}
     </Box>
   );
-});
+}

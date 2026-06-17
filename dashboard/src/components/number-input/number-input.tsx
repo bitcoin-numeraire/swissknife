@@ -1,15 +1,16 @@
+'use client';
+
 import type { BoxProps } from '@mui/material/Box';
 import type { InputBaseProps } from '@mui/material/InputBase';
 import type { ButtonBaseProps } from '@mui/material/ButtonBase';
 import type { FormHelperTextProps } from '@mui/material/FormHelperText';
 
+import { useId, useCallback } from 'react';
 import { varAlpha } from 'minimal-shared/utils';
-import { useId, forwardRef, useCallback } from 'react';
 
 import Box from '@mui/material/Box';
 
-import { Iconify } from 'src/components/iconify';
-
+import { Iconify } from '../iconify';
 import {
   HelperText,
   CaptionText,
@@ -49,25 +50,23 @@ export type NumberInputProps = Omit<React.ComponentProps<typeof NumberInputRoot>
   onChange?: (event: EventHandler, value: number) => void;
 };
 
-export const NumberInput = forwardRef<HTMLDivElement, NumberInputProps>((props, ref) => {
-  const {
-    sx,
-    error,
-    value,
-    onChange,
-    disabled,
-    slotProps,
-    helperText,
-    captionText,
-    hideDivider,
-    hideButtons,
-    disableInput,
-    min = 0,
-    max = 9999,
-    ...other
-  } = props;
-
-  const id = useId();
+export function NumberInput({
+  sx,
+  error,
+  value,
+  onChange,
+  disabled,
+  slotProps,
+  helperText,
+  captionText,
+  hideDivider,
+  hideButtons,
+  disableInput,
+  min = 0,
+  max = 9999,
+  ...other
+}: NumberInputProps) {
+  const uniqueId = useId();
 
   const currentValue = value ?? 0;
 
@@ -103,7 +102,6 @@ export const NumberInput = forwardRef<HTMLDivElement, NumberInputProps>((props, 
   return (
     <Box {...slotProps?.wrapper}>
       <NumberInputRoot
-        ref={ref}
         sx={[
           (theme) => ({
             '--border-color': varAlpha(theme.vars.palette.grey['500Channel'], 0.2),
@@ -131,7 +129,7 @@ export const NumberInput = forwardRef<HTMLDivElement, NumberInputProps>((props, 
 
         <InputContainer {...slotProps?.inputWrapper}>
           <CenteredInput
-            name={id}
+            name={uniqueId}
             disabled={disabled || disableInput}
             value={currentValue}
             onChange={handleChange}
@@ -159,7 +157,7 @@ export const NumberInput = forwardRef<HTMLDivElement, NumberInputProps>((props, 
       )}
     </Box>
   );
-});
+}
 
 // ----------------------------------------------------------------------
 

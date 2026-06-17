@@ -7,19 +7,16 @@ import Tooltip from '@mui/material/Tooltip';
 import { styled } from '@mui/material/styles';
 import ButtonBase from '@mui/material/ButtonBase';
 
-import { CONFIG } from 'src/global-config';
-
-import { Iconify } from 'src/components/iconify';
-
-import { SvgColor } from '../../svg-color';
+import { Iconify } from '../../iconify';
 
 // ----------------------------------------------------------------------
 
-export type BaseOptionProps = ButtonBaseProps & {
-  icon: string;
+export type BaseOptionProps = Omit<ButtonBaseProps, 'action'> & {
   label: string;
   tooltip?: string;
   selected: boolean;
+  icon: React.ReactNode;
+  action?: React.ReactNode;
   onChangeOption: () => void;
 };
 
@@ -27,6 +24,7 @@ export function BaseOption({
   sx,
   icon,
   label,
+  action,
   tooltip,
   selected,
   onChangeOption,
@@ -35,8 +33,10 @@ export function BaseOption({
   return (
     <ItemRoot disableRipple selected={selected} onClick={onChangeOption} sx={sx} {...other}>
       <TopContainer>
-        <SvgColor src={`${CONFIG.assetsDir}/assets/icons/settings/ic-${icon}.svg`} />
-        <Switch name={label} size="small" color="default" checked={selected} sx={{ mr: -0.75 }} />
+        {icon}
+        {action ?? (
+          <Switch name={label} size="small" color="default" checked={selected} sx={{ mr: -0.75 }} />
+        )}
       </TopContainer>
 
       <BottomContainer>
@@ -68,8 +68,8 @@ const ItemRoot = styled(ButtonBase, {
   cursor: 'pointer',
   flexDirection: 'column',
   alignItems: 'flex-start',
-  padding: theme.spacing(2, 2.5),
-  borderRadius: theme.shape.borderRadius * 2,
+  padding: theme.spacing(2, 2, 2, 2.5),
+  borderRadius: Number(theme.shape.borderRadius) * 2,
   border: `solid 1px ${varAlpha(theme.vars.palette.grey['500Channel'], 0.12)}`,
   '&:hover': {
     backgroundColor: varAlpha(theme.vars.palette.grey['500Channel'], 0.08),

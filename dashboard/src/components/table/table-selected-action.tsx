@@ -1,3 +1,5 @@
+'use client';
+
 import type { BoxProps } from '@mui/material/Box';
 
 import Box from '@mui/material/Box';
@@ -54,9 +56,11 @@ export function TableSelectedAction({
         onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
           onSelectAllRows(event.target.checked)
         }
-        inputProps={{
-          id: 'deselect-all-checkbox',
-          'aria-label': 'Deselect all checkbox',
+        slotProps={{
+          input: {
+            id: 'deselect-all-checkbox',
+            'aria-label': 'Deselect all checkbox',
+          },
         }}
       />
 

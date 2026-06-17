@@ -1,10 +1,12 @@
+'use client';
+
 import type { ChipProps } from '@mui/material/Chip';
 import type { Theme, SxProps } from '@mui/material/styles';
 
 import Button from '@mui/material/Button';
 import { styled } from '@mui/material/styles';
 
-import { Iconify } from 'src/components/iconify';
+import { Iconify } from '../iconify';
 
 // ----------------------------------------------------------------------
 

@@ -1,21 +1,20 @@
 import type { BoxProps } from '@mui/material/Box';
+import type { SettingsState } from '../types';
 
 import { varAlpha } from 'minimal-shared/utils';
 
 import Box from '@mui/material/Box';
 
-import { CONFIG } from 'src/global-config';
-
 import { OptionButton } from './styles';
-import { SvgColor } from '../../svg-color';
-
-import type { SettingsState } from '../types';
 
 // ----------------------------------------------------------------------
 
 export type NavLayoutOptionProps = BoxProps & {
   value: SettingsState['navLayout'];
-  options: SettingsState['navLayout'][];
+  options: {
+    value: SettingsState['navLayout'];
+    icon: React.ReactNode;
+  }[];
   onChangeOption: (newOption: SettingsState['navLayout']) => void;
 };
 
@@ -29,23 +28,23 @@ export function NavLayoutOptions({
   return (
     <Box
       sx={[
-        () => ({
+        {
           gap: 1.5,
           display: 'grid',
           gridTemplateColumns: 'repeat(3, 1fr)',
-        }),
+        },
         ...(Array.isArray(sx) ? sx : [sx]),
       ]}
       {...other}
     >
       {options.map((option) => {
-        const selected = value === option;
+        const selected = value === option.value;
 
         return (
           <OptionButton
-            key={option}
+            key={option.value}
             selected={selected}
-            onClick={() => onChangeOption(option)}
+            onClick={() => onChangeOption(option.value)}
             sx={[
               (theme) => ({
                 height: 64,
@@ -53,10 +52,7 @@ export function NavLayoutOptions({
               }),
             ]}
           >
-            <SvgColor
-              src={`${CONFIG.assetsDir}/assets/icons/settings/ic-nav-${option}.svg`}
-              sx={{ width: 1, height: 1, color: 'currentColor' }}
-            />
+            {option.icon}
           </OptionButton>
         );
       })}
@@ -68,7 +64,11 @@ export function NavLayoutOptions({
 
 export type NavColorOptionProps = BoxProps & {
   value: SettingsState['navColor'];
-  options: SettingsState['navColor'][];
+  options: {
+    label: string;
+    value: SettingsState['navColor'];
+    icon: React.ReactNode;
+  }[];
   onChangeOption: (newOption: SettingsState['navColor']) => void;
 };
 
@@ -82,29 +82,27 @@ export function NavColorOptions({
   return (
     <Box
       sx={[
-        () => ({
+        {
           gap: 1.5,
           display: 'grid',
           gridTemplateColumns: 'repeat(2, 1fr)',
-        }),
+        },
         ...(Array.isArray(sx) ? sx : [sx]),
       ]}
       {...other}
     >
       {options.map((option) => {
-        const selected = value === option;
+        const selected = value === option.value;
 
         return (
           <OptionButton
-            key={option}
+            key={option.value}
             selected={selected}
-            onClick={() => onChangeOption(option)}
-            sx={{ gap: 1.5, height: 56, textTransform: 'capitalize' }}
+            onClick={() => onChangeOption(option.value)}
+            sx={{ gap: 1.5, height: 56 }}
           >
-            <SvgColor
-              src={`${CONFIG.assetsDir}/assets/icons/settings/ic-sidebar-${option === 'integrate' ? 'outline' : 'filled'}.svg`}
-            />
-            {option}
+            {option.icon}
+            {option.label}
           </OptionButton>
         );
       })}

@@ -1,11 +1,11 @@
+'use client';
+
 import type { MotionProps } from 'framer-motion';
 import type { BoxProps } from '@mui/material/Box';
 
 import { m } from 'framer-motion';
-import { forwardRef } from 'react';
 
 import Box from '@mui/material/Box';
-import { useTheme } from '@mui/material/styles';
 import useMediaQuery from '@mui/material/useMediaQuery';
 
 import { varContainer } from './variants';
@@ -17,11 +17,13 @@ export type MotionViewportProps = BoxProps &
     disableAnimate?: boolean;
   };
 
-export const MotionViewport = forwardRef<HTMLDivElement, MotionViewportProps>((props, ref) => {
-  const { children, viewport, disableAnimate = true, ...other } = props;
-
-  const theme = useTheme();
-  const smDown = useMediaQuery(theme.breakpoints.down('sm'));
+export function MotionViewport({
+  children,
+  viewport,
+  disableAnimate = true,
+  ...other
+}: MotionViewportProps) {
+  const smDown = useMediaQuery((theme) => theme.breakpoints.down('sm'));
 
   const disabled = smDown && disableAnimate;
 
@@ -36,8 +38,8 @@ export const MotionViewport = forwardRef<HTMLDivElement, MotionViewportProps>((p
       };
 
   return (
-    <Box ref={ref} {...baseProps} {...other}>
+    <Box {...baseProps} {...other}>
       {children}
     </Box>
   );
-});
+}

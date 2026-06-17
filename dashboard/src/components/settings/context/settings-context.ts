@@ -1,8 +1,8 @@
 'use client';
 
-import { createContext } from 'react';
-
 import type { SettingsContextValue } from '../types';
+
+import { createContext } from 'react';
 
 // ----------------------------------------------------------------------
 

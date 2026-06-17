@@ -1,14 +1,14 @@
+'use client';
+
 import type { Theme, SxProps } from '@mui/material/styles';
+import type { LogoProps } from '../logo';
 
 import { m } from 'framer-motion';
-import { forwardRef } from 'react';
 import { varAlpha } from 'minimal-shared/utils';
 
 import { styled } from '@mui/material/styles';
 
 import { Logo } from '../logo';
-
-import type { LogoProps } from '../logo';
 
 // ----------------------------------------------------------------------
 
@@ -20,11 +20,9 @@ export type AnimateLogoProps = React.ComponentProps<'div'> & {
   };
 };
 
-export const AnimateLogoZoom = forwardRef<HTMLDivElement, AnimateLogoProps>((props, ref) => {
-  const { logo, slotProps, sx, ...other } = props;
-
+export function AnimateLogoZoom({ logo, slotProps, sx, ...other }: AnimateLogoProps) {
   return (
-    <LogoZoomRoot ref={ref} sx={sx} {...other}>
+    <LogoZoomRoot sx={sx} {...other}>
       <m.span
         animate={{ scale: [1, 0.9, 0.9, 1, 1], opacity: [1, 0.48, 0.48, 1, 1] }}
         transition={{
@@ -36,14 +34,11 @@ export const AnimateLogoZoom = forwardRef<HTMLDivElement, AnimateLogoProps>((pro
       >
         {logo ?? (
           <Logo
-            isSingle
             disabled
             {...slotProps?.logo}
             sx={[
               { width: 64, height: 64 },
-              ...(Array.isArray(slotProps?.logo?.sx)
-                ? (slotProps?.logo?.sx ?? [])
-                : [slotProps?.logo?.sx]),
+              ...(Array.isArray(slotProps?.logo?.sx) ? slotProps.logo.sx : [slotProps?.logo?.sx]),
             ]}
           />
         )}
@@ -70,7 +65,7 @@ export const AnimateLogoZoom = forwardRef<HTMLDivElement, AnimateLogoProps>((pro
       />
     </LogoZoomRoot>
   );
-});
+}
 
 const LogoZoomRoot = styled('div')(() => ({
   width: 120,
@@ -97,20 +92,15 @@ const LogoZoomSecondaryOutline = styled(m.span)(({ theme }) => ({
 
 // ----------------------------------------------------------------------
 
-export const AnimateLogoRotate = forwardRef<HTMLDivElement, AnimateLogoProps>((props, ref) => {
-  const { logo, sx, slotProps, ...other } = props;
-
+export function AnimateLogoRotate({ logo, sx, slotProps, ...other }: AnimateLogoProps) {
   return (
-    <LogoRotateRoot ref={ref} sx={sx} {...other}>
+    <LogoRotateRoot sx={sx} {...other}>
       {logo ?? (
         <Logo
-          isSingle
           {...slotProps?.logo}
           sx={[
             { zIndex: 9, width: 40, height: 40 },
-            ...(Array.isArray(slotProps?.logo?.sx)
-              ? (slotProps?.logo?.sx ?? [])
-              : [slotProps?.logo?.sx]),
+            ...(Array.isArray(slotProps?.logo?.sx) ? slotProps.logo.sx : [slotProps?.logo?.sx]),
           ]}
         />
       )}
@@ -121,7 +111,7 @@ export const AnimateLogoRotate = forwardRef<HTMLDivElement, AnimateLogoProps>((p
       />
     </LogoRotateRoot>
   );
-});
+}
 
 const LogoRotateRoot = styled('div')(() => ({
   width: 96,

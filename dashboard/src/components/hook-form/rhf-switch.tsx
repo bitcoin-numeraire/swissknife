@@ -45,14 +45,17 @@ export function RHFSwitch({ name, helperText, label, slotProps, sx, ...other }: 
                 {...field}
                 checked={field.value}
                 {...slotProps?.switch}
-                inputProps={{
-                  id: `${name}-switch`,
-                  ...(!label && { 'aria-label': `${name} switch` }),
-                  ...slotProps?.switch?.inputProps,
+                slotProps={{
+                  ...slotProps?.switch?.slotProps,
+                  input: {
+                    id: `${name}-switch`,
+                    ...(!label && { 'aria-label': `${name} switch` }),
+                    ...slotProps?.switch?.slotProps?.input,
+                  },
                 }}
               />
             }
-            sx={[{ mx: 0 }, ...(Array.isArray(sx) ? (sx ?? []) : [sx])]}
+            sx={[{ mx: 0 }, ...(Array.isArray(sx) ? sx : [sx])]}
             {...other}
           />
 
@@ -113,7 +116,7 @@ export function RHFMultiSwitch({
               sx={[
                 { mb: 1, typography: 'body2' },
                 ...(Array.isArray(slotProps?.formLabel?.sx)
-                  ? (slotProps?.formLabel?.sx ?? [])
+                  ? slotProps.formLabel.sx
                   : [slotProps?.formLabel?.sx]),
               ]}
             >
@@ -130,10 +133,13 @@ export function RHFMultiSwitch({
                     checked={field.value.includes(option.value)}
                     onChange={() => field.onChange(getSelected(field.value, option.value))}
                     {...slotProps?.switch}
-                    inputProps={{
-                      id: `${option.label}-switch`,
-                      ...(!option.label && { 'aria-label': `${option.label} switch` }),
-                      ...slotProps?.switch?.inputProps,
+                    slotProps={{
+                      ...slotProps?.switch?.slotProps,
+                      input: {
+                        id: `${option.label}-switch`,
+                        ...(!option.label && { 'aria-label': `${option.label} switch` }),
+                        ...slotProps?.switch?.slotProps?.input,
+                      },
                     }}
                   />
                 }

@@ -1,41 +1,63 @@
+'use client';
+
+import type { ChipProps } from '@mui/material/Chip';
+import type { Theme, SxProps } from '@mui/material/styles';
 import type { TextFieldProps } from '@mui/material/TextField';
 import type {
   AutocompleteProps,
   AutocompleteRenderInputParams,
-  AutocompleteRenderGetTagProps,
+  AutocompleteRenderValueGetItemProps,
 } from '@mui/material/Autocomplete';
 
-import { useMemo, useCallback } from 'react';
+import { merge } from 'es-toolkit';
+import { useId, useMemo, useCallback } from 'react';
 
 import Chip from '@mui/material/Chip';
 import TextField from '@mui/material/TextField';
-import Autocomplete from '@mui/material/Autocomplete';
-import InputAdornment from '@mui/material/InputAdornment';
 import { filledInputClasses } from '@mui/material/FilledInput';
 import { outlinedInputClasses } from '@mui/material/OutlinedInput';
+import Autocomplete, { autocompleteClasses } from '@mui/material/Autocomplete';
+import InputAdornment, { inputAdornmentClasses } from '@mui/material/InputAdornment';
 
 import { countries } from 'src/assets/data';
 
-import { FlagIcon, flagIconClasses } from 'src/components/flag-icon';
+import { FlagIcon } from '../flag-icon';
 
 // ----------------------------------------------------------------------
 
 type Value = string;
+type Multiple = boolean | undefined;
+type DisableClearable = boolean | undefined;
+type FreeSolo = boolean | undefined;
+
+type ExcludedProps = 'options' | 'renderOption' | 'renderInput' | 'renderValue' | 'getOptionLabel';
 
 export type AutocompleteBaseProps = Omit<
-  AutocompleteProps<any, boolean, boolean, boolean>,
-  'options' | 'renderOption' | 'renderInput' | 'renderTags' | 'getOptionLabel'
+  AutocompleteProps<any, Multiple, DisableClearable, FreeSolo>,
+  ExcludedProps
 >;
 
-export type CountrySelectProps = AutocompleteBaseProps & {
-  label?: string;
-  error?: boolean;
-  placeholder?: string;
-  hiddenLabel?: boolean;
-  getValue?: 'label' | 'code';
-  helperText?: React.ReactNode;
-  variant?: TextFieldProps['variant'];
-};
+export type CountrySelectProps = AutocompleteBaseProps &
+  Pick<
+    TextFieldProps,
+    'label' | 'error' | 'variant' | 'helperText' | 'placeholder' | 'hiddenLabel'
+  > & {
+    displayValue?: 'label' | 'code';
+    slotProps?: AutocompleteBaseProps['slotProps'] & {
+      chip?: Partial<ChipProps>;
+      textField?: Partial<TextFieldProps>;
+    };
+  };
+
+const getCountry = (inputValue: string) =>
+  countries.find(
+    (country) =>
+      country.label === inputValue || country.code === inputValue || country.phone === inputValue
+  ) ?? {
+    code: '',
+    label: '',
+    phone: '',
+  };
 
 export function CountrySelect({
   id,
@@ -43,36 +65,33 @@ export function CountrySelect({
   error,
   variant,
   multiple,
+  slotProps,
   helperText,
   hiddenLabel,
   placeholder,
-  getValue = 'label',
+  displayValue = 'label',
   ...other
 }: CountrySelectProps) {
+  const uniqueId = useId();
+
   const options = useMemo(
-    () => countries.map((country) => (getValue === 'label' ? country.label : country.code)),
-    [getValue]
+    () => countries.map((country) => (displayValue === 'code' ? country.code : country.label)),
+    [displayValue]
   );
 
-  const getCountry = useCallback((inputValue: string) => {
-    const country = countries.find(
-      (op) => op.label === inputValue || op.code === inputValue || op.phone === inputValue
-    );
-    return {
-      code: country?.code || '',
-      label: country?.label || '',
-      phone: country?.phone || '',
-    };
-  }, []);
+  const getOptionLabel = useCallback(
+    (option: Value) => (displayValue === 'code' ? getCountry(option).label : option),
+    [displayValue]
+  );
 
   const renderOption = useCallback(
-    (props: React.HTMLAttributes<HTMLLIElement>, option: Value) => {
+    (props: React.HTMLAttributes<HTMLLIElement> & { key: any }, option: Value) => {
+      const { key, ...otherProps } = props;
       const country = getCountry(option);
 
       return (
-        <li {...props} key={country.label}>
+        <li key={key} {...otherProps}>
           <FlagIcon
-            key={country.label}
             code={country.code}
             sx={{
               mr: 1,
@@ -85,106 +104,118 @@ export function CountrySelect({
         </li>
       );
     },
-    [getCountry]
+    []
   );
 
   const renderInput = useCallback(
     (params: AutocompleteRenderInputParams) => {
-      const country = getCountry(params.inputProps.value as Value);
+      const { slotProps: systemSlotProps, ...otherSystemProps } = params;
+      const {
+        slotProps: externalTextFieldSlotProps,
+        sx: textFieldSx,
+        ...otherTextFieldProps
+      } = slotProps?.textField ?? {};
 
-      const baseField = {
-        ...params,
-        label,
-        variant,
-        placeholder,
-        helperText,
-        hiddenLabel,
-        error: !!error,
-        inputProps: { ...params.inputProps, autoComplete: 'new-password' },
+      const inputValue = systemSlotProps?.htmlInput?.value as Value;
+      const country = getCountry(inputValue);
+      const hasAdornment = !multiple && !!country.code;
+
+      const internalStyles: SxProps<Theme> = {
+        [`& .${inputAdornmentClasses.root}`]: {
+          ml: 0.5,
+          mr: 1,
+        },
+        [`& .${outlinedInputClasses.root}, .${filledInputClasses.root}`]: {
+          [`& .${autocompleteClasses.input}`]: {
+            pl: 0,
+          },
+        },
+        [`& .${filledInputClasses.root}`]: {
+          [`& .${inputAdornmentClasses.root}`]: {
+            transform: hiddenLabel ? 'unset' : 'translateY(-8px)',
+          },
+        },
       };
 
-      if (multiple) {
-        return <TextField {...baseField} />;
-      }
+      const mergedSlotProps: TextFieldProps['slotProps'] = merge(
+        systemSlotProps,
+        externalTextFieldSlotProps ?? {}
+      );
 
       return (
         <TextField
-          {...baseField}
+          {...otherSystemProps}
+          label={label}
+          variant={variant}
+          placeholder={placeholder}
+          helperText={helperText}
+          hiddenLabel={hiddenLabel}
+          error={!!error}
+          {...otherTextFieldProps}
           slotProps={{
+            ...mergedSlotProps,
+            htmlInput: {
+              ...mergedSlotProps.htmlInput,
+              autoComplete: 'new-password', // Disable autocomplete and autofill
+            },
             input: {
-              ...params.InputProps,
-              startAdornment: (
-                <InputAdornment position="start" sx={{ ...(!country.code && { display: 'none' }) }}>
-                  <FlagIcon
-                    key={country.label}
-                    code={country.code}
-                    sx={{ width: 22, height: 22, borderRadius: '50%' }}
-                  />
-                </InputAdornment>
-              ),
+              ...mergedSlotProps.input,
+              ...(hasAdornment && {
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <FlagIcon
+                      code={country.code}
+                      sx={{ width: 22, height: 22, borderRadius: '50%' }}
+                    />
+                  </InputAdornment>
+                ),
+              }),
             },
           }}
-          sx={{
-            [`& .${outlinedInputClasses.root}`]: {
-              [`& .${flagIconClasses.root}`]: { ml: 0.5, mr: -0.5 },
-            },
-            [`& .${filledInputClasses.root}`]: {
-              [`& .${flagIconClasses.root}`]: { ml: 0.5, mr: -0.5, mt: hiddenLabel ? 0 : -2 },
-            },
-          }}
+          sx={[
+            !multiple && internalStyles,
+            ...(Array.isArray(textFieldSx) ? textFieldSx : [textFieldSx]),
+          ]}
         />
       );
     },
-    [getCountry, label, variant, placeholder, helperText, hiddenLabel, error, multiple]
+    [error, helperText, hiddenLabel, label, multiple, placeholder, slotProps, variant]
   );
 
-  const renderTags = useCallback(
-    (selected: Value[], getTagProps: AutocompleteRenderGetTagProps) =>
-      selected.map((option, index) => {
+  const renderValue = useCallback(
+    (selected: unknown, getItemProps: AutocompleteRenderValueGetItemProps<Multiple>) =>
+      (selected as Value[]).map((option, index) => {
         const country = getCountry(option);
 
         return (
           <Chip
-            {...getTagProps({ index })}
+            {...getItemProps({ index })}
             key={country.label}
             label={country.label}
             size="small"
             variant="soft"
             icon={
-              <FlagIcon
-                key={country.label}
-                code={country.code}
-                sx={{ width: 16, height: 16, borderRadius: '50%' }}
-              />
+              <FlagIcon code={country.code} sx={[{ width: 16, height: 16, borderRadius: '50%' }]} />
             }
+            {...slotProps?.chip}
           />
         );
       }),
-    [getCountry]
-  );
-
-  const getOptionLabel = useCallback(
-    (option: Value) => {
-      if (getValue === 'code') {
-        const country = countries.find((op) => op.code === option);
-        return country?.label ?? '';
-      }
-      return option;
-    },
-    [getValue]
+    [slotProps?.chip]
   );
 
   return (
     <Autocomplete
-      id={`${id}-country-select`}
-      multiple={multiple}
+      id={id ?? `${uniqueId}-country-select`}
       options={options}
+      multiple={multiple}
       autoHighlight={!multiple}
       disableCloseOnSelect={multiple}
+      getOptionLabel={getOptionLabel}
       renderOption={renderOption}
       renderInput={renderInput}
-      renderTags={multiple ? renderTags : undefined}
-      getOptionLabel={getOptionLabel}
+      renderValue={multiple ? renderValue : undefined}
+      {...slotProps}
       {...other}
     />
   );

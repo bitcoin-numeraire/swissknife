@@ -1,6 +1,5 @@
-import type { Theme, SxProps } from '@mui/material/styles';
+'use client';
 
-import { forwardRef } from 'react';
 import { mergeClasses } from 'minimal-shared/utils';
 
 import { styled } from '@mui/material/styles';
@@ -9,25 +8,17 @@ import { flagIconClasses } from './classes';
 
 // ----------------------------------------------------------------------
 
-export type FlagIconProps = React.ComponentProps<'span'> & {
+export type FlagIconProps = React.ComponentProps<typeof FlagRoot> & {
   code?: string;
-  sx?: SxProps<Theme>;
 };
 
-export const FlagIcon = forwardRef<HTMLSpanElement, FlagIconProps>((props, ref) => {
-  const { code, className, sx, ...other } = props;
-
+export function FlagIcon({ code, className, sx, ...other }: FlagIconProps) {
   if (!code) {
     return null;
   }
 
   return (
-    <FlagRoot
-      ref={ref}
-      className={mergeClasses([flagIconClasses.root, className])}
-      sx={sx}
-      {...other}
-    >
+    <FlagRoot className={mergeClasses([flagIconClasses.root, className])} sx={sx} {...other}>
       <FlagImg
         loading="lazy"
         alt={code}
@@ -36,7 +27,7 @@ export const FlagIcon = forwardRef<HTMLSpanElement, FlagIconProps>((props, ref) 
       />
     </FlagRoot>
   );
-});
+}
 
 // ----------------------------------------------------------------------
 

@@ -7,7 +7,7 @@ import type { EmblaOptionsType, EmblaCarouselType } from 'embla-carousel';
 // ----------------------------------------------------------------------
 
 /**
- * Dot Buttons
+ * Dot buttons
  */
 export type UseCarouselDotsReturn = {
   dotCount: number;
@@ -27,8 +27,9 @@ export type CarouselDotButtonsProps = BoxProps<'ul'> &
       };
     };
   };
+
 /**
- * Prev & Next Buttons
+ * Prev & next buttons
  */
 export type UseCarouselArrowsReturn = {
   disablePrev: boolean;
@@ -70,11 +71,41 @@ export type UseCarouselThumbsReturn = {
   onClickThumb: (index: number) => void;
 };
 
+export type CarouselThumbProps = ButtonBaseProps & {
+  src: string;
+  index: number;
+  selected: boolean;
+};
+
+export type CarouselThumbsProps = React.ComponentProps<'div'> & {
+  options?: Partial<CarouselOptions>;
+  sx?: SxProps<Theme>;
+  slotProps?: {
+    slide?: SxProps<Theme>;
+    container?: SxProps<Theme>;
+    disableMask?: boolean;
+  };
+};
+
 /**
  * Progress
  */
 export type UseCarouselProgressReturn = {
   value: number;
+};
+
+export type CarouselProgressBarProps = React.ComponentProps<'div'> &
+  UseCarouselProgressReturn & {
+    sx?: SxProps<Theme>;
+  };
+
+/**
+ * Autoplay
+ */
+export type UseCarouselAutoplayReturn = {
+  isPlaying: boolean;
+  onTogglePlay: () => void;
+  onClickPlay: (callback: () => void) => void;
 };
 
 /**
@@ -108,7 +139,9 @@ export type UseCarouselReturn = {
   mainApi?: EmblaCarouselType;
   thumbs: UseCarouselThumbsReturn;
   dots: UseCarouselDotsReturn;
+  autoplay: UseCarouselAutoplayReturn;
   progress: UseCarouselProgressReturn;
+  autoScroll: UseCarouselAutoplayReturn;
   arrows: UseCarouselArrowsReturn;
 };
 

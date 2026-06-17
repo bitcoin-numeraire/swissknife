@@ -1,3 +1,7 @@
+'use client';
+
+import type { NavGroupProps, NavSectionProps } from '../types';
+
 import { useBoolean } from 'minimal-shared/hooks';
 import { mergeClasses } from 'minimal-shared/utils';
 
@@ -8,8 +12,6 @@ import { NavList } from './nav-list';
 import { Nav, NavUl, NavLi, NavSubheader } from '../components';
 import { navSectionClasses, navSectionCssVars } from '../styles';
 
-import type { NavGroupProps, NavSectionProps } from '../types';
-
 // ----------------------------------------------------------------------
 
 export function NavSectionVertical({
@@ -18,7 +20,7 @@ export function NavSectionVertical({
   render,
   className,
   slotProps,
-  currentRole,
+  checkPermissions,
   enabledRootRedirect,
   cssVars: overridesVars,
   ...other
@@ -41,7 +43,7 @@ export function NavSectionVertical({
             items={group.items}
             render={render}
             slotProps={slotProps}
-            currentRole={currentRole}
+            checkPermissions={checkPermissions}
             enabledRootRedirect={enabledRootRedirect}
           />
         ))}
@@ -57,7 +59,7 @@ function Group({
   render,
   subheader,
   slotProps,
-  currentRole,
+  checkPermissions,
   enabledRootRedirect,
 }: NavGroupProps) {
   const groupOpen = useBoolean(true);
@@ -71,7 +73,7 @@ function Group({
           render={render}
           depth={1}
           slotProps={slotProps}
-          currentRole={currentRole}
+          checkPermissions={checkPermissions}
           enabledRootRedirect={enabledRootRedirect}
         />
       ))}

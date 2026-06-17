@@ -1,117 +1,139 @@
 'use client';
 
-import type { CSSObject } from '@mui/material/styles';
+import type { LabelVariant } from './types';
 
 import { varAlpha } from 'minimal-shared/utils';
 
 import { styled } from '@mui/material/styles';
 
-import type { LabelProps } from './types';
+import { colorKeys } from 'src/theme/core';
 
 // ----------------------------------------------------------------------
 
+const baseColors = ['default'] as const;
+const allColors = [...baseColors, ...colorKeys.palette, ...colorKeys.common] as const;
+
 export const LabelRoot = styled('span', {
   shouldForwardProp: (prop: string) => !['color', 'variant', 'disabled', 'sx'].includes(prop),
-})<LabelProps>(({ color, variant, disabled, theme }) => {
-  const defaultStyles: CSSObject = {
-    ...(color === 'default' && {
-      /**
-       * @variant filled
-       */
-      ...(variant === 'filled' && {
-        color: theme.vars.palette.common.white,
-        backgroundColor: theme.vars.palette.text.primary,
-        ...theme.applyStyles('dark', {
-          color: theme.vars.palette.grey[800],
-        }),
-      }),
-      /**
-       * @variant outlined
-       */
-      ...(variant === 'outlined' && {
-        backgroundColor: 'transparent',
-        color: theme.vars.palette.text.primary,
-        border: `2px solid ${theme.vars.palette.text.primary}`,
-      }),
-      /**
-       * @variant soft
-       */
-      ...(variant === 'soft' && {
-        color: theme.vars.palette.text.secondary,
-        backgroundColor: varAlpha(theme.vars.palette.grey['500Channel'], 0.16),
-      }),
-      /**
-       * @variant inverted
-       */
-      ...(variant === 'inverted' && {
+})<{ variant?: LabelVariant; disabled?: boolean }>(({ theme }) => ({
+  height: 24,
+  minWidth: 24,
+  flexShrink: 0,
+  lineHeight: 18 / 12,
+  cursor: 'default',
+  alignItems: 'center',
+  whiteSpace: 'nowrap',
+  display: 'inline-flex',
+  gap: theme.spacing(0.75),
+  justifyContent: 'center',
+  padding: theme.spacing(0, 0.75),
+  fontSize: theme.typography.pxToRem(12),
+  fontWeight: theme.typography.fontWeightBold,
+  borderRadius: Number(theme.shape.borderRadius) * 0.75,
+  variants: [
+    /**
+     * @variant filled
+     */
+    {
+      props: { variant: 'filled', color: 'default' },
+      style: {
+        ...theme.mixins.filledStyles(theme, 'inherit'),
+      },
+    },
+    ...colorKeys.common.map((colorKey) => ({
+      props: { variant: 'filled', color: colorKey },
+      style: {
+        ...theme.mixins.filledStyles(theme, colorKey),
+      },
+    })),
+    ...colorKeys.palette.map((colorKey) => ({
+      props: { variant: 'filled', color: colorKey },
+      style: {
+        ...theme.mixins.filledStyles(theme, colorKey),
+      },
+    })),
+    /**
+     * @variant outlined
+     */
+    {
+      props: { variant: 'outlined' },
+      style: {
+        border: '2px solid currentColor',
+      },
+    },
+    ...colorKeys.common.map((colorKey) => ({
+      props: { variant: 'outlined', color: colorKey },
+      style: {
+        color: theme.vars.palette.common[colorKey],
+      },
+    })),
+    ...colorKeys.palette.map((colorKey) => ({
+      props: { variant: 'outlined', color: colorKey },
+      style: {
+        color: theme.vars.palette[colorKey].main,
+      },
+    })),
+    /**
+     * @variant soft
+     */
+    ...allColors.map((colorKey) => ({
+      props: { variant: 'soft', color: colorKey },
+      style: () => {
+        const currentColor = colorKey === 'default' ? 'inherit' : colorKey;
+
+        return {
+          ...theme.mixins.softStyles(theme, currentColor),
+        };
+      },
+    })),
+    /**
+     * @variant inverted
+     */
+    {
+      props: { variant: 'inverted', color: 'default' },
+      style: {
         color: theme.vars.palette.grey[800],
         backgroundColor: theme.vars.palette.grey[300],
-      }),
-    }),
-  };
-
-  const colorStyles: CSSObject = {
-    ...(color &&
-      color !== 'default' && {
-        /**
-         * @variant filled
-         */
-        ...(variant === 'filled' && {
-          color: theme.vars.palette[color].contrastText,
-          backgroundColor: theme.vars.palette[color].main,
+      },
+    },
+    ...colorKeys.common.map((colorKey) => ({
+      props: { variant: 'inverted', color: colorKey },
+      style: {
+        color: theme.vars.palette.common[colorKey],
+        backgroundColor: varAlpha('currentColor', theme.vars.opacity.soft.commonHoverBg),
+      },
+    })),
+    ...colorKeys.palette.map((colorKey) => ({
+      props: { variant: 'inverted', color: colorKey },
+      style: {
+        color: theme.vars.palette[colorKey].darker,
+        backgroundColor: theme.vars.palette[colorKey].lighter,
+        ...theme.applyStyles('dark', {
+          color: theme.vars.palette[colorKey].lighter,
+          backgroundColor: theme.vars.palette[colorKey].darker,
         }),
-        /**
-         * @variant outlined
-         */
-        ...(variant === 'outlined' && {
-          backgroundColor: 'transparent',
-          color: theme.vars.palette[color].main,
-          border: `2px solid ${theme.vars.palette[color].main}`,
-        }),
-        /**
-         * @variant soft
-         */
-        ...(variant === 'soft' && {
-          color: theme.vars.palette[color].dark,
-          backgroundColor: varAlpha(theme.vars.palette[color].mainChannel, 0.16),
-          ...theme.applyStyles('dark', {
-            color: theme.vars.palette[color].light,
-          }),
-        }),
-        /**
-         * @variant inverted
-         */
-        ...(variant === 'inverted' && {
-          color: theme.vars.palette[color].darker,
-          backgroundColor: theme.vars.palette[color].lighter,
-        }),
-      }),
-  };
-
-  return {
-    height: 24,
-    minWidth: 24,
-    lineHeight: 0,
-    cursor: 'default',
-    alignItems: 'center',
-    whiteSpace: 'nowrap',
-    display: 'inline-flex',
-    gap: theme.spacing(0.75),
-    justifyContent: 'center',
-    padding: theme.spacing(0, 0.75),
-    fontSize: theme.typography.pxToRem(12),
-    fontWeight: theme.typography.fontWeightBold,
-    borderRadius: theme.shape.borderRadius * 0.75,
-    transition: theme.transitions.create(['all'], { duration: theme.transitions.duration.shorter }),
-    ...defaultStyles,
-    ...colorStyles,
-    ...(disabled && { opacity: 0.48, pointerEvents: 'none' }),
-  };
-});
+      },
+    })),
+    /**
+     * @disabled
+     */
+    {
+      props: { disabled: true },
+      style: {
+        opacity: 0.48,
+        pointerEvents: 'none',
+      },
+    },
+  ],
+}));
 
 export const LabelIcon = styled('span')({
   width: 16,
   height: 16,
   flexShrink: 0,
-  '& svg, img': { width: '100%', height: '100%', objectFit: 'cover' },
+  '& svg, & img': {
+    width: '100%',
+    height: '100%',
+    objectFit: 'cover',
+  },
 });

@@ -2,6 +2,8 @@ export * from './fields';
 
 export * from './rhf-code';
 
+export * from './help-text';
+
 export * from './rhf-select';
 
 export * from './rhf-rating';
@@ -11,6 +13,8 @@ export * from './rhf-switch';
 export * from './rhf-slider';
 
 export * from './rhf-checkbox';
+
+export * from './schema-utils';
 
 export * from './form-provider';
 
@@ -23,7 +27,5 @@ export * from './rhf-radio-group';
 export * from './rhf-autocomplete';
 
 export * from './rhf-number-input';
-
-export * from './rhf-autocomplete';
 
 export * from './rhf-country-select';

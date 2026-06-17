@@ -1,11 +1,13 @@
+'use client';
+
+import type { CarouselOptions, CarouselSlideProps } from '../types';
+
 import { mergeClasses } from 'minimal-shared/utils';
 
 import { styled } from '@mui/material/styles';
 
 import { getSlideSize } from '../utils';
 import { carouselClasses } from '../classes';
-
-import type { CarouselOptions, CarouselSlideProps } from '../types';
 
 // ----------------------------------------------------------------------
 

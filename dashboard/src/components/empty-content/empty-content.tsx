@@ -1,3 +1,5 @@
+'use client';
+
 import type { BoxProps } from '@mui/material/Box';
 import type { Theme, SxProps } from '@mui/material/styles';
 import type { TypographyProps } from '@mui/material/Typography';
@@ -48,9 +50,7 @@ export function EmptyContent({
             width: 1,
             maxWidth: 160,
           },
-          ...(Array.isArray(slotProps?.img?.sx)
-            ? (slotProps?.img?.sx ?? [])
-            : [slotProps?.img?.sx]),
+          ...(Array.isArray(slotProps?.img?.sx) ? slotProps.img.sx : [slotProps?.img?.sx]),
         ]}
       />
 
@@ -64,9 +64,7 @@ export function EmptyContent({
               textAlign: 'center',
               color: 'text.disabled',
             },
-            ...(Array.isArray(slotProps?.title?.sx)
-              ? (slotProps?.title?.sx ?? [])
-              : [slotProps?.title?.sx]),
+            ...(Array.isArray(slotProps?.title?.sx) ? slotProps.title.sx : [slotProps?.title?.sx]),
           ]}
         >
           {title}
@@ -84,7 +82,7 @@ export function EmptyContent({
               color: 'text.disabled',
             },
             ...(Array.isArray(slotProps?.description?.sx)
-              ? (slotProps?.description?.sx ?? [])
+              ? slotProps.description.sx
               : [slotProps?.description?.sx]),
           ]}
         >
@@ -110,7 +108,7 @@ const ContentRoot = styled('div', {
   justifyContent: 'center',
   padding: theme.spacing(0, 3),
   ...(filled && {
-    borderRadius: theme.shape.borderRadius * 2,
+    borderRadius: Number(theme.shape.borderRadius) * 2,
     backgroundColor: varAlpha(theme.vars.palette.grey['500Channel'], 0.04),
     border: `dashed 1px ${varAlpha(theme.vars.palette.grey['500Channel'], 0.08)}`,
   }),

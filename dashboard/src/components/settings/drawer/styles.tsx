@@ -7,7 +7,6 @@ import { styled } from '@mui/material/styles';
 import ButtonBase from '@mui/material/ButtonBase';
 
 import { Iconify } from '../../iconify';
-import { svgColorClasses } from '../../svg-color';
 
 // ----------------------------------------------------------------------
 
@@ -23,7 +22,7 @@ const LargeBlockRoot = styled('div')(({ theme }) => ({
   position: 'relative',
   flexDirection: 'column',
   padding: theme.spacing(4, 2, 2, 2),
-  borderRadius: theme.shape.borderRadius * 2,
+  borderRadius: Number(theme.shape.borderRadius) * 2,
   border: `solid 1px ${varAlpha(theme.vars.palette.grey['500Channel'], 0.12)}`,
 }));
 
@@ -89,7 +88,7 @@ type SmallBlockProps = React.ComponentProps<typeof SmallBlockRoot> & {
 const SmallBlockRoot = styled('div')(({ theme }) => ({
   display: 'flex',
   flexDirection: 'column',
-  gap: theme.spacing(1.25),
+  gap: theme.spacing(1.5),
 }));
 
 const SmallLabel = styled(ButtonBase, {
@@ -159,8 +158,8 @@ export function OptionButton({ selected, sx, children, ...other }: OptionButtonP
             ...theme.applyStyles('dark', {
               boxShadow: `-8px 8px 20px -4px ${varAlpha(theme.vars.palette.common.blackChannel, 0.12)}`,
             }),
-            [`& .${svgColorClasses.root}`]: {
-              background: `linear-gradient(135deg, ${theme.vars.palette.primary.light}, ${theme.vars.palette.primary.main})`,
+            '& svg': {
+              color: 'primary.main',
             },
           }),
         }),

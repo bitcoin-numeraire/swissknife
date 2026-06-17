@@ -1,6 +1,8 @@
-import type { CSSObject } from '@mui/material/styles';
+'use client';
 
-import { forwardRef } from 'react';
+import type { CSSObject } from '@mui/material/styles';
+import type { NavItemProps } from '../types';
+
 import { mergeClasses } from 'minimal-shared/utils';
 
 import Tooltip from '@mui/material/Tooltip';
@@ -11,32 +13,28 @@ import { Iconify } from '../../iconify';
 import { createNavItem } from '../utils';
 import { navItemStyles, navSectionClasses } from '../styles';
 
-import type { NavItemProps } from '../types';
-
 // ----------------------------------------------------------------------
 
-export const NavItem = forwardRef<HTMLButtonElement, NavItemProps>((props, ref) => {
-  const {
-    path,
-    icon,
-    info,
-    title,
-    caption,
-    /********/
-    open,
-    active,
-    disabled,
-    /********/
-    depth,
-    render,
-    hasChild,
-    slotProps,
-    className,
-    externalLink,
-    enabledRootRedirect,
-    ...other
-  } = props;
-
+export function NavItem({
+  path,
+  icon,
+  info,
+  title,
+  caption,
+  /********/
+  open,
+  active,
+  disabled,
+  /********/
+  depth,
+  render,
+  hasChild,
+  slotProps,
+  className,
+  externalLink,
+  enabledRootRedirect,
+  ...other
+}: NavItemProps) {
   const navItem = createNavItem({
     path,
     icon,
@@ -57,7 +55,6 @@ export const NavItem = forwardRef<HTMLButtonElement, NavItemProps>((props, ref) 
 
   return (
     <ItemRoot
-      ref={ref}
       aria-label={title}
       {...ownerState}
       {...navItem.baseProps}
@@ -108,7 +105,7 @@ export const NavItem = forwardRef<HTMLButtonElement, NavItemProps>((props, ref) 
       )}
     </ItemRoot>
   );
-});
+}
 
 // ----------------------------------------------------------------------
 
@@ -189,6 +186,7 @@ const ItemIcon = styled('span', { shouldForwardProp })<StyledState>(() => ({
 const ItemTitle = styled('span', { shouldForwardProp })<StyledState>(({ theme }) => ({
   ...navItemStyles.title(theme),
   ...theme.typography.body2,
+  whiteSpace: 'nowrap',
   fontWeight: theme.typography.fontWeightMedium,
   variants: [
     { props: { active: true }, style: { fontWeight: theme.typography.fontWeightSemiBold } },

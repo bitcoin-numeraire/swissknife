@@ -1,3 +1,7 @@
+'use client';
+
+import type { CarouselOptions, CarouselArrowButtonProps } from '../types';
+
 import { mergeClasses } from 'minimal-shared/utils';
 
 import SvgIcon from '@mui/material/SvgIcon';
@@ -5,8 +9,6 @@ import { styled } from '@mui/material/styles';
 import ButtonBase from '@mui/material/ButtonBase';
 
 import { carouselClasses } from '../classes';
-
-import type { CarouselOptions, CarouselArrowButtonProps } from '../types';
 
 // ----------------------------------------------------------------------
 

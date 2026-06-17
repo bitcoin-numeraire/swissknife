@@ -1,18 +1,15 @@
 import type { BoxProps } from '@mui/material/Box';
+import type { SettingsState } from '../types';
 
 import Box from '@mui/material/Box';
 import { alpha as hexAlpha } from '@mui/material/styles';
 
-import { CONFIG } from 'src/global-config';
-
 import { OptionButton } from './styles';
-import { SvgColor } from '../../svg-color';
-
-import type { SettingsState } from '../types';
 
 // ----------------------------------------------------------------------
 
 export type PresetsOptionsProps = BoxProps & {
+  icon: React.ReactNode;
   value: SettingsState['primaryColor'];
   options: { name: SettingsState['primaryColor']; value: string }[];
   onChangeOption: (newOption: SettingsState['primaryColor']) => void;
@@ -20,6 +17,7 @@ export type PresetsOptionsProps = BoxProps & {
 
 export function PresetsOptions({
   sx,
+  icon,
   value,
   options,
   onChangeOption,
@@ -28,11 +26,11 @@ export function PresetsOptions({
   return (
     <Box
       sx={[
-        () => ({
+        {
           gap: 1.5,
           display: 'grid',
           gridTemplateColumns: 'repeat(3, 1fr)',
-        }),
+        },
         ...(Array.isArray(sx) ? sx : [sx]),
       ]}
       {...other}
@@ -52,10 +50,7 @@ export function PresetsOptions({
               }),
             }}
           >
-            <SvgColor
-              src={`${CONFIG.assetsDir}/assets/icons/settings/ic-siderbar-duotone.svg`}
-              sx={{ width: 28, height: 28, color: 'currentColor' }}
-            />
+            {icon}
           </OptionButton>
         );
       })}

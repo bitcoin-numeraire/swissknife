@@ -1,3 +1,5 @@
+'use client';
+
 import type { Theme, SxProps } from '@mui/material/styles';
 import type { TablePaginationProps } from '@mui/material/TablePagination';
 
@@ -34,7 +36,11 @@ export function TablePaginationCustom({
         <FormControlLabel
           label="Dense"
           control={
-            <Switch checked={dense} onChange={onChangeDense} inputProps={{ id: 'dense-switch' }} />
+            <Switch
+              checked={dense}
+              onChange={onChangeDense}
+              slotProps={{ input: { id: 'dense-switch' } }}
+            />
           }
           sx={{
             pl: 2,

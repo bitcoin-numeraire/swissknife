@@ -1,19 +1,21 @@
 import type { CurrencyValue } from 'src/types/currency';
 import type { Theme, SxProps } from '@mui/material/styles';
-import type { ThemeDirection, ThemeColorScheme } from 'src/theme/types';
+import type { ThemeConfig } from 'src/theme/theme-config';
+import type { ThemeColorPreset } from 'src/theme/with-settings';
 
 // ----------------------------------------------------------------------
 
 export type SettingsState = {
-  fontSize?: number;
-  fontFamily?: string;
-  compactLayout?: boolean;
-  direction?: ThemeDirection;
-  colorScheme?: ThemeColorScheme;
-  contrast?: 'default' | 'hight';
-  navColor?: 'integrate' | 'apparent';
-  navLayout?: 'vertical' | 'horizontal' | 'mini';
-  primaryColor?: 'default' | 'preset1' | 'preset2' | 'preset3' | 'preset4' | 'preset5';
+  version: string;
+  fontSize: number;
+  fontFamily: string;
+  compactLayout: boolean;
+  contrast: 'default' | 'high';
+  primaryColor: ThemeColorPreset;
+  mode: ThemeConfig['defaultMode'];
+  navColor: 'integrate' | 'apparent';
+  direction: ThemeConfig['direction'];
+  navLayout: 'vertical' | 'horizontal' | 'mini';
   currency: CurrencyValue;
 };
 

@@ -1,5 +1,4 @@
 import type { Breakpoint } from '@mui/material/styles';
-
 import type { CarouselOptions } from './types';
 
 // ----------------------------------------------------------------------
@@ -21,6 +20,8 @@ export function getSlideSize(slidesToShow: InputValue): InputValue {
 
   return getValue(slidesToShow);
 }
+
+// ----------------------------------------------------------------------
 
 function getValue(value: string | number = 1): string {
   if (typeof value === 'string') {
