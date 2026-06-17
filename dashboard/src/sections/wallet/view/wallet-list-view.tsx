@@ -57,7 +57,7 @@ export function WalletListView() {
 
   return (
     <DashboardContent>
-      <RoleBasedGuard permissions={[Permission['READ:WALLET']]} hasContent>
+      <RoleBasedGuard permissions={[Permission.READ_WALLET]} hasContent>
         {failed ? (
           <ErrorView errors={errors} isLoading={isLoading} data={data} />
         ) : (

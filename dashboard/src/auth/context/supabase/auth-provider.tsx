@@ -4,7 +4,7 @@ import { useSetState } from 'minimal-shared/hooks';
 import { useMemo, useEffect, useCallback } from 'react';
 
 import { supabase } from 'src/lib/supabase';
-import { client } from 'src/lib/swissknife';
+import { client } from 'src/lib/swissknife/client.gen';
 
 import { AuthContext } from '../auth-context';
 

@@ -8,7 +8,7 @@ import { useAuth0, Auth0Provider } from '@auth0/auth0-react';
 import { useMemo, useState, useEffect, useCallback } from 'react';
 
 import { CONFIG } from 'src/global-config';
-import { client } from 'src/lib/swissknife';
+import { client } from 'src/lib/swissknife/client.gen';
 
 import { AuthContext } from '../auth-context';
 

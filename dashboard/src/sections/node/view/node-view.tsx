@@ -63,9 +63,9 @@ export function NodeView() {
     <DashboardContent maxWidth="xl">
       <RoleBasedGuard
         permissions={[
-          Permission['READ:TRANSACTION'],
-          Permission['READ:LN_NODE'],
-          Permission['READ:LN_ADDRESS'],
+          Permission.READ_TRANSACTION,
+          Permission.READ_LN_NODE,
+          Permission.READ_LN_ADDRESS,
         ]}
         hasContent
       >

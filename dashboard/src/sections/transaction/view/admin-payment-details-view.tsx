@@ -36,7 +36,7 @@ export function AdminPaymentDetailsView({ id }: Props) {
 
   return (
     <DashboardContent>
-      <RoleBasedGuard permissions={[Permission['READ:TRANSACTION']]} hasContent>
+      <RoleBasedGuard permissions={[Permission.READ_TRANSACTION]} hasContent>
         {failed ? (
           <ErrorView errors={errors} isLoading={isLoading} data={data} />
         ) : (

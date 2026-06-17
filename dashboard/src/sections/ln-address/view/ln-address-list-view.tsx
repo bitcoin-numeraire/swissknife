@@ -87,7 +87,7 @@ export function LnAddressListView() {
 
   return (
     <DashboardContent>
-      <RoleBasedGuard permissions={[Permission['READ:LN_ADDRESS']]} hasContent>
+      <RoleBasedGuard permissions={[Permission.READ_LN_ADDRESS]} hasContent>
         {failed ? (
           <ErrorView errors={errors} isLoading={isLoading} />
         ) : (
