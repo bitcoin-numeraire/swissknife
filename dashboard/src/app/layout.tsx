@@ -80,7 +80,7 @@ async function getAppConfig() {
       lang: 'en',
       i18nLang: undefined,
       cookieSettings: undefined,
-      dir: defaultSettings.direction,
+      dir: 'ltr',
     };
   } else {
     const [lang, settings] = await Promise.all([detectLanguage(), detectSettings()]);
@@ -89,7 +89,7 @@ async function getAppConfig() {
       lang: lang ?? 'en',
       i18nLang: lang ?? 'en',
       cookieSettings: settings,
-      dir: settings.direction,
+      dir: 'ltr',
     };
   }
 }
