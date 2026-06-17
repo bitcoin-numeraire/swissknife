@@ -11,7 +11,6 @@ import { useState, useEffect, useCallback } from 'react';
 import Box from '@mui/material/Box';
 import { Link } from '@mui/material';
 import Stack from '@mui/material/Stack';
-import { LoadingButton } from '@mui/lab';
 import Button from '@mui/material/Button';
 import Avatar from '@mui/material/Avatar';
 import Dialog from '@mui/material/Dialog';
@@ -78,7 +77,7 @@ export function ConfirmPaymentDialog({
     defaultValues: {
       amount_msat: MIN_AMOUNT,
       comment: '',
-      wallet: walletId || null,
+      wallet_id: walletId || null,
       input,
     },
   });
@@ -91,14 +90,14 @@ export function ConfirmPaymentDialog({
     reset,
   } = methods;
 
-  const amount = watch('amount_msat');
+  const amount = watch('amount_msat') as number;
 
-  const onSubmit = async (body: SendPaymentRequest) => {
+  const onSubmit = async (body: typeof methods.formState.defaultValues) => {
     try {
       let paymentResponse;
       const reqBody: SendPaymentRequest = {
-        ...body,
-        amount_msat: body.amount_msat! * 1000,
+        ...(body as SendPaymentRequest),
+        amount_msat: (body!.amount_msat as number) * 1000,
       };
 
       if (isAdmin) {
@@ -126,14 +125,14 @@ export function ConfirmPaymentDialog({
       reset({
         amount_msat: satsAmount,
         comment,
-        wallet: null,
+        wallet_id: null,
         input,
       });
     } else {
       reset({
         amount_msat: MIN_AMOUNT,
         comment: '',
-        wallet: null,
+        wallet_id: null,
         input,
       });
     }
@@ -190,15 +189,14 @@ export function ConfirmPaymentDialog({
 
       {payment !== undefined ? (
         <>
-          <Stack spacing={3} sx={{ px: 3 }} textAlign="center">
+          <Stack spacing={3} sx={{ px: 3, textAlign: 'center' }}>
             <MotionContainer>
               <Box
                 component={m.img}
                 src="/assets/icons/payments/success.png"
                 alt="payment success"
                 variants={varBounce('in')}
-                maxWidth={250}
-                margin="auto"
+                sx={{ maxWidth: 250, margin: 'auto' }}
               />
             </MotionContainer>
 
@@ -225,7 +223,7 @@ export function ConfirmPaymentDialog({
       ) : (
         <Form methods={methods} onSubmit={handleSubmit(onSubmit)}>
           <Stack spacing={3} sx={{ px: 3 }}>
-            <Stack direction="row" alignItems="center" spacing={2}>
+            <Stack direction="row" spacing={2} sx={{ alignItems: 'center' }}>
               <Avatar alt={input} sx={{ width: 48, height: 48 }}>
                 {input?.charAt(0).toUpperCase()}
               </Avatar>
@@ -245,7 +243,7 @@ export function ConfirmPaymentDialog({
               />
             </Stack>
 
-            <Stack direction="row" alignItems="center" spacing={2}>
+            <Stack direction="row" spacing={2} sx={{ alignItems: 'center' }}>
               <Typography sx={{ flexGrow: 0 }}>
                 {fCurrency(satsToFiat(amount!, fiatPrices, state.currency), {
                   currency: state.currency,
@@ -281,7 +279,7 @@ export function ConfirmPaymentDialog({
                 fullWidth
                 name="wallet_id"
                 label={t('wallet')}
-                inputProps={{ readOnly: true }}
+                slotProps={{ htmlInput: { readOnly: true } }}
               />
             ) : (
               isAdmin && <WalletSelectDropdown />
@@ -290,14 +288,14 @@ export function ConfirmPaymentDialog({
 
           <DialogActions>
             <Button onClick={handleClose}>{t('cancel')}</Button>
-            <LoadingButton
+            <Button
               type="submit"
               loading={isSubmitting}
               variant="contained"
               disabled={!isValid}
             >
               {t('confirm_payment_dialog.confirm_send')}
-            </LoadingButton>
+            </Button>
           </DialogActions>
         </Form>
       )}
@@ -322,7 +320,11 @@ function InputAmount({
   ...other
 }: InputAmountProps) {
   return (
-    <Stack direction="row" justifyContent="center" spacing={1} sx={sx}>
+    <Stack
+      direction="row"
+      spacing={1}
+      sx={[{ justifyContent: 'center' }, ...(Array.isArray(sx) ? sx : [sx])]}
+    >
       <Typography variant="h5">₿</Typography>
 
       <Input

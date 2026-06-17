@@ -69,49 +69,49 @@ export function LnAddressDetails({ lnAddress, isAdmin }: Props) {
 
   const renderList = (
     <Grid container spacing={3} sx={{ my: 5 }}>
-      <Grid item xs={12} sm={6}>
+      <Grid size={{ xs: 12, sm: 6 }}>
         <Title>{t('ln_address_details.username')}</Title>
         <Typography color="textSecondary">{lnAddress.username}</Typography>
       </Grid>
-      <Grid item xs={12} sm={6}>
+      <Grid size={{ xs: 12, sm: 6 }}>
         <Title>{t('ln_address_details.domain')}</Title>
         <Typography color="textSecondary">{CONFIG.domain}</Typography>
       </Grid>
 
-      <Grid item xs={12}>
+      <Grid size={{ xs: 12 }}>
         <Divider sx={{ borderStyle: 'dashed' }} />
       </Grid>
 
-      <Grid item xs={12} sm={6}>
+      <Grid size={{ xs: 12, sm: 6 }}>
         <Title>{t('ln_address_details.creation_date')}</Title>
         <Typography color="textSecondary">
           {fDate(lnAddress.created_at)} {fTime(lnAddress.created_at)}
         </Typography>
       </Grid>
 
-      <Grid item xs={12} sm={6}>
+      <Grid size={{ xs: 12, sm: 6 }}>
         <Title>{t('ln_address_details.update_date')}</Title>
         <Typography color="textSecondary">
           {fDate(lnAddress.updated_at)} {fTime(lnAddress.updated_at)}
         </Typography>
       </Grid>
 
-      <Grid item xs={12}>
+      <Grid size={{ xs: 12 }}>
         <Divider sx={{ borderStyle: 'dashed' }} />
       </Grid>
 
-      <Grid item xs={12}>
+      <Grid size={{ xs: 12 }}>
         <Title>LNURL</Title>
         <Typography color="textSecondary" sx={{ wordBreak: 'break-all' }}>
           {encodeLNURL(lnAddress.username)}
         </Typography>
       </Grid>
 
-      <Grid item xs={12}>
+      <Grid size={{ xs: 12 }}>
         <Divider sx={{ borderStyle: 'dashed' }} />
       </Grid>
 
-      <Grid item xs={12}>
+      <Grid size={{ xs: 12 }}>
         <Title>Nostr public Key</Title>
         <Typography color="textSecondary" sx={{ wordBreak: 'break-all' }}>
           {npub(lnAddress.nostr_pubkey)}
@@ -125,10 +125,12 @@ export function LnAddressDetails({ lnAddress, isAdmin }: Props) {
       <Stack
         spacing={3}
         direction={{ xs: 'column', sm: 'row' }}
-        alignItems={{ xs: 'flex-end', sm: 'center' }}
-        sx={{ mb: { xs: 3, md: 5 } }}
+        sx={{
+          mb: { xs: 3, md: 5 },
+          alignItems: { xs: 'flex-end', sm: 'center' },
+        }}
       >
-        <Stack direction="row" spacing={1} flexGrow={1} sx={{ width: 1 }}>
+        <Stack direction="row" spacing={1} sx={{ width: 1, flexGrow: 1 }}>
           <CopyButton value={lnAddressDisplay} title={t('ln_address_details.copy')} />
 
           <Tooltip title={t('send')}>
@@ -167,17 +169,19 @@ export function LnAddressDetails({ lnAddress, isAdmin }: Props) {
         sx={{ pt: 5, px: { xs: 2, sm: 5, md: 8 }, maxWidth: { xs: '100%', md: '80%' }, mx: 'auto' }}
       >
         <Box
-          rowGap={5}
-          display="grid"
-          alignItems="center"
-          gridTemplateColumns={{
-            xs: 'repeat(1, 1fr)',
-            sm: 'repeat(2, 1fr)',
+          sx={{
+            rowGap: 5,
+            display: 'grid',
+            alignItems: 'center',
+            gridTemplateColumns: {
+              xs: 'repeat(1, 1fr)',
+              sm: 'repeat(2, 1fr)',
+            },
           }}
         >
           <Typography variant="subtitle2">{lnAddress.id.toUpperCase()}</Typography>
 
-          <Stack spacing={1} alignItems={{ xs: 'flex-start', md: 'flex-end' }}>
+          <Stack spacing={1} sx={{ alignItems: { xs: 'flex-start', md: 'flex-end' } }}>
             <Stack direction="row" spacing={1}>
               <Label variant="soft" color={lnAddress.active ? 'success' : 'error'}>
                 {lnAddress.active
@@ -195,7 +199,7 @@ export function LnAddressDetails({ lnAddress, isAdmin }: Props) {
           </Stack>
 
           <Stack sx={{ typography: 'body2' }}>
-            <Typography fontWeight="bold" sx={{ mb: 1 }}>
+            <Typography sx={{ mb: 1, fontWeight: 'bold' }}>
               {t('ln_address_details.belongs_to')}
             </Typography>
             {isAdmin ? (
@@ -245,8 +249,8 @@ type TitleProps = {
   children: React.ReactNode;
 };
 
-const Title = ({ children }: TitleProps): JSX.Element => (
-  <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
+const Title = ({ children }: TitleProps) => (
+  <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 'bold' }}>
     {children}
   </Typography>
 );

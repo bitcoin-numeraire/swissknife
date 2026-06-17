@@ -2,7 +2,8 @@
 
 import { useMemo } from 'react';
 
-import { Box, Grid2 } from '@mui/material';
+import Box from '@mui/material/Box';
+import Grid from '@mui/material/Grid';
 
 import { shouldFail } from 'src/utils/errors';
 import {
@@ -85,8 +86,8 @@ export function NodeView() {
               sx={{ mb: { xs: 3, md: 5 } }}
             />
 
-            <Grid2 container spacing={3}>
-              <Grid2 size={{ xs: 12, md: 7, lg: 8 }}>
+            <Grid container spacing={3}>
+              <Grid size={{ xs: 12, md: 7, lg: 8 }}>
                 <Box sx={{ gap: 3, display: 'flex', flexDirection: 'column' }}>
                   <BalanceOverview
                     isAdmin
@@ -115,9 +116,9 @@ export function NodeView() {
 
                   <RecentTransactions isAdmin tableData={transactions.slice(0, 20)} />
                 </Box>
-              </Grid2>
+              </Grid>
 
-              <Grid2 size={{ xs: 12, md: 5, lg: 4 }}>
+              <Grid size={{ xs: 12, md: 5, lg: 4 }}>
                 <Box sx={{ gap: 3, display: 'flex', flexDirection: 'column' }}>
                   <LnAddresses
                     subheader={t('node_view.registered_ln_addresses', {
@@ -126,8 +127,8 @@ export function NodeView() {
                     list={lnAddresses!.slice(-20)}
                   />
                 </Box>
-              </Grid2>
-            </Grid2>
+              </Grid>
+            </Grid>
           </>
         )}
       </RoleBasedGuard>

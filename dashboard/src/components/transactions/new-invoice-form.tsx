@@ -9,7 +9,6 @@ import { useState, useEffect, useCallback } from 'react';
 
 import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
-import { LoadingButton } from '@mui/lab';
 import Button from '@mui/material/Button';
 import Typography from '@mui/material/Typography';
 import Input, { inputClasses } from '@mui/material/Input';
@@ -109,12 +108,12 @@ export function NewInvoiceForm({
     }
   }, [amount, setValue]);
 
-  const onSubmit = async (body: NewInvoiceRequest) => {
+  const onSubmit = async (body: typeof methods.formState.defaultValues) => {
     try {
       let invoice;
       const reqBody: NewInvoiceRequest = {
-        ...body,
-        amount_msat: body.amount_msat * 1000,
+        ...(body as NewInvoiceRequest),
+        amount_msat: (body!.amount_msat as number) * 1000,
       };
 
       if (isAdmin) {
@@ -157,7 +156,7 @@ export function NewInvoiceForm({
             onBlur={handleBlur}
           />
 
-          <Stack direction="row" alignItems="center" sx={{ typography: 'subtitle2' }}>
+          <Stack direction="row" sx={{ alignItems: 'center', typography: 'subtitle2' }}>
             <Box component="span" sx={{ flexGrow: 1 }}>
               {t('new_invoice.btc_exchange_rate', {
                 rate: fCurrency(fiatPrices[currency], { currency }),
@@ -180,14 +179,14 @@ export function NewInvoiceForm({
               fullWidth
               name="wallet_id"
               label={t('wallet')}
-              inputProps={{ readOnly: true }}
+              slotProps={{ htmlInput: { readOnly: true } }}
             />
           ) : (
             isAdmin && <WalletSelectDropdown />
           )}
 
           <Stack direction="row" spacing={2}>
-            <LoadingButton
+            <Button
               type="submit"
               size="large"
               color="inherit"
@@ -198,7 +197,7 @@ export function NewInvoiceForm({
             >
               {t('new_invoice.receive')}{' '}
               <Iconify width={16} icon="eva:flash-fill" sx={{ color: '#FF9900', ml: 0.5 }} />
-            </LoadingButton>
+            </Button>
 
             {lnAddress && (
               <Button
@@ -231,7 +230,11 @@ type InputAmountProps = InputProps & {
 
 function InputAmount({ autoWidth, amount, onBlur, onChange, sx, ...other }: InputAmountProps) {
   return (
-    <Stack direction="row" justifyContent="center" spacing={1} sx={sx}>
+    <Stack
+      direction="row"
+      spacing={1}
+      sx={[{ justifyContent: 'center' }, ...(Array.isArray(sx) ? sx : [sx])]}
+    >
       <Typography variant="h5">₿</Typography>
 
       <Input

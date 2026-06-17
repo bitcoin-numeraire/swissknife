@@ -122,8 +122,10 @@ export function AccountDrawer({ data = [], sx, ...other }: AccountDrawerProps) {
         open={open}
         onClose={onClose}
         anchor="right"
-        slotProps={{ backdrop: { invisible: true } }}
-        PaperProps={{ sx: { width: 320 } }}
+        slotProps={{
+          backdrop: { invisible: true },
+          paper: { sx: { width: 320 } },
+        }}
       >
         <IconButton
           onClick={onClose}
@@ -160,7 +162,7 @@ export function AccountDrawer({ data = [], sx, ...other }: AccountDrawerProps) {
 
           {renderList()}
 
-          <Stack spacing={2} sx={{ px: 2.5, py: 3 }} alignItems="flex-start">
+          <Stack spacing={2} sx={{ px: 2.5, py: 3, alignItems: 'flex-start' }}>
             <Typography variant="body2" color="text.secondary">
               Version: {CONFIG.appVersion}
             </Typography>

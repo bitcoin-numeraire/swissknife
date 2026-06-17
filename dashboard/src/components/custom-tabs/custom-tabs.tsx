@@ -29,7 +29,7 @@ export function CustomTabs({ children, slotProps, sx, ...other }: CustomTabsProp
           alignItems: 'center',
           bgcolor: 'background.neutral',
           [`& .${tabsClasses.scroller}`]: { p: 1, ...slotProps?.scroller },
-          [`& .${tabsClasses.flexContainer}`]: { gap: 0, ...slotProps?.flexContainer },
+          [`& .${tabsClasses.list}`]: { gap: 0, ...slotProps?.flexContainer },
           [`& .${tabsClasses.scrollButtons}`]: {
             borderRadius: 1,
             minHeight: 'inherit',
@@ -64,12 +64,14 @@ export function CustomTabs({ children, slotProps, sx, ...other }: CustomTabsProp
         ...(Array.isArray(sx) ? sx : [sx]),
       ]}
       {...other}
-      TabIndicatorProps={{
-        children: (
-          <NoSsr>
-            <span />
-          </NoSsr>
-        ),
+      slotProps={{
+        indicator: {
+          children: (
+            <NoSsr>
+              <span />
+            </NoSsr>
+          ),
+        },
       }}
     >
       {children}

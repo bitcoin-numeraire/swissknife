@@ -99,7 +99,7 @@ export function NewPaymentForm({
     <>
       {contacts && contacts.length > 0 && (
         <>
-          <Stack direction="row" alignItems="center" justifyContent="space-between">
+          <Stack direction="row" sx={{ alignItems: 'center', justifyContent: 'space-between' }}>
             <Typography variant="overline" sx={{ color: 'text.secondary' }}>
               {t('new_payment.recent')}
             </Typography>
@@ -176,7 +176,7 @@ export function NewPaymentForm({
         />
 
         {balance != null && (
-          <Stack direction="row" alignItems="center" sx={{ typography: 'subtitle2' }}>
+          <Stack direction="row" sx={{ alignItems: 'center', typography: 'subtitle2' }}>
             <Box component="span" sx={{ flexGrow: 1 }}>
               {t('new_payment.your_balance')}{' '}
             </Box>

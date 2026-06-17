@@ -15,7 +15,7 @@ import type { LanguageValue } from './locales-config';
  */
 
 export async function detectLanguage() {
-  const cookies = getCookies();
+  const cookies = await getCookies();
 
   const language = cookies.get(cookieName)?.value ?? fallbackLng;
 

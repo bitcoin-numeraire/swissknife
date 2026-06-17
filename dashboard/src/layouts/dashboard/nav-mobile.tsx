@@ -39,21 +39,23 @@ export function NavMobile({ data, open, onClose, slots, sx, className, ...other 
     <Drawer
       open={open}
       onClose={onClose}
-      PaperProps={{
-        className: mergeClasses([layoutClasses.nav.root, layoutClasses.nav.vertical, className]),
-        sx: [
-          (theme) => ({
-            overflow: 'unset',
-            bgcolor: 'var(--layout-nav-bg)',
-            width: 'var(--layout-nav-mobile-width)',
-          }),
-          ...(Array.isArray(sx) ? sx : [sx]),
-        ],
+      slotProps={{
+        paper: {
+          className: mergeClasses([layoutClasses.nav.root, layoutClasses.nav.vertical, className]),
+          sx: [
+            {
+              overflow: 'unset',
+              bgcolor: 'var(--layout-nav-bg)',
+              width: 'var(--layout-nav-mobile-width)',
+            },
+            ...(Array.isArray(sx) ? sx : [sx]),
+          ],
+        },
       }}
     >
       {slots?.topArea ?? (
         <Box sx={{ pl: 3.5, pt: 2.5, pb: 1 }}>
-          <Logo width="100%" />
+          <Logo />
         </Box>
       )}
 

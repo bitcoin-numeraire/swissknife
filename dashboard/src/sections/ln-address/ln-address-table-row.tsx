@@ -3,7 +3,7 @@ import type { LnAddress } from 'src/lib/swissknife';
 import { useBoolean, usePopover } from 'minimal-shared/hooks';
 
 import Link from '@mui/material/Link';
-import { LoadingButton } from '@mui/lab';
+import Button from '@mui/material/Button';
 import MenuItem from '@mui/material/MenuItem';
 import TableRow from '@mui/material/TableRow';
 import Checkbox from '@mui/material/Checkbox';
@@ -96,11 +96,9 @@ export function LnAddressTableRow({ row, selected, onSelectRow, onDeleteRow }: P
           <ListItemText
             primary={fDate(created_at)}
             secondary={fTime(created_at)}
-            primaryTypographyProps={{ typography: 'body2', noWrap: true }}
-            secondaryTypographyProps={{
-              mt: 0.5,
-              component: 'span',
-              typography: 'caption',
+            slotProps={{
+              primary: { noWrap: true, sx: { typography: 'body2' } },
+              secondary: { component: 'span', sx: { mt: 0.5, typography: 'caption' } },
             }}
           />
         </TableCell>
@@ -109,11 +107,9 @@ export function LnAddressTableRow({ row, selected, onSelectRow, onDeleteRow }: P
           <ListItemText
             primary={fDate(updated_at)}
             secondary={fTime(updated_at)}
-            primaryTypographyProps={{ typography: 'body2', noWrap: true }}
-            secondaryTypographyProps={{
-              mt: 0.5,
-              component: 'span',
-              typography: 'caption',
+            slotProps={{
+              primary: { noWrap: true, sx: { typography: 'body2' } },
+              secondary: { component: 'span', sx: { mt: 0.5, typography: 'caption' } },
             }}
           />
         </TableCell>
@@ -178,7 +174,7 @@ export function LnAddressTableRow({ row, selected, onSelectRow, onDeleteRow }: P
         title={t('delete')}
         content={t('confirm_delete')}
         action={
-          <LoadingButton
+          <Button
             variant="contained"
             color="error"
             onClick={async () => {
@@ -189,7 +185,7 @@ export function LnAddressTableRow({ row, selected, onSelectRow, onDeleteRow }: P
             loading={isDeleting.value}
           >
             {t('delete')}
-          </LoadingButton>
+          </Button>
         }
       />
     </>

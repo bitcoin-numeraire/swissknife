@@ -47,7 +47,7 @@ export function LnAddresses({ subheader, list, ...other }: Props) {
 
       <Stack spacing={3} sx={{ p: 3 }}>
         {list.map((address) => (
-          <Stack direction="row" alignItems="center" key={address.id}>
+          <Stack direction="row" key={address.id} sx={{ alignItems: 'center' }}>
             <Avatar alt={address.username} sx={{ width: 48, height: 48, mr: 2 }}>
               {address.username.charAt(0).toUpperCase()}
             </Avatar>

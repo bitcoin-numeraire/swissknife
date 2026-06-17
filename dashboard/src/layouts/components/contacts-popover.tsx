@@ -40,12 +40,7 @@ export function ContactsPopover({ data = [], sx, ...other }: ContactsPopoverProp
   const { open, anchorEl, onClose, onOpen } = usePopover();
 
   const renderMenuList = () => (
-    <CustomPopover
-      open={open}
-      anchorEl={anchorEl}
-      onClose={onClose}
-      slotProps={{ arrow: { offset: 20 } }}
-    >
+    <CustomPopover open={open} anchorEl={anchorEl} onClose={onClose}>
       <Typography variant="h6" sx={{ p: 1.5 }}>
         Contacts <span>({data.length})</span>
       </Typography>
@@ -60,8 +55,10 @@ export function ContactsPopover({ data = [], sx, ...other }: ContactsPopoverProp
             <ListItemText
               primary={contact.name}
               secondary={contact.status === 'offline' ? fToNow(contact.lastActivity) : ''}
-              primaryTypographyProps={{ typography: 'subtitle2' }}
-              secondaryTypographyProps={{ typography: 'caption', color: 'text.disabled' }}
+              slotProps={{
+                primary: { sx: { typography: 'subtitle2' } },
+                secondary: { sx: { typography: 'caption', color: 'text.disabled' } },
+              }}
             />
           </MenuItem>
         ))}

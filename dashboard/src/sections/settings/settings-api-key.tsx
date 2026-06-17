@@ -4,7 +4,6 @@ import { useBoolean, usePopover } from 'minimal-shared/hooks';
 
 import Table from '@mui/material/Table';
 import Stack from '@mui/material/Stack';
-import { LoadingButton } from '@mui/lab';
 import TableRow from '@mui/material/TableRow';
 import TableCell from '@mui/material/TableCell';
 import TableBody from '@mui/material/TableBody';
@@ -52,7 +51,10 @@ export function SettingsApiKey({ apiKeys }: Props) {
 
   return (
     <Card sx={{ p: { xs: 1, sm: 3 }, mx: 'auto' }}>
-      <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 3 }}>
+      <Stack
+        direction="row"
+        sx={{ mb: 3, alignItems: 'center', justifyContent: 'space-between' }}
+      >
         <Typography variant="h5">{t('settings_api_key.title')}</Typography>
 
         <Button
@@ -194,14 +196,14 @@ function CollapsibleTableRow({ row }: CollapsibleTableRowProps) {
         title={t('settings_api_key.revoke')}
         content={t('settings_api_key.confirm_revoke')}
         action={
-          <LoadingButton
+          <Button
             variant="contained"
             color="error"
             onClick={handleDeleteRow}
             loading={isDeleting.value}
           >
             {t('settings_api_key.revoke')}
-          </LoadingButton>
+          </Button>
         }
       />
     </>

@@ -67,7 +67,7 @@ export function Contacts({ title, fiatPrices, list, ...other }: Props) {
 
       <Stack spacing={3} sx={{ p: 3 }}>
         {list.map((contact) => (
-          <Stack direction="row" alignItems="center" key={contact.ln_address}>
+          <Stack direction="row" key={contact.ln_address} sx={{ alignItems: 'center' }}>
             <Avatar alt={contact.ln_address} sx={{ width: 48, height: 48, mr: 2 }}>
               {contact.ln_address.charAt(0).toUpperCase()}
             </Avatar>

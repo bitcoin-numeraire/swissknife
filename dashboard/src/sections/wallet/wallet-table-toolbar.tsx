@@ -58,7 +58,6 @@ export function WalletTableToolbar({ filters, onResetPage, dateError }: Props) {
     <>
       <Stack
         spacing={2}
-        alignItems={{ xs: 'flex-end', md: 'center' }}
         direction={{
           xs: 'column',
           md: 'row',
@@ -66,6 +65,7 @@ export function WalletTableToolbar({ filters, onResetPage, dateError }: Props) {
         sx={{
           p: 2.5,
           pr: { xs: 2.5, md: 1 },
+          alignItems: { xs: 'flex-end', md: 'center' },
         }}
       >
         <DatePicker
@@ -98,18 +98,20 @@ export function WalletTableToolbar({ filters, onResetPage, dateError }: Props) {
           }}
         />
 
-        <Stack direction="row" alignItems="center" spacing={2} flexGrow={1} sx={{ width: 1 }}>
+        <Stack direction="row" spacing={2} sx={{ width: 1, flexGrow: 1, alignItems: 'center' }}>
           <TextField
             fullWidth
             value={filters.state.name}
             onChange={handleFilterName}
             placeholder={t('wallet_toolbar.search_placeholder')}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <Iconify icon="eva:search-fill" sx={{ color: 'text.disabled' }} />
-                </InputAdornment>
-              ),
+            slotProps={{
+              input: {
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <Iconify icon="eva:search-fill" sx={{ color: 'text.disabled' }} />
+                  </InputAdornment>
+                ),
+              },
             }}
           />
 

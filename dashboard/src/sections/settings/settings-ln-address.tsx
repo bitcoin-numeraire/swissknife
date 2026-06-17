@@ -6,10 +6,10 @@ import { zodResolver } from '@hookform/resolvers/zod';
 
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
+import Grid from '@mui/material/Grid';
 import Stack from '@mui/material/Stack';
 import Button from '@mui/material/Button';
-import LoadingButton from '@mui/lab/LoadingButton';
-import { Alert, Grid2, Typography, InputAdornment } from '@mui/material';
+import { Alert, Typography, InputAdornment } from '@mui/material';
 
 import { npub } from 'src/utils/nostr';
 import { displayLnAddress } from 'src/utils/lnurl';
@@ -19,12 +19,7 @@ import { CONFIG } from 'src/global-config';
 import { useTranslate } from 'src/locales';
 import { endpointKeys } from 'src/actions/keys';
 import { zUpdateLnAddressRequest } from 'src/lib/swissknife/zod.gen';
-import {
-  type LnAddress,
-  updateWalletAddress,
-  deleteWalletAddress,
-  type UpdateLnAddressRequest,
-} from 'src/lib/swissknife';
+import { type LnAddress, updateWalletAddress, deleteWalletAddress } from 'src/lib/swissknife';
 
 import { toast } from 'src/components/snackbar';
 import { Form, Field } from 'src/components/hook-form';
@@ -59,7 +54,7 @@ export function SettingsLnAddress({ lnAddress }: Props) {
     formState: { isSubmitting },
   } = methods;
 
-  const onSubmit = async (data: UpdateLnAddressRequest) => {
+  const onSubmit = async (data: Record<string, unknown>) => {
     // Map empty strings to undefined
     const body = Object.fromEntries(
       Object.entries(data).map(([key, value]) => [key, value === '' ? undefined : value])
@@ -92,8 +87,8 @@ export function SettingsLnAddress({ lnAddress }: Props) {
 
   return (
     <Form methods={methods} onSubmit={handleSubmit(onSubmit)}>
-      <Grid2 container spacing={3}>
-        <Grid2 size={{ xs: 12, md: 4 }}>
+      <Grid container spacing={3}>
+        <Grid size={{ xs: 12, md: 4 }}>
           <Card
             sx={{
               pt: 5,
@@ -139,21 +134,25 @@ export function SettingsLnAddress({ lnAddress }: Props) {
               {t('settings_ln_address.delete_button')}
             </Button>
           </Card>
-        </Grid2>
+        </Grid>
 
-        <Grid2 size={{ xs: 12, md: 8 }}>
+        <Grid size={{ xs: 12, md: 8 }}>
           <Card sx={{ p: { xs: 1, sm: 3 } }}>
             <Box
-              rowGap={3}
-              columnGap={2}
-              display="grid"
-              gridTemplateColumns={{ xs: 'repeat(1, 1fr)', sm: 'repeat(2, 1fr)' }}
+              sx={{
+                rowGap: 3,
+                columnGap: 2,
+                display: 'grid',
+                gridTemplateColumns: { xs: 'repeat(1, 1fr)', sm: 'repeat(2, 1fr)' },
+              }}
             >
               <Field.Text
                 name="username"
                 label={t('settings_ln_address.username')}
-                InputProps={{
-                  endAdornment: <InputAdornment position="end">@{CONFIG.domain}</InputAdornment>,
+                slotProps={{
+                  input: {
+                    endAdornment: <InputAdornment position="end">@{CONFIG.domain}</InputAdornment>,
+                  },
                 }}
               />
               <Field.Text
@@ -164,17 +163,17 @@ export function SettingsLnAddress({ lnAddress }: Props) {
               />
             </Box>
 
-            <Stack spacing={3} alignItems="flex-end" sx={{ mt: 3 }}>
+            <Stack spacing={3} sx={{ mt: 3, alignItems: 'flex-end' }}>
               <Alert variant="outlined" severity="warning" sx={{ width: '100%' }}>
                 {t('settings_ln_address.alert')}
               </Alert>
-              <LoadingButton type="submit" variant="contained" loading={isSubmitting}>
+              <Button type="submit" variant="contained" loading={isSubmitting}>
                 {t('settings_ln_address.save')}
-              </LoadingButton>
+              </Button>
             </Stack>
           </Card>
-        </Grid2>
-      </Grid2>
+        </Grid>
+      </Grid>
 
       <ConfirmDialog
         open={confirm.value}
@@ -182,14 +181,9 @@ export function SettingsLnAddress({ lnAddress }: Props) {
         title={t('delete')}
         content={t('confirm_delete')}
         action={
-          <LoadingButton
-            variant="contained"
-            color="error"
-            onClick={onDelete}
-            loading={isDeleting.value}
-          >
+          <Button variant="contained" color="error" onClick={onDelete} loading={isDeleting.value}>
             {t('delete')}
-          </LoadingButton>
+          </Button>
         }
       />
     </Form>
