@@ -4,8 +4,8 @@ import type { Engine } from '@tsparticles/engine';
 import type { SlideData } from '../welcome-carousel';
 
 import { loadSlim } from '@tsparticles/slim';
+import { Particles, ParticlesProvider } from '@tsparticles/react';
 import { loadAbsorbersPlugin } from '@tsparticles/plugin-absorbers';
-import { Particles, ParticlesProvider, useParticlesProvider } from '@tsparticles/react';
 
 import { Box } from '@mui/material';
 
@@ -46,12 +46,6 @@ async function initParticles(engine: Engine) {
   await loadAbsorbersPlugin(engine);
 }
 
-function ParticlesBackground() {
-  const { loaded } = useParticlesProvider();
-
-  return loaded ? <Box component={Particles} id="tsparticles" options={particleOptions} /> : null;
-}
-
 export function WelcomeView() {
   const router = useRouter();
 
@@ -65,22 +59,24 @@ export function WelcomeView() {
   };
 
   return (
-    <ParticlesProvider init={initParticles}>
-      <Box
-        sx={{
-          position: 'relative',
-          width: '100vw',
-          height: '100vh',
-          overflow: 'hidden',
-          display: 'flex',
-          alignItems: 'center',
-          textAlign: 'center',
-        }}
-      >
-        <ParticlesBackground />
+    <Box
+      sx={{
+        position: 'relative',
+        width: '100vw',
+        height: '100vh',
+        overflow: 'hidden',
+        display: 'flex',
+        alignItems: 'center',
+        textAlign: 'center',
+      }}
+    >
+      {/* `ParticlesProvider` only renders its children once the engine has loaded, so it must
+          wrap ONLY the decorative background — never the onboarding content below. */}
+      <ParticlesProvider init={initParticles}>
+        <Box component={Particles} id="tsparticles" options={particleOptions} />
+      </ParticlesProvider>
 
-        <WelcomeCarousel data={slides} onComplete={handleWelcomeComplete} />
-      </Box>
-    </ParticlesProvider>
+      <WelcomeCarousel data={slides} onComplete={handleWelcomeComplete} />
+    </Box>
   );
 }
