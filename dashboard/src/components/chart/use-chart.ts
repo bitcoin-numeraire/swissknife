@@ -1,38 +1,42 @@
 import type { Theme } from '@mui/material/styles';
+import type { ChartOptions } from './types';
 
+import { useMemo } from 'react';
 import { merge } from 'es-toolkit';
 import { varAlpha } from 'minimal-shared/utils';
 
 import { useTheme } from '@mui/material/styles';
-
-import type { ChartOptions } from './types';
 
 // ----------------------------------------------------------------------
 
 export function useChart(updatedOptions?: ChartOptions): ChartOptions {
   const theme = useTheme();
 
-  const baseOptions = baseChartOptions(theme) ?? {};
+  const baseOptions = useMemo(() => baseChartOptions(theme), [theme]);
 
-  return merge(baseOptions, updatedOptions ?? {});
+  return useMemo(
+    () => (updatedOptions ? merge(baseOptions, updatedOptions) : baseOptions),
+    [baseOptions, updatedOptions]
+  );
 }
 
 // ----------------------------------------------------------------------
 
 const baseChartOptions = (theme: Theme): ChartOptions => {
-  const LABEL_TOTAL = {
-    show: true,
-    label: 'Total',
-    color: theme.vars.palette.text.secondary,
-    fontSize: theme.typography.subtitle2.fontSize as string,
-    fontWeight: theme.typography.subtitle2.fontWeight,
-  };
-
-  const LABEL_VALUE = {
-    offsetY: 8,
-    color: theme.vars.palette.text.primary,
-    fontSize: theme.typography.h4.fontSize as string,
-    fontWeight: theme.typography.h4.fontWeight,
+  const labelStyles = {
+    total: {
+      show: true,
+      label: 'Total',
+      color: theme.vars.palette.text.secondary,
+      fontSize: theme.typography.subtitle2.fontSize as string,
+      fontWeight: theme.typography.subtitle2.fontWeight,
+    },
+    value: {
+      offsetY: 8,
+      color: theme.vars.palette.text.primary,
+      fontSize: theme.typography.h4.fontSize as string,
+      fontWeight: theme.typography.h4.fontWeight,
+    },
   };
 
   return {
@@ -75,8 +79,12 @@ const baseChartOptions = (theme: Theme): ChartOptions => {
      * https://apexcharts.com/docs/options/states/
      *************************************** */
     states: {
-      hover: { filter: { type: 'darken' } },
-      active: { filter: { type: 'darken' } },
+      hover: {
+        filter: { type: 'darken' },
+      },
+      active: {
+        filter: { type: 'darken' },
+      },
     },
 
     /** **************************************
@@ -98,13 +106,19 @@ const baseChartOptions = (theme: Theme): ChartOptions => {
      * Data labels
      * https://apexcharts.com/docs/options/datalabels/
      *************************************** */
-    dataLabels: { enabled: false },
+    dataLabels: {
+      enabled: false,
+    },
 
     /** **************************************
      * Stroke
      * https://apexcharts.com/docs/options/stroke/
      *************************************** */
-    stroke: { width: 2.5, curve: 'smooth', lineCap: 'round' },
+    stroke: {
+      width: 2.5,
+      curve: 'smooth',
+      lineCap: 'round',
+    },
 
     /** **************************************
      * Grid
@@ -122,7 +136,10 @@ const baseChartOptions = (theme: Theme): ChartOptions => {
      * https://apexcharts.com/docs/options/xaxis/
      * https://apexcharts.com/docs/options/yaxis/
      *************************************** */
-    xaxis: { axisBorder: { show: false }, axisTicks: { show: false } },
+    xaxis: {
+      axisBorder: { show: false },
+      axisTicks: { show: false },
+    },
     yaxis: { tickAmount: 5 },
 
     /** **************************************
@@ -137,7 +154,10 @@ const baseChartOptions = (theme: Theme): ChartOptions => {
     /** **************************************
      * Tooltip
      *************************************** */
-    tooltip: { theme: 'false', fillSeriesColor: false, x: { show: true } },
+    tooltip: {
+      fillSeriesColor: false,
+      x: { show: true },
+    },
 
     /** **************************************
      * Legend
@@ -162,13 +182,24 @@ const baseChartOptions = (theme: Theme): ChartOptions => {
        * bar
        * https://apexcharts.com/docs/options/plotoptions/bar/
        */
-      bar: { borderRadius: 4, columnWidth: '48%', borderRadiusApplication: 'end' },
+      bar: {
+        borderRadius: 4,
+        columnWidth: '48%',
+        borderRadiusApplication: 'end',
+      },
       /**
        * pie + donut
        * https://apexcharts.com/docs/options/plotoptions/pie/
        */
       pie: {
-        donut: { labels: { show: true, value: { ...LABEL_VALUE }, total: { ...LABEL_TOTAL } } },
+        customScale: 0.98,
+        donut: {
+          labels: {
+            show: true,
+            value: labelStyles.value,
+            total: labelStyles.total,
+          },
+        },
       },
       /**
        * radialBar
@@ -181,7 +212,10 @@ const baseChartOptions = (theme: Theme): ChartOptions => {
           strokeWidth: '50%',
           background: varAlpha(theme.vars.palette.grey['500Channel'], 0.16),
         },
-        dataLabels: { value: { ...LABEL_VALUE }, total: { ...LABEL_TOTAL } },
+        dataLabels: {
+          value: labelStyles.value,
+          total: labelStyles.total,
+        },
       },
       /**
        * radar
@@ -199,14 +233,20 @@ const baseChartOptions = (theme: Theme): ChartOptions => {
        * https://apexcharts.com/docs/options/plotoptions/polararea/
        */
       polarArea: {
-        rings: { strokeColor: theme.vars.palette.divider },
-        spokes: { connectorColors: theme.vars.palette.divider },
+        rings: {
+          strokeColor: theme.vars.palette.divider,
+        },
+        spokes: {
+          connectorColors: theme.vars.palette.divider,
+        },
       },
       /**
        * heatmap
        * https://apexcharts.com/docs/options/plotoptions/heatmap/
        */
-      heatmap: { distributed: true },
+      heatmap: {
+        distributed: true,
+      },
     },
 
     /** **************************************
@@ -215,12 +255,22 @@ const baseChartOptions = (theme: Theme): ChartOptions => {
      *************************************** */
     responsive: [
       {
-        breakpoint: theme.breakpoints.values.sm, // sm ~ 600
-        options: { plotOptions: { bar: { borderRadius: 3, columnWidth: '80%' } } },
+        // sm ~ 600
+        breakpoint: theme.breakpoints.values.sm,
+        options: {
+          plotOptions: {
+            bar: { borderRadius: 3, columnWidth: '80%' },
+          },
+        },
       },
       {
-        breakpoint: theme.breakpoints.values.md, // md ~ 900
-        options: { plotOptions: { bar: { columnWidth: '60%' } } },
+        // md ~ 900
+        breakpoint: theme.breakpoints.values.md,
+        options: {
+          plotOptions: {
+            bar: { columnWidth: '60%' },
+          },
+        },
       },
     ],
   };

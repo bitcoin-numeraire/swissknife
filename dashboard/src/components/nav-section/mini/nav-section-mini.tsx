@@ -1,3 +1,7 @@
+'use client';
+
+import type { NavGroupProps, NavSectionProps } from '../types';
+
 import { mergeClasses } from 'minimal-shared/utils';
 
 import { useTheme } from '@mui/material/styles';
@@ -5,8 +9,6 @@ import { useTheme } from '@mui/material/styles';
 import { NavList } from './nav-list';
 import { Nav, NavUl, NavLi } from '../components';
 import { navSectionClasses, navSectionCssVars } from '../styles';
-
-import type { NavGroupProps, NavSectionProps } from '../types';
 
 // ----------------------------------------------------------------------
 
@@ -16,7 +18,7 @@ export function NavSectionMini({
   render,
   className,
   slotProps,
-  currentRole,
+  checkPermissions,
   enabledRootRedirect,
   cssVars: overridesVars,
   ...other
@@ -39,7 +41,7 @@ export function NavSectionMini({
             cssVars={cssVars}
             items={group.items}
             slotProps={slotProps}
-            currentRole={currentRole}
+            checkPermissions={checkPermissions}
             enabledRootRedirect={enabledRootRedirect}
           />
         ))}
@@ -55,7 +57,7 @@ function Group({
   render,
   cssVars,
   slotProps,
-  currentRole,
+  checkPermissions,
   enabledRootRedirect,
 }: NavGroupProps) {
   return (
@@ -69,7 +71,7 @@ function Group({
             render={render}
             cssVars={cssVars}
             slotProps={slotProps}
-            currentRole={currentRole}
+            checkPermissions={checkPermissions}
             enabledRootRedirect={enabledRootRedirect}
           />
         ))}

@@ -33,7 +33,7 @@ export function RHFRating({ name, helperText, slotProps, ...other }: RHFRatingPr
           sx={[
             { display: 'flex', flexDirection: 'column' },
             ...(Array.isArray(slotProps?.wrapper?.sx)
-              ? (slotProps?.wrapper?.sx ?? [])
+              ? slotProps.wrapper.sx
               : [slotProps?.wrapper?.sx]),
           ]}
         >

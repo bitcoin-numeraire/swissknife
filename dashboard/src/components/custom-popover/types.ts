@@ -4,29 +4,34 @@ import type { Theme, SxProps } from '@mui/material/styles';
 
 // ----------------------------------------------------------------------
 
-export type PopoverArrow = {
+export type ArrowPlacement =
+  | 'top-left'
+  | 'top-center'
+  | 'top-right'
+  | 'bottom-left'
+  | 'bottom-center'
+  | 'bottom-right'
+  | 'left-top'
+  | 'left-center'
+  | 'left-bottom'
+  | 'right-top'
+  | 'right-center'
+  | 'right-bottom';
+
+export type ArrowProps = {
   hide?: boolean;
   size?: number;
-  offset?: number;
   sx?: SxProps<Theme>;
-  placement?:
-    | 'top-left'
-    | 'top-center'
-    | 'top-right'
-    | 'bottom-left'
-    | 'bottom-center'
-    | 'bottom-right'
-    | 'left-top'
-    | 'left-center'
-    | 'left-bottom'
-    | 'right-top'
-    | 'right-center'
-    | 'right-bottom';
+  placement?: ArrowPlacement;
 };
+
+export type PaperOffset = [number, number];
 
 export type CustomPopoverProps = PopoverProps & {
   slotProps?: PopoverProps['slotProps'] & {
-    arrow?: PopoverArrow;
-    paper?: PaperProps;
+    arrow?: ArrowProps;
+    paper?: PaperProps & {
+      offset?: PaperOffset;
+    };
   };
 };

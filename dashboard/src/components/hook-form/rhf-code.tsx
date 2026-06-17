@@ -12,7 +12,7 @@ import { HelperText } from './help-text';
 
 // ----------------------------------------------------------------------
 
-export interface RHFCodesProps extends Omit<MuiOtpInputProps, 'sx'> {
+export interface RHFCodesProps extends MuiOtpInputProps {
   name: string;
   maxSize?: number;
   placeholder?: string;
@@ -20,11 +20,12 @@ export interface RHFCodesProps extends Omit<MuiOtpInputProps, 'sx'> {
   slotProps?: {
     wrapper?: BoxProps;
     helperText?: FormHelperTextProps;
-    textfield?: MuiOtpInputProps['TextFieldsProps'];
+    textField?: MuiOtpInputProps['TextFieldsProps'];
   };
 }
 
 export function RHFCode({
+  sx,
   name,
   slotProps,
   helperText,
@@ -43,8 +44,6 @@ export function RHFCode({
           {...slotProps?.wrapper}
           sx={[
             {
-              display: 'flex',
-              justifyContent: 'center',
               [`& .${inputBaseClasses.input}`]: {
                 p: 0,
                 height: 'auto',
@@ -53,20 +52,20 @@ export function RHFCode({
               },
             },
             ...(Array.isArray(slotProps?.wrapper?.sx)
-              ? (slotProps?.wrapper?.sx ?? [])
+              ? slotProps.wrapper.sx
               : [slotProps?.wrapper?.sx]),
           ]}
         >
           <MuiOtpInput
             {...field}
             autoFocus
-            gap={1.5}
             length={6}
             TextFieldsProps={{
               placeholder,
               error: !!error,
-              ...slotProps?.textfield,
+              ...slotProps?.textField,
             }}
+            sx={[{ gap: 1.5 }, ...(Array.isArray(sx) ? sx : [sx])]}
             {...other}
           />
 

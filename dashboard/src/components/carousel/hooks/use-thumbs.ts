@@ -1,9 +1,8 @@
 import type { EmblaCarouselType } from 'embla-carousel';
+import type { CarouselOptions, UseCarouselThumbsReturn } from '../types';
 
 import useEmblaCarousel from 'embla-carousel-react';
 import { useState, useEffect, useCallback } from 'react';
-
-import type { CarouselOptions, UseCarouselThumbsReturn } from '../types';
 
 // ----------------------------------------------------------------------
 

@@ -1,8 +1,8 @@
+import type { NavItemDataProps, NavItemOptionsProps } from '../types';
+
 import { cloneElement } from 'react';
 
 import { RouterLink } from 'src/routes/components';
-
-import type { NavItemDataProps, NavItemOptionsProps } from '../types';
 
 // ----------------------------------------------------------------------
 
@@ -32,7 +32,7 @@ export function createNavItem({
   const subDeepItem = Number(depth) > 2;
 
   const linkProps = externalLink
-    ? { href: path, target: '_blank', rel: 'noopener' }
+    ? { href: path, target: '_blank', rel: 'noopener noreferrer' }
     : { component: RouterLink, href: path };
 
   const baseProps = hasChild && !enabledRootRedirect ? { component: 'div' } : linkProps;

@@ -9,7 +9,7 @@ import { RHFCountrySelect } from './rhf-country-select';
 import { RHFSwitch, RHFMultiSwitch } from './rhf-switch';
 import { RHFSelect, RHFMultiSelect } from './rhf-select';
 import { RHFCheckbox, RHFMultiCheckbox } from './rhf-checkbox';
-import { RHFDatePicker, RHFMobileDateTimePicker } from './rhf-date-picker';
+import { RHFDatePicker, RHFTimePicker, RHFDateTimePicker } from './rhf-date-picker';
 
 // ----------------------------------------------------------------------
 
@@ -22,12 +22,14 @@ export const Field = {
   Text: RHFTextField,
   Checkbox: RHFCheckbox,
   RadioGroup: RHFRadioGroup,
-  DatePicker: RHFDatePicker,
   MultiSelect: RHFMultiSelect,
   MultiSwitch: RHFMultiSwitch,
   NumberInput: RHFNumberInput,
   Autocomplete: RHFAutocomplete,
   MultiCheckbox: RHFMultiCheckbox,
   CountrySelect: RHFCountrySelect,
-  MobileDateTimePicker: RHFMobileDateTimePicker,
+  // Pickers
+  DatePicker: RHFDatePicker,
+  TimePicker: RHFTimePicker,
+  DateTimePicker: RHFDateTimePicker,
 };

@@ -1,4 +1,7 @@
+'use client';
+
 import type { Theme } from '@mui/material/styles';
+import type { CarouselArrowButtonsProps } from '../types';
 
 import { varAlpha, mergeClasses } from 'minimal-shared/utils';
 
@@ -6,8 +9,6 @@ import { styled } from '@mui/material/styles';
 
 import { ArrowButton } from './arrow-button';
 import { carouselClasses } from '../classes';
-
-import type { CarouselArrowButtonsProps } from '../types';
 
 // ----------------------------------------------------------------------
 
@@ -100,7 +101,7 @@ export function CarouselArrowFloatButtons({
           }),
           ...(Array.isArray(sx) ? sx : [sx]),
           ...(Array.isArray(slotProps?.prevBtn?.sx)
-            ? (slotProps?.prevBtn?.sx ?? [])
+            ? slotProps.prevBtn.sx
             : [slotProps?.prevBtn?.sx]),
         ]}
       />
@@ -120,7 +121,7 @@ export function CarouselArrowFloatButtons({
           }),
           ...(Array.isArray(sx) ? sx : [sx]),
           ...(Array.isArray(slotProps?.nextBtn?.sx)
-            ? (slotProps?.nextBtn?.sx ?? [])
+            ? slotProps.nextBtn.sx
             : [slotProps?.nextBtn?.sx]),
         ]}
       />
@@ -137,7 +138,7 @@ const NumberButtonsRoot = styled('div')(({ theme }) => ({
   display: 'inline-flex',
   padding: theme.spacing(0.5),
   color: theme.vars.palette.common.white,
-  borderRadius: theme.shape.borderRadius * 1.25,
+  borderRadius: Number(theme.shape.borderRadius) * 1.25,
   backgroundColor: varAlpha(theme.vars.palette.grey['900Channel'], 0.48),
   [`& .${carouselClasses.arrows.label}`]: {
     ...theme.typography.subtitle2,

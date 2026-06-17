@@ -1,45 +1,46 @@
-import { lazy, Suspense, forwardRef } from 'react';
-import { useIsClient } from 'minimal-shared/hooks';
+'use client';
+
+import type { ChartProps } from './types';
+
+import { lazy, Suspense } from 'react';
 import { mergeClasses } from 'minimal-shared/utils';
 
+import NoSsr from '@mui/material/NoSsr';
 import { styled } from '@mui/material/styles';
 
 import { chartClasses } from './classes';
 import { ChartLoading } from './components';
 
-import type { ChartProps } from './types';
-
 // ----------------------------------------------------------------------
 
-const LazyChart = lazy(() =>
-  import('react-apexcharts').then((module) => ({ default: module.default }))
-);
+const LazyChart = lazy(() => import('react-apexcharts'));
 
-export const Chart = forwardRef<HTMLDivElement, ChartProps>((props, ref) => {
-  const { type, series, options, slotProps, className, sx, ...other } = props;
-
-  const isClient = useIsClient();
-
+export function Chart({
+  sx,
+  type,
+  series,
+  slotProps,
+  className,
+  options = {},
+  ...other
+}: ChartProps) {
   const renderFallback = () => <ChartLoading type={type} sx={slotProps?.loading} />;
 
   return (
     <ChartRoot
-      ref={ref}
       dir="ltr"
       className={mergeClasses([chartClasses.root, className])}
       sx={sx}
       {...other}
     >
-      {isClient ? (
+      <NoSsr fallback={renderFallback()}>
         <Suspense fallback={renderFallback()}>
           <LazyChart type={type} series={series} options={options} width="100%" height="100%" />
         </Suspense>
-      ) : (
-        renderFallback()
-      )}
+      </NoSsr>
     </ChartRoot>
   );
-});
+}
 
 // ----------------------------------------------------------------------
 
@@ -47,5 +48,5 @@ const ChartRoot = styled('div')(({ theme }) => ({
   width: '100%',
   flexShrink: 0,
   position: 'relative',
-  borderRadius: theme.shape.borderRadius * 1.5,
+  borderRadius: Number(theme.shape.borderRadius) * 1.5,
 }));

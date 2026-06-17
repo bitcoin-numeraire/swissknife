@@ -1,9 +1,15 @@
+'use client';
+
+import type { BoxProps } from '@mui/material/Box';
 import type { Theme, SxProps } from '@mui/material/styles';
 import type { MotionValue, MotionProps } from 'framer-motion';
+import type { PaletteColorKey } from 'src/theme/core';
 
 import { mergeClasses } from 'minimal-shared/utils';
 import { m, useSpring, useTransform } from 'framer-motion';
 
+import Box from '@mui/material/Box';
+import Portal from '@mui/material/Portal';
 import { styled, useTheme } from '@mui/material/styles';
 
 import { createClasses } from 'src/theme/create-classes';
@@ -15,40 +21,45 @@ export const scrollProgressClasses = {
   linear: createClasses('scroll__progress__linear'),
 };
 
-type RootProps = MotionProps & React.ComponentProps<'svg'> & React.ComponentProps<'div'>;
+type BaseProps = MotionProps & React.ComponentProps<'svg'> & React.ComponentProps<'div'>;
 
-export interface ScrollProgressProps extends RootProps {
+export interface ScrollProgressProps extends BaseProps {
   size?: number;
+  portal?: boolean;
   thickness?: number;
-  sx?: SxProps<Theme>;
   whenScroll?: 'x' | 'y';
+  sx?: SxProps<Theme>;
   progress: MotionValue<number>;
   variant: 'linear' | 'circular';
-  color?: 'inherit' | 'primary' | 'secondary' | 'info' | 'success' | 'warning' | 'error';
+  color?: PaletteColorKey | 'inherit';
+  slotProps?: {
+    wrapper?: BoxProps;
+  };
 }
 
 export function ScrollProgress({
   sx,
   size,
+  portal,
   variant,
+  slotProps,
   className,
+  progress,
   thickness = 3.6,
   whenScroll = 'y',
   color = 'primary',
-  progress: progressProps,
   ...other
 }: ScrollProgressProps) {
   const theme = useTheme();
 
   const isRtl = theme.direction === 'rtl';
 
-  const transformProgress = useTransform(progressProps, [0, -1], [0, 1]);
+  const transformProgress = useTransform(progress, [0, -1], [0, 1]);
 
-  const progress = isRtl && whenScroll === 'x' ? transformProgress : progressProps;
-
-  const scaleX = useSpring(progress, { stiffness: 100, damping: 30, restDelta: 0.001 });
-
+  const progressValue = isRtl && whenScroll === 'x' ? transformProgress : progress;
   const progressSize = variant === 'circular' ? (size ?? 64) : (size ?? 3);
+
+  const scaleX = useSpring(progressValue, { stiffness: 100, damping: 30, restDelta: 0.001 });
 
   const renderCircular = () => (
     <CircularRoot
@@ -56,11 +67,11 @@ export function ScrollProgress({
       xmlns="http://www.w3.org/2000/svg"
       className={mergeClasses([scrollProgressClasses.circular, className])}
       sx={[
-        () => ({
+        {
           width: progressSize,
           height: progressSize,
           ...(color !== 'inherit' && { color: theme.vars.palette[color].main }),
-        }),
+        },
         ...(Array.isArray(sx) ? sx : [sx]),
       ]}
       {...other}
@@ -78,7 +89,7 @@ export function ScrollProgress({
         cy={progressSize / 2}
         r={progressSize / 2 - thickness - 4}
         strokeWidth={thickness}
-        style={{ pathLength: progress }}
+        style={{ pathLength: progressValue }}
       />
     </CircularRoot>
   );
@@ -87,12 +98,12 @@ export function ScrollProgress({
     <LinearRoot
       className={mergeClasses([scrollProgressClasses.linear, className])}
       sx={[
-        () => ({
+        {
           height: progressSize,
           ...(color !== 'inherit' && {
             background: `linear-gradient(135deg, ${theme.vars.palette[color].light}, ${theme.vars.palette[color].main})`,
           }),
-        }),
+        },
         ...(Array.isArray(sx) ? sx : [sx]),
       ]}
       style={{ scaleX }}
@@ -100,11 +111,15 @@ export function ScrollProgress({
     />
   );
 
-  return (
-    <div style={{ overflow: 'hidden' }}>
-      {variant === 'circular' ? renderCircular() : renderLinear()}
-    </div>
+  const renderContent = () => (
+    <Box {...slotProps?.wrapper}>{variant === 'circular' ? renderCircular() : renderLinear()}</Box>
   );
+
+  if (portal) {
+    return <Portal>{renderContent()}</Portal>;
+  }
+
+  return renderContent();
 }
 
 // ----------------------------------------------------------------------

@@ -1,43 +1,40 @@
 import type { EmblaCarouselType } from 'embla-carousel';
+import type { UseCarouselArrowsReturn } from '../types';
 
 import { useState, useEffect, useCallback } from 'react';
 
-import type { UseCarouselArrowsReturn } from '../types';
-
 // ----------------------------------------------------------------------
 
-export const useCarouselArrows = (mainApi?: EmblaCarouselType): UseCarouselArrowsReturn => {
-  const [disablePrev, setDisabledPrevBtn] = useState(true);
+export function useCarouselArrows(mainApi?: EmblaCarouselType): UseCarouselArrowsReturn {
+  const [disablePrev, setDisabledPrevBtn] = useState<boolean>(true);
+  const [disableNext, setDisabledNextBtn] = useState<boolean>(true);
 
-  const [disableNext, setDisabledNextBtn] = useState(true);
-
-  const onClickPrev = useCallback(() => {
+  const handleClickPrev = useCallback(() => {
     if (!mainApi) return;
     mainApi.scrollPrev();
   }, [mainApi]);
 
-  const onClickNext = useCallback(() => {
+  const handleClickNext = useCallback(() => {
     if (!mainApi) return;
     mainApi.scrollNext();
   }, [mainApi]);
 
-  const onSelect = useCallback((_mainApi: EmblaCarouselType) => {
-    setDisabledPrevBtn(!_mainApi.canScrollPrev());
-    setDisabledNextBtn(!_mainApi.canScrollNext());
+  const updateArrowState = useCallback((carouselApi: EmblaCarouselType) => {
+    setDisabledPrevBtn(!carouselApi.canScrollPrev());
+    setDisabledNextBtn(!carouselApi.canScrollNext());
   }, []);
 
   useEffect(() => {
     if (!mainApi) return;
 
-    onSelect(mainApi);
-    mainApi.on('reInit', onSelect);
-    mainApi.on('select', onSelect);
-  }, [mainApi, onSelect]);
+    updateArrowState(mainApi);
+    mainApi.on('reInit', updateArrowState).on('select', updateArrowState);
+  }, [mainApi, updateArrowState]);
 
   return {
     disablePrev,
     disableNext,
-    onClickPrev,
-    onClickNext,
+    onClickPrev: handleClickPrev,
+    onClickNext: handleClickNext,
   };
-};
+}

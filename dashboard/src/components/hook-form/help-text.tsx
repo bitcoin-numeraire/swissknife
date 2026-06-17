@@ -14,25 +14,22 @@ export function HelperText({
   sx,
   helperText,
   errorMessage,
-  disableGutters,
+  disableGutters = false,
   ...other
 }: HelperTextProps) {
-  if (errorMessage || helperText) {
-    return (
-      <FormHelperText
-        error={!!errorMessage}
-        sx={[
-          {
-            mx: disableGutters ? 0 : 1.75,
-          },
-          ...(Array.isArray(sx) ? sx : [sx]),
-        ]}
-        {...other}
-      >
-        {errorMessage || helperText}
-      </FormHelperText>
-    );
+  const message = errorMessage ?? helperText;
+
+  if (!message) {
+    return null;
   }
 
-  return null;
+  return (
+    <FormHelperText
+      error={!!errorMessage}
+      sx={[{ mx: disableGutters ? 0 : 1.5 }, ...(Array.isArray(sx) ? sx : [sx])]}
+      {...other}
+    >
+      {errorMessage || helperText}
+    </FormHelperText>
+  );
 }

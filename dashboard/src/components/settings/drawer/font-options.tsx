@@ -1,28 +1,26 @@
 import type { BoxProps } from '@mui/material/Box';
 import type { SliderProps } from '@mui/material/Slider';
+import type { SettingsState } from '../types';
 
 import { setFont } from 'minimal-shared/utils';
 
 import Box from '@mui/material/Box';
 import Slider, { sliderClasses } from '@mui/material/Slider';
 
-import { CONFIG } from 'src/global-config';
-
 import { OptionButton } from './styles';
-import { SvgColor } from '../../svg-color';
-
-import type { SettingsState } from '../types';
 
 // ----------------------------------------------------------------------
 
 export type FontFamilyOptionsProps = BoxProps & {
   options: string[];
+  icon: React.ReactNode;
   value: SettingsState['fontFamily'];
   onChangeOption: (newOption: string) => void;
 };
 
 export function FontFamilyOptions({
   sx,
+  icon,
   value,
   options,
   onChangeOption,
@@ -31,11 +29,11 @@ export function FontFamilyOptions({
   return (
     <Box
       sx={[
-        () => ({
+        {
           gap: 1.5,
           display: 'grid',
           gridTemplateColumns: 'repeat(2, 1fr)',
-        }),
+        },
         ...(Array.isArray(sx) ? sx : [sx]),
       ]}
       {...other}
@@ -56,11 +54,7 @@ export function FontFamilyOptions({
               fontSize: theme.typography.pxToRem(12),
             })}
           >
-            <SvgColor
-              src={`${CONFIG.assetsDir}/assets/icons/settings/ic-font.svg`}
-              sx={{ width: 28, height: 28, color: 'currentColor' }}
-            />
-
+            {icon}
             {option.endsWith('Variable') ? option.replace(' Variable', '') : option}
           </OptionButton>
         );

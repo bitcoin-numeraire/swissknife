@@ -1,30 +1,28 @@
-import { forwardRef } from 'react';
+'use client';
+
+import type { LabelProps } from './types';
+
 import { upperFirst } from 'es-toolkit';
 import { mergeClasses } from 'minimal-shared/utils';
 
 import { labelClasses } from './classes';
 import { LabelRoot, LabelIcon } from './styles';
 
-import type { LabelProps } from './types';
-
 // ----------------------------------------------------------------------
 
-export const Label = forwardRef<HTMLSpanElement, LabelProps>((props, ref) => {
-  const {
-    endIcon,
-    children,
-    startIcon,
-    className,
-    disabled,
-    variant = 'soft',
-    color = 'default',
-    sx,
-    ...other
-  } = props;
-
+export function Label({
+  sx,
+  endIcon,
+  children,
+  startIcon,
+  className,
+  disabled,
+  variant = 'soft',
+  color = 'default',
+  ...other
+}: LabelProps) {
   return (
     <LabelRoot
-      ref={ref}
       color={color}
       variant={variant}
       disabled={disabled}
@@ -39,4 +37,4 @@ export const Label = forwardRef<HTMLSpanElement, LabelProps>((props, ref) => {
       {endIcon && <LabelIcon className={labelClasses.icon}>{endIcon}</LabelIcon>}
     </LabelRoot>
   );
-});
+}

@@ -3,7 +3,7 @@ import 'src/global.css';
 import type { Metadata, Viewport } from 'next';
 
 import InitColorSchemeScript from '@mui/material/InitColorSchemeScript';
-import { AppRouterCacheProvider } from '@mui/material-nextjs/v14-appRouter';
+import { AppRouterCacheProvider } from '@mui/material-nextjs/v15-appRouter';
 
 import { CONFIG } from 'src/global-config';
 import { primary } from 'src/theme/core/palette';

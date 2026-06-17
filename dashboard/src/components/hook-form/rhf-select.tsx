@@ -44,7 +44,7 @@ export function RHFSelect({
       MenuProps: {
         slotProps: {
           paper: {
-            sx: [{ maxHeight: 220 }],
+            sx: { maxHeight: 240 },
           },
         },
       },

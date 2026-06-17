@@ -1,3 +1,5 @@
+'use client';
+
 import type { TableRowProps } from '@mui/material/TableRow';
 
 import TableRow from '@mui/material/TableRow';

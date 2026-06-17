@@ -8,7 +8,7 @@ export const chartClasses = {
   legends: {
     root: createClasses('chart__legends__root'),
     item: {
-      wrap: createClasses('chart__legends__item__wrap'),
+      wrapper: createClasses('chart__legends__item__wrapper'),
       root: createClasses('chart__legends__item__root'),
       dot: createClasses('chart__legends__item__dot'),
       icon: createClasses('chart__legends__item__icon'),

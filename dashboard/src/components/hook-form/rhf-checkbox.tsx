@@ -52,14 +52,17 @@ export function RHFCheckbox({
                 {...field}
                 checked={field.value}
                 {...slotProps?.checkbox}
-                inputProps={{
-                  id: `${name}-checkbox`,
-                  ...(!label && { 'aria-label': `${name} checkbox` }),
-                  ...slotProps?.checkbox?.inputProps,
+                slotProps={{
+                  ...slotProps?.checkbox?.slotProps,
+                  input: {
+                    id: `${name}-checkbox`,
+                    ...(!label && { 'aria-label': `${name} checkbox` }),
+                    ...slotProps?.checkbox?.slotProps?.input,
+                  },
                 }}
               />
             }
-            sx={[{ mx: 0 }, ...(Array.isArray(sx) ? (sx ?? []) : [sx])]}
+            sx={[{ mx: 0 }, ...(Array.isArray(sx) ? sx : [sx])]}
             {...other}
           />
 
@@ -117,7 +120,7 @@ export function RHFMultiCheckbox({
               sx={[
                 { mb: 1, typography: 'body2' },
                 ...(Array.isArray(slotProps?.formLabel?.sx)
-                  ? (slotProps?.formLabel?.sx ?? [])
+                  ? slotProps.formLabel.sx
                   : [slotProps?.formLabel?.sx]),
               ]}
             >
@@ -134,10 +137,13 @@ export function RHFMultiCheckbox({
                     checked={field.value.includes(option.value)}
                     onChange={() => field.onChange(getSelected(field.value, option.value))}
                     {...slotProps?.checkbox}
-                    inputProps={{
-                      id: `${option.label}-checkbox`,
-                      ...(!option.label && { 'aria-label': `${option.label} checkbox` }),
-                      ...slotProps?.checkbox?.inputProps,
+                    slotProps={{
+                      ...slotProps?.checkbox?.slotProps,
+                      input: {
+                        id: `${option.label}-checkbox`,
+                        ...(!option.label && { 'aria-label': `${option.label} checkbox` }),
+                        ...slotProps?.checkbox?.slotProps?.input,
+                      },
                     }}
                   />
                 }

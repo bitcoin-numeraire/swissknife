@@ -4,7 +4,7 @@ import type { IconProps } from '@iconify/react';
 import type { Theme, SxProps } from '@mui/material/styles';
 
 import { forwardRef } from 'react';
-import { Icon, disableCache } from '@iconify/react';
+import { Icon } from '@iconify/react';
 import { mergeClasses } from 'minimal-shared/utils';
 
 import NoSsr from '@mui/material/NoSsr';
@@ -45,9 +45,6 @@ export const Iconify = forwardRef<SVGSVGElement, IconifyProps>((props, ref) => {
     </NoSsr>
   );
 });
-
-// https://iconify.design/docs/iconify-icon/disable-cache.html
-disableCache('local');
 
 // ----------------------------------------------------------------------
 

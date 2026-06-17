@@ -1,3 +1,5 @@
+'use client';
+
 import type { BoxProps } from '@mui/material/Box';
 import type { Theme, SxProps } from '@mui/material/styles';
 import type { TypographyProps } from '@mui/material/Typography';
@@ -44,9 +46,7 @@ export function SearchNotFound({ query, sx, slotProps, ...other }: SearchNotFoun
         {...slotProps?.title}
         sx={[
           { color: 'text.primary' },
-          ...(Array.isArray(slotProps?.title?.sx)
-            ? (slotProps?.title?.sx ?? [])
-            : [slotProps?.title?.sx]),
+          ...(Array.isArray(slotProps?.title?.sx) ? slotProps.title.sx : [slotProps?.title?.sx]),
         ]}
       >
         Not found

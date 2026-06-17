@@ -49,7 +49,7 @@ const ItemRoot = styled('div', {
 })<Pick<BreadcrumbsLinkProps, 'disabled'>>(({ disabled, theme }) => ({
   ...theme.typography.body2,
   alignItems: 'center',
-  gap: theme.spacing(1),
+  gap: theme.spacing(0.5),
   display: 'inline-flex',
   color: theme.vars.palette.text.primary,
   ...(disabled && {
@@ -65,5 +65,8 @@ const ItemIcon = styled('span')(() => ({
    * As ':first-child' for ssr
    * https://github.com/emotion-js/emotion/issues/1105#issuecomment-1126025608
    */
-  '& > :first-of-type:not(style):not(:first-of-type ~ *), & > style + *': { width: 20, height: 20 },
+  '& > :first-of-type:not(style):not(:first-of-type ~ *), & > style + *': {
+    width: 20,
+    height: 20,
+  },
 }));

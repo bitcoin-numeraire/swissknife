@@ -1,3 +1,5 @@
+'use client';
+
 import type { Theme, SxProps } from '@mui/material/styles';
 import type { TypographyProps } from '@mui/material/Typography';
 import type { Variants, UseInViewOptions } from 'framer-motion';
@@ -68,7 +70,7 @@ export function AnimateText({
   const isInView = useInView(textRef, { once, amount });
 
   useEffect(() => {
-    let timeout: NodeJS.Timeout;
+    let timeout: ReturnType<typeof setTimeout>;
 
     const triggerAnimation = () => {
       if (repeatDelayMs) {
@@ -111,12 +113,12 @@ export function AnimateText({
       <span className={animateTextClasses.srOnly}>{textArray.join(' ')}</span>
 
       <AnimatedTextContainer
+        aria-hidden
         ref={textRef}
         initial="initial"
         animate={animationControls}
         exit="exit"
         variants={varContainer()}
-        aria-hidden
         className={animateTextClasses.lines}
       >
         {textArray?.map((line, lineIndex) => (

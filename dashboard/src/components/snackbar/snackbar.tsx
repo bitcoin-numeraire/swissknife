@@ -13,8 +13,8 @@ export function Snackbar() {
     <Portal>
       <SnackbarRoot
         expand
-        gap={12}
         closeButton
+        gap={12}
         offset={16}
         visibleToasts={4}
         position="top-right"
@@ -24,16 +24,17 @@ export function Snackbar() {
           classNames: {
             toast: snackbarClasses.toast,
             icon: snackbarClasses.icon,
-            // content
+            loader: snackbarClasses.loader,
+            loading: snackbarClasses.loading,
+            /********/
             content: snackbarClasses.content,
             title: snackbarClasses.title,
             description: snackbarClasses.description,
-            // button
+            /********/
+            closeButton: snackbarClasses.closeButton,
             actionButton: snackbarClasses.actionButton,
             cancelButton: snackbarClasses.cancelButton,
-            closeButton: snackbarClasses.closeButton,
-            // state
-            default: snackbarClasses.default,
+            /********/
             info: snackbarClasses.info,
             error: snackbarClasses.error,
             success: snackbarClasses.success,

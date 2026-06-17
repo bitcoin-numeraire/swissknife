@@ -1,19 +1,16 @@
 import type { EmblaCarouselType } from 'embla-carousel';
+import type { UseCarouselDotsReturn } from '../types';
 
 import { useState, useEffect, useCallback } from 'react';
-
-import type { UseCarouselDotsReturn } from '../types';
 
 // ----------------------------------------------------------------------
 
 export function useCarouselDots(mainApi?: EmblaCarouselType): UseCarouselDotsReturn {
-  const [dotCount, setDotCount] = useState(0);
-
-  const [selectedIndex, setSelectedIndex] = useState(0);
-
+  const [dotCount, setDotCount] = useState<number>(0);
+  const [selectedIndex, setSelectedIndex] = useState<number>(0);
   const [scrollSnaps, setScrollSnaps] = useState<number[]>([]);
 
-  const onClickDot = useCallback(
+  const handleClickDot = useCallback(
     (index: number) => {
       if (!mainApi) return;
       mainApi.scrollTo(index);
@@ -21,29 +18,27 @@ export function useCarouselDots(mainApi?: EmblaCarouselType): UseCarouselDotsRet
     [mainApi]
   );
 
-  const onInit = useCallback((_mainApi: EmblaCarouselType) => {
-    setScrollSnaps(_mainApi.scrollSnapList());
+  const handleInit = useCallback((carouselApi: EmblaCarouselType) => {
+    setScrollSnaps(carouselApi.scrollSnapList());
   }, []);
 
-  const onSelect = useCallback((_mainApi: EmblaCarouselType) => {
-    setSelectedIndex(_mainApi.selectedScrollSnap());
-    setDotCount(_mainApi.scrollSnapList().length);
+  const handleSelect = useCallback((carouselApi: EmblaCarouselType) => {
+    setSelectedIndex(carouselApi.selectedScrollSnap());
+    setDotCount(carouselApi.scrollSnapList().length);
   }, []);
 
   useEffect(() => {
     if (!mainApi) return;
 
-    onInit(mainApi);
-    onSelect(mainApi);
-    mainApi.on('reInit', onInit);
-    mainApi.on('reInit', onSelect);
-    mainApi.on('select', onSelect);
-  }, [mainApi, onInit, onSelect]);
+    handleInit(mainApi);
+    handleSelect(mainApi);
+    mainApi.on('reInit', handleInit).on('reInit', handleSelect).on('select', handleSelect);
+  }, [mainApi, handleInit, handleSelect]);
 
   return {
     dotCount,
     scrollSnaps,
     selectedIndex,
-    onClickDot,
+    onClickDot: handleClickDot,
   };
 }

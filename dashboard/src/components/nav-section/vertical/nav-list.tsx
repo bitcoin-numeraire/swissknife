@@ -1,16 +1,16 @@
+'use client';
+
+import type { NavListProps, NavSubListProps } from '../types';
+
 import { useBoolean } from 'minimal-shared/hooks';
 import { useRef, useEffect, useCallback } from 'react';
 import { isActiveLink, isExternalLink } from 'minimal-shared/utils';
 
 import { usePathname } from 'src/routes/hooks';
 
-import { useTranslate } from 'src/locales';
-
 import { NavItem } from './nav-item';
 import { navSectionClasses } from '../styles';
 import { NavUl, NavLi, NavCollapse } from '../components';
-
-import type { NavListProps, NavSubListProps } from '../types';
 
 // ----------------------------------------------------------------------
 
@@ -19,14 +19,13 @@ export function NavList({
   depth,
   render,
   slotProps,
-  currentRole,
+  checkPermissions,
   enabledRootRedirect,
 }: NavListProps) {
   const pathname = usePathname();
-  const navItemRef = useRef<HTMLButtonElement | null>(null);
-  const { t } = useTranslate();
+  const navItemRef = useRef<HTMLButtonElement>(null);
 
-  const isActive = isActiveLink(pathname, data.path, !!data.children);
+  const isActive = isActiveLink(pathname, data.path, data.deepMatch ?? !!data.children);
 
   const { value: open, onFalse: onClose, onToggle } = useBoolean(isActive);
 
@@ -50,7 +49,7 @@ export function NavList({
       path={data.path}
       icon={data.icon}
       info={data.info}
-      title={t(data.title)}
+      title={data.title}
       caption={data.caption}
       // state
       open={open}
@@ -77,14 +76,14 @@ export function NavList({
           render={render}
           depth={depth}
           slotProps={slotProps}
-          currentRole={currentRole}
+          checkPermissions={checkPermissions}
           enabledRootRedirect={enabledRootRedirect}
         />
       </NavCollapse>
     );
 
   // Hidden item by role
-  if (data.roles && currentRole && !data.roles.includes(currentRole)) {
+  if (data.allowedRoles && checkPermissions && checkPermissions(data.allowedRoles)) {
     return null;
   }
 
@@ -93,7 +92,9 @@ export function NavList({
       disabled={data.disabled}
       sx={{
         ...(!!data.children && {
-          [`& .${navSectionClasses.li}`]: { '&:first-of-type': { mt: 'var(--nav-item-gap)' } },
+          [`& .${navSectionClasses.li}`]: {
+            '&:first-of-type': { mt: 'var(--nav-item-gap)' },
+          },
         }),
       }}
     >
@@ -110,7 +111,7 @@ function NavSubList({
   render,
   depth = 0,
   slotProps,
-  currentRole,
+  checkPermissions,
   enabledRootRedirect,
 }: NavSubListProps) {
   return (
@@ -122,7 +123,7 @@ function NavSubList({
           render={render}
           depth={depth + 1}
           slotProps={slotProps}
-          currentRole={currentRole}
+          checkPermissions={checkPermissions}
           enabledRootRedirect={enabledRootRedirect}
         />
       ))}

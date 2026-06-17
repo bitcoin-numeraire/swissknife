@@ -31,8 +31,8 @@ export const varFade = (direction: Direction, options?: Options): Variants => {
     /**** In ****/
     in: {
       initial: { opacity: 0 },
-      animate: { opacity: 1, transition: transitionEnter },
-      exit: { opacity: 0, transition: transitionExit },
+      animate: { opacity: 1, transition: transitionEnter() },
+      exit: { opacity: 0, transition: transitionExit() },
     },
     inUp: {
       initial: { y: distance, opacity: 0 },

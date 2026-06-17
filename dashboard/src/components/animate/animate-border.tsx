@@ -4,7 +4,7 @@ import type { BoxProps } from '@mui/material/Box';
 import type { Theme, SxProps, CSSObject } from '@mui/material/styles';
 
 import { mergeClasses } from 'minimal-shared/utils';
-import { useRef, useState, useEffect, forwardRef } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import {
   m,
   useTransform,
@@ -57,9 +57,8 @@ export function AnimateBorder({
 }: AnimateBorderProps) {
   const theme = useTheme();
 
-  const rootRef = useRef<HTMLDivElement | null>(null);
-
-  const primaryBorderRef = useRef<HTMLSpanElement | null>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const primaryBorderRef = useRef<HTMLSpanElement>(null);
 
   const [isHidden, setIsHidden] = useState(false);
 
@@ -104,7 +103,7 @@ export function AnimateBorder({
           ...theme.mixins.borderGradient({ padding: slotProps?.primaryBorder?.width }),
         },
         ...(Array.isArray(slotProps?.primaryBorder?.sx)
-          ? (slotProps?.primaryBorder?.sx ?? [])
+          ? slotProps.primaryBorder.sx
           : [slotProps?.primaryBorder?.sx]),
       ]}
     />
@@ -124,7 +123,7 @@ export function AnimateBorder({
             transform: 'scale(-1, -1)',
           },
           ...(Array.isArray(slotProps?.secondaryBorder?.sx)
-            ? (slotProps?.secondaryBorder?.sx ?? [])
+            ? slotProps.secondaryBorder.sx
             : [slotProps?.secondaryBorder?.sx]),
         ]}
       />
@@ -172,10 +171,16 @@ type MovingBorderProps = BoxProps<'span'> & {
   size?: BorderStyleProps['size'];
 };
 
-const MovingBorder = forwardRef<HTMLSpanElement, MovingBorderProps>((props, ref) => {
-  const { sx, rx = '30%', ry = '30%', size, duration = 8, isHidden, ...other } = props;
-
-  const svgRectRef = useRef<SVGRectElement | null>(null);
+function MovingBorder({
+  sx,
+  size,
+  isHidden,
+  rx = '30%',
+  ry = '30%',
+  duration = 8,
+  ...other
+}: MovingBorderProps) {
+  const svgRectRef = useRef<SVGRectElement>(null);
   const progress = useMotionValue<number>(0);
 
   const updateAnimationFrame = (time: number) => {
@@ -208,7 +213,6 @@ const MovingBorder = forwardRef<HTMLSpanElement, MovingBorderProps>((props, ref)
   return (
     <Box
       component="span"
-      ref={ref}
       sx={[{ textAlign: 'initial' }, ...(Array.isArray(sx) ? sx : [sx])]}
       {...other}
     >
@@ -237,11 +241,11 @@ const MovingBorder = forwardRef<HTMLSpanElement, MovingBorderProps>((props, ref)
       />
     </Box>
   );
-});
+}
 
 // ----------------------------------------------------------------------
 
-function useComputedElementStyles(theme: Theme, ref: React.RefObject<HTMLSpanElement>) {
+function useComputedElementStyles(theme: Theme, ref: React.RefObject<HTMLSpanElement | null>) {
   const [computedStyles, setComputedStyles] = useState<CSSObject | null>(null);
 
   const isRtl = theme.direction === 'rtl';

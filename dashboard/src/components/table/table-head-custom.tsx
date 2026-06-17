@@ -63,9 +63,11 @@ export function TableHeadCustom({
               onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
                 onSelectAllRows(event.target.checked)
               }
-              inputProps={{
-                id: `all-row-checkbox`,
-                'aria-label': `All row Checkbox`,
+              slotProps={{
+                input: {
+                  id: `all-row-checkbox`,
+                  'aria-label': `All row Checkbox`,
+                },
               }}
             />
           </TableCell>

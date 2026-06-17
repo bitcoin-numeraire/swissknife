@@ -1,3 +1,7 @@
+'use client';
+
+import type { NavListProps, NavSubListProps } from '../types';
+
 import { useEffect, useCallback } from 'react';
 import { usePopoverHover } from 'minimal-shared/hooks';
 import { isActiveLink, isExternalLink } from 'minimal-shared/utils';
@@ -10,8 +14,6 @@ import { NavItem } from './nav-item';
 import { navSectionClasses } from '../styles';
 import { NavUl, NavLi, NavDropdown, NavDropdownPaper } from '../components';
 
-import type { NavListProps, NavSubListProps } from '../types';
-
 // ----------------------------------------------------------------------
 
 export function NavList({
@@ -20,14 +22,14 @@ export function NavList({
   render,
   cssVars,
   slotProps,
-  currentRole,
+  checkPermissions,
   enabledRootRedirect,
 }: NavListProps) {
   const theme = useTheme();
 
   const pathname = usePathname();
 
-  const isActive = isActiveLink(pathname, data.path, !!data.children);
+  const isActive = isActiveLink(pathname, data.path, data.deepMatch ?? !!data.children);
 
   const {
     open,
@@ -86,6 +88,7 @@ export function NavList({
     !!data.children && (
       <NavDropdown
         disableScrollLock
+        aria-hidden={!open}
         id={id}
         open={open}
         anchorEl={anchorEl}
@@ -110,7 +113,7 @@ export function NavList({
             render={render}
             cssVars={cssVars}
             slotProps={slotProps}
-            currentRole={currentRole}
+            checkPermissions={checkPermissions}
             enabledRootRedirect={enabledRootRedirect}
           />
         </NavDropdownPaper>
@@ -118,19 +121,14 @@ export function NavList({
     );
 
   // Hidden item by role
-  if (data.roles && currentRole && !data.roles.includes(currentRole)) {
+  if (data.allowedRoles && checkPermissions && checkPermissions(data.allowedRoles)) {
     return null;
   }
 
   return (
     <NavLi disabled={data.disabled}>
       {renderNavItem()}
-      {/*
-       * TODO: Should be removed in MUI next.
-       * Add `open` condition to disable transition effect on close.
-       * https://github.com/mui/material-ui/issues/43106
-       */}
-      {open && renderDropdown()}
+      {renderDropdown()}
     </NavLi>
   );
 }
@@ -143,7 +141,7 @@ function NavSubList({
   cssVars,
   depth = 0,
   slotProps,
-  currentRole,
+  checkPermissions,
   enabledRootRedirect,
 }: NavSubListProps) {
   return (
@@ -156,7 +154,7 @@ function NavSubList({
           depth={depth + 1}
           cssVars={cssVars}
           slotProps={slotProps}
-          currentRole={currentRole}
+          checkPermissions={checkPermissions}
           enabledRootRedirect={enabledRootRedirect}
         />
       ))}
