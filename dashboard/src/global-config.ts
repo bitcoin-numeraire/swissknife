@@ -1,7 +1,7 @@
 import { paths } from 'src/routes/paths';
 
 import packageJson from '../package.json';
-import { client } from './lib/swissknife';
+import { client } from './lib/swissknife/client.gen';
 
 // ----------------------------------------------------------------------
 

@@ -53,7 +53,7 @@ export function ApiKeyListView() {
 
   return (
     <DashboardContent>
-      <RoleBasedGuard permissions={[Permission['READ:API_KEY']]} hasContent>
+      <RoleBasedGuard permissions={[Permission.READ_API_KEY]} hasContent>
         {failed ? (
           <ErrorView errors={errors} isLoading={isLoading} data={data} />
         ) : (

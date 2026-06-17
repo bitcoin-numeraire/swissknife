@@ -218,6 +218,8 @@ const eslintConfig = [
     'out/**',
     'dist/**',
     'build/**',
+    // Auto-generated API client
+    'src/lib/swissknife/**',
   ]),
   /********/
   {

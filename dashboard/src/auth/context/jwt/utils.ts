@@ -2,7 +2,7 @@ import { jwtDecode } from 'jwt-decode';
 
 import { paths } from 'src/routes/paths';
 
-import { client } from 'src/lib/swissknife';
+import { client } from 'src/lib/swissknife/client.gen';
 
 import { JWT_STORAGE_KEY } from './constant';
 
@@ -41,7 +41,7 @@ export async function setSession(accessToken: string) {
     });
 
     client.interceptors.error.use((error, response) => {
-      if (response.status === 401) {
+      if (response?.status === 401) {
         sessionStorage.removeItem(JWT_STORAGE_KEY);
         window.location.href = paths.auth.login;
       }

@@ -1762,10 +1762,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@hey-api/client-fetch@npm:^0.5.6":
-  version: 0.5.7
-  resolution: "@hey-api/client-fetch@npm:0.5.7"
-  checksum: 10c0/fc4408f0965ed9cc8cc9835caa9dea4247c6347b4a0bc16d8250522dbaf2853b93849ee3b802a1369ef8f715d22da3dcc2cd5d0e142da0bbae1a7da886b88327
+"@hey-api/client-fetch@npm:^0.13.1":
+  version: 0.13.1
+  resolution: "@hey-api/client-fetch@npm:0.13.1"
+  peerDependencies:
+    "@hey-api/openapi-ts": < 2
+  checksum: 10c0/2c144edd852475062ac2631a08e611d06d7c09b2cdf608ac02eb95de96df12fc83f49954f655733958f4279ab6cc5f179d2f8ba1c8e074bb0f476f51604a2623
   languageName: node
   linkType: hard
 
@@ -8124,7 +8126,7 @@ __metadata:
     "@eslint/js": "npm:^9.39.2"
     "@fontsource-variable/inter": "npm:^5.2.8"
     "@fontsource-variable/public-sans": "npm:^5.2.7"
-    "@hey-api/client-fetch": "npm:^0.5.6"
+    "@hey-api/client-fetch": "npm:^0.13.1"
     "@hey-api/openapi-ts": "npm:^0.98.2"
     "@hookform/resolvers": "npm:^5.2.2"
     "@iconify/react": "npm:^6.0.2"

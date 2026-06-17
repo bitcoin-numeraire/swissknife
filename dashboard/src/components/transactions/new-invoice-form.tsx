@@ -75,7 +75,7 @@ export function NewInvoiceForm({
     formState: { isSubmitting, isValid },
   } = methods;
 
-  const amount = watch('amount_msat');
+  const amount = watch('amount_msat') as number;
 
   const handleAutoWidth = useCallback(() => {
     const getNumberLength = amount.toString().length;
