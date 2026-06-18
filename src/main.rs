@@ -5,7 +5,7 @@ mod infra;
 use std::{process::exit, sync::Arc};
 
 #[cfg(debug_assertions)]
-use dotenv::dotenv;
+use dotenvy::dotenv;
 use tokio::signal::{
     ctrl_c,
     unix::{signal, SignalKind},
