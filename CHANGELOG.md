@@ -29,6 +29,11 @@ This section is the source for the `v0.2.0` release notes.
   payments, and wallet state are reconciled more reliably when SwissKnife starts
   ([#200], [#202]).
 - Refreshed the backend dependency baseline ([#210], [#212], [#226]).
+- Upgraded the dashboard to React 19, Next.js 16, MUI v9, and zod 4 on Node 24 /
+  Yarn 4.17, and refreshed its dependency baseline ([#219], [#276]).
+- Aligned the dashboard with the current backend API and regenerated its typed
+  client; added a `make openapi` workflow to keep the spec and client in sync
+  ([#221]).
 
 ### Removed
 
@@ -64,8 +69,11 @@ This section is the source for the `v0.2.0` release notes.
 [#209]: https://github.com/bitcoin-numeraire/swissknife/pull/209
 [#210]: https://github.com/bitcoin-numeraire/swissknife/pull/210
 [#212]: https://github.com/bitcoin-numeraire/swissknife/pull/212
+[#219]: https://github.com/bitcoin-numeraire/swissknife/issues/219
+[#221]: https://github.com/bitcoin-numeraire/swissknife/issues/221
 [#224]: https://github.com/bitcoin-numeraire/swissknife/pull/224
 [#226]: https://github.com/bitcoin-numeraire/swissknife/pull/226
 [#240]: https://github.com/bitcoin-numeraire/swissknife/issues/240
 [#267]: https://github.com/bitcoin-numeraire/swissknife/issues/267
+[#276]: https://github.com/bitcoin-numeraire/swissknife/pull/276
 [398e89f]: https://github.com/bitcoin-numeraire/swissknife/commit/398e89f
