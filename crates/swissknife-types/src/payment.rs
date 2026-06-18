@@ -142,7 +142,7 @@ pub struct SendPaymentRequest {
     /// Wallet ID. Will be populated with your own ID by default
     pub wallet_id: Option<Uuid>,
 
-    /// Recipient. Can be a Bolt11 invoice, LNURL or LN Address. Keysend and On-chain payments not yet supported
+    /// Recipient. Can be a Bolt11 invoice, LNURL or LN Address.
     #[schema(example = "hello@numeraire.tech")]
     pub input: String,
 

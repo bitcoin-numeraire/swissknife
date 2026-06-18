@@ -7001,7 +7001,7 @@
           },
           "input": {
             "type": "string",
-            "description": "Recipient. Can be a Bolt11 invoice, LNURL or LN Address. Keysend and On-chain payments not yet supported",
+            "description": "Recipient. Can be a Bolt11 invoice, LNURL or LN Address.",
             "example": "hello@numeraire.tech"
           },
           "wallet_id": {

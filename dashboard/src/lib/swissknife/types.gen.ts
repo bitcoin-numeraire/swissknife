@@ -804,7 +804,7 @@ export type SendPaymentRequest = {
    */
   comment?: string | null;
   /**
-   * Recipient. Can be a Bolt11 invoice, LNURL or LN Address. Keysend and On-chain payments not yet supported
+   * Recipient. Can be a Bolt11 invoice, LNURL or LN Address.
    */
   input: string;
   /**
