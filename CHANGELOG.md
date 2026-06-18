@@ -8,7 +8,7 @@ release notes when a tag is published.
 
 ## [Unreleased]
 
-## [0.2.0] - 2026-06-18
+This section is the source for the `v0.2.0` release notes.
 
 ### Added
 
@@ -55,8 +55,7 @@ release notes when a tag is published.
 
 - Removed blink on the login page ([#175]).
 
-[Unreleased]: https://github.com/bitcoin-numeraire/swissknife/compare/v0.2.0...HEAD
-[0.2.0]: https://github.com/bitcoin-numeraire/swissknife/releases/tag/v0.2.0
+[Unreleased]: https://github.com/bitcoin-numeraire/swissknife/compare/v0.1.8...HEAD
 [0.1.8]: https://github.com/bitcoin-numeraire/swissknife/releases/tag/v0.1.8
 [#175]: https://github.com/bitcoin-numeraire/swissknife/pull/175
 [#176]: https://github.com/bitcoin-numeraire/swissknife/pull/176
