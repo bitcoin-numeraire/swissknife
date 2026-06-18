@@ -8,7 +8,7 @@ release notes when a tag is published.
 
 ## [Unreleased]
 
-This section is the source for the `v0.2.0` release notes.
+## [0.2.0] - 2026-06-18
 
 ### Added
 
@@ -29,11 +29,18 @@ This section is the source for the `v0.2.0` release notes.
   payments, and wallet state are reconciled more reliably when SwissKnife starts
   ([#200], [#202]).
 - Refreshed the backend dependency baseline ([#210], [#212], [#226]).
+- Upgraded the dashboard to React 19, Next.js 16, MUI v9, and zod 4 on Node 24 /
+  Yarn 4.17, and refreshed its dependency baseline ([#219], [#276]).
+- Aligned the dashboard with the current backend API and regenerated its typed
+  client; added a `make openapi` workflow to keep the spec and client in sync
+  ([#221]).
 
 ### Removed
 
 - Removed Breez Liquid/Spark support for now, keeping the current release focused
   on self-hosted CLN and LND providers ([#224]).
+- Removed right-to-left (RTL) layout support from the dashboard; it is now
+  left-to-right only ([#219]).
 
 ### Fixed
 
@@ -48,7 +55,8 @@ This section is the source for the `v0.2.0` release notes.
 
 - Removed blink on the login page ([#175]).
 
-[Unreleased]: https://github.com/bitcoin-numeraire/swissknife/compare/v0.1.8...HEAD
+[Unreleased]: https://github.com/bitcoin-numeraire/swissknife/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/bitcoin-numeraire/swissknife/releases/tag/v0.2.0
 [0.1.8]: https://github.com/bitcoin-numeraire/swissknife/releases/tag/v0.1.8
 [#175]: https://github.com/bitcoin-numeraire/swissknife/pull/175
 [#176]: https://github.com/bitcoin-numeraire/swissknife/pull/176
@@ -64,8 +72,11 @@ This section is the source for the `v0.2.0` release notes.
 [#209]: https://github.com/bitcoin-numeraire/swissknife/pull/209
 [#210]: https://github.com/bitcoin-numeraire/swissknife/pull/210
 [#212]: https://github.com/bitcoin-numeraire/swissknife/pull/212
+[#219]: https://github.com/bitcoin-numeraire/swissknife/issues/219
+[#221]: https://github.com/bitcoin-numeraire/swissknife/issues/221
 [#224]: https://github.com/bitcoin-numeraire/swissknife/pull/224
 [#226]: https://github.com/bitcoin-numeraire/swissknife/pull/226
 [#240]: https://github.com/bitcoin-numeraire/swissknife/issues/240
 [#267]: https://github.com/bitcoin-numeraire/swissknife/issues/267
+[#276]: https://github.com/bitcoin-numeraire/swissknife/pull/276
 [398e89f]: https://github.com/bitcoin-numeraire/swissknife/commit/398e89f
