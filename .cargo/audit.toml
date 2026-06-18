@@ -1,0 +1,10 @@
+# cargo-audit configuration (read automatically by `cargo audit`).
+# Docs: https://github.com/rustsec/rustsec/tree/main/cargo-audit
+
+[advisories]
+# RUSTSEC-2023-0071 (Marvin Attack, `rsa` crate) is pulled in transitively via
+# `jsonwebtoken`. No fixed `rsa` release exists yet, and our usage is JWT
+# signature verification — not the RSA private-key decryption the attack
+# targets — so practical exposure is low. Accepted/deferred until a patched
+# `rsa` (and a `jsonwebtoken` that depends on it) is published.
+ignore = ["RUSTSEC-2023-0071"]

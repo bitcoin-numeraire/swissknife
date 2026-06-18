@@ -26,7 +26,7 @@ tokio = { version = "1.52", features = ["macros", "rt-multi-thread", "signal", "
 bip21 = { version = "0.5.0", features = ["std"] }
 lnurl = { package = "lnurl-rs", version = "0.9.0", default-features = false, features = ["async"] }
 config = { version = "0.15.23", features = ["yaml", "json", "toml"] }
-dotenv = "0.15.0"
+dotenvy = "0.15.7"
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["json", "env-filter"] }
 jsonwebtoken = { version = "10.4.0", features = ["rust_crypto"] }
