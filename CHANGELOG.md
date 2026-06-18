@@ -39,8 +39,6 @@ This section is the source for the `v0.2.0` release notes.
 
 - Removed Breez Liquid/Spark support for now, keeping the current release focused
   on self-hosted CLN and LND providers ([#224]).
-- Removed right-to-left (RTL) layout support from the dashboard; it is now
-  left-to-right only ([#219]).
 
 ### Fixed
 
