@@ -34,6 +34,12 @@ This section is the source for the `v0.2.0` release notes.
 - Aligned the dashboard with the current backend API and regenerated its typed
   client; added a `make openapi` workflow to keep the spec and client in sync
   ([#221]).
+- Migrated CLN Lightning payments from the deprecated `pay` RPC to `xpay`, and
+  refreshed the vendored CLN and LND gRPC protos to CLN v26.06 and LND v0.21
+  ([#282]).
+- Replaced the CLN `maxfeepercent` and `payment_exemptfee` settings with a single
+  absolute `maxfee` (msat); when left unset, the node applies its own default
+  ([#282]).
 
 ### Removed
 
@@ -46,6 +52,8 @@ This section is the source for the `v0.2.0` release notes.
 - Fixed LNURL payment callback encoding and error handling ([#224]).
 - Fixed on-chain deposit event handling so transient database write failures do
   not silently drop credits ([#267]).
+- Fixed CLN REST Lightning payments charging the routing fee twice for payments
+  that incur a non-zero fee ([#282]).
 
 ## [0.1.8] - 2025-11-03
 
@@ -76,4 +84,5 @@ This section is the source for the `v0.2.0` release notes.
 [#240]: https://github.com/bitcoin-numeraire/swissknife/issues/240
 [#267]: https://github.com/bitcoin-numeraire/swissknife/issues/267
 [#276]: https://github.com/bitcoin-numeraire/swissknife/pull/276
+[#282]: https://github.com/bitcoin-numeraire/swissknife/pull/282
 [398e89f]: https://github.com/bitcoin-numeraire/swissknife/commit/398e89f
