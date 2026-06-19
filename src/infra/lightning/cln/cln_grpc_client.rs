@@ -5,7 +5,7 @@ use bitcoin::{Address, Network, ScriptBuf};
 use chrono::{TimeZone, Utc};
 use cln::{
     node_client::NodeClient, Amount, Feerate, GetinfoRequest, ListinvoicesRequest, NewaddrRequest, OutputDesc,
-    PayRequest, SetpsbtversionRequest, TxdiscardRequest, TxprepareRequest, TxsendRequest,
+    SetpsbtversionRequest, TxdiscardRequest, TxprepareRequest, TxsendRequest, XpayRequest,
 };
 use hex::decode;
 use lightning_invoice::Bolt11Invoice;
@@ -55,10 +55,11 @@ pub mod cln {
 pub struct ClnClientConfig {
     pub endpoint: String,
     pub certs_dir: String,
-    pub maxfeepercent: Option<f64>,
     #[serde(deserialize_with = "deserialize_duration")]
     pub payment_timeout: Duration,
-    pub payment_exemptfee: Option<u64>,
+    /// Absolute max routing fee per payment, in msat. When unset, `xpay` applies
+    /// its own default of `max(1%, 5000 msat)`.
+    pub maxfee: Option<u64>,
 }
 
 const DEFAULT_CLIENT_CERT_FILENAME: &str = "client.pem";
@@ -67,9 +68,8 @@ const DEFAULT_CA_CRT_FILENAME: &str = "ca.pem";
 
 pub struct ClnGrpcClient {
     client: NodeClient<Channel>,
-    maxfeepercent: Option<f64>,
+    maxfee: Option<u64>,
     retry_for: Option<u32>,
-    payment_exemptfee: Option<Amount>,
     network: BtcNetwork,
 }
 
@@ -79,9 +79,8 @@ impl ClnGrpcClient {
 
         let mut cln_client = Self {
             client: client.clone(),
-            maxfeepercent: config.maxfeepercent,
+            maxfee: config.maxfee,
             retry_for: Some(config.payment_timeout.as_secs() as u32),
-            payment_exemptfee: config.payment_exemptfee.map(|fee| Amount { msat: fee }),
             network: BtcNetwork::default(),
         };
 
@@ -202,13 +201,12 @@ impl LnClient for ClnGrpcClient {
         let mut client = self.client.clone();
 
         let response = client
-            .pay(PayRequest {
-                bolt11,
+            .xpay(XpayRequest {
+                invstring: bolt11,
                 amount_msat: amount_msat.map(|msat| cln::Amount { msat }),
-                label: Some(label),
-                maxfeepercent: self.maxfeepercent,
+                maxfee: self.maxfee.map(|msat| cln::Amount { msat }),
                 retry_for: self.retry_for,
-                exemptfee: self.payment_exemptfee,
+                label: Some(label),
                 ..Default::default()
             })
             .await

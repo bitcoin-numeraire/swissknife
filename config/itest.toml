@@ -56,9 +56,7 @@ reorg_buffer_blocks = 2
 [cln_grpc_config]
 endpoint = "https://localhost:11002"
 certs_dir = "tests/itest/runtime/cln/regtest"
-maxfeepercent = 0.5
 payment_timeout = "10s"
-payment_exemptfee = 5000
 
 [cln_rest_config]
 endpoint = "https://127.0.0.1:3010"
@@ -68,8 +66,6 @@ timeout = "30s"
 connection_verbose = false
 accept_invalid_certs = true
 accept_invalid_hostnames = true
-maxfeepercent = 0.5
 payment_timeout = "10s"
-payment_exemptfee = 5000
 ws_min_reconnect_delay = "1s"
 ws_max_reconnect_delay = "5s"

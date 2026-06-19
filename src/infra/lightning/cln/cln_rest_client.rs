@@ -36,9 +36,9 @@ use super::{
     DelInvoiceRequest, DelInvoiceResponse, ErrorResponse, GetinfoRequest, GetinfoResponse, InvoiceRequest,
     InvoiceResponse, ListChainMovesRequest, ListChainMovesResponse, ListFundsRequest, ListInvoicesRequest,
     ListInvoicesResponse, ListPaysRequest, ListPaysResponse, ListTransactionsRequest, ListTransactionsResponse,
-    NewAddrRequest, NewAddrResponse, PayRequest, PayResponse, SetPsbtVersionRequest, SetPsbtVersionResponse,
-    TxDiscardRequest, TxDiscardResponse, TxPrepareOutput, TxPrepareRequest, TxPrepareResponse, TxSendRequest,
-    TxSendResponse,
+    NewAddrRequest, NewAddrResponse, SetPsbtVersionRequest, SetPsbtVersionResponse, TxDiscardRequest,
+    TxDiscardResponse, TxPrepareOutput, TxPrepareRequest, TxPrepareResponse, TxSendRequest, TxSendResponse,
+    XpayRequest, XpayResponse,
 };
 
 #[derive(Clone, Debug, Deserialize)]
@@ -52,10 +52,11 @@ pub struct ClnRestClientConfig {
     pub timeout: Duration,
     pub accept_invalid_certs: bool,
     pub accept_invalid_hostnames: bool,
-    pub maxfeepercent: Option<f64>,
     #[serde(deserialize_with = "deserialize_duration")]
     pub payment_timeout: Duration,
-    pub payment_exemptfee: Option<u64>,
+    /// Absolute max routing fee per payment, in msat. When unset, `xpay` applies
+    /// its own default of `max(1%, 5000 msat)`.
+    pub maxfee: Option<u64>,
     #[serde(deserialize_with = "deserialize_duration")]
     pub ws_min_reconnect_delay: Duration,
     #[serde(deserialize_with = "deserialize_duration")]
@@ -66,9 +67,8 @@ pub struct ClnRestClientConfig {
 pub struct ClnRestClient {
     client: Client,
     base_url: String,
-    maxfeepercent: Option<f64>,
+    maxfee: Option<u64>,
     retry_for: Option<u32>,
-    payment_exemptfee: Option<u64>,
     network: BtcNetwork,
 }
 
@@ -106,9 +106,8 @@ impl ClnRestClient {
         let mut cln_client = Self {
             client,
             base_url: config.endpoint.clone(),
-            maxfeepercent: config.maxfeepercent,
+            maxfee: config.maxfee,
             retry_for: Some(config.payment_timeout.as_secs() as u32),
-            payment_exemptfee: config.payment_exemptfee,
             network: BtcNetwork::default(),
         };
 
@@ -191,16 +190,15 @@ impl LnClient for ClnRestClient {
     }
 
     async fn pay(&self, bolt11: String, amount_msat: Option<u64>, label: String) -> Result<Payment, LightningError> {
-        let response: PayResponse = self
+        let response: XpayResponse = self
             .post_request(
-                "pay",
-                &PayRequest {
-                    bolt11,
+                "xpay",
+                &XpayRequest {
+                    invstring: bolt11,
                     amount_msat,
-                    label: Some(label),
-                    maxfeepercent: self.maxfeepercent,
+                    maxfee: self.maxfee,
                     retry_for: self.retry_for,
-                    exemptfee: self.payment_exemptfee,
+                    label: Some(label),
                 },
             )
             .await

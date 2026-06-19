@@ -8,7 +8,21 @@ release notes when a tag is published.
 
 ## [Unreleased]
 
-This section is the source for the `v0.2.0` release notes.
+### Changed
+
+- Migrated CLN Lightning payments from the deprecated `pay` RPC to `xpay`, and
+  refreshed the vendored CLN and LND gRPC protos to CLN v26.06 and LND v0.21
+  ([#282]).
+- Replaced the CLN `maxfeepercent` and `payment_exemptfee` settings with a single
+  absolute `maxfee` (msat); when left unset, the node applies its own default
+  ([#282]).
+
+### Fixed
+
+- Fixed CLN REST Lightning payments charging the routing fee twice for payments
+  that incur a non-zero fee ([#282]).
+
+## [0.2.0] - 2026-06-18
 
 ### Added
 
@@ -34,10 +48,7 @@ This section is the source for the `v0.2.0` release notes.
 - Aligned the dashboard with the current backend API and regenerated its typed
   client; added a `make openapi` workflow to keep the spec and client in sync
   ([#221]).
-
-### Removed
-
-- Removed Breez Liquid/Spark support for now, keeping the current release focused
+- Dropped Breez Liquid/Spark support for now, keeping the current release focused
   on self-hosted CLN and LND providers ([#224]).
 
 ### Fixed
@@ -53,7 +64,8 @@ This section is the source for the `v0.2.0` release notes.
 
 - Removed blink on the login page ([#175]).
 
-[Unreleased]: https://github.com/bitcoin-numeraire/swissknife/compare/v0.1.8...HEAD
+[Unreleased]: https://github.com/bitcoin-numeraire/swissknife/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/bitcoin-numeraire/swissknife/compare/v0.1.8...v0.2.0
 [0.1.8]: https://github.com/bitcoin-numeraire/swissknife/releases/tag/v0.1.8
 [#175]: https://github.com/bitcoin-numeraire/swissknife/pull/175
 [#176]: https://github.com/bitcoin-numeraire/swissknife/pull/176
@@ -76,4 +88,5 @@ This section is the source for the `v0.2.0` release notes.
 [#240]: https://github.com/bitcoin-numeraire/swissknife/issues/240
 [#267]: https://github.com/bitcoin-numeraire/swissknife/issues/267
 [#276]: https://github.com/bitcoin-numeraire/swissknife/pull/276
+[#282]: https://github.com/bitcoin-numeraire/swissknife/pull/282
 [398e89f]: https://github.com/bitcoin-numeraire/swissknife/commit/398e89f

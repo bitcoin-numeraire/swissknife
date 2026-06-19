@@ -20,7 +20,7 @@ ITEST_ENV = SWISSKNIFE_ITEST_COMPOSE_PROJECT=$(ITEST_PROJECT) \
 	SWISSKNIFE_ITEST_DATABASE=$(ITEST_DATABASE) \
 	SWISSKNIFE_ITEST_PROVIDER=$(ITEST_PROVIDER)
 
-.PHONY: watch up up-swissknife up-server up-postgres up-pgadmin shutdown down generate-certs build build-docker build-docker-server build-docker-dashboard run-docker lint fmt fmt-fix test test-unit test-integration test-persistence itest-up itest-down itest-shutdown itest-logs coverage coverage-html coverage-lcov coverage-matrix clean check deps-upgrade deps-outdated install-tools generate-models new-migration run-migrations fresh-migrations
+.PHONY: watch up up-swissknife up-server up-postgres up-pgadmin shutdown down generate-certs build protos build-docker build-docker-server build-docker-dashboard run-docker lint fmt fmt-fix test test-unit test-integration test-persistence itest-up itest-down itest-shutdown itest-logs coverage coverage-html coverage-lcov coverage-matrix clean check deps-upgrade deps-outdated install-tools generate-models new-migration run-migrations fresh-migrations
 
 watch:
 	@cargo watch -x run
@@ -98,6 +98,11 @@ fmt-fix:
 
 build:
 	@cargo build --workspace --all-targets --features itest
+
+# Refresh the vendored Lightning gRPC protos (logic in scripts/update-protos.sh).
+# Override versions: `CLN_VERSION=... LND_VERSION=... make protos`.
+protos:
+	@./scripts/update-protos.sh
 
 test:
 	@cargo test --workspace --all-targets
