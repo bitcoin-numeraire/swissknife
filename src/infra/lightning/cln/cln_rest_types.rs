@@ -1,6 +1,7 @@
 use chrono::{TimeZone, Utc};
 use lightning_invoice::Bolt11Invoice;
 use serde::{Deserialize, Serialize};
+use serde_bolt::bitcoin::hashes::{sha256, Hash};
 use std::str::FromStr;
 
 use crate::{
@@ -26,23 +27,19 @@ pub struct InvoiceResponse {
 }
 
 #[derive(Debug, Serialize)]
-pub struct PayRequest {
-    pub bolt11: String,
-    pub label: Option<String>,
-    pub maxfeepercent: Option<f64>,
-    pub retry_for: Option<u32>,
-    pub exemptfee: Option<u64>,
+pub struct XpayRequest {
+    pub invstring: String,
     pub amount_msat: Option<u64>,
+    pub maxfee: Option<u64>,
+    pub retry_for: Option<u32>,
+    pub label: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
-pub struct PayResponse {
+pub struct XpayResponse {
     pub payment_preimage: String,
-    pub payment_hash: String,
-    pub created_at: f64,
     pub amount_msat: u64,
     pub amount_sent_msat: u64,
-    pub status: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -243,27 +240,22 @@ pub struct ListInvoicesInvoice {
     amount_received_msat: Option<u64>,
 }
 
-impl From<PayResponse> for Payment {
-    fn from(val: PayResponse) -> Self {
-        let error = match val.status.as_str() {
-            "complete" => None,
-            _ => Some(format!(
-                "Unexpected error. Payment returned successfully but with status {}",
-                val.status
-            )),
-        };
-
-        let seconds = val.created_at as i64;
-        let nanoseconds = ((val.created_at - seconds as f64) * 1e9) as u32;
+impl From<XpayResponse> for Payment {
+    fn from(val: XpayResponse) -> Self {
+        // `xpay` returns no payment_hash; it is the SHA-256 of the preimage.
+        let preimage_bytes = hex::decode(&val.payment_preimage).unwrap_or_default();
+        let payment_hash = hex::encode(sha256::Hash::hash(&preimage_bytes).to_byte_array());
 
         Payment {
             ledger: Ledger::Lightning,
             amount_msat: val.amount_sent_msat,
-            fee_msat: Some(val.amount_sent_msat - val.amount_msat),
-            payment_time: Some(Utc.timestamp_opt(seconds, nanoseconds).unwrap()),
-            error,
+            fee_msat: Some(val.amount_sent_msat.saturating_sub(val.amount_msat)),
+            // A returned XpayResponse means the payment completed; xpay surfaces
+            // failures as an error response. No created_at is returned, so stamp now.
+            payment_time: Some(Utc::now()),
+            error: None,
             lightning: Some(LnPayment {
-                payment_hash: val.payment_hash,
+                payment_hash,
                 payment_preimage: Some(val.payment_preimage),
                 ..Default::default()
             }),

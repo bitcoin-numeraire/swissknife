@@ -5,7 +5,7 @@ use bitcoin::{Address, Network, ScriptBuf};
 use chrono::{TimeZone, Utc};
 use cln::{
     node_client::NodeClient, Amount, Feerate, GetinfoRequest, ListinvoicesRequest, NewaddrRequest, OutputDesc,
-    PayRequest, SetpsbtversionRequest, TxdiscardRequest, TxprepareRequest, TxsendRequest,
+    SetpsbtversionRequest, TxdiscardRequest, TxprepareRequest, TxsendRequest, XpayRequest,
 };
 use hex::decode;
 use lightning_invoice::Bolt11Invoice;
@@ -201,14 +201,28 @@ impl LnClient for ClnGrpcClient {
     async fn pay(&self, bolt11: String, amount_msat: Option<u64>, label: String) -> Result<Payment, LightningError> {
         let mut client = self.client.clone();
 
+        // `xpay` takes an absolute `maxfee` rather than `pay`'s deprecated
+        // `maxfeepercent`/`exemptfee`. Derive it from the configured percentage
+        // and the payment amount (explicit override or the invoice's amount).
+        let amount = amount_msat.or_else(|| {
+            Bolt11Invoice::from_str(&bolt11)
+                .ok()
+                .and_then(|inv| inv.amount_milli_satoshis())
+        });
+        let maxfee = self.maxfeepercent.zip(amount).map(|(pct, amt)| {
+            let exempt = self.payment_exemptfee.map(|a| a.msat).unwrap_or(0);
+            cln::Amount {
+                msat: ((amt as f64 * pct / 100.0) as u64).max(exempt),
+            }
+        });
+
         let response = client
-            .pay(PayRequest {
-                bolt11,
+            .xpay(XpayRequest {
+                invstring: bolt11,
                 amount_msat: amount_msat.map(|msat| cln::Amount { msat }),
-                label: Some(label),
-                maxfeepercent: self.maxfeepercent,
+                maxfee,
                 retry_for: self.retry_for,
-                exemptfee: self.payment_exemptfee,
+                label: Some(label),
                 ..Default::default()
             })
             .await

@@ -36,9 +36,9 @@ use super::{
     DelInvoiceRequest, DelInvoiceResponse, ErrorResponse, GetinfoRequest, GetinfoResponse, InvoiceRequest,
     InvoiceResponse, ListChainMovesRequest, ListChainMovesResponse, ListFundsRequest, ListInvoicesRequest,
     ListInvoicesResponse, ListPaysRequest, ListPaysResponse, ListTransactionsRequest, ListTransactionsResponse,
-    NewAddrRequest, NewAddrResponse, PayRequest, PayResponse, SetPsbtVersionRequest, SetPsbtVersionResponse,
-    TxDiscardRequest, TxDiscardResponse, TxPrepareOutput, TxPrepareRequest, TxPrepareResponse, TxSendRequest,
-    TxSendResponse,
+    NewAddrRequest, NewAddrResponse, SetPsbtVersionRequest, SetPsbtVersionResponse, TxDiscardRequest,
+    TxDiscardResponse, TxPrepareOutput, TxPrepareRequest, TxPrepareResponse, TxSendRequest, TxSendResponse,
+    XpayRequest, XpayResponse,
 };
 
 #[derive(Clone, Debug, Deserialize)]
@@ -191,16 +191,28 @@ impl LnClient for ClnRestClient {
     }
 
     async fn pay(&self, bolt11: String, amount_msat: Option<u64>, label: String) -> Result<Payment, LightningError> {
-        let response: PayResponse = self
+        // `xpay` takes an absolute `maxfee` rather than `pay`'s deprecated
+        // `maxfeepercent`/`exemptfee`. Derive it from the configured percentage
+        // and the payment amount (explicit override or the invoice's amount).
+        let amount = amount_msat.or_else(|| {
+            Bolt11Invoice::from_str(&bolt11)
+                .ok()
+                .and_then(|inv| inv.amount_milli_satoshis())
+        });
+        let maxfee = self
+            .maxfeepercent
+            .zip(amount)
+            .map(|(pct, amt)| ((amt as f64 * pct / 100.0) as u64).max(self.payment_exemptfee.unwrap_or(0)));
+
+        let response: XpayResponse = self
             .post_request(
-                "pay",
-                &PayRequest {
-                    bolt11,
+                "xpay",
+                &XpayRequest {
+                    invstring: bolt11,
                     amount_msat,
-                    label: Some(label),
-                    maxfeepercent: self.maxfeepercent,
+                    maxfee,
                     retry_for: self.retry_for,
-                    exemptfee: self.payment_exemptfee,
+                    label: Some(label),
                 },
             )
             .await

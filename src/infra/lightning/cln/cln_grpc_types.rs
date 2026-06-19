@@ -1,5 +1,6 @@
 use chrono::{TimeZone, Utc};
 use lightning_invoice::Bolt11Invoice;
+use serde_bolt::bitcoin::hashes::{sha256, Hash};
 use std::str::FromStr;
 
 use crate::{
@@ -14,31 +15,26 @@ use crate::{
 };
 
 use super::cln::{
-    listinvoices_invoices::ListinvoicesInvoicesStatus, pay_response::PayStatus, ListinvoicesInvoices, PayResponse,
-    WaitinvoiceResponse,
+    listinvoices_invoices::ListinvoicesInvoicesStatus, ListinvoicesInvoices, WaitinvoiceResponse, XpayResponse,
 };
 
-impl From<PayResponse> for Payment {
-    fn from(val: PayResponse) -> Self {
-        let error = match val.status() {
-            PayStatus::Complete => None,
-            _ => Some(format!(
-                "Unexpected error. Payment returned successfully but with status {}",
-                val.status().as_str_name()
-            )),
-        };
-
-        let seconds = val.created_at as i64;
-        let nanoseconds = ((val.created_at - seconds as f64) * 1e9) as u32;
+impl From<XpayResponse> for Payment {
+    fn from(val: XpayResponse) -> Self {
+        // `xpay` returns no payment_hash; it is the SHA-256 of the preimage.
+        let payment_hash = hex::encode(sha256::Hash::hash(&val.payment_preimage).to_byte_array());
+        let amount_msat = val.amount_msat.map(|a| a.msat).unwrap_or_default();
+        let amount_sent_msat = val.amount_sent_msat.map(|a| a.msat).unwrap_or(amount_msat);
 
         Payment {
             ledger: Ledger::Lightning,
-            amount_msat: val.amount_msat.unwrap().msat,
-            fee_msat: Some(val.amount_sent_msat.unwrap().msat - val.amount_msat.unwrap().msat),
-            payment_time: Some(Utc.timestamp_opt(seconds, nanoseconds).unwrap()),
-            error,
+            amount_msat,
+            fee_msat: Some(amount_sent_msat.saturating_sub(amount_msat)),
+            // A returned XpayResponse means the payment completed; xpay surfaces
+            // failures as a gRPC error. No created_at is returned, so stamp now.
+            payment_time: Some(Utc::now()),
+            error: None,
             lightning: Some(LnPayment {
-                payment_hash: hex::encode(&val.payment_hash),
+                payment_hash,
                 payment_preimage: Some(hex::encode(val.payment_preimage)),
                 ..Default::default()
             }),
