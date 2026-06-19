@@ -55,10 +55,11 @@ pub mod cln {
 pub struct ClnClientConfig {
     pub endpoint: String,
     pub certs_dir: String,
-    pub maxfeepercent: Option<f64>,
     #[serde(deserialize_with = "deserialize_duration")]
     pub payment_timeout: Duration,
-    pub payment_exemptfee: Option<u64>,
+    /// Absolute max routing fee per payment, in msat. When unset, `xpay` applies
+    /// its own default of `max(1%, 5000 msat)`.
+    pub maxfee: Option<u64>,
 }
 
 const DEFAULT_CLIENT_CERT_FILENAME: &str = "client.pem";
@@ -67,9 +68,8 @@ const DEFAULT_CA_CRT_FILENAME: &str = "ca.pem";
 
 pub struct ClnGrpcClient {
     client: NodeClient<Channel>,
-    maxfeepercent: Option<f64>,
+    maxfee: Option<u64>,
     retry_for: Option<u32>,
-    payment_exemptfee: Option<Amount>,
     network: BtcNetwork,
 }
 
@@ -79,9 +79,8 @@ impl ClnGrpcClient {
 
         let mut cln_client = Self {
             client: client.clone(),
-            maxfeepercent: config.maxfeepercent,
+            maxfee: config.maxfee,
             retry_for: Some(config.payment_timeout.as_secs() as u32),
-            payment_exemptfee: config.payment_exemptfee.map(|fee| Amount { msat: fee }),
             network: BtcNetwork::default(),
         };
 
@@ -201,26 +200,11 @@ impl LnClient for ClnGrpcClient {
     async fn pay(&self, bolt11: String, amount_msat: Option<u64>, label: String) -> Result<Payment, LightningError> {
         let mut client = self.client.clone();
 
-        // `xpay` takes an absolute `maxfee` rather than `pay`'s deprecated
-        // `maxfeepercent`/`exemptfee`. Derive it from the configured percentage
-        // and the payment amount (explicit override or the invoice's amount).
-        let amount = amount_msat.or_else(|| {
-            Bolt11Invoice::from_str(&bolt11)
-                .ok()
-                .and_then(|inv| inv.amount_milli_satoshis())
-        });
-        let maxfee = self.maxfeepercent.zip(amount).map(|(pct, amt)| {
-            let exempt = self.payment_exemptfee.map(|a| a.msat).unwrap_or(0);
-            cln::Amount {
-                msat: ((amt as f64 * pct / 100.0) as u64).max(exempt),
-            }
-        });
-
         let response = client
             .xpay(XpayRequest {
                 invstring: bolt11,
                 amount_msat: amount_msat.map(|msat| cln::Amount { msat }),
-                maxfee,
+                maxfee: self.maxfee.map(|msat| cln::Amount { msat }),
                 retry_for: self.retry_for,
                 label: Some(label),
                 ..Default::default()

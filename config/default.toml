@@ -17,9 +17,8 @@ request_timeout = "60s"
 [cln_grpc_config]
 endpoint = "https://localhost:11002"
 certs_dir = "certs/lightningd"
-maxfeepercent = 0.5
 payment_timeout = "60s"
-payment_exemptfee = 5000
+# maxfee = 50000 # Optional absolute routing fee cap in msat. Unset: xpay uses max(1%, 5000 msat).
 
 [cln_rest_config]
 endpoint = "http://localhost:3010"
@@ -30,9 +29,8 @@ timeout = "90s"
 connection_verbose = true
 accept_invalid_certs = false
 accept_invalid_hostnames = false
-maxfeepercent = 0.5
 payment_timeout = "60s"
-payment_exemptfee = 5000
+# maxfee = 50000 # Optional absolute routing fee cap in msat. Unset: xpay uses max(1%, 5000 msat).
 ws_min_reconnect_delay = "1s"
 ws_max_reconnect_delay = "30s"
 
