@@ -48,10 +48,7 @@ release notes when a tag is published.
 - Aligned the dashboard with the current backend API and regenerated its typed
   client; added a `make openapi` workflow to keep the spec and client in sync
   ([#221]).
-
-### Removed
-
-- Removed Breez Liquid/Spark support for now, keeping the current release focused
+- Dropped Breez Liquid/Spark support for now, keeping the current release focused
   on self-hosted CLN and LND providers ([#224]).
 
 ### Fixed
