@@ -88,3 +88,30 @@ impl From<ListfundsOutputsStatus> for BtcOutputStatus {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::infra::lightning::cln::cln::Amount;
+
+    /// `amount_msat` must be the delivered amount and `fee_msat` the routing fee, so
+    /// the settlement debit (`amount_msat + fee_msat`) equals `amount_sent_msat` once.
+    /// Mirrors the REST converter test; together they pin the semantics the single-hop
+    /// integration topology (zero routing fee) cannot exercise.
+    #[test]
+    fn xpay_response_separates_delivered_amount_from_routing_fee() {
+        let resp = XpayResponse {
+            payment_preimage: vec![1u8; 32],
+            failed_parts: 0,
+            successful_parts: 1,
+            amount_msat: Some(Amount { msat: 100_000 }), // delivered to the recipient
+            amount_sent_msat: Some(Amount { msat: 100_500 }), // delivered + 500 msat fee
+        };
+
+        let payment: Payment = resp.into();
+
+        assert_eq!(payment.amount_msat, 100_000);
+        assert_eq!(payment.fee_msat, Some(500));
+        assert_eq!(payment.amount_msat + payment.fee_msat.unwrap(), 100_500);
+    }
+}

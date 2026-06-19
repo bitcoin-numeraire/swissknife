@@ -248,7 +248,11 @@ impl From<XpayResponse> for Payment {
 
         Payment {
             ledger: Ledger::Lightning,
-            amount_msat: val.amount_sent_msat,
+            // `amount_msat` is the amount delivered to the recipient; `amount_sent_msat`
+            // includes the routing fee. Settlement debits `amount_msat + fee_msat`, so
+            // storing the delivered amount (not the fee-inclusive total) avoids charging
+            // the fee twice. Matches the gRPC converter.
+            amount_msat: val.amount_msat,
             fee_msat: Some(val.amount_sent_msat.saturating_sub(val.amount_msat)),
             // A returned XpayResponse means the payment completed; xpay surfaces
             // failures as an error response. No created_at is returned, so stamp now.
@@ -292,4 +296,32 @@ impl From<ListInvoicesInvoice> for Invoice {
 #[derive(Debug, Deserialize)]
 pub struct ErrorResponse {
     pub message: String,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Guards against debiting the routing fee twice. The settlement path debits
+    /// `amount_msat + fee_msat`, so `amount_msat` must be the delivered amount, not
+    /// the fee-inclusive `amount_sent_msat`. The integration suite cannot catch this
+    /// because its single-hop regtest topology always has a zero routing fee.
+    #[test]
+    fn xpay_response_separates_delivered_amount_from_routing_fee() {
+        let resp = XpayResponse {
+            payment_preimage: "01".repeat(32),
+            amount_msat: 100_000,      // delivered to the recipient
+            amount_sent_msat: 100_500, // delivered + 500 msat routing fee
+        };
+
+        let payment: Payment = resp.into();
+
+        assert_eq!(payment.amount_msat, 100_000);
+        assert_eq!(payment.fee_msat, Some(500));
+        assert_eq!(
+            payment.amount_msat + payment.fee_msat.unwrap(),
+            100_500,
+            "wallet debit (amount + fee) must equal amount_sent_msat, not amount + 2*fee"
+        );
+    }
 }
