@@ -3,24 +3,29 @@ import type { Invoice } from 'src/lib/swissknife';
 import { QRCode } from 'react-qrcode-logo';
 
 import Box from '@mui/material/Box';
-import { Grid } from '@mui/material';
 import Card from '@mui/material/Card';
+import Grid from '@mui/material/Grid';
 import Stack from '@mui/material/Stack';
-import Divider from '@mui/material/Divider';
+import Alert from '@mui/material/Alert';
 import Typography from '@mui/material/Typography';
-
-import { fDate, fTime } from 'src/utils/format-time';
 
 import { useTranslate } from 'src/locales';
 
-import { Label } from 'src/components/label';
+import { Iconify } from 'src/components/iconify';
+import { CopyButton } from 'src/components/copy';
 import { SatsWithIcon } from 'src/components/bitcoin';
-
-import { useAuthContext } from 'src/auth/hooks';
 
 import { TransactionType } from 'src/types/transaction';
 
 import { TransactionToolbar } from './transaction-toolbar';
+import {
+  DetailRow,
+  DetailCard,
+  MetricTile,
+  StatusBadges,
+  formatDateTime,
+  TransactionTimeline,
+} from './transaction-detail-common';
 
 // ----------------------------------------------------------------------
 
@@ -31,140 +36,9 @@ type Props = {
 
 export function InvoiceDetails({ invoice, isAdmin }: Props) {
   const { t } = useTranslate();
-  const { user } = useAuthContext();
-
-  const renderList = (
-    <Grid container spacing={3} sx={{ my: 5 }}>
-      <Grid size={{ xs: 12, md: 4, sm: 6 }}>
-        <Title>{t('invoice_details.amount_requested')}</Title>
-        <SatsWithIcon amountMSats={invoice.amount_msat || 0} color="text.secondary" />
-      </Grid>
-      <Grid size={{ xs: 12, md: 4, sm: 6 }}>
-        <Title>{t('invoice_details.amount_received')}</Title>
-        {invoice.status === 'Settled' && (
-          <SatsWithIcon
-            amountMSats={(invoice.amount_received_msat || 0) - (invoice.fee_msat || 0)}
-            color="text.secondary"
-          />
-        )}
-      </Grid>
-      <Grid size={{ xs: 12, md: 4, sm: 6 }}>
-        <Title>{t('invoice_details.fees')}</Title>
-        <SatsWithIcon amountMSats={invoice.fee_msat || 0} color="text.secondary" />
-      </Grid>
-
-      <Grid size={{ xs: 12 }}>
-        <Divider sx={{ borderStyle: 'dashed' }} />
-      </Grid>
-
-      <Grid size={{ xs: 12 }}>
-        <Title>{t('transaction_details.description')}</Title>
-        <Typography color="textSecondary">{invoice.description}</Typography>
-      </Grid>
-
-      <Grid size={{ xs: 12 }}>
-        <Divider sx={{ borderStyle: 'dashed' }} />
-      </Grid>
-
-      <Grid size={{ xs: 12, md: 4, sm: 6 }}>
-        <Title>{t('transaction_details.creation_date')}</Title>
-        <Typography color="textSecondary">
-          {fDate(invoice.timestamp)} {fTime(invoice.timestamp)}
-        </Typography>
-      </Grid>
-      <Grid size={{ xs: 12, md: 4, sm: 6 }}>
-        <Title>{t('invoice_details.expiration_date')}</Title>
-        <Typography color="textSecondary">
-          {fDate(invoice.ln_invoice?.expires_at)} {fTime(invoice.ln_invoice?.expires_at)}
-        </Typography>
-      </Grid>
-      <Grid size={{ xs: 12, md: 4, sm: 6 }}>
-        <Title>{t('transaction_details.settlement_date')}</Title>
-        <Typography color="textSecondary">
-          {fDate(invoice.payment_time)} {fTime(invoice.payment_time)}
-        </Typography>
-      </Grid>
-
-      <Grid size={{ xs: 12 }}>
-        <Divider sx={{ borderStyle: 'dashed' }} />
-      </Grid>
-
-      <Grid size={{ xs: 12, md: 4, sm: 6 }}>
-        <Title>{t('transaction_details.ledger')}</Title>
-        <Typography color="textSecondary">{invoice.ledger}</Typography>
-      </Grid>
-      <Grid size={{ xs: 12, md: 4, sm: 6 }}>
-        <Title>{t('transaction_details.currency')}</Title>
-        <Typography color="textSecondary">{invoice.currency}</Typography>
-      </Grid>
-      {invoice.ln_invoice && (
-        <Grid size={{ xs: 12, md: 4, sm: 6 }}>
-          <Title>{t('invoice_details.min_final_cltv_delta')}</Title>
-          <Typography color="textSecondary">
-            {invoice.ln_invoice?.min_final_cltv_expiry_delta}
-          </Typography>
-        </Grid>
-      )}
-
-      {invoice.ln_invoice && (
-        <>
-          <Grid size={{ xs: 12 }}>
-            <Divider sx={{ borderStyle: 'dashed' }} />
-          </Grid>
-
-          <Grid size={{ xs: 12 }}>
-            <Title>Bolt11</Title>
-            <Typography color="textSecondary" sx={{ wordBreak: 'break-all' }}>
-              {invoice.ln_invoice?.bolt11}
-            </Typography>
-          </Grid>
-        </>
-      )}
-
-      {invoice.ln_invoice && (
-        <>
-          <Grid size={{ xs: 12 }}>
-            <Divider sx={{ borderStyle: 'dashed' }} />
-          </Grid>
-
-          <Grid size={{ xs: 12 }}>
-            <Title>{t('transaction_details.payment_hash')}</Title>
-            <Typography color="textSecondary" sx={{ wordBreak: 'break-all' }}>
-              {invoice.ln_invoice?.payment_hash}
-            </Typography>
-          </Grid>
-        </>
-      )}
-
-      {invoice.ln_invoice && (
-        <>
-          <Grid size={{ xs: 12 }}>
-            <Divider sx={{ borderStyle: 'dashed' }} />
-          </Grid>
-
-          <Grid size={{ xs: 12 }}>
-            <Title>{t('invoice_details.payment_secret')}</Title>
-            <Typography color="textSecondary" sx={{ wordBreak: 'break-all' }}>
-              {invoice.ln_invoice?.payment_secret}
-            </Typography>
-          </Grid>
-        </>
-      )}
-
-      {invoice.ln_invoice && (
-        <>
-          <Grid size={{ xs: 12 }}>
-            <Divider sx={{ my: 1, borderStyle: 'dashed' }} />
-          </Grid>
-
-          <Grid size={{ xs: 12 }}>
-            <Title>{t('invoice_details.payee_pubkey')}</Title>
-            <Typography color="textSecondary">{invoice.ln_invoice?.payee_pubkey}</Typography>
-          </Grid>
-        </>
-      )}
-    </Grid>
-  );
+  const bolt11 = invoice.ln_invoice?.bolt11;
+  const receivedAmount =
+    invoice.status === 'Settled' ? (invoice.amount_received_msat || 0) - (invoice.fee_msat || 0) : 0;
 
   return (
     <>
@@ -173,105 +47,212 @@ export function InvoiceDetails({ invoice, isAdmin }: Props) {
         transactionType={TransactionType.INVOICE}
         isAdmin={isAdmin}
       />
-      <Card
-        sx={{ pt: 5, px: { xs: 2, sm: 5, md: 8 }, maxWidth: { xs: '100%', md: '80%' }, mx: 'auto' }}
-      >
-        <Box
-          sx={{
-            rowGap: 5,
-            display: 'grid',
-            alignItems: 'center',
-            gridTemplateColumns: {
-              xs: 'repeat(1, 1fr)',
-              sm: 'repeat(2, 1fr)',
-            },
-          }}
-        >
-          <Typography variant="subtitle2">{invoice.id.toUpperCase()}</Typography>
 
-          <Stack spacing={1} sx={{ alignItems: { xs: 'flex-start', md: 'flex-end' } }}>
-            <Box sx={{ display: 'flex', alignItems: 'center' }}>
-              <Label
-                variant="soft"
-                color={
-                  (invoice.status === 'Settled' && 'success') ||
-                  (invoice.status === 'Pending' && 'warning') ||
-                  (invoice.status === 'Expired' && 'error') ||
-                  'default'
-                }
-                sx={{ mr: 1 }}
-              >
-                {invoice.status}
-              </Label>
+      <Stack spacing={3}>
+        <Card sx={{ p: { xs: 3, md: 4 }, borderRadius: 1 }}>
+          <Grid container spacing={4} sx={{ alignItems: 'stretch' }}>
+            <Grid size={{ xs: 12, md: 7 }}>
+              <Stack spacing={3} sx={{ height: 1 }}>
+                <Stack spacing={1.25}>
+                  <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+                    <Box
+                      sx={{
+                        width: 52,
+                        height: 52,
+                        display: 'grid',
+                        borderRadius: 1,
+                        placeItems: 'center',
+                        color: 'success.main',
+                        bgcolor: 'success.lighter',
+                      }}
+                    >
+                      <Iconify icon="eva:diagonal-arrow-left-down-fill" width={30} />
+                    </Box>
+                    <StatusBadges status={invoice.status} ledger={invoice.ledger} />
+                  </Stack>
 
-              <Label
-                variant="soft"
-                color={
-                  (invoice.ledger === 'Lightning' && 'secondary') ||
-                  (invoice.ledger === 'Internal' && 'primary') ||
-                  'default'
-                }
-              >
-                {invoice.ledger}
-              </Label>
-            </Box>
-          </Stack>
+                  <Stack spacing={0.5}>
+                    <Typography variant="overline" color="text.secondary">
+                      {t('invoice_details.invoice_from')}
+                    </Typography>
+                    <Typography variant="h4">
+                      {invoice.description || t('recent_transactions.empty_description')}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      {isAdmin
+                        ? t('transaction_details.wallet_account')
+                        : t('transaction_details.incoming_invoice')}
+                    </Typography>
+                  </Stack>
+                </Stack>
 
-          <Stack sx={{ typography: 'body2' }}>
-            <Typography sx={{ fontWeight: 'bold', mb: 1 }}>
-              {t('invoice_details.invoice_from')}
-            </Typography>
-            {isAdmin ? (
-              invoice.wallet_id
-            ) : (
-              <>
-                {user?.displayName}
-                <br />
-                {user?.email}
-                <br />
-              </>
-            )}
-          </Stack>
+                <Stack spacing={0.5}>
+                  <Typography variant="caption" color="text.secondary">
+                    {t('invoice_details.amount_requested')}
+                  </Typography>
+                  <SatsWithIcon amountMSats={invoice.amount_msat || 0} variant="h3" />
+                </Stack>
 
-          {invoice.ln_invoice && (
-            <Stack sx={{ typography: 'body2' }}>
-              <Box
+                <Grid container spacing={2}>
+                  <Grid size={{ xs: 12, sm: 4 }}>
+                    <MetricTile
+                      title={t('invoice_details.amount_received')}
+                      amountMSats={receivedAmount}
+                      helper={invoice.status === 'Settled' ? t('transaction_details.settled') : t('transaction_details.pending')}
+                    />
+                  </Grid>
+                  <Grid size={{ xs: 12, sm: 4 }}>
+                    <MetricTile title={t('invoice_details.fees')} amountMSats={invoice.fee_msat || 0} />
+                  </Grid>
+                  <Grid size={{ xs: 12, sm: 4 }}>
+                    <MetricTile
+                      title={t('transaction_details.total')}
+                      amountMSats={(invoice.amount_msat || 0) + (invoice.fee_msat || 0)}
+                    />
+                  </Grid>
+                </Grid>
+              </Stack>
+            </Grid>
+
+            <Grid size={{ xs: 12, md: 5 }}>
+              <Card
+                variant="outlined"
                 sx={{
-                  width: '100%',
-                  maxWidth: 300,
-                  height: 'auto',
-                  '& > canvas': {
-                    width: '100% !important',
-                    height: 'auto !important',
-                  },
+                  p: 2,
+                  height: 1,
+                  borderRadius: 1,
+                  bgcolor: 'background.neutral',
                 }}
               >
-                <QRCode
-                  value={invoice.ln_invoice.bolt11}
-                  size={300} // Base size, will be overridden by CSS
-                  logoImage="/logo/logo_square_negative.svg"
-                  removeQrCodeBehindLogo
-                  logoPaddingStyle="circle"
-                  eyeRadius={5}
-                  logoPadding={3}
-                />
-              </Box>
-            </Stack>
-          )}
-        </Box>
+                {bolt11 ? (
+                  <Stack spacing={2}>
+                    <Box
+                      sx={{
+                        p: 2,
+                        borderRadius: 1,
+                        bgcolor: 'common.white',
+                        '& canvas': { width: '100% !important', height: 'auto !important' },
+                      }}
+                    >
+                      <QRCode
+                        value={bolt11}
+                        size={320}
+                        logoImage="/logo/logo_square_negative.svg"
+                        removeQrCodeBehindLogo
+                        logoPaddingStyle="circle"
+                        eyeRadius={5}
+                        logoPadding={3}
+                      />
+                    </Box>
 
-        {renderList}
-      </Card>
+                    <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
+                      <Typography variant="caption" color="text.secondary" noWrap sx={{ flex: 1 }}>
+                        {bolt11}
+                      </Typography>
+                      <CopyButton value={bolt11} title={t('invoice_details.copy_bolt11')} />
+                    </Stack>
+                  </Stack>
+                ) : (
+                  <Alert severity="info" variant="outlined">
+                    {t('invoice_details.no_lightning_payload')}
+                  </Alert>
+                )}
+              </Card>
+            </Grid>
+          </Grid>
+        </Card>
+
+        <Grid container spacing={3}>
+          <Grid size={{ xs: 12, md: 5 }}>
+            <DetailCard title={t('transaction_details.timeline')} icon="solar:sort-by-time-bold-duotone">
+              <TransactionTimeline
+                items={[
+                  {
+                    label: t('transaction_details.creation_date'),
+                    value: invoice.timestamp || invoice.created_at,
+                    state: 'done',
+                  },
+                  {
+                    label: t('invoice_details.expiration_date'),
+                    value: invoice.ln_invoice?.expires_at,
+                    state: invoice.status === 'Expired' ? 'error' : 'waiting',
+                  },
+                  {
+                    label: t('transaction_details.settlement_date'),
+                    value: invoice.payment_time,
+                    state: invoice.status === 'Settled' ? 'done' : 'waiting',
+                  },
+                ]}
+              />
+            </DetailCard>
+          </Grid>
+
+          <Grid size={{ xs: 12, md: 7 }}>
+            <DetailCard title={t('transaction_details.payment_context')} icon="solar:document-text-bold-duotone">
+              <DetailRow label={t('transaction_details.description')} value={invoice.description} />
+              <DetailRow label={t('transaction_details.ledger')} value={invoice.ledger} />
+              <DetailRow label={t('transaction_details.currency')} value={invoice.currency} />
+              <DetailRow
+                label={t('transaction_details.created')}
+                value={formatDateTime(invoice.timestamp || invoice.created_at)}
+              />
+              <DetailRow
+                label={t('transaction_details.settled_at')}
+                value={formatDateTime(invoice.payment_time)}
+              />
+            </DetailCard>
+          </Grid>
+
+          <Grid size={{ xs: 12 }}>
+            <DetailCard title={t('transaction_details.technical_details')} icon="solar:code-square-bold-duotone">
+              <DetailRow
+                label={t('transaction_details.transaction_id')}
+                value={invoice.id}
+                copyValue={invoice.id}
+                mono
+              />
+              <DetailRow
+                label={t('transaction_details.wallet_id')}
+                value={invoice.wallet_id}
+                copyValue={invoice.wallet_id}
+                mono
+              />
+              {invoice.ln_invoice && (
+                <>
+                  <DetailRow
+                    label={t('invoice_details.bolt11')}
+                    value={invoice.ln_invoice.bolt11}
+                    copyValue={invoice.ln_invoice.bolt11}
+                    mono
+                  />
+                  <DetailRow
+                    label={t('transaction_details.payment_hash')}
+                    value={invoice.ln_invoice.payment_hash}
+                    copyValue={invoice.ln_invoice.payment_hash}
+                    mono
+                  />
+                  <DetailRow
+                    label={t('invoice_details.payment_secret')}
+                    value={invoice.ln_invoice.payment_secret}
+                    copyValue={invoice.ln_invoice.payment_secret}
+                    mono
+                  />
+                  <DetailRow
+                    label={t('invoice_details.payee_pubkey')}
+                    value={invoice.ln_invoice.payee_pubkey}
+                    copyValue={invoice.ln_invoice.payee_pubkey}
+                    mono
+                  />
+                  <DetailRow
+                    label={t('invoice_details.min_final_cltv_delta')}
+                    value={invoice.ln_invoice.min_final_cltv_expiry_delta}
+                  />
+                </>
+              )}
+            </DetailCard>
+          </Grid>
+        </Grid>
+      </Stack>
     </>
   );
 }
-
-type TitleProps = {
-  children: React.ReactNode;
-};
-
-const Title = ({ children }: TitleProps) => (
-  <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 'bold' }}>
-    {children}
-  </Typography>
-);

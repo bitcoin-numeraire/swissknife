@@ -3,7 +3,6 @@
 import { paths } from 'src/routes/paths';
 
 import { shouldFail } from 'src/utils/errors';
-import { truncateText } from 'src/utils/format-string';
 
 import { useTranslate } from 'src/locales';
 import { DashboardContent } from 'src/layouts/dashboard';
@@ -38,7 +37,7 @@ export function PaymentDetailsView({ id }: Props) {
       ) : (
         <>
           <CustomBreadcrumbs
-            heading={`${t('payment')}: ${truncateText(payment!.id.toUpperCase(), 8)}`}
+            heading={payment!.description || t('payment_details.detail_heading')}
             links={[
               {
                 name: t('wallet'),
@@ -48,7 +47,7 @@ export function PaymentDetailsView({ id }: Props) {
                 name: t('payments'),
                 href: paths.wallet.payments,
               },
-              { name: payment!.id.toUpperCase() },
+              { name: t('payment_details.detail_heading') },
             ]}
             sx={{ mb: { xs: 3, md: 5 } }}
           />

@@ -3,7 +3,6 @@
 import { paths } from 'src/routes/paths';
 
 import { shouldFail } from 'src/utils/errors';
-import { truncateText } from 'src/utils/format-string';
 
 import { useTranslate } from 'src/locales';
 import { Permission } from 'src/lib/swissknife';
@@ -42,7 +41,7 @@ export function AdminInvoiceDetailsView({ id }: Props) {
         ) : (
           <>
             <CustomBreadcrumbs
-              heading={`${t('invoice')}: ${truncateText(invoice!.id.toUpperCase(), 8)}`}
+              heading={invoice!.description || t('invoice_details.detail_heading')}
               links={[
                 {
                   name: t('admin'),
@@ -51,7 +50,7 @@ export function AdminInvoiceDetailsView({ id }: Props) {
                   name: t('invoices'),
                   href: paths.admin.invoices,
                 },
-                { name: invoice!.id.toUpperCase() },
+                { name: t('invoice_details.detail_heading') },
               ]}
               sx={{ mb: { xs: 3, md: 5 } }}
             />
