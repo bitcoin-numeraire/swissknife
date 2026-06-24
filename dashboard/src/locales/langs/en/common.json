@@ -276,6 +276,19 @@
     "delete_success": "Wallet deleted successfully",
     "delete_multiple_success": "{{count}} wallets deleted successfully"
   },
+  "accounts_view": {
+    "admin_tools": "Admin tools",
+    "hero_title": "Account directory",
+    "hero_subheader": "A read-only operating map of wallet accounts, public receive identities, and activity mix. Use Wallet admin for creation, deletion, and send-on-behalf workflows.",
+    "identity_ready": "Identity ready",
+    "empty_title": "No accounts yet",
+    "empty_description": "Accounts will appear here after a wallet is registered.",
+    "created_on": "Created {{date}}",
+    "ready": "Ready",
+    "paused": "Paused",
+    "missing": "No identity",
+    "manage_in_admin": "Manage in admin"
+  },
   "wallet_table_row": {
     "new_payment": "New Payment",
     "new_invoice": "New Invoice",
