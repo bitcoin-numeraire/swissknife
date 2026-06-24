@@ -9,8 +9,8 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import Box from '@mui/material/Box';
 import Link from '@mui/material/Link';
 import Alert from '@mui/material/Alert';
+import Button from '@mui/material/Button';
 import IconButton from '@mui/material/IconButton';
-import LoadingButton from '@mui/lab/LoadingButton';
 import InputAdornment from '@mui/material/InputAdornment';
 
 import { paths } from 'src/routes/paths';
@@ -123,7 +123,7 @@ export function SupabaseSignUpView() {
         }}
       />
 
-      <LoadingButton
+      <Button
         fullWidth
         color="inherit"
         size="large"
@@ -133,7 +133,7 @@ export function SupabaseSignUpView() {
         loadingIndicator="Create account..."
       >
         Create account
-      </LoadingButton>
+      </Button>
     </Box>
   );
 

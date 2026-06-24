@@ -12,7 +12,7 @@ import Tabs from '@mui/material/Tabs';
 import Card from '@mui/material/Card';
 import Table from '@mui/material/Table';
 import Stack from '@mui/material/Stack';
-import { LoadingButton } from '@mui/lab';
+import Button from '@mui/material/Button';
 import Divider from '@mui/material/Divider';
 import Tooltip from '@mui/material/Tooltip';
 import TableBody from '@mui/material/TableBody';
@@ -325,7 +325,7 @@ export function LnAddressList({ data: lnAddresses, tableHead, tabs }: Props) {
         title={t('confirm_delete_title')}
         content={<>{t('confirm_delete_content', { count: table.selected.length })}</>}
         action={
-          <LoadingButton
+          <Button
             variant="contained"
             color="error"
             onClick={async () => {
@@ -337,7 +337,7 @@ export function LnAddressList({ data: lnAddresses, tableHead, tabs }: Props) {
             loading={isDeleting.value}
           >
             {t('delete')}
-          </LoadingButton>
+          </Button>
         }
       />
     </>

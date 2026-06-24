@@ -4,7 +4,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 
 import { Stack } from '@mui/material';
-import { LoadingButton } from '@mui/lab';
+import Button from '@mui/material/Button';
 
 import { handleActionError } from 'src/utils/errors';
 
@@ -56,7 +56,7 @@ export function RegisterWalletForm({ onSuccess }: NewWalletFormProps) {
       <Stack spacing={3}>
         <RHFTextField variant="outlined" name="user_id" label="User" />
 
-        <LoadingButton
+        <Button
           type="submit"
           variant="contained"
           color="inherit"
@@ -65,7 +65,7 @@ export function RegisterWalletForm({ onSuccess }: NewWalletFormProps) {
           disabled={!user || isSubmitting}
         >
           {t('register')}
-        </LoadingButton>
+        </Button>
       </Stack>
     </Form>
   );
