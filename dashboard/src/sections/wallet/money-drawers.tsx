@@ -424,25 +424,34 @@ export function ReceiveMoneyDrawer({
     try {
       setIsSubmitting(true);
       setAddressError(undefined);
+      setInvoice(undefined);
+      setBtcAddress(undefined);
 
-      const invoiceResult = await newWalletInvoice({
-        body: {
-          description,
-          amount_msat: amount * 1000,
-        },
-      });
+      const shouldGenerateInvoice = rail !== 'onchain';
+      const shouldGenerateAddress = rail !== 'lightning';
 
-      setInvoice(invoiceResult.data);
+      if (shouldGenerateInvoice) {
+        const invoiceResult = await newWalletInvoice({
+          body: {
+            description,
+            amount_msat: amount * 1000,
+          },
+        });
 
-      const addressResult = await newWalletBtcAddress({
-        body: { type: BtcAddressType.P2TR },
-      }).catch((error) => {
-        setAddressError(error?.message || t('receive_money.address_unavailable'));
-        return null;
-      });
+        setInvoice(invoiceResult.data);
+      }
 
-      if (addressResult?.data) {
-        setBtcAddress(addressResult.data);
+      if (shouldGenerateAddress) {
+        const addressResult = await newWalletBtcAddress({
+          body: { type: BtcAddressType.P2TR },
+        }).catch((error) => {
+          setAddressError(error?.message || t('receive_money.address_unavailable'));
+          return null;
+        });
+
+        if (addressResult?.data) {
+          setBtcAddress(addressResult.data);
+        }
       }
 
       onSuccess?.();

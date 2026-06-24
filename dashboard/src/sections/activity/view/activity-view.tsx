@@ -14,6 +14,7 @@ import Drawer from '@mui/material/Drawer';
 import Divider from '@mui/material/Divider';
 import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
+import useMediaQuery from '@mui/material/useMediaQuery';
 
 import { shouldFail } from 'src/utils/errors';
 import { fDateTime } from 'src/utils/format-time';
@@ -79,6 +80,7 @@ function technicalPayload(tx: ITransaction) {
 
 export function ActivityView() {
   const { t } = useTranslate();
+  const smDown = useMediaQuery((theme) => theme.breakpoints.down('sm'));
   const [lens, setLens] = useState<ActivityLens>('all');
   const [selected, setSelected] = useState<ITransaction>();
 
@@ -105,14 +107,35 @@ export function ActivityView() {
     [lens, transactions]
   );
 
-  const tabs: { value: ActivityLens; label: string; count: number }[] = [
-    { value: 'all', label: t('activity_view.all'), count: transactions.length },
-    { value: 'in', label: t('activity_view.in'), count: transactions.filter((tx) => txDirection(tx) === 'in').length },
-    { value: 'out', label: t('activity_view.out'), count: transactions.filter((tx) => txDirection(tx) === 'out').length },
-    { value: 'pending', label: t('activity_view.pending'), count: transactions.filter((tx) => tx.status === 'Pending').length },
+  const tabs: { value: ActivityLens; label: string; shortLabel: string; count: number }[] = [
+    {
+      value: 'all',
+      label: t('activity_view.all'),
+      shortLabel: t('activity_view.all'),
+      count: transactions.length,
+    },
+    {
+      value: 'in',
+      label: t('activity_view.in'),
+      shortLabel: t('activity_view.in'),
+      count: transactions.filter((tx) => txDirection(tx) === 'in').length,
+    },
+    {
+      value: 'out',
+      label: t('activity_view.out'),
+      shortLabel: t('activity_view.out'),
+      count: transactions.filter((tx) => txDirection(tx) === 'out').length,
+    },
+    {
+      value: 'pending',
+      label: t('activity_view.pending'),
+      shortLabel: t('activity_view.pending_short'),
+      count: transactions.filter((tx) => tx.status === 'Pending').length,
+    },
     {
       value: 'failed',
       label: t('activity_view.needs_action'),
+      shortLabel: t('activity_view.needs_action_short'),
       count: transactions.filter((tx) => tx.status === 'Failed' || tx.status === 'Expired').length,
     },
   ];
@@ -133,16 +156,17 @@ export function ActivityView() {
             <Tabs
               value={lens}
               onChange={(_, value) => setLens(value)}
-              variant="scrollable"
+              variant={smDown ? 'fullWidth' : 'scrollable'}
               sx={{ px: 2, borderBottom: (theme) => `1px solid ${theme.vars.palette.divider}` }}
             >
               {tabs.map((tab) => (
                 <Tab
                   key={tab.value}
                   value={tab.value}
-                  label={tab.label}
+                  label={smDown ? tab.shortLabel : tab.label}
                   iconPosition="end"
                   icon={<Label color={tab.count ? 'info' : 'default'}>{tab.count}</Label>}
+                  sx={{ minWidth: 0, px: { xs: 0.75, sm: 2 } }}
                 />
               ))}
             </Tabs>
