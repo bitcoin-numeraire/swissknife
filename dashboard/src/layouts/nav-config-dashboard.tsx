@@ -41,6 +41,7 @@ const ICONS = {
   observe: iconify('solar:pulse-2-bold-duotone'),
   policy: iconify('solar:shield-keyhole-bold-duotone'),
   webhooks: iconify('solar:programming-bold-duotone'),
+  adminWallets: iconify('solar:safe-square-bold-duotone'),
 };
 
 // ----------------------------------------------------------------------
@@ -108,11 +109,32 @@ export const navData: Array<NavGroupWithPermissions> = [
         modes: ['server', 'self-hosted', 'merchant'],
       },
       {
-        title: 'roles_access',
+        title: 'wallet_admin',
         path: paths.admin.wallets,
-        icon: ICONS.policy,
+        icon: ICONS.adminWallets,
         permissions: [Permission.READ_WALLET],
-        modes: ['server', 'merchant'],
+        modes: ['server', 'self-hosted', 'merchant'],
+      },
+      {
+        title: 'admin_invoices',
+        path: paths.admin.invoices,
+        icon: ICONS.invoice,
+        permissions: [Permission.READ_TRANSACTION],
+        modes: ['server', 'self-hosted', 'merchant'],
+      },
+      {
+        title: 'admin_payments',
+        path: paths.admin.payments,
+        icon: ICONS.payment,
+        permissions: [Permission.READ_TRANSACTION],
+        modes: ['server', 'self-hosted', 'merchant'],
+      },
+      {
+        title: 'admin_lightning_addresses',
+        path: paths.admin.lnAddresses,
+        icon: ICONS.lightning,
+        permissions: [Permission.READ_LN_ADDRESS],
+        modes: ['server', 'self-hosted', 'merchant'],
       },
     ],
   },
@@ -125,13 +147,6 @@ export const navData: Array<NavGroupWithPermissions> = [
         icon: ICONS.observe,
         permissions: [Permission.READ_LN_NODE],
         modes: ['server', 'self-hosted', 'desktop'],
-      },
-      {
-        title: 'volume_reconciliation',
-        path: paths.admin.node,
-        icon: ICONS.node,
-        permissions: [Permission.READ_TRANSACTION],
-        modes: ['server', 'merchant'],
       },
     ],
   },

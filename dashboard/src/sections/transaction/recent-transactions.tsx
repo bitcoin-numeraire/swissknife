@@ -4,7 +4,6 @@ import type { Invoice } from 'src/lib/swissknife';
 import type { ITransaction } from 'src/types/transaction';
 
 import { mutate } from 'swr';
-import Link from 'next/link';
 import { usePopover } from 'minimal-shared/hooks';
 
 import Box from '@mui/material/Box';
@@ -24,9 +23,9 @@ import TableContainer from '@mui/material/TableContainer';
 import { Stack, Tooltip, MenuList, Typography, Link as MuiLink } from '@mui/material';
 
 import { paths } from 'src/routes/paths';
+import { useRouter } from 'src/routes/hooks';
 
 import { fFromNow } from 'src/utils/format-time';
-import { truncateText } from 'src/utils/format-string';
 
 import { useTranslate } from 'src/locales';
 import { endpointKeys } from 'src/actions/keys';
@@ -53,7 +52,7 @@ const tableLabels = (t: TFunction) => [
 
 const adminTableLabels = (t: TFunction) => [
   { id: 'description', label: t('transaction_list.description') },
-  { id: 'wallet_id', label: t('transaction_list.wallet') },
+  { id: 'wallet_id', label: t('recent_transactions.source') },
   { id: 'amount_msat', label: t('transaction_list.amount') },
   { id: 'status', label: t('transaction_list.status') },
   { id: '' },
@@ -129,9 +128,9 @@ type RecentTransactionsRowProps = {
 
 function RecentTransactionsRow({ row, isAdmin }: RecentTransactionsRowProps) {
   const { t } = useTranslate();
+  const router = useRouter();
   const {
     id,
-    wallet_id,
     amount_msat,
     transaction_type,
     status,
@@ -153,7 +152,7 @@ function RecentTransactionsRow({ row, isAdmin }: RecentTransactionsRowProps) {
 
   return (
     <>
-      <TableRow>
+      <TableRow hover onClick={() => router.push(rowHref())} sx={{ cursor: 'pointer' }}>
         <TableCell sx={{ display: 'flex', alignItems: 'center' }}>
           <Box sx={{ position: 'relative', mr: 2 }}>
             {transaction_type === TransactionType.PAYMENT ? (
@@ -212,7 +211,7 @@ function RecentTransactionsRow({ row, isAdmin }: RecentTransactionsRowProps) {
         {isAdmin && (
           <TableCell>
             <Typography variant="body2" noWrap>
-              {truncateText(wallet_id, 10)}
+              {t('recent_transactions.wallet_account')}
             </Typography>
           </TableCell>
         )}
@@ -233,7 +232,13 @@ function RecentTransactionsRow({ row, isAdmin }: RecentTransactionsRowProps) {
         </TableCell>
 
         <TableCell align="right" sx={{ pr: 1 }}>
-          <IconButton color={popover.open ? 'inherit' : 'default'} onClick={popover.onOpen}>
+          <IconButton
+            color={popover.open ? 'inherit' : 'default'}
+            onClick={(event) => {
+              event.stopPropagation();
+              popover.onOpen(event);
+            }}
+          >
             <Iconify icon="eva:more-vertical-fill" />
           </IconButton>
         </TableCell>
@@ -246,19 +251,22 @@ function RecentTransactionsRow({ row, isAdmin }: RecentTransactionsRowProps) {
         slotProps={{ arrow: { placement: 'right-top' } }}
       >
         <MenuList>
-          <Link href={rowHref()} passHref legacyBehavior>
-            <MenuItem>
-              <Iconify icon="eva:eye-fill" />
-              {t('details')}
-            </MenuItem>
-          </Link>
-        </MenuList>
+          <MenuItem
+            onClick={() => {
+              router.push(rowHref());
+              popover.onClose();
+            }}
+          >
+            <Iconify icon="eva:eye-fill" />
+            {t('details')}
+          </MenuItem>
 
-        {transaction_type === TransactionType.INVOICE &&
-          status === 'Pending' &&
-          (row as Invoice).ln_invoice && (
-            <CopyMenuItem value={(row as Invoice).ln_invoice!.bolt11} />
-          )}
+          {transaction_type === TransactionType.INVOICE &&
+            status === 'Pending' &&
+            (row as Invoice).ln_invoice && (
+              <CopyMenuItem value={(row as Invoice).ln_invoice!.bolt11} />
+            )}
+        </MenuList>
       </CustomPopover>
     </>
   );

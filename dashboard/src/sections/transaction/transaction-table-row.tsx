@@ -3,7 +3,6 @@ import type { Invoice, Payment } from 'src/lib/swissknife';
 
 import { useBoolean, usePopover } from 'minimal-shared/hooks';
 
-import Link from '@mui/material/Link';
 import Button from '@mui/material/Button';
 import MenuItem from '@mui/material/MenuItem';
 import TableRow from '@mui/material/TableRow';
@@ -16,8 +15,8 @@ import { Avatar, Divider, MenuList } from '@mui/material';
 
 import { useRouter } from 'src/routes/hooks';
 
-import { fDate, fTime } from 'src/utils/format-time';
 import { truncateText } from 'src/utils/format-string';
+import { fDate, fTime, fDateTime } from 'src/utils/format-time';
 
 import { useTranslate } from 'src/locales';
 
@@ -59,13 +58,24 @@ export function TransactionTableRow({
   const confirm = useBoolean();
   const isDeleting = useBoolean();
 
-  const avatarLetter = (text?: string | null) => (text || id).charAt(0).toUpperCase();
+  const avatarLetter = (text?: string | null) => (text || description || ledger).charAt(0).toUpperCase();
 
   return (
     <>
-      <TableRow hover selected={selected}>
+      <TableRow
+        hover
+        selected={selected}
+        onClick={() => router.push(href)}
+        sx={{ cursor: 'pointer' }}
+      >
         <TableCell padding="checkbox">
-          <Checkbox checked={selected} onClick={onSelectRow} />
+          <Checkbox
+            checked={selected}
+            onClick={(event) => {
+              event.stopPropagation();
+              onSelectRow();
+            }}
+          />
         </TableCell>
 
         <TableCell sx={{ display: 'flex', alignItems: 'center' }}>
@@ -83,14 +93,13 @@ export function TransactionTableRow({
               </Typography>
             }
             secondary={
-              <Link
+              <Typography
                 noWrap
                 variant="body2"
-                href={href}
-                sx={{ color: 'text.disabled', cursor: 'pointer' }}
+                sx={{ color: 'text.disabled' }}
               >
-                {truncateText(id, 15)}
-              </Link>
+                {fDateTime(created_at)} · {ledger}
+              </Typography>
             }
           />
         </TableCell>
@@ -183,7 +192,13 @@ export function TransactionTableRow({
         </TableCell>
 
         <TableCell align="right" sx={{ px: 1 }}>
-          <IconButton color={popover.open ? 'inherit' : 'default'} onClick={popover.onOpen}>
+          <IconButton
+            color={popover.open ? 'inherit' : 'default'}
+            onClick={(event) => {
+              event.stopPropagation();
+              popover.onOpen(event);
+            }}
+          >
             <Iconify icon="eva:more-vertical-fill" />
           </IconButton>
         </TableCell>

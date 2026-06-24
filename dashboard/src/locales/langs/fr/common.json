@@ -6,6 +6,10 @@
   "identity_hub": "Hub identité",
   "accounts": "Comptes",
   "accounts_directory": "Répertoire des comptes",
+  "wallet_admin": "Administration des portefeuilles",
+  "admin_invoices": "Factures admin",
+  "admin_payments": "Paiements admin",
+  "admin_lightning_addresses": "Adresses LN admin",
   "roles_access": "Rôles et accès",
   "observe": "Observer",
   "node_health": "Santé du nœud",
@@ -146,6 +150,8 @@
     "fiat_unavailable": "Les prix fiat sont indisponibles, mais les actions du portefeuille fonctionnent.",
     "total_balance": "Solde total",
     "balance_tooltip": "Somme des soldes de tous les portefeuilles",
+    "identity_ready": "Identité réutilisable prête",
+    "identity_missing": "Enregistre une adresse Lightning pour partager ce portefeuille",
     "income": "Revenus",
     "income_tooltip": "Revenus totaux",
     "expenses": "Dépenses",
@@ -174,6 +180,7 @@
     "any": "Tout",
     "amount_sats": "Montant (sats)",
     "memo": "Mémo",
+    "address_type": "Type d'adresse",
     "generate": "Générer la demande",
     "regenerate": "Régénérer",
     "empty_qr": "Génère une demande pour afficher un QR",
@@ -185,14 +192,26 @@
     "reuse_warning": "Cette adresse a déjà été utilisée. Génère une adresse fraîche avant de la partager.",
     "identity": "Identité réutilisable :"
   },
+  "bitcoin_address_type": {
+    "taproot": "Taproot",
+    "taproot_helper": "Meilleure confidentialité et frais réduits lorsque l'envoyeur supporte les wallets modernes.",
+    "native_segwit": "Native SegWit",
+    "native_segwit_helper": "Type d'adresse moderne le plus compatible. À utiliser si le support Taproot est incertain."
+  },
   "activity_view": {
     "all": "Tout",
     "in": "Entrant",
     "out": "Sortant",
+    "direction": "Sens",
     "pending": "En attente",
     "pending_short": "Att.",
     "needs_action": "À traiter",
     "needs_action_short": "Fix",
+    "transactions_suffix": "transactions",
+    "flow_title": "Revenus et dépenses",
+    "flow_subheader": "Mouvements réglés dans le temps, séparés par sens.",
+    "empty_chart": "Aucun flux réglé",
+    "empty_chart_description": "Une facture ou un paiement réglé alimentera ce graphique.",
     "empty_title": "Aucune activité",
     "empty_description": "Les transactions apparaîtront ici après le premier envoi ou reçu.",
     "received": "Reçu",
@@ -202,16 +221,24 @@
     "created": "Créé",
     "settled": "Réglé",
     "wallet": "Portefeuille",
-    "copy_technical": "Copier les détails techniques"
+    "copy_technical": "Copier les détails techniques",
+    "copy_transaction_id": "Copier l'ID de transaction"
   },
   "identity_view": {
     "title": "Hub identité",
+    "hero_title": "Ta couche publique de réception",
+    "hero_subheader": "Sépare les identités réutilisables des demandes de paiement fraîches. Partage l'adresse humaine, fais tourner les adresses on-chain, et connecte Nostr seulement si tu veux une vérification publique.",
+    "claim_lightning": "Réclamer une adresse Lightning",
     "lightning": "Adresse Lightning",
+    "lightning_body": "Une adresse lisible pour recevoir des paiements Lightning répétés.",
     "nostr": "Nostr",
+    "nostr_body": "Vérification NIP-05 optionnelle pour ton profil public.",
     "onchain": "On-chain",
+    "onchain_body": "Adresses Native SegWit ou Taproot fraîches pour les dépôts Bitcoin.",
     "people": "Personnes",
     "reusable_address": "Adresse réutilisable",
     "no_ln_address": "Aucune adresse Lightning",
+    "no_ln_address_description": "Réclame un nom d'utilisateur pour recevoir avec une adresse de type email et débloquer la vérification Nostr.",
     "nostr_enabled": "NIP-05 est activé pour cette adresse.",
     "nostr_disabled": "La visibilité Nostr est désactivée.",
     "no_nostr": "Aucune clé publique Nostr liée",
@@ -327,7 +354,9 @@
     "title": "Transactions récentes",
     "subheader": "Dernières {{count}} transactions",
     "clean_failed_expired": "Nettoyer les transactions échouées et expirées",
-    "empty_description": "Description vide"
+    "empty_description": "Description vide",
+    "source": "Source",
+    "wallet_account": "Compte portefeuille"
   },
   "transaction_filters": {
     "ledger": "Registre :",
@@ -452,7 +481,15 @@
     "verification_failed": "Échec de la vérification. Le message n'appartient pas au nœud pour la signature donnée."
   },
   "settings_view": {
-    "manage_account": "Gérer ton compte"
+    "manage_account": "Gérer ton compte",
+    "control_center": "Centre de contrôle du compte",
+    "subtitle": "Gère l'identité publique utilisée pour te payer et te vérifier, ainsi que les jetons permettant aux apps d'utiliser ce portefeuille.",
+    "lightning_tab": "Adresse Lightning",
+    "api_keys_tab": "Clés API",
+    "address_ready": "Adresse prête",
+    "address_missing": "Non enregistrée",
+    "tokens_count": "{{count}} jetons",
+    "no_tokens": "Aucun jeton"
   },
   "settings_ln_address": {
     "update_failed": "Échec de mise à jour de l'adresse LN",
