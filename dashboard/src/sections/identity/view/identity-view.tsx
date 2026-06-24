@@ -13,7 +13,6 @@ import Stack from '@mui/material/Stack';
 import Button from '@mui/material/Button';
 import Divider from '@mui/material/Divider';
 import Typography from '@mui/material/Typography';
-import LoadingButton from '@mui/lab/LoadingButton';
 
 import { paths } from 'src/routes/paths';
 
@@ -200,7 +199,7 @@ export function IdentityView() {
                           {t('identity_view.onchain_subheader')}
                         </Typography>
                       </Stack>
-                      <LoadingButton
+                      <Button
                         color="inherit"
                         variant="contained"
                         loading={isGenerating}
@@ -208,7 +207,7 @@ export function IdentityView() {
                         startIcon={<Iconify icon="solar:refresh-bold" />}
                       >
                         {t('identity_view.generate_fresh')}
-                      </LoadingButton>
+                      </Button>
                     </Stack>
 
                     {btcAddressesError && (

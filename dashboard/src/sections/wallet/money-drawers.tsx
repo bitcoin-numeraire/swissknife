@@ -19,7 +19,6 @@ import Divider from '@mui/material/Divider';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import IconButton from '@mui/material/IconButton';
-import LoadingButton from '@mui/lab/LoadingButton';
 import ToggleButton from '@mui/material/ToggleButton';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 
@@ -369,7 +368,7 @@ export function SendMoneyDrawer({
               <Button color="inherit" variant="outlined" onClick={handleCopySnippet}>
                 {t('send_money.copy_curl')}
               </Button>
-              <LoadingButton
+              <Button
                 fullWidth
                 color="inherit"
                 variant="contained"
@@ -378,7 +377,7 @@ export function SendMoneyDrawer({
                 onClick={handlePay}
               >
                 {kind === 'bitcoin' ? t('send_money.send_onchain') : t('send_money.send')}
-              </LoadingButton>
+              </Button>
             </Stack>
           </>
         )}
@@ -503,14 +502,14 @@ export function ReceiveMoneyDrawer({
           onChange={(event) => setDescription(event.target.value)}
         />
 
-        <LoadingButton
+        <Button
           color="inherit"
           variant="contained"
           loading={isSubmitting}
           onClick={handleGenerate}
         >
           {invoice ? t('receive_money.regenerate') : t('receive_money.generate')}
-        </LoadingButton>
+        </Button>
 
         {addressError && <Alert severity="warning">{addressError}</Alert>}
 
