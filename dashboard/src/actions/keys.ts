@@ -11,6 +11,9 @@ export const endpointKeys = {
     contacts: { list: 'userWalletListContacts' },
     apiKeys: { list: 'userWalletListApiKeys' },
   },
+  system: {
+    health: 'systemHealth',
+  },
   wallets: {
     list: 'listWallets',
     get: 'getWallet',
@@ -34,6 +37,9 @@ export const endpointKeys = {
       list: 'listLnAddresses',
       get: 'getLnAddress',
     },
+  },
+  bitcoin: {
+    addresses: { list: 'listBtcAddresses' },
   },
   apiKeys: {
     list: 'listApiKeys',
