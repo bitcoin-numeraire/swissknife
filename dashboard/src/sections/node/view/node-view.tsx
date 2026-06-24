@@ -11,7 +11,6 @@ import Divider from '@mui/material/Divider';
 import Typography from '@mui/material/Typography';
 import LinearProgress from '@mui/material/LinearProgress';
 
-import { shouldFail } from 'src/utils/errors';
 import {
   getTotal,
   getCumulativeSeries,
@@ -19,16 +18,15 @@ import {
 } from 'src/utils/transactions';
 
 import { useTranslate } from 'src/locales';
-import { Permission } from 'src/lib/swissknife';
 import { useSystemHealth } from 'src/actions/system';
 import { useListPayments } from 'src/actions/payments';
 import { useListInvoices } from 'src/actions/invoices';
 import { DashboardContent } from 'src/layouts/dashboard';
+import { Permission, HealthStatus } from 'src/lib/swissknife';
 import { useListLnAddresses } from 'src/actions/ln-addresses';
 
 import { Label } from 'src/components/label';
 import { Iconify } from 'src/components/iconify';
-import { ErrorView } from 'src/components/error/error-view';
 import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';
 
 import { RecentTransactions } from 'src/sections/transaction/recent-transactions';
@@ -66,15 +64,18 @@ function GapCard({ title, icon }: { title: string; icon: string }) {
 export function NodeView() {
   const { t } = useTranslate();
 
-  const { health, healthLoading, healthError } = useSystemHealth();
+  const { health, healthLoading, healthError, healthDegraded, healthDegradedReason } =
+    useSystemHealth();
   const { payments, paymentsError } = useListPayments(100);
   const { invoices, invoicesError } = useListInvoices(100);
   const { lnAddresses, lnAddressesError } = useListLnAddresses(20);
 
-  const errors = [healthError];
-  const data = [health];
-  const isLoading = [healthLoading];
-  const failed = shouldFail(errors, data, isLoading);
+  const effectiveHealth = health ?? {
+    is_healthy: false,
+    database: HealthStatus.MAINTENANCE,
+    ln_provider: HealthStatus.UNAVAILABLE,
+  };
+  const healthUnavailable = !!healthError || healthDegraded || !health;
 
   const incomeSeries = useMemo(() => getCumulativeSeries(invoices || []), [invoices]);
   const expensesSeries = useMemo(() => getCumulativeSeries(payments || []), [payments]);
@@ -89,8 +90,8 @@ export function NodeView() {
   return (
     <DashboardContent maxWidth="xl">
       <RoleBasedGuard permissions={[Permission.READ_LN_NODE]} hasContent>
-        {failed ? (
-          <ErrorView errors={errors} isLoading={isLoading} data={data} />
+        {healthLoading && !health ? (
+          <LinearProgress />
         ) : (
           <>
             <CustomBreadcrumbs
@@ -98,6 +99,14 @@ export function NodeView() {
               links={[{ name: t('observe') }, { name: t('node_health') }]}
               sx={{ mb: { xs: 3, md: 5 } }}
             />
+
+            {healthUnavailable && (
+              <Alert severity="warning" variant="outlined" sx={{ mb: 3 }}>
+                {healthDegradedReason === 'timeout'
+                  ? t('node_view.health_timeout')
+                  : t('node_view.health_unavailable')}
+              </Alert>
+            )}
 
             <Grid container spacing={3}>
               <Grid size={{ xs: 12, md: 5 }}>
@@ -110,14 +119,16 @@ export function NodeView() {
                           {t('node_view.read_only')}
                         </Typography>
                       </Stack>
-                      <Label color={health?.is_healthy ? 'success' : 'error'}>
-                        {health?.is_healthy ? t('node_view.operational') : t('node_view.unavailable')}
+                      <Label color={effectiveHealth.is_healthy ? 'success' : 'error'}>
+                        {effectiveHealth.is_healthy
+                          ? t('node_view.operational')
+                          : t('node_view.unavailable')}
                       </Label>
                     </Stack>
 
                     {[
-                      [t('node_view.database'), health?.database],
-                      [t('node_view.ln_provider'), health?.ln_provider],
+                      [t('node_view.database'), effectiveHealth.database],
+                      [t('node_view.ln_provider'), effectiveHealth.ln_provider],
                     ].map(([label, value]) => (
                       <Stack key={label} spacing={1}>
                         <Stack direction="row" sx={{ justifyContent: 'space-between' }}>
