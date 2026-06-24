@@ -8,8 +8,8 @@ import { zodResolver } from '@hookform/resolvers/zod';
 
 import Box from '@mui/material/Box';
 import Alert from '@mui/material/Alert';
+import Button from '@mui/material/Button';
 import IconButton from '@mui/material/IconButton';
-import LoadingButton from '@mui/lab/LoadingButton';
 import InputAdornment from '@mui/material/InputAdornment';
 
 import { paths } from 'src/routes/paths';
@@ -116,7 +116,7 @@ export function SupabaseUpdatePasswordView() {
         }}
       />
 
-      <LoadingButton
+      <Button
         fullWidth
         type="submit"
         size="large"
@@ -125,7 +125,7 @@ export function SupabaseUpdatePasswordView() {
         loadingIndicator="Update password..."
       >
         Update password
-      </LoadingButton>
+      </Button>
     </Box>
   );
 

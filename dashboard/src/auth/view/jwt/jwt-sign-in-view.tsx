@@ -7,8 +7,8 @@ import { useBoolean } from 'minimal-shared/hooks';
 import { zodResolver } from '@hookform/resolvers/zod';
 
 import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
 import IconButton from '@mui/material/IconButton';
-import LoadingButton from '@mui/lab/LoadingButton';
 import InputAdornment from '@mui/material/InputAdornment';
 
 import { useRouter } from 'src/routes/hooks';
@@ -92,7 +92,7 @@ export function JwtSignInView() {
         />
       </Box>
 
-      <LoadingButton
+      <Button
         fullWidth
         color="inherit"
         size="large"
@@ -102,7 +102,7 @@ export function JwtSignInView() {
         loadingIndicator={t('sign_in.sign_in_loading')}
       >
         {t('sign_in.sign_in')}
-      </LoadingButton>
+      </Button>
     </Box>
   );
 

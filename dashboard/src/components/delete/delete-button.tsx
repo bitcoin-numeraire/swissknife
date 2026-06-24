@@ -1,6 +1,6 @@
 import { useBoolean } from 'minimal-shared/hooks';
 
-import { LoadingButton } from '@mui/lab';
+import Button from '@mui/material/Button';
 import Tooltip from '@mui/material/Tooltip';
 import IconButton from '@mui/material/IconButton';
 
@@ -35,7 +35,7 @@ export function DeleteButton({ id, onDelete }: Props) {
         title={t('delete')}
         content={t('confirm_delete')}
         action={
-          <LoadingButton
+          <Button
             variant="contained"
             color="error"
             onClick={async () => {
@@ -46,7 +46,7 @@ export function DeleteButton({ id, onDelete }: Props) {
             loading={isDeleting.value}
           >
             {t('delete')}
-          </LoadingButton>
+          </Button>
         }
       />
     </>

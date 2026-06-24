@@ -1,8 +1,8 @@
-import type { LoadingButtonProps } from '@mui/lab';
+import type { ButtonProps } from '@mui/material/Button';
 
 import { useBoolean } from 'minimal-shared/hooks';
 
-import { LoadingButton } from '@mui/lab';
+import Button from '@mui/material/Button';
 
 import { handleActionError } from 'src/utils/errors';
 
@@ -17,7 +17,7 @@ import { TransactionType } from 'src/types/transaction';
 
 interface Props {
   onSuccess: VoidFunction;
-  buttonProps?: LoadingButtonProps;
+  buttonProps?: ButtonProps;
   children?: React.ReactNode;
   transactionType?: TransactionType;
 }
@@ -69,8 +69,8 @@ export function CleanTransactionsButton({
   };
 
   return (
-    <LoadingButton loading={isDeleting.value} onClick={handleCleanTransactions} {...buttonProps}>
+    <Button loading={isDeleting.value} onClick={handleCleanTransactions} {...buttonProps}>
       {children || t('clean_transactions_button.clean_transactions')}
-    </LoadingButton>
+    </Button>
   );
 }
