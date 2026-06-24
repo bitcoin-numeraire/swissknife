@@ -16,6 +16,7 @@ import Stack from '@mui/material/Stack';
 import Button from '@mui/material/Button';
 import Drawer from '@mui/material/Drawer';
 import Divider from '@mui/material/Divider';
+import MenuItem from '@mui/material/MenuItem';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import IconButton from '@mui/material/IconButton';
@@ -64,6 +65,19 @@ const drawerSx = {
   width: { xs: 1, sm: 520 },
   maxWidth: 1,
 };
+
+const addressTypeOptions = [
+  {
+    value: BtcAddressType.P2TR,
+    labelKey: 'bitcoin_address_type.taproot',
+    helperKey: 'bitcoin_address_type.taproot_helper',
+  },
+  {
+    value: BtcAddressType.P2WPKH,
+    labelKey: 'bitcoin_address_type.native_segwit',
+    helperKey: 'bitcoin_address_type.native_segwit_helper',
+  },
+] as const;
 
 function satsToBtc(sats: number) {
   return (sats / 100_000_000).toFixed(8).replace(/0+$/, '').replace(/\.$/, '');
@@ -403,6 +417,7 @@ export function ReceiveMoneyDrawer({
   const [description, setDescription] = useState('');
   const [invoice, setInvoice] = useState<Invoice>();
   const [btcAddress, setBtcAddress] = useState<BtcAddress>();
+  const [addressType, setAddressType] = useState<BtcAddressType>(BtcAddressType.P2TR);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [addressError, setAddressError] = useState<string>();
 
@@ -443,7 +458,7 @@ export function ReceiveMoneyDrawer({
 
       if (shouldGenerateAddress) {
         const addressResult = await newWalletBtcAddress({
-          body: { type: BtcAddressType.P2TR },
+          body: { type: addressType },
         }).catch((error) => {
           setAddressError(error?.message || t('receive_money.address_unavailable'));
           return null;
@@ -510,6 +525,26 @@ export function ReceiveMoneyDrawer({
           value={description}
           onChange={(event) => setDescription(event.target.value)}
         />
+
+        {rail !== 'lightning' && (
+          <TextField
+            select
+            size="small"
+            label={t('receive_money.address_type')}
+            value={addressType}
+            onChange={(event) => setAddressType(event.target.value as BtcAddressType)}
+            helperText={t(
+              addressTypeOptions.find((option) => option.value === addressType)?.helperKey ??
+                'bitcoin_address_type.taproot_helper'
+            )}
+          >
+            {addressTypeOptions.map((option) => (
+              <MenuItem key={option.value} value={option.value}>
+                {t(option.labelKey)}
+              </MenuItem>
+            ))}
+          </TextField>
+        )}
 
         <Button
           color="inherit"
