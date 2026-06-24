@@ -1,3 +1,4 @@
+import type { DeploymentMode } from 'src/global-config';
 import type { NavGroupProps, NavItemDataProps } from 'src/components/nav-section';
 
 import { paths } from 'src/routes/paths';
@@ -7,6 +8,8 @@ import { Permission } from 'src/lib/swissknife';
 
 import { Iconify } from 'src/components/iconify';
 import { SvgColor } from 'src/components/svg-color';
+
+import { hasAllPermissions } from 'src/auth/permissions';
 
 // ----------------------------------------------------------------------
 
@@ -32,6 +35,12 @@ const ICONS = {
   nostr: <SvgColor src={`${CONFIG.assetsDir}/assets/icons/navbar/ic-nostr.svg`} />,
   contacts: iconify('solar:users-group-rounded-bold-duotone'),
   apiKeys: iconify('solar:code-bold-duotone'),
+  activity: iconify('solar:bill-list-bold-duotone'),
+  identity: iconify('solar:fingerprint-bold-duotone'),
+  accounts: iconify('solar:users-group-two-rounded-bold-duotone'),
+  observe: iconify('solar:pulse-2-bold-duotone'),
+  policy: iconify('solar:shield-keyhole-bold-duotone'),
+  webhooks: iconify('solar:programming-bold-duotone'),
 };
 
 // ----------------------------------------------------------------------
@@ -40,6 +49,8 @@ const ICONS = {
 // them (consumed by the searchbar permission filtering).
 type NavItemWithPermissions = NavItemDataProps & {
   permissions?: string[];
+  modes?: DeploymentMode[] | 'all';
+  flag?: 'agents' | 'policy' | 'webhooks' | 'l402' | 'node-health';
   children?: NavItemWithPermissions[];
 };
 
@@ -52,32 +63,29 @@ export const navData: Array<NavGroupWithPermissions> = [
    * User Wallet
    */
   {
-    subheader: 'wallet',
+    subheader: 'money',
     items: [
       {
         title: 'overview',
-        path: paths.wallet.root,
+        path: paths.overview,
         icon: ICONS.wallet,
       },
       {
-        title: 'payments',
-        path: paths.wallet.payments,
-        icon: ICONS.payment,
+        title: 'activity',
+        path: paths.activity,
+        icon: ICONS.activity,
+        permissions: [Permission.READ_TRANSACTION],
       },
+    ],
+  },
+  {
+    subheader: 'identity',
+    items: [
       {
-        title: 'invoices',
-        path: paths.wallet.invoices,
-        icon: ICONS.invoice,
-      },
-      {
-        title: 'lightning_address',
-        path: paths.wallet.lightningAddress,
-        icon: ICONS.lightning,
-      },
-      {
-        title: 'nostr_address',
-        path: paths.wallet.nostrAddress,
-        icon: ICONS.nostr,
+        title: 'identity_hub',
+        path: paths.identity,
+        icon: ICONS.identity,
+        permissions: [Permission.READ_LN_ADDRESS],
       },
       {
         title: 'contacts',
@@ -90,48 +98,115 @@ export const navData: Array<NavGroupWithPermissions> = [
    * Administration
    */
   {
-    subheader: 'administration',
+    subheader: 'accounts',
     items: [
       {
-        title: 'node',
+        title: 'accounts_directory',
+        path: paths.accounts,
+        icon: ICONS.accounts,
+        permissions: [Permission.READ_WALLET],
+        modes: ['server', 'self-hosted', 'merchant'],
+      },
+      {
+        title: 'roles_access',
+        path: paths.admin.wallets,
+        icon: ICONS.policy,
+        permissions: [Permission.READ_WALLET],
+        modes: ['server', 'merchant'],
+      },
+    ],
+  },
+  {
+    subheader: 'observe',
+    items: [
+      {
+        title: 'node_health',
+        path: paths.nodeHealth,
+        icon: ICONS.observe,
+        permissions: [Permission.READ_LN_NODE],
+        modes: ['server', 'self-hosted', 'desktop'],
+      },
+      {
+        title: 'volume_reconciliation',
         path: paths.admin.node,
         icon: ICONS.node,
-        permissions: [
-          Permission.READ_TRANSACTION,
-          Permission.READ_LN_NODE,
-          Permission.READ_LN_ADDRESS,
-        ],
-      },
-      {
-        title: 'wallets',
-        path: paths.admin.wallets,
-        icon: ICONS.wallet,
-        permissions: [Permission.READ_WALLET],
-      },
-      {
-        title: 'payments',
-        path: paths.admin.payments,
-        icon: ICONS.payment,
         permissions: [Permission.READ_TRANSACTION],
+        modes: ['server', 'merchant'],
       },
-      {
-        title: 'invoices',
-        path: paths.admin.invoices,
-        icon: ICONS.invoice,
-        permissions: [Permission.READ_TRANSACTION],
-      },
-      {
-        title: 'lightning_addresses',
-        path: paths.admin.lnAddresses,
-        icon: ICONS.lightning,
-        permissions: [Permission.READ_LN_ADDRESS],
-      },
+    ],
+  },
+  {
+    subheader: 'build',
+    items: [
       {
         title: 'api_keys',
         path: paths.admin.apiKeys,
         icon: ICONS.apiKeys,
         permissions: [Permission.READ_API_KEY],
+        modes: ['server', 'desktop', 'agent'],
+      },
+      {
+        title: 'agents',
+        path: paths.admin.apiKeys,
+        icon: ICONS.accounts,
+        permissions: [Permission.READ_API_KEY, Permission.READ_WALLET],
+        modes: ['server', 'agent'],
+        flag: 'agents',
+      },
+      {
+        title: 'webhooks',
+        path: paths.admin.apiKeys,
+        icon: ICONS.webhooks,
+        permissions: [Permission.READ_API_KEY],
+        modes: ['server', 'agent'],
+        flag: 'webhooks',
       },
     ],
   },
 ];
+
+const dashboardFlags = new Set(
+  (process.env.NEXT_PUBLIC_DASHBOARD_FLAGS ?? '')
+    .split(',')
+    .map((flag) => flag.trim())
+    .filter(Boolean)
+);
+
+function canRenderItem(
+  item: NavItemWithPermissions,
+  userPermissions: string[],
+  mode: DeploymentMode
+) {
+  const modes = item.modes ?? 'all';
+  const hasMode = modes === 'all' || modes.includes(mode);
+  const hasFlag = !item.flag || dashboardFlags.has(item.flag);
+  const hasPermissions = hasAllPermissions(item.permissions, userPermissions);
+
+  return hasMode && hasFlag && hasPermissions;
+}
+
+function filterItems(
+  items: NavItemWithPermissions[],
+  userPermissions: string[],
+  mode: DeploymentMode
+): NavItemWithPermissions[] {
+  return items
+    .filter((item) => canRenderItem(item, userPermissions, mode))
+    .map((item) => ({
+      ...item,
+      children: item.children ? filterItems(item.children, userPermissions, mode) : undefined,
+    }));
+}
+
+export function filterDashboardNavData(
+  data: Array<NavGroupWithPermissions>,
+  userPermissions: string[] = [],
+  mode: DeploymentMode = CONFIG.deploymentMode
+): Array<NavGroupWithPermissions> {
+  return data
+    .map((group) => ({
+      ...group,
+      items: filterItems(group.items, userPermissions, mode),
+    }))
+    .filter((group) => group.items.length > 0);
+}

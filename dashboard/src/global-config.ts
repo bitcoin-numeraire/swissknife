@@ -11,6 +11,7 @@ export type ConfigValue = {
   serverUrl: string;
   assetsDir: string;
   isStaticExport: boolean;
+  deploymentMode: DeploymentMode;
   domain: string;
   mempoolSpace: string;
   auth: {
@@ -23,6 +24,7 @@ export type ConfigValue = {
 };
 
 export type AuthMethod = 'jwt' | 'supabase' | 'auth0';
+export type DeploymentMode = 'server' | 'self-hosted' | 'merchant' | 'desktop' | 'agent';
 
 // ----------------------------------------------------------------------
 
@@ -32,6 +34,7 @@ export const CONFIG: ConfigValue = {
   serverUrl: process.env.NEXT_PUBLIC_SERVER_URL ?? '',
   assetsDir: process.env.NEXT_PUBLIC_ASSETS_DIR ?? '',
   isStaticExport: JSON.parse(`${process.env.BUILD_STATIC_EXPORT}`),
+  deploymentMode: (process.env.NEXT_PUBLIC_DEPLOYMENT_MODE as DeploymentMode) ?? 'server',
   domain: process.env.NEXT_PUBLIC_DOMAIN ?? 'numeraire.tech',
   mempoolSpace: process.env.NEXT_PUBLIC_MEMPOOL_SPACE_URL ?? 'https://mempool.space/api/v1',
   /**

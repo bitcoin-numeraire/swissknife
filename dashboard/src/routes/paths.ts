@@ -3,6 +3,11 @@ const ROOTS = {
 };
 
 export const paths = {
+  overview: '/',
+  activity: '/activity',
+  identity: '/identity',
+  accounts: '/accounts',
+  nodeHealth: '/node-health',
   onboarding: {
     welcome: '/welcome',
   },
