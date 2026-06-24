@@ -6,6 +6,7 @@ import type { HeaderSectionProps } from '../core/header-section';
 import type { LayoutSectionProps } from '../core/layout-section';
 import type { NavSectionProps } from 'src/components/nav-section';
 
+import { useMemo } from 'react';
 import { merge } from 'es-toolkit';
 import { useBoolean } from 'minimal-shared/hooks';
 
@@ -19,6 +20,8 @@ import { currencies } from 'src/assets/data';
 
 import { Logo } from 'src/components/logo';
 import { useSettingsContext } from 'src/components/settings';
+
+import { useAuthContext } from 'src/auth/hooks';
 
 import { NavMobile } from './nav-mobile';
 import { VerticalDivider } from './content';
@@ -37,8 +40,11 @@ import { LanguagePopover } from '../components/language-popover';
 import { CurrencyPopover } from '../components/currency-popover';
 import { navData as accountNavData } from '../nav-config-account';
 import { WorkspacesPopover } from '../components/workspaces-popover';
-import { navData as dashboardNavData } from '../nav-config-dashboard';
 import { dashboardLayoutVars, dashboardNavColorVars } from './css-vars';
+import {
+  filterDashboardNavData,
+  navData as dashboardNavData,
+} from '../nav-config-dashboard';
 
 // ----------------------------------------------------------------------
 
@@ -65,12 +71,20 @@ export function DashboardLayout({
   const theme = useTheme();
 
   const settings = useSettingsContext();
+  const { user } = useAuthContext();
 
   const navVars = dashboardNavColorVars(theme, settings.state.navColor, settings.state.navLayout);
 
   const { value: open, onFalse: onClose, onTrue: onOpen } = useBoolean();
 
-  const navData = slotProps?.nav?.data ?? dashboardNavData;
+  const rawNavData = slotProps?.nav?.data ?? dashboardNavData;
+  const navData = useMemo(
+    () =>
+      rawNavData === dashboardNavData
+        ? filterDashboardNavData(dashboardNavData, user?.permissions)
+        : rawNavData,
+    [rawNavData, user?.permissions]
+  );
 
   const isNavMini = settings.state.navLayout === 'mini';
   const isNavHorizontal = settings.state.navLayout === 'horizontal';

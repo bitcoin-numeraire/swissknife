@@ -6,6 +6,8 @@ import { useMemo } from 'react';
 import {
   listContacts,
   getUserWallet,
+  InvoiceOrderBy,
+  OrderDirection,
   getWalletAddress,
   getWalletBalance,
   getWalletInvoice,
@@ -49,7 +51,14 @@ export function useGetWalletBalance() {
 
 export function useListWalletInvoices(query?: ListWalletInvoicesData) {
   const result = useSWR(endpointKeys.userWallet.invoices.list, () =>
-    listWalletInvoices<true>(query)
+    listWalletInvoices<true>({
+      ...query,
+      query: {
+        order_by: InvoiceOrderBy.CREATED_AT,
+        order_direction: OrderDirection.DESC,
+        ...query?.query,
+      },
+    })
   );
 
   return useMemo(
@@ -79,7 +88,9 @@ export function useGetWalletInvoice(id: string) {
 
 export function useListWalletPayments(limit?: number, offset?: number) {
   const result = useSWR(endpointKeys.userWallet.payments.list, () =>
-    listWalletPayments<true>({ query: { limit, offset } })
+    listWalletPayments<true>({
+      query: { limit, offset, order_direction: OrderDirection.DESC },
+    })
   );
 
   return useMemo(

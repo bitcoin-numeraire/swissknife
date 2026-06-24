@@ -1,7 +1,7 @@
 import useSWR from 'swr';
 import { useMemo } from 'react';
 
-import { getPayment, listPayments } from 'src/lib/swissknife';
+import { getPayment, listPayments, OrderDirection } from 'src/lib/swissknife';
 
 import { endpointKeys } from './keys';
 
@@ -9,7 +9,9 @@ import { endpointKeys } from './keys';
 
 export function useListPayments(limit?: number, offset?: number) {
   const fetcher = async () => {
-    const { data, error } = await listPayments({ query: { limit, offset } });
+    const { data, error } = await listPayments({
+      query: { limit, offset, order_direction: OrderDirection.DESC },
+    });
     if (error) {
       throw Error(error.reason);
     }

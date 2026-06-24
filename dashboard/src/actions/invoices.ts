@@ -1,7 +1,7 @@
 import useSWR from 'swr';
 import { useMemo } from 'react';
 
-import { getInvoice, listInvoices } from 'src/lib/swissknife';
+import { getInvoice, listInvoices, InvoiceOrderBy, OrderDirection } from 'src/lib/swissknife';
 
 import { endpointKeys } from './keys';
 
@@ -9,7 +9,14 @@ import { endpointKeys } from './keys';
 
 export function useListInvoices(limit?: number, offset?: number) {
   const fetcher = async () => {
-    const { data, error } = await listInvoices({ query: { limit, offset } });
+    const { data, error } = await listInvoices({
+      query: {
+        limit,
+        offset,
+        order_by: InvoiceOrderBy.CREATED_AT,
+        order_direction: OrderDirection.DESC,
+      },
+    });
     if (error) {
       throw Error(error.reason);
     }

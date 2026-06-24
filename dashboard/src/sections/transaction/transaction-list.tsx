@@ -83,7 +83,11 @@ export function TransactionList({
 }: Props) {
   const { t } = useTranslate();
   const theme = useTheme();
-  const table = useTable({ defaultOrderBy: 'created_at', defaultRowsPerPage: 25 });
+  const table = useTable({
+    defaultOrder: 'desc',
+    defaultOrderBy: 'created_at',
+    defaultRowsPerPage: 25,
+  });
   const confirm = useBoolean();
   const isDeleting = useBoolean();
 
