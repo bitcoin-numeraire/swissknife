@@ -1,44 +1,109 @@
 'use client';
 
+import type { TFunction } from 'i18next';
 import type { LabelColor } from 'src/components/label';
-import type { ITransaction } from 'src/types/transaction';
+import type { ITransaction, ITransactionTableFilters } from 'src/types/transaction';
 
-import { useMemo, useState } from 'react';
+import { mutate } from 'swr';
+import { sumBy } from 'es-toolkit';
+import { useMemo, useState, useCallback } from 'react';
+import { usePopover, useSetState } from 'minimal-shared/hooks';
 
 import Tab from '@mui/material/Tab';
-import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
 import Tabs from '@mui/material/Tabs';
+import Table from '@mui/material/Table';
 import Stack from '@mui/material/Stack';
-import Drawer from '@mui/material/Drawer';
 import Divider from '@mui/material/Divider';
+import Tooltip from '@mui/material/Tooltip';
+import MenuItem from '@mui/material/MenuItem';
+import MenuList from '@mui/material/MenuList';
+import TableRow from '@mui/material/TableRow';
+import Checkbox from '@mui/material/Checkbox';
+import TableCell from '@mui/material/TableCell';
+import TableBody from '@mui/material/TableBody';
 import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
-import useMediaQuery from '@mui/material/useMediaQuery';
+import ListItemText from '@mui/material/ListItemText';
+import ToggleButton from '@mui/material/ToggleButton';
+import { alpha, useTheme } from '@mui/material/styles';
+import TableContainer from '@mui/material/TableContainer';
+import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
+
+import { paths } from 'src/routes/paths';
+import { useRouter } from 'src/routes/hooks';
 
 import { shouldFail } from 'src/utils/errors';
-import { fDateTime } from 'src/utils/format-time';
-import { mergeAndSortTransactions } from 'src/utils/transactions';
+import { fDate, fTime, fIsAfter, fDateTime, fIsBetween } from 'src/utils/format-time';
+import { LEDGERS, getCumulativeSeries, mergeAndSortTransactions } from 'src/utils/transactions';
 
 import { useTranslate } from 'src/locales';
+import { endpointKeys } from 'src/actions/keys';
 import { DashboardContent } from 'src/layouts/dashboard';
 import { useGetUserWallet } from 'src/actions/user-wallet';
 
 import { Label } from 'src/components/label';
 import { Iconify } from 'src/components/iconify';
-import { CopyButton } from 'src/components/copy';
+import { CopyMenuItem } from 'src/components/copy';
+import { Scrollbar } from 'src/components/scrollbar';
 import { SatsWithIcon } from 'src/components/bitcoin';
+import { Chart, useChart } from 'src/components/chart';
+import { ItemAnalytic } from 'src/components/analytic';
 import { ErrorView } from 'src/components/error/error-view';
 import { EmptyContent } from 'src/components/empty-content';
+import { CustomPopover } from 'src/components/custom-popover';
 import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';
+import { CleanTransactionsButton } from 'src/components/transactions';
+import {
+  useTable,
+  emptyRows,
+  TableNoData,
+  getComparator,
+  TableEmptyRows,
+  TableHeadCustom,
+  TablePaginationCustom,
+} from 'src/components/table';
+
+import { TransactionTableToolbar } from 'src/sections/transaction/transaction-table-toolbar';
+import { TransactionTableFiltersResult } from 'src/sections/transaction/transaction-table-filters-result';
 
 import { TransactionType } from 'src/types/transaction';
 
 // ----------------------------------------------------------------------
 
-type ActivityLens = 'all' | 'in' | 'out' | 'pending' | 'failed';
+type ActivityLens = 'all' | 'Settled' | 'Pending' | 'Expired' | 'Failed';
+type FlowLens = 'income' | 'expenses';
 
-function txDirection(tx: ITransaction) {
+type ActivityRow = ITransaction & {
+  row_key: string;
+  direction: 'in' | 'out';
+  detail_href: string;
+  amount_total_msat: number;
+  description_label: string;
+};
+
+type ActivityTab = {
+  title: string;
+  value: ActivityLens;
+  label: string;
+  color: LabelColor;
+  suffix: string;
+  icon: string;
+  analyticColor: string;
+};
+
+const tableHead = (t: TFunction) => [
+  { id: 'direction', label: t('activity_view.direction'), width: 96 },
+  { id: 'description_label', label: t('transaction_list.description') },
+  { id: 'created_at', label: t('transaction_list.created') },
+  { id: 'payment_time', label: t('transaction_list.settled') },
+  { id: 'amount_total_msat', label: t('transaction_list.amount') },
+  { id: 'ledger', label: t('transaction_details.ledger') },
+  { id: 'status', label: t('transaction_list.status') },
+  { id: '', width: 56 },
+];
+
+function txDirection(tx: ITransaction): 'in' | 'out' {
   return tx.transaction_type === TransactionType.INVOICE ? 'in' : 'out';
 }
 
@@ -52,93 +117,254 @@ function statusColor(status: string): LabelColor {
   return 'warning';
 }
 
-function railIcon(tx: ITransaction) {
-  if (tx.ledger === 'Onchain') return 'solar:link-bold-duotone';
-  if (tx.ledger === 'Internal') return 'solar:home-angle-bold-duotone';
-  return 'solar:bolt-bold-duotone';
+function directionColor(direction: 'in' | 'out'): LabelColor {
+  return direction === 'in' ? 'success' : 'warning';
 }
 
-function technicalPayload(tx: ITransaction) {
-  return JSON.stringify(
-    {
-      id: tx.id,
-      type: tx.transaction_type,
-      ledger: tx.ledger,
-      status: tx.status,
-      wallet_id: tx.wallet_id,
-      amount_msat: tx.amount_msat,
-      fee_msat: tx.fee_msat,
-      created_at: tx.created_at,
-      payment_time: tx.payment_time,
-    },
-    null,
-    2
-  );
+function detailHref(tx: ITransaction) {
+  if (tx.transaction_type === TransactionType.INVOICE) {
+    return paths.wallet.invoice(tx.id);
+  }
+
+  return paths.wallet.payment(tx.id);
+}
+
+function makeRow(tx: ITransaction): ActivityRow {
+  const direction = txDirection(tx);
+
+  return {
+    ...tx,
+    direction,
+    row_key: `${tx.transaction_type}-${tx.id}`,
+    detail_href: detailHref(tx),
+    amount_total_msat: txAmount(tx),
+    description_label: tx.description || (direction === 'in' ? 'Incoming payment' : 'Outgoing payment'),
+  };
+}
+
+function isNeedsAction(tx: ActivityRow) {
+  return tx.status === 'Failed' || tx.status === 'Expired';
+}
+
+function txMatchesStatus(tx: ActivityRow, status: ActivityLens) {
+  if (status === 'all') return true;
+  return tx.status === status;
+}
+
+function applyFilter({
+  inputData,
+  comparator,
+  filters,
+  dateError,
+}: {
+  dateError: boolean;
+  inputData: ActivityRow[];
+  filters: ITransactionTableFilters;
+  comparator: (a: any, b: any) => number;
+}) {
+  const { name, status, ledger, startDate, endDate } = filters;
+
+  const stabilizedThis = inputData.map((el, index) => [el, index] as const);
+
+  stabilizedThis.sort((a, b) => {
+    const order = comparator(a[0], b[0]);
+    if (order !== 0) return order;
+    return a[1] - b[1];
+  });
+
+  inputData = stabilizedThis.map((el) => el[0]);
+
+  if (name) {
+    inputData = inputData.filter((tx) => {
+      const value = name.toLowerCase();
+
+      return (
+        tx.description_label.toLowerCase().includes(value) ||
+        tx.ledger.toLowerCase().includes(value) ||
+        tx.status.toLowerCase().includes(value) ||
+        tx.id.toLowerCase().includes(value) ||
+        tx.wallet_id.toLowerCase().includes(value)
+      );
+    });
+  }
+
+  if (status !== 'all') {
+    inputData = inputData.filter((tx) => txMatchesStatus(tx, status as ActivityLens));
+  }
+
+  if (ledger.length) {
+    inputData = inputData.filter((tx) => ledger.includes(tx.ledger));
+  }
+
+  if (!dateError && startDate && endDate) {
+    inputData = inputData.filter((tx) => fIsBetween(tx.created_at, startDate, endDate));
+  }
+
+  return inputData;
 }
 
 // ----------------------------------------------------------------------
 
 export function ActivityView() {
   const { t } = useTranslate();
-  const smDown = useMediaQuery((theme) => theme.breakpoints.down('sm'));
-  const [lens, setLens] = useState<ActivityLens>('all');
-  const [selected, setSelected] = useState<ITransaction>();
+  const theme = useTheme();
+  const table = useTable({
+    defaultOrder: 'desc',
+    defaultOrderBy: 'created_at',
+    defaultRowsPerPage: 25,
+  });
+
+  const [flowLens, setFlowLens] = useState<FlowLens>('income');
+  const filters = useSetState<ITransactionTableFilters>({
+    name: '',
+    ledger: [],
+    status: 'all',
+    startDate: null,
+    endDate: null,
+  });
 
   const { wallet, walletLoading, walletError } = useGetUserWallet();
   const errors = [walletError];
   const data = [wallet];
   const isLoading = [walletLoading];
   const failed = shouldFail(errors, data, isLoading);
+  const dateError = fIsAfter(filters.state.startDate, filters.state.endDate);
 
-  const transactions = useMemo(
-    () => mergeAndSortTransactions(wallet?.invoices || [], wallet?.payments || []),
+  const rows = useMemo(
+    () => mergeAndSortTransactions(wallet?.invoices || [], wallet?.payments || []).map(makeRow),
     [wallet?.invoices, wallet?.payments]
   );
 
-  const filtered = useMemo(
-    () =>
-      transactions.filter((tx) => {
-        if (lens === 'in') return txDirection(tx) === 'in';
-        if (lens === 'out') return txDirection(tx) === 'out';
-        if (lens === 'pending') return tx.status === 'Pending';
-        if (lens === 'failed') return tx.status === 'Failed' || tx.status === 'Expired';
-        return true;
-      }),
-    [lens, transactions]
+  const incomeSeries = useMemo(() => getCumulativeSeries(wallet?.invoices || []), [wallet?.invoices]);
+  const expensesSeries = useMemo(
+    () => getCumulativeSeries(wallet?.payments || []),
+    [wallet?.payments]
   );
 
-  const tabs: { value: ActivityLens; label: string; shortLabel: string; count: number }[] = [
+  const chartSeries = useMemo(
+    () => [
+      {
+        name: flowLens === 'income' ? t('wallet_view.income') : t('wallet_view.expenses'),
+        data: (flowLens === 'income' ? incomeSeries : expensesSeries)[0].data,
+      },
+    ],
+    [expensesSeries, flowLens, incomeSeries, t]
+  );
+
+  const chartOptions = useChart({
+    colors: [flowLens === 'income' ? theme.palette.success.main : theme.palette.warning.main],
+    xaxis: { type: 'datetime' },
+    tooltip: {
+      y: {
+        formatter: (value) => `${Math.round(Number(value)).toLocaleString()} sats`,
+      },
+    },
+    yaxis: {
+      labels: {
+        formatter: (value) => `${Math.round(Number(value)).toLocaleString()} sats`,
+      },
+    },
+  });
+
+  const activityTabs: ActivityTab[] = [
     {
+      title: t('transaction_list.tabs.total'),
       value: 'all',
       label: t('activity_view.all'),
-      shortLabel: t('activity_view.all'),
-      count: transactions.length,
+      color: 'default',
+      suffix: t('activity_view.transactions_suffix'),
+      icon: 'solar:bill-list-bold-duotone',
+      analyticColor: theme.palette.info.main,
     },
     {
-      value: 'in',
-      label: t('activity_view.in'),
-      shortLabel: t('activity_view.in'),
-      count: transactions.filter((tx) => txDirection(tx) === 'in').length,
+      title: t('transaction_list.tabs.paid'),
+      value: 'Settled',
+      label: t('transaction_list.tabs.paid'),
+      color: 'success',
+      suffix: t('activity_view.transactions_suffix'),
+      icon: 'solar:bill-check-bold-duotone',
+      analyticColor: theme.palette.success.main,
     },
     {
-      value: 'out',
-      label: t('activity_view.out'),
-      shortLabel: t('activity_view.out'),
-      count: transactions.filter((tx) => txDirection(tx) === 'out').length,
+      title: t('transaction_list.tabs.pending'),
+      value: 'Pending',
+      label: t('transaction_list.tabs.pending'),
+      color: 'warning',
+      suffix: t('activity_view.transactions_suffix'),
+      icon: 'solar:sort-by-time-bold-duotone',
+      analyticColor: theme.palette.warning.main,
     },
     {
-      value: 'pending',
-      label: t('activity_view.pending'),
-      shortLabel: t('activity_view.pending_short'),
-      count: transactions.filter((tx) => tx.status === 'Pending').length,
+      title: t('transaction_list.tabs.expired'),
+      value: 'Expired',
+      label: t('transaction_list.tabs.expired'),
+      color: 'error',
+      suffix: t('activity_view.transactions_suffix'),
+      icon: 'solar:bill-cross-bold-duotone',
+      analyticColor: theme.palette.error.main,
     },
     {
-      value: 'failed',
-      label: t('activity_view.needs_action'),
-      shortLabel: t('activity_view.needs_action_short'),
-      count: transactions.filter((tx) => tx.status === 'Failed' || tx.status === 'Expired').length,
+      title: t('transaction_list.tabs.failed'),
+      value: 'Failed',
+      label: t('transaction_list.tabs.failed'),
+      color: 'error',
+      suffix: t('activity_view.transactions_suffix'),
+      icon: 'solar:danger-triangle-bold-duotone',
+      analyticColor: theme.palette.error.dark,
     },
   ];
+
+  const dataFiltered = applyFilter({
+    inputData: rows,
+    comparator: getComparator(table.order, table.orderBy),
+    filters: filters.state,
+    dateError,
+  });
+
+  const dataInPage = dataFiltered.slice(
+    table.page * table.rowsPerPage,
+    table.page * table.rowsPerPage + table.rowsPerPage
+  );
+
+  const denseHeight = table.dense ? 56 : 76;
+  const canReset =
+    !!filters.state.name ||
+    !!filters.state.ledger.length ||
+    filters.state.status !== 'all' ||
+    (!!filters.state.startDate && !!filters.state.endDate);
+  const notFound = (!dataFiltered.length && canReset) || !dataFiltered.length;
+  const hasFailedOrExpired = rows.some(isNeedsAction);
+
+  const getTransactionLength = useCallback(
+    (status: ActivityLens) => rows.filter((row) => txMatchesStatus(row, status)).length,
+    [rows]
+  );
+
+  const getTotalAmount = useCallback(
+    (status: ActivityLens) =>
+      sumBy(
+        rows.filter((row) => txMatchesStatus(row, status)),
+        (row) => row.amount_total_msat
+      ),
+    [rows]
+  );
+
+  const getPercentByStatus = useCallback(
+    (status: ActivityLens) => (rows.length ? (getTransactionLength(status) / rows.length) * 100 : 0),
+    [getTransactionLength, rows.length]
+  );
+
+  const handleFilterStatus = useCallback(
+    (event: React.SyntheticEvent, newValue: ActivityLens) => {
+      table.onResetPage();
+      filters.setState({ status: newValue });
+    },
+    [filters, table]
+  );
+
+  const handleCleanSuccess = () => {
+    mutate(endpointKeys.userWallet.get);
+  };
 
   return (
     <DashboardContent maxWidth="xl">
@@ -149,162 +375,323 @@ export function ActivityView() {
           <CustomBreadcrumbs
             heading={t('activity')}
             links={[{ name: t('money') }, { name: t('activity') }]}
+            action={
+              <Tooltip title={t('recent_transactions.clean_failed_expired')} placement="top" arrow>
+                <span>
+                  <CleanTransactionsButton
+                    onSuccess={handleCleanSuccess}
+                    buttonProps={{
+                      color: 'error',
+                      variant: 'outlined',
+                      disabled: !hasFailedOrExpired,
+                      startIcon: <Iconify icon="solar:trash-bin-trash-bold" />,
+                    }}
+                  >
+                    {t('clean')}
+                  </CleanTransactionsButton>
+                </span>
+              </Tooltip>
+            }
             sx={{ mb: { xs: 3, md: 5 } }}
           />
 
-          <Card sx={{ borderRadius: 1 }}>
-            <Tabs
-              value={lens}
-              onChange={(_, value) => setLens(value)}
-              variant={smDown ? 'fullWidth' : 'scrollable'}
-              sx={{ px: 2, borderBottom: (theme) => `1px solid ${theme.vars.palette.divider}` }}
-            >
-              {tabs.map((tab) => (
-                <Tab
-                  key={tab.value}
-                  value={tab.value}
-                  label={smDown ? tab.shortLabel : tab.label}
-                  iconPosition="end"
-                  icon={<Label color={tab.count ? 'info' : 'default'}>{tab.count}</Label>}
-                  sx={{ minWidth: 0, px: { xs: 0.75, sm: 2 } }}
-                />
-              ))}
-            </Tabs>
-
-            <Stack spacing={0} divider={<Divider />}>
-              {filtered.map((tx) => (
-                <Box
-                  key={`${tx.transaction_type}-${tx.id}`}
-                  component="button"
-                  onClick={() => setSelected(tx)}
-                  sx={[
-                    (theme) => ({
-                      p: 2,
-                      gap: 2,
-                      border: 0,
-                      width: 1,
-                      display: 'grid',
-                      cursor: 'pointer',
-                      textAlign: 'left',
-                      alignItems: 'center',
-                      bgcolor: 'transparent',
-                      color: 'text.primary',
-                      gridTemplateColumns: {
-                        xs: '36px minmax(0, 1fr)',
-                        md: '36px minmax(0, 1fr) 160px 140px 112px',
-                      },
-                      '&:hover': { bgcolor: theme.vars.palette.action.hover },
-                    }),
-                  ]}
+          <Stack spacing={3}>
+            <Card>
+              <Scrollbar>
+                <Stack
+                  direction="row"
+                  divider={<Divider orientation="vertical" flexItem sx={{ borderStyle: 'dashed' }} />}
+                  sx={{ py: 2 }}
                 >
-                  <Box
-                    sx={{
-                      width: 36,
-                      height: 36,
-                      display: 'grid',
-                      borderRadius: 1,
-                      placeItems: 'center',
-                      color: txDirection(tx) === 'in' ? 'success.main' : 'warning.main',
-                      bgcolor: txDirection(tx) === 'in' ? 'success.lighter' : 'warning.lighter',
-                    }}
-                  >
-                    <Iconify icon={railIcon(tx)} width={20} />
-                  </Box>
+                  {activityTabs.map((tab) => (
+                    <ItemAnalytic
+                      key={tab.title}
+                      title={tab.title}
+                      total={getTransactionLength(tab.value)}
+                      percent={getPercentByStatus(tab.value)}
+                      price={getTotalAmount(tab.value)}
+                      icon={tab.icon}
+                      color={tab.analyticColor}
+                      countSuffix={tab.suffix}
+                      compact
+                    />
+                  ))}
+                </Stack>
+              </Scrollbar>
+            </Card>
 
-                  <Stack sx={{ minWidth: 0 }}>
-                    <Typography variant="subtitle2" noWrap>
-                      {tx.description || tx.id}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {fDateTime(tx.created_at)} · {tx.ledger}
-                    </Typography>
-                  </Stack>
-
-                  <Typography variant="body2" color="text.secondary" sx={{ display: { xs: 'none', md: 'block' } }}>
-                    {tx.wallet_id}
+            <Card sx={{ p: 3 }}>
+              <Stack
+                direction={{ xs: 'column', md: 'row' }}
+                spacing={3}
+                sx={{ alignItems: { md: 'center' }, justifyContent: 'space-between' }}
+              >
+                <Stack spacing={0.5}>
+                  <Typography variant="h6">{t('activity_view.flow_title')}</Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    {t('activity_view.flow_subheader')}
                   </Typography>
-                  <SatsWithIcon amountMSats={txAmount(tx)} sx={{ display: { xs: 'none', md: 'block' } }} />
-                  <Label color={statusColor(tx.status)}>{tx.status}</Label>
-                </Box>
-              ))}
+                </Stack>
 
-              {filtered.length === 0 && (
+                <ToggleButtonGroup
+                  exclusive
+                  size="small"
+                  value={flowLens}
+                  onChange={(_, value) => value && setFlowLens(value)}
+                >
+                  <ToggleButton value="income">{t('wallet_view.income')}</ToggleButton>
+                  <ToggleButton value="expenses">{t('wallet_view.expenses')}</ToggleButton>
+                </ToggleButtonGroup>
+              </Stack>
+
+              {chartSeries[0].data.length ? (
+                <Chart
+                  type="area"
+                  series={chartSeries}
+                  options={chartOptions}
+                  sx={{ height: 300, mt: 3 }}
+                />
+              ) : (
                 <EmptyContent
-                  title={t('activity_view.empty_title')}
-                  description={t('activity_view.empty_description')}
-                  sx={{ py: 8 }}
+                  title={t('activity_view.empty_chart')}
+                  description={t('activity_view.empty_chart_description')}
+                  sx={{ py: 5 }}
                 />
               )}
-            </Stack>
-          </Card>
+            </Card>
 
-          <Drawer
-            anchor="right"
-            open={!!selected}
-            onClose={() => setSelected(undefined)}
-            slotProps={{ paper: { sx: { width: { xs: 1, sm: 520 }, maxWidth: 1 } } }}
-          >
-            {selected && (
-              <Stack spacing={3} sx={{ p: 3 }}>
-                <Stack direction="row" sx={{ alignItems: 'center', justifyContent: 'space-between' }}>
-                  <Stack>
-                    <Typography variant="h6">
-                      {selected.transaction_type === TransactionType.INVOICE
-                        ? t('activity_view.received')
-                        : t('activity_view.sent')}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      {selected.id}
-                    </Typography>
-                  </Stack>
-                  <IconButton onClick={() => setSelected(undefined)}>
-                    <Iconify icon="mingcute:close-line" />
-                  </IconButton>
-                </Stack>
-
-                <SatsWithIcon amountMSats={txAmount(selected)} variant="h3" />
-                <Divider />
-
-                {[
-                  [t('activity_view.rail'), selected.ledger],
-                  [t('activity_view.status'), selected.status],
-                  [t('activity_view.created'), fDateTime(selected.created_at)],
-                  [t('activity_view.settled'), fDateTime(selected.payment_time)],
-                  [t('activity_view.wallet'), selected.wallet_id],
-                ].map(([label, value]) => (
-                  <Stack key={label} direction="row" sx={{ justifyContent: 'space-between', gap: 2 }}>
-                    <Typography variant="body2" color="text.secondary">
-                      {label}
-                    </Typography>
-                    <Typography variant="body2" sx={{ textAlign: 'right' }}>
-                      {value || '—'}
-                    </Typography>
-                  </Stack>
+            <Card>
+              <Tabs
+                value={filters.state.status}
+                onChange={handleFilterStatus}
+                variant="scrollable"
+                sx={{
+                  px: 2.5,
+                  boxShadow: `inset 0 -2px 0 0 ${alpha(theme.palette.grey[500], 0.08)}`,
+                }}
+              >
+                {activityTabs.map((tab) => (
+                  <Tab
+                    key={tab.value}
+                    value={tab.value}
+                    label={tab.label}
+                    iconPosition="end"
+                    icon={
+                      <Label
+                        variant={
+                          ((tab.value === 'all' || tab.value === filters.state.status) &&
+                            'filled') ||
+                          'soft'
+                        }
+                        color={tab.color}
+                      >
+                        {getTransactionLength(tab.value)}
+                      </Label>
+                    }
+                  />
                 ))}
+              </Tabs>
 
-                <Box
-                  component="pre"
-                  sx={{
-                    m: 0,
-                    p: 2,
-                    overflow: 'auto',
-                    borderRadius: 1,
-                    typography: 'caption',
-                    bgcolor: 'grey.900',
-                    color: 'grey.100',
-                  }}
-                >
-                  {technicalPayload(selected)}
-                </Box>
+              <TransactionTableToolbar
+                filters={filters}
+                onResetPage={table.onResetPage}
+                dateError={dateError}
+                invoiceLedgerOptions={LEDGERS}
+              />
 
-                <Stack direction="row" sx={{ justifyContent: 'flex-end' }}>
-                  <CopyButton value={technicalPayload(selected)} title={t('activity_view.copy_technical')} />
-                </Stack>
-              </Stack>
-            )}
-          </Drawer>
+              {canReset && (
+                <TransactionTableFiltersResult
+                  filters={filters}
+                  onResetPage={table.onResetPage}
+                  totalResults={dataFiltered.length}
+                  sx={{ p: 2.5, pt: 0 }}
+                />
+              )}
+
+              <TableContainer sx={{ position: 'relative', overflow: 'unset' }}>
+                <Scrollbar>
+                  <Table size={table.dense ? 'small' : 'medium'} sx={{ minWidth: 960 }}>
+                    <TableHeadCustom
+                      order={table.order}
+                      orderBy={table.orderBy}
+                      headCells={tableHead(t)}
+                      rowCount={dataFiltered.length}
+                      numSelected={table.selected.length}
+                      onSort={table.onSort}
+                      onSelectAllRows={(checked) =>
+                        table.onSelectAllRows(
+                          checked,
+                          dataFiltered.map((row) => row.row_key)
+                        )
+                      }
+                    />
+
+                    <TableBody>
+                      {dataInPage.map((row) => (
+                        <ActivityTableRow
+                          key={row.row_key}
+                          row={row}
+                          selected={table.selected.includes(row.row_key)}
+                          onSelectRow={() => table.onSelectRow(row.row_key)}
+                        />
+                      ))}
+
+                      <TableEmptyRows
+                        height={denseHeight}
+                        emptyRows={emptyRows(table.page, table.rowsPerPage, dataFiltered.length)}
+                      />
+
+                      <TableNoData notFound={notFound} />
+                    </TableBody>
+                  </Table>
+                </Scrollbar>
+              </TableContainer>
+
+              <TablePaginationCustom
+                count={dataFiltered.length}
+                page={table.page}
+                rowsPerPage={table.rowsPerPage}
+                onPageChange={table.onChangePage}
+                onRowsPerPageChange={table.onChangeRowsPerPage}
+                dense={table.dense}
+                onChangeDense={table.onChangeDense}
+              />
+            </Card>
+          </Stack>
         </>
       )}
     </DashboardContent>
+  );
+}
+
+// ----------------------------------------------------------------------
+
+function ActivityTableRow({
+  row,
+  selected,
+  onSelectRow,
+}: {
+  row: ActivityRow;
+  selected: boolean;
+  onSelectRow: VoidFunction;
+}) {
+  const { t } = useTranslate();
+  const router = useRouter();
+  const popover = usePopover();
+
+  return (
+    <>
+      <TableRow
+        hover
+        selected={selected}
+        onClick={() => router.push(row.detail_href)}
+        sx={{ cursor: 'pointer' }}
+      >
+        <TableCell padding="checkbox">
+          <Checkbox
+            checked={selected}
+            onClick={(event) => {
+              event.stopPropagation();
+              onSelectRow();
+            }}
+          />
+        </TableCell>
+
+        <TableCell>
+          <Label color={directionColor(row.direction)}>
+            {row.direction === 'in' ? t('activity_view.in') : t('activity_view.out')}
+          </Label>
+        </TableCell>
+
+        <TableCell>
+          <ListItemText
+            primary={row.description_label}
+            secondary={`${fDateTime(row.created_at)} · ${row.ledger}`}
+            slotProps={{
+              primary: { noWrap: true, sx: { typography: 'body2' } },
+              secondary: { sx: { typography: 'caption', color: 'text.disabled' } },
+            }}
+          />
+        </TableCell>
+
+        <TableCell>
+          <ListItemText
+            primary={fDate(row.created_at)}
+            secondary={fTime(row.created_at)}
+            slotProps={{
+              primary: { noWrap: true, sx: { typography: 'body2' } },
+              secondary: { sx: { typography: 'caption', color: 'text.disabled' } },
+            }}
+          />
+        </TableCell>
+
+        <TableCell>
+          <ListItemText
+            primary={fDate(row.payment_time)}
+            secondary={fTime(row.payment_time)}
+            slotProps={{
+              primary: { noWrap: true, sx: { typography: 'body2' } },
+              secondary: { sx: { typography: 'caption', color: 'text.disabled' } },
+            }}
+          />
+        </TableCell>
+
+        <TableCell>
+          <SatsWithIcon amountMSats={row.amount_total_msat} />
+        </TableCell>
+
+        <TableCell>
+          <Label
+            variant="soft"
+            color={
+              (row.ledger === 'Lightning' && 'secondary') ||
+              (row.ledger === 'Internal' && 'primary') ||
+              'default'
+            }
+          >
+            {row.ledger}
+          </Label>
+        </TableCell>
+
+        <TableCell>
+          <Label variant="soft" color={statusColor(row.status)}>
+            {row.status}
+          </Label>
+        </TableCell>
+
+        <TableCell align="right" sx={{ px: 1 }}>
+          <IconButton
+            color={popover.open ? 'inherit' : 'default'}
+            onClick={(event) => {
+              event.stopPropagation();
+              popover.onOpen(event);
+            }}
+          >
+            <Iconify icon="eva:more-vertical-fill" />
+          </IconButton>
+        </TableCell>
+      </TableRow>
+
+      <CustomPopover
+        open={popover.open}
+        anchorEl={popover.anchorEl}
+        onClose={popover.onClose}
+        slotProps={{ arrow: { placement: 'right-top' } }}
+      >
+        <MenuList>
+          <MenuItem
+            onClick={() => {
+              router.push(row.detail_href);
+              popover.onClose();
+            }}
+          >
+            <Iconify icon="solar:eye-bold" />
+            {t('details')}
+          </MenuItem>
+
+          <CopyMenuItem value={row.id} title={t('activity_view.copy_transaction_id')} />
+        </MenuList>
+      </CustomPopover>
+    </>
   );
 }

@@ -143,7 +143,9 @@ export function WalletView() {
               </Stack>
               <Typography variant="h3">{t('wallet_view.title')}</Typography>
               <Typography variant="body2" color="text.secondary">
-                {wallet?.id}
+                {wallet?.ln_address
+                  ? t('wallet_view.identity_ready')
+                  : t('wallet_view.identity_missing')}
               </Typography>
             </Stack>
 
@@ -407,7 +409,10 @@ export function WalletView() {
                         </Box>
                         <Stack sx={{ minWidth: 0 }}>
                           <Typography variant="subtitle2" noWrap>
-                            {tx.description || tx.id}
+                            {tx.description ||
+                              (txDirection(tx) === 'in'
+                                ? t('activity_view.received')
+                                : t('activity_view.sent'))}
                           </Typography>
                           <Typography variant="caption" color="text.secondary">
                             {fFromNow(tx.created_at)} · {tx.ledger}

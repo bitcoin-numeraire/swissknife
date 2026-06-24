@@ -6,6 +6,10 @@
   "identity_hub": "Identity hub",
   "accounts": "Accounts",
   "accounts_directory": "Accounts directory",
+  "wallet_admin": "Wallet admin",
+  "admin_invoices": "Admin invoices",
+  "admin_payments": "Admin payments",
+  "admin_lightning_addresses": "Admin LN addresses",
   "roles_access": "Roles & access",
   "observe": "Observe",
   "node_health": "Node health",
@@ -147,6 +151,8 @@
     "fiat_unavailable": "Fiat prices are unavailable, but wallet actions still work.",
     "total_balance": "Total balance",
     "balance_tooltip": "Sum of balances of all wallets",
+    "identity_ready": "Reusable identity is ready",
+    "identity_missing": "Register a Lightning Address to make this wallet shareable",
     "income": "Income",
     "income_tooltip": "Total income",
     "expenses": "Expenses",
@@ -175,6 +181,7 @@
     "any": "Any",
     "amount_sats": "Amount (sats)",
     "memo": "Memo",
+    "address_type": "Address type",
     "generate": "Generate request",
     "regenerate": "Regenerate",
     "empty_qr": "Generate a request to show a QR",
@@ -186,14 +193,26 @@
     "reuse_warning": "This address has been used before. Generate a fresh address before sharing.",
     "identity": "Reusable identity:"
   },
+  "bitcoin_address_type": {
+    "taproot": "Taproot",
+    "taproot_helper": "Best privacy and lower fees when sender support is modern.",
+    "native_segwit": "Native SegWit",
+    "native_segwit_helper": "Most compatible modern address type. Use when Taproot support is uncertain."
+  },
   "activity_view": {
     "all": "All",
     "in": "In",
     "out": "Out",
+    "direction": "Direction",
     "pending": "Pending",
     "pending_short": "Pend",
     "needs_action": "Needs action",
     "needs_action_short": "Fix",
+    "transactions_suffix": "transactions",
+    "flow_title": "Income and expenses",
+    "flow_subheader": "Settled money movement over time, split by direction.",
+    "empty_chart": "No settled flow yet",
+    "empty_chart_description": "Settle an invoice or payment to build the income and expenses chart.",
     "empty_title": "No activity",
     "empty_description": "Transactions will appear here after your first send or receive.",
     "received": "Received",
@@ -203,16 +222,24 @@
     "created": "Created",
     "settled": "Settled",
     "wallet": "Wallet",
-    "copy_technical": "Copy technical details"
+    "copy_technical": "Copy technical details",
+    "copy_transaction_id": "Copy transaction ID"
   },
   "identity_view": {
     "title": "Identity hub",
+    "hero_title": "Your public receive layer",
+    "hero_subheader": "Keep reusable identities separate from fresh payment requests. Share the human address, rotate on-chain addresses, and connect Nostr only when you want public verification.",
+    "claim_lightning": "Claim Lightning Address",
     "lightning": "Lightning Address",
+    "lightning_body": "A human-readable address for repeat Lightning payments.",
     "nostr": "Nostr",
+    "nostr_body": "Optional NIP-05 verification for your public profile.",
     "onchain": "On-chain",
+    "onchain_body": "Fresh Native SegWit or Taproot addresses for Bitcoin deposits.",
     "people": "People",
     "reusable_address": "Reusable address",
     "no_ln_address": "No Lightning Address yet",
+    "no_ln_address_description": "Claim a username to receive Lightning payments with an email-like address and unlock Nostr verification.",
     "nostr_enabled": "NIP-05 is enabled for this address.",
     "nostr_disabled": "Nostr visibility is disabled.",
     "no_nostr": "No Nostr public key linked",
@@ -329,7 +356,9 @@
     "title": "Recent Transactions",
     "subheader": "Last {{count}} transactions",
     "clean_failed_expired": "Clean failed and expired transactions",
-    "empty_description": "Empty description"
+    "empty_description": "Empty description",
+    "source": "Source",
+    "wallet_account": "Wallet account"
   },
   "transaction_filters": {
     "ledger": "Ledger:",
@@ -452,7 +481,15 @@
     "verification_failed": "Verification failed. The message does not belong to the node for the given signature."
   },
   "settings_view": {
-    "manage_account": "Manage your account"
+    "manage_account": "Manage your account",
+    "control_center": "Account control center",
+    "subtitle": "Manage the public identity people can pay and verify, plus the tokens that let apps use this wallet.",
+    "lightning_tab": "Lightning Address",
+    "api_keys_tab": "API Keys",
+    "address_ready": "Address ready",
+    "address_missing": "Not registered",
+    "tokens_count": "{{count}} tokens",
+    "no_tokens": "No tokens"
   },
   "settings_ln_address": {
     "update_failed": "Failed to update LN Address",

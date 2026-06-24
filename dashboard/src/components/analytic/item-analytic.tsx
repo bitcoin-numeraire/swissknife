@@ -19,22 +19,34 @@ type Props = {
   price?: number;
   color?: string;
   countSuffix?: string;
+  compact?: boolean;
 };
 
-export function ItemAnalytic({ title, total, icon, color, percent, price, countSuffix }: Props) {
+export function ItemAnalytic({
+  title,
+  total,
+  icon,
+  color,
+  percent,
+  price,
+  countSuffix,
+  compact,
+}: Props) {
+  const indicatorSize = compact ? 48 : 56;
+
   return (
     <Stack
-      spacing={2.5}
+      spacing={compact ? 1.5 : 2.5}
       direction="row"
-      sx={{ alignItems: 'center', justifyContent: 'center', width: 1, minWidth: 200 }}
+      sx={{ alignItems: 'center', justifyContent: 'center', width: 1, minWidth: compact ? 150 : 200 }}
     >
       <Stack sx={{ alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
-        <Iconify icon={icon} width={32} sx={{ color, position: 'absolute' }} />
+        <Iconify icon={icon} width={compact ? 28 : 32} sx={{ color, position: 'absolute' }} />
 
         <CircularProgress
           variant="determinate"
           value={percent}
-          size={56}
+          size={indicatorSize}
           thickness={2}
           sx={{ color, opacity: 0.48 }}
         />
@@ -42,7 +54,7 @@ export function ItemAnalytic({ title, total, icon, color, percent, price, countS
         <CircularProgress
           variant="determinate"
           value={100}
-          size={56}
+          size={indicatorSize}
           thickness={3}
           sx={{
             top: 0,
@@ -55,13 +67,13 @@ export function ItemAnalytic({ title, total, icon, color, percent, price, countS
       </Stack>
 
       <Stack spacing={0.5}>
-        <Typography variant="subtitle1">{title}</Typography>
+        <Typography variant={compact ? 'subtitle2' : 'subtitle1'}>{title}</Typography>
 
         <Box component="span" sx={{ color: 'text.disabled', typography: 'body2' }}>
           {fShortenNumber(total)} {countSuffix}
         </Box>
 
-        {price && <SatsWithIcon amountMSats={price} />}
+        {price != null && <SatsWithIcon amountMSats={price} />}
       </Stack>
     </Stack>
   );
