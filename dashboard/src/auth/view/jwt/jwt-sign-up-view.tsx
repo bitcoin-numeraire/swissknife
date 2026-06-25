@@ -1,17 +1,24 @@
 'use client';
 
 import { z as zod } from 'zod';
+import { useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { useBoolean } from 'minimal-shared/hooks';
 import { zodResolver } from '@hookform/resolvers/zod';
 
 import Box from '@mui/material/Box';
+import Link from '@mui/material/Link';
+import Alert from '@mui/material/Alert';
+import Stack from '@mui/material/Stack';
 import Button from '@mui/material/Button';
 import IconButton from '@mui/material/IconButton';
+import Typography from '@mui/material/Typography';
+import LinearProgress from '@mui/material/LinearProgress';
 import InputAdornment from '@mui/material/InputAdornment';
 
 import { paths } from 'src/routes/paths';
 import { useRouter } from 'src/routes/hooks';
+import { RouterLink } from 'src/routes/components';
 
 import { handleActionError } from 'src/utils/errors';
 
@@ -29,17 +36,12 @@ import { SignUpTerms } from '../../components/sign-up-terms';
 
 // ----------------------------------------------------------------------
 
-export type SignUpSchemaType = zod.infer<typeof SignUpSchema>;
+const MIN_PASSWORD_LENGTH = 12;
 
-export const SignUpSchema = zod
-  .object({
-    password: zod.string().min(6),
-    repeatPassword: zod.string().min(6),
-  })
-  .refine((data) => data.password === data.repeatPassword, {
-    path: ['repeatPassword'],
-    message: 'Passwords do not match',
-  });
+export type SignUpSchemaType = {
+  password: string;
+  repeatPassword: string;
+};
 
 // ----------------------------------------------------------------------
 
@@ -51,15 +53,34 @@ export function JwtSignUpView() {
 
   const { checkUserSession } = useAuthContext();
 
+  const signUpSchema = useMemo(
+    () =>
+      zod
+        .object({
+          password: zod.string().min(MIN_PASSWORD_LENGTH, {
+            message: t('sign_up.min_password', { count: MIN_PASSWORD_LENGTH }),
+          }),
+          repeatPassword: zod.string().min(1, { message: t('sign_up.repeat_required') }),
+        })
+        .refine((data) => data.password === data.repeatPassword, {
+          path: ['repeatPassword'],
+          message: t('sign_up.passwords_do_not_match'),
+        }),
+    [t]
+  );
+
   const defaultValues: SignUpSchemaType = {
     password: '',
     repeatPassword: '',
   };
 
   const methods = useForm<SignUpSchemaType>({
-    resolver: zodResolver(SignUpSchema),
+    resolver: zodResolver(signUpSchema),
     defaultValues,
   });
+
+  const password = methods.watch('password');
+  const passwordProgress = Math.min((password.length / MIN_PASSWORD_LENGTH) * 100, 100);
 
   const {
     handleSubmit,
@@ -82,10 +103,11 @@ export function JwtSignUpView() {
   });
 
   const renderForm = () => (
-    <Box sx={{ gap: 3, display: 'flex', flexDirection: 'column' }}>
+    <Box sx={{ gap: 2.5, display: 'flex', flexDirection: 'column' }}>
       <Field.Text
         name="password"
         label={t('sign_up.password')}
+        helperText={t('sign_up.password_helper')}
         type={showPassword.value ? 'text' : 'password'}
         slotProps={{
           inputLabel: { shrink: true },
@@ -101,9 +123,25 @@ export function JwtSignUpView() {
         }}
       />
 
+      <Stack spacing={1}>
+        <LinearProgress
+          variant="determinate"
+          value={passwordProgress}
+          color={passwordProgress >= 100 ? 'success' : 'warning'}
+          sx={{ height: 6, borderRadius: 1 }}
+        />
+        <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+          {t('sign_up.length_progress', {
+            count: Math.min(password.length, MIN_PASSWORD_LENGTH),
+            min: MIN_PASSWORD_LENGTH,
+          })}
+        </Typography>
+      </Stack>
+
       <Field.Text
         name="repeatPassword"
         label={t('sign_up.repeat_password')}
+        helperText={t('sign_up.repeat_password_helper')}
         type={showPassword.value ? 'text' : 'password'}
         slotProps={{
           inputLabel: { shrink: true },
@@ -126,6 +164,7 @@ export function JwtSignUpView() {
         type="submit"
         variant="contained"
         loading={isSubmitting}
+        loadingIndicator={t('sign_up.create_loading')}
       >
         {t('sign_up.create_button')}
       </Button>
@@ -133,18 +172,57 @@ export function JwtSignUpView() {
   );
 
   return (
-    <>
+    <Stack spacing={4}>
       <FormHead
-        title="Set up your Password"
-        description="Your password is used to access your wallet and encrypt your data, you won't be able to log in if you lose but don't worry, your funds can be recovered."
-        sx={{ textAlign: { xs: 'center', md: 'left' } }}
+        title={t('sign_up.title')}
+        description={t('sign_up.description')}
+        sx={{ mb: 0, textAlign: 'left', alignItems: 'flex-start' }}
       />
+
+      <Alert
+        severity="warning"
+        icon={<Iconify icon="solar:key-minimalistic-square-3-bold-duotone" />}
+        sx={{ borderRadius: 1 }}
+      >
+        {t('sign_up.security_copy')}
+      </Alert>
 
       <Form methods={methods} onSubmit={onSubmit}>
         {renderForm()}
       </Form>
 
-      <SignUpTerms />
-    </>
+      <Stack spacing={1.5}>
+        <Typography variant="overline" sx={{ color: 'text.secondary', letterSpacing: 0 }}>
+          {t('sign_up.security_title')}
+        </Typography>
+
+        {[
+          ['solar:database-bold-duotone', 'sign_up.backup_node'],
+          ['solar:shield-user-bold-duotone', 'sign_up.keep_private'],
+          ['solar:bolt-bold-duotone', 'sign_up.fund_after_backup'],
+        ].map(([icon, label]) => (
+          <Stack key={label} direction="row" spacing={1.25} sx={{ alignItems: 'center' }}>
+            <Iconify icon={icon} width={20} sx={{ color: 'primary.main' }} />
+            <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+              {t(label)}
+            </Typography>
+          </Stack>
+        ))}
+      </Stack>
+
+      <SignUpTerms sx={{ mt: 0, textAlign: 'left' }} />
+
+      <Typography variant="body2" sx={{ color: 'text.secondary', textAlign: 'center' }}>
+        {t('sign_up.sign_in_prompt')}{' '}
+        <Link
+          component={RouterLink}
+          href={paths.auth.login}
+          color="text.primary"
+          underline="always"
+        >
+          {t('sign_up.sign_in_link')}
+        </Link>
+      </Typography>
+    </Stack>
   );
 }

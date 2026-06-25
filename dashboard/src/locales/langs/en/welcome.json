@@ -1,19 +1,47 @@
 {
+  "preview": {
+    "eyebrow": "SwissKnife first run",
+    "title": "Start with a wallet you can operate",
+    "content": "Preview the money surface before creating the password: self-custody, Lightning, on-chain deposits, reusable identity and node control are all part of the same workspace.",
+    "wallet_title": "Starter wallet",
+    "wallet_caption": "Ready for regtest funding",
+    "available": "Spendable now",
+    "empty_state": "Fund after backup, then receive or send from the dashboard.",
+    "lightning": "Lightning",
+    "onchain": "On-chain",
+    "identity": "Identity",
+    "node": "Node"
+  },
   "welcome": {
-    "title": "Welcome to Numeraire SwissKnife",
-    "content": "See that orange dot? That's Bitcoin absorbing the monetary value of every other asset in the universe. Be part of the journey with a mighty Bitcoin Lightning wallet."
+    "title": "One wallet surface, many payment rails",
+    "content": "SwissKnife treats Lightning invoices, on-chain requests and human-readable addresses as one money workflow instead of separate admin screens.",
+    "point_one": "Receive with Lightning, a fresh Bitcoin address or a reusable Lightning Address.",
+    "point_two": "Send from a single input that can grow into LNURL, BIP21 and address parsing.",
+    "point_three": "Keep the interface focused on amounts, status and next action."
   },
   "custody": {
-    "title": "Be Self-Sovereign",
-    "content": "Hold your own keys in self-custody so no-one but you can access your funds."
+    "title": "Self-custody stays visible",
+    "content": "The dashboard should make it clear what the password unlocks, what must be backed up and why the server cannot recover private material for you.",
+    "point_one": "Create a local password before the wallet opens.",
+    "point_two": "Back up node and wallet recovery material before meaningful deposits.",
+    "point_three": "Show security reminders at the moment they matter."
   },
   "accessibility": {
-    "title": "Up & Running",
-    "content": "Connect to your own node or get one for free running in the cloud. With support for all major Lightning node implementations."
+    "title": "Bring your own node, or host it cleanly",
+    "content": "Umbrel is one good self-hosted target, but the experience should also make sense for Start9, raw LND, CLN and managed cloud deployments.",
+    "point_one": "Treat self-hosted as a deployment model, not a separate wallet mode.",
+    "point_two": "Keep node health, liquidity and peer state close to payment actions.",
+    "point_three": "Use regtest-friendly flows so first deposits can be tested safely."
   },
   "multi_user": {
-    "title": "Multiple Users",
-    "content": "Create as many wallets as you need with instantaneous and free internal transfers between users."
+    "title": "Accounts without spreadsheet ops",
+    "content": "Accounts, wallets and reusable identities should feel like a small operating system for teams, agents and services.",
+    "point_one": "Separate the accounts directory from wallet administration.",
+    "point_two": "Make Lightning Address ownership visible without exposing raw UUIDs.",
+    "point_three": "Prepare the UI for roles, agents, API keys and service wallets."
   },
-  "get_started": "Get Started"
+  "step": "Step {{current}} of {{total}}",
+  "back": "Back",
+  "continue": "Continue",
+  "get_started": "Create password"
 }

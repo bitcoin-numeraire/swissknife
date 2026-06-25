@@ -1,19 +1,47 @@
 {
+  "preview": {
+    "eyebrow": "Première exécution SwissKnife",
+    "title": "Commence avec un wallet opérable",
+    "content": "Prévisualise la surface monétaire avant de créer le mot de passe : self-custody, Lightning, dépôts on-chain, identité réutilisable et contrôle du nœud vivent dans le même espace.",
+    "wallet_title": "Wallet de départ",
+    "wallet_caption": "Prêt pour un financement regtest",
+    "available": "Disponible maintenant",
+    "empty_state": "Finance après sauvegarde, puis reçois ou envoie depuis le dashboard.",
+    "lightning": "Lightning",
+    "onchain": "On-chain",
+    "identity": "Identité",
+    "node": "Nœud"
+  },
   "welcome": {
-    "title": "Bienvenue sur Numeraire SwissKnife",
-    "content": "Vois ce point orange ? C’est Bitcoin qui absorbe la valeur monétaire de tous les autres actifs dans l’univers. Participe à l’aventure avec un puissant portefeuille Bitcoin Lightning."
+    "title": "Une seule surface wallet, plusieurs rails",
+    "content": "SwissKnife traite les factures Lightning, les demandes on-chain et les adresses lisibles comme un même flux monétaire plutôt que des écrans admin séparés.",
+    "point_one": "Reçois avec Lightning, une adresse Bitcoin fraîche ou une adresse Lightning réutilisable.",
+    "point_two": "Envoie depuis une saisie unique qui pourra gérer LNURL, BIP21 et les adresses.",
+    "point_three": "Garde l'interface centrée sur les montants, le statut et la prochaine action."
   },
   "custody": {
-    "title": "Sois souverain",
-    "content": "Conserve tes propres clés pour que personne d’autre que toi ne puisse accéder à tes fonds."
+    "title": "La self-custody reste visible",
+    "content": "Le dashboard doit clarifier ce que le mot de passe déverrouille, ce qui doit être sauvegardé et pourquoi le serveur ne peut pas récupérer le matériel privé.",
+    "point_one": "Crée un mot de passe local avant l'ouverture du wallet.",
+    "point_two": "Sauvegarde le nœud et le matériel de récupération avant les dépôts importants.",
+    "point_three": "Affiche les rappels de sécurité au moment utile."
   },
   "accessibility": {
-    "title": "Prêt à l'emploi",
-    "content": "Connecte-toi à ton propre nœud ou procure-t’en un gratuitement dans le cloud, avec la prise en charge de toutes les principales implémentations."
+    "title": "Apporte ton nœud, ou héberge-le proprement",
+    "content": "Umbrel est une bonne cible self-hosted, mais l'expérience doit aussi convenir à Start9, LND brut, CLN et aux déploiements cloud managés.",
+    "point_one": "Traite le self-hosted comme un modèle de déploiement, pas comme un mode wallet séparé.",
+    "point_two": "Garde la santé du nœud, la liquidité et les peers près des actions de paiement.",
+    "point_three": "Utilise des flux adaptés au regtest pour tester les premiers dépôts sans risque."
   },
   "multi_user": {
-    "title": "Utilisateurs multiples",
-    "content": "Crée autant de portefeuilles que nécessaire avec des transferts internes instantanés et gratuits entre utilisateurs."
+    "title": "Des comptes sans opérations tableur",
+    "content": "Les comptes, wallets et identités réutilisables doivent ressembler à un petit système d'exploitation pour équipes, agents et services.",
+    "point_one": "Sépare le répertoire des comptes de l'administration des wallets.",
+    "point_two": "Rends la propriété des adresses Lightning visible sans exposer les UUID bruts.",
+    "point_three": "Prépare l'UI pour les rôles, agents, clés API et wallets de service."
   },
-  "get_started": "Commencer"
+  "step": "Étape {{current}} sur {{total}}",
+  "back": "Retour",
+  "continue": "Continuer",
+  "get_started": "Créer le mot de passe"
 }
