@@ -34,9 +34,7 @@ export function FormHead({ sx, icon, title, description, ...other }: FormHeadPro
         ]}
         {...other}
       >
-        <Typography variant="h4" sx={{ m: 'auto' }}>
-          {title}
-        </Typography>
+        <Typography variant="h4">{title}</Typography>
 
         {description && (
           <Typography variant="body2" sx={{ color: 'text.secondary' }}>

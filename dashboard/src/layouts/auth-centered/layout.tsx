@@ -73,7 +73,7 @@ export function AuthCenteredLayout({
             href={paths.external.numeraire.contact}
             component={RouterLink}
             color="inherit"
-            sx={{ typography: 'subtitle2' }}
+            sx={{ typography: 'subtitle2', display: { xs: 'none', sm: 'inline-flex' } }}
             target="_blank"
           >
             {t('need_help')}

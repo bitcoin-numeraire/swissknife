@@ -16,7 +16,7 @@ import Alert from '@mui/material/Alert';
 import { paths } from 'src/routes/paths';
 import { RouterLink } from 'src/routes/components';
 
-import { CONFIG } from 'src/global-config';
+import { allLangs, useTranslate } from 'src/locales';
 
 import { Logo } from 'src/components/logo';
 
@@ -25,6 +25,7 @@ import { AuthSplitContent } from './content';
 import { MainSection } from '../core/main-section';
 import { LayoutSection } from '../core/layout-section';
 import { HeaderSection } from '../core/header-section';
+import { LanguagePopover } from '../components/language-popover';
 
 // ----------------------------------------------------------------------
 
@@ -47,6 +48,8 @@ export function AuthSplitLayout({
   slotProps,
   layoutQuery = 'md',
 }: AuthSplitLayoutProps) {
+  const { t } = useTranslate();
+
   const renderHeader = () => {
     const headerSlotProps: HeaderSectionProps['slotProps'] = {
       container: { maxWidth: false },
@@ -66,15 +69,18 @@ export function AuthSplitLayout({
       ),
       rightArea: (
         <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 1, sm: 1.5 } }}>
+          {/** @slot Language popover */}
+          <LanguagePopover data={allLangs} />
+
           {/** @slot Help link */}
           <Link
             href={paths.external.numeraire.contact}
             component={RouterLink}
             color="inherit"
-            sx={{ typography: 'subtitle2' }}
+            sx={{ typography: 'subtitle2', display: { xs: 'none', sm: 'inline-flex' } }}
             target="_blank"
           >
-            Need help?
+            {t('need_help')}
           </Link>
         </Box>
       ),
@@ -109,28 +115,7 @@ export function AuthSplitLayout({
           : [slotProps?.main?.sx]),
       ]}
     >
-      <AuthSplitSection
-        layoutQuery={layoutQuery}
-        method={CONFIG.auth.method}
-        {...slotProps?.section}
-        methods={[
-          {
-            label: 'Jwt',
-            path: paths.auth.login,
-            icon: `${CONFIG.assetsDir}/assets/icons/platforms/ic-jwt.svg`,
-          },
-          {
-            label: 'Auth0',
-            path: paths.auth.login,
-            icon: `${CONFIG.assetsDir}/assets/icons/platforms/ic-auth0.svg`,
-          },
-          {
-            label: 'Supabase',
-            path: paths.auth.login,
-            icon: `${CONFIG.assetsDir}/assets/icons/platforms/ic-supabase.svg`,
-          },
-        ]}
-      />
+      <AuthSplitSection layoutQuery={layoutQuery} {...slotProps?.section} />
       <AuthSplitContent layoutQuery={layoutQuery} {...slotProps?.content}>
         {children}
       </AuthSplitContent>
