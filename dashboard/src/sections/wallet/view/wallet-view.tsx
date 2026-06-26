@@ -5,8 +5,8 @@ import type { ITransaction } from 'src/types/transaction';
 import type { Contact, Invoice, Payment } from 'src/lib/swissknife';
 
 import { mutate } from 'swr';
-import { useBoolean } from 'minimal-shared/hooks';
 import { useMemo, useState, useEffect } from 'react';
+import { useBoolean, useCopyToClipboard } from 'minimal-shared/hooks';
 
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
@@ -40,8 +40,8 @@ import { useGetUserWallet } from 'src/actions/user-wallet';
 import { useFetchFiatPrices } from 'src/actions/mempool-space';
 
 import { Label } from 'src/components/label';
+import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
-import { CopyButton } from 'src/components/copy';
 import { SatsWithIcon } from 'src/components/bitcoin';
 import { ErrorView } from 'src/components/error/error-view';
 import { useSettingsContext } from 'src/components/settings';
@@ -87,8 +87,8 @@ function railIcon(tx: ITransaction) {
 
 function txHref(tx: ITransaction) {
   return tx.transaction_type === TransactionType.PAYMENT
-    ? paths.activityPayment(tx.id)
-    : paths.activityInvoice(tx.id);
+    ? paths.wallet.payment(tx.id)
+    : paths.wallet.invoice(tx.id);
 }
 
 function txNetworkLabel(tx: ITransaction) {
@@ -110,6 +110,12 @@ function txDisplayTitle(tx: ITransaction, t: (key: string) => string) {
   if (tx.status === 'Pending') return t('wallet_view.payment_pending');
   if (tx.status === 'Failed') return t('wallet_view.payment_failed');
   return t('wallet_view.payment_sent');
+}
+
+function compactIdentifier(value: string) {
+  if (value.length <= 18) return value;
+
+  return `${value.slice(0, 8)}...${value.slice(-6)}`;
 }
 
 // ----------------------------------------------------------------------
@@ -1149,7 +1155,7 @@ function WalletActivityDrawer({
             {isOpenAmount ? (
               <Typography variant="h4">{t('wallet_view.open_amount')}</Typography>
             ) : (
-              <SatsWithIcon amountMSats={totalAmount} variant="h4" />
+              <SatsWithIcon amountMSats={totalAmount} variant="h4" sx={{ fontWeight: 400 }} />
             )}
           </Stack>
         </Box>
@@ -1163,7 +1169,11 @@ function WalletActivityDrawer({
             />
           </Grid>
           <Grid size={{ xs: 12, sm: 4 }}>
-            <WalletDrawerMetric label={t('wallet_view.fee')} amountMSats={feeAmount} />
+            <WalletDrawerMetric
+              label={t('wallet_view.fee')}
+              amountMSats={feeAmount}
+              showMillisatsTooltip
+            />
           </Grid>
           <Grid size={{ xs: 12, sm: 4 }}>
             <WalletDrawerMetric
@@ -1182,23 +1192,11 @@ function WalletActivityDrawer({
             value={row.payment_time ? fDateTime(row.payment_time) : t('wallet_view.not_settled')}
           />
           <WalletDrawerRow label={t('wallet_view.destination')} value={destination} mono />
-          <WalletDrawerRow label={t('wallet_view.transaction_id')} value={row.id} mono />
-        </Stack>
-
-        <Stack
-          direction="row"
-          spacing={1}
-          sx={{
-            p: 1,
-            borderRadius: 1,
-            alignItems: 'center',
-            bgcolor: 'background.neutral',
-          }}
-        >
-          <Typography variant="body2" sx={{ flex: 1 }} noWrap>
-            {t('wallet_view.transaction_id')}
-          </Typography>
-          <CopyButton value={row.id} title={t('wallet_view.transaction_id')} />
+          <WalletDrawerCopyRow
+            label={t('wallet_view.transaction_id')}
+            value={compactIdentifier(row.id)}
+            copyValue={row.id}
+          />
         </Stack>
 
         <Button
@@ -1207,7 +1205,7 @@ function WalletActivityDrawer({
           variant="outlined"
           startIcon={<Iconify icon="solar:bill-list-bold-duotone" />}
         >
-          {t('wallet_view.open_activity')}
+          {t('wallet_view.open_details')}
         </Button>
       </Stack>
     </Drawer>
@@ -1218,10 +1216,12 @@ function WalletDrawerMetric({
   label,
   amountMSats,
   value,
+  showMillisatsTooltip = false,
 }: {
   label: string;
   amountMSats?: number;
   value?: string;
+  showMillisatsTooltip?: boolean;
 }) {
   return (
     <Box
@@ -1241,7 +1241,11 @@ function WalletDrawerMetric({
       {value ? (
         <Typography variant="subtitle2">{value}</Typography>
       ) : (
-        <SatsWithIcon amountMSats={amountMSats ?? 0} variant="subtitle2" />
+        <SatsWithIcon
+          amountMSats={amountMSats ?? 0}
+          variant="subtitle2"
+          showMillisatsTooltip={showMillisatsTooltip}
+        />
       )}
     </Box>
   );
@@ -1275,5 +1279,60 @@ function WalletDrawerRow({
         {value}
       </Typography>
     </Stack>
+  );
+}
+
+function WalletDrawerCopyRow({
+  label,
+  value,
+  copyValue,
+}: {
+  label: string;
+  value: string;
+  copyValue: string;
+}) {
+  const { t } = useTranslate();
+  const { copy } = useCopyToClipboard();
+
+  const handleCopy = () => {
+    copy(copyValue);
+    toast.success(t('copied_to_clipboard'));
+  };
+
+  return (
+    <ButtonBase
+      onClick={handleCopy}
+      sx={[
+        (theme) => ({
+          py: 0.5,
+          gap: 1.5,
+          width: 1,
+          display: 'flex',
+          minWidth: 0,
+          borderRadius: 0.75,
+          textAlign: 'left',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          transition: theme.transitions.create('background-color'),
+          '&:hover': {
+            bgcolor: 'action.hover',
+          },
+        }),
+      ]}
+    >
+      <Typography variant="body2" color="text.secondary">
+        {label}
+      </Typography>
+      <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center', minWidth: 0 }}>
+        <Typography
+          variant="body2"
+          sx={{ typography: 'caption', fontFamily: 'monospace', color: 'text.primary' }}
+          noWrap
+        >
+          {value}
+        </Typography>
+        <Iconify icon="eva:copy-fill" width={16} sx={{ flexShrink: 0, color: 'text.disabled' }} />
+      </Stack>
+    </ButtonBase>
   );
 }
