@@ -122,6 +122,8 @@ const drawerSx = {
 };
 
 const SATS_PER_BITCOIN = 100_000_000;
+const MAX_SEND_AMOUNT_BTC = 100;
+const MAX_SEND_AMOUNT_SATS = MAX_SEND_AMOUNT_BTC * SATS_PER_BITCOIN;
 const DEFAULT_BOLT11_EXPIRY_SECONDS = 3600;
 
 const addressTypeOptions = [
@@ -325,6 +327,10 @@ function amountUnitPrefix(unit: AmountUnit, currency: string, displayUnit: 'bip1
   return displayUnit === 'bip177' ? '₿' : 'sats';
 }
 
+function maxSendAmountLabel() {
+  return `${MAX_SEND_AMOUNT_BTC} BTC`;
+}
+
 function railLabel(kind: RecipientKind, t: (key: string) => string) {
   if (kind === 'bip21') return t('send_money.request_type_bip21');
   if (kind === 'bitcoin') return t('send_money.request_type_onchain');
@@ -364,6 +370,7 @@ function AmountEntryField({
   currency,
   displayUnit,
   hasFiatPrice,
+  error = false,
   onChange,
   onSwap,
 }: {
@@ -374,6 +381,7 @@ function AmountEntryField({
   currency: string;
   displayUnit: 'bip177' | 'sats';
   hasFiatPrice: boolean;
+  error?: boolean;
   onChange: (value: string) => void;
   onSwap: VoidFunction;
 }) {
@@ -384,11 +392,13 @@ function AmountEntryField({
           p: 2,
           borderRadius: 1,
           bgcolor: 'background.neutral',
-          border: `1px solid ${theme.vars.palette.divider}`,
+          border: `1px solid ${error ? theme.vars.palette.error.main : theme.vars.palette.divider}`,
           transition: theme.transitions.create(['border-color', 'box-shadow']),
           '&:focus-within': {
-            borderColor: theme.vars.palette.primary.main,
-            boxShadow: `0 0 0 1px ${theme.vars.palette.primary.main}`,
+            borderColor: error ? theme.vars.palette.error.main : theme.vars.palette.primary.main,
+            boxShadow: `0 0 0 1px ${
+              error ? theme.vars.palette.error.main : theme.vars.palette.primary.main
+            }`,
           },
         }),
       ]}
@@ -401,7 +411,7 @@ function AmountEntryField({
         <Stack direction="row" spacing={1.25} sx={{ alignItems: 'center' }}>
           <Typography
             variant="h4"
-            color="text.secondary"
+            color={error ? 'error.main' : 'text.secondary'}
             sx={{ minWidth: amountUnit === 'fiat' ? 28 : 'auto' }}
           >
             {amountUnitPrefix(amountUnit, currency, displayUnit)}
@@ -413,6 +423,7 @@ function AmountEntryField({
             variant="standard"
             value={value}
             placeholder="0"
+            error={error}
             onChange={(event) => onChange(event.target.value)}
             sx={{
               '& .MuiInputBase-input': {
@@ -431,7 +442,7 @@ function AmountEntryField({
           </IconButton>
         </Stack>
 
-        <Typography variant="subtitle1" color="text.secondary">
+        <Typography variant="subtitle1" color={error ? 'error.main' : 'text.secondary'}>
           {fiatLabel}
         </Typography>
       </Stack>
@@ -557,6 +568,8 @@ export function SendMoneyDrawer({
   );
   const embeddedAmountSats = bolt11Amount || bitcoinRequest.amountSats || 0;
   const amountSats = embeddedAmountSats || manualAmountSats;
+  const amountExceedsSendLimit = amountSats > MAX_SEND_AMOUNT_SATS;
+  const sendAmountLimitLabel = maxSendAmountLabel();
   const canEnterAmount =
     input.trim().length > 0 &&
     embeddedAmountSats === 0 &&
@@ -577,17 +590,28 @@ export function SendMoneyDrawer({
     !hasUnsupportedBip21Params &&
     !hasInvalidBip21Amount &&
     !hasInvalidBitcoinAddress &&
+    !amountExceedsSendLimit &&
     !needsWallet;
+  const canEstimateFee =
+    kind !== 'unknown' &&
+    kind !== 'internal' &&
+    amountSats > 0 &&
+    !amountExceedsSendLimit &&
+    !hasUnsupportedBip21Params &&
+    !hasInvalidBip21Amount &&
+    !hasInvalidBitcoinAddress;
   const submitLabel =
     (kind === 'unknown' && t('send_money.unsupported_request')) ||
     ((kind === 'bitcoin' || (kind === 'bip21' && !bitcoinRequest.lightning)) &&
       t('send_money.send_onchain')) ||
     t('send_money.send');
-  const amountFiatLabel = hasFiatPrice
-    ? fCurrency(satsToFiat(amountSats, fiatPrices, state.currency), {
-        currency: state.currency,
-      })
-    : t('send_money.no_fiat_value');
+  const amountFiatLabel = amountExceedsSendLimit
+    ? t('send_money.amount_max_helper', { max: sendAmountLimitLabel })
+    : hasFiatPrice
+      ? fCurrency(satsToFiat(amountSats, fiatPrices, state.currency), {
+          currency: state.currency,
+        })
+      : t('send_money.no_fiat_value');
   const bolt11ExpiryLabel = bolt11ExpiresAt
     ? t(
         lightningInvoiceExpired ? 'send_money.invoice_expired_at' : 'send_money.invoice_expires_at',
@@ -625,10 +649,10 @@ export function SendMoneyDrawer({
     () => ({
       input,
       comment: canSendComment && comment ? comment : null,
-      amount_msat: amountSats ? amountSats * 1000 : null,
+      amount_msat: amountSats && !amountExceedsSendLimit ? amountSats * 1000 : null,
       ...(isAdmin && { wallet_id: activeWalletId || null }),
     }),
-    [activeWalletId, amountSats, canSendComment, comment, input, isAdmin]
+    [activeWalletId, amountExceedsSendLimit, amountSats, canSendComment, comment, input, isAdmin]
   );
 
   const handleClose = useCallback(() => {
@@ -667,6 +691,10 @@ export function SendMoneyDrawer({
 
     setAmountUnit(nextUnit);
     setAmountValue(satsToAmountValue(currentAmountSats, nextUnit, fiatPrices, state.currency));
+  };
+
+  const handleEstimateFee = () => {
+    toast.info(t('send_money.fee_estimate_unavailable'));
   };
 
   return (
@@ -852,11 +880,22 @@ export function SendMoneyDrawer({
                         <Typography variant="caption" color="text.secondary">
                           {t('send_money.estimated_fee')}
                         </Typography>
-                        <Typography variant="caption">
-                          {kind === 'internal'
-                            ? t('send_money.no_network_fee')
-                            : t('send_money.fee_probe_placeholder')}
-                        </Typography>
+                        {kind === 'internal' ? (
+                          <Typography variant="caption">
+                            {t('send_money.no_network_fee')}
+                          </Typography>
+                        ) : (
+                          <Button
+                            size="small"
+                            color="inherit"
+                            variant="text"
+                            disabled={!canEstimateFee}
+                            onClick={handleEstimateFee}
+                            sx={{ minWidth: 0, p: 0, typography: 'caption' }}
+                          >
+                            {t('send_money.estimate_fee')}
+                          </Button>
+                        )}
                       </Stack>
                     )}
 
@@ -869,6 +908,12 @@ export function SendMoneyDrawer({
                     {bitcoinRequest.amountInvalid && (
                       <Alert severity="warning" variant="outlined">
                         {t('send_money.invalid_bip21_amount')}
+                      </Alert>
+                    )}
+
+                    {amountExceedsSendLimit && (
+                      <Alert severity="warning" variant="outlined">
+                        {t('send_money.amount_exceeds_limit', { max: sendAmountLimitLabel })}
                       </Alert>
                     )}
 
@@ -910,6 +955,7 @@ export function SendMoneyDrawer({
                     currency={state.currency}
                     displayUnit={state.displayUnit ?? 'bip177'}
                     hasFiatPrice={hasFiatPrice}
+                    error={amountExceedsSendLimit}
                     onChange={setAmountValue}
                     onSwap={handleAmountUnitSwap}
                   />
