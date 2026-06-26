@@ -1,30 +1,33 @@
 'use client';
 
-import type { Key, MouseEvent, HTMLAttributes } from 'react';
+import type { Key, HTMLAttributes } from 'react';
+import type { DialogProps } from '@mui/material/Dialog';
+import type { IDetectedBarcode } from '@yudiel/react-qr-scanner';
 import type { IFiatPrices } from 'src/types/bitcoin';
 
 import { bech32, bech32m } from 'bech32';
 import { QRCode } from 'react-qrcode-logo';
 import { decode } from 'light-bolt11-decoder';
-import { useCopyToClipboard } from 'minimal-shared/hooks';
+import { Scanner } from '@yudiel/react-qr-scanner';
 import { useMemo, useState, useEffect, useCallback } from 'react';
+import { useBoolean, useCopyToClipboard } from 'minimal-shared/hooks';
 
-import Tab from '@mui/material/Tab';
 import Box from '@mui/material/Box';
-import Tabs from '@mui/material/Tabs';
 import Chip from '@mui/material/Chip';
 import Alert from '@mui/material/Alert';
 import Stack from '@mui/material/Stack';
 import Button from '@mui/material/Button';
 import Drawer from '@mui/material/Drawer';
+import Dialog from '@mui/material/Dialog';
 import Divider from '@mui/material/Divider';
-import MenuItem from '@mui/material/MenuItem';
 import Accordion from '@mui/material/Accordion';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import IconButton from '@mui/material/IconButton';
 import Autocomplete from '@mui/material/Autocomplete';
 import ToggleButton from '@mui/material/ToggleButton';
+import DialogActions from '@mui/material/DialogActions';
+import InputAdornment from '@mui/material/InputAdornment';
 import AccordionDetails from '@mui/material/AccordionDetails';
 import AccordionSummary from '@mui/material/AccordionSummary';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
@@ -98,7 +101,6 @@ type RecipientKind =
   | 'bitcoin'
   | 'internal'
   | 'unknown';
-type ReceiveRail = 'any' | 'lightning' | 'onchain';
 type ReceivePayload = 'unified' | 'lightning' | 'onchain' | 'identity';
 type AmountUnit = 'sats' | 'btc' | 'fiat';
 
@@ -148,6 +150,15 @@ function isBitcoinAddress(value: string) {
   return isBech32BitcoinAddress(value) || /^[13mn2][a-km-zA-HJ-NP-Z1-9]{25,90}$/.test(value.trim());
 }
 
+function looksLikeBitcoinAddress(value: string) {
+  const normalized = value.trim();
+
+  return (
+    /^(bc|tb|bcrt)1[02-9ac-hj-np-z]{8,}$/i.test(normalized) ||
+    /^[13mn2][a-km-zA-HJ-NP-Z1-9]{25,90}$/.test(normalized)
+  );
+}
+
 function isBech32BitcoinAddress(value: string) {
   const normalized = value.toLowerCase();
   const decoder =
@@ -172,7 +183,12 @@ function detectRecipientKind(input: string): RecipientKind {
   const paymentRequest = bitcoinUri.lightning ?? value;
 
   if (!value) return 'unknown';
-  if (bitcoinUri.isUri && isBitcoinAddress(bitcoinUri.address)) return 'bip21';
+  if (
+    bitcoinUri.isUri &&
+    (isBitcoinAddress(bitcoinUri.address) || looksLikeBitcoinAddress(bitcoinUri.address))
+  ) {
+    return 'bip21';
+  }
 
   try {
     decode(stripLightningScheme(paymentRequest));
@@ -181,7 +197,9 @@ function detectRecipientKind(input: string): RecipientKind {
     // Fall through to non-Bolt11 classifiers.
   }
 
-  if (isBitcoinAddress(bitcoinUri.address)) return 'bitcoin';
+  if (isBitcoinAddress(bitcoinUri.address) || looksLikeBitcoinAddress(bitcoinUri.address)) {
+    return 'bitcoin';
+  }
   if (normalized.startsWith('lnurl') || normalized.startsWith('lightning:lnurl')) return 'lnurl';
   if (normalized.startsWith('http://') || normalized.startsWith('https://')) return 'lnurl';
   if (isBitcoinAddress(extractBitcoinInput(value))) return 'bitcoin';
@@ -192,6 +210,26 @@ function detectRecipientKind(input: string): RecipientKind {
   }
 
   return 'unknown';
+}
+
+function compactAddress(value?: string | null) {
+  if (!value) return '';
+
+  const normalized = value.replace(/\s+/g, '');
+  const head =
+    normalized
+      .slice(0, 16)
+      .match(/.{1,4}/g)
+      ?.join(' ') ?? '';
+  const tail =
+    normalized
+      .slice(-16)
+      .match(/.{1,4}/g)
+      ?.join(' ') ?? '';
+
+  if (normalized.length <= 36) return normalized.match(/.{1,4}/g)?.join(' ') ?? normalized;
+
+  return `${head} ... ${tail}`;
 }
 
 function decodedBolt11Details(input: string): Bolt11Details {
@@ -382,7 +420,7 @@ export function SendMoneyDrawer({
 }: SendMoneyDrawerProps) {
   const { t } = useTranslate();
   const { state } = useSettingsContext();
-  const { copy } = useCopyToClipboard();
+  const scanQR = useBoolean();
 
   const [input, setInput] = useState(initialInput ?? '');
   const [amountValue, setAmountValue] = useState('');
@@ -405,9 +443,13 @@ export function SendMoneyDrawer({
     typeof bolt11ExpiryMs === 'number' &&
     Number.isFinite(bolt11ExpiryMs) &&
     bolt11ExpiryMs <= nowMs;
-  const hasUnsupportedBip21Params =
-    kind === 'bip21' && bitcoinRequest.requiredParams.length > 0;
+  const hasUnsupportedBip21Params = kind === 'bip21' && bitcoinRequest.requiredParams.length > 0;
   const hasInvalidBip21Amount = kind === 'bip21' && bitcoinRequest.amountInvalid;
+  const bitcoinAddressForValidation = bitcoinRequest.address || extractBitcoinInput(input);
+  const hasInvalidBitcoinAddress =
+    (kind === 'bitcoin' || kind === 'bip21') &&
+    looksLikeBitcoinAddress(bitcoinAddressForValidation) &&
+    !isBitcoinAddress(bitcoinAddressForValidation);
   const expiredInvoiceBlocksSubmit =
     lightningInvoiceExpired &&
     (kind === 'bolt11' || (kind === 'bip21' && !bitcoinRequest.amountSats));
@@ -417,6 +459,12 @@ export function SendMoneyDrawer({
   );
   const embeddedAmountSats = bolt11Amount || bitcoinRequest.amountSats || 0;
   const amountSats = embeddedAmountSats || manualAmountSats;
+  const canEnterAmount =
+    input.trim().length > 0 &&
+    embeddedAmountSats === 0 &&
+    kind !== 'unknown' &&
+    !hasInvalidBip21Amount &&
+    !hasUnsupportedBip21Params;
   const activeWalletId = walletId || selectedWalletId;
   const needsWallet = isAdmin && !activeWalletId;
   const hasFiatPrice = (fiatPrices[state.currency] ?? 0) > 0;
@@ -430,6 +478,7 @@ export function SendMoneyDrawer({
     !expiredInvoiceBlocksSubmit &&
     !hasUnsupportedBip21Params &&
     !hasInvalidBip21Amount &&
+    !hasInvalidBitcoinAddress &&
     !needsWallet;
   const submitLabel =
     (kind === 'unknown' && t('send_money.unsupported_request')) ||
@@ -441,10 +490,6 @@ export function SendMoneyDrawer({
         currency: state.currency,
       })
     : t('send_money.no_fiat_value');
-  const requestAmountSource =
-    (kind === 'bolt11' && t('send_money.amount_source_bolt11')) ||
-    (kind === 'bip21' && t('send_money.amount_source_bip21')) ||
-    t('send_money.amount_source_request');
   const bolt11ExpiryLabel = bolt11ExpiresAt
     ? t(
         lightningInvoiceExpired ? 'send_money.invoice_expired_at' : 'send_money.invoice_expires_at',
@@ -488,11 +533,6 @@ export function SendMoneyDrawer({
     [activeWalletId, amountSats, canSendComment, comment, input, isAdmin]
   );
 
-  const curlSnippet = `curl -X POST "$SWISSKNIFE_URL/${isAdmin ? 'v1/payments' : 'v1/me/payments'}" \\
-  -H "Authorization: Bearer $SWISSKNIFE_TOKEN" \\
-  -H "Content-Type: application/json" \\
-  -d '${JSON.stringify(requestBody)}'`;
-
   const handleClose = useCallback(() => {
     setInput('');
     setAmountValue('');
@@ -518,13 +558,8 @@ export function SendMoneyDrawer({
     }
   };
 
-  const handleCopySnippet = () => {
-    copy(curlSnippet);
-    toast.success(t('copied_to_clipboard'));
-  };
-
-  const handleAmountUnitChange = (_: MouseEvent<HTMLElement>, value: AmountUnit | null) => {
-    if (!value) return;
+  const handleAmountUnitSwap = () => {
+    const nextUnit: AmountUnit = amountUnit === 'fiat' ? 'sats' : 'fiat';
     const currentAmountSats = amountValueToSats(
       amountValue,
       amountUnit,
@@ -532,213 +567,112 @@ export function SendMoneyDrawer({
       state.currency
     );
 
-    setAmountUnit(value);
-    setAmountValue(satsToAmountValue(currentAmountSats, value, fiatPrices, state.currency));
+    setAmountUnit(nextUnit);
+    setAmountValue(satsToAmountValue(currentAmountSats, nextUnit, fiatPrices, state.currency));
   };
 
   return (
-    <Drawer
-      anchor="right"
-      open={open}
-      onClose={handleClose}
-      slotProps={{ paper: { sx: drawerSx } }}
-    >
-      {drawerTitle(t('send_money.title'), handleClose)}
-      <Divider />
+    <>
+      <Drawer
+        anchor="right"
+        open={open}
+        onClose={handleClose}
+        slotProps={{ paper: { sx: drawerSx } }}
+      >
+        {drawerTitle(t('send_money.title'), handleClose)}
+        <Divider />
 
-      <Stack spacing={3} sx={{ p: 3 }}>
-        {payment ? (
-          <Stack spacing={3} sx={{ textAlign: 'center', py: 4 }}>
-            <Box
-              sx={{
-                width: 72,
-                height: 72,
-                display: 'grid',
-                borderRadius: 1,
-                placeItems: 'center',
-                mx: 'auto',
-                color: 'success.main',
-                bgcolor: 'success.lighter',
-              }}
-            >
-              <Iconify icon="solar:check-circle-bold" width={42} />
-            </Box>
-            <Stack spacing={1}>
-              <Typography variant="h5">{t('send_money.sent')}</Typography>
-              <SatsWithIcon amountMSats={payment.amount_msat} variant="h4" />
-              <Typography variant="body2" color="text.secondary">
-                {truncateText(input, 42)}
-              </Typography>
-            </Stack>
-            <Button variant="contained" color="inherit" onClick={handleClose}>
-              {t('done')}
-            </Button>
-          </Stack>
-        ) : (
-          <>
-            {isAdmin &&
-              (walletId ? (
-                <TextField
-                  label={t('admin_wallet_picker.label')}
-                  value={walletId}
-                  slotProps={{ input: { readOnly: true } }}
-                  helperText={t('admin_wallet_picker.fixed')}
-                />
-              ) : (
-                <WalletPicker value={selectedWalletId} onChange={setSelectedWalletId} />
-              ))}
-
-            {needsWallet && (
-              <Alert severity="info" variant="outlined">
-                {t('admin_wallet_picker.required')}
-              </Alert>
-            )}
-
-            <Stack spacing={1}>
-              <Typography variant="overline" color="text.secondary">
-                {t('send_money.to')}
-              </Typography>
-              <TextField
-                multiline
-                minRows={3}
-                value={input}
-                onChange={(event) => setInput(event.target.value)}
-                placeholder={t('send_money.recipient_placeholder')}
-              />
-            </Stack>
-
-            {contacts.length > 0 && (
-              <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: 'wrap' }}>
-                {contacts.slice(0, 6).map((contact) => (
-                  <Chip
-                    key={contact.ln_address}
-                    label={contact.ln_address.split('@')[0]}
-                    onClick={() => setInput(contact.ln_address)}
-                    icon={<Iconify icon="solar:user-rounded-bold" />}
-                    variant="outlined"
-                  />
-                ))}
-              </Stack>
-            )}
-
-            {canShowParsedInput && (
+        <Stack spacing={3} sx={{ p: 3 }}>
+          {payment ? (
+            <Stack spacing={3} sx={{ textAlign: 'center', py: 4 }}>
               <Box
-                sx={[
-                  (theme) => ({
-                    p: 2,
-                    borderRadius: 1,
-                    bgcolor: 'background.neutral',
-                    border: `1px solid ${theme.vars.palette.divider}`,
-                  }),
-                ]}
+                sx={{
+                  width: 72,
+                  height: 72,
+                  display: 'grid',
+                  borderRadius: 1,
+                  placeItems: 'center',
+                  mx: 'auto',
+                  color: 'success.main',
+                  bgcolor: 'success.lighter',
+                }}
               >
-                <Stack spacing={1.25}>
-                  <Stack
-                    direction="row"
-                    sx={{ alignItems: 'center', justifyContent: 'space-between', gap: 1 }}
-                  >
-                    <Stack direction="row" spacing={1} sx={{ alignItems: 'center', minWidth: 0 }}>
-                      <Iconify icon="solar:radar-2-bold-duotone" />
-                      <Typography variant="subtitle2">{t('send_money.detected_input')}</Typography>
-                    </Stack>
-                    <Label color={railColor(kind)}>{railLabel(kind, t)}</Label>
-                  </Stack>
-
-                  {kind === 'bip21' && (
-                    <>
-                      <SendDetailRow
-                        label={t('send_money.destination')}
-                        value={truncateText(bitcoinRequest.address, 34)}
-                      />
-                      <SendDetailRow
-                        label={t('send_money.lightning_fallback')}
-                        value={
-                          bitcoinRequest.lightning
-                            ? t('send_money.included')
-                            : t('send_money.not_included')
-                        }
-                      />
-                      <SendDetailRow
-                        label={t('send_money.request_label')}
-                        value={bitcoinRequest.label}
-                      />
-                      <SendDetailRow
-                        label={t('send_money.request_message')}
-                        value={bitcoinRequest.message}
-                      />
-                      <SendDetailRow
-                        label={t('send_money.optional_parameters')}
-                        value={bitcoinRequest.unknownParams.join(', ')}
-                      />
-                      {bitcoinRequest.amountInvalid && (
-                        <Alert severity="warning" variant="outlined">
-                          {t('send_money.invalid_bip21_amount')}
-                        </Alert>
-                      )}
-                      {bitcoinRequest.requiredParams.length > 0 && (
-                        <Alert severity="warning" variant="outlined">
-                          {t('send_money.unsupported_required_parameters', {
-                            params: bitcoinRequest.requiredParams.join(', '),
-                          })}
-                        </Alert>
-                      )}
-                    </>
-                  )}
-
-                  {hasLightningInvoice && (
-                    <>
-                      {kind === 'bip21' && (
-                        <Typography variant="caption" color="text.secondary">
-                          {t('send_money.lightning_invoice')}
-                        </Typography>
-                      )}
-                      <SendDetailRow
-                        label={t('send_money.invoice_memo')}
-                        value={bolt11Details.description}
-                      />
-                      <SendDetailRow
-                        label={t('send_money.payment_hash')}
-                        value={truncateText(bolt11Details.paymentHash || '', 34)}
-                      />
-                      <SendDetailRow label={t('send_money.expiry')} value={bolt11ExpiryLabel} />
-                    </>
-                  )}
-
-                  {lightningInvoiceExpired && (
-                    <Alert
-                      severity={expiredInvoiceBlocksSubmit ? 'warning' : 'info'}
-                      variant="outlined"
-                    >
-                      {expiredInvoiceBlocksSubmit
-                        ? t('send_money.invoice_expired_note')
-                        : t('send_money.invoice_fallback_expired_note')}
-                    </Alert>
-                  )}
-
-                  {kind === 'bitcoin' && (
-                    <SendDetailRow
-                      label={t('send_money.destination')}
-                      value={truncateText(bitcoinRequest.address, 34)}
-                    />
-                  )}
-
-                  {kind === 'internal' && (
-                    <Alert severity="success" variant="outlined">
-                      {t('send_money.internal_transfer_description')}
-                    </Alert>
-                  )}
-
-                  {kind === 'unknown' && (
-                    <Alert severity="warning" variant="outlined">
-                      {t('send_money.unknown_input_note')}
-                    </Alert>
-                  )}
-                </Stack>
+                <Iconify icon="solar:check-circle-bold" width={42} />
               </Box>
-            )}
+              <Stack spacing={1}>
+                <Typography variant="h5">{t('send_money.sent')}</Typography>
+                <SatsWithIcon amountMSats={payment.amount_msat} variant="h4" />
+                <Typography variant="body2" color="text.secondary">
+                  {truncateText(input, 42)}
+                </Typography>
+              </Stack>
+              <Button variant="contained" color="inherit" onClick={handleClose}>
+                {t('done')}
+              </Button>
+            </Stack>
+          ) : (
+            <>
+              {isAdmin &&
+                (walletId ? (
+                  <TextField
+                    label={t('admin_wallet_picker.label')}
+                    value={walletId}
+                    slotProps={{ input: { readOnly: true } }}
+                    helperText={t('admin_wallet_picker.fixed')}
+                  />
+                ) : (
+                  <WalletPicker value={selectedWalletId} onChange={setSelectedWalletId} />
+                ))}
 
-            <Stack spacing={1.5}>
-              {embeddedAmountSats > 0 ? (
+              {needsWallet && (
+                <Alert severity="info" variant="outlined">
+                  {t('admin_wallet_picker.required')}
+                </Alert>
+              )}
+
+              <Stack spacing={1}>
+                <Stack
+                  direction="row"
+                  spacing={1}
+                  sx={{ alignItems: 'center', justifyContent: 'space-between' }}
+                >
+                  <Typography variant="overline" color="text.secondary">
+                    {t('send_money.to')}
+                  </Typography>
+                  <Button
+                    size="small"
+                    color="inherit"
+                    variant="outlined"
+                    onClick={scanQR.onTrue}
+                    startIcon={<Iconify icon="solar:qr-code-bold" />}
+                  >
+                    {t('send_money.scan_qr')}
+                  </Button>
+                </Stack>
+                <TextField
+                  multiline
+                  minRows={3}
+                  value={input}
+                  onChange={(event) => setInput(event.target.value)}
+                  placeholder={t('send_money.recipient_placeholder')}
+                />
+              </Stack>
+
+              {contacts.length > 0 && (
+                <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: 'wrap' }}>
+                  {contacts.slice(0, 6).map((contact) => (
+                    <Chip
+                      key={contact.ln_address}
+                      label={contact.ln_address.split('@')[0]}
+                      onClick={() => setInput(contact.ln_address)}
+                      icon={<Iconify icon="solar:user-rounded-bold" />}
+                      variant="outlined"
+                    />
+                  ))}
+                </Stack>
+              )}
+
+              {canShowParsedInput && (
                 <Box
                   sx={[
                     (theme) => ({
@@ -749,63 +683,177 @@ export function SendMoneyDrawer({
                     }),
                   ]}
                 >
-                  <Stack
-                    direction={{ xs: 'column', sm: 'row' }}
-                    spacing={1.5}
-                    sx={{ justifyContent: 'space-between' }}
-                  >
-                    <Stack spacing={0.5}>
-                      <Typography variant="caption" color="text.secondary">
-                        {t('send_money.amount_from_request')}
-                      </Typography>
-                      <SatsWithIcon amountMSats={embeddedAmountSats * 1000} variant="h6" />
-                      <Typography variant="caption" color="text.secondary">
-                        {requestAmountSource}
-                      </Typography>
+                  <Stack spacing={1.25}>
+                    <Stack
+                      direction="row"
+                      sx={{ alignItems: 'center', justifyContent: 'space-between', gap: 1 }}
+                    >
+                      <Stack direction="row" spacing={1} sx={{ alignItems: 'center', minWidth: 0 }}>
+                        <Iconify icon="solar:radar-2-bold-duotone" />
+                        <Typography variant="subtitle2">
+                          {t('send_money.payment_summary')}
+                        </Typography>
+                      </Stack>
+                      <Label color={railColor(kind)}>{railLabel(kind, t)}</Label>
                     </Stack>
-                    <Typography variant="body2" color="text.secondary">
-                      {amountFiatLabel}
-                    </Typography>
+
+                    {(kind === 'bip21' || kind === 'bitcoin') && bitcoinRequest.address && (
+                      <SendDetailRow
+                        label={t('send_money.destination')}
+                        value={compactAddress(bitcoinRequest.address)}
+                      />
+                    )}
+
+                    {kind === 'bip21' && bitcoinRequest.lightning && (
+                      <SendDetailRow
+                        label={t('send_money.lightning_fallback')}
+                        value={t('send_money.included')}
+                      />
+                    )}
+
+                    {bitcoinRequest.label && (
+                      <SendDetailRow
+                        label={t('send_money.request_label')}
+                        value={bitcoinRequest.label}
+                      />
+                    )}
+
+                    {bitcoinRequest.message && (
+                      <SendDetailRow
+                        label={t('send_money.request_message')}
+                        value={bitcoinRequest.message}
+                      />
+                    )}
+
+                    {hasLightningInvoice && (
+                      <>
+                        <SendDetailRow
+                          label={t('send_money.invoice_memo')}
+                          value={bolt11Details.description}
+                        />
+                        <SendDetailRow label={t('send_money.expiry')} value={bolt11ExpiryLabel} />
+                      </>
+                    )}
+
+                    {amountSats > 0 && (
+                      <Stack direction="row" sx={{ justifyContent: 'space-between' }}>
+                        <Typography variant="caption" color="text.secondary">
+                          {t('send_money.amount')}
+                        </Typography>
+                        <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+                          <SatsWithIcon amountMSats={amountSats * 1000} />
+                          <Typography variant="caption" color="text.secondary">
+                            {amountFiatLabel}
+                          </Typography>
+                        </Stack>
+                      </Stack>
+                    )}
+
+                    {kind !== 'unknown' && (
+                      <Stack direction="row" sx={{ justifyContent: 'space-between' }}>
+                        <Typography variant="caption" color="text.secondary">
+                          {t('send_money.estimated_fee')}
+                        </Typography>
+                        <Typography variant="caption">
+                          {kind === 'internal'
+                            ? t('send_money.no_network_fee')
+                            : t('send_money.fee_probe_placeholder')}
+                        </Typography>
+                      </Stack>
+                    )}
+
+                    {hasInvalidBitcoinAddress && (
+                      <Alert severity="warning" variant="outlined">
+                        {t('send_money.invalid_bitcoin_address')}
+                      </Alert>
+                    )}
+
+                    {bitcoinRequest.amountInvalid && (
+                      <Alert severity="warning" variant="outlined">
+                        {t('send_money.invalid_bip21_amount')}
+                      </Alert>
+                    )}
+
+                    {bitcoinRequest.requiredParams.length > 0 && (
+                      <Alert severity="warning" variant="outlined">
+                        {t('send_money.unsupported_required_parameters', {
+                          params: bitcoinRequest.requiredParams.join(', '),
+                        })}
+                      </Alert>
+                    )}
+
+                    {lightningInvoiceExpired && (
+                      <Alert
+                        severity={expiredInvoiceBlocksSubmit ? 'warning' : 'info'}
+                        variant="outlined"
+                      >
+                        {expiredInvoiceBlocksSubmit
+                          ? t('send_money.invoice_expired_note')
+                          : t('send_money.invoice_fallback_expired_note')}
+                      </Alert>
+                    )}
+
+                    {kind === 'unknown' && (
+                      <Alert severity="warning" variant="outlined">
+                        {t('send_money.unknown_input_note')}
+                      </Alert>
+                    )}
                   </Stack>
                 </Box>
-              ) : (
-                <>
-                  <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
-                    <TextField
-                      fullWidth
-                      type="number"
-                      label={t('send_money.amount')}
-                      value={amountValue}
-                      helperText={t('send_money.amount_helper', {
-                        unit: amountUnitLabel(amountUnit, state.currency),
-                      })}
-                      onChange={(event) => setAmountValue(event.target.value)}
-                    />
-                    <ToggleButtonGroup
-                      exclusive
-                      size="small"
-                      value={amountUnit}
-                      onChange={handleAmountUnitChange}
-                      sx={{ alignSelf: { sm: 'flex-start' } }}
-                    >
-                      <ToggleButton value="sats">{t('send_money.unit_sats')}</ToggleButton>
-                      <ToggleButton value="btc">{t('send_money.unit_btc')}</ToggleButton>
-                      <ToggleButton value="fiat">{state.currency}</ToggleButton>
-                    </ToggleButtonGroup>
-                  </Stack>
-
-                  <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-                    <SatsWithIcon amountMSats={amountSats * 1000} variant="subtitle2" />
-                    <Typography variant="body2" color="text.secondary">
-                      {amountFiatLabel}
-                    </Typography>
-                  </Stack>
-                </>
               )}
-            </Stack>
 
-            {kind !== 'unknown' &&
-              (canSendComment ? (
+              <Stack spacing={1.5}>
+                {embeddedAmountSats > 0 ? null : canEnterAmount ? (
+                  <>
+                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
+                      <TextField
+                        fullWidth
+                        type="number"
+                        label={t('send_money.amount')}
+                        value={amountValue}
+                        helperText={amountFiatLabel}
+                        onChange={(event) => setAmountValue(event.target.value)}
+                        slotProps={{
+                          input: {
+                            startAdornment: (
+                              <InputAdornment position="start">
+                                {amountUnitLabel(amountUnit, state.currency)}
+                              </InputAdornment>
+                            ),
+                            endAdornment: (
+                              <InputAdornment position="end">
+                                <IconButton
+                                  edge="end"
+                                  size="small"
+                                  disabled={!hasFiatPrice}
+                                  onClick={handleAmountUnitSwap}
+                                >
+                                  <Iconify icon="solar:transfer-horizontal-bold" />
+                                </IconButton>
+                              </InputAdornment>
+                            ),
+                          },
+                        }}
+                      />
+                    </Stack>
+
+                    <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+                      <SatsWithIcon amountMSats={amountSats * 1000} variant="subtitle2" />
+                      <Typography variant="body2" color="text.secondary">
+                        {amountFiatLabel}
+                      </Typography>
+                    </Stack>
+                  </>
+                ) : (
+                  !input.trim() && (
+                    <Typography variant="body2" color="text.secondary">
+                      {t('send_money.amount_waiting_for_request')}
+                    </Typography>
+                  )
+                )}
+              </Stack>
+
+              {kind !== 'unknown' && canSendComment && (
                 <TextField
                   label={t(
                     kind === 'internal' ? 'send_money.internal_note' : 'send_money.recipient_note'
@@ -818,161 +866,70 @@ export function SendMoneyDrawer({
                   )}
                   onChange={(event) => setComment(event.target.value)}
                 />
-              ) : (
-                <Alert severity="info" variant="outlined">
-                  {kind === 'bitcoin'
-                    ? t('send_money.onchain_note_unavailable')
-                    : t('send_money.note_not_sent')}
-                </Alert>
-              ))}
+              )}
 
-            {bitcoinRequest.message && kind !== 'bip21' && (
-              <Alert severity="info" variant="outlined">
-                {t('send_money.bitcoin_uri_message', { message: bitcoinRequest.message })}
-              </Alert>
-            )}
-
-            <Box
-              sx={[
-                (theme) => ({
-                  p: 2,
-                  borderRadius: 1,
-                  bgcolor: 'background.neutral',
-                  border: `1px solid ${theme.vars.palette.divider}`,
-                }),
-              ]}
-            >
-              <Stack spacing={1.5}>
+              {balance != null && (
                 <Stack
                   direction="row"
-                  sx={{ alignItems: 'center', justifyContent: 'space-between' }}
+                  sx={{ justifyContent: 'space-between', typography: 'body2' }}
                 >
-                  <Typography variant="subtitle2">{t('send_money.review')}</Typography>
-                  <Label color={railColor(kind)}>{railLabel(kind, t)}</Label>
+                  <Typography variant="body2" color="text.secondary">
+                    {t('send_money.available')}
+                  </Typography>
+                  <SatsWithIcon amountMSats={balance} />
                 </Stack>
+              )}
 
-                {kind === 'bip21' && (
-                  <>
-                    <Alert severity="info" variant="outlined">
-                      {bitcoinRequest.lightning
-                        ? t('send_money.bip21_with_lightning_note')
-                        : t('send_money.bip21_onchain_note')}
-                    </Alert>
-                    <Alert severity="info" variant="outlined">
-                      {bitcoinRequest.lightning
-                        ? t('send_money.internal_detection_invoice')
-                        : t('send_money.internal_detection_onchain')}
-                    </Alert>
-                  </>
-                )}
-
-                {kind === 'bitcoin' && (
-                  <>
-                    <Alert severity="warning" variant="outlined">
-                      {t('send_money.onchain_fee_note')}
-                    </Alert>
-                    <Alert severity="info" variant="outlined">
-                      {t('send_money.internal_detection_onchain')}
-                    </Alert>
-                    <ToggleButtonGroup exclusive fullWidth size="small" value="auto">
-                      <ToggleButton value="economy" disabled>
-                        {t('send_money.fee_economy')}
-                      </ToggleButton>
-                      <ToggleButton value="auto">{t('send_money.fee_auto')}</ToggleButton>
-                      <ToggleButton value="fast" disabled>
-                        {t('send_money.fee_fast')}
-                      </ToggleButton>
-                    </ToggleButtonGroup>
-                    <Typography variant="caption" color="text.secondary">
-                      {t('send_money.fee_tier_placeholder')}
-                    </Typography>
-                  </>
-                )}
-
-                {(kind === 'bolt11' || kind === 'lnurl' || kind === 'lightning-address') && (
-                  <Alert severity="info" variant="outlined">
-                    {t('send_money.lightning_fee_note')}
-                  </Alert>
-                )}
-
-                {kind === 'internal' && (
-                  <Alert severity="success" variant="outlined">
-                    {t('send_money.internal_fee_note')}
-                  </Alert>
-                )}
-
-                {kind === 'bolt11' && (
-                  <Alert severity="info" variant="outlined">
-                    {t('send_money.internal_detection_invoice')}
-                  </Alert>
-                )}
-
-                {balance != null && (
-                  <Stack direction="row" sx={{ justifyContent: 'space-between' }}>
-                    <Typography variant="body2" color="text.secondary">
-                      {t('send_money.available')}
-                    </Typography>
-                    <SatsWithIcon amountMSats={balance} />
-                  </Stack>
-                )}
+              <Stack direction="row" spacing={1.5}>
+                <Button
+                  fullWidth
+                  color="inherit"
+                  variant="contained"
+                  loading={isSubmitting}
+                  disabled={!canSubmit}
+                  onClick={handlePay}
+                >
+                  {submitLabel}
+                </Button>
               </Stack>
-            </Box>
+            </>
+          )}
+        </Stack>
+      </Drawer>
 
-            <Accordion
-              disableGutters
-              variant="outlined"
-              sx={{ borderRadius: 1, '&:before': { display: 'none' } }}
-            >
-              <AccordionSummary expandIcon={<Iconify icon="eva:arrow-ios-downward-fill" />}>
-                <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-                  <Iconify icon="solar:code-square-bold-duotone" />
-                  <Typography variant="subtitle2">{t('send_money.technical')}</Typography>
-                </Stack>
-              </AccordionSummary>
-              <AccordionDetails>
-                <Stack spacing={1.5}>
-                  <Box
-                    component="pre"
-                    sx={{
-                      m: 0,
-                      p: 2,
-                      overflow: 'auto',
-                      borderRadius: 1,
-                      typography: 'caption',
-                      bgcolor: 'grey.900',
-                      color: 'grey.100',
-                    }}
-                  >
-                    {curlSnippet}
-                  </Box>
-                  <Button
-                    color="inherit"
-                    variant="outlined"
-                    onClick={handleCopySnippet}
-                    startIcon={<Iconify icon="solar:copy-bold" />}
-                  >
-                    {t('send_money.copy_curl')}
-                  </Button>
-                </Stack>
-              </AccordionDetails>
-            </Accordion>
+      <ScanQRDialog open={scanQR.value} onClose={scanQR.onFalse} onResult={setInput} />
+    </>
+  );
+}
 
-            <Stack direction="row" spacing={1.5}>
-              <Button
-                fullWidth
-                color="inherit"
-                variant="contained"
-                loading={isSubmitting}
-                disabled={!canSubmit}
-                onClick={handlePay}
-              >
-                {submitLabel}
-              </Button>
-            </Stack>
-          </>
-        )}
-      </Stack>
-    </Drawer>
+// ----------------------------------------------------------------------
+
+type ScanQRDialogProps = DialogProps & {
+  onClose: VoidFunction;
+  onResult: (result: string) => void;
+};
+
+function ScanQRDialog({ open, onClose, onResult }: ScanQRDialogProps) {
+  const { t } = useTranslate();
+
+  const handleScannerResult = (detectedCodes: IDetectedBarcode[]) => {
+    const text = detectedCodes[0]?.rawValue;
+    if (!text) return;
+
+    onResult(text);
+    onClose();
+  };
+
+  return (
+    <Dialog open={open} fullWidth maxWidth="xs" onClose={onClose}>
+      <Box sx={{ overflow: 'hidden', borderRadius: 1 }}>
+        <Scanner paused={!open} onScan={handleScannerResult} formats={['qr_code']} />
+      </Box>
+
+      <DialogActions>
+        <Button onClick={onClose}>{t('close')}</Button>
+      </DialogActions>
+    </Dialog>
   );
 }
 
@@ -992,14 +949,17 @@ export function ReceiveMoneyDrawer({
   const { copy } = useCopyToClipboard();
   const { wallet } = useGetUserWallet();
 
-  const [rail, setRail] = useState<ReceiveRail>('any');
-  const [activePayload, setActivePayload] = useState<ReceivePayload>('identity');
+  const [activePayload, setActivePayload] = useState<ReceivePayload>(
+    lnAddress ? 'identity' : 'unified'
+  );
   const [amountValue, setAmountValue] = useState('');
   const [amountUnit, setAmountUnit] = useState<AmountUnit>('sats');
   const [description, setDescription] = useState('');
   const [invoice, setInvoice] = useState<Invoice>();
   const [btcAddress, setBtcAddress] = useState<BtcAddress>();
-  const [addressType, setAddressType] = useState<BtcAddressType>(BtcAddressType.P2TR);
+  const [addressType, setAddressType] = useState<BtcAddressType>(
+    (state.defaultAddressType ?? BtcAddressType.P2TR) as BtcAddressType
+  );
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [addressError, setAddressError] = useState<string>();
   const [nowMs, setNowMs] = useState(0);
@@ -1029,22 +989,12 @@ export function ReceiveMoneyDrawer({
       null,
     [addressType, btcAddresses]
   );
-  const selectedPayload = useMemo<ReceivePayload>(() => {
-    if (activePayload === 'unified' && bolt11 && btcAddress) return 'unified';
-    if (activePayload === 'lightning' && bolt11) return 'lightning';
-    if (activePayload === 'onchain' && btcAddress) return 'onchain';
-    if (activePayload === 'identity' && identityAddress) return 'identity';
-    if (bolt11 && btcAddress) return 'unified';
-    if (bolt11) return 'lightning';
-    if (btcAddress) return 'onchain';
-    if (identityAddress) return 'identity';
-    return 'unified';
-  }, [activePayload, bolt11, btcAddress, identityAddress]);
+  const selectedPayload = activePayload;
   const qrValue =
     (selectedPayload === 'identity' && (identityLnurl || identityAddress)) ||
-    (selectedPayload === 'lightning' && bolt11) ||
-    (selectedPayload === 'onchain' && onchainRequest) ||
-    bip21;
+    (selectedPayload === 'lightning' && (bolt11 || '')) ||
+    (selectedPayload === 'onchain' && (onchainRequest || '')) ||
+    (selectedPayload === 'unified' && bolt11 && btcAddress ? bip21 : '');
   const payloadLabel =
     (selectedPayload === 'unified' && t('receive_money.unified')) ||
     (selectedPayload === 'identity' && t('receive_money.identity_tab')) ||
@@ -1070,19 +1020,15 @@ export function ReceiveMoneyDrawer({
   const primaryPayloadDisabled = showInvoiceExpiry && invoiceHasExpired;
   const invoiceExpiryRelative = invoiceExpiresAt ? fToNow(invoiceExpiresAt) : '';
   const invoiceExpiryAbsolute = invoiceExpiresAt ? fDateTime(invoiceExpiresAt) : '';
-  const secondaryPayloads = [
-    ...(selectedPayload === 'unified' && bolt11
-      ? [{ label: t('receive_money.copy_lightning'), value: bolt11, disabled: invoiceHasExpired }]
-      : []),
-    ...(selectedPayload === 'unified' && btcAddress?.address
-      ? [{ label: t('receive_money.copy_onchain_address'), value: btcAddress.address }]
-      : []),
-    ...(selectedPayload === 'identity' && identityAddress
-      ? [{ label: t('receive_money.copy_identity'), value: identityAddress }]
-      : []),
-  ];
+  const requestNeedsGeneration = selectedPayload !== 'identity';
+  const selectedNeedsInvoice = selectedPayload === 'unified' || selectedPayload === 'lightning';
+  const selectedNeedsAddress = selectedPayload === 'unified' || selectedPayload === 'onchain';
   const requestActionLabel =
-    invoice || btcAddress ? t('receive_money.refresh_request') : t('receive_money.generate');
+    invoice || btcAddress
+      ? t('receive_money.refresh_request')
+      : selectedNeedsInvoice
+        ? t('receive_money.generate_invoice')
+        : t('receive_money.prepare_address');
 
   useEffect(() => {
     setSelectedWalletId(walletId ?? '');
@@ -1098,7 +1044,6 @@ export function ReceiveMoneyDrawer({
   }, [invoiceExpiresAt]);
 
   const handleClose = useCallback(() => {
-    setRail('any');
     setActivePayload(lnAddress ? 'identity' : 'unified');
     setAmountValue('');
     setAmountUnit('sats');
@@ -1111,18 +1056,19 @@ export function ReceiveMoneyDrawer({
   }, [lnAddress, onClose, walletId]);
 
   const handleGenerate = async () => {
-    if (needsWallet) return;
+    if (needsWallet || !requestNeedsGeneration) return;
 
     try {
       setIsSubmitting(true);
       setAddressError(undefined);
-      setInvoice(undefined);
-      setBtcAddress(undefined);
 
-      const shouldGenerateInvoice = rail !== 'onchain';
-      const shouldGenerateAddress = rail !== 'lightning';
+      const shouldGenerateInvoice = selectedNeedsInvoice;
+      const shouldGenerateAddress = selectedNeedsAddress;
       let nextInvoice: Invoice | undefined;
       let nextBtcAddress: BtcAddress | undefined;
+
+      if (shouldGenerateInvoice) setInvoice(undefined);
+      if (shouldGenerateAddress) setBtcAddress(undefined);
 
       if (shouldGenerateInvoice) {
         const invoiceBody = {
@@ -1165,13 +1111,6 @@ export function ReceiveMoneyDrawer({
         }
       }
 
-      if (nextInvoice && nextBtcAddress) {
-        setActivePayload('unified');
-      } else if (nextInvoice) {
-        setActivePayload('lightning');
-      } else {
-        setActivePayload('onchain');
-      }
       onSuccess?.();
     } catch (error) {
       handleActionError(error);
@@ -1180,8 +1119,8 @@ export function ReceiveMoneyDrawer({
     }
   };
 
-  const handleAmountUnitChange = (_: MouseEvent<HTMLElement>, value: AmountUnit | null) => {
-    if (!value) return;
+  const handleAmountUnitSwap = () => {
+    const nextUnit: AmountUnit = amountUnit === 'fiat' ? 'sats' : 'fiat';
     const currentAmountSats = amountValueToSats(
       amountValue,
       amountUnit,
@@ -1189,26 +1128,23 @@ export function ReceiveMoneyDrawer({
       state.currency
     );
 
-    setAmountUnit(value);
-    setAmountValue(satsToAmountValue(currentAmountSats, value, fiatPrices, state.currency));
+    setAmountUnit(nextUnit);
+    setAmountValue(satsToAmountValue(currentAmountSats, nextUnit, fiatPrices, state.currency));
   };
 
   const handleAddressTypeChange = (nextAddressType: BtcAddressType) => {
     setAddressType(nextAddressType);
 
     const nextUnusedAddress =
-      btcAddresses?.find(
-        (address) => address.address_type === nextAddressType && !address.used
-      ) ?? null;
+      btcAddresses?.find((address) => address.address_type === nextAddressType && !address.used) ??
+      null;
 
     if (nextUnusedAddress) {
       setBtcAddress(nextUnusedAddress);
-      setActivePayload(bolt11 ? 'unified' : 'onchain');
       return;
     }
 
     setBtcAddress(undefined);
-    setActivePayload(bolt11 ? 'lightning' : lnAddress ? 'identity' : 'unified');
   };
 
   const handleSharePayload = async () => {
@@ -1261,22 +1197,25 @@ export function ReceiveMoneyDrawer({
           </Alert>
         )}
 
-        <TextField
-          select
-          label={t('receive_money.request_format')}
-          value={rail}
-          helperText={t('receive_money.request_format_helper')}
-          onChange={(event) => {
-            setRail(event.target.value as ReceiveRail);
-            setInvoice(undefined);
-            setBtcAddress(undefined);
-            setActivePayload(lnAddress ? 'identity' : 'unified');
-          }}
-        >
-          <MenuItem value="any">{t('receive_money.any')}</MenuItem>
-          <MenuItem value="lightning">{t('receive_money.lightning')}</MenuItem>
-          <MenuItem value="onchain">{t('receive_money.onchain')}</MenuItem>
-        </TextField>
+        <Stack spacing={1}>
+          <Typography variant="overline" color="text.secondary">
+            {t('receive_money.display_mode')}
+          </Typography>
+          <ToggleButtonGroup
+            exclusive
+            fullWidth
+            size="small"
+            value={selectedPayload}
+            onChange={(_, value: ReceivePayload | null) => value && setActivePayload(value)}
+          >
+            <ToggleButton value="unified">{t('receive_money.unified')}</ToggleButton>
+            <ToggleButton value="lightning">{t('receive_money.lightning')}</ToggleButton>
+            <ToggleButton value="onchain">{t('receive_money.bitcoin')}</ToggleButton>
+            <ToggleButton value="identity" disabled={!identityAddress}>
+              {t('receive_money.paycode')}
+            </ToggleButton>
+          </ToggleButtonGroup>
+        </Stack>
 
         <Stack spacing={1.5}>
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
@@ -1285,22 +1224,36 @@ export function ReceiveMoneyDrawer({
               type="number"
               label={t('receive_money.amount')}
               value={amountValue}
-              helperText={t('receive_money.amount_helper', {
-                unit: amountUnitLabel(amountUnit, state.currency),
-              })}
+              helperText={
+                hasFiatPrice
+                  ? fCurrency(satsToFiat(amountSats, fiatPrices, state.currency), {
+                      currency: state.currency,
+                    })
+                  : t('send_money.no_fiat_value')
+              }
               onChange={(event) => setAmountValue(event.target.value)}
+              slotProps={{
+                input: {
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      {amountUnitLabel(amountUnit, state.currency)}
+                    </InputAdornment>
+                  ),
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <IconButton
+                        edge="end"
+                        size="small"
+                        disabled={!hasFiatPrice}
+                        onClick={handleAmountUnitSwap}
+                      >
+                        <Iconify icon="solar:transfer-horizontal-bold" />
+                      </IconButton>
+                    </InputAdornment>
+                  ),
+                },
+              }}
             />
-            <ToggleButtonGroup
-              exclusive
-              size="small"
-              value={amountUnit}
-              onChange={handleAmountUnitChange}
-              sx={{ alignSelf: { sm: 'flex-start' } }}
-            >
-              <ToggleButton value="sats">{t('send_money.unit_sats')}</ToggleButton>
-              <ToggleButton value="btc">{t('send_money.unit_btc')}</ToggleButton>
-              <ToggleButton value="fiat">{state.currency}</ToggleButton>
-            </ToggleButtonGroup>
           </Stack>
 
           <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
@@ -1321,37 +1274,74 @@ export function ReceiveMoneyDrawer({
           onChange={(event) => setDescription(event.target.value)}
         />
 
-        {rail !== 'lightning' && (
-          <TextField
-            select
-            size="small"
-            label={t('receive_money.address_type')}
-            value={addressType}
-            onChange={(event) => handleAddressTypeChange(event.target.value as BtcAddressType)}
-            helperText={t(
-              addressTypeOptions.find((option) => option.value === addressType)?.helperKey ??
-                'bitcoin_address_type.taproot_helper'
-            )}
+        <Accordion
+          disableGutters
+          variant="outlined"
+          sx={{ borderRadius: 1, '&:before': { display: 'none' } }}
+        >
+          <AccordionSummary expandIcon={<Iconify icon="eva:arrow-ios-downward-fill" />}>
+            <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+              <Iconify icon="solar:tuning-square-bold-duotone" />
+              <Typography variant="subtitle2">{t('receive_money.advanced')}</Typography>
+            </Stack>
+          </AccordionSummary>
+          <AccordionDetails>
+            <Stack spacing={2}>
+              {selectedNeedsAddress && (
+                <Stack spacing={1}>
+                  <Typography variant="caption" color="text.secondary">
+                    {t('receive_money.address_type')}
+                  </Typography>
+                  <ToggleButtonGroup
+                    exclusive
+                    fullWidth
+                    size="small"
+                    value={addressType}
+                    onChange={(_, value: BtcAddressType | null) =>
+                      value && handleAddressTypeChange(value)
+                    }
+                  >
+                    {addressTypeOptions.map((option) => (
+                      <ToggleButton key={option.value} value={option.value}>
+                        {t(option.labelKey)}
+                      </ToggleButton>
+                    ))}
+                  </ToggleButtonGroup>
+                  <Typography variant="caption" color="text.secondary">
+                    {t(
+                      addressTypeOptions.find((option) => option.value === addressType)
+                        ?.helperKey ?? 'bitcoin_address_type.taproot_helper'
+                    )}
+                  </Typography>
+                </Stack>
+              )}
+
+              {selectedNeedsInvoice && (
+                <TextField
+                  disabled
+                  size="small"
+                  label={t('receive_money.expiry')}
+                  value={t('receive_money.default_expiry')}
+                  helperText={t('receive_money.expiry_backend_needed')}
+                />
+              )}
+            </Stack>
+          </AccordionDetails>
+        </Accordion>
+
+        {requestNeedsGeneration && (
+          <Button
+            color="inherit"
+            variant="contained"
+            loading={isSubmitting}
+            disabled={needsWallet}
+            onClick={handleGenerate}
           >
-            {addressTypeOptions.map((option) => (
-              <MenuItem key={option.value} value={option.value}>
-                {t(option.labelKey)}
-              </MenuItem>
-            ))}
-          </TextField>
+            {requestActionLabel}
+          </Button>
         )}
 
-        <Button
-          color="inherit"
-          variant="contained"
-          loading={isSubmitting}
-          disabled={needsWallet}
-          onClick={handleGenerate}
-        >
-          {requestActionLabel}
-        </Button>
-
-        {rail !== 'lightning' && unusedAddressForType && !btcAddress && (
+        {selectedNeedsAddress && unusedAddressForType && !btcAddress && (
           <Alert severity="info" variant="outlined">
             {t('receive_money.unused_address_available')}
           </Alert>
@@ -1361,18 +1351,6 @@ export function ReceiveMoneyDrawer({
 
         {qrValue ? (
           <Stack spacing={2}>
-            <Tabs
-              value={selectedPayload}
-              onChange={(_, value) => setActivePayload(value)}
-              variant="scrollable"
-              sx={{ borderBottom: (theme) => `1px solid ${theme.vars.palette.divider}` }}
-            >
-              {bolt11 && btcAddress && <Tab value="unified" label={t('receive_money.unified')} />}
-              {bolt11 && <Tab value="lightning" label={t('receive_money.lightning')} />}
-              {btcAddress && <Tab value="onchain" label={t('receive_money.onchain')} />}
-              {identityAddress && <Tab value="identity" label={t('receive_money.identity_tab')} />}
-            </Tabs>
-
             <Box
               sx={[
                 (theme) => ({
@@ -1395,98 +1373,58 @@ export function ReceiveMoneyDrawer({
               />
             </Box>
 
-            <Stack spacing={1}>
-              <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+            <Stack spacing={1.5}>
+              <Stack
+                direction="row"
+                spacing={1}
+                sx={{ alignItems: 'center', justifyContent: 'space-between' }}
+              >
                 <Label color={selectedPayload === 'unified' ? 'success' : 'info'}>
                   {payloadLabel}
                 </Label>
-                <Typography variant="caption" color="text.secondary">
-                  {payloadDescription}
-                </Typography>
+                {selectedLightningInvoice && !invoiceHasExpired && (
+                  <Label color="success">{t('receive_money.waiting_for_payment')}</Label>
+                )}
               </Stack>
-
-              <Stack direction="row" sx={{ alignItems: 'center', gap: 1 }}>
-                <Typography variant="body2" sx={{ flex: 1 }} noWrap>
-                  {qrValue}
-                </Typography>
-              </Stack>
+              <Typography variant="body2" color="text.secondary">
+                {payloadDescription}
+              </Typography>
 
               <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: 'wrap' }}>
                 <Button
                   color="inherit"
-                  variant="outlined"
-                  size="small"
+                  variant="contained"
                   disabled={primaryPayloadDisabled}
                   onClick={() => handleCopyPayload(qrValue)}
                   startIcon={<Iconify icon="solar:copy-bold" />}
+                  sx={{ flex: 1, minWidth: 140 }}
                 >
                   {payloadCopyLabel}
                 </Button>
                 <Button
                   color="inherit"
                   variant="outlined"
-                  size="small"
                   disabled={primaryPayloadDisabled}
                   onClick={handleSharePayload}
                   startIcon={<Iconify icon="solar:share-bold" />}
+                  sx={{ flex: 1, minWidth: 140 }}
                 >
                   {t('share')}
                 </Button>
               </Stack>
 
-              {secondaryPayloads.length > 0 && (
-                <Stack spacing={1}>
-                  <Typography variant="caption" color="text.secondary">
-                    {t('receive_money.separate_copy_options')}
-                  </Typography>
-                  <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: 'wrap' }}>
-                    {secondaryPayloads.map((payload) => (
-                      <Button
-                        key={payload.label}
-                        color="inherit"
-                        variant="soft"
-                        size="small"
-                        disabled={payload.disabled}
-                        onClick={() => handleCopyPayload(payload.value)}
-                        startIcon={<Iconify icon="solar:copy-bold" />}
-                      >
-                        {payload.label}
-                      </Button>
-                    ))}
-                  </Stack>
-                </Stack>
-              )}
-
               {showInvoiceExpiry && (
-                <Alert severity={invoiceHasExpired ? 'warning' : 'info'} variant="outlined">
-                  <Stack spacing={0.5}>
-                    <Typography variant="subtitle2">
-                      {invoiceHasExpired
-                        ? t('receive_money.invoice_expired')
-                        : t('receive_money.invoice_expires')}
-                    </Typography>
-                    <Typography variant="body2">
-                      {invoiceHasExpired
-                        ? t('receive_money.invoice_expired_description')
-                        : t('receive_money.invoice_expires_description', {
-                            time: invoiceExpiryRelative,
-                            date: invoiceExpiryAbsolute,
-                          })}
-                    </Typography>
-                  </Stack>
-                </Alert>
-              )}
-
-              {selectedPayload === 'identity' && (
-                <Alert severity="info" variant="outlined">
-                  {t('receive_money.identity_note')}
-                </Alert>
-              )}
-
-              {selectedPayload === 'unified' && btcAddress && bolt11 && (
-                <Alert severity="success" variant="outlined">
-                  {t('receive_money.unified_note')}
-                </Alert>
+                <Typography
+                  variant="caption"
+                  color={invoiceHasExpired ? 'warning.main' : 'text.secondary'}
+                >
+                  {invoiceHasExpired
+                    ? t('receive_money.invoice_expired_description')
+                    : t('receive_money.invoice_expires_short', {
+                        time: invoiceExpiryRelative,
+                        date: invoiceExpiryAbsolute,
+                      })}
+                </Typography>
               )}
 
               {(selectedPayload === 'onchain' || selectedPayload === 'unified') && btcAddress && (

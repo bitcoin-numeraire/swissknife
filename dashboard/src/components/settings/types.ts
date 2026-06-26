@@ -11,6 +11,9 @@ export type SettingsState = {
   contrast: 'default' | 'high';
   compactLayout: boolean;
   currency: CurrencyValue;
+  displayUnit: 'bip177' | 'sats';
+  hideBalances: boolean;
+  defaultAddressType: 'p2tr' | 'p2wpkh';
   // Optional: omitted from defaultSettings so the settings drawer hides these controls
   // (the dashboard intentionally exposes only dark mode, contrast, RTL and compact).
   fontSize?: number;

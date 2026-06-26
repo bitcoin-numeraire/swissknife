@@ -1,34 +1,36 @@
 'use client';
 
-import type { Contact } from 'src/lib/swissknife';
 import type { IFiatPrices } from 'src/types/bitcoin';
 import type { ITransaction } from 'src/types/transaction';
+import type { Contact, Invoice, Payment } from 'src/lib/swissknife';
 
 import { mutate } from 'swr';
-import { sumBy } from 'es-toolkit';
-import { useMemo, useState } from 'react';
 import { useBoolean } from 'minimal-shared/hooks';
+import { useMemo, useState, useEffect } from 'react';
 
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
 import Grid from '@mui/material/Grid';
-import Chip from '@mui/material/Chip';
 import Alert from '@mui/material/Alert';
 import Stack from '@mui/material/Stack';
 import Button from '@mui/material/Button';
+import Avatar from '@mui/material/Avatar';
+import Drawer from '@mui/material/Drawer';
 import Divider from '@mui/material/Divider';
+import Tooltip from '@mui/material/Tooltip';
 import ButtonBase from '@mui/material/ButtonBase';
+import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
-import LinearProgress from '@mui/material/LinearProgress';
+import ListItemText from '@mui/material/ListItemText';
 
 import { paths } from 'src/routes/paths';
 import { useRouter } from 'src/routes/hooks';
 
 import { satsToFiat } from 'src/utils/fiat';
 import { shouldFail } from 'src/utils/errors';
-import { fFromNow } from 'src/utils/format-time';
 import { displayLnAddress } from 'src/utils/lnurl';
 import { fCurrency } from 'src/utils/format-number';
+import { fFromNow, fDateTime } from 'src/utils/format-time';
 import { mergeAndSortTransactions } from 'src/utils/transactions';
 
 import { useTranslate } from 'src/locales';
@@ -39,6 +41,7 @@ import { useFetchFiatPrices } from 'src/actions/mempool-space';
 
 import { Label } from 'src/components/label';
 import { Iconify } from 'src/components/iconify';
+import { CopyButton } from 'src/components/copy';
 import { SatsWithIcon } from 'src/components/bitcoin';
 import { ErrorView } from 'src/components/error/error-view';
 import { useSettingsContext } from 'src/components/settings';
@@ -50,9 +53,20 @@ import { SendMoneyDrawer, ReceiveMoneyDrawer } from '../money-drawers';
 // ----------------------------------------------------------------------
 
 const fallbackFiatPrices: IFiatPrices = { USD: 0, EUR: 0, CHF: 0 };
+const recentActivityLimit = 8;
+const drawerSx = {
+  width: { xs: 1, sm: 520 },
+  maxWidth: 1,
+};
 
 function txAmount(tx: ITransaction) {
   return (tx.amount_msat || 0) + (tx.fee_msat || 0);
+}
+
+function isOpenAmountRequest(tx: ITransaction) {
+  return (
+    tx.transaction_type === TransactionType.INVOICE && tx.status === 'Pending' && !tx.amount_msat
+  );
 }
 
 function txDirection(tx: ITransaction) {
@@ -83,6 +97,21 @@ function txNetworkLabel(tx: ITransaction) {
   return 'Lightning';
 }
 
+function txDisplayTitle(tx: ITransaction, t: (key: string) => string) {
+  if (tx.description) return tx.description;
+
+  if (tx.transaction_type === TransactionType.INVOICE) {
+    if (isOpenAmountRequest(tx)) return t('wallet_view.open_amount_request');
+    if (tx.status === 'Pending') return t('wallet_view.payment_request');
+    if (tx.status === 'Expired') return t('wallet_view.request_expired');
+    return t('wallet_view.payment_received');
+  }
+
+  if (tx.status === 'Pending') return t('wallet_view.payment_pending');
+  if (tx.status === 'Failed') return t('wallet_view.payment_failed');
+  return t('wallet_view.payment_sent');
+}
+
 // ----------------------------------------------------------------------
 
 export function WalletView() {
@@ -90,8 +119,11 @@ export function WalletView() {
   const sendDrawer = useBoolean();
   const receiveDrawer = useBoolean();
   const { t } = useTranslate();
-  const { state } = useSettingsContext();
+  const settings = useSettingsContext();
+  const { state } = settings;
   const [sendInitialInput, setSendInitialInput] = useState('');
+  const [detailTransaction, setDetailTransaction] = useState<ITransaction | null>(null);
+  const [lastWalletSyncAt, setLastWalletSyncAt] = useState<Date | null>(null);
 
   const { wallet, walletLoading, walletError } = useGetUserWallet();
   const { fiatPrices, fiatPricesError } = useFetchFiatPrices();
@@ -114,8 +146,18 @@ export function WalletView() {
     [wallet?.invoices]
   );
 
+  const openAmountPendingInvoices = useMemo(
+    () => pendingInvoices.filter((invoice) => !invoice.amount_msat),
+    [pendingInvoices]
+  );
+
   const pendingIncoming = useMemo(
-    () => pendingInvoices.reduce((total, invoice) => total + (invoice.amount_msat || 0), 0),
+    () =>
+      pendingInvoices.reduce(
+        (total, invoice) =>
+          total + (invoice.amount_msat && invoice.amount_msat > 0 ? invoice.amount_msat : 0),
+        0
+      ),
     [pendingInvoices]
   );
 
@@ -129,30 +171,19 @@ export function WalletView() {
     [wallet?.payments]
   );
 
-  const settledIn = useMemo(
-    () =>
-      sumBy(
-        wallet?.invoices.filter((invoice) => invoice.status === 'Settled') ?? [],
-        (invoice) => invoice.amount_received_msat || invoice.amount_msat || 0
-      ),
+  const expiredInvoices = useMemo(
+    () => wallet?.invoices.filter((invoice) => invoice.status === 'Expired') ?? [],
     [wallet?.invoices]
-  );
-
-  const settledOut = useMemo(
-    () =>
-      sumBy(
-        wallet?.payments.filter((payment) => payment.status === 'Settled') ?? [],
-        (payment) => payment.amount_msat || 0
-      ),
-    [wallet?.payments]
   );
 
   const onMutation = () => mutate(endpointKeys.userWallet.get);
   const fiatValueAvailable = (prices[state.currency] ?? 0) > 0;
+  const balancesHidden = state.hideBalances ?? false;
   const lnAddressDisplay = wallet?.ln_address?.username
     ? displayLnAddress(wallet.ln_address.username)
     : '';
-  const reviewQueueCount = failedPayments.length + pendingInvoices.length + pendingPayments.length;
+  const needsActionCount = failedPayments.length + expiredInvoices.length;
+  const inProgressCount = pendingInvoices.length + pendingPayments.length;
   const openBlankSend = () => {
     setSendInitialInput('');
     sendDrawer.onTrue();
@@ -165,6 +196,15 @@ export function WalletView() {
     setSendInitialInput('');
     sendDrawer.onFalse();
   };
+  const toggleBalances = () => {
+    settings.setState({ hideBalances: !balancesHidden });
+  };
+
+  useEffect(() => {
+    if (wallet && !walletLoading) {
+      setLastWalletSyncAt(new Date());
+    }
+  }, [wallet, walletLoading]);
 
   return (
     <DashboardContent maxWidth="xl">
@@ -179,30 +219,11 @@ export function WalletView() {
           >
             <Stack spacing={1}>
               <Typography variant="h3">{t('wallet_view.title')}</Typography>
-              <Typography variant="body2" color="text.secondary">
-                {wallet?.ln_address
-                  ? t('wallet_view.identity_ready')
-                  : t('wallet_view.identity_missing')}
-              </Typography>
-            </Stack>
-
-            <Stack direction="row" spacing={1}>
-              <Button
-                color="inherit"
-                variant="outlined"
-                startIcon={<Iconify icon="solar:arrow-up-linear" />}
-                onClick={openBlankSend}
-              >
-                {t('send')}
-              </Button>
-              <Button
-                color="inherit"
-                variant="contained"
-                startIcon={<Iconify icon="solar:arrow-down-linear" />}
-                onClick={receiveDrawer.onTrue}
-              >
-                {t('wallet_view.receive')}
-              </Button>
+              {!wallet?.ln_address && (
+                <Typography variant="body2" color="text.secondary">
+                  {t('wallet_view.identity_missing')}
+                </Typography>
+              )}
             </Stack>
           </Stack>
 
@@ -228,265 +249,157 @@ export function WalletView() {
                     sx={{ justifyContent: 'space-between' }}
                   >
                     <Stack spacing={1}>
-                      <Typography variant="overline" color="text.secondary">
-                        {t('wallet_view.spendable_now')}
-                      </Typography>
+                      <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+                        <Typography variant="overline" color="text.secondary">
+                          {t('wallet_view.spendable_now')}
+                        </Typography>
+                        <Tooltip
+                          title={
+                            balancesHidden
+                              ? t('wallet_view.show_balances')
+                              : t('wallet_view.hide_balances')
+                          }
+                        >
+                          <IconButton
+                            size="small"
+                            onClick={toggleBalances}
+                            aria-label={
+                              balancesHidden
+                                ? t('wallet_view.show_balances')
+                                : t('wallet_view.hide_balances')
+                            }
+                          >
+                            <Iconify
+                              width={18}
+                              icon={balancesHidden ? 'solar:eye-closed-bold' : 'solar:eye-bold'}
+                            />
+                          </IconButton>
+                        </Tooltip>
+                      </Stack>
                       <SatsWithIcon
                         variant="h2"
                         amountMSats={wallet?.balance.available_msat ?? 0}
-                        sx={{ letterSpacing: 0 }}
+                        sx={{ letterSpacing: 0, fontWeight: 400 }}
                       />
                       {fiatValueAvailable ? (
                         <Typography variant="subtitle1" color="text.secondary">
-                          {fCurrency(
-                            satsToFiat(
-                              (wallet?.balance.available_msat ?? 0) / 1000,
-                              prices,
-                              state.currency
-                            ),
-                            { currency: state.currency }
-                          )}
+                          {balancesHidden
+                            ? t('wallet_view.hidden_amount')
+                            : fCurrency(
+                                satsToFiat(
+                                  (wallet?.balance.available_msat ?? 0) / 1000,
+                                  prices,
+                                  state.currency
+                                ),
+                                { currency: state.currency }
+                              )}
                         </Typography>
                       ) : (
                         <Typography variant="subtitle1" color="text.secondary">
                           {t('wallet_view.no_fiat_value')}
                         </Typography>
                       )}
+                      {(wallet?.balance.reserved_msat ?? 0) > 0 && (
+                        <Typography variant="caption" color="text.secondary">
+                          {t('wallet_view.reserved_amount')}{' '}
+                          <SatsWithIcon
+                            component="span"
+                            amountMSats={wallet?.balance.reserved_msat ?? 0}
+                          />
+                        </Typography>
+                      )}
+                      {lastWalletSyncAt && (
+                        <Typography variant="caption" color="text.disabled">
+                          {t('wallet_view.synced_ago', { time: fFromNow(lastWalletSyncAt) })}
+                        </Typography>
+                      )}
                     </Stack>
-
-                    <Box
-                      sx={[
-                        (theme) => ({
-                          p: 2,
-                          width: { xs: 1, sm: 260 },
-                          borderRadius: 1,
-                          bgcolor: 'background.neutral',
-                          border: `1px solid ${theme.vars.palette.divider}`,
-                        }),
-                      ]}
-                    >
-                      <Stack spacing={1.5}>
-                        <Stack direction="row" sx={{ justifyContent: 'space-between' }}>
-                          <Typography variant="body2" color="text.secondary">
-                            {t('wallet_view.arriving_soon')}
-                          </Typography>
-                          <SatsWithIcon amountMSats={pendingIncoming} />
-                        </Stack>
-                        <LinearProgress
-                          variant="determinate"
-                          value={Math.min(
-                            100,
-                            ((wallet?.balance.available_msat ?? 0) /
-                              Math.max(1, (wallet?.balance.received_msat ?? 0) + pendingIncoming)) *
-                              100
-                          )}
-                          color="success"
-                        />
-                        <Stack direction="row" sx={{ justifyContent: 'space-between' }}>
-                          <Typography variant="body2" color="text.secondary">
-                            {t('wallet_view.sent')}
-                          </Typography>
-                          <SatsWithIcon amountMSats={settledOut} />
-                        </Stack>
-                        <Stack direction="row" sx={{ justifyContent: 'space-between' }}>
-                          <Typography variant="body2" color="text.secondary">
-                            {t('wallet_view.received')}
-                          </Typography>
-                          <SatsWithIcon amountMSats={settledIn} />
-                        </Stack>
-                      </Stack>
-                    </Box>
                   </Stack>
 
                   <Divider />
 
-                  <Stack spacing={1.5}>
-                    <Typography variant="overline" color="text.secondary">
-                      {t('wallet_view.money_status')}
-                    </Typography>
-                    <Grid container spacing={2}>
-                      <Grid size={{ xs: 12, sm: 4 }}>
-                        <ButtonBase
-                          onClick={receiveDrawer.onTrue}
-                          sx={[
-                            (theme) => ({
-                              p: 2,
-                              gap: 1.5,
-                              width: 1,
-                              minHeight: 190,
-                              display: 'flex',
-                              borderRadius: 1,
-                              textAlign: 'left',
-                              alignItems: 'stretch',
-                              flexDirection: 'column',
-                              justifyContent: 'space-between',
-                              border: `1px solid ${theme.vars.palette.divider}`,
-                              '&:hover': { borderColor: theme.vars.palette.text.secondary },
-                            }),
-                          ]}
-                        >
-                          <Stack direction="row" sx={{ alignItems: 'center', gap: 1 }}>
-                            <Iconify icon="solar:qr-code-bold-duotone" width={22} />
-                            <Typography variant="subtitle2" sx={{ flexGrow: 1 }}>
-                              {t('wallet_view.receive_readiness')}
-                            </Typography>
-                            <Label color={wallet?.ln_address ? 'success' : 'warning'}>
-                              {wallet?.ln_address ? t('wallet_view.ready') : t('wallet_view.setup')}
-                            </Label>
-                          </Stack>
-
-                          <Stack spacing={0.5} sx={{ minWidth: 0 }}>
-                            <Typography variant="h6" noWrap>
-                              {lnAddressDisplay || t('wallet_view.no_lightning_address')}
-                            </Typography>
-                            <Typography variant="body2" color="text.secondary">
-                              {wallet?.ln_address
-                                ? t('wallet_view.receive_ready_detail')
-                                : t('wallet_view.receive_setup_detail')}
-                            </Typography>
-                          </Stack>
-
-                          <Stack spacing={1}>
-                            <Stack direction="row" sx={{ justifyContent: 'space-between' }}>
-                              <Typography variant="caption" color="text.secondary">
-                                {t('wallet_view.pending_requests')}
-                              </Typography>
-                              <Typography variant="caption">{pendingInvoices.length}</Typography>
-                            </Stack>
-                            <Stack direction="row" sx={{ justifyContent: 'space-between' }}>
-                              <Typography variant="caption" color="text.secondary">
-                                {t('wallet_view.expected')}
-                              </Typography>
-                              <SatsWithIcon amountMSats={pendingIncoming} />
-                            </Stack>
-                          </Stack>
-                        </ButtonBase>
-                      </Grid>
-
-                      <Grid size={{ xs: 12, sm: 4 }}>
-                        <ButtonBase
-                          onClick={openBlankSend}
-                          sx={[
-                            (theme) => ({
-                              p: 2,
-                              gap: 1.5,
-                              width: 1,
-                              minHeight: 190,
-                              display: 'flex',
-                              borderRadius: 1,
-                              textAlign: 'left',
-                              alignItems: 'stretch',
-                              flexDirection: 'column',
-                              justifyContent: 'space-between',
-                              border: `1px solid ${theme.vars.palette.divider}`,
-                              '&:hover': { borderColor: theme.vars.palette.text.secondary },
-                            }),
-                          ]}
-                        >
-                          <Stack direction="row" sx={{ alignItems: 'center', gap: 1 }}>
-                            <Iconify icon="solar:plain-2-bold-duotone" width={22} />
-                            <Typography variant="subtitle2" sx={{ flexGrow: 1 }}>
-                              {t('wallet_view.spend_readiness')}
-                            </Typography>
-                            <Label
-                              color={
-                                (wallet?.balance.available_msat ?? 0) > 0 ? 'success' : 'default'
-                              }
-                            >
-                              {(wallet?.balance.available_msat ?? 0) > 0
-                                ? t('wallet_view.ready')
-                                : t('wallet_view.empty')}
-                            </Label>
-                          </Stack>
-
-                          <Stack spacing={0.5}>
-                            <SatsWithIcon
-                              variant="h6"
-                              amountMSats={wallet?.balance.available_msat ?? 0}
-                            />
-                            <Typography variant="body2" color="text.secondary">
-                              {contacts.length
-                                ? t('wallet_view.saved_contacts', { count: contacts.length })
-                                : t('wallet_view.no_contacts')}
-                            </Typography>
-                          </Stack>
-
-                          <Stack spacing={1}>
-                            <Stack direction="row" sx={{ justifyContent: 'space-between' }}>
-                              <Typography variant="caption" color="text.secondary">
-                                {t('wallet_view.reserved')}
-                              </Typography>
-                              <SatsWithIcon amountMSats={wallet?.balance.reserved_msat ?? 0} />
-                            </Stack>
-                            <Stack direction="row" sx={{ justifyContent: 'space-between' }}>
-                              <Typography variant="caption" color="text.secondary">
-                                {t('wallet_view.fees_paid')}
-                              </Typography>
-                              <SatsWithIcon amountMSats={wallet?.balance.fees_paid_msat ?? 0} />
-                            </Stack>
-                          </Stack>
-                        </ButtonBase>
-                      </Grid>
-
-                      <Grid size={{ xs: 12, sm: 4 }}>
-                        <ButtonBase
-                          onClick={() => router.push(paths.activity)}
-                          sx={[
-                            (theme) => ({
-                              p: 2,
-                              gap: 1.5,
-                              width: 1,
-                              minHeight: 190,
-                              display: 'flex',
-                              borderRadius: 1,
-                              textAlign: 'left',
-                              alignItems: 'stretch',
-                              flexDirection: 'column',
-                              justifyContent: 'space-between',
-                              border: `1px solid ${theme.vars.palette.divider}`,
-                              '&:hover': { borderColor: theme.vars.palette.text.secondary },
-                            }),
-                          ]}
-                        >
-                          <Stack direction="row" sx={{ alignItems: 'center', gap: 1 }}>
-                            <Iconify icon="solar:bill-list-bold-duotone" width={22} />
-                            <Typography variant="subtitle2" sx={{ flexGrow: 1 }}>
-                              {t('wallet_view.review_queue')}
-                            </Typography>
-                            <Label color={reviewQueueCount ? 'warning' : 'success'}>
-                              {reviewQueueCount || t('wallet_view.clear')}
-                            </Label>
-                          </Stack>
-
-                          <Stack spacing={0.5}>
-                            <Typography variant="h6">
-                              {reviewQueueCount
-                                ? t('wallet_view.review_items', { count: reviewQueueCount })
-                                : t('wallet_view.no_actions')}
-                            </Typography>
-                            <Typography variant="body2" color="text.secondary">
-                              {t('wallet_view.review_queue_detail')}
-                            </Typography>
-                          </Stack>
-
-                          <Stack spacing={1}>
-                            <Stack direction="row" sx={{ justifyContent: 'space-between' }}>
-                              <Typography variant="caption" color="text.secondary">
-                                {t('wallet_view.failed_payments')}
-                              </Typography>
-                              <Typography variant="caption">{failedPayments.length}</Typography>
-                            </Stack>
-                            <Stack direction="row" sx={{ justifyContent: 'space-between' }}>
-                              <Typography variant="caption" color="text.secondary">
-                                {t('wallet_view.pending_outgoing')}
-                              </Typography>
-                              <Typography variant="caption">{pendingPayments.length}</Typography>
-                            </Stack>
-                          </Stack>
-                        </ButtonBase>
-                      </Grid>
+                  <Grid container spacing={2}>
+                    <Grid size={{ xs: 12, sm: 6 }}>
+                      <WalletActionButton
+                        onClick={openBlankSend}
+                        title={t('wallet_view.send_money')}
+                        icon="solar:arrow-up-linear"
+                        color="warning"
+                      />
                     </Grid>
-                  </Stack>
+
+                    <Grid size={{ xs: 12, sm: 6 }}>
+                      <WalletActionButton
+                        onClick={receiveDrawer.onTrue}
+                        title={t('wallet_view.receive_money')}
+                        detail={
+                          pendingInvoices.length
+                            ? t('wallet_view.active_requests_summary', {
+                                count: pendingInvoices.length,
+                              })
+                            : t('wallet_view.no_active_requests')
+                        }
+                        icon="solar:arrow-down-linear"
+                        color="success"
+                      />
+                    </Grid>
+                  </Grid>
+
+                  <Box
+                    sx={[
+                      (theme) => ({
+                        p: 2,
+                        borderRadius: 1,
+                        bgcolor: 'background.neutral',
+                        border: `1px solid ${theme.vars.palette.divider}`,
+                      }),
+                    ]}
+                  >
+                    <Stack
+                      direction={{ xs: 'column', sm: 'row' }}
+                      spacing={2}
+                      sx={{ alignItems: { sm: 'center' }, justifyContent: 'space-between' }}
+                    >
+                      <Stack
+                        direction="row"
+                        spacing={1.5}
+                        sx={{ alignItems: 'center', minWidth: 0 }}
+                      >
+                        <Box
+                          sx={{
+                            width: 34,
+                            height: 34,
+                            display: 'grid',
+                            borderRadius: 1,
+                            placeItems: 'center',
+                            color: wallet?.ln_address ? 'grey.900' : 'text.disabled',
+                            bgcolor: wallet?.ln_address
+                              ? 'warning.main'
+                              : 'action.disabledBackground',
+                          }}
+                        >
+                          <Iconify icon="solar:bolt-bold-duotone" width={21} />
+                        </Box>
+                        <Stack sx={{ minWidth: 0 }}>
+                          <Typography variant="caption" color="text.secondary">
+                            {t('wallet_view.reusable_receive')}
+                          </Typography>
+                          <Typography variant="subtitle2" noWrap>
+                            {lnAddressDisplay || t('wallet_view.no_lightning_address')}
+                          </Typography>
+                        </Stack>
+                      </Stack>
+                      <Button
+                        href={`${paths.identity}?tab=lightning`}
+                        color="inherit"
+                        variant="outlined"
+                      >
+                        {wallet?.ln_address
+                          ? t('wallet_view.manage_receive_identity')
+                          : t('wallet_view.claim_receive_identity')}
+                      </Button>
+                    </Stack>
+                  </Box>
                 </Stack>
               </Card>
             </Grid>
@@ -500,33 +413,104 @@ export function WalletView() {
                       sx={{ alignItems: 'center', justifyContent: 'space-between' }}
                     >
                       <Typography variant="h6">{t('wallet_view.needs_action')}</Typography>
-                      <Label color={reviewQueueCount ? 'warning' : 'success'}>
-                        {reviewQueueCount || t('wallet_view.clear')}
+                      <Label color={needsActionCount ? 'warning' : 'success'}>
+                        {needsActionCount || t('wallet_view.clear')}
                       </Label>
                     </Stack>
 
-                    {failedPayments.slice(0, 3).map((payment) => (
-                      <Alert key={payment.id} severity="error" variant="outlined">
-                        {payment.error || t('wallet_view.failed_payment')}
-                      </Alert>
-                    ))}
-
-                    {pendingPayments.length > 0 && (
-                      <Alert severity="warning" variant="outlined">
-                        {t('wallet_view.pending_outgoing_notice')}
-                      </Alert>
+                    {failedPayments.length > 0 && (
+                      <ButtonBase
+                        onClick={() => router.push(paths.activityList('payment'))}
+                        sx={[
+                          (theme) => ({
+                            p: 1.5,
+                            gap: 1.5,
+                            width: 1,
+                            display: 'flex',
+                            borderRadius: 1,
+                            textAlign: 'left',
+                            alignItems: 'center',
+                            border: `1px solid ${theme.vars.palette.error.main}`,
+                          }),
+                        ]}
+                      >
+                        <Box
+                          sx={{
+                            width: 34,
+                            height: 34,
+                            display: 'grid',
+                            flexShrink: 0,
+                            borderRadius: 1,
+                            placeItems: 'center',
+                            color: 'grey.900',
+                            bgcolor: 'error.main',
+                          }}
+                        >
+                          <Iconify icon="solar:danger-triangle-bold-duotone" width={21} />
+                        </Box>
+                        <Stack sx={{ minWidth: 0, flex: 1 }}>
+                          <Typography variant="subtitle2">
+                            {t('wallet_view.failed_payments_action', {
+                              count: failedPayments.length,
+                            })}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary" noWrap>
+                            {failedPayments[0]?.error || t('wallet_view.failed_payment')}
+                          </Typography>
+                        </Stack>
+                      </ButtonBase>
                     )}
 
-                    {pendingInvoices.length > 0 && (
-                      <Alert severity="info" variant="outlined">
-                        {t('wallet_view.pending_incoming')}
-                      </Alert>
+                    {expiredInvoices.length > 0 && (
+                      <ButtonBase
+                        onClick={() => router.push(paths.activityList('invoice'))}
+                        sx={[
+                          (theme) => ({
+                            p: 1.5,
+                            gap: 1.5,
+                            width: 1,
+                            display: 'flex',
+                            borderRadius: 1,
+                            textAlign: 'left',
+                            alignItems: 'center',
+                            border: `1px solid ${theme.vars.palette.warning.main}`,
+                          }),
+                        ]}
+                      >
+                        <Box
+                          sx={{
+                            width: 34,
+                            height: 34,
+                            display: 'grid',
+                            flexShrink: 0,
+                            borderRadius: 1,
+                            placeItems: 'center',
+                            color: 'grey.900',
+                            bgcolor: 'warning.main',
+                          }}
+                        >
+                          <Iconify icon="solar:bill-cross-bold-duotone" width={21} />
+                        </Box>
+                        <Stack sx={{ minWidth: 0, flex: 1 }}>
+                          <Typography variant="subtitle2">
+                            {t('wallet_view.expired_requests_action', {
+                              count: expiredInvoices.length,
+                            })}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {t('wallet_view.expired_requests_detail')}
+                          </Typography>
+                        </Stack>
+                      </ButtonBase>
                     )}
 
-                    {reviewQueueCount === 0 && (
-                      <Alert severity="success" variant="outlined">
-                        {t('wallet_view.no_actions')}
-                      </Alert>
+                    {needsActionCount === 0 && (
+                      <Stack spacing={0.5}>
+                        <Typography variant="subtitle2">{t('wallet_view.no_actions')}</Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          {t('wallet_view.no_actions_detail')}
+                        </Typography>
+                      </Stack>
                     )}
                   </Stack>
                 </Card>
@@ -537,20 +521,162 @@ export function WalletView() {
                       direction="row"
                       sx={{ alignItems: 'center', justifyContent: 'space-between' }}
                     >
-                      <Typography variant="h6">{t('wallet_view.people')}</Typography>
-                      <Button href={paths.wallet.contacts} size="small" color="inherit">
+                      <Typography variant="h6">{t('wallet_view.in_progress')}</Typography>
+                      <Label color={inProgressCount ? 'info' : 'default'}>
+                        {inProgressCount || t('wallet_view.none')}
+                      </Label>
+                    </Stack>
+
+                    {pendingInvoices.length > 0 && (
+                      <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
+                        <Box
+                          sx={{
+                            width: 34,
+                            height: 34,
+                            display: 'grid',
+                            flexShrink: 0,
+                            borderRadius: 1,
+                            placeItems: 'center',
+                            color: 'grey.900',
+                            bgcolor: 'info.main',
+                          }}
+                        >
+                          <Iconify icon="solar:download-minimalistic-bold-duotone" width={21} />
+                        </Box>
+                        <Stack sx={{ flex: 1, minWidth: 0 }}>
+                          <Typography variant="subtitle2">
+                            {t('wallet_view.active_requests_summary', {
+                              count: pendingInvoices.length,
+                            })}
+                          </Typography>
+                          <Stack spacing={0.25}>
+                            {pendingIncoming > 0 && (
+                              <Typography variant="caption" color="text.secondary">
+                                <SatsWithIcon component="span" amountMSats={pendingIncoming} />{' '}
+                                {t('wallet_view.fixed_requested')}
+                              </Typography>
+                            )}
+                            {openAmountPendingInvoices.length > 0 && (
+                              <Typography variant="caption" color="text.secondary">
+                                {t('wallet_view.open_amount_requests_waiting', {
+                                  count: openAmountPendingInvoices.length,
+                                })}
+                              </Typography>
+                            )}
+                            {pendingIncoming === 0 && openAmountPendingInvoices.length === 0 && (
+                              <Typography variant="caption" color="text.secondary">
+                                {t('wallet_view.requested_not_received')}
+                              </Typography>
+                            )}
+                          </Stack>
+                        </Stack>
+                      </Stack>
+                    )}
+
+                    {pendingPayments.length > 0 && (
+                      <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
+                        <Box
+                          sx={{
+                            width: 34,
+                            height: 34,
+                            display: 'grid',
+                            flexShrink: 0,
+                            borderRadius: 1,
+                            placeItems: 'center',
+                            color: 'grey.900',
+                            bgcolor: 'warning.main',
+                          }}
+                        >
+                          <Iconify icon="solar:upload-minimalistic-bold-duotone" width={21} />
+                        </Box>
+                        <Stack sx={{ flex: 1, minWidth: 0 }}>
+                          <Typography variant="subtitle2">
+                            {t('wallet_view.pending_outgoing_action', {
+                              count: pendingPayments.length,
+                            })}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {t('wallet_view.pending_outgoing_detail')}
+                          </Typography>
+                        </Stack>
+                      </Stack>
+                    )}
+
+                    {inProgressCount === 0 && (
+                      <Typography variant="body2" color="text.secondary">
+                        {t('wallet_view.no_pending_activity')}
+                      </Typography>
+                    )}
+                  </Stack>
+                </Card>
+
+                <Card sx={{ p: 3, borderRadius: 1 }}>
+                  <Stack spacing={2}>
+                    <Stack
+                      direction="row"
+                      sx={{ alignItems: 'center', justifyContent: 'space-between' }}
+                    >
+                      <Stack spacing={0.25}>
+                        <Typography variant="h6">{t('wallet_view.people')}</Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {t('wallet_view.saved_contacts', { count: contacts.length })}
+                        </Typography>
+                      </Stack>
+                      <Button
+                        href={paths.wallet.contacts}
+                        size="small"
+                        color="inherit"
+                        endIcon={<Iconify icon="eva:arrow-ios-forward-fill" width={16} />}
+                      >
                         {t('view_all')}
                       </Button>
                     </Stack>
-                    <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: 'wrap' }}>
-                      {contacts.slice(0, 8).map((contact) => (
-                        <Chip
+
+                    <Stack spacing={2}>
+                      {contacts.slice(0, 4).map((contact) => (
+                        <ButtonBase
                           key={contact.ln_address}
-                          label={contact.ln_address.split('@')[0]}
-                          variant="outlined"
                           onClick={() => openSendTo(contact.ln_address)}
-                        />
+                          aria-label={`${t('wallet_view.quick_send')}: ${contact.ln_address}`}
+                          sx={[
+                            (theme) => ({
+                              p: 1,
+                              ml: -1,
+                              width: 1,
+                              gap: 1.5,
+                              display: 'flex',
+                              borderRadius: 1,
+                              textAlign: 'left',
+                              alignItems: 'center',
+                              justifyContent: 'flex-start',
+                              '&:hover': { bgcolor: 'background.neutral' },
+                              '&:focus-visible': {
+                                outline: `2px solid ${theme.vars.palette.primary.main}`,
+                                outlineOffset: 2,
+                              },
+                            }),
+                          ]}
+                        >
+                          <Avatar alt={contact.ln_address} sx={{ width: 40, height: 40 }}>
+                            {contact.ln_address.charAt(0).toUpperCase()}
+                          </Avatar>
+
+                          <ListItemText
+                            primary={contact.ln_address}
+                            secondary={fFromNow(contact.contact_since)}
+                            slotProps={{
+                              primary: { noWrap: true, sx: { typography: 'subtitle2' } },
+                              secondary: { sx: { typography: 'caption', color: 'text.disabled' } },
+                            }}
+                          />
+
+                          <Iconify
+                            icon="eva:diagonal-arrow-right-up-fill"
+                            sx={{ color: 'text.secondary', flexShrink: 0 }}
+                          />
+                        </ButtonBase>
                       ))}
+
                       {contacts.length === 0 && (
                         <Typography variant="body2" color="text.secondary">
                           {t('wallet_view.no_contacts')}
@@ -573,7 +699,7 @@ export function WalletView() {
                     <Stack>
                       <Typography variant="h6">{t('wallet_view.recent_activity')}</Typography>
                       <Typography variant="body2" color="text.secondary">
-                        {t('wallet_view.unified_activity')}
+                        {t('wallet_view.recent_activity_limit', { count: recentActivityLimit })}
                       </Typography>
                     </Stack>
                     <Button
@@ -588,19 +714,18 @@ export function WalletView() {
                   <Divider />
 
                   <Stack spacing={1}>
-                    {allTransactions.slice(0, 8).map((tx) => {
+                    {allTransactions.slice(0, recentActivityLimit).map((tx) => {
                       const direction = txDirection(tx);
                       const isIncoming = direction === 'in';
-                      const title =
-                        tx.description ||
-                        (isIncoming ? t('activity_view.received') : t('activity_view.sent'));
+                      const title = txDisplayTitle(tx, t);
+                      const isOpenAmount = isOpenAmountRequest(tx);
 
                       return (
                         <Box
                           component={ButtonBase}
                           key={`${tx.transaction_type}-${tx.id}`}
                           aria-label={`${t('details')}: ${title}`}
-                          onClick={() => router.push(txHref(tx))}
+                          onClick={() => setDetailTransaction(tx)}
                           sx={[
                             (theme) => ({
                               p: 1.5,
@@ -635,10 +760,10 @@ export function WalletView() {
                               borderRadius: 1,
                               placeItems: 'center',
                               color: isIncoming ? 'success.main' : 'warning.main',
-                              bgcolor: isIncoming ? 'success.lighter' : 'warning.lighter',
+                              bgcolor: isIncoming ? 'success.main' : 'warning.main',
                             }}
                           >
-                            <Iconify icon={railIcon(tx)} />
+                            <Iconify icon={railIcon(tx)} sx={{ color: 'grey.900' }} />
                           </Box>
 
                           <Stack sx={{ minWidth: 0 }}>
@@ -649,8 +774,8 @@ export function WalletView() {
                             >
                               <Label color={isIncoming ? 'success' : 'warning'}>
                                 {isIncoming
-                                  ? t('wallet_view.direction_received')
-                                  : t('wallet_view.direction_sent')}
+                                  ? t('wallet_view.direction_in')
+                                  : t('wallet_view.direction_out')}
                               </Label>
                               <Typography variant="subtitle2" noWrap>
                                 {title}
@@ -661,28 +786,41 @@ export function WalletView() {
                             </Typography>
                           </Stack>
 
-                          <Stack
-                            direction="row"
-                            spacing={0.25}
-                            sx={{
-                              gridColumn: { xs: '2', sm: 'auto' },
-                              alignItems: 'center',
-                              justifyContent: { xs: 'flex-start', sm: 'flex-end' },
-                            }}
-                          >
+                          {isOpenAmount ? (
                             <Typography
-                              component="span"
                               variant="body2"
-                              sx={{ color: isIncoming ? 'success.main' : 'warning.main' }}
+                              color="text.secondary"
+                              sx={{
+                                gridColumn: { xs: '2', sm: 'auto' },
+                                justifySelf: { xs: 'start', sm: 'end' },
+                              }}
                             >
-                              {isIncoming ? '+' : '-'}
+                              {t('wallet_view.open_amount')}
                             </Typography>
-                            <SatsWithIcon
-                              component="span"
-                              amountMSats={txAmount(tx)}
-                              sx={{ color: isIncoming ? 'success.main' : 'warning.main' }}
-                            />
-                          </Stack>
+                          ) : (
+                            <Stack
+                              direction="row"
+                              spacing={0.25}
+                              sx={{
+                                gridColumn: { xs: '2', sm: 'auto' },
+                                alignItems: 'center',
+                                justifyContent: { xs: 'flex-start', sm: 'flex-end' },
+                              }}
+                            >
+                              <Typography
+                                component="span"
+                                variant="body2"
+                                sx={{ color: isIncoming ? 'success.main' : 'warning.main' }}
+                              >
+                                {isIncoming ? '+' : '-'}
+                              </Typography>
+                              <SatsWithIcon
+                                component="span"
+                                amountMSats={txAmount(tx)}
+                                sx={{ color: isIncoming ? 'success.main' : 'warning.main' }}
+                              />
+                            </Stack>
+                          )}
 
                           <Label
                             color={statusColor(tx.status)}
@@ -720,6 +858,10 @@ export function WalletView() {
             </Grid>
           </Grid>
 
+          <WalletActivityDrawer
+            row={detailTransaction}
+            onClose={() => setDetailTransaction(null)}
+          />
           <SendMoneyDrawer
             open={sendDrawer.value}
             contacts={contacts}
@@ -739,5 +881,300 @@ export function WalletView() {
         </>
       )}
     </DashboardContent>
+  );
+}
+
+function WalletActionButton({
+  title,
+  detail,
+  icon,
+  color,
+  onClick,
+}: {
+  title: string;
+  detail?: string;
+  icon: string;
+  color: 'success' | 'warning';
+  onClick: VoidFunction;
+}) {
+  return (
+    <ButtonBase
+      onClick={onClick}
+      sx={[
+        (theme) => ({
+          p: 2,
+          gap: 1.5,
+          width: 1,
+          minHeight: 108,
+          display: 'flex',
+          borderRadius: 1,
+          textAlign: 'left',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          bgcolor: 'background.neutral',
+          border: `1px solid ${theme.vars.palette.divider}`,
+          transition: theme.transitions.create(['border-color', 'background-color']),
+          '&:hover': {
+            bgcolor: 'background.paper',
+            borderColor: theme.vars.palette[color].main,
+          },
+        }),
+      ]}
+    >
+      <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center', minWidth: 0 }}>
+        <Box
+          sx={[
+            (theme) => ({
+              width: 46,
+              height: 46,
+              display: 'grid',
+              flexShrink: 0,
+              borderRadius: 1,
+              placeItems: 'center',
+              color: theme.vars.palette[color].main,
+              bgcolor: 'background.paper',
+              border: `1px solid ${theme.vars.palette[color].main}`,
+            }),
+          ]}
+        >
+          <Iconify icon={icon} width={26} />
+        </Box>
+        <Stack sx={{ minWidth: 0 }}>
+          <Typography variant="h6">{title}</Typography>
+          {detail && (
+            <Typography variant="body2" color="text.secondary">
+              {detail}
+            </Typography>
+          )}
+        </Stack>
+      </Stack>
+
+      <Iconify icon="eva:arrow-ios-forward-fill" sx={{ color: 'text.disabled', flexShrink: 0 }} />
+    </ButtonBase>
+  );
+}
+
+function WalletActivityDrawer({
+  row,
+  onClose,
+}: {
+  row: ITransaction | null;
+  onClose: VoidFunction;
+}) {
+  const { t } = useTranslate();
+
+  if (!row) {
+    return (
+      <Drawer
+        anchor="right"
+        open={false}
+        onClose={onClose}
+        transitionDuration={{ enter: 225, exit: 195 }}
+        ModalProps={{ keepMounted: true }}
+        slotProps={{ paper: { sx: drawerSx } }}
+      />
+    );
+  }
+
+  const direction = txDirection(row);
+  const isIncoming = direction === 'in';
+  const invoice = row.transaction_type === TransactionType.INVOICE ? (row as Invoice) : null;
+  const payment = row.transaction_type === TransactionType.PAYMENT ? (row as Payment) : null;
+  const title = txDisplayTitle(row, t);
+  const methodLabel = txNetworkLabel(row);
+  const feeAmount = row.fee_msat || 0;
+  const amountOnly = row.amount_msat || 0;
+  const totalAmount = txAmount(row);
+  const isOpenAmount = isOpenAmountRequest(row);
+  const destination =
+    payment?.lightning?.ln_address ||
+    payment?.internal?.ln_address ||
+    payment?.internal?.btc_address ||
+    payment?.bitcoin?.address ||
+    payment?.bitcoin?.txid ||
+    invoice?.bitcoin_output?.address ||
+    invoice?.ln_invoice?.bolt11;
+
+  return (
+    <Drawer
+      anchor="right"
+      open={!!row}
+      onClose={onClose}
+      transitionDuration={{ enter: 225, exit: 195 }}
+      ModalProps={{ keepMounted: true }}
+      slotProps={{ paper: { sx: drawerSx } }}
+    >
+      <Stack
+        direction="row"
+        spacing={2}
+        sx={{ alignItems: 'center', justifyContent: 'space-between', px: 3, py: 2 }}
+      >
+        <Stack sx={{ minWidth: 0 }}>
+          <Typography variant="h6" noWrap>
+            {title}
+          </Typography>
+          <Typography variant="caption" color="text.secondary">
+            {isIncoming ? t('wallet_view.direction_in') : t('wallet_view.direction_out')} ·{' '}
+            {methodLabel}
+          </Typography>
+        </Stack>
+
+        <IconButton onClick={onClose} aria-label={t('close')}>
+          <Iconify icon="mingcute:close-line" />
+        </IconButton>
+      </Stack>
+
+      <Divider />
+
+      <Stack spacing={3} sx={{ p: 3 }}>
+        <Box
+          sx={[
+            (theme) => ({
+              p: 2,
+              borderRadius: 1,
+              bgcolor: 'background.neutral',
+              border: `1px solid ${theme.vars.palette.divider}`,
+            }),
+          ]}
+        >
+          <Stack spacing={1.5}>
+            <Stack direction="row" sx={{ alignItems: 'center', justifyContent: 'space-between' }}>
+              <Label color={isIncoming ? 'success' : 'warning'}>
+                {isIncoming ? t('wallet_view.direction_in') : t('wallet_view.direction_out')}
+              </Label>
+              <Label variant="soft" color={statusColor(row.status)}>
+                {row.status}
+              </Label>
+            </Stack>
+
+            {isOpenAmount ? (
+              <Typography variant="h4">{t('wallet_view.open_amount')}</Typography>
+            ) : (
+              <SatsWithIcon amountMSats={totalAmount} variant="h4" />
+            )}
+          </Stack>
+        </Box>
+
+        <Grid container spacing={1.5}>
+          <Grid size={{ xs: 12, sm: 4 }}>
+            <WalletDrawerMetric
+              label={t('wallet_view.amount')}
+              amountMSats={isOpenAmount ? undefined : amountOnly}
+              value={isOpenAmount ? t('wallet_view.open_amount') : undefined}
+            />
+          </Grid>
+          <Grid size={{ xs: 12, sm: 4 }}>
+            <WalletDrawerMetric label={t('wallet_view.fee')} amountMSats={feeAmount} />
+          </Grid>
+          <Grid size={{ xs: 12, sm: 4 }}>
+            <WalletDrawerMetric
+              label={t('wallet_view.total')}
+              amountMSats={isOpenAmount ? undefined : totalAmount}
+              value={isOpenAmount ? t('wallet_view.open_amount') : undefined}
+            />
+          </Grid>
+        </Grid>
+
+        <Stack spacing={1.5}>
+          <WalletDrawerRow label={t('wallet_view.rail')} value={methodLabel} />
+          <WalletDrawerRow label={t('wallet_view.created')} value={fDateTime(row.created_at)} />
+          <WalletDrawerRow
+            label={t('wallet_view.settled')}
+            value={row.payment_time ? fDateTime(row.payment_time) : t('wallet_view.not_settled')}
+          />
+          <WalletDrawerRow label={t('wallet_view.destination')} value={destination} mono />
+          <WalletDrawerRow label={t('wallet_view.transaction_id')} value={row.id} mono />
+        </Stack>
+
+        <Stack
+          direction="row"
+          spacing={1}
+          sx={{
+            p: 1,
+            borderRadius: 1,
+            alignItems: 'center',
+            bgcolor: 'background.neutral',
+          }}
+        >
+          <Typography variant="body2" sx={{ flex: 1 }} noWrap>
+            {t('wallet_view.transaction_id')}
+          </Typography>
+          <CopyButton value={row.id} title={t('wallet_view.transaction_id')} />
+        </Stack>
+
+        <Button
+          href={txHref(row)}
+          color="inherit"
+          variant="outlined"
+          startIcon={<Iconify icon="solar:bill-list-bold-duotone" />}
+        >
+          {t('wallet_view.open_activity')}
+        </Button>
+      </Stack>
+    </Drawer>
+  );
+}
+
+function WalletDrawerMetric({
+  label,
+  amountMSats,
+  value,
+}: {
+  label: string;
+  amountMSats?: number;
+  value?: string;
+}) {
+  return (
+    <Box
+      sx={[
+        (theme) => ({
+          p: 1.5,
+          height: 1,
+          borderRadius: 1,
+          bgcolor: 'background.neutral',
+          border: `1px solid ${theme.vars.palette.divider}`,
+        }),
+      ]}
+    >
+      <Typography variant="caption" color="text.secondary">
+        {label}
+      </Typography>
+      {value ? (
+        <Typography variant="subtitle2">{value}</Typography>
+      ) : (
+        <SatsWithIcon amountMSats={amountMSats ?? 0} variant="subtitle2" />
+      )}
+    </Box>
+  );
+}
+
+function WalletDrawerRow({
+  label,
+  value,
+  mono,
+}: {
+  label: string;
+  value?: string | null;
+  mono?: boolean;
+}) {
+  if (!value) return null;
+
+  return (
+    <Stack direction="row" spacing={1.5} sx={{ justifyContent: 'space-between', minWidth: 0 }}>
+      <Typography variant="body2" color="text.secondary">
+        {label}
+      </Typography>
+      <Typography
+        variant="body2"
+        sx={{
+          maxWidth: '68%',
+          textAlign: 'right',
+          wordBreak: 'break-word',
+          fontFamily: mono ? 'monospace' : undefined,
+        }}
+      >
+        {value}
+      </Typography>
+    </Stack>
   );
 }

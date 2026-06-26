@@ -7,7 +7,7 @@ import type { ITransaction, ITransactionTableFilters } from 'src/types/transacti
 
 import { mutate } from 'swr';
 import { sumBy } from 'es-toolkit';
-import { useMemo, useState, useCallback } from 'react';
+import { useMemo, useState, useEffect, useCallback } from 'react';
 import { useBoolean, usePopover, useSetState } from 'minimal-shared/hooks';
 
 import Tab from '@mui/material/Tab';
@@ -80,11 +80,7 @@ import {
   TablePaginationCustom,
 } from 'src/components/table';
 
-import { PaymentDetailsView } from 'src/sections/transaction/view/payment-details-view';
-import { InvoiceDetailsView } from 'src/sections/transaction/view/invoice-details-view';
 import { TransactionTableToolbar } from 'src/sections/transaction/transaction-table-toolbar';
-import { AdminPaymentDetailsView } from 'src/sections/transaction/view/admin-payment-details-view';
-import { AdminInvoiceDetailsView } from 'src/sections/transaction/view/admin-invoice-details-view';
 import { TransactionTableFiltersResult } from 'src/sections/transaction/transaction-table-filters-result';
 
 import { RoleBasedGuard } from 'src/auth/guard';
@@ -282,22 +278,20 @@ export function ActivityView() {
   const scope: ActivityScope = searchParams.get('scope') === 'admin' ? 'admin' : 'wallet';
   const kind = normalizeTransactionKind(searchParams.get('type'));
 
-  if (id && kind === 'payment') {
-    return scope === 'admin' ? <AdminPaymentDetailsView id={id} /> : <PaymentDetailsView id={id} />;
-  }
-
-  if (id && kind === 'invoice') {
-    return scope === 'admin' ? <AdminInvoiceDetailsView id={id} /> : <InvoiceDetailsView id={id} />;
-  }
-
   return scope === 'admin' ? (
-    <AdminActivityLedger kind={kind} />
+    <AdminActivityLedger kind={kind} initialDetailId={id} />
   ) : (
-    <WalletActivityLedger kind={kind} />
+    <WalletActivityLedger kind={kind} initialDetailId={id} />
   );
 }
 
-function WalletActivityLedger({ kind }: { kind: ActivityTransactionKind }) {
+function WalletActivityLedger({
+  kind,
+  initialDetailId,
+}: {
+  kind: ActivityTransactionKind;
+  initialDetailId?: string | null;
+}) {
   const { wallet, walletLoading, walletError } = useGetUserWallet();
 
   return (
@@ -309,12 +303,19 @@ function WalletActivityLedger({ kind }: { kind: ActivityTransactionKind }) {
       errors={[walletError]}
       data={[wallet]}
       isLoading={[walletLoading]}
+      initialDetailId={initialDetailId}
       onCleanSuccess={() => mutate(endpointKeys.userWallet.get)}
     />
   );
 }
 
-function AdminActivityLedger({ kind }: { kind: ActivityTransactionKind }) {
+function AdminActivityLedger({
+  kind,
+  initialDetailId,
+}: {
+  kind: ActivityTransactionKind;
+  initialDetailId?: string | null;
+}) {
   const { invoices, invoicesLoading, invoicesError } = useListInvoices();
   const { payments, paymentsLoading, paymentsError } = useListPayments();
 
@@ -328,6 +329,7 @@ function AdminActivityLedger({ kind }: { kind: ActivityTransactionKind }) {
         errors={[invoicesError, paymentsError]}
         data={[invoices, payments]}
         isLoading={[invoicesLoading, paymentsLoading]}
+        initialDetailId={initialDetailId}
         onCleanSuccess={() => {
           mutate(endpointKeys.invoices.list);
           mutate(endpointKeys.payments.list);
@@ -345,6 +347,7 @@ function ActivityLedger({
   errors,
   data,
   isLoading,
+  initialDetailId,
   onCleanSuccess,
 }: {
   scope: ActivityScope;
@@ -354,10 +357,12 @@ function ActivityLedger({
   errors: unknown[];
   data: (object | null | undefined)[];
   isLoading: boolean[];
+  initialDetailId?: string | null;
   onCleanSuccess: VoidFunction;
 }) {
   const { t } = useTranslate();
   const theme = useTheme();
+  const router = useRouter();
   const table = useTable({
     defaultOrder: 'desc',
     defaultOrderBy: 'created_at',
@@ -385,6 +390,12 @@ function ActivityLedger({
       mergeAndSortTransactions(visibleInvoices, visiblePayments).map((tx) => makeRow(tx, scope)),
     [scope, visibleInvoices, visiblePayments]
   );
+
+  useEffect(() => {
+    if (!initialDetailId) return;
+
+    setDetailRow(rows.find((row) => row.id === initialDetailId) ?? null);
+  }, [initialDetailId, rows]);
 
   const incomeSeries = useMemo(() => getCumulativeSeries(visibleInvoices), [visibleInvoices]);
   const expensesSeries = useMemo(() => getCumulativeSeries(visiblePayments), [visiblePayments]);
@@ -739,6 +750,9 @@ function ActivityLedger({
             onDeleteRow={detailRow ? () => handleDeleteRow(detailRow) : undefined}
             onClose={() => {
               setDetailRow(null);
+              if (initialDetailId) {
+                router.push(paths.activityList(kind === 'all' ? undefined : kind, scope));
+              }
             }}
           />
         </>

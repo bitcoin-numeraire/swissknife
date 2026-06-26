@@ -13,5 +13,8 @@ export const defaultSettings: SettingsState = {
   contrast: 'default',
   compactLayout: true,
   currency: 'USD',
+  displayUnit: 'bip177',
+  hideBalances: false,
+  defaultAddressType: 'p2tr',
   version: CONFIG.appVersion,
 };
