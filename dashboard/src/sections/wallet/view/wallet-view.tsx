@@ -858,6 +858,14 @@ export function WalletView() {
             </Grid>
           </Grid>
 
+          <Box sx={{ display: { xs: 'block', sm: 'none' }, height: 72 }} />
+          <MobileWalletActions
+            sendLabel={t('wallet_view.send_money')}
+            receiveLabel={t('wallet_view.receive_money')}
+            onSend={openBlankSend}
+            onReceive={receiveDrawer.onTrue}
+          />
+
           <WalletActivityDrawer
             row={detailTransaction}
             onClose={() => setDetailTransaction(null)}
@@ -881,6 +889,58 @@ export function WalletView() {
         </>
       )}
     </DashboardContent>
+  );
+}
+
+function MobileWalletActions({
+  sendLabel,
+  receiveLabel,
+  onSend,
+  onReceive,
+}: {
+  sendLabel: string;
+  receiveLabel: string;
+  onSend: VoidFunction;
+  onReceive: VoidFunction;
+}) {
+  return (
+    <Box
+      sx={[
+        (theme) => ({
+          left: 0,
+          right: 0,
+          bottom: 0,
+          gap: 1,
+          px: 2,
+          pt: 1.25,
+          display: { xs: 'flex', sm: 'none' },
+          position: 'fixed',
+          zIndex: theme.zIndex.appBar,
+          bgcolor: 'background.paper',
+          borderTop: `1px solid ${theme.vars.palette.divider}`,
+          pb: 'calc(10px + env(safe-area-inset-bottom))',
+        }),
+      ]}
+    >
+      <Button
+        fullWidth
+        color="inherit"
+        variant="outlined"
+        onClick={onSend}
+        startIcon={<Iconify icon="solar:arrow-up-linear" />}
+      >
+        {sendLabel}
+      </Button>
+      <Button
+        fullWidth
+        color="inherit"
+        variant="contained"
+        onClick={onReceive}
+        startIcon={<Iconify icon="solar:arrow-down-linear" />}
+      >
+        {receiveLabel}
+      </Button>
+    </Box>
   );
 }
 
