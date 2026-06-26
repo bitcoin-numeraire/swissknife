@@ -1156,6 +1156,9 @@ export function ReceiveMoneyDrawer({
   const requestNeedsGeneration = selectedPayload !== 'identity';
   const selectedNeedsInvoice = selectedPayload === 'unified' || selectedPayload === 'lightning';
   const selectedNeedsAddress = selectedPayload === 'unified' || selectedPayload === 'onchain';
+  const canSetAmount = requestNeedsGeneration;
+  const canSetMemo = selectedNeedsInvoice;
+  const showAdvanced = selectedNeedsAddress || selectedNeedsInvoice;
   const requestActionLabel =
     invoice || btcAddress
       ? t('receive_money.refresh_request')
@@ -1350,86 +1353,92 @@ export function ReceiveMoneyDrawer({
           </ToggleButtonGroup>
         </Stack>
 
-        <Stack spacing={1.5}>
-          <AmountEntryField
-            label={t('receive_money.amount')}
-            value={amountValue}
-            fiatLabel={
-              hasFiatPrice
-                ? fCurrency(satsToFiat(amountSats, fiatPrices, state.currency), {
-                    currency: state.currency,
-                  })
-                : t('send_money.no_fiat_value')
-            }
-            amountUnit={amountUnit}
-            currency={state.currency}
-            displayUnit={state.displayUnit ?? 'bip177'}
-            hasFiatPrice={hasFiatPrice}
-            onChange={setAmountValue}
-            onSwap={handleAmountUnitSwap}
+        {canSetAmount && (
+          <Stack spacing={1.5}>
+            <AmountEntryField
+              label={t('receive_money.amount')}
+              value={amountValue}
+              fiatLabel={
+                hasFiatPrice
+                  ? fCurrency(satsToFiat(amountSats, fiatPrices, state.currency), {
+                      currency: state.currency,
+                    })
+                  : t('send_money.no_fiat_value')
+              }
+              amountUnit={amountUnit}
+              currency={state.currency}
+              displayUnit={state.displayUnit ?? 'bip177'}
+              hasFiatPrice={hasFiatPrice}
+              onChange={setAmountValue}
+              onSwap={handleAmountUnitSwap}
+            />
+          </Stack>
+        )}
+
+        {canSetMemo && (
+          <TextField
+            label={t('receive_money.memo')}
+            value={description}
+            onChange={(event) => setDescription(event.target.value)}
           />
-        </Stack>
+        )}
 
-        <TextField
-          label={t('receive_money.memo')}
-          value={description}
-          onChange={(event) => setDescription(event.target.value)}
-        />
+        {showAdvanced && (
+          <Accordion
+            disableGutters
+            variant="outlined"
+            sx={{ borderRadius: 1, '&:before': { display: 'none' } }}
+          >
+            <AccordionSummary expandIcon={<Iconify icon="eva:arrow-ios-downward-fill" />}>
+              <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+                <Iconify icon="solar:tuning-square-bold-duotone" />
+                <Typography variant="subtitle2">{t('receive_money.advanced')}</Typography>
+              </Stack>
+            </AccordionSummary>
+            <AccordionDetails>
+              <Stack spacing={2}>
+                {selectedNeedsAddress && (
+                  <Stack spacing={1}>
+                    <Typography variant="caption" color="text.secondary">
+                      {t('receive_money.address_type')}
+                    </Typography>
+                    <ToggleButtonGroup
+                      exclusive
+                      fullWidth
+                      size="small"
+                      value={addressType}
+                      onChange={(_, value: BtcAddressType | null) =>
+                        value && handleAddressTypeChange(value)
+                      }
+                    >
+                      {addressTypeOptions.map((option) => (
+                        <ToggleButton key={option.value} value={option.value}>
+                          {t(option.labelKey)}
+                        </ToggleButton>
+                      ))}
+                    </ToggleButtonGroup>
+                    <Typography variant="caption" color="text.secondary">
+                      {t(
+                        addressTypeOptions.find((option) => option.value === addressType)
+                          ?.helperKey ?? 'bitcoin_address_type.taproot_helper'
+                      )}
+                    </Typography>
+                  </Stack>
+                )}
 
-        <Accordion
-          disableGutters
-          variant="outlined"
-          sx={{ borderRadius: 1, '&:before': { display: 'none' } }}
-        >
-          <AccordionSummary expandIcon={<Iconify icon="eva:arrow-ios-downward-fill" />}>
-            <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-              <Iconify icon="solar:tuning-square-bold-duotone" />
-              <Typography variant="subtitle2">{t('receive_money.advanced')}</Typography>
-            </Stack>
-          </AccordionSummary>
-          <AccordionDetails>
-            <Stack spacing={2}>
-              {selectedNeedsAddress && (
-                <Stack spacing={1}>
-                  <Typography variant="caption" color="text.secondary">
-                    {t('receive_money.address_type')}
-                  </Typography>
-                  <ToggleButtonGroup
-                    exclusive
-                    fullWidth
+                {selectedNeedsInvoice && (
+                  <TextField
+                    disabled
                     size="small"
-                    value={addressType}
-                    onChange={(_, value: BtcAddressType | null) =>
-                      value && handleAddressTypeChange(value)
-                    }
-                  >
-                    {addressTypeOptions.map((option) => (
-                      <ToggleButton key={option.value} value={option.value}>
-                        {t(option.labelKey)}
-                      </ToggleButton>
-                    ))}
-                  </ToggleButtonGroup>
-                  <Typography variant="caption" color="text.secondary">
-                    {t(
-                      addressTypeOptions.find((option) => option.value === addressType)
-                        ?.helperKey ?? 'bitcoin_address_type.taproot_helper'
-                    )}
-                  </Typography>
-                </Stack>
-              )}
-
-              {selectedNeedsInvoice && (
-                <TextField
-                  disabled
-                  size="small"
-                  label={t('receive_money.expiry')}
-                  value={t('receive_money.default_expiry')}
-                  helperText={t('receive_money.expiry_backend_needed')}
-                />
-              )}
-            </Stack>
-          </AccordionDetails>
-        </Accordion>
+                    label={t('receive_money.expiry')}
+                    value={t('receive_money.default_expiry')}
+                    helperText={t('receive_money.expiry_backend_needed')}
+                  />
+                )}
+              </Stack>
+            </AccordionDetails>
+          </Accordion>
+        )}
 
         {requestNeedsGeneration && (
           <Button
