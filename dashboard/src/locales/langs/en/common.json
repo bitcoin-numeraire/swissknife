@@ -170,11 +170,11 @@
     "arriving_soon": "Arriving soon",
     "sent": "Sent",
     "received": "Received",
-    "send_money": "Send money",
+    "send_money": "Send",
     "send_money_detail": "Paste an invoice, address, LNURL or Lightning Address.",
     "send_action_detail": "Paste or scan a request",
     "available_to_send": "Available to send:",
-    "receive_money": "Receive money",
+    "receive_money": "Receive",
     "receive_money_detail": "Create a unified request, Lightning invoice, Bitcoin address or paycode.",
     "active_requests_summary": "{{count}} active payment requests",
     "no_active_requests": "No active payment requests",
@@ -226,7 +226,7 @@
     "pending_outgoing_notice": "You have outgoing payments still pending.",
     "people": "People",
     "no_contacts": "No saved contacts yet.",
-    "quick_send": "Send money",
+    "quick_send": "Send",
     "recent_activity": "Recent activity",
     "unified_activity": "Incoming and outgoing payments across payment methods.",
     "recent_activity_limit": "Latest {{count}} payments and requests.",
@@ -260,7 +260,7 @@
     "expenses": "Expenses"
   },
   "send_money": {
-    "title": "Send money",
+    "title": "Send",
     "to": "To",
     "scan_qr": "Scan QR",
     "recipient_placeholder": "Paste an invoice, LNURL, Lightning Address, BIP21 URI or Bitcoin address",
@@ -338,7 +338,7 @@
     "sent": "Sent"
   },
   "receive_money": {
-    "title": "Receive money",
+    "title": "Receive",
     "any": "Any",
     "lightning": "Lightning",
     "onchain": "On-chain",

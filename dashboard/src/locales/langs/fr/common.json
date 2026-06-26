@@ -259,7 +259,7 @@
     "expenses": "Dépenses"
   },
   "send_money": {
-    "title": "Envoyer de l'argent",
+    "title": "Envoyer",
     "to": "Vers",
     "scan_qr": "Scanner QR",
     "recipient_placeholder": "Coller une facture, LNURL, adresse Lightning, URI BIP21 ou adresse Bitcoin",
@@ -337,7 +337,7 @@
     "sent": "Envoyé"
   },
   "receive_money": {
-    "title": "Recevoir de l'argent",
+    "title": "Recevoir",
     "any": "Tout",
     "lightning": "Lightning",
     "onchain": "On-chain",
