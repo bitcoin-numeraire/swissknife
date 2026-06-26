@@ -27,6 +27,7 @@ import IconButton from '@mui/material/IconButton';
 import Autocomplete from '@mui/material/Autocomplete';
 import ToggleButton from '@mui/material/ToggleButton';
 import DialogActions from '@mui/material/DialogActions';
+import InputAdornment from '@mui/material/InputAdornment';
 import AccordionDetails from '@mui/material/AccordionDetails';
 import AccordionSummary from '@mui/material/AccordionSummary';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
@@ -122,8 +123,6 @@ const drawerSx = {
 };
 
 const SATS_PER_BITCOIN = 100_000_000;
-const MAX_SEND_AMOUNT_BTC = 100;
-const MAX_SEND_AMOUNT_SATS = MAX_SEND_AMOUNT_BTC * SATS_PER_BITCOIN;
 const DEFAULT_BOLT11_EXPIRY_SECONDS = 3600;
 
 const addressTypeOptions = [
@@ -325,10 +324,6 @@ function amountUnitPrefix(unit: AmountUnit, currency: string, displayUnit: 'bip1
   if (unit === 'btc') return 'BTC';
   if (unit === 'fiat') return fiatSymbol(currency);
   return displayUnit === 'bip177' ? '₿' : 'sats';
-}
-
-function maxSendAmountLabel() {
-  return `${MAX_SEND_AMOUNT_BTC} BTC`;
 }
 
 function railLabel(kind: RecipientKind, t: (key: string) => string) {
@@ -568,8 +563,9 @@ export function SendMoneyDrawer({
   );
   const embeddedAmountSats = bolt11Amount || bitcoinRequest.amountSats || 0;
   const amountSats = embeddedAmountSats || manualAmountSats;
-  const amountExceedsSendLimit = amountSats > MAX_SEND_AMOUNT_SATS;
-  const sendAmountLimitLabel = maxSendAmountLabel();
+  const amountMSats = amountSats * 1000;
+  const amountExceedsAvailable =
+    balance != null && amountSats > 0 && amountMSats > Math.max(balance, 0);
   const canEnterAmount =
     input.trim().length > 0 &&
     embeddedAmountSats === 0 &&
@@ -590,13 +586,13 @@ export function SendMoneyDrawer({
     !hasUnsupportedBip21Params &&
     !hasInvalidBip21Amount &&
     !hasInvalidBitcoinAddress &&
-    !amountExceedsSendLimit &&
+    !amountExceedsAvailable &&
     !needsWallet;
   const canEstimateFee =
     kind !== 'unknown' &&
     kind !== 'internal' &&
     amountSats > 0 &&
-    !amountExceedsSendLimit &&
+    !amountExceedsAvailable &&
     !hasUnsupportedBip21Params &&
     !hasInvalidBip21Amount &&
     !hasInvalidBitcoinAddress;
@@ -605,8 +601,8 @@ export function SendMoneyDrawer({
     ((kind === 'bitcoin' || (kind === 'bip21' && !bitcoinRequest.lightning)) &&
       t('send_money.send_onchain')) ||
     t('send_money.send');
-  const amountFiatLabel = amountExceedsSendLimit
-    ? t('send_money.amount_max_helper', { max: sendAmountLimitLabel })
+  const amountFiatLabel = amountExceedsAvailable
+    ? t('send_money.amount_available_helper')
     : hasFiatPrice
       ? fCurrency(satsToFiat(amountSats, fiatPrices, state.currency), {
           currency: state.currency,
@@ -649,10 +645,19 @@ export function SendMoneyDrawer({
     () => ({
       input,
       comment: canSendComment && comment ? comment : null,
-      amount_msat: amountSats && !amountExceedsSendLimit ? amountSats * 1000 : null,
+      amount_msat: amountSats && !amountExceedsAvailable ? amountMSats : null,
       ...(isAdmin && { wallet_id: activeWalletId || null }),
     }),
-    [activeWalletId, amountExceedsSendLimit, amountSats, canSendComment, comment, input, isAdmin]
+    [
+      activeWalletId,
+      amountExceedsAvailable,
+      amountMSats,
+      amountSats,
+      canSendComment,
+      comment,
+      input,
+      isAdmin,
+    ]
   );
 
   const handleClose = useCallback(() => {
@@ -695,6 +700,12 @@ export function SendMoneyDrawer({
 
   const handleEstimateFee = () => {
     toast.info(t('send_money.fee_estimate_unavailable'));
+  };
+
+  const handleClearInput = () => {
+    setInput('');
+    setAmountValue('');
+    setComment('');
   };
 
   return (
@@ -781,6 +792,22 @@ export function SendMoneyDrawer({
                   value={input}
                   onChange={(event) => setInput(event.target.value)}
                   placeholder={t('send_money.recipient_placeholder')}
+                  slotProps={{
+                    input: {
+                      endAdornment: input ? (
+                        <InputAdornment position="end" sx={{ alignSelf: 'flex-start', mt: 0.5 }}>
+                          <IconButton
+                            size="small"
+                            edge="end"
+                            aria-label={t('send_money.clear_recipient')}
+                            onClick={handleClearInput}
+                          >
+                            <Iconify icon="mingcute:close-line" width={18} />
+                          </IconButton>
+                        </InputAdornment>
+                      ) : undefined,
+                    },
+                  }}
                 />
               </Stack>
 
@@ -888,10 +915,17 @@ export function SendMoneyDrawer({
                           <Button
                             size="small"
                             color="inherit"
-                            variant="text"
+                            variant="outlined"
                             disabled={!canEstimateFee}
                             onClick={handleEstimateFee}
-                            sx={{ minWidth: 0, p: 0, typography: 'caption' }}
+                            startIcon={<Iconify icon="solar:calculator-minimalistic-bold" />}
+                            sx={{
+                              minHeight: 28,
+                              px: 1,
+                              py: 0.25,
+                              typography: 'caption',
+                              whiteSpace: 'nowrap',
+                            }}
                           >
                             {t('send_money.estimate_fee')}
                           </Button>
@@ -911,9 +945,9 @@ export function SendMoneyDrawer({
                       </Alert>
                     )}
 
-                    {amountExceedsSendLimit && (
+                    {amountExceedsAvailable && (
                       <Alert severity="warning" variant="outlined">
-                        {t('send_money.amount_exceeds_limit', { max: sendAmountLimitLabel })}
+                        {t('send_money.amount_exceeds_available')}
                       </Alert>
                     )}
 
@@ -955,7 +989,7 @@ export function SendMoneyDrawer({
                     currency={state.currency}
                     displayUnit={state.displayUnit ?? 'bip177'}
                     hasFiatPrice={hasFiatPrice}
-                    error={amountExceedsSendLimit}
+                    error={amountExceedsAvailable}
                     onChange={setAmountValue}
                     onSwap={handleAmountUnitSwap}
                   />
