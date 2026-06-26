@@ -27,7 +27,6 @@ import IconButton from '@mui/material/IconButton';
 import Autocomplete from '@mui/material/Autocomplete';
 import ToggleButton from '@mui/material/ToggleButton';
 import DialogActions from '@mui/material/DialogActions';
-import InputAdornment from '@mui/material/InputAdornment';
 import AccordionDetails from '@mui/material/AccordionDetails';
 import AccordionSummary from '@mui/material/AccordionSummary';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
@@ -304,10 +303,26 @@ function satsToAmountValue(
   return String(Math.round(sats));
 }
 
-function amountUnitLabel(unit: AmountUnit, currency: string) {
+function fiatSymbol(currency: string) {
+  try {
+    const symbol = new Intl.NumberFormat(undefined, {
+      style: 'currency',
+      currency,
+      currencyDisplay: 'narrowSymbol',
+    })
+      .formatToParts(0)
+      .find((part) => part.type === 'currency')?.value;
+
+    return symbol || currency;
+  } catch {
+    return currency;
+  }
+}
+
+function amountUnitPrefix(unit: AmountUnit, currency: string, displayUnit: 'bip177' | 'sats') {
   if (unit === 'btc') return 'BTC';
-  if (unit === 'fiat') return currency;
-  return 'sats';
+  if (unit === 'fiat') return fiatSymbol(currency);
+  return displayUnit === 'bip177' ? '₿' : 'sats';
 }
 
 function railLabel(kind: RecipientKind, t: (key: string) => string) {
@@ -338,6 +353,89 @@ function drawerTitle(title: string, onClose: VoidFunction) {
         <Iconify icon="mingcute:close-line" />
       </IconButton>
     </Stack>
+  );
+}
+
+function AmountEntryField({
+  label,
+  value,
+  fiatLabel,
+  amountUnit,
+  currency,
+  displayUnit,
+  hasFiatPrice,
+  onChange,
+  onSwap,
+}: {
+  label: string;
+  value: string;
+  fiatLabel: string;
+  amountUnit: AmountUnit;
+  currency: string;
+  displayUnit: 'bip177' | 'sats';
+  hasFiatPrice: boolean;
+  onChange: (value: string) => void;
+  onSwap: VoidFunction;
+}) {
+  return (
+    <Box
+      sx={[
+        (theme) => ({
+          p: 2,
+          borderRadius: 1,
+          bgcolor: 'background.neutral',
+          border: `1px solid ${theme.vars.palette.divider}`,
+          transition: theme.transitions.create(['border-color', 'box-shadow']),
+          '&:focus-within': {
+            borderColor: theme.vars.palette.primary.main,
+            boxShadow: `0 0 0 1px ${theme.vars.palette.primary.main}`,
+          },
+        }),
+      ]}
+    >
+      <Stack spacing={1}>
+        <Typography variant="caption" color="text.secondary">
+          {label}
+        </Typography>
+
+        <Stack direction="row" spacing={1.25} sx={{ alignItems: 'center' }}>
+          <Typography
+            variant="h4"
+            color="text.secondary"
+            sx={{ minWidth: amountUnit === 'fiat' ? 28 : 'auto' }}
+          >
+            {amountUnitPrefix(amountUnit, currency, displayUnit)}
+          </Typography>
+
+          <TextField
+            fullWidth
+            type="number"
+            variant="standard"
+            value={value}
+            placeholder="0"
+            onChange={(event) => onChange(event.target.value)}
+            sx={{
+              '& .MuiInputBase-input': {
+                p: 0,
+                typography: 'h4',
+                fontWeight: 400,
+              },
+              '& .MuiInput-root:before, & .MuiInput-root:after': {
+                display: 'none',
+              },
+            }}
+          />
+
+          <IconButton size="small" disabled={!hasFiatPrice} onClick={onSwap}>
+            <Iconify icon="solar:transfer-horizontal-bold" />
+          </IconButton>
+        </Stack>
+
+        <Typography variant="subtitle1" color="text.secondary">
+          {fiatLabel}
+        </Typography>
+      </Stack>
+    </Box>
   );
 }
 
@@ -644,7 +742,7 @@ export function SendMoneyDrawer({
                     color="inherit"
                     variant="outlined"
                     onClick={scanQR.onTrue}
-                    startIcon={<Iconify icon="solar:qr-code-bold" />}
+                    startIcon={<Iconify icon="mdi:qrcode-scan" />}
                   >
                     {t('send_money.scan_qr')}
                   </Button>
@@ -735,7 +833,7 @@ export function SendMoneyDrawer({
                       </>
                     )}
 
-                    {amountSats > 0 && (
+                    {embeddedAmountSats > 0 && (
                       <Stack direction="row" sx={{ justifyContent: 'space-between' }}>
                         <Typography variant="caption" color="text.secondary">
                           {t('send_money.amount')}
@@ -804,46 +902,17 @@ export function SendMoneyDrawer({
 
               <Stack spacing={1.5}>
                 {embeddedAmountSats > 0 ? null : canEnterAmount ? (
-                  <>
-                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
-                      <TextField
-                        fullWidth
-                        type="number"
-                        label={t('send_money.amount')}
-                        value={amountValue}
-                        helperText={amountFiatLabel}
-                        onChange={(event) => setAmountValue(event.target.value)}
-                        slotProps={{
-                          input: {
-                            startAdornment: (
-                              <InputAdornment position="start">
-                                {amountUnitLabel(amountUnit, state.currency)}
-                              </InputAdornment>
-                            ),
-                            endAdornment: (
-                              <InputAdornment position="end">
-                                <IconButton
-                                  edge="end"
-                                  size="small"
-                                  disabled={!hasFiatPrice}
-                                  onClick={handleAmountUnitSwap}
-                                >
-                                  <Iconify icon="solar:transfer-horizontal-bold" />
-                                </IconButton>
-                              </InputAdornment>
-                            ),
-                          },
-                        }}
-                      />
-                    </Stack>
-
-                    <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-                      <SatsWithIcon amountMSats={amountSats * 1000} variant="subtitle2" />
-                      <Typography variant="body2" color="text.secondary">
-                        {amountFiatLabel}
-                      </Typography>
-                    </Stack>
-                  </>
+                  <AmountEntryField
+                    label={t('send_money.amount')}
+                    value={amountValue}
+                    fiatLabel={amountFiatLabel}
+                    amountUnit={amountUnit}
+                    currency={state.currency}
+                    displayUnit={state.displayUnit ?? 'bip177'}
+                    hasFiatPrice={hasFiatPrice}
+                    onChange={setAmountValue}
+                    onSwap={handleAmountUnitSwap}
+                  />
                 ) : (
                   !input.trim() && (
                     <Typography variant="body2" color="text.secondary">
@@ -1218,54 +1287,23 @@ export function ReceiveMoneyDrawer({
         </Stack>
 
         <Stack spacing={1.5}>
-          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
-            <TextField
-              fullWidth
-              type="number"
-              label={t('receive_money.amount')}
-              value={amountValue}
-              helperText={
-                hasFiatPrice
-                  ? fCurrency(satsToFiat(amountSats, fiatPrices, state.currency), {
-                      currency: state.currency,
-                    })
-                  : t('send_money.no_fiat_value')
-              }
-              onChange={(event) => setAmountValue(event.target.value)}
-              slotProps={{
-                input: {
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      {amountUnitLabel(amountUnit, state.currency)}
-                    </InputAdornment>
-                  ),
-                  endAdornment: (
-                    <InputAdornment position="end">
-                      <IconButton
-                        edge="end"
-                        size="small"
-                        disabled={!hasFiatPrice}
-                        onClick={handleAmountUnitSwap}
-                      >
-                        <Iconify icon="solar:transfer-horizontal-bold" />
-                      </IconButton>
-                    </InputAdornment>
-                  ),
-                },
-              }}
-            />
-          </Stack>
-
-          <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-            <SatsWithIcon amountMSats={amountSats * 1000} variant="subtitle2" />
-            <Typography variant="body2" color="text.secondary">
-              {hasFiatPrice
+          <AmountEntryField
+            label={t('receive_money.amount')}
+            value={amountValue}
+            fiatLabel={
+              hasFiatPrice
                 ? fCurrency(satsToFiat(amountSats, fiatPrices, state.currency), {
                     currency: state.currency,
                   })
-                : t('send_money.no_fiat_value')}
-            </Typography>
-          </Stack>
+                : t('send_money.no_fiat_value')
+            }
+            amountUnit={amountUnit}
+            currency={state.currency}
+            displayUnit={state.displayUnit ?? 'bip177'}
+            hasFiatPrice={hasFiatPrice}
+            onChange={setAmountValue}
+            onSwap={handleAmountUnitSwap}
+          />
         </Stack>
 
         <TextField
