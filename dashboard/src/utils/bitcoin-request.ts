@@ -16,6 +16,28 @@ export function satsToBtcAmount(sats: number) {
   return (sats / SATS_PER_BITCOIN).toFixed(8).replace(/0+$/, '').replace(/\.$/, '');
 }
 
+export function compactBitcoinAddress(value?: string | null) {
+  if (!value) return '';
+
+  const normalized = value.replace(/\s+/g, '');
+  const grouped = normalized.match(/.{1,4}/g)?.join(' ') ?? normalized;
+
+  if (normalized.length <= 36) return grouped;
+
+  const head =
+    normalized
+      .slice(0, 16)
+      .match(/.{1,4}/g)
+      ?.join(' ') ?? '';
+  const tail =
+    normalized
+      .slice(-16)
+      .match(/.{1,4}/g)
+      ?.join(' ') ?? '';
+
+  return `${head} ... ${tail}`;
+}
+
 function getParam(params: URLSearchParams, name: string) {
   const normalizedName = name.toLowerCase();
 
