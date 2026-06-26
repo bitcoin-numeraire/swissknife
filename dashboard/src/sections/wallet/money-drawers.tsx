@@ -1111,18 +1111,33 @@ export function ReceiveMoneyDrawer({
   const invoiceExpiryMs = invoiceExpiresAt ? new Date(invoiceExpiresAt).getTime() : null;
   const identityAddress = lnAddress ? displayLnAddress(lnAddress.username) : '';
   const identityLnurl = lnAddress ? encodeLNURL(lnAddress.username) : '';
-  const onchainRequest = composeBip21(btcAddress?.address, undefined, amountSats);
-  const bip21 = composeBip21(btcAddress?.address, bolt11, amountSats);
+  const selectedPayload = activePayload;
+  const selectedLightningInvoice = selectedPayload === 'unified' || selectedPayload === 'lightning';
+  const requestNeedsGeneration = selectedPayload !== 'identity';
+  const selectedNeedsInvoice = selectedPayload === 'unified' || selectedPayload === 'lightning';
+  const selectedNeedsAddress = selectedPayload === 'unified' || selectedPayload === 'onchain';
+  const canSetAmount = requestNeedsGeneration;
+  const canSetMemo = selectedNeedsInvoice;
+  const showAdvanced = selectedNeedsInvoice;
   const { btcAddresses, btcAddressesMutate } = useListBtcAddresses(
     addressWalletId ? { wallet_id: addressWalletId } : undefined
   );
-  const unusedAddressForType = useMemo(
+  const addressesForType = useMemo(
     () =>
-      btcAddresses?.find((address) => address.address_type === addressType && !address.used) ??
-      null,
+      (btcAddresses ?? [])
+        .filter((address) => address.address_type === addressType)
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()),
     [addressType, btcAddresses]
   );
-  const selectedPayload = activePayload;
+  const unusedAddressForType = useMemo(
+    () => addressesForType.find((address) => !address.used) ?? null,
+    [addressesForType]
+  );
+  const currentAddressForType = unusedAddressForType ?? addressesForType[0] ?? null;
+  const displayedBtcAddress =
+    btcAddress ?? (selectedPayload === 'onchain' ? currentAddressForType : undefined);
+  const onchainRequest = composeBip21(displayedBtcAddress?.address, undefined, amountSats);
+  const bip21 = composeBip21(btcAddress?.address, bolt11, amountSats);
   const qrValue =
     (selectedPayload === 'identity' && (identityLnurl || identityAddress)) ||
     (selectedPayload === 'lightning' && (bolt11 || '')) ||
@@ -1143,7 +1158,6 @@ export function ReceiveMoneyDrawer({
     (selectedPayload === 'identity' && t('receive_money.copy_lnurl')) ||
     (selectedPayload === 'lightning' && t('receive_money.copy_lightning')) ||
     t('receive_money.copy_onchain');
-  const selectedLightningInvoice = selectedPayload === 'unified' || selectedPayload === 'lightning';
   const invoiceHasExpired =
     invoice?.status === InvoiceStatus.EXPIRED ||
     (typeof invoiceExpiryMs === 'number' &&
@@ -1153,14 +1167,13 @@ export function ReceiveMoneyDrawer({
   const primaryPayloadDisabled = showInvoiceExpiry && invoiceHasExpired;
   const invoiceExpiryRelative = invoiceExpiresAt ? fToNow(invoiceExpiresAt) : '';
   const invoiceExpiryAbsolute = invoiceExpiresAt ? fDateTime(invoiceExpiresAt) : '';
-  const requestNeedsGeneration = selectedPayload !== 'identity';
-  const selectedNeedsInvoice = selectedPayload === 'unified' || selectedPayload === 'lightning';
-  const selectedNeedsAddress = selectedPayload === 'unified' || selectedPayload === 'onchain';
-  const canSetAmount = requestNeedsGeneration;
-  const canSetMemo = selectedNeedsInvoice;
-  const showAdvanced = selectedNeedsAddress || selectedNeedsInvoice;
-  const requestActionLabel =
-    invoice || btcAddress
+  const shouldGetFreshOnchainAddress = selectedPayload === 'onchain' && displayedBtcAddress?.used;
+  const showRequestAction =
+    requestNeedsGeneration &&
+    (selectedNeedsInvoice || !displayedBtcAddress || Boolean(displayedBtcAddress.used));
+  const requestActionLabel = shouldGetFreshOnchainAddress
+    ? t('receive_money.get_fresh_address')
+    : invoice || btcAddress
       ? t('receive_money.refresh_request')
       : selectedNeedsInvoice
         ? t('receive_money.generate_invoice')
@@ -1353,6 +1366,35 @@ export function ReceiveMoneyDrawer({
           </ToggleButtonGroup>
         </Stack>
 
+        {selectedNeedsAddress && (
+          <Stack spacing={1}>
+            <Typography variant="caption" color="text.secondary">
+              {t('receive_money.address_type')}
+            </Typography>
+            <ToggleButtonGroup
+              exclusive
+              fullWidth
+              size="small"
+              value={addressType}
+              onChange={(_, value: BtcAddressType | null) =>
+                value && handleAddressTypeChange(value)
+              }
+            >
+              {addressTypeOptions.map((option) => (
+                <ToggleButton key={option.value} value={option.value}>
+                  {t(option.labelKey)}
+                </ToggleButton>
+              ))}
+            </ToggleButtonGroup>
+            <Typography variant="caption" color="text.secondary">
+              {t(
+                addressTypeOptions.find((option) => option.value === addressType)?.helperKey ??
+                  'bitcoin_address_type.taproot_helper'
+              )}
+            </Typography>
+          </Stack>
+        )}
+
         {canSetAmount && (
           <Stack spacing={1.5}>
             <AmountEntryField
@@ -1397,35 +1439,6 @@ export function ReceiveMoneyDrawer({
             </AccordionSummary>
             <AccordionDetails>
               <Stack spacing={2}>
-                {selectedNeedsAddress && (
-                  <Stack spacing={1}>
-                    <Typography variant="caption" color="text.secondary">
-                      {t('receive_money.address_type')}
-                    </Typography>
-                    <ToggleButtonGroup
-                      exclusive
-                      fullWidth
-                      size="small"
-                      value={addressType}
-                      onChange={(_, value: BtcAddressType | null) =>
-                        value && handleAddressTypeChange(value)
-                      }
-                    >
-                      {addressTypeOptions.map((option) => (
-                        <ToggleButton key={option.value} value={option.value}>
-                          {t(option.labelKey)}
-                        </ToggleButton>
-                      ))}
-                    </ToggleButtonGroup>
-                    <Typography variant="caption" color="text.secondary">
-                      {t(
-                        addressTypeOptions.find((option) => option.value === addressType)
-                          ?.helperKey ?? 'bitcoin_address_type.taproot_helper'
-                      )}
-                    </Typography>
-                  </Stack>
-                )}
-
                 {selectedNeedsInvoice && (
                   <TextField
                     disabled
@@ -1440,7 +1453,7 @@ export function ReceiveMoneyDrawer({
           </Accordion>
         )}
 
-        {requestNeedsGeneration && (
+        {showRequestAction && (
           <Button
             color="inherit"
             variant="contained"
@@ -1450,12 +1463,6 @@ export function ReceiveMoneyDrawer({
           >
             {requestActionLabel}
           </Button>
-        )}
-
-        {selectedNeedsAddress && unusedAddressForType && !btcAddress && (
-          <Alert severity="info" variant="outlined">
-            {t('receive_money.unused_address_available')}
-          </Alert>
         )}
 
         {addressError && <Alert severity="warning">{addressError}</Alert>}
@@ -1501,6 +1508,25 @@ export function ReceiveMoneyDrawer({
                 {payloadDescription}
               </Typography>
 
+              {selectedNeedsAddress && displayedBtcAddress && (
+                <Stack direction="row" spacing={1} sx={{ alignItems: 'center', minWidth: 0 }}>
+                  <Typography variant="caption" color="text.secondary">
+                    {t('receive_money.address')}
+                  </Typography>
+                  <Typography
+                    variant="caption"
+                    noWrap
+                    sx={{ flex: 1, minWidth: 0, fontFamily: 'monospace', textAlign: 'right' }}
+                  >
+                    {compactBitcoinAddress(displayedBtcAddress.address)}
+                  </Typography>
+                  <CopyButton
+                    value={displayedBtcAddress.address}
+                    title={t('receive_money.copy_onchain_address')}
+                  />
+                </Stack>
+              )}
+
               <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: 'wrap' }}>
                 <Button
                   color="inherit"
@@ -1538,19 +1564,24 @@ export function ReceiveMoneyDrawer({
                 </Typography>
               )}
 
-              {(selectedPayload === 'onchain' || selectedPayload === 'unified') && btcAddress && (
-                <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-                  <Label color={btcAddress.used ? 'warning' : 'success'}>
-                    {btcAddress.used ? t('receive_money.used') : t('receive_money.unused')}
-                  </Label>
-                  <Typography variant="caption" color="text.secondary">
-                    {t('receive_money.address_reuse_note')}
-                  </Typography>
-                </Stack>
-              )}
+              {(selectedPayload === 'onchain' || selectedPayload === 'unified') &&
+                displayedBtcAddress && (
+                  <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+                    <Label color={displayedBtcAddress.used ? 'warning' : 'success'}>
+                      {displayedBtcAddress.used
+                        ? t('receive_money.used')
+                        : t('receive_money.unused')}
+                    </Label>
+                    {!displayedBtcAddress.used && (
+                      <Typography variant="caption" color="text.secondary">
+                        {t('receive_money.address_reuse_note')}
+                      </Typography>
+                    )}
+                  </Stack>
+                )}
             </Stack>
 
-            {btcAddress?.used && (
+            {displayedBtcAddress?.used && (
               <Alert severity="warning" variant="outlined">
                 {t('receive_money.reuse_warning')}
               </Alert>
@@ -1575,7 +1606,7 @@ export function ReceiveMoneyDrawer({
           </Box>
         )}
 
-        {lnAddress && selectedPayload !== 'identity' && (
+        {lnAddress && selectedPayload !== 'identity' && selectedPayload !== 'onchain' && (
           <Box
             sx={[
               (theme) => ({
