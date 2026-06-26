@@ -1,7 +1,6 @@
 'use client';
 
-import { useBoolean } from 'minimal-shared/hooks';
-import { useRef, useEffect, useCallback } from 'react';
+import { useRef, useState, useEffect, useCallback } from 'react';
 
 import { paths } from 'src/routes/paths';
 import { useRouter, usePathname, useSearchParams } from 'src/routes/hooks';
@@ -42,7 +41,7 @@ export function GuestGuard({ children }: GuestGuardProps) {
 
   const { loading, authenticated } = useAuthContext();
 
-  const isChecking = useBoolean(true);
+  const [isChecking, setIsChecking] = useState(true);
 
   const replaceOnce = useCallback((path: string) => {
     if (isSameRoutePath(pathname, path)) {
@@ -59,8 +58,10 @@ export function GuestGuard({ children }: GuestGuardProps) {
 
   useEffect(() => {
     if (loading) {
-      return;
+      return undefined;
     }
+
+    let active = true;
 
     (async () => {
       try {
@@ -84,14 +85,24 @@ export function GuestGuard({ children }: GuestGuardProps) {
           return;
         }
 
-        isChecking.onFalse();
+        if (active) {
+          setIsChecking(false);
+        }
       } catch (err) {
         handleActionError(err);
+
+        if (active) {
+          setIsChecking(false);
+        }
       }
     })();
-  }, [authenticated, loading, isChecking, replaceOnce, returnTo]);
 
-  if (isChecking.value) {
+    return () => {
+      active = false;
+    };
+  }, [authenticated, loading, replaceOnce, returnTo]);
+
+  if (isChecking) {
     return <SplashScreen />;
   }
 

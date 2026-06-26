@@ -3,21 +3,17 @@
 import type { SignInRequest } from 'src/lib/swissknife';
 
 import { useForm } from 'react-hook-form';
+import { varAlpha } from 'minimal-shared/utils';
 import { useBoolean } from 'minimal-shared/hooks';
 import { zodResolver } from '@hookform/resolvers/zod';
 
 import Box from '@mui/material/Box';
-import Link from '@mui/material/Link';
-import Alert from '@mui/material/Alert';
 import Stack from '@mui/material/Stack';
 import Button from '@mui/material/Button';
 import IconButton from '@mui/material/IconButton';
-import Typography from '@mui/material/Typography';
 import InputAdornment from '@mui/material/InputAdornment';
 
-import { paths } from 'src/routes/paths';
 import { useRouter } from 'src/routes/hooks';
-import { RouterLink } from 'src/routes/components';
 
 import { handleActionError } from 'src/utils/errors';
 
@@ -27,6 +23,7 @@ import { zSignInRequest } from 'src/lib/swissknife/zod.gen';
 
 import { Iconify } from 'src/components/iconify';
 import { Form, Field } from 'src/components/hook-form';
+import { AnimateLogoRotate } from 'src/components/animate';
 
 import { useAuthContext } from 'src/auth/hooks';
 import { JWT_STORAGE_KEY } from 'src/auth/context/jwt';
@@ -74,29 +71,29 @@ export function JwtSignInView() {
   });
 
   const renderForm = () => (
-    <Box sx={{ gap: 2.5, display: 'flex', flexDirection: 'column' }}>
-      <Box sx={{ gap: 1.5, display: 'flex', flexDirection: 'column' }}>
-        <Field.Text
-          name="password"
-          label={t('sign_in.password')}
-          helperText={t('sign_in.password_helper')}
-          type={showPassword.value ? 'text' : 'password'}
-          slotProps={{
-            inputLabel: { shrink: true },
-            input: {
-              endAdornment: (
-                <InputAdornment position="end">
-                  <IconButton onClick={showPassword.onToggle} edge="end">
-                    <Iconify
-                      icon={showPassword.value ? 'solar:eye-bold' : 'solar:eye-closed-bold'}
-                    />
-                  </IconButton>
-                </InputAdornment>
-              ),
+    <Box sx={{ gap: 3, display: 'flex', flexDirection: 'column' }}>
+      <Field.Text
+        name="password"
+        label={t('sign_in.password')}
+        type={showPassword.value ? 'text' : 'password'}
+        slotProps={{
+          inputLabel: { shrink: true },
+          input: {
+            sx: {
+              borderRadius: 1,
+              bgcolor: 'background.paper',
+              backgroundImage: 'none',
             },
-          }}
-        />
-      </Box>
+            endAdornment: (
+              <InputAdornment position="end">
+                <IconButton onClick={showPassword.onToggle} edge="end">
+                  <Iconify icon={showPassword.value ? 'solar:eye-bold' : 'solar:eye-closed-bold'} />
+                </IconButton>
+              </InputAdornment>
+            ),
+          },
+        }}
+      />
 
       <Button
         fullWidth
@@ -106,6 +103,12 @@ export function JwtSignInView() {
         variant="contained"
         loading={isSubmitting}
         loadingIndicator={t('sign_in.sign_in_loading')}
+        sx={{
+          py: 1.35,
+          borderRadius: 1,
+          fontWeight: 700,
+          boxShadow: 'none',
+        }}
       >
         {t('sign_in.sign_in')}
       </Button>
@@ -113,55 +116,59 @@ export function JwtSignInView() {
   );
 
   return (
-    <Stack spacing={4}>
-      <FormHead
-        title={t('sign_in.title')}
-        description={t('sign_in.description')}
-        sx={{ mb: 0, textAlign: 'left', alignItems: 'flex-start' }}
-      />
-
-      <Alert
-        severity="info"
-        icon={<Iconify icon="solar:shield-keyhole-bold-duotone" />}
-        sx={{ borderRadius: 1 }}
+    <Stack spacing={3.5}>
+      <Box
+        sx={(theme) => ({
+          width: 150,
+          height: 150,
+          mx: 'auto',
+          display: 'grid',
+          position: 'relative',
+          placeItems: 'center',
+          '&::before': {
+            inset: 10,
+            content: "''",
+            borderRadius: '50%',
+            position: 'absolute',
+            border: `1px solid ${varAlpha(theme.vars.palette.primary.mainChannel, 0.26)}`,
+            backgroundImage: `linear-gradient(180deg, ${varAlpha(theme.vars.palette.primary.mainChannel, 0.14)}, transparent)`,
+          },
+          '&::after': {
+            inset: 0,
+            content: "''",
+            borderRadius: '50%',
+            position: 'absolute',
+            border: `1px solid ${varAlpha(theme.vars.palette.grey['500Channel'], 0.16)}`,
+          },
+        })}
       >
-        {t('sign_in.local_password_note')}
-      </Alert>
+        <AnimateLogoRotate sx={{ zIndex: 1 }} />
+        <Box
+          sx={(theme) => ({
+            right: 20,
+            bottom: 18,
+            width: 34,
+            height: 34,
+            zIndex: 2,
+            borderRadius: 1,
+            display: 'grid',
+            position: 'absolute',
+            placeItems: 'center',
+            color: 'primary.main',
+            bgcolor: 'background.paper',
+            boxShadow: `0 12px 30px ${varAlpha(theme.vars.palette.common.blackChannel, 0.2)}`,
+            border: `1px solid ${varAlpha(theme.vars.palette.primary.mainChannel, 0.24)}`,
+          })}
+        >
+          <Iconify icon="solar:lock-keyhole-minimalistic-bold-duotone" width={20} />
+        </Box>
+      </Box>
+
+      <FormHead title={t('sign_in.title')} sx={{ mb: 0 }} />
 
       <Form methods={methods} onSubmit={onSubmit}>
         {renderForm()}
       </Form>
-
-      <Stack spacing={1.5}>
-        <Typography variant="overline" sx={{ color: 'text.secondary', letterSpacing: 0 }}>
-          {t('sign_in.vault_status')}
-        </Typography>
-
-        {[
-          ['solar:monitor-smartphone-bold-duotone', 'sign_in.session_status'],
-          ['solar:wallet-money-bold-duotone', 'sign_in.wallet_status'],
-          ['solar:user-cross-rounded-bold-duotone', 'sign_in.identity_status'],
-        ].map(([icon, label]) => (
-          <Stack key={label} direction="row" spacing={1.25} sx={{ alignItems: 'center' }}>
-            <Iconify icon={icon} width={20} sx={{ color: 'primary.main' }} />
-            <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-              {t(label)}
-            </Typography>
-          </Stack>
-        ))}
-      </Stack>
-
-      <Typography variant="body2" sx={{ color: 'text.secondary', textAlign: 'center' }}>
-        {t('sign_in.no_account')}{' '}
-        <Link
-          component={RouterLink}
-          href={paths.auth.signUp}
-          color="text.primary"
-          underline="always"
-        >
-          {t('sign_in.create_account')}
-        </Link>
-      </Typography>
     </Stack>
   );
 }

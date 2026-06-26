@@ -42,7 +42,7 @@ export function WelcomeCarousel({ data, onComplete }: Props) {
         minHeight: '100dvh',
         display: 'grid',
         overflowX: 'hidden',
-        gridTemplateColumns: { xs: '1fr', md: 'minmax(420px, 0.95fr) minmax(0, 1fr)' },
+        gridTemplateColumns: { xs: '1fr', md: 'minmax(520px, 1.08fr) minmax(0, 0.92fr)' },
         backgroundImage: [
           `linear-gradient(90deg, ${varAlpha(theme.vars.palette.grey['500Channel'], 0.05)} 1px, transparent 1px)`,
           `linear-gradient(0deg, ${varAlpha(theme.vars.palette.grey['500Channel'], 0.05)} 1px, transparent 1px)`,
@@ -67,7 +67,7 @@ export function WelcomeCarousel({ data, onComplete }: Props) {
           color: 'common.white',
         })}
       >
-        <Stack spacing={1.5} sx={{ maxWidth: 460 }}>
+        <Stack spacing={1.5} sx={{ maxWidth: 540 }}>
           <Typography
             variant="overline"
             sx={{ color: 'primary.light', letterSpacing: 0, fontWeight: 700 }}
@@ -77,7 +77,7 @@ export function WelcomeCarousel({ data, onComplete }: Props) {
           <Typography
             variant="h2"
             sx={{
-              maxWidth: { xs: 320, md: 460 },
+              maxWidth: { xs: 320, md: 540 },
               fontSize: { xs: 32, md: 52 },
               overflowWrap: 'break-word',
             }}
@@ -86,7 +86,7 @@ export function WelcomeCarousel({ data, onComplete }: Props) {
           </Typography>
           <Typography
             sx={(theme) => ({
-              maxWidth: { xs: 320, md: 420 },
+              maxWidth: { xs: 320, md: 500 },
               color: varAlpha(theme.vars.palette.common.whiteChannel, 0.7),
             })}
           >
@@ -100,7 +100,7 @@ export function WelcomeCarousel({ data, onComplete }: Props) {
       <Stack
         spacing={4}
         sx={{
-          p: { xs: 3, sm: 5, md: 8 },
+          p: { xs: 3, sm: 5, md: 6 },
           width: 1,
           minWidth: 0,
           maxWidth: '100vw',
@@ -247,7 +247,7 @@ function WalletPreview({ item, step, total }: WalletPreviewProps) {
       sx={(theme) => ({
         p: 2,
         width: { xs: 320, sm: 1 },
-        maxWidth: { xs: 320, sm: 460 },
+        maxWidth: { xs: 320, sm: 520 },
         borderRadius: 1,
         border: `1px solid ${varAlpha(theme.vars.palette.common.whiteChannel, 0.12)}`,
         bgcolor: varAlpha(theme.vars.palette.common.whiteChannel, 0.06),
@@ -296,20 +296,61 @@ function WalletPreview({ item, step, total }: WalletPreviewProps) {
             bgcolor: varAlpha(theme.vars.palette.common.blackChannel, 0.24),
           })}
         >
-          <Stack spacing={0.5}>
+          <Stack spacing={1.25}>
             <Typography
               variant="caption"
               sx={(theme) => ({ color: varAlpha(theme.vars.palette.common.whiteChannel, 0.52) })}
             >
-              {t('preview.available')}
+              {t('preview.setup_label')}
             </Typography>
-            <Typography variant="h3">0 sats</Typography>
+            <Typography variant="h4">{t('preview.setup_title')}</Typography>
             <Typography
               variant="body2"
               sx={(theme) => ({ color: varAlpha(theme.vars.palette.common.whiteChannel, 0.62) })}
             >
-              {t('preview.empty_state')}
+              {t('preview.setup_content')}
             </Typography>
+
+            <Box
+              sx={{
+                gap: 1,
+                display: 'grid',
+                gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, minmax(0, 1fr))' },
+              }}
+            >
+              {['preview.backup_check', 'preview.access_check', 'preview.test_check'].map(
+                (label) => (
+                  <Stack
+                    key={label}
+                    direction="row"
+                    spacing={0.75}
+                    sx={(theme) => ({
+                      p: 1,
+                      minWidth: 0,
+                      borderRadius: 0.75,
+                      alignItems: 'center',
+                      bgcolor: varAlpha(theme.vars.palette.common.whiteChannel, 0.05),
+                    })}
+                  >
+                    <Iconify
+                      icon="solar:check-circle-bold-duotone"
+                      width={18}
+                      sx={{ color: item.accent }}
+                    />
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        minWidth: 0,
+                        whiteSpace: 'normal',
+                        lineHeight: 1.35,
+                      }}
+                    >
+                      {t(label)}
+                    </Typography>
+                  </Stack>
+                )
+              )}
+            </Box>
           </Stack>
         </Box>
 
@@ -333,7 +374,7 @@ function WalletPreview({ item, step, total }: WalletPreviewProps) {
               })}
             >
               <Iconify icon={icon} width={20} sx={{ color: item.accent }} />
-              <Typography variant="caption" noWrap>
+              <Typography variant="caption" sx={{ minWidth: 0, lineHeight: 1.35 }}>
                 {t(label)}
               </Typography>
             </Stack>

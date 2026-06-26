@@ -7,7 +7,6 @@ import { useBoolean } from 'minimal-shared/hooks';
 import { zodResolver } from '@hookform/resolvers/zod';
 
 import Box from '@mui/material/Box';
-import Link from '@mui/material/Link';
 import Alert from '@mui/material/Alert';
 import Stack from '@mui/material/Stack';
 import Button from '@mui/material/Button';
@@ -18,7 +17,6 @@ import InputAdornment from '@mui/material/InputAdornment';
 
 import { paths } from 'src/routes/paths';
 import { useRouter } from 'src/routes/hooks';
-import { RouterLink } from 'src/routes/components';
 
 import { handleActionError } from 'src/utils/errors';
 
@@ -34,7 +32,6 @@ import { JWT_STORAGE_KEY } from 'src/auth/context/jwt';
 
 import { useAuthContext } from '../../hooks';
 import { FormHead } from '../../components/form-head';
-import { SignUpTerms } from '../../components/sign-up-terms';
 
 // ----------------------------------------------------------------------
 
@@ -162,7 +159,6 @@ export function JwtSignUpView() {
       <Field.Text
         name="repeatPassword"
         label={t('sign_up.repeat_password')}
-        helperText={t('sign_up.repeat_password_helper')}
         type={showPassword.value ? 'text' : 'password'}
         slotProps={{
           inputLabel: { shrink: true },
@@ -200,22 +196,6 @@ export function JwtSignUpView() {
         sx={{ mb: 0, textAlign: 'left', alignItems: 'flex-start' }}
       />
 
-      <Alert
-        severity="warning"
-        icon={<Iconify icon="solar:key-minimalistic-square-3-bold-duotone" />}
-        sx={{ borderRadius: 1 }}
-      >
-        {t('sign_up.security_copy')}
-      </Alert>
-
-      <Alert
-        severity="info"
-        icon={<Iconify icon="solar:user-rounded-bold-duotone" />}
-        sx={{ borderRadius: 1 }}
-      >
-        {t('sign_up.first_admin_only')}
-      </Alert>
-
       <Form methods={methods} onSubmit={onSubmit}>
         {renderForm()}
       </Form>
@@ -238,20 +218,6 @@ export function JwtSignUpView() {
           </Stack>
         ))}
       </Stack>
-
-      <SignUpTerms sx={{ mt: 0, textAlign: 'left' }} />
-
-      <Typography variant="body2" sx={{ color: 'text.secondary', textAlign: 'center' }}>
-        {t('sign_up.sign_in_prompt')}{' '}
-        <Link
-          component={RouterLink}
-          href={paths.auth.login}
-          color="text.primary"
-          underline="always"
-        >
-          {t('sign_up.sign_in_link')}
-        </Link>
-      </Typography>
     </Stack>
   );
 }

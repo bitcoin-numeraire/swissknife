@@ -1,47 +1,51 @@
 {
   "preview": {
-    "eyebrow": "SwissKnife first run",
-    "title": "Set up your Bitcoin wallet server",
-    "content": "Before you create the first admin password, review what this SwissKnife instance will control: wallet access, Lightning payments, on-chain deposits, reusable identity and node connectivity.",
-    "wallet_title": "Starter wallet",
-    "wallet_caption": "Ready after admin setup",
-    "available": "Spendable now",
-    "empty_state": "Back up your node and wallet material before sending meaningful funds.",
-    "lightning": "Lightning",
-    "onchain": "On-chain",
-    "identity": "Identity",
-    "node": "Node"
+    "eyebrow": "SwissKnife setup",
+    "title": "Set up your Bitcoin wallet",
+    "content": "This wallet runs from your server. You control the funds, so setup starts with access, backups and a few checks before money moves.",
+    "wallet_title": "Wallet setup",
+    "wallet_caption": "Empty until you fund it",
+    "setup_label": "Before adding sats",
+    "setup_title": "Backups first",
+    "setup_content": "Save your node and wallet recovery material, then test with a small payment before you rely on this wallet.",
+    "backup_check": "Backup saved",
+    "access_check": "Access protected",
+    "test_check": "Small test first",
+    "lightning": "Lightning payments",
+    "onchain": "Bitcoin addresses",
+    "identity": "Lightning Address",
+    "node": "Node health"
   },
   "welcome": {
-    "title": "One place to send and receive",
-    "content": "SwissKnife gives the first admin a dashboard for Lightning, on-chain Bitcoin and reusable receive identities without splitting them into separate apps.",
-    "point_one": "Receive with Lightning invoices, Bitcoin addresses or a reusable Lightning Address.",
-    "point_two": "Send by pasting an invoice, LNURL, BIP21 request, address or internal recipient.",
-    "point_three": "Track amounts, status and next actions from the wallet dashboard."
+    "title": "Your wallet for everyday Bitcoin",
+    "content": "SwissKnife brings Lightning payments, Bitcoin addresses and a reusable Lightning Address into one place, so you can receive, pay and see what needs attention.",
+    "point_one": "Receive payments with invoices, addresses or your Lightning Address.",
+    "point_two": "Pay from the same wallet when a payment request arrives.",
+    "point_three": "See amounts, status and next actions without switching tools."
   },
   "custody": {
-    "title": "Self-custody means you are responsible",
-    "content": "This server cannot recover funds or secrets you lose. Treat setup as the moment to decide who can administer the wallet and where backups live.",
-    "point_one": "Create the first local admin password before the wallet opens.",
-    "point_two": "Back up node and wallet recovery material before meaningful deposits.",
-    "point_three": "Keep the admin password and recovery material separate."
+    "title": "You hold the keys",
+    "content": "SwissKnife does not custody your bitcoin or keep a spare copy of your secrets. Before you fund the wallet, make sure your backups are real and reachable.",
+    "point_one": "Choose a strong owner password for this dashboard.",
+    "point_two": "Keep recovery material somewhere offline that you can find later.",
+    "point_three": "Test the wallet with a small amount before you add more."
   },
   "accessibility": {
-    "title": "Works for home, desktop and server installs",
-    "content": "This first-run flow is for self-hosted boxes, desktop runs and managed server deployments. The dashboard adapts after authentication is configured.",
-    "point_one": "Use local JWT setup for single-admin self-hosted or desktop installs.",
-    "point_two": "Use external auth when a server deployment manages accounts and roles elsewhere.",
-    "point_three": "Use regtest or test funds first when validating a new deployment."
+    "title": "Keep your node ready",
+    "content": "Lightning works best when your wallet server is online and healthy. A steady setup helps invoices, payments and connected apps work when you need them.",
+    "point_one": "Check node health before receiving real payments.",
+    "point_two": "Keep the server reachable from the apps that use it.",
+    "point_three": "Use test funds first after changing hosting or node settings."
   },
   "multi_user": {
-    "title": "Start with one admin, grow into accounts",
-    "content": "JWT installs create one initial admin today. Server deployments with external authentication can map dashboard access to provider-side users, roles and scopes.",
-    "point_one": "Manage wallets and reusable identities from the admin dashboard.",
-    "point_two": "Create API keys for services that need wallet access.",
-    "point_three": "Add accounts, roles and agents as your deployment model requires."
+    "title": "Decide who can use it",
+    "content": "Start with the owner account, then connect only the people, apps and services that should be able to pay or receive from this wallet.",
+    "point_one": "Give each connected app only the access it needs.",
+    "point_two": "Review access regularly, especially on shared servers.",
+    "point_three": "Add more accounts when your deployment supports them."
   },
   "step": "Step {{current}} of {{total}}",
   "back": "Back",
   "continue": "Continue",
-  "get_started": "Create password"
+  "get_started": "Choose password"
 }
