@@ -1,7 +1,6 @@
 'use client';
 
-import { useBoolean } from 'minimal-shared/hooks';
-import React, { useRef, useEffect, useCallback } from 'react';
+import React, { useRef, useState, useEffect, useCallback } from 'react';
 
 import { paths } from 'src/routes/paths';
 import { useRouter, usePathname } from 'src/routes/hooks';
@@ -14,6 +13,7 @@ import { setupCheck } from 'src/lib/swissknife';
 import { SplashScreen } from 'src/components/loading-screen';
 import { ONBOARDING_COMPLETE_STORAGE_KEY } from 'src/components/settings';
 
+import { useAuthContext } from '../hooks';
 import { clearSession } from '../context/jwt';
 import { isSameRoutePath } from './setup-route-utils';
 
@@ -28,7 +28,8 @@ function resetSetupCache() {
 export function OnboardingGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const isChecking = useBoolean(true);
+  const { authenticated, loading } = useAuthContext();
+  const [isChecking, setIsChecking] = useState(true);
   const lastRedirect = useRef<string | null>(null);
 
   const replaceOnce = useCallback((path: string) => {
@@ -45,6 +46,11 @@ export function OnboardingGuard({ children }: { children: React.ReactNode }) {
   }, [pathname, router]);
 
   useEffect(() => {
+    if (loading) {
+      return undefined;
+    }
+
+    let active = true;
     const isWelcomeRoute = isSameRoutePath(pathname, paths.onboarding.welcome);
     const isSignUpRoute = isSameRoutePath(pathname, paths.auth.signUp);
 
@@ -56,7 +62,9 @@ export function OnboardingGuard({ children }: { children: React.ReactNode }) {
           resetSetupCache();
 
           if (isWelcomeRoute) {
-            isChecking.onFalse();
+            if (active) {
+              setIsChecking(false);
+            }
             return;
           }
 
@@ -68,7 +76,9 @@ export function OnboardingGuard({ children }: { children: React.ReactNode }) {
           resetSetupCache();
 
           if (isSignUpRoute) {
-            isChecking.onFalse();
+            if (active) {
+              setIsChecking(false);
+            }
             return;
           }
 
@@ -78,18 +88,28 @@ export function OnboardingGuard({ children }: { children: React.ReactNode }) {
 
         if (data.welcome_complete && (CONFIG.auth.method !== 'jwt' || data.sign_up_complete)) {
           localStorage.setItem(ONBOARDING_COMPLETE_STORAGE_KEY, 'true');
-          replaceOnce(paths.auth.login);
+          replaceOnce(authenticated ? paths.wallet.root : paths.auth.login);
           return;
         }
 
-        isChecking.onFalse();
+        if (active) {
+          setIsChecking(false);
+        }
       } catch (err) {
         handleActionError(err);
+
+        if (active) {
+          setIsChecking(false);
+        }
       }
     })();
-  }, [isChecking, pathname, replaceOnce]);
 
-  if (isChecking.value) {
+    return () => {
+      active = false;
+    };
+  }, [authenticated, loading, pathname, replaceOnce]);
+
+  if (isChecking) {
     return <SplashScreen />;
   }
 

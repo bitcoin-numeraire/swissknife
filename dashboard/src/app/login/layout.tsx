@@ -1,4 +1,4 @@
-import { AuthSplitLayout } from 'src/layouts/auth-split';
+import { AuthCenteredLayout } from 'src/layouts/auth-centered';
 
 import { GuestGuard } from 'src/auth/guard';
 
@@ -11,7 +11,23 @@ type Props = {
 export default function Layout({ children }: Props) {
   return (
     <GuestGuard>
-      <AuthSplitLayout>{children}</AuthSplitLayout>
+      <AuthCenteredLayout
+        cssVars={{ '--layout-auth-content-width': '440px' }}
+        slotProps={{
+          content: {
+            sx: {
+              p: { xs: 3, sm: 4.5 },
+              overflow: 'hidden',
+              borderRadius: 1,
+              border: '1px solid',
+              borderColor: 'divider',
+              boxShadow: '0 28px 90px rgba(0,0,0,0.28)',
+            },
+          },
+        }}
+      >
+        {children}
+      </AuthCenteredLayout>
     </GuestGuard>
   );
 }

@@ -1,47 +1,51 @@
 {
   "preview": {
-    "eyebrow": "Première exécution SwissKnife",
-    "title": "Configure ton serveur wallet Bitcoin",
-    "content": "Avant de créer le premier mot de passe admin, vérifie ce que cette instance SwissKnife contrôlera : accès wallet, paiements Lightning, dépôts on-chain, identité réutilisable et connexion au nœud.",
-    "wallet_title": "Wallet de départ",
-    "wallet_caption": "Prêt après la configuration admin",
-    "available": "Disponible maintenant",
-    "empty_state": "Sauvegarde le nœud et le matériel wallet avant d'envoyer des fonds importants.",
-    "lightning": "Lightning",
-    "onchain": "On-chain",
-    "identity": "Identité",
-    "node": "Nœud"
+    "eyebrow": "Configuration SwissKnife",
+    "title": "Configure ton wallet Bitcoin",
+    "content": "Ce wallet tourne depuis ton serveur. Tu contrôles les fonds, donc la configuration commence par l'accès, les sauvegardes et quelques vérifications avant de déplacer de l'argent.",
+    "wallet_title": "Configuration du wallet",
+    "wallet_caption": "Vide jusqu'au premier dépôt",
+    "setup_label": "Avant d'ajouter des sats",
+    "setup_title": "Sauvegardes d'abord",
+    "setup_content": "Sauvegarde le nœud et le matériel de récupération du wallet, puis teste avec un petit paiement avant de t'appuyer sur ce wallet.",
+    "backup_check": "Sauvegarde prête",
+    "access_check": "Accès protégé",
+    "test_check": "Petit test d'abord",
+    "lightning": "Paiements Lightning",
+    "onchain": "Adresses Bitcoin",
+    "identity": "Adresse Lightning",
+    "node": "Santé du nœud"
   },
   "welcome": {
-    "title": "Un seul endroit pour envoyer et recevoir",
-    "content": "SwissKnife donne au premier admin un dashboard pour Lightning, Bitcoin on-chain et les identités de réception réutilisables sans les séparer en plusieurs apps.",
-    "point_one": "Reçois avec des factures Lightning, des adresses Bitcoin ou une adresse Lightning réutilisable.",
-    "point_two": "Envoie en collant une facture, LNURL, demande BIP21, adresse ou destinataire interne.",
-    "point_three": "Suis les montants, statuts et prochaines actions depuis le dashboard wallet."
+    "title": "Ton wallet pour le Bitcoin du quotidien",
+    "content": "SwissKnife réunit les paiements Lightning, les adresses Bitcoin et une adresse Lightning réutilisable au même endroit pour recevoir, payer et voir ce qui demande ton attention.",
+    "point_one": "Reçois avec des factures, des adresses ou ton adresse Lightning.",
+    "point_two": "Paie depuis le même wallet quand une demande de paiement arrive.",
+    "point_three": "Vois les montants, les statuts et les prochaines actions sans changer d'outil."
   },
   "custody": {
-    "title": "Self-custody veut dire responsabilité",
-    "content": "Ce serveur ne peut pas récupérer les fonds ou secrets perdus. La configuration sert à décider qui administre le wallet et où vivent les sauvegardes.",
-    "point_one": "Crée le premier mot de passe admin local avant l'ouverture du wallet.",
-    "point_two": "Sauvegarde le nœud et le matériel de récupération avant les dépôts importants.",
-    "point_three": "Garde le mot de passe admin et le matériel de récupération séparés."
+    "title": "Tu tiens les clés",
+    "content": "SwissKnife ne garde pas tes bitcoins et ne conserve pas de copie de tes secrets. Avant de financer le wallet, assure-toi que tes sauvegardes existent et sont accessibles.",
+    "point_one": "Choisis un mot de passe propriétaire fort pour ce dashboard.",
+    "point_two": "Garde le matériel de récupération hors ligne, dans un endroit que tu retrouveras.",
+    "point_three": "Teste le wallet avec un petit montant avant d'en ajouter plus."
   },
   "accessibility": {
-    "title": "Pour les installations maison, desktop et serveur",
-    "content": "Cette première exécution sert aux boxes self-hosted, aux lancements desktop et aux déploiements serveur managés. Le dashboard s'adapte après la configuration de l'authentification.",
-    "point_one": "Utilise la configuration JWT locale pour les installations self-hosted ou desktop avec un seul admin.",
-    "point_two": "Utilise une authentification externe lorsqu'un serveur gère les comptes et rôles ailleurs.",
-    "point_three": "Utilise regtest ou des fonds de test pour valider un nouveau déploiement."
+    "title": "Garde ton nœud prêt",
+    "content": "Lightning fonctionne mieux quand ton serveur wallet est en ligne et en bonne santé. Une configuration stable aide les factures, les paiements et les apps connectées à fonctionner quand tu en as besoin.",
+    "point_one": "Vérifie la santé du nœud avant de recevoir de vrais paiements.",
+    "point_two": "Garde le serveur accessible depuis les apps qui l'utilisent.",
+    "point_three": "Utilise des fonds de test après un changement d'hébergement ou de réglages du nœud."
   },
   "multi_user": {
-    "title": "Commence avec un admin, puis ajoute des comptes",
-    "content": "Les installations JWT créent aujourd'hui un seul admin initial. Les déploiements serveur avec authentification externe peuvent mapper l'accès dashboard aux utilisateurs, rôles et scopes du fournisseur.",
-    "point_one": "Gère les wallets et les identités réutilisables depuis le dashboard admin.",
-    "point_two": "Crée des clés API pour les services qui ont besoin d'un accès wallet.",
-    "point_three": "Ajoute comptes, rôles et agents selon ton modèle de déploiement."
+    "title": "Décide qui peut l'utiliser",
+    "content": "Commence avec le compte propriétaire, puis connecte seulement les personnes, apps et services qui doivent pouvoir payer ou recevoir depuis ce wallet.",
+    "point_one": "Donne à chaque app connectée uniquement l'accès nécessaire.",
+    "point_two": "Révise les accès régulièrement, surtout sur les serveurs partagés.",
+    "point_three": "Ajoute d'autres comptes quand ton déploiement le permet."
   },
   "step": "Étape {{current}} sur {{total}}",
   "back": "Retour",
   "continue": "Continuer",
-  "get_started": "Créer le mot de passe"
+  "get_started": "Choisir le mot de passe"
 }
