@@ -38,12 +38,15 @@ All four judges ranked D1 or D5 at the top; both money-UX laws and the compositi
 | One fused BIP21 QR shippable today | **TRUE (frontend-composed)** | display-only: compose `bitcoin:<addr>?amount=…&lightning=<bolt11>` on the client from the on-chain address + the bolt11 we already have. No backend leg needed. _(v2 correction)_ |
 | Unified Send routes on-chain | **TRUE** | on-chain send IS supported; the `SendPaymentRequest.input` doc string ("…not yet supported") is **stale** — remove it backend-side. _(v2 correction)_ |
 | On-chain receive (address) shippable | **True** | `BtcAddress.used:boolean` (`:98`); generate/list/delete BTC address endpoints exist |
+| Local JWT creates one admin login | **True** | `AuthService::sign_up` stores one `password_hash` config entry and returns `Conflict("Admin user already created")` after that; local JWT `sign_in` always issues subject `admin` with all permissions. Multiple dashboard identities/account ownership separation is tracked by [#252](https://github.com/bitcoin-numeraire/swissknife/issues/252). |
 | Per-account RBAC roles / spending policy / approvals | **FALSE — by design, v0.3.0** | `Permission` (`:742`) is a flat scope enum today; spending policy/budgets are scoped to the v0.3.0 AI-agent work, not a surprise gap |
 | Permission-gated nav engine exists | **True** | `hasAllPermissions()` (`auth/permissions.ts`), `navData` items carry `permissions?: string[]` |
 | Scope switcher is mock | **True** | `workspaces-popover.tsx:35` `useState(data[0])`, hardcoded `plan` Label |
 | Node view is analytics, not health | **True** | `node-view.tsx` renders only volume; no channel/liquidity/peer data |
 
 **Design law for the whole RFC (v2):** design for the *real target product*; where the backend is missing something non-trivial, treat it as an implementation task (the team can add it), not a wall. Reserve manifest `flag`s for genuinely *future* surfaces (the v0.3.0 agent/policy/L402/webhook work), which still degrade gracefully when absent. On-chain send and the fused-QR receive are **real, shippable flows** — not fenced.
+
+**JWT deployment note.** Until #252 (or a narrower user/account refactor) lands, JWT mode should be presented as a single local admin login suitable for Umbrel, desktop, and first-server-run installs. Additional human dashboard users require an external auth provider plus role/scope mapping; the dashboard must not imply that JWT self-sign-up can create multiple independent accounts.
 
 ---
 

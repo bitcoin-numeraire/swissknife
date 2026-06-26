@@ -3,6 +3,7 @@ import type { Invoice, Payment } from 'src/lib/swissknife';
 
 import { useBoolean, usePopover } from 'minimal-shared/hooks';
 
+import Stack from '@mui/material/Stack';
 import Button from '@mui/material/Button';
 import MenuItem from '@mui/material/MenuItem';
 import TableRow from '@mui/material/TableRow';
@@ -16,8 +17,11 @@ import { Avatar, Divider, MenuList } from '@mui/material';
 import { useRouter } from 'src/routes/hooks';
 
 import { truncateText } from 'src/utils/format-string';
+import { getLedgerLabel } from 'src/utils/transactions';
+import { composeBip21 } from 'src/utils/bitcoin-request';
 import { fDate, fTime, fDateTime } from 'src/utils/format-time';
 
+import { CONFIG } from 'src/global-config';
 import { useTranslate } from 'src/locales';
 
 import { Label } from 'src/components/label';
@@ -41,6 +45,13 @@ type Props = {
   isAdmin?: boolean;
 };
 
+function txExplorerUrl(txid?: string | null) {
+  if (!txid) return undefined;
+
+  const explorerBaseUrl = CONFIG.mempoolSpace.replace(/\/api\/v1\/?$/, '');
+  return `${explorerBaseUrl}/tx/${txid}`;
+}
+
 export function TransactionTableRow({
   row,
   isAdmin,
@@ -57,8 +68,33 @@ export function TransactionTableRow({
   const popover = usePopover();
   const confirm = useBoolean();
   const isDeleting = useBoolean();
+  const isPayment = transactionType === TransactionType.PAYMENT;
+  const amountColor = isPayment ? 'warning.main' : 'success.main';
+  const methodLabel = getLedgerLabel(ledger, t);
 
-  const avatarLetter = (text?: string | null) => (text || description || ledger).charAt(0).toUpperCase();
+  const avatarLetter = (text?: string | null) =>
+    (text || description || ledger).charAt(0).toUpperCase();
+  const invoice = row as Invoice;
+  const payment = row as Payment;
+  const invoiceBolt11 =
+    transactionType === TransactionType.INVOICE ? invoice.ln_invoice?.bolt11 : undefined;
+  const invoiceAddress =
+    transactionType === TransactionType.INVOICE ? invoice.bitcoin_output?.address : undefined;
+  const invoiceUnified =
+    invoiceBolt11 && invoiceAddress
+      ? composeBip21(
+          invoiceAddress,
+          invoiceBolt11,
+          invoice.amount_msat ? invoice.amount_msat / 1000 : 0
+        )
+      : undefined;
+  const paymentAddress =
+    transactionType === TransactionType.PAYMENT
+      ? payment.bitcoin?.address || payment.internal?.btc_address
+      : undefined;
+  const explorerUrl =
+    transactionType === TransactionType.PAYMENT ? txExplorerUrl(payment.bitcoin?.txid) : undefined;
+  const canDelete = isAdmin || status === 'Expired' || status === 'Failed';
 
   return (
     <>
@@ -79,7 +115,7 @@ export function TransactionTableRow({
         </TableCell>
 
         <TableCell sx={{ display: 'flex', alignItems: 'center' }}>
-          {transactionType === TransactionType.PAYMENT && (
+          {isPayment && (
             <Avatar alt={id} sx={{ mr: 2 }}>
               {avatarLetter((row as Payment).lightning?.ln_address || id)}
             </Avatar>
@@ -93,12 +129,8 @@ export function TransactionTableRow({
               </Typography>
             }
             secondary={
-              <Typography
-                noWrap
-                variant="body2"
-                sx={{ color: 'text.disabled' }}
-              >
-                {fDateTime(created_at)} · {ledger}
+              <Typography noWrap variant="body2" sx={{ color: 'text.disabled' }}>
+                {fDateTime(created_at)} · {methodLabel}
               </Typography>
             }
           />
@@ -161,7 +193,16 @@ export function TransactionTableRow({
         </TableCell>
 
         <TableCell>
-          <SatsWithIcon amountMSats={amount_msat || 0} />
+          <Stack direction="row" spacing={0.25} sx={{ alignItems: 'center' }}>
+            <Typography component="span" variant="body2" sx={{ color: amountColor }}>
+              {isPayment ? '-' : '+'}
+            </Typography>
+            <SatsWithIcon
+              component="span"
+              amountMSats={amount_msat || 0}
+              sx={{ color: amountColor }}
+            />
+          </Stack>
         </TableCell>
 
         <TableCell>
@@ -173,7 +214,7 @@ export function TransactionTableRow({
               'default'
             }
           >
-            {ledger}
+            {methodLabel}
           </Label>
         </TableCell>
 
@@ -220,13 +261,32 @@ export function TransactionTableRow({
             <Iconify icon="solar:eye-bold" />
             {t('view')}
           </MenuItem>
-          {transactionType === TransactionType.INVOICE &&
-            status === 'Pending' &&
-            (row as Invoice).ln_invoice && (
-              <CopyMenuItem value={(row as Invoice).ln_invoice!.bolt11} />
-            )}
+          {invoiceUnified && (
+            <CopyMenuItem value={invoiceUnified} title={t('transaction_actions.copy_unified')} />
+          )}
+          {invoiceBolt11 && (
+            <CopyMenuItem value={invoiceBolt11} title={t('transaction_actions.copy_bolt11')} />
+          )}
+          {invoiceAddress && (
+            <CopyMenuItem
+              value={invoiceAddress}
+              title={t('transaction_actions.copy_onchain_address')}
+            />
+          )}
+          {paymentAddress && (
+            <CopyMenuItem
+              value={paymentAddress}
+              title={t('transaction_actions.copy_destination')}
+            />
+          )}
+          {explorerUrl && (
+            <MenuItem component="a" href={explorerUrl} target="_blank" rel="noopener noreferrer">
+              <Iconify icon="solar:map-arrow-right-bold" />
+              {t('transaction_actions.open_explorer')}
+            </MenuItem>
+          )}
 
-          {isAdmin && (
+          {canDelete && (
             <>
               <Divider sx={{ borderStyle: 'dashed' }} />
 

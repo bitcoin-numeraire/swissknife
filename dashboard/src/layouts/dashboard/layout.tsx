@@ -15,13 +15,18 @@ import Alert from '@mui/material/Alert';
 import { useTheme } from '@mui/material/styles';
 import { iconButtonClasses } from '@mui/material/IconButton';
 
+import { useSearchParams } from 'src/routes/hooks';
+
 import { allLangs } from 'src/locales';
+import { CONFIG } from 'src/global-config';
 import { currencies } from 'src/assets/data';
+import { Permission } from 'src/lib/swissknife';
 
 import { Logo } from 'src/components/logo';
 import { useSettingsContext } from 'src/components/settings';
 
 import { useAuthContext } from 'src/auth/hooks';
+import { hasAllPermissions } from 'src/auth/permissions';
 
 import { NavMobile } from './nav-mobile';
 import { VerticalDivider } from './content';
@@ -34,6 +39,7 @@ import { _workspaces } from '../nav-config-workspace';
 import { MenuButton } from '../components/menu-button';
 import { HeaderSection } from '../core/header-section';
 import { LayoutSection } from '../core/layout-section';
+import { ModuleDebugPanel } from './module-debug-panel';
 import { AccountDrawer } from '../components/account-drawer';
 import { SettingsButton } from '../components/settings-button';
 import { LanguagePopover } from '../components/language-popover';
@@ -42,8 +48,10 @@ import { navData as accountNavData } from '../nav-config-account';
 import { WorkspacesPopover } from '../components/workspaces-popover';
 import { dashboardLayoutVars, dashboardNavColorVars } from './css-vars';
 import {
+  getDashboardFlags,
   filterDashboardNavData,
   navData as dashboardNavData,
+  getDashboardModuleDiagnostics,
 } from '../nav-config-dashboard';
 
 // ----------------------------------------------------------------------
@@ -72,18 +80,30 @@ export function DashboardLayout({
 
   const settings = useSettingsContext();
   const { user } = useAuthContext();
+  const searchParams = useSearchParams();
 
   const navVars = dashboardNavColorVars(theme, settings.state.navColor, settings.state.navLayout);
 
   const { value: open, onFalse: onClose, onTrue: onOpen } = useBoolean();
 
   const rawNavData = slotProps?.nav?.data ?? dashboardNavData;
+  const usesDashboardNav = rawNavData === dashboardNavData;
   const navData = useMemo(
     () =>
-      rawNavData === dashboardNavData
+      usesDashboardNav
         ? filterDashboardNavData(dashboardNavData, user?.permissions)
         : rawNavData,
-    [rawNavData, user?.permissions]
+    [rawNavData, usesDashboardNav, user?.permissions]
+  );
+  const showModuleDebug = usesDashboardNav && searchParams.get('debug') === 'modules';
+  const canInspectModules = hasAllPermissions([Permission.READ_WALLET], user?.permissions);
+  const dashboardFlags = useMemo(() => Array.from(getDashboardFlags()).sort(), []);
+  const moduleDiagnostics = useMemo(
+    () =>
+      showModuleDebug
+        ? getDashboardModuleDiagnostics(dashboardNavData, user?.permissions)
+        : [],
+    [showModuleDebug, user?.permissions]
   );
 
   const isNavMini = settings.state.navLayout === 'mini';
@@ -202,7 +222,20 @@ export function DashboardLayout({
 
   const renderFooter = () => null;
 
-  const renderMain = () => <MainSection {...slotProps?.main}>{children}</MainSection>;
+  const renderMain = () => (
+    <MainSection {...slotProps?.main}>
+      {children}
+
+      {showModuleDebug && (
+        <ModuleDebugPanel
+          diagnostics={moduleDiagnostics}
+          enabledFlags={dashboardFlags}
+          canInspect={canInspectModules}
+          mode={CONFIG.deploymentMode}
+        />
+      )}
+    </MainSection>
+  );
 
   return (
     <LayoutSection

@@ -44,8 +44,8 @@ export function PaymentDetailsView({ id }: Props) {
                 href: paths.wallet.root,
               },
               {
-                name: t('payments'),
-                href: paths.wallet.payments,
+                name: t('activity'),
+                href: paths.activityList('payment'),
               },
               { name: t('payment_details.detail_heading') },
             ]}

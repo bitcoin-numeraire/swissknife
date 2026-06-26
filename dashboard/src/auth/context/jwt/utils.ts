@@ -8,6 +8,37 @@ import { JWT_STORAGE_KEY } from './constant';
 
 // ----------------------------------------------------------------------
 
+let requestInterceptorId: number | null = null;
+let errorInterceptorId: number | null = null;
+
+function normalizePath(path: string) {
+  if (path === '/') return path;
+
+  return path.replace(/\/+$/, '');
+}
+
+function isSetupPath(pathname: string) {
+  const currentPath = normalizePath(pathname);
+
+  return [paths.onboarding.welcome, paths.auth.signUp].some(
+    (path) => normalizePath(path) === currentPath
+  );
+}
+
+export function clearSession() {
+  sessionStorage.removeItem(JWT_STORAGE_KEY);
+
+  if (requestInterceptorId !== null) {
+    client.interceptors.request.eject(requestInterceptorId);
+    requestInterceptorId = null;
+  }
+
+  if (errorInterceptorId !== null) {
+    client.interceptors.error.eject(errorInterceptorId);
+    errorInterceptorId = null;
+  }
+}
+
 export function isValidToken(accessToken: string) {
   if (!accessToken) {
     return false;
@@ -33,17 +64,24 @@ export function isValidToken(accessToken: string) {
 
 export async function setSession(accessToken: string) {
   try {
+    clearSession();
     sessionStorage.setItem(JWT_STORAGE_KEY, accessToken);
 
-    client.interceptors.request.use((request, _) => {
+    requestInterceptorId = client.interceptors.request.use((request, _) => {
       request.headers.set('Authorization', `Bearer ${accessToken}`);
       return request;
     });
 
-    client.interceptors.error.use((error, response) => {
+    errorInterceptorId = client.interceptors.error.use((error, response) => {
       if (response?.status === 401) {
-        sessionStorage.removeItem(JWT_STORAGE_KEY);
-        window.location.href = paths.auth.login;
+        clearSession();
+
+        if (
+          normalizePath(window.location.pathname) !== normalizePath(paths.auth.login) &&
+          !isSetupPath(window.location.pathname)
+        ) {
+          window.location.replace(paths.auth.login);
+        }
       }
 
       return Promise.reject(error);

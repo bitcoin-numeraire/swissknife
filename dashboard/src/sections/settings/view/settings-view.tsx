@@ -1,38 +1,26 @@
 'use client';
 
-import type { ReactElement } from 'react';
-
-import { mutate } from 'swr';
-import { useState } from 'react';
-
-import Tab from '@mui/material/Tab';
 import Box from '@mui/material/Box';
+import Grid from '@mui/material/Grid';
 import Card from '@mui/material/Card';
-import Tabs from '@mui/material/Tabs';
+import Alert from '@mui/material/Alert';
 import Stack from '@mui/material/Stack';
+import Button from '@mui/material/Button';
 import Typography from '@mui/material/Typography';
 
+import { paths } from 'src/routes/paths';
 import { useSearchParams } from 'src/routes/hooks';
 
 import { shouldFail } from 'src/utils/errors';
 
+import { CONFIG } from 'src/global-config';
 import { useTranslate } from 'src/locales';
-import { endpointKeys } from 'src/actions/keys';
 import { DashboardContent } from 'src/layouts/dashboard';
 import { useListWalletApiKeys, useGetWalletLnAddress } from 'src/actions/user-wallet';
 
-import { Welcome } from 'src/components/app';
 import { Iconify } from 'src/components/iconify';
 import { ErrorView } from 'src/components/error';
-import { RegisterLnAddressForm } from 'src/components/ln-address';
 import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';
-
-import { SettingsApiKey } from '../settings-api-key';
-import { SettingsLnAddress } from '../settings-ln-address';
-
-// ----------------------------------------------------------------------
-
-type SettingsTab = 'lnaddress' | 'apikeys';
 
 // ----------------------------------------------------------------------
 
@@ -40,9 +28,6 @@ export function SettingsView() {
   const { t } = useTranslate();
   const searchParams = useSearchParams();
   const requestedTab = searchParams.get('tab');
-  const [activeTab, setActiveTab] = useState<SettingsTab>(
-    requestedTab === 'apikeys' || requestedTab === 'lnaddress' ? requestedTab : 'lnaddress'
-  );
 
   const { lnAddress, lnAddressLoading, lnAddressError } = useGetWalletLnAddress();
   const { apiKeys, apiKeysLoading, apiKeysError } = useListWalletApiKeys();
@@ -53,22 +38,12 @@ export function SettingsView() {
   const data = [apiKeys];
 
   const failed = shouldFail(errors, data, isLoading);
-  const tabs: Array<{
-    value: SettingsTab;
-    label: string;
-    icon: ReactElement;
-  }> = [
-    {
-      value: 'lnaddress',
-      label: t('settings_view.lightning_tab'),
-      icon: <Iconify icon="solar:bolt-bold-duotone" width={24} />,
-    },
-    {
-      value: 'apikeys',
-      label: t('settings_view.api_keys_tab'),
-      icon: <Iconify icon="solar:code-bold-duotone" width={24} />,
-    },
-  ];
+  const identityHref = `${paths.identity}?tab=lightning`;
+  const apiKeysHref = paths.build.apiKeys;
+  const authModeLabel =
+    CONFIG.auth.method === 'jwt'
+      ? t('settings_view.jwt_admin_mode')
+      : t('settings_view.external_auth_mode');
 
   return (
     <DashboardContent>
@@ -120,41 +95,137 @@ export function SettingsView() {
                   }
                   color={apiKeys?.length ? 'info.main' : 'text.disabled'}
                 />
+                <SettingsStatus
+                  icon="solar:server-bold-duotone"
+                  title={t('settings_view.access_tab')}
+                  value={authModeLabel}
+                  color={CONFIG.auth.method === 'jwt' ? 'warning.main' : 'success.main'}
+                />
               </Stack>
             </Stack>
           </Card>
 
-          <Tabs
-            value={activeTab}
-            onChange={(_, value: SettingsTab) => setActiveTab(value)}
-            sx={{ mb: { xs: 3, md: 5 } }}
-          >
-            {tabs.map((tab) => (
-              <Tab key={tab.value} label={tab.label} icon={tab.icon} value={tab.value} />
-            ))}
-          </Tabs>
+          {requestedTab === 'lnaddress' && (
+            <Alert
+              severity="info"
+              variant="outlined"
+              sx={{ mb: 3 }}
+              action={
+                <Button color="inherit" size="small" href={identityHref}>
+                  {t('settings_view.open_identity')}
+                </Button>
+              }
+            >
+              {t('settings_view.identity_moved')}
+            </Alert>
+          )}
 
-          {activeTab === 'lnaddress' &&
-            (lnAddress ? (
-              <SettingsLnAddress lnAddress={lnAddress} />
-            ) : (
-              <Welcome
-                description={t('register_ln_address.register_lightning_address_welcome')}
-                img={
-                  <img src="/assets/icons/bitcoin/ic-bitcoin-lightning.svg" alt="Lightning logo" />
+          <Grid container spacing={3}>
+            <Grid size={{ xs: 12, md: 4 }}>
+              <SettingsRouteCard
+                icon="solar:user-rounded-bold-duotone"
+                title={t('identity_hub')}
+                value={
+                  lnAddress ? t('settings_view.address_ready') : t('settings_view.address_missing')
                 }
-                action={
-                  <RegisterLnAddressForm
-                    onSuccess={() => mutate(endpointKeys.userWallet.lnAddress.get)}
-                  />
-                }
+                description={t('settings_view.identity_description')}
+                actionLabel={t('settings_view.open_identity')}
+                href={identityHref}
+                color={lnAddress ? 'success.main' : 'warning.main'}
               />
-            ))}
+            </Grid>
 
-          {activeTab === 'apikeys' && <SettingsApiKey apiKeys={apiKeys!} />}
+            <Grid size={{ xs: 12, md: 4 }}>
+              <SettingsRouteCard
+                icon="solar:key-minimalistic-square-bold-duotone"
+                title={t('api_keys')}
+                value={
+                  apiKeys?.length
+                    ? t('settings_view.tokens_count', { count: apiKeys.length })
+                    : t('settings_view.no_tokens')
+                }
+                description={t('settings_view.api_keys_description')}
+                actionLabel={t('settings_view.open_api_keys')}
+                href={apiKeysHref}
+                color={apiKeys?.length ? 'info.main' : 'text.disabled'}
+              />
+            </Grid>
+
+            <Grid size={{ xs: 12, md: 4 }}>
+              <SettingsRouteCard
+                icon="solar:server-bold-duotone"
+                title={t('settings_view.instance_access')}
+                value={`${CONFIG.deploymentMode} · ${authModeLabel}`}
+                description={
+                  CONFIG.auth.method === 'jwt'
+                    ? t('settings_view.jwt_instance_description')
+                    : t('settings_view.external_instance_description')
+                }
+                actionLabel={t('settings_view.open_node_health')}
+                href={paths.nodeHealth}
+                color={CONFIG.auth.method === 'jwt' ? 'warning.main' : 'success.main'}
+              />
+            </Grid>
+          </Grid>
         </>
       )}
     </DashboardContent>
+  );
+}
+
+function SettingsRouteCard({
+  icon,
+  title,
+  value,
+  color,
+  description,
+  actionLabel,
+  href,
+}: {
+  icon: string;
+  title: string;
+  value: string;
+  color: string;
+  description: string;
+  actionLabel: string;
+  href: string;
+}) {
+  return (
+    <Card sx={{ p: 3, borderRadius: 1, height: 1 }}>
+      <Stack spacing={2.5} sx={{ height: 1 }}>
+        <Box
+          sx={{
+            width: 48,
+            height: 48,
+            display: 'grid',
+            borderRadius: 1,
+            placeItems: 'center',
+            color,
+            bgcolor: 'background.neutral',
+          }}
+        >
+          <Iconify icon={icon} width={28} />
+        </Box>
+
+        <Stack spacing={0.75}>
+          <Typography variant="h6">{title}</Typography>
+          <Typography variant="body2" color="text.secondary">
+            {description}
+          </Typography>
+        </Stack>
+
+        <Box sx={{ flexGrow: 1 }} />
+
+        <Stack spacing={1.5}>
+          <Typography variant="subtitle2" color={color}>
+            {value}
+          </Typography>
+          <Button href={href} color="inherit" variant="outlined">
+            {actionLabel}
+          </Button>
+        </Stack>
+      </Stack>
+    </Card>
   );
 }
 

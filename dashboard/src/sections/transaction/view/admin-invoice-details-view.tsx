@@ -47,8 +47,8 @@ export function AdminInvoiceDetailsView({ id }: Props) {
                   name: t('admin'),
                 },
                 {
-                  name: t('invoices'),
-                  href: paths.admin.invoices,
+                  name: t('activity'),
+                  href: paths.activityList('invoice', 'admin'),
                 },
                 { name: t('invoice_details.detail_heading') },
               ]}

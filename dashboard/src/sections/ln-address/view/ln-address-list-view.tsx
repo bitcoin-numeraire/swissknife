@@ -20,7 +20,7 @@ import { useListLnAddresses } from 'src/actions/ln-addresses';
 
 import { Iconify } from 'src/components/iconify';
 import { ErrorView } from 'src/components/error/error-view';
-import { RegisterLnAddressDialog } from 'src/components/ln-address';
+import { RegisterLnAddressDrawer } from 'src/components/ln-address';
 import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';
 
 import { RoleBasedGuard } from 'src/auth/guard';
@@ -120,7 +120,7 @@ export function LnAddressListView() {
 
             <LnAddressList data={lnAddresses!} tableHead={tableHead(t)} tabs={tabs} />
 
-            <RegisterLnAddressDialog
+            <RegisterLnAddressDrawer
               open={newLnAddress.value}
               onClose={newLnAddress.onFalse}
               onSuccess={() => mutate(endpointKeys.lightning.addresses.list)}

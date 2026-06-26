@@ -26,20 +26,11 @@ import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
 import { Scrollbar } from 'src/components/scrollbar';
 import { TableHeadCustom } from 'src/components/table';
-import { CreateApiKeyDialog } from 'src/components/api-key';
+import { CreateApiKeyDrawer } from 'src/components/api-key';
 import { ConfirmDialog } from 'src/components/custom-dialog';
 import { CustomPopover } from 'src/components/custom-popover';
 
 // ----------------------------------------------------------------------
-
-const TABLE_HEAD = [
-  { id: 'permissions', label: 'Scopes' },
-  { id: 'name', label: 'Name' },
-  { id: 'description', label: 'Description' },
-  { id: 'created_at', label: 'Created' },
-  { id: 'expires_at', label: 'Expires in' },
-  { id: '' },
-];
 
 type Props = {
   apiKeys: ListWalletApiKeysResponse;
@@ -48,6 +39,14 @@ type Props = {
 export function SettingsApiKey({ apiKeys }: Props) {
   const { t } = useTranslate();
   const newApiKey = useBoolean();
+  const tableHead = [
+    { id: 'permissions', label: t('api_key_list.scopes') },
+    { id: 'name', label: t('api_key_list.name') },
+    { id: 'description', label: t('api_key_list.description') },
+    { id: 'created_at', label: t('api_key_list.created') },
+    { id: 'expires_at', label: t('api_key_list.expires') },
+    { id: '' },
+  ];
 
   return (
     <Card sx={{ p: { xs: 1, sm: 3 }, mx: 'auto' }}>
@@ -75,7 +74,7 @@ export function SettingsApiKey({ apiKeys }: Props) {
 
       <Scrollbar>
         <Table sx={{ minWidth: 800 }}>
-          <TableHeadCustom headCells={TABLE_HEAD} />
+          <TableHeadCustom headCells={tableHead} />
 
           <TableBody>
             {apiKeys.map((row) => (
@@ -85,7 +84,7 @@ export function SettingsApiKey({ apiKeys }: Props) {
         </Table>
       </Scrollbar>
 
-      <CreateApiKeyDialog
+      <CreateApiKeyDrawer
         title={t('settings_api_key.new_dialog_title')}
         open={newApiKey.value}
         onClose={newApiKey.onFalse}
@@ -109,6 +108,7 @@ function CollapsibleTableRow({ row }: CollapsibleTableRowProps) {
   const popover = usePopover();
   const confirm = useBoolean();
   const isDeleting = useBoolean();
+  const scopeCount = row.permissions.length + 1;
 
   const handleDeleteRow = useCallback(async () => {
     isDeleting.onTrue();
@@ -130,22 +130,29 @@ function CollapsibleTableRow({ row }: CollapsibleTableRowProps) {
     <>
       <TableRow sx={{ '& > *': { borderBottom: 'unset' } }}>
         <TableCell>
-          <IconButton
-            size="small"
-            color={collapsible.value ? 'inherit' : 'default'}
-            onClick={collapsible.onToggle}
-          >
-            <Iconify
-              icon={collapsible.value ? 'eva:arrow-ios-upward-fill' : 'eva:arrow-ios-downward-fill'}
-            />
-          </IconButton>
+          <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center' }}>
+            <IconButton
+              size="small"
+              color={collapsible.value ? 'inherit' : 'default'}
+              onClick={collapsible.onToggle}
+            >
+              <Iconify
+                icon={
+                  collapsible.value ? 'eva:arrow-ios-upward-fill' : 'eva:arrow-ios-downward-fill'
+                }
+              />
+            </IconButton>
+            <Label variant="soft" color="info">
+              {t('api_key_list.scope_count', { count: scopeCount })}
+            </Label>
+          </Stack>
         </TableCell>
         <TableCell>
           <b>{row.name}</b>
         </TableCell>
         <TableCell>{row.description}</TableCell>
         <TableCell>{fFromNow(row.created_at)}</TableCell>
-        <TableCell>{row.expires_at ? fFromNow(row.expires_at) : 'never'}</TableCell>
+        <TableCell>{row.expires_at ? fFromNow(row.expires_at) : t('api_key_list.never')}</TableCell>
         <TableCell>
           <IconButton color={popover.open ? 'inherit' : 'default'} onClick={popover.onOpen}>
             <Iconify icon="eva:more-vertical-fill" />
@@ -157,6 +164,9 @@ function CollapsibleTableRow({ row }: CollapsibleTableRowProps) {
         <TableCell sx={{ py: 0 }} colSpan={6}>
           <Collapse in={collapsible.value} timeout="auto" unmountOnExit>
             <Stack direction="row" spacing={1} sx={{ my: 2 }}>
+              <Label variant="soft" color="secondary">
+                {t('api_key_list.user_wallet_permission')}
+              </Label>
               {row.permissions.map((scope) => (
                 <Label key={scope} variant="soft" color="default">
                   {scope}

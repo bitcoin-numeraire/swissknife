@@ -17,7 +17,8 @@ import { fFromNow } from 'src/utils/format-time';
 import { useTranslate } from 'src/locales';
 
 import { Iconify } from 'src/components/iconify';
-import { ConfirmPaymentDialog } from 'src/components/transactions';
+
+import { SendMoneyDrawer } from 'src/sections/wallet/money-drawers';
 
 // ----------------------------------------------------------------------
 
@@ -84,8 +85,9 @@ export function ContactList({ data, fiatPrices }: Props) {
         </Card>
       ))}
 
-      <ConfirmPaymentDialog
-        input={input}
+      <SendMoneyDrawer
+        contacts={data}
+        initialInput={input}
         open={confirm.value}
         onClose={handleClose}
         fiatPrices={fiatPrices}

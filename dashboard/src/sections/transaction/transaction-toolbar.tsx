@@ -41,18 +41,18 @@ export function TransactionToolbar({ transaction, transactionType, isAdmin }: Pr
           await deleteInvoice({ path: { id } });
 
           toast.success(t('transaction_toolbar.delete_invoice_success', { id }));
-          router.push(paths.admin.invoices);
+          router.push(paths.activityList('invoice', isAdmin ? 'admin' : 'wallet'));
         } else {
           await deletePayment({ path: { id } });
 
           toast.success(t('transaction_toolbar.delete_payment_success', { id }));
-          router.push(paths.admin.payments);
+          router.push(paths.activityList('payment', isAdmin ? 'admin' : 'wallet'));
         }
       } catch (error) {
         handleActionError(error);
       }
     },
-    [router, transactionType, t]
+    [isAdmin, router, transactionType, t]
   );
 
   return (

@@ -22,8 +22,9 @@ import { useFetchFiatPrices } from 'src/actions/mempool-space';
 
 import { Iconify } from 'src/components/iconify';
 import { ErrorView } from 'src/components/error/error-view';
-import { NewInvoiceDialog } from 'src/components/transactions';
 import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';
+
+import { ReceiveMoneyDrawer } from 'src/sections/wallet/money-drawers';
 
 import { RoleBasedGuard } from 'src/auth/guard';
 
@@ -99,10 +100,10 @@ export function AdminInvoiceListView() {
               tableHead={tableHead(t)}
               tabs={invoiceTabs(theme, t)}
               transactionType={TransactionType.INVOICE}
-              href={paths.admin.invoice}
+              href={(id) => paths.activityInvoice(id, 'admin')}
             />
 
-            <NewInvoiceDialog
+            <ReceiveMoneyDrawer
               fiatPrices={fiatPrices!}
               open={newInvoice.value}
               onClose={newInvoice.onFalse}

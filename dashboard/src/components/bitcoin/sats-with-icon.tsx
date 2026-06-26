@@ -19,11 +19,15 @@ export function SatsWithIcon({
   variant,
   ...other
 }: Props) {
+  const hasSubSat = amountMSats % 1000 !== 0;
+
   return (
-    <Tooltip title={`${amountMSats} mSats`} placement={placement} arrow>
+    <Tooltip title={`${fSats(amountMSats)} mSats`} placement={placement} arrow>
       <Typography variant={variant || 'inherit'} {...other}>
         <span style={{ opacity: 0.65, marginRight: 2 }}>₿</span>
-        {fSats(amountMSats / 1000)}
+        {fSats(amountMSats / 1000, {
+          maximumFractionDigits: hasSubSat ? 3 : 0,
+        })}
         {children}
       </Typography>
     </Tooltip>

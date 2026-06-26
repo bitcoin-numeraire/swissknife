@@ -317,7 +317,7 @@ function WalletPreview({ item, step, total }: WalletPreviewProps) {
           {[
             ['solar:bolt-bold-duotone', 'preview.lightning'],
             ['solar:qr-code-bold-duotone', 'preview.onchain'],
-            ['solar:user-id-bold-duotone', 'preview.identity'],
+            ['solar:user-rounded-bold-duotone', 'preview.identity'],
             ['solar:server-bold-duotone', 'preview.node'],
           ].map(([icon, label]) => (
             <Stack

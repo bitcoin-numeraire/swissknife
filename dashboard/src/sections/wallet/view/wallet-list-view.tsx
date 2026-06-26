@@ -8,6 +8,8 @@ import { useBoolean } from 'minimal-shared/hooks';
 import Stack from '@mui/material/Stack';
 import Button from '@mui/material/Button';
 
+import { useSearchParams } from 'src/routes/hooks';
+
 import { shouldFail } from 'src/utils/errors';
 
 import { useTranslate } from 'src/locales';
@@ -19,7 +21,7 @@ import { useFetchFiatPrices } from 'src/actions/mempool-space';
 
 import { Iconify } from 'src/components/iconify';
 import { ErrorView } from 'src/components/error/error-view';
-import { RegisterWalletDialog } from 'src/components/wallet';
+import { RegisterWalletDrawer } from 'src/components/wallet';
 import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';
 
 import { RoleBasedGuard } from 'src/auth/guard';
@@ -44,6 +46,8 @@ const tableHead = (t: TFunction) => [
 export function WalletListView() {
   const newWallet = useBoolean();
   const { t } = useTranslate();
+  const searchParams = useSearchParams();
+  const focusedWalletId = searchParams.get('id') || '';
 
   const { walletOverviews, walletOverviewsLoading, walletOverviewsError } =
     useListWalletOverviews();
@@ -88,9 +92,14 @@ export function WalletListView() {
               }}
             />
 
-            <WalletList data={walletOverviews!} tableHead={tableHead(t)} fiatPrices={fiatPrices!} />
+            <WalletList
+              data={walletOverviews!}
+              tableHead={tableHead(t)}
+              fiatPrices={fiatPrices!}
+              initialSearch={focusedWalletId}
+            />
 
-            <RegisterWalletDialog
+            <RegisterWalletDrawer
               open={newWallet.value}
               onClose={newWallet.onFalse}
               onSuccess={() => mutate(endpointKeys.wallets.listOverviews)}

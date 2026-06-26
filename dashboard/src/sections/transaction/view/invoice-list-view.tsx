@@ -20,12 +20,14 @@ import { useTranslate } from 'src/locales';
 import { endpointKeys } from 'src/actions/keys';
 import { DashboardContent } from 'src/layouts/dashboard';
 import { useFetchFiatPrices } from 'src/actions/mempool-space';
-import { useListWalletInvoices } from 'src/actions/user-wallet';
+import { useGetUserWallet, useListWalletInvoices } from 'src/actions/user-wallet';
 
 import { Iconify } from 'src/components/iconify';
 import { ErrorView } from 'src/components/error/error-view';
 import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';
-import { NewInvoiceDialog, CleanTransactionsButton } from 'src/components/transactions';
+import { CleanTransactionsButton } from 'src/components/transactions';
+
+import { ReceiveMoneyDrawer } from 'src/sections/wallet/money-drawers';
 
 import { TransactionType } from 'src/types/transaction';
 
@@ -91,11 +93,12 @@ export function InvoiceListView() {
   const newInvoice = useBoolean();
 
   const { invoices, invoicesLoading, invoicesError, invoicesMutate } = useListWalletInvoices();
+  const { wallet, walletLoading, walletError } = useGetUserWallet();
   const { fiatPrices, fiatPricesLoading, fiatPricesError } = useFetchFiatPrices();
 
-  const errors = [invoicesError, fiatPricesError];
-  const data = [invoices, fiatPrices];
-  const isLoading = [invoicesLoading, fiatPricesLoading];
+  const errors = [invoicesError, fiatPricesError, walletError];
+  const data = [invoices, fiatPrices, wallet];
+  const isLoading = [invoicesLoading, fiatPricesLoading, walletLoading];
 
   const failed = shouldFail(errors, data, isLoading);
 
@@ -155,12 +158,13 @@ export function InvoiceListView() {
             tableHead={tableHead(t)}
             tabs={invoiceTabs(theme, t)}
             transactionType={TransactionType.INVOICE}
-            href={paths.wallet.invoice}
+            href={paths.activityInvoice}
           />
 
-          <NewInvoiceDialog
+          <ReceiveMoneyDrawer
             fiatPrices={fiatPrices!}
             open={newInvoice.value}
+            lnAddress={wallet?.ln_address}
             onClose={newInvoice.onFalse}
             onSuccess={() => mutate(endpointKeys.userWallet.invoices.list)}
           />

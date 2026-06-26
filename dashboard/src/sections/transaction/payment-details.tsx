@@ -8,6 +8,9 @@ import Stack from '@mui/material/Stack';
 import Alert from '@mui/material/Alert';
 import Typography from '@mui/material/Typography';
 
+import { fSats } from 'src/utils/format-number';
+import { getLedgerLabel } from 'src/utils/transactions';
+
 import { useTranslate } from 'src/locales';
 
 import { Iconify } from 'src/components/iconify';
@@ -35,7 +38,31 @@ type Props = {
 export function PaymentDetails({ payment, isAdmin }: Props) {
   const { t } = useTranslate();
   const { ln_address, success_action, payment_hash, payment_preimage } = payment.lightning ?? {};
-  const amountWithoutFees = payment.amount_msat - (payment.fee_msat || 0);
+  const amountSent = payment.amount_msat || 0;
+  const feeAmount = payment.fee_msat || 0;
+  const totalAmount = amountSent + feeAmount;
+  const feeHelper =
+    feeAmount % 1000 !== 0
+      ? t('payment_details.exact_msats', { amount: fSats(feeAmount) })
+      : undefined;
+  const methodLabel = getLedgerLabel(payment.ledger, t);
+  const destination =
+    ln_address ||
+    payment.internal?.ln_address ||
+    payment.bitcoin?.address ||
+    payment.internal?.btc_address ||
+    payment.bitcoin?.txid ||
+    payment_hash ||
+    methodLabel;
+  const settlementTitle =
+    (payment.status === 'Failed' && t('transaction_details.failed')) ||
+    (payment.status === 'Settled' && t('payment_details.settlement_complete')) ||
+    t('payment_details.awaiting_settlement');
+  const settlementDescription =
+    (payment.status === 'Failed' && (payment.error || t('payment_details.failed_description'))) ||
+    (payment.ledger === 'Lightning' && t('payment_details.lightning_settlement_description')) ||
+    (payment.ledger === 'Internal' && t('payment_details.internal_settlement_description')) ||
+    t('payment_details.onchain_settlement_description');
 
   return (
     <>
@@ -70,61 +97,48 @@ export function PaymentDetails({ payment, isAdmin }: Props) {
 
                   <Stack spacing={0.5}>
                     <Typography variant="overline" color="text.secondary">
-                      {t('payment_details.payment_from')}
+                      {t('payment_details.payment_to')}
                     </Typography>
-                    <Typography variant="h4">
-                      {payment.description || ln_address || t('recent_transactions.empty_description')}
+                    <Typography variant="h4" sx={{ wordBreak: 'break-word' }}>
+                      {destination}
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
-                      {isAdmin
-                        ? t('transaction_details.wallet_account')
-                        : t('transaction_details.outgoing_payment')}
+                      {payment.description ||
+                        (isAdmin
+                          ? t('transaction_details.wallet_account')
+                          : t('transaction_details.outgoing_payment'))}
                     </Typography>
                   </Stack>
                 </Stack>
 
                 <Stack spacing={0.5}>
                   <Typography variant="caption" color="text.secondary">
-                    {t('payment_details.total_amount')}
+                    {t('payment_details.amount_sent')}
                   </Typography>
-                  <SatsWithIcon amountMSats={payment.amount_msat} variant="h3" />
+                  <SatsWithIcon amountMSats={amountSent} variant="h3" />
                 </Stack>
 
                 <Grid container spacing={2}>
                   <Grid size={{ xs: 12, sm: 4 }}>
                     <MetricTile
                       title={t('payment_details.amount_sent')}
-                      amountMSats={amountWithoutFees}
-                      helper={payment.status === 'Settled' ? t('transaction_details.settled') : payment.status}
+                      amountMSats={amountSent}
+                      helper={t('payment_details.recipient_receives')}
                     />
                   </Grid>
                   <Grid size={{ xs: 12, sm: 4 }}>
-                    <MetricTile title={t('payment_details.fees')} amountMSats={payment.fee_msat || 0} />
+                    <MetricTile
+                      title={t('payment_details.fees')}
+                      amountMSats={feeAmount}
+                      helper={feeHelper}
+                    />
                   </Grid>
                   <Grid size={{ xs: 12, sm: 4 }}>
-                    <Box
-                      sx={[
-                        (theme) => ({
-                          p: 2,
-                          height: 1,
-                          borderRadius: 1,
-                          bgcolor: 'background.neutral',
-                          border: `1px solid ${theme.vars.palette.divider}`,
-                        }),
-                      ]}
-                    >
-                      <Stack spacing={0.75}>
-                        <Typography variant="caption" color="text.secondary">
-                          {t('payment_details.recipient')}
-                        </Typography>
-                        <Typography variant="subtitle1" noWrap>
-                          {ln_address || payment.ledger}
-                        </Typography>
-                        <Typography variant="caption" color="text.disabled">
-                          {t('payment_details.destination')}
-                        </Typography>
-                      </Stack>
-                    </Box>
+                    <MetricTile
+                      title={t('payment_details.total_spent')}
+                      amountMSats={totalAmount}
+                      helper={t('payment_details.amount_plus_fees')}
+                    />
                   </Grid>
                 </Grid>
               </Stack>
@@ -143,18 +157,67 @@ export function PaymentDetails({ payment, isAdmin }: Props) {
                 <Stack spacing={2}>
                   <Stack spacing={0.5}>
                     <Typography variant="overline" color="text.secondary">
-                      {t('payment_details.delivery')}
+                      {t('payment_details.settlement')}
                     </Typography>
-                    <Typography variant="h6">
-                      {payment.status === 'Settled'
-                        ? t('payment_details.delivered')
-                        : t('payment_details.awaiting_settlement')}
-                    </Typography>
+                    <Typography variant="h6">{settlementTitle}</Typography>
                     <Typography variant="body2" color="text.secondary">
-                      {payment.status === 'Failed'
-                        ? payment.error || t('payment_details.failed_description')
-                        : t('payment_details.delivery_description')}
+                      {settlementDescription}
                     </Typography>
+                  </Stack>
+
+                  <Stack spacing={1}>
+                    <Box
+                      sx={[
+                        (theme) => ({
+                          p: 2,
+                          borderRadius: 1,
+                          bgcolor: 'background.paper',
+                          border: `1px solid ${theme.vars.palette.divider}`,
+                        }),
+                      ]}
+                    >
+                      <Stack spacing={0.75}>
+                        <Typography variant="caption" color="text.secondary">
+                          {t('payment_details.recipient')}
+                        </Typography>
+                        <Typography variant="subtitle2" sx={{ wordBreak: 'break-word' }}>
+                          {destination}
+                        </Typography>
+                        <Typography variant="caption" color="text.disabled">
+                          {t('payment_details.destination')}
+                        </Typography>
+                      </Stack>
+                    </Box>
+
+                    <Box
+                      sx={[
+                        (theme) => ({
+                          p: 2,
+                          borderRadius: 1,
+                          bgcolor: 'background.paper',
+                          border: `1px solid ${theme.vars.palette.divider}`,
+                        }),
+                      ]}
+                    >
+                      <Stack
+                        direction="row"
+                        spacing={1}
+                        sx={{ alignItems: 'center', justifyContent: 'space-between' }}
+                      >
+                        <Stack spacing={0.5}>
+                          <Typography variant="caption" color="text.secondary">
+                            {t('payment_details.method')}
+                          </Typography>
+                          <Typography variant="subtitle2">{methodLabel}</Typography>
+                        </Stack>
+                        <Stack spacing={0.5} sx={{ alignItems: 'flex-end' }}>
+                          <Typography variant="caption" color="text.secondary">
+                            {t('payment_details.total_spent')}
+                          </Typography>
+                          <SatsWithIcon amountMSats={totalAmount} variant="subtitle2" />
+                        </Stack>
+                      </Stack>
+                    </Box>
                   </Stack>
 
                   {payment.error && (
@@ -188,7 +251,10 @@ export function PaymentDetails({ payment, isAdmin }: Props) {
 
         <Grid container spacing={3}>
           <Grid size={{ xs: 12, md: 5 }}>
-            <DetailCard title={t('transaction_details.timeline')} icon="solar:sort-by-time-bold-duotone">
+            <DetailCard
+              title={t('transaction_details.timeline')}
+              icon="solar:sort-by-time-bold-duotone"
+            >
               <TransactionTimeline
                 items={[
                   {
@@ -210,10 +276,21 @@ export function PaymentDetails({ payment, isAdmin }: Props) {
           </Grid>
 
           <Grid size={{ xs: 12, md: 7 }}>
-            <DetailCard title={t('transaction_details.payment_context')} icon="solar:document-text-bold-duotone">
+            <DetailCard
+              title={t('transaction_details.payment_context')}
+              icon="solar:document-text-bold-duotone"
+            >
               <DetailRow label={t('transaction_details.description')} value={payment.description} />
               <DetailRow label={t('payment_details.lightning_address')} value={ln_address} />
-              <DetailRow label={t('transaction_details.ledger')} value={payment.ledger} />
+              <DetailRow
+                label={t('payment_details.onchain_address')}
+                value={payment.bitcoin?.address}
+              />
+              <DetailRow
+                label={t('payment_details.internal_address')}
+                value={payment.internal?.ln_address}
+              />
+              <DetailRow label={t('transaction_details.ledger')} value={methodLabel} />
               <DetailRow label={t('transaction_details.currency')} value={payment.currency} />
               <DetailRow
                 label={t('transaction_details.created')}
@@ -227,7 +304,10 @@ export function PaymentDetails({ payment, isAdmin }: Props) {
           </Grid>
 
           <Grid size={{ xs: 12 }}>
-            <DetailCard title={t('transaction_details.technical_details')} icon="solar:code-square-bold-duotone">
+            <DetailCard
+              title={t('transaction_details.technical_details')}
+              icon="solar:code-square-bold-duotone"
+            >
               <DetailRow
                 label={t('transaction_details.transaction_id')}
                 value={payment.id}
@@ -250,6 +330,18 @@ export function PaymentDetails({ payment, isAdmin }: Props) {
                 label={t('payment_details.payment_preimage')}
                 value={payment_preimage}
                 copyValue={payment_preimage ?? undefined}
+                mono
+              />
+              <DetailRow
+                label={t('payment_details.onchain_txid')}
+                value={payment.bitcoin?.txid}
+                copyValue={payment.bitcoin?.txid ?? undefined}
+                mono
+              />
+              <DetailRow
+                label={t('payment_details.onchain_address')}
+                value={payment.bitcoin?.address || payment.internal?.btc_address}
+                copyValue={payment.bitcoin?.address || payment.internal?.btc_address || undefined}
                 mono
               />
               <DetailRow

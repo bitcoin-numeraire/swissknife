@@ -39,6 +39,7 @@ export function ApiKeyTableRow({ row, selected, onSelectRow, onDeleteRow }: Prop
   const confirm = useBoolean();
   const isDeleting = useBoolean();
   const collapsible = useBoolean();
+  const scopeCount = permissions.length + 1;
 
   return (
     <>
@@ -84,15 +85,22 @@ export function ApiKeyTableRow({ row, selected, onSelectRow, onDeleteRow }: Prop
         </TableCell>
 
         <TableCell>
-          <IconButton
-            size="small"
-            color={collapsible.value ? 'inherit' : 'default'}
-            onClick={collapsible.onToggle}
-          >
-            <Iconify
-              icon={collapsible.value ? 'eva:arrow-ios-upward-fill' : 'eva:arrow-ios-downward-fill'}
-            />
-          </IconButton>
+          <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center' }}>
+            <IconButton
+              size="small"
+              color={collapsible.value ? 'inherit' : 'default'}
+              onClick={collapsible.onToggle}
+            >
+              <Iconify
+                icon={
+                  collapsible.value ? 'eva:arrow-ios-upward-fill' : 'eva:arrow-ios-downward-fill'
+                }
+              />
+            </IconButton>
+            <Label variant="soft" color="info">
+              {t('api_key_list.scope_count', { count: scopeCount })}
+            </Label>
+          </Stack>
         </TableCell>
 
         <TableCell>

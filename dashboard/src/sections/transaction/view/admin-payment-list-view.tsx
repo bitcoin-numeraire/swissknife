@@ -20,8 +20,9 @@ import { useFetchFiatPrices } from 'src/actions/mempool-space';
 
 import { Iconify } from 'src/components/iconify';
 import { ErrorView } from 'src/components/error/error-view';
-import { NewPaymentDialog } from 'src/components/transactions';
 import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';
+
+import { SendMoneyDrawer } from 'src/sections/wallet/money-drawers';
 
 import { RoleBasedGuard } from 'src/auth/guard';
 
@@ -94,12 +95,13 @@ export function AdminPaymentListView() {
               tableHead={tableHead(t)}
               tabs={paymentTabs(theme, t)}
               transactionType={TransactionType.PAYMENT}
-              href={paths.admin.payment}
+              href={(id) => paths.activityPayment(id, 'admin')}
               isAdmin
             />
 
-            <NewPaymentDialog
+            <SendMoneyDrawer
               fiatPrices={fiatPrices!}
+              contacts={[]}
               open={newPayment.value}
               onClose={newPayment.onFalse}
               onSuccess={() => mutate(endpointKeys.payments.list)}

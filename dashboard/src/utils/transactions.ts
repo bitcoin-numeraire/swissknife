@@ -7,6 +7,14 @@ import { TransactionType } from 'src/types/transaction';
 
 export const LEDGERS = ['Lightning', 'Internal', 'Onchain'];
 
+export function getLedgerLabel(ledger: string | null | undefined, t: (key: string) => string) {
+  if (ledger === 'Lightning') return t('transaction_details.lightning');
+  if (ledger === 'Internal') return t('transaction_details.internal');
+  if (ledger === 'Onchain') return t('transaction_details.onchain');
+
+  return ledger || '';
+}
+
 export function mergeAndSortTransactions(invoices: Invoice[], payments: Payment[]): ITransaction[] {
   const invoicesWithType = invoices.map((invoice) => ({
     ...invoice,

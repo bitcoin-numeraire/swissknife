@@ -36,7 +36,7 @@ const ICONS = {
   contacts: iconify('solar:users-group-rounded-bold-duotone'),
   apiKeys: iconify('solar:code-bold-duotone'),
   activity: iconify('solar:bill-list-bold-duotone'),
-  identity: iconify('solar:fingerprint-bold-duotone'),
+  identity: iconify('solar:user-rounded-bold-duotone'),
   accounts: iconify('solar:users-group-two-rounded-bold-duotone'),
   observe: iconify('solar:pulse-2-bold-duotone'),
   policy: iconify('solar:shield-keyhole-bold-duotone'),
@@ -48,15 +48,44 @@ const ICONS = {
 
 // Swissknife-specific: nav items carry the API permissions required to view
 // them (consumed by the searchbar permission filtering).
-type NavItemWithPermissions = NavItemDataProps & {
+export type DashboardNavFlag = 'agents' | 'policy' | 'webhooks' | 'l402' | 'node-health';
+
+export type NavItemWithPermissions = NavItemDataProps & {
   permissions?: string[];
   modes?: DeploymentMode[] | 'all';
-  flag?: 'agents' | 'policy' | 'webhooks' | 'l402' | 'node-health';
+  flag?: DashboardNavFlag;
   children?: NavItemWithPermissions[];
 };
 
-type NavGroupWithPermissions = Omit<NavGroupProps, 'items'> & {
+export type NavGroupWithPermissions = Omit<NavGroupProps, 'items'> & {
   items: NavItemWithPermissions[];
+};
+
+export type DashboardModuleGateReason =
+  | {
+      type: 'permissions';
+      missing: string[];
+    }
+  | {
+      type: 'mode';
+      activeMode: DeploymentMode;
+      allowedModes: DeploymentMode[];
+    }
+  | {
+      type: 'flag';
+      flag: DashboardNavFlag;
+    };
+
+export type DashboardModuleDiagnostic = {
+  group: string;
+  title: string;
+  path?: string;
+  permissions: string[];
+  modes: DeploymentMode[] | 'all';
+  flag?: DashboardNavFlag;
+  visible: boolean;
+  reasons: DashboardModuleGateReason[];
+  depth: number;
 };
 
 export const navData: Array<NavGroupWithPermissions> = [
@@ -64,7 +93,7 @@ export const navData: Array<NavGroupWithPermissions> = [
    * User Wallet
    */
   {
-    subheader: 'money',
+    subheader: 'wallet',
     items: [
       {
         title: 'overview',
@@ -116,20 +145,6 @@ export const navData: Array<NavGroupWithPermissions> = [
         modes: ['server', 'self-hosted', 'merchant'],
       },
       {
-        title: 'admin_invoices',
-        path: paths.admin.invoices,
-        icon: ICONS.invoice,
-        permissions: [Permission.READ_TRANSACTION],
-        modes: ['server', 'self-hosted', 'merchant'],
-      },
-      {
-        title: 'admin_payments',
-        path: paths.admin.payments,
-        icon: ICONS.payment,
-        permissions: [Permission.READ_TRANSACTION],
-        modes: ['server', 'self-hosted', 'merchant'],
-      },
-      {
         title: 'admin_lightning_addresses',
         path: paths.admin.lnAddresses,
         icon: ICONS.lightning,
@@ -155,14 +170,14 @@ export const navData: Array<NavGroupWithPermissions> = [
     items: [
       {
         title: 'api_keys',
-        path: paths.admin.apiKeys,
+        path: paths.build.apiKeys,
         icon: ICONS.apiKeys,
         permissions: [Permission.READ_API_KEY],
         modes: ['server', 'desktop', 'agent'],
       },
       {
         title: 'agents',
-        path: paths.admin.apiKeys,
+        path: paths.build.apiKeys,
         icon: ICONS.accounts,
         permissions: [Permission.READ_API_KEY, Permission.READ_WALLET],
         modes: ['server', 'agent'],
@@ -170,7 +185,7 @@ export const navData: Array<NavGroupWithPermissions> = [
       },
       {
         title: 'webhooks',
-        path: paths.admin.apiKeys,
+        path: paths.build.apiKeys,
         icon: ICONS.webhooks,
         permissions: [Permission.READ_API_KEY],
         modes: ['server', 'agent'],
@@ -180,24 +195,80 @@ export const navData: Array<NavGroupWithPermissions> = [
   },
 ];
 
-const dashboardFlags = new Set(
-  (process.env.NEXT_PUBLIC_DASHBOARD_FLAGS ?? '')
-    .split(',')
-    .map((flag) => flag.trim())
-    .filter(Boolean)
-);
+export function getDashboardFlags(flags = process.env.NEXT_PUBLIC_DASHBOARD_FLAGS ?? '') {
+  return new Set(
+    flags
+      .split(',')
+      .map((flag) => flag.trim())
+      .filter(Boolean)
+  );
+}
 
-function canRenderItem(
+const dashboardFlags = getDashboardFlags();
+
+function getGateReasons(
   item: NavItemWithPermissions,
   userPermissions: string[],
-  mode: DeploymentMode
-) {
+  mode: DeploymentMode,
+  enabledFlags: Set<string>
+): DashboardModuleGateReason[] {
   const modes = item.modes ?? 'all';
-  const hasMode = modes === 'all' || modes.includes(mode);
-  const hasFlag = !item.flag || dashboardFlags.has(item.flag);
   const hasPermissions = hasAllPermissions(item.permissions, userPermissions);
+  const missingPermissions = hasPermissions
+    ? []
+    : (item.permissions ?? []).filter((permission) => !userPermissions.includes(permission));
 
-  return hasMode && hasFlag && hasPermissions;
+  return [
+    ...(missingPermissions.length > 0
+      ? [{ type: 'permissions' as const, missing: missingPermissions }]
+      : []),
+    ...(modes !== 'all' && !modes.includes(mode)
+      ? [{ type: 'mode' as const, activeMode: mode, allowedModes: modes }]
+      : []),
+    ...(item.flag && !enabledFlags.has(item.flag)
+      ? [{ type: 'flag' as const, flag: item.flag }]
+      : []),
+  ];
+}
+
+function getModuleDiagnostics(
+  group: NavGroupWithPermissions,
+  userPermissions: string[],
+  mode: DeploymentMode,
+  enabledFlags: Set<string>,
+  items: NavItemWithPermissions[] = group.items,
+  depth = 0
+): DashboardModuleDiagnostic[] {
+  return items.flatMap((item) => {
+    const reasons = getGateReasons(item, userPermissions, mode, enabledFlags);
+    const diagnostic: DashboardModuleDiagnostic = {
+      group: group.subheader ?? 'ungrouped',
+      title: item.title,
+      path: item.path,
+      permissions: item.permissions ?? [],
+      modes: item.modes ?? 'all',
+      flag: item.flag,
+      visible: reasons.length === 0,
+      reasons,
+      depth,
+    };
+
+    return [
+      diagnostic,
+      ...(item.children
+        ? getModuleDiagnostics(group, userPermissions, mode, enabledFlags, item.children, depth + 1)
+        : []),
+    ];
+  });
+}
+
+export function getDashboardModuleDiagnostics(
+  data: Array<NavGroupWithPermissions>,
+  userPermissions: string[] = [],
+  mode: DeploymentMode = CONFIG.deploymentMode,
+  enabledFlags: Set<string> = dashboardFlags
+): DashboardModuleDiagnostic[] {
+  return data.flatMap((group) => getModuleDiagnostics(group, userPermissions, mode, enabledFlags));
 }
 
 function filterItems(
@@ -206,7 +277,7 @@ function filterItems(
   mode: DeploymentMode
 ): NavItemWithPermissions[] {
   return items
-    .filter((item) => canRenderItem(item, userPermissions, mode))
+    .filter((item) => getGateReasons(item, userPermissions, mode, dashboardFlags).length === 0)
     .map((item) => ({
       ...item,
       children: item.children ? filterItems(item.children, userPermissions, mode) : undefined,

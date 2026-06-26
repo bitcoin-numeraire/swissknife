@@ -1,6 +1,6 @@
 import { appTitle } from 'src/utils/format-string';
 
-import { InvoicesView } from 'src/sections/transaction/view/invoices-view';
+import { LegacyActivityRedirect } from 'src/sections/transaction/legacy-activity-redirect';
 
 // ----------------------------------------------------------------------
 
@@ -9,5 +9,5 @@ export const metadata = {
 };
 
 export default function InvoiceListPage() {
-  return <InvoicesView />;
+  return <LegacyActivityRedirect kind="invoice" />;
 }
