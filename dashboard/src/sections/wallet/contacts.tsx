@@ -23,7 +23,8 @@ import { useTranslate } from 'src/locales';
 import { endpointKeys } from 'src/actions/keys';
 
 import { Iconify } from 'src/components/iconify';
-import { ConfirmPaymentDialog } from 'src/components/transactions';
+
+import { SendMoneyDrawer } from './money-drawers';
 
 // ----------------------------------------------------------------------
 
@@ -86,8 +87,9 @@ export function Contacts({ title, fiatPrices, list, ...other }: Props) {
         ))}
       </Stack>
 
-      <ConfirmPaymentDialog
-        input={input}
+      <SendMoneyDrawer
+        contacts={list}
+        initialInput={input}
         open={confirm.value}
         onClose={handleClose}
         onSuccess={() => mutate(endpointKeys.userWallet.get)}

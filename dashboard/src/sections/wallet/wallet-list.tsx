@@ -47,11 +47,12 @@ type Props = {
   data: ListWalletOverviewsResponse;
   tableHead: TableHeadProps[];
   fiatPrices: IFiatPrices;
+  initialSearch?: string;
 };
 
 type TableHeadProps = { id: string; label?: string };
 
-export function WalletList({ data: wallets, fiatPrices, tableHead }: Props) {
+export function WalletList({ data: wallets, fiatPrices, tableHead, initialSearch = '' }: Props) {
   const { t } = useTranslate();
   const table = useTable({ defaultOrderBy: 'created_at', defaultRowsPerPage: 25 });
   const confirm = useBoolean();
@@ -60,7 +61,7 @@ export function WalletList({ data: wallets, fiatPrices, tableHead }: Props) {
   const [tableData, setTableData] = useState(wallets);
 
   const filters = useSetState<IWalletTableFilters>({
-    name: '',
+    name: initialSearch,
     startDate: null,
     endDate: null,
   });

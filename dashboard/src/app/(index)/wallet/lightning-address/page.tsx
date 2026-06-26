@@ -1,6 +1,6 @@
-import { appTitle } from 'src/utils/format-string';
+import { redirect } from 'next/navigation';
 
-import { LnAddressDetailsView } from 'src/sections/ln-address/view';
+import { appTitle } from 'src/utils/format-string';
 
 // ----------------------------------------------------------------------
 
@@ -9,5 +9,5 @@ export const metadata = {
 };
 
 export default function LnAddressDetailsPage() {
-  return <LnAddressDetailsView />;
+  redirect('/identity?tab=lightning');
 }

@@ -29,9 +29,10 @@ import { ConfirmDialog } from 'src/components/custom-dialog';
 
 type Props = {
   lnAddress: LnAddress;
+  onSuccess?: VoidFunction;
 };
 
-export function SettingsLnAddress({ lnAddress }: Props) {
+export function SettingsLnAddress({ lnAddress, onSuccess }: Props) {
   const { t } = useTranslate();
   const confirm = useBoolean();
   const isDeleting = useBoolean();
@@ -65,6 +66,7 @@ export function SettingsLnAddress({ lnAddress }: Props) {
 
       toast.success(t('settings_ln_address.update_success'));
       mutate(endpointKeys.userWallet.lnAddress.get);
+      onSuccess?.();
     } catch (error) {
       handleActionError(error);
     }
@@ -78,6 +80,7 @@ export function SettingsLnAddress({ lnAddress }: Props) {
 
       toast.success(t('settings_ln_address.delete_success'));
       mutate(endpointKeys.userWallet.lnAddress.get);
+      onSuccess?.();
     } catch (error) {
       handleActionError(error);
     } finally {

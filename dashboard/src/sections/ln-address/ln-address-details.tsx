@@ -155,13 +155,15 @@ export function LnAddressDetails({ lnAddress, isAdmin }: Props) {
 
           <DeleteButton id={lnAddress.id} onDelete={onDelete} />
 
-          <Tooltip title={t('edit')}>
-            <Link href={{ pathname: paths.settings.root, query: { tab: 'lnaddress' } }}>
-              <IconButton>
-                <Iconify icon="solar:pen-2-bold-duotone" />
-              </IconButton>
-            </Link>
-          </Tooltip>
+          {!isAdmin && (
+            <Tooltip title={t('edit')}>
+              <Link href={{ pathname: paths.identity, query: { tab: 'lightning' } }}>
+                <IconButton>
+                  <Iconify icon="solar:pen-2-bold-duotone" />
+                </IconButton>
+              </Link>
+            </Tooltip>
+          )}
         </Stack>
       </Stack>
 

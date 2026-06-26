@@ -1,10 +1,10 @@
 'use client';
 
-import { useEffect } from 'react';
 import { useBoolean } from 'minimal-shared/hooks';
+import { useRef, useEffect, useCallback } from 'react';
 
 import { paths } from 'src/routes/paths';
-import { useRouter, useSearchParams } from 'src/routes/hooks';
+import { useRouter, usePathname, useSearchParams } from 'src/routes/hooks';
 
 import { handleActionError } from 'src/utils/errors';
 
@@ -15,6 +15,8 @@ import { SplashScreen } from 'src/components/loading-screen';
 import { ONBOARDING_COMPLETE_STORAGE_KEY } from 'src/components/settings';
 
 import { useAuthContext } from '../hooks';
+import { clearSession } from '../context/jwt';
+import { getSafeReturnTo, isSameRoutePath } from './setup-route-utils';
 
 // ----------------------------------------------------------------------
 
@@ -22,34 +24,41 @@ type GuestGuardProps = {
   children: React.ReactNode;
 };
 
+function resetSetupCache() {
+  localStorage.removeItem(ONBOARDING_COMPLETE_STORAGE_KEY);
+
+  if (CONFIG.auth.method === 'jwt') {
+    clearSession();
+  }
+}
+
 export function GuestGuard({ children }: GuestGuardProps) {
   const router = useRouter();
+  const pathname = usePathname();
+  const lastRedirect = useRef<string | null>(null);
 
   const searchParams = useSearchParams();
-  const returnTo = searchParams.get('returnTo') || CONFIG.auth.redirectPath;
+  const returnTo = getSafeReturnTo(searchParams.get('returnTo'), CONFIG.auth.redirectPath);
 
   const { loading, authenticated } = useAuthContext();
 
   const isChecking = useBoolean(true);
 
+  const replaceOnce = useCallback((path: string) => {
+    if (isSameRoutePath(pathname, path)) {
+      return;
+    }
+
+    if (lastRedirect.current === path) {
+      return;
+    }
+
+    lastRedirect.current = path;
+    router.replace(path);
+  }, [pathname, router]);
+
   useEffect(() => {
     if (loading) {
-      return;
-    }
-
-    if (authenticated) {
-      router.replace(returnTo);
-      return;
-    }
-
-    if (localStorage.getItem(ONBOARDING_COMPLETE_STORAGE_KEY) === 'true') {
-      isChecking.onFalse();
-      return;
-    }
-
-    // Skip setupCheck for non-JWT auth methods (Auth0, Supabase) as they handle auth externally
-    if (CONFIG.auth.method !== 'jwt') {
-      isChecking.onFalse();
       return;
     }
 
@@ -57,22 +66,30 @@ export function GuestGuard({ children }: GuestGuardProps) {
       try {
         const { data } = await setupCheck<true>();
         if (!data.welcome_complete) {
-          router.replace(paths.onboarding.welcome);
+          resetSetupCache();
+          replaceOnce(paths.onboarding.welcome);
           return;
         }
 
-        if (!data.sign_up_complete) {
-          router.replace(paths.auth.signUp);
+        if (CONFIG.auth.method === 'jwt' && !data.sign_up_complete) {
+          resetSetupCache();
+          replaceOnce(paths.auth.signUp);
           return;
         }
 
         localStorage.setItem(ONBOARDING_COMPLETE_STORAGE_KEY, 'true');
+
+        if (authenticated) {
+          replaceOnce(returnTo);
+          return;
+        }
+
         isChecking.onFalse();
       } catch (err) {
         handleActionError(err);
       }
     })();
-  }, [authenticated, loading, isChecking, returnTo, router]);
+  }, [authenticated, loading, isChecking, replaceOnce, returnTo]);
 
   if (isChecking.value) {
     return <SplashScreen />;

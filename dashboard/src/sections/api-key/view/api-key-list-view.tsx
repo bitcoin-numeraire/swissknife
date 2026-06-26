@@ -7,6 +7,7 @@ import { useBoolean } from 'minimal-shared/hooks';
 
 import Stack from '@mui/material/Stack';
 import Button from '@mui/material/Button';
+import Typography from '@mui/material/Typography';
 
 import { shouldFail } from 'src/utils/errors';
 
@@ -15,15 +16,17 @@ import { endpointKeys } from 'src/actions/keys';
 import { Permission } from 'src/lib/swissknife';
 import { useListApiKeys } from 'src/actions/api-key';
 import { DashboardContent } from 'src/layouts/dashboard';
+import { useListWalletApiKeys } from 'src/actions/user-wallet';
 
 import { Iconify } from 'src/components/iconify';
 import { ErrorView } from 'src/components/error/error-view';
-import { CreateApiKeyDialog } from 'src/components/api-key';
+import { CreateApiKeyDrawer } from 'src/components/api-key';
 import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';
 
 import { RoleBasedGuard } from 'src/auth/guard';
 
 import { ApiKeyList } from '../api-key-list';
+import { SettingsApiKey } from '../../settings/settings-api-key';
 
 // ----------------------------------------------------------------------
 
@@ -40,6 +43,51 @@ const tableHead = (t: TFunction) => [
 // ----------------------------------------------------------------------
 
 export function ApiKeyListView() {
+  const { t } = useTranslate();
+
+  const { apiKeys, apiKeysLoading, apiKeysError } = useListWalletApiKeys();
+
+  const errors = [apiKeysError];
+  const data = [apiKeys];
+  const isLoading = [apiKeysLoading];
+
+  const failed = shouldFail(errors, data, isLoading);
+
+  return (
+    <DashboardContent>
+      {failed ? (
+        <ErrorView errors={errors} isLoading={isLoading} data={data} />
+      ) : (
+        <>
+          <CustomBreadcrumbs
+            heading={t('api_keys')}
+            links={[
+              {
+                name: t('build'),
+              },
+              {
+                name: t('api_keys'),
+              },
+            ]}
+            sx={{
+              mb: { xs: 3, md: 5 },
+            }}
+          />
+
+          <Stack spacing={3}>
+            <SettingsApiKey apiKeys={apiKeys!} />
+
+            <RoleBasedGuard permissions={[Permission.READ_API_KEY]}>
+              <InstanceApiKeysPanel />
+            </RoleBasedGuard>
+          </Stack>
+        </>
+      )}
+    </DashboardContent>
+  );
+}
+
+function InstanceApiKeysPanel() {
   const newApiKey = useBoolean();
   const { t } = useTranslate();
 
@@ -52,52 +100,45 @@ export function ApiKeyListView() {
   const failed = shouldFail(errors, data, isLoading);
 
   return (
-    <DashboardContent>
-      <RoleBasedGuard permissions={[Permission.READ_API_KEY]} hasContent>
-        {failed ? (
-          <ErrorView errors={errors} isLoading={isLoading} data={data} />
-        ) : (
-          <>
-            <CustomBreadcrumbs
-              heading={t('api_keys')}
-              links={[
-                {
-                  name: t('admin'),
-                },
-                {
-                  name: t('api_keys'),
-                },
-              ]}
-              action={
-                <Stack direction="row" spacing={1}>
-                  <Button
-                    onClick={newApiKey.onTrue}
-                    variant="contained"
-                    startIcon={<Iconify icon="mingcute:add-line" />}
-                  >
-                    {t('new')}
-                  </Button>
-                </Stack>
-              }
-              sx={{
-                mb: { xs: 3, md: 5 },
-              }}
-            />
+    <>
+      {failed ? (
+        <ErrorView errors={errors} isLoading={isLoading} data={data} />
+      ) : (
+        <Stack spacing={2.5}>
+          <Stack
+            direction={{ xs: 'column', sm: 'row' }}
+            spacing={2}
+            sx={{ alignItems: { sm: 'center' }, justifyContent: 'space-between' }}
+          >
+            <Stack spacing={0.5}>
+              <Typography variant="h5">{t('api_key_list.instance_title')}</Typography>
+              <Typography variant="body2" color="text.secondary">
+                {t('api_key_list.instance_description')}
+              </Typography>
+            </Stack>
 
-            <ApiKeyList data={apiKeys!} tableHead={tableHead(t)} />
+            <Button
+              onClick={newApiKey.onTrue}
+              variant="contained"
+              startIcon={<Iconify icon="mingcute:add-line" />}
+            >
+              {t('new')}
+            </Button>
+          </Stack>
 
-            <CreateApiKeyDialog
-              title={t('settings_api_key.new_dialog_title')}
-              open={newApiKey.value}
-              onClose={newApiKey.onFalse}
-              onSuccess={() => {
-                mutate(endpointKeys.apiKeys.list);
-              }}
-              isAdmin
-            />
-          </>
-        )}
-      </RoleBasedGuard>
-    </DashboardContent>
+          <ApiKeyList data={apiKeys!} tableHead={tableHead(t)} />
+
+          <CreateApiKeyDrawer
+            title={t('settings_api_key.new_dialog_title')}
+            open={newApiKey.value}
+            onClose={newApiKey.onFalse}
+            onSuccess={() => {
+              mutate(endpointKeys.apiKeys.list);
+            }}
+            isAdmin
+          />
+        </Stack>
+      )}
+    </>
   );
 }

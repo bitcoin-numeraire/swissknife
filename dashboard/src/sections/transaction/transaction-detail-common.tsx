@@ -4,10 +4,19 @@ import type { LabelColor } from 'src/components/label';
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
 import Stack from '@mui/material/Stack';
+import Timeline from '@mui/lab/Timeline';
 import Divider from '@mui/material/Divider';
+import TimelineDot from '@mui/lab/TimelineDot';
+import TimelineItem from '@mui/lab/TimelineItem';
 import Typography from '@mui/material/Typography';
+import TimelineContent from '@mui/lab/TimelineContent';
+import TimelineConnector from '@mui/lab/TimelineConnector';
+import TimelineSeparator from '@mui/lab/TimelineSeparator';
 
 import { fDate, fTime } from 'src/utils/format-time';
+import { getLedgerLabel } from 'src/utils/transactions';
+
+import { useTranslate } from 'src/locales';
 
 import { Label } from 'src/components/label';
 import { Iconify } from 'src/components/iconify';
@@ -121,7 +130,11 @@ export function DetailRow({
   mono?: boolean;
 }) {
   return (
-    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ alignItems: { sm: 'center' } }}>
+    <Stack
+      direction={{ xs: 'column', sm: 'row' }}
+      spacing={1.5}
+      sx={{ alignItems: { sm: 'center' } }}
+    >
       <Typography variant="body2" color="text.secondary" sx={{ width: { sm: 180 }, flexShrink: 0 }}>
         {label}
       </Typography>
@@ -146,45 +159,53 @@ export function DetailRow({
 export function TransactionTimeline({
   items,
 }: {
-  items: Array<{ label: string; value?: string | Date | null; state?: 'done' | 'waiting' | 'error' }>;
+  items: Array<{
+    label: string;
+    value?: string | Date | null;
+    state?: 'done' | 'waiting' | 'error';
+  }>;
 }) {
   return (
-    <Stack spacing={1.5}>
-      {items.map((item) => (
-        <Stack key={item.label} direction="row" spacing={1.5} sx={{ alignItems: 'flex-start' }}>
-          <Box
-            sx={{
-              mt: 0.25,
-              width: 10,
-              height: 10,
-              borderRadius: '50%',
-              flexShrink: 0,
-              bgcolor:
-                (item.state === 'done' && 'success.main') ||
-                (item.state === 'error' && 'error.main') ||
-                'warning.main',
-            }}
-          />
-          <Stack sx={{ minWidth: 0 }}>
+    <Timeline
+      sx={{
+        m: 0,
+        p: 0,
+        [`& .MuiTimelineItem-root:before`]: { display: 'none' },
+      }}
+    >
+      {items.map((item, index) => (
+        <TimelineItem key={item.label}>
+          <TimelineSeparator>
+            <TimelineDot
+              color={
+                item.state === 'done' ? 'success' : item.state === 'error' ? 'error' : 'warning'
+              }
+              sx={{ my: 0.5 }}
+            />
+            {index < items.length - 1 && <TimelineConnector />}
+          </TimelineSeparator>
+          <TimelineContent sx={{ pt: 0, pb: 2, px: 2 }}>
             <Typography variant="body2">{item.label}</Typography>
             <Typography variant="caption" color="text.secondary">
               {formatDateTime(item.value)}
             </Typography>
-          </Stack>
-        </Stack>
+          </TimelineContent>
+        </TimelineItem>
       ))}
-    </Stack>
+    </Timeline>
   );
 }
 
 export function StatusBadges({ status, ledger }: { status: string; ledger: string }) {
+  const { t } = useTranslate();
+
   return (
     <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: 'wrap' }}>
       <Label variant="soft" color={statusColor(status)}>
         {status}
       </Label>
       <Label variant="soft" color={ledgerColor(ledger)}>
-        {ledger}
+        {getLedgerLabel(ledger, t)}
       </Label>
     </Stack>
   );

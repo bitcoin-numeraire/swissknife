@@ -141,13 +141,15 @@ function RecentTransactionsRow({ row, isAdmin }: RecentTransactionsRowProps) {
   } = row;
 
   const popover = usePopover();
+  const isPayment = transaction_type === TransactionType.PAYMENT;
+  const amountColor = isPayment ? 'warning.main' : 'success.main';
 
   const rowHref = (): string => {
-    if (transaction_type === TransactionType.PAYMENT) {
-      return isAdmin ? paths.admin.payment(id) : paths.wallet.payment(id);
+    if (isPayment) {
+      return paths.activityPayment(id, isAdmin ? 'admin' : 'wallet');
     }
 
-    return isAdmin ? paths.admin.invoice(id) : paths.wallet.invoice(id);
+    return paths.activityInvoice(id, isAdmin ? 'admin' : 'wallet');
   };
 
   return (
@@ -155,7 +157,7 @@ function RecentTransactionsRow({ row, isAdmin }: RecentTransactionsRowProps) {
       <TableRow hover onClick={() => router.push(rowHref())} sx={{ cursor: 'pointer' }}>
         <TableCell sx={{ display: 'flex', alignItems: 'center' }}>
           <Box sx={{ position: 'relative', mr: 2 }}>
-            {transaction_type === TransactionType.PAYMENT ? (
+            {isPayment ? (
               <Badge
                 overlap="circular"
                 color="error"
@@ -217,7 +219,16 @@ function RecentTransactionsRow({ row, isAdmin }: RecentTransactionsRowProps) {
         )}
 
         <TableCell>
-          <SatsWithIcon amountMSats={(amount_msat || 0) + (fee_msat || 0)} />
+          <Stack direction="row" spacing={0.25} sx={{ alignItems: 'center' }}>
+            <Typography component="span" variant="body2" sx={{ color: amountColor }}>
+              {isPayment ? '-' : '+'}
+            </Typography>
+            <SatsWithIcon
+              component="span"
+              amountMSats={(amount_msat || 0) + (fee_msat || 0)}
+              sx={{ color: amountColor }}
+            />
+          </Stack>
         </TableCell>
 
         <TableCell>

@@ -19,6 +19,8 @@ import InputAdornment from '@mui/material/InputAdornment';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { formHelperTextClasses } from '@mui/material/FormHelperText';
 
+import { getLedgerLabel } from 'src/utils/transactions';
+
 import { useTranslate } from 'src/locales';
 
 import { toast } from 'src/components/snackbar';
@@ -42,6 +44,7 @@ export function TransactionTableToolbar({
 }: Props) {
   const { t } = useTranslate();
   const popover = usePopover();
+  const methodFilterLabel = t('transaction_details.ledger');
 
   const handleFilterName = useCallback(
     (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -98,14 +101,14 @@ export function TransactionTableToolbar({
             width: { xs: 1, md: 180 },
           }}
         >
-          <InputLabel>{t('transaction_details.ledger')}</InputLabel>
+          <InputLabel>{methodFilterLabel}</InputLabel>
 
           <Select
             multiple
             value={filters.state.ledger}
             onChange={handleFilterLedger}
-            input={<OutlinedInput label="Ledger" />}
-            renderValue={(selected) => selected.map((value) => value).join(', ')}
+            input={<OutlinedInput label={methodFilterLabel} />}
+            renderValue={(selected) => selected.map((value) => getLedgerLabel(value, t)).join(', ')}
             inputProps={{ id: 'transaction-filter-ledger-select-label' }}
             sx={{ textTransform: 'capitalize' }}
           >
@@ -116,7 +119,7 @@ export function TransactionTableToolbar({
                   size="small"
                   checked={filters.state.ledger.includes(option)}
                 />
-                {option.toLowerCase()}
+                {getLedgerLabel(option, t)}
               </MenuItem>
             ))}
           </Select>

@@ -36,7 +36,7 @@ const railItems = [
     color: 'warning.main',
   },
   {
-    icon: 'solar:user-id-bold-duotone',
+    icon: 'solar:user-rounded-bold-duotone',
     title: 'auth_panel.identity_title',
     description: 'auth_panel.identity_description',
     color: 'info.main',

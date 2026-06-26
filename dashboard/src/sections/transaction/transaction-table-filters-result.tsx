@@ -6,6 +6,7 @@ import { useCallback } from 'react';
 
 import Chip from '@mui/material/Chip';
 
+import { getLedgerLabel } from 'src/utils/transactions';
 import { fDateRangeShortLabel } from 'src/utils/format-time';
 
 import { useTranslate } from 'src/locales';
@@ -53,7 +54,12 @@ export function TransactionTableFiltersResult({ filters, totalResults, onResetPa
     <FiltersResult totalResults={totalResults} onReset={() => filters.resetState()} sx={sx}>
       <FiltersBlock label={t('transaction_filters.ledger')} isShow={!!filters.state.ledger.length}>
         {filters.state.ledger.map((item) => (
-          <Chip {...chipProps} key={item} label={item} onDelete={() => handleRemoveLedger(item)} />
+          <Chip
+            {...chipProps}
+            key={item}
+            label={getLedgerLabel(item, t)}
+            onDelete={() => handleRemoveLedger(item)}
+          />
         ))}
       </FiltersBlock>
 

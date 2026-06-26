@@ -1,15 +1,17 @@
 'use client';
 
+import type { Key, MouseEvent, HTMLAttributes } from 'react';
 import type { IFiatPrices } from 'src/types/bitcoin';
-import type { Contact, Invoice, Payment, LnAddress, BtcAddress } from 'src/lib/swissknife';
 
 import { bech32, bech32m } from 'bech32';
 import { QRCode } from 'react-qrcode-logo';
 import { decode } from 'light-bolt11-decoder';
-import { useMemo, useState, useCallback } from 'react';
 import { useCopyToClipboard } from 'minimal-shared/hooks';
+import { useMemo, useState, useEffect, useCallback } from 'react';
 
+import Tab from '@mui/material/Tab';
 import Box from '@mui/material/Box';
+import Tabs from '@mui/material/Tabs';
 import Chip from '@mui/material/Chip';
 import Alert from '@mui/material/Alert';
 import Stack from '@mui/material/Stack';
@@ -17,20 +19,45 @@ import Button from '@mui/material/Button';
 import Drawer from '@mui/material/Drawer';
 import Divider from '@mui/material/Divider';
 import MenuItem from '@mui/material/MenuItem';
+import Accordion from '@mui/material/Accordion';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import IconButton from '@mui/material/IconButton';
+import Autocomplete from '@mui/material/Autocomplete';
 import ToggleButton from '@mui/material/ToggleButton';
+import AccordionDetails from '@mui/material/AccordionDetails';
+import AccordionSummary from '@mui/material/AccordionSummary';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 
 import { satsToFiat } from 'src/utils/fiat';
-import { displayLnAddress } from 'src/utils/lnurl';
 import { fCurrency } from 'src/utils/format-number';
 import { handleActionError } from 'src/utils/errors';
 import { truncateText } from 'src/utils/format-string';
+import { fToNow, fDateTime } from 'src/utils/format-time';
+import { encodeLNURL, displayLnAddress } from 'src/utils/lnurl';
+import { composeBip21, parseBitcoinUri } from 'src/utils/bitcoin-request';
 
+import { CONFIG } from 'src/global-config';
 import { useTranslate } from 'src/locales';
-import { walletPay, BtcAddressType, newWalletInvoice, newWalletBtcAddress } from 'src/lib/swissknife';
+import { useListWallets } from 'src/actions/wallet';
+import { useGetUserWallet } from 'src/actions/user-wallet';
+import { useListBtcAddresses } from 'src/actions/btc-addresses';
+import {
+  pay,
+  walletPay,
+  type Wallet,
+  type Contact,
+  type Invoice,
+  type Payment,
+  InvoiceStatus,
+  BtcAddressType,
+  type LnAddress,
+  generateInvoice,
+  type BtcAddress,
+  newWalletInvoice,
+  generateBtcAddress,
+  newWalletBtcAddress,
+} from 'src/lib/swissknife';
 
 import { Label } from 'src/components/label';
 import { toast } from 'src/components/snackbar';
@@ -48,6 +75,9 @@ type SendMoneyDrawerProps = {
   fiatPrices: IFiatPrices;
   onClose: VoidFunction;
   onSuccess?: VoidFunction;
+  isAdmin?: boolean;
+  walletId?: string;
+  initialInput?: string;
 };
 
 type ReceiveMoneyDrawerProps = {
@@ -56,15 +86,42 @@ type ReceiveMoneyDrawerProps = {
   lnAddress?: LnAddress | null;
   onClose: VoidFunction;
   onSuccess?: VoidFunction;
+  isAdmin?: boolean;
+  walletId?: string;
 };
 
-type RecipientKind = 'bolt11' | 'lightning-address' | 'lnurl' | 'bitcoin' | 'unknown';
+type RecipientKind =
+  | 'bip21'
+  | 'bolt11'
+  | 'lightning-address'
+  | 'lnurl'
+  | 'bitcoin'
+  | 'internal'
+  | 'unknown';
 type ReceiveRail = 'any' | 'lightning' | 'onchain';
+type ReceivePayload = 'unified' | 'lightning' | 'onchain' | 'identity';
+type AmountUnit = 'sats' | 'btc' | 'fiat';
+
+type DecodedBolt11 = {
+  description?: string;
+  sections?: Array<{ name: string; value?: string | number }>;
+};
+
+type Bolt11Details = {
+  amountSats: number;
+  description?: string;
+  paymentHash?: string;
+  expirySeconds?: number;
+  expiresAt?: Date;
+};
 
 const drawerSx = {
   width: { xs: 1, sm: 520 },
   maxWidth: 1,
 };
+
+const SATS_PER_BITCOIN = 100_000_000;
+const DEFAULT_BOLT11_EXPIRY_SECONDS = 3600;
 
 const addressTypeOptions = [
   {
@@ -79,22 +136,26 @@ const addressTypeOptions = [
   },
 ] as const;
 
-function satsToBtc(sats: number) {
-  return (sats / 100_000_000).toFixed(8).replace(/0+$/, '').replace(/\.$/, '');
+function stripLightningScheme(input: string) {
+  return input.trim().replace(/^lightning:/i, '');
 }
 
 function extractBitcoinInput(input: string) {
-  const value = input.trim();
-  if (value.toLowerCase().startsWith('bitcoin:')) {
-    return value.slice('bitcoin:'.length).split('?')[0];
-  }
+  return parseBitcoinUri(input).address;
+}
 
-  return value;
+function isBitcoinAddress(value: string) {
+  return isBech32BitcoinAddress(value) || /^[13mn2][a-km-zA-HJ-NP-Z1-9]{25,90}$/.test(value.trim());
 }
 
 function isBech32BitcoinAddress(value: string) {
   const normalized = value.toLowerCase();
-  const decoder = normalized.startsWith('bc1p') || normalized.startsWith('tb1p') ? bech32m : bech32;
+  const decoder =
+    normalized.startsWith('bc1p') ||
+    normalized.startsWith('tb1p') ||
+    normalized.startsWith('bcrt1p')
+      ? bech32m
+      : bech32;
 
   try {
     const decoded = decoder.decode(normalized, 1023);
@@ -107,61 +168,201 @@ function isBech32BitcoinAddress(value: string) {
 function detectRecipientKind(input: string): RecipientKind {
   const value = input.trim();
   const normalized = value.toLowerCase();
+  const bitcoinUri = parseBitcoinUri(value);
+  const paymentRequest = bitcoinUri.lightning ?? value;
 
   if (!value) return 'unknown';
+  if (bitcoinUri.isUri && isBitcoinAddress(bitcoinUri.address)) return 'bip21';
 
   try {
-    decode(value);
+    decode(stripLightningScheme(paymentRequest));
     return 'bolt11';
   } catch {
     // Fall through to non-Bolt11 classifiers.
   }
 
-  if (normalized.startsWith('lnurl')) return 'lnurl';
-  if (isBech32BitcoinAddress(extractBitcoinInput(value))) return 'bitcoin';
-  if (/^[13mn2][a-km-zA-HJ-NP-Z1-9]{25,90}$/.test(value)) return 'bitcoin';
-  if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) return 'lightning-address';
+  if (isBitcoinAddress(bitcoinUri.address)) return 'bitcoin';
+  if (normalized.startsWith('lnurl') || normalized.startsWith('lightning:lnurl')) return 'lnurl';
+  if (normalized.startsWith('http://') || normalized.startsWith('https://')) return 'lnurl';
+  if (isBitcoinAddress(extractBitcoinInput(value))) return 'bitcoin';
+  if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+    return value.split('@')[1].toLowerCase() === CONFIG.domain.toLowerCase()
+      ? 'internal'
+      : 'lightning-address';
+  }
 
   return 'unknown';
 }
 
-function decodedBolt11Amount(input: string) {
-  try {
-    const decoded = decode(input);
-    const amountSection = decoded.sections.find((section: any) => section.name === 'amount');
+function decodedBolt11Details(input: string): Bolt11Details {
+  const bitcoinUri = parseBitcoinUri(input);
+  const paymentRequest = bitcoinUri.lightning ?? input;
 
-    return amountSection ? Number(amountSection.value) / 1000 : 0;
+  try {
+    const decoded = decode(stripLightningScheme(paymentRequest)) as DecodedBolt11;
+    const amountSection = decoded.sections?.find((section) => section.name === 'amount');
+    const descriptionSection = decoded.sections?.find((section) => section.name === 'description');
+    const paymentHashSection = decoded.sections?.find((section) => section.name === 'payment_hash');
+    const expirySection = decoded.sections?.find((section) => section.name === 'expiry');
+    const timestampSection = decoded.sections?.find((section) => section.name === 'timestamp');
+    const timestampSeconds = Number(timestampSection?.value);
+    const expirySeconds = Number(expirySection?.value ?? DEFAULT_BOLT11_EXPIRY_SECONDS);
+    const expiresAt =
+      Number.isFinite(timestampSeconds) && Number.isFinite(expirySeconds)
+        ? new Date((timestampSeconds + expirySeconds) * 1000)
+        : undefined;
+
+    return {
+      amountSats: amountSection?.value ? Number(amountSection.value) / 1000 : 0,
+      description: descriptionSection?.value ? String(descriptionSection.value) : undefined,
+      paymentHash: paymentHashSection?.value ? String(paymentHashSection.value) : undefined,
+      expirySeconds,
+      expiresAt,
+    };
   } catch {
-    return 0;
+    return { amountSats: 0 };
   }
 }
 
-function composeBip21(address?: string, bolt11?: string, amountSats?: number) {
-  if (!address) return bolt11 ?? '';
+function amountValueToSats(
+  value: string,
+  unit: AmountUnit,
+  fiatPrices: IFiatPrices,
+  currency: string
+) {
+  const numericValue = Number(value.replaceAll(',', ''));
+  if (!Number.isFinite(numericValue) || numericValue <= 0) return 0;
 
-  const params = new URLSearchParams();
-  if (amountSats) params.set('amount', satsToBtc(amountSats));
-  if (bolt11) params.set('lightning', bolt11);
+  if (unit === 'btc') return Math.round(numericValue * SATS_PER_BITCOIN);
+  if (unit === 'fiat') {
+    const price = fiatPrices[currency] ?? 0;
+    return price > 0 ? Math.round((numericValue / price) * SATS_PER_BITCOIN) : 0;
+  }
 
-  const suffix = params.toString();
-  return `bitcoin:${address}${suffix ? `?${suffix}` : ''}`;
+  return Math.round(numericValue);
 }
 
-function railLabel(kind: RecipientKind) {
-  if (kind === 'bitcoin') return 'On-chain';
-  if (kind === 'bolt11') return 'Lightning invoice';
-  if (kind === 'lnurl') return 'LNURL';
-  if (kind === 'lightning-address') return 'Lightning address';
-  return 'Paste a payment request';
+function trimFixed(value: number, maximumFractionDigits: number) {
+  return value.toFixed(maximumFractionDigits).replace(/0+$/, '').replace(/\.$/, '');
+}
+
+function satsToAmountValue(
+  sats: number,
+  unit: AmountUnit,
+  fiatPrices: IFiatPrices,
+  currency: string
+) {
+  if (!Number.isFinite(sats) || sats <= 0) return '';
+
+  if (unit === 'btc') return trimFixed(sats / SATS_PER_BITCOIN, 8);
+
+  if (unit === 'fiat') {
+    const price = fiatPrices[currency] ?? 0;
+    if (price <= 0) return '';
+
+    return trimFixed((sats / SATS_PER_BITCOIN) * price, 8);
+  }
+
+  return String(Math.round(sats));
+}
+
+function amountUnitLabel(unit: AmountUnit, currency: string) {
+  if (unit === 'btc') return 'BTC';
+  if (unit === 'fiat') return currency;
+  return 'sats';
+}
+
+function railLabel(kind: RecipientKind, t: (key: string) => string) {
+  if (kind === 'bip21') return t('send_money.request_type_bip21');
+  if (kind === 'bitcoin') return t('send_money.request_type_onchain');
+  if (kind === 'internal') return t('send_money.request_type_internal');
+  if (kind === 'bolt11') return t('send_money.request_type_bolt11');
+  if (kind === 'lnurl') return t('send_money.request_type_lnurl');
+  if (kind === 'lightning-address') return t('send_money.request_type_lightning_address');
+  return t('send_money.request_type_unknown');
+}
+
+function railColor(kind: RecipientKind) {
+  if (kind === 'bitcoin') return 'warning';
+  if (kind === 'internal') return 'success';
+  if (kind === 'unknown') return 'default';
+  return 'info';
 }
 
 function drawerTitle(title: string, onClose: VoidFunction) {
   return (
-    <Stack direction="row" sx={{ alignItems: 'center', justifyContent: 'space-between', px: 3, py: 2 }}>
+    <Stack
+      direction="row"
+      sx={{ alignItems: 'center', justifyContent: 'space-between', px: 3, py: 2 }}
+    >
       <Typography variant="h6">{title}</Typography>
       <IconButton onClick={onClose}>
         <Iconify icon="mingcute:close-line" />
       </IconButton>
+    </Stack>
+  );
+}
+
+function WalletPicker({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  const { t } = useTranslate();
+  const { wallets, walletsError, walletsLoading } = useListWallets();
+
+  const selectedWallet = wallets?.find((wallet) => wallet.id === value) ?? null;
+
+  if (walletsError) {
+    return (
+      <Alert severity="warning" variant="outlined">
+        {t('admin_wallet_picker.unavailable')}
+      </Alert>
+    );
+  }
+
+  return (
+    <Autocomplete
+      options={wallets ?? []}
+      loading={walletsLoading}
+      value={selectedWallet}
+      onChange={(_, wallet: Wallet | null) => onChange(wallet?.id ?? '')}
+      getOptionLabel={(wallet) => wallet.user_id || wallet.id}
+      isOptionEqualToValue={(option, wallet) => option.id === wallet.id}
+      renderOption={(props: HTMLAttributes<HTMLLIElement> & { key: Key }, wallet) => {
+        const { key, ...optionProps } = props;
+
+        return (
+          <li key={key} {...optionProps}>
+            <Stack sx={{ minWidth: 0 }}>
+              <Typography variant="subtitle2" noWrap>
+                {wallet.user_id}
+              </Typography>
+              <Typography variant="caption" color="text.secondary" noWrap>
+                {wallet.id}
+              </Typography>
+            </Stack>
+          </li>
+        );
+      }}
+      renderInput={(params) => (
+        <TextField
+          {...params}
+          label={t('admin_wallet_picker.label')}
+          helperText={t('admin_wallet_picker.helper')}
+        />
+      )}
+    />
+  );
+}
+
+function SendDetailRow({ label, value }: { label: string; value?: string | number | null }) {
+  if (value == null || value === '') return null;
+
+  return (
+    <Stack direction="row" spacing={1.5} sx={{ justifyContent: 'space-between', minWidth: 0 }}>
+      <Typography variant="caption" color="text.secondary">
+        {label}
+      </Typography>
+      <Typography variant="caption" sx={{ maxWidth: '68%', textAlign: 'right' }} noWrap>
+        {value}
+      </Typography>
     </Stack>
   );
 }
@@ -175,49 +376,139 @@ export function SendMoneyDrawer({
   fiatPrices,
   onClose,
   onSuccess,
+  isAdmin = false,
+  walletId,
+  initialInput,
 }: SendMoneyDrawerProps) {
   const { t } = useTranslate();
   const { state } = useSettingsContext();
   const { copy } = useCopyToClipboard();
 
-  const [input, setInput] = useState('');
-  const [amount, setAmount] = useState(0);
+  const [input, setInput] = useState(initialInput ?? '');
+  const [amountValue, setAmountValue] = useState('');
+  const [amountUnit, setAmountUnit] = useState<AmountUnit>('sats');
   const [comment, setComment] = useState('');
   const [payment, setPayment] = useState<Payment>();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [nowMs, setNowMs] = useState(0);
+  const [selectedWalletId, setSelectedWalletId] = useState(walletId ?? '');
 
   const kind = useMemo(() => detectRecipientKind(input), [input]);
-  const bolt11Amount = useMemo(() => decodedBolt11Amount(input), [input]);
-  const amountSats = bolt11Amount || amount;
+  const bolt11Details = useMemo(() => decodedBolt11Details(input), [input]);
+  const bolt11Amount = bolt11Details.amountSats;
+  const bitcoinRequest = useMemo(() => parseBitcoinUri(input), [input]);
+  const hasLightningInvoice = kind === 'bolt11' || Boolean(bitcoinRequest.lightning);
+  const bolt11ExpiresAt = bolt11Details.expiresAt ?? null;
+  const bolt11ExpiryMs = bolt11ExpiresAt ? bolt11ExpiresAt.getTime() : null;
+  const lightningInvoiceExpired =
+    hasLightningInvoice &&
+    typeof bolt11ExpiryMs === 'number' &&
+    Number.isFinite(bolt11ExpiryMs) &&
+    bolt11ExpiryMs <= nowMs;
+  const hasUnsupportedBip21Params =
+    kind === 'bip21' && bitcoinRequest.requiredParams.length > 0;
+  const hasInvalidBip21Amount = kind === 'bip21' && bitcoinRequest.amountInvalid;
+  const expiredInvoiceBlocksSubmit =
+    lightningInvoiceExpired &&
+    (kind === 'bolt11' || (kind === 'bip21' && !bitcoinRequest.amountSats));
+  const manualAmountSats = useMemo(
+    () => amountValueToSats(amountValue, amountUnit, fiatPrices, state.currency),
+    [amountUnit, amountValue, fiatPrices, state.currency]
+  );
+  const embeddedAmountSats = bolt11Amount || bitcoinRequest.amountSats || 0;
+  const amountSats = embeddedAmountSats || manualAmountSats;
+  const activeWalletId = walletId || selectedWalletId;
+  const needsWallet = isAdmin && !activeWalletId;
+  const hasFiatPrice = (fiatPrices[state.currency] ?? 0) > 0;
+  const canSendComment = kind === 'lnurl' || kind === 'lightning-address' || kind === 'internal';
+  const canShowParsedInput = input.trim().length > 0;
+  const canSubmit =
+    kind !== 'unknown' &&
+    input.trim().length > 4 &&
+    amountSats > 0 &&
+    (amountUnit !== 'fiat' || hasFiatPrice || embeddedAmountSats > 0) &&
+    !expiredInvoiceBlocksSubmit &&
+    !hasUnsupportedBip21Params &&
+    !hasInvalidBip21Amount &&
+    !needsWallet;
+  const submitLabel =
+    (kind === 'unknown' && t('send_money.unsupported_request')) ||
+    ((kind === 'bitcoin' || (kind === 'bip21' && !bitcoinRequest.lightning)) &&
+      t('send_money.send_onchain')) ||
+    t('send_money.send');
+  const amountFiatLabel = hasFiatPrice
+    ? fCurrency(satsToFiat(amountSats, fiatPrices, state.currency), {
+        currency: state.currency,
+      })
+    : t('send_money.no_fiat_value');
+  const requestAmountSource =
+    (kind === 'bolt11' && t('send_money.amount_source_bolt11')) ||
+    (kind === 'bip21' && t('send_money.amount_source_bip21')) ||
+    t('send_money.amount_source_request');
+  const bolt11ExpiryLabel = bolt11ExpiresAt
+    ? t(
+        lightningInvoiceExpired ? 'send_money.invoice_expired_at' : 'send_money.invoice_expires_at',
+        {
+          time: fToNow(bolt11ExpiresAt),
+          date: fDateTime(bolt11ExpiresAt),
+        }
+      )
+    : bolt11Details.expirySeconds
+      ? t('send_money.expiry_seconds', {
+          count: bolt11Details.expirySeconds,
+        })
+      : undefined;
+
+  useEffect(() => {
+    setSelectedWalletId(walletId ?? '');
+  }, [walletId]);
+
+  useEffect(() => {
+    if (open && initialInput) {
+      setInput(initialInput);
+    }
+  }, [initialInput, open]);
+
+  useEffect(() => {
+    if (!bolt11ExpiryMs) return undefined;
+
+    setNowMs(Date.now());
+    const interval = window.setInterval(() => setNowMs(Date.now()), 30_000);
+
+    return () => window.clearInterval(interval);
+  }, [bolt11ExpiryMs]);
 
   const requestBody = useMemo(
     () => ({
       input,
-      comment: comment || null,
+      comment: canSendComment && comment ? comment : null,
       amount_msat: amountSats ? amountSats * 1000 : null,
+      ...(isAdmin && { wallet_id: activeWalletId || null }),
     }),
-    [amountSats, comment, input]
+    [activeWalletId, amountSats, canSendComment, comment, input, isAdmin]
   );
 
-  const curlSnippet = `curl -X POST "$SWISSKNIFE_URL/v1/me/payments" \\
+  const curlSnippet = `curl -X POST "$SWISSKNIFE_URL/${isAdmin ? 'v1/payments' : 'v1/me/payments'}" \\
   -H "Authorization: Bearer $SWISSKNIFE_TOKEN" \\
   -H "Content-Type: application/json" \\
   -d '${JSON.stringify(requestBody)}'`;
 
-  const canSubmit = input.trim().length > 4 && (bolt11Amount > 0 || amount > 0);
-
   const handleClose = useCallback(() => {
     setInput('');
-    setAmount(0);
+    setAmountValue('');
+    setAmountUnit('sats');
     setComment('');
     setPayment(undefined);
+    setSelectedWalletId(walletId ?? '');
     onClose();
-  }, [onClose]);
+  }, [onClose, walletId]);
 
   const handlePay = async () => {
     try {
       setIsSubmitting(true);
-      const { data } = await walletPay({ body: requestBody });
+      const { data } = isAdmin
+        ? await pay({ body: requestBody })
+        : await walletPay({ body: requestBody });
       setPayment(data);
       onSuccess?.();
     } catch (error) {
@@ -230,6 +521,19 @@ export function SendMoneyDrawer({
   const handleCopySnippet = () => {
     copy(curlSnippet);
     toast.success(t('copied_to_clipboard'));
+  };
+
+  const handleAmountUnitChange = (_: MouseEvent<HTMLElement>, value: AmountUnit | null) => {
+    if (!value) return;
+    const currentAmountSats = amountValueToSats(
+      amountValue,
+      amountUnit,
+      fiatPrices,
+      state.currency
+    );
+
+    setAmountUnit(value);
+    setAmountValue(satsToAmountValue(currentAmountSats, value, fiatPrices, state.currency));
   };
 
   return (
@@ -272,6 +576,24 @@ export function SendMoneyDrawer({
           </Stack>
         ) : (
           <>
+            {isAdmin &&
+              (walletId ? (
+                <TextField
+                  label={t('admin_wallet_picker.label')}
+                  value={walletId}
+                  slotProps={{ input: { readOnly: true } }}
+                  helperText={t('admin_wallet_picker.fixed')}
+                />
+              ) : (
+                <WalletPicker value={selectedWalletId} onChange={setSelectedWalletId} />
+              ))}
+
+            {needsWallet && (
+              <Alert severity="info" variant="outlined">
+                {t('admin_wallet_picker.required')}
+              </Alert>
+            )}
+
             <Stack spacing={1}>
               <Typography variant="overline" color="text.secondary">
                 {t('send_money.to')}
@@ -299,32 +621,216 @@ export function SendMoneyDrawer({
               </Stack>
             )}
 
-            <Stack direction="row" spacing={2} sx={{ alignItems: 'center' }}>
-              <TextField
-                fullWidth
-                type="number"
-                label={t('send_money.amount_sats')}
-                value={bolt11Amount || amount || ''}
-                disabled={bolt11Amount > 0}
-                onChange={(event) => setAmount(Number(event.target.value))}
-              />
-              <Stack sx={{ minWidth: 120 }}>
-                <Typography variant="caption" color="text.secondary">
-                  {state.currency}
-                </Typography>
-                <Typography variant="subtitle2">
-                  {fCurrency(satsToFiat(amountSats, fiatPrices, state.currency), {
-                    currency: state.currency,
-                  })}
-                </Typography>
-              </Stack>
+            {canShowParsedInput && (
+              <Box
+                sx={[
+                  (theme) => ({
+                    p: 2,
+                    borderRadius: 1,
+                    bgcolor: 'background.neutral',
+                    border: `1px solid ${theme.vars.palette.divider}`,
+                  }),
+                ]}
+              >
+                <Stack spacing={1.25}>
+                  <Stack
+                    direction="row"
+                    sx={{ alignItems: 'center', justifyContent: 'space-between', gap: 1 }}
+                  >
+                    <Stack direction="row" spacing={1} sx={{ alignItems: 'center', minWidth: 0 }}>
+                      <Iconify icon="solar:radar-2-bold-duotone" />
+                      <Typography variant="subtitle2">{t('send_money.detected_input')}</Typography>
+                    </Stack>
+                    <Label color={railColor(kind)}>{railLabel(kind, t)}</Label>
+                  </Stack>
+
+                  {kind === 'bip21' && (
+                    <>
+                      <SendDetailRow
+                        label={t('send_money.destination')}
+                        value={truncateText(bitcoinRequest.address, 34)}
+                      />
+                      <SendDetailRow
+                        label={t('send_money.lightning_fallback')}
+                        value={
+                          bitcoinRequest.lightning
+                            ? t('send_money.included')
+                            : t('send_money.not_included')
+                        }
+                      />
+                      <SendDetailRow
+                        label={t('send_money.request_label')}
+                        value={bitcoinRequest.label}
+                      />
+                      <SendDetailRow
+                        label={t('send_money.request_message')}
+                        value={bitcoinRequest.message}
+                      />
+                      <SendDetailRow
+                        label={t('send_money.optional_parameters')}
+                        value={bitcoinRequest.unknownParams.join(', ')}
+                      />
+                      {bitcoinRequest.amountInvalid && (
+                        <Alert severity="warning" variant="outlined">
+                          {t('send_money.invalid_bip21_amount')}
+                        </Alert>
+                      )}
+                      {bitcoinRequest.requiredParams.length > 0 && (
+                        <Alert severity="warning" variant="outlined">
+                          {t('send_money.unsupported_required_parameters', {
+                            params: bitcoinRequest.requiredParams.join(', '),
+                          })}
+                        </Alert>
+                      )}
+                    </>
+                  )}
+
+                  {hasLightningInvoice && (
+                    <>
+                      {kind === 'bip21' && (
+                        <Typography variant="caption" color="text.secondary">
+                          {t('send_money.lightning_invoice')}
+                        </Typography>
+                      )}
+                      <SendDetailRow
+                        label={t('send_money.invoice_memo')}
+                        value={bolt11Details.description}
+                      />
+                      <SendDetailRow
+                        label={t('send_money.payment_hash')}
+                        value={truncateText(bolt11Details.paymentHash || '', 34)}
+                      />
+                      <SendDetailRow label={t('send_money.expiry')} value={bolt11ExpiryLabel} />
+                    </>
+                  )}
+
+                  {lightningInvoiceExpired && (
+                    <Alert
+                      severity={expiredInvoiceBlocksSubmit ? 'warning' : 'info'}
+                      variant="outlined"
+                    >
+                      {expiredInvoiceBlocksSubmit
+                        ? t('send_money.invoice_expired_note')
+                        : t('send_money.invoice_fallback_expired_note')}
+                    </Alert>
+                  )}
+
+                  {kind === 'bitcoin' && (
+                    <SendDetailRow
+                      label={t('send_money.destination')}
+                      value={truncateText(bitcoinRequest.address, 34)}
+                    />
+                  )}
+
+                  {kind === 'internal' && (
+                    <Alert severity="success" variant="outlined">
+                      {t('send_money.internal_transfer_description')}
+                    </Alert>
+                  )}
+
+                  {kind === 'unknown' && (
+                    <Alert severity="warning" variant="outlined">
+                      {t('send_money.unknown_input_note')}
+                    </Alert>
+                  )}
+                </Stack>
+              </Box>
+            )}
+
+            <Stack spacing={1.5}>
+              {embeddedAmountSats > 0 ? (
+                <Box
+                  sx={[
+                    (theme) => ({
+                      p: 2,
+                      borderRadius: 1,
+                      bgcolor: 'background.neutral',
+                      border: `1px solid ${theme.vars.palette.divider}`,
+                    }),
+                  ]}
+                >
+                  <Stack
+                    direction={{ xs: 'column', sm: 'row' }}
+                    spacing={1.5}
+                    sx={{ justifyContent: 'space-between' }}
+                  >
+                    <Stack spacing={0.5}>
+                      <Typography variant="caption" color="text.secondary">
+                        {t('send_money.amount_from_request')}
+                      </Typography>
+                      <SatsWithIcon amountMSats={embeddedAmountSats * 1000} variant="h6" />
+                      <Typography variant="caption" color="text.secondary">
+                        {requestAmountSource}
+                      </Typography>
+                    </Stack>
+                    <Typography variant="body2" color="text.secondary">
+                      {amountFiatLabel}
+                    </Typography>
+                  </Stack>
+                </Box>
+              ) : (
+                <>
+                  <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
+                    <TextField
+                      fullWidth
+                      type="number"
+                      label={t('send_money.amount')}
+                      value={amountValue}
+                      helperText={t('send_money.amount_helper', {
+                        unit: amountUnitLabel(amountUnit, state.currency),
+                      })}
+                      onChange={(event) => setAmountValue(event.target.value)}
+                    />
+                    <ToggleButtonGroup
+                      exclusive
+                      size="small"
+                      value={amountUnit}
+                      onChange={handleAmountUnitChange}
+                      sx={{ alignSelf: { sm: 'flex-start' } }}
+                    >
+                      <ToggleButton value="sats">{t('send_money.unit_sats')}</ToggleButton>
+                      <ToggleButton value="btc">{t('send_money.unit_btc')}</ToggleButton>
+                      <ToggleButton value="fiat">{state.currency}</ToggleButton>
+                    </ToggleButtonGroup>
+                  </Stack>
+
+                  <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+                    <SatsWithIcon amountMSats={amountSats * 1000} variant="subtitle2" />
+                    <Typography variant="body2" color="text.secondary">
+                      {amountFiatLabel}
+                    </Typography>
+                  </Stack>
+                </>
+              )}
             </Stack>
 
-            <TextField
-              label={t('send_money.note')}
-              value={comment}
-              onChange={(event) => setComment(event.target.value)}
-            />
+            {kind !== 'unknown' &&
+              (canSendComment ? (
+                <TextField
+                  label={t(
+                    kind === 'internal' ? 'send_money.internal_note' : 'send_money.recipient_note'
+                  )}
+                  value={comment}
+                  helperText={t(
+                    kind === 'internal'
+                      ? 'send_money.internal_note_helper'
+                      : 'send_money.recipient_note_helper'
+                  )}
+                  onChange={(event) => setComment(event.target.value)}
+                />
+              ) : (
+                <Alert severity="info" variant="outlined">
+                  {kind === 'bitcoin'
+                    ? t('send_money.onchain_note_unavailable')
+                    : t('send_money.note_not_sent')}
+                </Alert>
+              ))}
+
+            {bitcoinRequest.message && kind !== 'bip21' && (
+              <Alert severity="info" variant="outlined">
+                {t('send_money.bitcoin_uri_message', { message: bitcoinRequest.message })}
+              </Alert>
+            )}
 
             <Box
               sx={[
@@ -337,18 +843,67 @@ export function SendMoneyDrawer({
               ]}
             >
               <Stack spacing={1.5}>
-                <Stack direction="row" sx={{ alignItems: 'center', justifyContent: 'space-between' }}>
+                <Stack
+                  direction="row"
+                  sx={{ alignItems: 'center', justifyContent: 'space-between' }}
+                >
                   <Typography variant="subtitle2">{t('send_money.review')}</Typography>
-                  <Label color={kind === 'bitcoin' ? 'warning' : 'info'}>{railLabel(kind)}</Label>
+                  <Label color={railColor(kind)}>{railLabel(kind, t)}</Label>
                 </Stack>
 
-                {kind === 'bitcoin' ? (
-                  <Alert severity="warning" variant="outlined">
-                    {t('send_money.onchain_fee_note')}
-                  </Alert>
-                ) : (
+                {kind === 'bip21' && (
+                  <>
+                    <Alert severity="info" variant="outlined">
+                      {bitcoinRequest.lightning
+                        ? t('send_money.bip21_with_lightning_note')
+                        : t('send_money.bip21_onchain_note')}
+                    </Alert>
+                    <Alert severity="info" variant="outlined">
+                      {bitcoinRequest.lightning
+                        ? t('send_money.internal_detection_invoice')
+                        : t('send_money.internal_detection_onchain')}
+                    </Alert>
+                  </>
+                )}
+
+                {kind === 'bitcoin' && (
+                  <>
+                    <Alert severity="warning" variant="outlined">
+                      {t('send_money.onchain_fee_note')}
+                    </Alert>
+                    <Alert severity="info" variant="outlined">
+                      {t('send_money.internal_detection_onchain')}
+                    </Alert>
+                    <ToggleButtonGroup exclusive fullWidth size="small" value="auto">
+                      <ToggleButton value="economy" disabled>
+                        {t('send_money.fee_economy')}
+                      </ToggleButton>
+                      <ToggleButton value="auto">{t('send_money.fee_auto')}</ToggleButton>
+                      <ToggleButton value="fast" disabled>
+                        {t('send_money.fee_fast')}
+                      </ToggleButton>
+                    </ToggleButtonGroup>
+                    <Typography variant="caption" color="text.secondary">
+                      {t('send_money.fee_tier_placeholder')}
+                    </Typography>
+                  </>
+                )}
+
+                {(kind === 'bolt11' || kind === 'lnurl' || kind === 'lightning-address') && (
                   <Alert severity="info" variant="outlined">
                     {t('send_money.lightning_fee_note')}
+                  </Alert>
+                )}
+
+                {kind === 'internal' && (
+                  <Alert severity="success" variant="outlined">
+                    {t('send_money.internal_fee_note')}
+                  </Alert>
+                )}
+
+                {kind === 'bolt11' && (
+                  <Alert severity="info" variant="outlined">
+                    {t('send_money.internal_detection_invoice')}
                   </Alert>
                 )}
 
@@ -363,25 +918,46 @@ export function SendMoneyDrawer({
               </Stack>
             </Box>
 
-            <Box
-              component="pre"
-              sx={{
-                m: 0,
-                p: 2,
-                overflow: 'auto',
-                borderRadius: 1,
-                typography: 'caption',
-                bgcolor: 'grey.900',
-                color: 'grey.100',
-              }}
+            <Accordion
+              disableGutters
+              variant="outlined"
+              sx={{ borderRadius: 1, '&:before': { display: 'none' } }}
             >
-              {curlSnippet}
-            </Box>
+              <AccordionSummary expandIcon={<Iconify icon="eva:arrow-ios-downward-fill" />}>
+                <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+                  <Iconify icon="solar:code-square-bold-duotone" />
+                  <Typography variant="subtitle2">{t('send_money.technical')}</Typography>
+                </Stack>
+              </AccordionSummary>
+              <AccordionDetails>
+                <Stack spacing={1.5}>
+                  <Box
+                    component="pre"
+                    sx={{
+                      m: 0,
+                      p: 2,
+                      overflow: 'auto',
+                      borderRadius: 1,
+                      typography: 'caption',
+                      bgcolor: 'grey.900',
+                      color: 'grey.100',
+                    }}
+                  >
+                    {curlSnippet}
+                  </Box>
+                  <Button
+                    color="inherit"
+                    variant="outlined"
+                    onClick={handleCopySnippet}
+                    startIcon={<Iconify icon="solar:copy-bold" />}
+                  >
+                    {t('send_money.copy_curl')}
+                  </Button>
+                </Stack>
+              </AccordionDetails>
+            </Accordion>
 
             <Stack direction="row" spacing={1.5}>
-              <Button color="inherit" variant="outlined" onClick={handleCopySnippet}>
-                {t('send_money.copy_curl')}
-              </Button>
               <Button
                 fullWidth
                 color="inherit"
@@ -390,7 +966,7 @@ export function SendMoneyDrawer({
                 disabled={!canSubmit}
                 onClick={handlePay}
               >
-                {kind === 'bitcoin' ? t('send_money.send_onchain') : t('send_money.send')}
+                {submitLabel}
               </Button>
             </Stack>
           </>
@@ -408,34 +984,135 @@ export function ReceiveMoneyDrawer({
   fiatPrices,
   onClose,
   onSuccess,
+  isAdmin = false,
+  walletId,
 }: ReceiveMoneyDrawerProps) {
   const { t } = useTranslate();
   const { state } = useSettingsContext();
+  const { copy } = useCopyToClipboard();
+  const { wallet } = useGetUserWallet();
 
   const [rail, setRail] = useState<ReceiveRail>('any');
-  const [amount, setAmount] = useState(0);
+  const [activePayload, setActivePayload] = useState<ReceivePayload>('identity');
+  const [amountValue, setAmountValue] = useState('');
+  const [amountUnit, setAmountUnit] = useState<AmountUnit>('sats');
   const [description, setDescription] = useState('');
   const [invoice, setInvoice] = useState<Invoice>();
   const [btcAddress, setBtcAddress] = useState<BtcAddress>();
   const [addressType, setAddressType] = useState<BtcAddressType>(BtcAddressType.P2TR);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [addressError, setAddressError] = useState<string>();
+  const [nowMs, setNowMs] = useState(0);
+  const [selectedWalletId, setSelectedWalletId] = useState(walletId ?? '');
 
+  const amountSats = useMemo(
+    () => amountValueToSats(amountValue, amountUnit, fiatPrices, state.currency),
+    [amountUnit, amountValue, fiatPrices, state.currency]
+  );
+  const activeWalletId = walletId || selectedWalletId;
+  const addressWalletId = isAdmin ? activeWalletId : activeWalletId || wallet?.id;
+  const needsWallet = isAdmin && !activeWalletId;
+  const hasFiatPrice = (fiatPrices[state.currency] ?? 0) > 0;
   const bolt11 = invoice?.ln_invoice?.bolt11;
-  const bip21 = composeBip21(btcAddress?.address, bolt11, amount);
-  const qrValue = rail === 'lightning' ? (bolt11 ?? '') : rail === 'onchain' ? (btcAddress?.address ?? '') : bip21;
+  const invoiceExpiresAt = invoice?.ln_invoice?.expires_at ?? null;
+  const invoiceExpiryMs = invoiceExpiresAt ? new Date(invoiceExpiresAt).getTime() : null;
+  const identityAddress = lnAddress ? displayLnAddress(lnAddress.username) : '';
+  const identityLnurl = lnAddress ? encodeLNURL(lnAddress.username) : '';
+  const onchainRequest = composeBip21(btcAddress?.address, undefined, amountSats);
+  const bip21 = composeBip21(btcAddress?.address, bolt11, amountSats);
+  const { btcAddresses, btcAddressesMutate } = useListBtcAddresses(
+    addressWalletId ? { wallet_id: addressWalletId } : undefined
+  );
+  const unusedAddressForType = useMemo(
+    () =>
+      btcAddresses?.find((address) => address.address_type === addressType && !address.used) ??
+      null,
+    [addressType, btcAddresses]
+  );
+  const selectedPayload = useMemo<ReceivePayload>(() => {
+    if (activePayload === 'unified' && bolt11 && btcAddress) return 'unified';
+    if (activePayload === 'lightning' && bolt11) return 'lightning';
+    if (activePayload === 'onchain' && btcAddress) return 'onchain';
+    if (activePayload === 'identity' && identityAddress) return 'identity';
+    if (bolt11 && btcAddress) return 'unified';
+    if (bolt11) return 'lightning';
+    if (btcAddress) return 'onchain';
+    if (identityAddress) return 'identity';
+    return 'unified';
+  }, [activePayload, bolt11, btcAddress, identityAddress]);
+  const qrValue =
+    (selectedPayload === 'identity' && (identityLnurl || identityAddress)) ||
+    (selectedPayload === 'lightning' && bolt11) ||
+    (selectedPayload === 'onchain' && onchainRequest) ||
+    bip21;
+  const payloadLabel =
+    (selectedPayload === 'unified' && t('receive_money.unified')) ||
+    (selectedPayload === 'identity' && t('receive_money.identity_tab')) ||
+    (selectedPayload === 'lightning' && t('receive_money.lightning')) ||
+    t('receive_money.onchain');
+  const payloadDescription =
+    (selectedPayload === 'unified' && t('receive_money.unified_payload_description')) ||
+    (selectedPayload === 'identity' && t('receive_money.identity_payload_description')) ||
+    (selectedPayload === 'lightning' && t('receive_money.lightning_payload_description')) ||
+    t('receive_money.onchain_payload_description');
+  const payloadCopyLabel =
+    (selectedPayload === 'unified' && t('receive_money.copy_unified')) ||
+    (selectedPayload === 'identity' && t('receive_money.copy_lnurl')) ||
+    (selectedPayload === 'lightning' && t('receive_money.copy_lightning')) ||
+    t('receive_money.copy_onchain');
+  const selectedLightningInvoice = selectedPayload === 'unified' || selectedPayload === 'lightning';
+  const invoiceHasExpired =
+    invoice?.status === InvoiceStatus.EXPIRED ||
+    (typeof invoiceExpiryMs === 'number' &&
+      Number.isFinite(invoiceExpiryMs) &&
+      invoiceExpiryMs <= nowMs);
+  const showInvoiceExpiry = selectedLightningInvoice && Boolean(invoice?.ln_invoice);
+  const primaryPayloadDisabled = showInvoiceExpiry && invoiceHasExpired;
+  const invoiceExpiryRelative = invoiceExpiresAt ? fToNow(invoiceExpiresAt) : '';
+  const invoiceExpiryAbsolute = invoiceExpiresAt ? fDateTime(invoiceExpiresAt) : '';
+  const secondaryPayloads = [
+    ...(selectedPayload === 'unified' && bolt11
+      ? [{ label: t('receive_money.copy_lightning'), value: bolt11, disabled: invoiceHasExpired }]
+      : []),
+    ...(selectedPayload === 'unified' && btcAddress?.address
+      ? [{ label: t('receive_money.copy_onchain_address'), value: btcAddress.address }]
+      : []),
+    ...(selectedPayload === 'identity' && identityAddress
+      ? [{ label: t('receive_money.copy_identity'), value: identityAddress }]
+      : []),
+  ];
+  const requestActionLabel =
+    invoice || btcAddress ? t('receive_money.refresh_request') : t('receive_money.generate');
+
+  useEffect(() => {
+    setSelectedWalletId(walletId ?? '');
+  }, [walletId]);
+
+  useEffect(() => {
+    if (!invoiceExpiresAt) return undefined;
+
+    setNowMs(Date.now());
+    const interval = window.setInterval(() => setNowMs(Date.now()), 30_000);
+
+    return () => window.clearInterval(interval);
+  }, [invoiceExpiresAt]);
 
   const handleClose = useCallback(() => {
     setRail('any');
-    setAmount(0);
+    setActivePayload(lnAddress ? 'identity' : 'unified');
+    setAmountValue('');
+    setAmountUnit('sats');
     setDescription('');
     setInvoice(undefined);
     setBtcAddress(undefined);
     setAddressError(undefined);
+    setSelectedWalletId(walletId ?? '');
     onClose();
-  }, [onClose]);
+  }, [lnAddress, onClose, walletId]);
 
   const handleGenerate = async () => {
+    if (needsWallet) return;
+
     try {
       setIsSubmitting(true);
       setAddressError(undefined);
@@ -444,37 +1121,115 @@ export function ReceiveMoneyDrawer({
 
       const shouldGenerateInvoice = rail !== 'onchain';
       const shouldGenerateAddress = rail !== 'lightning';
+      let nextInvoice: Invoice | undefined;
+      let nextBtcAddress: BtcAddress | undefined;
 
       if (shouldGenerateInvoice) {
-        const invoiceResult = await newWalletInvoice({
-          body: {
-            description,
-            amount_msat: amount * 1000,
-          },
-        });
+        const invoiceBody = {
+          description,
+          amount_msat: amountSats * 1000,
+          ...(isAdmin && { wallet_id: activeWalletId }),
+        };
+        const invoiceResult = isAdmin
+          ? await generateInvoice({ body: invoiceBody })
+          : await newWalletInvoice({ body: invoiceBody });
 
-        setInvoice(invoiceResult.data);
+        nextInvoice = invoiceResult.data;
+        setInvoice(nextInvoice);
       }
 
       if (shouldGenerateAddress) {
-        const addressResult = await newWalletBtcAddress({
-          body: { type: addressType },
-        }).catch((error) => {
-          setAddressError(error?.message || t('receive_money.address_unavailable'));
-          return null;
-        });
+        if (unusedAddressForType) {
+          nextBtcAddress = unusedAddressForType;
+          setBtcAddress(nextBtcAddress);
+        } else {
+          const addressBody = {
+            type: addressType,
+            ...(isAdmin && { wallet_id: activeWalletId }),
+          };
 
-        if (addressResult?.data) {
-          setBtcAddress(addressResult.data);
+          const addressResult = await (
+            isAdmin
+              ? generateBtcAddress({ body: addressBody })
+              : newWalletBtcAddress({ body: addressBody })
+          ).catch((error) => {
+            setAddressError(error?.message || t('receive_money.address_unavailable'));
+            return null;
+          });
+
+          if (addressResult?.data) {
+            nextBtcAddress = addressResult.data;
+            setBtcAddress(nextBtcAddress);
+            btcAddressesMutate();
+          }
         }
       }
 
+      if (nextInvoice && nextBtcAddress) {
+        setActivePayload('unified');
+      } else if (nextInvoice) {
+        setActivePayload('lightning');
+      } else {
+        setActivePayload('onchain');
+      }
       onSuccess?.();
     } catch (error) {
       handleActionError(error);
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleAmountUnitChange = (_: MouseEvent<HTMLElement>, value: AmountUnit | null) => {
+    if (!value) return;
+    const currentAmountSats = amountValueToSats(
+      amountValue,
+      amountUnit,
+      fiatPrices,
+      state.currency
+    );
+
+    setAmountUnit(value);
+    setAmountValue(satsToAmountValue(currentAmountSats, value, fiatPrices, state.currency));
+  };
+
+  const handleAddressTypeChange = (nextAddressType: BtcAddressType) => {
+    setAddressType(nextAddressType);
+
+    const nextUnusedAddress =
+      btcAddresses?.find(
+        (address) => address.address_type === nextAddressType && !address.used
+      ) ?? null;
+
+    if (nextUnusedAddress) {
+      setBtcAddress(nextUnusedAddress);
+      setActivePayload(bolt11 ? 'unified' : 'onchain');
+      return;
+    }
+
+    setBtcAddress(undefined);
+    setActivePayload(bolt11 ? 'lightning' : lnAddress ? 'identity' : 'unified');
+  };
+
+  const handleSharePayload = async () => {
+    if (!qrValue) return;
+
+    if (typeof navigator !== 'undefined' && navigator.share) {
+      try {
+        await navigator.share({ text: qrValue });
+        return;
+      } catch {
+        // Fall back to copying when native share is unavailable or cancelled.
+      }
+    }
+
+    copy(qrValue);
+    toast.success(t('copied_to_clipboard'));
+  };
+
+  const handleCopyPayload = (value: string) => {
+    copy(value);
+    toast.success(t('copied_to_clipboard'));
   };
 
   return (
@@ -488,34 +1243,74 @@ export function ReceiveMoneyDrawer({
       <Divider />
 
       <Stack spacing={3} sx={{ p: 3 }}>
-        <ToggleButtonGroup
-          exclusive
-          fullWidth
-          size="small"
-          value={rail}
-          onChange={(_, value) => value && setRail(value)}
-        >
-          <ToggleButton value="any">{t('receive_money.any')}</ToggleButton>
-          <ToggleButton value="lightning">Lightning</ToggleButton>
-          <ToggleButton value="onchain">On-chain</ToggleButton>
-        </ToggleButtonGroup>
+        {isAdmin &&
+          (walletId ? (
+            <TextField
+              label={t('admin_wallet_picker.label')}
+              value={walletId}
+              slotProps={{ input: { readOnly: true } }}
+              helperText={t('admin_wallet_picker.fixed')}
+            />
+          ) : (
+            <WalletPicker value={selectedWalletId} onChange={setSelectedWalletId} />
+          ))}
 
-        <Stack direction="row" spacing={2} sx={{ alignItems: 'center' }}>
-          <TextField
-            fullWidth
-            type="number"
-            label={t('receive_money.amount_sats')}
-            value={amount || ''}
-            onChange={(event) => setAmount(Number(event.target.value))}
-          />
-          <Stack sx={{ minWidth: 120 }}>
-            <Typography variant="caption" color="text.secondary">
-              {state.currency}
-            </Typography>
-            <Typography variant="subtitle2">
-              {fCurrency(satsToFiat(amount, fiatPrices, state.currency), {
-                currency: state.currency,
+        {needsWallet && (
+          <Alert severity="info" variant="outlined">
+            {t('admin_wallet_picker.required')}
+          </Alert>
+        )}
+
+        <TextField
+          select
+          label={t('receive_money.request_format')}
+          value={rail}
+          helperText={t('receive_money.request_format_helper')}
+          onChange={(event) => {
+            setRail(event.target.value as ReceiveRail);
+            setInvoice(undefined);
+            setBtcAddress(undefined);
+            setActivePayload(lnAddress ? 'identity' : 'unified');
+          }}
+        >
+          <MenuItem value="any">{t('receive_money.any')}</MenuItem>
+          <MenuItem value="lightning">{t('receive_money.lightning')}</MenuItem>
+          <MenuItem value="onchain">{t('receive_money.onchain')}</MenuItem>
+        </TextField>
+
+        <Stack spacing={1.5}>
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
+            <TextField
+              fullWidth
+              type="number"
+              label={t('receive_money.amount')}
+              value={amountValue}
+              helperText={t('receive_money.amount_helper', {
+                unit: amountUnitLabel(amountUnit, state.currency),
               })}
+              onChange={(event) => setAmountValue(event.target.value)}
+            />
+            <ToggleButtonGroup
+              exclusive
+              size="small"
+              value={amountUnit}
+              onChange={handleAmountUnitChange}
+              sx={{ alignSelf: { sm: 'flex-start' } }}
+            >
+              <ToggleButton value="sats">{t('send_money.unit_sats')}</ToggleButton>
+              <ToggleButton value="btc">{t('send_money.unit_btc')}</ToggleButton>
+              <ToggleButton value="fiat">{state.currency}</ToggleButton>
+            </ToggleButtonGroup>
+          </Stack>
+
+          <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+            <SatsWithIcon amountMSats={amountSats * 1000} variant="subtitle2" />
+            <Typography variant="body2" color="text.secondary">
+              {hasFiatPrice
+                ? fCurrency(satsToFiat(amountSats, fiatPrices, state.currency), {
+                    currency: state.currency,
+                  })
+                : t('send_money.no_fiat_value')}
             </Typography>
           </Stack>
         </Stack>
@@ -532,7 +1327,7 @@ export function ReceiveMoneyDrawer({
             size="small"
             label={t('receive_money.address_type')}
             value={addressType}
-            onChange={(event) => setAddressType(event.target.value as BtcAddressType)}
+            onChange={(event) => handleAddressTypeChange(event.target.value as BtcAddressType)}
             helperText={t(
               addressTypeOptions.find((option) => option.value === addressType)?.helperKey ??
                 'bitcoin_address_type.taproot_helper'
@@ -550,15 +1345,34 @@ export function ReceiveMoneyDrawer({
           color="inherit"
           variant="contained"
           loading={isSubmitting}
+          disabled={needsWallet}
           onClick={handleGenerate}
         >
-          {invoice ? t('receive_money.regenerate') : t('receive_money.generate')}
+          {requestActionLabel}
         </Button>
+
+        {rail !== 'lightning' && unusedAddressForType && !btcAddress && (
+          <Alert severity="info" variant="outlined">
+            {t('receive_money.unused_address_available')}
+          </Alert>
+        )}
 
         {addressError && <Alert severity="warning">{addressError}</Alert>}
 
         {qrValue ? (
           <Stack spacing={2}>
+            <Tabs
+              value={selectedPayload}
+              onChange={(_, value) => setActivePayload(value)}
+              variant="scrollable"
+              sx={{ borderBottom: (theme) => `1px solid ${theme.vars.palette.divider}` }}
+            >
+              {bolt11 && btcAddress && <Tab value="unified" label={t('receive_money.unified')} />}
+              {bolt11 && <Tab value="lightning" label={t('receive_money.lightning')} />}
+              {btcAddress && <Tab value="onchain" label={t('receive_money.onchain')} />}
+              {identityAddress && <Tab value="identity" label={t('receive_money.identity_tab')} />}
+            </Tabs>
+
             <Box
               sx={[
                 (theme) => ({
@@ -582,30 +1396,107 @@ export function ReceiveMoneyDrawer({
             </Box>
 
             <Stack spacing={1}>
-              {rail === 'any' && (
-                <Label color={btcAddress && bolt11 ? 'success' : 'warning'}>
-                  {btcAddress && bolt11 ? t('receive_money.bip21_ready') : t('receive_money.partial_qr')}
+              <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+                <Label color={selectedPayload === 'unified' ? 'success' : 'info'}>
+                  {payloadLabel}
                 </Label>
-              )}
+                <Typography variant="caption" color="text.secondary">
+                  {payloadDescription}
+                </Typography>
+              </Stack>
 
-              {bolt11 && (
-                <Stack direction="row" sx={{ alignItems: 'center', gap: 1 }}>
-                  <Typography variant="body2" sx={{ flex: 1 }} noWrap>
-                    {bolt11}
+              <Stack direction="row" sx={{ alignItems: 'center', gap: 1 }}>
+                <Typography variant="body2" sx={{ flex: 1 }} noWrap>
+                  {qrValue}
+                </Typography>
+              </Stack>
+
+              <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: 'wrap' }}>
+                <Button
+                  color="inherit"
+                  variant="outlined"
+                  size="small"
+                  disabled={primaryPayloadDisabled}
+                  onClick={() => handleCopyPayload(qrValue)}
+                  startIcon={<Iconify icon="solar:copy-bold" />}
+                >
+                  {payloadCopyLabel}
+                </Button>
+                <Button
+                  color="inherit"
+                  variant="outlined"
+                  size="small"
+                  disabled={primaryPayloadDisabled}
+                  onClick={handleSharePayload}
+                  startIcon={<Iconify icon="solar:share-bold" />}
+                >
+                  {t('share')}
+                </Button>
+              </Stack>
+
+              {secondaryPayloads.length > 0 && (
+                <Stack spacing={1}>
+                  <Typography variant="caption" color="text.secondary">
+                    {t('receive_money.separate_copy_options')}
                   </Typography>
-                  <CopyButton value={bolt11} title={t('copy')} />
+                  <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: 'wrap' }}>
+                    {secondaryPayloads.map((payload) => (
+                      <Button
+                        key={payload.label}
+                        color="inherit"
+                        variant="soft"
+                        size="small"
+                        disabled={payload.disabled}
+                        onClick={() => handleCopyPayload(payload.value)}
+                        startIcon={<Iconify icon="solar:copy-bold" />}
+                      >
+                        {payload.label}
+                      </Button>
+                    ))}
+                  </Stack>
                 </Stack>
               )}
 
-              {btcAddress && (
-                <Stack direction="row" sx={{ alignItems: 'center', gap: 1 }}>
-                  <Typography variant="body2" sx={{ flex: 1 }} noWrap>
-                    {btcAddress.address}
-                  </Typography>
+              {showInvoiceExpiry && (
+                <Alert severity={invoiceHasExpired ? 'warning' : 'info'} variant="outlined">
+                  <Stack spacing={0.5}>
+                    <Typography variant="subtitle2">
+                      {invoiceHasExpired
+                        ? t('receive_money.invoice_expired')
+                        : t('receive_money.invoice_expires')}
+                    </Typography>
+                    <Typography variant="body2">
+                      {invoiceHasExpired
+                        ? t('receive_money.invoice_expired_description')
+                        : t('receive_money.invoice_expires_description', {
+                            time: invoiceExpiryRelative,
+                            date: invoiceExpiryAbsolute,
+                          })}
+                    </Typography>
+                  </Stack>
+                </Alert>
+              )}
+
+              {selectedPayload === 'identity' && (
+                <Alert severity="info" variant="outlined">
+                  {t('receive_money.identity_note')}
+                </Alert>
+              )}
+
+              {selectedPayload === 'unified' && btcAddress && bolt11 && (
+                <Alert severity="success" variant="outlined">
+                  {t('receive_money.unified_note')}
+                </Alert>
+              )}
+
+              {(selectedPayload === 'onchain' || selectedPayload === 'unified') && btcAddress && (
+                <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
                   <Label color={btcAddress.used ? 'warning' : 'success'}>
-                    {btcAddress.used ? t('receive_money.used') : t('receive_money.fresh')}
+                    {btcAddress.used ? t('receive_money.used') : t('receive_money.unused')}
                   </Label>
-                  <CopyButton value={btcAddress.address} title={t('copy')} />
+                  <Typography variant="caption" color="text.secondary">
+                    {t('receive_money.address_reuse_note')}
+                  </Typography>
                 </Stack>
               )}
             </Stack>
@@ -635,10 +1526,30 @@ export function ReceiveMoneyDrawer({
           </Box>
         )}
 
-        {lnAddress && (
-          <Alert severity="info" variant="outlined">
-            {t('receive_money.identity')} {displayLnAddress(lnAddress.username)}
-          </Alert>
+        {lnAddress && selectedPayload !== 'identity' && (
+          <Box
+            sx={[
+              (theme) => ({
+                p: 2,
+                borderRadius: 1,
+                bgcolor: 'background.neutral',
+                border: `1px solid ${theme.vars.palette.divider}`,
+              }),
+            ]}
+          >
+            <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+              <Iconify icon="solar:bolt-bold-duotone" sx={{ color: 'warning.main' }} />
+              <Stack sx={{ flex: 1, minWidth: 0 }}>
+                <Typography variant="caption" color="text.secondary">
+                  {t('receive_money.identity')}
+                </Typography>
+                <Typography variant="subtitle2" noWrap>
+                  {displayLnAddress(lnAddress.username)}
+                </Typography>
+              </Stack>
+              <CopyButton value={displayLnAddress(lnAddress.username)} title={t('copy')} />
+            </Stack>
+          </Box>
         )}
       </Stack>
     </Drawer>

@@ -26,7 +26,9 @@ import {
 import { Iconify } from 'src/components/iconify';
 import { ErrorView } from 'src/components/error/error-view';
 import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';
-import { NewPaymentDialog, CleanTransactionsButton } from 'src/components/transactions';
+import { CleanTransactionsButton } from 'src/components/transactions';
+
+import { SendMoneyDrawer } from 'src/sections/wallet/money-drawers';
 
 import { TransactionType } from 'src/types/transaction';
 
@@ -157,10 +159,10 @@ export function PaymentListView() {
             tableHead={tableHead(t)}
             tabs={paymentTabs(theme, t)}
             transactionType={TransactionType.PAYMENT}
-            href={paths.wallet.payment}
+            href={paths.activityPayment}
           />
 
-          <NewPaymentDialog
+          <SendMoneyDrawer
             balance={userBalance!.available_msat}
             fiatPrices={fiatPrices!}
             open={newPayment.value}

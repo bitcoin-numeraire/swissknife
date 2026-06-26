@@ -2,12 +2,44 @@ const ROOTS = {
   AUTH: '/auth',
 };
 
+type ActivityScope = 'wallet' | 'admin';
+type ActivityTransactionKind = 'payment' | 'invoice';
+
+function activityHref(kind?: ActivityTransactionKind, id?: string, scope: ActivityScope = 'wallet') {
+  const params = new URLSearchParams();
+
+  if (kind) {
+    params.set('type', kind);
+  }
+
+  if (id) {
+    params.set('id', id);
+  }
+
+  if (scope === 'admin') {
+    params.set('scope', scope);
+  }
+
+  const query = params.toString();
+
+  return query ? `/activity?${query}` : '/activity';
+}
+
 export const paths = {
   overview: '/',
   activity: '/activity',
+  activityList: (kind?: ActivityTransactionKind, scope: ActivityScope = 'wallet') =>
+    activityHref(kind, undefined, scope),
+  activityPayment: (id: string, scope: ActivityScope = 'wallet') =>
+    activityHref('payment', id, scope),
+  activityInvoice: (id: string, scope: ActivityScope = 'wallet') =>
+    activityHref('invoice', id, scope),
   identity: '/identity',
   accounts: '/accounts',
   nodeHealth: '/node-health',
+  build: {
+    apiKeys: '/build/api-keys',
+  },
   onboarding: {
     welcome: '/welcome',
   },

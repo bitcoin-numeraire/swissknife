@@ -1,44 +1,44 @@
 {
   "preview": {
     "eyebrow": "Première exécution SwissKnife",
-    "title": "Commence avec un wallet opérable",
-    "content": "Prévisualise la surface monétaire avant de créer le mot de passe : self-custody, Lightning, dépôts on-chain, identité réutilisable et contrôle du nœud vivent dans le même espace.",
+    "title": "Configure ton serveur wallet Bitcoin",
+    "content": "Avant de créer le premier mot de passe admin, vérifie ce que cette instance SwissKnife contrôlera : accès wallet, paiements Lightning, dépôts on-chain, identité réutilisable et connexion au nœud.",
     "wallet_title": "Wallet de départ",
-    "wallet_caption": "Prêt pour un financement regtest",
+    "wallet_caption": "Prêt après la configuration admin",
     "available": "Disponible maintenant",
-    "empty_state": "Finance après sauvegarde, puis reçois ou envoie depuis le dashboard.",
+    "empty_state": "Sauvegarde le nœud et le matériel wallet avant d'envoyer des fonds importants.",
     "lightning": "Lightning",
     "onchain": "On-chain",
     "identity": "Identité",
     "node": "Nœud"
   },
   "welcome": {
-    "title": "Une seule surface wallet, plusieurs rails",
-    "content": "SwissKnife traite les factures Lightning, les demandes on-chain et les adresses lisibles comme un même flux monétaire plutôt que des écrans admin séparés.",
-    "point_one": "Reçois avec Lightning, une adresse Bitcoin fraîche ou une adresse Lightning réutilisable.",
-    "point_two": "Envoie depuis une saisie unique qui pourra gérer LNURL, BIP21 et les adresses.",
-    "point_three": "Garde l'interface centrée sur les montants, le statut et la prochaine action."
+    "title": "Un seul endroit pour envoyer et recevoir",
+    "content": "SwissKnife donne au premier admin un dashboard pour Lightning, Bitcoin on-chain et les identités de réception réutilisables sans les séparer en plusieurs apps.",
+    "point_one": "Reçois avec des factures Lightning, des adresses Bitcoin ou une adresse Lightning réutilisable.",
+    "point_two": "Envoie en collant une facture, LNURL, demande BIP21, adresse ou destinataire interne.",
+    "point_three": "Suis les montants, statuts et prochaines actions depuis le dashboard wallet."
   },
   "custody": {
-    "title": "La self-custody reste visible",
-    "content": "Le dashboard doit clarifier ce que le mot de passe déverrouille, ce qui doit être sauvegardé et pourquoi le serveur ne peut pas récupérer le matériel privé.",
-    "point_one": "Crée un mot de passe local avant l'ouverture du wallet.",
+    "title": "Self-custody veut dire responsabilité",
+    "content": "Ce serveur ne peut pas récupérer les fonds ou secrets perdus. La configuration sert à décider qui administre le wallet et où vivent les sauvegardes.",
+    "point_one": "Crée le premier mot de passe admin local avant l'ouverture du wallet.",
     "point_two": "Sauvegarde le nœud et le matériel de récupération avant les dépôts importants.",
-    "point_three": "Affiche les rappels de sécurité au moment utile."
+    "point_three": "Garde le mot de passe admin et le matériel de récupération séparés."
   },
   "accessibility": {
-    "title": "Apporte ton nœud, ou héberge-le proprement",
-    "content": "Umbrel est une bonne cible self-hosted, mais l'expérience doit aussi convenir à Start9, LND brut, CLN et aux déploiements cloud managés.",
-    "point_one": "Traite le self-hosted comme un modèle de déploiement, pas comme un mode wallet séparé.",
-    "point_two": "Garde la santé du nœud, la liquidité et les peers près des actions de paiement.",
-    "point_three": "Utilise des flux adaptés au regtest pour tester les premiers dépôts sans risque."
+    "title": "Pour les installations maison, desktop et serveur",
+    "content": "Cette première exécution sert aux boxes self-hosted, aux lancements desktop et aux déploiements serveur managés. Le dashboard s'adapte après la configuration de l'authentification.",
+    "point_one": "Utilise la configuration JWT locale pour les installations self-hosted ou desktop avec un seul admin.",
+    "point_two": "Utilise une authentification externe lorsqu'un serveur gère les comptes et rôles ailleurs.",
+    "point_three": "Utilise regtest ou des fonds de test pour valider un nouveau déploiement."
   },
   "multi_user": {
-    "title": "Des comptes sans opérations tableur",
-    "content": "Les comptes, wallets et identités réutilisables doivent ressembler à un petit système d'exploitation pour équipes, agents et services.",
-    "point_one": "Sépare le répertoire des comptes de l'administration des wallets.",
-    "point_two": "Rends la propriété des adresses Lightning visible sans exposer les UUID bruts.",
-    "point_three": "Prépare l'UI pour les rôles, agents, clés API et wallets de service."
+    "title": "Commence avec un admin, puis ajoute des comptes",
+    "content": "Les installations JWT créent aujourd'hui un seul admin initial. Les déploiements serveur avec authentification externe peuvent mapper l'accès dashboard aux utilisateurs, rôles et scopes du fournisseur.",
+    "point_one": "Gère les wallets et les identités réutilisables depuis le dashboard admin.",
+    "point_two": "Crée des clés API pour les services qui ont besoin d'un accès wallet.",
+    "point_three": "Ajoute comptes, rôles et agents selon ton modèle de déploiement."
   },
   "step": "Étape {{current}} sur {{total}}",
   "back": "Retour",

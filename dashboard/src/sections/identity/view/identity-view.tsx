@@ -1,8 +1,11 @@
 'use client';
 
+import type { ReactNode } from 'react';
+
 import { mutate } from 'swr';
 import { useMemo, useState } from 'react';
 import { QRCode } from 'react-qrcode-logo';
+import { useBoolean, useCopyToClipboard } from 'minimal-shared/hooks';
 
 import Tab from '@mui/material/Tab';
 import Box from '@mui/material/Box';
@@ -12,16 +15,18 @@ import Grid from '@mui/material/Grid';
 import Alert from '@mui/material/Alert';
 import Stack from '@mui/material/Stack';
 import Button from '@mui/material/Button';
+import Drawer from '@mui/material/Drawer';
 import Divider from '@mui/material/Divider';
 import MenuItem from '@mui/material/MenuItem';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
+import IconButton from '@mui/material/IconButton';
 
-import { paths } from 'src/routes/paths';
+import { useSearchParams } from 'src/routes/hooks';
 
 import { npub } from 'src/utils/nostr';
 import { fDateTime } from 'src/utils/format-time';
-import { displayLnAddress } from 'src/utils/lnurl';
+import { encodeLNURL, displayLnAddress } from 'src/utils/lnurl';
 import { shouldFail, handleActionError } from 'src/utils/errors';
 
 import { useTranslate } from 'src/locales';
@@ -32,11 +37,15 @@ import { useListBtcAddresses } from 'src/actions/btc-addresses';
 import { Permission, BtcAddressType, newWalletBtcAddress } from 'src/lib/swissknife';
 
 import { Label } from 'src/components/label';
+import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
 import { CopyButton } from 'src/components/copy';
 import { EmptyContent } from 'src/components/empty-content';
 import { ErrorView } from 'src/components/error/error-view';
+import { RegisterLnAddressForm } from 'src/components/ln-address';
 import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';
+
+import { SettingsLnAddress } from 'src/sections/settings/settings-ln-address';
 
 import { RoleBasedGuard } from 'src/auth/guard';
 
@@ -57,13 +66,27 @@ const addressTypeOptions = [
   },
 ] as const;
 
+const drawerSx = {
+  width: { xs: 1, md: 760 },
+  maxWidth: 1,
+};
+
 // ----------------------------------------------------------------------
 
 export function IdentityView() {
   const { t } = useTranslate();
-  const [tab, setTab] = useState<IdentityTab>('lightning');
+  const { copy } = useCopyToClipboard();
+  const searchParams = useSearchParams();
+  const requestedTab = searchParams.get('tab');
+  const [tab, setTab] = useState<IdentityTab>(
+    requestedTab === 'nostr' || requestedTab === 'onchain' || requestedTab === 'lightning'
+      ? requestedTab
+      : 'lightning'
+  );
   const [isGenerating, setIsGenerating] = useState(false);
   const [addressType, setAddressType] = useState<BtcAddressType>(BtcAddressType.P2TR);
+  const registerDrawer = useBoolean();
+  const manageDrawer = useBoolean();
 
   const { wallet, walletLoading, walletError } = useGetUserWallet();
   const { btcAddresses, btcAddressesLoading, btcAddressesError, btcAddressesMutate } =
@@ -76,7 +99,12 @@ export function IdentityView() {
 
   const lnAddress = wallet?.ln_address;
   const displayAddress = lnAddress ? displayLnAddress(lnAddress.username) : '';
+  const identityLnurl = lnAddress ? encodeLNURL(lnAddress.username) : '';
   const nostrDisplay = useMemo(() => npub(lnAddress?.nostr_pubkey), [lnAddress?.nostr_pubkey]);
+  const unusedAddressForType = useMemo(
+    () => btcAddresses?.find((address) => address.address_type === addressType && !address.used),
+    [addressType, btcAddresses]
+  );
 
   const handleGenerateAddress = async () => {
     try {
@@ -89,6 +117,30 @@ export function IdentityView() {
     } finally {
       setIsGenerating(false);
     }
+  };
+
+  const handleCopyUnusedAddress = () => {
+    if (!unusedAddressForType) return;
+
+    copy(unusedAddressForType.address);
+    toast.success(t('copied_to_clipboard'));
+  };
+
+  const handleCopyIdentityLnurl = () => {
+    if (!identityLnurl) return;
+
+    copy(identityLnurl);
+    toast.success(t('copied_to_clipboard'));
+  };
+
+  const handleIdentityChanged = () => {
+    mutate(endpointKeys.userWallet.get);
+    mutate(endpointKeys.userWallet.lnAddress.get);
+  };
+
+  const handleRegisterSuccess = () => {
+    handleIdentityChanged();
+    registerDrawer.onFalse();
   };
 
   return (
@@ -119,7 +171,7 @@ export function IdentityView() {
                         bgcolor: 'warning.lighter',
                       }}
                     >
-                      <Iconify icon="solar:fingerprint-bold-duotone" width={32} />
+                      <Iconify icon="solar:user-rounded-bold-duotone" width={32} />
                     </Box>
                     <Stack spacing={1}>
                       <Typography variant="h4">{t('identity_view.hero_title')}</Typography>
@@ -129,7 +181,7 @@ export function IdentityView() {
                     </Stack>
                     {!displayAddress && (
                       <Button
-                        href={paths.wallet.lightningAddress}
+                        onClick={registerDrawer.onTrue}
                         variant="contained"
                         color="inherit"
                         startIcon={<Iconify icon="solar:bolt-bold-duotone" />}
@@ -220,7 +272,7 @@ export function IdentityView() {
                         }}
                       >
                         <QRCode
-                          value={displayAddress}
+                          value={identityLnurl}
                           size={320}
                           eyeRadius={5}
                           logoPadding={3}
@@ -237,12 +289,25 @@ export function IdentityView() {
                           {t('identity_view.reusable_address')}
                         </Typography>
                         {displayAddress ? (
-                          <Stack direction="row" sx={{ alignItems: 'center', gap: 1 }}>
-                            <Typography variant="h4" noWrap>
-                              {displayAddress}
-                            </Typography>
-                            <CopyButton value={displayAddress} title={t('copy')} />
-                          </Stack>
+                          <>
+                            <Stack direction="row" sx={{ alignItems: 'center', gap: 1 }}>
+                              <Typography variant="h4" noWrap>
+                                {displayAddress}
+                              </Typography>
+                              <CopyButton value={displayAddress} title={t('copy')} />
+                            </Stack>
+                            {identityLnurl && (
+                              <Button
+                                color="inherit"
+                                variant="outlined"
+                                onClick={handleCopyIdentityLnurl}
+                                startIcon={<Iconify icon="solar:copy-bold" />}
+                                sx={{ alignSelf: 'flex-start' }}
+                              >
+                                {t('identity_view.copy_lnurl')}
+                              </Button>
+                            )}
+                          </>
                         ) : (
                           <Box
                             sx={[
@@ -269,7 +334,7 @@ export function IdentityView() {
                                 </Typography>
                               </Stack>
                               <Button
-                                href={paths.wallet.lightningAddress}
+                                onClick={registerDrawer.onTrue}
                                 variant="contained"
                                 color="inherit"
                                 sx={{ alignSelf: 'flex-start' }}
@@ -282,11 +347,26 @@ export function IdentityView() {
                       </Stack>
 
                       {lnAddress && (
-                        <Stack direction="row" spacing={1}>
-                          <Label color={lnAddress.active ? 'success' : 'error'}>
-                            {lnAddress.active ? t('ln_address_table_row.active') : t('ln_address_table_row.inactive')}
-                          </Label>
-                          <Label color={lnAddress.allows_nostr ? 'info' : 'default'}>NIP-05</Label>
+                        <Stack spacing={1.5}>
+                          <Stack direction="row" spacing={1}>
+                            <Label color={lnAddress.active ? 'success' : 'error'}>
+                              {lnAddress.active
+                                ? t('ln_address_table_row.active')
+                                : t('ln_address_table_row.inactive')}
+                            </Label>
+                            <Label color={lnAddress.allows_nostr ? 'info' : 'default'}>
+                              NIP-05
+                            </Label>
+                          </Stack>
+                          <Button
+                            color="inherit"
+                            variant="outlined"
+                            onClick={manageDrawer.onTrue}
+                            startIcon={<Iconify icon="solar:pen-bold" />}
+                            sx={{ alignSelf: 'flex-start' }}
+                          >
+                            {t('identity_view.manage_identity')}
+                          </Button>
                         </Stack>
                       )}
                     </Stack>
@@ -303,18 +383,36 @@ export function IdentityView() {
                           </Typography>
                           <CopyButton value={nostrDisplay} title={t('copy')} />
                         </Stack>
-                        <Alert severity={lnAddress?.allows_nostr ? 'success' : 'warning'} variant="outlined">
+                        <Alert
+                          severity={lnAddress?.allows_nostr ? 'success' : 'warning'}
+                          variant="outlined"
+                        >
                           {lnAddress?.allows_nostr
                             ? t('identity_view.nostr_enabled')
                             : t('identity_view.nostr_disabled')}
                         </Alert>
+                        <Button
+                          color="inherit"
+                          variant="outlined"
+                          onClick={manageDrawer.onTrue}
+                          startIcon={<Iconify icon="solar:pen-bold" />}
+                          sx={{ alignSelf: 'flex-start' }}
+                        >
+                          {t('identity_view.edit_nostr')}
+                        </Button>
                       </>
                     ) : (
                       <EmptyContent
                         title={t('identity_view.no_nostr')}
                         action={
-                          <Button href={paths.wallet.nostrAddress} variant="contained" color="inherit">
-                            {t('edit')}
+                          <Button
+                            onClick={lnAddress ? manageDrawer.onTrue : registerDrawer.onTrue}
+                            variant="contained"
+                            color="inherit"
+                          >
+                            {lnAddress
+                              ? t('identity_view.edit_nostr')
+                              : t('identity_view.claim_lightning')}
                           </Button>
                         }
                       />
@@ -343,8 +441,10 @@ export function IdentityView() {
                           value={addressType}
                           onChange={(event) => setAddressType(event.target.value as BtcAddressType)}
                           helperText={t(
-                            addressTypeOptions.find((option) => option.value === addressType)?.helperKey ??
-                              'bitcoin_address_type.taproot_helper'
+                            unusedAddressForType
+                              ? 'identity_view.unused_address_available'
+                              : (addressTypeOptions.find((option) => option.value === addressType)
+                                  ?.helperKey ?? 'bitcoin_address_type.taproot_helper')
                           )}
                           sx={{ minWidth: { sm: 260 } }}
                         >
@@ -354,17 +454,44 @@ export function IdentityView() {
                             </MenuItem>
                           ))}
                         </TextField>
-                        <Button
-                          color="inherit"
-                          variant="contained"
-                          loading={isGenerating}
-                          onClick={handleGenerateAddress}
-                          startIcon={<Iconify icon="solar:refresh-bold" />}
-                          sx={{ minHeight: 40 }}
-                        >
-                          {t('identity_view.generate_fresh')}
-                        </Button>
+                        {unusedAddressForType ? (
+                          <Button
+                            color="inherit"
+                            variant="outlined"
+                            onClick={handleCopyUnusedAddress}
+                            startIcon={<Iconify icon="solar:copy-bold" />}
+                            sx={{ minHeight: 40 }}
+                          >
+                            {t('identity_view.copy_unused_address')}
+                          </Button>
+                        ) : (
+                          <Button
+                            color="inherit"
+                            variant="contained"
+                            loading={isGenerating}
+                            onClick={handleGenerateAddress}
+                            startIcon={<Iconify icon="solar:refresh-bold" />}
+                            sx={{ minHeight: 40 }}
+                          >
+                            {t('identity_view.generate_fresh')}
+                          </Button>
+                        )}
                       </Stack>
+                      {unusedAddressForType && (
+                        <Alert severity="info" variant="outlined">
+                          <Stack spacing={1}>
+                            <Typography variant="body2">
+                              {t('identity_view.reuse_unused_address')}
+                            </Typography>
+                            <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+                              <Typography variant="caption" sx={{ flex: 1 }} noWrap>
+                                {unusedAddressForType.address}
+                              </Typography>
+                              <CopyButton value={unusedAddressForType.address} title={t('copy')} />
+                            </Stack>
+                          </Stack>
+                        </Alert>
+                      )}
                     </Stack>
 
                     {btcAddressesError && (
@@ -404,16 +531,71 @@ export function IdentityView() {
                     </Stack>
 
                     {!btcAddressesLoading && !btcAddressesError && !btcAddresses?.length && (
-                      <EmptyContent title={t('identity_view.no_onchain_addresses')} sx={{ py: 6 }} />
+                      <EmptyContent
+                        title={t('identity_view.no_onchain_addresses')}
+                        sx={{ py: 6 }}
+                      />
                     )}
                   </Stack>
                 )}
-
               </Box>
             </Card>
+
+            <IdentityDrawer
+              open={registerDrawer.value}
+              title={t('identity_view.claim_lightning')}
+              onClose={registerDrawer.onFalse}
+            >
+              <Stack spacing={3}>
+                <Alert severity="info" variant="outlined">
+                  {t('identity_view.claim_lightning_description')}
+                </Alert>
+                <RegisterLnAddressForm onSuccess={handleRegisterSuccess} />
+              </Stack>
+            </IdentityDrawer>
+
+            <IdentityDrawer
+              open={manageDrawer.value}
+              title={t('identity_view.manage_identity')}
+              onClose={manageDrawer.onFalse}
+            >
+              {lnAddress ? (
+                <SettingsLnAddress lnAddress={lnAddress} onSuccess={handleIdentityChanged} />
+              ) : (
+                <RegisterLnAddressForm onSuccess={handleRegisterSuccess} />
+              )}
+            </IdentityDrawer>
           </>
         )}
       </RoleBasedGuard>
     </DashboardContent>
+  );
+}
+
+function IdentityDrawer({
+  open,
+  title,
+  children,
+  onClose,
+}: {
+  open: boolean;
+  title: string;
+  children: ReactNode;
+  onClose: VoidFunction;
+}) {
+  return (
+    <Drawer anchor="right" open={open} onClose={onClose} slotProps={{ paper: { sx: drawerSx } }}>
+      <Stack
+        direction="row"
+        sx={{ alignItems: 'center', justifyContent: 'space-between', px: 3, py: 2 }}
+      >
+        <Typography variant="h6">{title}</Typography>
+        <IconButton onClick={onClose}>
+          <Iconify icon="mingcute:close-line" />
+        </IconButton>
+      </Stack>
+      <Divider />
+      <Box sx={{ p: 3 }}>{children}</Box>
+    </Drawer>
   );
 }

@@ -41,7 +41,33 @@ function healthColor(status?: string) {
   return 'error';
 }
 
-function GapCard({ title, icon }: { title: string; icon: string }) {
+function healthProgress(status?: string) {
+  if (status === 'Operational') return 100;
+  if (status === 'Maintenance') return 50;
+  return 12;
+}
+
+function HealthMetric({ label, value }: { label: string; value?: string }) {
+  const { t } = useTranslate();
+
+  return (
+    <Stack spacing={1}>
+      <Stack direction="row" sx={{ justifyContent: 'space-between' }}>
+        <Typography variant="body2" color="text.secondary">
+          {label}
+        </Typography>
+        <Label color={healthColor(value)}>{value || t('node_view.unknown')}</Label>
+      </Stack>
+      <LinearProgress
+        variant="determinate"
+        value={healthProgress(value)}
+        color={healthColor(value)}
+      />
+    </Stack>
+  );
+}
+
+function GapCard({ title, icon, body }: { title: string; icon: string; body?: string }) {
   const { t } = useTranslate();
 
   return (
@@ -52,7 +78,7 @@ function GapCard({ title, icon }: { title: string; icon: string }) {
           <Iconify icon={icon} width={24} sx={{ color: 'text.secondary' }} />
         </Stack>
         <Alert severity="info" variant="outlined">
-          {t('node_view.backend_needed')}
+          {body || t('node_view.backend_needed')}
         </Alert>
       </Stack>
     </Card>
@@ -109,41 +135,89 @@ export function NodeView() {
             )}
 
             <Grid container spacing={3}>
-              <Grid size={{ xs: 12, md: 5 }}>
+              <Grid size={{ xs: 12, md: 4 }}>
                 <Card sx={{ p: 3, borderRadius: 1, height: 1 }}>
                   <Stack spacing={3}>
-                    <Stack direction="row" sx={{ alignItems: 'center', justifyContent: 'space-between' }}>
+                    <Stack
+                      direction="row"
+                      sx={{ alignItems: 'flex-start', justifyContent: 'space-between' }}
+                    >
                       <Stack>
-                        <Typography variant="h6">{t('node_view.connection')}</Typography>
+                        <Typography variant="h6">{t('node_view.backend')}</Typography>
                         <Typography variant="body2" color="text.secondary">
-                          {t('node_view.read_only')}
+                          {t('node_view.backend_body')}
                         </Typography>
                       </Stack>
-                      <Label color={effectiveHealth.is_healthy ? 'success' : 'error'}>
-                        {effectiveHealth.is_healthy
-                          ? t('node_view.operational')
-                          : t('node_view.unavailable')}
+                      <Label color={healthUnavailable ? 'warning' : 'success'}>
+                        {healthUnavailable ? t('node_view.partial') : t('node_view.operational')}
                       </Label>
                     </Stack>
 
-                    {[
-                      [t('node_view.database'), effectiveHealth.database],
-                      [t('node_view.ln_provider'), effectiveHealth.ln_provider],
-                    ].map(([label, value]) => (
-                      <Stack key={label} spacing={1}>
-                        <Stack direction="row" sx={{ justifyContent: 'space-between' }}>
-                          <Typography variant="body2" color="text.secondary">
-                            {label}
-                          </Typography>
-                          <Label color={healthColor(value)}>{value || t('node_view.unknown')}</Label>
-                        </Stack>
-                        <LinearProgress
-                          variant="determinate"
-                          value={value === 'Operational' ? 100 : value === 'Maintenance' ? 50 : 12}
-                          color={healthColor(value)}
-                        />
+                    <HealthMetric label={t('node_view.database')} value={effectiveHealth.database} />
+
+                    <Divider />
+
+                    <Stack direction="row" sx={{ justifyContent: 'space-between' }}>
+                      <Typography variant="body2" color="text.secondary">
+                        {t('node_view.health_endpoint')}
+                      </Typography>
+                      <Label color={health ? 'success' : 'warning'}>
+                        {health ? t('node_view.available') : t('node_view.unavailable')}
+                      </Label>
+                    </Stack>
+                  </Stack>
+                </Card>
+              </Grid>
+
+              <Grid size={{ xs: 12, md: 4 }}>
+                <Card sx={{ p: 3, borderRadius: 1, height: 1 }}>
+                  <Stack spacing={3}>
+                    <Stack
+                      direction="row"
+                      sx={{ alignItems: 'flex-start', justifyContent: 'space-between' }}
+                    >
+                      <Stack>
+                        <Typography variant="h6">{t('node_view.provider')}</Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          {t('node_view.provider_body')}
+                        </Typography>
                       </Stack>
-                    ))}
+                      <Label color={healthColor(effectiveHealth.ln_provider)}>
+                        {effectiveHealth.ln_provider || t('node_view.unknown')}
+                      </Label>
+                    </Stack>
+
+                    <HealthMetric
+                      label={t('node_view.ln_provider')}
+                      value={effectiveHealth.ln_provider}
+                    />
+                  </Stack>
+                </Card>
+              </Grid>
+
+              <Grid size={{ xs: 12, md: 4 }}>
+                <Card sx={{ p: 3, borderRadius: 1, height: 1 }}>
+                  <Stack spacing={3}>
+                    <Stack
+                      direction="row"
+                      sx={{ alignItems: 'flex-start', justifyContent: 'space-between' }}
+                    >
+                      <Stack>
+                        <Typography variant="h6">{t('node_view.activity')}</Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          {t('node_view.activity_body')}
+                        </Typography>
+                      </Stack>
+                      <Label color={volumeUnavailable ? 'warning' : 'info'}>
+                        {volumeUnavailable ? t('node_view.partial') : t('node_view.client_computed')}
+                      </Label>
+                    </Stack>
+
+                    {volumeUnavailable && (
+                      <Alert severity="warning" variant="outlined">
+                        {t('node_view.volume_unavailable')}
+                      </Alert>
+                    )}
 
                     {lnAddressesError ? (
                       <Alert severity="warning" variant="outlined">
@@ -156,25 +230,6 @@ export function NodeView() {
                         </Typography>
                         <Typography variant="subtitle2">{lnAddresses?.length ?? 0}</Typography>
                       </Stack>
-                    )}
-                  </Stack>
-                </Card>
-              </Grid>
-
-              <Grid size={{ xs: 12, md: 7 }}>
-                <Card sx={{ p: 3, borderRadius: 1, height: 1 }}>
-                  <Stack spacing={3}>
-                    <Stack direction="row" sx={{ alignItems: 'center', justifyContent: 'space-between' }}>
-                      <Typography variant="h6">{t('node_view.volume')}</Typography>
-                      <Label color={volumeUnavailable ? 'warning' : 'info'}>
-                        {volumeUnavailable ? t('node_view.partial') : t('node_view.client_computed')}
-                      </Label>
-                    </Stack>
-
-                    {volumeUnavailable && (
-                      <Alert severity="warning" variant="outlined">
-                        {t('node_view.volume_unavailable')}
-                      </Alert>
                     )}
 
                     <Grid container spacing={2}>
@@ -207,17 +262,37 @@ export function NodeView() {
               </Grid>
 
               <Grid size={{ xs: 12, md: 4 }}>
-                <GapCard title={t('node_view.liquidity')} icon="solar:waterdrops-bold-duotone" />
+                <GapCard
+                  title={t('node_view.liquidity')}
+                  icon="solar:waterdrops-bold-duotone"
+                  body={t('node_view.provider_gap')}
+                />
               </Grid>
               <Grid size={{ xs: 12, md: 4 }}>
-                <GapCard title={t('node_view.channels')} icon="solar:route-bold-duotone" />
+                <GapCard
+                  title={t('node_view.channels')}
+                  icon="solar:route-bold-duotone"
+                  body={t('node_view.provider_gap')}
+                />
               </Grid>
               <Grid size={{ xs: 12, md: 4 }}>
-                <GapCard title={t('node_view.alerts')} icon="solar:bell-bing-bold-duotone" />
+                <GapCard
+                  title={t('node_view.alerts')}
+                  icon="solar:bell-bing-bold-duotone"
+                  body={t('node_view.backend_gap')}
+                />
               </Grid>
 
               <Grid size={{ xs: 12 }}>
-                <RecentTransactions isAdmin tableData={transactions.slice(0, 12)} />
+                <Stack spacing={2}>
+                  <Stack>
+                    <Typography variant="h6">{t('node_view.activity_log')}</Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      {t('node_view.activity_log_body')}
+                    </Typography>
+                  </Stack>
+                  <RecentTransactions isAdmin tableData={transactions.slice(0, 12)} />
+                </Stack>
               </Grid>
             </Grid>
           </>

@@ -1,2 +1,2 @@
 export * from './register-ln-address-form';
-export * from './register-ln-address-dialog';
+export * from './register-ln-address-drawer';

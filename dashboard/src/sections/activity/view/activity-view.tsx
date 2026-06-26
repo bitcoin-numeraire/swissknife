@@ -2,18 +2,22 @@
 
 import type { TFunction } from 'i18next';
 import type { LabelColor } from 'src/components/label';
+import type { Invoice, Payment } from 'src/lib/swissknife';
 import type { ITransaction, ITransactionTableFilters } from 'src/types/transaction';
 
 import { mutate } from 'swr';
 import { sumBy } from 'es-toolkit';
 import { useMemo, useState, useCallback } from 'react';
-import { usePopover, useSetState } from 'minimal-shared/hooks';
+import { useBoolean, usePopover, useSetState } from 'minimal-shared/hooks';
 
 import Tab from '@mui/material/Tab';
+import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
 import Tabs from '@mui/material/Tabs';
 import Table from '@mui/material/Table';
 import Stack from '@mui/material/Stack';
+import Button from '@mui/material/Button';
+import Drawer from '@mui/material/Drawer';
 import Divider from '@mui/material/Divider';
 import Tooltip from '@mui/material/Tooltip';
 import MenuItem from '@mui/material/MenuItem';
@@ -31,27 +35,39 @@ import TableContainer from '@mui/material/TableContainer';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 
 import { paths } from 'src/routes/paths';
-import { useRouter } from 'src/routes/hooks';
+import { useRouter, useSearchParams } from 'src/routes/hooks';
 
-import { shouldFail } from 'src/utils/errors';
+import { composeBip21 } from 'src/utils/bitcoin-request';
+import { shouldFail, handleActionError } from 'src/utils/errors';
 import { fDate, fTime, fIsAfter, fDateTime, fIsBetween } from 'src/utils/format-time';
-import { LEDGERS, getCumulativeSeries, mergeAndSortTransactions } from 'src/utils/transactions';
+import {
+  LEDGERS,
+  getLedgerLabel,
+  getCumulativeSeries,
+  mergeAndSortTransactions,
+} from 'src/utils/transactions';
 
+import { CONFIG } from 'src/global-config';
 import { useTranslate } from 'src/locales';
 import { endpointKeys } from 'src/actions/keys';
+import { useListPayments } from 'src/actions/payments';
+import { useListInvoices } from 'src/actions/invoices';
 import { DashboardContent } from 'src/layouts/dashboard';
 import { useGetUserWallet } from 'src/actions/user-wallet';
+import { Permission, deleteInvoice, deletePayment } from 'src/lib/swissknife';
 
 import { Label } from 'src/components/label';
+import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
-import { CopyMenuItem } from 'src/components/copy';
 import { Scrollbar } from 'src/components/scrollbar';
 import { SatsWithIcon } from 'src/components/bitcoin';
 import { Chart, useChart } from 'src/components/chart';
 import { ItemAnalytic } from 'src/components/analytic';
 import { ErrorView } from 'src/components/error/error-view';
 import { EmptyContent } from 'src/components/empty-content';
+import { ConfirmDialog } from 'src/components/custom-dialog';
 import { CustomPopover } from 'src/components/custom-popover';
+import { CopyButton, CopyMenuItem } from 'src/components/copy';
 import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';
 import { CleanTransactionsButton } from 'src/components/transactions';
 import {
@@ -64,8 +80,14 @@ import {
   TablePaginationCustom,
 } from 'src/components/table';
 
+import { PaymentDetailsView } from 'src/sections/transaction/view/payment-details-view';
+import { InvoiceDetailsView } from 'src/sections/transaction/view/invoice-details-view';
 import { TransactionTableToolbar } from 'src/sections/transaction/transaction-table-toolbar';
+import { AdminPaymentDetailsView } from 'src/sections/transaction/view/admin-payment-details-view';
+import { AdminInvoiceDetailsView } from 'src/sections/transaction/view/admin-invoice-details-view';
 import { TransactionTableFiltersResult } from 'src/sections/transaction/transaction-table-filters-result';
+
+import { RoleBasedGuard } from 'src/auth/guard';
 
 import { TransactionType } from 'src/types/transaction';
 
@@ -73,6 +95,8 @@ import { TransactionType } from 'src/types/transaction';
 
 type ActivityLens = 'all' | 'Settled' | 'Pending' | 'Expired' | 'Failed';
 type FlowLens = 'income' | 'expenses';
+type ActivityScope = 'wallet' | 'admin';
+type ActivityTransactionKind = 'all' | 'payment' | 'invoice';
 
 type ActivityRow = ITransaction & {
   row_key: string;
@@ -103,6 +127,11 @@ const tableHead = (t: TFunction) => [
   { id: '', width: 56 },
 ];
 
+const drawerSx = {
+  width: { xs: 1, sm: 520 },
+  maxWidth: 1,
+};
+
 function txDirection(tx: ITransaction): 'in' | 'out' {
   return tx.transaction_type === TransactionType.INVOICE ? 'in' : 'out';
 }
@@ -121,29 +150,59 @@ function directionColor(direction: 'in' | 'out'): LabelColor {
   return direction === 'in' ? 'success' : 'warning';
 }
 
-function detailHref(tx: ITransaction) {
-  if (tx.transaction_type === TransactionType.INVOICE) {
-    return paths.wallet.invoice(tx.id);
-  }
+function txExplorerUrl(txid?: string | null) {
+  if (!txid) return undefined;
 
-  return paths.wallet.payment(tx.id);
+  const explorerBaseUrl = CONFIG.mempoolSpace.replace(/\/api\/v1\/?$/, '');
+  return `${explorerBaseUrl}/tx/${txid}`;
 }
 
-function makeRow(tx: ITransaction): ActivityRow {
+function txidFromOutpoint(outpoint?: string | null) {
+  if (!outpoint) return undefined;
+
+  const [txid] = outpoint.split(':');
+  return txid || undefined;
+}
+
+function composeInvoiceBip21(invoice?: Invoice | null) {
+  const address = invoice?.bitcoin_output?.address;
+  const bolt11 = invoice?.ln_invoice?.bolt11;
+
+  if (!address || !bolt11) return undefined;
+
+  const amountSats = invoice?.amount_msat ? invoice.amount_msat / 1000 : 0;
+
+  return composeBip21(address, bolt11, amountSats);
+}
+
+function detailHrefForScope(tx: ITransaction, scope: ActivityScope) {
+  if (tx.transaction_type === TransactionType.INVOICE) {
+    return paths.activityInvoice(tx.id, scope);
+  }
+
+  return paths.activityPayment(tx.id, scope);
+}
+
+function makeRow(tx: ITransaction, scope: ActivityScope): ActivityRow {
   const direction = txDirection(tx);
 
   return {
     ...tx,
     direction,
     row_key: `${tx.transaction_type}-${tx.id}`,
-    detail_href: detailHref(tx),
+    detail_href: detailHrefForScope(tx, scope),
     amount_total_msat: txAmount(tx),
-    description_label: tx.description || (direction === 'in' ? 'Incoming payment' : 'Outgoing payment'),
+    description_label:
+      tx.description || (direction === 'in' ? 'Incoming payment' : 'Outgoing payment'),
   };
 }
 
 function isNeedsAction(tx: ActivityRow) {
   return tx.status === 'Failed' || tx.status === 'Expired';
+}
+
+function canDeleteRow(tx: ActivityRow, scope: ActivityScope) {
+  return scope === 'admin' || tx.status === 'Failed' || tx.status === 'Expired';
 }
 
 function txMatchesStatus(tx: ActivityRow, status: ActivityLens) {
@@ -203,9 +262,100 @@ function applyFilter({
   return inputData;
 }
 
+function normalizeTransactionKind(value: string | null): ActivityTransactionKind {
+  if (value === 'payment' || value === 'payments') return 'payment';
+  if (value === 'invoice' || value === 'invoices') return 'invoice';
+  return 'all';
+}
+
+function transactionTypeForKind(kind: ActivityTransactionKind) {
+  if (kind === 'payment') return TransactionType.PAYMENT;
+  if (kind === 'invoice') return TransactionType.INVOICE;
+  return undefined;
+}
+
 // ----------------------------------------------------------------------
 
 export function ActivityView() {
+  const searchParams = useSearchParams();
+  const id = searchParams.get('id');
+  const scope: ActivityScope = searchParams.get('scope') === 'admin' ? 'admin' : 'wallet';
+  const kind = normalizeTransactionKind(searchParams.get('type'));
+
+  if (id && kind === 'payment') {
+    return scope === 'admin' ? <AdminPaymentDetailsView id={id} /> : <PaymentDetailsView id={id} />;
+  }
+
+  if (id && kind === 'invoice') {
+    return scope === 'admin' ? <AdminInvoiceDetailsView id={id} /> : <InvoiceDetailsView id={id} />;
+  }
+
+  return scope === 'admin' ? (
+    <AdminActivityLedger kind={kind} />
+  ) : (
+    <WalletActivityLedger kind={kind} />
+  );
+}
+
+function WalletActivityLedger({ kind }: { kind: ActivityTransactionKind }) {
+  const { wallet, walletLoading, walletError } = useGetUserWallet();
+
+  return (
+    <ActivityLedger
+      scope="wallet"
+      kind={kind}
+      invoices={wallet?.invoices || []}
+      payments={wallet?.payments || []}
+      errors={[walletError]}
+      data={[wallet]}
+      isLoading={[walletLoading]}
+      onCleanSuccess={() => mutate(endpointKeys.userWallet.get)}
+    />
+  );
+}
+
+function AdminActivityLedger({ kind }: { kind: ActivityTransactionKind }) {
+  const { invoices, invoicesLoading, invoicesError } = useListInvoices();
+  const { payments, paymentsLoading, paymentsError } = useListPayments();
+
+  return (
+    <RoleBasedGuard permissions={[Permission.READ_TRANSACTION]} hasContent>
+      <ActivityLedger
+        scope="admin"
+        kind={kind}
+        invoices={invoices || []}
+        payments={payments || []}
+        errors={[invoicesError, paymentsError]}
+        data={[invoices, payments]}
+        isLoading={[invoicesLoading, paymentsLoading]}
+        onCleanSuccess={() => {
+          mutate(endpointKeys.invoices.list);
+          mutate(endpointKeys.payments.list);
+        }}
+      />
+    </RoleBasedGuard>
+  );
+}
+
+function ActivityLedger({
+  scope,
+  kind,
+  invoices,
+  payments,
+  errors,
+  data,
+  isLoading,
+  onCleanSuccess,
+}: {
+  scope: ActivityScope;
+  kind: ActivityTransactionKind;
+  invoices: Invoice[];
+  payments: Payment[];
+  errors: unknown[];
+  data: (object | null | undefined)[];
+  isLoading: boolean[];
+  onCleanSuccess: VoidFunction;
+}) {
   const { t } = useTranslate();
   const theme = useTheme();
   const table = useTable({
@@ -214,7 +364,8 @@ export function ActivityView() {
     defaultRowsPerPage: 25,
   });
 
-  const [flowLens, setFlowLens] = useState<FlowLens>('income');
+  const [flowLens, setFlowLens] = useState<FlowLens>(kind === 'payment' ? 'expenses' : 'income');
+  const [detailRow, setDetailRow] = useState<ActivityRow | null>(null);
   const filters = useSetState<ITransactionTableFilters>({
     name: '',
     ledger: [],
@@ -223,23 +374,20 @@ export function ActivityView() {
     endDate: null,
   });
 
-  const { wallet, walletLoading, walletError } = useGetUserWallet();
-  const errors = [walletError];
-  const data = [wallet];
-  const isLoading = [walletLoading];
   const failed = shouldFail(errors, data, isLoading);
   const dateError = fIsAfter(filters.state.startDate, filters.state.endDate);
 
+  const visibleInvoices = useMemo(() => (kind === 'payment' ? [] : invoices), [invoices, kind]);
+  const visiblePayments = useMemo(() => (kind === 'invoice' ? [] : payments), [kind, payments]);
+
   const rows = useMemo(
-    () => mergeAndSortTransactions(wallet?.invoices || [], wallet?.payments || []).map(makeRow),
-    [wallet?.invoices, wallet?.payments]
+    () =>
+      mergeAndSortTransactions(visibleInvoices, visiblePayments).map((tx) => makeRow(tx, scope)),
+    [scope, visibleInvoices, visiblePayments]
   );
 
-  const incomeSeries = useMemo(() => getCumulativeSeries(wallet?.invoices || []), [wallet?.invoices]);
-  const expensesSeries = useMemo(
-    () => getCumulativeSeries(wallet?.payments || []),
-    [wallet?.payments]
-  );
+  const incomeSeries = useMemo(() => getCumulativeSeries(visibleInvoices), [visibleInvoices]);
+  const expensesSeries = useMemo(() => getCumulativeSeries(visiblePayments), [visiblePayments]);
 
   const chartSeries = useMemo(
     () => [
@@ -350,7 +498,8 @@ export function ActivityView() {
   );
 
   const getPercentByStatus = useCallback(
-    (status: ActivityLens) => (rows.length ? (getTransactionLength(status) / rows.length) * 100 : 0),
+    (status: ActivityLens) =>
+      rows.length ? (getTransactionLength(status) / rows.length) * 100 : 0,
     [getTransactionLength, rows.length]
   );
 
@@ -362,9 +511,24 @@ export function ActivityView() {
     [filters, table]
   );
 
-  const handleCleanSuccess = () => {
-    mutate(endpointKeys.userWallet.get);
-  };
+  const handleDeleteRow = useCallback(
+    async (row: ActivityRow) => {
+      try {
+        if (row.transaction_type === TransactionType.INVOICE) {
+          await deleteInvoice({ path: { id: row.id } });
+        } else {
+          await deletePayment({ path: { id: row.id } });
+        }
+
+        toast.success(t('transaction_list.delete_success'));
+        setDetailRow((currentRow) => (currentRow?.row_key === row.row_key ? null : currentRow));
+        onCleanSuccess();
+      } catch (error) {
+        handleActionError(error);
+      }
+    },
+    [onCleanSuccess, t]
+  );
 
   return (
     <DashboardContent maxWidth="xl">
@@ -374,12 +538,16 @@ export function ActivityView() {
         <>
           <CustomBreadcrumbs
             heading={t('activity')}
-            links={[{ name: t('money') }, { name: t('activity') }]}
+            links={[
+              { name: scope === 'admin' ? t('accounts') : t('money') },
+              { name: t('activity') },
+            ]}
             action={
               <Tooltip title={t('recent_transactions.clean_failed_expired')} placement="top" arrow>
                 <span>
                   <CleanTransactionsButton
-                    onSuccess={handleCleanSuccess}
+                    onSuccess={onCleanSuccess}
+                    transactionType={transactionTypeForKind(kind)}
                     buttonProps={{
                       color: 'error',
                       variant: 'outlined',
@@ -400,7 +568,9 @@ export function ActivityView() {
               <Scrollbar>
                 <Stack
                   direction="row"
-                  divider={<Divider orientation="vertical" flexItem sx={{ borderStyle: 'dashed' }} />}
+                  divider={
+                    <Divider orientation="vertical" flexItem sx={{ borderStyle: 'dashed' }} />
+                  }
                   sx={{ py: 2 }}
                 >
                   {activityTabs.map((tab) => (
@@ -531,8 +701,12 @@ export function ActivityView() {
                         <ActivityTableRow
                           key={row.row_key}
                           row={row}
+                          scope={scope}
                           selected={table.selected.includes(row.row_key)}
                           onSelectRow={() => table.onSelectRow(row.row_key)}
+                          onOpenRow={() => setDetailRow(row)}
+                          canDelete={canDeleteRow(row, scope)}
+                          onDeleteRow={() => handleDeleteRow(row)}
                         />
                       ))}
 
@@ -558,6 +732,15 @@ export function ActivityView() {
               />
             </Card>
           </Stack>
+
+          <ActivityDetailDrawer
+            row={detailRow}
+            canDelete={!!detailRow && canDeleteRow(detailRow, scope)}
+            onDeleteRow={detailRow ? () => handleDeleteRow(detailRow) : undefined}
+            onClose={() => {
+              setDetailRow(null);
+            }}
+          />
         </>
       )}
     </DashboardContent>
@@ -568,25 +751,40 @@ export function ActivityView() {
 
 function ActivityTableRow({
   row,
+  scope,
   selected,
   onSelectRow,
+  onOpenRow,
+  canDelete,
+  onDeleteRow,
 }: {
   row: ActivityRow;
+  scope: ActivityScope;
   selected: boolean;
   onSelectRow: VoidFunction;
+  onOpenRow: VoidFunction;
+  canDelete: boolean;
+  onDeleteRow: () => Promise<void>;
 }) {
   const { t } = useTranslate();
   const router = useRouter();
   const popover = usePopover();
+  const confirm = useBoolean();
+  const isDeleting = useBoolean();
+  const invoice = row.transaction_type === TransactionType.INVOICE ? (row as Invoice) : null;
+  const payment = row.transaction_type === TransactionType.PAYMENT ? (row as Payment) : null;
+  const invoiceBolt11 = invoice?.ln_invoice?.bolt11;
+  const invoiceAddress = invoice?.bitcoin_output?.address;
+  const invoiceOutpoint = invoice?.bitcoin_output?.outpoint;
+  const invoiceUnified = composeInvoiceBip21(invoice);
+  const paymentAddress =
+    payment?.bitcoin?.address || payment?.internal?.btc_address || payment?.internal?.ln_address;
+  const explorerUrl = txExplorerUrl(payment?.bitcoin?.txid || txidFromOutpoint(invoiceOutpoint));
+  const methodLabel = getLedgerLabel(row.ledger, t);
 
   return (
     <>
-      <TableRow
-        hover
-        selected={selected}
-        onClick={() => router.push(row.detail_href)}
-        sx={{ cursor: 'pointer' }}
-      >
+      <TableRow hover selected={selected} onClick={onOpenRow} sx={{ cursor: 'pointer' }}>
         <TableCell padding="checkbox">
           <Checkbox
             checked={selected}
@@ -606,7 +804,11 @@ function ActivityTableRow({
         <TableCell>
           <ListItemText
             primary={row.description_label}
-            secondary={`${fDateTime(row.created_at)} · ${row.ledger}`}
+            secondary={
+              scope === 'admin'
+                ? `${row.wallet_id} · ${fDateTime(row.created_at)} · ${methodLabel}`
+                : `${fDateTime(row.created_at)} · ${methodLabel}`
+            }
             slotProps={{
               primary: { noWrap: true, sx: { typography: 'body2' } },
               secondary: { sx: { typography: 'caption', color: 'text.disabled' } },
@@ -649,7 +851,7 @@ function ActivityTableRow({
               'default'
             }
           >
-            {row.ledger}
+            {methodLabel}
           </Label>
         </TableCell>
 
@@ -690,8 +892,337 @@ function ActivityTableRow({
           </MenuItem>
 
           <CopyMenuItem value={row.id} title={t('activity_view.copy_transaction_id')} />
+
+          {invoiceUnified && (
+            <CopyMenuItem value={invoiceUnified} title={t('transaction_actions.copy_unified')} />
+          )}
+          {invoiceBolt11 && (
+            <CopyMenuItem value={invoiceBolt11} title={t('transaction_actions.copy_bolt11')} />
+          )}
+          {invoiceAddress && (
+            <CopyMenuItem
+              value={invoiceAddress}
+              title={t('transaction_actions.copy_onchain_address')}
+            />
+          )}
+          {invoiceOutpoint && (
+            <CopyMenuItem value={invoiceOutpoint} title={t('transaction_actions.copy_outpoint')} />
+          )}
+          {paymentAddress && (
+            <CopyMenuItem
+              value={paymentAddress}
+              title={t('transaction_actions.copy_destination')}
+            />
+          )}
+          {explorerUrl && (
+            <MenuItem component="a" href={explorerUrl} target="_blank" rel="noopener noreferrer">
+              <Iconify icon="solar:map-arrow-right-bold" />
+              {t('transaction_actions.open_explorer')}
+            </MenuItem>
+          )}
+
+          {canDelete && (
+            <>
+              <Divider sx={{ borderStyle: 'dashed' }} />
+
+              <MenuItem
+                onClick={() => {
+                  confirm.onTrue();
+                  popover.onClose();
+                }}
+                sx={{ color: 'error.main' }}
+              >
+                <Iconify icon="solar:trash-bin-trash-bold" />
+                {t('delete')}
+              </MenuItem>
+            </>
+          )}
         </MenuList>
       </CustomPopover>
+
+      <ConfirmDialog
+        open={confirm.value}
+        onClose={confirm.onFalse}
+        title={t('delete')}
+        content={t('confirm_delete')}
+        action={
+          <Button
+            variant="contained"
+            color="error"
+            loading={isDeleting.value}
+            onClick={async () => {
+              isDeleting.onTrue();
+              await onDeleteRow();
+              isDeleting.onFalse();
+              confirm.onFalse();
+            }}
+          >
+            {t('delete')}
+          </Button>
+        }
+      />
     </>
+  );
+}
+
+function ActivityDetailDrawer({
+  row,
+  canDelete,
+  onDeleteRow,
+  onClose,
+}: {
+  row: ActivityRow | null;
+  canDelete: boolean;
+  onDeleteRow?: () => Promise<void>;
+  onClose: VoidFunction;
+}) {
+  const { t } = useTranslate();
+  const confirm = useBoolean();
+  const isDeleting = useBoolean();
+
+  const invoice = row?.transaction_type === TransactionType.INVOICE ? (row as Invoice) : null;
+  const payment = row?.transaction_type === TransactionType.PAYMENT ? (row as Payment) : null;
+  const invoiceBolt11 = invoice?.ln_invoice?.bolt11;
+  const invoiceAddress = invoice?.bitcoin_output?.address;
+  const invoiceOutpoint = invoice?.bitcoin_output?.outpoint;
+  const invoiceUnified = composeInvoiceBip21(invoice);
+  const paymentAddress =
+    payment?.bitcoin?.address || payment?.internal?.btc_address || payment?.internal?.ln_address;
+  const paymentHash = payment?.lightning?.payment_hash || payment?.internal?.payment_hash;
+  const explorerUrl = txExplorerUrl(payment?.bitcoin?.txid || txidFromOutpoint(invoiceOutpoint));
+  const methodLabel = getLedgerLabel(row?.ledger, t);
+
+  return (
+    <Drawer anchor="right" open={!!row} onClose={onClose} slotProps={{ paper: { sx: drawerSx } }}>
+      {row && (
+        <>
+          <Stack
+            direction="row"
+            spacing={2}
+            sx={{ alignItems: 'center', justifyContent: 'space-between', px: 3, py: 2 }}
+          >
+            <Stack sx={{ minWidth: 0 }}>
+              <Typography variant="h6" noWrap>
+                {row.description_label}
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                {row.direction === 'in' ? t('activity_view.received') : t('activity_view.sent')} ·{' '}
+                {methodLabel}
+              </Typography>
+            </Stack>
+
+            <IconButton onClick={onClose}>
+              <Iconify icon="mingcute:close-line" />
+            </IconButton>
+          </Stack>
+
+          <Divider />
+
+          <Stack spacing={3} sx={{ p: 3 }}>
+            <Box
+              sx={[
+                (theme) => ({
+                  p: 2,
+                  borderRadius: 1,
+                  bgcolor: 'background.neutral',
+                  border: `1px solid ${theme.vars.palette.divider}`,
+                }),
+              ]}
+            >
+              <Stack spacing={1.5}>
+                <Stack
+                  direction="row"
+                  sx={{ alignItems: 'center', justifyContent: 'space-between' }}
+                >
+                  <Label color={directionColor(row.direction)}>
+                    {row.direction === 'in' ? t('activity_view.in') : t('activity_view.out')}
+                  </Label>
+                  <Label variant="soft" color={statusColor(row.status)}>
+                    {row.status}
+                  </Label>
+                </Stack>
+
+                <SatsWithIcon amountMSats={row.amount_total_msat} variant="h4" />
+
+                <Typography variant="body2" color="text.secondary">
+                  {row.id}
+                </Typography>
+              </Stack>
+            </Box>
+
+            <Stack spacing={1.5}>
+              <ActivityDrawerRow label={t('activity_view.rail')} value={methodLabel} />
+              <ActivityDrawerRow
+                label={t('activity_view.created')}
+                value={fDateTime(row.created_at)}
+              />
+              <ActivityDrawerRow
+                label={t('activity_view.settled')}
+                value={
+                  row.payment_time ? fDateTime(row.payment_time) : t('transaction_details.pending')
+                }
+              />
+              <ActivityDrawerRow label={t('activity_view.wallet')} value={row.wallet_id} mono />
+              {invoice?.ln_invoice?.expires_at && (
+                <ActivityDrawerRow
+                  label={t('transaction_list.expires')}
+                  value={fDateTime(invoice.ln_invoice.expires_at)}
+                />
+              )}
+              {payment?.error && (
+                <ActivityDrawerRow
+                  label={t('payment_details.error_message')}
+                  value={payment.error}
+                />
+              )}
+            </Stack>
+
+            <Stack spacing={1}>
+              {invoiceUnified && (
+                <ActionCopyButton
+                  value={invoiceUnified}
+                  label={t('transaction_actions.copy_unified')}
+                />
+              )}
+              {invoiceBolt11 && (
+                <ActionCopyButton
+                  value={invoiceBolt11}
+                  label={t('transaction_actions.copy_bolt11')}
+                />
+              )}
+              {invoiceAddress && (
+                <ActionCopyButton
+                  value={invoiceAddress}
+                  label={t('transaction_actions.copy_onchain_address')}
+                />
+              )}
+              {invoiceOutpoint && (
+                <ActionCopyButton
+                  value={invoiceOutpoint}
+                  label={t('transaction_actions.copy_outpoint')}
+                />
+              )}
+              {paymentAddress && (
+                <ActionCopyButton
+                  value={paymentAddress}
+                  label={t('transaction_actions.copy_destination')}
+                />
+              )}
+              {paymentHash && (
+                <ActionCopyButton value={paymentHash} label={t('payment_details.payment_hash')} />
+              )}
+              <ActionCopyButton value={row.id} label={t('activity_view.copy_transaction_id')} />
+
+              {explorerUrl && (
+                <Button
+                  href={explorerUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  color="inherit"
+                  variant="outlined"
+                  startIcon={<Iconify icon="solar:map-arrow-right-bold" />}
+                >
+                  {t('transaction_actions.open_explorer')}
+                </Button>
+              )}
+            </Stack>
+
+            <Button
+              href={row.detail_href}
+              color="inherit"
+              variant="contained"
+              startIcon={<Iconify icon="solar:eye-bold" />}
+            >
+              {t('details')}
+            </Button>
+
+            {canDelete && onDeleteRow && (
+              <Button
+                color="error"
+                variant="outlined"
+                onClick={confirm.onTrue}
+                startIcon={<Iconify icon="solar:trash-bin-trash-bold" />}
+              >
+                {t('delete')}
+              </Button>
+            )}
+          </Stack>
+
+          <ConfirmDialog
+            open={confirm.value}
+            onClose={confirm.onFalse}
+            title={t('delete')}
+            content={t('confirm_delete')}
+            action={
+              <Button
+                variant="contained"
+                color="error"
+                loading={isDeleting.value}
+                onClick={async () => {
+                  if (!onDeleteRow) return;
+                  isDeleting.onTrue();
+                  await onDeleteRow();
+                  isDeleting.onFalse();
+                  confirm.onFalse();
+                }}
+              >
+                {t('delete')}
+              </Button>
+            }
+          />
+        </>
+      )}
+    </Drawer>
+  );
+}
+
+function ActivityDrawerRow({
+  label,
+  value,
+  mono,
+}: {
+  label: string;
+  value?: string | null;
+  mono?: boolean;
+}) {
+  if (!value) return null;
+
+  return (
+    <Stack direction="row" spacing={1.5} sx={{ justifyContent: 'space-between', minWidth: 0 }}>
+      <Typography variant="body2" color="text.secondary">
+        {label}
+      </Typography>
+      <Typography
+        variant="body2"
+        sx={{
+          maxWidth: '68%',
+          textAlign: 'right',
+          wordBreak: 'break-word',
+          fontFamily: mono ? 'monospace' : undefined,
+        }}
+      >
+        {value}
+      </Typography>
+    </Stack>
+  );
+}
+
+function ActionCopyButton({ value, label }: { value: string; label: string }) {
+  return (
+    <Stack
+      direction="row"
+      spacing={1}
+      sx={{
+        p: 1,
+        borderRadius: 1,
+        alignItems: 'center',
+        bgcolor: 'background.neutral',
+      }}
+    >
+      <Typography variant="body2" sx={{ flex: 1 }} noWrap>
+        {label}
+      </Typography>
+      <CopyButton value={value} title={label} />
+    </Stack>
   );
 }

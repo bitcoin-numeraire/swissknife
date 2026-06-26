@@ -1,44 +1,44 @@
 {
   "preview": {
     "eyebrow": "SwissKnife first run",
-    "title": "Start with a wallet you can operate",
-    "content": "Preview the money surface before creating the password: self-custody, Lightning, on-chain deposits, reusable identity and node control are all part of the same workspace.",
+    "title": "Set up your Bitcoin wallet server",
+    "content": "Before you create the first admin password, review what this SwissKnife instance will control: wallet access, Lightning payments, on-chain deposits, reusable identity and node connectivity.",
     "wallet_title": "Starter wallet",
-    "wallet_caption": "Ready for regtest funding",
+    "wallet_caption": "Ready after admin setup",
     "available": "Spendable now",
-    "empty_state": "Fund after backup, then receive or send from the dashboard.",
+    "empty_state": "Back up your node and wallet material before sending meaningful funds.",
     "lightning": "Lightning",
     "onchain": "On-chain",
     "identity": "Identity",
     "node": "Node"
   },
   "welcome": {
-    "title": "One wallet surface, many payment rails",
-    "content": "SwissKnife treats Lightning invoices, on-chain requests and human-readable addresses as one money workflow instead of separate admin screens.",
-    "point_one": "Receive with Lightning, a fresh Bitcoin address or a reusable Lightning Address.",
-    "point_two": "Send from a single input that can grow into LNURL, BIP21 and address parsing.",
-    "point_three": "Keep the interface focused on amounts, status and next action."
+    "title": "One place to send and receive",
+    "content": "SwissKnife gives the first admin a dashboard for Lightning, on-chain Bitcoin and reusable receive identities without splitting them into separate apps.",
+    "point_one": "Receive with Lightning invoices, Bitcoin addresses or a reusable Lightning Address.",
+    "point_two": "Send by pasting an invoice, LNURL, BIP21 request, address or internal recipient.",
+    "point_three": "Track amounts, status and next actions from the wallet dashboard."
   },
   "custody": {
-    "title": "Self-custody stays visible",
-    "content": "The dashboard should make it clear what the password unlocks, what must be backed up and why the server cannot recover private material for you.",
-    "point_one": "Create a local password before the wallet opens.",
+    "title": "Self-custody means you are responsible",
+    "content": "This server cannot recover funds or secrets you lose. Treat setup as the moment to decide who can administer the wallet and where backups live.",
+    "point_one": "Create the first local admin password before the wallet opens.",
     "point_two": "Back up node and wallet recovery material before meaningful deposits.",
-    "point_three": "Show security reminders at the moment they matter."
+    "point_three": "Keep the admin password and recovery material separate."
   },
   "accessibility": {
-    "title": "Bring your own node, or host it cleanly",
-    "content": "Umbrel is one good self-hosted target, but the experience should also make sense for Start9, raw LND, CLN and managed cloud deployments.",
-    "point_one": "Treat self-hosted as a deployment model, not a separate wallet mode.",
-    "point_two": "Keep node health, liquidity and peer state close to payment actions.",
-    "point_three": "Use regtest-friendly flows so first deposits can be tested safely."
+    "title": "Works for home, desktop and server installs",
+    "content": "This first-run flow is for self-hosted boxes, desktop runs and managed server deployments. The dashboard adapts after authentication is configured.",
+    "point_one": "Use local JWT setup for single-admin self-hosted or desktop installs.",
+    "point_two": "Use external auth when a server deployment manages accounts and roles elsewhere.",
+    "point_three": "Use regtest or test funds first when validating a new deployment."
   },
   "multi_user": {
-    "title": "Accounts without spreadsheet ops",
-    "content": "Accounts, wallets and reusable identities should feel like a small operating system for teams, agents and services.",
-    "point_one": "Separate the accounts directory from wallet administration.",
-    "point_two": "Make Lightning Address ownership visible without exposing raw UUIDs.",
-    "point_three": "Prepare the UI for roles, agents, API keys and service wallets."
+    "title": "Start with one admin, grow into accounts",
+    "content": "JWT installs create one initial admin today. Server deployments with external authentication can map dashboard access to provider-side users, roles and scopes.",
+    "point_one": "Manage wallets and reusable identities from the admin dashboard.",
+    "point_two": "Create API keys for services that need wallet access.",
+    "point_three": "Add accounts, roles and agents as your deployment model requires."
   },
   "step": "Step {{current}} of {{total}}",
   "back": "Back",

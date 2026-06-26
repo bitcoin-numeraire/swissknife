@@ -1,6 +1,6 @@
-import { appTitle } from 'src/utils/format-string';
+import { redirect } from 'next/navigation';
 
-import { NostrDetailsView } from 'src/sections/nostr/view';
+import { appTitle } from 'src/utils/format-string';
 
 // ----------------------------------------------------------------------
 
@@ -9,5 +9,5 @@ export const metadata = {
 };
 
 export default function LnAddressDetailsPage() {
-  return <NostrDetailsView />;
+  redirect('/identity?tab=nostr');
 }

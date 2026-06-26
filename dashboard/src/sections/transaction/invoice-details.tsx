@@ -9,6 +9,8 @@ import Stack from '@mui/material/Stack';
 import Alert from '@mui/material/Alert';
 import Typography from '@mui/material/Typography';
 
+import { getLedgerLabel } from 'src/utils/transactions';
+
 import { useTranslate } from 'src/locales';
 
 import { Iconify } from 'src/components/iconify';
@@ -37,8 +39,11 @@ type Props = {
 export function InvoiceDetails({ invoice, isAdmin }: Props) {
   const { t } = useTranslate();
   const bolt11 = invoice.ln_invoice?.bolt11;
+  const methodLabel = getLedgerLabel(invoice.ledger, t);
   const receivedAmount =
-    invoice.status === 'Settled' ? (invoice.amount_received_msat || 0) - (invoice.fee_msat || 0) : 0;
+    invoice.status === 'Settled'
+      ? (invoice.amount_received_msat || 0) - (invoice.fee_msat || 0)
+      : 0;
 
   return (
     <>
@@ -73,10 +78,10 @@ export function InvoiceDetails({ invoice, isAdmin }: Props) {
 
                   <Stack spacing={0.5}>
                     <Typography variant="overline" color="text.secondary">
-                      {t('invoice_details.invoice_from')}
+                      {t('invoice_details.request_memo')}
                     </Typography>
                     <Typography variant="h4">
-                      {invoice.description || t('recent_transactions.empty_description')}
+                      {invoice.description || t('transaction_details.incoming_invoice')}
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
                       {isAdmin
@@ -98,11 +103,18 @@ export function InvoiceDetails({ invoice, isAdmin }: Props) {
                     <MetricTile
                       title={t('invoice_details.amount_received')}
                       amountMSats={receivedAmount}
-                      helper={invoice.status === 'Settled' ? t('transaction_details.settled') : t('transaction_details.pending')}
+                      helper={
+                        invoice.status === 'Settled'
+                          ? t('transaction_details.settled')
+                          : t('transaction_details.pending')
+                      }
                     />
                   </Grid>
                   <Grid size={{ xs: 12, sm: 4 }}>
-                    <MetricTile title={t('invoice_details.fees')} amountMSats={invoice.fee_msat || 0} />
+                    <MetricTile
+                      title={t('invoice_details.fees')}
+                      amountMSats={invoice.fee_msat || 0}
+                    />
                   </Grid>
                   <Grid size={{ xs: 12, sm: 4 }}>
                     <MetricTile
@@ -164,7 +176,10 @@ export function InvoiceDetails({ invoice, isAdmin }: Props) {
 
         <Grid container spacing={3}>
           <Grid size={{ xs: 12, md: 5 }}>
-            <DetailCard title={t('transaction_details.timeline')} icon="solar:sort-by-time-bold-duotone">
+            <DetailCard
+              title={t('transaction_details.timeline')}
+              icon="solar:sort-by-time-bold-duotone"
+            >
               <TransactionTimeline
                 items={[
                   {
@@ -188,9 +203,12 @@ export function InvoiceDetails({ invoice, isAdmin }: Props) {
           </Grid>
 
           <Grid size={{ xs: 12, md: 7 }}>
-            <DetailCard title={t('transaction_details.payment_context')} icon="solar:document-text-bold-duotone">
+            <DetailCard
+              title={t('transaction_details.payment_context')}
+              icon="solar:document-text-bold-duotone"
+            >
               <DetailRow label={t('transaction_details.description')} value={invoice.description} />
-              <DetailRow label={t('transaction_details.ledger')} value={invoice.ledger} />
+              <DetailRow label={t('transaction_details.ledger')} value={methodLabel} />
               <DetailRow label={t('transaction_details.currency')} value={invoice.currency} />
               <DetailRow
                 label={t('transaction_details.created')}
@@ -204,7 +222,10 @@ export function InvoiceDetails({ invoice, isAdmin }: Props) {
           </Grid>
 
           <Grid size={{ xs: 12 }}>
-            <DetailCard title={t('transaction_details.technical_details')} icon="solar:code-square-bold-duotone">
+            <DetailCard
+              title={t('transaction_details.technical_details')}
+              icon="solar:code-square-bold-duotone"
+            >
               <DetailRow
                 label={t('transaction_details.transaction_id')}
                 value={invoice.id}

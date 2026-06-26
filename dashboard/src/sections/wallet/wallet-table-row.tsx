@@ -27,11 +27,8 @@ import { CopyMenuItem } from 'src/components/copy';
 import { SatsWithIcon } from 'src/components/bitcoin';
 import { ConfirmDialog } from 'src/components/custom-dialog';
 import { CustomPopover } from 'src/components/custom-popover';
-import {
-  NewInvoiceDialog,
-  NewPaymentDialog,
-  ConfirmPaymentDialog,
-} from 'src/components/transactions';
+
+import { SendMoneyDrawer, ReceiveMoneyDrawer } from './money-drawers';
 
 // ----------------------------------------------------------------------
 
@@ -215,28 +212,34 @@ export function WalletTableRow({ row, selected, onSelectRow, onDeleteRow, fiatPr
         </MenuList>
       </CustomPopover>
 
-      <NewPaymentDialog
+      <SendMoneyDrawer
         isAdmin
         walletId={id}
+        contacts={[]}
         balance={balance.available_msat}
         fiatPrices={fiatPrices}
         open={newPayment.value}
         onClose={newPayment.onFalse}
       />
 
-      <NewInvoiceDialog
+      <ReceiveMoneyDrawer
         isAdmin
         walletId={id}
+        lnAddress={ln_address}
         fiatPrices={fiatPrices!}
         open={newInvoice.value}
         onClose={newInvoice.onFalse}
       />
 
-      <ConfirmPaymentDialog
-        input={input}
+      <SendMoneyDrawer
+        isAdmin
+        walletId={id}
+        contacts={[]}
+        balance={balance.available_msat}
+        initialInput={input}
+        fiatPrices={fiatPrices}
         open={sendTo.value}
         onClose={handleCloseSendTo}
-        fiatPrices={fiatPrices}
       />
 
       <ConfirmDialog

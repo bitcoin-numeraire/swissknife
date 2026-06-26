@@ -1,6 +1,8 @@
-import { appTitle } from 'src/utils/format-string';
+import { redirect } from 'next/navigation';
 
-import { ApiKeyListView } from 'src/sections/api-key/view';
+import { paths } from 'src/routes/paths';
+
+import { appTitle } from 'src/utils/format-string';
 
 // ----------------------------------------------------------------------
 
@@ -9,5 +11,5 @@ export const metadata = {
 };
 
 export default function AdminApiKeyListPage() {
-  return <ApiKeyListView />;
+  redirect(paths.build.apiKeys);
 }

@@ -22,11 +22,13 @@ import { RouterLink } from 'src/routes/components';
 
 import { handleActionError } from 'src/utils/errors';
 
+import { CONFIG } from 'src/global-config';
 import { useTranslate } from 'src/locales';
 import { signUp } from 'src/lib/swissknife';
 
 import { Iconify } from 'src/components/iconify';
 import { Form, Field } from 'src/components/hook-form';
+import { ONBOARDING_COMPLETE_STORAGE_KEY } from 'src/components/settings';
 
 import { JWT_STORAGE_KEY } from 'src/auth/context/jwt';
 
@@ -87,6 +89,24 @@ export function JwtSignUpView() {
     formState: { isSubmitting },
   } = methods;
 
+  if (CONFIG.auth.method !== 'jwt') {
+    return (
+      <Stack spacing={3}>
+        <FormHead
+          title={t('sign_up.external_auth_title')}
+          description={t('sign_up.external_auth_description')}
+          sx={{ mb: 0, textAlign: 'left', alignItems: 'flex-start' }}
+        />
+        <Alert severity="info" sx={{ borderRadius: 1 }}>
+          {t('sign_up.external_auth_note')}
+        </Alert>
+        <Button fullWidth color="inherit" size="large" variant="contained" href={paths.auth.login}>
+          {t('sign_up.external_auth_action')}
+        </Button>
+      </Stack>
+    );
+  }
+
   const onSubmit = handleSubmit(async (body) => {
     try {
       const { data } = await signUp<true>({
@@ -94,9 +114,10 @@ export function JwtSignUpView() {
       });
 
       sessionStorage.setItem(JWT_STORAGE_KEY, data.token);
+      localStorage.setItem(ONBOARDING_COMPLETE_STORAGE_KEY, 'true');
       await checkUserSession?.();
 
-      router.push(paths.wallet.root);
+      router.replace(paths.wallet.root);
     } catch (error) {
       handleActionError(error);
     }
@@ -185,6 +206,14 @@ export function JwtSignUpView() {
         sx={{ borderRadius: 1 }}
       >
         {t('sign_up.security_copy')}
+      </Alert>
+
+      <Alert
+        severity="info"
+        icon={<Iconify icon="solar:user-rounded-bold-duotone" />}
+        sx={{ borderRadius: 1 }}
+      >
+        {t('sign_up.first_admin_only')}
       </Alert>
 
       <Form methods={methods} onSubmit={onSubmit}>

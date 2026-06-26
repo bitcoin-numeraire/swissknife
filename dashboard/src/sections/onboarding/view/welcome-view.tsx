@@ -9,6 +9,7 @@ import { useRouter } from 'src/routes/hooks';
 
 import { handleActionError } from 'src/utils/errors';
 
+import { CONFIG } from 'src/global-config';
 import { markWelcomeComplete } from 'src/lib/swissknife';
 
 import { WelcomeCarousel } from '../welcome-carousel';
@@ -54,7 +55,7 @@ export function WelcomeView() {
   const handleWelcomeComplete = async () => {
     try {
       await markWelcomeComplete();
-      router.push(paths.auth.signUp);
+      router.replace(CONFIG.auth.method === 'jwt' ? paths.auth.signUp : paths.auth.login);
     } catch (err) {
       handleActionError(err);
     }

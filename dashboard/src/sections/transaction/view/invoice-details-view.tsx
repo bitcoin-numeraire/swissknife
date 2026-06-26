@@ -44,8 +44,8 @@ export function InvoiceDetailsView({ id }: Props) {
                 href: paths.wallet.root,
               },
               {
-                name: t('invoices'),
-                href: paths.wallet.invoices,
+                name: t('activity'),
+                href: paths.activityList('invoice'),
               },
               { name: t('invoice_details.detail_heading') },
             ]}
