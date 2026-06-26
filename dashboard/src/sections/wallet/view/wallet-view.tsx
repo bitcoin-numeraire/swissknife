@@ -32,7 +32,9 @@ import { displayLnAddress } from 'src/utils/lnurl';
 import { fCurrency } from 'src/utils/format-number';
 import { fFromNow, fDateTime } from 'src/utils/format-time';
 import { mergeAndSortTransactions } from 'src/utils/transactions';
+import { compactBitcoinAddress } from 'src/utils/bitcoin-request';
 
+import { CONFIG } from 'src/global-config';
 import { useTranslate } from 'src/locales';
 import { endpointKeys } from 'src/actions/keys';
 import { DashboardContent } from 'src/layouts/dashboard';
@@ -116,6 +118,20 @@ function compactIdentifier(value: string) {
   if (value.length <= 18) return value;
 
   return `${value.slice(0, 8)}...${value.slice(-6)}`;
+}
+
+function txExplorerUrl(txid?: string | null) {
+  if (!txid) return undefined;
+
+  const explorerBaseUrl = CONFIG.mempoolSpace.replace(/\/api\/v1\/?$/, '');
+  return `${explorerBaseUrl}/tx/${txid}`;
+}
+
+function txidFromOutpoint(outpoint?: string | null) {
+  if (!outpoint) return undefined;
+
+  const [txid] = outpoint.split(':');
+  return txid || undefined;
 }
 
 // ----------------------------------------------------------------------
@@ -1091,14 +1107,19 @@ function WalletActivityDrawer({
   const amountOnly = row.amount_msat || 0;
   const totalAmount = txAmount(row);
   const isOpenAmount = isOpenAmountRequest(row);
+  const bitcoinDestination =
+    payment?.internal?.btc_address || payment?.bitcoin?.address || invoice?.bitcoin_output?.address;
   const destination =
     payment?.lightning?.ln_address ||
     payment?.internal?.ln_address ||
-    payment?.internal?.btc_address ||
-    payment?.bitcoin?.address ||
+    bitcoinDestination ||
     payment?.bitcoin?.txid ||
-    invoice?.bitcoin_output?.address ||
     invoice?.ln_invoice?.bolt11;
+  const destinationLabel =
+    destination === bitcoinDestination ? compactBitcoinAddress(destination) : destination;
+  const explorerUrl = txExplorerUrl(
+    payment?.bitcoin?.txid || txidFromOutpoint(invoice?.bitcoin_output?.outpoint)
+  );
 
   return (
     <Drawer
@@ -1191,13 +1212,35 @@ function WalletActivityDrawer({
             label={t('wallet_view.settled')}
             value={row.payment_time ? fDateTime(row.payment_time) : t('wallet_view.not_settled')}
           />
-          <WalletDrawerRow label={t('wallet_view.destination')} value={destination} mono />
+          {destination && (
+            <WalletDrawerCopyRow
+              label={t('wallet_view.destination')}
+              value={destinationLabel || destination}
+              copyValue={destination}
+              copyLabel={t('transaction_actions.copy_destination')}
+            />
+          )}
           <WalletDrawerCopyRow
             label={t('wallet_view.transaction_id')}
             value={compactIdentifier(row.id)}
             copyValue={row.id}
+            copyLabel={t('activity_view.copy_transaction_id')}
           />
         </Stack>
+
+        {explorerUrl && (
+          <Button
+            component="a"
+            href={explorerUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            color="inherit"
+            variant="outlined"
+            startIcon={<Iconify icon="solar:map-arrow-right-bold" />}
+          >
+            {t('transaction_actions.open_explorer')}
+          </Button>
+        )}
 
         <Button
           href={txHref(row)}
@@ -1286,21 +1329,27 @@ function WalletDrawerCopyRow({
   label,
   value,
   copyValue,
+  copyLabel,
 }: {
   label: string;
   value: string;
   copyValue: string;
+  copyLabel: string;
 }) {
   const { t } = useTranslate();
   const { copy } = useCopyToClipboard();
 
-  const handleCopy = () => {
-    copy(copyValue);
-    toast.success(t('copied_to_clipboard'));
+  const handleCopy = async () => {
+    if (await copy(copyValue)) {
+      toast.success(t('copied_to_clipboard'));
+    }
   };
 
   return (
     <ButtonBase
+      type="button"
+      title={copyLabel}
+      aria-label={copyLabel}
       onClick={handleCopy}
       sx={[
         (theme) => ({

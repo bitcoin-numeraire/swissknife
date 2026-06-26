@@ -38,7 +38,7 @@ import { handleActionError } from 'src/utils/errors';
 import { truncateText } from 'src/utils/format-string';
 import { fToNow, fDateTime } from 'src/utils/format-time';
 import { encodeLNURL, displayLnAddress } from 'src/utils/lnurl';
-import { composeBip21, parseBitcoinUri } from 'src/utils/bitcoin-request';
+import { composeBip21, parseBitcoinUri, compactBitcoinAddress } from 'src/utils/bitcoin-request';
 
 import { CONFIG } from 'src/global-config';
 import { useTranslate } from 'src/locales';
@@ -210,26 +210,6 @@ function detectRecipientKind(input: string): RecipientKind {
   }
 
   return 'unknown';
-}
-
-function compactAddress(value?: string | null) {
-  if (!value) return '';
-
-  const normalized = value.replace(/\s+/g, '');
-  const head =
-    normalized
-      .slice(0, 16)
-      .match(/.{1,4}/g)
-      ?.join(' ') ?? '';
-  const tail =
-    normalized
-      .slice(-16)
-      .match(/.{1,4}/g)
-      ?.join(' ') ?? '';
-
-  if (normalized.length <= 36) return normalized.match(/.{1,4}/g)?.join(' ') ?? normalized;
-
-  return `${head} ... ${tail}`;
 }
 
 function decodedBolt11Details(input: string): Bolt11Details {
@@ -853,7 +833,7 @@ export function SendMoneyDrawer({
                     {(kind === 'bip21' || kind === 'bitcoin') && bitcoinRequest.address && (
                       <SendDetailRow
                         label={t('send_money.destination')}
-                        value={compactAddress(bitcoinRequest.address)}
+                        value={compactBitcoinAddress(bitcoinRequest.address)}
                       />
                     )}
 
