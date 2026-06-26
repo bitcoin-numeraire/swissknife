@@ -146,6 +146,18 @@ function extractBitcoinInput(input: string) {
   return parseBitcoinUri(input).address;
 }
 
+function isLnurlPayload(input: string) {
+  const value = stripLightningScheme(input);
+
+  if (!value.toLowerCase().startsWith('lnurl1')) return false;
+
+  try {
+    return bech32.decode(value, 2000).prefix.toLowerCase() === 'lnurl';
+  } catch {
+    return false;
+  }
+}
+
 function isBitcoinAddress(value: string) {
   return isBech32BitcoinAddress(value) || /^[13mn2][a-km-zA-HJ-NP-Z1-9]{25,90}$/.test(value.trim());
 }
@@ -178,7 +190,6 @@ function isBech32BitcoinAddress(value: string) {
 
 function detectRecipientKind(input: string): RecipientKind {
   const value = input.trim();
-  const normalized = value.toLowerCase();
   const bitcoinUri = parseBitcoinUri(value);
   const paymentRequest = bitcoinUri.lightning ?? value;
 
@@ -200,8 +211,7 @@ function detectRecipientKind(input: string): RecipientKind {
   if (isBitcoinAddress(bitcoinUri.address) || looksLikeBitcoinAddress(bitcoinUri.address)) {
     return 'bitcoin';
   }
-  if (normalized.startsWith('lnurl') || normalized.startsWith('lightning:lnurl')) return 'lnurl';
-  if (normalized.startsWith('http://') || normalized.startsWith('https://')) return 'lnurl';
+  if (isLnurlPayload(value)) return 'lnurl';
   if (isBitcoinAddress(extractBitcoinInput(value))) return 'bitcoin';
   if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
     return value.split('@')[1].toLowerCase() === CONFIG.domain.toLowerCase()
