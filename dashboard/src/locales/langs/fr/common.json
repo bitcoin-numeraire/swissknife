@@ -254,7 +254,7 @@
     "not_settled": "Pas encore réglé",
     "destination": "Destination",
     "transaction_id": "ID de transaction",
-    "open_activity": "Ouvrir dans Activité",
+    "open_details": "Ouvrir les détails",
     "income": "Revenus",
     "expenses": "Dépenses"
   },

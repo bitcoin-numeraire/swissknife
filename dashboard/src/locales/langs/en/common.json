@@ -255,7 +255,7 @@
     "not_settled": "Not settled yet",
     "destination": "Destination",
     "transaction_id": "Transaction ID",
-    "open_activity": "Open in Activity",
+    "open_details": "Open details",
     "income": "Income",
     "expenses": "Expenses"
   },
