@@ -319,7 +319,6 @@
     "estimate_fee": "Estimer les frais",
     "fee_estimate_unavailable": "L'estimation par probe nécessite un support backend avant de pouvoir être lancée ici.",
     "no_network_fee": "Aucun frais réseau",
-    "amount_waiting_for_request": "Colle d'abord une demande ; le champ montant apparaît seulement si elle en a besoin.",
     "bip21_with_lightning_note": "Demande BIP21 : elle contient une adresse on-chain et une demande de paiement Lightning. SwissKnife envoie la demande complète pour que le backend route le paiement supporté.",
     "bip21_onchain_note": "Demande BIP21 : la destination on-chain et le montant restent ensemble pour la revue.",
     "onchain_fee_note": "Paiement on-chain : les frais et le délai de confirmation peuvent changer la décision.",

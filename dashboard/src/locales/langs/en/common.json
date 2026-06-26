@@ -320,7 +320,6 @@
     "estimate_fee": "Estimate fee",
     "fee_estimate_unavailable": "Fee probing needs backend support before it can run here.",
     "no_network_fee": "No network fee",
-    "amount_waiting_for_request": "Paste a request first; the amount field appears only when the request needs one.",
     "bip21_with_lightning_note": "BIP21 request: includes an on-chain address and a Lightning payment request. SwissKnife submits the full request so the backend can route the supported payment.",
     "bip21_onchain_note": "BIP21 request: on-chain destination and amount are kept together for review.",
     "onchain_fee_note": "On-chain payment: fees and confirmation time can change the decision.",

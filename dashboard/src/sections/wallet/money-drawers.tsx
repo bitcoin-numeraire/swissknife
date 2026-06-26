@@ -601,7 +601,7 @@ export function SendMoneyDrawer({
     !hasInvalidBip21Amount &&
     !hasInvalidBitcoinAddress;
   const submitLabel =
-    (kind === 'unknown' && t('send_money.unsupported_request')) ||
+    (input.trim() && kind === 'unknown' && t('send_money.unsupported_request')) ||
     ((kind === 'bitcoin' || (kind === 'bip21' && !bitcoinRequest.lightning)) &&
       t('send_money.send_onchain')) ||
     t('send_money.send');
@@ -945,8 +945,8 @@ export function SendMoneyDrawer({
                 </Box>
               )}
 
-              <Stack spacing={1.5}>
-                {embeddedAmountSats > 0 ? null : canEnterAmount ? (
+              {embeddedAmountSats > 0 ? null : canEnterAmount ? (
+                <Stack spacing={1.5}>
                   <AmountEntryField
                     label={t('send_money.amount')}
                     value={amountValue}
@@ -959,14 +959,8 @@ export function SendMoneyDrawer({
                     onChange={setAmountValue}
                     onSwap={handleAmountUnitSwap}
                   />
-                ) : (
-                  !input.trim() && (
-                    <Typography variant="body2" color="text.secondary">
-                      {t('send_money.amount_waiting_for_request')}
-                    </Typography>
-                  )
-                )}
-              </Stack>
+                </Stack>
+              ) : null}
 
               {kind !== 'unknown' && canSendComment && (
                 <TextField
