@@ -728,15 +728,15 @@ export function WalletView() {
                           onClick={() => setDetailTransaction(tx)}
                           sx={[
                             (theme) => ({
-                              p: 1.5,
-                              gap: 1.5,
+                              p: { xs: 1.25, sm: 1.5 },
+                              gap: { xs: 1.25, sm: 1.5 },
                               display: 'grid',
                               width: 1,
                               borderRadius: 1,
                               textAlign: 'left',
                               alignItems: 'center',
                               gridTemplateColumns: {
-                                xs: '32px minmax(0, 1fr)',
+                                xs: '32px minmax(0, 1fr) max-content',
                                 sm: '32px minmax(0, 1fr) minmax(120px, auto) auto 20px',
                               },
                               bgcolor: 'background.neutral',
@@ -786,11 +786,48 @@ export function WalletView() {
                             </Typography>
                           </Stack>
 
+                          <Stack
+                            spacing={0.75}
+                            sx={{
+                              display: { xs: 'flex', sm: 'none' },
+                              gridColumn: '3',
+                              gridRow: '1',
+                              alignItems: 'flex-end',
+                              justifySelf: 'end',
+                              minWidth: 86,
+                            }}
+                          >
+                            {isOpenAmount ? (
+                              <Typography variant="body2" color="text.secondary" noWrap>
+                                {t('wallet_view.open_amount')}
+                              </Typography>
+                            ) : (
+                              <Stack direction="row" spacing={0.25} sx={{ alignItems: 'center' }}>
+                                <Typography
+                                  component="span"
+                                  variant="body2"
+                                  sx={{ color: isIncoming ? 'success.main' : 'warning.main' }}
+                                >
+                                  {isIncoming ? '+' : '-'}
+                                </Typography>
+                                <SatsWithIcon
+                                  component="span"
+                                  amountMSats={txAmount(tx)}
+                                  noWrap
+                                  sx={{ color: isIncoming ? 'success.main' : 'warning.main' }}
+                                />
+                              </Stack>
+                            )}
+
+                            <Label color={statusColor(tx.status)}>{tx.status}</Label>
+                          </Stack>
+
                           {isOpenAmount ? (
                             <Typography
                               variant="body2"
                               color="text.secondary"
                               sx={{
+                                display: { xs: 'none', sm: 'block' },
                                 gridColumn: { xs: '2', sm: 'auto' },
                                 justifySelf: { xs: 'start', sm: 'end' },
                               }}
@@ -802,6 +839,7 @@ export function WalletView() {
                               direction="row"
                               spacing={0.25}
                               sx={{
+                                display: { xs: 'none', sm: 'flex' },
                                 gridColumn: { xs: '2', sm: 'auto' },
                                 alignItems: 'center',
                                 justifyContent: { xs: 'flex-start', sm: 'flex-end' },
@@ -825,6 +863,7 @@ export function WalletView() {
                           <Label
                             color={statusColor(tx.status)}
                             sx={{
+                              display: { xs: 'none', sm: 'inline-flex' },
                               gridColumn: { xs: '2', sm: 'auto' },
                               justifySelf: { xs: 'start', sm: 'auto' },
                             }}
