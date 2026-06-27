@@ -402,11 +402,15 @@ function AmountEntryField({
           {label}
         </Typography>
 
-        <Stack direction="row" spacing={1.25} sx={{ alignItems: 'center' }}>
+        <Stack
+          direction="row"
+          spacing={amountUnit === 'fiat' ? 0.75 : 1}
+          sx={{ alignItems: 'center' }}
+        >
           <Typography
             variant="h4"
             color={error ? 'error.main' : 'text.secondary'}
-            sx={{ minWidth: amountUnit === 'fiat' ? 28 : 'auto' }}
+            sx={{ flexShrink: 0, lineHeight: 1 }}
           >
             {amountUnitPrefix(amountUnit, currency, displayUnit)}
           </Typography>
@@ -420,6 +424,8 @@ function AmountEntryField({
             error={error}
             onChange={(event) => onChange(event.target.value)}
             sx={{
+              flex: 1,
+              minWidth: 0,
               '& .MuiInputBase-input': {
                 p: 0,
                 typography: 'h4',
