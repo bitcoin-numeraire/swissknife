@@ -714,11 +714,11 @@ export function WalletView() {
               <Card sx={{ p: 3, borderRadius: 1 }}>
                 <Stack spacing={2}>
                   <Stack
-                    direction={{ xs: 'column', sm: 'row' }}
+                    direction="row"
                     spacing={1}
-                    sx={{ alignItems: { sm: 'center' }, justifyContent: 'space-between' }}
+                    sx={{ alignItems: 'center', justifyContent: 'space-between' }}
                   >
-                    <Stack>
+                    <Stack spacing={0.25}>
                       <Typography variant="h6">{t('wallet_view.recent_activity')}</Typography>
                       <Typography variant="body2" color="text.secondary">
                         {t('wallet_view.recent_activity_limit', { count: recentActivityLimit })}
@@ -726,8 +726,9 @@ export function WalletView() {
                     </Stack>
                     <Button
                       href={paths.activity}
+                      size="small"
                       color="inherit"
-                      endIcon={<Iconify icon="eva:arrow-ios-forward-fill" />}
+                      endIcon={<Iconify icon="eva:arrow-ios-forward-fill" width={16} />}
                     >
                       {t('view_all')}
                     </Button>
