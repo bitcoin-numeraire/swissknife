@@ -33,10 +33,10 @@ import AccordionSummary from '@mui/material/AccordionSummary';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 
 import { satsToFiat } from 'src/utils/fiat';
-import { fCurrency } from 'src/utils/format-number';
 import { handleActionError } from 'src/utils/errors';
 import { truncateText } from 'src/utils/format-string';
 import { fToNow, fDateTime } from 'src/utils/format-time';
+import { fSats, fCurrency } from 'src/utils/format-number';
 import { encodeLNURL, displayLnAddress } from 'src/utils/lnurl';
 import { composeBip21, parseBitcoinUri, compactBitcoinAddress } from 'src/utils/bitcoin-request';
 
@@ -316,6 +316,12 @@ function amountUnitPrefix(unit: AmountUnit, currency: string, displayUnit: 'bip1
   return displayUnit === 'bip177' ? '₿' : 'sats';
 }
 
+function bitcoinAmountLabel(sats: number, displayUnit: 'bip177' | 'sats') {
+  const formattedAmount = fSats(sats);
+
+  return displayUnit === 'sats' ? `${formattedAmount} sats` : `₿${formattedAmount}`;
+}
+
 function railLabel(kind: RecipientKind, t: (key: string) => string) {
   if (kind === 'bip21') return t('send_money.request_type_bip21');
   if (kind === 'bitcoin') return t('send_money.request_type_onchain');
@@ -350,7 +356,7 @@ function drawerTitle(title: string, onClose: VoidFunction) {
 function AmountEntryField({
   label,
   value,
-  fiatLabel,
+  secondaryLabel,
   amountUnit,
   currency,
   displayUnit,
@@ -361,7 +367,7 @@ function AmountEntryField({
 }: {
   label: string;
   value: string;
-  fiatLabel: string;
+  secondaryLabel: string;
   amountUnit: AmountUnit;
   currency: string;
   displayUnit: 'bip177' | 'sats';
@@ -428,7 +434,7 @@ function AmountEntryField({
         </Stack>
 
         <Typography variant="subtitle1" color={error ? 'error.main' : 'text.secondary'}>
-          {fiatLabel}
+          {secondaryLabel}
         </Typography>
       </Stack>
     </Box>
@@ -565,6 +571,7 @@ export function SendMoneyDrawer({
   const activeWalletId = walletId || selectedWalletId;
   const needsWallet = isAdmin && !activeWalletId;
   const hasFiatPrice = (fiatPrices[state.currency] ?? 0) > 0;
+  const displayUnit = state.displayUnit ?? 'bip177';
   const canSendComment = kind === 'lnurl' || kind === 'lightning-address' || kind === 'internal';
   const canShowParsedInput = input.trim().length > 0;
   const canSubmit =
@@ -591,13 +598,16 @@ export function SendMoneyDrawer({
     ((kind === 'bitcoin' || (kind === 'bip21' && !bitcoinRequest.lightning)) &&
       t('send_money.send_onchain')) ||
     t('send_money.send');
-  const amountFiatLabel = amountExceedsAvailable
+  const amountFiatLabel = hasFiatPrice
+    ? fCurrency(satsToFiat(amountSats, fiatPrices, state.currency), {
+        currency: state.currency,
+      })
+    : t('send_money.no_fiat_value');
+  const amountSecondaryLabel = amountExceedsAvailable
     ? t('send_money.amount_available_helper')
-    : hasFiatPrice
-      ? fCurrency(satsToFiat(amountSats, fiatPrices, state.currency), {
-          currency: state.currency,
-        })
-      : t('send_money.no_fiat_value');
+    : amountUnit === 'fiat'
+      ? bitcoinAmountLabel(amountSats, displayUnit)
+      : amountFiatLabel;
   const bolt11ExpiryLabel = bolt11ExpiresAt
     ? t(
         lightningInvoiceExpired ? 'send_money.invoice_expired_at' : 'send_money.invoice_expires_at',
@@ -974,10 +984,10 @@ export function SendMoneyDrawer({
                   <AmountEntryField
                     label={t('send_money.amount')}
                     value={amountValue}
-                    fiatLabel={amountFiatLabel}
+                    secondaryLabel={amountSecondaryLabel}
                     amountUnit={amountUnit}
                     currency={state.currency}
-                    displayUnit={state.displayUnit ?? 'bip177'}
+                    displayUnit={displayUnit}
                     hasFiatPrice={hasFiatPrice}
                     error={amountExceedsAvailable}
                     onChange={setAmountValue}
@@ -1106,6 +1116,7 @@ export function ReceiveMoneyDrawer({
   const addressWalletId = isAdmin ? activeWalletId : activeWalletId || wallet?.id;
   const needsWallet = isAdmin && !activeWalletId;
   const hasFiatPrice = (fiatPrices[state.currency] ?? 0) > 0;
+  const displayUnit = state.displayUnit ?? 'bip177';
   const bolt11 = invoice?.ln_invoice?.bolt11;
   const invoiceExpiresAt = invoice?.ln_invoice?.expires_at ?? null;
   const invoiceExpiryMs = invoiceExpiresAt ? new Date(invoiceExpiresAt).getTime() : null;
@@ -1400,16 +1411,18 @@ export function ReceiveMoneyDrawer({
             <AmountEntryField
               label={t('receive_money.amount')}
               value={amountValue}
-              fiatLabel={
-                hasFiatPrice
-                  ? fCurrency(satsToFiat(amountSats, fiatPrices, state.currency), {
-                      currency: state.currency,
-                    })
-                  : t('send_money.no_fiat_value')
+              secondaryLabel={
+                amountUnit === 'fiat'
+                  ? bitcoinAmountLabel(amountSats, displayUnit)
+                  : hasFiatPrice
+                    ? fCurrency(satsToFiat(amountSats, fiatPrices, state.currency), {
+                        currency: state.currency,
+                      })
+                    : t('send_money.no_fiat_value')
               }
               amountUnit={amountUnit}
               currency={state.currency}
-              displayUnit={state.displayUnit ?? 'bip177'}
+              displayUnit={displayUnit}
               hasFiatPrice={hasFiatPrice}
               onChange={setAmountValue}
               onSwap={handleAmountUnitSwap}
