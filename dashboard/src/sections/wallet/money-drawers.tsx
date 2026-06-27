@@ -20,7 +20,6 @@ import Button from '@mui/material/Button';
 import Drawer from '@mui/material/Drawer';
 import Dialog from '@mui/material/Dialog';
 import Divider from '@mui/material/Divider';
-import Accordion from '@mui/material/Accordion';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import IconButton from '@mui/material/IconButton';
@@ -28,8 +27,6 @@ import Autocomplete from '@mui/material/Autocomplete';
 import ToggleButton from '@mui/material/ToggleButton';
 import DialogActions from '@mui/material/DialogActions';
 import InputAdornment from '@mui/material/InputAdornment';
-import AccordionDetails from '@mui/material/AccordionDetails';
-import AccordionSummary from '@mui/material/AccordionSummary';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 
 import { satsToFiat } from 'src/utils/fiat';
@@ -124,6 +121,12 @@ const drawerSx = {
 
 const SATS_PER_BITCOIN = 100_000_000;
 const DEFAULT_BOLT11_EXPIRY_SECONDS = 3600;
+
+const invoiceExpiryOptions = [
+  { value: 3600, labelKey: 'receive_money.expiry_1_hour' },
+  { value: 86400, labelKey: 'receive_money.expiry_1_day' },
+  { value: 604800, labelKey: 'receive_money.expiry_1_week' },
+] as const;
 
 const addressTypeOptions = [
   {
@@ -1098,6 +1101,7 @@ export function ReceiveMoneyDrawer({
   const [amountValue, setAmountValue] = useState('');
   const [amountUnit, setAmountUnit] = useState<AmountUnit>('sats');
   const [description, setDescription] = useState('');
+  const [invoiceExpirySeconds, setInvoiceExpirySeconds] = useState(DEFAULT_BOLT11_EXPIRY_SECONDS);
   const [invoice, setInvoice] = useState<Invoice>();
   const [btcAddress, setBtcAddress] = useState<BtcAddress>();
   const [addressType, setAddressType] = useState<BtcAddressType>(
@@ -1129,7 +1133,6 @@ export function ReceiveMoneyDrawer({
   const selectedNeedsAddress = selectedPayload === 'unified' || selectedPayload === 'onchain';
   const canSetAmount = requestNeedsGeneration;
   const canSetMemo = selectedNeedsInvoice;
-  const showAdvanced = selectedNeedsInvoice;
   const { btcAddresses, btcAddressesMutate } = useListBtcAddresses(
     addressWalletId ? { wallet_id: addressWalletId } : undefined
   );
@@ -1208,6 +1211,7 @@ export function ReceiveMoneyDrawer({
     setAmountValue('');
     setAmountUnit('sats');
     setDescription('');
+    setInvoiceExpirySeconds(DEFAULT_BOLT11_EXPIRY_SECONDS);
     setInvoice(undefined);
     setBtcAddress(undefined);
     setAddressError(undefined);
@@ -1234,6 +1238,7 @@ export function ReceiveMoneyDrawer({
         const invoiceBody = {
           description,
           amount_msat: amountSats * 1000,
+          expiry: invoiceExpirySeconds,
           ...(isAdmin && { wallet_id: activeWalletId }),
         };
         const invoiceResult = isAdmin
@@ -1438,32 +1443,25 @@ export function ReceiveMoneyDrawer({
           />
         )}
 
-        {showAdvanced && (
-          <Accordion
-            disableGutters
-            variant="outlined"
-            sx={{ borderRadius: 1, '&:before': { display: 'none' } }}
-          >
-            <AccordionSummary expandIcon={<Iconify icon="eva:arrow-ios-downward-fill" />}>
-              <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-                <Iconify icon="solar:tuning-square-bold-duotone" />
-                <Typography variant="subtitle2">{t('receive_money.advanced')}</Typography>
-              </Stack>
-            </AccordionSummary>
-            <AccordionDetails>
-              <Stack spacing={2}>
-                {selectedNeedsInvoice && (
-                  <TextField
-                    disabled
-                    size="small"
-                    label={t('receive_money.expiry')}
-                    value={t('receive_money.default_expiry')}
-                    helperText={t('receive_money.expiry_backend_needed')}
-                  />
-                )}
-              </Stack>
-            </AccordionDetails>
-          </Accordion>
+        {selectedNeedsInvoice && (
+          <Stack spacing={1}>
+            <Typography variant="caption" color="text.secondary">
+              {t('receive_money.expiry')}
+            </Typography>
+            <ToggleButtonGroup
+              exclusive
+              fullWidth
+              size="small"
+              value={invoiceExpirySeconds}
+              onChange={(_, value: number | null) => value && setInvoiceExpirySeconds(value)}
+            >
+              {invoiceExpiryOptions.map((option) => (
+                <ToggleButton key={option.value} value={option.value}>
+                  {t(option.labelKey)}
+                </ToggleButton>
+              ))}
+            </ToggleButtonGroup>
+          </Stack>
         )}
 
         {showRequestAction && (
@@ -1619,7 +1617,7 @@ export function ReceiveMoneyDrawer({
           </Box>
         )}
 
-        {lnAddress && selectedPayload !== 'identity' && selectedPayload !== 'onchain' && (
+        {lnAddress && selectedPayload !== 'onchain' && (
           <Box
             sx={[
               (theme) => ({
