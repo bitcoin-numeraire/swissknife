@@ -398,6 +398,7 @@ export function WalletDetailsView({ id }: Props) {
                           : undefined
                       }
                       hrefLabel={t('details')}
+                      targetBlank={false}
                     />
                     <Stack
                       direction={{ xs: 'column', sm: 'row' }}
@@ -447,6 +448,27 @@ export function WalletDetailsView({ id }: Props) {
 
                 <Grid size={{ xs: 12, md: 7 }}>
                   <DetailCard
+                    title={t('wallet_details.recent_transactions')}
+                    icon="solar:bill-list-bold-duotone"
+                    color="warning"
+                  >
+                    {transactions.length ? (
+                      <Stack spacing={1}>
+                        {transactions.slice(0, 8).map((transaction) => (
+                          <RecentTransactionRow
+                            key={`${transaction.kind}-${transaction.id}`}
+                            transaction={transaction}
+                          />
+                        ))}
+                      </Stack>
+                    ) : (
+                      <EmptyContent title={t('wallet_details.no_transactions')} sx={{ py: 3 }} />
+                    )}
+                  </DetailCard>
+                </Grid>
+
+                <Grid size={{ xs: 12, md: 5 }}>
+                  <DetailCard
                     title={t('wallet_details.bitcoin_addresses')}
                     icon="solar:link-round-angle-bold-duotone"
                     color="success"
@@ -465,27 +487,6 @@ export function WalletDetailsView({ id }: Props) {
                         title={t('wallet_details.no_bitcoin_addresses')}
                         sx={{ py: 3 }}
                       />
-                    )}
-                  </DetailCard>
-                </Grid>
-
-                <Grid size={{ xs: 12, md: 5 }}>
-                  <DetailCard
-                    title={t('wallet_details.recent_transactions')}
-                    icon="solar:bill-list-bold-duotone"
-                    color="warning"
-                  >
-                    {transactions.length ? (
-                      <Stack spacing={1}>
-                        {transactions.slice(0, 8).map((transaction) => (
-                          <RecentTransactionRow
-                            key={`${transaction.kind}-${transaction.id}`}
-                            transaction={transaction}
-                          />
-                        ))}
-                      </Stack>
-                    ) : (
-                      <EmptyContent title={t('wallet_details.no_transactions')} sx={{ py: 3 }} />
                     )}
                   </DetailCard>
                 </Grid>
