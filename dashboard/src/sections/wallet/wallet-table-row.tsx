@@ -1,7 +1,6 @@
 import type { IFiatPrices } from 'src/types/bitcoin';
 import type { WalletOverview } from 'src/lib/swissknife';
 
-import { useState } from 'react';
 import { useBoolean, usePopover } from 'minimal-shared/hooks';
 
 import Button from '@mui/material/Button';
@@ -49,18 +48,6 @@ export function WalletTableRow({ row, selected, onSelectRow, onDeleteRow, fiatPr
   const isDeleting = useBoolean();
   const newPayment = useBoolean();
   const newInvoice = useBoolean();
-  const sendTo = useBoolean();
-  const [input, setInput] = useState('');
-
-  const handleClickSendTo = (val: string) => {
-    setInput(displayLnAddress(val));
-    sendTo.onTrue();
-  };
-
-  const handleCloseSendTo = () => {
-    setInput('');
-    sendTo.onFalse();
-  };
 
   return (
     <>
@@ -185,16 +172,10 @@ export function WalletTableRow({ row, selected, onSelectRow, onDeleteRow, fiatPr
           </MenuItem>
 
           {ln_address && (
-            <>
-              <CopyMenuItem
-                title={t('wallet_table_row.copy_ln_address')}
-                value={displayLnAddress(ln_address.username)}
-              />
-              <MenuItem onClick={() => handleClickSendTo(ln_address.username)}>
-                <Iconify icon="eva:flash-fill" />
-                {t('wallet_table_row.send_to_ln_address')}
-              </MenuItem>
-            </>
+            <CopyMenuItem
+              title={t('wallet_table_row.copy_ln_address')}
+              value={displayLnAddress(ln_address.username)}
+            />
           )}
 
           <Divider sx={{ borderStyle: 'dashed' }} />
@@ -229,17 +210,6 @@ export function WalletTableRow({ row, selected, onSelectRow, onDeleteRow, fiatPr
         fiatPrices={fiatPrices!}
         open={newInvoice.value}
         onClose={newInvoice.onFalse}
-      />
-
-      <SendMoneyDrawer
-        isAdmin
-        walletId={id}
-        contacts={[]}
-        balance={balance.available_msat}
-        initialInput={input}
-        fiatPrices={fiatPrices}
-        open={sendTo.value}
-        onClose={handleCloseSendTo}
       />
 
       <ConfirmDialog
