@@ -10,7 +10,6 @@ import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
 import Grid from '@mui/material/Grid';
 import Stack from '@mui/material/Stack';
-import Button from '@mui/material/Button';
 import Divider from '@mui/material/Divider';
 import MenuItem from '@mui/material/MenuItem';
 import TextField from '@mui/material/TextField';
@@ -18,8 +17,6 @@ import Typography from '@mui/material/Typography';
 import ToggleButton from '@mui/material/ToggleButton';
 import InputAdornment from '@mui/material/InputAdornment';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
-
-import { paths } from 'src/routes/paths';
 
 import { fDate } from 'src/utils/format-time';
 import { shouldFail } from 'src/utils/errors';
@@ -160,16 +157,6 @@ export function AccountsView() {
             <CustomBreadcrumbs
               heading={t('accounts_directory')}
               links={[{ name: t('accounts') }, { name: t('accounts_directory') }]}
-              action={
-                <Button
-                  href={paths.admin.wallets}
-                  color="inherit"
-                  variant="outlined"
-                  startIcon={<Iconify icon="solar:safe-square-bold-duotone" />}
-                >
-                  {t('accounts_view.admin_tools')}
-                </Button>
-              }
               sx={{ mb: { xs: 3, md: 5 } }}
             />
 

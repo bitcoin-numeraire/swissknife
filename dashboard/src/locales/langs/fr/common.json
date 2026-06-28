@@ -496,7 +496,6 @@
     "delete_multiple_success": "{{count}} portefeuilles supprimés avec succès"
   },
   "accounts_view": {
-    "admin_tools": "Outils admin",
     "hero_title": "Répertoire des comptes",
     "hero_subheader": "Une carte opérationnelle en lecture seule des comptes portefeuille, des identités publiques de réception et du mix d'activité. Utilise l'administration des portefeuilles pour créer, supprimer et envoyer au nom d'un compte.",
     "identity_ready": "Identité prête",
