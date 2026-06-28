@@ -45,6 +45,12 @@ type Props = {
   isAdmin?: boolean;
 };
 
+function ambossNodeUrl(pubkey?: string | null) {
+  if (!pubkey) return undefined;
+
+  return `https://amboss.space/node/${encodeURIComponent(pubkey)}`;
+}
+
 export function InvoiceDetails({ invoice, isAdmin }: Props) {
   const { t } = useTranslate();
   const bolt11 = invoice.ln_invoice?.bolt11;
@@ -56,6 +62,7 @@ export function InvoiceDetails({ invoice, isAdmin }: Props) {
   const txExplorerUrl = bitcoinTransactionExplorerUrl(bitcoinTxid);
   const addressExplorerUrl = bitcoinAddressExplorerUrl(bitcoinAddress);
   const outpointExplorerUrl = bitcoinOutpointExplorerUrl(bitcoinOutpoint);
+  const payeeExplorerUrl = ambossNodeUrl(invoice.ln_invoice?.payee_pubkey);
   const isOpenAmount = !invoice.amount_msat;
   const receivedAmount =
     invoice.status === 'Settled'
@@ -372,6 +379,8 @@ export function InvoiceDetails({ invoice, isAdmin }: Props) {
                     label={t('invoice_details.payee_pubkey')}
                     value={invoice.ln_invoice.payee_pubkey}
                     copyValue={invoice.ln_invoice.payee_pubkey}
+                    href={payeeExplorerUrl}
+                    hrefLabel={t('transaction_actions.open_explorer')}
                     mono
                   />
                   <DetailRow
