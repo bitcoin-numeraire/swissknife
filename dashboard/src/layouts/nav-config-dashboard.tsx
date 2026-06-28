@@ -145,6 +145,20 @@ export const navData: Array<NavGroupWithPermissions> = [
         modes: ['server', 'self-hosted', 'merchant'],
       },
       {
+        title: 'admin_invoices',
+        path: paths.admin.invoices,
+        icon: ICONS.invoice,
+        permissions: [Permission.READ_TRANSACTION],
+        modes: ['server', 'self-hosted', 'merchant'],
+      },
+      {
+        title: 'admin_payments',
+        path: paths.admin.payments,
+        icon: ICONS.payment,
+        permissions: [Permission.READ_TRANSACTION],
+        modes: ['server', 'self-hosted', 'merchant'],
+      },
+      {
         title: 'admin_lightning_addresses',
         path: paths.admin.lnAddresses,
         icon: ICONS.lightning,

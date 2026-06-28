@@ -47,8 +47,8 @@ export function AdminPaymentDetailsView({ id }: Props) {
                   name: t('admin'),
                 },
                 {
-                  name: t('activity'),
-                  href: paths.activityList('payment', 'admin'),
+                  name: t('payments'),
+                  href: paths.admin.payments,
                 },
                 { name: t('payment_details.detail_heading') },
               ]}

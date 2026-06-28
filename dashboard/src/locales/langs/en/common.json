@@ -7,6 +7,8 @@
   "accounts": "Accounts",
   "accounts_directory": "Accounts directory",
   "wallet_admin": "Wallet admin",
+  "admin_invoices": "Admin invoices",
+  "admin_payments": "Admin payments",
   "admin_lightning_addresses": "Admin LN addresses",
   "roles_access": "Roles & access",
   "observe": "Observe",
