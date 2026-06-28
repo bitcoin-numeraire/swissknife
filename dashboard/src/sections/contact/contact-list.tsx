@@ -47,7 +47,7 @@ export function ContactList({ data, fiatPrices }: Props) {
       sx={{
         gap: 3,
         display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 380px), 1fr))',
+        gridTemplateColumns: { xs: '1fr', md: 'repeat(2, minmax(0, 1fr))' },
       }}
     >
       {data.map((contact) => (
