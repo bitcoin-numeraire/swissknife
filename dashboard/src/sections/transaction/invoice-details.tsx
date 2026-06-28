@@ -7,12 +7,20 @@ import Card from '@mui/material/Card';
 import Grid from '@mui/material/Grid';
 import Stack from '@mui/material/Stack';
 import Alert from '@mui/material/Alert';
+import Button from '@mui/material/Button';
 import Typography from '@mui/material/Typography';
 
 import { getLedgerLabel } from 'src/utils/transactions';
+import { compactBitcoinAddress } from 'src/utils/bitcoin-request';
+import {
+  txidFromOutpoint,
+  bitcoinAddressExplorerUrl,
+  bitcoinTransactionExplorerUrl,
+} from 'src/utils/bitcoin-explorer';
 
 import { useTranslate } from 'src/locales';
 
+import { Iconify } from 'src/components/iconify';
 import { CopyButton } from 'src/components/copy';
 import { SatsWithIcon } from 'src/components/bitcoin';
 
@@ -40,6 +48,11 @@ export function InvoiceDetails({ invoice, isAdmin }: Props) {
   const { t } = useTranslate();
   const bolt11 = invoice.ln_invoice?.bolt11;
   const methodLabel = getLedgerLabel(invoice.ledger, t);
+  const isOnchain = invoice.ledger === 'Onchain';
+  const bitcoinAddress = invoice.bitcoin_output?.address;
+  const bitcoinTxid = txidFromOutpoint(invoice.bitcoin_output?.outpoint);
+  const txExplorerUrl = bitcoinTransactionExplorerUrl(bitcoinTxid);
+  const addressExplorerUrl = bitcoinAddressExplorerUrl(bitcoinAddress);
   const isOpenAmount = !invoice.amount_msat;
   const receivedAmount =
     invoice.status === 'Settled'
@@ -72,27 +85,36 @@ export function InvoiceDetails({ invoice, isAdmin }: Props) {
 
                   <Stack spacing={0.5}>
                     <Typography variant="overline" color="text.secondary">
-                      {t('invoice_details.request_memo')}
+                      {isOnchain
+                        ? t('transaction_details.onchain')
+                        : t('invoice_details.request_memo')}
                     </Typography>
                     <Typography variant="h4">
                       {invoice.description || t('transaction_details.incoming_invoice')}
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
-                      {isAdmin
-                        ? t('transaction_details.wallet_account')
-                        : t('transaction_details.incoming_invoice')}
+                      {isOnchain
+                        ? methodLabel
+                        : isAdmin
+                          ? t('transaction_details.wallet_account')
+                          : t('transaction_details.incoming_invoice')}
                     </Typography>
                   </Stack>
                 </Stack>
 
                 <Stack spacing={0.5}>
                   <Typography variant="caption" color="text.secondary">
-                    {t('invoice_details.amount_requested')}
+                    {isOnchain
+                      ? t('invoice_details.amount_received')
+                      : t('invoice_details.amount_requested')}
                   </Typography>
-                  {isOpenAmount ? (
+                  {isOpenAmount && !isOnchain ? (
                     <Typography variant="h3">{t('wallet_view.open_amount')}</Typography>
                   ) : (
-                    <SatsWithIcon amountMSats={invoice.amount_msat || 0} variant="h3" />
+                    <SatsWithIcon
+                      amountMSats={isOnchain ? receivedAmount : invoice.amount_msat || 0}
+                      variant="h3"
+                    />
                   )}
                 </Stack>
 
@@ -135,7 +157,56 @@ export function InvoiceDetails({ invoice, isAdmin }: Props) {
                   bgcolor: 'background.neutral',
                 }}
               >
-                {bolt11 ? (
+                {isOnchain && bitcoinAddress ? (
+                  <Stack spacing={2}>
+                    <Stack spacing={0.75}>
+                      <Typography variant="overline" color="text.secondary">
+                        {t('payment_details.onchain_address')}
+                      </Typography>
+                      <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
+                        <Typography
+                          variant="subtitle2"
+                          sx={{ fontFamily: 'monospace', wordBreak: 'break-word' }}
+                        >
+                          {compactBitcoinAddress(bitcoinAddress)}
+                        </Typography>
+                        <CopyButton
+                          value={bitcoinAddress}
+                          title={t('transaction_actions.copy_onchain_address')}
+                        />
+                      </Stack>
+                    </Stack>
+
+                    <Stack spacing={1}>
+                      {txExplorerUrl && (
+                        <Button
+                          component="a"
+                          href={txExplorerUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          color="inherit"
+                          variant="outlined"
+                          startIcon={<Iconify icon="solar:map-arrow-right-bold" />}
+                        >
+                          {t('transaction_actions.open_explorer')}
+                        </Button>
+                      )}
+                      {addressExplorerUrl && (
+                        <Button
+                          component="a"
+                          href={addressExplorerUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          color="inherit"
+                          variant="outlined"
+                          startIcon={<Iconify icon="solar:map-arrow-right-bold" />}
+                        >
+                          {t('payment_details.onchain_address')}
+                        </Button>
+                      )}
+                    </Stack>
+                  </Stack>
+                ) : bolt11 ? (
                   <Stack spacing={2}>
                     <Box
                       sx={{
@@ -187,11 +258,15 @@ export function InvoiceDetails({ invoice, isAdmin }: Props) {
                     value: invoice.timestamp || invoice.created_at,
                     state: 'done',
                   },
-                  {
-                    label: t('invoice_details.expiration_date'),
-                    value: invoice.ln_invoice?.expires_at,
-                    state: invoice.status === 'Expired' ? 'error' : 'waiting',
-                  },
+                  ...(isOnchain
+                    ? []
+                    : [
+                        {
+                          label: t('invoice_details.expiration_date'),
+                          value: invoice.ln_invoice?.expires_at,
+                          state: invoice.status === 'Expired' ? 'error' : 'waiting',
+                        } as const,
+                      ]),
                   {
                     label: t('transaction_details.settlement_date'),
                     value: invoice.payment_time,
@@ -209,6 +284,16 @@ export function InvoiceDetails({ invoice, isAdmin }: Props) {
               color="success"
             >
               <DetailRow label={t('transaction_details.description')} value={invoice.description} />
+              {bitcoinAddress && (
+                <DetailRow
+                  label={t('payment_details.onchain_address')}
+                  value={compactBitcoinAddress(bitcoinAddress)}
+                  copyValue={bitcoinAddress}
+                  href={addressExplorerUrl}
+                  hrefLabel={t('transaction_actions.open_explorer')}
+                  mono
+                />
+              )}
               <DetailRow label={t('transaction_details.ledger')} value={methodLabel} />
               <DetailRow label={t('transaction_details.currency')} value={invoice.currency} />
               <DetailRow
@@ -240,7 +325,25 @@ export function InvoiceDetails({ invoice, isAdmin }: Props) {
                 copyValue={invoice.wallet_id}
                 mono
               />
-              {invoice.ln_invoice && (
+              {isOnchain && (
+                <>
+                  <DetailRow
+                    label={t('payment_details.onchain_txid')}
+                    value={bitcoinTxid}
+                    copyValue={bitcoinTxid}
+                    href={txExplorerUrl}
+                    hrefLabel={t('transaction_actions.open_explorer')}
+                    mono
+                  />
+                  <DetailRow
+                    label={t('invoice_details.outpoint')}
+                    value={invoice.bitcoin_output?.outpoint}
+                    copyValue={invoice.bitcoin_output?.outpoint}
+                    mono
+                  />
+                </>
+              )}
+              {!isOnchain && invoice.ln_invoice && (
                 <>
                   <DetailRow
                     label={t('invoice_details.bolt11')}

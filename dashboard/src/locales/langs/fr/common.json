@@ -601,6 +601,7 @@
     "no_lightning_payload": "Aucune charge utile Lightning n'est disponible pour cette facture.",
     "payment_secret": "Secret de paiement",
     "payee_pubkey": "Clé publique du bénéficiaire",
+    "outpoint": "Outpoint",
     "request_memo": "Mémo de la demande",
     "invoice_from": "Facture de"
   },
