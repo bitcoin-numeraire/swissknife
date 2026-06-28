@@ -28,6 +28,8 @@ import { npub } from 'src/utils/nostr';
 import { fDateTime } from 'src/utils/format-time';
 import { encodeLNURL, displayLnAddress } from 'src/utils/lnurl';
 import { shouldFail, handleActionError } from 'src/utils/errors';
+import { compactBitcoinAddress } from 'src/utils/bitcoin-request';
+import { bitcoinAddressExplorerUrl } from 'src/utils/bitcoin-explorer';
 
 import { useTranslate } from 'src/locales';
 import { endpointKeys } from 'src/actions/keys';
@@ -70,6 +72,35 @@ const drawerSx = {
   width: { xs: 1, md: 760 },
   maxWidth: 1,
 };
+
+function BitcoinAddressValue({ address }: { address: string }) {
+  const { t } = useTranslate();
+  const explorerUrl = bitcoinAddressExplorerUrl(address);
+
+  return (
+    <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center', minWidth: 0 }}>
+      <Typography
+        variant="subtitle2"
+        noWrap
+        sx={{ minWidth: 0, fontFamily: 'monospace', color: 'text.primary' }}
+      >
+        {compactBitcoinAddress(address)}
+      </Typography>
+      <CopyButton value={address} title={t('copy')} />
+      {explorerUrl && (
+        <IconButton
+          component="a"
+          href={explorerUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          title={t('transaction_actions.open_explorer')}
+        >
+          <Iconify icon="solar:map-arrow-right-bold" />
+        </IconButton>
+      )}
+    </Stack>
+  );
+}
 
 // ----------------------------------------------------------------------
 
@@ -507,22 +538,22 @@ export function IdentityView() {
                       {(btcAddresses ?? []).map((address) => (
                         <Stack
                           key={address.id}
-                          direction={{ xs: 'column', sm: 'row' }}
+                          direction="row"
                           spacing={1}
-                          sx={{ alignItems: { sm: 'center' }, py: 1 }}
+                          sx={{ alignItems: 'flex-start', minWidth: 0, py: 1 }}
                         >
                           <Stack sx={{ flex: 1, minWidth: 0 }}>
-                            <Typography variant="subtitle2" noWrap>
-                              {address.address}
-                            </Typography>
+                            <BitcoinAddressValue address={address.address} />
                             <Typography variant="caption" color="text.secondary">
                               {address.address_type.toUpperCase()} · {fDateTime(address.created_at)}
                             </Typography>
                           </Stack>
-                          <Label color={address.used ? 'warning' : 'success'}>
+                          <Label
+                            color={address.used ? 'warning' : 'success'}
+                            sx={{ flexShrink: 0, mt: 0.75 }}
+                          >
                             {address.used ? t('identity_view.used') : t('identity_view.unused')}
                           </Label>
-                          <CopyButton value={address.address} title={t('copy')} />
                         </Stack>
                       ))}
                     </Stack>
