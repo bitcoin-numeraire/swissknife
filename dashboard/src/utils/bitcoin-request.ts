@@ -26,12 +26,12 @@ export function compactBitcoinAddress(value?: string | null) {
 
   const head =
     normalized
-      .slice(0, 16)
+      .slice(0, 12)
       .match(/.{1,4}/g)
       ?.join(' ') ?? '';
   const tail =
     normalized
-      .slice(-16)
+      .slice(-12)
       .match(/.{1,4}/g)
       ?.join(' ') ?? '';
 
