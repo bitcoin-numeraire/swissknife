@@ -542,11 +542,31 @@
     "unused": "Unused"
   },
   "btc_address_list": {
+    "address": "Address",
+    "wallet": "Wallet",
+    "type": "Type",
+    "created": "Created",
+    "updated": "Updated",
+    "status": "Status",
     "search_placeholder": "Search address, wallet ID, type, or state",
     "visible_count": "addresses visible",
     "empty_title": "No Bitcoin addresses",
     "used": "Used",
-    "unused": "Unused"
+    "unused": "Unused",
+    "delete_success": "Address deleted successfully",
+    "delete_multiple_success": "{{count}} addresses deleted successfully",
+    "tabs": {
+      "total": "Total",
+      "used": "Used",
+      "unused": "Unused",
+      "addresses": "addresses"
+    }
+  },
+  "btc_address_table_row": {
+    "copy_wallet_id": "Copy wallet ID"
+  },
+  "btc_address_table_toolbar": {
+    "search_placeholder": "Search ID, wallet, address or type"
   },
   "wallet_toolbar": {
     "search_placeholder": "Search ID, User or LN Address"

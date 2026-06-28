@@ -1,0 +1,150 @@
+import type { IDatePickerControl } from 'src/types/common';
+import type { IBtcAddressTableFilters } from 'src/types/btc-address';
+
+import { useCallback } from 'react';
+import { usePopover, type UseSetStateReturn } from 'minimal-shared/hooks';
+
+import Stack from '@mui/material/Stack';
+import { MenuList } from '@mui/material';
+import MenuItem from '@mui/material/MenuItem';
+import TextField from '@mui/material/TextField';
+import IconButton from '@mui/material/IconButton';
+import InputAdornment from '@mui/material/InputAdornment';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import { formHelperTextClasses } from '@mui/material/FormHelperText';
+
+import { useTranslate } from 'src/locales';
+
+import { toast } from 'src/components/snackbar';
+import { Iconify } from 'src/components/iconify';
+import { CustomPopover } from 'src/components/custom-popover';
+
+// ----------------------------------------------------------------------
+
+type Props = {
+  filters: UseSetStateReturn<IBtcAddressTableFilters>;
+  onResetPage: () => void;
+  dateError: boolean;
+};
+
+export function BtcAddressTableToolbar({ filters, onResetPage, dateError }: Props) {
+  const { t } = useTranslate();
+  const popover = usePopover();
+
+  const handleFilterName = useCallback(
+    (event: React.ChangeEvent<HTMLInputElement>) => {
+      onResetPage();
+      filters.setState({ name: event.target.value });
+    },
+    [filters, onResetPage]
+  );
+
+  const handleFilterStartDate = useCallback(
+    (newValue: IDatePickerControl) => {
+      onResetPage();
+      filters.setState({ startDate: newValue });
+    },
+    [filters, onResetPage]
+  );
+
+  const handleFilterEndDate = useCallback(
+    (newValue: IDatePickerControl) => {
+      onResetPage();
+      filters.setState({ endDate: newValue });
+    },
+    [filters, onResetPage]
+  );
+
+  return (
+    <>
+      <Stack
+        spacing={2}
+        direction={{ xs: 'column', md: 'row' }}
+        sx={{
+          p: 2.5,
+          pr: { xs: 2.5, md: 1 },
+          alignItems: { xs: 'flex-end', md: 'center' },
+        }}
+      >
+        <DatePicker
+          label={t('start_date')}
+          value={filters.state.startDate}
+          onChange={handleFilterStartDate}
+          slotProps={{ textField: { fullWidth: true } }}
+          sx={{ maxWidth: { md: 180 } }}
+        />
+
+        <DatePicker
+          label={t('end_date')}
+          value={filters.state.endDate}
+          onChange={handleFilterEndDate}
+          slotProps={{
+            textField: {
+              fullWidth: true,
+              error: dateError,
+              helperText: dateError && t('end_date_error'),
+            },
+          }}
+          sx={{
+            maxWidth: { md: 180 },
+            [`& .${formHelperTextClasses.root}`]: {
+              position: { md: 'absolute' },
+              bottom: { md: -40 },
+            },
+          }}
+        />
+
+        <Stack direction="row" spacing={2} sx={{ width: 1, flexGrow: 1, alignItems: 'center' }}>
+          <TextField
+            fullWidth
+            value={filters.state.name}
+            onChange={handleFilterName}
+            placeholder={t('btc_address_table_toolbar.search_placeholder')}
+            slotProps={{
+              input: {
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <Iconify icon="eva:search-fill" sx={{ color: 'text.disabled' }} />
+                  </InputAdornment>
+                ),
+              },
+            }}
+          />
+
+          <IconButton onClick={popover.onOpen}>
+            <Iconify icon="eva:more-vertical-fill" />
+          </IconButton>
+        </Stack>
+      </Stack>
+
+      <CustomPopover
+        open={popover.open}
+        anchorEl={popover.anchorEl}
+        onClose={popover.onClose}
+        slotProps={{ arrow: { placement: 'right-top' } }}
+      >
+        <MenuList>
+          <MenuItem
+            onClick={() => {
+              popover.onClose();
+              toast.info(t('coming_soon'));
+            }}
+          >
+            <Iconify icon="solar:printer-minimalistic-bold" />
+            {t('print')}
+          </MenuItem>
+
+          <MenuItem
+            onClick={() => {
+              popover.onClose();
+              toast.info(t('coming_soon'));
+            }}
+          >
+            <Iconify icon="solar:export-bold" />
+            {t('export')}
+          </MenuItem>
+        </MenuList>
+      </CustomPopover>
+    </>
+  );
+}
