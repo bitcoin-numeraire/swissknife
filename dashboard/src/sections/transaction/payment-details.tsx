@@ -118,22 +118,22 @@ export function PaymentDetails({ payment, isAdmin }: Props) {
                   <SatsWithIcon amountMSats={amountSent} variant="h3" />
                 </Stack>
 
-                <Grid container spacing={2}>
-                  <Grid size={{ xs: 12, sm: 4 }}>
+                <Grid container spacing={{ xs: 1, sm: 2 }}>
+                  <Grid size={{ xs: 4 }}>
                     <MetricTile
                       title={t('payment_details.amount_sent')}
                       amountMSats={amountSent}
                       helper={t('payment_details.recipient_receives')}
                     />
                   </Grid>
-                  <Grid size={{ xs: 12, sm: 4 }}>
+                  <Grid size={{ xs: 4 }}>
                     <MetricTile
                       title={t('payment_details.fees')}
                       amountMSats={feeAmount}
                       helper={feeHelper}
                     />
                   </Grid>
-                  <Grid size={{ xs: 12, sm: 4 }}>
+                  <Grid size={{ xs: 4 }}>
                     <MetricTile
                       title={t('payment_details.total_spent')}
                       amountMSats={totalAmount}

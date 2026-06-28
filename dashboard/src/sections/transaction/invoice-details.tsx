@@ -40,10 +40,16 @@ export function InvoiceDetails({ invoice, isAdmin }: Props) {
   const { t } = useTranslate();
   const bolt11 = invoice.ln_invoice?.bolt11;
   const methodLabel = getLedgerLabel(invoice.ledger, t);
+  const isOpenAmount = !invoice.amount_msat;
   const receivedAmount =
     invoice.status === 'Settled'
       ? (invoice.amount_received_msat || 0) - (invoice.fee_msat || 0)
       : 0;
+  const totalAmount = isOpenAmount
+    ? invoice.status === 'Settled'
+      ? invoice.amount_received_msat || 0
+      : undefined
+    : (invoice.amount_msat || 0) + (invoice.fee_msat || 0);
 
   return (
     <>
@@ -95,11 +101,15 @@ export function InvoiceDetails({ invoice, isAdmin }: Props) {
                   <Typography variant="caption" color="text.secondary">
                     {t('invoice_details.amount_requested')}
                   </Typography>
-                  <SatsWithIcon amountMSats={invoice.amount_msat || 0} variant="h3" />
+                  {isOpenAmount ? (
+                    <Typography variant="h3">{t('wallet_view.open_amount')}</Typography>
+                  ) : (
+                    <SatsWithIcon amountMSats={invoice.amount_msat || 0} variant="h3" />
+                  )}
                 </Stack>
 
-                <Grid container spacing={2}>
-                  <Grid size={{ xs: 12, sm: 4 }}>
+                <Grid container spacing={{ xs: 1, sm: 2 }}>
+                  <Grid size={{ xs: 4 }}>
                     <MetricTile
                       title={t('invoice_details.amount_received')}
                       amountMSats={receivedAmount}
@@ -110,16 +120,17 @@ export function InvoiceDetails({ invoice, isAdmin }: Props) {
                       }
                     />
                   </Grid>
-                  <Grid size={{ xs: 12, sm: 4 }}>
+                  <Grid size={{ xs: 4 }}>
                     <MetricTile
                       title={t('invoice_details.fees')}
                       amountMSats={invoice.fee_msat || 0}
                     />
                   </Grid>
-                  <Grid size={{ xs: 12, sm: 4 }}>
+                  <Grid size={{ xs: 4 }}>
                     <MetricTile
                       title={t('transaction_details.total')}
-                      amountMSats={(invoice.amount_msat || 0) + (invoice.fee_msat || 0)}
+                      amountMSats={totalAmount}
+                      value={totalAmount === undefined ? t('wallet_view.open_amount') : undefined}
                     />
                   </Grid>
                 </Grid>

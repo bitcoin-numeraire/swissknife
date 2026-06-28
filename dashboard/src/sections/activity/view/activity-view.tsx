@@ -1039,16 +1039,29 @@ function ActivityDetailDrawer({
   const confirm = useBoolean();
   const isDeleting = useBoolean();
 
-  const invoice = row?.transaction_type === TransactionType.INVOICE ? (row as Invoice) : null;
-  const payment = row?.transaction_type === TransactionType.PAYMENT ? (row as Payment) : null;
+  if (!row) {
+    return (
+      <Drawer
+        anchor="right"
+        open={false}
+        onClose={onClose}
+        transitionDuration={{ enter: 225, exit: 195 }}
+        ModalProps={{ keepMounted: true }}
+        slotProps={{ paper: { sx: drawerSx } }}
+      />
+    );
+  }
+
+  const invoice = row.transaction_type === TransactionType.INVOICE ? (row as Invoice) : null;
+  const payment = row.transaction_type === TransactionType.PAYMENT ? (row as Payment) : null;
   const invoiceOutpoint = invoice?.bitcoin_output?.outpoint;
   const explorerUrl = txExplorerUrl(payment?.bitcoin?.txid || txidFromOutpoint(invoiceOutpoint));
-  const methodLabel = getLedgerLabel(row?.ledger, t);
-  const isIncoming = row?.direction === 'in';
-  const amountOnly = row?.amount_msat || 0;
-  const feeAmount = row?.fee_msat || 0;
-  const totalAmount = row?.amount_total_msat || 0;
-  const isOpenAmount = row ? isOpenAmountRequest(row) : false;
+  const methodLabel = getLedgerLabel(row.ledger, t);
+  const isIncoming = row.direction === 'in';
+  const amountOnly = row.amount_msat || 0;
+  const feeAmount = row.fee_msat || 0;
+  const totalAmount = row.amount_total_msat || 0;
+  const isOpenAmount = isOpenAmountRequest(row);
   const bitcoinDestination =
     payment?.internal?.btc_address || payment?.bitcoin?.address || invoice?.bitcoin_output?.address;
   const destination =
@@ -1071,9 +1084,7 @@ function ActivityDetailDrawer({
       ModalProps={{ keepMounted: true }}
       slotProps={{ paper: { sx: drawerSx } }}
     >
-      {row && (
-        <>
-          <Stack
+      <Stack
             direction="row"
             spacing={2}
             sx={{ alignItems: 'center', justifyContent: 'space-between', px: 3, py: 2 }}
@@ -1237,8 +1248,6 @@ function ActivityDetailDrawer({
               </Button>
             }
           />
-        </>
-      )}
     </Drawer>
   );
 }
