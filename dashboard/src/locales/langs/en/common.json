@@ -602,6 +602,7 @@
     "no_lightning_payload": "No Lightning payload is available for this invoice.",
     "payment_secret": "Payment Secret",
     "payee_pubkey": "Payee public key",
+    "outpoint": "Outpoint",
     "request_memo": "Request memo",
     "invoice_from": "Invoice From"
   },
