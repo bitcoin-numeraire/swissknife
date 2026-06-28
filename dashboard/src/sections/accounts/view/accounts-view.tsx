@@ -24,7 +24,6 @@ import { paths } from 'src/routes/paths';
 import { fDate } from 'src/utils/format-time';
 import { shouldFail } from 'src/utils/errors';
 import { displayLnAddress } from 'src/utils/lnurl';
-import { truncateText } from 'src/utils/format-string';
 
 import { useTranslate } from 'src/locales';
 import { Permission } from 'src/lib/swissknife';
@@ -517,22 +516,25 @@ function InfoRow({
       variant="body2"
       component={href ? 'a' : 'span'}
       href={href}
+      title={value}
       sx={{
+        display: 'block',
+        maxWidth: 1,
         color: href ? 'primary.main' : 'text.primary',
         textDecoration: 'none',
         '&:hover': { textDecoration: href ? 'underline' : 'none' },
       }}
     >
-      {truncateText(value, 34)}
+      {value}
     </Typography>
   );
 
   return (
-    <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+    <Stack direction="row" spacing={1} sx={{ alignItems: 'center', minWidth: 0, width: 1 }}>
       <Typography variant="caption" color="text.secondary" sx={{ width: 88, flexShrink: 0 }}>
         {label}
       </Typography>
-      <Box sx={{ minWidth: 0, flex: 1 }}>{content}</Box>
+      <Box sx={{ minWidth: 0, flex: 1, overflow: 'hidden' }}>{content}</Box>
       {copyValue && <CopyButton value={copyValue} title="Copy" />}
     </Stack>
   );
