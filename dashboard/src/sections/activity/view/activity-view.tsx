@@ -496,6 +496,7 @@ function ActivityLedger({
       analyticColor: theme.palette.error.dark,
     },
   ];
+  const analyticTabs = activityTabs.filter((tab) => tab.value !== 'all');
 
   const dataFiltered = applyFilter({
     inputData: rows,
@@ -608,13 +609,13 @@ function ActivityLedger({
                   }
                   sx={{ py: 2 }}
                 >
-                  {activityTabs.map((tab) => (
+                  {analyticTabs.map((tab) => (
                     <ItemAnalytic
                       key={tab.title}
                       title={tab.title}
                       total={getTransactionLength(tab.value)}
                       percent={getPercentByStatus(tab.value)}
-                      price={tab.value === 'all' ? undefined : getTotalAmount(tab.value)}
+                      price={getTotalAmount(tab.value)}
                       icon={tab.icon}
                       color={tab.analyticColor}
                       countSuffix={tab.suffix}
@@ -819,6 +820,7 @@ function ActivityTableRow({
     payment?.bitcoin?.address || payment?.internal?.btc_address || payment?.internal?.ln_address;
   const explorerUrl = txExplorerUrl(payment?.bitcoin?.txid || txidFromOutpoint(invoiceOutpoint));
   const methodLabel = getLedgerLabel(row.ledger, t);
+  const isOpenAmount = isOpenAmountRequest(row);
 
   return (
     <>
@@ -877,20 +879,26 @@ function ActivityTableRow({
         </TableCell>
 
         <TableCell>
-          <Stack
-            direction="row"
-            spacing={0.25}
-            sx={{
-              alignItems: 'center',
-              color: row.direction === 'in' ? 'success.main' : 'warning.main',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            <Typography variant="body2" color="inherit">
-              {row.direction === 'in' ? '+' : '-'}
+          {isOpenAmount ? (
+            <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>
+              {t('wallet_view.open_amount')}
             </Typography>
-            <SatsWithIcon amountMSats={row.amount_total_msat} variant="body2" color="inherit" />
-          </Stack>
+          ) : (
+            <Stack
+              direction="row"
+              spacing={0.25}
+              sx={{
+                alignItems: 'center',
+                color: row.direction === 'in' ? 'success.main' : 'warning.main',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              <Typography variant="body2" color="inherit">
+                {row.direction === 'in' ? '+' : '-'}
+              </Typography>
+              <SatsWithIcon amountMSats={row.amount_total_msat} variant="body2" color="inherit" />
+            </Stack>
+          )}
         </TableCell>
 
         <TableCell>
