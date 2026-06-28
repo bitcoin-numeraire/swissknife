@@ -16,6 +16,17 @@ export function bitcoinAddressExplorerUrl(address?: string | null) {
   return `${explorerBaseUrl()}/address/${address}`;
 }
 
+export function bitcoinOutpointExplorerUrl(outpoint?: string | null) {
+  if (!outpoint) return undefined;
+
+  const [txid, vout] = outpoint.split(':');
+  if (!txid) return undefined;
+
+  const fragment = vout ? `#vout=${vout}` : '';
+
+  return `${bitcoinTransactionExplorerUrl(txid)}${fragment}`;
+}
+
 export function txidFromOutpoint(outpoint?: string | null) {
   if (!outpoint) return undefined;
 

@@ -15,6 +15,7 @@ import { compactBitcoinAddress } from 'src/utils/bitcoin-request';
 import {
   txidFromOutpoint,
   bitcoinAddressExplorerUrl,
+  bitcoinOutpointExplorerUrl,
   bitcoinTransactionExplorerUrl,
 } from 'src/utils/bitcoin-explorer';
 
@@ -50,9 +51,11 @@ export function InvoiceDetails({ invoice, isAdmin }: Props) {
   const methodLabel = getLedgerLabel(invoice.ledger, t);
   const isOnchain = invoice.ledger === 'Onchain';
   const bitcoinAddress = invoice.bitcoin_output?.address;
-  const bitcoinTxid = txidFromOutpoint(invoice.bitcoin_output?.outpoint);
+  const bitcoinOutpoint = invoice.bitcoin_output?.outpoint;
+  const bitcoinTxid = txidFromOutpoint(bitcoinOutpoint);
   const txExplorerUrl = bitcoinTransactionExplorerUrl(bitcoinTxid);
   const addressExplorerUrl = bitcoinAddressExplorerUrl(bitcoinAddress);
+  const outpointExplorerUrl = bitcoinOutpointExplorerUrl(bitcoinOutpoint);
   const isOpenAmount = !invoice.amount_msat;
   const receivedAmount =
     invoice.status === 'Settled'
@@ -337,8 +340,10 @@ export function InvoiceDetails({ invoice, isAdmin }: Props) {
                   />
                   <DetailRow
                     label={t('invoice_details.outpoint')}
-                    value={invoice.bitcoin_output?.outpoint}
-                    copyValue={invoice.bitcoin_output?.outpoint}
+                    value={bitcoinOutpoint}
+                    copyValue={bitcoinOutpoint}
+                    href={outpointExplorerUrl}
+                    hrefLabel={t('transaction_actions.open_explorer')}
                     mono
                   />
                 </>
