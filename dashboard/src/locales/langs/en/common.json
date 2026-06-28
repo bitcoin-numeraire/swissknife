@@ -10,6 +10,7 @@
   "admin_invoices": "Admin invoices",
   "admin_payments": "Admin payments",
   "admin_lightning_addresses": "Admin LN addresses",
+  "admin_bitcoin_addresses": "Admin Bitcoin addresses",
   "roles_access": "Roles & access",
   "observe": "Observe",
   "node_health": "Node health",
@@ -538,6 +539,13 @@
     "recent_transactions": "Recent transactions",
     "no_bitcoin_addresses": "No Bitcoin addresses yet",
     "no_transactions": "No transactions yet",
+    "used": "Used",
+    "unused": "Unused"
+  },
+  "btc_address_list": {
+    "search_placeholder": "Search address, wallet ID, type, or state",
+    "visible_count": "addresses visible",
+    "empty_title": "No Bitcoin addresses",
     "used": "Used",
     "unused": "Unused"
   },
