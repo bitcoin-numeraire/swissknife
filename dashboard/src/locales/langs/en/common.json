@@ -498,7 +498,6 @@
     "delete_multiple_success": "{{count}} wallets deleted successfully"
   },
   "accounts_view": {
-    "admin_tools": "Admin tools",
     "hero_title": "Account directory",
     "hero_subheader": "A read-only operating map of wallet accounts, public receive identities, and activity mix. Use Wallet admin for creation, deletion, and send-on-behalf workflows.",
     "identity_ready": "Identity ready",
