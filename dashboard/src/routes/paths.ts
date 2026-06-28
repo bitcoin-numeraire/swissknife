@@ -29,6 +29,22 @@ function activityHref(
   return query ? `/activity?${query}` : '/activity';
 }
 
+function adminTransactionsHref(kind?: ActivityTransactionKind, id?: string) {
+  const params = new URLSearchParams();
+
+  if (kind) {
+    params.set('type', kind);
+  }
+
+  if (id) {
+    params.set('id', id);
+  }
+
+  const query = params.toString();
+
+  return query ? `/admin/transactions?${query}` : '/admin/transactions';
+}
+
 export const paths = {
   overview: '/',
   activity: '/activity',
@@ -60,6 +76,10 @@ export const paths = {
   admin: {
     wallets: '/admin/wallets',
     wallet: (id: string) => `/admin/wallets?id=${id}`,
+    transactions: '/admin/transactions',
+    transactionList: (kind?: ActivityTransactionKind) => adminTransactionsHref(kind),
+    transactionPayment: (id: string) => adminTransactionsHref('payment', id),
+    transactionInvoice: (id: string) => adminTransactionsHref('invoice', id),
     payments: '/admin/payments',
     payment: (id: string) => `/admin/payments?id=${id}`,
     invoices: '/admin/invoices',

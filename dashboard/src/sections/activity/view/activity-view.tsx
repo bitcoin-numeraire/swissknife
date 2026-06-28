@@ -94,6 +94,7 @@ type ActivityLens = 'all' | 'received' | 'paid' | 'Pending' | 'Expired' | 'Faile
 type FlowLens = 'income' | 'expenses';
 type ActivityScope = 'wallet' | 'admin';
 type ActivityTransactionKind = 'all' | 'payment' | 'invoice';
+type ActivityRoute = 'activity' | 'adminTransactions';
 
 type ActivityRow = ITransaction & {
   row_key: string;
@@ -289,6 +290,14 @@ export function ActivityView() {
   );
 }
 
+export function AdminTransactionsView() {
+  const searchParams = useSearchParams();
+  const id = searchParams.get('id');
+  const kind = normalizeTransactionKind(searchParams.get('type'));
+
+  return <AdminActivityLedger kind={kind} initialDetailId={id} route="adminTransactions" />;
+}
+
 function WalletActivityLedger({
   kind,
   initialDetailId,
@@ -316,9 +325,11 @@ function WalletActivityLedger({
 function AdminActivityLedger({
   kind,
   initialDetailId,
+  route = 'activity',
 }: {
   kind: ActivityTransactionKind;
   initialDetailId?: string | null;
+  route?: ActivityRoute;
 }) {
   const { invoices, invoicesLoading, invoicesError } = useListInvoices();
   const { payments, paymentsLoading, paymentsError } = useListPayments();
@@ -334,6 +345,7 @@ function AdminActivityLedger({
         data={[invoices, payments]}
         isLoading={[invoicesLoading, paymentsLoading]}
         initialDetailId={initialDetailId}
+        route={route}
         onCleanSuccess={() => {
           mutate(endpointKeys.invoices.list);
           mutate(endpointKeys.payments.list);
@@ -352,6 +364,7 @@ function ActivityLedger({
   data,
   isLoading,
   initialDetailId,
+  route = 'activity',
   onCleanSuccess,
 }: {
   scope: ActivityScope;
@@ -362,6 +375,7 @@ function ActivityLedger({
   data: (object | null | undefined)[];
   isLoading: boolean[];
   initialDetailId?: string | null;
+  route?: ActivityRoute;
   onCleanSuccess: VoidFunction;
 }) {
   const { t } = useTranslate();
@@ -507,6 +521,11 @@ function ActivityLedger({
     (!!filters.state.startDate && !!filters.state.endDate);
   const notFound = (!dataFiltered.length && canReset) || !dataFiltered.length;
   const hasFailedOrExpired = rows.some(isNeedsAction);
+  const isAdminTransactionsRoute = route === 'adminTransactions';
+  const currentKind = kind === 'all' ? undefined : kind;
+  const listHref = isAdminTransactionsRoute
+    ? paths.admin.transactionList(currentKind)
+    : paths.activityList(currentKind, scope);
 
   const getTransactionLength = useCallback(
     (status: ActivityLens) => rows.filter((row) => txMatchesStatus(row, status)).length,
@@ -562,10 +581,10 @@ function ActivityLedger({
       ) : (
         <>
           <CustomBreadcrumbs
-            heading={t('activity')}
+            heading={isAdminTransactionsRoute ? t('transactions') : t('activity')}
             links={[
-              { name: scope === 'admin' ? t('accounts') : t('money') },
-              { name: t('activity') },
+              { name: isAdminTransactionsRoute || scope === 'admin' ? t('admin') : t('money') },
+              { name: isAdminTransactionsRoute ? t('transactions') : t('activity') },
             ]}
             action={
               <Tooltip title={t('recent_transactions.clean_failed_expired')} placement="top" arrow>
@@ -767,7 +786,7 @@ function ActivityLedger({
             onClose={() => {
               setDetailRow(null);
               if (initialDetailId) {
-                router.push(paths.activityList(kind === 'all' ? undefined : kind, scope));
+                router.push(listHref);
               }
             }}
           />
