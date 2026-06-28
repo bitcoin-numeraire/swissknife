@@ -123,6 +123,7 @@ export function TransactionQuickDrawer({
   const amountOnly = row.amount_msat || 0;
   const totalAmount = txAmount(row);
   const isOpenAmount = isOpenAmountRequest(row);
+  const invoiceBolt11 = invoice?.ln_invoice?.bolt11;
   const bitcoinDestination =
     payment?.internal?.btc_address || payment?.bitcoin?.address || invoice?.bitcoin_output?.address;
   const destination =
@@ -130,11 +131,14 @@ export function TransactionQuickDrawer({
     payment?.internal?.ln_address ||
     bitcoinDestination ||
     payment?.bitcoin?.txid ||
-    invoice?.ln_invoice?.bolt11;
-  const destinationLabel =
-    destination === bitcoinDestination && destination
-      ? compactBitcoinAddress(destination)
-      : destination;
+    invoiceBolt11;
+  let destinationLabel = destination;
+  if (destination && destination === bitcoinDestination) {
+    destinationLabel = compactBitcoinAddress(destination);
+  }
+  if (destination && destination === invoiceBolt11) {
+    destinationLabel = compactIdentifier(destination);
+  }
   const explorerUrl = bitcoinTransactionExplorerUrl(
     payment?.bitcoin?.txid || txidFromOutpoint(invoiceOutpoint)
   );
