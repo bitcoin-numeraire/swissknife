@@ -13,7 +13,6 @@ import { getLedgerLabel } from 'src/utils/transactions';
 
 import { useTranslate } from 'src/locales';
 
-import { Iconify } from 'src/components/iconify';
 import { CopyButton } from 'src/components/copy';
 import { SatsWithIcon } from 'src/components/bitcoin';
 
@@ -26,6 +25,7 @@ import {
   MetricTile,
   StatusBadges,
   formatDateTime,
+  TransactionDirectionIcon,
   TransactionTimeline,
 } from './transaction-detail-common';
 
@@ -66,19 +66,7 @@ export function InvoiceDetails({ invoice, isAdmin }: Props) {
               <Stack spacing={3} sx={{ height: 1 }}>
                 <Stack spacing={1.25}>
                   <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-                    <Box
-                      sx={{
-                        width: 52,
-                        height: 52,
-                        display: 'grid',
-                        borderRadius: 1,
-                        placeItems: 'center',
-                        color: 'success.main',
-                        bgcolor: 'success.lighter',
-                      }}
-                    >
-                      <Iconify icon="eva:diagonal-arrow-left-down-fill" width={30} />
-                    </Box>
+                    <TransactionDirectionIcon direction="in" />
                     <StatusBadges status={invoice.status} ledger={invoice.ledger} />
                   </Stack>
 

@@ -47,6 +47,31 @@ export function formatDateTime(value?: string | Date | null) {
   return `${fDate(value)} ${fTime(value)}`;
 }
 
+export function TransactionDirectionIcon({ direction }: { direction: 'in' | 'out' }) {
+  const isIncoming = direction === 'in';
+
+  return (
+    <Box
+      sx={{
+        width: 52,
+        height: 52,
+        display: 'grid',
+        borderRadius: 1,
+        placeItems: 'center',
+        color: isIncoming ? 'success.contrastText' : 'warning.contrastText',
+        bgcolor: isIncoming ? 'success.main' : 'warning.main',
+      }}
+    >
+      <Iconify
+        icon={
+          isIncoming ? 'eva:diagonal-arrow-left-down-fill' : 'eva:diagonal-arrow-right-up-fill'
+        }
+        width={30}
+      />
+    </Box>
+  );
+}
+
 export function MetricTile({
   title,
   amountMSats,

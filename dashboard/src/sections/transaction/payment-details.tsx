@@ -18,7 +18,6 @@ import {
 
 import { useTranslate } from 'src/locales';
 
-import { Iconify } from 'src/components/iconify';
 import { CopyButton } from 'src/components/copy';
 import { SatsWithIcon } from 'src/components/bitcoin';
 
@@ -31,6 +30,7 @@ import {
   MetricTile,
   StatusBadges,
   formatDateTime,
+  TransactionDirectionIcon,
   TransactionTimeline,
 } from './transaction-detail-common';
 
@@ -97,19 +97,7 @@ export function PaymentDetails({ payment, isAdmin }: Props) {
               <Stack spacing={3} sx={{ height: 1 }}>
                 <Stack spacing={1.25}>
                   <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-                    <Box
-                      sx={{
-                        width: 52,
-                        height: 52,
-                        display: 'grid',
-                        borderRadius: 1,
-                        placeItems: 'center',
-                        color: 'warning.main',
-                        bgcolor: 'warning.lighter',
-                      }}
-                    >
-                      <Iconify icon="eva:diagonal-arrow-right-up-fill" width={30} />
-                    </Box>
+                    <TransactionDirectionIcon direction="out" />
                     <StatusBadges status={payment.status} ledger={payment.ledger} />
                   </Stack>
 
