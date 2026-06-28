@@ -14,6 +14,7 @@ import ListItemText from '@mui/material/ListItemText';
 import { Avatar, Divider, MenuList } from '@mui/material';
 
 import { paths } from 'src/routes/paths';
+import { RouterLink } from 'src/routes/components';
 import { useRouter } from 'src/routes/hooks';
 
 import { npub } from 'src/utils/nostr';
@@ -81,9 +82,15 @@ export function LnAddressTableRow({ row, selected, onSelectRow, onDeleteRow }: P
         </TableCell>
 
         <TableCell>
-          <Typography noWrap variant="body2" sx={{ color: 'text.secondary' }}>
+          <Link
+            noWrap
+            component={RouterLink}
+            href={paths.admin.wallet(wallet_id)}
+            variant="body2"
+            sx={{ color: 'text.secondary' }}
+          >
             {truncateText(wallet_id, 15)}
-          </Typography>
+          </Link>
         </TableCell>
 
         <TableCell>
