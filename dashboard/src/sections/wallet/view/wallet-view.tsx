@@ -1230,22 +1230,22 @@ function WalletActivityDrawer({
           </Stack>
         </Box>
 
-        <Grid container spacing={1.5}>
-          <Grid size={{ xs: 12, sm: 4 }}>
+        <Grid container spacing={{ xs: 1, sm: 1.5 }}>
+          <Grid size={{ xs: 4 }}>
             <WalletDrawerMetric
               label={t('wallet_view.amount')}
               amountMSats={isOpenAmount ? undefined : amountOnly}
               value={isOpenAmount ? t('wallet_view.open_amount') : undefined}
             />
           </Grid>
-          <Grid size={{ xs: 12, sm: 4 }}>
+          <Grid size={{ xs: 4 }}>
             <WalletDrawerMetric
               label={t('wallet_view.fee')}
               amountMSats={feeAmount}
               showMillisatsTooltip
             />
           </Grid>
-          <Grid size={{ xs: 12, sm: 4 }}>
+          <Grid size={{ xs: 4 }}>
             <WalletDrawerMetric
               label={t('wallet_view.total')}
               amountMSats={isOpenAmount ? undefined : totalAmount}
