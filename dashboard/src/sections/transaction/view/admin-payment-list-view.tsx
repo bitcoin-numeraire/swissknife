@@ -95,7 +95,7 @@ export function AdminPaymentListView() {
               tableHead={tableHead(t)}
               tabs={paymentTabs(theme, t)}
               transactionType={TransactionType.PAYMENT}
-              href={(id) => paths.activityPayment(id, 'admin')}
+              href={paths.admin.payment}
               isAdmin
             />
 

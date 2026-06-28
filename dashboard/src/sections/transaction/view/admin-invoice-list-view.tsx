@@ -100,7 +100,7 @@ export function AdminInvoiceListView() {
               tableHead={tableHead(t)}
               tabs={invoiceTabs(theme, t)}
               transactionType={TransactionType.INVOICE}
-              href={(id) => paths.activityInvoice(id, 'admin')}
+              href={paths.admin.invoice}
             />
 
             <ReceiveMoneyDrawer

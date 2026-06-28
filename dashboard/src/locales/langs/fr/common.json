@@ -7,6 +7,8 @@
   "accounts": "Comptes",
   "accounts_directory": "Répertoire des comptes",
   "wallet_admin": "Administration des portefeuilles",
+  "admin_invoices": "Factures admin",
+  "admin_payments": "Paiements admin",
   "admin_lightning_addresses": "Adresses LN admin",
   "roles_access": "Rôles et accès",
   "observe": "Observer",
