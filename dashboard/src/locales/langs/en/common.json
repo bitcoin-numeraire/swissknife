@@ -522,8 +522,24 @@
   "wallet_table_row": {
     "new_payment": "New Payment",
     "new_invoice": "New Invoice",
-    "copy_ln_address": "Copy LN Address",
-    "send_to_ln_address": "Send to LN Address"
+    "copy_ln_address": "Copy LN Address"
+  },
+  "wallet_details": {
+    "spendable": "Spendable",
+    "received": "Received",
+    "sent": "Sent",
+    "reserved": "Reserved",
+    "fees_paid": "Fees paid",
+    "identity": "Identity",
+    "user": "User",
+    "updated": "Updated",
+    "counts": "Activity counts",
+    "bitcoin_addresses": "Bitcoin addresses",
+    "recent_transactions": "Recent transactions",
+    "no_bitcoin_addresses": "No Bitcoin addresses yet",
+    "no_transactions": "No transactions yet",
+    "used": "Used",
+    "unused": "Unused"
   },
   "wallet_toolbar": {
     "search_placeholder": "Search ID, User or LN Address"

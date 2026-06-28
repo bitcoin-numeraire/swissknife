@@ -14,6 +14,7 @@ import ListItemText from '@mui/material/ListItemText';
 import { Link, Avatar, Divider, MenuList } from '@mui/material';
 
 import { paths } from 'src/routes/paths';
+import { useRouter } from 'src/routes/hooks';
 
 import { displayLnAddress } from 'src/utils/lnurl';
 import { fDate, fTime } from 'src/utils/format-time';
@@ -43,6 +44,7 @@ export function WalletTableRow({ row, selected, onSelectRow, onDeleteRow, fiatPr
   const { id, user_id, ln_address, n_contacts, n_invoices, n_payments, balance, created_at } = row;
 
   const { t } = useTranslate();
+  const router = useRouter();
   const popover = usePopover();
   const confirm = useBoolean();
   const isDeleting = useBoolean();
@@ -151,6 +153,16 @@ export function WalletTableRow({ row, selected, onSelectRow, onDeleteRow, fiatPr
         slotProps={{ arrow: { placement: 'right-top' } }}
       >
         <MenuList>
+          <MenuItem
+            onClick={() => {
+              router.push(paths.admin.wallet(id));
+              popover.onClose();
+            }}
+          >
+            <Iconify icon="solar:eye-bold" />
+            {t('details')}
+          </MenuItem>
+
           <MenuItem
             onClick={() => {
               newPayment.onTrue();
