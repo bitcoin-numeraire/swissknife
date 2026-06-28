@@ -8,7 +8,7 @@ import type { ITransaction, ITransactionTableFilters } from 'src/types/transacti
 import { mutate } from 'swr';
 import { sumBy } from 'es-toolkit';
 import { useMemo, useState, useEffect, useCallback } from 'react';
-import { useBoolean, usePopover, useSetState } from 'minimal-shared/hooks';
+import { useBoolean, usePopover, useSetState, useCopyToClipboard } from 'minimal-shared/hooks';
 
 import Tab from '@mui/material/Tab';
 import Box from '@mui/material/Box';
@@ -24,6 +24,7 @@ import MenuItem from '@mui/material/MenuItem';
 import MenuList from '@mui/material/MenuList';
 import TableRow from '@mui/material/TableRow';
 import Checkbox from '@mui/material/Checkbox';
+import ButtonBase from '@mui/material/ButtonBase';
 import TableCell from '@mui/material/TableCell';
 import TableBody from '@mui/material/TableBody';
 import IconButton from '@mui/material/IconButton';
@@ -37,7 +38,7 @@ import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import { paths } from 'src/routes/paths';
 import { useRouter, useSearchParams } from 'src/routes/hooks';
 
-import { composeBip21 } from 'src/utils/bitcoin-request';
+import { composeBip21, compactBitcoinAddress } from 'src/utils/bitcoin-request';
 import { shouldFail, handleActionError } from 'src/utils/errors';
 import { fDate, fTime, fIsAfter, fDateTime, fIsBetween } from 'src/utils/format-time';
 import {
@@ -67,7 +68,7 @@ import { ErrorView } from 'src/components/error/error-view';
 import { EmptyContent } from 'src/components/empty-content';
 import { ConfirmDialog } from 'src/components/custom-dialog';
 import { CustomPopover } from 'src/components/custom-popover';
-import { CopyButton, CopyMenuItem } from 'src/components/copy';
+import { CopyMenuItem } from 'src/components/copy';
 import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';
 import { CleanTransactionsButton } from 'src/components/transactions';
 import {
@@ -97,7 +98,7 @@ type ActivityTransactionKind = 'all' | 'payment' | 'invoice';
 type ActivityRow = ITransaction & {
   row_key: string;
   direction: 'in' | 'out';
-  detail_href: string;
+  detail_page_href: string;
   amount_total_msat: number;
   description_label: string;
 };
@@ -171,12 +172,24 @@ function composeInvoiceBip21(invoice?: Invoice | null) {
   return composeBip21(address, bolt11, amountSats);
 }
 
-function detailHrefForScope(tx: ITransaction, scope: ActivityScope) {
+function detailPageHrefForScope(tx: ITransaction, scope: ActivityScope) {
   if (tx.transaction_type === TransactionType.INVOICE) {
-    return paths.activityInvoice(tx.id, scope);
+    return scope === 'admin' ? paths.admin.invoice(tx.id) : paths.wallet.invoice(tx.id);
   }
 
-  return paths.activityPayment(tx.id, scope);
+  return scope === 'admin' ? paths.admin.payment(tx.id) : paths.wallet.payment(tx.id);
+}
+
+function compactIdentifier(value: string) {
+  if (value.length <= 18) return value;
+
+  return `${value.slice(0, 8)}...${value.slice(-6)}`;
+}
+
+function isOpenAmountRequest(tx: ITransaction) {
+  return (
+    tx.transaction_type === TransactionType.INVOICE && tx.status === 'Pending' && !tx.amount_msat
+  );
 }
 
 function makeRow(tx: ITransaction, scope: ActivityScope): ActivityRow {
@@ -186,7 +199,7 @@ function makeRow(tx: ITransaction, scope: ActivityScope): ActivityRow {
     ...tx,
     direction,
     row_key: `${tx.transaction_type}-${tx.id}`,
-    detail_href: detailHrefForScope(tx, scope),
+    detail_page_href: detailPageHrefForScope(tx, scope),
     amount_total_msat: txAmount(tx),
     description_label:
       tx.description || (direction === 'in' ? 'Incoming payment' : 'Outgoing payment'),
@@ -921,12 +934,12 @@ function ActivityTableRow({
         <MenuList>
           <MenuItem
             onClick={() => {
-              router.push(row.detail_href);
+              router.push(row.detail_page_href);
               popover.onClose();
             }}
           >
-            <Iconify icon="solar:eye-bold" />
-            {t('details')}
+            <Iconify icon="solar:bill-list-bold-duotone" />
+            {t('wallet_view.open_details')}
           </MenuItem>
 
           <CopyMenuItem value={row.id} title={t('activity_view.copy_transaction_id')} />
@@ -1020,18 +1033,36 @@ function ActivityDetailDrawer({
 
   const invoice = row?.transaction_type === TransactionType.INVOICE ? (row as Invoice) : null;
   const payment = row?.transaction_type === TransactionType.PAYMENT ? (row as Payment) : null;
-  const invoiceBolt11 = invoice?.ln_invoice?.bolt11;
-  const invoiceAddress = invoice?.bitcoin_output?.address;
   const invoiceOutpoint = invoice?.bitcoin_output?.outpoint;
-  const invoiceUnified = composeInvoiceBip21(invoice);
-  const paymentAddress =
-    payment?.bitcoin?.address || payment?.internal?.btc_address || payment?.internal?.ln_address;
-  const paymentHash = payment?.lightning?.payment_hash || payment?.internal?.payment_hash;
   const explorerUrl = txExplorerUrl(payment?.bitcoin?.txid || txidFromOutpoint(invoiceOutpoint));
   const methodLabel = getLedgerLabel(row?.ledger, t);
+  const isIncoming = row?.direction === 'in';
+  const amountOnly = row?.amount_msat || 0;
+  const feeAmount = row?.fee_msat || 0;
+  const totalAmount = row?.amount_total_msat || 0;
+  const isOpenAmount = row ? isOpenAmountRequest(row) : false;
+  const bitcoinDestination =
+    payment?.internal?.btc_address || payment?.bitcoin?.address || invoice?.bitcoin_output?.address;
+  const destination =
+    payment?.lightning?.ln_address ||
+    payment?.internal?.ln_address ||
+    bitcoinDestination ||
+    payment?.bitcoin?.txid ||
+    invoice?.ln_invoice?.bolt11;
+  const destinationLabel =
+    destination === bitcoinDestination && destination
+      ? compactBitcoinAddress(destination)
+      : destination;
 
   return (
-    <Drawer anchor="right" open={!!row} onClose={onClose} slotProps={{ paper: { sx: drawerSx } }}>
+    <Drawer
+      anchor="right"
+      open={!!row}
+      onClose={onClose}
+      transitionDuration={{ enter: 225, exit: 195 }}
+      ModalProps={{ keepMounted: true }}
+      slotProps={{ paper: { sx: drawerSx } }}
+    >
       {row && (
         <>
           <Stack
@@ -1049,7 +1080,7 @@ function ActivityDetailDrawer({
               </Typography>
             </Stack>
 
-            <IconButton onClick={onClose}>
+            <IconButton onClick={onClose} aria-label={t('close')}>
               <Iconify icon="mingcute:close-line" />
             </IconButton>
           </Stack>
@@ -1072,106 +1103,96 @@ function ActivityDetailDrawer({
                   direction="row"
                   sx={{ alignItems: 'center', justifyContent: 'space-between' }}
                 >
-                  <Label color={directionColor(row.direction)}>
-                    {row.direction === 'in' ? t('activity_view.in') : t('activity_view.out')}
+                  <Label color={isIncoming ? 'success' : 'warning'}>
+                    {isIncoming ? t('wallet_view.direction_in') : t('wallet_view.direction_out')}
                   </Label>
                   <Label variant="soft" color={statusColor(row.status)}>
                     {row.status}
                   </Label>
                 </Stack>
 
-                <SatsWithIcon amountMSats={row.amount_total_msat} variant="h4" />
-
-                <Typography variant="body2" color="text.secondary">
-                  {row.id}
-                </Typography>
+                {isOpenAmount ? (
+                  <Typography variant="h4">{t('wallet_view.open_amount')}</Typography>
+                ) : (
+                  <SatsWithIcon amountMSats={totalAmount} variant="h4" sx={{ fontWeight: 400 }} />
+                )}
               </Stack>
             </Box>
 
+            <Grid container spacing={1.5}>
+              <Grid size={{ xs: 12, sm: 4 }}>
+                <ActivityDrawerMetric
+                  label={t('wallet_view.amount')}
+                  amountMSats={isOpenAmount ? undefined : amountOnly}
+                  value={isOpenAmount ? t('wallet_view.open_amount') : undefined}
+                />
+              </Grid>
+              <Grid size={{ xs: 12, sm: 4 }}>
+                <ActivityDrawerMetric
+                  label={t('wallet_view.fee')}
+                  amountMSats={feeAmount}
+                  showMillisatsTooltip
+                />
+              </Grid>
+              <Grid size={{ xs: 12, sm: 4 }}>
+                <ActivityDrawerMetric
+                  label={t('wallet_view.total')}
+                  amountMSats={isOpenAmount ? undefined : totalAmount}
+                  value={isOpenAmount ? t('wallet_view.open_amount') : undefined}
+                />
+              </Grid>
+            </Grid>
+
             <Stack spacing={1.5}>
-              <ActivityDrawerRow label={t('activity_view.rail')} value={methodLabel} />
+              <ActivityDrawerRow label={t('wallet_view.rail')} value={methodLabel} />
               <ActivityDrawerRow
-                label={t('activity_view.created')}
+                label={t('wallet_view.created')}
                 value={fDateTime(row.created_at)}
               />
               <ActivityDrawerRow
-                label={t('activity_view.settled')}
+                label={t('wallet_view.settled')}
                 value={
-                  row.payment_time ? fDateTime(row.payment_time) : t('transaction_details.pending')
+                  row.payment_time ? fDateTime(row.payment_time) : t('wallet_view.not_settled')
                 }
               />
-              <ActivityDrawerRow label={t('activity_view.wallet')} value={row.wallet_id} mono />
-              {invoice?.ln_invoice?.expires_at && (
-                <ActivityDrawerRow
-                  label={t('transaction_list.expires')}
-                  value={fDateTime(invoice.ln_invoice.expires_at)}
+              {destination && (
+                <ActionCopyButton
+                  label={t('wallet_view.destination')}
+                  value={destination}
+                  displayValue={destinationLabel || destination}
+                  copyLabel={t('transaction_actions.copy_destination')}
                 />
               )}
-              {payment?.error && (
-                <ActivityDrawerRow
-                  label={t('payment_details.error_message')}
-                  value={payment.error}
-                />
-              )}
+              <ActionCopyButton
+                label={t('wallet_view.transaction_id')}
+                value={row.id}
+                displayValue={compactIdentifier(row.id)}
+                copyLabel={t('activity_view.copy_transaction_id')}
+              />
             </Stack>
 
-            <Stack spacing={1}>
-              {invoiceUnified && (
-                <ActionCopyButton
-                  value={invoiceUnified}
-                  label={t('transaction_actions.copy_unified')}
-                />
-              )}
-              {invoiceBolt11 && (
-                <ActionCopyButton
-                  value={invoiceBolt11}
-                  label={t('transaction_actions.copy_bolt11')}
-                />
-              )}
-              {invoiceAddress && (
-                <ActionCopyButton
-                  value={invoiceAddress}
-                  label={t('transaction_actions.copy_onchain_address')}
-                />
-              )}
-              {invoiceOutpoint && (
-                <ActionCopyButton
-                  value={invoiceOutpoint}
-                  label={t('transaction_actions.copy_outpoint')}
-                />
-              )}
-              {paymentAddress && (
-                <ActionCopyButton
-                  value={paymentAddress}
-                  label={t('transaction_actions.copy_destination')}
-                />
-              )}
-              {paymentHash && (
-                <ActionCopyButton value={paymentHash} label={t('payment_details.payment_hash')} />
-              )}
-              <ActionCopyButton value={row.id} label={t('activity_view.copy_transaction_id')} />
-
-              {explorerUrl && (
-                <Button
-                  href={explorerUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  color="inherit"
-                  variant="outlined"
-                  startIcon={<Iconify icon="solar:map-arrow-right-bold" />}
-                >
-                  {t('transaction_actions.open_explorer')}
-                </Button>
-              )}
-            </Stack>
+            {explorerUrl && (
+              <Button
+                component="a"
+                href={explorerUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                color="inherit"
+                variant="outlined"
+                startIcon={<Iconify icon="solar:map-arrow-right-bold" />}
+              >
+                {t('transaction_actions.open_explorer')}
+              </Button>
+            )}
 
             <Button
-              href={row.detail_href}
+              component="a"
+              href={row.detail_page_href}
               color="inherit"
-              variant="contained"
-              startIcon={<Iconify icon="solar:eye-bold" />}
+              variant="outlined"
+              startIcon={<Iconify icon="solar:bill-list-bold-duotone" />}
             >
-              {t('details')}
+              {t('wallet_view.open_details')}
             </Button>
 
             {canDelete && onDeleteRow && (
@@ -1245,22 +1266,102 @@ function ActivityDrawerRow({
   );
 }
 
-function ActionCopyButton({ value, label }: { value: string; label: string }) {
+function ActivityDrawerMetric({
+  label,
+  amountMSats,
+  value,
+  showMillisatsTooltip = false,
+}: {
+  label: string;
+  amountMSats?: number;
+  value?: string;
+  showMillisatsTooltip?: boolean;
+}) {
   return (
-    <Stack
-      direction="row"
-      spacing={1}
-      sx={{
-        p: 1,
-        borderRadius: 1,
-        alignItems: 'center',
-        bgcolor: 'background.neutral',
-      }}
+    <Box
+      sx={[
+        (theme) => ({
+          p: 1.5,
+          height: 1,
+          borderRadius: 1,
+          bgcolor: 'background.neutral',
+          border: `1px solid ${theme.vars.palette.divider}`,
+        }),
+      ]}
     >
-      <Typography variant="body2" sx={{ flex: 1 }} noWrap>
+      <Typography variant="caption" color="text.secondary">
         {label}
       </Typography>
-      <CopyButton value={value} title={label} />
-    </Stack>
+      {value ? (
+        <Typography variant="subtitle2">{value}</Typography>
+      ) : (
+        <SatsWithIcon
+          amountMSats={amountMSats ?? 0}
+          variant="subtitle2"
+          showMillisatsTooltip={showMillisatsTooltip}
+        />
+      )}
+    </Box>
+  );
+}
+
+function ActionCopyButton({
+  value,
+  displayValue,
+  label,
+  copyLabel,
+}: {
+  value: string;
+  displayValue?: string;
+  label: string;
+  copyLabel: string;
+}) {
+  const { t } = useTranslate();
+  const { copy } = useCopyToClipboard();
+
+  const handleCopy = async () => {
+    if (await copy(value)) {
+      toast.success(t('copied_to_clipboard'));
+    }
+  };
+
+  return (
+    <ButtonBase
+      type="button"
+      title={copyLabel}
+      aria-label={copyLabel}
+      onClick={handleCopy}
+      sx={[
+        (theme) => ({
+          py: 0.5,
+          gap: 1.5,
+          width: 1,
+          display: 'flex',
+          minWidth: 0,
+          borderRadius: 0.75,
+          textAlign: 'left',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          transition: theme.transitions.create('background-color'),
+          '&:hover': {
+            bgcolor: 'action.hover',
+          },
+        }),
+      ]}
+    >
+      <Typography variant="body2" color="text.secondary">
+        {label}
+      </Typography>
+      <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center', minWidth: 0 }}>
+        <Typography
+          variant="body2"
+          sx={{ typography: 'caption', fontFamily: 'monospace', color: 'text.primary' }}
+          noWrap
+        >
+          {displayValue || value}
+        </Typography>
+        <Iconify icon="eva:copy-fill" width={16} sx={{ flexShrink: 0, color: 'text.disabled' }} />
+      </Stack>
+    </ButtonBase>
   );
 }
