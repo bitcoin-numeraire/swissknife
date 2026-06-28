@@ -2,11 +2,11 @@
 
 import type { IFiatPrices } from 'src/types/bitcoin';
 import type { ITransaction } from 'src/types/transaction';
-import type { Contact, Invoice, Payment } from 'src/lib/swissknife';
+import type { Contact } from 'src/lib/swissknife';
 
 import { mutate } from 'swr';
 import { useMemo, useState, useEffect } from 'react';
-import { useBoolean, useCopyToClipboard } from 'minimal-shared/hooks';
+import { useBoolean } from 'minimal-shared/hooks';
 
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
@@ -15,7 +15,6 @@ import Alert from '@mui/material/Alert';
 import Stack from '@mui/material/Stack';
 import Button from '@mui/material/Button';
 import Avatar from '@mui/material/Avatar';
-import Drawer from '@mui/material/Drawer';
 import Divider from '@mui/material/Divider';
 import Tooltip from '@mui/material/Tooltip';
 import ButtonBase from '@mui/material/ButtonBase';
@@ -30,11 +29,9 @@ import { satsToFiat } from 'src/utils/fiat';
 import { shouldFail } from 'src/utils/errors';
 import { displayLnAddress } from 'src/utils/lnurl';
 import { fCurrency } from 'src/utils/format-number';
-import { fFromNow, fDateTime } from 'src/utils/format-time';
+import { fFromNow } from 'src/utils/format-time';
 import { mergeAndSortTransactions } from 'src/utils/transactions';
-import { compactBitcoinAddress } from 'src/utils/bitcoin-request';
 
-import { CONFIG } from 'src/global-config';
 import { useTranslate } from 'src/locales';
 import { endpointKeys } from 'src/actions/keys';
 import { DashboardContent } from 'src/layouts/dashboard';
@@ -50,16 +47,14 @@ import { useSettingsContext } from 'src/components/settings';
 
 import { TransactionType } from 'src/types/transaction';
 
+import { TransactionQuickDrawer } from 'src/sections/transaction/transaction-quick-drawer';
+
 import { SendMoneyDrawer, ReceiveMoneyDrawer } from '../money-drawers';
 
 // ----------------------------------------------------------------------
 
 const fallbackFiatPrices: IFiatPrices = { USD: 0, EUR: 0, CHF: 0 };
 const recentActivityLimit = 8;
-const drawerSx = {
-  width: { xs: 1, sm: 520 },
-  maxWidth: 1,
-};
 
 function txAmount(tx: ITransaction) {
   return (tx.amount_msat || 0) + (tx.fee_msat || 0);
@@ -112,26 +107,6 @@ function txDisplayTitle(tx: ITransaction, t: (key: string) => string) {
   if (tx.status === 'Pending') return t('wallet_view.payment_pending');
   if (tx.status === 'Failed') return t('wallet_view.payment_failed');
   return t('wallet_view.payment_sent');
-}
-
-function compactIdentifier(value: string) {
-  if (value.length <= 18) return value;
-
-  return `${value.slice(0, 8)}...${value.slice(-6)}`;
-}
-
-function txExplorerUrl(txid?: string | null) {
-  if (!txid) return undefined;
-
-  const explorerBaseUrl = CONFIG.mempoolSpace.replace(/\/api\/v1\/?$/, '');
-  return `${explorerBaseUrl}/tx/${txid}`;
-}
-
-function txidFromOutpoint(outpoint?: string | null) {
-  if (!outpoint) return undefined;
-
-  const [txid] = outpoint.split(':');
-  return txid || undefined;
 }
 
 // ----------------------------------------------------------------------
@@ -976,8 +951,9 @@ export function WalletView() {
             onReceive={receiveDrawer.onTrue}
           />
 
-          <WalletActivityDrawer
+          <TransactionQuickDrawer
             row={detailTransaction}
+            detailHref={detailTransaction ? txHref(detailTransaction) : undefined}
             onClose={() => setDetailTransaction(null)}
           />
           <SendMoneyDrawer
@@ -1120,323 +1096,6 @@ function WalletActionButton({
       </Stack>
 
       <Iconify icon="eva:arrow-ios-forward-fill" sx={{ color: 'text.disabled', flexShrink: 0 }} />
-    </ButtonBase>
-  );
-}
-
-function WalletActivityDrawer({
-  row,
-  onClose,
-}: {
-  row: ITransaction | null;
-  onClose: VoidFunction;
-}) {
-  const { t } = useTranslate();
-
-  if (!row) {
-    return (
-      <Drawer
-        anchor="right"
-        open={false}
-        onClose={onClose}
-        transitionDuration={{ enter: 225, exit: 195 }}
-        ModalProps={{ keepMounted: true }}
-        slotProps={{ paper: { sx: drawerSx } }}
-      />
-    );
-  }
-
-  const direction = txDirection(row);
-  const isIncoming = direction === 'in';
-  const invoice = row.transaction_type === TransactionType.INVOICE ? (row as Invoice) : null;
-  const payment = row.transaction_type === TransactionType.PAYMENT ? (row as Payment) : null;
-  const title = txDisplayTitle(row, t);
-  const methodLabel = txNetworkLabel(row);
-  const feeAmount = row.fee_msat || 0;
-  const amountOnly = row.amount_msat || 0;
-  const totalAmount = txAmount(row);
-  const isOpenAmount = isOpenAmountRequest(row);
-  const bitcoinDestination =
-    payment?.internal?.btc_address || payment?.bitcoin?.address || invoice?.bitcoin_output?.address;
-  const destination =
-    payment?.lightning?.ln_address ||
-    payment?.internal?.ln_address ||
-    bitcoinDestination ||
-    payment?.bitcoin?.txid ||
-    invoice?.ln_invoice?.bolt11;
-  const destinationLabel =
-    destination === bitcoinDestination ? compactBitcoinAddress(destination) : destination;
-  const explorerUrl = txExplorerUrl(
-    payment?.bitcoin?.txid || txidFromOutpoint(invoice?.bitcoin_output?.outpoint)
-  );
-
-  return (
-    <Drawer
-      anchor="right"
-      open={!!row}
-      onClose={onClose}
-      transitionDuration={{ enter: 225, exit: 195 }}
-      ModalProps={{ keepMounted: true }}
-      slotProps={{ paper: { sx: drawerSx } }}
-    >
-      <Stack
-        direction="row"
-        spacing={2}
-        sx={{ alignItems: 'center', justifyContent: 'space-between', px: 3, py: 2 }}
-      >
-        <Stack sx={{ minWidth: 0 }}>
-          <Typography variant="h6" noWrap>
-            {title}
-          </Typography>
-          <Typography variant="caption" color="text.secondary">
-            {isIncoming ? t('wallet_view.direction_in') : t('wallet_view.direction_out')} ·{' '}
-            {methodLabel}
-          </Typography>
-        </Stack>
-
-        <IconButton onClick={onClose} aria-label={t('close')}>
-          <Iconify icon="mingcute:close-line" />
-        </IconButton>
-      </Stack>
-
-      <Divider />
-
-      <Stack spacing={3} sx={{ p: 3 }}>
-        <Box
-          sx={[
-            (theme) => ({
-              p: 2,
-              borderRadius: 1,
-              bgcolor: 'background.neutral',
-              border: `1px solid ${theme.vars.palette.divider}`,
-            }),
-          ]}
-        >
-          <Stack spacing={1.5}>
-            <Stack direction="row" sx={{ alignItems: 'center', justifyContent: 'space-between' }}>
-              <Label color={isIncoming ? 'success' : 'warning'}>
-                {isIncoming ? t('wallet_view.direction_in') : t('wallet_view.direction_out')}
-              </Label>
-              <Label variant="soft" color={statusColor(row.status)}>
-                {row.status}
-              </Label>
-            </Stack>
-
-            {isOpenAmount ? (
-              <Typography variant="h4">{t('wallet_view.open_amount')}</Typography>
-            ) : (
-              <SatsWithIcon amountMSats={totalAmount} variant="h4" sx={{ fontWeight: 400 }} />
-            )}
-          </Stack>
-        </Box>
-
-        <Grid container spacing={{ xs: 1, sm: 1.5 }}>
-          <Grid size={{ xs: 4 }}>
-            <WalletDrawerMetric
-              label={t('wallet_view.amount')}
-              amountMSats={isOpenAmount ? undefined : amountOnly}
-              value={isOpenAmount ? t('wallet_view.open_amount') : undefined}
-            />
-          </Grid>
-          <Grid size={{ xs: 4 }}>
-            <WalletDrawerMetric
-              label={t('wallet_view.fee')}
-              amountMSats={feeAmount}
-              showMillisatsTooltip
-            />
-          </Grid>
-          <Grid size={{ xs: 4 }}>
-            <WalletDrawerMetric
-              label={t('wallet_view.total')}
-              amountMSats={isOpenAmount ? undefined : totalAmount}
-              value={isOpenAmount ? t('wallet_view.open_amount') : undefined}
-            />
-          </Grid>
-        </Grid>
-
-        <Stack spacing={1.5}>
-          <WalletDrawerRow label={t('wallet_view.rail')} value={methodLabel} />
-          <WalletDrawerRow label={t('wallet_view.created')} value={fDateTime(row.created_at)} />
-          {invoice?.ln_invoice?.expires_at && (
-            <WalletDrawerRow
-              label={t('transaction_list.expires')}
-              value={fDateTime(invoice.ln_invoice.expires_at)}
-            />
-          )}
-          <WalletDrawerRow
-            label={t('wallet_view.settled')}
-            value={row.payment_time ? fDateTime(row.payment_time) : t('wallet_view.not_settled')}
-          />
-          {destination && (
-            <WalletDrawerCopyRow
-              label={t('wallet_view.destination')}
-              value={destinationLabel || destination}
-              copyValue={destination}
-              copyLabel={t('transaction_actions.copy_destination')}
-            />
-          )}
-          <WalletDrawerCopyRow
-            label={t('wallet_view.transaction_id')}
-            value={compactIdentifier(row.id)}
-            copyValue={row.id}
-            copyLabel={t('activity_view.copy_transaction_id')}
-          />
-        </Stack>
-
-        {explorerUrl && (
-          <Button
-            component="a"
-            href={explorerUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            color="inherit"
-            variant="outlined"
-            startIcon={<Iconify icon="solar:map-arrow-right-bold" />}
-          >
-            {t('transaction_actions.open_explorer')}
-          </Button>
-        )}
-
-        <Button
-          href={txHref(row)}
-          color="inherit"
-          variant="outlined"
-          startIcon={<Iconify icon="solar:bill-list-bold-duotone" />}
-        >
-          {t('wallet_view.open_details')}
-        </Button>
-      </Stack>
-    </Drawer>
-  );
-}
-
-function WalletDrawerMetric({
-  label,
-  amountMSats,
-  value,
-  showMillisatsTooltip = false,
-}: {
-  label: string;
-  amountMSats?: number;
-  value?: string;
-  showMillisatsTooltip?: boolean;
-}) {
-  return (
-    <Box
-      sx={[
-        (theme) => ({
-          p: 1.5,
-          height: 1,
-          borderRadius: 1,
-          bgcolor: 'background.neutral',
-          border: `1px solid ${theme.vars.palette.divider}`,
-        }),
-      ]}
-    >
-      <Typography variant="caption" color="text.secondary">
-        {label}
-      </Typography>
-      {value ? (
-        <Typography variant="subtitle2">{value}</Typography>
-      ) : (
-        <SatsWithIcon
-          amountMSats={amountMSats ?? 0}
-          variant="subtitle2"
-          showMillisatsTooltip={showMillisatsTooltip}
-        />
-      )}
-    </Box>
-  );
-}
-
-function WalletDrawerRow({
-  label,
-  value,
-  mono,
-}: {
-  label: string;
-  value?: string | null;
-  mono?: boolean;
-}) {
-  if (!value) return null;
-
-  return (
-    <Stack direction="row" spacing={1.5} sx={{ justifyContent: 'space-between', minWidth: 0 }}>
-      <Typography variant="body2" color="text.secondary">
-        {label}
-      </Typography>
-      <Typography
-        variant="body2"
-        sx={{
-          maxWidth: '68%',
-          textAlign: 'right',
-          wordBreak: 'break-word',
-          fontFamily: mono ? 'monospace' : undefined,
-        }}
-      >
-        {value}
-      </Typography>
-    </Stack>
-  );
-}
-
-function WalletDrawerCopyRow({
-  label,
-  value,
-  copyValue,
-  copyLabel,
-}: {
-  label: string;
-  value: string;
-  copyValue: string;
-  copyLabel: string;
-}) {
-  const { t } = useTranslate();
-  const { copy } = useCopyToClipboard();
-
-  const handleCopy = async () => {
-    if (await copy(copyValue)) {
-      toast.success(t('copied_to_clipboard'));
-    }
-  };
-
-  return (
-    <ButtonBase
-      type="button"
-      title={copyLabel}
-      aria-label={copyLabel}
-      onClick={handleCopy}
-      sx={[
-        (theme) => ({
-          py: 0.5,
-          gap: 1.5,
-          width: 1,
-          display: 'flex',
-          minWidth: 0,
-          borderRadius: 0.75,
-          textAlign: 'left',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          transition: theme.transitions.create('background-color'),
-          '&:hover': {
-            bgcolor: 'action.hover',
-          },
-        }),
-      ]}
-    >
-      <Typography variant="body2" color="text.secondary">
-        {label}
-      </Typography>
-      <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center', minWidth: 0 }}>
-        <Typography
-          variant="body2"
-          sx={{ typography: 'caption', fontFamily: 'monospace', color: 'text.primary' }}
-          noWrap
-        >
-          {value}
-        </Typography>
-        <Iconify icon="eva:copy-fill" width={16} sx={{ flexShrink: 0, color: 'text.disabled' }} />
-      </Stack>
     </ButtonBase>
   );
 }
