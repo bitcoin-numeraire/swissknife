@@ -167,8 +167,8 @@ export function IdentityView() {
                         display: 'grid',
                         borderRadius: 1,
                         placeItems: 'center',
-                        color: 'warning.main',
-                        bgcolor: 'warning.lighter',
+                        color: 'warning.contrastText',
+                        bgcolor: 'warning.main',
                       }}
                     >
                       <Iconify icon="solar:user-rounded-bold-duotone" width={32} />
@@ -198,13 +198,17 @@ export function IdentityView() {
                     {[
                       {
                         title: t('identity_view.lightning'),
-                        body: displayAddress || t('identity_view.lightning_body'),
+                        body: displayAddress
+                          ? t('identity_view.lightning_ready')
+                          : t('identity_view.lightning_body'),
                         icon: 'solar:bolt-bold-duotone',
                         color: 'warning',
                       },
                       {
                         title: t('identity_view.nostr'),
-                        body: nostrDisplay || t('identity_view.nostr_body'),
+                        body: nostrDisplay
+                          ? t('identity_view.nostr_ready')
+                          : t('identity_view.nostr_body'),
                         icon: 'solar:verified-check-bold-duotone',
                         color: 'info',
                       },
@@ -228,11 +232,19 @@ export function IdentityView() {
                           ]}
                         >
                           <Stack spacing={1.5}>
-                            <Iconify
-                              icon={item.icon}
-                              width={28}
-                              sx={{ color: `${item.color}.main` }}
-                            />
+                            <Box
+                              sx={{
+                                width: 36,
+                                height: 36,
+                                display: 'grid',
+                                borderRadius: 1,
+                                placeItems: 'center',
+                                color: `${item.color}.contrastText`,
+                                bgcolor: `${item.color}.main`,
+                              }}
+                            >
+                              <Iconify icon={item.icon} width={22} />
+                            </Box>
                             <Typography variant="subtitle2">{item.title}</Typography>
                             <Typography variant="body2" color="text.secondary">
                               {item.body}
