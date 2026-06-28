@@ -1,6 +1,6 @@
 import { appTitle } from 'src/utils/format-string';
 
-import { LegacyActivityRedirect } from 'src/sections/transaction/legacy-activity-redirect';
+import { PaymentsView } from 'src/sections/transaction/view';
 
 // ----------------------------------------------------------------------
 
@@ -9,5 +9,5 @@ export const metadata = {
 };
 
 export default function PaymentListPage() {
-  return <LegacyActivityRedirect kind="payment" />;
+  return <PaymentsView />;
 }
