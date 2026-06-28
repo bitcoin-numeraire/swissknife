@@ -44,11 +44,11 @@ export function AdminPaymentDetailsView({ id }: Props) {
               heading={payment!.description || t('payment_details.detail_heading')}
               links={[
                 {
-                  name: t('admin'),
+                  name: t('accounts'),
                 },
                 {
-                  name: t('payments'),
-                  href: paths.admin.payments,
+                  name: t('transactions'),
+                  href: paths.admin.transactionList('payment'),
                 },
                 { name: t('payment_details.detail_heading') },
               ]}

@@ -5,7 +5,7 @@ import { LnAddressesView } from 'src/sections/ln-address/view';
 // ----------------------------------------------------------------------
 
 export const metadata = {
-  title: appTitle('Lightning Addresses Management'),
+  title: appTitle('LN Addresses'),
 };
 
 export default function LnAddressListPage() {

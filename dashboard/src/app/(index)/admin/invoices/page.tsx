@@ -1,13 +1,28 @@
+import { redirect } from 'next/navigation';
+
+import { paths } from 'src/routes/paths';
+
 import { appTitle } from 'src/utils/format-string';
 
-import { AdminInvoicesView } from 'src/sections/transaction/view';
+import { AdminInvoiceDetailsView } from 'src/sections/transaction/view';
 
 // ----------------------------------------------------------------------
 
 export const metadata = {
-  title: appTitle('Invoices Management'),
+  title: appTitle('Invoice details'),
 };
 
-export default function AdminInvoiceListPage() {
-  return <AdminInvoicesView />;
+type Props = {
+  searchParams?: Promise<{ id?: string | string[] }>;
+};
+
+export default async function AdminInvoicePage({ searchParams }: Props) {
+  const params = await searchParams;
+  const id = Array.isArray(params?.id) ? params.id[0] : params?.id;
+
+  if (!id) {
+    redirect(paths.admin.transactionList('invoice'));
+  }
+
+  return <AdminInvoiceDetailsView id={id} />;
 }

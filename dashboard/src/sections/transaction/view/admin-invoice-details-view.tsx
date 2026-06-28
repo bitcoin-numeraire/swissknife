@@ -44,11 +44,11 @@ export function AdminInvoiceDetailsView({ id }: Props) {
               heading={invoice!.description || t('invoice_details.detail_heading')}
               links={[
                 {
-                  name: t('admin'),
+                  name: t('accounts'),
                 },
                 {
-                  name: t('invoices'),
-                  href: paths.admin.invoices,
+                  name: t('transactions'),
+                  href: paths.admin.transactionList('invoice'),
                 },
                 { name: t('invoice_details.detail_heading') },
               ]}

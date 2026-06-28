@@ -84,7 +84,7 @@ export function BtcAddressesView() {
           <>
             <CustomBreadcrumbs
               heading={t('admin_bitcoin_addresses')}
-              links={[{ name: t('admin') }, { name: t('admin_bitcoin_addresses') }]}
+              links={[{ name: t('accounts') }, { name: t('admin_bitcoin_addresses') }]}
               sx={{ mb: { xs: 3, md: 5 } }}
             />
 

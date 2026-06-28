@@ -85,7 +85,7 @@ export function LnAddressTableRow({ row, selected, onSelectRow, onDeleteRow }: P
           <Link
             noWrap
             component={RouterLink}
-            href={paths.admin.wallet(wallet_id)}
+            href={paths.account(wallet_id)}
             variant="body2"
             sx={{ color: 'text.secondary' }}
           >

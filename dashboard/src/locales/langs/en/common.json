@@ -6,13 +6,10 @@
   "identity": "Identity",
   "identity_hub": "Identity hub",
   "accounts": "Accounts",
-  "accounts_directory": "Accounts directory",
-  "wallet_admin": "Wallet admin",
-  "admin_transactions": "Admin transactions",
-  "admin_invoices": "Admin invoices",
-  "admin_payments": "Admin payments",
-  "admin_lightning_addresses": "Admin LN addresses",
-  "admin_bitcoin_addresses": "Admin Bitcoin addresses",
+  "accounts_directory": "Directory",
+  "admin_transactions": "Transactions",
+  "admin_lightning_addresses": "LN Addresses",
+  "admin_bitcoin_addresses": "Bitcoin addresses",
   "roles_access": "Roles & access",
   "observe": "Observe",
   "node_health": "Node health",
@@ -508,7 +505,7 @@
   },
   "accounts_view": {
     "hero_title": "Account directory",
-    "hero_subheader": "A read-only operating map of wallet accounts, public receive identities, and activity mix. Use Wallet admin for creation, deletion, and send-on-behalf workflows.",
+    "hero_subheader": "A read-only operating map of wallet accounts, public receive identities, and activity mix.",
     "identity_ready": "Identity ready",
     "empty_title": "No accounts yet",
     "empty_description": "Accounts will appear here after a wallet is registered.",
@@ -526,7 +523,7 @@
     "ready": "Ready",
     "paused": "Paused",
     "missing": "No identity",
-    "manage_in_admin": "Manage in admin"
+    "manage_in_admin": "Open details"
   },
   "wallet_table_row": {
     "new_payment": "New Payment",

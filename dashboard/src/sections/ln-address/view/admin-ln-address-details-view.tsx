@@ -45,7 +45,7 @@ export function AdminLnAddressDetailsView({ id }: Props) {
               heading={`${displayLnAddress(lnAddress!.username)}`}
               links={[
                 {
-                  name: t('admin'),
+                  name: t('accounts'),
                 },
                 {
                   name: t('lightning_addresses'),
