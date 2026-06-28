@@ -13,6 +13,7 @@ import { useBoolean, usePopover, useSetState, useCopyToClipboard } from 'minimal
 import Tab from '@mui/material/Tab';
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
+import Grid from '@mui/material/Grid';
 import Tabs from '@mui/material/Tabs';
 import Table from '@mui/material/Table';
 import Stack from '@mui/material/Stack';
@@ -1084,170 +1085,167 @@ function ActivityDetailDrawer({
       ModalProps={{ keepMounted: true }}
       slotProps={{ paper: { sx: drawerSx } }}
     >
-      <Stack
-            direction="row"
-            spacing={2}
-            sx={{ alignItems: 'center', justifyContent: 'space-between', px: 3, py: 2 }}
-          >
-            <Stack sx={{ minWidth: 0 }}>
-              <Typography variant="h6" noWrap>
-                {row.description_label}
-              </Typography>
-              <Typography variant="caption" color="text.secondary">
-                {row.direction === 'in' ? t('activity_view.received') : t('activity_view.sent')} ·{' '}
-                {methodLabel}
-              </Typography>
-            </Stack>
-
-            <IconButton onClick={onClose} aria-label={t('close')}>
-              <Iconify icon="mingcute:close-line" />
-            </IconButton>
+      <Box>
+        <Stack
+          direction="row"
+          spacing={2}
+          sx={{ alignItems: 'center', justifyContent: 'space-between', px: 3, py: 2 }}
+        >
+          <Stack sx={{ minWidth: 0 }}>
+            <Typography variant="h6" noWrap>
+              {row.description_label}
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              {row.direction === 'in' ? t('activity_view.received') : t('activity_view.sent')} ·{' '}
+              {methodLabel}
+            </Typography>
           </Stack>
 
-          <Divider />
+          <IconButton onClick={onClose} aria-label={t('close')}>
+            <Iconify icon="mingcute:close-line" />
+          </IconButton>
+        </Stack>
 
-          <Stack spacing={3} sx={{ p: 3 }}>
-            <Box
-              sx={[
-                (theme) => ({
-                  p: 2,
-                  borderRadius: 1,
-                  bgcolor: 'background.neutral',
-                  border: `1px solid ${theme.vars.palette.divider}`,
-                }),
-              ]}
-            >
-              <Stack spacing={1.5}>
-                <Stack
-                  direction="row"
-                  sx={{ alignItems: 'center', justifyContent: 'space-between' }}
-                >
-                  <Label color={isIncoming ? 'success' : 'warning'}>
-                    {isIncoming ? t('wallet_view.direction_in') : t('wallet_view.direction_out')}
-                  </Label>
-                  <Label variant="soft" color={statusColor(row.status)}>
-                    {row.status}
-                  </Label>
-                </Stack>
+        <Divider />
 
-                {isOpenAmount ? (
-                  <Typography variant="h4">{t('wallet_view.open_amount')}</Typography>
-                ) : (
-                  <SatsWithIcon amountMSats={totalAmount} variant="h4" sx={{ fontWeight: 400 }} />
-                )}
-              </Stack>
-            </Box>
-
-            <Grid container spacing={{ xs: 1, sm: 1.5 }}>
-              <Grid size={{ xs: 4 }}>
-                <ActivityDrawerMetric
-                  label={t('wallet_view.amount')}
-                  amountMSats={isOpenAmount ? undefined : amountOnly}
-                  value={isOpenAmount ? t('wallet_view.open_amount') : undefined}
-                />
-              </Grid>
-              <Grid size={{ xs: 4 }}>
-                <ActivityDrawerMetric
-                  label={t('wallet_view.fee')}
-                  amountMSats={feeAmount}
-                  showMillisatsTooltip
-                />
-              </Grid>
-              <Grid size={{ xs: 4 }}>
-                <ActivityDrawerMetric
-                  label={t('wallet_view.total')}
-                  amountMSats={isOpenAmount ? undefined : totalAmount}
-                  value={isOpenAmount ? t('wallet_view.open_amount') : undefined}
-                />
-              </Grid>
-            </Grid>
-
+        <Stack spacing={3} sx={{ p: 3 }}>
+          <Box
+            sx={[
+              (theme) => ({
+                p: 2,
+                borderRadius: 1,
+                bgcolor: 'background.neutral',
+                border: `1px solid ${theme.vars.palette.divider}`,
+              }),
+            ]}
+          >
             <Stack spacing={1.5}>
-              <ActivityDrawerRow label={t('wallet_view.rail')} value={methodLabel} />
-              <ActivityDrawerRow
-                label={t('wallet_view.created')}
-                value={fDateTime(row.created_at)}
-              />
-              <ActivityDrawerRow
-                label={t('wallet_view.settled')}
-                value={
-                  row.payment_time ? fDateTime(row.payment_time) : t('wallet_view.not_settled')
-                }
-              />
-              {destination && (
-                <ActionCopyButton
-                  label={t('wallet_view.destination')}
-                  value={destination}
-                  displayValue={destinationLabel || destination}
-                  copyLabel={t('transaction_actions.copy_destination')}
-                />
-              )}
-              <ActionCopyButton
-                label={t('wallet_view.transaction_id')}
-                value={row.id}
-                displayValue={compactIdentifier(row.id)}
-                copyLabel={t('activity_view.copy_transaction_id')}
-              />
-            </Stack>
-
-            {explorerUrl && (
-              <Button
-                component="a"
-                href={explorerUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                color="inherit"
-                variant="outlined"
-                startIcon={<Iconify icon="solar:map-arrow-right-bold" />}
+              <Stack
+                direction="row"
+                sx={{ alignItems: 'center', justifyContent: 'space-between' }}
               >
-                {t('transaction_actions.open_explorer')}
-              </Button>
-            )}
+                <Label color={isIncoming ? 'success' : 'warning'}>
+                  {isIncoming ? t('wallet_view.direction_in') : t('wallet_view.direction_out')}
+                </Label>
+                <Label variant="soft" color={statusColor(row.status)}>
+                  {row.status}
+                </Label>
+              </Stack>
 
+              {isOpenAmount ? (
+                <Typography variant="h4">{t('wallet_view.open_amount')}</Typography>
+              ) : (
+                <SatsWithIcon amountMSats={totalAmount} variant="h4" sx={{ fontWeight: 400 }} />
+              )}
+            </Stack>
+          </Box>
+
+          <Grid container spacing={{ xs: 1, sm: 1.5 }}>
+            <Grid size={{ xs: 4 }}>
+              <ActivityDrawerMetric
+                label={t('wallet_view.amount')}
+                amountMSats={isOpenAmount ? undefined : amountOnly}
+                value={isOpenAmount ? t('wallet_view.open_amount') : undefined}
+              />
+            </Grid>
+            <Grid size={{ xs: 4 }}>
+              <ActivityDrawerMetric
+                label={t('wallet_view.fee')}
+                amountMSats={feeAmount}
+                showMillisatsTooltip
+              />
+            </Grid>
+            <Grid size={{ xs: 4 }}>
+              <ActivityDrawerMetric
+                label={t('wallet_view.total')}
+                amountMSats={isOpenAmount ? undefined : totalAmount}
+                value={isOpenAmount ? t('wallet_view.open_amount') : undefined}
+              />
+            </Grid>
+          </Grid>
+
+          <Stack spacing={1.5}>
+            <ActivityDrawerRow label={t('wallet_view.rail')} value={methodLabel} />
+            <ActivityDrawerRow label={t('wallet_view.created')} value={fDateTime(row.created_at)} />
+            <ActivityDrawerRow
+              label={t('wallet_view.settled')}
+              value={row.payment_time ? fDateTime(row.payment_time) : t('wallet_view.not_settled')}
+            />
+            {destination && (
+              <ActionCopyButton
+                label={t('wallet_view.destination')}
+                value={destination}
+                displayValue={destinationLabel || destination}
+                copyLabel={t('transaction_actions.copy_destination')}
+              />
+            )}
+            <ActionCopyButton
+              label={t('wallet_view.transaction_id')}
+              value={row.id}
+              displayValue={compactIdentifier(row.id)}
+              copyLabel={t('activity_view.copy_transaction_id')}
+            />
+          </Stack>
+
+          {explorerUrl && (
             <Button
               component="a"
-              href={row.detail_page_href}
+              href={explorerUrl}
+              target="_blank"
+              rel="noopener noreferrer"
               color="inherit"
               variant="outlined"
-              startIcon={<Iconify icon="solar:bill-list-bold-duotone" />}
+              startIcon={<Iconify icon="solar:map-arrow-right-bold" />}
             >
-              {t('wallet_view.open_details')}
+              {t('transaction_actions.open_explorer')}
             </Button>
+          )}
 
-            {canDelete && onDeleteRow && (
-              <Button
-                color="error"
-                variant="outlined"
-                onClick={confirm.onTrue}
-                startIcon={<Iconify icon="solar:trash-bin-trash-bold" />}
-              >
-                {t('delete')}
-              </Button>
-            )}
-          </Stack>
+          <Button
+            component="a"
+            href={row.detail_page_href}
+            color="inherit"
+            variant="outlined"
+            startIcon={<Iconify icon="solar:bill-list-bold-duotone" />}
+          >
+            {t('wallet_view.open_details')}
+          </Button>
 
-          <ConfirmDialog
-            open={confirm.value}
-            onClose={confirm.onFalse}
-            title={t('delete')}
-            content={t('confirm_delete')}
-            action={
-              <Button
-                variant="contained"
-                color="error"
-                loading={isDeleting.value}
-                onClick={async () => {
-                  if (!onDeleteRow) return;
-                  isDeleting.onTrue();
-                  await onDeleteRow();
-                  isDeleting.onFalse();
-                  confirm.onFalse();
-                }}
-              >
-                {t('delete')}
-              </Button>
-            }
-          />
+          {canDelete && onDeleteRow && (
+            <Button
+              color="error"
+              variant="outlined"
+              onClick={confirm.onTrue}
+              startIcon={<Iconify icon="solar:trash-bin-trash-bold" />}
+            >
+              {t('delete')}
+            </Button>
+          )}
+        </Stack>
+
+        <ConfirmDialog
+          open={confirm.value}
+          onClose={confirm.onFalse}
+          title={t('delete')}
+          content={t('confirm_delete')}
+          action={
+            <Button
+              variant="contained"
+              color="error"
+              loading={isDeleting.value}
+              onClick={async () => {
+                if (!onDeleteRow) return;
+                isDeleting.onTrue();
+                await onDeleteRow();
+                isDeleting.onFalse();
+                confirm.onFalse();
+              }}
+            >
+              {t('delete')}
+            </Button>
+          }
+        />
+      </Box>
     </Drawer>
   );
 }

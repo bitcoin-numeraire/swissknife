@@ -117,10 +117,12 @@ export function MetricTile({
 export function DetailCard({
   title,
   icon,
+  color = 'primary',
   children,
 }: {
   title: string;
   icon: string;
+  color?: 'primary' | 'success' | 'warning' | 'info' | 'error';
   children: ReactNode;
 }) {
   return (
@@ -128,15 +130,16 @@ export function DetailCard({
       <Stack spacing={2.5}>
         <Stack direction="row" spacing={1.25} sx={{ alignItems: 'center' }}>
           <Box
-            sx={{
+            sx={(theme) => ({
               width: 36,
               height: 36,
               display: 'grid',
               borderRadius: 1,
               placeItems: 'center',
-              color: 'primary.main',
-              bgcolor: 'primary.lighter',
-            }}
+              color: theme.vars.palette[color].main,
+              bgcolor: 'background.paper',
+              border: `1px solid ${theme.vars.palette[color].main}`,
+            })}
           >
             <Iconify icon={icon} width={22} />
           </Box>
