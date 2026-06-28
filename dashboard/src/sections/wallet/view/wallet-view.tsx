@@ -1257,6 +1257,12 @@ function WalletActivityDrawer({
         <Stack spacing={1.5}>
           <WalletDrawerRow label={t('wallet_view.rail')} value={methodLabel} />
           <WalletDrawerRow label={t('wallet_view.created')} value={fDateTime(row.created_at)} />
+          {invoice?.ln_invoice?.expires_at && (
+            <WalletDrawerRow
+              label={t('transaction_list.expires')}
+              value={fDateTime(invoice.ln_invoice.expires_at)}
+            />
+          )}
           <WalletDrawerRow
             label={t('wallet_view.settled')}
             value={row.payment_time ? fDateTime(row.payment_time) : t('wallet_view.not_settled')}
