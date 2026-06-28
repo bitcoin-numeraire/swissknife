@@ -5,7 +5,7 @@ import { AdminTransactionsView } from 'src/sections/activity/view';
 // ----------------------------------------------------------------------
 
 export const metadata = {
-  title: appTitle('Transactions Management'),
+  title: appTitle('Transactions'),
 };
 
 export default function AdminTransactionsPage() {

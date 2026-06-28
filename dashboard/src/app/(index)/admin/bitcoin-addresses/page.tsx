@@ -5,7 +5,7 @@ import { BtcAddressesView } from 'src/sections/btc-address/view';
 // ----------------------------------------------------------------------
 
 export const metadata = {
-  title: appTitle('Bitcoin Addresses Management'),
+  title: appTitle('Bitcoin addresses'),
 };
 
 export default function BtcAddressListPage() {

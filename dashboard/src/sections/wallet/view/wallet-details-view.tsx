@@ -3,7 +3,9 @@
 import type { ReactNode } from 'react';
 import type { BtcAddress, Invoice, Payment, Wallet } from 'src/lib/swissknife';
 
+import { mutate } from 'swr';
 import { useMemo } from 'react';
+import { useBoolean } from 'minimal-shared/hooks';
 
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
@@ -16,29 +18,36 @@ import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
 
 import { paths } from 'src/routes/paths';
+import { useRouter } from 'src/routes/hooks';
 
 import { fDate } from 'src/utils/format-time';
-import { shouldFail } from 'src/utils/errors';
+import { shouldFail, handleActionError } from 'src/utils/errors';
 import { displayLnAddress } from 'src/utils/lnurl';
 import { getLedgerLabel } from 'src/utils/transactions';
 import { compactBitcoinAddress } from 'src/utils/bitcoin-request';
 import { bitcoinAddressExplorerUrl } from 'src/utils/bitcoin-explorer';
 
 import { useTranslate } from 'src/locales';
-import { Permission } from 'src/lib/swissknife';
+import { endpointKeys } from 'src/actions/keys';
 import { useGetWallet } from 'src/actions/wallet';
+import { deleteWallet, Permission } from 'src/lib/swissknife';
 import { DashboardContent } from 'src/layouts/dashboard';
+import { useFetchFiatPrices } from 'src/actions/mempool-space';
 import { useListBtcAddresses } from 'src/actions/btc-addresses';
 
 import { Label } from 'src/components/label';
+import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
 import { CopyButton } from 'src/components/copy';
 import { SatsWithIcon } from 'src/components/bitcoin';
 import { ErrorView } from 'src/components/error/error-view';
 import { EmptyContent } from 'src/components/empty-content';
+import { ConfirmDialog } from 'src/components/custom-dialog';
 import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';
 
 import { RoleBasedGuard } from 'src/auth/guard';
+
+import { SendMoneyDrawer, ReceiveMoneyDrawer } from 'src/sections/wallet/money-drawers';
 
 import {
   DetailRow,
@@ -53,6 +62,8 @@ import {
 type Props = {
   id: string;
 };
+
+const fallbackFiatPrices = { USD: 0, EUR: 0, CHF: 0 };
 
 type WalletTransaction = {
   id: string;
@@ -245,10 +256,16 @@ function RecentTransactionRow({ transaction }: { transaction: WalletTransaction 
 
 export function WalletDetailsView({ id }: Props) {
   const { t } = useTranslate();
+  const router = useRouter();
+  const newPayment = useBoolean();
+  const newInvoice = useBoolean();
+  const confirmDelete = useBoolean();
+  const isDeleting = useBoolean();
   const { wallet, walletLoading, walletError } = useGetWallet(id);
   const { btcAddresses, btcAddressesLoading, btcAddressesError } = useListBtcAddresses({
     wallet_id: id,
   });
+  const { fiatPrices } = useFetchFiatPrices();
 
   const errors = [walletError, btcAddressesError];
   const data = [wallet, btcAddresses];
@@ -256,6 +273,30 @@ export function WalletDetailsView({ id }: Props) {
   const failed = shouldFail(errors, data, isLoading);
 
   const transactions = useMemo(() => (wallet ? getTransactions(wallet) : []), [wallet]);
+  const safeFiatPrices = fiatPrices ?? fallbackFiatPrices;
+
+  const refreshWallet = () => {
+    mutate(endpointKeys.wallets.get);
+    mutate(endpointKeys.wallets.listOverviews);
+    mutate(endpointKeys.invoices.list);
+    mutate(endpointKeys.payments.list);
+  };
+
+  const handleDeleteWallet = async () => {
+    isDeleting.onTrue();
+
+    try {
+      await deleteWallet({ path: { id } });
+      toast.success(t('wallet_list.delete_success'));
+      mutate(endpointKeys.wallets.listOverviews);
+      router.push(paths.accounts);
+    } catch (error) {
+      handleActionError(error);
+    } finally {
+      confirmDelete.onFalse();
+      isDeleting.onFalse();
+    }
+  };
 
   return (
     <DashboardContent maxWidth="xl">
@@ -267,10 +308,41 @@ export function WalletDetailsView({ id }: Props) {
             <CustomBreadcrumbs
               heading={walletName(wallet!)}
               links={[
-                { name: t('admin') },
-                { name: t('wallets'), href: paths.admin.wallets },
+                { name: t('accounts') },
+                { name: t('accounts_directory'), href: paths.accounts },
                 { name: t('details') },
               ]}
+              action={
+                <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: 'wrap' }}>
+                  <RoleBasedGuard permissions={[Permission.WRITE_TRANSACTION]}>
+                    <Button
+                      color="inherit"
+                      variant="outlined"
+                      onClick={newPayment.onTrue}
+                      startIcon={<Iconify icon="eva:diagonal-arrow-right-up-fill" />}
+                    >
+                      {t('wallet_table_row.new_payment')}
+                    </Button>
+                    <Button
+                      variant="contained"
+                      onClick={newInvoice.onTrue}
+                      startIcon={<Iconify icon="eva:diagonal-arrow-left-down-fill" />}
+                    >
+                      {t('wallet_table_row.new_invoice')}
+                    </Button>
+                  </RoleBasedGuard>
+                  <RoleBasedGuard permissions={[Permission.WRITE_WALLET]}>
+                    <Button
+                      color="error"
+                      variant="outlined"
+                      onClick={confirmDelete.onTrue}
+                      startIcon={<Iconify icon="solar:trash-bin-trash-bold" />}
+                    >
+                      {t('delete')}
+                    </Button>
+                  </RoleBasedGuard>
+                </Stack>
+              }
               sx={{ mb: { xs: 3, md: 5 } }}
             />
 
@@ -492,6 +564,44 @@ export function WalletDetailsView({ id }: Props) {
                 </Grid>
               </Grid>
             </Stack>
+
+            <SendMoneyDrawer
+              isAdmin
+              walletId={id}
+              contacts={[]}
+              open={newPayment.value}
+              balance={wallet!.balance.available_msat}
+              fiatPrices={safeFiatPrices}
+              onClose={newPayment.onFalse}
+              onSuccess={refreshWallet}
+            />
+
+            <ReceiveMoneyDrawer
+              isAdmin
+              walletId={id}
+              open={newInvoice.value}
+              fiatPrices={safeFiatPrices}
+              lnAddress={wallet!.ln_address}
+              onClose={newInvoice.onFalse}
+              onSuccess={refreshWallet}
+            />
+
+            <ConfirmDialog
+              open={confirmDelete.value}
+              onClose={confirmDelete.onFalse}
+              title={t('confirm_delete_title')}
+              content={t('confirm_delete_content', { count: 1 })}
+              action={
+                <Button
+                  variant="contained"
+                  color="error"
+                  loading={isDeleting.value}
+                  onClick={handleDeleteWallet}
+                >
+                  {t('delete')}
+                </Button>
+              }
+            />
           </>
         )}
       </RoleBasedGuard>

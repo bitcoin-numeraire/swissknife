@@ -583,7 +583,7 @@ function ActivityLedger({
           <CustomBreadcrumbs
             heading={isAdminTransactionsRoute ? t('transactions') : t('activity')}
             links={[
-              { name: isAdminTransactionsRoute || scope === 'admin' ? t('admin') : t('money') },
+              { name: isAdminTransactionsRoute || scope === 'admin' ? t('accounts') : t('money') },
               { name: isAdminTransactionsRoute ? t('transactions') : t('activity') },
             ]}
             action={

@@ -4,12 +4,15 @@ import type { ReactNode } from 'react';
 import type { WalletOverview } from 'src/lib/swissknife';
 
 import { sumBy } from 'es-toolkit';
+import { mutate } from 'swr';
 import { useMemo, useState } from 'react';
+import { useBoolean } from 'minimal-shared/hooks';
 
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
 import Grid from '@mui/material/Grid';
 import Stack from '@mui/material/Stack';
+import Button from '@mui/material/Button';
 import Divider from '@mui/material/Divider';
 import MenuItem from '@mui/material/MenuItem';
 import TextField from '@mui/material/TextField';
@@ -18,11 +21,15 @@ import ToggleButton from '@mui/material/ToggleButton';
 import InputAdornment from '@mui/material/InputAdornment';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 
+import { paths } from 'src/routes/paths';
+import { useSearchParams } from 'src/routes/hooks';
+
 import { fDate } from 'src/utils/format-time';
 import { shouldFail } from 'src/utils/errors';
 import { displayLnAddress } from 'src/utils/lnurl';
 
 import { useTranslate } from 'src/locales';
+import { endpointKeys } from 'src/actions/keys';
 import { Permission } from 'src/lib/swissknife';
 import { DashboardContent } from 'src/layouts/dashboard';
 import { useListWalletOverviews } from 'src/actions/wallet';
@@ -33,9 +40,12 @@ import { CopyButton } from 'src/components/copy';
 import { SatsWithIcon } from 'src/components/bitcoin';
 import { ErrorView } from 'src/components/error/error-view';
 import { EmptyContent } from 'src/components/empty-content';
+import { RegisterWalletDrawer } from 'src/components/wallet';
 import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';
 
 import { RoleBasedGuard } from 'src/auth/guard';
+
+import { WalletDetailsView } from 'src/sections/wallet/view/wallet-details-view';
 
 // ----------------------------------------------------------------------
 
@@ -90,7 +100,15 @@ function accountReadiness(account: WalletOverview) {
 }
 
 export function AccountsView() {
+  const searchParams = useSearchParams();
+  const accountId = searchParams.get('id');
+
+  return accountId ? <WalletDetailsView id={accountId} /> : <AccountsDirectoryView />;
+}
+
+function AccountsDirectoryView() {
   const { t } = useTranslate();
+  const newWallet = useBoolean();
   const { walletOverviews, walletOverviewsLoading, walletOverviewsError } =
     useListWalletOverviews();
   const [query, setQuery] = useState('');
@@ -157,6 +175,17 @@ export function AccountsView() {
             <CustomBreadcrumbs
               heading={t('accounts_directory')}
               links={[{ name: t('accounts') }, { name: t('accounts_directory') }]}
+              action={
+                <RoleBasedGuard permissions={[Permission.WRITE_WALLET]}>
+                  <Button
+                    variant="contained"
+                    startIcon={<Iconify icon="mingcute:add-line" />}
+                    onClick={newWallet.onTrue}
+                  >
+                    {t('new')}
+                  </Button>
+                </RoleBasedGuard>
+              }
               sx={{ mb: { xs: 3, md: 5 } }}
             />
 
@@ -254,6 +283,15 @@ export function AccountsView() {
                   sx={{ py: 8 }}
                 />
               )}
+
+              <RegisterWalletDrawer
+                open={newWallet.value}
+                onClose={newWallet.onFalse}
+                onSuccess={() => {
+                  mutate(endpointKeys.wallets.listOverviews);
+                  newWallet.onFalse();
+                }}
+              />
             </Stack>
           </>
         )}
@@ -474,12 +512,12 @@ function AccountCard({ account, index }: { account: WalletOverview; index: numbe
         </Grid>
 
         <Button
-          href={`${paths.admin.wallets}?id=${account.id}`}
+          href={paths.account(account.id)}
           color="inherit"
           variant="soft"
           endIcon={<Iconify icon="eva:arrow-ios-forward-fill" />}
         >
-          {t('accounts_view.manage_in_admin')}
+          {t('details')}
         </Button>
       </Stack>
     </Card>

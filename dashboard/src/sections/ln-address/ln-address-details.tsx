@@ -177,7 +177,7 @@ export function LnAddressDetails({ lnAddress, isAdmin }: Props) {
                         isAdmin ? (
                           <Link
                             component={RouterLink}
-                            href={paths.admin.wallet(lnAddress.wallet_id)}
+                            href={paths.account(lnAddress.wallet_id)}
                             color="inherit"
                             underline="hover"
                             sx={{ wordBreak: 'break-word' }}
@@ -288,7 +288,7 @@ export function LnAddressDetails({ lnAddress, isAdmin }: Props) {
                   isAdmin ? (
                     <Link
                       component={RouterLink}
-                      href={paths.admin.wallet(lnAddress.wallet_id)}
+                      href={paths.account(lnAddress.wallet_id)}
                       color="inherit"
                       underline="hover"
                     >

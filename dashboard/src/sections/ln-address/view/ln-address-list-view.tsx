@@ -96,7 +96,7 @@ export function LnAddressListView() {
               heading={t('lightning_addresses')}
               links={[
                 {
-                  name: t('admin'),
+                  name: t('accounts'),
                 },
                 {
                   name: t('lightning_addresses'),
@@ -104,13 +104,15 @@ export function LnAddressListView() {
               ]}
               action={
                 <Stack direction="row" spacing={1}>
-                  <Button
-                    onClick={newLnAddress.onTrue}
-                    variant="contained"
-                    startIcon={<Iconify icon="mingcute:add-line" />}
-                  >
-                    {t('new')}
-                  </Button>
+                  <RoleBasedGuard permissions={[Permission.WRITE_LN_ADDRESS]}>
+                    <Button
+                      onClick={newLnAddress.onTrue}
+                      variant="contained"
+                      startIcon={<Iconify icon="mingcute:add-line" />}
+                    >
+                      {t('new')}
+                    </Button>
+                  </RoleBasedGuard>
                 </Stack>
               }
               sx={{

@@ -56,6 +56,7 @@ export const paths = {
     activityHref('invoice', id, scope),
   identity: '/identity',
   accounts: '/accounts',
+  account: (id: string) => `/accounts?id=${id}`,
   nodeHealth: '/node-health',
   build: {
     apiKeys: '/build/api-keys',
@@ -74,8 +75,6 @@ export const paths = {
     contacts: '/wallet/contacts',
   },
   admin: {
-    wallets: '/admin/wallets',
-    wallet: (id: string) => `/admin/wallets?id=${id}`,
     transactions: '/admin/transactions',
     transactionList: (kind?: ActivityTransactionKind) => adminTransactionsHref(kind),
     transactionPayment: (id: string) => adminTransactionsHref('payment', id),
