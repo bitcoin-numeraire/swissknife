@@ -89,7 +89,7 @@ import { TransactionType } from 'src/types/transaction';
 
 // ----------------------------------------------------------------------
 
-type ActivityLens = 'all' | 'Settled' | 'Pending' | 'Expired' | 'Failed';
+type ActivityLens = 'all' | 'received' | 'paid' | 'Pending' | 'Expired' | 'Failed';
 type FlowLens = 'income' | 'expenses';
 type ActivityScope = 'wallet' | 'admin';
 type ActivityTransactionKind = 'all' | 'payment' | 'invoice';
@@ -203,6 +203,8 @@ function canDeleteRow(tx: ActivityRow, scope: ActivityScope) {
 
 function txMatchesStatus(tx: ActivityRow, status: ActivityLens) {
   if (status === 'all') return true;
+  if (status === 'received') return tx.direction === 'in' && tx.status === 'Settled';
+  if (status === 'paid') return tx.direction === 'out' && tx.status === 'Settled';
   return tx.status === status;
 }
 
@@ -427,7 +429,7 @@ function ActivityLedger({
 
   const activityTabs: ActivityTab[] = [
     {
-      title: t('transaction_list.tabs.total'),
+      title: t('activity_view.all'),
       value: 'all',
       label: t('activity_view.all'),
       color: 'default',
@@ -436,13 +438,22 @@ function ActivityLedger({
       analyticColor: theme.palette.info.main,
     },
     {
-      title: t('transaction_list.tabs.paid'),
-      value: 'Settled',
-      label: t('transaction_list.tabs.paid'),
+      title: t('activity_view.received'),
+      value: 'received',
+      label: t('activity_view.received'),
       color: 'success',
       suffix: t('activity_view.transactions_suffix'),
-      icon: 'solar:bill-check-bold-duotone',
+      icon: 'solar:download-minimalistic-bold-duotone',
       analyticColor: theme.palette.success.main,
+    },
+    {
+      title: t('transaction_list.tabs.paid'),
+      value: 'paid',
+      label: t('transaction_list.tabs.paid'),
+      color: 'warning',
+      suffix: t('activity_view.transactions_suffix'),
+      icon: 'solar:upload-minimalistic-bold-duotone',
+      analyticColor: theme.palette.warning.main,
     },
     {
       title: t('transaction_list.tabs.pending'),
@@ -590,7 +601,7 @@ function ActivityLedger({
                       title={tab.title}
                       total={getTransactionLength(tab.value)}
                       percent={getPercentByStatus(tab.value)}
-                      price={getTotalAmount(tab.value)}
+                      price={tab.value === 'all' ? undefined : getTotalAmount(tab.value)}
                       icon={tab.icon}
                       color={tab.analyticColor}
                       countSuffix={tab.suffix}
@@ -853,7 +864,20 @@ function ActivityTableRow({
         </TableCell>
 
         <TableCell>
-          <SatsWithIcon amountMSats={row.amount_total_msat} />
+          <Stack
+            direction="row"
+            spacing={0.25}
+            sx={{
+              alignItems: 'center',
+              color: row.direction === 'in' ? 'success.main' : 'warning.main',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            <Typography variant="body2" color="inherit">
+              {row.direction === 'in' ? '+' : '-'}
+            </Typography>
+            <SatsWithIcon amountMSats={row.amount_total_msat} variant="body2" color="inherit" />
+          </Stack>
         </TableCell>
 
         <TableCell>
