@@ -540,11 +540,31 @@
     "unused": "Inutilisée"
   },
   "btc_address_list": {
+    "address": "Adresse",
+    "wallet": "Portefeuille",
+    "type": "Type",
+    "created": "Créée",
+    "updated": "MàJ",
+    "status": "Statut",
     "search_placeholder": "Rechercher adresse, ID portefeuille, type ou état",
     "visible_count": "adresses visibles",
     "empty_title": "Aucune adresse Bitcoin",
     "used": "Utilisée",
-    "unused": "Inutilisée"
+    "unused": "Inutilisée",
+    "delete_success": "Adresse supprimée avec succès",
+    "delete_multiple_success": "{{count}} adresses supprimées avec succès",
+    "tabs": {
+      "total": "Total",
+      "used": "Utilisées",
+      "unused": "Inutilisées",
+      "addresses": "adresses"
+    }
+  },
+  "btc_address_table_row": {
+    "copy_wallet_id": "Copier l'ID portefeuille"
+  },
+  "btc_address_table_toolbar": {
+    "search_placeholder": "Rechercher ID, portefeuille, adresse ou type"
   },
   "wallet_toolbar": {
     "search_placeholder": "Rechercher ID, Utilisateur ou Adresse LN"
