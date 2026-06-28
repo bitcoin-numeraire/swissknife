@@ -489,21 +489,6 @@ export function IdentityView() {
                           </Button>
                         )}
                       </Stack>
-                      {unusedAddressForType && (
-                        <Alert severity="info" variant="outlined">
-                          <Stack spacing={1}>
-                            <Typography variant="body2">
-                              {t('identity_view.reuse_unused_address')}
-                            </Typography>
-                            <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-                              <Typography variant="caption" sx={{ flex: 1 }} noWrap>
-                                {unusedAddressForType.address}
-                              </Typography>
-                              <CopyButton value={unusedAddressForType.address} title={t('copy')} />
-                            </Stack>
-                          </Stack>
-                        </Alert>
-                      )}
                     </Stack>
 
                     {btcAddressesError && (
