@@ -45,6 +45,39 @@ import { RoleBasedGuard } from 'src/auth/guard';
 
 type ReadinessFilter = 'all' | 'ready' | 'paused' | 'missing';
 type AccountSort = 'activity' | 'balance' | 'recent' | 'identity';
+type IconBoxColor = 'primary' | 'info' | 'warning' | 'success';
+
+function OutlinedIconBox({
+  icon,
+  color,
+  size,
+  iconSize,
+}: {
+  icon: string;
+  color: IconBoxColor;
+  size: number;
+  iconSize: number;
+}) {
+  return (
+    <Box
+      sx={[
+        (theme) => ({
+          width: size,
+          height: size,
+          display: 'grid',
+          flexShrink: 0,
+          borderRadius: 1,
+          placeItems: 'center',
+          color: theme.vars.palette[color].main,
+          bgcolor: 'background.paper',
+          border: `1px solid ${theme.vars.palette[color].main}`,
+        }),
+      ]}
+    >
+      <Iconify icon={icon} width={iconSize} />
+    </Box>
+  );
+}
 
 function accountName(account: WalletOverview, index: number) {
   if (account.ln_address?.username) {
@@ -146,19 +179,12 @@ export function AccountsView() {
                 <Grid container spacing={3} sx={{ alignItems: 'stretch' }}>
                   <Grid size={{ xs: 12, md: 5 }}>
                     <Stack spacing={2} sx={{ height: 1, justifyContent: 'center' }}>
-                      <Box
-                        sx={{
-                          width: 56,
-                          height: 56,
-                          display: 'grid',
-                          borderRadius: 1,
-                          placeItems: 'center',
-                          color: 'info.main',
-                          bgcolor: 'info.lighter',
-                        }}
-                      >
-                        <Iconify icon="solar:users-group-two-rounded-bold-duotone" width={32} />
-                      </Box>
+                      <OutlinedIconBox
+                        icon="solar:users-group-two-rounded-bold-duotone"
+                        color="info"
+                        size={56}
+                        iconSize={32}
+                      />
                       <Stack spacing={1}>
                         <Typography variant="h4">{t('accounts_view.hero_title')}</Typography>
                         <Typography variant="body2" color="text.secondary">
@@ -189,6 +215,7 @@ export function AccountsView() {
                           icon="eva:diagonal-arrow-left-down-fill"
                           label={t('wallet_list.invoices')}
                           value={totalInvoices.toLocaleString()}
+                          color="success"
                         />
                       </Grid>
                       <Grid size={{ xs: 12, sm: 6 }}>
@@ -196,6 +223,7 @@ export function AccountsView() {
                           icon="eva:diagonal-arrow-right-up-fill"
                           label={t('wallet_list.payments')}
                           value={totalPayments.toLocaleString()}
+                          color="warning"
                         />
                       </Grid>
                     </Grid>
@@ -343,7 +371,17 @@ function DirectoryControls({
   );
 }
 
-function SummaryTile({ icon, label, value }: { icon: string; label: string; value: ReactNode }) {
+function SummaryTile({
+  icon,
+  label,
+  value,
+  color = 'primary',
+}: {
+  icon: string;
+  label: string;
+  value: ReactNode;
+  color?: IconBoxColor;
+}) {
   return (
     <Box
       sx={[
@@ -357,7 +395,7 @@ function SummaryTile({ icon, label, value }: { icon: string; label: string; valu
       ]}
     >
       <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
-        <Iconify icon={icon} width={28} sx={{ color: 'primary.main' }} />
+        <OutlinedIconBox icon={icon} color={color} size={44} iconSize={26} />
         <Stack sx={{ minWidth: 0 }}>
           <Typography variant="caption" color="text.secondary">
             {label}
@@ -377,20 +415,12 @@ function AccountCard({ account, index }: { account: WalletOverview; index: numbe
     <Card sx={{ p: 2.5, borderRadius: 1, height: 1 }}>
       <Stack spacing={2.5}>
         <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
-          <Box
-            sx={{
-              width: 44,
-              height: 44,
-              display: 'grid',
-              borderRadius: 1,
-              flexShrink: 0,
-              placeItems: 'center',
-              color: 'warning.main',
-              bgcolor: 'warning.lighter',
-            }}
-          >
-            <Iconify icon="solar:user-rounded-bold-duotone" width={26} />
-          </Box>
+          <OutlinedIconBox
+            icon="solar:user-rounded-bold-duotone"
+            color="warning"
+            size={44}
+            iconSize={26}
+          />
 
           <Stack sx={{ minWidth: 0, flex: 1 }}>
             <Typography variant="subtitle1" noWrap>
