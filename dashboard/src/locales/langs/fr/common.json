@@ -469,7 +469,6 @@
     "use_unused_address": "Utiliser l'adresse disponible",
     "copy_unused_address": "Copier l'adresse disponible",
     "unused_address_available": "Une adresse non utilisée de ce type est déjà disponible.",
-    "reuse_unused_address": "Utilise l'adresse non utilisée ci-dessous jusqu'à réception de fonds ; SwissKnife retournera la même adresse pour ce type jusque-là.",
     "btc_addresses_unavailable": "La liste des adresses Bitcoin est indisponible. Le backend peut nécessiter read:btc_address pour cet utilisateur.",
     "loading_addresses": "Chargement des adresses...",
     "used": "Utilisée",
