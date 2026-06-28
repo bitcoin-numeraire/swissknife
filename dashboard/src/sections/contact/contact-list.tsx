@@ -47,7 +47,7 @@ export function ContactList({ data, fiatPrices }: Props) {
       sx={{
         gap: 3,
         display: 'grid',
-        gridTemplateColumns: { xs: 'repeat(1, 1fr)', sm: 'repeat(2, 1fr)', md: 'repeat(3, 1fr)' },
+        gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 380px), 1fr))',
       }}
     >
       {data.map((contact) => (
@@ -62,6 +62,7 @@ export function ContactList({ data, fiatPrices }: Props) {
           <ListItemText
             primary={contact.ln_address}
             secondary={fFromNow(contact.contact_since)}
+            sx={{ minWidth: 0, flex: 1 }}
             slotProps={{
               primary: { noWrap: true, sx: { typography: 'subtitle2' } },
               secondary: {
