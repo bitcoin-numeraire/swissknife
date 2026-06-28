@@ -48,17 +48,19 @@ export function formatDateTime(value?: string | Date | null) {
 export function MetricTile({
   title,
   amountMSats,
+  value,
   helper,
 }: {
   title: string;
-  amountMSats: number;
+  amountMSats?: number;
+  value?: ReactNode;
   helper?: string;
 }) {
   return (
     <Box
       sx={[
         (theme) => ({
-          p: 2,
+          p: { xs: 1.25, sm: 2 },
           height: 1,
           borderRadius: 1,
           bgcolor: 'background.neutral',
@@ -70,7 +72,11 @@ export function MetricTile({
         <Typography variant="caption" color="text.secondary">
           {title}
         </Typography>
-        <SatsWithIcon amountMSats={amountMSats} variant="subtitle1" />
+        {value ? (
+          <Typography variant="subtitle1">{value}</Typography>
+        ) : (
+          <SatsWithIcon amountMSats={amountMSats ?? 0} variant="subtitle1" />
+        )}
         {helper && (
           <Typography variant="caption" color="text.disabled">
             {helper}
