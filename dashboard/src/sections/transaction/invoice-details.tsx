@@ -178,6 +178,7 @@ export function InvoiceDetails({ invoice, isAdmin }: Props) {
             <DetailCard
               title={t('transaction_details.timeline')}
               icon="solar:sort-by-time-bold-duotone"
+              color="success"
             >
               <TransactionTimeline
                 items={[
@@ -205,6 +206,7 @@ export function InvoiceDetails({ invoice, isAdmin }: Props) {
             <DetailCard
               title={t('transaction_details.payment_context')}
               icon="solar:document-text-bold-duotone"
+              color="success"
             >
               <DetailRow label={t('transaction_details.description')} value={invoice.description} />
               <DetailRow label={t('transaction_details.ledger')} value={methodLabel} />
@@ -224,6 +226,7 @@ export function InvoiceDetails({ invoice, isAdmin }: Props) {
             <DetailCard
               title={t('transaction_details.technical_details')}
               icon="solar:code-square-bold-duotone"
+              color="success"
             >
               <DetailRow
                 label={t('transaction_details.transaction_id')}

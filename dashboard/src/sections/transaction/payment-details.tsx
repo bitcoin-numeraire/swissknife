@@ -296,6 +296,7 @@ export function PaymentDetails({ payment, isAdmin }: Props) {
             <DetailCard
               title={t('transaction_details.timeline')}
               icon="solar:sort-by-time-bold-duotone"
+              color="warning"
             >
               <TransactionTimeline
                 items={[
@@ -321,6 +322,7 @@ export function PaymentDetails({ payment, isAdmin }: Props) {
             <DetailCard
               title={t('transaction_details.payment_context')}
               icon="solar:document-text-bold-duotone"
+              color="warning"
             >
               <DetailRow label={t('transaction_details.description')} value={payment.description} />
               <DetailRow label={t('payment_details.lightning_address')} value={ln_address} />
@@ -353,6 +355,7 @@ export function PaymentDetails({ payment, isAdmin }: Props) {
             <DetailCard
               title={t('transaction_details.technical_details')}
               icon="solar:code-square-bold-duotone"
+              color="warning"
             >
               <DetailRow
                 label={t('transaction_details.transaction_id')}
