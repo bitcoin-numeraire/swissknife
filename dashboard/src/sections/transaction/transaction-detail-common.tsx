@@ -5,7 +5,9 @@ import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
 import Stack from '@mui/material/Stack';
 import Timeline from '@mui/lab/Timeline';
+import Tooltip from '@mui/material/Tooltip';
 import Divider from '@mui/material/Divider';
+import IconButton from '@mui/material/IconButton';
 import TimelineDot from '@mui/lab/TimelineDot';
 import TimelineItem from '@mui/lab/TimelineItem';
 import Typography from '@mui/material/Typography';
@@ -128,11 +130,15 @@ export function DetailRow({
   label,
   value,
   copyValue,
+  href,
+  hrefLabel,
   mono,
 }: {
   label: string;
   value?: ReactNode;
   copyValue?: string;
+  href?: string;
+  hrefLabel?: string;
   mono?: boolean;
 }) {
   return (
@@ -157,6 +163,19 @@ export function DetailRow({
           {value || 'N/A'}
         </Typography>
         {copyValue && <CopyButton value={copyValue} title="Copy" />}
+        {href && (
+          <Tooltip title={hrefLabel || 'Open'}>
+            <IconButton
+              component="a"
+              href={href}
+              target="_blank"
+              rel="noopener noreferrer"
+              size="small"
+            >
+              <Iconify icon="solar:map-arrow-right-bold" width={18} />
+            </IconButton>
+          </Tooltip>
+        )}
       </Stack>
     </Stack>
   );
