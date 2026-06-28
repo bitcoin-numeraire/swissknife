@@ -205,9 +205,10 @@ export function AccountsView() {
                       </Grid>
                       <Grid size={{ xs: 12, sm: 6 }}>
                         <SummaryTile
-                          icon="solar:fingerprint-bold-duotone"
+                          icon="solar:verified-check-bold-duotone"
                           label={t('accounts_view.identity_ready')}
                           value={`${identityReady}/${accounts.length}`}
+                          color="success"
                         />
                       </Grid>
                       <Grid size={{ xs: 12, sm: 6 }}>
