@@ -5,7 +5,11 @@ const ROOTS = {
 type ActivityScope = 'wallet' | 'admin';
 type ActivityTransactionKind = 'payment' | 'invoice';
 
-function activityHref(kind?: ActivityTransactionKind, id?: string, scope: ActivityScope = 'wallet') {
+function activityHref(
+  kind?: ActivityTransactionKind,
+  id?: string,
+  scope: ActivityScope = 'wallet'
+) {
   const params = new URLSearchParams();
 
   if (kind) {
@@ -55,6 +59,7 @@ export const paths = {
   },
   admin: {
     wallets: '/admin/wallets',
+    wallet: (id: string) => `/admin/wallets?id=${id}`,
     payments: '/admin/payments',
     payment: (id: string) => `/admin/payments?id=${id}`,
     invoices: '/admin/invoices',

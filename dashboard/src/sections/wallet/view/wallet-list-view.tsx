@@ -27,6 +27,7 @@ import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';
 import { RoleBasedGuard } from 'src/auth/guard';
 
 import { WalletList } from '../wallet-list';
+import { WalletDetailsView } from './wallet-details-view';
 
 // ----------------------------------------------------------------------
 
@@ -58,6 +59,10 @@ export function WalletListView() {
   const isLoading = [walletOverviewsLoading, fiatPricesLoading];
 
   const failed = shouldFail(errors, data, isLoading);
+
+  if (focusedWalletId) {
+    return <WalletDetailsView id={focusedWalletId} />;
+  }
 
   return (
     <DashboardContent>

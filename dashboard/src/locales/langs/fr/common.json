@@ -520,8 +520,24 @@
   "wallet_table_row": {
     "new_payment": "Nouveau paiement",
     "new_invoice": "Nouvelle facture",
-    "copy_ln_address": "Copier l'adresse LN",
-    "send_to_ln_address": "Envoyer à l'adresse LN"
+    "copy_ln_address": "Copier l'adresse LN"
+  },
+  "wallet_details": {
+    "spendable": "Disponible",
+    "received": "Reçu",
+    "sent": "Envoyé",
+    "reserved": "Réservé",
+    "fees_paid": "Frais payés",
+    "identity": "Identité",
+    "user": "Utilisateur",
+    "updated": "Mis à jour",
+    "counts": "Compteurs d'activité",
+    "bitcoin_addresses": "Adresses Bitcoin",
+    "recent_transactions": "Transactions récentes",
+    "no_bitcoin_addresses": "Aucune adresse Bitcoin",
+    "no_transactions": "Aucune transaction",
+    "used": "Utilisée",
+    "unused": "Inutilisée"
   },
   "wallet_toolbar": {
     "search_placeholder": "Rechercher ID, Utilisateur ou Adresse LN"
