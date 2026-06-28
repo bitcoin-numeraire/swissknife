@@ -15,6 +15,8 @@ import TimelineContent from '@mui/lab/TimelineContent';
 import TimelineConnector from '@mui/lab/TimelineConnector';
 import TimelineSeparator from '@mui/lab/TimelineSeparator';
 
+import { RouterLink } from 'src/routes/components';
+
 import { fDate, fTime } from 'src/utils/format-time';
 import { getLedgerLabel } from 'src/utils/transactions';
 
@@ -63,9 +65,7 @@ export function TransactionDirectionIcon({ direction }: { direction: 'in' | 'out
       }}
     >
       <Iconify
-        icon={
-          isIncoming ? 'eva:diagonal-arrow-left-down-fill' : 'eva:diagonal-arrow-right-up-fill'
-        }
+        icon={isIncoming ? 'eva:diagonal-arrow-left-down-fill' : 'eva:diagonal-arrow-right-up-fill'}
         width={30}
       />
     </Box>
@@ -160,6 +160,7 @@ export function DetailRow({
   copyValue,
   href,
   hrefLabel,
+  targetBlank = true,
   mono,
 }: {
   label: string;
@@ -167,6 +168,7 @@ export function DetailRow({
   copyValue?: string;
   href?: string;
   hrefLabel?: string;
+  targetBlank?: boolean;
   mono?: boolean;
 }) {
   return (
@@ -194,10 +196,10 @@ export function DetailRow({
         {href && (
           <Tooltip title={hrefLabel || 'Open'}>
             <IconButton
-              component="a"
+              component={targetBlank ? 'a' : RouterLink}
               href={href}
-              target="_blank"
-              rel="noopener noreferrer"
+              target={targetBlank ? '_blank' : undefined}
+              rel={targetBlank ? 'noopener noreferrer' : undefined}
               size="small"
             >
               <Iconify icon="solar:map-arrow-right-bold" width={18} />
