@@ -67,6 +67,7 @@ export const paths = {
     node: '/admin/lightning-node',
     lnAddresses: '/admin/lightning-addresses',
     lnAddress: (id: string) => `/admin/lightning-addresses?id=${id}`,
+    btcAddresses: '/admin/bitcoin-addresses',
     apiKeys: '/admin/api-keys',
   },
   settings: {
