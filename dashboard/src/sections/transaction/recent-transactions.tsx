@@ -146,10 +146,10 @@ function RecentTransactionsRow({ row, isAdmin }: RecentTransactionsRowProps) {
 
   const rowHref = (): string => {
     if (isPayment) {
-      return paths.activityPayment(id, isAdmin ? 'admin' : 'wallet');
+      return isAdmin ? paths.admin.transactionPayment(id) : paths.activityPayment(id);
     }
 
-    return paths.activityInvoice(id, isAdmin ? 'admin' : 'wallet');
+    return isAdmin ? paths.admin.transactionInvoice(id) : paths.activityInvoice(id);
   };
 
   return (

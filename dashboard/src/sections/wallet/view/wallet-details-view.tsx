@@ -446,7 +446,7 @@ export function WalletDetailsView({ id }: Props) {
                   </DetailCard>
                 </Grid>
 
-                <Grid size={{ xs: 12, md: 7 }}>
+                <Grid size={{ xs: 12, md: 6 }}>
                   <DetailCard
                     title={t('wallet_details.recent_transactions')}
                     icon="solar:bill-list-bold-duotone"
@@ -467,7 +467,7 @@ export function WalletDetailsView({ id }: Props) {
                   </DetailCard>
                 </Grid>
 
-                <Grid size={{ xs: 12, md: 5 }}>
+                <Grid size={{ xs: 12, md: 6 }}>
                   <DetailCard
                     title={t('wallet_details.bitcoin_addresses')}
                     icon="solar:link-round-angle-bold-duotone"

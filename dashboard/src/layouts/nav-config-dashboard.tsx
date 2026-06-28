@@ -146,6 +146,13 @@ export const navData: Array<NavGroupWithPermissions> = [
         modes: ['server', 'self-hosted', 'merchant'],
       },
       {
+        title: 'admin_transactions',
+        path: paths.admin.transactions,
+        icon: ICONS.activity,
+        permissions: [Permission.READ_TRANSACTION],
+        modes: ['server', 'self-hosted', 'merchant'],
+      },
+      {
         title: 'admin_invoices',
         path: paths.admin.invoices,
         icon: ICONS.invoice,
