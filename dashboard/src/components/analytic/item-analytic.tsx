@@ -73,7 +73,13 @@ export function ItemAnalytic({
           {fShortenNumber(total)} {countSuffix}
         </Box>
 
-        {price != null && <SatsWithIcon amountMSats={price} />}
+        {price != null && (
+          <SatsWithIcon
+            amountMSats={price}
+            variant={compact ? 'body2' : 'inherit'}
+            sx={{ color: compact ? 'text.secondary' : 'inherit', whiteSpace: 'nowrap' }}
+          />
+        )}
       </Stack>
     </Stack>
   );
