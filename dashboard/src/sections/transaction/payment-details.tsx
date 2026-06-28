@@ -10,10 +10,16 @@ import Typography from '@mui/material/Typography';
 
 import { fSats } from 'src/utils/format-number';
 import { getLedgerLabel } from 'src/utils/transactions';
+import { compactBitcoinAddress } from 'src/utils/bitcoin-request';
+import {
+  bitcoinAddressExplorerUrl,
+  bitcoinTransactionExplorerUrl,
+} from 'src/utils/bitcoin-explorer';
 
 import { useTranslate } from 'src/locales';
 
 import { Iconify } from 'src/components/iconify';
+import { CopyButton } from 'src/components/copy';
 import { SatsWithIcon } from 'src/components/bitcoin';
 
 import { TransactionType } from 'src/types/transaction';
@@ -35,6 +41,12 @@ type Props = {
   isAdmin?: boolean;
 };
 
+function compactHash(value?: string | null) {
+  if (!value || value.length <= 18) return value;
+
+  return `${value.slice(0, 8)}...${value.slice(-8)}`;
+}
+
 export function PaymentDetails({ payment, isAdmin }: Props) {
   const { t } = useTranslate();
   const { ln_address, success_action, payment_hash, payment_preimage } = payment.lightning ?? {};
@@ -46,14 +58,20 @@ export function PaymentDetails({ payment, isAdmin }: Props) {
       ? t('payment_details.exact_msats', { amount: fSats(feeAmount) })
       : undefined;
   const methodLabel = getLedgerLabel(payment.ledger, t);
+  const bitcoinAddress = payment.bitcoin?.address || payment.internal?.btc_address;
+  const bitcoinTxid = payment.bitcoin?.txid;
   const destination =
     ln_address ||
     payment.internal?.ln_address ||
-    payment.bitcoin?.address ||
-    payment.internal?.btc_address ||
-    payment.bitcoin?.txid ||
+    bitcoinAddress ||
+    bitcoinTxid ||
     payment_hash ||
     methodLabel;
+  const destinationDisplay =
+    destination === bitcoinAddress ? compactBitcoinAddress(destination) : destination;
+  const destinationCopyValue = destination !== methodLabel ? destination : undefined;
+  const txExplorerUrl = bitcoinTransactionExplorerUrl(bitcoinTxid);
+  const addressExplorerUrl = bitcoinAddressExplorerUrl(bitcoinAddress);
   const settlementTitle =
     (payment.status === 'Failed' && t('transaction_details.failed')) ||
     (payment.status === 'Settled' && t('payment_details.settlement_complete')) ||
@@ -99,9 +117,27 @@ export function PaymentDetails({ payment, isAdmin }: Props) {
                     <Typography variant="overline" color="text.secondary">
                       {t('payment_details.payment_to')}
                     </Typography>
-                    <Typography variant="h4" sx={{ wordBreak: 'break-word' }}>
-                      {destination}
-                    </Typography>
+                    <Stack
+                      direction="row"
+                      spacing={0.75}
+                      sx={{ alignItems: 'center', minWidth: 0 }}
+                    >
+                      <Typography
+                        variant="subtitle1"
+                        sx={{
+                          fontFamily: destination === bitcoinAddress ? 'monospace' : undefined,
+                          wordBreak: 'break-word',
+                        }}
+                      >
+                        {destinationDisplay}
+                      </Typography>
+                      {destinationCopyValue && (
+                        <CopyButton
+                          value={destinationCopyValue}
+                          title={t('transaction_actions.copy_destination')}
+                        />
+                      )}
+                    </Stack>
                     <Typography variant="body2" color="text.secondary">
                       {payment.description ||
                         (isAdmin
@@ -115,7 +151,7 @@ export function PaymentDetails({ payment, isAdmin }: Props) {
                   <Typography variant="caption" color="text.secondary">
                     {t('payment_details.amount_sent')}
                   </Typography>
-                  <SatsWithIcon amountMSats={amountSent} variant="h3" />
+                  <SatsWithIcon amountMSats={amountSent} variant="h3" sx={{ fontWeight: 400 }} />
                 </Stack>
 
                 <Grid container spacing={{ xs: 1, sm: 2 }}>
@@ -180,9 +216,27 @@ export function PaymentDetails({ payment, isAdmin }: Props) {
                         <Typography variant="caption" color="text.secondary">
                           {t('payment_details.recipient')}
                         </Typography>
-                        <Typography variant="subtitle2" sx={{ wordBreak: 'break-word' }}>
-                          {destination}
-                        </Typography>
+                        <Stack
+                          direction="row"
+                          spacing={0.75}
+                          sx={{ alignItems: 'center', minWidth: 0 }}
+                        >
+                          <Typography
+                            variant="subtitle2"
+                            sx={{
+                              fontFamily: destination === bitcoinAddress ? 'monospace' : undefined,
+                              wordBreak: 'break-word',
+                            }}
+                          >
+                            {destinationDisplay}
+                          </Typography>
+                          {destinationCopyValue && (
+                            <CopyButton
+                              value={destinationCopyValue}
+                              title={t('transaction_actions.copy_destination')}
+                            />
+                          )}
+                        </Stack>
                         <Typography variant="caption" color="text.disabled">
                           {t('payment_details.destination')}
                         </Typography>
@@ -284,7 +338,11 @@ export function PaymentDetails({ payment, isAdmin }: Props) {
               <DetailRow label={t('payment_details.lightning_address')} value={ln_address} />
               <DetailRow
                 label={t('payment_details.onchain_address')}
-                value={payment.bitcoin?.address}
+                value={compactBitcoinAddress(payment.bitcoin?.address)}
+                copyValue={payment.bitcoin?.address ?? undefined}
+                href={bitcoinAddressExplorerUrl(payment.bitcoin?.address)}
+                hrefLabel={t('transaction_actions.open_explorer')}
+                mono
               />
               <DetailRow
                 label={t('payment_details.internal_address')}
@@ -334,14 +392,18 @@ export function PaymentDetails({ payment, isAdmin }: Props) {
               />
               <DetailRow
                 label={t('payment_details.onchain_txid')}
-                value={payment.bitcoin?.txid}
-                copyValue={payment.bitcoin?.txid ?? undefined}
+                value={compactHash(bitcoinTxid)}
+                copyValue={bitcoinTxid ?? undefined}
+                href={txExplorerUrl}
+                hrefLabel={t('transaction_actions.open_explorer')}
                 mono
               />
               <DetailRow
                 label={t('payment_details.onchain_address')}
-                value={payment.bitcoin?.address || payment.internal?.btc_address}
-                copyValue={payment.bitcoin?.address || payment.internal?.btc_address || undefined}
+                value={compactBitcoinAddress(bitcoinAddress)}
+                copyValue={bitcoinAddress ?? undefined}
+                href={addressExplorerUrl}
+                hrefLabel={t('transaction_actions.open_explorer')}
                 mono
               />
               <DetailRow

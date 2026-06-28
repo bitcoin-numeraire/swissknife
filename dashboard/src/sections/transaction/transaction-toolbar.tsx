@@ -1,4 +1,4 @@
-import type { Invoice } from 'src/lib/swissknife';
+import type { Invoice, Payment } from 'src/lib/swissknife';
 import type { ITransaction } from 'src/types/transaction';
 
 import { useCallback } from 'react';
@@ -11,6 +11,7 @@ import { paths } from 'src/routes/paths';
 import { useRouter } from 'src/routes/hooks';
 
 import { handleActionError } from 'src/utils/errors';
+import { txidFromOutpoint, bitcoinTransactionExplorerUrl } from 'src/utils/bitcoin-explorer';
 
 import { useTranslate } from 'src/locales';
 import { deleteInvoice, deletePayment } from 'src/lib/swissknife';
@@ -33,6 +34,12 @@ type Props = {
 export function TransactionToolbar({ transaction, transactionType, isAdmin }: Props) {
   const { t } = useTranslate();
   const router = useRouter();
+  const explorerUrl =
+    transactionType === TransactionType.PAYMENT
+      ? bitcoinTransactionExplorerUrl((transaction as Payment).bitcoin?.txid)
+      : bitcoinTransactionExplorerUrl(
+          txidFromOutpoint((transaction as Invoice).bitcoin_output?.outpoint)
+        );
 
   const onDelete = useCallback(
     async (id: string) => {
@@ -69,15 +76,23 @@ export function TransactionToolbar({ transaction, transactionType, isAdmin }: Pr
           />
         )}
 
-        <Tooltip title={t('send')}>
-          <IconButton
-            onClick={() => {
-              toast.info(t('coming_soon'));
-            }}
-          >
-            <Iconify icon="iconamoon:send-fill" />
-          </IconButton>
-        </Tooltip>
+        {explorerUrl ? (
+          <Tooltip title={t('transaction_actions.open_explorer')}>
+            <IconButton component="a" href={explorerUrl} target="_blank" rel="noopener noreferrer">
+              <Iconify icon="solar:map-arrow-right-bold" />
+            </IconButton>
+          </Tooltip>
+        ) : (
+          <Tooltip title={t('send')}>
+            <IconButton
+              onClick={() => {
+                toast.info(t('coming_soon'));
+              }}
+            >
+              <Iconify icon="iconamoon:send-fill" />
+            </IconButton>
+          </Tooltip>
+        )}
 
         <Tooltip title={t('share')}>
           <IconButton
