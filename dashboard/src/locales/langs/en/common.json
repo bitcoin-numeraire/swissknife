@@ -200,6 +200,8 @@
     "show_balances": "Show balances",
     "hidden_amount": "Hidden",
     "synced_ago": "Synced {{time}} ago",
+    "refresh_wallet": "Refresh wallet",
+    "refresh_failed": "Could not refresh wallet",
     "review_items": "{{count}} items need review",
     "review_queue_detail": "Failed payments and pending transfers across payment methods.",
     "failed_payments": "Failed payments",

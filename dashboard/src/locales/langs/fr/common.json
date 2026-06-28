@@ -199,6 +199,8 @@
     "show_balances": "Afficher les soldes",
     "hidden_amount": "Masqué",
     "synced_ago": "Synchronisé il y a {{time}}",
+    "refresh_wallet": "Actualiser le portefeuille",
+    "refresh_failed": "Impossible d'actualiser le portefeuille",
     "review_items": "{{count}} éléments à vérifier",
     "review_queue_detail": "Paiements échoués et transferts en attente selon la méthode.",
     "failed_payments": "Paiements échoués",

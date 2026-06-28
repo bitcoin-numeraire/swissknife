@@ -146,6 +146,7 @@ export function WalletView() {
   const [sendInitialInput, setSendInitialInput] = useState('');
   const [detailTransaction, setDetailTransaction] = useState<ITransaction | null>(null);
   const [lastWalletSyncAt, setLastWalletSyncAt] = useState<Date | null>(null);
+  const [isRefreshingWallet, setIsRefreshingWallet] = useState(false);
 
   const { wallet, walletLoading, walletError } = useGetUserWallet();
   const { fiatPrices, fiatPricesError } = useFetchFiatPrices();
@@ -220,6 +221,17 @@ export function WalletView() {
   };
   const toggleBalances = () => {
     settings.setState({ hideBalances: !balancesHidden });
+  };
+  const refreshWallet = async () => {
+    try {
+      setIsRefreshingWallet(true);
+      await mutate(endpointKeys.userWallet.get);
+      setLastWalletSyncAt(new Date());
+    } catch {
+      toast.error(t('wallet_view.refresh_failed'));
+    } finally {
+      setIsRefreshingWallet(false);
+    }
   };
 
   useEffect(() => {
@@ -331,9 +343,45 @@ export function WalletView() {
                         </Typography>
                       )}
                       {lastWalletSyncAt && (
-                        <Typography variant="caption" color="text.disabled">
-                          {t('wallet_view.synced_ago', { time: fFromNow(lastWalletSyncAt) })}
-                        </Typography>
+                        <Stack
+                          direction="row"
+                          spacing={0.5}
+                          sx={{ alignItems: 'center', color: 'text.disabled' }}
+                        >
+                          <Typography variant="caption" color="inherit">
+                            {t('wallet_view.synced_ago', { time: fFromNow(lastWalletSyncAt) })}
+                          </Typography>
+                          <Tooltip title={t('wallet_view.refresh_wallet')}>
+                            <span>
+                              <IconButton
+                                size="small"
+                                onClick={refreshWallet}
+                                disabled={isRefreshingWallet}
+                                aria-label={t('wallet_view.refresh_wallet')}
+                                sx={{
+                                  p: 0.25,
+                                  width: 24,
+                                  height: 24,
+                                  color: 'inherit',
+                                  '&.Mui-disabled': { color: 'text.disabled' },
+                                }}
+                              >
+                                <Iconify
+                                  width={14}
+                                  icon="solar:refresh-bold"
+                                  sx={{
+                                    '@keyframes walletRefreshSpin': {
+                                      to: { transform: 'rotate(360deg)' },
+                                    },
+                                    ...(isRefreshingWallet && {
+                                      animation: 'walletRefreshSpin 0.8s linear infinite',
+                                    }),
+                                  }}
+                                />
+                              </IconButton>
+                            </span>
+                          </Tooltip>
+                        </Stack>
                       )}
                     </Stack>
                   </Stack>
