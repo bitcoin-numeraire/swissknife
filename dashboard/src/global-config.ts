@@ -61,8 +61,7 @@ export const CONFIG: ConfigValue = {
    */
   mockOAuth2: {
     tokenUrl:
-      process.env.NEXT_PUBLIC_MOCK_OAUTH2_TOKEN_URL ??
-      'http://127.0.0.1:8090/default/token',
+      process.env.NEXT_PUBLIC_MOCK_OAUTH2_TOKEN_URL ?? 'http://127.0.0.1:8090/default/token',
     clientSecret: process.env.NEXT_PUBLIC_MOCK_OAUTH2_CLIENT_SECRET ?? 'dev-secret',
   },
   /**
