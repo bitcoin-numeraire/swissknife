@@ -557,6 +557,12 @@
     "empty_title": "Aucune adresse Bitcoin",
     "used": "Utilisée",
     "unused": "Inutilisée",
+    "new_address": "Nouvelle adresse",
+    "generate_address": "Générer l'adresse",
+    "generate_success": "Adresse Bitcoin générée",
+    "wallet_helper": "Choisis le portefeuille qui doit recevoir cette adresse.",
+    "wallets_error": "Impossible de charger les portefeuilles.",
+    "unused_address_exists": "Ce portefeuille a déjà une adresse {{type}} inutilisée.",
     "delete_success": "Adresse supprimée avec succès",
     "delete_multiple_success": "{{count}} adresses supprimées avec succès",
     "tabs": {

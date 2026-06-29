@@ -559,6 +559,12 @@
     "empty_title": "No Bitcoin addresses",
     "used": "Used",
     "unused": "Unused",
+    "new_address": "New address",
+    "generate_address": "Generate address",
+    "generate_success": "Bitcoin address generated",
+    "wallet_helper": "Choose the wallet that should receive this address.",
+    "wallets_error": "Could not load wallets.",
+    "unused_address_exists": "This wallet already has an unused {{type}} address.",
     "delete_success": "Address deleted successfully",
     "delete_multiple_success": "{{count}} addresses deleted successfully",
     "tabs": {
