@@ -315,7 +315,7 @@ export function PaymentDetails({ payment, isAdmin }: Props) {
                 <>
                   <DetailRow
                     label={t('transaction_details.payment_hash')}
-                    value={compactHash(payment_hash)}
+                    value={payment_hash}
                     copyValue={payment_hash ?? undefined}
                     mono
                   />
