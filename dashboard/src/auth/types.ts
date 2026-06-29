@@ -17,5 +17,8 @@ export type AuthContextValue = {
 };
 
 export type DecodedToken = JwtPayload & {
+  email?: string;
+  name?: string;
+  picture?: string;
   permissions: Permission[];
 };

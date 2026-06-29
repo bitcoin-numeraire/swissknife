@@ -34,7 +34,9 @@ export function AuthProvider({ children }: Props) {
         setState({
           user: {
             sub: decodedToken.sub,
-            displayName: decodedToken.sub,
+            email: decodedToken.email,
+            displayName: decodedToken.name ?? decodedToken.email ?? decodedToken.sub,
+            photoURL: decodedToken.picture,
             permissions: decodedToken.permissions || [],
             accessToken,
           },

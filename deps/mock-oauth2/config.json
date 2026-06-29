@@ -10,6 +10,7 @@
             "sub": "dev-oauth2-admin",
             "name": "Dev Admin",
             "email": "admin@localhost.test",
+            "picture": "/logo/logo_square.png",
             "aud": ["https://swissknife.local/api"],
             "permissions": [
               "read:wallet",
@@ -34,6 +35,7 @@
             "sub": "dev-oauth2-readonly",
             "name": "Dev Readonly",
             "email": "readonly@localhost.test",
+            "picture": "/logo/logo_square.png",
             "aud": ["https://swissknife.local/api"],
             "permissions": [
               "read:wallet",
@@ -52,6 +54,7 @@
             "sub": "dev-oauth2-wallet-operator",
             "name": "Dev Wallet Operator",
             "email": "wallet-operator@localhost.test",
+            "picture": "/logo/logo_square.png",
             "aud": ["https://swissknife.local/api"],
             "permissions": [
               "read:wallet",
@@ -68,6 +71,7 @@
             "sub": "dev-oauth2-address-operator",
             "name": "Dev Address Operator",
             "email": "address-operator@localhost.test",
+            "picture": "/logo/logo_square.png",
             "aud": ["https://swissknife.local/api"],
             "permissions": [
               "read:wallet",
@@ -85,8 +89,9 @@
             "sub": "dev-oauth2-api-key-admin",
             "name": "Dev API Key Admin",
             "email": "api-key-admin@localhost.test",
+            "picture": "/logo/logo_square.png",
             "aud": ["https://swissknife.local/api"],
-            "permissions": ["read:wallet", "read:api_key", "write:api_key"]
+            "permissions": ["read:api_key", "write:api_key"]
           }
         },
         {
@@ -96,6 +101,7 @@
             "sub": "dev-oauth2-empty",
             "name": "Dev Empty",
             "email": "empty@localhost.test",
+            "picture": "/logo/logo_square.png",
             "aud": ["https://swissknife.local/api"],
             "permissions": []
           }

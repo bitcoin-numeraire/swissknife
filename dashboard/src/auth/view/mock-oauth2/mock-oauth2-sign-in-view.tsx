@@ -103,7 +103,7 @@ const PERSONAS: MockOAuth2Persona[] = [
     label: 'API key admin',
     description: 'API key management',
     icon: 'solar:code-bold-duotone',
-    permissions: [Permission.READ_WALLET, Permission.READ_API_KEY, Permission.WRITE_API_KEY],
+    permissions: [Permission.READ_API_KEY, Permission.WRITE_API_KEY],
   },
   {
     clientId: 'dev-empty',

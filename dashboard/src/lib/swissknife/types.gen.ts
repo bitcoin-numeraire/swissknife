@@ -2559,6 +2559,74 @@ export type NewWalletBtcAddressResponses = {
 export type NewWalletBtcAddressResponse =
   NewWalletBtcAddressResponses[keyof NewWalletBtcAddressResponses];
 
+export type ListWalletBtcAddressesData = {
+  body?: never;
+  path?: never;
+  query?: {
+    /**
+     * Total amount of results to return
+     */
+    limit?: number | null;
+    /**
+     * Offset where to start returning results
+     */
+    offset?: number | null;
+    /**
+     * List of IDs
+     */
+    ids?: Array<string> | null;
+    /**
+     * Wallet ID. Automatically populated with your ID
+     */
+    wallet_id?: string | null;
+    /**
+     * Address
+     */
+    address?: string | null;
+    /**
+     * Status
+     */
+    address_type?: null | BtcAddressType;
+    /**
+     * Whether the address has been used
+     */
+    used?: boolean | null;
+    /**
+     * Direction of the ordering of results
+     */
+    order_direction?: OrderDirection;
+  };
+  url: '/v1/me/bitcoin/addresses';
+};
+
+export type ListWalletBtcAddressesErrors = {
+  /**
+   * Bad Request
+   */
+  400: ErrorResponse;
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
+
+export type ListWalletBtcAddressesError =
+  ListWalletBtcAddressesErrors[keyof ListWalletBtcAddressesErrors];
+
+export type ListWalletBtcAddressesResponses = {
+  /**
+   * Success
+   */
+  200: Array<BtcAddress>;
+};
+
+export type ListWalletBtcAddressesResponse =
+  ListWalletBtcAddressesResponses[keyof ListWalletBtcAddressesResponses];
+
 export type ListContactsData = {
   body?: never;
   path?: never;

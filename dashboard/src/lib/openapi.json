@@ -3422,6 +3422,172 @@
         }
       }
     },
+    "/v1/me/bitcoin/addresses": {
+      "get": {
+        "tags": [
+          "User Wallet"
+        ],
+        "summary": "List Bitcoin addresses",
+        "description": "Returns the authenticated user's Bitcoin addresses given a filter.",
+        "operationId": "list_wallet_btc_addresses",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Total amount of results to return",
+            "required": false,
+            "schema": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "int64",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "description": "Offset where to start returning results",
+            "required": false,
+            "schema": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "int64",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "ids",
+            "in": "query",
+            "description": "List of IDs",
+            "required": false,
+            "schema": {
+              "type": [
+                "array",
+                "null"
+              ],
+              "items": {
+                "type": "string",
+                "format": "uuid"
+              }
+            }
+          },
+          {
+            "name": "wallet_id",
+            "in": "query",
+            "description": "Wallet ID. Automatically populated with your ID",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "address",
+            "in": "query",
+            "description": "Address",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "address_type",
+            "in": "query",
+            "description": "Status",
+            "required": false,
+            "schema": {
+              "oneOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "$ref": "#/components/schemas/BtcAddressType"
+                }
+              ]
+            }
+          },
+          {
+            "name": "used",
+            "in": "query",
+            "description": "Whether the address has been used",
+            "required": false,
+            "schema": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "order_direction",
+            "in": "query",
+            "description": "Direction of the ordering of results",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/OrderDirection"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BtcAddress"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"400 Bad Request\",\n    \"reason\": \"Missing required parameter in request\"\n}\n"
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"401 Unauthorized\",\n    \"reason\": \"Invalid credentials\"\n}\n"
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"500 Internal Server Error\",\n    \"reason\": \"Internal server error, Please contact your administrator or try later\"\n}\n"
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/me/contacts": {
       "get": {
         "tags": [
