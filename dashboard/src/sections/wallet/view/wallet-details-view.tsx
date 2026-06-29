@@ -275,7 +275,7 @@ export function WalletDetailsView({ id }: Props) {
   const safeFiatPrices = fiatPrices ?? fallbackFiatPrices;
 
   const refreshWallet = () => {
-    mutate(endpointKeys.wallets.get);
+    mutate(endpointKeys.wallets.get(id));
     mutate(endpointKeys.wallets.listOverviews);
     mutate(endpointKeys.invoices.list);
     mutate(endpointKeys.payments.list);

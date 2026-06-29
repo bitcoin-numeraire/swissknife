@@ -16,7 +16,7 @@ export const endpointKeys = {
   },
   wallets: {
     list: 'listWallets',
-    get: 'getWallet',
+    get: (id: string) => ['getWallet', id] as const,
     listOverviews: 'listWalletOverviews',
   },
   invoices: {

@@ -8,7 +8,7 @@ import { endpointKeys } from './keys';
 // ----------------------------------------------------------------------
 
 export function useGetWallet(id: string) {
-  const result = useSWR(endpointKeys.wallets.get, () => getWallet<true>({ path: { id } }));
+  const result = useSWR(endpointKeys.wallets.get(id), () => getWallet<true>({ path: { id } }));
 
   return useMemo(
     () => ({
