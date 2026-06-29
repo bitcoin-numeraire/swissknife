@@ -41,18 +41,21 @@ export function AuthGuard({ children }: AuthGuardProps) {
     }
   };
 
-  const replaceOnce = useCallback((path: string) => {
-    if (isSameRoutePath(pathname, path)) {
-      return;
-    }
+  const replaceOnce = useCallback(
+    (path: string) => {
+      if (isSameRoutePath(pathname, path)) {
+        return;
+      }
 
-    if (lastRedirect.current === path) {
-      return;
-    }
+      if (lastRedirect.current === path) {
+        return;
+      }
 
-    lastRedirect.current = path;
-    router.replace(path);
-  }, [pathname, router]);
+      lastRedirect.current = path;
+      router.replace(path);
+    },
+    [pathname, router]
+  );
 
   const checkPermissions = async (): Promise<void> => {
     if (loading) {

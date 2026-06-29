@@ -14,8 +14,8 @@ import ListItemText from '@mui/material/ListItemText';
 import { Avatar, Divider, MenuList } from '@mui/material';
 
 import { paths } from 'src/routes/paths';
-import { RouterLink } from 'src/routes/components';
 import { useRouter } from 'src/routes/hooks';
+import { RouterLink } from 'src/routes/components';
 
 import { npub } from 'src/utils/nostr';
 import { displayLnAddress } from 'src/utils/lnurl';

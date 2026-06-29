@@ -1,9 +1,6 @@
 'use client';
 
-import type {
-  DashboardModuleDiagnostic,
-  DashboardModuleGateReason,
-} from '../nav-config-dashboard';
+import type { DashboardModuleDiagnostic, DashboardModuleGateReason } from '../nav-config-dashboard';
 
 import Box from '@mui/material/Box';
 import Paper from '@mui/material/Paper';

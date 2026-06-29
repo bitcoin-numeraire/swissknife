@@ -38,7 +38,12 @@ export function ItemAnalytic({
     <Stack
       spacing={compact ? 1.5 : 2.5}
       direction="row"
-      sx={{ alignItems: 'center', justifyContent: 'center', width: 1, minWidth: compact ? 150 : 200 }}
+      sx={{
+        alignItems: 'center',
+        justifyContent: 'center',
+        width: 1,
+        minWidth: compact ? 150 : 200,
+      }}
     >
       <Stack sx={{ alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
         <Iconify icon={icon} width={compact ? 28 : 32} sx={{ color, position: 'absolute' }} />

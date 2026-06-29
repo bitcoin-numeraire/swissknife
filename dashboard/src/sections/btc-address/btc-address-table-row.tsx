@@ -10,12 +10,12 @@ import Checkbox from '@mui/material/Checkbox';
 import TableCell from '@mui/material/TableCell';
 import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
-import ListItemText from '@mui/material/ListItemText';
 import { Divider, MenuList } from '@mui/material';
+import ListItemText from '@mui/material/ListItemText';
 
 import { paths } from 'src/routes/paths';
-import { RouterLink } from 'src/routes/components';
 import { useRouter } from 'src/routes/hooks';
+import { RouterLink } from 'src/routes/components';
 
 import { fDate, fTime } from 'src/utils/format-time';
 import { truncateText } from 'src/utils/format-string';
@@ -26,9 +26,9 @@ import { useTranslate } from 'src/locales';
 
 import { Label } from 'src/components/label';
 import { Iconify } from 'src/components/iconify';
-import { CopyButton, CopyMenuItem } from 'src/components/copy';
 import { ConfirmDialog } from 'src/components/custom-dialog';
 import { CustomPopover } from 'src/components/custom-popover';
+import { CopyButton, CopyMenuItem } from 'src/components/copy';
 
 // ----------------------------------------------------------------------
 
@@ -40,11 +40,14 @@ type Props = {
 };
 
 export function addressTypeLabel(address: BtcAddress) {
-  if (address.address_type === 'p2tr') return 'Taproot';
-  if (address.address_type === 'p2wpkh') return 'Native SegWit';
-  if (address.address_type === 'p2pkh') return 'Legacy';
-  if (address.address_type === 'p2sh') return 'P2SH';
-  return address.address_type.toUpperCase();
+  const labels: Record<BtcAddress['address_type'], string> = {
+    p2tr: 'Taproot',
+    p2wpkh: 'Native SegWit',
+    p2pkh: 'Legacy',
+    p2sh: 'P2SH',
+  };
+
+  return labels[address.address_type];
 }
 
 export function BtcAddressTableRow({ row, selected, onSelectRow, onDeleteRow }: Props) {

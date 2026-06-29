@@ -11,9 +11,7 @@ import { useMemo, useState, useEffect, useCallback } from 'react';
 import { useBoolean, usePopover, useSetState } from 'minimal-shared/hooks';
 
 import Tab from '@mui/material/Tab';
-import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
-import Grid from '@mui/material/Grid';
 import Tabs from '@mui/material/Tabs';
 import Table from '@mui/material/Table';
 import Stack from '@mui/material/Stack';
@@ -59,6 +57,7 @@ import { Permission, deleteInvoice, deletePayment } from 'src/lib/swissknife';
 import { Label } from 'src/components/label';
 import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
+import { CopyMenuItem } from 'src/components/copy';
 import { Scrollbar } from 'src/components/scrollbar';
 import { SatsWithIcon } from 'src/components/bitcoin';
 import { Chart, useChart } from 'src/components/chart';
@@ -67,7 +66,6 @@ import { ErrorView } from 'src/components/error/error-view';
 import { EmptyContent } from 'src/components/empty-content';
 import { ConfirmDialog } from 'src/components/custom-dialog';
 import { CustomPopover } from 'src/components/custom-popover';
-import { CopyMenuItem } from 'src/components/copy';
 import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';
 import { CleanTransactionsButton } from 'src/components/transactions';
 import {
@@ -80,8 +78,8 @@ import {
   TablePaginationCustom,
 } from 'src/components/table';
 
-import { TransactionTableToolbar } from 'src/sections/transaction/transaction-table-toolbar';
 import { TransactionQuickDrawer } from 'src/sections/transaction/transaction-quick-drawer';
+import { TransactionTableToolbar } from 'src/sections/transaction/transaction-table-toolbar';
 import { TransactionTableFiltersResult } from 'src/sections/transaction/transaction-table-filters-result';
 
 import { RoleBasedGuard } from 'src/auth/guard';
@@ -170,10 +168,14 @@ function composeInvoiceBip21(invoice?: Invoice | null) {
 
 function detailPageHrefForScope(tx: ITransaction, scope: ActivityScope) {
   if (tx.transaction_type === TransactionType.INVOICE) {
-    return scope === 'admin' ? paths.admin.invoice(tx.id) : paths.wallet.invoice(tx.id);
+    return scope === 'admin'
+      ? paths.admin.transactionInvoiceDetail(tx.id)
+      : paths.wallet.invoice(tx.id);
   }
 
-  return scope === 'admin' ? paths.admin.payment(tx.id) : paths.wallet.payment(tx.id);
+  return scope === 'admin'
+    ? paths.admin.transactionPaymentDetail(tx.id)
+    : paths.wallet.payment(tx.id);
 }
 
 function isOpenAmountRequest(tx: ITransaction) {
