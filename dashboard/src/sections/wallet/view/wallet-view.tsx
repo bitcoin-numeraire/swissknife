@@ -1,12 +1,12 @@
 'use client';
 
+import type { Contact } from 'src/lib/swissknife';
 import type { IFiatPrices } from 'src/types/bitcoin';
 import type { ITransaction } from 'src/types/transaction';
-import type { Contact } from 'src/lib/swissknife';
 
 import { mutate } from 'swr';
-import { useMemo, useState, useEffect } from 'react';
 import { useBoolean } from 'minimal-shared/hooks';
+import { useMemo, useState, useEffect } from 'react';
 
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
@@ -27,9 +27,9 @@ import { useRouter } from 'src/routes/hooks';
 
 import { satsToFiat } from 'src/utils/fiat';
 import { shouldFail } from 'src/utils/errors';
+import { fFromNow } from 'src/utils/format-time';
 import { displayLnAddress } from 'src/utils/lnurl';
 import { fCurrency } from 'src/utils/format-number';
-import { fFromNow } from 'src/utils/format-time';
 import { mergeAndSortTransactions } from 'src/utils/transactions';
 
 import { useTranslate } from 'src/locales';
@@ -45,9 +45,9 @@ import { SatsWithIcon } from 'src/components/bitcoin';
 import { ErrorView } from 'src/components/error/error-view';
 import { useSettingsContext } from 'src/components/settings';
 
-import { TransactionType } from 'src/types/transaction';
-
 import { TransactionQuickDrawer } from 'src/sections/transaction/transaction-quick-drawer';
+
+import { TransactionType } from 'src/types/transaction';
 
 import { SendMoneyDrawer, ReceiveMoneyDrawer } from '../money-drawers';
 

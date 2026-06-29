@@ -90,9 +90,7 @@ export function DashboardLayout({
   const usesDashboardNav = rawNavData === dashboardNavData;
   const navData = useMemo(
     () =>
-      usesDashboardNav
-        ? filterDashboardNavData(dashboardNavData, user?.permissions)
-        : rawNavData,
+      usesDashboardNav ? filterDashboardNavData(dashboardNavData, user?.permissions) : rawNavData,
     [rawNavData, usesDashboardNav, user?.permissions]
   );
   const showModuleDebug = usesDashboardNav && searchParams.get('debug') === 'modules';
@@ -100,9 +98,7 @@ export function DashboardLayout({
   const dashboardFlags = useMemo(() => Array.from(getDashboardFlags()).sort(), []);
   const moduleDiagnostics = useMemo(
     () =>
-      showModuleDebug
-        ? getDashboardModuleDiagnostics(dashboardNavData, user?.permissions)
-        : [],
+      showModuleDebug ? getDashboardModuleDiagnostics(dashboardNavData, user?.permissions) : [],
     [showModuleDebug, user?.permissions]
   );
 

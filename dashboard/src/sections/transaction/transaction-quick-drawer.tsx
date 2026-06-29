@@ -1,8 +1,8 @@
 'use client';
 
 import type { LabelColor } from 'src/components/label';
-import type { Invoice, Payment } from 'src/lib/swissknife';
 import type { ITransaction } from 'src/types/transaction';
+import type { Invoice, Payment } from 'src/lib/swissknife';
 
 import { useBoolean, useCopyToClipboard } from 'minimal-shared/hooks';
 
@@ -16,10 +16,10 @@ import ButtonBase from '@mui/material/ButtonBase';
 import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
 
-import { compactBitcoinAddress } from 'src/utils/bitcoin-request';
 import { fDateTime } from 'src/utils/format-time';
 import { getLedgerLabel } from 'src/utils/transactions';
-import { bitcoinTransactionExplorerUrl, txidFromOutpoint } from 'src/utils/bitcoin-explorer';
+import { compactBitcoinAddress } from 'src/utils/bitcoin-request';
+import { txidFromOutpoint, bitcoinTransactionExplorerUrl } from 'src/utils/bitcoin-explorer';
 
 import { useTranslate } from 'src/locales';
 
@@ -187,10 +187,7 @@ export function TransactionQuickDrawer({
             ]}
           >
             <Stack spacing={1.5}>
-              <Stack
-                direction="row"
-                sx={{ alignItems: 'center', justifyContent: 'space-between' }}
-              >
+              <Stack direction="row" sx={{ alignItems: 'center', justifyContent: 'space-between' }}>
                 <Label color={isIncoming ? 'success' : 'warning'}>
                   {isIncoming ? t('wallet_view.direction_in') : t('wallet_view.direction_out')}
                 </Label>

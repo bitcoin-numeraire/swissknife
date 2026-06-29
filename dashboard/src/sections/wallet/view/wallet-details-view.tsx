@@ -1,7 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import type { BtcAddress, Invoice, Payment, Wallet } from 'src/lib/swissknife';
+import type { Wallet, Invoice, Payment, BtcAddress } from 'src/lib/swissknife';
 
 import { mutate } from 'swr';
 import { useMemo } from 'react';
@@ -21,17 +21,17 @@ import { paths } from 'src/routes/paths';
 import { useRouter } from 'src/routes/hooks';
 
 import { fDate } from 'src/utils/format-time';
-import { shouldFail, handleActionError } from 'src/utils/errors';
 import { displayLnAddress } from 'src/utils/lnurl';
 import { getLedgerLabel } from 'src/utils/transactions';
+import { shouldFail, handleActionError } from 'src/utils/errors';
 import { compactBitcoinAddress } from 'src/utils/bitcoin-request';
 import { bitcoinAddressExplorerUrl } from 'src/utils/bitcoin-explorer';
 
 import { useTranslate } from 'src/locales';
 import { endpointKeys } from 'src/actions/keys';
 import { useGetWallet } from 'src/actions/wallet';
-import { deleteWallet, Permission } from 'src/lib/swissknife';
 import { DashboardContent } from 'src/layouts/dashboard';
+import { Permission, deleteWallet } from 'src/lib/swissknife';
 import { useFetchFiatPrices } from 'src/actions/mempool-space';
 import { useListBtcAddresses } from 'src/actions/btc-addresses';
 
@@ -45,10 +45,7 @@ import { EmptyContent } from 'src/components/empty-content';
 import { ConfirmDialog } from 'src/components/custom-dialog';
 import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';
 
-import { RoleBasedGuard } from 'src/auth/guard';
-
 import { SendMoneyDrawer, ReceiveMoneyDrawer } from 'src/sections/wallet/money-drawers';
-
 import {
   DetailRow,
   DetailCard,
@@ -56,6 +53,8 @@ import {
   statusColor,
   formatDateTime,
 } from 'src/sections/transaction/transaction-detail-common';
+
+import { RoleBasedGuard } from 'src/auth/guard';
 
 // ----------------------------------------------------------------------
 
@@ -190,8 +189,8 @@ function RecentTransactionRow({ transaction }: { transaction: WalletTransaction 
   const { t } = useTranslate();
   const isPayment = transaction.kind === 'payment';
   const detailHref = isPayment
-    ? paths.admin.payment(transaction.id)
-    : paths.admin.invoice(transaction.id);
+    ? paths.admin.transactionPaymentDetail(transaction.id)
+    : paths.admin.transactionInvoiceDetail(transaction.id);
   const amountColor = isPayment ? 'warning.main' : 'success.main';
 
   return (

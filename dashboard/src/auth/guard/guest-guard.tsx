@@ -43,18 +43,21 @@ export function GuestGuard({ children }: GuestGuardProps) {
 
   const [isChecking, setIsChecking] = useState(true);
 
-  const replaceOnce = useCallback((path: string) => {
-    if (isSameRoutePath(pathname, path)) {
-      return;
-    }
+  const replaceOnce = useCallback(
+    (path: string) => {
+      if (isSameRoutePath(pathname, path)) {
+        return;
+      }
 
-    if (lastRedirect.current === path) {
-      return;
-    }
+      if (lastRedirect.current === path) {
+        return;
+      }
 
-    lastRedirect.current = path;
-    router.replace(path);
-  }, [pathname, router]);
+      lastRedirect.current = path;
+      router.replace(path);
+    },
+    [pathname, router]
+  );
 
   useEffect(() => {
     if (loading) {

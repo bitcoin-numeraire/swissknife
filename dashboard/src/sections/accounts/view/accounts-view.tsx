@@ -3,8 +3,8 @@
 import type { ReactNode } from 'react';
 import type { WalletOverview } from 'src/lib/swissknife';
 
-import { sumBy } from 'es-toolkit';
 import { mutate } from 'swr';
+import { sumBy } from 'es-toolkit';
 import { useMemo, useState } from 'react';
 import { useBoolean } from 'minimal-shared/hooks';
 
@@ -43,9 +43,9 @@ import { EmptyContent } from 'src/components/empty-content';
 import { RegisterWalletDrawer } from 'src/components/wallet';
 import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';
 
-import { RoleBasedGuard } from 'src/auth/guard';
-
 import { WalletDetailsView } from 'src/sections/wallet/view/wallet-details-view';
+
+import { RoleBasedGuard } from 'src/auth/guard';
 
 // ----------------------------------------------------------------------
 

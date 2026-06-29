@@ -1,5 +1,5 @@
-import type { Invoice, Payment } from 'src/lib/swissknife';
 import type { ITransaction } from 'src/types/transaction';
+import type { Invoice, Payment } from 'src/lib/swissknife';
 
 import { useCallback } from 'react';
 

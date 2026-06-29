@@ -29,8 +29,8 @@ import {
   MetricTile,
   StatusBadges,
   formatDateTime,
-  TransactionDirectionIcon,
   TransactionTimeline,
+  TransactionDirectionIcon,
 } from './transaction-detail-common';
 
 // ----------------------------------------------------------------------

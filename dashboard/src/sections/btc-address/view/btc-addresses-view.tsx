@@ -2,10 +2,10 @@
 
 import type { TFunction } from 'i18next';
 import type { LabelColor } from 'src/components/label';
-import type { BtcAddress, Wallet, BtcAddressType as BtcAddressTypeValue } from 'src/lib/swissknife';
+import type { Wallet, BtcAddress, BtcAddressType as BtcAddressTypeValue } from 'src/lib/swissknife';
 
-import { useMemo, useState, useEffect } from 'react';
 import { useBoolean } from 'minimal-shared/hooks';
+import { useMemo, useState, useEffect } from 'react';
 
 import Alert from '@mui/material/Alert';
 import Stack from '@mui/material/Stack';
@@ -13,9 +13,9 @@ import Button from '@mui/material/Button';
 import Drawer from '@mui/material/Drawer';
 import MenuItem from '@mui/material/MenuItem';
 import TextField from '@mui/material/TextField';
+import { useTheme } from '@mui/material/styles';
 import Typography from '@mui/material/Typography';
 import IconButton from '@mui/material/IconButton';
-import { useTheme } from '@mui/material/styles';
 
 import { shouldFail, handleActionError } from 'src/utils/errors';
 
@@ -135,7 +135,9 @@ export function BtcAddressesView() {
               heading={t('admin_bitcoin_addresses')}
               links={[{ name: t('accounts') }, { name: t('admin_bitcoin_addresses') }]}
               action={
-                <RoleBasedGuard permissions={[Permission.READ_WALLET, Permission.WRITE_BTC_ADDRESS]}>
+                <RoleBasedGuard
+                  permissions={[Permission.READ_WALLET, Permission.WRITE_BTC_ADDRESS]}
+                >
                   <Button
                     variant="contained"
                     startIcon={<Iconify icon="mingcute:add-line" />}
