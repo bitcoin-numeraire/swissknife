@@ -5,7 +5,6 @@ import { useRef, useState, useEffect, useCallback } from 'react';
 import { paths } from 'src/routes/paths';
 import { useRouter, usePathname } from 'src/routes/hooks';
 
-import { CONFIG } from 'src/global-config';
 import { setupCheck } from 'src/lib/swissknife';
 
 import { SplashScreen } from 'src/components/loading-screen';
@@ -14,6 +13,7 @@ import { ONBOARDING_COMPLETE_STORAGE_KEY } from 'src/components/settings';
 import { useAuthContext } from '../hooks';
 import { clearSession } from '../context/jwt';
 import { isSameRoutePath } from './setup-route-utils';
+import { authRequiresLocalSignUp, authUsesLocalTokenSession } from '../utils';
 
 // ----------------------------------------------------------------------
 
@@ -36,7 +36,7 @@ export function AuthGuard({ children }: AuthGuardProps) {
   const resetSetupCache = () => {
     localStorage.removeItem(ONBOARDING_COMPLETE_STORAGE_KEY);
 
-    if (CONFIG.auth.method === 'jwt') {
+    if (authUsesLocalTokenSession()) {
       clearSession();
     }
   };
@@ -71,7 +71,7 @@ export function AuthGuard({ children }: AuthGuardProps) {
         return;
       }
 
-      if (CONFIG.auth.method === 'jwt' && !data.sign_up_complete) {
+      if (authRequiresLocalSignUp() && !data.sign_up_complete) {
         resetSetupCache();
         replaceOnce(paths.auth.signUp);
         return;

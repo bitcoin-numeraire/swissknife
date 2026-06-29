@@ -20,10 +20,11 @@ export type ConfigValue = {
     redirectPath: string;
   };
   auth0: { clientId: string; domain: string; callbackUrl: string; audience: string };
+  mockOAuth2: { tokenUrl: string; clientSecret: string };
   supabase: { url: string; key: string };
 };
 
-export type AuthMethod = 'jwt' | 'supabase' | 'auth0';
+export type AuthMethod = 'jwt' | 'supabase' | 'auth0' | 'mock-oauth2';
 export type DeploymentMode = 'server' | 'self-hosted' | 'merchant' | 'desktop' | 'agent';
 
 // ----------------------------------------------------------------------
@@ -54,6 +55,15 @@ export const CONFIG: ConfigValue = {
     domain: process.env.NEXT_PUBLIC_AUTH0_DOMAIN ?? '',
     callbackUrl: process.env.NEXT_PUBLIC_AUTH0_CALLBACK_URL ?? '',
     audience: process.env.NEXT_PUBLIC_AUTH0_AUDIENCE ?? 'https://swissknife.numeraire.tech/api/v1',
+  },
+  /**
+   * Mock OAuth2
+   */
+  mockOAuth2: {
+    tokenUrl:
+      process.env.NEXT_PUBLIC_MOCK_OAUTH2_TOKEN_URL ??
+      'http://127.0.0.1:8090/default/token',
+    clientSecret: process.env.NEXT_PUBLIC_MOCK_OAUTH2_CLIENT_SECRET ?? 'dev-secret',
   },
   /**
    * Supabase
