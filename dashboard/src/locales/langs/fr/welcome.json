@@ -14,7 +14,7 @@
     "lightning": "Paiements Lightning",
     "onchain": "Adresses Bitcoin",
     "identity": "Adresse Lightning",
-    "node": "Santé du nœud"
+    "node": "Serveur prêt"
   },
   "welcome": {
     "title": "Ton wallet pour le Bitcoin du quotidien",
@@ -31,9 +31,9 @@
     "point_three": "Teste le wallet avec un petit montant avant d'en ajouter plus."
   },
   "accessibility": {
-    "title": "Garde ton nœud prêt",
-    "content": "Lightning fonctionne mieux quand ton serveur wallet est en ligne et en bonne santé. Une configuration stable aide les factures, les paiements et les apps connectées à fonctionner quand tu en as besoin.",
-    "point_one": "Vérifie la santé du nœud avant de recevoir de vrais paiements.",
+    "title": "Garde ton serveur prêt",
+    "content": "Lightning fonctionne mieux quand ton serveur wallet est en ligne et joignable. Une configuration stable aide les factures, les paiements et les apps connectées à fonctionner quand tu en as besoin.",
+    "point_one": "Vérifie que le serveur est joignable avant de recevoir de vrais paiements.",
     "point_two": "Garde le serveur accessible depuis les apps qui l'utilisent.",
     "point_three": "Utilise des fonds de test après un changement d'hébergement ou de réglages du nœud."
   },

@@ -57,7 +57,6 @@ export const paths = {
   identity: '/identity',
   accounts: '/accounts',
   account: (id: string) => `/accounts?id=${id}`,
-  nodeHealth: '/node-health',
   build: {
     apiKeys: '/build/api-keys',
   },
@@ -83,7 +82,6 @@ export const paths = {
     payment: (id: string) => `/admin/payments?id=${id}`,
     invoices: '/admin/invoices',
     invoice: (id: string) => `/admin/invoices?id=${id}`,
-    node: '/admin/lightning-node',
     lnAddresses: '/admin/lightning-addresses',
     lnAddress: (id: string) => `/admin/lightning-addresses?id=${id}`,
     btcAddresses: '/admin/bitcoin-addresses',

@@ -14,7 +14,7 @@
     "lightning": "Lightning payments",
     "onchain": "Bitcoin addresses",
     "identity": "Lightning Address",
-    "node": "Node health"
+    "node": "Server readiness"
   },
   "welcome": {
     "title": "Your wallet for everyday Bitcoin",
@@ -31,9 +31,9 @@
     "point_three": "Test the wallet with a small amount before you add more."
   },
   "accessibility": {
-    "title": "Keep your node ready",
-    "content": "Lightning works best when your wallet server is online and healthy. A steady setup helps invoices, payments and connected apps work when you need them.",
-    "point_one": "Check node health before receiving real payments.",
+    "title": "Keep your server ready",
+    "content": "Lightning works best when your wallet server is online and reachable. A steady setup helps invoices, payments and connected apps work when you need them.",
+    "point_one": "Confirm the server is reachable before receiving real payments.",
     "point_two": "Keep the server reachable from the apps that use it.",
     "point_three": "Use test funds first after changing hosting or node settings."
   },

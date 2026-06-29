@@ -341,11 +341,7 @@ export function SettingsView() {
                         : t('settings_view.external_instance_description')
                     }
                     status={`${CONFIG.deploymentMode} · ${authModeLabel}`}
-                  >
-                    <Button href={paths.nodeHealth} color="inherit" variant="outlined">
-                      {t('settings_view.open_node_health')}
-                    </Button>
-                  </SettingRow>
+                  />
                 </SettingsPanel>
               )}
             </Grid>
@@ -425,7 +421,7 @@ function SettingRow({
   title: string;
   description: string;
   status?: string;
-  children: ReactNode;
+  children?: ReactNode;
 }) {
   return (
     <Stack
@@ -443,7 +439,7 @@ function SettingRow({
         </Typography>
       </Stack>
 
-      <Box sx={{ flexShrink: 0 }}>{children}</Box>
+      {children && <Box sx={{ flexShrink: 0 }}>{children}</Box>}
     </Stack>
   );
 }
