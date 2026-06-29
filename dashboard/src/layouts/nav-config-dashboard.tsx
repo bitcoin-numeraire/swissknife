@@ -28,7 +28,6 @@ const ICONS = {
   dashboard: icon('ic-dashboard'),
   parameter: icon('ic-parameter'),
   wallet: iconify('solar:wallet-bold-duotone'),
-  node: iconify('solar:server-minimalistic-bold-duotone'),
   invoice: iconify('eva:diagonal-arrow-left-down-fill'),
   payment: iconify('eva:diagonal-arrow-right-up-fill'),
   lightning: iconify('solar:bolt-bold-duotone'),
@@ -39,7 +38,6 @@ const ICONS = {
   activity: iconify('solar:bill-list-bold-duotone'),
   identity: iconify('solar:user-rounded-bold-duotone'),
   accounts: iconify('solar:users-group-two-rounded-bold-duotone'),
-  observe: iconify('solar:pulse-2-bold-duotone'),
   policy: iconify('solar:shield-keyhole-bold-duotone'),
   webhooks: iconify('solar:programming-bold-duotone'),
   adminWallets: iconify('solar:safe-square-bold-duotone'),
@@ -49,7 +47,7 @@ const ICONS = {
 
 // Swissknife-specific: nav items carry the API permissions required to view
 // them (consumed by the searchbar permission filtering).
-export type DashboardNavFlag = 'agents' | 'policy' | 'webhooks' | 'l402' | 'node-health';
+export type DashboardNavFlag = 'agents' | 'policy' | 'webhooks' | 'l402';
 
 export type NavItemWithPermissions = NavItemDataProps & {
   permissions?: string[];
@@ -158,18 +156,6 @@ export const navData: Array<NavGroupWithPermissions> = [
         icon: ICONS.bitcoinAddress,
         permissions: [Permission.READ_BTC_ADDRESS],
         modes: ['server', 'self-hosted', 'merchant'],
-      },
-    ],
-  },
-  {
-    subheader: 'observe',
-    items: [
-      {
-        title: 'node_health',
-        path: paths.nodeHealth,
-        icon: ICONS.observe,
-        permissions: [Permission.READ_LN_NODE],
-        modes: ['server', 'self-hosted', 'desktop'],
       },
     ],
   },

@@ -26,7 +26,7 @@ Uses the Next.js 16 App Router (React 19, MUI v9) with route groups:
 
 Main route sections:
 - `/wallet/*` - End-user wallet views (dashboard, payments, invoices, contacts)
-- `/admin/*` - Admin views (wallets, api-keys, lightning-node)
+- `/admin/*` - Administrative account resources (transactions, addresses, api keys)
 - `/settings` - User settings
 - `/welcome` - Onboarding flow
 
