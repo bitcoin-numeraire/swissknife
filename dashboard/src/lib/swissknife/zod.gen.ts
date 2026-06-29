@@ -983,6 +983,34 @@ export const zNewWalletBtcAddressBody = zNewBtcAddressRequest;
  */
 export const zNewWalletBtcAddressResponse = zBtcAddress;
 
+export const zListWalletBtcAddressesQuery = z.object({
+  limit: z.coerce
+    .bigint()
+    .gte(BigInt(0))
+    .max(BigInt('9223372036854775807'), {
+      error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
+    })
+    .nullish(),
+  offset: z.coerce
+    .bigint()
+    .gte(BigInt(0))
+    .max(BigInt('9223372036854775807'), {
+      error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
+    })
+    .nullish(),
+  ids: z.array(z.uuid()).nullish(),
+  wallet_id: z.uuid().nullish(),
+  address: z.string().nullish(),
+  address_type: zBtcAddressType.nullish(),
+  used: z.boolean().nullish(),
+  order_direction: zOrderDirection.optional(),
+});
+
+/**
+ * Success
+ */
+export const zListWalletBtcAddressesResponse = z.array(zBtcAddress);
+
 /**
  * Success
  */

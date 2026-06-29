@@ -103,7 +103,6 @@ export const navData: Array<NavGroupWithPermissions> = [
         title: 'activity',
         path: paths.activity,
         icon: ICONS.activity,
-        permissions: [Permission.READ_TRANSACTION],
       },
     ],
   },
@@ -114,7 +113,6 @@ export const navData: Array<NavGroupWithPermissions> = [
         title: 'identity_hub',
         path: paths.identity,
         icon: ICONS.identity,
-        permissions: [Permission.READ_LN_ADDRESS],
       },
       {
         title: 'contacts',
@@ -166,7 +164,6 @@ export const navData: Array<NavGroupWithPermissions> = [
         title: 'api_keys',
         path: paths.build.apiKeys,
         icon: ICONS.apiKeys,
-        permissions: [Permission.READ_API_KEY],
         modes: ['server', 'desktop', 'agent'],
       },
       {

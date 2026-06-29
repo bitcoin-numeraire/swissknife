@@ -6,6 +6,7 @@ export const endpointKeys = {
     get: 'userWallet',
     balance: 'userWalletBalance',
     lnAddress: { get: 'userWalletGetAddress' },
+    btcAddresses: { list: 'userWalletListBtcAddresses' },
     payments: { list: 'userWalletListPayments', get: 'userWalletGetPayment' },
     invoices: { list: 'userWalletListInvoices', get: 'userWalletGetInvoice' },
     contacts: { list: 'userWalletListContacts' },

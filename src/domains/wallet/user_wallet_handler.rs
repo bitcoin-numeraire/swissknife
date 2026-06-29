@@ -20,7 +20,7 @@ use crate::{
         errors::{ApplicationError, DataError},
     },
     domains::{
-        bitcoin::BtcAddress,
+        bitcoin::{BtcAddress, BtcAddressFilter},
         invoice::{Invoice, InvoiceFilter, InvoiceStatus},
         ln_address::{LnAddress, LnAddressFilter},
         payment::{Payment, PaymentFilter, PaymentStatus},
@@ -35,7 +35,7 @@ use super::{Balance, Contact, Wallet};
 #[openapi(
     paths(
         get_user_wallet, get_wallet_balance,
-        new_wallet_btc_address,
+        new_wallet_btc_address, list_wallet_btc_addresses,
         get_wallet_address, register_wallet_address, update_wallet_address, delete_wallet_address,
         wallet_pay, list_wallet_payments, get_wallet_payment, delete_failed_payments, list_wallet_invoices,
         get_wallet_invoice, new_wallet_invoice, delete_expired_invoices,
@@ -55,6 +55,7 @@ pub fn user_router() -> Router<Arc<AppServices>> {
         .route("/", get(get_user_wallet))
         .route("/balance", get(get_wallet_balance))
         .route("/bitcoin/address", post(new_wallet_btc_address))
+        .route("/bitcoin/addresses", get(list_wallet_btc_addresses))
         .route("/lightning-address", get(get_wallet_address))
         .route("/lightning-address", post(register_wallet_address))
         .route("/lightning-address", put(update_wallet_address))
@@ -125,6 +126,33 @@ async fn new_wallet_btc_address(
         .new_deposit_address(user.wallet_id, payload.address_type)
         .await?;
     Ok(Json(address))
+}
+
+/// List Bitcoin addresses
+///
+/// Returns the authenticated user's Bitcoin addresses given a filter.
+#[utoipa::path(
+    get,
+    path = "/bitcoin/addresses",
+    tag = "User Wallet",
+    context_path = CONTEXT_PATH,
+    params(BtcAddressFilter),
+    responses(
+        (status = 200, description = "Success", body = Vec<BtcAddress>),
+        (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
+        (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
+        (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
+    )
+)]
+async fn list_wallet_btc_addresses(
+    State(services): State<Arc<AppServices>>,
+    user: User,
+    Query(mut filter): Query<BtcAddressFilter>,
+) -> Result<Json<Vec<BtcAddress>>, ApplicationError> {
+    filter.wallet_id = Some(user.wallet_id);
+    let addresses = services.bitcoin.list_addresses(filter).await?;
+
+    Ok(Json(addresses))
 }
 
 /// Send payment
@@ -824,6 +852,33 @@ mod tests {
             };
 
             let result = new_wallet_btc_address(State(Arc::new(builder.build())), caller, Json(payload)).await;
+
+            assert!(result.is_ok());
+        }
+    }
+
+    mod list_wallet_btc_addresses {
+        use super::*;
+
+        #[tokio::test]
+        async fn lists_only_the_authenticated_users_addresses() {
+            let caller = user();
+            let wallet_id = caller.wallet_id;
+
+            let mut builder = MockAppServicesBuilder::new();
+            builder
+                .bitcoin
+                .expect_list_addresses()
+                .withf(move |filter| filter.wallet_id == Some(wallet_id))
+                .times(1)
+                .returning(|filter| Ok(vec![btc_address(filter.wallet_id.expect("wallet_id should be scoped"))]));
+
+            let filter = BtcAddressFilter {
+                wallet_id: Some(Uuid::new_v4()),
+                ..Default::default()
+            };
+
+            let result = list_wallet_btc_addresses(State(Arc::new(builder.build())), caller, Query(filter)).await;
 
             assert!(result.is_ok());
         }

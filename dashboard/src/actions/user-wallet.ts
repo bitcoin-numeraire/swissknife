@@ -1,4 +1,8 @@
-import type { ListWalletApiKeysData, ListWalletInvoicesData } from 'src/lib/swissknife';
+import type {
+  ListWalletApiKeysData,
+  ListWalletInvoicesData,
+  ListWalletBtcAddressesData,
+} from 'src/lib/swissknife';
 
 import useSWR from 'swr';
 import { useMemo } from 'react';
@@ -15,6 +19,7 @@ import {
   listWalletApiKeys,
   listWalletInvoices,
   listWalletPayments,
+  listWalletBtcAddresses,
 } from 'src/lib/swissknife';
 
 import { endpointKeys } from './keys';
@@ -129,6 +134,38 @@ export function useGetWalletLnAddress(shouldRetryOnError: boolean = false) {
     lnAddressError: result.error,
     lnAddressValidating: result.isValidating,
   };
+}
+
+export function useListWalletBtcAddresses(query?: ListWalletBtcAddressesData['query']) {
+  const key = [
+    endpointKeys.userWallet.btcAddresses.list,
+    query?.limit,
+    query?.offset,
+    query?.address,
+    query?.address_type,
+    query?.used,
+  ];
+
+  const result = useSWR(key, () =>
+    listWalletBtcAddresses<true>({
+      query: {
+        limit: 50,
+        order_direction: OrderDirection.DESC,
+        ...query,
+      },
+    })
+  );
+
+  return useMemo(
+    () => ({
+      btcAddresses: result.data?.data,
+      btcAddressesLoading: result.isLoading,
+      btcAddressesError: result.error,
+      btcAddressesValidating: result.isValidating,
+      btcAddressesMutate: result.mutate,
+    }),
+    [result]
+  );
 }
 
 export function useListWalletContacts() {

@@ -25,6 +25,7 @@ import {
   listInvoicesResponseTransformer,
   listPaymentsResponseTransformer,
   listWalletApiKeysResponseTransformer,
+  listWalletBtcAddressesResponseTransformer,
   listWalletInvoicesResponseTransformer,
   listWalletOverviewsResponseTransformer,
   listWalletPaymentsResponseTransformer,
@@ -154,6 +155,9 @@ import type {
   ListWalletApiKeysData,
   ListWalletApiKeysErrors,
   ListWalletApiKeysResponses,
+  ListWalletBtcAddressesData,
+  ListWalletBtcAddressesErrors,
+  ListWalletBtcAddressesResponses,
   ListWalletInvoicesData,
   ListWalletInvoicesErrors,
   ListWalletInvoicesResponses,
@@ -809,6 +813,25 @@ export const newWalletBtcAddress = <ThrowOnError extends boolean = false>(
       'Content-Type': 'application/json',
       ...options.headers,
     },
+  });
+
+/**
+ * List Bitcoin addresses
+ *
+ * Returns the authenticated user's Bitcoin addresses given a filter.
+ */
+export const listWalletBtcAddresses = <ThrowOnError extends boolean = false>(
+  options?: Options<ListWalletBtcAddressesData, ThrowOnError>
+): RequestResult<ListWalletBtcAddressesResponses, ListWalletBtcAddressesErrors, ThrowOnError> =>
+  (options?.client ?? client).get<
+    ListWalletBtcAddressesResponses,
+    ListWalletBtcAddressesErrors,
+    ThrowOnError
+  >({
+    responseTransformer: listWalletBtcAddressesResponseTransformer,
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/me/bitcoin/addresses',
+    ...options,
   });
 
 /**

@@ -23,6 +23,7 @@ import type {
   ListInvoicesResponse,
   ListPaymentsResponse,
   ListWalletApiKeysResponse,
+  ListWalletBtcAddressesResponse,
   ListWalletInvoicesResponse,
   ListWalletOverviewsResponse,
   ListWalletPaymentsResponse,
@@ -234,6 +235,13 @@ export const newWalletBtcAddressResponseTransformer = async (
   data: any
 ): Promise<NewWalletBtcAddressResponse> => {
   data = btcAddressSchemaResponseTransformer(data);
+  return data;
+};
+
+export const listWalletBtcAddressesResponseTransformer = async (
+  data: any
+): Promise<ListWalletBtcAddressesResponse> => {
+  data = data.map((item: any) => btcAddressSchemaResponseTransformer(item));
   return data;
 };
 
