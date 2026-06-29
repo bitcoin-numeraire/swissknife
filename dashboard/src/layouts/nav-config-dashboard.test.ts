@@ -23,7 +23,11 @@ describe('dashboard permission gating', () => {
 
   it('shows modules when the user has the required permission', () => {
     const titles = itemTitles(
-      filterDashboardNavData(navData, [Permission.READ_WALLET, Permission.READ_TRANSACTION], 'server')
+      filterDashboardNavData(
+        navData,
+        [Permission.READ_WALLET, Permission.READ_TRANSACTION],
+        'server'
+      )
     );
 
     expect(titles).toContain('accounts_directory');
