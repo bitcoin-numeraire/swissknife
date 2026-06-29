@@ -12,6 +12,8 @@
     "lint": "eslint \"src/**/*.{js,jsx,ts,tsx}\"",
     "lint:fix": "eslint --fix \"src/**/*.{js,jsx,ts,tsx}\"",
     "lint:print": "npx eslint --print-config eslint.config.mjs > eslint-show-config.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "fm:check": "prettier --check \"src/**/*.{js,jsx,ts,tsx}\"",
     "fm:fix": "prettier --write \"src/**/*.{js,jsx,ts,tsx}\"",
     "fix:all": "npm run lint:fix && npm run fm:fix",
@@ -76,6 +78,9 @@
     "@eslint/js": "^9.39.4",
     "@hey-api/openapi-ts": "^0.98.2",
     "@svgr/webpack": "^8.1.0",
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
     "@types/autosuggest-highlight": "^3.2.3",
     "@types/node": "^24.13.2",
     "@types/nprogress": "^0.2.3",
@@ -90,9 +95,11 @@
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-unused-imports": "^4.4.1",
     "globals": "^16.5.0",
+    "jsdom": "^29.1.1",
     "prettier": "^3.8.4",
     "typescript": "^5.9.3",
-    "typescript-eslint": "^8.61.1"
+    "typescript-eslint": "^8.61.1",
+    "vitest": "^4.1.9"
   },
   "packageManager": "yarn@4.17.0",
   "engines": {
