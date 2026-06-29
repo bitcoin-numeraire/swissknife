@@ -1,9 +1,13 @@
 COMPOSE := docker compose -f docker-compose.yml
 DB_SERVICE := postgres
 PGADMIN_SERVICE := pgadmin
+MOCK_OAUTH2_SERVICE := mock-oauth2-server
 SWISSKNIFE_SERVICE := swissknife
 SWISSKNIFE_SERVER_SERVICE := swissknife-server
 IMAGE_NAME := swissknife:latest
+MOCK_OAUTH2_PORT ?= 8090
+MOCK_OAUTH2_URL := http://127.0.0.1:$(MOCK_OAUTH2_PORT)
+OAUTH2_PERSONA ?= dev-admin
 ITEST_PROJECT ?= swissknife-itest
 ITEST_COMPOSE = docker compose -p $(ITEST_PROJECT) -f tests/itest/docker-compose.yml
 ITEST_DATABASE ?= sqlite
@@ -20,7 +24,7 @@ ITEST_ENV = SWISSKNIFE_ITEST_COMPOSE_PROJECT=$(ITEST_PROJECT) \
 	SWISSKNIFE_ITEST_DATABASE=$(ITEST_DATABASE) \
 	SWISSKNIFE_ITEST_PROVIDER=$(ITEST_PROVIDER)
 
-.PHONY: watch up up-swissknife up-server up-postgres up-pgadmin shutdown down generate-certs build protos build-docker build-docker-server build-docker-dashboard run-docker lint fmt fmt-fix test test-unit test-integration test-persistence itest-up itest-down itest-shutdown itest-logs coverage coverage-html coverage-lcov coverage-matrix clean check deps-upgrade deps-outdated install-tools generate-models new-migration run-migrations fresh-migrations
+.PHONY: watch up up-swissknife up-server up-postgres up-pgadmin up-oauth2 down-oauth2 oauth2-token shutdown down generate-certs build protos build-docker build-docker-server build-docker-dashboard run-docker lint fmt fmt-fix test test-unit test-integration test-persistence itest-up itest-down itest-shutdown itest-logs coverage coverage-html coverage-lcov coverage-matrix clean check deps-upgrade deps-outdated install-tools generate-models new-migration run-migrations fresh-migrations
 
 watch:
 	@cargo watch -x run
@@ -45,6 +49,22 @@ up-postgres:
 up-pgadmin:
 	@$(COMPOSE) up -d $(PGADMIN_SERVICE)
 	@until $(COMPOSE) logs $(PGADMIN_SERVICE) | grep 'pgAdmin 4 - Application Initialisation'; do sleep 1; done
+
+up-oauth2:
+	@MOCK_OAUTH2_PORT=$(MOCK_OAUTH2_PORT) $(COMPOSE) up -d $(MOCK_OAUTH2_SERVICE)
+	@until python3 -c 'import sys, urllib.request; urllib.request.urlopen(sys.argv[1], timeout=2)' "$(MOCK_OAUTH2_URL)/isalive" >/dev/null 2>&1; do sleep 1; done
+	@echo "Mock OAuth2 server ready at $(MOCK_OAUTH2_URL)/default"
+
+down-oauth2:
+	@$(COMPOSE) rm -sf $(MOCK_OAUTH2_SERVICE)
+
+oauth2-token:
+	@curl -fsS -X POST "$(MOCK_OAUTH2_URL)/default/token" \
+		-H 'content-type: application/x-www-form-urlencoded' \
+		-d "grant_type=client_credentials" \
+		-d "client_id=$(OAUTH2_PERSONA)" \
+		-d "client_secret=dev-secret" \
+		-d "scope=openid"
 
 down:
 	@$(COMPOSE) down

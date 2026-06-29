@@ -1,0 +1,106 @@
+{
+  "tokenCallbacks": [
+    {
+      "issuerId": "default",
+      "requestMappings": [
+        {
+          "requestParam": "client_id",
+          "match": "dev-admin",
+          "claims": {
+            "sub": "dev-oauth2-admin",
+            "name": "Dev Admin",
+            "email": "admin@localhost.test",
+            "aud": ["https://swissknife.local/api"],
+            "permissions": [
+              "read:wallet",
+              "write:wallet",
+              "read:ln_address",
+              "write:ln_address",
+              "read:transaction",
+              "write:transaction",
+              "read:ln_node",
+              "write:ln_node",
+              "read:api_key",
+              "write:api_key",
+              "read:btc_address",
+              "write:btc_address"
+            ]
+          }
+        },
+        {
+          "requestParam": "client_id",
+          "match": "dev-readonly",
+          "claims": {
+            "sub": "dev-oauth2-readonly",
+            "name": "Dev Readonly",
+            "email": "readonly@localhost.test",
+            "aud": ["https://swissknife.local/api"],
+            "permissions": [
+              "read:wallet",
+              "read:ln_address",
+              "read:transaction",
+              "read:ln_node",
+              "read:api_key",
+              "read:btc_address"
+            ]
+          }
+        },
+        {
+          "requestParam": "client_id",
+          "match": "dev-wallet-operator",
+          "claims": {
+            "sub": "dev-oauth2-wallet-operator",
+            "name": "Dev Wallet Operator",
+            "email": "wallet-operator@localhost.test",
+            "aud": ["https://swissknife.local/api"],
+            "permissions": [
+              "read:wallet",
+              "write:wallet",
+              "read:transaction",
+              "write:transaction"
+            ]
+          }
+        },
+        {
+          "requestParam": "client_id",
+          "match": "dev-address-operator",
+          "claims": {
+            "sub": "dev-oauth2-address-operator",
+            "name": "Dev Address Operator",
+            "email": "address-operator@localhost.test",
+            "aud": ["https://swissknife.local/api"],
+            "permissions": [
+              "read:wallet",
+              "read:ln_address",
+              "write:ln_address",
+              "read:btc_address",
+              "write:btc_address"
+            ]
+          }
+        },
+        {
+          "requestParam": "client_id",
+          "match": "dev-api-key-admin",
+          "claims": {
+            "sub": "dev-oauth2-api-key-admin",
+            "name": "Dev API Key Admin",
+            "email": "api-key-admin@localhost.test",
+            "aud": ["https://swissknife.local/api"],
+            "permissions": ["read:wallet", "read:api_key", "write:api_key"]
+          }
+        },
+        {
+          "requestParam": "client_id",
+          "match": "dev-empty",
+          "claims": {
+            "sub": "dev-oauth2-empty",
+            "name": "Dev Empty",
+            "email": "empty@localhost.test",
+            "aud": ["https://swissknife.local/api"],
+            "permissions": []
+          }
+        }
+      ]
+    }
+  ]
+}
