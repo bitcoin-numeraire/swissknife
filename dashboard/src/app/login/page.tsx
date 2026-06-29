@@ -5,6 +5,7 @@ import { CONFIG } from 'src/global-config';
 import { JwtSignInView } from 'src/auth/view/jwt';
 import { Auth0SignInView } from 'src/auth/view/auth0';
 import { SupabaseSignInView } from 'src/auth/view/supabase';
+import { MockOAuth2SignInView } from 'src/auth/view/mock-oauth2';
 
 // ----------------------------------------------------------------------
 
@@ -16,6 +17,8 @@ export default function Page() {
       return <Auth0SignInView />;
     case 'supabase':
       return <SupabaseSignInView />;
+    case 'mock-oauth2':
+      return <MockOAuth2SignInView />;
     default:
       return <JwtSignInView />;
   }

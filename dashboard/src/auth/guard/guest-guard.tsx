@@ -16,6 +16,7 @@ import { ONBOARDING_COMPLETE_STORAGE_KEY } from 'src/components/settings';
 import { useAuthContext } from '../hooks';
 import { clearSession } from '../context/jwt';
 import { getSafeReturnTo, isSameRoutePath } from './setup-route-utils';
+import { authRequiresLocalSignUp, authUsesLocalTokenSession } from '../utils';
 
 // ----------------------------------------------------------------------
 
@@ -26,7 +27,7 @@ type GuestGuardProps = {
 function resetSetupCache() {
   localStorage.removeItem(ONBOARDING_COMPLETE_STORAGE_KEY);
 
-  if (CONFIG.auth.method === 'jwt') {
+  if (authUsesLocalTokenSession()) {
     clearSession();
   }
 }
@@ -75,7 +76,7 @@ export function GuestGuard({ children }: GuestGuardProps) {
           return;
         }
 
-        if (CONFIG.auth.method === 'jwt' && !data.sign_up_complete) {
+        if (authRequiresLocalSignUp() && !data.sign_up_complete) {
           resetSetupCache();
           replaceOnce(paths.auth.signUp);
           return;

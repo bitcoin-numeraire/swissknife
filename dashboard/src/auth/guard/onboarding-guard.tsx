@@ -7,7 +7,6 @@ import { useRouter, usePathname } from 'src/routes/hooks';
 
 import { handleActionError } from 'src/utils/errors';
 
-import { CONFIG } from 'src/global-config';
 import { setupCheck } from 'src/lib/swissknife';
 
 import { SplashScreen } from 'src/components/loading-screen';
@@ -16,11 +15,12 @@ import { ONBOARDING_COMPLETE_STORAGE_KEY } from 'src/components/settings';
 import { useAuthContext } from '../hooks';
 import { clearSession } from '../context/jwt';
 import { isSameRoutePath } from './setup-route-utils';
+import { authRequiresLocalSignUp, authUsesLocalTokenSession } from '../utils';
 
 function resetSetupCache() {
   localStorage.removeItem(ONBOARDING_COMPLETE_STORAGE_KEY);
 
-  if (CONFIG.auth.method === 'jwt') {
+  if (authUsesLocalTokenSession()) {
     clearSession();
   }
 }
@@ -75,7 +75,7 @@ export function OnboardingGuard({ children }: { children: React.ReactNode }) {
           return;
         }
 
-        if (CONFIG.auth.method === 'jwt' && !data.sign_up_complete) {
+        if (authRequiresLocalSignUp() && !data.sign_up_complete) {
           resetSetupCache();
 
           if (isSignUpRoute) {
@@ -89,7 +89,7 @@ export function OnboardingGuard({ children }: { children: React.ReactNode }) {
           return;
         }
 
-        if (data.welcome_complete && (CONFIG.auth.method !== 'jwt' || data.sign_up_complete)) {
+        if (data.welcome_complete && (!authRequiresLocalSignUp() || data.sign_up_complete)) {
           localStorage.setItem(ONBOARDING_COMPLETE_STORAGE_KEY, 'true');
           replaceOnce(authenticated ? paths.wallet.root : paths.auth.login);
           return;

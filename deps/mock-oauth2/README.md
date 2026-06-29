@@ -23,6 +23,14 @@ Fetch a token for a persona:
 make oauth2-token OAUTH2_PERSONA=dev-admin
 ```
 
+Use the dashboard persona picker with:
+
+```bash
+NEXT_PUBLIC_AUTH_METHOD=mock-oauth2
+NEXT_PUBLIC_MOCK_OAUTH2_TOKEN_URL=http://127.0.0.1:8090/default/token
+NEXT_PUBLIC_MOCK_OAUTH2_CLIENT_SECRET=dev-secret
+```
+
 Available personas:
 
 - `dev-admin`: all permissions
