@@ -1,6 +1,5 @@
 import type { Payment } from 'src/lib/swissknife';
 
-import Box from '@mui/material/Box';
 import Link from '@mui/material/Link';
 import Card from '@mui/material/Card';
 import Grid from '@mui/material/Grid';
@@ -58,7 +57,6 @@ export function PaymentDetails({ payment, isAdmin }: Props) {
       ? t('payment_details.exact_msats', { amount: fSats(feeAmount) })
       : undefined;
   const methodLabel = getLedgerLabel(payment.ledger, t);
-  const isOnchain = payment.ledger === 'Onchain';
   const isLightning = payment.ledger === 'Lightning';
   const isInternal = payment.ledger === 'Internal';
   const bitcoinAddress = payment.bitcoin?.address || payment.internal?.btc_address;
@@ -70,9 +68,17 @@ export function PaymentDetails({ payment, isAdmin }: Props) {
     bitcoinTxid ||
     payment_hash ||
     methodLabel;
+  const destinationIsTechnicalId = destination === payment_hash || destination === bitcoinTxid;
+  const destinationIsMonospace = destination === bitcoinAddress || destinationIsTechnicalId;
   const destinationDisplay =
-    destination === bitcoinAddress ? compactBitcoinAddress(destination) : destination;
+    (destination === bitcoinAddress && compactBitcoinAddress(destination)) ||
+    (destinationIsTechnicalId && compactHash(destination)) ||
+    destination;
   const destinationCopyValue = destination !== methodLabel ? destination : undefined;
+  const destinationLabel =
+    destination === payment_hash
+      ? t('transaction_details.payment_hash')
+      : t('payment_details.payment_to');
   const txExplorerUrl = bitcoinTransactionExplorerUrl(bitcoinTxid);
   const addressExplorerUrl = bitcoinAddressExplorerUrl(bitcoinAddress);
   const settlementTitle =
@@ -106,7 +112,7 @@ export function PaymentDetails({ payment, isAdmin }: Props) {
 
                   <Stack spacing={0.5}>
                     <Typography variant="overline" color="text.secondary">
-                      {t('payment_details.payment_to')}
+                      {destinationLabel}
                     </Typography>
                     <Stack
                       direction="row"
@@ -116,7 +122,7 @@ export function PaymentDetails({ payment, isAdmin }: Props) {
                       <Typography
                         variant="subtitle1"
                         sx={{
-                          fontFamily: destination === bitcoinAddress ? 'monospace' : undefined,
+                          fontFamily: destinationIsMonospace ? 'monospace' : undefined,
                           wordBreak: 'break-word',
                         }}
                       >
@@ -191,82 +197,6 @@ export function PaymentDetails({ payment, isAdmin }: Props) {
                       {settlementDescription}
                     </Typography>
                   </Stack>
-
-                  {!isOnchain && (
-                    <Stack spacing={1}>
-                      <Box
-                        sx={[
-                          (theme) => ({
-                            p: 2,
-                            borderRadius: 1,
-                            bgcolor: 'background.paper',
-                            border: `1px solid ${theme.vars.palette.divider}`,
-                          }),
-                        ]}
-                      >
-                        <Stack spacing={0.75}>
-                          <Typography variant="caption" color="text.secondary">
-                            {t('payment_details.recipient')}
-                          </Typography>
-                          <Stack
-                            direction="row"
-                            spacing={0.75}
-                            sx={{ alignItems: 'center', minWidth: 0 }}
-                          >
-                            <Typography
-                              variant="subtitle2"
-                              sx={{
-                                fontFamily:
-                                  destination === bitcoinAddress ? 'monospace' : undefined,
-                                wordBreak: 'break-word',
-                              }}
-                            >
-                              {destinationDisplay}
-                            </Typography>
-                            {destinationCopyValue && (
-                              <CopyButton
-                                value={destinationCopyValue}
-                                title={t('transaction_actions.copy_destination')}
-                              />
-                            )}
-                          </Stack>
-                          <Typography variant="caption" color="text.disabled">
-                            {t('payment_details.destination')}
-                          </Typography>
-                        </Stack>
-                      </Box>
-
-                      <Box
-                        sx={[
-                          (theme) => ({
-                            p: 2,
-                            borderRadius: 1,
-                            bgcolor: 'background.paper',
-                            border: `1px solid ${theme.vars.palette.divider}`,
-                          }),
-                        ]}
-                      >
-                        <Stack
-                          direction="row"
-                          spacing={1}
-                          sx={{ alignItems: 'center', justifyContent: 'space-between' }}
-                        >
-                          <Stack spacing={0.5}>
-                            <Typography variant="caption" color="text.secondary">
-                              {t('payment_details.method')}
-                            </Typography>
-                            <Typography variant="subtitle2">{methodLabel}</Typography>
-                          </Stack>
-                          <Stack spacing={0.5} sx={{ alignItems: 'flex-end' }}>
-                            <Typography variant="caption" color="text.secondary">
-                              {t('payment_details.total_spent')}
-                            </Typography>
-                            <SatsWithIcon amountMSats={totalAmount} variant="subtitle2" />
-                          </Stack>
-                        </Stack>
-                      </Box>
-                    </Stack>
-                  )}
 
                   {payment.error && (
                     <Alert severity="error" variant="outlined">
@@ -385,7 +315,7 @@ export function PaymentDetails({ payment, isAdmin }: Props) {
                 <>
                   <DetailRow
                     label={t('transaction_details.payment_hash')}
-                    value={payment_hash}
+                    value={compactHash(payment_hash)}
                     copyValue={payment_hash ?? undefined}
                     mono
                   />
