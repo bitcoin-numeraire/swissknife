@@ -40,8 +40,8 @@ import { composeBip21, parseBitcoinUri, compactBitcoinAddress } from 'src/utils/
 import { CONFIG } from 'src/global-config';
 import { useTranslate } from 'src/locales';
 import { useListWallets } from 'src/actions/wallet';
-import { useGetUserWallet } from 'src/actions/user-wallet';
 import { useListBtcAddresses } from 'src/actions/btc-addresses';
+import { useGetUserWallet, useListWalletBtcAddresses } from 'src/actions/user-wallet';
 import {
   pay,
   walletPay,
@@ -65,6 +65,8 @@ import { Iconify } from 'src/components/iconify';
 import { CopyButton } from 'src/components/copy';
 import { SatsWithIcon } from 'src/components/bitcoin';
 import { useSettingsContext } from 'src/components/settings';
+
+import { getReceiveAddressListState } from './receive-address-list';
 
 // ----------------------------------------------------------------------
 
@@ -1139,9 +1141,24 @@ export function ReceiveMoneyDrawer({
   const selectedNeedsAddress = selectedPayload === 'unified' || selectedPayload === 'onchain';
   const canSetAmount = requestNeedsGeneration;
   const canSetMemo = selectedNeedsInvoice;
-  const { btcAddresses, btcAddressesMutate } = useListBtcAddresses(
-    addressWalletId ? { wallet_id: addressWalletId } : undefined
-  );
+  const receiveAddressList = getReceiveAddressListState({
+    open,
+    isAdmin,
+    addressWalletId,
+    selectedNeedsAddress,
+  });
+  const adminBtcAddressList = useListBtcAddresses(receiveAddressList.adminQuery, {
+    enabled: receiveAddressList.adminEnabled,
+  });
+  const walletBtcAddressList = useListWalletBtcAddresses(undefined, {
+    enabled: receiveAddressList.walletEnabled,
+  });
+  const btcAddresses = isAdmin
+    ? adminBtcAddressList.btcAddresses
+    : walletBtcAddressList.btcAddresses;
+  const btcAddressesMutate = isAdmin
+    ? adminBtcAddressList.btcAddressesMutate
+    : walletBtcAddressList.btcAddressesMutate;
   const addressesForType = useMemo(
     () =>
       (btcAddresses ?? [])

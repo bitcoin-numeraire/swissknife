@@ -9,16 +9,26 @@ import { endpointKeys } from './keys';
 
 // ----------------------------------------------------------------------
 
-export function useListBtcAddresses(query?: ListBtcAddressesData['query']) {
-  const key = [
-    endpointKeys.bitcoin.addresses.list,
-    query?.wallet_id ?? 'all',
-    query?.limit,
-    query?.offset,
-    query?.address,
-    query?.address_type,
-    query?.used,
-  ];
+type UseListBtcAddressesOptions = {
+  enabled?: boolean;
+};
+
+export function useListBtcAddresses(
+  query?: ListBtcAddressesData['query'],
+  options?: UseListBtcAddressesOptions
+) {
+  const enabled = options?.enabled ?? true;
+  const key = enabled
+    ? [
+        endpointKeys.bitcoin.addresses.list,
+        query?.wallet_id ?? 'all',
+        query?.limit,
+        query?.offset,
+        query?.address,
+        query?.address_type,
+        query?.used,
+      ]
+    : null;
 
   const result = useSWR(key, () =>
     listBtcAddresses<true>({

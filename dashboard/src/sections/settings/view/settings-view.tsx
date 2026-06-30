@@ -28,7 +28,7 @@ import { CONFIG } from 'src/global-config';
 import { useTranslate } from 'src/locales';
 import { BtcAddressType } from 'src/lib/swissknife';
 import { DashboardContent } from 'src/layouts/dashboard';
-import { useListWalletApiKeys, useGetWalletLnAddress } from 'src/actions/user-wallet';
+import { useGetWalletLnAddress } from 'src/actions/user-wallet';
 
 import { Label } from 'src/components/label';
 import { Iconify } from 'src/components/iconify';
@@ -38,7 +38,7 @@ import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';
 
 // ----------------------------------------------------------------------
 
-type SettingsSection = 'preferences' | 'receive' | 'security' | 'connections';
+type SettingsSection = 'preferences' | 'receive' | 'security';
 
 const addressTypeOptions = [
   {
@@ -66,15 +66,11 @@ export function SettingsView() {
   );
 
   const { lnAddress, lnAddressLoading, lnAddressError } = useGetWalletLnAddress();
-  const { apiKeys, apiKeysLoading, apiKeysError } = useListWalletApiKeys();
 
-  const errors = [lnAddressError, apiKeysError];
-  const isLoading = [lnAddressLoading, apiKeysLoading];
-  const failed = shouldFail(errors, [apiKeys], isLoading);
-  const authModeLabel =
-    CONFIG.auth.method === 'jwt'
-      ? t('settings_view.jwt_admin_mode')
-      : t('settings_view.external_auth_mode');
+  const errors = [lnAddressError];
+  const isLoading = [lnAddressLoading];
+  const failed = shouldFail(errors, [], isLoading);
+  const supportsLocalPasswordSettings = CONFIG.auth.method === 'jwt';
   const currentMode = settings.state.mode ?? mode ?? 'system';
   const currentDisplayUnit = settings.state.displayUnit ?? 'bip177';
   const currentHideBalances = settings.state.hideBalances ?? false;
@@ -140,18 +136,14 @@ export function SettingsView() {
                     title={t('settings_view.receive_section')}
                     onClick={() => setSection('receive')}
                   />
-                  <SettingsNavButton
-                    active={section === 'security'}
-                    icon="solar:lock-password-bold-duotone"
-                    title={t('settings_view.security_section')}
-                    onClick={() => setSection('security')}
-                  />
-                  <SettingsNavButton
-                    active={section === 'connections'}
-                    icon="solar:server-bold-duotone"
-                    title={t('settings_view.connections_section')}
-                    onClick={() => setSection('connections')}
-                  />
+                  {supportsLocalPasswordSettings && (
+                    <SettingsNavButton
+                      active={section === 'security'}
+                      icon="solar:lock-password-bold-duotone"
+                      title={t('settings_view.security_section')}
+                      onClick={() => setSection('security')}
+                    />
+                  )}
                 </Stack>
               </Card>
             </Grid>
@@ -265,15 +257,13 @@ export function SettingsView() {
                 </SettingsPanel>
               )}
 
-              {section === 'security' && (
+              {section === 'security' && supportsLocalPasswordSettings && (
                 <SettingsPanel
                   title={t('settings_view.security_section')}
                   description={t('settings_view.security_description')}
                 >
                   <Alert severity="info" variant="outlined">
-                    {CONFIG.auth.method === 'jwt'
-                      ? t('settings_view.password_backend_needed')
-                      : t('settings_view.external_password_notice')}
+                    {t('settings_view.password_backend_needed')}
                   </Alert>
 
                   <Grid container spacing={2}>
@@ -309,39 +299,6 @@ export function SettingsView() {
                     </Button>
                     <Label color="warning">{t('settings_view.backend_needed')}</Label>
                   </Stack>
-                </SettingsPanel>
-              )}
-
-              {section === 'connections' && (
-                <SettingsPanel
-                  title={t('settings_view.connections_section')}
-                  description={t('settings_view.connections_description')}
-                >
-                  <SettingRow
-                    title={t('settings_view.api_keys_tab')}
-                    description={t('settings_view.api_keys_description')}
-                    status={
-                      apiKeys?.length
-                        ? t('settings_view.tokens_count', { count: apiKeys.length })
-                        : t('settings_view.no_tokens')
-                    }
-                  >
-                    <Button href={paths.build.apiKeys} color="inherit" variant="outlined">
-                      {t('settings_view.open_api_keys')}
-                    </Button>
-                  </SettingRow>
-
-                  <Divider />
-
-                  <SettingRow
-                    title={t('settings_view.instance_access')}
-                    description={
-                      CONFIG.auth.method === 'jwt'
-                        ? t('settings_view.jwt_instance_description')
-                        : t('settings_view.external_instance_description')
-                    }
-                    status={`${CONFIG.deploymentMode} · ${authModeLabel}`}
-                  />
                 </SettingsPanel>
               )}
             </Grid>

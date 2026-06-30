@@ -136,15 +136,25 @@ export function useGetWalletLnAddress(shouldRetryOnError: boolean = false) {
   };
 }
 
-export function useListWalletBtcAddresses(query?: ListWalletBtcAddressesData['query']) {
-  const key = [
-    endpointKeys.userWallet.btcAddresses.list,
-    query?.limit,
-    query?.offset,
-    query?.address,
-    query?.address_type,
-    query?.used,
-  ];
+type UseListWalletBtcAddressesOptions = {
+  enabled?: boolean;
+};
+
+export function useListWalletBtcAddresses(
+  query?: ListWalletBtcAddressesData['query'],
+  options?: UseListWalletBtcAddressesOptions
+) {
+  const enabled = options?.enabled ?? true;
+  const key = enabled
+    ? [
+        endpointKeys.userWallet.btcAddresses.list,
+        query?.limit,
+        query?.offset,
+        query?.address,
+        query?.address_type,
+        query?.used,
+      ]
+    : null;
 
   const result = useSWR(key, () =>
     listWalletBtcAddresses<true>({
