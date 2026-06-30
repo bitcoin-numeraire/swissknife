@@ -10,12 +10,14 @@ import { useBoolean } from 'minimal-shared/hooks';
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
 import Grid from '@mui/material/Grid';
+import Alert from '@mui/material/Alert';
 import Stack from '@mui/material/Stack';
 import Button from '@mui/material/Button';
 import Divider from '@mui/material/Divider';
 import Tooltip from '@mui/material/Tooltip';
 import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
+import CircularProgress from '@mui/material/CircularProgress';
 
 import { paths } from 'src/routes/paths';
 import { useRouter } from 'src/routes/hooks';
@@ -27,6 +29,7 @@ import { shouldFail, handleActionError } from 'src/utils/errors';
 import { compactBitcoinAddress } from 'src/utils/bitcoin-request';
 import { bitcoinAddressExplorerUrl } from 'src/utils/bitcoin-explorer';
 
+import { CONFIG } from 'src/global-config';
 import { useTranslate } from 'src/locales';
 import { endpointKeys } from 'src/actions/keys';
 import { useGetWallet } from 'src/actions/wallet';
@@ -54,7 +57,10 @@ import {
   formatDateTime,
 } from 'src/sections/transaction/transaction-detail-common';
 
+import { useAuthContext } from 'src/auth/hooks';
 import { RoleBasedGuard } from 'src/auth/guard';
+
+import { getWalletDetailsPermissionState } from '../wallet-details-permissions';
 
 // ----------------------------------------------------------------------
 
@@ -256,19 +262,25 @@ function RecentTransactionRow({ transaction }: { transaction: WalletTransaction 
 export function WalletDetailsView({ id }: Props) {
   const { t } = useTranslate();
   const router = useRouter();
+  const { user } = useAuthContext();
   const newPayment = useBoolean();
   const newInvoice = useBoolean();
   const confirmDelete = useBoolean();
   const isDeleting = useBoolean();
+  const { canReadBtcAddresses, canReadLnAddresses } = getWalletDetailsPermissionState(
+    user?.permissions,
+    CONFIG.auth.skip
+  );
   const { wallet, walletLoading, walletError } = useGetWallet(id);
-  const { btcAddresses, btcAddressesLoading, btcAddressesError } = useListBtcAddresses({
-    wallet_id: id,
-  });
+  const { btcAddresses, btcAddressesLoading, btcAddressesError } = useListBtcAddresses(
+    { wallet_id: id },
+    { enabled: canReadBtcAddresses }
+  );
   const { fiatPrices } = useFetchFiatPrices();
 
-  const errors = [walletError, btcAddressesError];
-  const data = [wallet, btcAddresses];
-  const isLoading = [walletLoading, btcAddressesLoading];
+  const errors = [walletError];
+  const data = [wallet];
+  const isLoading = [walletLoading];
   const failed = shouldFail(errors, data, isLoading);
 
   const transactions = useMemo(() => (wallet ? getTransactions(wallet) : []), [wallet]);
@@ -464,11 +476,11 @@ export function WalletDetailsView({ id }: Props) {
                           : undefined
                       }
                       href={
-                        wallet!.ln_address?.id
+                        canReadLnAddresses && wallet!.ln_address?.id
                           ? paths.admin.lnAddress(wallet!.ln_address.id)
                           : undefined
                       }
-                      hrefLabel={t('details')}
+                      hrefLabel={canReadLnAddresses ? t('details') : undefined}
                       targetBlank={false}
                     />
                     <Stack
@@ -517,7 +529,7 @@ export function WalletDetailsView({ id }: Props) {
                   </DetailCard>
                 </Grid>
 
-                <Grid size={{ xs: 12, md: 6 }}>
+                <Grid size={{ xs: 12, md: canReadBtcAddresses ? 6 : 12 }}>
                   <DetailCard
                     title={t('wallet_details.recent_transactions')}
                     icon="solar:bill-list-bold-duotone"
@@ -538,29 +550,39 @@ export function WalletDetailsView({ id }: Props) {
                   </DetailCard>
                 </Grid>
 
-                <Grid size={{ xs: 12, md: 6 }}>
-                  <DetailCard
-                    title={t('wallet_details.bitcoin_addresses')}
-                    icon="solar:link-round-angle-bold-duotone"
-                    color="success"
-                  >
-                    {btcAddresses!.length ? (
-                      <Stack
-                        spacing={2}
-                        divider={<Divider flexItem sx={{ borderStyle: 'dashed' }} />}
-                      >
-                        {btcAddresses!.map((address) => (
-                          <BitcoinAddressRow key={address.id} address={address} />
-                        ))}
-                      </Stack>
-                    ) : (
-                      <EmptyContent
-                        title={t('wallet_details.no_bitcoin_addresses')}
-                        sx={{ py: 3 }}
-                      />
-                    )}
-                  </DetailCard>
-                </Grid>
+                {canReadBtcAddresses && (
+                  <Grid size={{ xs: 12, md: 6 }}>
+                    <DetailCard
+                      title={t('wallet_details.bitcoin_addresses')}
+                      icon="solar:link-round-angle-bold-duotone"
+                      color="success"
+                    >
+                      {btcAddressesLoading ? (
+                        <Box sx={{ py: 3, display: 'flex', justifyContent: 'center' }}>
+                          <CircularProgress size={24} />
+                        </Box>
+                      ) : btcAddressesError ? (
+                        <Alert severity="warning" variant="outlined">
+                          {t('identity_view.btc_addresses_unavailable')}
+                        </Alert>
+                      ) : btcAddresses?.length ? (
+                        <Stack
+                          spacing={2}
+                          divider={<Divider flexItem sx={{ borderStyle: 'dashed' }} />}
+                        >
+                          {btcAddresses.map((address) => (
+                            <BitcoinAddressRow key={address.id} address={address} />
+                          ))}
+                        </Stack>
+                      ) : (
+                        <EmptyContent
+                          title={t('wallet_details.no_bitcoin_addresses')}
+                          sx={{ py: 3 }}
+                        />
+                      )}
+                    </DetailCard>
+                  </Grid>
+                )}
               </Grid>
             </Stack>
 
