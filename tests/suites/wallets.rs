@@ -4,8 +4,8 @@ use reqwest::StatusCode;
 use serde_json::json;
 
 use swissknife_types::{
-    Balance, Ledger, LnAddress, Payment, PaymentStatus, RegisterLnAddressRequest, RegisterWalletRequest,
-    SendPaymentRequest, Wallet, WalletOverview,
+    Balance, BtcAddress, BtcAddressType, Ledger, LnAddress, NewBtcAddressRequest, Payment, PaymentStatus, Permission,
+    RegisterLnAddressRequest, RegisterWalletRequest, SendPaymentRequest, Wallet, WalletOverview,
 };
 
 use crate::common::fixtures::unique;
@@ -71,6 +71,42 @@ mod register_wallet {
 
 mod get_wallet {
     use super::*;
+
+    #[tokio::test]
+    async fn includes_bitcoin_addresses_for_read_wallet_permission() {
+        let app = app().await;
+        let admin_token = app.admin_token().await;
+        let wallet = app.create_wallet(admin_token, "wallet-details-addresses").await;
+
+        let created = app
+            .api()
+            .post(
+                "/v1/bitcoin/addresses",
+                Auth::Bearer(admin_token),
+                NewBtcAddressRequest {
+                    wallet_id: Some(wallet.id),
+                    address_type: Some(BtcAddressType::P2tr),
+                },
+            )
+            .await;
+        assert_status(&created, StatusCode::OK);
+        let created = created.parse::<BtcAddress>();
+
+        let read_wallet_key = app
+            .user_api_key(admin_token, &wallet.user_id, vec![Permission::ReadWallet])
+            .await;
+        let res = app
+            .api()
+            .get(&format!("/v1/wallets/{}", wallet.id), Auth::ApiKey(&read_wallet_key))
+            .await;
+        assert_status(&res, StatusCode::OK);
+        let detailed = res.parse::<Wallet>();
+
+        assert!(
+            detailed.btc_addresses.iter().any(|address| address.id == created.id),
+            "wallet details include the generated Bitcoin address"
+        );
+    }
 
     #[tokio::test]
     async fn unknown_id_is_not_found() {

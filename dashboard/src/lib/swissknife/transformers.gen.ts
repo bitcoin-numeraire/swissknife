@@ -190,6 +190,9 @@ const paymentSchemaResponseTransformer = (data: any) => {
 };
 
 const walletSchemaResponseTransformer = (data: any) => {
+  data.btc_addresses = data.btc_addresses.map((item: any) =>
+    btcAddressSchemaResponseTransformer(item)
+  );
   data.contacts = data.contacts.map((item: any) => contactSchemaResponseTransformer(item));
   data.created_at = new Date(data.created_at);
   data.invoices = data.invoices.map((item: any) => invoiceSchemaResponseTransformer(item));

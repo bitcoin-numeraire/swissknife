@@ -4,7 +4,7 @@ use serde_with::{serde_as, DisplayFromStr};
 use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
 
-use crate::{Invoice, LnAddress, OrderDirection, Payment};
+use crate::{BtcAddress, Invoice, LnAddress, OrderDirection, Payment};
 
 /// A wallet's balance, in millisatoshis.
 #[derive(Debug, Clone, Deserialize, Serialize, Default, ToSchema)]
@@ -41,7 +41,7 @@ pub struct Contact {
     pub contact_since: DateTime<Utc>,
 }
 
-/// A user wallet with its balance and linked payments, invoices and contacts.
+/// A user wallet with its balance and linked payments, invoices, Bitcoin addresses and contacts.
 #[derive(Debug, Clone, Default, Deserialize, Serialize, ToSchema)]
 pub struct Wallet {
     /// Internal ID
@@ -56,6 +56,8 @@ pub struct Wallet {
     pub payments: Vec<Payment>,
     /// List of Invoices
     pub invoices: Vec<Invoice>,
+    /// List of Bitcoin addresses
+    pub btc_addresses: Vec<BtcAddress>,
     /// List of contacts
     pub contacts: Vec<Contact>,
     /// Date of creation in database

@@ -894,13 +894,17 @@ export type VersionInfo = {
 };
 
 /**
- * A user wallet with its balance and linked payments, invoices and contacts.
+ * A user wallet with its balance and linked payments, invoices, Bitcoin addresses and contacts.
  */
 export type Wallet = {
   /**
    * User Balance
    */
   balance: Balance;
+  /**
+   * List of Bitcoin addresses
+   */
+  btc_addresses: Array<BtcAddress>;
   /**
    * List of contacts
    */

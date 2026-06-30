@@ -17,7 +17,7 @@ use crate::{
         contact::ContactModel,
         invoice::Column as InvoiceColumn,
         payment::Column as PaymentColumn,
-        prelude::{BtcOutput, Invoice, LnAddress, Payment, Wallet as WalletEntity, WalletBalance},
+        prelude::{BtcAddress, BtcOutput, Invoice, LnAddress, Payment, Wallet as WalletEntity, WalletBalance},
         wallet::{ActiveModel, Column},
         wallet_balance::Column as WalletBalanceColumn,
     },
@@ -64,6 +64,11 @@ where
                     .one(self.db.connection())
                     .await
                     .map_err(|e| DatabaseError::FindRelated(e.to_string()))?;
+                let btc_addresses = model
+                    .find_related(BtcAddress)
+                    .all(self.db.connection())
+                    .await
+                    .map_err(|e| DatabaseError::FindRelated(e.to_string()))?;
                 let contacts = self.find_contacts(id).await?;
 
                 let mut wallet: Wallet = model.into();
@@ -78,6 +83,7 @@ where
                     })
                     .collect();
                 wallet.ln_address = ln_address.map(Into::into);
+                wallet.btc_addresses = btc_addresses.into_iter().map(Into::into).collect();
                 wallet.contacts = contacts;
 
                 return Ok(Some(wallet));

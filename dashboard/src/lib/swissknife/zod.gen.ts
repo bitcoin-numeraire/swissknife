@@ -478,10 +478,11 @@ export const zVersionInfo = z.object({
 });
 
 /**
- * A user wallet with its balance and linked payments, invoices and contacts.
+ * A user wallet with its balance and linked payments, invoices, Bitcoin addresses and contacts.
  */
 export const zWallet = z.object({
   balance: zBalance,
+  btc_addresses: z.array(zBtcAddress),
   contacts: z.array(zContact),
   created_at: z.iso.datetime(),
   id: z.uuid(),
