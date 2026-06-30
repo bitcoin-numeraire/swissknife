@@ -6,8 +6,9 @@
 //! can never touch another wallet).
 
 use swissknife_types::{
-    ApiKey, Balance, Contact, CreateApiKeyRequest, Invoice, LnAddress, NewBtcAddressRequest, NewInvoiceRequest,
-    Payment, PaymentStatus, Permission, RegisterLnAddressRequest, SendPaymentRequest, UpdateLnAddressRequest, Wallet,
+    ApiKey, Balance, BtcAddress, Contact, CreateApiKeyRequest, Invoice, LnAddress, NewBtcAddressRequest,
+    NewInvoiceRequest, Payment, PaymentStatus, Permission, RegisterLnAddressRequest, SendPaymentRequest,
+    UpdateLnAddressRequest, Wallet,
 };
 
 use reqwest::StatusCode;
@@ -98,7 +99,70 @@ mod bitcoin {
             )
             .await;
         assert_status(&res, StatusCode::OK);
-        assert!(!res.parse::<swissknife_types::BtcAddress>().address.is_empty());
+        assert!(!res.parse::<BtcAddress>().address.is_empty());
+    }
+
+    #[tokio::test]
+    async fn list_is_scoped_to_the_caller_even_with_a_wallet_id_filter() {
+        let app = app().await;
+        let token = app.admin_token().await;
+        let alice_wallet = app.create_wallet(token, "me-btc-list-a").await;
+        let bob_wallet = app.create_wallet(token, "me-btc-list-b").await;
+        let alice_key = app.user_api_key(token, &alice_wallet.user_id, vec![]).await;
+        let bob_key = app.user_api_key(token, &bob_wallet.user_id, vec![]).await;
+
+        let alice_address = app
+            .api()
+            .post(
+                "/v1/me/bitcoin/address",
+                Auth::ApiKey(&alice_key),
+                NewBtcAddressRequest {
+                    wallet_id: Some(bob_wallet.id),
+                    address_type: None,
+                },
+            )
+            .await
+            .parse::<BtcAddress>();
+        let bob_address = app
+            .api()
+            .post(
+                "/v1/me/bitcoin/address",
+                Auth::ApiKey(&bob_key),
+                NewBtcAddressRequest {
+                    wallet_id: Some(alice_wallet.id),
+                    address_type: None,
+                },
+            )
+            .await
+            .parse::<BtcAddress>();
+
+        assert_eq!(alice_address.wallet_id, alice_wallet.id);
+        assert_eq!(bob_address.wallet_id, bob_wallet.id);
+
+        let alice_list = app
+            .api()
+            .get(
+                &format!("/v1/me/bitcoin/addresses?wallet_id={}", bob_wallet.id),
+                Auth::ApiKey(&alice_key),
+            )
+            .await;
+        assert_status(&alice_list, StatusCode::OK);
+        let alice_addresses = alice_list.parse::<Vec<BtcAddress>>();
+
+        assert!(
+            alice_addresses.iter().any(|address| address.id == alice_address.id),
+            "alice sees her own address"
+        );
+        assert!(
+            !alice_addresses.iter().any(|address| address.id == bob_address.id),
+            "alice cannot use wallet_id to list bob's address"
+        );
+        assert!(
+            alice_addresses
+                .iter()
+                .all(|address| address.wallet_id == alice_wallet.id),
+            "all listed addresses belong to alice"
+        );
     }
 }
 
