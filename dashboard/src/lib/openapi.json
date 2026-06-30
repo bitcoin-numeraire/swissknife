@@ -7297,13 +7297,14 @@
       },
       "Wallet": {
         "type": "object",
-        "description": "A user wallet with its balance and linked payments, invoices and contacts.",
+        "description": "A user wallet with its balance and linked payments, invoices, Bitcoin addresses and contacts.",
         "required": [
           "id",
           "user_id",
           "balance",
           "payments",
           "invoices",
+          "btc_addresses",
           "contacts",
           "created_at"
         ],
@@ -7311,6 +7312,13 @@
           "balance": {
             "$ref": "#/components/schemas/Balance",
             "description": "User Balance"
+          },
+          "btc_addresses": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BtcAddress"
+            },
+            "description": "List of Bitcoin addresses"
           },
           "contacts": {
             "type": "array",

@@ -10,14 +10,12 @@ import { useBoolean } from 'minimal-shared/hooks';
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
 import Grid from '@mui/material/Grid';
-import Alert from '@mui/material/Alert';
 import Stack from '@mui/material/Stack';
 import Button from '@mui/material/Button';
 import Divider from '@mui/material/Divider';
 import Tooltip from '@mui/material/Tooltip';
 import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
-import CircularProgress from '@mui/material/CircularProgress';
 
 import { paths } from 'src/routes/paths';
 import { useRouter } from 'src/routes/hooks';
@@ -36,7 +34,6 @@ import { useGetWallet } from 'src/actions/wallet';
 import { DashboardContent } from 'src/layouts/dashboard';
 import { Permission, deleteWallet } from 'src/lib/swissknife';
 import { useFetchFiatPrices } from 'src/actions/mempool-space';
-import { useListBtcAddresses } from 'src/actions/btc-addresses';
 
 import { Label } from 'src/components/label';
 import { toast } from 'src/components/snackbar';
@@ -59,8 +56,7 @@ import {
 
 import { useAuthContext } from 'src/auth/hooks';
 import { RoleBasedGuard } from 'src/auth/guard';
-
-import { getWalletDetailsPermissionState } from '../wallet-details-permissions';
+import { hasAllPermissions } from 'src/auth/permissions';
 
 // ----------------------------------------------------------------------
 
@@ -267,15 +263,9 @@ export function WalletDetailsView({ id }: Props) {
   const newInvoice = useBoolean();
   const confirmDelete = useBoolean();
   const isDeleting = useBoolean();
-  const { canReadBtcAddresses, canReadLnAddresses } = getWalletDetailsPermissionState(
-    user?.permissions,
-    CONFIG.auth.skip
-  );
+  const canReadLnAddresses =
+    CONFIG.auth.skip || hasAllPermissions([Permission.READ_LN_ADDRESS], user?.permissions);
   const { wallet, walletLoading, walletError } = useGetWallet(id);
-  const { btcAddresses, btcAddressesLoading, btcAddressesError } = useListBtcAddresses(
-    { wallet_id: id },
-    { enabled: canReadBtcAddresses }
-  );
   const { fiatPrices } = useFetchFiatPrices();
 
   const errors = [walletError];
@@ -529,7 +519,7 @@ export function WalletDetailsView({ id }: Props) {
                   </DetailCard>
                 </Grid>
 
-                <Grid size={{ xs: 12, md: canReadBtcAddresses ? 6 : 12 }}>
+                <Grid size={{ xs: 12, md: 6 }}>
                   <DetailCard
                     title={t('wallet_details.recent_transactions')}
                     icon="solar:bill-list-bold-duotone"
@@ -550,39 +540,29 @@ export function WalletDetailsView({ id }: Props) {
                   </DetailCard>
                 </Grid>
 
-                {canReadBtcAddresses && (
-                  <Grid size={{ xs: 12, md: 6 }}>
-                    <DetailCard
-                      title={t('wallet_details.bitcoin_addresses')}
-                      icon="solar:link-round-angle-bold-duotone"
-                      color="success"
-                    >
-                      {btcAddressesLoading ? (
-                        <Box sx={{ py: 3, display: 'flex', justifyContent: 'center' }}>
-                          <CircularProgress size={24} />
-                        </Box>
-                      ) : btcAddressesError ? (
-                        <Alert severity="warning" variant="outlined">
-                          {t('identity_view.btc_addresses_unavailable')}
-                        </Alert>
-                      ) : btcAddresses?.length ? (
-                        <Stack
-                          spacing={2}
-                          divider={<Divider flexItem sx={{ borderStyle: 'dashed' }} />}
-                        >
-                          {btcAddresses.map((address) => (
-                            <BitcoinAddressRow key={address.id} address={address} />
-                          ))}
-                        </Stack>
-                      ) : (
-                        <EmptyContent
-                          title={t('wallet_details.no_bitcoin_addresses')}
-                          sx={{ py: 3 }}
-                        />
-                      )}
-                    </DetailCard>
-                  </Grid>
-                )}
+                <Grid size={{ xs: 12, md: 6 }}>
+                  <DetailCard
+                    title={t('wallet_details.bitcoin_addresses')}
+                    icon="solar:link-round-angle-bold-duotone"
+                    color="success"
+                  >
+                    {wallet!.btc_addresses.length ? (
+                      <Stack
+                        spacing={2}
+                        divider={<Divider flexItem sx={{ borderStyle: 'dashed' }} />}
+                      >
+                        {wallet!.btc_addresses.map((address) => (
+                          <BitcoinAddressRow key={address.id} address={address} />
+                        ))}
+                      </Stack>
+                    ) : (
+                      <EmptyContent
+                        title={t('wallet_details.no_bitcoin_addresses')}
+                        sx={{ py: 3 }}
+                      />
+                    )}
+                  </DetailCard>
+                </Grid>
               </Grid>
             </Stack>
 
