@@ -5,7 +5,7 @@ use tracing::{debug, info, trace};
 use crate::{
     application::{
         composition::{AppStore, Currency, Ledger},
-        errors::{ApplicationError, DataError},
+        errors::ApplicationError,
     },
     domains::{
         bitcoin::{BtcOutput, BtcOutputStatus},
@@ -57,7 +57,11 @@ impl EventUseCases for EventService {
             return Ok(());
         }
 
-        return Err(DataError::NotFound("Lightning invoice not found.".into()).into());
+        debug!(
+            payment_hash = %event.payment_hash,
+            "Ignoring incoming Lightning payment for unknown invoice"
+        );
+        Ok(())
     }
 
     async fn outgoing_payment(&self, event: LnPaySuccessEvent) -> Result<(), ApplicationError> {
@@ -86,7 +90,11 @@ impl EventUseCases for EventService {
             return Ok(());
         }
 
-        return Err(DataError::NotFound("Lightning payment not found.".into()).into());
+        debug!(
+            payment_hash = %event.payment_hash,
+            "Ignoring completed outgoing Lightning payment for unknown payment"
+        );
+        Ok(())
     }
 
     async fn failed_payment(&self, event: LnPayFailureEvent) -> Result<(), ApplicationError> {
@@ -111,7 +119,11 @@ impl EventUseCases for EventService {
             return Ok(());
         }
 
-        return Err(DataError::NotFound("Lightning payment not found.".into()).into());
+        debug!(
+            payment_hash = %event.payment_hash,
+            "Ignoring failed outgoing Lightning payment for unknown payment"
+        );
+        Ok(())
     }
 
     async fn onchain_deposit(&self, event: OnchainDepositEvent, currency: Currency) -> Result<bool, ApplicationError> {
@@ -259,7 +271,7 @@ mod tests {
             use super::*;
 
             #[tokio::test]
-            async fn returns_not_found() {
+            async fn ignores_the_event() {
                 let mut store = MockAppStoreBuilder::new();
                 store
                     .invoice
@@ -274,9 +286,7 @@ mod tests {
                     payment_time: Utc::now(),
                 };
 
-                let err = service(store).invoice_paid(event).await.unwrap_err();
-
-                assert!(matches!(err, ApplicationError::Data(DataError::NotFound(_))));
+                assert!(service(store).invoice_paid(event).await.is_ok());
             }
         }
     }
@@ -346,7 +356,7 @@ mod tests {
             use super::*;
 
             #[tokio::test]
-            async fn returns_not_found() {
+            async fn ignores_the_event() {
                 let mut store = MockAppStoreBuilder::new();
                 store
                     .payment
@@ -354,9 +364,7 @@ mod tests {
                     .times(1)
                     .returning(|_| Ok(None));
 
-                let err = service(store).outgoing_payment(event()).await.unwrap_err();
-
-                assert!(matches!(err, ApplicationError::Data(DataError::NotFound(_))));
+                assert!(service(store).outgoing_payment(event()).await.is_ok());
             }
         }
     }
@@ -408,6 +416,22 @@ mod tests {
                         ..Default::default()
                     }))
                 });
+
+                assert!(service(store).failed_payment(event()).await.is_ok());
+            }
+        }
+
+        mod when_payment_is_missing {
+            use super::*;
+
+            #[tokio::test]
+            async fn ignores_the_event() {
+                let mut store = MockAppStoreBuilder::new();
+                store
+                    .payment
+                    .expect_find_by_payment_hash()
+                    .times(1)
+                    .returning(|_| Ok(None));
 
                 assert!(service(store).failed_payment(event()).await.is_ok());
             }

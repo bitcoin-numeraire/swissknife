@@ -11,7 +11,7 @@ use tokio::fs;
 use tokio::net::TcpStream;
 use tokio_tungstenite::tungstenite::ClientRequestBuilder;
 use tokio_tungstenite::{connect_async_tls_with_config, Connector, MaybeTlsStream, WebSocketStream};
-use tracing::{debug, error, warn};
+use tracing::{debug, error};
 
 use crate::application::composition::AppServices;
 use crate::application::errors::LightningError;
@@ -145,11 +145,9 @@ impl LndWebsocketListener {
                 Ok(msg) => {
                     if msg.is_text() {
                         let text = msg.into_text().unwrap();
-                        // Invoice parse/settlement errors are skippable (idempotent and re-synced
-                        // by invoice.sync()), so log and keep reading rather than dropping the stream.
-                        if let Err(e) = self.process_invoice_message(&text).await {
-                            error!(%e, "Failed to process message");
-                        }
+                        // Parse/semantic errors are skippable; database projection errors
+                        // propagate so the supervisor replays pending state before resubscribe.
+                        self.process_invoice_message(&text).await?;
                     } else if msg.is_close() {
                         debug!("WebSocket closed");
                         return Ok(());
@@ -186,15 +184,21 @@ impl LndWebsocketListener {
         Ok(())
     }
 
-    async fn process_invoice_message(&self, text: &str) -> anyhow::Result<()> {
-        let value: Value = serde_json::from_str(text)?;
+    async fn process_invoice_message(&self, text: &str) -> Result<(), LightningError> {
+        let value: Value = match serde_json::from_str(text) {
+            Ok(value) => value,
+            Err(err) => {
+                error!(%err, "Failed to parse invoice message");
+                return Ok(());
+            }
+        };
 
         if let Some(event) = value.get("result") {
             match serde_json::from_value::<InvoiceResponse>(event.clone()) {
                 Ok(invoice) => {
                     if invoice.state.as_str() == "SETTLED" {
                         if let Err(err) = self.services.event.invoice_paid(invoice.into()).await {
-                            warn!(%err, "Failed to process incoming payment");
+                            return Err(LightningError::EventProcessing(err.to_string()));
                         }
                     }
                 }

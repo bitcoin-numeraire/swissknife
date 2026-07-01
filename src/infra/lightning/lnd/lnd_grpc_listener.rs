@@ -59,7 +59,7 @@ impl LndGrpcListener {
             .await
             .map_err(|e| LightningError::Listener(format!("Failed to read invoice stream: {}", e)))?
         {
-            self.handle_invoice(invoice).await;
+            self.handle_invoice(invoice).await?;
         }
 
         Err(LightningError::Listener("LND invoice stream closed".to_string()))
@@ -92,14 +92,14 @@ impl LndGrpcListener {
         Err(LightningError::Listener("LND transaction stream closed".to_string()))
     }
 
-    async fn handle_invoice(&self, invoice: lnrpc::Invoice) {
+    async fn handle_invoice(&self, invoice: lnrpc::Invoice) -> Result<(), LightningError> {
         if invoice.state() != lnrpc::invoice::InvoiceState::Settled {
-            return;
+            return Ok(());
         }
 
         if invoice.r_hash.is_empty() {
             warn!("Invoice update missing payment hash");
-            return;
+            return Ok(());
         }
 
         let payment_time = Utc.timestamp_opt(invoice.settle_date, 0).unwrap();
@@ -110,9 +110,13 @@ impl LndGrpcListener {
             payment_time,
         };
 
-        if let Err(err) = self.services.event.invoice_paid(event).await {
-            warn!(%err, "Failed to process incoming payment");
-        }
+        self.services
+            .event
+            .invoice_paid(event)
+            .await
+            .map_err(|err| LightningError::EventProcessing(err.to_string()))?;
+
+        Ok(())
     }
 
     fn map_transaction(transaction: lnrpc::Transaction) -> BtcTransaction {

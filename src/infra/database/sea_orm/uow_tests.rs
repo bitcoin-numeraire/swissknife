@@ -203,6 +203,29 @@ async fn fail_releases_the_reservation() {
 }
 
 #[tokio::test]
+async fn duplicate_fail_does_not_double_release() {
+    let conn = connect().await;
+    let wallet = seed_wallet(&conn, 200_000).await;
+    let mut payment = uow(&conn)
+        .reserve(pending_payment(wallet, 100_000, 0), 110_000)
+        .await
+        .expect("reserve");
+    payment.status = PaymentStatus::Failed;
+    payment.error = Some("payment failed".to_string());
+
+    let first = uow(&conn).fail(payment.clone()).await.expect("first fail");
+    assert_eq!(first.status, PaymentStatus::Failed);
+    assert_eq!(balance(&conn, wallet).await, (200_000, 0));
+
+    // The failure event and replay sync can both observe the same failed node
+    // payment. The replay must return the already-failed row without trying to
+    // release the stale reservation again.
+    let second = uow(&conn).fail(payment).await.expect("second fail");
+    assert_eq!(second.status, PaymentStatus::Failed);
+    assert_eq!(balance(&conn, wallet).await, (200_000, 0));
+}
+
+#[tokio::test]
 async fn settle_adjusts_reserved_to_actual() {
     let conn = connect().await;
     let wallet = seed_wallet(&conn, 200_000).await;

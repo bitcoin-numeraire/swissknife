@@ -1,22 +1,23 @@
-use std::{
-    path::PathBuf,
-    sync::{Arc, Mutex},
-};
+use std::{path::PathBuf, sync::Arc, time::Duration};
 
 use async_trait::async_trait;
 use futures_util::{future::BoxFuture, FutureExt};
 use native_tls::{Certificate, TlsConnector};
 use rust_socketio::{
-    asynchronous::{Client, ClientBuilder},
+    asynchronous::{Client, ClientBuilder, ReconnectSettings},
     Payload, TransportType,
 };
-use tokio::{fs, sync};
-use tracing::{error, info, warn};
+use tokio::{
+    fs,
+    sync::{self, mpsc},
+    time::sleep,
+};
+use tracing::{debug, error, info, warn};
 
 use crate::{
     application::{
         composition::{AppServices, Currency},
-        errors::LightningError,
+        errors::{ApplicationError, LightningError},
     },
     domains::bitcoin::{BitcoinWallet, OnchainSyncCursor, OnchainTransaction},
     infra::lightning::EventsListener,
@@ -26,7 +27,7 @@ use super::cln_websocket_types::{InvoicePayment, SendPayFailure, SendPaySuccess}
 use super::ClnRestClientConfig;
 
 pub struct ClnWebsocketListener {
-    client_builder: Mutex<Option<ClientBuilder>>,
+    config: ClnRestClientConfig,
     services: Arc<AppServices>,
     wallet: Arc<dyn BitcoinWallet>,
 }
@@ -37,6 +38,17 @@ impl ClnWebsocketListener {
         services: Arc<AppServices>,
         wallet: Arc<dyn BitcoinWallet>,
     ) -> Result<Self, LightningError> {
+        Ok(Self {
+            config,
+            services,
+            wallet,
+        })
+    }
+
+    async fn client_builder(&self) -> Result<ClientBuilder, LightningError> {
+        let config = &self.config;
+        let reconnect_delay_min = config.ws_min_reconnect_delay;
+        let reconnect_delay_max = config.ws_max_reconnect_delay;
         let mut client_builder = ClientBuilder::new(config.endpoint.clone())
             .transport_type(TransportType::Websocket)
             .reconnect_on_disconnect(true)
@@ -45,6 +57,23 @@ impl ClnWebsocketListener {
                 config.ws_min_reconnect_delay.as_secs(),
                 config.ws_max_reconnect_delay.as_secs(),
             )
+            .on_reconnect({
+                let services = self.services.clone();
+                move || {
+                    let services = services.clone();
+                    async move {
+                        ClnWebsocketListener::sync_offchain_state_until_success(
+                            &services,
+                            "Core Lightning websocket reconnect",
+                            reconnect_delay_min,
+                            reconnect_delay_max,
+                        )
+                        .await;
+                        ReconnectSettings::new()
+                    }
+                    .boxed()
+                }
+            })
             .on("open", on_open)
             .on("close", on_close)
             .on("error", on_error);
@@ -70,18 +99,16 @@ impl ClnWebsocketListener {
             client_builder = client_builder.tls_config(tls_connector);
         }
 
-        Ok(Self {
-            client_builder: Mutex::new(Some(client_builder)),
-            services,
-            wallet,
-        })
+        Ok(client_builder)
     }
 
     fn on_message(
         services: Arc<AppServices>,
         wallet: Arc<dyn BitcoinWallet>,
+        failure_tx: mpsc::Sender<LightningError>,
         cursor: Arc<tokio::sync::Mutex<Option<OnchainSyncCursor>>>,
         payload: Payload,
+        client: Client,
     ) -> BoxFuture<'static, ()> {
         async move {
             match payload {
@@ -91,7 +118,14 @@ impl ClnWebsocketListener {
                             match serde_json::from_value::<InvoicePayment>(event.clone()) {
                                 Ok(invoice_payment) => {
                                     if let Err(err) = services.event.invoice_paid(invoice_payment.into()).await {
-                                        warn!(%err, "Failed to process incoming payment");
+                                        Self::stop_after_offchain_projection_error(
+                                            &failure_tx,
+                                            &client,
+                                            "incoming_payment",
+                                            err,
+                                        )
+                                        .await;
+                                        return;
                                     }
                                 }
                                 Err(err) => {
@@ -116,7 +150,14 @@ impl ClnWebsocketListener {
                                     }
 
                                     if let Err(err) = services.event.outgoing_payment(sendpay_success.into()).await {
-                                        warn!(%err, "Failed to process outgoing payment");
+                                        Self::stop_after_offchain_projection_error(
+                                            &failure_tx,
+                                            &client,
+                                            "outgoing_payment",
+                                            err,
+                                        )
+                                        .await;
+                                        return;
                                     }
                                 }
                                 Err(err) => {
@@ -139,7 +180,14 @@ impl ClnWebsocketListener {
                                     }
 
                                     if let Err(err) = services.event.failed_payment(sendpay_failure.into()).await {
-                                        warn!(%err, "Failed to process failed outgoing payment");
+                                        Self::stop_after_offchain_projection_error(
+                                            &failure_tx,
+                                            &client,
+                                            "failed_payment",
+                                            err,
+                                        )
+                                        .await;
+                                        return;
                                     }
                                 }
                                 Err(err) => {
@@ -204,17 +252,78 @@ impl ClnWebsocketListener {
         }
         .boxed()
     }
+
+    async fn stop_after_offchain_projection_error(
+        failure_tx: &mpsc::Sender<LightningError>,
+        client: &Client,
+        event_type: &'static str,
+        err: ApplicationError,
+    ) {
+        Self::signal_listener_failure(failure_tx, event_type, err);
+
+        if let Err(err) = client.disconnect().await {
+            debug!(%err, event_type, "Failed to disconnect Core Lightning websocket after projection error");
+        }
+    }
+
+    fn signal_listener_failure(
+        failure_tx: &mpsc::Sender<LightningError>,
+        event_type: &'static str,
+        err: ApplicationError,
+    ) {
+        let err = err.to_string();
+        error!(%err, event_type, "Failed to process Lightning off-chain event; reconnecting listener");
+
+        if let Err(send_err) = failure_tx.try_send(LightningError::EventProcessing(err)) {
+            debug!(
+                ?send_err,
+                event_type, "Core Lightning websocket listener failure already signaled"
+            );
+        }
+    }
+
+    async fn sync_offchain_state(services: &AppServices, context: &'static str) -> Result<(), ApplicationError> {
+        let (synced_invoices, synced_payments) = tokio::try_join!(services.invoice.sync(), services.payment.sync())?;
+
+        debug!(
+            context,
+            synced_invoices, synced_payments, "Lightning off-chain state replayed"
+        );
+
+        Ok(())
+    }
+
+    async fn sync_offchain_state_until_success(
+        services: &AppServices,
+        context: &'static str,
+        min_delay: Duration,
+        max_delay: Duration,
+    ) {
+        let min_delay = if min_delay.is_zero() {
+            Duration::from_millis(100)
+        } else {
+            min_delay
+        };
+        let max_delay = max_delay.max(min_delay);
+        let mut backoff = min_delay;
+
+        loop {
+            match Self::sync_offchain_state(services, context).await {
+                Ok(()) => return,
+                Err(err) => {
+                    error!(%err, context, ?backoff, "Lightning off-chain replay failed; retrying before reconnect");
+                    sleep(backoff).await;
+                    backoff = (backoff * 2).min(max_delay);
+                }
+            }
+        }
+    }
 }
 
 #[async_trait]
 impl EventsListener for ClnWebsocketListener {
     async fn listen(&self) -> Result<(), LightningError> {
-        let mut client_builder = self
-            .client_builder
-            .lock()
-            .map_err(|_| LightningError::Listener("Failed to lock client builder".to_string()))?
-            .take()
-            .ok_or_else(|| LightningError::Listener("Listener already started".to_string()))?;
+        let mut client_builder = self.client_builder().await?;
 
         self.services
             .bitcoin
@@ -232,23 +341,31 @@ impl EventsListener for ClnWebsocketListener {
 
         let wallet = self.wallet.clone();
         let services = self.services.clone();
+        let (failure_tx, mut failure_rx) = mpsc::channel(1);
 
-        client_builder = client_builder.on("message", move |payload, _: Client| {
-            Self::on_message(services.clone(), wallet.clone(), cursor.clone(), payload)
+        client_builder = client_builder.on("message", move |payload, client| {
+            Self::on_message(
+                services.clone(),
+                wallet.clone(),
+                failure_tx.clone(),
+                cursor.clone(),
+                payload,
+                client,
+            )
         });
 
         // Hold the connected client: rust_socketio reconnects internally
-        // (reconnect_on_disconnect), so this listener owns its own recovery. Park the task
-        // for the process lifetime — returning would let the supervisor re-enter listen() on
-        // a builder already consumed by take() above, failing with "Listener already started".
+        // (reconnect_on_disconnect) for transport failures. Projection failures are
+        // signaled from callbacks so the supervisor can apply its backoff and replay sync.
         let _client = client_builder
             .connect()
             .await
             .map_err(|e| LightningError::ConnectWebsocket(e.to_string()))?;
 
-        std::future::pending::<()>().await;
-
-        Ok(())
+        Err(failure_rx
+            .recv()
+            .await
+            .unwrap_or_else(|| LightningError::Listener("Core Lightning websocket listener stopped".to_string())))
     }
 }
 
@@ -278,4 +395,89 @@ fn on_error(err: Payload, _: Client) -> BoxFuture<'static, ()> {
         error!(?err, "Error from Core Lightning websocket server ");
     }
     .boxed()
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{
+        sync::{
+            atomic::{AtomicUsize, Ordering},
+            Arc,
+        },
+        time::Duration,
+    };
+
+    use tokio::sync::mpsc;
+
+    use crate::application::{
+        composition::MockAppServicesBuilder,
+        errors::{DataError, DatabaseError, LightningError},
+    };
+
+    use super::ClnWebsocketListener;
+
+    #[test]
+    fn offchain_projection_error_signals_listener_failure() {
+        let (failure_tx, mut failure_rx) = mpsc::channel(1);
+
+        ClnWebsocketListener::signal_listener_failure(
+            &failure_tx,
+            "incoming_payment",
+            DatabaseError::Update("database is locked".to_string()).into(),
+        );
+
+        let err = failure_rx.try_recv().expect("listener failure");
+        assert!(matches!(
+            err,
+            LightningError::EventProcessing(message) if message.contains("database is locked")
+        ));
+    }
+
+    #[test]
+    fn repeated_offchain_projection_error_is_dropped_after_failure_is_signaled() {
+        let (failure_tx, mut failure_rx) = mpsc::channel(1);
+
+        ClnWebsocketListener::signal_listener_failure(
+            &failure_tx,
+            "incoming_payment",
+            DatabaseError::Update("database is locked".to_string()).into(),
+        );
+        ClnWebsocketListener::signal_listener_failure(
+            &failure_tx,
+            "incoming_payment",
+            DataError::NotFound("Lightning invoice not found.".to_string()).into(),
+        );
+
+        assert!(failure_rx.try_recv().is_ok());
+        assert!(failure_rx.try_recv().is_err());
+    }
+
+    #[tokio::test]
+    async fn reconnect_replay_retries_until_sync_succeeds() {
+        let invoice_attempts = Arc::new(AtomicUsize::new(0));
+        let mut builder = MockAppServicesBuilder::new();
+
+        builder.invoice.expect_sync().times(2).returning({
+            let invoice_attempts = invoice_attempts.clone();
+            move || {
+                if invoice_attempts.fetch_add(1, Ordering::SeqCst) == 0 {
+                    Err(DatabaseError::Update("transient failure".to_string()).into())
+                } else {
+                    Ok(1)
+                }
+            }
+        });
+        builder.payment.expect_sync().returning(|| Ok(1));
+        let services = builder.build();
+
+        ClnWebsocketListener::sync_offchain_state_until_success(
+            &services,
+            "test reconnect",
+            Duration::from_millis(1),
+            Duration::from_millis(1),
+        )
+        .await;
+
+        assert_eq!(invoice_attempts.load(Ordering::SeqCst), 2);
+    }
 }
