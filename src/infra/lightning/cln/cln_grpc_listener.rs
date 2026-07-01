@@ -93,7 +93,7 @@ impl ClnGrpcListener {
                         match invoice.status() {
                             WaitinvoiceStatus::Paid => {
                                 if let Err(err) = self.services.event.invoice_paid(invoice.clone().into()).await {
-                                    warn!(%err, "Failed to process incoming payment");
+                                    return Err(LightningError::EventProcessing(err.to_string()));
                                 }
                             }
                             WaitinvoiceStatus::Expired => {}
@@ -138,12 +138,8 @@ impl ClnGrpcListener {
                 let payment_hash = hex::encode(&payment_hash_bytes);
                 match sendpays.status() {
                     WaitSendpaysStatus::Complete => {
-                        if let Err(err) = self
-                            .handle_sendpay_complete(payment_hash_bytes, sendpays.partid, sendpays.groupid)
-                            .await
-                        {
-                            warn!(%err, "Failed to process completed outgoing payment");
-                        }
+                        self.handle_sendpay_complete(payment_hash_bytes, sendpays.partid, sendpays.groupid)
+                            .await?;
                     }
                     WaitSendpaysStatus::Failed => {
                         let failure_event = LnPayFailureEvent {
@@ -151,7 +147,7 @@ impl ClnGrpcListener {
                             payment_hash,
                         };
                         if let Err(err) = self.services.event.failed_payment(failure_event).await {
-                            warn!(%err, "Failed to process failed outgoing payment");
+                            return Err(LightningError::EventProcessing(err.to_string()));
                         }
                     }
                     WaitSendpaysStatus::Pending => {}
@@ -267,7 +263,7 @@ impl ClnGrpcListener {
             .event
             .outgoing_payment(success_event)
             .await
-            .map_err(|err| LightningError::Listener(err.to_string()))
+            .map_err(|err| LightningError::EventProcessing(err.to_string()))
     }
 
     async fn handle_chainmoves(&self, start_index: u64) -> Result<u64, LightningError> {

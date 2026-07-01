@@ -1,6 +1,9 @@
 use std::{sync::Arc, time::Duration};
 
-use tokio::time::{sleep, Instant};
+use tokio::{
+    task::yield_now,
+    time::{sleep, Instant},
+};
 use tracing::{error, warn};
 
 use crate::{
@@ -85,10 +88,21 @@ impl EventListener {
 
     pub async fn start(&self) -> Result<(), ApplicationError> {
         let listener = self.listener.clone();
+        let services = self.services.clone();
         tokio::spawn(async move {
             let mut backoff = LISTENER_MIN_RECONNECT_DELAY;
+            let mut replay_before_listen = false;
 
             loop {
+                if replay_before_listen {
+                    if let Err(err) = Self::sync_offchain_state(&services).await {
+                        error!(%err, ?backoff, "Lightning listener replay sync failed; retrying");
+                        sleep(backoff).await;
+                        backoff = (backoff * 2).min(LISTENER_MAX_RECONNECT_DELAY);
+                        continue;
+                    }
+                }
+
                 let started = Instant::now();
                 let outcome = listener.listen().await;
                 let uptime = started.elapsed();
@@ -101,6 +115,7 @@ impl EventListener {
                 }
 
                 sleep(backoff).await;
+                replay_before_listen = true;
                 backoff = if uptime >= LISTENER_STABLE_THRESHOLD {
                     LISTENER_MIN_RECONNECT_DELAY
                 } else {
@@ -109,8 +124,69 @@ impl EventListener {
             }
         });
 
-        tokio::try_join!(self.services.invoice.sync(), self.services.payment.sync())?;
+        yield_now().await;
+        Self::sync_offchain_state(&self.services).await?;
 
         Ok(())
+    }
+
+    async fn sync_offchain_state(services: &AppServices) -> Result<(), ApplicationError> {
+        let (synced_invoices, synced_payments) = tokio::try_join!(services.invoice.sync(), services.payment.sync())?;
+
+        tracing::debug!(synced_invoices, synced_payments, "Lightning off-chain state replayed");
+
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    };
+
+    use crate::{application::composition::MockAppServicesBuilder, infra::lightning::MockEventsListener};
+
+    use super::*;
+
+    #[tokio::test]
+    async fn sync_offchain_state_replays_invoices_and_payments() {
+        let mut builder = MockAppServicesBuilder::new();
+        builder.invoice.expect_sync().times(1).returning(|| Ok(2));
+        builder.payment.expect_sync().times(1).returning(|| Ok(3));
+        let services = builder.build();
+
+        EventListener::sync_offchain_state(&services).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn start_begins_listening_before_startup_replay() {
+        let listening_started = Arc::new(AtomicBool::new(false));
+        let mut listener = MockEventsListener::new();
+        listener.expect_listen().times(1).returning({
+            let listening_started = listening_started.clone();
+            move || {
+                listening_started.store(true, Ordering::SeqCst);
+                Ok(())
+            }
+        });
+
+        let mut builder = MockAppServicesBuilder::new();
+        builder.invoice.expect_sync().times(1).returning({
+            let listening_started = listening_started.clone();
+            move || {
+                assert!(listening_started.load(Ordering::SeqCst));
+                Ok(2)
+            }
+        });
+        builder.payment.expect_sync().times(1).returning(|| Ok(3));
+        let services = Arc::new(builder.build());
+        let event_listener = EventListener {
+            listener: Arc::new(listener),
+            services,
+        };
+
+        event_listener.start().await.unwrap();
     }
 }
