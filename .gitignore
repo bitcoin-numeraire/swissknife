@@ -31,3 +31,5 @@ deps/lightningd
 
 # Code coverage
 lcov.info
+
+.DS_Store

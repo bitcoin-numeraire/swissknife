@@ -8,7 +8,10 @@ use swissknife_types::{ChangePasswordRequest, ErrorResponse, SignInRequest, Sign
 use crate::{
     application::{
         composition::AppServices,
-        docs::{BAD_REQUEST_EXAMPLE, CONFLICT_EXAMPLE, NOT_FOUND_EXAMPLE, UNAUTHORIZED_EXAMPLE, UNSUPPORTED_EXAMPLE},
+        docs::{
+            BAD_REQUEST_EXAMPLE, CONFLICT_EXAMPLE, NOT_FOUND_EXAMPLE, UNAUTHORIZED_EXAMPLE, UNPROCESSABLE_EXAMPLE,
+            UNSUPPORTED_EXAMPLE,
+        },
         errors::ApplicationError,
     },
     infra::axum::Json,
@@ -98,6 +101,7 @@ async fn sign_in(
         (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
         (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
         (status = 404, description = "Not Found", body = ErrorResponse, example = json!(NOT_FOUND_EXAMPLE)),
+        (status = 422, description = "Validation failed", body = ErrorResponse, example = json!(UNPROCESSABLE_EXAMPLE)),
         (status = 405, description = "Unsupported", body = ErrorResponse, example = json!(UNSUPPORTED_EXAMPLE))
     ),
     security(("jwt" = []))

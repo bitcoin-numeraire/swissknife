@@ -55,9 +55,6 @@ up-oauth2:
 	@until python3 -c 'import sys, urllib.request; urllib.request.urlopen(sys.argv[1], timeout=2)' "$(MOCK_OAUTH2_URL)/isalive" >/dev/null 2>&1; do sleep 1; done
 	@echo "Mock OAuth2 server ready at $(MOCK_OAUTH2_URL)/default"
 
-down-oauth2:
-	@$(COMPOSE) rm -sf $(MOCK_OAUTH2_SERVICE)
-
 oauth2-token:
 	@curl -fsS -X POST "$(MOCK_OAUTH2_URL)/default/token" \
 		-H 'content-type: application/x-www-form-urlencoded' \

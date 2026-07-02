@@ -108,7 +108,7 @@ impl AuthUseCases for AuthService {
             .ok_or_else(|| DataError::Inconsistency("Expected string in password hash".to_string()))?;
 
         if !verify(&current_password, password_hash_str).map_err(|e| AuthenticationError::Hash(e.to_string()))? {
-            return Err(AuthenticationError::InvalidCredentials.into());
+            return Err(DataError::Validation("Current password is incorrect".to_string()).into());
         }
 
         let new_password_hash =
@@ -427,7 +427,7 @@ mod tests {
             use super::*;
 
             #[tokio::test]
-            async fn returns_invalid_credentials() {
+            async fn returns_validation_error() {
                 let stored_hash = hash("correct", 4).unwrap();
 
                 let mut store = MockAppStoreBuilder::new();
@@ -444,10 +444,7 @@ mod tests {
                     .await
                     .unwrap_err();
 
-                assert!(matches!(
-                    err,
-                    ApplicationError::Authentication(AuthenticationError::InvalidCredentials)
-                ));
+                assert!(matches!(err, ApplicationError::Data(DataError::Validation(_))));
             }
         }
 
