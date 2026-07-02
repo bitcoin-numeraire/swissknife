@@ -1367,6 +1367,10 @@ export type ChangePasswordErrors = {
    * Unsupported
    */
   405: ErrorResponse;
+  /**
+   * Validation failed
+   */
+  422: ErrorResponse;
 };
 
 export type ChangePasswordError = ChangePasswordErrors[keyof ChangePasswordErrors];

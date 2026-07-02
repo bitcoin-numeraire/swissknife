@@ -808,6 +808,17 @@
                 "example": "\n{\n    \"status\": \"405 Method Not Allowed\",\n    \"reason\": \"Sign in not allowed (not needed) for oauth2 provider\"\n}\n"
               }
             }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"422 Unprocessable Entity\",\n    \"reason\": \"Validation failed: ...\"\n}\n"
+              }
+            }
           }
         },
         "security": [

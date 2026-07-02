@@ -89,7 +89,7 @@ mod change_password {
     }
 
     #[tokio::test]
-    async fn with_a_wrong_current_password_is_unauthorized() {
+    async fn with_a_wrong_current_password_is_unprocessable() {
         let app = app().await;
         let token = app.admin_token().await;
         let res = app
@@ -103,7 +103,7 @@ mod change_password {
                 },
             )
             .await;
-        assert_error(&res, StatusCode::UNAUTHORIZED);
+        assert_error(&res, StatusCode::UNPROCESSABLE_ENTITY);
     }
 
     #[tokio::test]
