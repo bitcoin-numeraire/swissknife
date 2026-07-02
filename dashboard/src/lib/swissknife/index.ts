@@ -2,6 +2,7 @@
 
 export {
   callback,
+  changePassword,
   createApiKey,
   createWalletApiKey,
   deleteAddress,
@@ -81,6 +82,12 @@ export {
   type CallbackErrors,
   type CallbackResponse,
   type CallbackResponses,
+  type ChangePasswordData,
+  type ChangePasswordError,
+  type ChangePasswordErrors,
+  type ChangePasswordRequest,
+  type ChangePasswordResponse,
+  type ChangePasswordResponses,
   type ClientOptions,
   type Contact,
   type CreateApiKeyData,

@@ -97,6 +97,14 @@ export const zBtcPayment = z.object({
 });
 
 /**
+ * Change Password Request
+ */
+export const zChangePasswordRequest = z.object({
+  current_password: z.string(),
+  new_password: z.string(),
+});
+
+/**
  * A counterparty the wallet has paid, with the date of first contact.
  */
 export const zContact = z.object({
@@ -625,6 +633,13 @@ export const zGetApiKeyPath = z.object({
  * Found
  */
 export const zGetApiKeyResponse = zApiKey;
+
+export const zChangePasswordBody = zChangePasswordRequest;
+
+/**
+ * Password changed
+ */
+export const zChangePasswordResponse = z.void();
 
 export const zSignInBody = zSignInRequest;
 

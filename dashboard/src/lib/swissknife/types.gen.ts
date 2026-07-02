@@ -206,6 +206,20 @@ export type BtcPayment = {
 };
 
 /**
+ * Change Password Request
+ */
+export type ChangePasswordRequest = {
+  /**
+   * Current user password
+   */
+  current_password: string;
+  /**
+   * New user password
+   */
+  new_password: string;
+};
+
+/**
  * A counterparty the wallet has paid, with the date of first contact.
  */
 export type Contact = {
@@ -1328,6 +1342,43 @@ export type GetApiKeyResponses = {
 };
 
 export type GetApiKeyResponse = GetApiKeyResponses[keyof GetApiKeyResponses];
+
+export type ChangePasswordData = {
+  body: ChangePasswordRequest;
+  path?: never;
+  query?: never;
+  url: '/v1/auth/change-password';
+};
+
+export type ChangePasswordErrors = {
+  /**
+   * Bad Request
+   */
+  400: ErrorResponse;
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Not Found
+   */
+  404: ErrorResponse;
+  /**
+   * Unsupported
+   */
+  405: ErrorResponse;
+};
+
+export type ChangePasswordError = ChangePasswordErrors[keyof ChangePasswordErrors];
+
+export type ChangePasswordResponses = {
+  /**
+   * Password changed
+   */
+  204: void;
+};
+
+export type ChangePasswordResponse = ChangePasswordResponses[keyof ChangePasswordResponses];
 
 export type SignInData = {
   body: SignInRequest;
