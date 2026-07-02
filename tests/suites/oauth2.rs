@@ -150,4 +150,22 @@ mod local_auth_is_disabled {
             .await;
         assert_error(&res, StatusCode::UNAUTHORIZED);
     }
+
+    #[tokio::test]
+    async fn change_password_is_unsupported() {
+        let app = oauth2_app().await;
+        let token = app.token(CLIENT_FULL).await;
+        let res = app
+            .api()
+            .post(
+                "/v1/auth/change-password",
+                Auth::Bearer(&token),
+                json!({
+                    "current_password": "irrelevant",
+                    "new_password": "still-irrelevant"
+                }),
+            )
+            .await;
+        assert_error(&res, StatusCode::UNAUTHORIZED);
+    }
 }

@@ -2,7 +2,11 @@
 
 import type { ReactNode, MouseEvent, ChangeEvent } from 'react';
 
-import { useState } from 'react';
+import { z as zod } from 'zod';
+import { useMemo, useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { useBoolean } from 'minimal-shared/hooks';
+import { zodResolver } from '@hookform/resolvers/zod';
 
 import Box from '@mui/material/Box';
 import Grid from '@mui/material/Grid';
@@ -12,33 +16,44 @@ import Stack from '@mui/material/Stack';
 import Button from '@mui/material/Button';
 import Switch from '@mui/material/Switch';
 import Divider from '@mui/material/Divider';
-import TextField from '@mui/material/TextField';
+import IconButton from '@mui/material/IconButton';
 import ButtonBase from '@mui/material/ButtonBase';
 import Typography from '@mui/material/Typography';
 import ToggleButton from '@mui/material/ToggleButton';
 import { useColorScheme } from '@mui/material/styles';
+import InputAdornment from '@mui/material/InputAdornment';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 
 import { paths } from 'src/routes/paths';
 import { useSearchParams } from 'src/routes/hooks';
 
-import { shouldFail } from 'src/utils/errors';
+import { shouldFail, handleActionError } from 'src/utils/errors';
 
 import { CONFIG } from 'src/global-config';
 import { useTranslate } from 'src/locales';
-import { BtcAddressType } from 'src/lib/swissknife';
 import { DashboardContent } from 'src/layouts/dashboard';
 import { useGetWalletLnAddress } from 'src/actions/user-wallet';
+import { BtcAddressType, changePassword } from 'src/lib/swissknife';
 
 import { Label } from 'src/components/label';
+import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
 import { ErrorView } from 'src/components/error';
+import { Form, Field } from 'src/components/hook-form';
 import { useSettingsContext } from 'src/components/settings';
 import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';
 
 // ----------------------------------------------------------------------
 
 type SettingsSection = 'preferences' | 'receive' | 'security';
+
+const MIN_PASSWORD_LENGTH = 12;
+
+type ChangePasswordFormValues = {
+  current_password: string;
+  new_password: string;
+  confirm_password: string;
+};
 
 const addressTypeOptions = [
   {
@@ -60,6 +75,7 @@ export function SettingsView() {
   const settings = useSettingsContext();
   const { mode, setMode } = useColorScheme();
   const searchParams = useSearchParams();
+  const showPassword = useBoolean();
   const requestedTab = searchParams.get('tab');
   const [section, setSection] = useState<SettingsSection>(
     requestedTab === 'lnaddress' ? 'receive' : 'preferences'
@@ -75,6 +91,76 @@ export function SettingsView() {
   const currentDisplayUnit = settings.state.displayUnit ?? 'bip177';
   const currentHideBalances = settings.state.hideBalances ?? false;
   const currentAddressType = settings.state.defaultAddressType ?? BtcAddressType.P2TR;
+
+  const changePasswordSchema = useMemo(
+    () =>
+      zod
+        .object({
+          current_password: zod
+            .string()
+            .min(1, { message: t('settings_view.current_password_required') }),
+          new_password: zod.string().min(MIN_PASSWORD_LENGTH, {
+            message: t('settings_view.min_password', { count: MIN_PASSWORD_LENGTH }),
+          }),
+          confirm_password: zod
+            .string()
+            .min(1, { message: t('settings_view.confirm_password_required') }),
+        })
+        .refine((data) => data.new_password === data.confirm_password, {
+          path: ['confirm_password'],
+          message: t('settings_view.passwords_do_not_match'),
+        }),
+    [t]
+  );
+
+  const passwordMethods = useForm<ChangePasswordFormValues>({
+    resolver: zodResolver(changePasswordSchema),
+    defaultValues: {
+      current_password: '',
+      new_password: '',
+      confirm_password: '',
+    },
+  });
+
+  const {
+    reset: resetPasswordForm,
+    handleSubmit: handlePasswordSubmit,
+    formState: { isDirty: passwordFormDirty, isSubmitting: passwordFormSubmitting },
+  } = passwordMethods;
+
+  const onPasswordSubmit = handlePasswordSubmit(async (body) => {
+    try {
+      await changePassword<true>({
+        body: {
+          current_password: body.current_password,
+          new_password: body.new_password,
+        },
+      });
+      toast.success(t('settings_view.password_change_success'));
+      resetPasswordForm();
+    } catch (error) {
+      handleActionError(error);
+    }
+  });
+
+  const passwordFieldSlotProps = {
+    inputLabel: { shrink: true },
+    input: {
+      endAdornment: (
+        <InputAdornment position="end">
+          <IconButton
+            onClick={showPassword.onToggle}
+            edge="end"
+            aria-label={t(
+              showPassword.value ? 'settings_view.hide_password' : 'settings_view.show_password'
+            )}
+          >
+            <Iconify icon={showPassword.value ? 'solar:eye-bold' : 'solar:eye-closed-bold'} />
+          </IconButton>
+        </InputAdornment>
+      ),
+    },
+  };
 
   const handleModeChange = (
     _: MouseEvent<HTMLElement>,
@@ -262,43 +348,52 @@ export function SettingsView() {
                   title={t('settings_view.security_section')}
                   description={t('settings_view.security_description')}
                 >
-                  <Alert severity="info" variant="outlined">
-                    {t('settings_view.password_backend_needed')}
-                  </Alert>
+                  <Form methods={passwordMethods} onSubmit={onPasswordSubmit}>
+                    <Stack spacing={3}>
+                      <Alert severity="info" variant="outlined">
+                        {t('settings_view.password_change_notice')}
+                      </Alert>
 
-                  <Grid container spacing={2}>
-                    <Grid size={{ xs: 12 }}>
-                      <TextField
-                        disabled
-                        fullWidth
-                        type="password"
-                        label={t('settings_view.current_password')}
-                      />
-                    </Grid>
-                    <Grid size={{ xs: 12, sm: 6 }}>
-                      <TextField
-                        disabled
-                        fullWidth
-                        type="password"
-                        label={t('settings_view.new_password')}
-                      />
-                    </Grid>
-                    <Grid size={{ xs: 12, sm: 6 }}>
-                      <TextField
-                        disabled
-                        fullWidth
-                        type="password"
-                        label={t('settings_view.confirm_password')}
-                      />
-                    </Grid>
-                  </Grid>
+                      <Grid container spacing={2}>
+                        <Grid size={{ xs: 12 }}>
+                          <Field.Text
+                            name="current_password"
+                            type={showPassword.value ? 'text' : 'password'}
+                            label={t('settings_view.current_password')}
+                            slotProps={passwordFieldSlotProps}
+                          />
+                        </Grid>
+                        <Grid size={{ xs: 12, sm: 6 }}>
+                          <Field.Text
+                            name="new_password"
+                            type={showPassword.value ? 'text' : 'password'}
+                            label={t('settings_view.new_password')}
+                            slotProps={passwordFieldSlotProps}
+                          />
+                        </Grid>
+                        <Grid size={{ xs: 12, sm: 6 }}>
+                          <Field.Text
+                            name="confirm_password"
+                            type={showPassword.value ? 'text' : 'password'}
+                            label={t('settings_view.confirm_password')}
+                            slotProps={passwordFieldSlotProps}
+                          />
+                        </Grid>
+                      </Grid>
 
-                  <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-                    <Button disabled variant="contained" color="inherit">
-                      {t('settings_view.change_password')}
-                    </Button>
-                    <Label color="warning">{t('settings_view.backend_needed')}</Label>
-                  </Stack>
+                      <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+                        <Button
+                          type="submit"
+                          variant="contained"
+                          color="inherit"
+                          loading={passwordFormSubmitting}
+                          disabled={!passwordFormDirty || passwordFormSubmitting}
+                        >
+                          {t('settings_view.change_password')}
+                        </Button>
+                      </Stack>
+                    </Stack>
+                  </Form>
                 </SettingsPanel>
               )}
             </Grid>

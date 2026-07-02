@@ -90,6 +90,39 @@ impl AuthUseCases for AuthService {
         }
     }
 
+    async fn change_password(&self, current_password: String, new_password: String) -> Result<(), ApplicationError> {
+        trace!("Start password change");
+
+        if self.provider != AuthProvider::Jwt {
+            return Err(AuthenticationError::UnsupportedOperation.into());
+        }
+
+        let password_hash = self
+            .store
+            .config
+            .find(PASSWORD_HASH_KEY)
+            .await?
+            .ok_or_else(|| DataError::NotFound("Missing admin credentials".into()))?;
+        let password_hash_str = password_hash
+            .as_str()
+            .ok_or_else(|| DataError::Inconsistency("Expected string in password hash".to_string()))?;
+
+        if !verify(&current_password, password_hash_str).map_err(|e| AuthenticationError::Hash(e.to_string()))? {
+            return Err(AuthenticationError::InvalidCredentials.into());
+        }
+
+        let new_password_hash =
+            hash(&new_password, DEFAULT_COST).map_err(|e| AuthenticationError::Hash(e.to_string()))?;
+
+        self.store
+            .config
+            .upsert(PASSWORD_HASH_KEY, new_password_hash.into())
+            .await?;
+
+        debug!("Admin password changed successfully");
+        Ok(())
+    }
+
     async fn authenticate_jwt(&self, token: &str) -> Result<User, ApplicationError> {
         trace!("Start JWT authentication");
 
@@ -339,6 +372,135 @@ mod tests {
                 let service = service(MockJWTAuthenticator::new(), store, AuthProvider::Jwt);
 
                 let err = service.sign_in("password".to_string()).await.unwrap_err();
+
+                assert!(matches!(err, ApplicationError::Data(DataError::Inconsistency(_))));
+            }
+        }
+    }
+
+    mod change_password {
+        use super::*;
+
+        mod when_provider_is_not_jwt {
+            use super::*;
+
+            #[tokio::test]
+            async fn returns_unsupported_operation() {
+                let service = service(
+                    MockJWTAuthenticator::new(),
+                    MockAppStoreBuilder::new(),
+                    AuthProvider::OAuth2,
+                );
+
+                let err = service
+                    .change_password("current".to_string(), "new".to_string())
+                    .await
+                    .unwrap_err();
+
+                assert!(matches!(
+                    err,
+                    ApplicationError::Authentication(AuthenticationError::UnsupportedOperation)
+                ));
+            }
+        }
+
+        mod when_credentials_are_missing {
+            use super::*;
+
+            #[tokio::test]
+            async fn returns_not_found() {
+                let mut store = MockAppStoreBuilder::new();
+                store.config.expect_find().times(1).returning(|_| Ok(None));
+
+                let service = service(MockJWTAuthenticator::new(), store, AuthProvider::Jwt);
+
+                let err = service
+                    .change_password("current".to_string(), "new".to_string())
+                    .await
+                    .unwrap_err();
+
+                assert!(matches!(err, ApplicationError::Data(DataError::NotFound(_))));
+            }
+        }
+
+        mod with_a_wrong_current_password {
+            use super::*;
+
+            #[tokio::test]
+            async fn returns_invalid_credentials() {
+                let stored_hash = hash("correct", 4).unwrap();
+
+                let mut store = MockAppStoreBuilder::new();
+                store
+                    .config
+                    .expect_find()
+                    .times(1)
+                    .returning(move |_| Ok(Some(stored_hash.clone().into())));
+
+                let service = service(MockJWTAuthenticator::new(), store, AuthProvider::Jwt);
+
+                let err = service
+                    .change_password("wrong".to_string(), "new".to_string())
+                    .await
+                    .unwrap_err();
+
+                assert!(matches!(
+                    err,
+                    ApplicationError::Authentication(AuthenticationError::InvalidCredentials)
+                ));
+            }
+        }
+
+        mod with_the_correct_current_password {
+            use super::*;
+
+            #[tokio::test]
+            async fn persists_the_new_password_hash() {
+                let stored_hash = hash("current", 4).unwrap();
+
+                let mut store = MockAppStoreBuilder::new();
+                store
+                    .config
+                    .expect_find()
+                    .times(1)
+                    .returning(move |_| Ok(Some(stored_hash.clone().into())));
+                store
+                    .config
+                    .expect_upsert()
+                    .withf(|key, value| {
+                        key == PASSWORD_HASH_KEY
+                            && value.as_str().is_some_and(|hash| verify("new", hash).unwrap_or(false))
+                    })
+                    .times(1)
+                    .returning(|_, _| Ok(()));
+
+                let service = service(MockJWTAuthenticator::new(), store, AuthProvider::Jwt);
+
+                service
+                    .change_password("current".to_string(), "new".to_string())
+                    .await
+                    .unwrap();
+            }
+        }
+
+        mod when_stored_hash_is_not_a_string {
+            use super::*;
+
+            #[tokio::test]
+            async fn returns_inconsistency() {
+                let mut store = MockAppStoreBuilder::new();
+                store
+                    .config
+                    .expect_find()
+                    .times(1)
+                    .returning(|_| Ok(Some(serde_json::json!(42))));
+
+                let service = service(MockJWTAuthenticator::new(), store, AuthProvider::Jwt);
+
+                let err = service
+                    .change_password("current".to_string(), "new".to_string())
+                    .await
+                    .unwrap_err();
 
                 assert!(matches!(err, ApplicationError::Data(DataError::Inconsistency(_))));
             }

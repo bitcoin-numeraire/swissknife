@@ -44,6 +44,9 @@ import type {
   CallbackData,
   CallbackErrors,
   CallbackResponses,
+  ChangePasswordData,
+  ChangePasswordErrors,
+  ChangePasswordResponses,
   CreateApiKeyData,
   CreateApiKeyErrors,
   CreateApiKeyResponses,
@@ -368,6 +371,24 @@ export const getApiKey = <ThrowOnError extends boolean = false>(
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/v1/api-keys/{id}',
     ...options,
+  });
+
+/**
+ * Change Password
+ *
+ * Changes the local owner password for `JWT` auth provider deployments.
+ */
+export const changePassword = <ThrowOnError extends boolean = false>(
+  options: Options<ChangePasswordData, ThrowOnError>
+): RequestResult<ChangePasswordResponses, ChangePasswordErrors, ThrowOnError> =>
+  (options.client ?? client).post<ChangePasswordResponses, ChangePasswordErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/auth/change-password',
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
   });
 
 /**
