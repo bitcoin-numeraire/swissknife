@@ -2,9 +2,10 @@
 
 use reqwest::StatusCode;
 
-use swissknife_types::{SignInRequest, SignInResponse, SignUpRequest};
+use swissknife_types::{ChangePasswordRequest, SignInRequest, SignInResponse, SignUpRequest};
 
-use crate::common::harness::ADMIN_PASSWORD;
+use crate::common::client::ApiClient;
+use crate::common::harness::{matrix_cell, spawn_instance, ADMIN_PASSWORD};
 use crate::common::{app, assert_error, assert_status, Auth};
 
 mod sign_in {
@@ -64,6 +65,117 @@ mod sign_up {
             )
             .await;
         assert_error(&res, StatusCode::CONFLICT);
+    }
+}
+
+mod change_password {
+    use super::*;
+
+    #[tokio::test]
+    async fn rejects_missing_credentials() {
+        let app = app().await;
+        let res = app
+            .api()
+            .post(
+                "/v1/auth/change-password",
+                Auth::None,
+                ChangePasswordRequest {
+                    current_password: ADMIN_PASSWORD.to_string(),
+                    new_password: "new-integration-admin-password".to_string(),
+                },
+            )
+            .await;
+        assert_error(&res, StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
+    async fn with_a_wrong_current_password_is_unauthorized() {
+        let app = app().await;
+        let token = app.admin_token().await;
+        let res = app
+            .api()
+            .post(
+                "/v1/auth/change-password",
+                Auth::Bearer(token),
+                ChangePasswordRequest {
+                    current_password: "wrong-password".to_string(),
+                    new_password: "new-integration-admin-password".to_string(),
+                },
+            )
+            .await;
+        assert_error(&res, StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
+    async fn with_the_correct_current_password_updates_future_sign_ins() {
+        let api = isolated_api("auth-change-password").await;
+        let admin_token = bootstrap_admin(&api, ADMIN_PASSWORD).await;
+        let new_password = "new-integration-admin-password";
+
+        let res = api
+            .post(
+                "/v1/auth/change-password",
+                Auth::Bearer(&admin_token),
+                ChangePasswordRequest {
+                    current_password: ADMIN_PASSWORD.to_string(),
+                    new_password: new_password.to_string(),
+                },
+            )
+            .await;
+        assert_status(&res, StatusCode::NO_CONTENT);
+
+        let old_password = api
+            .post(
+                "/v1/auth/sign-in",
+                Auth::None,
+                SignInRequest {
+                    password: ADMIN_PASSWORD.to_string(),
+                },
+            )
+            .await;
+        assert_error(&old_password, StatusCode::UNAUTHORIZED);
+
+        let new_password = api
+            .post(
+                "/v1/auth/sign-in",
+                Auth::None,
+                SignInRequest {
+                    password: new_password.to_string(),
+                },
+            )
+            .await;
+        assert_status(&new_password, StatusCode::OK);
+        assert!(
+            !new_password.parse::<SignInResponse>().token.is_empty(),
+            "{}",
+            new_password.body
+        );
+    }
+
+    async fn isolated_api(label: &str) -> ApiClient {
+        let (database, provider) = matrix_cell();
+        let label = format!("{database}-{provider}-{label}");
+        let spawned = spawn_instance(&database, &provider, &label, &[]).await;
+        ApiClient::new(spawned.base_url)
+    }
+
+    async fn bootstrap_admin(api: &ApiClient, password: &str) -> String {
+        let res = api
+            .post(
+                "/v1/auth/sign-up",
+                Auth::None,
+                SignUpRequest {
+                    password: password.to_string(),
+                },
+            )
+            .await;
+        assert_status(&res, StatusCode::OK);
+        let token = res.parse::<SignInResponse>().token;
+
+        let warmup = api.get("/v1/me", Auth::Bearer(&token)).await;
+        assert_status(&warmup, StatusCode::OK);
+
+        token
     }
 }
 

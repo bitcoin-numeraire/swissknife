@@ -12,6 +12,7 @@ use super::{ApiKey, ApiKeyFilter, User};
 pub trait AuthUseCases: Send + Sync {
     async fn sign_up(&self, password: String) -> Result<String, ApplicationError>;
     async fn sign_in(&self, password: String) -> Result<String, ApplicationError>;
+    async fn change_password(&self, current_password: String, new_password: String) -> Result<(), ApplicationError>;
     async fn authenticate_jwt(&self, token: &str) -> Result<User, ApplicationError>;
     async fn authenticate_api_key(&self, token: Vec<u8>) -> Result<User, ApplicationError>;
 }

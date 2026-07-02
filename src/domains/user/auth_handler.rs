@@ -1,9 +1,9 @@
 use std::sync::Arc;
 
-use axum::{extract::State, routing::post, Router};
+use axum::{extract::State, http::StatusCode, response::IntoResponse, routing::post, Router};
 use utoipa::OpenApi;
 
-use swissknife_types::{ErrorResponse, SignInRequest, SignInResponse, SignUpRequest};
+use swissknife_types::{ChangePasswordRequest, ErrorResponse, SignInRequest, SignInResponse, SignUpRequest};
 
 use crate::{
     application::{
@@ -14,10 +14,12 @@ use crate::{
     infra::axum::Json,
 };
 
+use super::User;
+
 #[derive(OpenApi)]
 #[openapi(
-    paths(sign_in, sign_up),
-    components(schemas(SignUpRequest, SignInRequest, SignInResponse)),
+    paths(sign_in, sign_up, change_password),
+    components(schemas(ChangePasswordRequest, SignUpRequest, SignInRequest, SignInResponse)),
     tags(
         (name = "Authentication", description = "Some endpoints are public, but some require authentication. We provide all the required endpoints to create an account and authorize yourself.")
     )
@@ -29,6 +31,7 @@ pub fn auth_router() -> Router<Arc<AppServices>> {
     Router::new()
         .route("/sign-up", post(sign_up))
         .route("/sign-in", post(sign_in))
+        .route("/change-password", post(change_password))
 }
 
 /// Sign up
@@ -79,6 +82,36 @@ async fn sign_in(
 ) -> Result<Json<SignInResponse>, ApplicationError> {
     let token = services.auth.sign_in(payload.password).await?;
     Ok(SignInResponse { token }.into())
+}
+
+/// Change Password
+///
+/// Changes the local owner password for `JWT` auth provider deployments.
+#[utoipa::path(
+    post,
+    path = "/change-password",
+    tag = "Authentication",
+    context_path = CONTEXT_PATH,
+    request_body = ChangePasswordRequest,
+    responses(
+        (status = 204, description = "Password changed"),
+        (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
+        (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
+        (status = 404, description = "Not Found", body = ErrorResponse, example = json!(NOT_FOUND_EXAMPLE)),
+        (status = 405, description = "Unsupported", body = ErrorResponse, example = json!(UNSUPPORTED_EXAMPLE))
+    ),
+    security(("jwt" = []))
+)]
+async fn change_password(
+    State(services): State<Arc<AppServices>>,
+    _user: User,
+    Json(payload): Json<ChangePasswordRequest>,
+) -> Result<impl IntoResponse, ApplicationError> {
+    services
+        .auth
+        .change_password(payload.current_password, payload.new_password)
+        .await?;
+    Ok(StatusCode::NO_CONTENT)
 }
 
 #[cfg(test)]
@@ -134,6 +167,35 @@ mod tests {
             .await;
 
             assert!(matches!(result, Err(ApplicationError::Data(DataError::NotFound(_)))));
+        }
+    }
+
+    mod change_password {
+        use super::*;
+
+        #[tokio::test]
+        async fn returns_no_content_when_password_changed() {
+            let mut builder = MockAppServicesBuilder::new();
+            builder
+                .auth
+                .expect_change_password()
+                .withf(|current_password, new_password| current_password == "old" && new_password == "new")
+                .times(1)
+                .returning(|_, _| Ok(()));
+
+            let response = change_password(
+                State(Arc::new(builder.build())),
+                User::default(),
+                Json(ChangePasswordRequest {
+                    current_password: "old".to_string(),
+                    new_password: "new".to_string(),
+                }),
+            )
+            .await
+            .unwrap()
+            .into_response();
+
+            assert_eq!(response.status(), StatusCode::NO_CONTENT);
         }
     }
 }
