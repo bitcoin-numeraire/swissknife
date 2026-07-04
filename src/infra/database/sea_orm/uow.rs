@@ -114,10 +114,12 @@ impl PaymentUnitOfWork for SeaOrmPaymentUnitOfWork {
         let actual_msat = payment.amount_msat.saturating_add(payment.fee_msat.unwrap_or_default());
         if actual_msat > 0
             && !balance_repo
-                .debit(payment.wallet_id, &payment.currency, actual_msat)
+                .debit_confirmed(payment.wallet_id, &payment.currency, actual_msat)
                 .await?
         {
-            return Err(DataError::InsufficientFunds(actual_msat as f64).into());
+            return Err(
+                DataError::Inconsistency(format!("Wallet balance missing for settled payment {}", payment.id)).into(),
+            );
         }
         payment.reserved_amount = 0;
         // A successful settlement carries no failure reason, even when correcting

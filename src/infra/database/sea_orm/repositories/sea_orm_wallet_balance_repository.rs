@@ -92,6 +92,25 @@ where
         Ok(result.rows_affected == 1)
     }
 
+    async fn debit_confirmed(
+        &self,
+        wallet_id: Uuid,
+        currency: &Currency,
+        amount_msat: u64,
+    ) -> Result<bool, DatabaseError> {
+        let amount = amount_msat as i64;
+        let result = WalletBalance::update_many()
+            .col_expr(Column::AvailableAmount, Expr::col(Column::AvailableAmount).sub(amount))
+            .col_expr(Column::UpdatedAt, Expr::value(Utc::now().naive_utc()))
+            .filter(Column::WalletId.eq(wallet_id))
+            .filter(Column::Currency.eq(currency.to_string()))
+            .exec(self.db.connection())
+            .await
+            .map_err(|e| DatabaseError::Update(e.to_string()))?;
+
+        Ok(result.rows_affected == 1)
+    }
+
     async fn release(&self, wallet_id: Uuid, currency: &Currency, amount_msat: u64) -> Result<bool, DatabaseError> {
         let amount = amount_msat as i64;
         let result = WalletBalance::update_many()
