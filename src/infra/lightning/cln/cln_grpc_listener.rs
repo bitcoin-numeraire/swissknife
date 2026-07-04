@@ -304,7 +304,13 @@ impl ClnGrpcListener {
                         continue;
                     };
 
-                    let output = match self.wallet.get_output(&txid, Some(outnum), None, false).await {
+                    // Include spent outputs: when replaying an un-advanced cursor after a failed
+                    // write, the deposit's UTXO may already have been spent. `spent: false` would
+                    // return None, skip it, and still advance the cursor past it — losing the
+                    // credit. `block_height` (not spent-status) drives confirmation, so a
+                    // confirmed-then-spent deposit still credits. Matches the `synchronize` path,
+                    // which also lists with `spent: true`.
+                    let output = match self.wallet.get_output(&txid, Some(outnum), None, true).await {
                         Ok(Some(output)) => output,
                         Ok(None) => {
                             trace!(%txid, outnum, "Output not found in wallet, skipping chainmove");
