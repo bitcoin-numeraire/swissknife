@@ -30,6 +30,11 @@ pub(crate) enum Wallet {
     Table,
     Id,
     UserId,
+    AccountId,
+    AssetId,
+    Label,
+    AvailableAmount,
+    ReservedAmount,
     CreatedAt,
     UpdatedAt,
 }

@@ -5,7 +5,7 @@
 
 use reqwest::StatusCode;
 
-use swissknife_types::{ApiKey, CreateApiKeyRequest, Permission, RegisterWalletRequest};
+use swissknife_types::{ApiKey, CreateApiKeyRequest, CreateWalletRequest, Permission};
 
 use crate::common::fixtures::unique;
 use crate::common::{app, assert_error, assert_status, Auth};
@@ -27,21 +27,19 @@ mod create {
     async fn creates_a_key_for_the_named_user_that_authenticates() {
         let app = app().await;
         let token = app.admin_token().await;
-        // The admin endpoint names an explicit user, who needs a wallet for the
-        // key to resolve to when it is later used.
-        let wallet = app.create_wallet(token, "key-owner").await;
+        let subject = unique("key-owner");
 
         let res = app
             .api()
             .post(
                 "/v1/api-keys",
                 Auth::Bearer(token),
-                new_key(&wallet.user_id, vec![Permission::ReadWallet]),
+                new_key(&subject, vec![Permission::ReadWallet]),
             )
             .await;
         assert_status(&res, StatusCode::OK);
         let created = res.parse::<ApiKey>();
-        assert_eq!(created.user_id, wallet.user_id, "key belongs to the named user");
+        assert_eq!(created.user_id, subject, "key belongs to the named subject");
         assert_eq!(
             created.permissions,
             vec![Permission::ReadWallet],
@@ -92,8 +90,9 @@ mod scope {
             .post(
                 "/v1/wallets",
                 Auth::ApiKey(&key),
-                RegisterWalletRequest {
-                    user_id: unique("blocked"),
+                CreateWalletRequest {
+                    account_id: uuid::Uuid::new_v4(),
+                    asset_id: uuid::Uuid::new_v4(),
                 },
             )
             .await;
@@ -108,14 +107,14 @@ mod manage {
     async fn get_list_then_revoke() {
         let app = app().await;
         let token = app.admin_token().await;
-        let wallet = app.create_wallet(token, "key-managed").await;
+        let subject = unique("key-managed");
 
         let created = app
             .api()
             .post(
                 "/v1/api-keys",
                 Auth::Bearer(token),
-                new_key(&wallet.user_id, vec![Permission::ReadApiKey]),
+                new_key(&subject, vec![Permission::ReadApiKey]),
             )
             .await
             .parse::<ApiKey>();

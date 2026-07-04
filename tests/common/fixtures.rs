@@ -3,9 +3,7 @@ use std::time::Duration;
 
 use uuid::Uuid;
 
-use swissknife_types::{
-    ApiKey, Balance, BtcAddress, CreateApiKeyRequest, NewBtcAddressRequest, Permission, RegisterWalletRequest, Wallet,
-};
+use swissknife_types::{ApiKey, Balance, BtcAddress, CreateApiKeyRequest, NewBtcAddressRequest, Permission, Wallet};
 
 use super::chain;
 use super::client::Auth;
@@ -22,19 +20,14 @@ pub fn unique(prefix: &str) -> String {
 }
 
 impl TestApp {
-    /// Register a fresh wallet (its own user id) and return it. Behavioural
-    /// tests use their own wallet so balances stay isolated on the shared
-    /// instance.
+    /// Provision a fresh account through API-key authentication and return its
+    /// active asset wallet. Behavioural tests use their own account wallet so
+    /// balances stay isolated on the shared instance.
     pub async fn create_wallet(&self, token: &str, label: &str) -> Wallet {
-        let res = self
-            .api()
-            .post(
-                "/v1/wallets",
-                Auth::Bearer(token),
-                RegisterWalletRequest { user_id: unique(label) },
-            )
-            .await;
-        assert_eq!(res.status.as_u16(), 200, "create_wallet failed: {}", res.body);
+        let subject = unique(label);
+        let key = self.user_api_key(token, &subject, Permission::all_permissions()).await;
+        let res = self.api().get("/v1/me", Auth::ApiKey(&key)).await;
+        assert_eq!(res.status.as_u16(), 200, "create_wallet /v1/me failed: {}", res.body);
         res.parse()
     }
 
@@ -126,10 +119,11 @@ impl TestApp {
     /// Register a fresh wallet and a full-permission API key for it: a distinct
     /// external user for exercising the `/me` endpoints.
     pub async fn create_user(&self, token: &str, label: &str) -> TestUser {
-        let wallet = self.create_wallet(token, label).await;
-        let key = self
-            .user_api_key(token, &wallet.user_id, Permission::all_permissions())
-            .await;
+        let subject = unique(label);
+        let key = self.user_api_key(token, &subject, Permission::all_permissions()).await;
+        let res = self.api().get("/v1/me", Auth::ApiKey(&key)).await;
+        assert_eq!(res.status.as_u16(), 200, "create_user /v1/me failed: {}", res.body);
+        let wallet = res.parse();
         TestUser { wallet, key }
     }
 }

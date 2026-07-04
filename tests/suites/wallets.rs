@@ -4,8 +4,8 @@ use reqwest::StatusCode;
 use serde_json::json;
 
 use swissknife_types::{
-    Balance, BtcAddress, BtcAddressType, Ledger, LnAddress, NewBtcAddressRequest, Payment, PaymentStatus, Permission,
-    RegisterLnAddressRequest, RegisterWalletRequest, SendPaymentRequest, Wallet, WalletOverview,
+    Balance, BtcAddress, BtcAddressType, CreateWalletRequest, Ledger, LnAddress, NewBtcAddressRequest, Payment,
+    PaymentStatus, Permission, RegisterLnAddressRequest, SendPaymentRequest, Wallet, WalletOverview,
 };
 
 use crate::common::fixtures::unique;
@@ -18,21 +18,23 @@ mod register_wallet {
     async fn succeeds_and_is_persisted() {
         let app = app().await;
         let token = app.admin_token().await;
-        let user_id = unique("wallet-user");
+        let existing = app.create_wallet(token, "wallet-create-owner").await;
 
         let res = app
             .api()
             .post(
                 "/v1/wallets",
                 Auth::Bearer(token),
-                RegisterWalletRequest {
-                    user_id: user_id.clone(),
+                CreateWalletRequest {
+                    account_id: existing.account_id,
+                    asset_id: existing.asset_id,
                 },
             )
             .await;
         assert_status(&res, StatusCode::OK);
         let wallet = res.parse::<Wallet>();
-        assert_eq!(wallet.user_id, user_id);
+        assert_eq!(wallet.account_id, existing.account_id);
+        assert_eq!(wallet.asset_id, existing.asset_id);
         assert_eq!(wallet.balance.available_msat, 0);
 
         // Persisted: fetchable by id.
@@ -52,8 +54,9 @@ mod register_wallet {
             .post(
                 "/v1/wallets",
                 Auth::None,
-                RegisterWalletRequest {
-                    user_id: unique("wallet-user"),
+                CreateWalletRequest {
+                    account_id: uuid::Uuid::new_v4(),
+                    asset_id: uuid::Uuid::new_v4(),
                 },
             )
             .await;
@@ -92,9 +95,7 @@ mod get_wallet {
         assert_status(&created, StatusCode::OK);
         let created = created.parse::<BtcAddress>();
 
-        let read_wallet_key = app
-            .user_api_key(admin_token, &wallet.user_id, vec![Permission::ReadWallet])
-            .await;
+        let read_wallet_key = app.api_key(admin_token, vec![Permission::ReadWallet]).await;
         let res = app
             .api()
             .get(&format!("/v1/wallets/{}", wallet.id), Auth::ApiKey(&read_wallet_key))

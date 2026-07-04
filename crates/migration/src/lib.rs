@@ -22,6 +22,7 @@ mod m20260704_000004_account_preference_table;
 mod m20260704_000005_asset_table;
 mod m20260704_000006_api_key_account_id;
 mod m20260704_000007_backfill_oauth2_accounts;
+mod m20260704_000008_asset_scoped_wallets;
 
 pub struct Migrator;
 
@@ -51,6 +52,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260704_000005_asset_table::Migration),
             Box::new(m20260704_000006_api_key_account_id::Migration),
             Box::new(m20260704_000007_backfill_oauth2_accounts::Migration),
+            Box::new(m20260704_000008_asset_scoped_wallets::Migration),
         ]
     }
 }
@@ -62,6 +64,7 @@ mod tests {
     use super::*;
 
     const MIGRATIONS_BEFORE_IDENTITY_ASSETS: u32 = 16;
+    const IDENTITY_ASSET_MIGRATION_COUNT: u32 = 7;
 
     async fn sqlite() -> sea_orm::DatabaseConnection {
         Database::connect("sqlite::memory:")
@@ -126,13 +129,26 @@ mod tests {
             DatabaseBackend::Sqlite,
             r#"
             INSERT INTO wallet (id, user_id, created_at)
-            VALUES ('11111111-1111-4111-8111-111111111111', 'alice', CURRENT_TIMESTAMP)
+            VALUES (X'11111111111141118111111111111111', 'alice', CURRENT_TIMESTAMP)
             "#
             .to_string(),
         ))
         .await
         .expect("insert legacy wallet");
-        Migrator::up(&conn, None).await.expect("run identity assets migration");
+        conn.execute(Statement::from_string(
+            DatabaseBackend::Sqlite,
+            r#"
+            INSERT INTO wallet_balance (wallet_id, currency, available_amount, reserved_amount, created_at)
+            VALUES (X'11111111111141118111111111111111', 'Regtest', 0, 0, CURRENT_TIMESTAMP)
+            "#
+            .to_string(),
+        ))
+        .await
+        .expect("insert legacy wallet balance");
+
+        Migrator::up(&conn, Some(IDENTITY_ASSET_MIGRATION_COUNT))
+            .await
+            .expect("run identity assets migration");
 
         assert_eq!(count(&conn, "SELECT COUNT(*) AS count FROM account").await, 1);
         assert_eq!(

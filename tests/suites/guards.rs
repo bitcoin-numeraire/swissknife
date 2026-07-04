@@ -7,8 +7,8 @@ use reqwest::{Method, StatusCode};
 use serde_json::Value;
 
 use swissknife_types::{
-    CreateApiKeyRequest, NewBtcAddressRequest, NewInvoiceRequest, Permission, RegisterLnAddressRequest,
-    RegisterWalletRequest, SendPaymentRequest, UpdateLnAddressRequest,
+    CreateApiKeyRequest, CreateWalletRequest, NewBtcAddressRequest, NewInvoiceRequest, Permission,
+    RegisterLnAddressRequest, SendPaymentRequest, UpdateLnAddressRequest,
 };
 
 use crate::common::fixtures::unique;
@@ -47,8 +47,9 @@ async fn every_admin_endpoint_enforces_its_permission() {
         Permission::ReadWallet,
         Permission::WriteWallet,
         id,
-        body(RegisterWalletRequest {
-            user_id: unique("guard"),
+        body(CreateWalletRequest {
+            account_id: uuid::Uuid::new_v4(),
+            asset_id: uuid::Uuid::new_v4(),
         }),
     ));
     cases.push((

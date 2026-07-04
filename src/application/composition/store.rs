@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use crate::domains::{
+    asset::AssetRepository,
     bitcoin::{BtcAddressRepository, BtcOutputRepository},
     event::EventProjectionUnitOfWork,
     invoice::InvoiceRepository,
@@ -18,6 +19,8 @@ pub struct AppStore {
     pub invoice: Arc<dyn InvoiceRepository>,
     pub wallet: Arc<dyn WalletRepository>,
     pub account: Arc<dyn AccountRepository>,
+    #[allow(dead_code)]
+    pub asset: Arc<dyn AssetRepository>,
     pub api_key: Arc<dyn ApiKeyRepository>,
     pub config: Arc<dyn ConfigRepository>,
     pub btc_address: Arc<dyn BtcAddressRepository>,
@@ -35,6 +38,7 @@ impl AppStore {
         invoice: Arc<dyn InvoiceRepository>,
         wallet: Arc<dyn WalletRepository>,
         account: Arc<dyn AccountRepository>,
+        asset: Arc<dyn AssetRepository>,
         api_key: Arc<dyn ApiKeyRepository>,
         config: Arc<dyn ConfigRepository>,
         btc_address: Arc<dyn BtcAddressRepository>,
@@ -49,6 +53,7 @@ impl AppStore {
             invoice,
             wallet,
             account,
+            asset,
             api_key,
             config,
             btc_address,
@@ -67,6 +72,7 @@ pub struct MockAppStoreBuilder {
     pub invoice: crate::domains::invoice::MockInvoiceRepository,
     pub wallet: crate::domains::wallet::MockWalletRepository,
     pub account: crate::domains::user::MockAccountRepository,
+    pub asset: crate::domains::asset::MockAssetRepository,
     pub api_key: crate::domains::user::MockApiKeyRepository,
     pub config: crate::domains::system::MockConfigRepository,
     pub btc_address: crate::domains::bitcoin::MockBtcAddressRepository,
@@ -85,6 +91,7 @@ impl MockAppStoreBuilder {
             invoice: crate::domains::invoice::MockInvoiceRepository::new(),
             wallet: crate::domains::wallet::MockWalletRepository::new(),
             account: crate::domains::user::MockAccountRepository::new(),
+            asset: crate::domains::asset::MockAssetRepository::new(),
             api_key: crate::domains::user::MockApiKeyRepository::new(),
             config: crate::domains::system::MockConfigRepository::new(),
             btc_address: crate::domains::bitcoin::MockBtcAddressRepository::new(),
@@ -102,6 +109,7 @@ impl MockAppStoreBuilder {
             Arc::new(self.invoice),
             Arc::new(self.wallet),
             Arc::new(self.account),
+            Arc::new(self.asset),
             Arc::new(self.api_key),
             Arc::new(self.config),
             Arc::new(self.btc_address),

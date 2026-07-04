@@ -73,8 +73,9 @@ impl AppServices {
             host,
         );
         let ln_address = LnAddressService::new(store.clone());
-        let wallet = WalletService::new(store.clone(), bitcoin_wallet.network().into());
-        let auth = AuthService::new(jwt_authenticator, store.clone(), auth_provider);
+        let active_bitcoin_network = bitcoin_wallet.network();
+        let wallet = WalletService::new(store.clone());
+        let auth = AuthService::new(jwt_authenticator, store.clone(), auth_provider, active_bitcoin_network);
         let system = Arc::new(SystemService::new(store.clone(), ln_client.clone()));
         let nostr = NostrService::new(store.clone());
         let api_key = ApiKeyService::new(store.clone());

@@ -38,4 +38,4 @@ pub use permission::Permission;
 pub use query::OrderDirection;
 pub use system::{HealthCheck, HealthStatus, SetupInfo, VersionInfo};
 pub use transaction::{Currency, Ledger};
-pub use wallet::{Balance, Contact, RegisterWalletRequest, Wallet, WalletFilter, WalletOverview};
+pub use wallet::{Asset, Balance, Contact, CreateWalletRequest, Wallet, WalletFilter, WalletOverview};

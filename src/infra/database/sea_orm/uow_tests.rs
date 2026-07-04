@@ -21,12 +21,16 @@ use crate::domains::event::EventProjectionUnitOfWork;
 use crate::domains::invoice::{Invoice, InvoiceRepository};
 use crate::domains::payment::{LnPayment, Payment, PaymentStatus, PaymentUnitOfWork};
 use crate::domains::user::{AccountRepository, AuthProvider, Permission};
-use crate::domains::wallet::{WalletBalanceRepository, WalletRepository};
+use crate::domains::{
+    asset::AssetRepository,
+    bitcoin::BtcNetwork,
+    wallet::{WalletBalanceRepository, WalletRepository},
+};
 
-use super::models::{prelude::WalletBalance, wallet_balance};
+use super::models::{prelude::Wallet, wallet};
 use super::{
-    SeaOrmAccountRepository, SeaOrmEventProjectionUnitOfWork, SeaOrmInvoiceRepository, SeaOrmPaymentUnitOfWork,
-    SeaOrmWalletBalanceRepository, SeaOrmWalletRepository,
+    SeaOrmAccountRepository, SeaOrmAssetRepository, SeaOrmEventProjectionUnitOfWork, SeaOrmInvoiceRepository,
+    SeaOrmPaymentUnitOfWork, SeaOrmWalletBalanceRepository, SeaOrmWalletRepository,
 };
 
 static COUNTER: AtomicU64 = AtomicU64::new(0);
@@ -81,11 +85,15 @@ async fn connect() -> DatabaseConnection {
 
 /// Register a wallet and credit it `balance_msat` of available funds.
 async fn seed_wallet(conn: &DatabaseConnection, balance_msat: u64) -> Uuid {
-    let n = COUNTER.fetch_add(1, Ordering::Relaxed);
-    let wallet = SeaOrmWalletRepository::new(conn.clone())
-        .insert(&format!("uow-user-{}-{n}", std::process::id()))
+    let asset = SeaOrmAssetRepository::new(conn.clone())
+        .find_native_btc_by_network(BtcNetwork::Bitcoin)
         .await
-        .expect("insert wallet");
+        .expect("find native BTC asset")
+        .expect("native BTC asset");
+    let wallet = SeaOrmWalletRepository::new(conn.clone())
+        .ensure_for_account_asset(Uuid::new_v4(), asset.id)
+        .await
+        .expect("ensure wallet");
     if balance_msat > 0 {
         SeaOrmWalletBalanceRepository::new(conn.clone())
             .credit(wallet.id, &CURRENCY, balance_msat)
@@ -97,8 +105,8 @@ async fn seed_wallet(conn: &DatabaseConnection, balance_msat: u64) -> Uuid {
 
 /// `(available_msat, reserved_msat)` for a wallet's balance row.
 async fn balance(conn: &DatabaseConnection, wallet_id: Uuid) -> (i64, i64) {
-    let row = WalletBalance::find()
-        .filter(wallet_balance::Column::WalletId.eq(wallet_id))
+    let row = Wallet::find()
+        .filter(wallet::Column::Id.eq(wallet_id))
         .one(conn)
         .await
         .expect("query balance");

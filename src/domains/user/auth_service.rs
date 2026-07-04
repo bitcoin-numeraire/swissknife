@@ -12,6 +12,7 @@ use crate::{
         composition::AuthProvider,
         errors::{ApplicationError, AuthenticationError, DataError},
     },
+    domains::bitcoin::BtcNetwork,
     infra::jwt::JWTAuthenticator,
 };
 
@@ -24,15 +25,41 @@ pub struct AuthService {
     jwt_authenticator: Arc<dyn JWTAuthenticator>,
     store: AppStore,
     provider: AuthProvider,
+    active_bitcoin_network: BtcNetwork,
 }
 
 impl AuthService {
-    pub fn new(jwt_authenticator: Arc<dyn JWTAuthenticator>, store: AppStore, provider: AuthProvider) -> Self {
+    pub fn new(
+        jwt_authenticator: Arc<dyn JWTAuthenticator>,
+        store: AppStore,
+        provider: AuthProvider,
+        active_bitcoin_network: BtcNetwork,
+    ) -> Self {
         AuthService {
             jwt_authenticator,
             store,
             provider,
+            active_bitcoin_network,
         }
+    }
+
+    async fn ensure_active_wallet(
+        &self,
+        account_id: uuid::Uuid,
+    ) -> Result<crate::domains::wallet::Wallet, ApplicationError> {
+        let asset = self
+            .store
+            .asset
+            .find_native_btc_by_network(self.active_bitcoin_network)
+            .await?
+            .ok_or_else(|| {
+                DataError::Inconsistency(format!(
+                    "Missing native BTC asset for active network {}",
+                    self.active_bitcoin_network
+                ))
+            })?;
+
+        Ok(self.store.wallet.ensure_for_account_asset(account_id, asset.id).await?)
     }
 }
 
@@ -158,17 +185,13 @@ impl AuthUseCases for AuthService {
             claims.permissions
         };
 
-        let wallet_opt = self.store.wallet.find_by_user_id(&claims.sub).await?;
+        let wallet = self.ensure_active_wallet(account.id).await?;
 
-        let wallet = match wallet_opt {
-            Some(wallet) => wallet,
-            None => {
-                let wallet = self.store.wallet.insert(&claims.sub).await?;
-
-                info!(wallet_id = %wallet.id, user_id = %wallet.user_id, "New user created successfully on first login");
-                wallet
-            }
-        };
+        info!(
+            wallet_id = %wallet.id,
+            account_id = %account.id,
+            "Account active asset wallet available after authentication"
+        );
 
         let user = User {
             account_id: account.id,
@@ -194,17 +217,11 @@ impl AuthUseCases for AuthService {
             }
         };
 
-        let wallet_opt = self.store.wallet.find_by_user_id(&api_key.user_id).await?;
-        let wallet = match wallet_opt {
-            Some(wallet) => wallet,
-            None => {
-                return Err(DataError::Inconsistency("Existing API key without wallet".to_string()).into());
-            }
-        };
+        let wallet = self.ensure_active_wallet(api_key.account_id).await?;
 
         let user = User {
             account_id: api_key.account_id,
-            id: wallet.user_id,
+            id: api_key.user_id,
             wallet_id: wallet.id,
             permissions: api_key.permissions,
         };
@@ -222,6 +239,8 @@ mod tests {
     use crate::{
         application::composition::MockAppStoreBuilder,
         domains::{
+            asset::Asset,
+            bitcoin::BtcNetwork,
             user::{Account, ApiKey, AuthClaims, AuthIdentity},
             wallet::Wallet,
         },
@@ -231,7 +250,7 @@ mod tests {
     use super::*;
 
     fn service(jwt: MockJWTAuthenticator, store: MockAppStoreBuilder, provider: AuthProvider) -> AuthService {
-        AuthService::new(Arc::new(jwt), store.build(), provider)
+        AuthService::new(Arc::new(jwt), store.build(), provider, BtcNetwork::Regtest)
     }
 
     fn claims(sub: &str) -> AuthClaims {
@@ -243,10 +262,26 @@ mod tests {
         }
     }
 
-    fn wallet_fixture(id: Uuid, user_id: &str) -> Wallet {
+    fn asset_fixture(id: Uuid) -> Asset {
+        Asset {
+            id,
+            code: "BTC".to_string(),
+            name: Some("Bitcoin regtest".to_string()),
+            protocol: "bitcoin".to_string(),
+            network: "bitcoin/regtest".to_string(),
+            asset_ref: "native".to_string(),
+            display_ticker: "rBTC".to_string(),
+            decimals: 11,
+            created_at: chrono::Utc::now(),
+            updated_at: None,
+        }
+    }
+
+    fn wallet_fixture(id: Uuid, account_id: Uuid, asset_id: Uuid) -> Wallet {
         Wallet {
             id,
-            user_id: user_id.to_string(),
+            account_id,
+            asset_id,
             ..Default::default()
         }
     }
@@ -611,13 +646,14 @@ mod tests {
     mod authenticate_jwt {
         use super::*;
 
-        mod when_wallet_exists {
+        mod when_token_is_valid {
             use super::*;
 
             #[tokio::test]
-            async fn returns_user_for_existing_wallet() {
+            async fn ensures_the_active_asset_wallet() {
                 let wallet_id = Uuid::new_v4();
                 let account_id = Uuid::new_v4();
+                let asset_id = Uuid::new_v4();
 
                 let mut jwt = MockJWTAuthenticator::new();
                 jwt.expect_decode().times(1).returning(|_| Ok(claims("alice")));
@@ -645,11 +681,17 @@ mod tests {
                         ))
                     });
                 store
-                    .wallet
-                    .expect_find_by_user_id()
-                    .withf(|user_id| user_id == "alice")
+                    .asset
+                    .expect_find_native_btc_by_network()
+                    .withf(|network| *network == BtcNetwork::Regtest)
                     .times(1)
-                    .returning(move |user_id| Ok(Some(wallet_fixture(wallet_id, user_id))));
+                    .returning(move |_| Ok(Some(asset_fixture(asset_id))));
+                store
+                    .wallet
+                    .expect_ensure_for_account_asset()
+                    .withf(move |account, asset| *account == account_id && *asset == asset_id)
+                    .times(1)
+                    .returning(move |account, asset| Ok(wallet_fixture(wallet_id, account, asset)));
 
                 let service = service(jwt, store, AuthProvider::Jwt);
 
@@ -658,56 +700,6 @@ mod tests {
                 assert_eq!(user.id, "alice");
                 assert_eq!(user.account_id, account_id);
                 assert_eq!(user.wallet_id, wallet_id);
-                assert_eq!(user.permissions, vec![Permission::ReadApiKey]);
-            }
-        }
-
-        mod when_wallet_is_missing {
-            use super::*;
-
-            #[tokio::test]
-            async fn provisions_a_wallet_on_first_login() {
-                let account_id = Uuid::new_v4();
-
-                let mut jwt = MockJWTAuthenticator::new();
-                jwt.expect_decode().times(1).returning(|_| Ok(claims("alice")));
-
-                let mut store = MockAppStoreBuilder::new();
-                store
-                    .account
-                    .expect_find_by_identity()
-                    .withf(|provider, subject| *provider == AuthProvider::Jwt && subject == "alice")
-                    .times(1)
-                    .returning(|_, _| Ok(None));
-                store
-                    .account
-                    .expect_upsert()
-                    .withf(|provider, subject, granted| {
-                        *provider == AuthProvider::Jwt && subject == "alice" && granted.is_empty()
-                    })
-                    .times(1)
-                    .returning(move |provider, subject, _| {
-                        Ok(account_fixture(
-                            account_id,
-                            provider,
-                            subject,
-                            vec![Permission::ReadApiKey],
-                        ))
-                    });
-                store.wallet.expect_find_by_user_id().times(1).returning(|_| Ok(None));
-                store
-                    .wallet
-                    .expect_insert()
-                    .withf(|user_id| user_id == "alice")
-                    .times(1)
-                    .returning(|user_id| Ok(wallet_fixture(Uuid::new_v4(), user_id)));
-
-                let service = service(jwt, store, AuthProvider::Jwt);
-
-                let user = service.authenticate_jwt("token").await.unwrap();
-
-                assert_eq!(user.id, "alice");
-                assert_eq!(user.account_id, account_id);
                 assert_eq!(user.permissions, vec![Permission::ReadApiKey]);
             }
         }
@@ -760,6 +752,7 @@ mod tests {
             async fn returns_user_with_api_key_permissions() {
                 let wallet_id = Uuid::new_v4();
                 let account_id = Uuid::new_v4();
+                let asset_id = Uuid::new_v4();
 
                 let mut store = MockAppStoreBuilder::new();
                 store.api_key.expect_find_by_key_hash().times(1).returning(move |_| {
@@ -771,10 +764,17 @@ mod tests {
                     }))
                 });
                 store
-                    .wallet
-                    .expect_find_by_user_id()
+                    .asset
+                    .expect_find_native_btc_by_network()
+                    .withf(|network| *network == BtcNetwork::Regtest)
                     .times(1)
-                    .returning(move |user_id| Ok(Some(wallet_fixture(wallet_id, user_id))));
+                    .returning(move |_| Ok(Some(asset_fixture(asset_id))));
+                store
+                    .wallet
+                    .expect_ensure_for_account_asset()
+                    .withf(move |account, asset| *account == account_id && *asset == asset_id)
+                    .times(1)
+                    .returning(move |account, asset| Ok(wallet_fixture(wallet_id, account, asset)));
 
                 let service = service(MockJWTAuthenticator::new(), store, AuthProvider::Jwt);
 
@@ -783,29 +783,6 @@ mod tests {
                 assert_eq!(user.account_id, account_id);
                 assert_eq!(user.wallet_id, wallet_id);
                 assert_eq!(user.permissions, vec![Permission::ReadWallet]);
-            }
-        }
-
-        mod when_key_exists_without_wallet {
-            use super::*;
-
-            #[tokio::test]
-            async fn returns_inconsistency() {
-                let mut store = MockAppStoreBuilder::new();
-                store.api_key.expect_find_by_key_hash().times(1).returning(|_| {
-                    Ok(Some(ApiKey {
-                        user_id: "alice".to_string(),
-                        account_id: Uuid::new_v4(),
-                        ..Default::default()
-                    }))
-                });
-                store.wallet.expect_find_by_user_id().times(1).returning(|_| Ok(None));
-
-                let service = service(MockJWTAuthenticator::new(), store, AuthProvider::Jwt);
-
-                let err = service.authenticate_api_key(vec![1, 2, 3]).await.unwrap_err();
-
-                assert!(matches!(err, ApplicationError::Data(DataError::Inconsistency(_))));
             }
         }
     }

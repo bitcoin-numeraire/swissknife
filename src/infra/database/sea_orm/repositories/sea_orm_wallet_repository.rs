@@ -1,14 +1,15 @@
 use async_trait::async_trait;
+use chrono::Utc;
 use sea_orm::{
-    sea_query::Expr, ActiveModelTrait, ActiveValue::Set, ColumnTrait, DatabaseConnection, EntityTrait, ModelTrait,
-    QueryFilter, QueryOrder, QuerySelect, QueryTrait,
+    sea_query::{Expr, OnConflict},
+    ColumnTrait, DatabaseConnection, EntityTrait, ModelTrait, QueryFilter, QueryOrder, QuerySelect, QueryTrait, Set,
 };
 use uuid::Uuid;
 
 use super::SeaOrmConnection;
 
 use crate::{
-    application::{composition::Currency, errors::DatabaseError},
+    application::errors::DatabaseError,
     domains::{
         payment::PaymentStatus,
         wallet::{Balance, Contact, Wallet, WalletFilter, WalletOverview, WalletRepository},
@@ -17,9 +18,8 @@ use crate::{
         contact::ContactModel,
         invoice::Column as InvoiceColumn,
         payment::Column as PaymentColumn,
-        prelude::{BtcAddress, BtcOutput, Invoice, LnAddress, Payment, Wallet as WalletEntity, WalletBalance},
+        prelude::{Asset as AssetEntity, BtcAddress, BtcOutput, Invoice, LnAddress, Payment, Wallet as WalletEntity},
         wallet::{ActiveModel, Column},
-        wallet_balance::Column as WalletBalanceColumn,
     },
 };
 
@@ -39,72 +39,79 @@ impl<C> WalletRepository for SeaOrmWalletRepository<C>
 where
     C: SeaOrmConnection,
 {
-    async fn find(&self, id: Uuid, currency: &Currency) -> Result<Option<Wallet>, DatabaseError> {
-        let model_opt = WalletEntity::find_by_id(id)
+    async fn find(&self, id: Uuid) -> Result<Option<Wallet>, DatabaseError> {
+        let Some(model) = WalletEntity::find_by_id(id)
             .one(self.db.connection())
             .await
-            .map_err(|e| DatabaseError::FindOne(e.to_string()))?;
-
-        match model_opt {
-            Some(model) => {
-                let balance = self.get_balance(id, currency).await?;
-                let payments_with_output = Payment::find()
-                    .filter(PaymentColumn::WalletId.eq(id))
-                    .all(self.db.connection())
-                    .await
-                    .map_err(|e| DatabaseError::FindRelated(e.to_string()))?;
-                let invoices_with_output = Invoice::find()
-                    .filter(InvoiceColumn::WalletId.eq(id))
-                    .find_also_related(BtcOutput)
-                    .all(self.db.connection())
-                    .await
-                    .map_err(|e| DatabaseError::FindRelated(e.to_string()))?;
-                let ln_address = model
-                    .find_related(LnAddress)
-                    .one(self.db.connection())
-                    .await
-                    .map_err(|e| DatabaseError::FindRelated(e.to_string()))?;
-                let btc_addresses = model
-                    .find_related(BtcAddress)
-                    .all(self.db.connection())
-                    .await
-                    .map_err(|e| DatabaseError::FindRelated(e.to_string()))?;
-                let contacts = self.find_contacts(id).await?;
-
-                let mut wallet: Wallet = model.into();
-                wallet.balance = balance;
-                wallet.payments = payments_with_output.into_iter().map(Into::into).collect();
-                wallet.invoices = invoices_with_output
-                    .into_iter()
-                    .map(|(invoice_model, output_model)| {
-                        let mut invoice: crate::domains::invoice::Invoice = invoice_model.into();
-                        invoice.bitcoin_output = output_model.map(Into::into);
-                        invoice
-                    })
-                    .collect();
-                wallet.ln_address = ln_address.map(Into::into);
-                wallet.btc_addresses = btc_addresses.into_iter().map(Into::into).collect();
-                wallet.contacts = contacts;
-
-                return Ok(Some(wallet));
-            }
-            None => return Ok(None),
+            .map_err(|e| DatabaseError::FindOne(e.to_string()))?
+        else {
+            return Ok(None);
         };
+
+        let payments_with_output = Payment::find()
+            .filter(PaymentColumn::WalletId.eq(id))
+            .all(self.db.connection())
+            .await
+            .map_err(|e| DatabaseError::FindRelated(e.to_string()))?;
+        let invoices_with_output = Invoice::find()
+            .filter(InvoiceColumn::WalletId.eq(id))
+            .find_also_related(BtcOutput)
+            .all(self.db.connection())
+            .await
+            .map_err(|e| DatabaseError::FindRelated(e.to_string()))?;
+        let ln_address = model
+            .find_related(LnAddress)
+            .one(self.db.connection())
+            .await
+            .map_err(|e| DatabaseError::FindRelated(e.to_string()))?;
+        let btc_addresses = model
+            .find_related(BtcAddress)
+            .all(self.db.connection())
+            .await
+            .map_err(|e| DatabaseError::FindRelated(e.to_string()))?;
+        let contacts = self.find_contacts(id).await?;
+
+        let mut wallet = self.hydrate(model).await?;
+        wallet.payments = payments_with_output.into_iter().map(Into::into).collect();
+        wallet.invoices = invoices_with_output
+            .into_iter()
+            .map(|(invoice_model, output_model)| {
+                let mut invoice: crate::domains::invoice::Invoice = invoice_model.into();
+                invoice.bitcoin_output = output_model.map(Into::into);
+                invoice
+            })
+            .collect();
+        wallet.ln_address = ln_address.map(Into::into);
+        wallet.btc_addresses = btc_addresses.into_iter().map(Into::into).collect();
+        wallet.contacts = contacts;
+
+        Ok(Some(wallet))
     }
 
-    async fn find_by_user_id(&self, user_id: &str) -> Result<Option<Wallet>, DatabaseError> {
+    async fn find_by_account_and_asset(
+        &self,
+        account_id: Uuid,
+        asset_id: Uuid,
+    ) -> Result<Option<Wallet>, DatabaseError> {
         let model = WalletEntity::find()
-            .filter(Column::UserId.eq(user_id))
+            .filter(Column::AccountId.eq(account_id))
+            .filter(Column::AssetId.eq(asset_id))
             .one(self.db.connection())
             .await
             .map_err(|e| DatabaseError::FindOne(e.to_string()))?;
 
-        Ok(model.map(Into::into))
+        match model {
+            Some(model) => Ok(Some(self.hydrate(model).await?)),
+            None => Ok(None),
+        }
     }
 
     async fn find_many(&self, filter: WalletFilter) -> Result<Vec<Wallet>, DatabaseError> {
         let models = WalletEntity::find()
-            .apply_if(filter.user_id, |q, user| q.filter(Column::UserId.eq(user)))
+            .apply_if(filter.account_id, |q, account_id| {
+                q.filter(Column::AccountId.eq(account_id))
+            })
+            .apply_if(filter.asset_id, |q, asset_id| q.filter(Column::AssetId.eq(asset_id)))
             .apply_if(filter.ids, |q, ids| q.filter(Column::Id.is_in(ids)))
             .order_by(
                 Column::CreatedAt,
@@ -116,20 +123,22 @@ where
             .await
             .map_err(|e| DatabaseError::FindMany(e.to_string()))?;
 
-        Ok(models.into_iter().map(Into::into).collect())
+        let mut wallets = Vec::with_capacity(models.len());
+        for model in models {
+            wallets.push(self.hydrate(model).await?);
+        }
+
+        Ok(wallets)
     }
 
-    async fn find_many_overview(&self, currency: &Currency) -> Result<Vec<WalletOverview>, DatabaseError> {
-        // Get all wallets with their ln_address (1-to-1 relation)
+    async fn find_many_overview(&self) -> Result<Vec<WalletOverview>, DatabaseError> {
         let wallets_with_ln = WalletEntity::find()
             .find_also_related(LnAddress)
             .all(self.db.connection())
             .await
             .map_err(|e| DatabaseError::FindMany(e.to_string()))?;
 
-        // Get invoice aggregates grouped by wallet_id
         let invoice_aggs = Invoice::find()
-            .filter(InvoiceColumn::Currency.eq(currency.to_string()))
             .select_only()
             .column(InvoiceColumn::WalletId)
             .column_as(
@@ -143,12 +152,9 @@ where
             .await
             .map_err(|e| DatabaseError::FindMany(e.to_string()))?;
 
-        // Money totals count settled payments only (pending is surfaced via reserved_msat below),
-        // matching get_balance; counts below still include every payment.
         let settled_payment_status = PaymentStatus::Settled.to_string();
 
         let payment_aggs = Payment::find()
-            .filter(PaymentColumn::Currency.eq(currency.to_string()))
             .select_only()
             .column(PaymentColumn::WalletId)
             .column_as(
@@ -173,19 +179,6 @@ where
             .await
             .map_err(|e| DatabaseError::FindMany(e.to_string()))?;
 
-        // One row per wallet for this currency (PK is (wallet_id, currency)); no aggregation needed.
-        let balance_rows = WalletBalance::find()
-            .filter(WalletBalanceColumn::Currency.eq(currency.to_string()))
-            .select_only()
-            .column(WalletBalanceColumn::WalletId)
-            .column(WalletBalanceColumn::AvailableAmount)
-            .column(WalletBalanceColumn::ReservedAmount)
-            .into_tuple::<(Uuid, i64, i64)>()
-            .all(self.db.connection())
-            .await
-            .map_err(|e| DatabaseError::FindMany(e.to_string()))?;
-
-        // Convert to HashMaps for efficient lookup
         let invoice_map: std::collections::HashMap<_, _> = invoice_aggs
             .into_iter()
             .map(|(id, received, count)| (id, (received, count)))
@@ -194,65 +187,92 @@ where
             .into_iter()
             .map(|(id, sent, fees, count, contacts)| (id, (sent, fees, count, contacts)))
             .collect();
-        let balance_map: std::collections::HashMap<_, _> = balance_rows
-            .into_iter()
-            .map(|(id, available, reserved)| (id, (available, reserved)))
-            .collect();
 
-        // Combine the results
-        Ok(wallets_with_ln
-            .into_iter()
-            .map(|(wallet_model, ln_address_model)| {
-                let wallet_id = wallet_model.id;
-                let (received_msat, n_invoices) =
-                    invoice_map.get(&wallet_id).map(|(r, n)| (*r, *n)).unwrap_or((None, 0));
-                let (sent_msat, fees_paid_msat, n_payments, n_contacts) = payment_map
-                    .get(&wallet_id)
-                    .map(|(s, f, np, nc)| (*s, *f, *np, *nc))
-                    .unwrap_or((None, None, 0, 0));
-                let (available_msat, reserved_msat) =
-                    balance_map.get(&wallet_id).map(|(a, r)| (*a, *r)).unwrap_or((0, 0));
+        let mut overviews = Vec::with_capacity(wallets_with_ln.len());
+        for (wallet_model, ln_address_model) in wallets_with_ln {
+            let wallet_id = wallet_model.id;
+            let asset_model = AssetEntity::find_by_id(wallet_model.asset_id)
+                .one(self.db.connection())
+                .await
+                .map_err(|e| DatabaseError::FindOne(e.to_string()))?;
+            let (received_msat, n_invoices) = invoice_map.get(&wallet_id).map(|(r, n)| (*r, *n)).unwrap_or((None, 0));
+            let (sent_msat, fees_paid_msat, n_payments, n_contacts) = payment_map
+                .get(&wallet_id)
+                .map(|(s, f, np, nc)| (*s, *f, *np, *nc))
+                .unwrap_or((None, None, 0, 0));
 
-                WalletOverview {
-                    id: wallet_model.id,
-                    user_id: wallet_model.user_id,
-                    balance: Balance {
-                        received_msat: received_msat.unwrap_or(0) as u64,
-                        sent_msat: sent_msat.unwrap_or(0) as u64,
-                        fees_paid_msat: fees_paid_msat.unwrap_or(0) as u64,
-                        reserved_msat: reserved_msat as u64,
-                        available_msat,
-                    },
-                    n_payments: n_payments as u32,
-                    n_invoices: n_invoices as u32,
-                    n_contacts: n_contacts as u32,
-                    ln_address: ln_address_model.map(Into::into),
-                    created_at: wallet_model.created_at.and_utc(),
-                    updated_at: wallet_model.updated_at.map(|t| t.and_utc()),
-                }
-            })
-            .collect())
+            overviews.push(WalletOverview {
+                id: wallet_model.id,
+                account_id: wallet_model.account_id,
+                asset_id: wallet_model.asset_id,
+                asset: asset_model.map(Into::into),
+                label: wallet_model.label,
+                balance: Balance {
+                    received_msat: received_msat.unwrap_or(0) as u64,
+                    sent_msat: sent_msat.unwrap_or(0) as u64,
+                    fees_paid_msat: fees_paid_msat.unwrap_or(0) as u64,
+                    reserved_msat: wallet_model.reserved_amount as u64,
+                    available_msat: wallet_model.available_amount,
+                },
+                n_payments: n_payments as u32,
+                n_invoices: n_invoices as u32,
+                n_contacts: n_contacts as u32,
+                ln_address: ln_address_model.map(Into::into),
+                created_at: wallet_model.created_at.and_utc(),
+                updated_at: wallet_model.updated_at.map(|t| t.and_utc()),
+            });
+        }
+
+        Ok(overviews)
     }
 
-    async fn insert(&self, user_id: &str) -> Result<Wallet, DatabaseError> {
+    async fn ensure_for_account_asset(&self, account_id: Uuid, asset_id: Uuid) -> Result<Wallet, DatabaseError> {
+        if let Some(wallet) = self.find_by_account_and_asset(account_id, asset_id).await? {
+            return Ok(wallet);
+        }
+
+        let now = Utc::now().naive_utc();
+        let id = Uuid::new_v4();
         let model = ActiveModel {
-            id: Set(Uuid::new_v4()),
-            user_id: Set(user_id.to_string()),
+            id: Set(id),
+            user_id: Set(legacy_user_id(account_id, asset_id)),
+            account_id: Set(account_id),
+            asset_id: Set(asset_id),
+            available_amount: Set(0),
+            reserved_amount: Set(0),
+            created_at: Set(now),
             ..Default::default()
         };
 
-        let model = model
-            .insert(self.db.connection())
+        WalletEntity::insert(model)
+            .on_conflict(
+                OnConflict::columns([Column::AccountId, Column::AssetId])
+                    .do_nothing()
+                    .to_owned(),
+            )
+            .exec_without_returning(self.db.connection())
             .await
             .map_err(|e| DatabaseError::Insert(e.to_string()))?;
 
-        Ok(model.into())
+        self.find_by_account_and_asset(account_id, asset_id)
+            .await?
+            .ok_or_else(|| DatabaseError::Insert("wallet was not available after idempotent provisioning".to_string()))
     }
 
-    async fn get_balance(&self, id: Uuid, currency: &Currency) -> Result<Balance, DatabaseError> {
+    async fn get_balance(&self, id: Uuid) -> Result<Balance, DatabaseError> {
+        let wallet_amounts = WalletEntity::find_by_id(id)
+            .select_only()
+            .column(Column::AvailableAmount)
+            .column(Column::ReservedAmount)
+            .into_tuple::<(i64, i64)>()
+            .one(self.db.connection())
+            .await
+            .map_err(|e| DatabaseError::FindOne(e.to_string()))?;
+
+        let (available_msat, reserved_msat) = wallet_amounts.unwrap_or((0, 0));
+
         let received = Invoice::find()
             .filter(InvoiceColumn::WalletId.eq(id))
-            .filter(InvoiceColumn::Currency.eq(currency.to_string()))
             .select_only()
             .column_as(
                 Expr::cust("CAST(SUM(invoice.amount_received_msat) AS BIGINT)"),
@@ -266,7 +286,6 @@ where
 
         let (sent_msat, fees_paid_msat) = Payment::find()
             .filter(PaymentColumn::WalletId.eq(id))
-            .filter(PaymentColumn::Currency.eq(currency.to_string()))
             .filter(PaymentColumn::Status.eq(PaymentStatus::Settled.to_string()))
             .select_only()
             .column_as(Expr::cust("CAST(SUM(payment.amount_msat) AS BIGINT)"), "sent_msat")
@@ -276,19 +295,6 @@ where
             .await
             .map_err(|e| DatabaseError::FindOne(e.to_string()))?
             .unwrap_or((None, None));
-
-        // At most one row per wallet for this currency (PK is (wallet_id, currency)).
-        let (available_msat, reserved_msat) = WalletBalance::find()
-            .filter(WalletBalanceColumn::WalletId.eq(id))
-            .filter(WalletBalanceColumn::Currency.eq(currency.to_string()))
-            .select_only()
-            .column(WalletBalanceColumn::AvailableAmount)
-            .column(WalletBalanceColumn::ReservedAmount)
-            .into_tuple::<(i64, i64)>()
-            .one(self.db.connection())
-            .await
-            .map_err(|e| DatabaseError::FindOne(e.to_string()))?
-            .unwrap_or((0, 0));
 
         Ok(Balance {
             received_msat: received.unwrap_or(0) as u64,
@@ -314,13 +320,15 @@ where
             .await
             .map_err(|e| DatabaseError::FindMany(e.to_string()))?;
 
-        let response: Vec<Contact> = models.into_iter().map(Into::into).collect();
-        Ok(response)
+        Ok(models.into_iter().map(Into::into).collect())
     }
 
     async fn delete_many(&self, filter: WalletFilter) -> Result<u64, DatabaseError> {
         let result = WalletEntity::delete_many()
-            .apply_if(filter.user_id, |q, user| q.filter(Column::UserId.eq(user)))
+            .apply_if(filter.account_id, |q, account_id| {
+                q.filter(Column::AccountId.eq(account_id))
+            })
+            .apply_if(filter.asset_id, |q, asset_id| q.filter(Column::AssetId.eq(asset_id)))
             .apply_if(filter.ids, |q, ids| q.filter(Column::Id.is_in(ids)))
             .exec(self.db.connection())
             .await
@@ -328,4 +336,27 @@ where
 
         Ok(result.rows_affected)
     }
+}
+
+impl<C> SeaOrmWalletRepository<C>
+where
+    C: SeaOrmConnection,
+{
+    async fn hydrate(
+        &self,
+        model: crate::infra::database::sea_orm::models::wallet::Model,
+    ) -> Result<Wallet, DatabaseError> {
+        let asset = AssetEntity::find_by_id(model.asset_id)
+            .one(self.db.connection())
+            .await
+            .map_err(|e| DatabaseError::FindOne(e.to_string()))?;
+        let mut wallet: Wallet = model.into();
+        wallet.asset = asset.map(Into::into);
+        wallet.balance = self.get_balance(wallet.id).await?;
+        Ok(wallet)
+    }
+}
+
+fn legacy_user_id(account_id: Uuid, asset_id: Uuid) -> String {
+    format!("{account_id}:{asset_id}")
 }

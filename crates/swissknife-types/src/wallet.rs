@@ -41,13 +41,48 @@ pub struct Contact {
     pub contact_since: DateTime<Utc>,
 }
 
+/// A spendable asset on one protocol/network.
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, ToSchema)]
+pub struct Asset {
+    /// Internal asset ID
+    pub id: Uuid,
+    /// Display code, such as BTC or USDT
+    pub code: String,
+    /// Optional display name
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    /// Settlement protocol, such as bitcoin or taproot_assets
+    pub protocol: String,
+    /// Settlement network, such as bitcoin/mainnet or bitcoin/regtest
+    pub network: String,
+    /// Protocol-specific asset reference; native for chain-native BTC
+    pub asset_ref: String,
+    /// Display ticker, such as BTC, tBTC, or rBTC
+    pub display_ticker: String,
+    /// Integer storage scale for this asset
+    pub decimals: i16,
+    /// Date of creation in database
+    pub created_at: DateTime<Utc>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    /// Date of update in database
+    pub updated_at: Option<DateTime<Utc>>,
+}
+
 /// A user wallet with its balance and linked payments, invoices, Bitcoin addresses and contacts.
 #[derive(Debug, Clone, Default, Deserialize, Serialize, ToSchema)]
 pub struct Wallet {
     /// Internal ID
     pub id: Uuid,
-    /// User ID. Populated from the Authentication method,  such as JWT subject
-    pub user_id: String,
+    /// Owning account ID
+    pub account_id: Uuid,
+    /// Spendable asset held by this wallet
+    pub asset_id: Uuid,
+    /// Asset metadata, when loaded by the repository
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub asset: Option<Asset>,
+    /// Optional display label
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
     /// Lightning Address
     pub ln_address: Option<LnAddress>,
     /// User Balance
@@ -72,8 +107,16 @@ pub struct Wallet {
 pub struct WalletOverview {
     /// Internal ID
     pub id: Uuid,
-    /// User ID. Populated from the Authentication method,  such as JWT subject
-    pub user_id: String,
+    /// Owning account ID
+    pub account_id: Uuid,
+    /// Spendable asset held by this wallet
+    pub asset_id: Uuid,
+    /// Asset metadata, when loaded by the repository
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub asset: Option<Asset>,
+    /// Optional display label
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
     /// Lightning Address
     pub ln_address: Option<LnAddress>,
     /// User Balance
@@ -91,11 +134,13 @@ pub struct WalletOverview {
     pub updated_at: Option<DateTime<Utc>>,
 }
 
-/// Register Wallet Request
+/// Create Wallet Request
 #[derive(Debug, Deserialize, Clone, ToSchema, Serialize)]
-pub struct RegisterWalletRequest {
-    /// User ID. Should ideally be registered in your Auth provider.
-    pub user_id: String,
+pub struct CreateWalletRequest {
+    /// Owning account ID
+    pub account_id: Uuid,
+    /// Asset ID to enable for the account
+    pub asset_id: Uuid,
 }
 
 /// Wallet query filter.
@@ -110,8 +155,10 @@ pub struct WalletFilter {
     pub offset: Option<u64>,
     /// List of IDs
     pub ids: Option<Vec<Uuid>>,
-    /// User ID. Automatically populated with your ID
-    pub user_id: Option<String>,
+    /// Owning account ID
+    pub account_id: Option<Uuid>,
+    /// Asset ID
+    pub asset_id: Option<Uuid>,
     /// Direction of the ordering of results
     #[serde(default)]
     pub order_direction: OrderDirection,

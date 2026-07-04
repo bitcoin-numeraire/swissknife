@@ -1,3 +1,4 @@
+pub mod asset;
 pub mod bitcoin;
 pub mod event;
 pub mod invoice;

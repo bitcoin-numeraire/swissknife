@@ -8,7 +8,7 @@ use super::{Balance, Contact, Wallet, WalletFilter, WalletOverview};
 #[cfg_attr(test, mockall::automock)]
 #[async_trait]
 pub trait WalletUseCases: Send + Sync {
-    async fn register(&self, user_id: String) -> Result<Wallet, ApplicationError>;
+    async fn create(&self, account_id: Uuid, asset_id: Uuid) -> Result<Wallet, ApplicationError>;
     async fn get(&self, id: Uuid) -> Result<Wallet, ApplicationError>;
     async fn list(&self, filter: WalletFilter) -> Result<Vec<Wallet>, ApplicationError>;
     async fn list_overviews(&self) -> Result<Vec<WalletOverview>, ApplicationError>;
