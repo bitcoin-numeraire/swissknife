@@ -92,7 +92,9 @@ Developer documentation:
 
 - [Contributing](docs/CONTRIBUTING.md)
 - [Developer guidelines](docs/DEVELOPER_GUIDELINES.md)
-- [Architecture decisions](docs/adr/0001-appstore-uow-wallet-reservations.md)
+- Architecture decisions:
+  - [ADR 0001: AppStore, Unit of Work, and wallet reservations](docs/adr/0001-appstore-uow-wallet-reservations.md)
+  - [ADR 0002: Identity, assets, and asset-scoped wallets](docs/adr/0002-identity-assets-wallet-model.md)
 - [Code of conduct](docs/CODE_OF_CONDUCT.md)
 
 ## Work In Progress (WIP)
