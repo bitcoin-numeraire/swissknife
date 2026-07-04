@@ -259,7 +259,7 @@ async fn get_wallet_address(
     let ln_addresses = services
         .ln_address
         .list(LnAddressFilter {
-            wallet_id: Some(user.wallet_id),
+            account_id: Some(user.account_id),
             ..Default::default()
         })
         .await?;
@@ -292,7 +292,7 @@ async fn register_wallet_address(
     let ln_address = services
         .ln_address
         .register(
-            user.wallet_id,
+            user.account_id,
             payload.username,
             payload.allows_nostr,
             payload.nostr_pubkey,
@@ -327,7 +327,7 @@ async fn update_wallet_address(
     let ln_addresses = services
         .ln_address
         .list(LnAddressFilter {
-            wallet_id: Some(user.wallet_id),
+            account_id: Some(user.account_id),
             ..Default::default()
         })
         .await?;
@@ -362,7 +362,7 @@ async fn delete_wallet_address(State(services): State<Arc<AppServices>>, user: U
     let n_deleted = services
         .ln_address
         .delete_many(LnAddressFilter {
-            wallet_id: Some(user.wallet_id),
+            account_id: Some(user.account_id),
             ..Default::default()
         })
         .await?;
@@ -760,9 +760,9 @@ mod tests {
     // scoped to the authenticated user's wallet. These tests lock that invariant.
     fn user() -> User {
         User {
+            account_id: Uuid::new_v4(),
             wallet_id: Uuid::new_v4(),
             permissions: vec![],
-            ..Default::default()
         }
     }
 
@@ -891,13 +891,13 @@ mod tests {
         #[tokio::test]
         async fn lists_only_the_authenticated_users_addresses() {
             let caller = user();
-            let wallet_id = caller.wallet_id;
+            let account_id = caller.account_id;
 
             let mut builder = MockAppServicesBuilder::new();
             builder
                 .ln_address
                 .expect_list()
-                .withf(move |filter| filter.wallet_id == Some(wallet_id))
+                .withf(move |filter| filter.account_id == Some(account_id))
                 .times(1)
                 .returning(|_| Ok(vec![]));
 

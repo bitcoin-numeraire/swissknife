@@ -20,7 +20,7 @@ use crate::common::{app, assert_error, assert_status, Auth, TestApp};
 async fn register_address(app: &TestApp, token: &str, label: &str, nostr_pubkey: Option<&str>) -> (Wallet, LnAddress) {
     let wallet = app.create_wallet(token, label).await;
     let body = serde_json::json!({
-        "wallet_id": wallet.id,
+        "account_id": wallet.account_id,
         "username": unique(label),
         "allows_nostr": nostr_pubkey.is_some(),
         "nostr_pubkey": nostr_pubkey,

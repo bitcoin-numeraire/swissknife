@@ -25,6 +25,7 @@ mod m20260704_000007_backfill_oauth2_accounts;
 mod m20260704_000008_wallet_account_asset_schema;
 mod m20260704_000009_backfill_mainnet_wallet_accounts;
 mod m20260704_000010_drop_api_key_user_id_fk;
+mod m20260704_000011_ln_address_account_routes;
 
 pub struct Migrator;
 
@@ -57,6 +58,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260704_000008_wallet_account_asset_schema::Migration),
             Box::new(m20260704_000009_backfill_mainnet_wallet_accounts::Migration),
             Box::new(m20260704_000010_drop_api_key_user_id_fk::Migration),
+            Box::new(m20260704_000011_ln_address_account_routes::Migration),
         ]
     }
 }
@@ -69,6 +71,8 @@ mod tests {
 
     const MIGRATIONS_BEFORE_IDENTITY_ASSETS: u32 = 16;
     const IDENTITY_ASSET_MIGRATION_COUNT: u32 = 9;
+    const MIGRATIONS_BEFORE_LN_ADDRESS_ACCOUNT_ROUTES: u32 =
+        MIGRATIONS_BEFORE_IDENTITY_ASSETS + IDENTITY_ASSET_MIGRATION_COUNT;
 
     async fn sqlite() -> sea_orm::DatabaseConnection {
         Database::connect("sqlite::memory:")
@@ -267,6 +271,81 @@ mod tests {
             )
             .await,
             0
+        );
+    }
+
+    #[async_std::test]
+    async fn ln_address_account_routes_backfill_from_receiving_wallets() {
+        let conn = sqlite().await;
+
+        Migrator::up(&conn, Some(MIGRATIONS_BEFORE_LN_ADDRESS_ACCOUNT_ROUTES))
+            .await
+            .expect("run migrations before ln address account routes");
+        conn.execute(Statement::from_string(
+            DatabaseBackend::Sqlite,
+            r#"
+            INSERT INTO wallet (
+                id,
+                account_id,
+                asset_id,
+                available_amount,
+                reserved_amount,
+                created_at
+            )
+            VALUES (
+                X'11111111111141118111111111111111',
+                X'22222222222242228222222222222222',
+                X'33333333333343338333333333333333',
+                0,
+                0,
+                CURRENT_TIMESTAMP
+            )
+            "#
+            .to_string(),
+        ))
+        .await
+        .expect("insert asset wallet");
+        conn.execute(Statement::from_string(
+            DatabaseBackend::Sqlite,
+            r#"
+            INSERT INTO ln_address (
+                id,
+                wallet_id,
+                username,
+                active,
+                allows_nostr,
+                created_at
+            )
+            VALUES (
+                X'44444444444444448444444444444444',
+                X'11111111111141118111111111111111',
+                'alice',
+                1,
+                0,
+                CURRENT_TIMESTAMP
+            )
+            "#
+            .to_string(),
+        ))
+        .await
+        .expect("insert legacy ln address");
+
+        Migrator::up(&conn, None)
+            .await
+            .expect("run ln address account routes migration");
+
+        assert_eq!(
+            count(
+                &conn,
+                r#"
+                SELECT COUNT(*) AS count
+                FROM ln_address
+                WHERE account_id = X'22222222222242228222222222222222'
+                  AND wallet_id = X'11111111111141118111111111111111'
+                "#,
+            )
+            .await,
+            1
         );
     }
 }

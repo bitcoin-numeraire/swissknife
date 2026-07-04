@@ -164,6 +164,7 @@ mod tests {
     fn ln_address(active: bool) -> LnAddress {
         LnAddress {
             id: Uuid::new_v4(),
+            account_id: Uuid::new_v4(),
             wallet_id: Uuid::new_v4(),
             username: "alice".to_string(),
             active,

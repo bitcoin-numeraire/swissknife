@@ -372,6 +372,7 @@ function applyFilter({
   if (name) {
     inputData = inputData.filter(
       (addr) =>
+        addr.account_id.toLowerCase().indexOf(name.toLowerCase()) !== -1 ||
         addr.wallet_id.toLowerCase().indexOf(name.toLowerCase()) !== -1 ||
         addr.username.toLowerCase().indexOf(name.toLowerCase()) !== -1 ||
         addr.id.toLowerCase().indexOf(name.toLowerCase()) !== -1

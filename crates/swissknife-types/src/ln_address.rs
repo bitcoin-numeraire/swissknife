@@ -12,7 +12,9 @@ use crate::OrderDirection;
 pub struct LnAddress {
     /// Internal ID
     pub id: Uuid,
-    /// Wallet ID
+    /// Owning account ID
+    pub account_id: Uuid,
+    /// Wallet that receives invoices generated for this address
     pub wallet_id: Uuid,
     /// Username
     pub username: String,
@@ -34,8 +36,8 @@ pub struct LnAddress {
 /// Register Lightning Address Request
 #[derive(Debug, Deserialize, ToSchema, Serialize)]
 pub struct RegisterLnAddressRequest {
-    /// Wallet ID. Will be populated with your own ID by default
-    pub wallet_id: Option<Uuid>,
+    /// Owning account ID. Required for admin routes; user-scoped routes use the authenticated account.
+    pub account_id: Option<Uuid>,
 
     /// Username such as `username@domain`
     pub username: String,
@@ -80,7 +82,9 @@ pub struct LnAddressFilter {
     pub offset: Option<u64>,
     /// List of IDs
     pub ids: Option<Vec<Uuid>>,
-    /// wallet ID. Automatically populated with your ID
+    /// Owning account ID
+    pub account_id: Option<Uuid>,
+    /// Receiving wallet ID
     pub wallet_id: Option<Uuid>,
     /// Username
     pub username: Option<String>,

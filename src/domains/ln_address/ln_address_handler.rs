@@ -18,7 +18,7 @@ use crate::{
             BAD_REQUEST_EXAMPLE, FORBIDDEN_EXAMPLE, INTERNAL_EXAMPLE, NOT_FOUND_EXAMPLE, UNAUTHORIZED_EXAMPLE,
             UNPROCESSABLE_EXAMPLE,
         },
-        errors::ApplicationError,
+        errors::{ApplicationError, DataError},
     },
     domains::user::{Permission, User},
     infra::axum::{Json, Path},
@@ -75,7 +75,9 @@ async fn register_address(
     let ln_address = services
         .ln_address
         .register(
-            payload.wallet_id.unwrap_or(user.wallet_id),
+            payload
+                .account_id
+                .ok_or_else(|| DataError::Malformed("account_id is required.".to_string()))?,
             payload.username,
             payload.allows_nostr,
             payload.nostr_pubkey,
@@ -242,15 +244,16 @@ mod tests {
 
     fn user(permissions: Vec<Permission>) -> User {
         User {
+            account_id: Uuid::new_v4(),
             wallet_id: Uuid::new_v4(),
             permissions,
-            ..Default::default()
         }
     }
 
-    fn ln_address(wallet_id: Uuid) -> LnAddress {
+    fn ln_address(account_id: Uuid, wallet_id: Uuid) -> LnAddress {
         LnAddress {
             id: Uuid::new_v4(),
+            account_id,
             wallet_id,
             username: "alice".to_string(),
             active: true,
@@ -261,9 +264,9 @@ mod tests {
         }
     }
 
-    fn register_request(wallet_id: Option<Uuid>) -> RegisterLnAddressRequest {
+    fn register_request(account_id: Option<Uuid>) -> RegisterLnAddressRequest {
         RegisterLnAddressRequest {
-            wallet_id,
+            account_id,
             username: "alice".to_string(),
             allows_nostr: false,
             nostr_pubkey: None,
@@ -280,31 +283,57 @@ mod tests {
             async fn is_forbidden_and_does_not_call_the_service() {
                 let services = MockAppServicesBuilder::new().build();
 
-                let result =
-                    register_address(State(Arc::new(services)), user(vec![]), Json(register_request(None))).await;
+                let result = register_address(
+                    State(Arc::new(services)),
+                    user(vec![]),
+                    Json(register_request(Some(Uuid::new_v4()))),
+                )
+                .await;
 
                 assert!(matches!(result, Err(ApplicationError::Authorization(_))));
             }
         }
 
-        mod when_wallet_id_is_omitted {
+        mod when_account_id_is_missing {
             use super::*;
 
             #[tokio::test]
-            async fn defaults_to_the_authenticated_users_wallet() {
+            async fn returns_bad_request_without_calling_the_service() {
                 let caller = user(vec![Permission::WriteLnAddress]);
-                let expected_wallet = caller.wallet_id;
+
+                let result = register_address(
+                    State(Arc::new(MockAppServicesBuilder::new().build())),
+                    caller,
+                    Json(register_request(None)),
+                )
+                .await;
+
+                assert!(matches!(result, Err(ApplicationError::Data(DataError::Malformed(_)))));
+            }
+        }
+
+        mod with_an_explicit_account {
+            use super::*;
+
+            #[tokio::test]
+            async fn passes_the_account_to_the_service() {
+                let account_id = Uuid::new_v4();
+                let wallet_id = Uuid::new_v4();
 
                 let mut builder = MockAppServicesBuilder::new();
                 builder
                     .ln_address
                     .expect_register()
-                    .withf(move |wallet_id, _, _, _| *wallet_id == expected_wallet)
+                    .withf(move |account, username, _, _| *account == account_id && username == "alice")
                     .times(1)
-                    .returning(|wallet_id, _, _, _| Ok(ln_address(wallet_id)));
+                    .returning(move |account, _, _, _| Ok(ln_address(account, wallet_id)));
 
-                let result =
-                    register_address(State(Arc::new(builder.build())), caller, Json(register_request(None))).await;
+                let result = register_address(
+                    State(Arc::new(builder.build())),
+                    user(vec![Permission::WriteLnAddress]),
+                    Json(register_request(Some(account_id))),
+                )
+                .await;
 
                 assert!(result.is_ok());
             }

@@ -173,21 +173,7 @@ export function LnAddressDetails({ lnAddress, isAdmin }: Props) {
                   <Grid size={{ xs: 12, sm: 4 }}>
                     <MetricTile
                       title={t('ln_address_details.belongs_to')}
-                      value={
-                        isAdmin ? (
-                          <Link
-                            component={RouterLink}
-                            href={paths.account(lnAddress.wallet_id)}
-                            color="inherit"
-                            underline="hover"
-                            sx={{ wordBreak: 'break-word' }}
-                          >
-                            {truncateText(lnAddress.wallet_id, 15)}
-                          </Link>
-                        ) : (
-                          truncateText(lnAddress.wallet_id, 15)
-                        )
-                      }
+                      value={truncateText(lnAddress.account_id, 15)}
                     />
                   </Grid>
                 </Grid>
@@ -284,6 +270,12 @@ export function LnAddressDetails({ lnAddress, isAdmin }: Props) {
               />
               <DetailRow
                 label={t('ln_address_details.belongs_to')}
+                value={lnAddress.account_id}
+                copyValue={lnAddress.account_id}
+                mono
+              />
+              <DetailRow
+                label={t('ln_address_details.wallet_id')}
                 value={
                   isAdmin ? (
                     <Link

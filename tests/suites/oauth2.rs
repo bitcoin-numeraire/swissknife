@@ -75,7 +75,7 @@ mod rejects {
                 "/v1/lightning-addresses",
                 Auth::Bearer(&token),
                 RegisterLnAddressRequest {
-                    wallet_id: None,
+                    account_id: None,
                     username: unique("oauth2-guard"),
                     allows_nostr: false,
                     nostr_pubkey: None,

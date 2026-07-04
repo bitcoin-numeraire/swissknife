@@ -17,8 +17,6 @@ import { registerAddress, registerWalletAddress } from 'src/lib/swissknife';
 import { toast } from 'src/components/snackbar';
 import { Form, RHFTextField } from 'src/components/hook-form';
 
-import { WalletSelectDropdown } from '../wallet';
-
 // ----------------------------------------------------------------------
 
 type Props = {
@@ -33,15 +31,17 @@ export function RegisterLnAddressForm({ onSuccess, isAdmin }: Props) {
     resolver: zodResolver(zRegisterLnAddressRequest),
     defaultValues: {
       username: '',
-      wallet_id: null,
+      account_id: null,
     },
   });
 
   const {
     reset,
     handleSubmit,
+    watch,
     formState: { isSubmitting, isValid },
   } = methods;
+  const accountId = watch('account_id');
 
   const onSubmit = handleSubmit(async (data) => {
     const body = data as RegisterLnAddressRequest;
@@ -77,7 +77,13 @@ export function RegisterLnAddressForm({ onSuccess, isAdmin }: Props) {
           }}
         />
 
-        {isAdmin && <WalletSelectDropdown />}
+        {isAdmin && (
+          <RHFTextField
+            variant="outlined"
+            name="account_id"
+            label={t('register_wallet.account_id')}
+          />
+        )}
 
         <Button
           type="submit"
@@ -85,7 +91,7 @@ export function RegisterLnAddressForm({ onSuccess, isAdmin }: Props) {
           color="inherit"
           size="large"
           loading={isSubmitting}
-          disabled={!isValid}
+          disabled={!isValid || (isAdmin && !accountId)}
         >
           {t('register')}
         </Button>

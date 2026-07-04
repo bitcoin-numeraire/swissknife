@@ -512,6 +512,10 @@ export type Ledger = (typeof Ledger)[keyof typeof Ledger];
  */
 export type LnAddress = {
   /**
+   * Owning account ID
+   */
+  account_id: string;
+  /**
    * Active status. Inactive addresses cannot receive funds
    */
   active: boolean;
@@ -540,7 +544,7 @@ export type LnAddress = {
    */
   username: string;
   /**
-   * Wallet ID
+   * Wallet that receives invoices generated for this address
    */
   wallet_id: string;
 };
@@ -850,6 +854,10 @@ export type Protocol = (typeof Protocol)[keyof typeof Protocol];
  */
 export type RegisterLnAddressRequest = {
   /**
+   * Owning account ID. Required for admin routes; user-scoped routes use the authenticated account.
+   */
+  account_id?: string | null;
+  /**
    * Nostr enabled
    */
   allows_nostr?: boolean;
@@ -861,10 +869,6 @@ export type RegisterLnAddressRequest = {
    * Username such as `username@domain`
    */
   username: string;
-  /**
-   * Wallet ID. Will be populated with your own ID by default
-   */
-  wallet_id?: string | null;
 };
 
 /**
@@ -2091,7 +2095,11 @@ export type DeleteAddressesData = {
      */
     ids?: Array<string> | null;
     /**
-     * wallet ID. Automatically populated with your ID
+     * Owning account ID
+     */
+    account_id?: string | null;
+    /**
+     * Receiving wallet ID
      */
     wallet_id?: string | null;
     /**
@@ -2157,7 +2165,11 @@ export type ListAddressesData = {
      */
     ids?: Array<string> | null;
     /**
-     * wallet ID. Automatically populated with your ID
+     * Owning account ID
+     */
+    account_id?: string | null;
+    /**
+     * Receiving wallet ID
      */
     wallet_id?: string | null;
     /**

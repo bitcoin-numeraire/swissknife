@@ -105,7 +105,7 @@ async fn every_admin_endpoint_enforces_its_permission() {
         Permission::WriteLnAddress,
         id,
         body(RegisterLnAddressRequest {
-            wallet_id: None,
+            account_id: None,
             username: unique("guard"),
             allows_nostr: false,
             nostr_pubkey: None,

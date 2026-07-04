@@ -11,7 +11,10 @@ use crate::{
         composition::AppStore,
         errors::{ApplicationError, DataError},
     },
-    domains::ln_address::{LnAddress, LnAddressFilter},
+    domains::{
+        bitcoin::BtcNetwork,
+        ln_address::{LnAddress, LnAddressFilter},
+    },
 };
 
 use super::LnAddressUseCases;
@@ -21,11 +24,12 @@ const MAX_USERNAME_LENGTH: usize = 64;
 
 pub struct LnAddressService {
     store: AppStore,
+    network: BtcNetwork,
 }
 
 impl LnAddressService {
-    pub fn new(store: AppStore) -> Self {
-        LnAddressService { store }
+    pub fn new(store: AppStore, network: BtcNetwork) -> Self {
+        LnAddressService { store, network }
     }
 }
 
@@ -33,31 +37,48 @@ impl LnAddressService {
 impl LnAddressUseCases for LnAddressService {
     async fn register(
         &self,
-        wallet_id: Uuid,
+        account_id: Uuid,
         mut username: String,
         allows_nostr: bool,
         nostr_pubkey: Option<PublicKey>,
     ) -> Result<LnAddress, ApplicationError> {
-        debug!(%wallet_id, username, "Registering lightning address");
+        debug!(%account_id, username, network = %self.network, "Registering lightning address");
 
         username = username.to_lowercase();
         validate_username(username.as_str())?;
 
-        if self.store.ln_address.find_by_wallet_id(wallet_id).await?.is_some() {
-            return Err(DataError::Conflict("Duplicate User ID.".to_string()).into());
+        if self.store.ln_address.find_by_account_id(account_id).await?.is_some() {
+            return Err(DataError::Conflict("Account already has a lightning address.".to_string()).into());
         }
 
         if self.store.ln_address.find_by_username(&username).await?.is_some() {
             return Err(DataError::Conflict("Duplicate username.".to_string()).into());
         }
 
+        let asset = self
+            .store
+            .asset
+            .find_native_btc_by_network(self.network)
+            .await?
+            .ok_or_else(|| DataError::Inconsistency("Native BTC asset is not configured.".to_string()))?;
+        let wallet = self
+            .store
+            .wallet
+            .find_by_account_and_asset(account_id, asset.id)
+            .await?
+            .ok_or_else(|| {
+                DataError::Validation("Account has no native BTC wallet for the active network.".to_string())
+            })?;
+        let wallet_id = wallet.id;
+
         let ln_address = self
             .store
             .ln_address
-            .insert(wallet_id, &username, allows_nostr, nostr_pubkey)
+            .insert(account_id, wallet_id, &username, allows_nostr, nostr_pubkey)
             .await?;
 
         info!(
+            %account_id,
             %wallet_id,
             username, "Lightning address registered successfully"
         );
@@ -179,13 +200,49 @@ fn validate_username(username: &str) -> Result<(), DataError> {
 mod tests {
     use chrono::Utc;
 
-    use crate::application::{composition::MockAppStoreBuilder, errors::DatabaseError};
+    use crate::{
+        application::{composition::MockAppStoreBuilder, errors::DatabaseError},
+        domains::{
+            asset::{Asset, Protocol},
+            bitcoin::BtcNetwork,
+            wallet::Wallet,
+        },
+    };
 
     use super::*;
 
-    fn ln_address_fixture(id: Uuid, wallet_id: Uuid, username: &str) -> LnAddress {
+    const NATIVE_ASSET_REF: &str = "native";
+
+    fn native_btc_asset() -> Asset {
+        Asset {
+            id: Uuid::new_v4(),
+            code: "BTC".to_string(),
+            name: Some("Bitcoin".to_string()),
+            protocol: Protocol::Bitcoin,
+            network: BtcNetwork::Regtest,
+            asset_ref: NATIVE_ASSET_REF.to_string(),
+            display_ticker: "rBTC".to_string(),
+            decimals: 11,
+            created_at: Utc::now(),
+            updated_at: None,
+        }
+    }
+
+    fn wallet(id: Uuid, account_id: Uuid) -> Wallet {
+        let asset = native_btc_asset();
+        Wallet {
+            id,
+            account_id,
+            asset_id: asset.id,
+            asset: Some(asset),
+            ..Default::default()
+        }
+    }
+
+    fn ln_address_fixture(id: Uuid, account_id: Uuid, wallet_id: Uuid, username: &str) -> LnAddress {
         LnAddress {
             id,
+            account_id,
             wallet_id,
             username: username.to_string(),
             active: true,
@@ -245,12 +302,16 @@ mod tests {
 
             #[tokio::test]
             async fn lowercases_username_and_inserts() {
+                let account_id = Uuid::new_v4();
                 let wallet_id = Uuid::new_v4();
+                let asset = native_btc_asset();
+                let asset_id = asset.id;
 
                 let mut store = MockAppStoreBuilder::new();
                 store
                     .ln_address
-                    .expect_find_by_wallet_id()
+                    .expect_find_by_account_id()
+                    .withf(move |id| *id == account_id)
                     .times(1)
                     .returning(|_| Ok(None));
                 store
@@ -260,20 +321,37 @@ mod tests {
                     .times(1)
                     .returning(|_| Ok(None));
                 store
+                    .asset
+                    .expect_find_native_btc_by_network()
+                    .withf(|network| *network == BtcNetwork::Regtest)
+                    .times(1)
+                    .returning(move |_| Ok(Some(asset.clone())));
+                store
+                    .wallet
+                    .expect_find_by_account_and_asset()
+                    .withf(move |account, asset| *account == account_id && *asset == asset_id)
+                    .times(1)
+                    .returning(move |account, _| Ok(Some(wallet(wallet_id, account))));
+                store
                     .ln_address
                     .expect_insert()
-                    .withf(|_, username, _, _| username == "alice")
+                    .withf(move |account, wallet, username, _, _| {
+                        *account == account_id && *wallet == wallet_id && username == "alice"
+                    })
                     .times(1)
-                    .returning(|wallet_id, username, _, _| Ok(ln_address_fixture(Uuid::new_v4(), wallet_id, username)));
+                    .returning(|account_id, wallet_id, username, _, _| {
+                        Ok(ln_address_fixture(Uuid::new_v4(), account_id, wallet_id, username))
+                    });
 
-                let service = LnAddressService::new(store.build());
+                let service = LnAddressService::new(store.build(), BtcNetwork::Regtest);
 
                 let ln_address = service
-                    .register(wallet_id, "Alice".to_string(), false, None)
+                    .register(account_id, "Alice".to_string(), false, None)
                     .await
                     .unwrap();
 
                 assert_eq!(ln_address.username, "alice");
+                assert_eq!(ln_address.account_id, account_id);
                 assert_eq!(ln_address.wallet_id, wallet_id);
             }
         }
@@ -284,7 +362,7 @@ mod tests {
             #[tokio::test]
             async fn rejects_without_touching_the_store() {
                 // No store expectations are installed, so any repository call panics.
-                let service = LnAddressService::new(MockAppStoreBuilder::new().build());
+                let service = LnAddressService::new(MockAppStoreBuilder::new().build(), BtcNetwork::Regtest);
 
                 let err = service
                     .register(Uuid::new_v4(), "invalid username".to_string(), false, None)
@@ -295,29 +373,37 @@ mod tests {
             }
         }
 
-        mod when_wallet_already_has_an_address {
+        mod when_account_already_has_an_address {
             use super::*;
 
             #[tokio::test]
             async fn returns_conflict() {
+                let account_id = Uuid::new_v4();
                 let wallet_id = Uuid::new_v4();
 
                 let mut store = MockAppStoreBuilder::new();
                 store
                     .ln_address
-                    .expect_find_by_wallet_id()
+                    .expect_find_by_account_id()
                     .times(1)
-                    .returning(move |_| Ok(Some(ln_address_fixture(Uuid::new_v4(), wallet_id, "existing"))));
+                    .returning(move |_| {
+                        Ok(Some(ln_address_fixture(
+                            Uuid::new_v4(),
+                            account_id,
+                            wallet_id,
+                            "existing",
+                        )))
+                    });
 
-                let service = LnAddressService::new(store.build());
+                let service = LnAddressService::new(store.build(), BtcNetwork::Regtest);
 
                 let err = service
-                    .register(wallet_id, "alice".to_string(), false, None)
+                    .register(account_id, "alice".to_string(), false, None)
                     .await
                     .unwrap_err();
 
                 assert!(matches!(err, ApplicationError::Data(DataError::Conflict(_))));
-                assert!(err.to_string().contains("Duplicate User ID"));
+                assert!(err.to_string().contains("Account already has a lightning address"));
             }
         }
 
@@ -329,16 +415,19 @@ mod tests {
                 let mut store = MockAppStoreBuilder::new();
                 store
                     .ln_address
-                    .expect_find_by_wallet_id()
+                    .expect_find_by_account_id()
                     .times(1)
                     .returning(|_| Ok(None));
-                store
-                    .ln_address
-                    .expect_find_by_username()
-                    .times(1)
-                    .returning(|_| Ok(Some(ln_address_fixture(Uuid::new_v4(), Uuid::new_v4(), "alice"))));
+                store.ln_address.expect_find_by_username().times(1).returning(|_| {
+                    Ok(Some(ln_address_fixture(
+                        Uuid::new_v4(),
+                        Uuid::new_v4(),
+                        Uuid::new_v4(),
+                        "alice",
+                    )))
+                });
 
-                let service = LnAddressService::new(store.build());
+                let service = LnAddressService::new(store.build(), BtcNetwork::Regtest);
 
                 let err = service
                     .register(Uuid::new_v4(), "alice".to_string(), false, None)
@@ -358,11 +447,11 @@ mod tests {
                 let mut store = MockAppStoreBuilder::new();
                 store
                     .ln_address
-                    .expect_find_by_wallet_id()
+                    .expect_find_by_account_id()
                     .times(1)
                     .returning(|_| Err(DatabaseError::FindOne("boom".to_string())));
 
-                let service = LnAddressService::new(store.build());
+                let service = LnAddressService::new(store.build(), BtcNetwork::Regtest);
 
                 let err = service
                     .register(Uuid::new_v4(), "alice".to_string(), false, None)
@@ -370,6 +459,86 @@ mod tests {
                     .unwrap_err();
 
                 assert!(matches!(err, ApplicationError::Database(DatabaseError::FindOne(_))));
+            }
+        }
+
+        mod when_active_network_asset_is_missing {
+            use super::*;
+
+            #[tokio::test]
+            async fn returns_inconsistency() {
+                let mut store = MockAppStoreBuilder::new();
+                store
+                    .ln_address
+                    .expect_find_by_account_id()
+                    .times(1)
+                    .returning(|_| Ok(None));
+                store
+                    .ln_address
+                    .expect_find_by_username()
+                    .times(1)
+                    .returning(|_| Ok(None));
+                store
+                    .asset
+                    .expect_find_native_btc_by_network()
+                    .withf(|network| *network == BtcNetwork::Regtest)
+                    .times(1)
+                    .returning(|_| Ok(None));
+
+                let service = LnAddressService::new(store.build(), BtcNetwork::Regtest);
+
+                let err = service
+                    .register(Uuid::new_v4(), "alice".to_string(), false, None)
+                    .await
+                    .unwrap_err();
+
+                assert!(matches!(err, ApplicationError::Data(DataError::Inconsistency(_))));
+                assert!(err.to_string().contains("Native BTC asset is not configured"));
+            }
+        }
+
+        mod when_account_has_no_active_network_wallet {
+            use super::*;
+
+            #[tokio::test]
+            async fn returns_validation_error() {
+                let account_id = Uuid::new_v4();
+                let asset = native_btc_asset();
+                let asset_id = asset.id;
+
+                let mut store = MockAppStoreBuilder::new();
+                store
+                    .ln_address
+                    .expect_find_by_account_id()
+                    .times(1)
+                    .returning(|_| Ok(None));
+                store
+                    .ln_address
+                    .expect_find_by_username()
+                    .times(1)
+                    .returning(|_| Ok(None));
+                store
+                    .asset
+                    .expect_find_native_btc_by_network()
+                    .withf(|network| *network == BtcNetwork::Regtest)
+                    .times(1)
+                    .returning(move |_| Ok(Some(asset.clone())));
+                store
+                    .wallet
+                    .expect_find_by_account_and_asset()
+                    .withf(move |account, asset| *account == account_id && *asset == asset_id)
+                    .times(1)
+                    .returning(|_, _| Ok(None));
+
+                let service = LnAddressService::new(store.build(), BtcNetwork::Regtest);
+
+                let err = service
+                    .register(account_id, "alice".to_string(), false, None)
+                    .await
+                    .unwrap_err();
+
+                assert!(matches!(err, ApplicationError::Data(DataError::Validation(_))));
+                assert!(err.to_string().contains("native BTC wallet"));
             }
         }
     }
@@ -390,9 +559,9 @@ mod tests {
                     .expect_find()
                     .withf(move |queried| *queried == id)
                     .times(1)
-                    .returning(move |id| Ok(Some(ln_address_fixture(id, Uuid::new_v4(), "alice"))));
+                    .returning(move |id| Ok(Some(ln_address_fixture(id, Uuid::new_v4(), Uuid::new_v4(), "alice"))));
 
-                let service = LnAddressService::new(store.build());
+                let service = LnAddressService::new(store.build(), BtcNetwork::Regtest);
 
                 let ln_address = service.get(id).await.unwrap();
 
@@ -408,7 +577,7 @@ mod tests {
                 let mut store = MockAppStoreBuilder::new();
                 store.ln_address.expect_find().times(1).returning(|_| Ok(None));
 
-                let service = LnAddressService::new(store.build());
+                let service = LnAddressService::new(store.build(), BtcNetwork::Regtest);
 
                 let err = service.get(Uuid::new_v4()).await.unwrap_err();
 
@@ -423,13 +592,16 @@ mod tests {
         #[tokio::test]
         async fn returns_addresses_from_the_repository() {
             let mut store = MockAppStoreBuilder::new();
-            store
-                .ln_address
-                .expect_find_many()
-                .times(1)
-                .returning(|_| Ok(vec![ln_address_fixture(Uuid::new_v4(), Uuid::new_v4(), "alice")]));
+            store.ln_address.expect_find_many().times(1).returning(|_| {
+                Ok(vec![ln_address_fixture(
+                    Uuid::new_v4(),
+                    Uuid::new_v4(),
+                    Uuid::new_v4(),
+                    "alice",
+                )])
+            });
 
-            let service = LnAddressService::new(store.build());
+            let service = LnAddressService::new(store.build(), BtcNetwork::Regtest);
 
             let addresses = service.list(LnAddressFilter::default()).await.unwrap();
 
@@ -448,7 +620,7 @@ mod tests {
                 let mut store = MockAppStoreBuilder::new();
                 store.ln_address.expect_find().times(1).returning(|_| Ok(None));
 
-                let service = LnAddressService::new(store.build());
+                let service = LnAddressService::new(store.build(), BtcNetwork::Regtest);
 
                 let err = service
                     .update(Uuid::new_v4(), update_request(Some("bob")))
@@ -471,7 +643,7 @@ mod tests {
                     .ln_address
                     .expect_find()
                     .times(1)
-                    .returning(move |id| Ok(Some(ln_address_fixture(id, Uuid::new_v4(), "alice"))));
+                    .returning(move |id| Ok(Some(ln_address_fixture(id, Uuid::new_v4(), Uuid::new_v4(), "alice"))));
                 store
                     .ln_address
                     .expect_find_by_username()
@@ -485,7 +657,7 @@ mod tests {
                     .times(1)
                     .returning(Ok);
 
-                let service = LnAddressService::new(store.build());
+                let service = LnAddressService::new(store.build(), BtcNetwork::Regtest);
 
                 let updated = service.update(id, update_request(Some("Bob"))).await.unwrap();
 
@@ -503,12 +675,12 @@ mod tests {
                     .ln_address
                     .expect_find()
                     .times(1)
-                    .returning(|id| Ok(Some(ln_address_fixture(id, Uuid::new_v4(), "alice"))));
+                    .returning(|id| Ok(Some(ln_address_fixture(id, Uuid::new_v4(), Uuid::new_v4(), "alice"))));
                 // find_by_username is intentionally not expected: an unchanged
                 // username must not trigger a uniqueness lookup.
                 store.ln_address.expect_update().times(1).returning(Ok);
 
-                let service = LnAddressService::new(store.build());
+                let service = LnAddressService::new(store.build(), BtcNetwork::Regtest);
 
                 let updated = service
                     .update(Uuid::new_v4(), update_request(Some("alice")))
@@ -529,14 +701,17 @@ mod tests {
                     .ln_address
                     .expect_find()
                     .times(1)
-                    .returning(|id| Ok(Some(ln_address_fixture(id, Uuid::new_v4(), "alice"))));
-                store
-                    .ln_address
-                    .expect_find_by_username()
-                    .times(1)
-                    .returning(|_| Ok(Some(ln_address_fixture(Uuid::new_v4(), Uuid::new_v4(), "bob"))));
+                    .returning(|id| Ok(Some(ln_address_fixture(id, Uuid::new_v4(), Uuid::new_v4(), "alice"))));
+                store.ln_address.expect_find_by_username().times(1).returning(|_| {
+                    Ok(Some(ln_address_fixture(
+                        Uuid::new_v4(),
+                        Uuid::new_v4(),
+                        Uuid::new_v4(),
+                        "bob",
+                    )))
+                });
 
-                let service = LnAddressService::new(store.build());
+                let service = LnAddressService::new(store.build(), BtcNetwork::Regtest);
 
                 let err = service
                     .update(Uuid::new_v4(), update_request(Some("bob")))
@@ -559,7 +734,7 @@ mod tests {
                 let mut store = MockAppStoreBuilder::new();
                 store.ln_address.expect_delete_many().times(1).returning(|_| Ok(1));
 
-                let service = LnAddressService::new(store.build());
+                let service = LnAddressService::new(store.build(), BtcNetwork::Regtest);
 
                 assert!(service.delete(Uuid::new_v4()).await.is_ok());
             }
@@ -573,7 +748,7 @@ mod tests {
                 let mut store = MockAppStoreBuilder::new();
                 store.ln_address.expect_delete_many().times(1).returning(|_| Ok(0));
 
-                let service = LnAddressService::new(store.build());
+                let service = LnAddressService::new(store.build(), BtcNetwork::Regtest);
 
                 let err = service.delete(Uuid::new_v4()).await.unwrap_err();
 
@@ -590,7 +765,7 @@ mod tests {
             let mut store = MockAppStoreBuilder::new();
             store.ln_address.expect_delete_many().times(1).returning(|_| Ok(3));
 
-            let service = LnAddressService::new(store.build());
+            let service = LnAddressService::new(store.build(), BtcNetwork::Regtest);
 
             let deleted = service.delete_many(LnAddressFilter::default()).await.unwrap();
 
