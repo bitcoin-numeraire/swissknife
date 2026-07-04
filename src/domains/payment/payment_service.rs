@@ -12,7 +12,8 @@ use crate::{
         errors::{ApplicationError, DataError, LightningError},
     },
     domains::{
-        bitcoin::BitcoinWallet,
+        asset::{Protocol, NATIVE_ASSET_REF},
+        bitcoin::{BitcoinWallet, BtcNetwork},
         event::{EventUseCases, LnPayFailureEvent, LnPaySuccessEvent},
         invoice::{Invoice, InvoiceStatus},
         lnurl::{process_success_action, validate_lnurl_pay, LnUrlPayRequestData, LnUrlPaySuccessAction},
@@ -517,6 +518,38 @@ impl PaymentService {
         }
         false
     }
+
+    fn bolt11_network(&self, invoice: &ParsedBolt11Invoice) -> BtcNetwork {
+        let network = BtcNetwork::from(invoice.currency.clone());
+        if network == BtcNetwork::Testnet && self.bitcoin_wallet.network() == BtcNetwork::Testnet4 {
+            BtcNetwork::Testnet4
+        } else {
+            network
+        }
+    }
+
+    async fn ensure_wallet_network(&self, wallet_id: Uuid, network: BtcNetwork) -> Result<(), ApplicationError> {
+        let wallet = self
+            .store
+            .wallet
+            .find(wallet_id)
+            .await?
+            .ok_or_else(|| DataError::NotFound(format!("Wallet {wallet_id} not found")))?;
+        let asset = wallet.asset.ok_or_else(|| {
+            DataError::Inconsistency(format!(
+                "Wallet {wallet_id} is missing asset metadata for payment validation"
+            ))
+        })?;
+        if asset.protocol == Protocol::Bitcoin && asset.asset_ref == NATIVE_ASSET_REF && asset.network == network {
+            return Ok(());
+        }
+
+        Err(DataError::Validation(format!(
+            "Wallet {wallet_id} holds {} on {}, but payment requires native BTC on {network}",
+            asset.display_ticker, asset.network
+        ))
+        .into())
+    }
 }
 
 #[async_trait]
@@ -554,9 +587,17 @@ impl PaymentsUseCases for PaymentService {
         debug!(%input, %wallet_id, "Received pay request");
 
         let payment = if self.is_internal_payment(&input) {
+            self.ensure_wallet_network(wallet_id, self.bitcoin_wallet.network())
+                .await?;
             self.send_internal(input, amount_msat, comment, wallet_id).await
         } else {
             let input_type = parse_payment_input(&input).await.map_err(DataError::Validation)?;
+            let expected_network = match &input_type {
+                PaymentInput::BitcoinAddress(address) => address.network,
+                PaymentInput::Bolt11(invoice) => self.bolt11_network(invoice),
+                PaymentInput::LnUrlPay(_) => self.bitcoin_wallet.network(),
+            };
+            self.ensure_wallet_network(wallet_id, expected_network).await?;
 
             match input_type {
                 PaymentInput::BitcoinAddress(address) => {
@@ -692,9 +733,11 @@ mod tests {
             errors::BitcoinError,
         },
         domains::{
+            asset::{Asset, Protocol},
             bitcoin::{BtcAddress, BtcAddressType, BtcNetwork, BtcPreparedTransaction, MockBitcoinWallet},
             event::MockEventUseCases,
             ln_address::LnAddress,
+            wallet::Wallet,
         },
         infra::lightning::MockLnClient,
     };
@@ -743,6 +786,46 @@ mod tests {
             address_type: BtcAddressType::P2wpkh,
             created_at: Utc::now(),
             updated_at: None,
+        }
+    }
+
+    fn native_btc_asset(network: BtcNetwork) -> Asset {
+        Asset {
+            id: Uuid::new_v4(),
+            code: "BTC".to_string(),
+            name: Some("Bitcoin".to_string()),
+            protocol: Protocol::Bitcoin,
+            network,
+            asset_ref: NATIVE_ASSET_REF.to_string(),
+            display_ticker: "BTC".to_string(),
+            decimals: 11,
+            created_at: Utc::now(),
+            updated_at: None,
+        }
+    }
+
+    fn taproot_asset(network: BtcNetwork) -> Asset {
+        Asset {
+            id: Uuid::new_v4(),
+            code: "USDT".to_string(),
+            name: Some("Tether USD".to_string()),
+            protocol: Protocol::TaprootAssets,
+            network,
+            asset_ref: "taproot-asset-id".to_string(),
+            display_ticker: "USDT".to_string(),
+            decimals: 8,
+            created_at: Utc::now(),
+            updated_at: None,
+        }
+    }
+
+    fn wallet_with_asset(wallet_id: Uuid, asset: Asset) -> Wallet {
+        Wallet {
+            id: wallet_id,
+            account_id: Uuid::new_v4(),
+            asset_id: asset.id,
+            asset: Some(asset),
+            ..Default::default()
         }
     }
 
@@ -827,6 +910,150 @@ mod tests {
             assert!(service.is_internal_payment("bob@numeraire.tech"));
             assert!(!service.is_internal_payment("bob@example.com"));
             assert!(!service.is_internal_payment("not-an-address"));
+        }
+    }
+
+    mod ensure_wallet_network {
+        use super::*;
+
+        mod with_matching_native_btc_network {
+            use super::*;
+
+            #[tokio::test]
+            async fn accepts_the_wallet() {
+                let wallet_id = Uuid::new_v4();
+
+                let mut store = MockAppStoreBuilder::new();
+                store
+                    .wallet
+                    .expect_find()
+                    .withf(move |id| *id == wallet_id)
+                    .times(1)
+                    .returning(move |_| {
+                        Ok(Some(wallet_with_asset(
+                            wallet_id,
+                            native_btc_asset(BtcNetwork::Regtest),
+                        )))
+                    });
+
+                let service = service(
+                    store,
+                    MockLnClient::new(),
+                    MockBitcoinWallet::new(),
+                    MockEventUseCases::new(),
+                );
+
+                service
+                    .ensure_wallet_network(wallet_id, BtcNetwork::Regtest)
+                    .await
+                    .unwrap();
+            }
+        }
+
+        mod with_mismatched_native_btc_network {
+            use super::*;
+
+            #[tokio::test]
+            async fn returns_validation_error() {
+                let wallet_id = Uuid::new_v4();
+
+                let mut store = MockAppStoreBuilder::new();
+                store
+                    .wallet
+                    .expect_find()
+                    .withf(move |id| *id == wallet_id)
+                    .times(1)
+                    .returning(move |_| {
+                        Ok(Some(wallet_with_asset(
+                            wallet_id,
+                            native_btc_asset(BtcNetwork::Regtest),
+                        )))
+                    });
+
+                let service = service(
+                    store,
+                    MockLnClient::new(),
+                    MockBitcoinWallet::new(),
+                    MockEventUseCases::new(),
+                );
+
+                let err = service
+                    .ensure_wallet_network(wallet_id, BtcNetwork::Signet)
+                    .await
+                    .unwrap_err();
+
+                assert!(matches!(err, ApplicationError::Data(DataError::Validation(_))));
+                assert!(err.to_string().contains("requires native BTC on Signet"));
+            }
+        }
+
+        mod with_non_native_asset {
+            use super::*;
+
+            #[tokio::test]
+            async fn returns_validation_error() {
+                let wallet_id = Uuid::new_v4();
+
+                let mut store = MockAppStoreBuilder::new();
+                store
+                    .wallet
+                    .expect_find()
+                    .withf(move |id| *id == wallet_id)
+                    .times(1)
+                    .returning(move |_| Ok(Some(wallet_with_asset(wallet_id, taproot_asset(BtcNetwork::Regtest)))));
+
+                let service = service(
+                    store,
+                    MockLnClient::new(),
+                    MockBitcoinWallet::new(),
+                    MockEventUseCases::new(),
+                );
+
+                let err = service
+                    .ensure_wallet_network(wallet_id, BtcNetwork::Regtest)
+                    .await
+                    .unwrap_err();
+
+                assert!(matches!(err, ApplicationError::Data(DataError::Validation(_))));
+                assert!(err.to_string().contains("payment requires native BTC"));
+            }
+        }
+
+        mod with_testnet4_bolt11_currency {
+            use super::*;
+
+            #[tokio::test]
+            async fn accepts_the_active_testnet4_wallet() {
+                let wallet_id = Uuid::new_v4();
+
+                let mut store = MockAppStoreBuilder::new();
+                store
+                    .wallet
+                    .expect_find()
+                    .withf(move |id| *id == wallet_id)
+                    .times(1)
+                    .returning(move |_| {
+                        Ok(Some(wallet_with_asset(
+                            wallet_id,
+                            native_btc_asset(BtcNetwork::Testnet4),
+                        )))
+                    });
+
+                let mut bitcoin_wallet = MockBitcoinWallet::new();
+                bitcoin_wallet
+                    .expect_network()
+                    .times(1)
+                    .returning(|| BtcNetwork::Testnet4);
+
+                let service = service(store, MockLnClient::new(), bitcoin_wallet, MockEventUseCases::new());
+                let invoice = ParsedBolt11Invoice {
+                    currency: Currency::BitcoinTestnet,
+                    ..bolt11(Some(1_000))
+                };
+
+                let network = service.bolt11_network(&invoice);
+                service.ensure_wallet_network(wallet_id, network).await.unwrap();
+            }
         }
     }
 
@@ -992,9 +1219,16 @@ mod tests {
 
             #[tokio::test]
             async fn routes_to_the_internal_flow() {
+                let sender = Uuid::new_v4();
                 let recipient = Uuid::new_v4();
 
                 let mut store = MockAppStoreBuilder::new();
+                store
+                    .wallet
+                    .expect_find()
+                    .withf(move |id| *id == sender)
+                    .times(1)
+                    .returning(move |_| Ok(Some(wallet_with_asset(sender, native_btc_asset(BtcNetwork::Regtest)))));
                 store
                     .ln_address
                     .expect_find_by_username()
@@ -1013,7 +1247,7 @@ mod tests {
                 let service = service(store, MockLnClient::new(), bitcoin_wallet, MockEventUseCases::new());
 
                 let payment = service
-                    .pay("bob@numeraire.tech".to_string(), Some(1_000), None, Uuid::new_v4())
+                    .pay("bob@numeraire.tech".to_string(), Some(1_000), None, sender)
                     .await
                     .unwrap();
 

@@ -320,6 +320,82 @@ where
         })
     }
 
+    async fn credit(&self, id: Uuid, amount_msat: u64) -> Result<(), DatabaseError> {
+        let amount = amount_msat as i64;
+        let result = WalletEntity::update_many()
+            .col_expr(Column::AvailableAmount, Expr::col(Column::AvailableAmount).add(amount))
+            .col_expr(Column::UpdatedAt, Expr::value(Utc::now().naive_utc()))
+            .filter(Column::Id.eq(id))
+            .exec(self.db.connection())
+            .await
+            .map_err(|e| DatabaseError::Update(e.to_string()))?;
+
+        if result.rows_affected == 1 {
+            Ok(())
+        } else {
+            Err(DatabaseError::Update(
+                "wallet balance credit target was missing".to_string(),
+            ))
+        }
+    }
+
+    async fn reserve(&self, id: Uuid, amount_msat: u64) -> Result<bool, DatabaseError> {
+        let amount = amount_msat as i64;
+        let result = WalletEntity::update_many()
+            .col_expr(Column::AvailableAmount, Expr::col(Column::AvailableAmount).sub(amount))
+            .col_expr(Column::ReservedAmount, Expr::col(Column::ReservedAmount).add(amount))
+            .col_expr(Column::UpdatedAt, Expr::value(Utc::now().naive_utc()))
+            .filter(Column::Id.eq(id))
+            .filter(Column::AvailableAmount.gte(amount))
+            .exec(self.db.connection())
+            .await
+            .map_err(|e| DatabaseError::Update(e.to_string()))?;
+
+        Ok(result.rows_affected == 1)
+    }
+
+    async fn debit(&self, id: Uuid, amount_msat: u64) -> Result<bool, DatabaseError> {
+        let amount = amount_msat as i64;
+        let result = WalletEntity::update_many()
+            .col_expr(Column::AvailableAmount, Expr::col(Column::AvailableAmount).sub(amount))
+            .col_expr(Column::UpdatedAt, Expr::value(Utc::now().naive_utc()))
+            .filter(Column::Id.eq(id))
+            .filter(Column::AvailableAmount.gte(amount))
+            .exec(self.db.connection())
+            .await
+            .map_err(|e| DatabaseError::Update(e.to_string()))?;
+
+        Ok(result.rows_affected == 1)
+    }
+
+    async fn debit_confirmed(&self, id: Uuid, amount_msat: u64) -> Result<bool, DatabaseError> {
+        let amount = amount_msat as i64;
+        let result = WalletEntity::update_many()
+            .col_expr(Column::AvailableAmount, Expr::col(Column::AvailableAmount).sub(amount))
+            .col_expr(Column::UpdatedAt, Expr::value(Utc::now().naive_utc()))
+            .filter(Column::Id.eq(id))
+            .exec(self.db.connection())
+            .await
+            .map_err(|e| DatabaseError::Update(e.to_string()))?;
+
+        Ok(result.rows_affected == 1)
+    }
+
+    async fn release(&self, id: Uuid, amount_msat: u64) -> Result<bool, DatabaseError> {
+        let amount = amount_msat as i64;
+        let result = WalletEntity::update_many()
+            .col_expr(Column::AvailableAmount, Expr::col(Column::AvailableAmount).add(amount))
+            .col_expr(Column::ReservedAmount, Expr::col(Column::ReservedAmount).sub(amount))
+            .col_expr(Column::UpdatedAt, Expr::value(Utc::now().naive_utc()))
+            .filter(Column::Id.eq(id))
+            .filter(Column::ReservedAmount.gte(amount))
+            .exec(self.db.connection())
+            .await
+            .map_err(|e| DatabaseError::Update(e.to_string()))?;
+
+        Ok(result.rows_affected == 1)
+    }
+
     async fn find_contacts(&self, id: Uuid) -> Result<Vec<Contact>, DatabaseError> {
         let models = Payment::find()
             .filter(PaymentColumn::WalletId.eq(id))
