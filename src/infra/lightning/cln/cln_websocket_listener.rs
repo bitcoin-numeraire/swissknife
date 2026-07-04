@@ -62,7 +62,7 @@ impl ClnWebsocketListener {
                 move || {
                     let services = services.clone();
                     async move {
-                        ClnWebsocketListener::sync_offchain_state_until_success(
+                        ClnWebsocketListener::resync_state_until_success(
                             &services,
                             "Core Lightning websocket reconnect",
                             reconnect_delay_min,
@@ -284,18 +284,26 @@ impl ClnWebsocketListener {
         }
     }
 
-    async fn sync_offchain_state(services: &AppServices, context: &'static str) -> Result<(), ApplicationError> {
-        let (synced_invoices, synced_payments) = tokio::try_join!(services.invoice.sync(), services.payment.sync())?;
+    async fn resync_state(services: &AppServices, context: &'static str) -> Result<(), ApplicationError> {
+        // Replay off-chain (invoice/payment) AND on-chain (deposit/withdrawal) state. A
+        // transport-level socket.io reconnect does not re-enter listen(), so bitcoin.sync() must
+        // run here too; otherwise a deposit whose coin_movement arrived during the disconnect
+        // stays uncredited until the next chain event.
+        let (synced_invoices, synced_payments, synced_onchain) = tokio::try_join!(
+            services.invoice.sync(),
+            services.payment.sync(),
+            services.bitcoin.sync()
+        )?;
 
         debug!(
             context,
-            synced_invoices, synced_payments, "Lightning off-chain state replayed"
+            synced_invoices, synced_payments, synced_onchain, "Lightning state replayed after reconnect"
         );
 
         Ok(())
     }
 
-    async fn sync_offchain_state_until_success(
+    async fn resync_state_until_success(
         services: &AppServices,
         context: &'static str,
         min_delay: Duration,
@@ -310,10 +318,10 @@ impl ClnWebsocketListener {
         let mut backoff = min_delay;
 
         loop {
-            match Self::sync_offchain_state(services, context).await {
+            match Self::resync_state(services, context).await {
                 Ok(()) => return,
                 Err(err) => {
-                    error!(%err, context, ?backoff, "Lightning off-chain replay failed; retrying before reconnect");
+                    error!(%err, context, ?backoff, "Lightning state replay failed; retrying before reconnect");
                     sleep(backoff).await;
                     backoff = (backoff * 2).min(max_delay);
                 }
@@ -470,9 +478,11 @@ mod tests {
             }
         });
         builder.payment.expect_sync().returning(|| Ok(1));
+        // The reconnect replay also re-syncs on-chain state (bitcoin.sync).
+        builder.bitcoin.expect_sync().returning(|| Ok(0));
         let services = builder.build();
 
-        ClnWebsocketListener::sync_offchain_state_until_success(
+        ClnWebsocketListener::resync_state_until_success(
             &services,
             "test reconnect",
             Duration::from_millis(1),
