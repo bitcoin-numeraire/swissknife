@@ -193,12 +193,8 @@ impl ClnGrpcListener {
                 continue;
             }
 
-            // Reprocess from the persisted cursor (`next_index`), NOT the index `wait` returned:
-            // `wait` returns the current tip, which after a reconnect or a burst can be far past
-            // the un-advanced cursor. Listing from the tip would silently skip — and permanently
-            // lose — every chainmove between the cursor and the tip. A failed deposit/withdrawal
-            // write propagates out (cursor not advanced) so the supervisor reconnects; listing
-            // from `next_index` then replays the un-advanced range idempotently.
+            // Replay from the persisted cursor, not the tip `wait` returned: listing from the tip
+            // would skip chainmoves between the cursor and the tip.
             let max_index = self.handle_chainmoves(next_index).await?;
             next_index = max_index.saturating_add(1);
             self.services
@@ -304,13 +300,13 @@ impl ClnGrpcListener {
                         continue;
                     };
 
-                    // Include spent outputs: when replaying an un-advanced cursor after a failed
-                    // write, the deposit's UTXO may already have been spent. `spent: false` would
-                    // return None, skip it, and still advance the cursor past it — losing the
-                    // credit. `block_height` (not spent-status) drives confirmation, so a
-                    // confirmed-then-spent deposit still credits. Matches the `synchronize` path,
-                    // which also lists with `spent: true`.
-                    let output = match self.wallet.get_output(&txid, Some(outnum), None, true).await {
+                    // Prefer the bounded unspent set; only on a miss fall back to the unbounded
+                    // spent-inclusive query, since a replayed deposit's UTXO may already be spent.
+                    let resolved = match self.wallet.get_output(&txid, Some(outnum), None, false).await {
+                        Ok(None) => self.wallet.get_output(&txid, Some(outnum), None, true).await,
+                        other => other,
+                    };
+                    let output = match resolved {
                         Ok(Some(output)) => output,
                         Ok(None) => {
                             trace!(%txid, outnum, "Output not found in wallet, skipping chainmove");
