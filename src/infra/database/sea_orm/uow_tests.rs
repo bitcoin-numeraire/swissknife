@@ -247,6 +247,30 @@ async fn settle_adjusts_reserved_to_actual() {
 }
 
 #[tokio::test]
+async fn settle_records_confirmed_spend_when_actual_exceeds_reserved() {
+    let conn = connect().await;
+    let wallet = seed_wallet(&conn, 110_000).await;
+    // The node ultimately reports a 20k fee, exceeding the 10k admission buffer.
+    let mut payment = uow(&conn)
+        .reserve(pending_payment(wallet, 100_000, 20_000), 110_000)
+        .await
+        .expect("reserve");
+    assert_eq!(balance(&conn, wallet).await, (0, 110_000));
+
+    payment.status = PaymentStatus::Settled;
+    let settled = uow(&conn)
+        .settle(payment)
+        .await
+        .expect("confirmed settlement must not be stranded");
+
+    assert_eq!(settled.status, PaymentStatus::Settled);
+    assert_eq!(settled.reserved_amount, 0);
+    // The ledger records the confirmed 120k spend even though only 110k was held,
+    // surfacing the overspend as a negative available balance for reconciliation.
+    assert_eq!(balance(&conn, wallet).await, (-10_000, 0));
+}
+
+#[tokio::test]
 async fn duplicate_settle_does_not_double_debit() {
     let conn = connect().await;
     let wallet = seed_wallet(&conn, 200_000).await;
