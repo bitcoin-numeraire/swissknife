@@ -188,14 +188,18 @@ impl ClnGrpcListener {
                 .map_err(|e| LightningError::Listener(e.to_string()))?
                 .into_inner();
 
-            let Some(created_index) = response.created else {
+            if response.created.is_none() {
                 warn!("Chainmoves wait response missing created index");
                 continue;
-            };
+            }
 
-            // A failed deposit/withdrawal write propagates out (cursor not advanced) so the
-            // supervisor reconnects and reprocesses from the un-advanced CreatedIndex.
-            let max_index = self.handle_chainmoves(created_index).await?;
+            // Reprocess from the persisted cursor (`next_index`), NOT the index `wait` returned:
+            // `wait` returns the current tip, which after a reconnect or a burst can be far past
+            // the un-advanced cursor. Listing from the tip would silently skip — and permanently
+            // lose — every chainmove between the cursor and the tip. A failed deposit/withdrawal
+            // write propagates out (cursor not advanced) so the supervisor reconnects; listing
+            // from `next_index` then replays the un-advanced range idempotently.
+            let max_index = self.handle_chainmoves(next_index).await?;
             next_index = max_index.saturating_add(1);
             self.services
                 .system
