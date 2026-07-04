@@ -216,12 +216,9 @@ impl ClnWebsocketListener {
                                             }
                                         };
 
-                                        // Don't advance the cursor past a write we couldn't persist, or the
-                                        // deposit is lost. Unlike a busy chain, no further `coin_movement` is
-                                        // guaranteed to arrive to re-trigger this sync (e.g. the deposit is the
-                                        // last on-chain activity), so signal the supervisor to reconnect just
-                                        // like the off-chain events above: re-entering listen() re-runs
-                                        // bitcoin.sync() from the un-advanced cursor and reprocesses idempotently.
+                                        // Cursor not advanced past a failed write; signal a reconnect (like
+                                        // the off-chain events) so listen() re-runs bitcoin.sync() from the
+                                        // un-advanced cursor and reprocesses idempotently.
                                         if let Err(err) = result {
                                             error!(%err, "Failed to process onchain transaction; cursor not advanced");
                                             processed_all = false;
@@ -284,10 +281,9 @@ impl ClnWebsocketListener {
         }
     }
 
-    /// Replay off-chain (invoice/payment) AND on-chain (deposit/withdrawal) state, retrying with
-    /// backoff until it succeeds. A transport-level socket.io reconnect does not re-enter listen(),
-    /// so bitcoin.sync() must run here too; otherwise a deposit whose coin_movement arrived during
-    /// the disconnect stays uncredited until the next chain event.
+    /// Replay off-chain and on-chain state, retrying with backoff until it succeeds. A transport
+    /// reconnect does not re-enter listen(), so bitcoin.sync() must run here too, not only at
+    /// listen() startup.
     async fn resync(services: &AppServices, context: &'static str, min_delay: Duration, max_delay: Duration) {
         let min_delay = if min_delay.is_zero() {
             Duration::from_millis(100)
