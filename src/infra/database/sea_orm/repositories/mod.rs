@@ -1,4 +1,5 @@
 mod connection;
+mod sea_orm_account_repository;
 mod sea_orm_api_key_repository;
 mod sea_orm_btc_address_repository;
 mod sea_orm_btc_output_repository;
@@ -10,6 +11,7 @@ mod sea_orm_wallet_balance_repository;
 mod sea_orm_wallet_repository;
 
 pub(crate) use connection::SeaOrmConnection;
+pub use sea_orm_account_repository::*;
 pub use sea_orm_api_key_repository::*;
 pub use sea_orm_btc_address_repository::*;
 pub use sea_orm_btc_output_repository::*;

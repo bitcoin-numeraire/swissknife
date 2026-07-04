@@ -75,6 +75,7 @@ impl ApiKeyRepository for SeaOrmApiKeyRepository {
         let model = ActiveModel {
             id: Set(Uuid::new_v4()),
             user_id: Set(api_key.user_id),
+            account_id: Set(api_key.account_id),
             name: Set(api_key.name),
             key_hash: Set(api_key.key_hash),
             permissions: Set(permissions_json),
