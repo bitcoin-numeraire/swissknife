@@ -26,7 +26,7 @@ mod register_wallet {
                 "/v1/wallets",
                 Auth::Bearer(token),
                 CreateWalletRequest {
-                    account_id: existing.account_id,
+                    account_id: Some(existing.account_id),
                     asset_id: existing.asset_id,
                 },
             )
@@ -55,7 +55,7 @@ mod register_wallet {
                 "/v1/wallets",
                 Auth::None,
                 CreateWalletRequest {
-                    account_id: uuid::Uuid::new_v4(),
+                    account_id: Some(uuid::Uuid::new_v4()),
                     asset_id: uuid::Uuid::new_v4(),
                 },
             )

@@ -209,7 +209,6 @@ impl AuthUseCases for AuthService {
 
         let user = User {
             account_id: account.id,
-            wallet_id: wallet.id,
             permissions,
         };
 
@@ -229,20 +228,8 @@ impl AuthUseCases for AuthService {
             }
         };
 
-        let asset_id = self.active_asset_id().await?;
-        let wallet = match self
-            .store
-            .wallet
-            .find_by_account_and_asset(api_key.account_id, asset_id)
-            .await?
-        {
-            Some(wallet) => wallet,
-            None => self.store.wallet.upsert(api_key.account_id, asset_id).await?,
-        };
-
         let user = User {
             account_id: api_key.account_id,
-            wallet_id: wallet.id,
             permissions: api_key.permissions,
         };
 
@@ -723,7 +710,6 @@ mod tests {
                 let user = service.authenticate_jwt("token").await.unwrap();
 
                 assert_eq!(user.account_id, account_id);
-                assert_eq!(user.wallet_id, wallet_id);
                 assert_eq!(user.permissions, vec![Permission::ReadApiKey]);
             }
         }
@@ -769,14 +755,12 @@ mod tests {
             }
         }
 
-        mod when_key_and_wallet_exist {
+        mod when_key_is_valid {
             use super::*;
 
             #[tokio::test]
             async fn returns_user_with_api_key_permissions() {
-                let wallet_id = Uuid::new_v4();
                 let account_id = Uuid::new_v4();
-                let asset_id = Uuid::new_v4();
 
                 let mut store = MockAppStoreBuilder::new();
                 store.api_key.expect_find_by_key_hash().times(1).returning(move |_| {
@@ -786,31 +770,12 @@ mod tests {
                         ..Default::default()
                     }))
                 });
-                store
-                    .wallet
-                    .expect_find_by_account_and_asset()
-                    .withf(move |account, asset| *account == account_id && *asset == asset_id)
-                    .times(1)
-                    .returning(|_, _| Ok(None));
-                store
-                    .wallet
-                    .expect_upsert()
-                    .withf(move |account, asset| *account == account_id && *asset == asset_id)
-                    .times(1)
-                    .returning(move |account, asset| Ok(wallet_fixture(wallet_id, account, asset)));
-                store
-                    .asset
-                    .expect_find_native_btc_by_network()
-                    .withf(|network| *network == BtcNetwork::Regtest)
-                    .times(1)
-                    .returning(move |_| Ok(Some(asset_fixture(asset_id))));
 
                 let service = service(MockJWTAuthenticator::new(), store, AuthProvider::Jwt);
 
                 let user = service.authenticate_api_key(vec![1, 2, 3]).await.unwrap();
 
                 assert_eq!(user.account_id, account_id);
-                assert_eq!(user.wallet_id, wallet_id);
                 assert_eq!(user.permissions, vec![Permission::ReadWallet]);
             }
         }

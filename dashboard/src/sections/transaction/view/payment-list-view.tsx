@@ -18,6 +18,7 @@ import { endpointKeys } from 'src/actions/keys';
 import { DashboardContent } from 'src/layouts/dashboard';
 import { useFetchFiatPrices } from 'src/actions/mempool-space';
 import {
+  useGetUserWallet,
   useGetWalletBalance,
   useListWalletContacts,
   useListWalletPayments,
@@ -91,6 +92,7 @@ export function PaymentListView() {
   const { t } = useTranslate();
   const theme = useTheme();
 
+  const { wallet } = useGetUserWallet();
   const { payments, paymentsLoading, paymentsError, paymentsMutate } = useListWalletPayments();
   const { userBalance, userBalanceLoading, userBalanceError } = useGetWalletBalance();
   const { contacts, contactsLoading, contactsError } = useListWalletContacts();
@@ -168,7 +170,9 @@ export function PaymentListView() {
             open={newPayment.value}
             onClose={newPayment.onFalse}
             contacts={contacts!}
-            onSuccess={() => mutate(endpointKeys.userWallet.payments.list)}
+            onSuccess={() => {
+              if (wallet?.id) mutate(endpointKeys.userWallet.payments.list(wallet.id));
+            }}
           />
         </>
       )}

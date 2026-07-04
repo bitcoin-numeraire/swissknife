@@ -11,7 +11,7 @@ use crate::{
         nostr::{NostrService, NostrUseCases},
         payment::{PaymentService, PaymentsUseCases},
         system::{SystemService, SystemUseCases},
-        user::{ApiKeyService, ApiKeyUseCases, AuthService, AuthUseCases},
+        user::{AccountService, AccountUseCases, ApiKeyService, ApiKeyUseCases, AuthService, AuthUseCases},
         wallet::{WalletService, WalletUseCases},
     },
 };
@@ -22,6 +22,7 @@ pub struct AppServices {
     pub wallet: Box<dyn WalletUseCases>,
     pub lnurl: Box<dyn LnUrlUseCases>,
     pub ln_address: Box<dyn LnAddressUseCases>,
+    pub account: Box<dyn AccountUseCases>,
     pub auth: Box<dyn AuthUseCases>,
     pub system: Arc<dyn SystemUseCases>,
     pub nostr: Box<dyn NostrUseCases>,
@@ -73,6 +74,7 @@ impl AppServices {
             host,
         );
         let ln_address = LnAddressService::new(store.clone(), bitcoin_wallet.network());
+        let account = AccountService::new(store.clone());
         let wallet = WalletService::new(store.clone());
         let auth = AuthService::new(
             jwt_authenticator,
@@ -97,6 +99,7 @@ impl AppServices {
             wallet: Box::new(wallet),
             lnurl: Box::new(lnurl),
             ln_address: Box::new(ln_address),
+            account: Box::new(account),
             auth: Box::new(auth),
             system,
             nostr: Box::new(nostr),
@@ -118,6 +121,7 @@ pub struct MockAppServicesBuilder {
     pub wallet: crate::domains::wallet::MockWalletUseCases,
     pub lnurl: crate::domains::lnurl::MockLnUrlUseCases,
     pub ln_address: crate::domains::ln_address::MockLnAddressUseCases,
+    pub account: crate::domains::user::MockAccountUseCases,
     pub auth: crate::domains::user::MockAuthUseCases,
     pub system: crate::domains::system::MockSystemUseCases,
     pub nostr: crate::domains::nostr::MockNostrUseCases,
@@ -135,6 +139,7 @@ impl MockAppServicesBuilder {
             wallet: crate::domains::wallet::MockWalletUseCases::new(),
             lnurl: crate::domains::lnurl::MockLnUrlUseCases::new(),
             ln_address: crate::domains::ln_address::MockLnAddressUseCases::new(),
+            account: crate::domains::user::MockAccountUseCases::new(),
             auth: crate::domains::user::MockAuthUseCases::new(),
             system: crate::domains::system::MockSystemUseCases::new(),
             nostr: crate::domains::nostr::MockNostrUseCases::new(),
@@ -151,6 +156,7 @@ impl MockAppServicesBuilder {
             wallet: Box::new(self.wallet),
             lnurl: Box::new(self.lnurl),
             ln_address: Box::new(self.ln_address),
+            account: Box::new(self.account),
             auth: Box::new(self.auth),
             system: Arc::new(self.system),
             nostr: Box::new(self.nostr),

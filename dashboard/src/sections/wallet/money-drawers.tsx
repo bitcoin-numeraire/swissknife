@@ -532,6 +532,7 @@ export function SendMoneyDrawer({
   const { t } = useTranslate();
   const { state } = useSettingsContext();
   const scanQR = useBoolean();
+  const { wallet } = useGetUserWallet();
 
   const [input, setInput] = useState(initialInput ?? '');
   const [amountValue, setAmountValue] = useState('');
@@ -579,7 +580,7 @@ export function SendMoneyDrawer({
     kind !== 'unknown' &&
     !hasInvalidBip21Amount &&
     !hasUnsupportedBip21Params;
-  const activeWalletId = walletId || selectedWalletId;
+  const activeWalletId = walletId || selectedWalletId || (!isAdmin ? wallet?.id : '');
   const needsWallet = isAdmin && !activeWalletId;
   const hasFiatPrice = (fiatPrices[state.currency] ?? 0) > 0;
   const displayUnit = state.displayUnit ?? 'bip177';
@@ -657,18 +658,8 @@ export function SendMoneyDrawer({
       input,
       comment: canSendComment && comment ? comment : null,
       amount_msat: amountSats && !amountExceedsAvailable ? amountMSats : null,
-      ...(isAdmin && { wallet_id: activeWalletId || null }),
     }),
-    [
-      activeWalletId,
-      amountExceedsAvailable,
-      amountMSats,
-      amountSats,
-      canSendComment,
-      comment,
-      input,
-      isAdmin,
-    ]
+    [amountExceedsAvailable, amountMSats, amountSats, canSendComment, comment, input]
   );
 
   const handleClose = useCallback(() => {
@@ -685,8 +676,15 @@ export function SendMoneyDrawer({
     try {
       setIsSubmitting(true);
       const { data } = isAdmin
-        ? await pay({ body: requestBody })
-        : await walletPay({ body: requestBody });
+        ? await pay({ body: { ...requestBody, wallet_id: activeWalletId! } })
+        : await walletPay({
+            path: { wallet_id: activeWalletId! },
+            body: {
+              input: requestBody.input,
+              comment: requestBody.comment,
+              amount_msat: requestBody.amount_msat,
+            },
+          });
       setPayment(data);
       onSuccess?.();
     } catch (error) {
@@ -1152,6 +1150,7 @@ export function ReceiveMoneyDrawer({
   });
   const walletBtcAddressList = useListWalletBtcAddresses(undefined, {
     enabled: receiveAddressList.walletEnabled,
+    walletId: addressWalletId,
   });
   const btcAddresses = isAdmin
     ? adminBtcAddressList.btcAddresses
@@ -1262,11 +1261,17 @@ export function ReceiveMoneyDrawer({
           description,
           amount_msat: amountSats * 1000,
           expiry: invoiceExpirySeconds,
-          ...(isAdmin && { wallet_id: activeWalletId }),
         };
         const invoiceResult = isAdmin
-          ? await generateInvoice({ body: invoiceBody })
-          : await newWalletInvoice({ body: invoiceBody });
+          ? await generateInvoice({ body: { ...invoiceBody, wallet_id: activeWalletId! } })
+          : await newWalletInvoice({
+              path: { wallet_id: addressWalletId! },
+              body: {
+                description: invoiceBody.description,
+                amount_msat: invoiceBody.amount_msat,
+                expiry: invoiceBody.expiry,
+              },
+            });
 
         nextInvoice = invoiceResult.data;
         setInvoice(nextInvoice);
@@ -1279,13 +1284,15 @@ export function ReceiveMoneyDrawer({
         } else {
           const addressBody = {
             type: addressType,
-            ...(isAdmin && { wallet_id: activeWalletId }),
           };
 
           const addressResult = await (
             isAdmin
-              ? generateBtcAddress({ body: addressBody })
-              : newWalletBtcAddress({ body: addressBody })
+              ? generateBtcAddress({ body: { ...addressBody, wallet_id: activeWalletId! } })
+              : newWalletBtcAddress({
+                  path: { wallet_id: addressWalletId! },
+                  body: { type: addressBody.type },
+                })
           ).catch((error) => {
             setAddressError(error?.message || t('receive_money.address_unavailable'));
             return null;

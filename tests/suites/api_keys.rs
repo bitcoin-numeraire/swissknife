@@ -95,7 +95,7 @@ mod scope {
                 "/v1/wallets",
                 Auth::ApiKey(&key),
                 CreateWalletRequest {
-                    account_id: uuid::Uuid::new_v4(),
+                    account_id: Some(uuid::Uuid::new_v4()),
                     asset_id: uuid::Uuid::new_v4(),
                 },
             )

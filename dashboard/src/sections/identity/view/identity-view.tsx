@@ -135,9 +135,14 @@ export function IdentityView() {
   );
 
   const handleGenerateAddress = async () => {
+    if (!wallet?.id) return;
+
     try {
       setIsGenerating(true);
-      await newWalletBtcAddress({ body: { type: addressType } });
+      await newWalletBtcAddress({
+        path: { wallet_id: wallet.id },
+        body: { type: addressType },
+      });
       btcAddressesMutate();
       mutate(endpointKeys.userWallet.get);
     } catch (error) {

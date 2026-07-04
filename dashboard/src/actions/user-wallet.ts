@@ -9,14 +9,15 @@ import { useMemo } from 'react';
 
 import {
   listContacts,
-  getUserWallet,
   InvoiceOrderBy,
   OrderDirection,
   getWalletAddress,
   getWalletBalance,
   getWalletInvoice,
   getWalletPayment,
+  getAccountWallet,
   listWalletApiKeys,
+  listAccountWallets,
   listWalletInvoices,
   listWalletPayments,
   listWalletBtcAddresses,
@@ -27,11 +28,21 @@ import { endpointKeys } from './keys';
 // ----------------------------------------------------------------------
 
 export function useGetUserWallet() {
-  const result = useSWR(endpointKeys.userWallet.get, () => getUserWallet<true>());
+  const result = useSWR(endpointKeys.userWallet.get, async () => {
+    const wallets = await listAccountWallets<true>({ query: { limit: 1 } });
+    const wallet = wallets.data?.[0];
+
+    if (!wallet) {
+      return undefined;
+    }
+
+    const hydratedWallet = await getAccountWallet<true>({ path: { wallet_id: wallet.id } });
+    return hydratedWallet.data;
+  });
 
   return useMemo(
     () => ({
-      wallet: result.data?.data,
+      wallet: result.data,
       walletLoading: result.isLoading,
       walletError: result.error,
       walletValidating: result.isValidating,
@@ -40,28 +51,38 @@ export function useGetUserWallet() {
   );
 }
 
-export function useGetWalletBalance() {
-  const result = useSWR(endpointKeys.userWallet.balance, () => getWalletBalance<true>());
+export function useGetWalletBalance(walletId?: string) {
+  const { wallet, walletLoading, walletError } = useGetUserWallet();
+  const activeWalletId = walletId ?? wallet?.id;
+  const key = activeWalletId ? endpointKeys.userWallet.balance(activeWalletId) : null;
+
+  const result = useSWR(key, () =>
+    getWalletBalance<true>({ path: { wallet_id: activeWalletId! } })
+  );
 
   return useMemo(
     () => ({
       userBalance: result.data?.data,
-      userBalanceLoading: result.isLoading,
-      userBalanceError: result.error,
+      userBalanceLoading: walletLoading || result.isLoading,
+      userBalanceError: walletError || result.error,
       userBalanceValidating: result.isValidating,
     }),
-    [result]
+    [result, walletError, walletLoading]
   );
 }
 
-export function useListWalletInvoices(query?: ListWalletInvoicesData) {
-  const result = useSWR(endpointKeys.userWallet.invoices.list, () =>
+export function useListWalletInvoices(query?: ListWalletInvoicesData['query'], walletId?: string) {
+  const { wallet, walletLoading, walletError } = useGetUserWallet();
+  const activeWalletId = walletId ?? wallet?.id;
+  const key = activeWalletId ? endpointKeys.userWallet.invoices.list(activeWalletId) : null;
+
+  const result = useSWR(key, () =>
     listWalletInvoices<true>({
-      ...query,
+      path: { wallet_id: activeWalletId! },
       query: {
         order_by: InvoiceOrderBy.CREATED_AT,
         order_direction: OrderDirection.DESC,
-        ...query?.query,
+        ...query,
       },
     })
   );
@@ -69,31 +90,42 @@ export function useListWalletInvoices(query?: ListWalletInvoicesData) {
   return useMemo(
     () => ({
       invoices: result.data?.data,
-      invoicesLoading: result.isLoading,
-      invoicesError: result.error,
+      invoicesLoading: walletLoading || result.isLoading,
+      invoicesError: walletError || result.error,
       invoicesValidating: result.isValidating,
       invoicesMutate: result.mutate,
     }),
-    [result]
+    [result, walletError, walletLoading]
   );
 }
 
-export function useGetWalletInvoice(id: string) {
-  const result = useSWR(endpointKeys.userWallet.invoices.get, () =>
-    getWalletInvoice<true>({ path: { id } })
+export function useGetWalletInvoice(id: string, walletId?: string) {
+  const { wallet, walletLoading, walletError } = useGetUserWallet();
+  const activeWalletId = walletId ?? wallet?.id;
+  const key = activeWalletId ? endpointKeys.userWallet.invoices.get(activeWalletId, id) : null;
+
+  const result = useSWR(key, () =>
+    getWalletInvoice<true>({ path: { wallet_id: activeWalletId!, id } })
   );
 
   return {
     invoice: result.data?.data,
-    invoiceLoading: result.isLoading,
-    invoiceError: result.error,
+    invoiceLoading: walletLoading || result.isLoading,
+    invoiceError: walletError || result.error,
     invoiceValidating: result.isValidating,
   };
 }
 
-export function useListWalletPayments(limit?: number, offset?: number) {
-  const result = useSWR(endpointKeys.userWallet.payments.list, () =>
+export function useListWalletPayments(limit?: number, offset?: number, walletId?: string) {
+  const { wallet, walletLoading, walletError } = useGetUserWallet();
+  const activeWalletId = walletId ?? wallet?.id;
+  const key = activeWalletId
+    ? endpointKeys.userWallet.payments.list(activeWalletId, limit, offset)
+    : null;
+
+  const result = useSWR(key, () =>
     listWalletPayments<true>({
+      path: { wallet_id: activeWalletId! },
       query: { limit, offset, order_direction: OrderDirection.DESC },
     })
   );
@@ -101,24 +133,28 @@ export function useListWalletPayments(limit?: number, offset?: number) {
   return useMemo(
     () => ({
       payments: result.data?.data,
-      paymentsLoading: result.isLoading,
-      paymentsError: result.error,
+      paymentsLoading: walletLoading || result.isLoading,
+      paymentsError: walletError || result.error,
       paymentsValidating: result.isValidating,
       paymentsMutate: result.mutate,
     }),
-    [result]
+    [result, walletError, walletLoading]
   );
 }
 
-export function useGetWalletPayment(id: string) {
-  const result = useSWR(endpointKeys.userWallet.payments.get, () =>
-    getWalletPayment<true>({ path: { id } })
+export function useGetWalletPayment(id: string, walletId?: string) {
+  const { wallet, walletLoading, walletError } = useGetUserWallet();
+  const activeWalletId = walletId ?? wallet?.id;
+  const key = activeWalletId ? endpointKeys.userWallet.payments.get(activeWalletId, id) : null;
+
+  const result = useSWR(key, () =>
+    getWalletPayment<true>({ path: { wallet_id: activeWalletId!, id } })
   );
 
   return {
     payment: result.data?.data,
-    paymentLoading: result.isLoading,
-    paymentError: result.error,
+    paymentLoading: walletLoading || result.isLoading,
+    paymentError: walletError || result.error,
     paymentValidating: result.isValidating,
   };
 }
@@ -138,26 +174,32 @@ export function useGetWalletLnAddress(shouldRetryOnError: boolean = false) {
 
 type UseListWalletBtcAddressesOptions = {
   enabled?: boolean;
+  walletId?: string;
 };
 
 export function useListWalletBtcAddresses(
   query?: ListWalletBtcAddressesData['query'],
   options?: UseListWalletBtcAddressesOptions
 ) {
+  const { wallet, walletLoading, walletError } = useGetUserWallet();
   const enabled = options?.enabled ?? true;
-  const key = enabled
-    ? [
-        endpointKeys.userWallet.btcAddresses.list,
-        query?.limit,
-        query?.offset,
-        query?.address,
-        query?.address_type,
-        query?.used,
-      ]
-    : null;
+  const activeWalletId = options?.walletId ?? wallet?.id;
+  const key =
+    enabled && activeWalletId
+      ? [
+          endpointKeys.userWallet.btcAddresses.list,
+          activeWalletId,
+          query?.limit,
+          query?.offset,
+          query?.address,
+          query?.address_type,
+          query?.used,
+        ]
+      : null;
 
   const result = useSWR(key, () =>
     listWalletBtcAddresses<true>({
+      path: { wallet_id: activeWalletId! },
       query: {
         limit: 50,
         order_direction: OrderDirection.DESC,
@@ -169,26 +211,30 @@ export function useListWalletBtcAddresses(
   return useMemo(
     () => ({
       btcAddresses: result.data?.data,
-      btcAddressesLoading: result.isLoading,
-      btcAddressesError: result.error,
+      btcAddressesLoading: walletLoading || result.isLoading,
+      btcAddressesError: walletError || result.error,
       btcAddressesValidating: result.isValidating,
       btcAddressesMutate: result.mutate,
     }),
-    [result]
+    [result, walletError, walletLoading]
   );
 }
 
-export function useListWalletContacts() {
-  const result = useSWR(endpointKeys.userWallet.contacts.list, () => listContacts<true>());
+export function useListWalletContacts(walletId?: string) {
+  const { wallet, walletLoading, walletError } = useGetUserWallet();
+  const activeWalletId = walletId ?? wallet?.id;
+  const key = activeWalletId ? endpointKeys.userWallet.contacts.list(activeWalletId) : null;
+
+  const result = useSWR(key, () => listContacts<true>({ path: { wallet_id: activeWalletId! } }));
 
   return useMemo(
     () => ({
       contacts: result.data?.data,
-      contactsLoading: result.isLoading,
-      contactsError: result.error,
+      contactsLoading: walletLoading || result.isLoading,
+      contactsError: walletError || result.error,
       contactsValidating: result.isValidating,
     }),
-    [result]
+    [result, walletError, walletLoading]
   );
 }
 

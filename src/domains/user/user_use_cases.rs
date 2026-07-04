@@ -1,11 +1,12 @@
 use async_trait::async_trait;
+use serde_json::Value;
 use uuid::Uuid;
 
 use swissknife_types::CreateApiKeyRequest;
 
 use crate::application::errors::ApplicationError;
 
-use super::{ApiKey, ApiKeyFilter, User};
+use super::{Account, AccountPreferences, ApiKey, ApiKeyFilter, User};
 
 #[cfg_attr(test, mockall::automock)]
 #[async_trait]
@@ -15,6 +16,17 @@ pub trait AuthUseCases: Send + Sync {
     async fn change_password(&self, current_password: String, new_password: String) -> Result<(), ApplicationError>;
     async fn authenticate_jwt(&self, token: &str) -> Result<User, ApplicationError>;
     async fn authenticate_api_key(&self, token: Vec<u8>) -> Result<User, ApplicationError>;
+}
+
+#[cfg_attr(test, mockall::automock)]
+#[async_trait]
+pub trait AccountUseCases: Send + Sync {
+    async fn get(&self, id: Uuid) -> Result<Account, ApplicationError>;
+    async fn update_preferences(
+        &self,
+        id: Uuid,
+        dashboard_settings: Value,
+    ) -> Result<AccountPreferences, ApplicationError>;
 }
 
 #[cfg_attr(test, mockall::automock)]

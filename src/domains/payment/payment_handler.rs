@@ -18,7 +18,7 @@ use crate::{
             BAD_REQUEST_EXAMPLE, FORBIDDEN_EXAMPLE, INTERNAL_EXAMPLE, NOT_FOUND_EXAMPLE, UNAUTHORIZED_EXAMPLE,
             UNPROCESSABLE_EXAMPLE,
         },
-        errors::ApplicationError,
+        errors::{ApplicationError, DataError},
     },
     domains::{
         lnurl::LnUrlSuccessAction,
@@ -81,15 +81,13 @@ async fn pay(
     Json(payload): Json<SendPaymentRequest>,
 ) -> Result<Json<Payment>, ApplicationError> {
     user.check_permission(Permission::WriteLnTransaction)?;
+    let wallet_id = payload
+        .wallet_id
+        .ok_or_else(|| DataError::Malformed("wallet_id is required.".to_string()))?;
 
     let payment = services
         .payment
-        .pay(
-            payload.input,
-            payload.amount_msat,
-            payload.comment,
-            payload.wallet_id.unwrap_or(user.wallet_id),
-        )
+        .pay(payload.input, payload.amount_msat, payload.comment, wallet_id)
         .await?;
 
     Ok(Json(payment))
@@ -216,15 +214,14 @@ mod tests {
 
     fn user(permissions: Vec<Permission>) -> User {
         User {
-            wallet_id: Uuid::new_v4(),
             permissions,
             ..Default::default()
         }
     }
 
-    fn send_request(wallet_id: Option<Uuid>) -> SendPaymentRequest {
+    fn send_request(wallet_id: Uuid) -> SendPaymentRequest {
         SendPaymentRequest {
-            wallet_id,
+            wallet_id: Some(wallet_id),
             input: "bob@numeraire.tech".to_string(),
             amount_msat: Some(1_000),
             comment: None,
@@ -242,31 +239,14 @@ mod tests {
                 // No expect_pay installed: any call to the use case panics.
                 let services = MockAppServicesBuilder::new().build();
 
-                let result = pay(State(Arc::new(services)), user(vec![]), Json(send_request(None))).await;
+                let result = pay(
+                    State(Arc::new(services)),
+                    user(vec![]),
+                    Json(send_request(Uuid::new_v4())),
+                )
+                .await;
 
                 assert!(matches!(result, Err(ApplicationError::Authorization(_))));
-            }
-        }
-
-        mod when_wallet_id_is_omitted {
-            use super::*;
-
-            #[tokio::test]
-            async fn defaults_to_the_authenticated_users_wallet() {
-                let caller = user(vec![Permission::WriteLnTransaction]);
-                let expected_wallet = caller.wallet_id;
-
-                let mut builder = MockAppServicesBuilder::new();
-                builder
-                    .payment
-                    .expect_pay()
-                    .withf(move |_, _, _, wallet_id| *wallet_id == expected_wallet)
-                    .times(1)
-                    .returning(|_, _, _, _| Ok(Payment::default()));
-
-                let result = pay(State(Arc::new(builder.build())), caller, Json(send_request(None))).await;
-
-                assert!(result.is_ok());
             }
         }
 
@@ -288,7 +268,7 @@ mod tests {
                 let result = pay(
                     State(Arc::new(builder.build())),
                     user(vec![Permission::WriteLnTransaction]),
-                    Json(send_request(Some(explicit))),
+                    Json(send_request(explicit)),
                 )
                 .await;
 

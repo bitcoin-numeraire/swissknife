@@ -56,7 +56,7 @@ mod generate {
                 "/v1/invoices",
                 Auth::None,
                 NewInvoiceRequest {
-                    wallet_id: None,
+                    wallet_id: Some(uuid::Uuid::new_v4()),
                     amount_msat: 1_000,
                     description: None,
                     expiry: None,

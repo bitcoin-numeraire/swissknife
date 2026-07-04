@@ -3,21 +3,25 @@
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
 import {
+  createAccountWalletResponseTransformer,
   createApiKeyResponseTransformer,
   createWalletApiKeyResponseTransformer,
   generateBtcAddressResponseTransformer,
   generateInvoiceResponseTransformer,
+  getAccountPreferencesResponseTransformer,
+  getAccountResponseTransformer,
+  getAccountWalletResponseTransformer,
   getAddressResponseTransformer,
   getApiKeyResponseTransformer,
   getBtcAddressResponseTransformer,
   getInvoiceResponseTransformer,
   getPaymentResponseTransformer,
-  getUserWalletResponseTransformer,
   getWalletAddressResponseTransformer,
   getWalletApiKeyResponseTransformer,
   getWalletInvoiceResponseTransformer,
   getWalletPaymentResponseTransformer,
   getWalletResponseTransformer,
+  listAccountWalletsResponseTransformer,
   listAddressesResponseTransformer,
   listApiKeysResponseTransformer,
   listBtcAddressesResponseTransformer,
@@ -36,6 +40,7 @@ import {
   registerAddressResponseTransformer,
   registerWalletAddressResponseTransformer,
   registerWalletResponseTransformer,
+  updateAccountPreferencesResponseTransformer,
   updateAddressResponseTransformer,
   updateWalletAddressResponseTransformer,
   walletPayResponseTransformer,
@@ -47,6 +52,9 @@ import type {
   ChangePasswordData,
   ChangePasswordErrors,
   ChangePasswordResponses,
+  CreateAccountWalletData,
+  CreateAccountWalletErrors,
+  CreateAccountWalletResponses,
   CreateApiKeyData,
   CreateApiKeyErrors,
   CreateApiKeyResponses,
@@ -98,6 +106,15 @@ import type {
   GenerateInvoiceData,
   GenerateInvoiceErrors,
   GenerateInvoiceResponses,
+  GetAccountData,
+  GetAccountErrors,
+  GetAccountPreferencesData,
+  GetAccountPreferencesErrors,
+  GetAccountPreferencesResponses,
+  GetAccountResponses,
+  GetAccountWalletData,
+  GetAccountWalletErrors,
+  GetAccountWalletResponses,
   GetAddressData,
   GetAddressErrors,
   GetAddressResponses,
@@ -113,9 +130,6 @@ import type {
   GetPaymentData,
   GetPaymentErrors,
   GetPaymentResponses,
-  GetUserWalletData,
-  GetUserWalletErrors,
-  GetUserWalletResponses,
   GetWalletAddressData,
   GetWalletAddressErrors,
   GetWalletAddressResponses,
@@ -137,6 +151,9 @@ import type {
   HealthCheckData,
   HealthCheckErrors,
   HealthCheckResponses,
+  ListAccountWalletsData,
+  ListAccountWalletsErrors,
+  ListAccountWalletsResponses,
   ListAddressesData,
   ListAddressesErrors,
   ListAddressesResponses,
@@ -217,6 +234,9 @@ import type {
   SignUpData,
   SignUpErrors,
   SignUpResponses,
+  UpdateAccountPreferencesData,
+  UpdateAccountPreferencesErrors,
+  UpdateAccountPreferencesResponses,
   UpdateAddressData,
   UpdateAddressErrors,
   UpdateAddressResponses,
@@ -693,24 +713,20 @@ export const updateAddress = <ThrowOnError extends boolean = false>(
   });
 
 /**
- * Get wallet
- *
- * Returns the user wallet.
+ * Get account.
  */
-export const getUserWallet = <ThrowOnError extends boolean = false>(
-  options?: Options<GetUserWalletData, ThrowOnError>
-): RequestResult<GetUserWalletResponses, GetUserWalletErrors, ThrowOnError> =>
-  (options?.client ?? client).get<GetUserWalletResponses, GetUserWalletErrors, ThrowOnError>({
-    responseTransformer: getUserWalletResponseTransformer,
+export const getAccount = <ThrowOnError extends boolean = false>(
+  options?: Options<GetAccountData, ThrowOnError>
+): RequestResult<GetAccountResponses, GetAccountErrors, ThrowOnError> =>
+  (options?.client ?? client).get<GetAccountResponses, GetAccountErrors, ThrowOnError>({
+    responseTransformer: getAccountResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/v1/me',
     ...options,
   });
 
 /**
- * Revoke API Keys
- *
- * Revokes all the API Keys given a filter. Returns the number of revoked keys.
+ * Revoke account API keys.
  */
 export const revokeWalletApiKeys = <ThrowOnError extends boolean = false>(
   options?: Options<RevokeWalletApiKeysData, ThrowOnError>
@@ -726,9 +742,7 @@ export const revokeWalletApiKeys = <ThrowOnError extends boolean = false>(
   });
 
 /**
- * List API Keys
- *
- * Returns all the API Keys given a filter
+ * List account API keys.
  */
 export const listWalletApiKeys = <ThrowOnError extends boolean = false>(
   options?: Options<ListWalletApiKeysData, ThrowOnError>
@@ -747,7 +761,7 @@ export const listWalletApiKeys = <ThrowOnError extends boolean = false>(
 /**
  * Generate a new API Key
  *
- * Returns the generated API Key for the authenticated account. Users can create API keys with
+ * Returns the generated API Key for the account. Users can create API keys with
  * permissions as a subset of their current permissions.
  */
 export const createWalletApiKey = <ThrowOnError extends boolean = false>(
@@ -769,9 +783,7 @@ export const createWalletApiKey = <ThrowOnError extends boolean = false>(
   });
 
 /**
- * Revoke an API Key
- *
- * Revokes an API Key by ID. Returns an empty body.
+ * Revoke an account API key.
  */
 export const revokeWalletApiKey = <ThrowOnError extends boolean = false>(
   options: Options<RevokeWalletApiKeyData, ThrowOnError>
@@ -787,9 +799,7 @@ export const revokeWalletApiKey = <ThrowOnError extends boolean = false>(
   });
 
 /**
- * Find an API Key
- *
- * Returns the API Key by its ID.
+ * Get an account API key.
  */
 export const getWalletApiKey = <ThrowOnError extends boolean = false>(
   options: Options<GetWalletApiKeyData, ThrowOnError>
@@ -802,151 +812,7 @@ export const getWalletApiKey = <ThrowOnError extends boolean = false>(
   });
 
 /**
- * Get wallet balance
- *
- * Returns the wallet balance.
- */
-export const getWalletBalance = <ThrowOnError extends boolean = false>(
-  options?: Options<GetWalletBalanceData, ThrowOnError>
-): RequestResult<GetWalletBalanceResponses, GetWalletBalanceErrors, ThrowOnError> =>
-  (options?.client ?? client).get<GetWalletBalanceResponses, GetWalletBalanceErrors, ThrowOnError>({
-    security: [{ scheme: 'bearer', type: 'http' }],
-    url: '/v1/me/balance',
-    ...options,
-  });
-
-/**
- * Generate a new Bitcoin address.
- *
- * Returns the Bitcoin address for the given address type. The returned address is the same until used.
- */
-export const newWalletBtcAddress = <ThrowOnError extends boolean = false>(
-  options: Options<NewWalletBtcAddressData, ThrowOnError>
-): RequestResult<NewWalletBtcAddressResponses, NewWalletBtcAddressErrors, ThrowOnError> =>
-  (options.client ?? client).post<
-    NewWalletBtcAddressResponses,
-    NewWalletBtcAddressErrors,
-    ThrowOnError
-  >({
-    responseTransformer: newWalletBtcAddressResponseTransformer,
-    security: [{ scheme: 'bearer', type: 'http' }],
-    url: '/v1/me/bitcoin/address',
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...options.headers,
-    },
-  });
-
-/**
- * List Bitcoin addresses
- *
- * Returns the authenticated user's Bitcoin addresses given a filter.
- */
-export const listWalletBtcAddresses = <ThrowOnError extends boolean = false>(
-  options?: Options<ListWalletBtcAddressesData, ThrowOnError>
-): RequestResult<ListWalletBtcAddressesResponses, ListWalletBtcAddressesErrors, ThrowOnError> =>
-  (options?.client ?? client).get<
-    ListWalletBtcAddressesResponses,
-    ListWalletBtcAddressesErrors,
-    ThrowOnError
-  >({
-    responseTransformer: listWalletBtcAddressesResponseTransformer,
-    security: [{ scheme: 'bearer', type: 'http' }],
-    url: '/v1/me/bitcoin/addresses',
-    ...options,
-  });
-
-/**
- * List contacts
- *
- * Returns all the contacts
- */
-export const listContacts = <ThrowOnError extends boolean = false>(
-  options?: Options<ListContactsData, ThrowOnError>
-): RequestResult<ListContactsResponses, ListContactsErrors, ThrowOnError> =>
-  (options?.client ?? client).get<ListContactsResponses, ListContactsErrors, ThrowOnError>({
-    responseTransformer: listContactsResponseTransformer,
-    security: [{ scheme: 'bearer', type: 'http' }],
-    url: '/v1/me/contacts',
-    ...options,
-  });
-
-/**
- * Delete expired invoices
- *
- * Deletes all the invoices with status `Èxpired`. Returns the number of deleted invoices
- */
-export const deleteExpiredInvoices = <ThrowOnError extends boolean = false>(
-  options?: Options<DeleteExpiredInvoicesData, ThrowOnError>
-): RequestResult<DeleteExpiredInvoicesResponses, DeleteExpiredInvoicesErrors, ThrowOnError> =>
-  (options?.client ?? client).delete<
-    DeleteExpiredInvoicesResponses,
-    DeleteExpiredInvoicesErrors,
-    ThrowOnError
-  >({
-    security: [{ scheme: 'bearer', type: 'http' }],
-    url: '/v1/me/invoices',
-    ...options,
-  });
-
-/**
- * List invoices
- *
- * Returns all the invoices given a filter
- */
-export const listWalletInvoices = <ThrowOnError extends boolean = false>(
-  options?: Options<ListWalletInvoicesData, ThrowOnError>
-): RequestResult<ListWalletInvoicesResponses, ListWalletInvoicesErrors, ThrowOnError> =>
-  (options?.client ?? client).get<
-    ListWalletInvoicesResponses,
-    ListWalletInvoicesErrors,
-    ThrowOnError
-  >({
-    responseTransformer: listWalletInvoicesResponseTransformer,
-    security: [{ scheme: 'bearer', type: 'http' }],
-    url: '/v1/me/invoices',
-    ...options,
-  });
-
-/**
- * Generate a new invoice
- *
- * Returns the generated invoice
- */
-export const newWalletInvoice = <ThrowOnError extends boolean = false>(
-  options: Options<NewWalletInvoiceData, ThrowOnError>
-): RequestResult<NewWalletInvoiceResponses, NewWalletInvoiceErrors, ThrowOnError> =>
-  (options.client ?? client).post<NewWalletInvoiceResponses, NewWalletInvoiceErrors, ThrowOnError>({
-    responseTransformer: newWalletInvoiceResponseTransformer,
-    security: [{ scheme: 'bearer', type: 'http' }],
-    url: '/v1/me/invoices',
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...options.headers,
-    },
-  });
-
-/**
- * Find an invoice
- *
- * Returns the invoice by its ID
- */
-export const getWalletInvoice = <ThrowOnError extends boolean = false>(
-  options: Options<GetWalletInvoiceData, ThrowOnError>
-): RequestResult<GetWalletInvoiceResponses, GetWalletInvoiceErrors, ThrowOnError> =>
-  (options.client ?? client).get<GetWalletInvoiceResponses, GetWalletInvoiceErrors, ThrowOnError>({
-    responseTransformer: getWalletInvoiceResponseTransformer,
-    security: [{ scheme: 'bearer', type: 'http' }],
-    url: '/v1/me/invoices/{id}',
-    ...options,
-  });
-
-/**
- * Delete LN Address
- *
- * Deletes an address. Returns an empty body. Once the address is deleted, it will no longer be able to receive funds and its username can be claimed by another user.
+ * Delete account Lightning Address.
  */
 export const deleteWalletAddress = <ThrowOnError extends boolean = false>(
   options?: Options<DeleteWalletAddressData, ThrowOnError>
@@ -962,9 +828,7 @@ export const deleteWalletAddress = <ThrowOnError extends boolean = false>(
   });
 
 /**
- * Get LN Address
- *
- * Returns the registered address
+ * Get account Lightning Address.
  */
 export const getWalletAddress = <ThrowOnError extends boolean = false>(
   options?: Options<GetWalletAddressData, ThrowOnError>
@@ -977,9 +841,7 @@ export const getWalletAddress = <ThrowOnError extends boolean = false>(
   });
 
 /**
- * Register LN Address
- *
- * Registers an address. Returns the address details. LN Addresses are ready to receive funds through the LNURL protocol upon registration.
+ * Register account Lightning Address.
  */
 export const registerWalletAddress = <ThrowOnError extends boolean = false>(
   options: Options<RegisterWalletAddressData, ThrowOnError>
@@ -1000,9 +862,7 @@ export const registerWalletAddress = <ThrowOnError extends boolean = false>(
   });
 
 /**
- * Update LN Address
- *
- * Updates the address. Returns the address details.
+ * Update account Lightning Address.
  */
 export const updateWalletAddress = <ThrowOnError extends boolean = false>(
   options: Options<UpdateWalletAddressData, ThrowOnError>
@@ -1023,54 +883,36 @@ export const updateWalletAddress = <ThrowOnError extends boolean = false>(
   });
 
 /**
- * Delete failed payments
- *
- * Deletes all the payments with `Failed` status. Returns the number of deleted payments
+ * Get account preferences.
  */
-export const deleteFailedPayments = <ThrowOnError extends boolean = false>(
-  options?: Options<DeleteFailedPaymentsData, ThrowOnError>
-): RequestResult<DeleteFailedPaymentsResponses, DeleteFailedPaymentsErrors, ThrowOnError> =>
-  (options?.client ?? client).delete<
-    DeleteFailedPaymentsResponses,
-    DeleteFailedPaymentsErrors,
-    ThrowOnError
-  >({
-    security: [{ scheme: 'bearer', type: 'http' }],
-    url: '/v1/me/payments',
-    ...options,
-  });
-
-/**
- * List payments
- *
- * Returns all the payments given a filter
- */
-export const listWalletPayments = <ThrowOnError extends boolean = false>(
-  options?: Options<ListWalletPaymentsData, ThrowOnError>
-): RequestResult<ListWalletPaymentsResponses, ListWalletPaymentsErrors, ThrowOnError> =>
+export const getAccountPreferences = <ThrowOnError extends boolean = false>(
+  options?: Options<GetAccountPreferencesData, ThrowOnError>
+): RequestResult<GetAccountPreferencesResponses, GetAccountPreferencesErrors, ThrowOnError> =>
   (options?.client ?? client).get<
-    ListWalletPaymentsResponses,
-    ListWalletPaymentsErrors,
+    GetAccountPreferencesResponses,
+    GetAccountPreferencesErrors,
     ThrowOnError
   >({
-    responseTransformer: listWalletPaymentsResponseTransformer,
+    responseTransformer: getAccountPreferencesResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
-    url: '/v1/me/payments',
+    url: '/v1/me/preferences',
     ...options,
   });
 
 /**
- * Send payment
- *
- * Pay for a LN invoice, LNURL, LN Address, On-chain or internally to an other user on the same instance. Returns the payment details.
+ * Replace account preferences.
  */
-export const walletPay = <ThrowOnError extends boolean = false>(
-  options: Options<WalletPayData, ThrowOnError>
-): RequestResult<WalletPayResponses, WalletPayErrors, ThrowOnError> =>
-  (options.client ?? client).post<WalletPayResponses, WalletPayErrors, ThrowOnError>({
-    responseTransformer: walletPayResponseTransformer,
+export const updateAccountPreferences = <ThrowOnError extends boolean = false>(
+  options: Options<UpdateAccountPreferencesData, ThrowOnError>
+): RequestResult<UpdateAccountPreferencesResponses, UpdateAccountPreferencesErrors, ThrowOnError> =>
+  (options.client ?? client).put<
+    UpdateAccountPreferencesResponses,
+    UpdateAccountPreferencesErrors,
+    ThrowOnError
+  >({
+    responseTransformer: updateAccountPreferencesResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
-    url: '/v1/me/payments',
+    url: '/v1/me/preferences',
     ...options,
     headers: {
       'Content-Type': 'application/json',
@@ -1079,9 +921,234 @@ export const walletPay = <ThrowOnError extends boolean = false>(
   });
 
 /**
- * Find a payment
- *
- * Returns the payment by its ID
+ * List account wallets.
+ */
+export const listAccountWallets = <ThrowOnError extends boolean = false>(
+  options?: Options<ListAccountWalletsData, ThrowOnError>
+): RequestResult<ListAccountWalletsResponses, ListAccountWalletsErrors, ThrowOnError> =>
+  (options?.client ?? client).get<
+    ListAccountWalletsResponses,
+    ListAccountWalletsErrors,
+    ThrowOnError
+  >({
+    responseTransformer: listAccountWalletsResponseTransformer,
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/me/wallets',
+    ...options,
+  });
+
+/**
+ * Create or enable an asset wallet.
+ */
+export const createAccountWallet = <ThrowOnError extends boolean = false>(
+  options: Options<CreateAccountWalletData, ThrowOnError>
+): RequestResult<CreateAccountWalletResponses, CreateAccountWalletErrors, ThrowOnError> =>
+  (options.client ?? client).post<
+    CreateAccountWalletResponses,
+    CreateAccountWalletErrors,
+    ThrowOnError
+  >({
+    responseTransformer: createAccountWalletResponseTransformer,
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/me/wallets',
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
+
+/**
+ * Get one account wallet.
+ */
+export const getAccountWallet = <ThrowOnError extends boolean = false>(
+  options: Options<GetAccountWalletData, ThrowOnError>
+): RequestResult<GetAccountWalletResponses, GetAccountWalletErrors, ThrowOnError> =>
+  (options.client ?? client).get<GetAccountWalletResponses, GetAccountWalletErrors, ThrowOnError>({
+    responseTransformer: getAccountWalletResponseTransformer,
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/me/wallets/{wallet_id}',
+    ...options,
+  });
+
+/**
+ * Get wallet balance.
+ */
+export const getWalletBalance = <ThrowOnError extends boolean = false>(
+  options: Options<GetWalletBalanceData, ThrowOnError>
+): RequestResult<GetWalletBalanceResponses, GetWalletBalanceErrors, ThrowOnError> =>
+  (options.client ?? client).get<GetWalletBalanceResponses, GetWalletBalanceErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/me/wallets/{wallet_id}/balance',
+    ...options,
+  });
+
+/**
+ * List Bitcoin addresses for a wallet.
+ */
+export const listWalletBtcAddresses = <ThrowOnError extends boolean = false>(
+  options: Options<ListWalletBtcAddressesData, ThrowOnError>
+): RequestResult<ListWalletBtcAddressesResponses, ListWalletBtcAddressesErrors, ThrowOnError> =>
+  (options.client ?? client).get<
+    ListWalletBtcAddressesResponses,
+    ListWalletBtcAddressesErrors,
+    ThrowOnError
+  >({
+    responseTransformer: listWalletBtcAddressesResponseTransformer,
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/me/wallets/{wallet_id}/bitcoin/addresses',
+    ...options,
+  });
+
+/**
+ * Generate a new Bitcoin address for a wallet.
+ */
+export const newWalletBtcAddress = <ThrowOnError extends boolean = false>(
+  options: Options<NewWalletBtcAddressData, ThrowOnError>
+): RequestResult<NewWalletBtcAddressResponses, NewWalletBtcAddressErrors, ThrowOnError> =>
+  (options.client ?? client).post<
+    NewWalletBtcAddressResponses,
+    NewWalletBtcAddressErrors,
+    ThrowOnError
+  >({
+    responseTransformer: newWalletBtcAddressResponseTransformer,
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/me/wallets/{wallet_id}/bitcoin/addresses',
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
+
+/**
+ * List contacts for a wallet.
+ */
+export const listContacts = <ThrowOnError extends boolean = false>(
+  options: Options<ListContactsData, ThrowOnError>
+): RequestResult<ListContactsResponses, ListContactsErrors, ThrowOnError> =>
+  (options.client ?? client).get<ListContactsResponses, ListContactsErrors, ThrowOnError>({
+    responseTransformer: listContactsResponseTransformer,
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/me/wallets/{wallet_id}/contacts',
+    ...options,
+  });
+
+/**
+ * Delete expired invoices for a wallet.
+ */
+export const deleteExpiredInvoices = <ThrowOnError extends boolean = false>(
+  options: Options<DeleteExpiredInvoicesData, ThrowOnError>
+): RequestResult<DeleteExpiredInvoicesResponses, DeleteExpiredInvoicesErrors, ThrowOnError> =>
+  (options.client ?? client).delete<
+    DeleteExpiredInvoicesResponses,
+    DeleteExpiredInvoicesErrors,
+    ThrowOnError
+  >({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/me/wallets/{wallet_id}/invoices',
+    ...options,
+  });
+
+/**
+ * List invoices for a wallet.
+ */
+export const listWalletInvoices = <ThrowOnError extends boolean = false>(
+  options: Options<ListWalletInvoicesData, ThrowOnError>
+): RequestResult<ListWalletInvoicesResponses, ListWalletInvoicesErrors, ThrowOnError> =>
+  (options.client ?? client).get<
+    ListWalletInvoicesResponses,
+    ListWalletInvoicesErrors,
+    ThrowOnError
+  >({
+    responseTransformer: listWalletInvoicesResponseTransformer,
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/me/wallets/{wallet_id}/invoices',
+    ...options,
+  });
+
+/**
+ * Generate a new invoice for a wallet.
+ */
+export const newWalletInvoice = <ThrowOnError extends boolean = false>(
+  options: Options<NewWalletInvoiceData, ThrowOnError>
+): RequestResult<NewWalletInvoiceResponses, NewWalletInvoiceErrors, ThrowOnError> =>
+  (options.client ?? client).post<NewWalletInvoiceResponses, NewWalletInvoiceErrors, ThrowOnError>({
+    responseTransformer: newWalletInvoiceResponseTransformer,
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/me/wallets/{wallet_id}/invoices',
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
+
+/**
+ * Get a wallet invoice.
+ */
+export const getWalletInvoice = <ThrowOnError extends boolean = false>(
+  options: Options<GetWalletInvoiceData, ThrowOnError>
+): RequestResult<GetWalletInvoiceResponses, GetWalletInvoiceErrors, ThrowOnError> =>
+  (options.client ?? client).get<GetWalletInvoiceResponses, GetWalletInvoiceErrors, ThrowOnError>({
+    responseTransformer: getWalletInvoiceResponseTransformer,
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/me/wallets/{wallet_id}/invoices/{id}',
+    ...options,
+  });
+
+/**
+ * Delete failed payments for a wallet.
+ */
+export const deleteFailedPayments = <ThrowOnError extends boolean = false>(
+  options: Options<DeleteFailedPaymentsData, ThrowOnError>
+): RequestResult<DeleteFailedPaymentsResponses, DeleteFailedPaymentsErrors, ThrowOnError> =>
+  (options.client ?? client).delete<
+    DeleteFailedPaymentsResponses,
+    DeleteFailedPaymentsErrors,
+    ThrowOnError
+  >({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/me/wallets/{wallet_id}/payments',
+    ...options,
+  });
+
+/**
+ * List payments for a wallet.
+ */
+export const listWalletPayments = <ThrowOnError extends boolean = false>(
+  options: Options<ListWalletPaymentsData, ThrowOnError>
+): RequestResult<ListWalletPaymentsResponses, ListWalletPaymentsErrors, ThrowOnError> =>
+  (options.client ?? client).get<
+    ListWalletPaymentsResponses,
+    ListWalletPaymentsErrors,
+    ThrowOnError
+  >({
+    responseTransformer: listWalletPaymentsResponseTransformer,
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/me/wallets/{wallet_id}/payments',
+    ...options,
+  });
+
+/**
+ * Send a payment from a wallet.
+ */
+export const walletPay = <ThrowOnError extends boolean = false>(
+  options: Options<WalletPayData, ThrowOnError>
+): RequestResult<WalletPayResponses, WalletPayErrors, ThrowOnError> =>
+  (options.client ?? client).post<WalletPayResponses, WalletPayErrors, ThrowOnError>({
+    responseTransformer: walletPayResponseTransformer,
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/me/wallets/{wallet_id}/payments',
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
+
+/**
+ * Get a wallet payment.
  */
 export const getWalletPayment = <ThrowOnError extends boolean = false>(
   options: Options<GetWalletPaymentData, ThrowOnError>
@@ -1089,7 +1156,7 @@ export const getWalletPayment = <ThrowOnError extends boolean = false>(
   (options.client ?? client).get<GetWalletPaymentResponses, GetWalletPaymentErrors, ThrowOnError>({
     responseTransformer: getWalletPaymentResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
-    url: '/v1/me/payments/{id}',
+    url: '/v1/me/wallets/{wallet_id}/payments/{id}',
     ...options,
   });
 

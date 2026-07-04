@@ -5,6 +5,57 @@ export type ClientOptions = {
 };
 
 /**
+ * An account is the owner and authorization boundary for identities, wallets,
+ * API keys, permissions, and account-scoped preferences.
+ */
+export type Account = {
+  /**
+   * Date of creation in database.
+   */
+  created_at: Date;
+  /**
+   * Optional human-readable name for the account.
+   */
+  display_name?: string | null;
+  /**
+   * Stable internal account ID.
+   */
+  id: string;
+  identity?: null | AuthIdentity;
+  /**
+   * Permissions stored for this account.
+   *
+   * These are authoritative for local JWT identities. OAuth2 requests use
+   * token claims as the effective permissions instead of mirroring claims
+   * into this field.
+   */
+  permissions?: Array<Permission> | null;
+  preferences?: null | AccountPreferences;
+  /**
+   * Date of update in database.
+   */
+  updated_at?: Date | null;
+};
+
+/**
+ * Account-scoped dashboard and UI preferences.
+ */
+export type AccountPreferences = {
+  /**
+   * Date of creation in database.
+   */
+  created_at: Date;
+  /**
+   * Versioned dashboard settings document stored by the server.
+   */
+  dashboard_settings: unknown;
+  /**
+   * Date of update in database.
+   */
+  updated_at?: Date | null;
+};
+
+/**
  * API Key
  */
 export type ApiKey = {
@@ -87,6 +138,38 @@ export type Asset = {
    */
   updated_at?: Date | null;
 };
+
+/**
+ * A login identity from an authentication provider linked to an account.
+ */
+export type AuthIdentity = {
+  /**
+   * Date of creation in database.
+   */
+  created_at: Date;
+  /**
+   * Stable internal identity ID.
+   */
+  id: string;
+  /**
+   * Authentication provider namespace, such as `jwt` or `oauth2`.
+   */
+  provider: AuthProvider;
+  /**
+   * Provider subject, such as a JWT username or OAuth2 `sub`.
+   */
+  subject: string;
+};
+
+/**
+ * Authentication provider namespace.
+ */
+export const AuthProvider = { JWT: 'jwt', OAUTH2: 'oauth2' } as const;
+
+/**
+ * Authentication provider namespace.
+ */
+export type AuthProvider = (typeof AuthProvider)[keyof typeof AuthProvider];
 
 /**
  * A wallet's balance, in millisatoshis.
@@ -312,9 +395,9 @@ export type CreateApiKeyRequest = {
  */
 export type CreateWalletRequest = {
   /**
-   * Owning account ID
+   * Owning account ID. Required by admin endpoints; derived from the authenticated account on account-scoped endpoints.
    */
-  account_id: string;
+  account_id?: string | null;
   /**
    * Asset ID to enable for the account
    */
@@ -696,7 +779,7 @@ export type LnUrlSuccessAction = {
 export type NewBtcAddressRequest = {
   type?: null | BtcAddressType;
   /**
-   * User ID. Will be populated with your own ID by default
+   * Wallet ID to receive into. Required by admin endpoints; derived from the path on wallet-scoped endpoints.
    */
   wallet_id?: string | null;
 };
@@ -718,7 +801,7 @@ export type NewInvoiceRequest = {
    */
   expiry?: number | null;
   /**
-   * User ID. Will be populated with your own ID by default
+   * Wallet ID to receive into. Required by admin endpoints; derived from the path on wallet-scoped endpoints.
    */
   wallet_id?: string | null;
 };
@@ -888,7 +971,7 @@ export type SendPaymentRequest = {
    */
   input: string;
   /**
-   * Wallet ID. Will be populated with your own ID by default
+   * Wallet ID to pay from. Required by admin endpoints; derived from the path on wallet-scoped endpoints.
    */
   wallet_id?: string | null;
 };
@@ -935,6 +1018,16 @@ export type SignUpRequest = {
    * User password
    */
   password: string;
+};
+
+/**
+ * Replace account-scoped dashboard preferences.
+ */
+export type UpdateAccountPreferencesRequest = {
+  /**
+   * Versioned dashboard settings document stored by the server.
+   */
+  dashboard_settings: unknown;
 };
 
 /**
@@ -2390,14 +2483,14 @@ export type UpdateAddressResponses = {
 
 export type UpdateAddressResponse = UpdateAddressResponses[keyof UpdateAddressResponses];
 
-export type GetUserWalletData = {
+export type GetAccountData = {
   body?: never;
   path?: never;
   query?: never;
   url: '/v1/me';
 };
 
-export type GetUserWalletErrors = {
+export type GetAccountErrors = {
   /**
    * Unauthorized
    */
@@ -2412,16 +2505,16 @@ export type GetUserWalletErrors = {
   500: ErrorResponse;
 };
 
-export type GetUserWalletError = GetUserWalletErrors[keyof GetUserWalletErrors];
+export type GetAccountError = GetAccountErrors[keyof GetAccountErrors];
 
-export type GetUserWalletResponses = {
+export type GetAccountResponses = {
   /**
    * Found
    */
-  200: Wallet;
+  200: Account;
 };
 
-export type GetUserWalletResponse = GetUserWalletResponses[keyof GetUserWalletResponses];
+export type GetAccountResponse = GetAccountResponses[keyof GetAccountResponses];
 
 export type RevokeWalletApiKeysData = {
   body?: never;
@@ -2651,348 +2744,6 @@ export type GetWalletApiKeyResponses = {
 
 export type GetWalletApiKeyResponse = GetWalletApiKeyResponses[keyof GetWalletApiKeyResponses];
 
-export type GetWalletBalanceData = {
-  body?: never;
-  path?: never;
-  query?: never;
-  url: '/v1/me/balance';
-};
-
-export type GetWalletBalanceErrors = {
-  /**
-   * Unauthorized
-   */
-  401: ErrorResponse;
-  /**
-   * Internal Server Error
-   */
-  500: ErrorResponse;
-};
-
-export type GetWalletBalanceError = GetWalletBalanceErrors[keyof GetWalletBalanceErrors];
-
-export type GetWalletBalanceResponses = {
-  /**
-   * Found
-   */
-  200: Balance;
-};
-
-export type GetWalletBalanceResponse = GetWalletBalanceResponses[keyof GetWalletBalanceResponses];
-
-export type NewWalletBtcAddressData = {
-  body: NewBtcAddressRequest;
-  path?: never;
-  query?: never;
-  url: '/v1/me/bitcoin/address';
-};
-
-export type NewWalletBtcAddressErrors = {
-  /**
-   * Bad Request
-   */
-  400: ErrorResponse;
-  /**
-   * Unauthorized
-   */
-  401: ErrorResponse;
-  /**
-   * Unprocessable Entity
-   */
-  422: ErrorResponse;
-  /**
-   * Internal Server Error
-   */
-  500: ErrorResponse;
-};
-
-export type NewWalletBtcAddressError = NewWalletBtcAddressErrors[keyof NewWalletBtcAddressErrors];
-
-export type NewWalletBtcAddressResponses = {
-  /**
-   * Bitcoin Address Created
-   */
-  200: BtcAddress;
-};
-
-export type NewWalletBtcAddressResponse =
-  NewWalletBtcAddressResponses[keyof NewWalletBtcAddressResponses];
-
-export type ListWalletBtcAddressesData = {
-  body?: never;
-  path?: never;
-  query?: {
-    /**
-     * Total amount of results to return
-     */
-    limit?: number | null;
-    /**
-     * Offset where to start returning results
-     */
-    offset?: number | null;
-    /**
-     * List of IDs
-     */
-    ids?: Array<string> | null;
-    /**
-     * Wallet ID. Automatically populated with your ID
-     */
-    wallet_id?: string | null;
-    /**
-     * Address
-     */
-    address?: string | null;
-    /**
-     * Status
-     */
-    address_type?: null | BtcAddressType;
-    /**
-     * Whether the address has been used
-     */
-    used?: boolean | null;
-    /**
-     * Direction of the ordering of results
-     */
-    order_direction?: OrderDirection;
-  };
-  url: '/v1/me/bitcoin/addresses';
-};
-
-export type ListWalletBtcAddressesErrors = {
-  /**
-   * Bad Request
-   */
-  400: ErrorResponse;
-  /**
-   * Unauthorized
-   */
-  401: ErrorResponse;
-  /**
-   * Internal Server Error
-   */
-  500: ErrorResponse;
-};
-
-export type ListWalletBtcAddressesError =
-  ListWalletBtcAddressesErrors[keyof ListWalletBtcAddressesErrors];
-
-export type ListWalletBtcAddressesResponses = {
-  /**
-   * Success
-   */
-  200: Array<BtcAddress>;
-};
-
-export type ListWalletBtcAddressesResponse =
-  ListWalletBtcAddressesResponses[keyof ListWalletBtcAddressesResponses];
-
-export type ListContactsData = {
-  body?: never;
-  path?: never;
-  query?: never;
-  url: '/v1/me/contacts';
-};
-
-export type ListContactsErrors = {
-  /**
-   * Bad Request
-   */
-  400: ErrorResponse;
-  /**
-   * Unauthorized
-   */
-  401: ErrorResponse;
-  /**
-   * Internal Server Error
-   */
-  500: ErrorResponse;
-};
-
-export type ListContactsError = ListContactsErrors[keyof ListContactsErrors];
-
-export type ListContactsResponses = {
-  /**
-   * Success
-   */
-  200: Array<Contact>;
-};
-
-export type ListContactsResponse = ListContactsResponses[keyof ListContactsResponses];
-
-export type DeleteExpiredInvoicesData = {
-  body?: never;
-  path?: never;
-  query?: never;
-  url: '/v1/me/invoices';
-};
-
-export type DeleteExpiredInvoicesErrors = {
-  /**
-   * Unauthorized
-   */
-  401: ErrorResponse;
-  /**
-   * Internal Server Error
-   */
-  500: ErrorResponse;
-};
-
-export type DeleteExpiredInvoicesError =
-  DeleteExpiredInvoicesErrors[keyof DeleteExpiredInvoicesErrors];
-
-export type DeleteExpiredInvoicesResponses = {
-  /**
-   * Success
-   */
-  200: number;
-};
-
-export type DeleteExpiredInvoicesResponse =
-  DeleteExpiredInvoicesResponses[keyof DeleteExpiredInvoicesResponses];
-
-export type ListWalletInvoicesData = {
-  body?: never;
-  path?: never;
-  query?: {
-    /**
-     * Total amount of results to return
-     */
-    limit?: number | null;
-    /**
-     * Offset where to start returning results
-     */
-    offset?: number | null;
-    /**
-     * List of IDs
-     */
-    ids?: Array<string> | null;
-    /**
-     * Wallet ID. Automatically populated with your ID
-     */
-    wallet_id?: string | null;
-    /**
-     * Status
-     */
-    status?: null | InvoiceStatus;
-    /**
-     * Ledger
-     */
-    ledger?: null | Ledger;
-    /**
-     * Order by
-     */
-    order_by?: InvoiceOrderBy;
-    /**
-     * Direction of the ordering of results
-     */
-    order_direction?: OrderDirection;
-  };
-  url: '/v1/me/invoices';
-};
-
-export type ListWalletInvoicesErrors = {
-  /**
-   * Bad Request
-   */
-  400: ErrorResponse;
-  /**
-   * Unauthorized
-   */
-  401: ErrorResponse;
-  /**
-   * Internal Server Error
-   */
-  500: ErrorResponse;
-};
-
-export type ListWalletInvoicesError = ListWalletInvoicesErrors[keyof ListWalletInvoicesErrors];
-
-export type ListWalletInvoicesResponses = {
-  /**
-   * Success
-   */
-  200: Array<Invoice>;
-};
-
-export type ListWalletInvoicesResponse =
-  ListWalletInvoicesResponses[keyof ListWalletInvoicesResponses];
-
-export type NewWalletInvoiceData = {
-  body: NewInvoiceRequest;
-  path?: never;
-  query?: never;
-  url: '/v1/me/invoices';
-};
-
-export type NewWalletInvoiceErrors = {
-  /**
-   * Bad Request
-   */
-  400: ErrorResponse;
-  /**
-   * Unauthorized
-   */
-  401: ErrorResponse;
-  /**
-   * Unprocessable Entity
-   */
-  422: ErrorResponse;
-  /**
-   * Internal Server Error
-   */
-  500: ErrorResponse;
-};
-
-export type NewWalletInvoiceError = NewWalletInvoiceErrors[keyof NewWalletInvoiceErrors];
-
-export type NewWalletInvoiceResponses = {
-  /**
-   * Invoice Created
-   */
-  200: Invoice;
-};
-
-export type NewWalletInvoiceResponse = NewWalletInvoiceResponses[keyof NewWalletInvoiceResponses];
-
-export type GetWalletInvoiceData = {
-  body?: never;
-  path: {
-    id: string;
-  };
-  query?: never;
-  url: '/v1/me/invoices/{id}';
-};
-
-export type GetWalletInvoiceErrors = {
-  /**
-   * Bad Request
-   */
-  400: ErrorResponse;
-  /**
-   * Unauthorized
-   */
-  401: ErrorResponse;
-  /**
-   * Not Found
-   */
-  404: ErrorResponse;
-  /**
-   * Internal Server Error
-   */
-  500: ErrorResponse;
-};
-
-export type GetWalletInvoiceError = GetWalletInvoiceErrors[keyof GetWalletInvoiceErrors];
-
-export type GetWalletInvoiceResponses = {
-  /**
-   * Found
-   */
-  200: Invoice;
-};
-
-export type GetWalletInvoiceResponse = GetWalletInvoiceResponses[keyof GetWalletInvoiceResponses];
-
 export type DeleteWalletAddressData = {
   body?: never;
   path?: never;
@@ -3142,11 +2893,606 @@ export type UpdateWalletAddressResponses = {
 export type UpdateWalletAddressResponse =
   UpdateWalletAddressResponses[keyof UpdateWalletAddressResponses];
 
-export type DeleteFailedPaymentsData = {
+export type GetAccountPreferencesData = {
   body?: never;
   path?: never;
   query?: never;
-  url: '/v1/me/payments';
+  url: '/v1/me/preferences';
+};
+
+export type GetAccountPreferencesErrors = {
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Not Found
+   */
+  404: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
+
+export type GetAccountPreferencesError =
+  GetAccountPreferencesErrors[keyof GetAccountPreferencesErrors];
+
+export type GetAccountPreferencesResponses = {
+  /**
+   * Found
+   */
+  200: AccountPreferences;
+};
+
+export type GetAccountPreferencesResponse =
+  GetAccountPreferencesResponses[keyof GetAccountPreferencesResponses];
+
+export type UpdateAccountPreferencesData = {
+  body: UpdateAccountPreferencesRequest;
+  path?: never;
+  query?: never;
+  url: '/v1/me/preferences';
+};
+
+export type UpdateAccountPreferencesErrors = {
+  /**
+   * Bad Request
+   */
+  400: ErrorResponse;
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Unprocessable Entity
+   */
+  422: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
+
+export type UpdateAccountPreferencesError =
+  UpdateAccountPreferencesErrors[keyof UpdateAccountPreferencesErrors];
+
+export type UpdateAccountPreferencesResponses = {
+  /**
+   * Updated
+   */
+  200: AccountPreferences;
+};
+
+export type UpdateAccountPreferencesResponse =
+  UpdateAccountPreferencesResponses[keyof UpdateAccountPreferencesResponses];
+
+export type ListAccountWalletsData = {
+  body?: never;
+  path?: never;
+  query?: {
+    /**
+     * Total amount of results to return
+     */
+    limit?: number | null;
+    /**
+     * Offset where to start returning results
+     */
+    offset?: number | null;
+    /**
+     * List of IDs
+     */
+    ids?: Array<string> | null;
+    /**
+     * Owning account ID.
+     *
+     * User-scoped endpoints populate this from the authenticated account.
+     */
+    account_id?: string | null;
+    /**
+     * Asset ID
+     */
+    asset_id?: string | null;
+    /**
+     * Direction of the ordering of results
+     */
+    order_direction?: OrderDirection;
+  };
+  url: '/v1/me/wallets';
+};
+
+export type ListAccountWalletsErrors = {
+  /**
+   * Bad Request
+   */
+  400: ErrorResponse;
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
+
+export type ListAccountWalletsError = ListAccountWalletsErrors[keyof ListAccountWalletsErrors];
+
+export type ListAccountWalletsResponses = {
+  /**
+   * Success
+   */
+  200: Array<Wallet>;
+};
+
+export type ListAccountWalletsResponse =
+  ListAccountWalletsResponses[keyof ListAccountWalletsResponses];
+
+export type CreateAccountWalletData = {
+  body: CreateWalletRequest;
+  path?: never;
+  query?: never;
+  url: '/v1/me/wallets';
+};
+
+export type CreateAccountWalletErrors = {
+  /**
+   * Bad Request
+   */
+  400: ErrorResponse;
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Unprocessable Entity
+   */
+  422: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
+
+export type CreateAccountWalletError = CreateAccountWalletErrors[keyof CreateAccountWalletErrors];
+
+export type CreateAccountWalletResponses = {
+  /**
+   * Wallet Created
+   */
+  200: Wallet;
+};
+
+export type CreateAccountWalletResponse =
+  CreateAccountWalletResponses[keyof CreateAccountWalletResponses];
+
+export type GetAccountWalletData = {
+  body?: never;
+  path: {
+    wallet_id: string;
+  };
+  query?: never;
+  url: '/v1/me/wallets/{wallet_id}';
+};
+
+export type GetAccountWalletErrors = {
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Not Found
+   */
+  404: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
+
+export type GetAccountWalletError = GetAccountWalletErrors[keyof GetAccountWalletErrors];
+
+export type GetAccountWalletResponses = {
+  /**
+   * Found
+   */
+  200: Wallet;
+};
+
+export type GetAccountWalletResponse = GetAccountWalletResponses[keyof GetAccountWalletResponses];
+
+export type GetWalletBalanceData = {
+  body?: never;
+  path: {
+    wallet_id: string;
+  };
+  query?: never;
+  url: '/v1/me/wallets/{wallet_id}/balance';
+};
+
+export type GetWalletBalanceErrors = {
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Not Found
+   */
+  404: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
+
+export type GetWalletBalanceError = GetWalletBalanceErrors[keyof GetWalletBalanceErrors];
+
+export type GetWalletBalanceResponses = {
+  /**
+   * Found
+   */
+  200: Balance;
+};
+
+export type GetWalletBalanceResponse = GetWalletBalanceResponses[keyof GetWalletBalanceResponses];
+
+export type ListWalletBtcAddressesData = {
+  body?: never;
+  path: {
+    wallet_id: string;
+  };
+  query?: {
+    /**
+     * Total amount of results to return
+     */
+    limit?: number | null;
+    /**
+     * Offset where to start returning results
+     */
+    offset?: number | null;
+    /**
+     * List of IDs
+     */
+    ids?: Array<string> | null;
+    /**
+     * Wallet ID. Automatically populated with your ID
+     */
+    wallet_id?: string | null;
+    /**
+     * Address
+     */
+    address?: string | null;
+    /**
+     * Status
+     */
+    address_type?: null | BtcAddressType;
+    /**
+     * Whether the address has been used
+     */
+    used?: boolean | null;
+    /**
+     * Direction of the ordering of results
+     */
+    order_direction?: OrderDirection;
+  };
+  url: '/v1/me/wallets/{wallet_id}/bitcoin/addresses';
+};
+
+export type ListWalletBtcAddressesErrors = {
+  /**
+   * Bad Request
+   */
+  400: ErrorResponse;
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Not Found
+   */
+  404: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
+
+export type ListWalletBtcAddressesError =
+  ListWalletBtcAddressesErrors[keyof ListWalletBtcAddressesErrors];
+
+export type ListWalletBtcAddressesResponses = {
+  /**
+   * Success
+   */
+  200: Array<BtcAddress>;
+};
+
+export type ListWalletBtcAddressesResponse =
+  ListWalletBtcAddressesResponses[keyof ListWalletBtcAddressesResponses];
+
+export type NewWalletBtcAddressData = {
+  body: NewBtcAddressRequest;
+  path: {
+    wallet_id: string;
+  };
+  query?: never;
+  url: '/v1/me/wallets/{wallet_id}/bitcoin/addresses';
+};
+
+export type NewWalletBtcAddressErrors = {
+  /**
+   * Bad Request
+   */
+  400: ErrorResponse;
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Not Found
+   */
+  404: ErrorResponse;
+  /**
+   * Unprocessable Entity
+   */
+  422: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
+
+export type NewWalletBtcAddressError = NewWalletBtcAddressErrors[keyof NewWalletBtcAddressErrors];
+
+export type NewWalletBtcAddressResponses = {
+  /**
+   * Bitcoin Address Created
+   */
+  200: BtcAddress;
+};
+
+export type NewWalletBtcAddressResponse =
+  NewWalletBtcAddressResponses[keyof NewWalletBtcAddressResponses];
+
+export type ListContactsData = {
+  body?: never;
+  path: {
+    wallet_id: string;
+  };
+  query?: never;
+  url: '/v1/me/wallets/{wallet_id}/contacts';
+};
+
+export type ListContactsErrors = {
+  /**
+   * Bad Request
+   */
+  400: ErrorResponse;
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Not Found
+   */
+  404: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
+
+export type ListContactsError = ListContactsErrors[keyof ListContactsErrors];
+
+export type ListContactsResponses = {
+  /**
+   * Success
+   */
+  200: Array<Contact>;
+};
+
+export type ListContactsResponse = ListContactsResponses[keyof ListContactsResponses];
+
+export type DeleteExpiredInvoicesData = {
+  body?: never;
+  path: {
+    wallet_id: string;
+  };
+  query?: never;
+  url: '/v1/me/wallets/{wallet_id}/invoices';
+};
+
+export type DeleteExpiredInvoicesErrors = {
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Not Found
+   */
+  404: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
+
+export type DeleteExpiredInvoicesError =
+  DeleteExpiredInvoicesErrors[keyof DeleteExpiredInvoicesErrors];
+
+export type DeleteExpiredInvoicesResponses = {
+  /**
+   * Success
+   */
+  200: number;
+};
+
+export type DeleteExpiredInvoicesResponse =
+  DeleteExpiredInvoicesResponses[keyof DeleteExpiredInvoicesResponses];
+
+export type ListWalletInvoicesData = {
+  body?: never;
+  path: {
+    wallet_id: string;
+  };
+  query?: {
+    /**
+     * Total amount of results to return
+     */
+    limit?: number | null;
+    /**
+     * Offset where to start returning results
+     */
+    offset?: number | null;
+    /**
+     * List of IDs
+     */
+    ids?: Array<string> | null;
+    /**
+     * Wallet ID. Automatically populated with your ID
+     */
+    wallet_id?: string | null;
+    /**
+     * Status
+     */
+    status?: null | InvoiceStatus;
+    /**
+     * Ledger
+     */
+    ledger?: null | Ledger;
+    /**
+     * Order by
+     */
+    order_by?: InvoiceOrderBy;
+    /**
+     * Direction of the ordering of results
+     */
+    order_direction?: OrderDirection;
+  };
+  url: '/v1/me/wallets/{wallet_id}/invoices';
+};
+
+export type ListWalletInvoicesErrors = {
+  /**
+   * Bad Request
+   */
+  400: ErrorResponse;
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Not Found
+   */
+  404: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
+
+export type ListWalletInvoicesError = ListWalletInvoicesErrors[keyof ListWalletInvoicesErrors];
+
+export type ListWalletInvoicesResponses = {
+  /**
+   * Success
+   */
+  200: Array<Invoice>;
+};
+
+export type ListWalletInvoicesResponse =
+  ListWalletInvoicesResponses[keyof ListWalletInvoicesResponses];
+
+export type NewWalletInvoiceData = {
+  body: NewInvoiceRequest;
+  path: {
+    wallet_id: string;
+  };
+  query?: never;
+  url: '/v1/me/wallets/{wallet_id}/invoices';
+};
+
+export type NewWalletInvoiceErrors = {
+  /**
+   * Bad Request
+   */
+  400: ErrorResponse;
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Not Found
+   */
+  404: ErrorResponse;
+  /**
+   * Unprocessable Entity
+   */
+  422: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
+
+export type NewWalletInvoiceError = NewWalletInvoiceErrors[keyof NewWalletInvoiceErrors];
+
+export type NewWalletInvoiceResponses = {
+  /**
+   * Invoice Created
+   */
+  200: Invoice;
+};
+
+export type NewWalletInvoiceResponse = NewWalletInvoiceResponses[keyof NewWalletInvoiceResponses];
+
+export type GetWalletInvoiceData = {
+  body?: never;
+  path: {
+    wallet_id: string;
+    id: string;
+  };
+  query?: never;
+  url: '/v1/me/wallets/{wallet_id}/invoices/{id}';
+};
+
+export type GetWalletInvoiceErrors = {
+  /**
+   * Bad Request
+   */
+  400: ErrorResponse;
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Not Found
+   */
+  404: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
+
+export type GetWalletInvoiceError = GetWalletInvoiceErrors[keyof GetWalletInvoiceErrors];
+
+export type GetWalletInvoiceResponses = {
+  /**
+   * Found
+   */
+  200: Invoice;
+};
+
+export type GetWalletInvoiceResponse = GetWalletInvoiceResponses[keyof GetWalletInvoiceResponses];
+
+export type DeleteFailedPaymentsData = {
+  body?: never;
+  path: {
+    wallet_id: string;
+  };
+  query?: never;
+  url: '/v1/me/wallets/{wallet_id}/payments';
 };
 
 export type DeleteFailedPaymentsErrors = {
@@ -3154,6 +3500,10 @@ export type DeleteFailedPaymentsErrors = {
    * Unauthorized
    */
   401: ErrorResponse;
+  /**
+   * Not Found
+   */
+  404: ErrorResponse;
   /**
    * Internal Server Error
    */
@@ -3175,7 +3525,9 @@ export type DeleteFailedPaymentsResponse =
 
 export type ListWalletPaymentsData = {
   body?: never;
-  path?: never;
+  path: {
+    wallet_id: string;
+  };
   query?: {
     /**
      * Total amount of results to return
@@ -3214,7 +3566,7 @@ export type ListWalletPaymentsData = {
      */
     order_direction?: OrderDirection;
   };
-  url: '/v1/me/payments';
+  url: '/v1/me/wallets/{wallet_id}/payments';
 };
 
 export type ListWalletPaymentsErrors = {
@@ -3226,6 +3578,10 @@ export type ListWalletPaymentsErrors = {
    * Unauthorized
    */
   401: ErrorResponse;
+  /**
+   * Not Found
+   */
+  404: ErrorResponse;
   /**
    * Internal Server Error
    */
@@ -3246,9 +3602,11 @@ export type ListWalletPaymentsResponse =
 
 export type WalletPayData = {
   body: SendPaymentRequest;
-  path?: never;
+  path: {
+    wallet_id: string;
+  };
   query?: never;
-  url: '/v1/me/payments';
+  url: '/v1/me/wallets/{wallet_id}/payments';
 };
 
 export type WalletPayErrors = {
@@ -3260,6 +3618,10 @@ export type WalletPayErrors = {
    * Unauthorized
    */
   401: ErrorResponse;
+  /**
+   * Not Found
+   */
+  404: ErrorResponse;
   /**
    * Unprocessable Entity
    */
@@ -3284,10 +3646,11 @@ export type WalletPayResponse = WalletPayResponses[keyof WalletPayResponses];
 export type GetWalletPaymentData = {
   body?: never;
   path: {
+    wallet_id: string;
     id: string;
   };
   query?: never;
-  url: '/v1/me/payments/{id}';
+  url: '/v1/me/wallets/{wallet_id}/payments/{id}';
 };
 
 export type GetWalletPaymentErrors = {
