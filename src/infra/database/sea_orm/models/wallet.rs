@@ -35,8 +35,6 @@ pub enum Relation {
     LnAddress,
     #[sea_orm(has_many = "super::payment::Entity")]
     Payment,
-    #[sea_orm(has_many = "super::wallet_balance::Entity")]
-    WalletBalance,
 }
 
 impl Related<super::asset::Entity> for Entity {
@@ -66,12 +64,6 @@ impl Related<super::ln_address::Entity> for Entity {
 impl Related<super::payment::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::Payment.def()
-    }
-}
-
-impl Related<super::wallet_balance::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::WalletBalance.def()
     }
 }
 

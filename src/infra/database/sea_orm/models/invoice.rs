@@ -19,7 +19,6 @@ pub struct Model {
     pub description_hash: Option<String>,
     pub amount_msat: Option<i64>,
     pub amount_received_msat: Option<i64>,
-    pub currency: String,
     pub payment_secret: Option<String>,
     pub timestamp: DateTime,
     pub expiry: Option<i64>,

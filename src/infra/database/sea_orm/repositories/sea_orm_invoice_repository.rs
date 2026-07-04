@@ -139,7 +139,6 @@ where
             timestamp: Set(invoice.timestamp.naive_utc()),
             payment_time: Set(invoice.payment_time.map(|t| t.naive_utc())),
             ledger: Set(invoice.ledger.to_string()),
-            currency: Set(invoice.currency.to_string()),
             btc_output_id: Set(invoice.btc_output_id),
             ..Default::default()
         };

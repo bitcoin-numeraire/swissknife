@@ -4,7 +4,7 @@ use tracing::{debug, info, trace};
 
 use crate::{
     application::{
-        composition::{AppStore, Currency, Ledger},
+        composition::{AppStore, Ledger},
         errors::ApplicationError,
     },
     domains::{
@@ -126,7 +126,7 @@ impl EventUseCases for EventService {
         Ok(())
     }
 
-    async fn onchain_deposit(&self, event: OnchainDepositEvent, currency: Currency) -> Result<bool, ApplicationError> {
+    async fn onchain_deposit(&self, event: OnchainDepositEvent) -> Result<bool, ApplicationError> {
         let outpoint = format!("{}:{}", event.txid, event.output_index);
         trace!(%outpoint, "Processing onchain deposit event");
 
@@ -158,7 +158,6 @@ impl EventUseCases for EventService {
             amount_received_msat: is_confirmed.then_some(amount_msat),
             timestamp: now,
             ledger: Ledger::Onchain,
-            currency,
             payment_time: is_confirmed.then_some(now),
             ..Default::default()
         };
@@ -454,7 +453,7 @@ mod tests {
                     .returning(|_| Ok(None));
 
                 let processed = service(store)
-                    .onchain_deposit(OnchainDepositEvent::default(), Currency::Regtest)
+                    .onchain_deposit(OnchainDepositEvent::default())
                     .await
                     .unwrap();
 
@@ -492,7 +491,7 @@ mod tests {
                     block_height: Some(800_000),
                 };
 
-                let processed = service(store).onchain_deposit(event, Currency::Bitcoin).await.unwrap();
+                let processed = service(store).onchain_deposit(event).await.unwrap();
 
                 assert!(processed);
             }
@@ -528,7 +527,7 @@ mod tests {
                     block_height: None,
                 };
 
-                let processed = service(store).onchain_deposit(event, Currency::Bitcoin).await.unwrap();
+                let processed = service(store).onchain_deposit(event).await.unwrap();
 
                 assert!(processed);
             }

@@ -19,10 +19,7 @@ use super::{
     cln_grpc_client::{ClnClientConfig, ClnGrpcClient},
 };
 use crate::{
-    application::{
-        composition::{AppServices, Currency},
-        errors::LightningError,
-    },
+    application::{composition::AppServices, errors::LightningError},
     domains::{
         bitcoin::{BitcoinWallet, OnchainSyncCursor},
         event::{LnPayFailureEvent, LnPaySuccessEvent, OnchainWithdrawalEvent},
@@ -268,7 +265,6 @@ impl ClnGrpcListener {
 
     async fn handle_chainmoves(&self, start_index: u64) -> Result<u64, LightningError> {
         let mut client = self.client.clone();
-        let currency: Currency = self.wallet.network().into();
 
         let response = client
             .list_chain_moves(ListchainmovesRequest {
@@ -322,7 +318,7 @@ impl ClnGrpcListener {
                     // failed to credit; the supervisor reconnects and reprocesses idempotently.
                     self.services
                         .event
-                        .onchain_deposit(output.into(), currency.clone())
+                        .onchain_deposit(output.into())
                         .await
                         .map_err(|e| LightningError::EventProcessing(e.to_string()))?;
                 }

@@ -7297,17 +7297,6 @@
           }
         }
       },
-      "Currency": {
-        "type": "string",
-        "description": "The currency and network a transaction is denominated in.",
-        "enum": [
-          "Bitcoin",
-          "BitcoinTestnet",
-          "Regtest",
-          "Simnet",
-          "Signet"
-        ]
-      },
       "ErrorResponse": {
         "type": "object",
         "description": "Application error response",
@@ -7399,7 +7388,6 @@
           "timestamp",
           "status",
           "ledger",
-          "currency",
           "created_at"
         ],
         "properties": {
@@ -7436,10 +7424,6 @@
             "type": "string",
             "format": "date-time",
             "description": "Date of creation in database"
-          },
-          "currency": {
-            "$ref": "#/components/schemas/Currency",
-            "description": "Currency"
           },
           "description": {
             "type": [
@@ -7951,7 +7935,6 @@
           "wallet_id",
           "amount_msat",
           "ledger",
-          "currency",
           "status",
           "created_at"
         ],
@@ -7977,10 +7960,6 @@
             "type": "string",
             "format": "date-time",
             "description": "Date of creation in database"
-          },
-          "currency": {
-            "$ref": "#/components/schemas/Currency",
-            "description": "Currency"
           },
           "description": {
             "type": [

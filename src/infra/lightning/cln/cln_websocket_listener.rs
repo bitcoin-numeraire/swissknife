@@ -16,7 +16,7 @@ use tracing::{debug, error, info, warn};
 
 use crate::{
     application::{
-        composition::{AppServices, Currency},
+        composition::AppServices,
         errors::{ApplicationError, LightningError},
     },
     domains::bitcoin::{BitcoinWallet, OnchainSyncCursor, OnchainTransaction},
@@ -201,7 +201,6 @@ impl ClnWebsocketListener {
                             }
 
                             let mut cursor_guard = cursor.lock().await;
-                            let currency: Currency = wallet.network().into();
 
                             match wallet.synchronize(cursor_guard.clone()).await {
                                 Ok(batch) => {
@@ -209,7 +208,7 @@ impl ClnWebsocketListener {
                                     for transaction in batch.events {
                                         let result = match transaction {
                                             OnchainTransaction::Deposit(output) => {
-                                                services.event.onchain_deposit(output.into(), currency.clone()).await
+                                                services.event.onchain_deposit(output.into()).await
                                             }
                                             OnchainTransaction::Withdrawal(event) => {
                                                 services.event.onchain_withdrawal(event).await

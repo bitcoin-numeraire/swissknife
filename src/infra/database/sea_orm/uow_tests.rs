@@ -15,7 +15,7 @@ use sea_orm::{
 };
 use uuid::Uuid;
 
-use crate::application::composition::{Currency, Ledger};
+use crate::application::composition::Ledger;
 use crate::application::errors::{ApplicationError, DataError};
 use crate::domains::event::EventProjectionUnitOfWork;
 use crate::domains::invoice::{Invoice, InvoiceRepository};
@@ -30,8 +30,6 @@ use super::{
 };
 
 static COUNTER: AtomicU64 = AtomicU64::new(0);
-
-const CURRENCY: Currency = Currency::Bitcoin;
 
 /// Provision a fresh database (a sqlite file or a new postgres db) from
 /// `SWISSKNIFE_ITEST_DATABASE`, run migrations, and return a connection.
@@ -116,7 +114,6 @@ fn pending_payment(wallet_id: Uuid, amount_msat: u64, fee_msat: u64) -> Payment 
         wallet_id,
         amount_msat,
         fee_msat: Some(fee_msat),
-        currency: CURRENCY,
         ledger: Ledger::Lightning,
         lightning: Some(LnPayment {
             payment_hash: format!("ph-{}-{n}", std::process::id()),
@@ -132,7 +129,6 @@ fn pending_invoice(wallet_id: Uuid, amount_msat: u64) -> Invoice {
         wallet_id,
         amount_msat: Some(amount_msat),
         amount_received_msat: Some(amount_msat),
-        currency: CURRENCY,
         ledger: Ledger::Internal,
         ..Default::default()
     }

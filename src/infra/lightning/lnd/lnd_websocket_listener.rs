@@ -15,7 +15,7 @@ use tracing::{debug, error};
 
 use crate::application::composition::AppServices;
 use crate::application::errors::LightningError;
-use crate::domains::bitcoin::{BitcoinWallet, BtcNetwork, BtcTransaction, OnchainSyncCursor};
+use crate::domains::bitcoin::{BitcoinWallet, BtcTransaction, OnchainSyncCursor};
 use crate::infra::lightning::EventsListener;
 
 use super::lnd_rest_client::read_macaroon;
@@ -26,26 +26,22 @@ pub struct LndWebsocketListener {
     config: LndRestClientConfig,
     macaroon: String,
     services: Arc<AppServices>,
-    network: BtcNetwork,
 }
 
 impl LndWebsocketListener {
     pub async fn new(
         config: LndRestClientConfig,
         services: Arc<AppServices>,
-        wallet: Arc<dyn BitcoinWallet>,
+        _wallet: Arc<dyn BitcoinWallet>,
     ) -> Result<Self, LightningError> {
         let macaroon = read_macaroon(&config.macaroon_path)
             .await
             .map_err(|e| LightningError::ParseConfig(e.to_string()))?;
 
-        let network = wallet.network();
-
         Ok(Self {
             config,
             macaroon,
             services,
-            network,
         })
     }
 
@@ -256,7 +252,7 @@ impl LndWebsocketListener {
             } else {
                 self.services
                     .event
-                    .onchain_deposit(transaction.deposit_event(output), self.network.into())
+                    .onchain_deposit(transaction.deposit_event(output))
                     .await
             };
 

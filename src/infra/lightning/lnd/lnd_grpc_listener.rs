@@ -24,21 +24,19 @@ use super::LndGrpcClientConfig;
 pub struct LndGrpcListener {
     client: LightningClient<LndChannel>,
     services: Arc<AppServices>,
-    network: crate::domains::bitcoin::BtcNetwork,
 }
 
 impl LndGrpcListener {
     pub async fn new(
         config: LndGrpcClientConfig,
         services: Arc<AppServices>,
-        wallet: Arc<dyn BitcoinWallet>,
+        _wallet: Arc<dyn BitcoinWallet>,
     ) -> Result<Self, LightningError> {
         let channel = LndGrpcClient::connect(&config).await?;
 
         Ok(Self {
             client: LightningClient::new(channel),
             services,
-            network: wallet.network(),
         })
     }
 
@@ -172,7 +170,7 @@ impl LndGrpcListener {
             } else {
                 self.services
                     .event
-                    .onchain_deposit(transaction.deposit_event(output), self.network.into())
+                    .onchain_deposit(transaction.deposit_event(output))
                     .await
             };
 

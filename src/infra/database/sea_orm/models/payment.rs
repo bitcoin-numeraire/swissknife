@@ -19,7 +19,6 @@ pub struct Model {
     pub payment_time: Option<DateTime>,
     pub status: String,
     pub ledger: String,
-    pub currency: String,
     pub description: Option<String>,
     pub metadata: Option<String>,
     #[sea_orm(column_type = "JsonBinary", nullable)]

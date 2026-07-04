@@ -127,7 +127,6 @@ where
             amount_msat: Set(payment.amount_msat as i64),
             status: Set(payment.status.to_string()),
             ledger: Set(payment.ledger.to_string()),
-            currency: Set(payment.currency.to_string()),
             fee_msat: Set(payment.fee_msat.map(|v| v as i64)),
             reserved_amount: Set(payment.reserved_amount as i64),
             payment_time: Set(payment.payment_time.map(|t| t.naive_utc())),

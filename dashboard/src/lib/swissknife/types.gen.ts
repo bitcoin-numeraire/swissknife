@@ -405,22 +405,6 @@ export type CreateWalletRequest = {
 };
 
 /**
- * The currency and network a transaction is denominated in.
- */
-export const Currency = {
-  BITCOIN: 'Bitcoin',
-  BITCOIN_TESTNET: 'BitcoinTestnet',
-  REGTEST: 'Regtest',
-  SIMNET: 'Simnet',
-  SIGNET: 'Signet',
-} as const;
-
-/**
- * The currency and network a transaction is denominated in.
- */
-export type Currency = (typeof Currency)[keyof typeof Currency];
-
-/**
  * Application error response
  */
 export type ErrorResponse = {
@@ -501,10 +485,6 @@ export type Invoice = {
    * Date of creation in database
    */
   created_at: Date;
-  /**
-   * Currency
-   */
-  currency: Currency;
   /**
    * Description
    */
@@ -841,10 +821,6 @@ export type Payment = {
    * Date of creation in database
    */
   created_at: Date;
-  /**
-   * Currency
-   */
-  currency: Currency;
   /**
    * Description
    */

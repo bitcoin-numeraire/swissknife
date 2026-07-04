@@ -1,7 +1,7 @@
 use swissknife_types::{ErrorResponse, OrderDirection};
 
 use crate::{
-    application::composition::{Currency, Ledger},
+    application::composition::Ledger,
     domains::{
         bitcoin::BtcAddressHandler,
         invoice::InvoiceHandler,
@@ -28,7 +28,7 @@ use utoipa::{
         title = "Numeraire SwissKnife REST API",
         description = "This API is available to anyone with a Numeraire account. The `Me` (`/me`) endpoints expose the authenticated account and wallet-scoped user operations.",
     ),
-    components(schemas(OrderDirection, Ledger, Currency, ErrorResponse), responses(ErrorResponse)),
+    components(schemas(OrderDirection, Ledger, ErrorResponse), responses(ErrorResponse)),
     modifiers(&SecurityAddon),
     security(("jwt" = []))
 )]

@@ -113,13 +113,10 @@ impl PaymentService {
                 }
 
                 let curr_time = Utc::now();
-                let network = self.bitcoin_wallet.network();
-
                 let invoice = Invoice {
                     wallet_id: retrieved_address.wallet_id,
                     ln_address_id: Some(retrieved_address.id),
                     ledger: Ledger::Internal,
-                    currency: network.into(),
                     description: comment
                         .clone()
                         .or(DEFAULT_INTERNAL_INVOICE_DESCRIPTION.to_string().into()),
@@ -140,7 +137,6 @@ impl PaymentService {
                     fee_msat: Some(0),
                     payment_time: Some(curr_time),
                     ledger: Ledger::Internal,
-                    currency: network.into(),
                     internal: Some(InternalPayment {
                         ln_address: Some(input),
                         btc_address: None,
@@ -189,7 +185,6 @@ impl PaymentService {
                     timestamp,
                     status: InvoiceStatus::Settled,
                     ledger: Ledger::Internal,
-                    currency: data.network.into(),
                     fee_msat: Some(0),
                     payment_time: Some(timestamp),
                     btc_output_id: None,
@@ -201,7 +196,6 @@ impl PaymentService {
                     amount_msat,
                     status: PaymentStatus::Settled,
                     ledger: Ledger::Internal,
-                    currency: data.network.into(),
                     description: description.clone(),
                     internal: Some(InternalPayment {
                         ln_address: None,
@@ -236,7 +230,6 @@ impl PaymentService {
                         fee_msat: Some(prepared_tx.fee_sat.saturating_mul(1000)),
                         status: PaymentStatus::Pending,
                         ledger: Ledger::Onchain,
-                        currency: data.network.into(),
                         description,
                         bitcoin: Some(BtcPayment {
                             address: data.address,
@@ -339,7 +332,6 @@ impl PaymentService {
                             fee_msat: Some(0),
                             payment_time: Some(curr_time),
                             ledger: Ledger::Internal,
-                            currency: invoice.currency.clone(),
                             internal: Some(InternalPayment {
                                 ln_address: None,
                                 btc_address: None,
@@ -384,7 +376,6 @@ impl PaymentService {
                         amount_msat: amount,
                         status: PaymentStatus::Pending,
                         ledger: Ledger::Lightning,
-                        currency: invoice.currency.clone(),
                         description: comment,
                         lightning: Some(LnPayment {
                             payment_hash: invoice.payment_hash,
@@ -439,7 +430,6 @@ impl PaymentService {
                     status: PaymentStatus::Pending,
                     description: comment.clone(),
                     ledger: Ledger::Lightning,
-                    currency: self.bitcoin_wallet.network().into(),
                     lightning: Some(LnPayment {
                         ln_address: data.ln_address.clone(),
                         payment_hash: Bolt11Invoice::from_str(&cb.pr)
@@ -470,7 +460,6 @@ impl PaymentService {
             Ok(mut settled_payment) => {
                 settled_payment.id = pending_payment.id;
                 settled_payment.wallet_id = pending_payment.wallet_id;
-                settled_payment.currency = pending_payment.currency.clone();
                 settled_payment.ledger = pending_payment.ledger.clone();
                 settled_payment.reserved_amount = pending_payment.reserved_amount;
                 settled_payment.status = PaymentStatus::Settled;
