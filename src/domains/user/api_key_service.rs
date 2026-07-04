@@ -54,6 +54,7 @@ impl ApiKeyUseCases for ApiKeyService {
 
         let api_key = ApiKey {
             user_id: request.user_id.expect("user_id should be defined"),
+            account_id: Some(user.account_id),
             name: request.name,
             key_hash,
             permissions: request.permissions.clone(),
@@ -133,6 +134,7 @@ mod tests {
 
     fn user_with(permissions: Vec<Permission>) -> User {
         User {
+            account_id: Uuid::new_v4(),
             id: "alice".to_string(),
             wallet_id: Uuid::new_v4(),
             permissions,
@@ -163,6 +165,7 @@ mod tests {
                     .expect_insert()
                     .withf(|api_key| {
                         api_key.user_id == "alice"
+                            && api_key.account_id.is_some()
                             && api_key.permissions == vec![Permission::ReadWallet]
                             && api_key.expires_at.is_none()
                             && !api_key.key_hash.is_empty()

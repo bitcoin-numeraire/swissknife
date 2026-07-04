@@ -1,3 +1,4 @@
+mod account_repository;
 mod api_key_handler;
 mod api_key_repository;
 mod api_key_service;
@@ -7,6 +8,7 @@ mod auth_service;
 mod entities;
 mod user_use_cases;
 
+pub use account_repository::*;
 pub use api_key_handler::*;
 pub use api_key_repository::*;
 pub use api_key_service::*;

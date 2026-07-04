@@ -198,6 +198,7 @@ mod tests {
             id: "alice".to_string(),
             wallet_id: Uuid::new_v4(),
             permissions,
+            ..Default::default()
         }
     }
 

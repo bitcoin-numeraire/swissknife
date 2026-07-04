@@ -127,6 +127,15 @@ impl AuthUseCases for AuthService {
         trace!("Start JWT authentication");
 
         let claims = self.jwt_authenticator.decode(token).await?;
+        let provider = self.provider.to_string();
+        let account_identity = self.store.account.ensure_for_identity(&provider, &claims.sub).await?;
+
+        if self.provider == AuthProvider::Jwt {
+            self.store
+                .account
+                .grant_permissions(account_identity.account_id, &claims.permissions)
+                .await?;
+        }
 
         let wallet_opt = self.store.wallet.find_by_user_id(&claims.sub).await?;
 
@@ -141,6 +150,7 @@ impl AuthUseCases for AuthService {
         };
 
         let user = User {
+            account_id: account_identity.account_id,
             id: claims.sub,
             wallet_id: wallet.id,
             permissions: claims.permissions,
@@ -172,7 +182,20 @@ impl AuthUseCases for AuthService {
             }
         };
 
+        let account_id = match api_key.account_id {
+            Some(account_id) => account_id,
+            None => {
+                let provider = self.provider.to_string();
+                self.store
+                    .account
+                    .ensure_for_identity(&provider, &api_key.user_id)
+                    .await?
+                    .account_id
+            }
+        };
+
         let user = User {
+            account_id,
             id: wallet.user_id,
             wallet_id: wallet.id,
             permissions: api_key.permissions,
@@ -190,7 +213,7 @@ mod tests {
     use crate::{
         application::composition::MockAppStoreBuilder,
         domains::{
-            user::{ApiKey, AuthClaims},
+            user::{AccountIdentity, ApiKey, AuthClaims},
             wallet::Wallet,
         },
         infra::jwt::MockJWTAuthenticator,
@@ -513,11 +536,30 @@ mod tests {
             #[tokio::test]
             async fn returns_user_for_existing_wallet() {
                 let wallet_id = Uuid::new_v4();
+                let account_id = Uuid::new_v4();
 
                 let mut jwt = MockJWTAuthenticator::new();
                 jwt.expect_decode().times(1).returning(|_| Ok(claims("alice")));
 
                 let mut store = MockAppStoreBuilder::new();
+                store
+                    .account
+                    .expect_ensure_for_identity()
+                    .withf(|provider, subject| provider == "jwt" && subject == "alice")
+                    .times(1)
+                    .returning(move |provider, subject| {
+                        Ok(AccountIdentity {
+                            account_id,
+                            provider: provider.to_string(),
+                            subject: subject.to_string(),
+                        })
+                    });
+                store
+                    .account
+                    .expect_grant_permissions()
+                    .withf(move |id, permissions| *id == account_id && permissions == [Permission::ReadWallet])
+                    .times(1)
+                    .returning(|_, _| Ok(()));
                 store
                     .wallet
                     .expect_find_by_user_id()
@@ -530,6 +572,7 @@ mod tests {
                 let user = service.authenticate_jwt("token").await.unwrap();
 
                 assert_eq!(user.id, "alice");
+                assert_eq!(user.account_id, account_id);
                 assert_eq!(user.wallet_id, wallet_id);
             }
         }
@@ -539,10 +582,30 @@ mod tests {
 
             #[tokio::test]
             async fn provisions_a_wallet_on_first_login() {
+                let account_id = Uuid::new_v4();
+
                 let mut jwt = MockJWTAuthenticator::new();
                 jwt.expect_decode().times(1).returning(|_| Ok(claims("alice")));
 
                 let mut store = MockAppStoreBuilder::new();
+                store
+                    .account
+                    .expect_ensure_for_identity()
+                    .withf(|provider, subject| provider == "jwt" && subject == "alice")
+                    .times(1)
+                    .returning(move |provider, subject| {
+                        Ok(AccountIdentity {
+                            account_id,
+                            provider: provider.to_string(),
+                            subject: subject.to_string(),
+                        })
+                    });
+                store
+                    .account
+                    .expect_grant_permissions()
+                    .withf(move |id, permissions| *id == account_id && permissions == [Permission::ReadWallet])
+                    .times(1)
+                    .returning(|_, _| Ok(()));
                 store.wallet.expect_find_by_user_id().times(1).returning(|_| Ok(None));
                 store
                     .wallet
@@ -556,6 +619,7 @@ mod tests {
                 let user = service.authenticate_jwt("token").await.unwrap();
 
                 assert_eq!(user.id, "alice");
+                assert_eq!(user.account_id, account_id);
             }
         }
 
@@ -606,11 +670,13 @@ mod tests {
             #[tokio::test]
             async fn returns_user_with_api_key_permissions() {
                 let wallet_id = Uuid::new_v4();
+                let account_id = Uuid::new_v4();
 
                 let mut store = MockAppStoreBuilder::new();
-                store.api_key.expect_find_by_key_hash().times(1).returning(|_| {
+                store.api_key.expect_find_by_key_hash().times(1).returning(move |_| {
                     Ok(Some(ApiKey {
                         user_id: "alice".to_string(),
+                        account_id: Some(account_id),
                         permissions: vec![Permission::ReadWallet],
                         ..Default::default()
                     }))
@@ -625,6 +691,7 @@ mod tests {
 
                 let user = service.authenticate_api_key(vec![1, 2, 3]).await.unwrap();
 
+                assert_eq!(user.account_id, account_id);
                 assert_eq!(user.wallet_id, wallet_id);
                 assert_eq!(user.permissions, vec![Permission::ReadWallet]);
             }
