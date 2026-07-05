@@ -27,7 +27,7 @@ const POLL_INTERVAL: Duration = Duration::from_millis(200);
 /// at process exit — a shared instance would otherwise leak past the test run.
 static SPAWNED: Mutex<Vec<Child>> = Mutex::new(Vec::new());
 
-#[ctor::dtor]
+#[dtor::dtor(unsafe)]
 fn reap_spawned_instances() {
     let Ok(mut children) = SPAWNED.lock() else {
         return;

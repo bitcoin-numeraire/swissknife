@@ -93,13 +93,7 @@ type ReceiveMoneyDrawerProps = {
 };
 
 type RecipientKind =
-  | 'bip21'
-  | 'bolt11'
-  | 'lightning-address'
-  | 'lnurl'
-  | 'bitcoin'
-  | 'internal'
-  | 'unknown';
+  'bip21' | 'bolt11' | 'lightning-address' | 'lnurl' | 'bitcoin' | 'internal' | 'unknown';
 type ReceivePayload = 'unified' | 'lightning' | 'onchain' | 'identity';
 type AmountUnit = 'sats' | 'btc' | 'fiat';
 
