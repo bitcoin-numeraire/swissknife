@@ -16,11 +16,20 @@ release notes when a tag is published.
 - Replaced the CLN `maxfeepercent` and `payment_exemptfee` settings with a single
   absolute `maxfee` (msat); when left unset, the node applies its own default
   ([#282]).
+- Upgraded backend and dashboard dependencies to their latest compatible
+  versions, including `lnurl-rs`, `tower-http`, and `mockall` on the backend and
+  the MUI, Next.js, and toolchain packages on the dashboard ([#324]).
 
 ### Fixed
 
 - Fixed CLN REST Lightning payments charging the routing fee twice for payments
   that incur a non-zero fee ([#282]).
+
+### Security
+
+- Updated `bcrypt` to 0.19.2, fixing a panic in `bcrypt::verify` on non-ASCII
+  hash input (RUSTSEC-2026-0199), and moved the `bitcoin` crate off the yanked
+  0.32.100 release ([#324]).
 
 ## [0.2.0] - 2026-06-18
 
@@ -89,4 +98,5 @@ release notes when a tag is published.
 [#267]: https://github.com/bitcoin-numeraire/swissknife/issues/267
 [#276]: https://github.com/bitcoin-numeraire/swissknife/pull/276
 [#282]: https://github.com/bitcoin-numeraire/swissknife/pull/282
+[#324]: https://github.com/bitcoin-numeraire/swissknife/pull/324
 [398e89f]: https://github.com/bitcoin-numeraire/swissknife/commit/398e89f
