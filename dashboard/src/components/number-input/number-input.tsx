@@ -32,8 +32,7 @@ type NumberInputSlotProps = {
 };
 
 type EventHandler =
-  | React.MouseEvent<HTMLButtonElement, MouseEvent>
-  | React.ChangeEvent<HTMLInputElement>;
+  React.MouseEvent<HTMLButtonElement, MouseEvent> | React.ChangeEvent<HTMLInputElement>;
 
 export type NumberInputProps = Omit<React.ComponentProps<typeof NumberInputRoot>, 'onChange'> & {
   min?: number;

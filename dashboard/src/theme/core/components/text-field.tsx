@@ -21,18 +21,15 @@ type InputSizeProps = Pick<FilledInputProps, 'size' | 'hiddenLabel'> & {
 
 type InputBaseVariants = ComponentsVariants<Theme>['MuiInputBase'];
 type PickersInputBaseVariants =
-  | InputBaseVariants
-  | ComponentsVariants<Theme>['MuiPickersInputBase'];
+  InputBaseVariants | ComponentsVariants<Theme>['MuiPickersInputBase'];
 
 type OutlinedInputVariants = ComponentsVariants<Theme>['MuiOutlinedInput'];
 type PickersOutlinedInputVariants =
-  | OutlinedInputVariants
-  | ComponentsVariants<Theme>['MuiPickersOutlinedInput'];
+  OutlinedInputVariants | ComponentsVariants<Theme>['MuiPickersOutlinedInput'];
 
 type FilledInputVariants = ComponentsVariants<Theme>['MuiFilledInput'];
 type PickersFilledInputVariants =
-  | FilledInputVariants
-  | ComponentsVariants<Theme>['MuiPickersFilledInput'];
+  FilledInputVariants | ComponentsVariants<Theme>['MuiPickersFilledInput'];
 
 export const INPUT_TYPOGRAPHY = {
   fontSize: { base: 15, responsive: 16 },
