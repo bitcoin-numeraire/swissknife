@@ -188,14 +188,14 @@ impl ClnGrpcListener {
                 .map_err(|e| LightningError::Listener(e.to_string()))?
                 .into_inner();
 
-            let Some(created_index) = response.created else {
+            if response.created.is_none() {
                 warn!("Chainmoves wait response missing created index");
                 continue;
-            };
+            }
 
-            // A failed deposit/withdrawal write propagates out (cursor not advanced) so the
-            // supervisor reconnects and reprocesses from the un-advanced CreatedIndex.
-            let max_index = self.handle_chainmoves(created_index).await?;
+            // Replay from the persisted cursor, not the tip `wait` returned: listing from the tip
+            // would skip chainmoves between the cursor and the tip.
+            let max_index = self.handle_chainmoves(next_index).await?;
             next_index = max_index.saturating_add(1);
             self.services
                 .system
@@ -300,7 +300,13 @@ impl ClnGrpcListener {
                         continue;
                     };
 
-                    let output = match self.wallet.get_output(&txid, Some(outnum), None, false).await {
+                    // Prefer the bounded unspent set; only on a miss fall back to the unbounded
+                    // spent-inclusive query, since a replayed deposit's UTXO may already be spent.
+                    let resolved = match self.wallet.get_output(&txid, Some(outnum), None, false).await {
+                        Ok(None) => self.wallet.get_output(&txid, Some(outnum), None, true).await,
+                        other => other,
+                    };
+                    let output = match resolved {
                         Ok(Some(output)) => output,
                         Ok(None) => {
                             trace!(%txid, outnum, "Output not found in wallet, skipping chainmove");

@@ -62,7 +62,7 @@ impl ClnWebsocketListener {
                 move || {
                     let services = services.clone();
                     async move {
-                        ClnWebsocketListener::sync_offchain_state_until_success(
+                        ClnWebsocketListener::resync(
                             &services,
                             "Core Lightning websocket reconnect",
                             reconnect_delay_min,
@@ -118,7 +118,7 @@ impl ClnWebsocketListener {
                             match serde_json::from_value::<InvoicePayment>(event.clone()) {
                                 Ok(invoice_payment) => {
                                     if let Err(err) = services.event.invoice_paid(invoice_payment.into()).await {
-                                        Self::stop_after_offchain_projection_error(
+                                        Self::stop_after_projection_error(
                                             &failure_tx,
                                             &client,
                                             "incoming_payment",
@@ -150,7 +150,7 @@ impl ClnWebsocketListener {
                                     }
 
                                     if let Err(err) = services.event.outgoing_payment(sendpay_success.into()).await {
-                                        Self::stop_after_offchain_projection_error(
+                                        Self::stop_after_projection_error(
                                             &failure_tx,
                                             &client,
                                             "outgoing_payment",
@@ -180,13 +180,8 @@ impl ClnWebsocketListener {
                                     }
 
                                     if let Err(err) = services.event.failed_payment(sendpay_failure.into()).await {
-                                        Self::stop_after_offchain_projection_error(
-                                            &failure_tx,
-                                            &client,
-                                            "failed_payment",
-                                            err,
-                                        )
-                                        .await;
+                                        Self::stop_after_projection_error(&failure_tx, &client, "failed_payment", err)
+                                            .await;
                                         return;
                                     }
                                 }
@@ -221,12 +216,14 @@ impl ClnWebsocketListener {
                                             }
                                         };
 
-                                        // Don't advance the cursor past a write we couldn't persist, or the
-                                        // deposit is lost. socket.io keeps the connection alive and re-syncs
-                                        // on the next chain event, reprocessing from the un-advanced cursor.
+                                        // Cursor not advanced past a failed write; signal a reconnect (like
+                                        // the off-chain events) so listen() re-runs bitcoin.sync() from the
+                                        // un-advanced cursor and reprocesses idempotently.
                                         if let Err(err) = result {
                                             error!(%err, "Failed to process onchain transaction; cursor not advanced");
                                             processed_all = false;
+                                            Self::stop_after_projection_error(&failure_tx, &client, "onchain", err)
+                                                .await;
                                             break;
                                         }
                                     }
@@ -241,7 +238,9 @@ impl ClnWebsocketListener {
                                     }
                                 }
                                 Err(err) => {
-                                    error!(%err, "Failed to synchronize onchain transactions");
+                                    error!(%err, "Failed to synchronize onchain transactions; reconnecting listener");
+                                    Self::stop_after_projection_error(&failure_tx, &client, "onchain_sync", err.into())
+                                        .await;
                                 }
                             }
                         }
@@ -253,7 +252,7 @@ impl ClnWebsocketListener {
         .boxed()
     }
 
-    async fn stop_after_offchain_projection_error(
+    async fn stop_after_projection_error(
         failure_tx: &mpsc::Sender<LightningError>,
         client: &Client,
         event_type: &'static str,
@@ -272,7 +271,7 @@ impl ClnWebsocketListener {
         err: ApplicationError,
     ) {
         let err = err.to_string();
-        error!(%err, event_type, "Failed to process Lightning off-chain event; reconnecting listener");
+        error!(%err, event_type, "Failed to process Lightning event; reconnecting listener");
 
         if let Err(send_err) = failure_tx.try_send(LightningError::EventProcessing(err)) {
             debug!(
@@ -282,23 +281,10 @@ impl ClnWebsocketListener {
         }
     }
 
-    async fn sync_offchain_state(services: &AppServices, context: &'static str) -> Result<(), ApplicationError> {
-        let (synced_invoices, synced_payments) = tokio::try_join!(services.invoice.sync(), services.payment.sync())?;
-
-        debug!(
-            context,
-            synced_invoices, synced_payments, "Lightning off-chain state replayed"
-        );
-
-        Ok(())
-    }
-
-    async fn sync_offchain_state_until_success(
-        services: &AppServices,
-        context: &'static str,
-        min_delay: Duration,
-        max_delay: Duration,
-    ) {
+    /// Replay off-chain and on-chain state, retrying with backoff until it succeeds. A transport
+    /// reconnect does not re-enter listen(), so bitcoin.sync() must run here too, not only at
+    /// listen() startup.
+    async fn resync(services: &AppServices, context: &'static str, min_delay: Duration, max_delay: Duration) {
         let min_delay = if min_delay.is_zero() {
             Duration::from_millis(100)
         } else {
@@ -308,10 +294,20 @@ impl ClnWebsocketListener {
         let mut backoff = min_delay;
 
         loop {
-            match Self::sync_offchain_state(services, context).await {
-                Ok(()) => return,
+            match tokio::try_join!(
+                services.invoice.sync(),
+                services.payment.sync(),
+                services.bitcoin.sync()
+            ) {
+                Ok((synced_invoices, synced_payments, synced_onchain)) => {
+                    debug!(
+                        context,
+                        synced_invoices, synced_payments, synced_onchain, "State replayed after reconnect"
+                    );
+                    return;
+                }
                 Err(err) => {
-                    error!(%err, context, ?backoff, "Lightning off-chain replay failed; retrying before reconnect");
+                    error!(%err, context, ?backoff, "State replay failed; retrying before reconnect");
                     sleep(backoff).await;
                     backoff = (backoff * 2).min(max_delay);
                 }
@@ -468,9 +464,11 @@ mod tests {
             }
         });
         builder.payment.expect_sync().returning(|| Ok(1));
+        // The reconnect replay also re-syncs on-chain state (bitcoin.sync).
+        builder.bitcoin.expect_sync().returning(|| Ok(0));
         let services = builder.build();
 
-        ClnWebsocketListener::sync_offchain_state_until_success(
+        ClnWebsocketListener::resync(
             &services,
             "test reconnect",
             Duration::from_millis(1),
