@@ -11,7 +11,7 @@ use tokio::fs;
 use tokio::net::TcpStream;
 use tokio_tungstenite::tungstenite::ClientRequestBuilder;
 use tokio_tungstenite::{connect_async_tls_with_config, Connector, MaybeTlsStream, WebSocketStream};
-use tracing::{debug, error};
+use tracing::{debug, error, trace, warn};
 
 use crate::application::composition::AppServices;
 use crate::application::errors::LightningError;
@@ -145,18 +145,23 @@ impl LndWebsocketListener {
                 Ok(msg) => {
                     if msg.is_text() {
                         let text = msg.into_text().unwrap();
+                        // [DEBUG-FLAKE] raw invoice frame as received from LND.
+                        debug!(%text, "LND invoice frame received");
                         // Parse/semantic errors are skippable; database projection errors
                         // propagate so the supervisor replays pending state before resubscribe.
                         self.process_invoice_message(&text).await?;
                     } else if msg.is_close() {
-                        debug!("WebSocket closed");
+                        debug!(?msg, "LND invoice websocket closed by peer");
                         return Ok(());
+                    } else {
+                        trace!(?msg, "LND invoice non-text frame");
                     }
                 }
                 Err(err) => return Err(LightningError::ConnectWebsocket(err.to_string())),
             }
         }
 
+        debug!("LND invoice stream ended (next() returned None)");
         Ok(())
     }
 
@@ -169,18 +174,25 @@ impl LndWebsocketListener {
                 Ok(msg) => {
                     if msg.is_text() {
                         let text = msg.into_text().unwrap();
+                        // [DEBUG-FLAKE] raw frame as received from LND, before any parsing/filtering.
+                        debug!(%text, "LND transaction frame received");
                         // A failed deposit/withdrawal write propagates so the supervisor
                         // reconnects and re-syncs; parse errors are skipped inside.
                         self.process_transaction_message(&text).await?;
                     } else if msg.is_close() {
-                        debug!("WebSocket closed");
+                        debug!(?msg, "LND transaction websocket closed by peer");
                         return Ok(());
+                    } else {
+                        // [DEBUG-FLAKE] ping/pong/binary — currently ignored silently.
+                        trace!(?msg, "LND transaction non-text frame");
                     }
                 }
                 Err(err) => return Err(LightningError::ConnectWebsocket(err.to_string())),
             }
         }
 
+        // [DEBUG-FLAKE] stream ended without a close frame — surfaces as a reconnect upstream.
+        debug!("LND transaction stream ended (next() returned None)");
         Ok(())
     }
 
@@ -188,7 +200,7 @@ impl LndWebsocketListener {
         let value: Value = match serde_json::from_str(text) {
             Ok(value) => value,
             Err(err) => {
-                error!(%err, "Failed to parse invoice message");
+                error!(%err, %text, "Failed to parse invoice message");
                 return Ok(());
             }
         };
@@ -196,6 +208,7 @@ impl LndWebsocketListener {
         if let Some(event) = value.get("result") {
             match serde_json::from_value::<InvoiceResponse>(event.clone()) {
                 Ok(invoice) => {
+                    debug!(state = %invoice.state, "LND invoice event parsed");
                     if invoice.state.as_str() == "SETTLED" {
                         if let Err(err) = self.services.event.invoice_paid(invoice.into()).await {
                             return Err(LightningError::EventProcessing(err.to_string()));
@@ -203,9 +216,12 @@ impl LndWebsocketListener {
                     }
                 }
                 Err(err) => {
-                    error!(%err, "Failed to parse SubscribeInvoices event");
+                    error!(%err, %text, "Failed to parse SubscribeInvoices event");
                 }
             }
+        } else {
+            // [DEBUG-FLAKE] frame with no "result" key (e.g. an LND {"error": ...}) was silently dropped.
+            warn!(%text, "LND invoice frame without 'result' key; ignoring");
         }
 
         Ok(())
@@ -227,15 +243,29 @@ impl LndWebsocketListener {
                     self.handle_transaction(transaction).await?;
                 }
                 Err(err) => {
-                    error!(%err, "Failed to parse SubscribeTransactions event");
+                    error!(%err, %text, "Failed to parse SubscribeTransactions event");
                 }
             }
+        } else {
+            // [DEBUG-FLAKE] frame with no "result" key (e.g. an LND {"error": ...}) was silently dropped.
+            warn!(%text, "LND transaction frame without 'result' key; ignoring");
         }
 
         Ok(())
     }
 
     async fn handle_transaction(&self, transaction: BtcTransaction) -> Result<(), LightningError> {
+        // [DEBUG-FLAKE] full parsed tx: direction, confirmation height, and every output's
+        // ownership/address/amount, so we can see if a deposit arrived unconfirmed-only or was
+        // filtered out by is_ours.
+        debug!(
+            txid = %transaction.txid,
+            block_height = ?transaction.block_height,
+            is_outgoing = transaction.is_outgoing,
+            n_outputs = transaction.outputs.len(),
+            outputs = ?transaction.outputs,
+            "Handling LND transaction"
+        );
         // Filter outputs based on transaction direction:
         // - Incoming tx (deposit): only process outputs that are ours
         // - Outgoing tx (withdrawal): only process outputs that are NOT ours (skip change)
@@ -248,6 +278,9 @@ impl LndWebsocketListener {
         });
 
         for output in relevant_outputs {
+            // [DEBUG-FLAKE] the output we are about to project (relevant ones only). If an expected
+            // deposit never logs here, it was filtered out above (is_ours == false).
+            debug!(txid = %transaction.txid, ?output, is_outgoing = transaction.is_outgoing, "Projecting LND output");
             let result = if transaction.is_outgoing {
                 self.services
                     .event

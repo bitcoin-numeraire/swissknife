@@ -20,7 +20,7 @@ dashboard_dir = ""
 format = "compact"
 ansi = false
 level = "info"
-filter = "warn,swissknife=info,sea_orm_migration=warn"
+filter = "warn,swissknife=debug,swissknife::infra::lightning=trace,sea_orm_migration=warn"
 file = false
 
 [jwt]
