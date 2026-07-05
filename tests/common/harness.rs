@@ -27,7 +27,12 @@ const POLL_INTERVAL: Duration = Duration::from_millis(200);
 /// at process exit — a shared instance would otherwise leak past the test run.
 static SPAWNED: Mutex<Vec<Child>> = Mutex::new(Vec::new());
 
-#[dtor::dtor(unsafe)]
+// `method = at_binary_exit` registers via libc `atexit` (the behavior of the
+// old `ctor::dtor`), not dtor's default `.fini_array` linker section. This runs
+// the hook while std services are still alive, so the `Mutex`/`Command`/wait
+// calls below are safe; a linker destructor could run after teardown and leak
+// the spawned child processes.
+#[dtor::dtor(unsafe, method = at_binary_exit)]
 fn reap_spawned_instances() {
     let Ok(mut children) = SPAWNED.lock() else {
         return;
