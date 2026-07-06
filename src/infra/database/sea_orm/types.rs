@@ -9,7 +9,7 @@ use crate::{
         invoice::{Invoice, InvoiceStatus, LnInvoice},
         ln_address::LnAddress,
         payment::{BtcPayment, InternalPayment, LnPayment, Payment},
-        user::ApiKey,
+        user::{Account, ApiKey},
         wallet::{Contact, Wallet},
     },
 };
@@ -18,9 +18,9 @@ use sea_orm::Order;
 use swissknife_types::OrderDirection;
 
 use super::models::{
-    api_key::Model as ApiKeyModel, btc_address::Model as BitcoinAddressModel, btc_output::Model as BitcoinOutputModel,
-    contact::ContactModel, invoice::Model as InvoiceModel, ln_address::Model as LnAddressModel,
-    payment::Model as PaymentModel, wallet::Model as WalletModel,
+    account::Model as AccountModel, api_key::Model as ApiKeyModel, btc_address::Model as BitcoinAddressModel,
+    btc_output::Model as BitcoinOutputModel, contact::ContactModel, invoice::Model as InvoiceModel,
+    ln_address::Model as LnAddressModel, payment::Model as PaymentModel, wallet::Model as WalletModel,
 };
 
 const ASSERTION_MSG: &str = "should parse successfully by assertion";
@@ -31,6 +31,17 @@ pub fn sea_order(direction: &OrderDirection) -> Order {
     match direction {
         OrderDirection::Asc => Order::Asc,
         OrderDirection::Desc => Order::Desc,
+    }
+}
+
+impl From<AccountModel> for Account {
+    fn from(model: AccountModel) -> Self {
+        Account {
+            id: model.id,
+            display_name: model.display_name,
+            created_at: model.created_at.and_utc(),
+            updated_at: model.updated_at.map(|t| t.and_utc()),
+        }
     }
 }
 

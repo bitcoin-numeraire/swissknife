@@ -6,28 +6,40 @@ use utoipa::ToSchema;
 #[derive(Clone, Debug, PartialEq, Eq, Hash, EnumString, Display, VariantNames, Serialize, Deserialize, ToSchema)]
 pub enum Permission {
     #[serde(rename = "read:wallet")]
+    #[strum(serialize = "read:wallet")]
     ReadWallet,
     #[serde(rename = "write:wallet")]
+    #[strum(serialize = "write:wallet")]
     WriteWallet,
     #[serde(rename = "read:ln_address")]
+    #[strum(serialize = "read:ln_address")]
     ReadLnAddress,
     #[serde(rename = "write:ln_address")]
+    #[strum(serialize = "write:ln_address")]
     WriteLnAddress,
     #[serde(rename = "read:transaction")]
+    #[strum(serialize = "read:transaction")]
     ReadLnTransaction,
     #[serde(rename = "write:transaction")]
+    #[strum(serialize = "write:transaction")]
     WriteLnTransaction,
     #[serde(rename = "read:ln_node")]
+    #[strum(serialize = "read:ln_node")]
     ReadLnNode,
     #[serde(rename = "write:ln_node")]
+    #[strum(serialize = "write:ln_node")]
     WriteLnNode,
     #[serde(rename = "read:api_key")]
+    #[strum(serialize = "read:api_key")]
     ReadApiKey,
     #[serde(rename = "write:api_key")]
+    #[strum(serialize = "write:api_key")]
     WriteApiKey,
     #[serde(rename = "read:btc_address")]
+    #[strum(serialize = "read:btc_address")]
     ReadBtcAddress,
     #[serde(rename = "write:btc_address")]
+    #[strum(serialize = "write:btc_address")]
     WriteBtcAddress,
 }
 
@@ -47,5 +59,16 @@ impl Permission {
             Permission::ReadBtcAddress,
             Permission::WriteBtcAddress,
         ]
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn display_and_parse_use_scope_strings() {
+        assert_eq!(Permission::ReadWallet.to_string(), "read:wallet");
+        assert_eq!("read:wallet".parse::<Permission>(), Ok(Permission::ReadWallet));
     }
 }

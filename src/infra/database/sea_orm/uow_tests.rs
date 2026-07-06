@@ -20,12 +20,13 @@ use crate::application::errors::{ApplicationError, DataError};
 use crate::domains::event::EventProjectionUnitOfWork;
 use crate::domains::invoice::{Invoice, InvoiceRepository};
 use crate::domains::payment::{LnPayment, Payment, PaymentStatus, PaymentUnitOfWork};
+use crate::domains::user::{AccountRepository, Permission};
 use crate::domains::wallet::{WalletBalanceRepository, WalletRepository};
 
 use super::models::{prelude::WalletBalance, wallet_balance};
 use super::{
-    SeaOrmEventProjectionUnitOfWork, SeaOrmInvoiceRepository, SeaOrmPaymentUnitOfWork, SeaOrmWalletBalanceRepository,
-    SeaOrmWalletRepository,
+    SeaOrmAccountRepository, SeaOrmEventProjectionUnitOfWork, SeaOrmInvoiceRepository, SeaOrmPaymentUnitOfWork,
+    SeaOrmWalletBalanceRepository, SeaOrmWalletRepository,
 };
 
 static COUNTER: AtomicU64 = AtomicU64::new(0);
@@ -135,6 +136,56 @@ fn pending_invoice(wallet_id: Uuid, amount_msat: u64) -> Invoice {
 
 fn uow(conn: &DatabaseConnection) -> SeaOrmPaymentUnitOfWork {
     SeaOrmPaymentUnitOfWork::new(conn.clone())
+}
+
+async fn count(conn: &DatabaseConnection, sql: &str) -> i64 {
+    conn.query_one(Statement::from_string(conn.get_database_backend(), sql.to_string()))
+        .await
+        .expect("query count")
+        .expect("count row")
+        .try_get::<i64>("", "count")
+        .expect("count value")
+}
+
+#[tokio::test]
+async fn account_identity_upsert_is_idempotent() {
+    let conn = connect().await;
+    let repo = SeaOrmAccountRepository::new(conn.clone());
+
+    let first = repo.upsert_for_identity("jwt", "alice").await.unwrap();
+    let second = repo.upsert_for_identity("jwt", "alice").await.unwrap();
+
+    assert_eq!(first, second);
+    assert_eq!(count(&conn, "SELECT COUNT(*) AS count FROM account").await, 1);
+    assert_eq!(count(&conn, "SELECT COUNT(*) AS count FROM auth_identity").await, 1);
+    assert_eq!(
+        count(&conn, "SELECT COUNT(*) AS count FROM account_preference").await,
+        1
+    );
+}
+
+#[tokio::test]
+async fn account_permissions_upsert_is_idempotent() {
+    let conn = connect().await;
+    let repo = SeaOrmAccountRepository::new(conn.clone());
+    let account = repo.upsert_for_identity("jwt", "alice").await.unwrap();
+
+    repo.upsert_permissions(account.id, &[Permission::ReadWallet, Permission::ReadWallet])
+        .await
+        .unwrap();
+
+    assert_eq!(
+        repo.find_permissions(account.id).await.unwrap(),
+        vec![Permission::ReadWallet]
+    );
+    assert_eq!(
+        count(
+            &conn,
+            "SELECT COUNT(*) AS count FROM account_permission WHERE permission = 'read:wallet'",
+        )
+        .await,
+        1
+    );
 }
 
 #[tokio::test]
