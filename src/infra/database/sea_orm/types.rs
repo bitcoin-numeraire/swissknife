@@ -9,7 +9,7 @@ use crate::{
         invoice::{Invoice, InvoiceStatus, LnInvoice},
         ln_address::LnAddress,
         payment::{BtcPayment, InternalPayment, LnPayment, Payment},
-        user::{Account, ApiKey},
+        user::{Account, AccountPreferences, ApiKey, AuthIdentity},
         wallet::{Contact, Wallet},
     },
 };
@@ -18,7 +18,8 @@ use sea_orm::Order;
 use swissknife_types::OrderDirection;
 
 use super::models::{
-    account::Model as AccountModel, api_key::Model as ApiKeyModel, btc_address::Model as BitcoinAddressModel,
+    account::Model as AccountModel, account_preference::Model as AccountPreferenceModel, api_key::Model as ApiKeyModel,
+    auth_identity::Model as AuthIdentityModel, btc_address::Model as BitcoinAddressModel,
     btc_output::Model as BitcoinOutputModel, contact::ContactModel, invoice::Model as InvoiceModel,
     ln_address::Model as LnAddressModel, payment::Model as PaymentModel, wallet::Model as WalletModel,
 };
@@ -39,6 +40,31 @@ impl From<AccountModel> for Account {
         Account {
             id: model.id,
             display_name: model.display_name,
+            identities: None,
+            permissions: None,
+            preferences: None,
+            created_at: model.created_at.and_utc(),
+            updated_at: model.updated_at.map(|t| t.and_utc()),
+        }
+    }
+}
+
+impl From<AuthIdentityModel> for AuthIdentity {
+    fn from(model: AuthIdentityModel) -> Self {
+        AuthIdentity {
+            id: model.id,
+            provider: model.provider,
+            subject: model.subject,
+            created_at: model.created_at.and_utc(),
+            updated_at: model.updated_at.map(|t| t.and_utc()),
+        }
+    }
+}
+
+impl From<AccountPreferenceModel> for AccountPreferences {
+    fn from(model: AccountPreferenceModel) -> Self {
+        AccountPreferences {
+            dashboard_settings: model.dashboard_settings,
             created_at: model.created_at.and_utc(),
             updated_at: model.updated_at.map(|t| t.and_utc()),
         }

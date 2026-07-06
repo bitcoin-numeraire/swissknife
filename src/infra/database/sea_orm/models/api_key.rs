@@ -16,7 +16,7 @@ pub struct Model {
     pub created_at: DateTime,
     pub expires_at: Option<DateTime>,
     pub permissions: Json,
-    pub account_id: Option<Uuid>,
+    pub account_id: Uuid,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

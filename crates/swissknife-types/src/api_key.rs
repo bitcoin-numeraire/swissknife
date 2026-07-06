@@ -13,9 +13,9 @@ pub struct ApiKey {
     pub id: Uuid,
     /// User ID
     pub user_id: String,
-    /// Internal account ID. Internal only while the account cutover is in progress.
+    /// Internal account ID. Internal only.
     #[serde(skip)]
-    pub account_id: Option<Uuid>,
+    pub account_id: Uuid,
     /// API key name
     pub name: String,
     /// API key (only returned once on creation, save it securely as it cannot be retrieved)

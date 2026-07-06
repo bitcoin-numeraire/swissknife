@@ -54,7 +54,7 @@ impl ApiKeyUseCases for ApiKeyService {
 
         let api_key = ApiKey {
             user_id: request.user_id.expect("user_id should be defined"),
-            account_id: Some(user.account_id),
+            account_id: user.account_id,
             name: request.name,
             key_hash,
             permissions: request.permissions.clone(),
@@ -159,13 +159,15 @@ mod tests {
 
             #[tokio::test]
             async fn inserts_key_and_returns_plaintext_secret() {
+                let user = user_with(vec![Permission::ReadWallet, Permission::WriteWallet]);
+                let account_id = user.account_id;
                 let mut store = MockAppStoreBuilder::new();
                 store
                     .api_key
                     .expect_insert()
-                    .withf(|api_key| {
+                    .withf(move |api_key| {
                         api_key.user_id == "alice"
-                            && api_key.account_id.is_some()
+                            && api_key.account_id == account_id
                             && api_key.permissions == vec![Permission::ReadWallet]
                             && api_key.expires_at.is_none()
                             && !api_key.key_hash.is_empty()
@@ -176,10 +178,7 @@ mod tests {
                 let service = ApiKeyService::new(store.build());
 
                 let api_key = service
-                    .generate(
-                        user_with(vec![Permission::ReadWallet, Permission::WriteWallet]),
-                        create_request(vec![Permission::ReadWallet], None),
-                    )
+                    .generate(user, create_request(vec![Permission::ReadWallet], None))
                     .await
                     .unwrap();
 
