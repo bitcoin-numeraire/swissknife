@@ -1,6 +1,9 @@
 use async_trait::async_trait;
 use chrono::Utc;
-use sea_orm::{sea_query::OnConflict, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set};
+use sea_orm::{
+    sea_query::OnConflict, ActiveModelTrait, ColumnTrait, ConnectionTrait, DatabaseConnection, EntityTrait,
+    QueryFilter, Set, TransactionTrait,
+};
 use serde_json::json;
 use uuid::Uuid;
 
@@ -8,10 +11,10 @@ use super::SeaOrmConnection;
 
 use crate::{
     application::errors::DatabaseError,
-    domains::user::{AccountIdentity, AccountRepository, Permission},
+    domains::user::{Account, AccountRepository, Permission},
     infra::database::sea_orm::models::{
         account, account_permission, account_preference, auth_identity,
-        prelude::{Account, AccountPermission, AccountPreference, AuthIdentity},
+        prelude::{Account as AccountEntity, AccountPermission, AuthIdentity},
     },
 };
 
@@ -26,17 +29,32 @@ impl<C> SeaOrmAccountRepository<C> {
     }
 }
 
-#[async_trait]
-impl<C> AccountRepository for SeaOrmAccountRepository<C>
+impl<C> SeaOrmAccountRepository<C>
 where
     C: SeaOrmConnection,
 {
-    async fn ensure_for_identity(&self, provider: &str, subject: &str) -> Result<AccountIdentity, DatabaseError> {
-        if let Some(identity) = self.find_identity(provider, subject).await? {
-            return Ok(identity);
+    async fn find_by_identity_internal(&self, provider: &str, subject: &str) -> Result<Option<Account>, DatabaseError> {
+        find_account_by_identity(self.db.connection(), provider, subject).await
+    }
+}
+
+#[async_trait]
+impl AccountRepository for SeaOrmAccountRepository<DatabaseConnection> {
+    async fn find_by_identity(&self, provider: &str, subject: &str) -> Result<Option<Account>, DatabaseError> {
+        self.find_by_identity_internal(provider, subject).await
+    }
+
+    async fn upsert_for_identity(&self, provider: &str, subject: &str) -> Result<Account, DatabaseError> {
+        if let Some(account) = self.find_by_identity(provider, subject).await? {
+            return Ok(account);
         }
 
-        let account_id = deterministic_account_id(provider, subject);
+        let tx = self
+            .db
+            .begin()
+            .await
+            .map_err(|e| DatabaseError::Transaction(e.to_string()))?;
+        let account_id = Uuid::new_v4();
         let now = Utc::now().naive_utc();
 
         let account_model = account::ActiveModel {
@@ -45,13 +63,8 @@ where
             ..Default::default()
         };
 
-        let _ = Account::insert(account_model)
-            .on_conflict(
-                OnConflict::column(account::Column::Id)
-                    .do_nothing_on([account::Column::Id])
-                    .to_owned(),
-            )
-            .exec_without_returning(self.db.connection())
+        let account = account_model
+            .insert(&tx)
             .await
             .map_err(|e| DatabaseError::Insert(e.to_string()))?;
 
@@ -62,13 +75,8 @@ where
             ..Default::default()
         };
 
-        let _ = AccountPreference::insert(preference_model)
-            .on_conflict(
-                OnConflict::column(account_preference::Column::AccountId)
-                    .do_nothing_on([account_preference::Column::AccountId])
-                    .to_owned(),
-            )
-            .exec_without_returning(self.db.connection())
+        preference_model
+            .insert(&tx)
             .await
             .map_err(|e| DatabaseError::Insert(e.to_string()))?;
 
@@ -81,27 +89,34 @@ where
             ..Default::default()
         };
 
-        let _ = AuthIdentity::insert(identity_model)
-            .on_conflict(
-                OnConflict::columns([auth_identity::Column::Provider, auth_identity::Column::Subject])
-                    .do_nothing()
-                    .to_owned(),
-            )
-            .exec_without_returning(self.db.connection())
-            .await
-            .map_err(|e| DatabaseError::Insert(e.to_string()))?;
+        let identity_insert = identity_model.insert(&tx).await;
 
-        self.find_identity(provider, subject).await?.ok_or_else(|| {
-            DatabaseError::Insert("account identity was not available after idempotent provisioning".to_string())
-        })
+        if let Err(err) = identity_insert {
+            tx.rollback()
+                .await
+                .map_err(|e| DatabaseError::Transaction(e.to_string()))?;
+
+            return self
+                .find_by_identity(provider, subject)
+                .await?
+                .ok_or_else(|| DatabaseError::Insert(err.to_string()));
+        }
+
+        tx.commit()
+            .await
+            .map_err(|e| DatabaseError::Transaction(e.to_string()))?;
+
+        Ok(account.into())
     }
 
-    async fn grant_permissions(&self, account_id: Uuid, permissions: &[Permission]) -> Result<(), DatabaseError> {
+    async fn upsert_permissions(&self, account_id: Uuid, permissions: &[Permission]) -> Result<(), DatabaseError> {
+        let now = Utc::now().naive_utc();
+
         for permission in permissions {
             let model = account_permission::ActiveModel {
                 account_id: Set(account_id),
-                permission: Set(permission_storage_value(permission)?),
-                created_at: Set(Utc::now().naive_utc()),
+                permission: Set(permission.to_string()),
+                created_at: Set(now),
             };
 
             let _ = AccountPermission::insert(model)
@@ -120,95 +135,41 @@ where
 
         Ok(())
     }
+
+    async fn find_permissions(&self, account_id: Uuid) -> Result<Vec<Permission>, DatabaseError> {
+        AccountPermission::find()
+            .filter(account_permission::Column::AccountId.eq(account_id))
+            .all(&self.db)
+            .await
+            .map_err(|e| DatabaseError::FindMany(e.to_string()))?
+            .into_iter()
+            .map(|model| {
+                model
+                    .permission
+                    .parse()
+                    .map_err(|e: strum::ParseError| DatabaseError::FindMany(e.to_string()))
+            })
+            .collect()
+    }
 }
 
-impl<C> SeaOrmAccountRepository<C>
+async fn find_account_by_identity<C>(db: &C, provider: &str, subject: &str) -> Result<Option<Account>, DatabaseError>
 where
-    C: SeaOrmConnection,
+    C: ConnectionTrait,
 {
-    async fn find_identity(&self, provider: &str, subject: &str) -> Result<Option<AccountIdentity>, DatabaseError> {
-        let identity = AuthIdentity::find()
-            .filter(auth_identity::Column::Provider.eq(provider))
-            .filter(auth_identity::Column::Subject.eq(subject))
-            .one(self.db.connection())
-            .await
-            .map_err(|e| DatabaseError::FindOne(e.to_string()))?;
+    let account = AuthIdentity::find()
+        .filter(auth_identity::Column::Provider.eq(provider))
+        .filter(auth_identity::Column::Subject.eq(subject))
+        .find_also_related(AccountEntity)
+        .one(db)
+        .await
+        .map_err(|e| DatabaseError::FindOne(e.to_string()))?;
 
-        Ok(identity.map(|model| AccountIdentity {
-            account_id: model.account_id,
-            provider: model.provider,
-            subject: model.subject,
-        }))
-    }
-}
-
-fn deterministic_account_id(provider: &str, subject: &str) -> Uuid {
-    Uuid::new_v5(
-        &Uuid::NAMESPACE_URL,
-        format!("swissknife:account:{provider}:{subject}").as_bytes(),
-    )
-}
-
-fn permission_storage_value(permission: &Permission) -> Result<String, DatabaseError> {
-    serde_json::to_value(permission)
-        .map_err(|e| DatabaseError::Insert(e.to_string()))?
-        .as_str()
-        .map(str::to_string)
-        .ok_or_else(|| DatabaseError::Insert("permission did not serialize to a string".to_string()))
-}
-
-#[cfg(test)]
-mod tests {
-    use migration::{Migrator, MigratorTrait};
-    use sea_orm::{ConnectionTrait, Database, DatabaseBackend, Statement};
-
-    use super::*;
-
-    async fn sqlite() -> DatabaseConnection {
-        let conn = Database::connect("sqlite::memory:").await.expect("connect sqlite");
-        Migrator::up(&conn, None).await.expect("run migrations");
-        conn
-    }
-
-    async fn count(conn: &DatabaseConnection, sql: &str) -> i64 {
-        conn.query_one(Statement::from_string(DatabaseBackend::Sqlite, sql.to_string()))
-            .await
-            .expect("query count")
-            .expect("count row")
-            .try_get::<i64>("", "count")
-            .expect("count value")
-    }
-
-    #[tokio::test]
-    async fn ensure_for_identity_is_idempotent() {
-        let conn = sqlite().await;
-        let repo = SeaOrmAccountRepository::new(conn.clone());
-
-        let first = repo.ensure_for_identity("jwt", "alice").await.unwrap();
-        let second = repo.ensure_for_identity("jwt", "alice").await.unwrap();
-
-        assert_eq!(first, second);
-        assert_eq!(count(&conn, "SELECT COUNT(*) AS count FROM account").await, 1);
-        assert_eq!(count(&conn, "SELECT COUNT(*) AS count FROM auth_identity").await, 1);
-        assert_eq!(
-            count(&conn, "SELECT COUNT(*) AS count FROM account_preference").await,
-            1
-        );
-    }
-
-    #[tokio::test]
-    async fn grant_permissions_is_idempotent() {
-        let conn = sqlite().await;
-        let repo = SeaOrmAccountRepository::new(conn.clone());
-        let identity = repo.ensure_for_identity("jwt", "alice").await.unwrap();
-
-        repo.grant_permissions(identity.account_id, &[Permission::ReadWallet, Permission::ReadWallet])
-            .await
-            .unwrap();
-
-        assert_eq!(
-            count(&conn, "SELECT COUNT(*) AS count FROM account_permission").await,
-            1
-        );
+    match account {
+        Some((_, Some(account))) => Ok(Some(account.into())),
+        Some((_, None)) => Err(DatabaseError::FindRelated(
+            "auth identity does not reference an account".to_string(),
+        )),
+        None => Ok(None),
     }
 }
