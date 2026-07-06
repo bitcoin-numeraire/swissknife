@@ -15,9 +15,10 @@ use crate::{
     infra::jwt::JWTAuthenticator,
 };
 
-use super::{AuthUseCases, Permission, User};
+use super::{Account, AuthUseCases, Permission, User};
 
 pub const PASSWORD_HASH_KEY: &str = "password_hash";
+const BOOTSTRAP_ADMIN_SUBJECT: &str = "admin";
 
 pub struct AuthService {
     jwt_authenticator: Arc<dyn JWTAuthenticator>,
@@ -57,10 +58,15 @@ impl AuthUseCases for AuthService {
 
         let permissions = Permission::all_permissions();
         let provider = self.provider.to_string();
-        let account = self.store.account.upsert_for_identity(&provider, "admin").await?;
-        self.store.account.upsert_permissions(account.id, &permissions).await?;
+        let account = self
+            .store
+            .account
+            .upsert_for_identity(&provider, BOOTSTRAP_ADMIN_SUBJECT, &permissions)
+            .await?;
 
-        let token = self.jwt_authenticator.encode("admin".to_string(), permissions)?;
+        let token = self
+            .jwt_authenticator
+            .encode(account_subject(&account, &provider)?, account_permissions(&account))?;
 
         debug!("Admin user created successfully");
         Ok(token)
@@ -83,10 +89,15 @@ impl AuthUseCases for AuthService {
                 }
 
                 let provider = self.provider.to_string();
-                let account = self.store.account.upsert_for_identity(&provider, "admin").await?;
-                let permissions = self.store.account.find_permissions(account.id).await?;
+                let account = self
+                    .store
+                    .account
+                    .upsert_for_identity(&provider, BOOTSTRAP_ADMIN_SUBJECT, &[])
+                    .await?;
 
-                let token = self.jwt_authenticator.encode("admin".to_string(), permissions)?;
+                let token = self
+                    .jwt_authenticator
+                    .encode(account_subject(&account, &provider)?, account_permissions(&account))?;
 
                 debug!("User logged in successfully");
                 Ok(token)
@@ -133,10 +144,16 @@ impl AuthUseCases for AuthService {
 
         let claims = self.jwt_authenticator.decode(token).await?;
         let provider = self.provider.to_string();
-        let account = self.store.account.upsert_for_identity(&provider, &claims.sub).await?;
+        let account = self
+            .store
+            .account
+            .upsert_for_identity(&provider, &claims.sub, &[])
+            .await?;
         let permissions = if self.provider == AuthProvider::Jwt {
-            self.store.account.find_permissions(account.id).await?
+            account_permissions(&account)
         } else {
+            // OAuth2 claims are authoritative for request-time permissions; DB
+            // account permissions are only used by local JWT identities.
             claims.permissions
         };
 
@@ -176,10 +193,6 @@ impl AuthUseCases for AuthService {
             }
         };
 
-        let account_id = api_key
-            .account_id
-            .ok_or_else(|| DataError::Inconsistency("Existing API key without account".to_string()))?;
-
         let wallet_opt = self.store.wallet.find_by_user_id(&api_key.user_id).await?;
         let wallet = match wallet_opt {
             Some(wallet) => wallet,
@@ -189,7 +202,7 @@ impl AuthUseCases for AuthService {
         };
 
         let user = User {
-            account_id,
+            account_id: api_key.account_id,
             id: wallet.user_id,
             wallet_id: wallet.id,
             permissions: api_key.permissions,
@@ -200,6 +213,19 @@ impl AuthUseCases for AuthService {
     }
 }
 
+fn account_subject(account: &Account, provider: &str) -> Result<String, ApplicationError> {
+    account
+        .identities
+        .as_deref()
+        .and_then(|identities| identities.iter().find(|identity| identity.provider == provider))
+        .map(|identity| identity.subject.clone())
+        .ok_or_else(|| DataError::Inconsistency(format!("Account {} has no {provider} identity", account.id)).into())
+}
+
+fn account_permissions(account: &Account) -> Vec<Permission> {
+    account.permissions.clone().unwrap_or_default()
+}
+
 #[cfg(test)]
 mod tests {
     use chrono::Utc;
@@ -208,7 +234,7 @@ mod tests {
     use crate::{
         application::composition::MockAppStoreBuilder,
         domains::{
-            user::{Account, ApiKey, AuthClaims},
+            user::{Account, ApiKey, AuthClaims, AuthIdentity},
             wallet::Wallet,
         },
         infra::jwt::MockJWTAuthenticator,
@@ -237,10 +263,19 @@ mod tests {
         }
     }
 
-    fn account_fixture(id: Uuid) -> Account {
+    fn account_fixture(id: Uuid, provider: &str, subject: &str, permissions: Vec<Permission>) -> Account {
         Account {
             id,
             display_name: None,
+            identities: Some(vec![AuthIdentity {
+                id: Uuid::new_v4(),
+                provider: provider.to_string(),
+                subject: subject.to_string(),
+                created_at: Utc::now(),
+                updated_at: None,
+            }]),
+            permissions: Some(permissions),
+            preferences: None,
             created_at: Utc::now(),
             updated_at: None,
         }
@@ -307,18 +342,19 @@ mod tests {
                 store
                     .account
                     .expect_upsert_for_identity()
-                    .withf(|provider, subject| provider == "jwt" && subject == "admin")
+                    .withf(|provider, subject, granted| {
+                        provider == "jwt" && subject == "admin" && granted == Permission::all_permissions().as_slice()
+                    })
                     .times(1)
-                    .returning(move |_, _| Ok(account_fixture(account_id)));
-                store
-                    .account
-                    .expect_upsert_permissions()
-                    .withf(move |id, granted| *id == account_id && granted == permissions.as_slice())
-                    .times(1)
-                    .returning(|_, _| Ok(()));
+                    .returning(move |provider, subject, permissions| {
+                        Ok(account_fixture(account_id, provider, subject, permissions.to_vec()))
+                    });
 
                 let mut jwt = MockJWTAuthenticator::new();
-                jwt.expect_encode().times(1).returning(|_, _| Ok("token".to_string()));
+                jwt.expect_encode()
+                    .withf(move |subject, granted| subject == "admin" && granted == permissions.as_slice())
+                    .times(1)
+                    .returning(|_, _| Ok("token".to_string()));
 
                 let service = service(jwt, store, AuthProvider::Jwt);
 
@@ -390,15 +426,16 @@ mod tests {
                 store
                     .account
                     .expect_upsert_for_identity()
-                    .withf(|provider, subject| provider == "jwt" && subject == "admin")
+                    .withf(|provider, subject, granted| provider == "jwt" && subject == "admin" && granted.is_empty())
                     .times(1)
-                    .returning(move |_, _| Ok(account_fixture(account_id)));
-                store
-                    .account
-                    .expect_find_permissions()
-                    .withf(move |id| *id == account_id)
-                    .times(1)
-                    .returning(|_| Ok(vec![Permission::ReadWallet]));
+                    .returning(move |provider, subject, _| {
+                        Ok(account_fixture(
+                            account_id,
+                            provider,
+                            subject,
+                            vec![Permission::ReadWallet],
+                        ))
+                    });
 
                 let mut jwt = MockJWTAuthenticator::new();
                 jwt.expect_encode()
@@ -579,15 +616,16 @@ mod tests {
                 store
                     .account
                     .expect_upsert_for_identity()
-                    .withf(|provider, subject| provider == "jwt" && subject == "alice")
+                    .withf(|provider, subject, granted| provider == "jwt" && subject == "alice" && granted.is_empty())
                     .times(1)
-                    .returning(move |_, _| Ok(account_fixture(account_id)));
-                store
-                    .account
-                    .expect_find_permissions()
-                    .withf(move |id| *id == account_id)
-                    .times(1)
-                    .returning(|_| Ok(vec![Permission::ReadApiKey]));
+                    .returning(move |provider, subject, _| {
+                        Ok(account_fixture(
+                            account_id,
+                            provider,
+                            subject,
+                            vec![Permission::ReadApiKey],
+                        ))
+                    });
                 store
                     .wallet
                     .expect_find_by_user_id()
@@ -620,15 +658,16 @@ mod tests {
                 store
                     .account
                     .expect_upsert_for_identity()
-                    .withf(|provider, subject| provider == "jwt" && subject == "alice")
+                    .withf(|provider, subject, granted| provider == "jwt" && subject == "alice" && granted.is_empty())
                     .times(1)
-                    .returning(move |_, _| Ok(account_fixture(account_id)));
-                store
-                    .account
-                    .expect_find_permissions()
-                    .withf(move |id| *id == account_id)
-                    .times(1)
-                    .returning(|_| Ok(vec![Permission::ReadApiKey]));
+                    .returning(move |provider, subject, _| {
+                        Ok(account_fixture(
+                            account_id,
+                            provider,
+                            subject,
+                            vec![Permission::ReadApiKey],
+                        ))
+                    });
                 store.wallet.expect_find_by_user_id().times(1).returning(|_| Ok(None));
                 store
                     .wallet
@@ -700,7 +739,7 @@ mod tests {
                 store.api_key.expect_find_by_key_hash().times(1).returning(move |_| {
                     Ok(Some(ApiKey {
                         user_id: "alice".to_string(),
-                        account_id: Some(account_id),
+                        account_id,
                         permissions: vec![Permission::ReadWallet],
                         ..Default::default()
                     }))
@@ -730,33 +769,11 @@ mod tests {
                 store.api_key.expect_find_by_key_hash().times(1).returning(|_| {
                     Ok(Some(ApiKey {
                         user_id: "alice".to_string(),
-                        account_id: Some(Uuid::new_v4()),
+                        account_id: Uuid::new_v4(),
                         ..Default::default()
                     }))
                 });
                 store.wallet.expect_find_by_user_id().times(1).returning(|_| Ok(None));
-
-                let service = service(MockJWTAuthenticator::new(), store, AuthProvider::Jwt);
-
-                let err = service.authenticate_api_key(vec![1, 2, 3]).await.unwrap_err();
-
-                assert!(matches!(err, ApplicationError::Data(DataError::Inconsistency(_))));
-            }
-        }
-
-        mod when_key_exists_without_account {
-            use super::*;
-
-            #[tokio::test]
-            async fn returns_inconsistency() {
-                let mut store = MockAppStoreBuilder::new();
-                store.api_key.expect_find_by_key_hash().times(1).returning(|_| {
-                    Ok(Some(ApiKey {
-                        user_id: "alice".to_string(),
-                        account_id: None,
-                        ..Default::default()
-                    }))
-                });
 
                 let service = service(MockJWTAuthenticator::new(), store, AuthProvider::Jwt);
 

@@ -197,6 +197,10 @@ mod tests {
             1
         );
         assert_eq!(
+            count(&conn, "SELECT COUNT(*) AS count FROM api_key WHERE account_id IS NULL",).await,
+            0
+        );
+        assert_eq!(
             count(&conn, "SELECT COUNT(*) AS count FROM account_permission",).await,
             0
         );

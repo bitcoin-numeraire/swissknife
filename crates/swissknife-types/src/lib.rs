@@ -6,6 +6,7 @@
 //! annotations so the wire shape lives with the type; behaviour stays in the
 //! app's use cases.
 
+mod account;
 mod api_key;
 mod auth;
 mod bitcoin;
@@ -22,6 +23,7 @@ mod system;
 mod transaction;
 mod wallet;
 
+pub use account::{Account, AccountPreferences, AuthIdentity};
 pub use api_key::{ApiKey, ApiKeyFilter, CreateApiKeyRequest};
 pub use auth::{ChangePasswordRequest, SignInRequest, SignInResponse, SignUpRequest};
 pub use bitcoin::{BtcAddress, BtcAddressFilter, BtcAddressType, BtcOutput, BtcOutputStatus, NewBtcAddressRequest};

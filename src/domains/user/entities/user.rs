@@ -4,6 +4,11 @@ use crate::application::errors::AuthorizationError;
 
 use super::Permission;
 
+/// Runtime principal produced by authentication for one request.
+///
+/// `Account` is the persisted owner aggregate. `User` is the effective actor:
+/// the authenticated subject, selected wallet context, account ID, and
+/// request-time permissions.
 #[derive(Clone, Debug, Default)]
 pub struct User {
     pub account_id: Uuid,
