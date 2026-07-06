@@ -118,7 +118,7 @@ mod tests {
     }
 
     #[async_std::test]
-    async fn identity_asset_migration_backfills_oauth2_accounts_and_api_keys() {
+    async fn identity_asset_migration_backfills_oauth2_accounts() {
         let conn = sqlite().await;
 
         Migrator::up(&conn, Some(MIGRATIONS_BEFORE_IDENTITY_ASSETS))
@@ -134,24 +134,6 @@ mod tests {
         ))
         .await
         .expect("insert legacy wallet");
-        conn.execute(Statement::from_string(
-            DatabaseBackend::Sqlite,
-            r#"
-            INSERT INTO api_key (id, user_id, name, key_hash, permissions, created_at)
-            VALUES (
-                '22222222-2222-4222-8222-222222222222',
-                'alice',
-                'legacy key',
-                X'0000000000000000000000000000000000000000000000000000000000000001',
-                '[]',
-                CURRENT_TIMESTAMP
-            )
-            "#
-            .to_string(),
-        ))
-        .await
-        .expect("insert legacy api key");
-
         Migrator::up(&conn, None).await.expect("run identity assets migration");
 
         assert_eq!(count(&conn, "SELECT COUNT(*) AS count FROM account").await, 1);
@@ -170,35 +152,6 @@ mod tests {
             )
             .await,
             1
-        );
-        assert_eq!(
-            count(
-                &conn,
-                r#"
-                SELECT COUNT(*) AS count
-                FROM api_key
-                WHERE account_id = (
-                    SELECT account_id
-                    FROM auth_identity
-                    WHERE provider = 'oauth2'
-                      AND subject = 'alice'
-                )
-                "#,
-            )
-            .await,
-            1
-        );
-        assert_eq!(
-            count(
-                &conn,
-                "SELECT COUNT(*) AS count FROM api_key WHERE length(account_id) = 16",
-            )
-            .await,
-            1
-        );
-        assert_eq!(
-            count(&conn, "SELECT COUNT(*) AS count FROM api_key WHERE account_id IS NULL",).await,
-            0
         );
         assert_eq!(
             count(&conn, "SELECT COUNT(*) AS count FROM account_permission",).await,

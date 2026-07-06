@@ -2,9 +2,7 @@ use sea_orm::{ConnectionTrait, DatabaseBackend, Statement};
 use sea_orm_migration::prelude::*;
 use uuid::Uuid;
 
-use crate::{
-    m20240420_1_wallet_table::Wallet, m20241009_6_api_key_table::ApiKey, m20260704_000001_account_table::Account,
-};
+use crate::{m20240420_1_wallet_table::Wallet, m20260704_000001_account_table::Account};
 
 #[derive(DeriveMigrationName)]
 pub struct Migration;
@@ -14,37 +12,13 @@ const LEGACY_AUTH_PROVIDER: &str = "oauth2";
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        backfill_accounts(manager.get_connection()).await?;
-        enforce_api_key_account_ids(manager.get_connection()).await
+        backfill_accounts(manager.get_connection()).await
     }
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         let db = manager.get_connection();
         let backend = db.get_database_backend();
 
-        if backend == DatabaseBackend::Postgres {
-            execute(
-                db,
-                backend,
-                format!(
-                    "ALTER TABLE {} ALTER COLUMN {} DROP NOT NULL",
-                    ApiKey::Table.to_string(),
-                    ApiKey::AccountId.to_string()
-                ),
-            )
-            .await?;
-        }
-
-        execute(
-            db,
-            backend,
-            format!(
-                "UPDATE {} SET {} = NULL",
-                ApiKey::Table.to_string(),
-                ApiKey::AccountId.to_string()
-            ),
-        )
-        .await?;
         execute(db, backend, format!("DELETE FROM {}", Account::Table.to_string())).await
     }
 }
@@ -107,58 +81,6 @@ async fn backfill_accounts(db: &dyn ConnectionTrait) -> Result<(), DbErr> {
                 INSERT INTO account_preference (account_id, dashboard_settings, created_at)
                 VALUES ({account_id}, '{{}}', CURRENT_TIMESTAMP)
                 "#
-            ),
-        )
-        .await?;
-
-        execute(
-            db,
-            backend,
-            format!(
-                r#"
-                UPDATE api_key
-                SET account_id = {account_id}
-                WHERE user_id = '{user_id}'
-                  AND account_id IS NULL
-                "#,
-                user_id = sql_literal(&user_id),
-            ),
-        )
-        .await?;
-    }
-
-    Ok(())
-}
-
-async fn enforce_api_key_account_ids(db: &dyn ConnectionTrait) -> Result<(), DbErr> {
-    let backend = db.get_database_backend();
-    let missing_accounts = db
-        .query_one(Statement::from_string(
-            backend,
-            format!(
-                "SELECT COUNT(*) AS count FROM {} WHERE {} IS NULL",
-                ApiKey::Table.to_string(),
-                ApiKey::AccountId.to_string(),
-            ),
-        ))
-        .await?
-        .ok_or_else(|| DbErr::Migration("api key account_id count returned no row".to_string()))?
-        .try_get::<i64>("", "count")?;
-
-    if missing_accounts > 0 {
-        return Err(DbErr::Migration(format!(
-            "{missing_accounts} api_key rows have no account_id after account backfill"
-        )));
-    }
-
-    if backend == DatabaseBackend::Postgres {
-        execute(
-            db,
-            backend,
-            format!(
-                "ALTER TABLE {} ALTER COLUMN {} SET NOT NULL",
-                ApiKey::Table.to_string(),
-                ApiKey::AccountId.to_string()
             ),
         )
         .await?;

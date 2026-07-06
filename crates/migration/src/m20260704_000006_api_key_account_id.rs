@@ -1,3 +1,4 @@
+use sea_orm::{ConnectionTrait, DatabaseBackend, Statement};
 use sea_orm_migration::{prelude::*, schema::*};
 
 use crate::m20241009_6_api_key_table::ApiKey;
@@ -25,10 +26,40 @@ impl MigrationTrait for Migration {
                     .col(ApiKey::AccountId)
                     .to_owned(),
             )
-            .await
+            .await?;
+
+        if manager.get_database_backend() == DatabaseBackend::Postgres {
+            manager
+                .get_connection()
+                .execute(Statement::from_string(
+                    DatabaseBackend::Postgres,
+                    format!(
+                        "ALTER TABLE {} ALTER COLUMN {} SET NOT NULL",
+                        ApiKey::Table.to_string(),
+                        ApiKey::AccountId.to_string()
+                    ),
+                ))
+                .await?;
+        }
+
+        Ok(())
     }
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        if manager.get_database_backend() == DatabaseBackend::Postgres {
+            manager
+                .get_connection()
+                .execute(Statement::from_string(
+                    DatabaseBackend::Postgres,
+                    format!(
+                        "ALTER TABLE {} ALTER COLUMN {} DROP NOT NULL",
+                        ApiKey::Table.to_string(),
+                        ApiKey::AccountId.to_string()
+                    ),
+                ))
+                .await?;
+        }
+
         manager
             .drop_index(
                 Index::drop()
