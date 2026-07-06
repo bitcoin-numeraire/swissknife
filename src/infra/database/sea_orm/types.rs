@@ -40,7 +40,7 @@ impl From<AccountModel> for Account {
         Account {
             id: model.id,
             display_name: model.display_name,
-            identities: None,
+            identity: None,
             permissions: None,
             preferences: None,
             created_at: model.created_at.and_utc(),
@@ -53,7 +53,7 @@ impl From<AuthIdentityModel> for AuthIdentity {
     fn from(model: AuthIdentityModel) -> Self {
         AuthIdentity {
             id: model.id,
-            provider: model.provider,
+            provider: model.provider.parse().expect(ASSERTION_MSG),
             subject: model.subject,
             created_at: model.created_at.and_utc(),
             updated_at: model.updated_at.map(|t| t.and_utc()),

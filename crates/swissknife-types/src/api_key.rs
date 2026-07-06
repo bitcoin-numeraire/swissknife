@@ -13,8 +13,7 @@ pub struct ApiKey {
     pub id: Uuid,
     /// User ID
     pub user_id: String,
-    /// Internal account ID. Internal only.
-    #[serde(skip)]
+    /// Account ID
     pub account_id: Uuid,
     /// API key name
     pub name: String,

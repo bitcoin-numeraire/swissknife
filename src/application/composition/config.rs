@@ -2,6 +2,7 @@ use std::time::Duration;
 
 use serde::{Deserialize, Deserializer};
 use strum_macros::{Display, EnumString};
+pub use swissknife_types::AuthProvider;
 
 use crate::{
     domains::bitcoin::BtcAddressType,
@@ -67,13 +68,4 @@ pub enum LightningProvider {
     ClnRest,
     LndGrpc,
     LndRest,
-}
-
-#[derive(Clone, Copy, Debug, Deserialize, EnumString, Display, PartialEq, Eq, Default)]
-#[serde(rename_all = "lowercase")]
-#[strum(serialize_all = "lowercase")]
-pub enum AuthProvider {
-    #[default]
-    Jwt,
-    OAuth2,
 }
