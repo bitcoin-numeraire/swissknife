@@ -25,7 +25,7 @@ mod wallet;
 
 pub use account::{Account, AccountPreferences, AuthIdentity};
 pub use api_key::{ApiKey, ApiKeyFilter, CreateApiKeyRequest};
-pub use auth::{ChangePasswordRequest, SignInRequest, SignInResponse, SignUpRequest};
+pub use auth::{AuthProvider, ChangePasswordRequest, SignInRequest, SignInResponse, SignUpRequest};
 pub use bitcoin::{BtcAddress, BtcAddressFilter, BtcAddressType, BtcOutput, BtcOutputStatus, NewBtcAddressRequest};
 pub use error::ErrorResponse;
 pub use invoice::{Invoice, InvoiceFilter, InvoiceOrderBy, InvoiceStatus, LnInvoice, NewInvoiceRequest};

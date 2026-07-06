@@ -20,7 +20,7 @@ use crate::application::errors::{ApplicationError, DataError};
 use crate::domains::event::EventProjectionUnitOfWork;
 use crate::domains::invoice::{Invoice, InvoiceRepository};
 use crate::domains::payment::{LnPayment, Payment, PaymentStatus, PaymentUnitOfWork};
-use crate::domains::user::{AccountRepository, Permission};
+use crate::domains::user::{AccountRepository, AuthProvider, Permission};
 use crate::domains::wallet::{WalletBalanceRepository, WalletRepository};
 
 use super::models::{prelude::WalletBalance, wallet_balance};
@@ -152,11 +152,14 @@ async fn account_identity_upsert_is_idempotent() {
     let conn = connect().await;
     let repo = SeaOrmAccountRepository::new(conn.clone());
 
-    let first = repo.upsert_for_identity("jwt", "alice", &[]).await.unwrap();
-    let second = repo.upsert_for_identity("jwt", "alice", &[]).await.unwrap();
+    let first = repo.upsert(AuthProvider::Jwt, "alice", &[]).await.unwrap();
+    let second = repo.upsert(AuthProvider::Jwt, "alice", &[]).await.unwrap();
 
     assert_eq!(first, second);
-    assert_eq!(first.identities.as_ref().map(Vec::len), Some(1));
+    assert_eq!(
+        first.identity.as_ref().map(|identity| identity.subject.as_str()),
+        Some("alice")
+    );
     assert_eq!(first.preferences.as_ref().map(|_| ()), Some(()));
     assert_eq!(count(&conn, "SELECT COUNT(*) AS count FROM account").await, 1);
     assert_eq!(count(&conn, "SELECT COUNT(*) AS count FROM auth_identity").await, 1);
@@ -172,32 +175,14 @@ async fn account_identity_upsert_inserts_initial_permissions() {
     let repo = SeaOrmAccountRepository::new(conn.clone());
 
     let account = repo
-        .upsert_for_identity("jwt", "alice", &[Permission::ReadWallet, Permission::ReadWallet])
-        .await
-        .unwrap();
-
-    assert_eq!(account.permissions, Some(vec![Permission::ReadWallet]));
-    assert_eq!(
-        count(
-            &conn,
-            "SELECT COUNT(*) AS count FROM account_permission WHERE permission = 'read:wallet'",
+        .upsert(
+            AuthProvider::Jwt,
+            "alice",
+            &[Permission::ReadWallet, Permission::ReadWallet],
         )
-        .await,
-        1
-    );
-}
-
-#[tokio::test]
-async fn account_permissions_upsert_is_idempotent() {
-    let conn = connect().await;
-    let repo = SeaOrmAccountRepository::new(conn.clone());
-    let account = repo.upsert_for_identity("jwt", "alice", &[]).await.unwrap();
-
-    repo.upsert_permissions(account.id, &[Permission::ReadWallet, Permission::ReadWallet])
         .await
         .unwrap();
 
-    let account = repo.find_by_identity("jwt", "alice").await.unwrap().unwrap();
     assert_eq!(account.permissions, Some(vec![Permission::ReadWallet]));
     assert_eq!(
         count(

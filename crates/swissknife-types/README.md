@@ -9,15 +9,16 @@ generated client/SDK consume the same types.
 
 ## What's inside
 
-- **Entities** — `Invoice`, `Payment`, `Wallet`, `LnAddress`, `BtcAddress`,
-  `BtcOutput`, `ApiKey`, … the core records. They serialize directly as the wire
-  representation; there are no parallel `*Response` types.
+- **Entities** — `Account`, `AuthIdentity`, `AccountPreferences`, `Invoice`,
+  `Payment`, `Wallet`, `LnAddress`, `BtcAddress`, `BtcOutput`, `ApiKey`, … the
+  core records. They serialize directly as the wire representation; there are no
+  parallel `*Response` types.
 - **Requests** — `SendPaymentRequest`, `NewInvoiceRequest`, … the inputs decoded
   from request bodies and query strings.
 - **Responses** — the few edge shapes with no entity: `SignInResponse`,
   `NostrNIP05Response`, `ErrorResponse`, `LnUrlCallback`.
-- **Shared enums** — `Currency`, `Ledger`, `Permission`, `BtcNetwork`,
-  `InvoiceStatus`, `PaymentStatus`, `BtcAddressType`, …
+- **Shared enums** — `AuthProvider`, `Currency`, `Ledger`, `Permission`,
+  `BtcNetwork`, `InvoiceStatus`, `PaymentStatus`, `BtcAddressType`, …
 
 ## Principles
 
@@ -25,8 +26,8 @@ generated client/SDK consume the same types.
   live in the application's use cases, never on the types here.
 - **The wire shape lives with the type.** Each type carries its own `serde` and
   `utoipa::ToSchema` annotations, so what you read is what's serialized.
-- **Internal-only fields are `#[serde(skip)]`** so they never reach the wire
-  (e.g. `ApiKey::key_hash`).
+- **Sensitive internal-only fields are `#[serde(skip)]`** so they never reach the
+  wire (e.g. `ApiKey::key_hash`).
 
 ## Usage
 

@@ -1,5 +1,16 @@
 use serde::{Deserialize, Serialize};
+use strum_macros::{Display, EnumString};
 use utoipa::ToSchema;
+
+/// Authentication provider namespace.
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, EnumString, Display, PartialEq, Eq, Default, ToSchema)]
+#[serde(rename_all = "lowercase")]
+#[strum(serialize_all = "lowercase")]
+pub enum AuthProvider {
+    #[default]
+    Jwt,
+    OAuth2,
+}
 
 /// Sign Up Request
 #[derive(Debug, Deserialize, ToSchema, Serialize)]

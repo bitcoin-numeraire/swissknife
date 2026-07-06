@@ -2,7 +2,10 @@ use sea_orm::{ConnectionTrait, DatabaseBackend, Statement};
 use sea_orm_migration::prelude::*;
 use uuid::Uuid;
 
-use crate::{m20240420_1_wallet_table::Wallet, m20260704_000001_account_table::Account};
+use crate::{
+    m20240420_1_wallet_table::Wallet, m20260704_000001_account_table::Account,
+    m20260704_000002_auth_identity_table::AuthIdentity,
+};
 
 #[derive(DeriveMigrationName)]
 pub struct Migration;
@@ -19,7 +22,34 @@ impl MigrationTrait for Migration {
         let db = manager.get_connection();
         let backend = db.get_database_backend();
 
-        execute(db, backend, format!("DELETE FROM {}", Account::Table.to_string())).await
+        execute(
+            db,
+            backend,
+            format!(
+                r#"
+                DELETE FROM {account}
+                WHERE {account_id} IN (
+                    SELECT {identity_account_id}
+                    FROM {identity}
+                    WHERE {provider} = '{legacy_provider}'
+                    AND {subject} IN (
+                        SELECT {user_id}
+                        FROM {wallet}
+                    )
+                )
+                "#,
+                account = Account::Table.to_string(),
+                account_id = Account::Id.to_string(),
+                identity = AuthIdentity::Table.to_string(),
+                identity_account_id = AuthIdentity::AccountId.to_string(),
+                legacy_provider = sql_literal(LEGACY_AUTH_PROVIDER),
+                provider = AuthIdentity::Provider.to_string(),
+                subject = AuthIdentity::Subject.to_string(),
+                user_id = Wallet::UserId.to_string(),
+                wallet = Wallet::Table.to_string(),
+            ),
+        )
+        .await
     }
 }
 

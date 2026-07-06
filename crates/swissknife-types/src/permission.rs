@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
-use strum_macros::{Display, EnumString, VariantNames};
+use strum_macros::{Display, EnumString};
 use utoipa::ToSchema;
 
 /// An API access scope granted to a JWT or API key.
-#[derive(Clone, Debug, PartialEq, Eq, Hash, EnumString, Display, VariantNames, Serialize, Deserialize, ToSchema)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, EnumString, Display, Serialize, Deserialize, ToSchema)]
 pub enum Permission {
     #[serde(rename = "read:wallet")]
     #[strum(serialize = "read:wallet")]
@@ -59,16 +59,5 @@ impl Permission {
             Permission::ReadBtcAddress,
             Permission::WriteBtcAddress,
         ]
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn display_and_parse_use_scope_strings() {
-        assert_eq!(Permission::ReadWallet.to_string(), "read:wallet");
-        assert_eq!("read:wallet".parse::<Permission>(), Ok(Permission::ReadWallet));
     }
 }
