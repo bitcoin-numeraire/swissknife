@@ -18,7 +18,6 @@ mod m20260609_143600_wallet_balance_table;
 mod m20260609_143601_backfill_wallet_balances;
 mod m20260704_000001_account_table;
 mod m20260704_000002_auth_identity_table;
-mod m20260704_000003_account_permission_table;
 mod m20260704_000004_account_preference_table;
 mod m20260704_000005_asset_table;
 mod m20260704_000006_api_key_account_id;
@@ -48,7 +47,6 @@ impl MigratorTrait for Migrator {
             Box::new(m20260609_143601_backfill_wallet_balances::Migration),
             Box::new(m20260704_000001_account_table::Migration),
             Box::new(m20260704_000002_auth_identity_table::Migration),
-            Box::new(m20260704_000003_account_permission_table::Migration),
             Box::new(m20260704_000004_account_preference_table::Migration),
             Box::new(m20260704_000005_asset_table::Migration),
             Box::new(m20260704_000006_api_key_account_id::Migration),
@@ -154,8 +152,8 @@ mod tests {
             1
         );
         assert_eq!(
-            count(&conn, "SELECT COUNT(*) AS count FROM account_permission",).await,
-            0
+            count(&conn, "SELECT COUNT(*) AS count FROM account WHERE permissions = '[]'").await,
+            1
         );
         assert_eq!(
             count(

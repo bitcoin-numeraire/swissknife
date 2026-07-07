@@ -18,7 +18,6 @@ impl MigrationTrait for Migration {
                     .col(string_len(AuthIdentity::Provider, 255))
                     .col(string_len(AuthIdentity::Subject, 255))
                     .col(timestamp(AuthIdentity::CreatedAt).default(Expr::current_timestamp()))
-                    .col(timestamp_null(AuthIdentity::UpdatedAt))
                     .foreign_key(
                         ForeignKey::create()
                             .name("fk_auth_identity_account")
@@ -67,5 +66,4 @@ pub(crate) enum AuthIdentity {
     Provider,
     Subject,
     CreatedAt,
-    UpdatedAt,
 }

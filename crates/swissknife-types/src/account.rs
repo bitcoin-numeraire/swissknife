@@ -15,6 +15,7 @@ pub struct Account {
 
     /// Optional human-readable name for the account.
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(example = "Numeraire")]
     pub display_name: Option<String>,
 
     /// Login identity currently linked to this account.
@@ -51,14 +52,11 @@ pub struct AuthIdentity {
     pub provider: AuthProvider,
 
     /// Provider subject, such as a JWT username or OAuth2 `sub`.
+    #[schema(example = "auth0|numeraire")]
     pub subject: String,
 
     /// Date of creation in database.
     pub created_at: DateTime<Utc>,
-
-    /// Date of update in database.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub updated_at: Option<DateTime<Utc>>,
 }
 
 /// Account-scoped dashboard and UI preferences.

@@ -3,7 +3,6 @@
 pub mod prelude;
 
 pub mod account;
-pub mod account_permission;
 pub mod account_preference;
 pub mod api_key;
 pub mod asset;
