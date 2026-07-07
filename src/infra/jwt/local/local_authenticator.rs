@@ -1,8 +1,8 @@
 use std::time::Duration;
 
-use crate::domains::user::AuthClaims;
+use crate::application::errors::AuthenticationError;
+use crate::domains::user::{Account, AuthClaims};
 use crate::infra::jwt::JWTAuthenticator;
-use crate::{application::errors::AuthenticationError, domains::user::Permission};
 use async_trait::async_trait;
 
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
@@ -36,15 +36,18 @@ impl LocalAuthenticator {
 
 #[async_trait]
 impl JWTAuthenticator for LocalAuthenticator {
-    fn encode(&self, sub: String, permissions: Vec<Permission>) -> Result<String, AuthenticationError> {
+    fn encode(&self, account: Account) -> Result<String, AuthenticationError> {
         let now = chrono::Utc::now().timestamp();
         let expiration = now + self.token_expiry.as_secs() as i64;
+        let identity = account
+            .identity
+            .ok_or_else(|| AuthenticationError::EncodeJWT(format!("Account {} has no identity", account.id)))?;
 
         let claims = AuthClaims {
-            sub,
+            sub: identity.subject,
             exp: expiration as usize,
             iat: now as usize,
-            permissions,
+            permissions: account.permissions.unwrap_or_default(),
         };
 
         let token = encode(&Header::default(), &claims, &self.encoding_key)

@@ -13,6 +13,7 @@ impl MigrationTrait for Migration {
                     .if_not_exists()
                     .col(uuid(Account::Id).primary_key())
                     .col(text_null(Account::DisplayName))
+                    .col(json(Account::Permissions).default("[]"))
                     .col(timestamp(Account::CreatedAt).default(Expr::current_timestamp()))
                     .col(timestamp_null(Account::UpdatedAt))
                     .to_owned(),
@@ -30,6 +31,7 @@ pub(crate) enum Account {
     Table,
     Id,
     DisplayName,
+    Permissions,
     CreatedAt,
     UpdatedAt,
 }

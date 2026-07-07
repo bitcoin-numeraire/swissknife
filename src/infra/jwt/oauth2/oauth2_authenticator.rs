@@ -3,7 +3,7 @@ use std::time::Duration;
 
 use crate::domains::user::AuthClaims;
 use crate::infra::jwt::JWTAuthenticator;
-use crate::{application::errors::AuthenticationError, domains::user::Permission};
+use crate::{application::errors::AuthenticationError, domains::user::Account};
 use async_trait::async_trait;
 use jsonwebtoken::{
     decode, decode_header,
@@ -134,7 +134,7 @@ impl OAuth2Authenticator {
 
 #[async_trait]
 impl JWTAuthenticator for OAuth2Authenticator {
-    fn encode(&self, _: String, _: Vec<Permission>) -> Result<String, AuthenticationError> {
+    fn encode(&self, _: Account) -> Result<String, AuthenticationError> {
         Err(AuthenticationError::UnsupportedOperation)
     }
 

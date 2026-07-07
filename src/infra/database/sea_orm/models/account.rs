@@ -10,24 +10,17 @@ pub struct Model {
     pub id: Uuid,
     #[sea_orm(column_type = "Text", nullable)]
     pub display_name: Option<String>,
+    pub permissions: Json,
     pub created_at: DateTime,
     pub updated_at: Option<DateTime>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
-    #[sea_orm(has_many = "super::account_permission::Entity")]
-    AccountPermission,
     #[sea_orm(has_one = "super::account_preference::Entity")]
     AccountPreference,
     #[sea_orm(has_many = "super::auth_identity::Entity")]
     AuthIdentity,
-}
-
-impl Related<super::account_permission::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::AccountPermission.def()
-    }
 }
 
 impl Related<super::account_preference::Entity> for Entity {

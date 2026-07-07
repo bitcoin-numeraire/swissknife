@@ -41,7 +41,7 @@ impl From<AccountModel> for Account {
             id: model.id,
             display_name: model.display_name,
             identity: None,
-            permissions: None,
+            permissions: serde_json::from_value(model.permissions).expect(ASSERTION_MSG),
             preferences: None,
             created_at: model.created_at.and_utc(),
             updated_at: model.updated_at.map(|t| t.and_utc()),
@@ -56,7 +56,6 @@ impl From<AuthIdentityModel> for AuthIdentity {
             provider: model.provider.parse().expect(ASSERTION_MSG),
             subject: model.subject,
             created_at: model.created_at.and_utc(),
-            updated_at: model.updated_at.map(|t| t.and_utc()),
         }
     }
 }

@@ -2,7 +2,6 @@
 #![allow(unused_imports)]
 
 pub use super::account::Entity as Account;
-pub use super::account_permission::Entity as AccountPermission;
 pub use super::account_preference::Entity as AccountPreference;
 pub use super::api_key::Entity as ApiKey;
 pub use super::asset::Entity as Asset;

@@ -1,18 +1,17 @@
 use async_trait::async_trait;
 use chrono::Utc;
-use sea_orm::{
-    sea_query::OnConflict, ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, QueryOrder,
-    Set, TransactionTrait,
-};
+use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set, TransactionTrait};
 use serde_json::json;
 use uuid::Uuid;
 
 use crate::{
     application::errors::DatabaseError,
-    domains::user::{Account, AccountRepository, AuthProvider, Permission},
+    domains::user::{
+        Account, AccountPreferences, AccountRepository, AuthIdentity as AuthIdentityEntity, AuthProvider, Permission,
+    },
     infra::database::sea_orm::models::{
-        account, account_permission, account_preference, auth_identity,
-        prelude::{Account as AccountEntity, AccountPermission, AccountPreference, AuthIdentity},
+        account, account_preference, auth_identity,
+        prelude::{Account as AccountEntity, AccountPreference, AuthIdentity},
     },
 };
 
@@ -51,23 +50,6 @@ impl AccountRepository for SeaOrmAccountRepository {
         let mut account: Account = account_model.into();
         account.identity = Some(identity.into());
 
-        account.permissions = Some(
-            AccountPermission::find()
-                .filter(account_permission::Column::AccountId.eq(account.id))
-                .order_by_asc(account_permission::Column::Permission)
-                .all(&self.db)
-                .await
-                .map_err(|e| DatabaseError::FindMany(e.to_string()))?
-                .into_iter()
-                .map(|model| {
-                    model
-                        .permission
-                        .parse()
-                        .map_err(|e: strum::ParseError| DatabaseError::FindMany(e.to_string()))
-                })
-                .collect::<Result<Vec<_>, _>>()?,
-        );
-
         account.preferences = AccountPreference::find_by_id(account.id)
             .one(&self.db)
             .await
@@ -83,10 +65,6 @@ impl AccountRepository for SeaOrmAccountRepository {
         subject: &str,
         initial_permissions: &[Permission],
     ) -> Result<Account, DatabaseError> {
-        if let Some(account) = self.find_by_identity(provider, subject).await? {
-            return Ok(account);
-        }
-
         let tx = self
             .db
             .begin()
@@ -94,10 +72,20 @@ impl AccountRepository for SeaOrmAccountRepository {
             .map_err(|e| DatabaseError::Transaction(e.to_string()))?;
 
         let account_id = Uuid::new_v4();
+        let identity_id = Uuid::new_v4();
         let now = Utc::now().naive_utc();
+        let mut permissions = Vec::new();
+        for permission in initial_permissions {
+            if !permissions.contains(permission) {
+                permissions.push(permission.clone());
+            }
+        }
+        let permissions_json =
+            serde_json::to_value(permissions.clone()).map_err(|e| DatabaseError::Insert(e.to_string()))?;
 
         let account_model = account::ActiveModel {
             id: Set(account_id),
+            permissions: Set(permissions_json),
             created_at: Set(now),
             ..Default::default()
         };
@@ -120,20 +108,19 @@ impl AccountRepository for SeaOrmAccountRepository {
             .map_err(|e| DatabaseError::Insert(e.to_string()))?;
 
         let identity_model = auth_identity::ActiveModel {
-            id: Set(Uuid::new_v4()),
+            id: Set(identity_id),
             account_id: Set(account_id),
             provider: Set(provider.to_string()),
             subject: Set(subject.to_string()),
             created_at: Set(now),
-            ..Default::default()
         };
 
         let identity_insert = identity_model.insert(&tx).await;
 
         if let Err(err) = identity_insert {
             // A concurrent first request can create this identity after the
-            // pre-read. The unique index rejects our duplicate insert; return
-            // the account that won the race.
+            // caller's read. The unique index rejects our duplicate insert;
+            // return the account that won the race.
             tx.rollback()
                 .await
                 .map_err(|e| DatabaseError::Transaction(e.to_string()))?;
@@ -144,33 +131,27 @@ impl AccountRepository for SeaOrmAccountRepository {
                 .ok_or_else(|| DatabaseError::Insert(err.to_string()));
         }
 
-        for permission in initial_permissions {
-            let model = account_permission::ActiveModel {
-                account_id: Set(account_id),
-                permission: Set(permission.to_string()),
-                created_at: Set(now),
-            };
-
-            let _ = AccountPermission::insert(model)
-                .on_conflict(
-                    OnConflict::columns([
-                        account_permission::Column::AccountId,
-                        account_permission::Column::Permission,
-                    ])
-                    .do_nothing()
-                    .to_owned(),
-                )
-                .exec_without_returning(&tx)
-                .await
-                .map_err(|e| DatabaseError::Insert(e.to_string()))?;
-        }
-
         tx.commit()
             .await
             .map_err(|e| DatabaseError::Transaction(e.to_string()))?;
 
-        self.find_by_identity(provider, subject)
-            .await?
-            .ok_or_else(|| DatabaseError::Insert("account was not available after provisioning".to_string()))
+        Ok(Account {
+            id: account_id,
+            display_name: None,
+            identity: Some(AuthIdentityEntity {
+                id: identity_id,
+                provider,
+                subject: subject.to_string(),
+                created_at: now.and_utc(),
+            }),
+            permissions: Some(permissions),
+            preferences: Some(AccountPreferences {
+                dashboard_settings: json!({}),
+                created_at: now.and_utc(),
+                updated_at: None,
+            }),
+            created_at: now.and_utc(),
+            updated_at: None,
+        })
     }
 }

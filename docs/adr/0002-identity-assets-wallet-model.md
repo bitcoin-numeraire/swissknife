@@ -78,6 +78,7 @@ The owner table is named `account`, one word. `user` is a reserved word in Postg
 account(
   id UUID primary key,
   display_name TEXT NULL,
+  permissions JSON NOT NULL DEFAULT '[]',
   created_at TIMESTAMP NOT NULL,
   updated_at TIMESTAMP NULL
 )
@@ -88,15 +89,7 @@ auth_identity(
   provider TEXT NOT NULL,       -- jwt, oauth2, future provider names
   subject TEXT NOT NULL,        -- JWT sub / OAuth2 sub / local username
   created_at TIMESTAMP NOT NULL,
-  updated_at TIMESTAMP NULL,
   unique(provider, subject)
-)
-
-account_permission(
-  account_id UUID NOT NULL references account(id),
-  permission TEXT NOT NULL,
-  created_at TIMESTAMP NOT NULL,
-  primary key (account_id, permission)
 )
 
 account_preference(
@@ -118,7 +111,7 @@ pub struct User {
 }
 ```
 
-Permissions are a many-valued relation, not a column on `account`, and their source of truth depends on the provider. For OAuth2 identities the IdP's token claims are authoritative and `account_permission` is not consulted: mirroring claims into the database would create a second source of truth that drifts. For local-credential identities (`provider = jwt`) there is no IdP, so `account_permission` is authoritative and the bootstrap admin is granted the full permission set. API keys keep their own `permissions` column because a key is an attenuated grant: at creation its permissions must be a subset of the creator's effective permissions, and at authentication the key's stored permissions are used as-is.
+Permissions are stored as a JSON array on `account`, matching the existing `api_key.permissions` representation because the current product always loads the full permission set instead of querying individual grants. For OAuth2 identities the IdP's token claims are authoritative and `account.permissions` is not consulted: mirroring claims into the database would create a second source of truth that drifts. For local-credential identities (`provider = jwt`) there is no IdP, so `account.permissions` is authoritative and the bootstrap admin is granted the full permission set. API keys keep their own `permissions` column because a key is an attenuated grant: at creation its permissions must be a subset of the creator's effective permissions, and at authentication the key's stored permissions are used as-is. If a future admin/grant workflow needs row-level querying, audit history, or grant metadata, promote account permissions to a dedicated table at that point.
 
 Preferences that only the dashboard reads live in `account_preference.dashboard_settings` as a versioned JSON document the server stores but never branches on. Promote a preference to a typed column or table only when backend policy, querying, constraints, or cross-device semantics depend on it.
 
@@ -343,12 +336,12 @@ The migration must support SQLite and Postgres and must preserve existing wallet
 
 ### Phase 1: Add identity and asset tables
 
-1. Create `account`, `auth_identity`, `account_permission`, `account_preference`, and `asset`.
+1. Create `account`, `auth_identity`, `account_preference`, and `asset`.
 2. Seed assets for all existing `Currency` enum values.
 3. Backfill one `account` per distinct `wallet.user_id`.
 4. Backfill one `auth_identity` per old wallet user ID using the configured auth provider when known; otherwise require an operator-supplied provider mapping before migration.
 5. Add `account_id` to `api_key` and backfill through `wallet.user_id`.
-6. Grant the full permission set in `account_permission` to the bootstrap admin's account when the deployment uses local JWT. OAuth2 deployments backfill nothing, because token claims stay authoritative. `api_key.permissions` rows are unchanged.
+6. Grant the full permission set in `account.permissions` to the bootstrap admin's account when the deployment uses local JWT. OAuth2 deployments backfill nothing, because token claims stay authoritative. `api_key.permissions` rows are unchanged.
 
 ### Phase 2: Convert wallet rows into asset wallets
 

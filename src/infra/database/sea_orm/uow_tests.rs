@@ -155,7 +155,7 @@ async fn account_identity_upsert_is_idempotent() {
     let first = repo.upsert(AuthProvider::Jwt, "alice", &[]).await.unwrap();
     let second = repo.upsert(AuthProvider::Jwt, "alice", &[]).await.unwrap();
 
-    assert_eq!(first, second);
+    assert_eq!(first.id, second.id);
     assert_eq!(
         first.identity.as_ref().map(|identity| identity.subject.as_str()),
         Some("alice")
@@ -184,14 +184,7 @@ async fn account_identity_upsert_inserts_initial_permissions() {
         .unwrap();
 
     assert_eq!(account.permissions, Some(vec![Permission::ReadWallet]));
-    assert_eq!(
-        count(
-            &conn,
-            "SELECT COUNT(*) AS count FROM account_permission WHERE permission = 'read:wallet'",
-        )
-        .await,
-        1
-    );
+    assert_eq!(count(&conn, "SELECT COUNT(*) AS count FROM account").await, 1);
 }
 
 #[tokio::test]

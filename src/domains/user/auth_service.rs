@@ -63,10 +63,7 @@ impl AuthUseCases for AuthService {
             .upsert(self.provider, BOOTSTRAP_ADMIN_SUBJECT, &permissions)
             .await?;
 
-        let token = self.jwt_authenticator.encode(
-            BOOTSTRAP_ADMIN_SUBJECT.to_string(),
-            account.permissions.unwrap_or_default(),
-        )?;
+        let token = self.jwt_authenticator.encode(account)?;
 
         debug!("Admin user created successfully");
         Ok(token)
@@ -88,16 +85,22 @@ impl AuthUseCases for AuthService {
                     return Err(AuthenticationError::InvalidCredentials.into());
                 }
 
-                let account = self
+                let account = match self
                     .store
                     .account
-                    .upsert(self.provider, BOOTSTRAP_ADMIN_SUBJECT, &[])
-                    .await?;
+                    .find_by_identity(self.provider, BOOTSTRAP_ADMIN_SUBJECT)
+                    .await?
+                {
+                    Some(account) => account,
+                    None => {
+                        self.store
+                            .account
+                            .upsert(self.provider, BOOTSTRAP_ADMIN_SUBJECT, &[])
+                            .await?
+                    }
+                };
 
-                let token = self.jwt_authenticator.encode(
-                    BOOTSTRAP_ADMIN_SUBJECT.to_string(),
-                    account.permissions.unwrap_or_default(),
-                )?;
+                let token = self.jwt_authenticator.encode(account)?;
 
                 debug!("User logged in successfully");
                 Ok(token)
@@ -143,7 +146,10 @@ impl AuthUseCases for AuthService {
         trace!("Start JWT authentication");
 
         let claims = self.jwt_authenticator.decode(token).await?;
-        let account = self.store.account.upsert(self.provider, &claims.sub, &[]).await?;
+        let account = match self.store.account.find_by_identity(self.provider, &claims.sub).await? {
+            Some(account) => account,
+            None => self.store.account.upsert(self.provider, &claims.sub, &[]).await?,
+        };
         let permissions = if self.provider == AuthProvider::Jwt {
             account.permissions.unwrap_or_default()
         } else {
@@ -254,7 +260,6 @@ mod tests {
                 provider,
                 subject: subject.to_string(),
                 created_at: Utc::now(),
-                updated_at: None,
             }),
             permissions: Some(permissions),
             preferences: None,
@@ -335,10 +340,17 @@ mod tests {
                     });
 
                 let mut jwt = MockJWTAuthenticator::new();
+                let expected_permissions = permissions.clone();
                 jwt.expect_encode()
-                    .withf(move |subject, granted| subject == "admin" && granted == permissions.as_slice())
+                    .withf(move |account| {
+                        account
+                            .identity
+                            .as_ref()
+                            .is_some_and(|identity| identity.subject == "admin")
+                            && account.permissions.as_ref() == Some(&expected_permissions)
+                    })
                     .times(1)
-                    .returning(|_, _| Ok("token".to_string()));
+                    .returning(|_| Ok("token".to_string()));
 
                 let service = service(jwt, store, AuthProvider::Jwt);
 
@@ -409,6 +421,12 @@ mod tests {
                     .returning(move |_| Ok(Some(stored_hash.clone().into())));
                 store
                     .account
+                    .expect_find_by_identity()
+                    .withf(|provider, subject| *provider == AuthProvider::Jwt && subject == "admin")
+                    .times(1)
+                    .returning(|_, _| Ok(None));
+                store
+                    .account
                     .expect_upsert()
                     .withf(|provider, subject, granted| {
                         *provider == AuthProvider::Jwt && subject == "admin" && granted.is_empty()
@@ -425,9 +443,15 @@ mod tests {
 
                 let mut jwt = MockJWTAuthenticator::new();
                 jwt.expect_encode()
-                    .withf(|subject, permissions| subject == "admin" && permissions == &[Permission::ReadWallet])
+                    .withf(|account| {
+                        account
+                            .identity
+                            .as_ref()
+                            .is_some_and(|identity| identity.subject == "admin")
+                            && account.permissions.as_deref() == Some(&[Permission::ReadWallet][..])
+                    })
                     .times(1)
-                    .returning(|_, _| Ok("token".to_string()));
+                    .returning(|_| Ok("token".to_string()));
 
                 let service = service(jwt, store, AuthProvider::Jwt);
 
@@ -601,6 +625,12 @@ mod tests {
                 let mut store = MockAppStoreBuilder::new();
                 store
                     .account
+                    .expect_find_by_identity()
+                    .withf(|provider, subject| *provider == AuthProvider::Jwt && subject == "alice")
+                    .times(1)
+                    .returning(|_, _| Ok(None));
+                store
+                    .account
                     .expect_upsert()
                     .withf(|provider, subject, granted| {
                         *provider == AuthProvider::Jwt && subject == "alice" && granted.is_empty()
@@ -643,6 +673,12 @@ mod tests {
                 jwt.expect_decode().times(1).returning(|_| Ok(claims("alice")));
 
                 let mut store = MockAppStoreBuilder::new();
+                store
+                    .account
+                    .expect_find_by_identity()
+                    .withf(|provider, subject| *provider == AuthProvider::Jwt && subject == "alice")
+                    .times(1)
+                    .returning(|_, _| Ok(None));
                 store
                     .account
                     .expect_upsert()
