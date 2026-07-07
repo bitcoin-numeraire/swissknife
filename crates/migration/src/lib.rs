@@ -22,7 +22,9 @@ mod m20260704_000004_account_preference_table;
 mod m20260704_000005_asset_table;
 mod m20260704_000006_api_key_account_id;
 mod m20260704_000007_backfill_oauth2_accounts;
-mod m20260704_000008_asset_scoped_wallets;
+mod m20260704_000008_wallet_account_asset_schema;
+mod m20260704_000009_backfill_mainnet_wallet_accounts;
+mod m20260704_000010_drop_api_key_user_id_fk;
 
 pub struct Migrator;
 
@@ -52,7 +54,9 @@ impl MigratorTrait for Migrator {
             Box::new(m20260704_000005_asset_table::Migration),
             Box::new(m20260704_000006_api_key_account_id::Migration),
             Box::new(m20260704_000007_backfill_oauth2_accounts::Migration),
-            Box::new(m20260704_000008_asset_scoped_wallets::Migration),
+            Box::new(m20260704_000008_wallet_account_asset_schema::Migration),
+            Box::new(m20260704_000009_backfill_mainnet_wallet_accounts::Migration),
+            Box::new(m20260704_000010_drop_api_key_user_id_fk::Migration),
         ]
     }
 }
@@ -64,7 +68,7 @@ mod tests {
     use super::*;
 
     const MIGRATIONS_BEFORE_IDENTITY_ASSETS: u32 = 16;
-    const IDENTITY_ASSET_MIGRATION_COUNT: u32 = 7;
+    const IDENTITY_ASSET_MIGRATION_COUNT: u32 = 9;
 
     async fn sqlite() -> sea_orm::DatabaseConnection {
         Database::connect("sqlite::memory:")
@@ -139,7 +143,7 @@ mod tests {
             DatabaseBackend::Sqlite,
             r#"
             INSERT INTO wallet_balance (wallet_id, currency, available_amount, reserved_amount, created_at)
-            VALUES (X'11111111111141118111111111111111', 'Regtest', 0, 0, CURRENT_TIMESTAMP)
+            VALUES (X'11111111111141118111111111111111', 'Bitcoin', 12345, 678, CURRENT_TIMESTAMP)
             "#
             .to_string(),
         ))
@@ -188,5 +192,66 @@ mod tests {
             .await,
             1
         );
+        assert_eq!(
+            count(
+                &conn,
+                r#"
+                SELECT COUNT(*) AS count
+                FROM wallet
+                JOIN asset ON wallet.asset_id = asset.id
+                WHERE wallet.account_id = (
+                    SELECT account_id
+                    FROM auth_identity
+                    WHERE provider = 'oauth2'
+                      AND subject = 'alice'
+                )
+                  AND asset.protocol = 'bitcoin'
+                  AND asset.network = 'bitcoin/mainnet'
+                  AND asset.asset_ref = 'native'
+                  AND wallet.available_amount = 12345
+                  AND wallet.reserved_amount = 678
+                "#,
+            )
+            .await,
+            1
+        );
+    }
+
+    #[async_std::test]
+    async fn api_key_user_id_is_not_a_wallet_foreign_key() {
+        let conn = sqlite().await;
+
+        Migrator::up(&conn, None).await.expect("run migrations");
+
+        conn.execute(Statement::from_string(
+            DatabaseBackend::Sqlite,
+            r#"
+            INSERT INTO account (id, permissions, created_at)
+            VALUES (X'22222222222242228222222222222222', '[]', CURRENT_TIMESTAMP)
+            "#
+            .to_string(),
+        ))
+        .await
+        .expect("insert account");
+        conn.execute(Statement::from_string(
+            DatabaseBackend::Sqlite,
+            r#"
+            INSERT INTO api_key (id, user_id, account_id, name, key_hash, permissions, created_at)
+            VALUES (
+                X'33333333333343338333333333333333',
+                'external-subject',
+                X'22222222222242228222222222222222',
+                'ci',
+                X'4444444444444444444444444444444444444444444444444444444444444444',
+                '[]',
+                CURRENT_TIMESTAMP
+            )
+            "#
+            .to_string(),
+        ))
+        .await
+        .expect("insert api key without matching wallet user_id");
+
+        assert_eq!(count(&conn, "SELECT COUNT(*) AS count FROM api_key").await, 1);
     }
 }

@@ -21,8 +21,6 @@ pub struct Model {
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
-    #[sea_orm(has_many = "super::api_key::Entity")]
-    ApiKey,
     #[sea_orm(
         belongs_to = "super::asset::Entity",
         from = "Column::AssetId",
@@ -41,12 +39,6 @@ pub enum Relation {
     Payment,
     #[sea_orm(has_many = "super::wallet_balance::Entity")]
     WalletBalance,
-}
-
-impl Related<super::api_key::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::ApiKey.def()
-    }
 }
 
 impl Related<super::asset::Entity> for Entity {

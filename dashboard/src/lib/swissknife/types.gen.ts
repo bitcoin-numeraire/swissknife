@@ -9,6 +9,10 @@ export type ClientOptions = {
  */
 export type ApiKey = {
   /**
+   * Owning account ID
+   */
+  account_id: string;
+  /**
    * Date of creation in database
    */
   created_at: Date;
@@ -37,9 +41,58 @@ export type ApiKey = {
    */
   permissions: Array<Permission>;
   /**
-   * User ID
+   * Auth provider subject this key authenticates as.
+   *
+   * Ownership is enforced through `account_id`; this subject is the
+   * request-time actor label returned by authentication.
    */
   user_id: string;
+};
+
+/**
+ * A spendable asset on one protocol/network.
+ */
+export type Asset = {
+  /**
+   * Protocol-specific asset reference; native for chain-native BTC
+   */
+  asset_ref: string;
+  /**
+   * Stable server asset code, independent of network-specific UI ticker.
+   */
+  code: string;
+  /**
+   * Date of creation in database
+   */
+  created_at: Date;
+  /**
+   * Integer storage scale for this asset
+   */
+  decimals: number;
+  /**
+   * UI ticker for the specific network, such as BTC, tBTC, or rBTC.
+   */
+  display_ticker: string;
+  /**
+   * Internal asset ID
+   */
+  id: string;
+  /**
+   * Optional display name
+   */
+  name?: string | null;
+  /**
+   * Settlement network, such as bitcoin/mainnet or bitcoin/regtest
+   */
+  network: string;
+  /**
+   * Settlement protocol, such as bitcoin or taproot_assets
+   */
+  protocol: string;
+  /**
+   * Date of update in database
+   */
+  updated_at?: Date | null;
 };
 
 /**
@@ -254,9 +307,25 @@ export type CreateApiKeyRequest = {
    */
   permissions: Array<Permission>;
   /**
-   * User ID. Will be populated with your own ID by default
+   * Auth provider subject to mint the key for.
+   *
+   * User-scoped endpoints populate this with your own subject.
    */
   user_id?: string | null;
+};
+
+/**
+ * Create Wallet Request
+ */
+export type CreateWalletRequest = {
+  /**
+   * Owning account ID
+   */
+  account_id: string;
+  /**
+   * Asset ID to enable for the account
+   */
+  asset_id: string;
 };
 
 /**
@@ -796,16 +865,6 @@ export type RegisterLnAddressRequest = {
 };
 
 /**
- * Register Wallet Request
- */
-export type RegisterWalletRequest = {
-  /**
-   * User ID. Should ideally be registered in your Auth provider.
-   */
-  user_id: string;
-};
-
-/**
  * Send Payment Request
  */
 export type SendPaymentRequest = {
@@ -912,6 +971,15 @@ export type VersionInfo = {
  */
 export type Wallet = {
   /**
+   * Owning account ID
+   */
+  account_id: string;
+  asset?: null | Asset;
+  /**
+   * Spendable asset held by this wallet
+   */
+  asset_id: string;
+  /**
    * User Balance
    */
   balance: Balance;
@@ -935,6 +1003,10 @@ export type Wallet = {
    * List of Invoices
    */
   invoices: Array<Invoice>;
+  /**
+   * Optional account-specific display label.
+   */
+  label?: string | null;
   ln_address?: null | LnAddress;
   /**
    * List of payments
@@ -944,16 +1016,21 @@ export type Wallet = {
    * Date of update in database
    */
   updated_at?: Date | null;
-  /**
-   * User ID. Populated from the Authentication method,  such as JWT subject
-   */
-  user_id: string;
 };
 
 /**
  * A lightweight wallet summary with counts in place of the full lists.
  */
 export type WalletOverview = {
+  /**
+   * Owning account ID
+   */
+  account_id: string;
+  asset?: null | Asset;
+  /**
+   * Spendable asset held by this wallet
+   */
+  asset_id: string;
   /**
    * User Balance
    */
@@ -966,6 +1043,10 @@ export type WalletOverview = {
    * Internal ID
    */
   id: string;
+  /**
+   * Optional account-specific display label.
+   */
+  label?: string | null;
   ln_address?: null | LnAddress;
   /**
    * Number of contacts
@@ -983,10 +1064,6 @@ export type WalletOverview = {
    * Date of update in database
    */
   updated_at?: Date | null;
-  /**
-   * User ID. Populated from the Authentication method,  such as JWT subject
-   */
-  user_id: string;
 };
 
 export type WellKnownData = {
@@ -1119,9 +1196,15 @@ export type RevokeApiKeysData = {
      */
     ids?: Array<string> | null;
     /**
-     * User ID. Automatically populated with your ID
+     * Auth provider subject to filter by.
+     *
+     * User-scoped endpoints populate this with your own subject.
      */
     user_id?: string | null;
+    /**
+     * Owning account ID.
+     */
+    account_id?: string | null;
     /**
      * Direction of the ordering of results
      */
@@ -1177,9 +1260,15 @@ export type ListApiKeysData = {
      */
     ids?: Array<string> | null;
     /**
-     * User ID. Automatically populated with your ID
+     * Auth provider subject to filter by.
+     *
+     * User-scoped endpoints populate this with your own subject.
      */
     user_id?: string | null;
+    /**
+     * Owning account ID.
+     */
+    account_id?: string | null;
     /**
      * Direction of the ordering of results
      */
@@ -2344,9 +2433,15 @@ export type RevokeWalletApiKeysData = {
      */
     ids?: Array<string> | null;
     /**
-     * User ID. Automatically populated with your ID
+     * Auth provider subject to filter by.
+     *
+     * User-scoped endpoints populate this with your own subject.
      */
     user_id?: string | null;
+    /**
+     * Owning account ID.
+     */
+    account_id?: string | null;
     /**
      * Direction of the ordering of results
      */
@@ -2399,9 +2494,15 @@ export type ListWalletApiKeysData = {
      */
     ids?: Array<string> | null;
     /**
-     * User ID. Automatically populated with your ID
+     * Auth provider subject to filter by.
+     *
+     * User-scoped endpoints populate this with your own subject.
      */
     user_id?: string | null;
+    /**
+     * Owning account ID.
+     */
+    account_id?: string | null;
     /**
      * Direction of the ordering of results
      */
@@ -3618,9 +3719,13 @@ export type DeleteWalletsData = {
      */
     ids?: Array<string> | null;
     /**
-     * User ID. Automatically populated with your ID
+     * Owning account ID
      */
-    user_id?: string | null;
+    account_id?: string | null;
+    /**
+     * Asset ID
+     */
+    asset_id?: string | null;
     /**
      * Direction of the ordering of results
      */
@@ -3697,7 +3802,7 @@ export type ListWalletsResponses = {
 export type ListWalletsResponse = ListWalletsResponses[keyof ListWalletsResponses];
 
 export type RegisterWalletData = {
-  body: RegisterWalletRequest;
+  body: CreateWalletRequest;
   path?: never;
   query?: never;
   url: '/v1/wallets';

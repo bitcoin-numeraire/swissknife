@@ -19,7 +19,6 @@ pub struct AppStore {
     pub invoice: Arc<dyn InvoiceRepository>,
     pub wallet: Arc<dyn WalletRepository>,
     pub account: Arc<dyn AccountRepository>,
-    #[allow(dead_code)]
     pub asset: Arc<dyn AssetRepository>,
     pub api_key: Arc<dyn ApiKeyRepository>,
     pub config: Arc<dyn ConfigRepository>,

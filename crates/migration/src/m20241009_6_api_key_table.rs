@@ -1,7 +1,5 @@
 use sea_orm_migration::{prelude::*, schema::*};
 
-use crate::m20240420_1_wallet_table::Wallet;
-
 #[derive(DeriveMigrationName)]
 pub struct Migration;
 
@@ -21,27 +19,13 @@ impl MigrationTrait for Migration {
                     .col(text_null(ApiKey::Description))
                     .col(timestamp(ApiKey::CreatedAt).default(Expr::current_timestamp()))
                     .col(timestamp_null(ApiKey::ExpiresAt))
-                    .foreign_key(
-                        ForeignKey::create()
-                            .from(ApiKey::Table, ApiKey::UserId)
-                            .to(Wallet::Table, Wallet::UserId)
-                            .on_delete(ForeignKeyAction::Cascade),
-                    )
                     .to_owned(),
             )
             .await
     }
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        manager
-            .drop_table(Table::drop().table(ApiKey::Table).to_owned())
-            .await?;
-
-        manager
-            .drop_foreign_key(ForeignKey::drop().table(ApiKey::Table).to_owned())
-            .await?;
-
-        Ok(())
+        manager.drop_table(Table::drop().table(ApiKey::Table).to_owned()).await
     }
 }
 

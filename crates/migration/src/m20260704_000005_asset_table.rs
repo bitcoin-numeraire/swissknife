@@ -149,7 +149,7 @@ async fn seed_assets(db: &dyn ConnectionTrait) -> Result<(), DbErr> {
                 decimals,
                 created_at
             )
-            VALUES (
+            SELECT
                 {id},
                 '{code}',
                 '{name}',
@@ -159,8 +159,13 @@ async fn seed_assets(db: &dyn ConnectionTrait) -> Result<(), DbErr> {
                 '{display_ticker}',
                 {decimals},
                 CURRENT_TIMESTAMP
+            WHERE NOT EXISTS (
+                SELECT 1
+                FROM asset
+                WHERE protocol = '{protocol}'
+                  AND network = '{network}'
+                  AND asset_ref = '{asset_ref}'
             )
-            ON CONFLICT(protocol, network, asset_ref) DO NOTHING
             "#,
             id = id,
             code = sql_literal(asset.code),

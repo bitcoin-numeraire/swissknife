@@ -1274,7 +1274,7 @@ export const listWallets = <ThrowOnError extends boolean = false>(
 /**
  * Register a new wallet
  *
- * Returns the generated wallet for the given user
+ * Returns the account asset wallet.
  */
 export const registerWallet = <ThrowOnError extends boolean = false>(
   options: Options<RegisterWalletData, ThrowOnError>

@@ -226,7 +226,7 @@ where
         Ok(overviews)
     }
 
-    async fn ensure_for_account_asset(&self, account_id: Uuid, asset_id: Uuid) -> Result<Wallet, DatabaseError> {
+    async fn upsert(&self, account_id: Uuid, asset_id: Uuid) -> Result<Wallet, DatabaseError> {
         if let Some(wallet) = self.find_by_account_and_asset(account_id, asset_id).await? {
             return Ok(wallet);
         }
@@ -235,7 +235,7 @@ where
         let id = Uuid::new_v4();
         let model = ActiveModel {
             id: Set(id),
-            user_id: Set(legacy_user_id(account_id, asset_id)),
+            user_id: Set(id.to_string()),
             account_id: Set(account_id),
             asset_id: Set(asset_id),
             available_amount: Set(0),
@@ -355,8 +355,4 @@ where
         wallet.balance = self.get_balance(wallet.id).await?;
         Ok(wallet)
     }
-}
-
-fn legacy_user_id(account_id: Uuid, asset_id: Uuid) -> String {
-    format!("{account_id}:{asset_id}")
 }

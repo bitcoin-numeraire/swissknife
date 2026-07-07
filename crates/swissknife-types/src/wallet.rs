@@ -46,20 +46,27 @@ pub struct Contact {
 pub struct Asset {
     /// Internal asset ID
     pub id: Uuid,
-    /// Display code, such as BTC or USDT
+    /// Stable server asset code, independent of network-specific UI ticker.
+    #[schema(example = "BTC")]
     pub code: String,
     /// Optional display name
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(example = "Bitcoin")]
     pub name: Option<String>,
     /// Settlement protocol, such as bitcoin or taproot_assets
+    #[schema(example = "bitcoin")]
     pub protocol: String,
     /// Settlement network, such as bitcoin/mainnet or bitcoin/regtest
+    #[schema(example = "bitcoin/mainnet")]
     pub network: String,
     /// Protocol-specific asset reference; native for chain-native BTC
+    #[schema(example = "native")]
     pub asset_ref: String,
-    /// Display ticker, such as BTC, tBTC, or rBTC
+    /// UI ticker for the specific network, such as BTC, tBTC, or rBTC.
+    #[schema(example = "BTC")]
     pub display_ticker: String,
     /// Integer storage scale for this asset
+    #[schema(example = 11)]
     pub decimals: i16,
     /// Date of creation in database
     pub created_at: DateTime<Utc>,
@@ -77,10 +84,10 @@ pub struct Wallet {
     pub account_id: Uuid,
     /// Spendable asset held by this wallet
     pub asset_id: Uuid,
-    /// Asset metadata, when loaded by the repository
+    /// Asset metadata for this wallet, when included in the response.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub asset: Option<Asset>,
-    /// Optional display label
+    /// Optional account-specific display label.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub label: Option<String>,
     /// Lightning Address
@@ -111,10 +118,10 @@ pub struct WalletOverview {
     pub account_id: Uuid,
     /// Spendable asset held by this wallet
     pub asset_id: Uuid,
-    /// Asset metadata, when loaded by the repository
+    /// Asset metadata for this wallet, when included in the response.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub asset: Option<Asset>,
-    /// Optional display label
+    /// Optional account-specific display label.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub label: Option<String>,
     /// Lightning Address

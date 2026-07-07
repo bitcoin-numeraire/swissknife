@@ -23,7 +23,7 @@ impl WalletUseCases for WalletService {
     async fn create(&self, account_id: Uuid, asset_id: Uuid) -> Result<Wallet, ApplicationError> {
         debug!(%account_id, %asset_id, "Creating account asset wallet");
 
-        let wallet = self.store.wallet.ensure_for_account_asset(account_id, asset_id).await?;
+        let wallet = self.store.wallet.upsert(account_id, asset_id).await?;
 
         info!(id = %wallet.id, %account_id, %asset_id, "Wallet created or already existed");
         Ok(wallet)
@@ -136,7 +136,7 @@ mod tests {
             let mut store = MockAppStoreBuilder::new();
             store
                 .wallet
-                .expect_ensure_for_account_asset()
+                .expect_upsert()
                 .withf(move |account, asset| *account == account_id && *asset == asset_id)
                 .times(1)
                 .returning(move |account, asset| Ok(wallet_fixture(wallet_id, account, asset)));

@@ -91,7 +91,7 @@ async fn seed_wallet(conn: &DatabaseConnection, balance_msat: u64) -> Uuid {
         .expect("find native BTC asset")
         .expect("native BTC asset");
     let wallet = SeaOrmWalletRepository::new(conn.clone())
-        .ensure_for_account_asset(Uuid::new_v4(), asset.id)
+        .upsert(Uuid::new_v4(), asset.id)
         .await
         .expect("ensure wallet");
     if balance_msat > 0 {

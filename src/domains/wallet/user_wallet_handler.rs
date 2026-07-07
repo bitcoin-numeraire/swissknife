@@ -636,7 +636,7 @@ async fn get_wallet_api_key(
     let api_keys = services
         .api_key
         .list(ApiKeyFilter {
-            user_id: Some(user.id),
+            account_id: Some(user.account_id),
             ids: Some(vec![id]),
             ..Default::default()
         })
@@ -671,7 +671,7 @@ async fn list_wallet_api_keys(
     user: User,
     Query(mut filter): Query<ApiKeyFilter>,
 ) -> Result<Json<Vec<ApiKey>>, ApplicationError> {
-    filter.user_id = Some(user.id);
+    filter.account_id = Some(user.account_id);
     let api_keys = services.api_key.list(filter).await?;
 
     Ok(Json(api_keys))
@@ -701,7 +701,7 @@ async fn revoke_wallet_api_key(
     let n_revoked = services
         .api_key
         .revoke_many(ApiKeyFilter {
-            user_id: Some(user.id),
+            account_id: Some(user.account_id),
             ids: Some(vec![id]),
             ..Default::default()
         })
@@ -735,7 +735,7 @@ async fn revoke_wallet_api_keys(
     user: User,
     Query(mut filter): Query<ApiKeyFilter>,
 ) -> Result<Json<u64>, ApplicationError> {
-    filter.user_id = Some(user.id);
+    filter.account_id = Some(user.account_id);
     let n_revoked = services.api_key.revoke_many(filter).await?;
     Ok(n_revoked.into())
 }

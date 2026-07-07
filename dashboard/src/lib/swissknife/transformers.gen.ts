@@ -173,6 +173,14 @@ export const updateAddressResponseTransformer = async (
   return data;
 };
 
+const assetSchemaResponseTransformer = (data: any) => {
+  data.created_at = new Date(data.created_at);
+  if (data.updated_at) {
+    data.updated_at = new Date(data.updated_at);
+  }
+  return data;
+};
+
 const contactSchemaResponseTransformer = (data: any) => {
   data.contact_since = new Date(data.contact_since);
   return data;
@@ -190,6 +198,9 @@ const paymentSchemaResponseTransformer = (data: any) => {
 };
 
 const walletSchemaResponseTransformer = (data: any) => {
+  if (data.asset) {
+    data.asset = assetSchemaResponseTransformer(data.asset);
+  }
   data.btc_addresses = data.btc_addresses.map((item: any) =>
     btcAddressSchemaResponseTransformer(item)
   );
@@ -344,6 +355,9 @@ export const registerWalletResponseTransformer = async (
 };
 
 const walletOverviewSchemaResponseTransformer = (data: any) => {
+  if (data.asset) {
+    data.asset = assetSchemaResponseTransformer(data.asset);
+  }
   data.created_at = new Date(data.created_at);
   if (data.ln_address) {
     data.ln_address = lnAddressSchemaResponseTransformer(data.ln_address);

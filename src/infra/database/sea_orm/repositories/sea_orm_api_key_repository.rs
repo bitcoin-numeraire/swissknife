@@ -54,6 +54,9 @@ impl ApiKeyRepository for SeaOrmApiKeyRepository {
     async fn find_many(&self, filter: ApiKeyFilter) -> Result<Vec<ApiKey>, DatabaseError> {
         let models = ApiKeyEntity::find()
             .apply_if(filter.user_id, |q, user| q.filter(Column::UserId.eq(user)))
+            .apply_if(filter.account_id, |q, account_id| {
+                q.filter(Column::AccountId.eq(account_id))
+            })
             .apply_if(filter.ids, |q, ids| q.filter(Column::Id.is_in(ids)))
             .order_by(
                 Column::CreatedAt,
@@ -95,6 +98,9 @@ impl ApiKeyRepository for SeaOrmApiKeyRepository {
     async fn delete_many(&self, filter: ApiKeyFilter) -> Result<u64, DatabaseError> {
         let result = ApiKeyEntity::delete_many()
             .apply_if(filter.user_id, |q, user| q.filter(Column::UserId.eq(user)))
+            .apply_if(filter.account_id, |q, account_id| {
+                q.filter(Column::AccountId.eq(account_id))
+            })
             .apply_if(filter.ids, |q, ids| q.filter(Column::Id.is_in(ids)))
             .exec(&self.db)
             .await

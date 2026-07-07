@@ -8,7 +8,7 @@ use uuid::Uuid;
 use swissknife_types::CreateApiKeyRequest;
 
 use crate::application::{
-    composition::AppStore,
+    composition::{AppStore, AuthProvider},
     errors::{ApplicationError, DataError},
 };
 
@@ -18,11 +18,12 @@ const MAX_ALLOWED_EXPIRY_SECONDS: u32 = 31_536_000; // 1 year in seconds
 
 pub struct ApiKeyService {
     store: AppStore,
+    provider: AuthProvider,
 }
 
 impl ApiKeyService {
-    pub fn new(store: AppStore) -> Self {
-        ApiKeyService { store }
+    pub fn new(store: AppStore, provider: AuthProvider) -> Self {
+        ApiKeyService { store, provider }
     }
 }
 
@@ -47,14 +48,24 @@ impl ApiKeyUseCases for ApiKeyService {
             None => None,
         };
 
+        let target_user_id = request
+            .user_id
+            .as_deref()
+            .ok_or_else(|| DataError::Validation("user_id is required".to_string()))?;
+        let target_account_id = if target_user_id == user.id {
+            user.account_id
+        } else {
+            self.store.account.upsert(self.provider, target_user_id, &[]).await?.id
+        };
+
         // Generate a new API key
         let bytes: [u8; 32] = rand::random();
         let api_key_plain = BASE64_STANDARD.encode(bytes);
         let key_hash = sha256::Hash::hash(&bytes).to_byte_array().to_vec();
 
         let api_key = ApiKey {
-            user_id: request.user_id.expect("user_id should be defined"),
-            account_id: user.account_id,
+            user_id: target_user_id.to_string(),
+            account_id: target_account_id,
             name: request.name,
             key_hash,
             permissions: request.permissions.clone(),
@@ -127,7 +138,7 @@ impl ApiKeyUseCases for ApiKeyService {
 mod tests {
     use crate::{
         application::{composition::MockAppStoreBuilder, errors::DatabaseError},
-        domains::user::Permission,
+        domains::user::{Account, Permission},
     };
 
     use super::*;
@@ -175,7 +186,7 @@ mod tests {
                     .times(1)
                     .returning(Ok);
 
-                let service = ApiKeyService::new(store.build());
+                let service = ApiKeyService::new(store.build(), AuthProvider::Jwt);
 
                 let api_key = service
                     .generate(user, create_request(vec![Permission::ReadWallet], None))
@@ -183,6 +194,49 @@ mod tests {
                     .unwrap();
 
                 // The plaintext secret is only attached on creation.
+                assert!(api_key.key.is_some());
+            }
+        }
+
+        mod for_another_subject {
+            use super::*;
+
+            #[tokio::test]
+            async fn attaches_the_key_to_the_target_account() {
+                let user = user_with(vec![Permission::ReadWallet, Permission::WriteWallet]);
+                let target_account_id = Uuid::new_v4();
+                let mut request = create_request(vec![Permission::ReadWallet], None);
+                request.user_id = Some("bob".to_string());
+
+                let mut store = MockAppStoreBuilder::new();
+                store
+                    .account
+                    .expect_upsert()
+                    .withf(|provider, subject, permissions| {
+                        *provider == AuthProvider::Jwt && subject == "bob" && permissions.is_empty()
+                    })
+                    .times(1)
+                    .returning(move |_, _, _| {
+                        Ok(Account {
+                            id: target_account_id,
+                            ..Default::default()
+                        })
+                    });
+                store
+                    .api_key
+                    .expect_insert()
+                    .withf(move |api_key| {
+                        api_key.user_id == "bob"
+                            && api_key.account_id == target_account_id
+                            && api_key.permissions == vec![Permission::ReadWallet]
+                    })
+                    .times(1)
+                    .returning(Ok);
+
+                let service = ApiKeyService::new(store.build(), AuthProvider::Jwt);
+
+                let api_key = service.generate(user, request).await.unwrap();
+
                 assert!(api_key.key.is_some());
             }
         }
@@ -200,7 +254,7 @@ mod tests {
                     .times(1)
                     .returning(Ok);
 
-                let service = ApiKeyService::new(store.build());
+                let service = ApiKeyService::new(store.build(), AuthProvider::Jwt);
 
                 let api_key = service
                     .generate(
@@ -220,7 +274,7 @@ mod tests {
             #[tokio::test]
             async fn rejects_with_validation_error() {
                 // No insert expected: the request must be rejected before persistence.
-                let service = ApiKeyService::new(MockAppStoreBuilder::new().build());
+                let service = ApiKeyService::new(MockAppStoreBuilder::new().build(), AuthProvider::Jwt);
 
                 let err = service
                     .generate(
@@ -239,7 +293,7 @@ mod tests {
 
             #[tokio::test]
             async fn rejects_with_validation_error() {
-                let service = ApiKeyService::new(MockAppStoreBuilder::new().build());
+                let service = ApiKeyService::new(MockAppStoreBuilder::new().build(), AuthProvider::Jwt);
 
                 let err = service
                     .generate(
@@ -265,7 +319,7 @@ mod tests {
                     .times(1)
                     .returning(|_| Err(DatabaseError::Insert("boom".to_string())));
 
-                let service = ApiKeyService::new(store.build());
+                let service = ApiKeyService::new(store.build(), AuthProvider::Jwt);
 
                 let err = service
                     .generate(
@@ -298,7 +352,7 @@ mod tests {
                     }))
                 });
 
-                let service = ApiKeyService::new(store.build());
+                let service = ApiKeyService::new(store.build(), AuthProvider::Jwt);
 
                 assert_eq!(service.get(id).await.unwrap().id, id);
             }
@@ -312,7 +366,7 @@ mod tests {
                 let mut store = MockAppStoreBuilder::new();
                 store.api_key.expect_find().times(1).returning(|_| Ok(None));
 
-                let service = ApiKeyService::new(store.build());
+                let service = ApiKeyService::new(store.build(), AuthProvider::Jwt);
 
                 let err = service.get(Uuid::new_v4()).await.unwrap_err();
 
@@ -332,7 +386,7 @@ mod tests {
                 let mut store = MockAppStoreBuilder::new();
                 store.api_key.expect_delete_many().times(1).returning(|_| Ok(1));
 
-                let service = ApiKeyService::new(store.build());
+                let service = ApiKeyService::new(store.build(), AuthProvider::Jwt);
 
                 assert!(service.revoke(Uuid::new_v4()).await.is_ok());
             }
@@ -346,7 +400,7 @@ mod tests {
                 let mut store = MockAppStoreBuilder::new();
                 store.api_key.expect_delete_many().times(1).returning(|_| Ok(0));
 
-                let service = ApiKeyService::new(store.build());
+                let service = ApiKeyService::new(store.build(), AuthProvider::Jwt);
 
                 let err = service.revoke(Uuid::new_v4()).await.unwrap_err();
 
@@ -363,7 +417,7 @@ mod tests {
             let mut store = MockAppStoreBuilder::new();
             store.api_key.expect_delete_many().times(1).returning(|_| Ok(4));
 
-            let service = ApiKeyService::new(store.build());
+            let service = ApiKeyService::new(store.build(), AuthProvider::Jwt);
 
             assert_eq!(service.revoke_many(ApiKeyFilter::default()).await.unwrap(), 4);
         }

@@ -3,6 +3,25 @@
 import * as z from 'zod';
 
 /**
+ * A spendable asset on one protocol/network.
+ */
+export const zAsset = z.object({
+  asset_ref: z.string(),
+  code: z.string(),
+  created_at: z.iso.datetime(),
+  decimals: z
+    .int()
+    .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
+    .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
+  display_ticker: z.string(),
+  id: z.uuid(),
+  name: z.string().nullish(),
+  network: z.string(),
+  protocol: z.string(),
+  updated_at: z.iso.datetime().nullish(),
+});
+
+/**
  * A wallet's balance, in millisatoshis.
  */
 export const zBalance = z.object({
@@ -14,18 +33,30 @@ export const zBalance = z.object({
     .max(BigInt('9223372036854775807'), {
       error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
     }),
-  fees_paid_msat: z.coerce.bigint().gte(BigInt(0)).max(BigInt('9223372036854775807'), {
-    error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
-  }),
-  received_msat: z.coerce.bigint().gte(BigInt(0)).max(BigInt('9223372036854775807'), {
-    error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
-  }),
-  reserved_msat: z.coerce.bigint().gte(BigInt(0)).max(BigInt('9223372036854775807'), {
-    error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
-  }),
-  sent_msat: z.coerce.bigint().gte(BigInt(0)).max(BigInt('9223372036854775807'), {
-    error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
-  }),
+  fees_paid_msat: z.coerce
+    .bigint()
+    .gte(BigInt(0))
+    .max(BigInt('9223372036854775807'), {
+      error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
+    }),
+  received_msat: z.coerce
+    .bigint()
+    .gte(BigInt(0))
+    .max(BigInt('9223372036854775807'), {
+      error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
+    }),
+  reserved_msat: z.coerce
+    .bigint()
+    .gte(BigInt(0))
+    .max(BigInt('9223372036854775807'), {
+      error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
+    }),
+  sent_msat: z.coerce
+    .bigint()
+    .gte(BigInt(0))
+    .max(BigInt('9223372036854775807'), {
+      error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
+    }),
 });
 
 /**
@@ -68,9 +99,12 @@ export const zBtcOutputStatus = z.enum(['Unconfirmed', 'Confirmed', 'Spent', 'Im
  */
 export const zBtcOutput = z.object({
   address: z.string(),
-  amount_sat: z.coerce.bigint().gte(BigInt(0)).max(BigInt('9223372036854775807'), {
-    error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
-  }),
+  amount_sat: z.coerce
+    .bigint()
+    .gte(BigInt(0))
+    .max(BigInt('9223372036854775807'), {
+      error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
+    }),
   block_height: z
     .int()
     .gte(0)
@@ -110,6 +144,14 @@ export const zChangePasswordRequest = z.object({
 export const zContact = z.object({
   contact_since: z.iso.datetime(),
   ln_address: z.string(),
+});
+
+/**
+ * Create Wallet Request
+ */
+export const zCreateWalletRequest = z.object({
+  account_id: z.uuid(),
+  asset_id: z.uuid(),
 });
 
 /**
@@ -184,12 +226,18 @@ export const zLnInvoice = z.object({
   bolt11: z.string(),
   description_hash: z.string().nullish(),
   expires_at: z.iso.datetime(),
-  expiry: z.coerce.bigint().gte(BigInt(0)).max(BigInt('9223372036854775807'), {
-    error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
-  }),
-  min_final_cltv_expiry_delta: z.coerce.bigint().gte(BigInt(0)).max(BigInt('9223372036854775807'), {
-    error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
-  }),
+  expiry: z.coerce
+    .bigint()
+    .gte(BigInt(0))
+    .max(BigInt('9223372036854775807'), {
+      error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
+    }),
+  min_final_cltv_expiry_delta: z.coerce
+    .bigint()
+    .gte(BigInt(0))
+    .max(BigInt('9223372036854775807'), {
+      error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
+    }),
   payee_pubkey: z.string(),
   payment_hash: z.string(),
   payment_secret: z.string(),
@@ -245,13 +293,19 @@ export const zLnUrlPayRequest = z.object({
     .int()
     .gte(0)
     .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
-  maxSendable: z.coerce.bigint().gte(BigInt(0)).max(BigInt('9223372036854775807'), {
-    error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
-  }),
+  maxSendable: z.coerce
+    .bigint()
+    .gte(BigInt(0))
+    .max(BigInt('9223372036854775807'), {
+      error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
+    }),
   metadata: z.string(),
-  minSendable: z.coerce.bigint().gte(BigInt(0)).max(BigInt('9223372036854775807'), {
-    error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
-  }),
+  minSendable: z.coerce
+    .bigint()
+    .gte(BigInt(0))
+    .max(BigInt('9223372036854775807'), {
+      error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
+    }),
   nostrPubkey: z.string().nullish(),
   tag: z.string(),
 });
@@ -300,9 +354,12 @@ export const zNewBtcAddressRequest = z.object({
  * New Invoice Request
  */
 export const zNewInvoiceRequest = z.object({
-  amount_msat: z.coerce.bigint().gte(BigInt(0)).max(BigInt('9223372036854775807'), {
-    error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
-  }),
+  amount_msat: z.coerce
+    .bigint()
+    .gte(BigInt(0))
+    .max(BigInt('9223372036854775807'), {
+      error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
+    }),
   description: z.string().nullish(),
   expiry: z
     .int()
@@ -333,9 +390,12 @@ export const zPaymentStatus = z.enum(['Pending', 'Settled', 'Failed']);
  * An outgoing payment, over Lightning, on-chain, or internal to the instance.
  */
 export const zPayment = z.object({
-  amount_msat: z.coerce.bigint().gte(BigInt(0)).max(BigInt('9223372036854775807'), {
-    error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
-  }),
+  amount_msat: z.coerce
+    .bigint()
+    .gte(BigInt(0))
+    .max(BigInt('9223372036854775807'), {
+      error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
+    }),
   bitcoin: zBtcPayment.nullish(),
   created_at: z.iso.datetime(),
   currency: zCurrency,
@@ -380,6 +440,7 @@ export const zPermission = z.enum([
  * API Key
  */
 export const zApiKey = z.object({
+  account_id: z.uuid(),
   created_at: z.iso.datetime(),
   description: z.string().nullish(),
   expires_at: z.iso.datetime().nullish(),
@@ -413,13 +474,6 @@ export const zRegisterLnAddressRequest = z.object({
   nostr_pubkey: z.string().nullish(),
   username: z.string(),
   wallet_id: z.uuid().nullish(),
-});
-
-/**
- * Register Wallet Request
- */
-export const zRegisterWalletRequest = z.object({
-  user_id: z.string(),
 });
 
 /**
@@ -489,25 +543,32 @@ export const zVersionInfo = z.object({
  * A user wallet with its balance and linked payments, invoices, Bitcoin addresses and contacts.
  */
 export const zWallet = z.object({
+  account_id: z.uuid(),
+  asset: zAsset.nullish(),
+  asset_id: z.uuid(),
   balance: zBalance,
   btc_addresses: z.array(zBtcAddress),
   contacts: z.array(zContact),
   created_at: z.iso.datetime(),
   id: z.uuid(),
   invoices: z.array(zInvoice),
+  label: z.string().nullish(),
   ln_address: zLnAddress.nullish(),
   payments: z.array(zPayment),
   updated_at: z.iso.datetime().nullish(),
-  user_id: z.string(),
 });
 
 /**
  * A lightweight wallet summary with counts in place of the full lists.
  */
 export const zWalletOverview = z.object({
+  account_id: z.uuid(),
+  asset: zAsset.nullish(),
+  asset_id: z.uuid(),
   balance: zBalance,
   created_at: z.iso.datetime(),
   id: z.uuid(),
+  label: z.string().nullish(),
   ln_address: zLnAddress.nullish(),
   n_contacts: z
     .int()
@@ -522,7 +583,6 @@ export const zWalletOverview = z.object({
     .gte(0)
     .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
   updated_at: z.iso.datetime().nullish(),
-  user_id: z.string(),
 });
 
 export const zWellKnownPath = z.object({
@@ -548,9 +608,12 @@ export const zCallbackPath = z.object({
 });
 
 export const zCallbackQuery = z.object({
-  amount: z.coerce.bigint().gte(BigInt(0)).max(BigInt('9223372036854775807'), {
-    error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
-  }),
+  amount: z.coerce
+    .bigint()
+    .gte(BigInt(0))
+    .max(BigInt('9223372036854775807'), {
+      error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
+    }),
   comment: z.string().nullish(),
 });
 
@@ -576,6 +639,7 @@ export const zRevokeApiKeysQuery = z.object({
     .nullish(),
   ids: z.array(z.uuid()).nullish(),
   user_id: z.string().nullish(),
+  account_id: z.uuid().nullish(),
   order_direction: zOrderDirection.optional(),
 });
 
@@ -606,6 +670,7 @@ export const zListApiKeysQuery = z.object({
     .nullish(),
   ids: z.array(z.uuid()).nullish(),
   user_id: z.string().nullish(),
+  account_id: z.uuid().nullish(),
   order_direction: zOrderDirection.optional(),
 });
 
@@ -929,6 +994,7 @@ export const zRevokeWalletApiKeysQuery = z.object({
     .nullish(),
   ids: z.array(z.uuid()).nullish(),
   user_id: z.string().nullish(),
+  account_id: z.uuid().nullish(),
   order_direction: zOrderDirection.optional(),
 });
 
@@ -959,6 +1025,7 @@ export const zListWalletApiKeysQuery = z.object({
     .nullish(),
   ids: z.array(z.uuid()).nullish(),
   user_id: z.string().nullish(),
+  account_id: z.uuid().nullish(),
   order_direction: zOrderDirection.optional(),
 });
 
@@ -1284,7 +1351,8 @@ export const zDeleteWalletsQuery = z.object({
     })
     .nullish(),
   ids: z.array(z.uuid()).nullish(),
-  user_id: z.string().nullish(),
+  account_id: z.uuid().nullish(),
+  asset_id: z.uuid().nullish(),
   order_direction: zOrderDirection.optional(),
 });
 
@@ -1303,7 +1371,7 @@ export const zDeleteWalletsResponse = z.coerce
  */
 export const zListWalletsResponse = z.array(zWallet);
 
-export const zRegisterWalletBody = zRegisterWalletRequest;
+export const zRegisterWalletBody = zCreateWalletRequest;
 
 /**
  * Wallet Created

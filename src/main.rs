@@ -45,7 +45,13 @@ async fn main() {
         }
     };
 
-    let services = Arc::new(AppServices::new(config.clone(), adapters.clone()));
+    let services = match AppServices::new(config.clone(), adapters.clone()).await {
+        Ok(services) => Arc::new(services),
+        Err(err) => {
+            error!(%err, "failed to create app services");
+            exit(1);
+        }
+    };
 
     let event_listener =
         match EventListener::new(config.clone(), adapters.bitcoin_wallet.clone(), services.clone()).await {
