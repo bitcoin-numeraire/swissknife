@@ -6,9 +6,7 @@ use uuid::Uuid;
 
 use crate::{
     application::errors::DatabaseError,
-    domains::user::{
-        Account, AccountPreferences, AccountRepository, AuthIdentity as AuthIdentityEntity, AuthProvider, Permission,
-    },
+    domains::user::{Account, AccountRepository, AuthProvider, Permission},
     infra::database::sea_orm::models::{
         account, account_preference, auth_identity,
         prelude::{Account as AccountEntity, AccountPreference, AuthIdentity},
@@ -80,8 +78,7 @@ impl AccountRepository for SeaOrmAccountRepository {
                 permissions.push(permission.clone());
             }
         }
-        let permissions_json =
-            serde_json::to_value(permissions.clone()).map_err(|e| DatabaseError::Insert(e.to_string()))?;
+        let permissions_json = serde_json::to_value(permissions).map_err(|e| DatabaseError::Insert(e.to_string()))?;
 
         let account_model = account::ActiveModel {
             id: Set(account_id),
@@ -90,7 +87,7 @@ impl AccountRepository for SeaOrmAccountRepository {
             ..Default::default()
         };
 
-        account_model
+        let account_model = account_model
             .insert(&tx)
             .await
             .map_err(|e| DatabaseError::Insert(e.to_string()))?;
@@ -102,7 +99,7 @@ impl AccountRepository for SeaOrmAccountRepository {
             ..Default::default()
         };
 
-        preference_model
+        let preference_model = preference_model
             .insert(&tx)
             .await
             .map_err(|e| DatabaseError::Insert(e.to_string()))?;
@@ -117,41 +114,31 @@ impl AccountRepository for SeaOrmAccountRepository {
 
         let identity_insert = identity_model.insert(&tx).await;
 
-        if let Err(err) = identity_insert {
-            // A concurrent first request can create this identity after the
-            // caller's read. The unique index rejects our duplicate insert;
-            // return the account that won the race.
-            tx.rollback()
-                .await
-                .map_err(|e| DatabaseError::Transaction(e.to_string()))?;
+        let identity_model = match identity_insert {
+            Ok(identity_model) => identity_model,
+            Err(err) => {
+                // A concurrent first request can create this identity after the
+                // caller's read. The unique index rejects our duplicate insert;
+                // return the account that won the race.
+                tx.rollback()
+                    .await
+                    .map_err(|e| DatabaseError::Transaction(e.to_string()))?;
 
-            return self
-                .find_by_identity(provider, subject)
-                .await?
-                .ok_or_else(|| DatabaseError::Insert(err.to_string()));
-        }
+                return self
+                    .find_by_identity(provider, subject)
+                    .await?
+                    .ok_or_else(|| DatabaseError::Insert(err.to_string()));
+            }
+        };
 
         tx.commit()
             .await
             .map_err(|e| DatabaseError::Transaction(e.to_string()))?;
 
-        Ok(Account {
-            id: account_id,
-            display_name: None,
-            identity: Some(AuthIdentityEntity {
-                id: identity_id,
-                provider,
-                subject: subject.to_string(),
-                created_at: now.and_utc(),
-            }),
-            permissions: Some(permissions),
-            preferences: Some(AccountPreferences {
-                dashboard_settings: json!({}),
-                created_at: now.and_utc(),
-                updated_at: None,
-            }),
-            created_at: now.and_utc(),
-            updated_at: None,
-        })
+        let mut account: Account = account_model.into();
+        account.identity = Some(identity_model.into());
+        account.preferences = Some(preference_model.into());
+
+        Ok(account)
     }
 }
