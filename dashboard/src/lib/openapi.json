@@ -276,15 +276,16 @@
             }
           },
           {
-            "name": "user_id",
+            "name": "account_id",
             "in": "query",
-            "description": "User ID. Automatically populated with your ID",
+            "description": "Owning account ID.\n\nUser-scoped endpoints populate this from the authenticated account.",
             "required": false,
             "schema": {
               "type": [
                 "string",
                 "null"
-              ]
+              ],
+              "format": "uuid"
             }
           },
           {
@@ -362,7 +363,7 @@
           "API Keys"
         ],
         "summary": "Generate a new API Key",
-        "description": "Returns the generated API Key for the given user. Users can create API keys with permissions as a subset of his current permissions.",
+        "description": "Returns the generated API Key for the requested account. Users can create API keys with permissions\nas a subset of their current permissions.",
         "operationId": "create_api_key",
         "requestBody": {
           "content": {
@@ -495,15 +496,16 @@
             }
           },
           {
-            "name": "user_id",
+            "name": "account_id",
             "in": "query",
-            "description": "User ID. Automatically populated with your ID",
+            "description": "Owning account ID.\n\nUser-scoped endpoints populate this from the authenticated account.",
             "required": false,
             "schema": {
               "type": [
                 "string",
                 "null"
-              ]
+              ],
+              "format": "uuid"
             }
           },
           {
@@ -2975,15 +2977,16 @@
             }
           },
           {
-            "name": "user_id",
+            "name": "account_id",
             "in": "query",
-            "description": "User ID. Automatically populated with your ID",
+            "description": "Owning account ID.\n\nUser-scoped endpoints populate this from the authenticated account.",
             "required": false,
             "schema": {
               "type": [
                 "string",
                 "null"
-              ]
+              ],
+              "format": "uuid"
             }
           },
           {
@@ -3050,7 +3053,7 @@
           "User Wallet"
         ],
         "summary": "Generate a new API Key",
-        "description": "Returns the generated API Key for the given user. Users can create API keys with permissions as a subset of his current permissions.",
+        "description": "Returns the generated API Key for the authenticated account. Users can create API keys with\npermissions as a subset of their current permissions.",
         "operationId": "create_wallet_api_key",
         "requestBody": {
           "content": {
@@ -3172,15 +3175,16 @@
             }
           },
           {
-            "name": "user_id",
+            "name": "account_id",
             "in": "query",
-            "description": "User ID. Automatically populated with your ID",
+            "description": "Owning account ID.\n\nUser-scoped endpoints populate this from the authenticated account.",
             "required": false,
             "schema": {
               "type": [
                 "string",
                 "null"
-              ]
+              ],
+              "format": "uuid"
             }
           },
           {
@@ -5602,13 +5606,13 @@
           "Wallets"
         ],
         "summary": "Register a new wallet",
-        "description": "Returns the generated wallet for the given user",
+        "description": "Returns the account asset wallet.",
         "operationId": "register_wallet",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/RegisterWalletRequest"
+                "$ref": "#/components/schemas/CreateWalletRequest"
               }
             }
           },
@@ -5735,15 +5739,29 @@
             }
           },
           {
-            "name": "user_id",
+            "name": "account_id",
             "in": "query",
-            "description": "User ID. Automatically populated with your ID",
+            "description": "Owning account ID.\n\nUser-scoped endpoints populate this from the authenticated account.",
             "required": false,
             "schema": {
               "type": [
                 "string",
                 "null"
-              ]
+              ],
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "asset_id",
+            "in": "query",
+            "description": "Asset ID",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "uuid"
             }
           },
           {
@@ -6060,12 +6078,17 @@
         "description": "API Key",
         "required": [
           "id",
-          "user_id",
+          "account_id",
           "name",
           "permissions",
           "created_at"
         ],
         "properties": {
+          "account_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Owning account ID"
+          },
           "created_at": {
             "type": "string",
             "format": "date-time",
@@ -6108,10 +6131,77 @@
               "$ref": "#/components/schemas/Permission"
             },
             "description": "List of permissions for this API key"
-          },
-          "user_id": {
+          }
+        }
+      },
+      "Asset": {
+        "type": "object",
+        "description": "A spendable asset on one protocol/network.",
+        "required": [
+          "id",
+          "code",
+          "protocol",
+          "network",
+          "asset_ref",
+          "display_ticker",
+          "decimals",
+          "created_at"
+        ],
+        "properties": {
+          "asset_ref": {
             "type": "string",
-            "description": "User ID"
+            "description": "Protocol-specific asset reference; native for chain-native BTC",
+            "example": "native"
+          },
+          "code": {
+            "type": "string",
+            "description": "Stable server asset code, independent of network-specific UI ticker.",
+            "example": "BTC"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Date of creation in database"
+          },
+          "decimals": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Integer storage scale for this asset",
+            "example": 11
+          },
+          "display_ticker": {
+            "type": "string",
+            "description": "UI ticker for the specific network, such as BTC, tBTC, or rBTC.",
+            "example": "BTC"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Internal asset ID"
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Optional display name",
+            "example": "Bitcoin"
+          },
+          "network": {
+            "$ref": "#/components/schemas/BtcNetwork",
+            "description": "Settlement network."
+          },
+          "protocol": {
+            "$ref": "#/components/schemas/Protocol",
+            "description": "Settlement protocol."
+          },
+          "updated_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "Date of update in database"
           }
         }
       },
@@ -6377,6 +6467,14 @@
           "permissions"
         ],
         "properties": {
+          "account_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "Owning account ID.\n\nUser-scoped endpoints populate this with your own account."
+          },
           "description": {
             "type": [
               "string",
@@ -6403,13 +6501,26 @@
               "$ref": "#/components/schemas/Permission"
             },
             "description": "List of permissions for this API key"
+          }
+        }
+      },
+      "CreateWalletRequest": {
+        "type": "object",
+        "description": "Create Wallet Request",
+        "required": [
+          "account_id",
+          "asset_id"
+        ],
+        "properties": {
+          "account_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Owning account ID"
           },
-          "user_id": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "User ID. Will be populated with your own ID by default"
+          "asset_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Asset ID to enable for the account"
           }
         }
       },
@@ -7201,6 +7312,14 @@
           "write:btc_address"
         ]
       },
+      "Protocol": {
+        "type": "string",
+        "description": "Asset settlement protocol.",
+        "enum": [
+          "bitcoin",
+          "taproot_assets"
+        ]
+      },
       "RegisterLnAddressRequest": {
         "type": "object",
         "description": "Register Lightning Address Request",
@@ -7231,19 +7350,6 @@
             ],
             "format": "uuid",
             "description": "Wallet ID. Will be populated with your own ID by default"
-          }
-        }
-      },
-      "RegisterWalletRequest": {
-        "type": "object",
-        "description": "Register Wallet Request",
-        "required": [
-          "user_id"
-        ],
-        "properties": {
-          "user_id": {
-            "type": "string",
-            "description": "User ID. Should ideally be registered in your Auth provider."
           }
         }
       },
@@ -7405,7 +7511,8 @@
         "description": "A user wallet with its balance and linked payments, invoices, Bitcoin addresses and contacts.",
         "required": [
           "id",
-          "user_id",
+          "account_id",
+          "asset_id",
           "balance",
           "payments",
           "invoices",
@@ -7414,6 +7521,27 @@
           "created_at"
         ],
         "properties": {
+          "account_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Owning account ID"
+          },
+          "asset": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Asset",
+                "description": "Asset metadata for this wallet, when included in the response."
+              }
+            ]
+          },
+          "asset_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Spendable asset held by this wallet"
+          },
           "balance": {
             "$ref": "#/components/schemas/Balance",
             "description": "User Balance"
@@ -7449,6 +7577,13 @@
             },
             "description": "List of Invoices"
           },
+          "label": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Optional account-specific display label."
+          },
           "ln_address": {
             "oneOf": [
               {
@@ -7474,10 +7609,6 @@
             ],
             "format": "date-time",
             "description": "Date of update in database"
-          },
-          "user_id": {
-            "type": "string",
-            "description": "User ID. Populated from the Authentication method,  such as JWT subject"
           }
         }
       },
@@ -7486,7 +7617,8 @@
         "description": "A lightweight wallet summary with counts in place of the full lists.",
         "required": [
           "id",
-          "user_id",
+          "account_id",
+          "asset_id",
           "balance",
           "n_payments",
           "n_invoices",
@@ -7494,6 +7626,27 @@
           "created_at"
         ],
         "properties": {
+          "account_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Owning account ID"
+          },
+          "asset": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Asset",
+                "description": "Asset metadata for this wallet, when included in the response."
+              }
+            ]
+          },
+          "asset_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Spendable asset held by this wallet"
+          },
           "balance": {
             "$ref": "#/components/schemas/Balance",
             "description": "User Balance"
@@ -7507,6 +7660,13 @@
             "type": "string",
             "format": "uuid",
             "description": "Internal ID"
+          },
+          "label": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Optional account-specific display label."
           },
           "ln_address": {
             "oneOf": [
@@ -7544,10 +7704,6 @@
             ],
             "format": "date-time",
             "description": "Date of update in database"
-          },
-          "user_id": {
-            "type": "string",
-            "description": "User ID. Populated from the Authentication method,  such as JWT subject"
           }
         }
       }

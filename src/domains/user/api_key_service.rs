@@ -29,7 +29,7 @@ impl ApiKeyService {
 #[async_trait]
 impl ApiKeyUseCases for ApiKeyService {
     async fn generate(&self, user: User, request: CreateApiKeyRequest) -> Result<ApiKey, ApplicationError> {
-        debug!(user_id = request.user_id, "Generating API key");
+        debug!(account_id = ?request.account_id, "Generating API key");
 
         // Validate that requested permissions are a subset of user's permissions
         if !request.permissions.iter().all(|p| user.has_permission(p.clone())) {
@@ -47,14 +47,15 @@ impl ApiKeyUseCases for ApiKeyService {
             None => None,
         };
 
+        let account_id = request.account_id.expect("account_id should be defined");
+
         // Generate a new API key
         let bytes: [u8; 32] = rand::random();
         let api_key_plain = BASE64_STANDARD.encode(bytes);
         let key_hash = sha256::Hash::hash(&bytes).to_byte_array().to_vec();
 
         let api_key = ApiKey {
-            user_id: request.user_id.expect("user_id should be defined"),
-            account_id: user.account_id,
+            account_id,
             name: request.name,
             key_hash,
             permissions: request.permissions.clone(),
@@ -135,7 +136,6 @@ mod tests {
     fn user_with(permissions: Vec<Permission>) -> User {
         User {
             account_id: Uuid::new_v4(),
-            id: "alice".to_string(),
             wallet_id: Uuid::new_v4(),
             permissions,
         }
@@ -143,7 +143,7 @@ mod tests {
 
     fn create_request(permissions: Vec<Permission>, expiry: Option<u32>) -> CreateApiKeyRequest {
         CreateApiKeyRequest {
-            user_id: Some("alice".to_string()),
+            account_id: None,
             name: "primary".to_string(),
             permissions,
             description: None,
@@ -161,13 +161,14 @@ mod tests {
             async fn inserts_key_and_returns_plaintext_secret() {
                 let user = user_with(vec![Permission::ReadWallet, Permission::WriteWallet]);
                 let account_id = user.account_id;
+                let mut request = create_request(vec![Permission::ReadWallet], None);
+                request.account_id = Some(account_id);
                 let mut store = MockAppStoreBuilder::new();
                 store
                     .api_key
                     .expect_insert()
                     .withf(move |api_key| {
-                        api_key.user_id == "alice"
-                            && api_key.account_id == account_id
+                        api_key.account_id == account_id
                             && api_key.permissions == vec![Permission::ReadWallet]
                             && api_key.expires_at.is_none()
                             && !api_key.key_hash.is_empty()
@@ -177,12 +178,37 @@ mod tests {
 
                 let service = ApiKeyService::new(store.build());
 
-                let api_key = service
-                    .generate(user, create_request(vec![Permission::ReadWallet], None))
-                    .await
-                    .unwrap();
+                let api_key = service.generate(user, request).await.unwrap();
 
                 // The plaintext secret is only attached on creation.
+                assert!(api_key.key.is_some());
+            }
+        }
+
+        mod for_an_explicit_account {
+            use super::*;
+
+            #[tokio::test]
+            async fn attaches_the_key_to_the_requested_account() {
+                let user = user_with(vec![Permission::ReadWallet, Permission::WriteWallet]);
+                let target_account_id = Uuid::new_v4();
+                let mut request = create_request(vec![Permission::ReadWallet], None);
+                request.account_id = Some(target_account_id);
+
+                let mut store = MockAppStoreBuilder::new();
+                store
+                    .api_key
+                    .expect_insert()
+                    .withf(move |api_key| {
+                        api_key.account_id == target_account_id && api_key.permissions == vec![Permission::ReadWallet]
+                    })
+                    .times(1)
+                    .returning(Ok);
+
+                let service = ApiKeyService::new(store.build());
+
+                let api_key = service.generate(user, request).await.unwrap();
+
                 assert!(api_key.key.is_some());
             }
         }
@@ -192,6 +218,10 @@ mod tests {
 
             #[tokio::test]
             async fn sets_an_expiration() {
+                let user = user_with(vec![Permission::ReadWallet]);
+                let account_id = user.account_id;
+                let mut request = create_request(vec![Permission::ReadWallet], Some(3_600));
+                request.account_id = Some(account_id);
                 let mut store = MockAppStoreBuilder::new();
                 store
                     .api_key
@@ -202,13 +232,7 @@ mod tests {
 
                 let service = ApiKeyService::new(store.build());
 
-                let api_key = service
-                    .generate(
-                        user_with(vec![Permission::ReadWallet]),
-                        create_request(vec![Permission::ReadWallet], Some(3_600)),
-                    )
-                    .await
-                    .unwrap();
+                let api_key = service.generate(user, request).await.unwrap();
 
                 assert!(api_key.expires_at.is_some());
             }
@@ -258,6 +282,10 @@ mod tests {
 
             #[tokio::test]
             async fn propagates_database_error() {
+                let user = user_with(vec![Permission::ReadWallet]);
+                let account_id = user.account_id;
+                let mut request = create_request(vec![Permission::ReadWallet], None);
+                request.account_id = Some(account_id);
                 let mut store = MockAppStoreBuilder::new();
                 store
                     .api_key
@@ -267,13 +295,7 @@ mod tests {
 
                 let service = ApiKeyService::new(store.build());
 
-                let err = service
-                    .generate(
-                        user_with(vec![Permission::ReadWallet]),
-                        create_request(vec![Permission::ReadWallet], None),
-                    )
-                    .await
-                    .unwrap_err();
+                let err = service.generate(user, request).await.unwrap_err();
 
                 assert!(matches!(err, ApplicationError::Database(DatabaseError::Insert(_))));
             }

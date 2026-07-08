@@ -328,7 +328,8 @@ export const listApiKeys = <ThrowOnError extends boolean = false>(
 /**
  * Generate a new API Key
  *
- * Returns the generated API Key for the given user. Users can create API keys with permissions as a subset of his current permissions.
+ * Returns the generated API Key for the requested account. Users can create API keys with permissions
+ * as a subset of their current permissions.
  */
 export const createApiKey = <ThrowOnError extends boolean = false>(
   options: Options<CreateApiKeyData, ThrowOnError>
@@ -746,7 +747,8 @@ export const listWalletApiKeys = <ThrowOnError extends boolean = false>(
 /**
  * Generate a new API Key
  *
- * Returns the generated API Key for the given user. Users can create API keys with permissions as a subset of his current permissions.
+ * Returns the generated API Key for the authenticated account. Users can create API keys with
+ * permissions as a subset of their current permissions.
  */
 export const createWalletApiKey = <ThrowOnError extends boolean = false>(
   options: Options<CreateWalletApiKeyData, ThrowOnError>
@@ -1274,7 +1276,7 @@ export const listWallets = <ThrowOnError extends boolean = false>(
 /**
  * Register a new wallet
  *
- * Returns the generated wallet for the given user
+ * Returns the account asset wallet.
  */
 export const registerWallet = <ThrowOnError extends boolean = false>(
   options: Options<RegisterWalletData, ThrowOnError>

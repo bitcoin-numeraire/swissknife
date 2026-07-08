@@ -5,12 +5,13 @@ use chrono::Utc;
 use crate::{
     application::composition::Ledger,
     domains::{
+        asset::Asset,
         bitcoin::{BtcAddress, BtcOutput},
         invoice::{Invoice, InvoiceStatus, LnInvoice},
         ln_address::LnAddress,
         payment::{BtcPayment, InternalPayment, LnPayment, Payment},
         user::{Account, AccountPreferences, ApiKey, AuthIdentity},
-        wallet::{Contact, Wallet},
+        wallet::{Balance, Contact, Wallet},
     },
 };
 
@@ -19,12 +20,29 @@ use swissknife_types::OrderDirection;
 
 use super::models::{
     account::Model as AccountModel, account_preference::Model as AccountPreferenceModel, api_key::Model as ApiKeyModel,
-    auth_identity::Model as AuthIdentityModel, btc_address::Model as BitcoinAddressModel,
+    asset::Model as AssetModel, auth_identity::Model as AuthIdentityModel, btc_address::Model as BitcoinAddressModel,
     btc_output::Model as BitcoinOutputModel, contact::ContactModel, invoice::Model as InvoiceModel,
     ln_address::Model as LnAddressModel, payment::Model as PaymentModel, wallet::Model as WalletModel,
 };
 
 const ASSERTION_MSG: &str = "should parse successfully by assertion";
+
+impl From<AssetModel> for Asset {
+    fn from(model: AssetModel) -> Self {
+        Asset {
+            id: model.id,
+            code: model.code,
+            name: model.name,
+            protocol: model.protocol.parse().expect(ASSERTION_MSG),
+            network: model.network.parse().expect(ASSERTION_MSG),
+            asset_ref: model.asset_ref,
+            display_ticker: model.display_ticker,
+            decimals: model.decimals,
+            created_at: model.created_at.and_utc(),
+            updated_at: model.updated_at.map(|t| t.and_utc()),
+        }
+    }
+}
 
 /// Maps the API ordering direction to sea-orm's `Order`. A free function rather
 /// than a `From` impl because both types are foreign here (orphan rule).
@@ -198,7 +216,14 @@ impl From<WalletModel> for Wallet {
     fn from(model: WalletModel) -> Self {
         Wallet {
             id: model.id,
-            user_id: model.user_id,
+            account_id: model.account_id,
+            asset_id: model.asset_id,
+            label: model.label,
+            balance: Balance {
+                available_msat: model.available_amount,
+                reserved_msat: model.reserved_amount as u64,
+                ..Default::default()
+            },
             created_at: model.created_at.and_utc(),
             updated_at: model.updated_at.map(|t| t.and_utc()),
             ..Default::default()
@@ -210,7 +235,6 @@ impl From<ApiKeyModel> for ApiKey {
     fn from(model: ApiKeyModel) -> Self {
         ApiKey {
             id: model.id,
-            user_id: model.user_id,
             account_id: model.account_id,
             name: model.name,
             key: None,

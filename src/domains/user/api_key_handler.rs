@@ -47,7 +47,8 @@ pub fn api_key_router() -> Router<Arc<AppServices>> {
 
 /// Generate a new API Key
 ///
-/// Returns the generated API Key for the given user. Users can create API keys with permissions as a subset of his current permissions.
+/// Returns the generated API Key for the requested account. Users can create API keys with permissions
+/// as a subset of their current permissions.
 #[utoipa::path(
     post,
     path = "",
@@ -195,7 +196,6 @@ mod tests {
 
     fn user(permissions: Vec<Permission>) -> User {
         User {
-            id: "alice".to_string(),
             wallet_id: Uuid::new_v4(),
             permissions,
             ..Default::default()
@@ -204,7 +204,7 @@ mod tests {
 
     fn create_request() -> CreateApiKeyRequest {
         CreateApiKeyRequest {
-            user_id: Some("alice".to_string()),
+            account_id: Some(Uuid::new_v4()),
             name: "primary".to_string(),
             permissions: vec![Permission::ReadWallet],
             description: None,

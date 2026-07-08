@@ -70,6 +70,7 @@ export {
 } from './sdk.gen';
 export {
   type ApiKey,
+  type Asset,
   type Balance,
   type BtcAddress,
   BtcAddressType,
@@ -101,6 +102,7 @@ export {
   type CreateWalletApiKeyErrors,
   type CreateWalletApiKeyResponse,
   type CreateWalletApiKeyResponses,
+  type CreateWalletRequest,
   Currency,
   type DeleteAddressData,
   type DeleteAddressError,
@@ -337,6 +339,7 @@ export {
   type PayResponse,
   type PayResponses,
   Permission,
+  Protocol,
   type ReadinessCheckData,
   type ReadinessCheckResponse,
   type ReadinessCheckResponses,
@@ -354,7 +357,6 @@ export {
   type RegisterWalletData,
   type RegisterWalletError,
   type RegisterWalletErrors,
-  type RegisterWalletRequest,
   type RegisterWalletResponse,
   type RegisterWalletResponses,
   type RevokeApiKeyData,

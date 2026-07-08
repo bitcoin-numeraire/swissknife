@@ -491,6 +491,7 @@
   },
   "wallet_list": {
     "user": "User",
+    "account": "Account",
     "ln_address": "LN Address",
     "balance": "Balance",
     "invoices": "Invoices",
@@ -536,6 +537,7 @@
     "fees_paid": "Fees paid",
     "identity": "Identity",
     "user": "User",
+    "account": "Account",
     "updated": "Updated",
     "counts": "Activity counts",
     "bitcoin_addresses": "Bitcoin addresses",
@@ -751,6 +753,8 @@
   },
   "register_wallet": {
     "title": "Register New Wallet",
+    "account_id": "Account ID",
+    "asset_id": "Asset ID",
     "success_wallet_registration": "Wallet registered successfully"
   },
   "register_ln_address": {
@@ -846,6 +850,7 @@
     "create_success": "API token created successfully",
     "create_button": "Generate token",
     "name": "Token name",
+    "account_id": "Account ID",
     "expiration": "Expiration",
     "description": "Description",
     "key": "Secret key",
@@ -854,7 +859,7 @@
     "key_display_message": "Save your token and keep it secure, do not share it publicly or expose it in code repositories. This token will never be displayed anymore."
   },
   "api_key_list": {
-    "user": "User",
+    "account": "Account",
     "name": "Name",
     "scopes": "Scopes",
     "description": "Description",

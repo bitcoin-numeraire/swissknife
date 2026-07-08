@@ -1,10 +1,21 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
+use strum_macros::{Display, EnumString};
 use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
 
-use crate::{BtcAddress, Invoice, LnAddress, OrderDirection, Payment};
+use crate::{BtcAddress, BtcNetwork, Invoice, LnAddress, OrderDirection, Payment};
+
+/// Asset settlement protocol.
+#[derive(Debug, Clone, Copy, Default, Deserialize, Serialize, EnumString, Display, PartialEq, Eq, ToSchema)]
+#[serde(rename_all = "snake_case")]
+#[strum(serialize_all = "snake_case")]
+pub enum Protocol {
+    #[default]
+    Bitcoin,
+    TaprootAssets,
+}
 
 /// A wallet's balance, in millisatoshis.
 #[derive(Debug, Clone, Deserialize, Serialize, Default, ToSchema)]
@@ -41,13 +52,53 @@ pub struct Contact {
     pub contact_since: DateTime<Utc>,
 }
 
+/// A spendable asset on one protocol/network.
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, ToSchema)]
+pub struct Asset {
+    /// Internal asset ID
+    pub id: Uuid,
+    /// Stable server asset code, independent of network-specific UI ticker.
+    #[schema(example = "BTC")]
+    pub code: String,
+    /// Optional display name
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(example = "Bitcoin")]
+    pub name: Option<String>,
+    /// Settlement protocol.
+    pub protocol: Protocol,
+    /// Settlement network.
+    pub network: BtcNetwork,
+    /// Protocol-specific asset reference; native for chain-native BTC
+    #[schema(example = "native")]
+    pub asset_ref: String,
+    /// UI ticker for the specific network, such as BTC, tBTC, or rBTC.
+    #[schema(example = "BTC")]
+    pub display_ticker: String,
+    /// Integer storage scale for this asset
+    #[schema(example = 11)]
+    pub decimals: i16,
+    /// Date of creation in database
+    pub created_at: DateTime<Utc>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    /// Date of update in database
+    pub updated_at: Option<DateTime<Utc>>,
+}
+
 /// A user wallet with its balance and linked payments, invoices, Bitcoin addresses and contacts.
 #[derive(Debug, Clone, Default, Deserialize, Serialize, ToSchema)]
 pub struct Wallet {
     /// Internal ID
     pub id: Uuid,
-    /// User ID. Populated from the Authentication method,  such as JWT subject
-    pub user_id: String,
+    /// Owning account ID
+    pub account_id: Uuid,
+    /// Spendable asset held by this wallet
+    pub asset_id: Uuid,
+    /// Asset metadata for this wallet, when included in the response.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub asset: Option<Asset>,
+    /// Optional account-specific display label.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
     /// Lightning Address
     pub ln_address: Option<LnAddress>,
     /// User Balance
@@ -72,8 +123,16 @@ pub struct Wallet {
 pub struct WalletOverview {
     /// Internal ID
     pub id: Uuid,
-    /// User ID. Populated from the Authentication method,  such as JWT subject
-    pub user_id: String,
+    /// Owning account ID
+    pub account_id: Uuid,
+    /// Spendable asset held by this wallet
+    pub asset_id: Uuid,
+    /// Asset metadata for this wallet, when included in the response.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub asset: Option<Asset>,
+    /// Optional account-specific display label.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
     /// Lightning Address
     pub ln_address: Option<LnAddress>,
     /// User Balance
@@ -91,11 +150,13 @@ pub struct WalletOverview {
     pub updated_at: Option<DateTime<Utc>>,
 }
 
-/// Register Wallet Request
+/// Create Wallet Request
 #[derive(Debug, Deserialize, Clone, ToSchema, Serialize)]
-pub struct RegisterWalletRequest {
-    /// User ID. Should ideally be registered in your Auth provider.
-    pub user_id: String,
+pub struct CreateWalletRequest {
+    /// Owning account ID
+    pub account_id: Uuid,
+    /// Asset ID to enable for the account
+    pub asset_id: Uuid,
 }
 
 /// Wallet query filter.
@@ -110,8 +171,12 @@ pub struct WalletFilter {
     pub offset: Option<u64>,
     /// List of IDs
     pub ids: Option<Vec<Uuid>>,
-    /// User ID. Automatically populated with your ID
-    pub user_id: Option<String>,
+    /// Owning account ID.
+    ///
+    /// User-scoped endpoints populate this from the authenticated account.
+    pub account_id: Option<Uuid>,
+    /// Asset ID
+    pub asset_id: Option<Uuid>,
     /// Direction of the ordering of results
     #[serde(default)]
     pub order_direction: OrderDirection,

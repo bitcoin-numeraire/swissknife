@@ -9,7 +9,7 @@ use axum_extra::extract::Query;
 use utoipa::OpenApi;
 use uuid::Uuid;
 
-use swissknife_types::{ErrorResponse, RegisterWalletRequest};
+use swissknife_types::{CreateWalletRequest, ErrorResponse};
 
 use crate::{
     application::{
@@ -29,7 +29,7 @@ use super::{Wallet, WalletFilter, WalletOverview};
 #[derive(OpenApi)]
 #[openapi(
     paths(register_wallet, list_wallets, list_wallet_overviews, get_wallet, delete_wallet, delete_wallets),
-    components(schemas(Wallet, WalletOverview, RegisterWalletRequest)),
+    components(schemas(Wallet, WalletOverview, CreateWalletRequest)),
     tags(
         (name = "Wallets", description = "Wallet management endpoints. Require `read:wallet` or `write:wallet` permissions.")
     ),
@@ -49,13 +49,13 @@ pub fn router() -> Router<Arc<AppServices>> {
 
 /// Register a new wallet
 ///
-/// Returns the generated wallet for the given user
+/// Returns the account asset wallet.
 #[utoipa::path(
     post,
     path = "",
     tag = "Wallets",
     context_path = CONTEXT_PATH,
-    request_body = RegisterWalletRequest,
+    request_body = CreateWalletRequest,
     responses(
         (status = 200, description = "Wallet Created", body = Wallet),
         (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
@@ -68,11 +68,11 @@ pub fn router() -> Router<Arc<AppServices>> {
 async fn register_wallet(
     State(services): State<Arc<AppServices>>,
     user: User,
-    Json(payload): Json<RegisterWalletRequest>,
+    Json(payload): Json<CreateWalletRequest>,
 ) -> Result<Json<Wallet>, ApplicationError> {
     user.check_permission(Permission::WriteWallet)?;
 
-    let wallet = services.wallet.register(payload.user_id).await?;
+    let wallet = services.wallet.create(payload.account_id, payload.asset_id).await?;
     Ok(Json(wallet))
 }
 
@@ -223,7 +223,6 @@ mod tests {
 
     fn user(permissions: Vec<Permission>) -> User {
         User {
-            id: "alice".to_string(),
             wallet_id: Uuid::new_v4(),
             permissions,
             ..Default::default()
@@ -239,13 +238,13 @@ mod tests {
             #[tokio::test]
             async fn is_forbidden_and_does_not_call_the_service() {
                 let services = MockAppServicesBuilder::new().build();
+                let account_id = Uuid::new_v4();
+                let asset_id = Uuid::new_v4();
 
                 let result = register_wallet(
                     State(Arc::new(services)),
                     user(vec![]),
-                    Json(RegisterWalletRequest {
-                        user_id: "bob".to_string(),
-                    }),
+                    Json(CreateWalletRequest { account_id, asset_id }),
                 )
                 .await;
 
@@ -258,20 +257,20 @@ mod tests {
 
             #[tokio::test]
             async fn delegates_to_the_service() {
+                let account_id = Uuid::new_v4();
+                let asset_id = Uuid::new_v4();
                 let mut builder = MockAppServicesBuilder::new();
                 builder
                     .wallet
-                    .expect_register()
-                    .withf(|user_id| user_id == "bob")
+                    .expect_create()
+                    .withf(move |account, asset| *account == account_id && *asset == asset_id)
                     .times(1)
-                    .returning(|_| Ok(Wallet::default()));
+                    .returning(|_, _| Ok(Wallet::default()));
 
                 let result = register_wallet(
                     State(Arc::new(builder.build())),
                     user(vec![Permission::WriteWallet]),
-                    Json(RegisterWalletRequest {
-                        user_id: "bob".to_string(),
-                    }),
+                    Json(CreateWalletRequest { account_id, asset_id }),
                 )
                 .await;
 

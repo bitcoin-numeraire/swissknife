@@ -3,9 +3,7 @@ use std::time::Duration;
 
 use uuid::Uuid;
 
-use swissknife_types::{
-    ApiKey, Balance, BtcAddress, CreateApiKeyRequest, NewBtcAddressRequest, Permission, RegisterWalletRequest, Wallet,
-};
+use swissknife_types::{ApiKey, Balance, BtcAddress, CreateApiKeyRequest, NewBtcAddressRequest, Permission, Wallet};
 
 use super::chain;
 use super::client::Auth;
@@ -22,19 +20,16 @@ pub fn unique(prefix: &str) -> String {
 }
 
 impl TestApp {
-    /// Register a fresh wallet (its own user id) and return it. Behavioural
-    /// tests use their own wallet so balances stay isolated on the shared
-    /// instance.
-    pub async fn create_wallet(&self, token: &str, label: &str) -> Wallet {
-        let res = self
-            .api()
-            .post(
-                "/v1/wallets",
-                Auth::Bearer(token),
-                RegisterWalletRequest { user_id: unique(label) },
-            )
+    /// Provision a fresh account through API-key authentication and return its
+    /// active asset wallet. Behavioural tests use their own account wallet so
+    /// balances stay isolated on the shared instance.
+    pub async fn create_wallet(&self, token: &str, _label: &str) -> Wallet {
+        let account_id = Uuid::new_v4();
+        let key = self
+            .user_api_key(token, account_id, Permission::all_permissions())
             .await;
-        assert_eq!(res.status.as_u16(), 200, "create_wallet failed: {}", res.body);
+        let res = self.api().get("/v1/me", Auth::ApiKey(&key)).await;
+        assert_eq!(res.status.as_u16(), 200, "create_wallet /v1/me failed: {}", res.body);
         res.parse()
     }
 
@@ -76,9 +71,9 @@ impl TestApp {
     }
 
     /// Mint an API key for the caller's own wallet with exactly `permissions`,
-    /// via `/v1/me/api-keys` (which fills in the user). Returns the raw secret
-    /// for use as `Auth::ApiKey` — a credential narrower than the admin JWT, for
-    /// exercising permission enforcement.
+    /// via `/v1/me/api-keys` (which fills in the account). Returns the raw
+    /// secret for use as `Auth::ApiKey` — a credential narrower than the admin
+    /// JWT, for exercising permission enforcement.
     pub async fn api_key(&self, token: &str, permissions: Vec<Permission>) -> String {
         let res = self
             .api()
@@ -86,7 +81,7 @@ impl TestApp {
                 "/v1/me/api-keys",
                 Auth::Bearer(token),
                 CreateApiKeyRequest {
-                    user_id: None,
+                    account_id: None,
                     name: unique("key"),
                     permissions,
                     description: None,
@@ -100,16 +95,16 @@ impl TestApp {
             .expect("a freshly created key returns its secret")
     }
 
-    /// Mint an API key for `user_id` via the admin endpoint with `permissions`,
-    /// returning its secret. The key authenticates as that user.
-    pub async fn user_api_key(&self, token: &str, user_id: &str, permissions: Vec<Permission>) -> String {
+    /// Mint an API key for `account_id` via the admin endpoint with `permissions`,
+    /// returning its secret. The key authenticates into that account.
+    pub async fn user_api_key(&self, token: &str, account_id: Uuid, permissions: Vec<Permission>) -> String {
         let res = self
             .api()
             .post(
                 "/v1/api-keys",
                 Auth::Bearer(token),
                 CreateApiKeyRequest {
-                    user_id: Some(user_id.to_string()),
+                    account_id: Some(account_id),
                     name: unique("user-key"),
                     permissions,
                     description: None,
@@ -124,12 +119,14 @@ impl TestApp {
     }
 
     /// Register a fresh wallet and a full-permission API key for it: a distinct
-    /// external user for exercising the `/me` endpoints.
-    pub async fn create_user(&self, token: &str, label: &str) -> TestUser {
-        let wallet = self.create_wallet(token, label).await;
+    /// external account for exercising the `/me` endpoints.
+    pub async fn create_user(&self, token: &str, _label: &str) -> TestUser {
         let key = self
-            .user_api_key(token, &wallet.user_id, Permission::all_permissions())
+            .user_api_key(token, Uuid::new_v4(), Permission::all_permissions())
             .await;
+        let res = self.api().get("/v1/me", Auth::ApiKey(&key)).await;
+        assert_eq!(res.status.as_u16(), 200, "create_user /v1/me failed: {}", res.body);
+        let wallet = res.parse();
         TestUser { wallet, key }
     }
 }

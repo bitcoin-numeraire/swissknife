@@ -466,7 +466,7 @@ function WalletPicker({ value, onChange }: { value: string; onChange: (value: st
       loading={walletsLoading}
       value={selectedWallet}
       onChange={(_, wallet: Wallet | null) => onChange(wallet?.id ?? '')}
-      getOptionLabel={(wallet) => wallet.user_id || wallet.id}
+      getOptionLabel={walletDisplayName}
       isOptionEqualToValue={(option, wallet) => option.id === wallet.id}
       renderOption={(props: HTMLAttributes<HTMLLIElement> & { key: Key }, wallet) => {
         const { key, ...optionProps } = props;
@@ -475,10 +475,10 @@ function WalletPicker({ value, onChange }: { value: string; onChange: (value: st
           <li key={key} {...optionProps}>
             <Stack sx={{ minWidth: 0 }}>
               <Typography variant="subtitle2" noWrap>
-                {wallet.user_id}
+                {walletDisplayName(wallet)}
               </Typography>
               <Typography variant="caption" color="text.secondary" noWrap>
-                {wallet.id}
+                {wallet.account_id}
               </Typography>
             </Stack>
           </li>
@@ -493,6 +493,12 @@ function WalletPicker({ value, onChange }: { value: string; onChange: (value: st
       )}
     />
   );
+}
+
+function walletDisplayName(wallet: Wallet) {
+  if (wallet.ln_address?.username) return displayLnAddress(wallet.ln_address.username);
+
+  return wallet.label ?? wallet.account_id;
 }
 
 function SendDetailRow({ label, value }: { label: string; value?: string | number | null }) {

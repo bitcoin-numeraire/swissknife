@@ -587,7 +587,8 @@ async fn delete_failed_payments(
 
 /// Generate a new API Key
 ///
-/// Returns the generated API Key for the given user. Users can create API keys with permissions as a subset of his current permissions.
+/// Returns the generated API Key for the authenticated account. Users can create API keys with
+/// permissions as a subset of their current permissions.
 #[utoipa::path(
     post,
     path = "/api-keys",
@@ -607,7 +608,7 @@ async fn create_wallet_api_key(
     user: User,
     Json(mut payload): Json<CreateApiKeyRequest>,
 ) -> Result<Json<ApiKey>, ApplicationError> {
-    payload.user_id = Some(user.id.clone());
+    payload.account_id = Some(user.account_id);
     let api_key = services.api_key.generate(user, payload).await?;
     Ok(Json(api_key))
 }
@@ -636,7 +637,7 @@ async fn get_wallet_api_key(
     let api_keys = services
         .api_key
         .list(ApiKeyFilter {
-            user_id: Some(user.id),
+            account_id: Some(user.account_id),
             ids: Some(vec![id]),
             ..Default::default()
         })
@@ -671,7 +672,7 @@ async fn list_wallet_api_keys(
     user: User,
     Query(mut filter): Query<ApiKeyFilter>,
 ) -> Result<Json<Vec<ApiKey>>, ApplicationError> {
-    filter.user_id = Some(user.id);
+    filter.account_id = Some(user.account_id);
     let api_keys = services.api_key.list(filter).await?;
 
     Ok(Json(api_keys))
@@ -701,7 +702,7 @@ async fn revoke_wallet_api_key(
     let n_revoked = services
         .api_key
         .revoke_many(ApiKeyFilter {
-            user_id: Some(user.id),
+            account_id: Some(user.account_id),
             ids: Some(vec![id]),
             ..Default::default()
         })
@@ -735,7 +736,7 @@ async fn revoke_wallet_api_keys(
     user: User,
     Query(mut filter): Query<ApiKeyFilter>,
 ) -> Result<Json<u64>, ApplicationError> {
-    filter.user_id = Some(user.id);
+    filter.account_id = Some(user.account_id);
     let n_revoked = services.api_key.revoke_many(filter).await?;
     Ok(n_revoked.into())
 }
@@ -759,7 +760,6 @@ mod tests {
     // scoped to the authenticated user's wallet. These tests lock that invariant.
     fn user() -> User {
         User {
-            id: "alice".to_string(),
             wallet_id: Uuid::new_v4(),
             permissions: vec![],
             ..Default::default()

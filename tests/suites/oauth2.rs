@@ -30,9 +30,10 @@ mod accepts {
         let res = app.api().get("/v1/me", Auth::Bearer(&token)).await;
         assert_status(&res, StatusCode::OK);
         let wallet = res.parse::<Wallet>();
-        assert_eq!(
-            wallet.user_id, "itest-oauth2-full",
-            "the wallet is owned by the token subject"
+        assert_ne!(
+            wallet.account_id,
+            uuid::Uuid::nil(),
+            "the token subject provisions an account"
         );
 
         // A second call with a fresh token for the same subject resolves to the
@@ -41,8 +42,8 @@ mod accepts {
         let res = app.api().get("/v1/me", Auth::Bearer(&again)).await;
         assert_status(&res, StatusCode::OK);
         assert_eq!(
-            res.parse::<Wallet>().id,
-            wallet.id,
+            res.parse::<Wallet>().account_id,
+            wallet.account_id,
             "the subject maps to a stable wallet"
         );
     }

@@ -113,6 +113,14 @@ export const zContact = z.object({
 });
 
 /**
+ * Create Wallet Request
+ */
+export const zCreateWalletRequest = z.object({
+  account_id: z.uuid(),
+  asset_id: z.uuid(),
+});
+
+/**
  * The currency and network a transaction is denominated in.
  */
 export const zCurrency = z.enum(['Bitcoin', 'BitcoinTestnet', 'Regtest', 'Simnet', 'Signet']);
@@ -380,6 +388,7 @@ export const zPermission = z.enum([
  * API Key
  */
 export const zApiKey = z.object({
+  account_id: z.uuid(),
   created_at: z.iso.datetime(),
   description: z.string().nullish(),
   expires_at: z.iso.datetime().nullish(),
@@ -387,13 +396,13 @@ export const zApiKey = z.object({
   key: z.string().nullish(),
   name: z.string(),
   permissions: z.array(zPermission),
-  user_id: z.string(),
 });
 
 /**
  * Create API Key Request
  */
 export const zCreateApiKeyRequest = z.object({
+  account_id: z.uuid().nullish(),
   description: z.string().nullish(),
   expiry: z
     .int()
@@ -402,7 +411,30 @@ export const zCreateApiKeyRequest = z.object({
     .nullish(),
   name: z.string(),
   permissions: z.array(zPermission),
-  user_id: z.string().nullish(),
+});
+
+/**
+ * Asset settlement protocol.
+ */
+export const zProtocol = z.enum(['bitcoin', 'taproot_assets']);
+
+/**
+ * A spendable asset on one protocol/network.
+ */
+export const zAsset = z.object({
+  asset_ref: z.string(),
+  code: z.string(),
+  created_at: z.iso.datetime(),
+  decimals: z
+    .int()
+    .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
+    .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
+  display_ticker: z.string(),
+  id: z.uuid(),
+  name: z.string().nullish(),
+  network: zBtcNetwork,
+  protocol: zProtocol,
+  updated_at: z.iso.datetime().nullish(),
 });
 
 /**
@@ -413,13 +445,6 @@ export const zRegisterLnAddressRequest = z.object({
   nostr_pubkey: z.string().nullish(),
   username: z.string(),
   wallet_id: z.uuid().nullish(),
-});
-
-/**
- * Register Wallet Request
- */
-export const zRegisterWalletRequest = z.object({
-  user_id: z.string(),
 });
 
 /**
@@ -489,25 +514,32 @@ export const zVersionInfo = z.object({
  * A user wallet with its balance and linked payments, invoices, Bitcoin addresses and contacts.
  */
 export const zWallet = z.object({
+  account_id: z.uuid(),
+  asset: zAsset.nullish(),
+  asset_id: z.uuid(),
   balance: zBalance,
   btc_addresses: z.array(zBtcAddress),
   contacts: z.array(zContact),
   created_at: z.iso.datetime(),
   id: z.uuid(),
   invoices: z.array(zInvoice),
+  label: z.string().nullish(),
   ln_address: zLnAddress.nullish(),
   payments: z.array(zPayment),
   updated_at: z.iso.datetime().nullish(),
-  user_id: z.string(),
 });
 
 /**
  * A lightweight wallet summary with counts in place of the full lists.
  */
 export const zWalletOverview = z.object({
+  account_id: z.uuid(),
+  asset: zAsset.nullish(),
+  asset_id: z.uuid(),
   balance: zBalance,
   created_at: z.iso.datetime(),
   id: z.uuid(),
+  label: z.string().nullish(),
   ln_address: zLnAddress.nullish(),
   n_contacts: z
     .int()
@@ -522,7 +554,6 @@ export const zWalletOverview = z.object({
     .gte(0)
     .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
   updated_at: z.iso.datetime().nullish(),
-  user_id: z.string(),
 });
 
 export const zWellKnownPath = z.object({
@@ -575,7 +606,7 @@ export const zRevokeApiKeysQuery = z.object({
     })
     .nullish(),
   ids: z.array(z.uuid()).nullish(),
-  user_id: z.string().nullish(),
+  account_id: z.uuid().nullish(),
   order_direction: zOrderDirection.optional(),
 });
 
@@ -605,7 +636,7 @@ export const zListApiKeysQuery = z.object({
     })
     .nullish(),
   ids: z.array(z.uuid()).nullish(),
-  user_id: z.string().nullish(),
+  account_id: z.uuid().nullish(),
   order_direction: zOrderDirection.optional(),
 });
 
@@ -928,7 +959,7 @@ export const zRevokeWalletApiKeysQuery = z.object({
     })
     .nullish(),
   ids: z.array(z.uuid()).nullish(),
-  user_id: z.string().nullish(),
+  account_id: z.uuid().nullish(),
   order_direction: zOrderDirection.optional(),
 });
 
@@ -958,7 +989,7 @@ export const zListWalletApiKeysQuery = z.object({
     })
     .nullish(),
   ids: z.array(z.uuid()).nullish(),
-  user_id: z.string().nullish(),
+  account_id: z.uuid().nullish(),
   order_direction: zOrderDirection.optional(),
 });
 
@@ -1284,7 +1315,8 @@ export const zDeleteWalletsQuery = z.object({
     })
     .nullish(),
   ids: z.array(z.uuid()).nullish(),
-  user_id: z.string().nullish(),
+  account_id: z.uuid().nullish(),
+  asset_id: z.uuid().nullish(),
   order_direction: zOrderDirection.optional(),
 });
 
@@ -1303,7 +1335,7 @@ export const zDeleteWalletsResponse = z.coerce
  */
 export const zListWalletsResponse = z.array(zWallet);
 
-export const zRegisterWalletBody = zRegisterWalletRequest;
+export const zRegisterWalletBody = zCreateWalletRequest;
 
 /**
  * Wallet Created

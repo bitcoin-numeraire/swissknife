@@ -11,9 +11,7 @@ use crate::{OrderDirection, Permission};
 pub struct ApiKey {
     /// Internal ID
     pub id: Uuid,
-    /// User ID
-    pub user_id: String,
-    /// Account ID
+    /// Owning account ID
     pub account_id: Uuid,
     /// API key name
     pub name: String,
@@ -36,8 +34,10 @@ pub struct ApiKey {
 /// Create API Key Request
 #[derive(Deserialize, ToSchema, Serialize)]
 pub struct CreateApiKeyRequest {
-    /// User ID. Will be populated with your own ID by default
-    pub user_id: Option<String>,
+    /// Owning account ID.
+    ///
+    /// User-scoped endpoints populate this with your own account.
+    pub account_id: Option<Uuid>,
     /// API key name
     pub name: String,
     /// List of permissions for this API key
@@ -60,8 +60,10 @@ pub struct ApiKeyFilter {
     pub offset: Option<u64>,
     /// List of IDs
     pub ids: Option<Vec<Uuid>>,
-    /// User ID. Automatically populated with your ID
-    pub user_id: Option<String>,
+    /// Owning account ID.
+    ///
+    /// User-scoped endpoints populate this from the authenticated account.
+    pub account_id: Option<Uuid>,
     /// Direction of the ordering of results
     #[serde(default)]
     pub order_direction: OrderDirection,

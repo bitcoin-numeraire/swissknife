@@ -139,7 +139,9 @@ function AccountsDirectoryView() {
         const lnAddress = account.ln_address?.username
           ? displayLnAddress(account.ln_address.username)
           : '';
-        const haystack = [account.id, account.user_id, lnAddress].join(' ').toLowerCase();
+        const haystack = [account.id, account.account_id, account.label ?? '', lnAddress]
+          .join(' ')
+          .toLowerCase();
 
         return haystack.includes(normalizedQuery);
       })
@@ -478,9 +480,9 @@ function AccountCard({ account, index }: { account: WalletOverview; index: numbe
 
         <Stack spacing={1}>
           <InfoRow
-            label={t('wallet_list.user')}
-            value={account.user_id}
-            copyValue={account.user_id}
+            label={t('wallet_list.account')}
+            value={account.account_id}
+            copyValue={account.account_id}
           />
           <InfoRow label={t('wallet')} value={account.id} copyValue={account.id} />
           <InfoRow

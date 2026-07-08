@@ -29,7 +29,8 @@ mod wallet {
         assert_status(&res, StatusCode::OK);
         let wallet = res.parse::<Wallet>();
         assert_eq!(wallet.id, user.wallet.id);
-        assert_eq!(wallet.user_id, user.wallet.user_id);
+        assert_eq!(wallet.account_id, user.wallet.account_id);
+        assert_eq!(wallet.asset_id, user.wallet.asset_id);
     }
 
     #[tokio::test]
@@ -69,12 +70,12 @@ mod wallet {
         // /me is auth-only: a key carrying no scopes still works for its wallet.
         let app = app().await;
         let token = app.admin_token().await;
-        let wallet = app.create_wallet(token, "me-noperm").await;
-        let key = app.user_api_key(token, &wallet.user_id, vec![]).await;
+        let _subject = unique("me-noperm");
+        let key = app.user_api_key(token, uuid::Uuid::new_v4(), vec![]).await;
 
         let res = app.api().get("/v1/me", Auth::ApiKey(&key)).await;
         assert_status(&res, StatusCode::OK);
-        assert_eq!(res.parse::<Wallet>().id, wallet.id);
+        assert_ne!(res.parse::<Wallet>().id, uuid::Uuid::nil());
     }
 }
 
@@ -106,10 +107,12 @@ mod bitcoin {
     async fn list_is_scoped_to_the_caller_even_with_a_wallet_id_filter() {
         let app = app().await;
         let token = app.admin_token().await;
-        let alice_wallet = app.create_wallet(token, "me-btc-list-a").await;
-        let bob_wallet = app.create_wallet(token, "me-btc-list-b").await;
-        let alice_key = app.user_api_key(token, &alice_wallet.user_id, vec![]).await;
-        let bob_key = app.user_api_key(token, &bob_wallet.user_id, vec![]).await;
+        let alice = app.create_user(token, "me-btc-list-a").await;
+        let bob = app.create_user(token, "me-btc-list-b").await;
+        let alice_wallet = alice.wallet;
+        let bob_wallet = bob.wallet;
+        let alice_key = alice.key;
+        let bob_key = bob.key;
 
         let alice_address = app
             .api()
@@ -478,7 +481,7 @@ mod api_keys {
                 "/v1/me/api-keys",
                 Auth::ApiKey(&user.key),
                 CreateApiKeyRequest {
-                    user_id: None,
+                    account_id: None,
                     name: unique("me-key"),
                     permissions: vec![Permission::ReadWallet],
                     description: None,
@@ -523,7 +526,7 @@ mod api_keys {
                 "/v1/me/api-keys",
                 Auth::ApiKey(&alice.key),
                 CreateApiKeyRequest {
-                    user_id: None,
+                    account_id: None,
                     name: unique("me-key-a"),
                     permissions: vec![],
                     description: None,

@@ -32,7 +32,7 @@ type Props = {
 };
 
 export function ApiKeyTableRow({ row, selected, onSelectRow, onDeleteRow }: Props) {
-  const { id, user_id, name, description, permissions, created_at, expires_at } = row;
+  const { id, account_id, name, description, permissions, created_at, expires_at } = row;
 
   const { t } = useTranslate();
   const popover = usePopover();
@@ -49,15 +49,15 @@ export function ApiKeyTableRow({ row, selected, onSelectRow, onDeleteRow }: Prop
         </TableCell>
 
         <TableCell sx={{ display: 'flex', alignItems: 'center' }}>
-          <Avatar alt={user_id} sx={{ mr: 2 }}>
-            {user_id.charAt(0).toUpperCase()}
+          <Avatar alt={account_id} sx={{ mr: 2 }}>
+            {account_id.charAt(0).toUpperCase()}
           </Avatar>
 
           <ListItemText
             disableTypography
             primary={
               <Typography variant="body2" noWrap>
-                {truncateText(user_id, 20)}
+                {truncateText(account_id, 20)}
               </Typography>
             }
             secondary={

@@ -9,6 +9,10 @@ export type ClientOptions = {
  */
 export type ApiKey = {
   /**
+   * Owning account ID
+   */
+  account_id: string;
+  /**
    * Date of creation in database
    */
   created_at: Date;
@@ -36,10 +40,52 @@ export type ApiKey = {
    * List of permissions for this API key
    */
   permissions: Array<Permission>;
+};
+
+/**
+ * A spendable asset on one protocol/network.
+ */
+export type Asset = {
   /**
-   * User ID
+   * Protocol-specific asset reference; native for chain-native BTC
    */
-  user_id: string;
+  asset_ref: string;
+  /**
+   * Stable server asset code, independent of network-specific UI ticker.
+   */
+  code: string;
+  /**
+   * Date of creation in database
+   */
+  created_at: Date;
+  /**
+   * Integer storage scale for this asset
+   */
+  decimals: number;
+  /**
+   * UI ticker for the specific network, such as BTC, tBTC, or rBTC.
+   */
+  display_ticker: string;
+  /**
+   * Internal asset ID
+   */
+  id: string;
+  /**
+   * Optional display name
+   */
+  name?: string | null;
+  /**
+   * Settlement network.
+   */
+  network: BtcNetwork;
+  /**
+   * Settlement protocol.
+   */
+  protocol: Protocol;
+  /**
+   * Date of update in database
+   */
+  updated_at?: Date | null;
 };
 
 /**
@@ -238,6 +284,12 @@ export type Contact = {
  */
 export type CreateApiKeyRequest = {
   /**
+   * Owning account ID.
+   *
+   * User-scoped endpoints populate this with your own account.
+   */
+  account_id?: string | null;
+  /**
    * API key description
    */
   description?: string | null;
@@ -253,10 +305,20 @@ export type CreateApiKeyRequest = {
    * List of permissions for this API key
    */
   permissions: Array<Permission>;
+};
+
+/**
+ * Create Wallet Request
+ */
+export type CreateWalletRequest = {
   /**
-   * User ID. Will be populated with your own ID by default
+   * Owning account ID
    */
-  user_id?: string | null;
+  account_id: string;
+  /**
+   * Asset ID to enable for the account
+   */
+  asset_id: string;
 };
 
 /**
@@ -774,6 +836,16 @@ export const Permission = {
 export type Permission = (typeof Permission)[keyof typeof Permission];
 
 /**
+ * Asset settlement protocol.
+ */
+export const Protocol = { BITCOIN: 'bitcoin', TAPROOT_ASSETS: 'taproot_assets' } as const;
+
+/**
+ * Asset settlement protocol.
+ */
+export type Protocol = (typeof Protocol)[keyof typeof Protocol];
+
+/**
  * Register Lightning Address Request
  */
 export type RegisterLnAddressRequest = {
@@ -793,16 +865,6 @@ export type RegisterLnAddressRequest = {
    * Wallet ID. Will be populated with your own ID by default
    */
   wallet_id?: string | null;
-};
-
-/**
- * Register Wallet Request
- */
-export type RegisterWalletRequest = {
-  /**
-   * User ID. Should ideally be registered in your Auth provider.
-   */
-  user_id: string;
 };
 
 /**
@@ -912,6 +974,15 @@ export type VersionInfo = {
  */
 export type Wallet = {
   /**
+   * Owning account ID
+   */
+  account_id: string;
+  asset?: null | Asset;
+  /**
+   * Spendable asset held by this wallet
+   */
+  asset_id: string;
+  /**
    * User Balance
    */
   balance: Balance;
@@ -935,6 +1006,10 @@ export type Wallet = {
    * List of Invoices
    */
   invoices: Array<Invoice>;
+  /**
+   * Optional account-specific display label.
+   */
+  label?: string | null;
   ln_address?: null | LnAddress;
   /**
    * List of payments
@@ -944,16 +1019,21 @@ export type Wallet = {
    * Date of update in database
    */
   updated_at?: Date | null;
-  /**
-   * User ID. Populated from the Authentication method,  such as JWT subject
-   */
-  user_id: string;
 };
 
 /**
  * A lightweight wallet summary with counts in place of the full lists.
  */
 export type WalletOverview = {
+  /**
+   * Owning account ID
+   */
+  account_id: string;
+  asset?: null | Asset;
+  /**
+   * Spendable asset held by this wallet
+   */
+  asset_id: string;
   /**
    * User Balance
    */
@@ -966,6 +1046,10 @@ export type WalletOverview = {
    * Internal ID
    */
   id: string;
+  /**
+   * Optional account-specific display label.
+   */
+  label?: string | null;
   ln_address?: null | LnAddress;
   /**
    * Number of contacts
@@ -983,10 +1067,6 @@ export type WalletOverview = {
    * Date of update in database
    */
   updated_at?: Date | null;
-  /**
-   * User ID. Populated from the Authentication method,  such as JWT subject
-   */
-  user_id: string;
 };
 
 export type WellKnownData = {
@@ -1119,9 +1199,11 @@ export type RevokeApiKeysData = {
      */
     ids?: Array<string> | null;
     /**
-     * User ID. Automatically populated with your ID
+     * Owning account ID.
+     *
+     * User-scoped endpoints populate this from the authenticated account.
      */
-    user_id?: string | null;
+    account_id?: string | null;
     /**
      * Direction of the ordering of results
      */
@@ -1177,9 +1259,11 @@ export type ListApiKeysData = {
      */
     ids?: Array<string> | null;
     /**
-     * User ID. Automatically populated with your ID
+     * Owning account ID.
+     *
+     * User-scoped endpoints populate this from the authenticated account.
      */
-    user_id?: string | null;
+    account_id?: string | null;
     /**
      * Direction of the ordering of results
      */
@@ -2344,9 +2428,11 @@ export type RevokeWalletApiKeysData = {
      */
     ids?: Array<string> | null;
     /**
-     * User ID. Automatically populated with your ID
+     * Owning account ID.
+     *
+     * User-scoped endpoints populate this from the authenticated account.
      */
-    user_id?: string | null;
+    account_id?: string | null;
     /**
      * Direction of the ordering of results
      */
@@ -2399,9 +2485,11 @@ export type ListWalletApiKeysData = {
      */
     ids?: Array<string> | null;
     /**
-     * User ID. Automatically populated with your ID
+     * Owning account ID.
+     *
+     * User-scoped endpoints populate this from the authenticated account.
      */
-    user_id?: string | null;
+    account_id?: string | null;
     /**
      * Direction of the ordering of results
      */
@@ -3618,9 +3706,15 @@ export type DeleteWalletsData = {
      */
     ids?: Array<string> | null;
     /**
-     * User ID. Automatically populated with your ID
+     * Owning account ID.
+     *
+     * User-scoped endpoints populate this from the authenticated account.
      */
-    user_id?: string | null;
+    account_id?: string | null;
+    /**
+     * Asset ID
+     */
+    asset_id?: string | null;
     /**
      * Direction of the ordering of results
      */
@@ -3697,7 +3791,7 @@ export type ListWalletsResponses = {
 export type ListWalletsResponse = ListWalletsResponses[keyof ListWalletsResponses];
 
 export type RegisterWalletData = {
-  body: RegisterWalletRequest;
+  body: CreateWalletRequest;
   path?: never;
   query?: never;
   url: '/v1/wallets';

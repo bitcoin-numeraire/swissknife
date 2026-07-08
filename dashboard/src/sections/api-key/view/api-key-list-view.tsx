@@ -31,7 +31,7 @@ import { SettingsApiKey } from '../../settings/settings-api-key';
 // ----------------------------------------------------------------------
 
 const tableHead = (t: TFunction) => [
-  { id: 'user_id', label: t('api_key_list.user') },
+  { id: 'account_id', label: t('api_key_list.account') },
   { id: 'name', label: t('api_key_list.name') },
   { id: 'description', label: t('api_key_list.description') },
   { id: 'permissions', label: t('api_key_list.scopes') },

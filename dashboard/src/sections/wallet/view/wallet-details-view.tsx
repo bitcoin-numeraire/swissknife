@@ -78,7 +78,8 @@ type WalletTransaction = {
 
 function walletName(wallet: Wallet) {
   if (wallet.ln_address?.username) return displayLnAddress(wallet.ln_address.username);
-  return wallet.user_id;
+
+  return wallet.label ?? wallet.account_id;
 }
 
 function addressTypeLabel(address: BtcAddress) {
@@ -441,9 +442,9 @@ export function WalletDetailsView({ id }: Props) {
                     color="info"
                   >
                     <DetailRow
-                      label={t('wallet_details.user')}
-                      value={wallet!.user_id}
-                      copyValue={wallet!.user_id}
+                      label={t('wallet_details.account')}
+                      value={wallet!.account_id}
+                      copyValue={wallet!.account_id}
                     />
                     <DetailRow
                       label={t('wallet_list.created')}

@@ -30,7 +30,6 @@ import { RHFSelect, RHFTextField, RHFMultiCheckbox } from 'src/components/hook-f
 import { useAuthContext } from 'src/auth/hooks';
 
 import { CopyButton } from '../copy';
-import { WalletSelectDropdown } from '../wallet';
 
 // ----------------------------------------------------------------------
 
@@ -59,7 +58,7 @@ export function CreateApiKeyForm({ onSuccess, isAdmin }: Props) {
     resolver: zodResolver(zCreateApiKeyRequest),
     defaultValues: {
       name: '',
-      user_id: user?.sub,
+      account_id: isAdmin ? '' : undefined,
       expiry: expiryOptions[2].value,
       permissions: [],
     },
@@ -72,7 +71,10 @@ export function CreateApiKeyForm({ onSuccess, isAdmin }: Props) {
   } = methods;
 
   const onSubmit = handleSubmit(async (data) => {
-    const body = data as CreateApiKeyRequest;
+    const body = {
+      ...data,
+      account_id: data.account_id || undefined,
+    } as CreateApiKeyRequest;
     try {
       if (isAdmin) {
         const { data: apiKeyData } = await createApiKey({ body });
@@ -162,7 +164,13 @@ export function CreateApiKeyForm({ onSuccess, isAdmin }: Props) {
             </Alert>
           )}
 
-          {isAdmin && <WalletSelectDropdown name="user_id" />}
+          {isAdmin && (
+            <RHFTextField
+              variant="outlined"
+              name="account_id"
+              label={t('create_api_key_form.account_id')}
+            />
+          )}
 
           <Button
             type="submit"

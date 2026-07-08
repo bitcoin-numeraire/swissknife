@@ -7,16 +7,26 @@ use sea_orm::entity::prelude::*;
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
     pub id: Uuid,
-    #[sea_orm(unique)]
-    pub user_id: String,
+    pub account_id: Uuid,
+    pub asset_id: Uuid,
+    #[sea_orm(column_type = "Text", nullable)]
+    pub label: Option<String>,
+    pub available_amount: i64,
+    pub reserved_amount: i64,
     pub created_at: DateTime,
     pub updated_at: Option<DateTime>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
-    #[sea_orm(has_many = "super::api_key::Entity")]
-    ApiKey,
+    #[sea_orm(
+        belongs_to = "super::asset::Entity",
+        from = "Column::AssetId",
+        to = "super::asset::Column::Id",
+        on_update = "NoAction",
+        on_delete = "Restrict"
+    )]
+    Asset,
     #[sea_orm(has_many = "super::btc_address::Entity")]
     BtcAddress,
     #[sea_orm(has_many = "super::invoice::Entity")]
@@ -29,9 +39,9 @@ pub enum Relation {
     WalletBalance,
 }
 
-impl Related<super::api_key::Entity> for Entity {
+impl Related<super::asset::Entity> for Entity {
     fn to() -> RelationDef {
-        Relation::ApiKey.def()
+        Relation::Asset.def()
     }
 }
 

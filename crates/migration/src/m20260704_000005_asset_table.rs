@@ -11,7 +11,7 @@ const ASSETS: &[SeedAsset] = &[
         code: "BTC",
         name: "Bitcoin",
         protocol: "bitcoin",
-        network: "bitcoin/mainnet",
+        network: "Bitcoin",
         asset_ref: "native",
         display_ticker: "BTC",
         decimals: 11,
@@ -21,7 +21,7 @@ const ASSETS: &[SeedAsset] = &[
         code: "BTC",
         name: "Bitcoin testnet",
         protocol: "bitcoin",
-        network: "bitcoin/testnet",
+        network: "Testnet",
         asset_ref: "native",
         display_ticker: "tBTC",
         decimals: 11,
@@ -31,7 +31,7 @@ const ASSETS: &[SeedAsset] = &[
         code: "BTC",
         name: "Bitcoin testnet4",
         protocol: "bitcoin",
-        network: "bitcoin/testnet4",
+        network: "Testnet4",
         asset_ref: "native",
         display_ticker: "tBTC",
         decimals: 11,
@@ -41,7 +41,7 @@ const ASSETS: &[SeedAsset] = &[
         code: "BTC",
         name: "Bitcoin regtest",
         protocol: "bitcoin",
-        network: "bitcoin/regtest",
+        network: "Regtest",
         asset_ref: "native",
         display_ticker: "rBTC",
         decimals: 11,
@@ -51,7 +51,7 @@ const ASSETS: &[SeedAsset] = &[
         code: "BTC",
         name: "Bitcoin simnet",
         protocol: "bitcoin",
-        network: "bitcoin/simnet",
+        network: "Simnet",
         asset_ref: "native",
         display_ticker: "sBTC",
         decimals: 11,
@@ -61,7 +61,7 @@ const ASSETS: &[SeedAsset] = &[
         code: "BTC",
         name: "Bitcoin signet",
         protocol: "bitcoin",
-        network: "bitcoin/signet",
+        network: "Signet",
         asset_ref: "native",
         display_ticker: "sBTC",
         decimals: 11,
@@ -149,7 +149,7 @@ async fn seed_assets(db: &dyn ConnectionTrait) -> Result<(), DbErr> {
                 decimals,
                 created_at
             )
-            VALUES (
+            SELECT
                 {id},
                 '{code}',
                 '{name}',
@@ -159,8 +159,13 @@ async fn seed_assets(db: &dyn ConnectionTrait) -> Result<(), DbErr> {
                 '{display_ticker}',
                 {decimals},
                 CURRENT_TIMESTAMP
+            WHERE NOT EXISTS (
+                SELECT 1
+                FROM asset
+                WHERE protocol = '{protocol}'
+                  AND network = '{network}'
+                  AND asset_ref = '{asset_ref}'
             )
-            ON CONFLICT(protocol, network, asset_ref) DO NOTHING
             "#,
             id = id,
             code = sql_literal(asset.code),
