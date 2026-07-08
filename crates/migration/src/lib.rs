@@ -107,7 +107,7 @@ mod tests {
         assert_eq!(
             count(
                 &conn,
-                "SELECT COUNT(*) AS count FROM asset WHERE network IN ('bitcoin/testnet', 'bitcoin/testnet4')",
+                "SELECT COUNT(*) AS count FROM asset WHERE network IN ('Testnet', 'Testnet4')",
             )
             .await,
             2
@@ -115,7 +115,7 @@ mod tests {
         assert_eq!(
             count(
                 &conn,
-                "SELECT COUNT(*) AS count FROM asset WHERE network = 'bitcoin/signet' AND display_ticker = 'sBTC'",
+                "SELECT COUNT(*) AS count FROM asset WHERE network = 'Signet' AND display_ticker = 'sBTC'",
             )
             .await,
             1
@@ -206,7 +206,7 @@ mod tests {
                       AND subject = 'alice'
                 )
                   AND asset.protocol = 'bitcoin'
-                  AND asset.network = 'bitcoin/mainnet'
+                  AND asset.network = 'Bitcoin'
                   AND asset.asset_ref = 'native'
                   AND wallet.available_amount = 12345
                   AND wallet.reserved_amount = 678

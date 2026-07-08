@@ -760,7 +760,6 @@ mod tests {
     // scoped to the authenticated user's wallet. These tests lock that invariant.
     fn user() -> User {
         User {
-            id: "alice".to_string(),
             wallet_id: Uuid::new_v4(),
             permissions: vec![],
             ..Default::default()

@@ -26,7 +26,7 @@ pub struct AuthService {
     jwt_authenticator: Arc<dyn JWTAuthenticator>,
     store: AppStore,
     provider: AuthProvider,
-    active_bitcoin_network: BtcNetwork,
+    network: BtcNetwork,
     active_asset_id: OnceCell<uuid::Uuid>,
 }
 
@@ -35,13 +35,13 @@ impl AuthService {
         jwt_authenticator: Arc<dyn JWTAuthenticator>,
         store: AppStore,
         provider: AuthProvider,
-        active_bitcoin_network: BtcNetwork,
+        network: BtcNetwork,
     ) -> Self {
         AuthService {
             jwt_authenticator,
             store,
             provider,
-            active_bitcoin_network,
+            network,
             active_asset_id: OnceCell::new(),
         }
     }
@@ -53,12 +53,12 @@ impl AuthService {
                 let asset = self
                     .store
                     .asset
-                    .find_native_btc_by_network(self.active_bitcoin_network)
+                    .find_native_btc_by_network(self.network)
                     .await?
                     .ok_or_else(|| {
                         DataError::Inconsistency(format!(
                             "Missing native BTC asset for active network {}",
-                            self.active_bitcoin_network
+                            self.network
                         ))
                     })?;
 
@@ -190,12 +190,25 @@ impl AuthUseCases for AuthService {
             claims.permissions
         };
 
-        let active_asset_id = self.active_asset_id().await?;
-        let wallet = self.store.wallet.upsert(account.id, active_asset_id).await?;
+        let asset_id = self.active_asset_id().await?;
+        let wallet = match self
+            .store
+            .wallet
+            .find_by_account_and_asset(account.id, asset_id)
+            .await?
+        {
+            Some(wallet) => wallet,
+            None => self.store.wallet.upsert(account.id, asset_id).await?,
+        };
+
+        trace!(
+            wallet_id = %wallet.id,
+            account_id = %account.id,
+            "Account active asset wallet available after authentication"
+        );
 
         let user = User {
             account_id: account.id,
-            id: claims.sub,
             wallet_id: wallet.id,
             permissions,
         };
@@ -216,12 +229,25 @@ impl AuthUseCases for AuthService {
             }
         };
 
-        let active_asset_id = self.active_asset_id().await?;
-        let wallet = self.store.wallet.upsert(api_key.account_id, active_asset_id).await?;
+        let asset_id = self.active_asset_id().await?;
+        let wallet = match self
+            .store
+            .wallet
+            .find_by_account_and_asset(api_key.account_id, asset_id)
+            .await?
+        {
+            Some(wallet) => wallet,
+            None => self.store.wallet.upsert(api_key.account_id, asset_id).await?,
+        };
+
+        trace!(
+            wallet_id = %wallet.id,
+            account_id = %api_key.account_id,
+            "Account active asset wallet available after authentication"
+        );
 
         let user = User {
             account_id: api_key.account_id,
-            id: api_key.account_id.to_string(),
             wallet_id: wallet.id,
             permissions: api_key.permissions,
         };
@@ -266,8 +292,8 @@ mod tests {
             id,
             code: "BTC".to_string(),
             name: Some("Bitcoin regtest".to_string()),
-            protocol: swissknife_types::AssetProtocol::Bitcoin,
-            network: swissknife_types::AssetNetwork::BitcoinRegtest,
+            protocol: swissknife_types::Protocol::Bitcoin,
+            network: BtcNetwork::Regtest,
             asset_ref: "native".to_string(),
             display_ticker: "rBTC".to_string(),
             decimals: 11,
@@ -681,6 +707,12 @@ mod tests {
                     });
                 store
                     .wallet
+                    .expect_find_by_account_and_asset()
+                    .withf(move |account, asset| *account == account_id && *asset == asset_id)
+                    .times(1)
+                    .returning(|_, _| Ok(None));
+                store
+                    .wallet
                     .expect_upsert()
                     .withf(move |account, asset| *account == account_id && *asset == asset_id)
                     .times(1)
@@ -696,7 +728,6 @@ mod tests {
 
                 let user = service.authenticate_jwt("token").await.unwrap();
 
-                assert_eq!(user.id, "alice");
                 assert_eq!(user.account_id, account_id);
                 assert_eq!(user.wallet_id, wallet_id);
                 assert_eq!(user.permissions, vec![Permission::ReadApiKey]);
@@ -763,6 +794,12 @@ mod tests {
                 });
                 store
                     .wallet
+                    .expect_find_by_account_and_asset()
+                    .withf(move |account, asset| *account == account_id && *asset == asset_id)
+                    .times(1)
+                    .returning(|_, _| Ok(None));
+                store
+                    .wallet
                     .expect_upsert()
                     .withf(move |account, asset| *account == account_id && *asset == asset_id)
                     .times(1)
@@ -778,7 +815,6 @@ mod tests {
 
                 let user = service.authenticate_api_key(vec![1, 2, 3]).await.unwrap();
 
-                assert_eq!(user.id, account_id.to_string());
                 assert_eq!(user.account_id, account_id);
                 assert_eq!(user.wallet_id, wallet_id);
                 assert_eq!(user.permissions, vec![Permission::ReadWallet]);

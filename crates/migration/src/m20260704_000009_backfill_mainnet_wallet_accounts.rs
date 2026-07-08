@@ -5,7 +5,7 @@ use sea_orm_migration::prelude::*;
 pub struct Migration;
 
 const OAUTH2_PROVIDER: &str = "oauth2";
-const BTC_MAINNET: &str = "bitcoin/mainnet";
+const BTC_MAINNET: &str = "Bitcoin";
 const NATIVE_ASSET_REF: &str = "native";
 const LEGACY_BTC_CURRENCY: &str = "Bitcoin";
 

@@ -1,1 +1,1 @@
-pub use swissknife_types::{Asset, AssetNetwork, AssetProtocol};
+pub use swissknife_types::{Asset, Protocol};

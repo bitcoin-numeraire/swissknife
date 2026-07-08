@@ -3,42 +3,6 @@
 import * as z from 'zod';
 
 /**
- * Asset settlement network.
- */
-export const zAssetNetwork = z.enum([
-  'bitcoin/mainnet',
-  'bitcoin/testnet',
-  'bitcoin/testnet4',
-  'bitcoin/regtest',
-  'bitcoin/simnet',
-  'bitcoin/signet',
-]);
-
-/**
- * Asset settlement protocol.
- */
-export const zAssetProtocol = z.enum(['bitcoin', 'taproot_assets']);
-
-/**
- * A spendable asset on one protocol/network.
- */
-export const zAsset = z.object({
-  asset_ref: z.string(),
-  code: z.string(),
-  created_at: z.iso.datetime(),
-  decimals: z
-    .int()
-    .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
-    .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
-  display_ticker: z.string(),
-  id: z.uuid(),
-  name: z.string().nullish(),
-  network: zAssetNetwork,
-  protocol: zAssetProtocol,
-  updated_at: z.iso.datetime().nullish(),
-});
-
-/**
  * A wallet's balance, in millisatoshis.
  */
 export const zBalance = z.object({
@@ -447,6 +411,30 @@ export const zCreateApiKeyRequest = z.object({
     .nullish(),
   name: z.string(),
   permissions: z.array(zPermission),
+});
+
+/**
+ * Asset settlement protocol.
+ */
+export const zProtocol = z.enum(['bitcoin', 'taproot_assets']);
+
+/**
+ * A spendable asset on one protocol/network.
+ */
+export const zAsset = z.object({
+  asset_ref: z.string(),
+  code: z.string(),
+  created_at: z.iso.datetime(),
+  decimals: z
+    .int()
+    .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
+    .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
+  display_ticker: z.string(),
+  id: z.uuid(),
+  name: z.string().nullish(),
+  network: zBtcNetwork,
+  protocol: zProtocol,
+  updated_at: z.iso.datetime().nullish(),
 });
 
 /**

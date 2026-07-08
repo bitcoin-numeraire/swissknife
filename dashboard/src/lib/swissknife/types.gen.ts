@@ -77,43 +77,16 @@ export type Asset = {
   /**
    * Settlement network.
    */
-  network: AssetNetwork;
+  network: BtcNetwork;
   /**
    * Settlement protocol.
    */
-  protocol: AssetProtocol;
+  protocol: Protocol;
   /**
    * Date of update in database
    */
   updated_at?: Date | null;
 };
-
-/**
- * Asset settlement network.
- */
-export const AssetNetwork = {
-  BITCOIN_MAINNET: 'bitcoin/mainnet',
-  BITCOIN_TESTNET: 'bitcoin/testnet',
-  BITCOIN_TESTNET4: 'bitcoin/testnet4',
-  BITCOIN_REGTEST: 'bitcoin/regtest',
-  BITCOIN_SIMNET: 'bitcoin/simnet',
-  BITCOIN_SIGNET: 'bitcoin/signet',
-} as const;
-
-/**
- * Asset settlement network.
- */
-export type AssetNetwork = (typeof AssetNetwork)[keyof typeof AssetNetwork];
-
-/**
- * Asset settlement protocol.
- */
-export const AssetProtocol = { BITCOIN: 'bitcoin', TAPROOT_ASSETS: 'taproot_assets' } as const;
-
-/**
- * Asset settlement protocol.
- */
-export type AssetProtocol = (typeof AssetProtocol)[keyof typeof AssetProtocol];
 
 /**
  * A wallet's balance, in millisatoshis.
@@ -861,6 +834,16 @@ export const Permission = {
  * An API access scope granted to a JWT or API key.
  */
 export type Permission = (typeof Permission)[keyof typeof Permission];
+
+/**
+ * Asset settlement protocol.
+ */
+export const Protocol = { BITCOIN: 'bitcoin', TAPROOT_ASSETS: 'taproot_assets' } as const;
+
+/**
+ * Asset settlement protocol.
+ */
+export type Protocol = (typeof Protocol)[keyof typeof Protocol];
 
 /**
  * Register Lightning Address Request

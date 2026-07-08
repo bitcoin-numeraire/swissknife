@@ -6188,11 +6188,11 @@
             "example": "Bitcoin"
           },
           "network": {
-            "$ref": "#/components/schemas/AssetNetwork",
+            "$ref": "#/components/schemas/BtcNetwork",
             "description": "Settlement network."
           },
           "protocol": {
-            "$ref": "#/components/schemas/AssetProtocol",
+            "$ref": "#/components/schemas/Protocol",
             "description": "Settlement protocol."
           },
           "updated_at": {
@@ -6204,26 +6204,6 @@
             "description": "Date of update in database"
           }
         }
-      },
-      "AssetNetwork": {
-        "type": "string",
-        "description": "Asset settlement network.",
-        "enum": [
-          "bitcoin/mainnet",
-          "bitcoin/testnet",
-          "bitcoin/testnet4",
-          "bitcoin/regtest",
-          "bitcoin/simnet",
-          "bitcoin/signet"
-        ]
-      },
-      "AssetProtocol": {
-        "type": "string",
-        "description": "Asset settlement protocol.",
-        "enum": [
-          "bitcoin",
-          "taproot_assets"
-        ]
       },
       "Balance": {
         "type": "object",
@@ -7330,6 +7310,14 @@
           "write:api_key",
           "read:btc_address",
           "write:btc_address"
+        ]
+      },
+      "Protocol": {
+        "type": "string",
+        "description": "Asset settlement protocol.",
+        "enum": [
+          "bitcoin",
+          "taproot_assets"
         ]
       },
       "RegisterLnAddressRequest": {

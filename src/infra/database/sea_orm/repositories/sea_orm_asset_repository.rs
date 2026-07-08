@@ -6,7 +6,7 @@ use super::SeaOrmConnection;
 use crate::{
     application::errors::DatabaseError,
     domains::{
-        asset::{Asset, AssetNetwork, AssetProtocol, AssetRepository},
+        asset::{Asset, AssetRepository, Protocol},
         bitcoin::BtcNetwork,
     },
     infra::database::sea_orm::models::{asset::Column, prelude::Asset as AssetEntity},
@@ -32,8 +32,8 @@ where
 {
     async fn find_native_btc_by_network(&self, network: BtcNetwork) -> Result<Option<Asset>, DatabaseError> {
         let model = AssetEntity::find()
-            .filter(Column::Protocol.eq(AssetProtocol::Bitcoin.as_str()))
-            .filter(Column::Network.eq(AssetNetwork::from(network).as_str()))
+            .filter(Column::Protocol.eq(Protocol::Bitcoin.to_string()))
+            .filter(Column::Network.eq(network.to_string()))
             .filter(Column::AssetRef.eq(NATIVE_ASSET_REF))
             .one(self.db.connection())
             .await

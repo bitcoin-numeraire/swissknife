@@ -29,7 +29,7 @@ impl ApiKeyService {
 #[async_trait]
 impl ApiKeyUseCases for ApiKeyService {
     async fn generate(&self, user: User, request: CreateApiKeyRequest) -> Result<ApiKey, ApplicationError> {
-        debug!(actor = %user.id, account_id = ?request.account_id, "Generating API key");
+        debug!(account_id = ?request.account_id, "Generating API key");
 
         // Validate that requested permissions are a subset of user's permissions
         if !request.permissions.iter().all(|p| user.has_permission(p.clone())) {
@@ -47,9 +47,7 @@ impl ApiKeyUseCases for ApiKeyService {
             None => None,
         };
 
-        let account_id = request
-            .account_id
-            .ok_or_else(|| DataError::Validation("account_id is required".to_string()))?;
+        let account_id = request.account_id.expect("account_id should be defined");
 
         // Generate a new API key
         let bytes: [u8; 32] = rand::random();
@@ -138,7 +136,6 @@ mod tests {
     fn user_with(permissions: Vec<Permission>) -> User {
         User {
             account_id: Uuid::new_v4(),
-            id: "alice".to_string(),
             wallet_id: Uuid::new_v4(),
             permissions,
         }

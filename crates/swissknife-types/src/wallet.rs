@@ -1,112 +1,20 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
+use strum_macros::{Display, EnumString};
 use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
 
 use crate::{BtcAddress, BtcNetwork, Invoice, LnAddress, OrderDirection, Payment};
 
 /// Asset settlement protocol.
-#[derive(Debug, Clone, Copy, Default, Deserialize, Serialize, PartialEq, Eq, ToSchema)]
-pub enum AssetProtocol {
+#[derive(Debug, Clone, Copy, Default, Deserialize, Serialize, EnumString, Display, PartialEq, Eq, ToSchema)]
+#[serde(rename_all = "snake_case")]
+#[strum(serialize_all = "snake_case")]
+pub enum Protocol {
     #[default]
-    #[serde(rename = "bitcoin")]
     Bitcoin,
-    #[serde(rename = "taproot_assets")]
     TaprootAssets,
-}
-
-impl AssetProtocol {
-    pub const fn as_str(self) -> &'static str {
-        match self {
-            AssetProtocol::Bitcoin => "bitcoin",
-            AssetProtocol::TaprootAssets => "taproot_assets",
-        }
-    }
-}
-
-impl std::fmt::Display for AssetProtocol {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(self.as_str())
-    }
-}
-
-impl std::str::FromStr for AssetProtocol {
-    type Err = String;
-
-    fn from_str(value: &str) -> Result<Self, Self::Err> {
-        match value {
-            "bitcoin" => Ok(AssetProtocol::Bitcoin),
-            "taproot_assets" => Ok(AssetProtocol::TaprootAssets),
-            other => Err(format!("unsupported asset protocol: {other}")),
-        }
-    }
-}
-
-/// Asset settlement network.
-#[derive(Debug, Clone, Copy, Default, Deserialize, Serialize, PartialEq, Eq, ToSchema)]
-pub enum AssetNetwork {
-    #[default]
-    #[serde(rename = "bitcoin/mainnet")]
-    BitcoinMainnet,
-    #[serde(rename = "bitcoin/testnet")]
-    BitcoinTestnet,
-    #[serde(rename = "bitcoin/testnet4")]
-    BitcoinTestnet4,
-    #[serde(rename = "bitcoin/regtest")]
-    BitcoinRegtest,
-    #[serde(rename = "bitcoin/simnet")]
-    BitcoinSimnet,
-    #[serde(rename = "bitcoin/signet")]
-    BitcoinSignet,
-}
-
-impl AssetNetwork {
-    pub const fn as_str(self) -> &'static str {
-        match self {
-            AssetNetwork::BitcoinMainnet => "bitcoin/mainnet",
-            AssetNetwork::BitcoinTestnet => "bitcoin/testnet",
-            AssetNetwork::BitcoinTestnet4 => "bitcoin/testnet4",
-            AssetNetwork::BitcoinRegtest => "bitcoin/regtest",
-            AssetNetwork::BitcoinSimnet => "bitcoin/simnet",
-            AssetNetwork::BitcoinSignet => "bitcoin/signet",
-        }
-    }
-}
-
-impl From<BtcNetwork> for AssetNetwork {
-    fn from(network: BtcNetwork) -> Self {
-        match network {
-            BtcNetwork::Bitcoin => AssetNetwork::BitcoinMainnet,
-            BtcNetwork::Testnet => AssetNetwork::BitcoinTestnet,
-            BtcNetwork::Testnet4 => AssetNetwork::BitcoinTestnet4,
-            BtcNetwork::Regtest => AssetNetwork::BitcoinRegtest,
-            BtcNetwork::Simnet => AssetNetwork::BitcoinSimnet,
-            BtcNetwork::Signet => AssetNetwork::BitcoinSignet,
-        }
-    }
-}
-
-impl std::fmt::Display for AssetNetwork {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(self.as_str())
-    }
-}
-
-impl std::str::FromStr for AssetNetwork {
-    type Err = String;
-
-    fn from_str(value: &str) -> Result<Self, Self::Err> {
-        match value {
-            "bitcoin/mainnet" => Ok(AssetNetwork::BitcoinMainnet),
-            "bitcoin/testnet" => Ok(AssetNetwork::BitcoinTestnet),
-            "bitcoin/testnet4" => Ok(AssetNetwork::BitcoinTestnet4),
-            "bitcoin/regtest" => Ok(AssetNetwork::BitcoinRegtest),
-            "bitcoin/simnet" => Ok(AssetNetwork::BitcoinSimnet),
-            "bitcoin/signet" => Ok(AssetNetwork::BitcoinSignet),
-            other => Err(format!("unsupported asset network: {other}")),
-        }
-    }
 }
 
 /// A wallet's balance, in millisatoshis.
@@ -157,11 +65,9 @@ pub struct Asset {
     #[schema(example = "Bitcoin")]
     pub name: Option<String>,
     /// Settlement protocol.
-    #[schema(example = "bitcoin")]
-    pub protocol: AssetProtocol,
+    pub protocol: Protocol,
     /// Settlement network.
-    #[schema(example = "bitcoin/mainnet")]
-    pub network: AssetNetwork,
+    pub network: BtcNetwork,
     /// Protocol-specific asset reference; native for chain-native BTC
     #[schema(example = "native")]
     pub asset_ref: String,
