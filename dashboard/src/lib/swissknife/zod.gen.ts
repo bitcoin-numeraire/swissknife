@@ -175,6 +175,7 @@ export const zLedger = z.enum(['Lightning', 'Internal', 'Onchain']);
  * Lightning Address
  */
 export const zLnAddress = z.object({
+  account_id: z.uuid(),
   active: z.boolean(),
   allows_nostr: z.boolean(),
   created_at: z.iso.datetime(),
@@ -441,10 +442,10 @@ export const zAsset = z.object({
  * Register Lightning Address Request
  */
 export const zRegisterLnAddressRequest = z.object({
+  account_id: z.uuid().nullish(),
   allows_nostr: z.boolean().optional(),
   nostr_pubkey: z.string().nullish(),
   username: z.string(),
-  wallet_id: z.uuid().nullish(),
 });
 
 /**
@@ -864,6 +865,7 @@ export const zDeleteAddressesQuery = z.object({
     })
     .nullish(),
   ids: z.array(z.uuid()).nullish(),
+  account_id: z.uuid().nullish(),
   wallet_id: z.uuid().nullish(),
   username: z.string().nullish(),
   active: z.boolean().nullish(),
@@ -896,6 +898,7 @@ export const zListAddressesQuery = z.object({
     })
     .nullish(),
   ids: z.array(z.uuid()).nullish(),
+  account_id: z.uuid().nullish(),
   wallet_id: z.uuid().nullish(),
   username: z.string().nullish(),
   active: z.boolean().nullish(),

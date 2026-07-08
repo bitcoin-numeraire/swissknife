@@ -1,18 +1,18 @@
 //! `/v1/lightning-addresses` — admin LN-address management, permission-gated
-//! (`*:ln_address`). Each test registers under its own wallet (a wallet holds at
+//! (`*:ln_address`). Each test registers under its own account (an account holds at
 //! most one address) with a process-unique, globally-unique username. Nostr is
 //! left off (`allows_nostr: false`) — its serving path is mocked separately.
 
 use reqwest::StatusCode;
 
-use swissknife_types::{LnAddress, RegisterLnAddressRequest, UpdateLnAddressRequest};
+use swissknife_types::{LnAddress, RegisterLnAddressRequest, UpdateLnAddressRequest, Wallet};
 
 use crate::common::fixtures::unique;
 use crate::common::{app, assert_error, assert_status, Auth};
 
-fn register_req(wallet_id: uuid::Uuid, username: &str) -> RegisterLnAddressRequest {
+fn register_req(wallet: &Wallet, username: &str) -> RegisterLnAddressRequest {
     RegisterLnAddressRequest {
-        wallet_id: Some(wallet_id),
+        account_id: Some(wallet.account_id),
         username: username.to_string(),
         allows_nostr: false,
         nostr_pubkey: None,
@@ -34,12 +34,13 @@ mod register {
             .post(
                 "/v1/lightning-addresses",
                 Auth::Bearer(token),
-                register_req(wallet.id, &username),
+                register_req(&wallet, &username),
             )
             .await;
         assert_status(&res, StatusCode::OK);
         let addr = res.parse::<LnAddress>();
         assert_eq!(addr.username, username);
+        assert_eq!(addr.account_id, wallet.account_id);
         assert_eq!(addr.wallet_id, wallet.id);
         assert!(addr.active, "a newly registered address is active");
         assert!(!addr.allows_nostr);
@@ -53,7 +54,12 @@ mod register {
             .post(
                 "/v1/lightning-addresses",
                 Auth::None,
-                register_req(uuid::Uuid::new_v4(), "noauth"),
+                RegisterLnAddressRequest {
+                    account_id: Some(uuid::Uuid::new_v4()),
+                    username: "noauth".to_string(),
+                    allows_nostr: false,
+                    nostr_pubkey: None,
+                },
             )
             .await;
         assert_error(&res, StatusCode::UNAUTHORIZED);
@@ -71,7 +77,7 @@ mod register {
             .post(
                 "/v1/lightning-addresses",
                 Auth::Bearer(token),
-                register_req(wallet.id, "Invalid Name"),
+                register_req(&wallet, "Invalid Name"),
             )
             .await;
         assert_error(&res, StatusCode::UNPROCESSABLE_ENTITY);
@@ -90,25 +96,25 @@ mod register {
             .post(
                 "/v1/lightning-addresses",
                 Auth::Bearer(token),
-                register_req(first.id, &username),
+                register_req(&first, &username),
             )
             .await;
         assert_status(&res, StatusCode::OK);
 
-        // The same username on another wallet conflicts.
+        // The same username on another account conflicts.
         let dup = app
             .api()
             .post(
                 "/v1/lightning-addresses",
                 Auth::Bearer(token),
-                register_req(second.id, &username),
+                register_req(&second, &username),
             )
             .await;
         assert_error(&dup, StatusCode::CONFLICT);
     }
 
     #[tokio::test]
-    async fn rejects_a_second_address_for_one_wallet() {
+    async fn rejects_a_second_address_for_one_account() {
         let app = app().await;
         let token = app.admin_token().await;
         let wallet = app.create_wallet(token, "lnaddr-one").await;
@@ -118,18 +124,18 @@ mod register {
             .post(
                 "/v1/lightning-addresses",
                 Auth::Bearer(token),
-                register_req(wallet.id, &unique("lnaddr-one")),
+                register_req(&wallet, &unique("lnaddr-one")),
             )
             .await;
         assert_status(&res, StatusCode::OK);
 
-        // A wallet may hold only one address.
+        // An account may hold only one address.
         let again = app
             .api()
             .post(
                 "/v1/lightning-addresses",
                 Auth::Bearer(token),
-                register_req(wallet.id, &unique("lnaddr-two")),
+                register_req(&wallet, &unique("lnaddr-two")),
             )
             .await;
         assert_error(&again, StatusCode::CONFLICT);
@@ -151,7 +157,7 @@ mod manage {
             .post(
                 "/v1/lightning-addresses",
                 Auth::Bearer(token),
-                register_req(wallet.id, &username),
+                register_req(&wallet, &username),
             )
             .await
             .parse::<LnAddress>();

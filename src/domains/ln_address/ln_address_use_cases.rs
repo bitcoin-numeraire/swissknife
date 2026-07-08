@@ -14,7 +14,7 @@ use super::{LnAddress, LnAddressFilter};
 pub trait LnAddressUseCases: Send + Sync {
     async fn register(
         &self,
-        wallet_id: Uuid,
+        account_id: Uuid,
         username: String,
         allows_nostr: bool,
         nostr_pubkey: Option<PublicKey>,

@@ -49,6 +49,7 @@ pub(crate) enum LnAddress {
     Table,
     Id,
     WalletId,
+    AccountId,
     Username,
     Active,
     CreatedAt,

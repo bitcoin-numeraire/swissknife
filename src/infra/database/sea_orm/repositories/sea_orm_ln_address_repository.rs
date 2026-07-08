@@ -36,9 +36,9 @@ impl LnAddressRepository for SeaOrmLnAddressRepository {
         Ok(model.map(Into::into))
     }
 
-    async fn find_by_wallet_id(&self, wallet_id: Uuid) -> Result<Option<LnAddress>, DatabaseError> {
+    async fn find_by_account_id(&self, account_id: Uuid) -> Result<Option<LnAddress>, DatabaseError> {
         let model = LnAddressEntity::find()
-            .filter(Column::WalletId.eq(wallet_id))
+            .filter(Column::AccountId.eq(account_id))
             .one(&self.db)
             .await
             .map_err(|e| DatabaseError::FindOne(e.to_string()))?;
@@ -58,6 +58,7 @@ impl LnAddressRepository for SeaOrmLnAddressRepository {
 
     async fn find_many(&self, filter: LnAddressFilter) -> Result<Vec<LnAddress>, DatabaseError> {
         let models = LnAddressEntity::find()
+            .apply_if(filter.account_id, |q, id| q.filter(Column::AccountId.eq(id)))
             .apply_if(filter.wallet_id, |q, id| q.filter(Column::WalletId.eq(id)))
             .apply_if(filter.username, |q, username| q.filter(Column::Username.eq(username)))
             .apply_if(filter.ids, |q, ids| q.filter(Column::Id.is_in(ids)))
@@ -77,6 +78,7 @@ impl LnAddressRepository for SeaOrmLnAddressRepository {
 
     async fn insert(
         &self,
+        account_id: Uuid,
         wallet_id: Uuid,
         username: &str,
         allows_nostr: bool,
@@ -84,6 +86,7 @@ impl LnAddressRepository for SeaOrmLnAddressRepository {
     ) -> Result<LnAddress, DatabaseError> {
         let model = ActiveModel {
             id: Set(Uuid::new_v4()),
+            account_id: Set(account_id),
             wallet_id: Set(wallet_id),
             username: Set(username.to_owned()),
             allows_nostr: Set(allows_nostr),
@@ -103,6 +106,7 @@ impl LnAddressRepository for SeaOrmLnAddressRepository {
     async fn update(&self, ln_address: LnAddress) -> Result<LnAddress, DatabaseError> {
         let model = ActiveModel {
             id: Unchanged(ln_address.id),
+            account_id: Unchanged(ln_address.account_id),
             wallet_id: Unchanged(ln_address.wallet_id),
             username: Set(ln_address.username),
             allows_nostr: Set(ln_address.allows_nostr),
@@ -122,6 +126,7 @@ impl LnAddressRepository for SeaOrmLnAddressRepository {
 
     async fn delete_many(&self, filter: LnAddressFilter) -> Result<u64, DatabaseError> {
         let result = LnAddressEntity::delete_many()
+            .apply_if(filter.account_id, |q, id| q.filter(Column::AccountId.eq(id)))
             .apply_if(filter.wallet_id, |q, id| q.filter(Column::WalletId.eq(id)))
             .apply_if(filter.ids, |q, ids| q.filter(Column::Id.is_in(ids)))
             .apply_if(filter.username, |q, username| q.filter(Column::Username.eq(username)))

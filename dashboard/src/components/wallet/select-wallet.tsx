@@ -1,5 +1,7 @@
 import type { Wallet } from 'src/lib/swissknife';
 
+import { useFormContext } from 'react-hook-form';
+
 import { Box } from '@mui/material';
 
 import { displayLnAddress } from 'src/utils/lnurl';
@@ -13,6 +15,7 @@ import { RHFAutocomplete } from 'src/components/hook-form';
 
 type WalletSelectProps = {
   name?: 'account_id' | 'wallet_id';
+  linkedAccountName?: 'account_id';
 };
 
 function walletFieldValue(wallet: Wallet, name: WalletSelectProps['name']) {
@@ -25,8 +28,9 @@ function walletOptionLabel(wallet: Wallet) {
   return wallet.label ?? wallet.account_id;
 }
 
-export function WalletSelectDropdown({ name = 'wallet_id' }: WalletSelectProps) {
+export function WalletSelectDropdown({ name = 'wallet_id', linkedAccountName }: WalletSelectProps) {
   const { wallets, walletsError, walletsLoading } = useListWallets();
+  const { setValue } = useFormContext();
 
   if (walletsError) {
     handleActionError(walletsError);
@@ -46,6 +50,13 @@ export function WalletSelectDropdown({ name = 'wallet_id' }: WalletSelectProps) 
           const wallet = wallets.find((item) => walletFieldValue(item, name) === option);
 
           return wallet ? walletOptionLabel(wallet) : option;
+        }}
+        onChange={(_, newValue) => {
+          setValue(name, newValue, { shouldValidate: true });
+          if (linkedAccountName) {
+            const wallet = wallets.find((item) => walletFieldValue(item, name) === newValue);
+            setValue(linkedAccountName, wallet?.account_id ?? null, { shouldValidate: true });
+          }
         }}
       />
     )

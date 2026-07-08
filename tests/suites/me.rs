@@ -383,7 +383,7 @@ mod ln_address {
                 "/v1/me/lightning-address",
                 Auth::ApiKey(&user.key),
                 RegisterLnAddressRequest {
-                    wallet_id: None,
+                    account_id: None,
                     username: username.clone(),
                     allows_nostr: false,
                     nostr_pubkey: None,
@@ -434,7 +434,7 @@ mod ln_address {
                 "/v1/me/lightning-address",
                 Auth::ApiKey(&alice.key),
                 RegisterLnAddressRequest {
-                    wallet_id: None,
+                    account_id: None,
                     username: unique("me-lnaddr-a"),
                     allows_nostr: false,
                     nostr_pubkey: None,

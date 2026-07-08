@@ -72,7 +72,7 @@ impl AppServices {
             domain,
             host,
         );
-        let ln_address = LnAddressService::new(store.clone());
+        let ln_address = LnAddressService::new(store.clone(), bitcoin_wallet.network());
         let wallet = WalletService::new(store.clone());
         let auth = AuthService::new(
             jwt_authenticator,

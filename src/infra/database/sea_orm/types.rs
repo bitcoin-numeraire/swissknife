@@ -201,6 +201,7 @@ impl From<LnAddressModel> for LnAddress {
     fn from(model: LnAddressModel) -> Self {
         LnAddress {
             id: model.id,
+            account_id: model.account_id,
             wallet_id: model.wallet_id,
             username: model.username,
             active: model.active,

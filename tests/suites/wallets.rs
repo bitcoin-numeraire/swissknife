@@ -144,9 +144,9 @@ mod list {
 mod list_overviews {
     use super::*;
 
-    fn register_ln_address(wallet_id: uuid::Uuid, username: &str) -> RegisterLnAddressRequest {
+    fn register_ln_address(wallet: &Wallet, username: &str) -> RegisterLnAddressRequest {
         RegisterLnAddressRequest {
-            wallet_id: Some(wallet_id),
+            account_id: Some(wallet.account_id),
             username: username.to_string(),
             allows_nostr: false,
             nostr_pubkey: None,
@@ -194,7 +194,7 @@ mod list_overviews {
             .post(
                 "/v1/lightning-addresses",
                 Auth::Bearer(token),
-                register_ln_address(payee.id, &username),
+                register_ln_address(&payee, &username),
             )
             .await;
         assert_status(&address, StatusCode::OK);

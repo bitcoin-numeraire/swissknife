@@ -201,7 +201,7 @@ wallet.available_amount/reserved_amount are integers in 10^-decimals of one asse
 ### 5. Addresses and API keys move to account-aware ownership
 
 - `btc_address.wallet_id` remains wallet-scoped. A Bitcoin deposit address belongs to a specific native-BTC wallet on a specific network.
-- `ln_address` becomes identity-owned with an explicit receiving wallet route. Add `account_id` and rename the existing `wallet_id` to `receive_wallet_id`, required on address creation. The receive wallet must belong to the same account and must be a Lightning-compatible BTC asset. This keeps one username as an identity-level handle while every generated invoice still lands in a concrete wallet.
+- `ln_address` becomes identity-owned. Add `account_id` while keeping the existing `wallet_id` column as the concrete wallet that receives generated invoices. Address creation should not accept an arbitrary wallet; the service resolves the account's native BTC wallet for the active Bitcoin network and fails if it does not exist. This keeps one username as an identity-level handle while every generated invoice still lands in a concrete wallet compatible with the running node.
 - `api_key` should reference `account.id`, not `wallet.user_id`.
 - Issue #115's "master key" should be treated as an account/keyring feature, not a side effect of the old wallet-as-user table. A future key model can derive wallet-specific keys from account-level material, but this remodel should not silently create or migrate private key material.
 
@@ -361,8 +361,8 @@ The migration must support SQLite and Postgres and must preserve existing wallet
 1. Update `payment.wallet_id` by joining `(old wallet_id, payment.currency)` through the migration mapping.
 2. Update `invoice.wallet_id` by joining `(old wallet_id, invoice.currency)` through the migration mapping.
 3. Move `btc_address.wallet_id` to the account's native BTC wallet for the active Bitcoin network. Existing `btc_address` rows do not carry their own currency, so this must use deployment/network configuration or a documented manual fallback.
-4. Add `ln_address.account_id` and rename or replace the old `wallet_id` column with `receive_wallet_id`.
-5. Add/validate constraints so the receiving wallet belongs to the same account. If a cross-table check cannot be expressed portably in SQL for SQLite and Postgres, enforce it in service/repository code and cover it with integration tests.
+4. Add `ln_address.account_id` and keep the old `wallet_id` column as the invoice-receiving wallet route.
+5. Resolve the receiving wallet from `(account_id, active native BTC asset)` in service code and cover it with integration tests. This avoids accepting mismatched wallets or networks at the API boundary.
 
 ### Phase 4: Cut over services
 
@@ -371,8 +371,7 @@ The migration must support SQLite and Postgres and must preserve existing wallet
 
    ```rust
    async fn find_by_account_and_asset(account_id: Uuid, asset_id: Uuid) -> Result<Option<Wallet>, DatabaseError>;
-   async fn find_owned(wallet_id: Uuid, account_id: Uuid) -> Result<Option<Wallet>, DatabaseError>;
-   async fn ensure_for_account_asset(account_id: Uuid, asset_id: Uuid) -> Result<Wallet, DatabaseError>;
+   async fn upsert(account_id: Uuid, asset_id: Uuid) -> Result<Wallet, DatabaseError>;
    ```
 
 3. Move reserve/debit/credit operations from `wallet_balance` to `wallet` conditional updates:
