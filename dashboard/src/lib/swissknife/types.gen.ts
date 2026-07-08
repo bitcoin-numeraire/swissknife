@@ -40,13 +40,6 @@ export type ApiKey = {
    * List of permissions for this API key
    */
   permissions: Array<Permission>;
-  /**
-   * Auth provider subject this key authenticates as.
-   *
-   * Ownership is enforced through `account_id`; this subject is the
-   * request-time actor label returned by authentication.
-   */
-  user_id: string;
 };
 
 /**
@@ -82,18 +75,45 @@ export type Asset = {
    */
   name?: string | null;
   /**
-   * Settlement network, such as bitcoin/mainnet or bitcoin/regtest
+   * Settlement network.
    */
-  network: string;
+  network: AssetNetwork;
   /**
-   * Settlement protocol, such as bitcoin or taproot_assets
+   * Settlement protocol.
    */
-  protocol: string;
+  protocol: AssetProtocol;
   /**
    * Date of update in database
    */
   updated_at?: Date | null;
 };
+
+/**
+ * Asset settlement network.
+ */
+export const AssetNetwork = {
+  BITCOIN_MAINNET: 'bitcoin/mainnet',
+  BITCOIN_TESTNET: 'bitcoin/testnet',
+  BITCOIN_TESTNET4: 'bitcoin/testnet4',
+  BITCOIN_REGTEST: 'bitcoin/regtest',
+  BITCOIN_SIMNET: 'bitcoin/simnet',
+  BITCOIN_SIGNET: 'bitcoin/signet',
+} as const;
+
+/**
+ * Asset settlement network.
+ */
+export type AssetNetwork = (typeof AssetNetwork)[keyof typeof AssetNetwork];
+
+/**
+ * Asset settlement protocol.
+ */
+export const AssetProtocol = { BITCOIN: 'bitcoin', TAPROOT_ASSETS: 'taproot_assets' } as const;
+
+/**
+ * Asset settlement protocol.
+ */
+export type AssetProtocol = (typeof AssetProtocol)[keyof typeof AssetProtocol];
 
 /**
  * A wallet's balance, in millisatoshis.
@@ -291,6 +311,12 @@ export type Contact = {
  */
 export type CreateApiKeyRequest = {
   /**
+   * Owning account ID.
+   *
+   * User-scoped endpoints populate this with your own account.
+   */
+  account_id?: string | null;
+  /**
    * API key description
    */
   description?: string | null;
@@ -306,12 +332,6 @@ export type CreateApiKeyRequest = {
    * List of permissions for this API key
    */
   permissions: Array<Permission>;
-  /**
-   * Auth provider subject to mint the key for.
-   *
-   * User-scoped endpoints populate this with your own subject.
-   */
-  user_id?: string | null;
 };
 
 /**
@@ -1196,13 +1216,9 @@ export type RevokeApiKeysData = {
      */
     ids?: Array<string> | null;
     /**
-     * Auth provider subject to filter by.
-     *
-     * User-scoped endpoints populate this with your own subject.
-     */
-    user_id?: string | null;
-    /**
      * Owning account ID.
+     *
+     * User-scoped endpoints populate this from the authenticated account.
      */
     account_id?: string | null;
     /**
@@ -1260,13 +1276,9 @@ export type ListApiKeysData = {
      */
     ids?: Array<string> | null;
     /**
-     * Auth provider subject to filter by.
-     *
-     * User-scoped endpoints populate this with your own subject.
-     */
-    user_id?: string | null;
-    /**
      * Owning account ID.
+     *
+     * User-scoped endpoints populate this from the authenticated account.
      */
     account_id?: string | null;
     /**
@@ -2433,13 +2445,9 @@ export type RevokeWalletApiKeysData = {
      */
     ids?: Array<string> | null;
     /**
-     * Auth provider subject to filter by.
-     *
-     * User-scoped endpoints populate this with your own subject.
-     */
-    user_id?: string | null;
-    /**
      * Owning account ID.
+     *
+     * User-scoped endpoints populate this from the authenticated account.
      */
     account_id?: string | null;
     /**
@@ -2494,13 +2502,9 @@ export type ListWalletApiKeysData = {
      */
     ids?: Array<string> | null;
     /**
-     * Auth provider subject to filter by.
-     *
-     * User-scoped endpoints populate this with your own subject.
-     */
-    user_id?: string | null;
-    /**
      * Owning account ID.
+     *
+     * User-scoped endpoints populate this from the authenticated account.
      */
     account_id?: string | null;
     /**
@@ -3719,7 +3723,9 @@ export type DeleteWalletsData = {
      */
     ids?: Array<string> | null;
     /**
-     * Owning account ID
+     * Owning account ID.
+     *
+     * User-scoped endpoints populate this from the authenticated account.
      */
     account_id?: string | null;
     /**

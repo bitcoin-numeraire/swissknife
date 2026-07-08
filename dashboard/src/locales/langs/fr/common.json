@@ -849,7 +849,7 @@
     "create_success": "Jeton API créé avec succès",
     "create_button": "Générer un jeton",
     "name": "Nom du jeton",
-    "user_id": "Sujet utilisateur",
+    "account_id": "ID du compte",
     "expiration": "Expiration",
     "description": "Description",
     "key": "Clé secrète",
@@ -858,7 +858,7 @@
     "key_display_message": "Sauvegardez votre jeton et gardez-le en sécurité, ne le partagez pas publiquement. Ce jeton ne sera plus jamais affiché."
   },
   "api_key_list": {
-    "user": "Utilisateur",
+    "account": "Compte",
     "name": "Nom",
     "scopes": "Permissions",
     "description": "Description",

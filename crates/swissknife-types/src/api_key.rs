@@ -11,12 +11,6 @@ use crate::{OrderDirection, Permission};
 pub struct ApiKey {
     /// Internal ID
     pub id: Uuid,
-    /// Auth provider subject this key authenticates as.
-    ///
-    /// Ownership is enforced through `account_id`; this subject is the
-    /// request-time actor label returned by authentication.
-    #[schema(example = "auth0|numeraire")]
-    pub user_id: String,
     /// Owning account ID
     pub account_id: Uuid,
     /// API key name
@@ -40,11 +34,10 @@ pub struct ApiKey {
 /// Create API Key Request
 #[derive(Deserialize, ToSchema, Serialize)]
 pub struct CreateApiKeyRequest {
-    /// Auth provider subject to mint the key for.
+    /// Owning account ID.
     ///
-    /// User-scoped endpoints populate this with your own subject.
-    #[schema(example = "auth0|numeraire")]
-    pub user_id: Option<String>,
+    /// User-scoped endpoints populate this with your own account.
+    pub account_id: Option<Uuid>,
     /// API key name
     pub name: String,
     /// List of permissions for this API key
@@ -67,11 +60,9 @@ pub struct ApiKeyFilter {
     pub offset: Option<u64>,
     /// List of IDs
     pub ids: Option<Vec<Uuid>>,
-    /// Auth provider subject to filter by.
-    ///
-    /// User-scoped endpoints populate this with your own subject.
-    pub user_id: Option<String>,
     /// Owning account ID.
+    ///
+    /// User-scoped endpoints populate this from the authenticated account.
     pub account_id: Option<Uuid>,
     /// Direction of the ordering of results
     #[serde(default)]

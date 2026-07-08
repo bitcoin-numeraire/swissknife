@@ -218,7 +218,7 @@ mod tests {
     }
 
     #[async_std::test]
-    async fn api_key_user_id_is_not_a_wallet_foreign_key() {
+    async fn api_key_uses_account_id_without_a_wallet_subject() {
         let conn = sqlite().await;
 
         Migrator::up(&conn, None).await.expect("run migrations");
@@ -236,10 +236,9 @@ mod tests {
         conn.execute(Statement::from_string(
             DatabaseBackend::Sqlite,
             r#"
-            INSERT INTO api_key (id, user_id, account_id, name, key_hash, permissions, created_at)
+            INSERT INTO api_key (id, account_id, name, key_hash, permissions, created_at)
             VALUES (
                 X'33333333333343338333333333333333',
-                'external-subject',
                 X'22222222222242228222222222222222',
                 'ci',
                 X'4444444444444444444444444444444444444444444444444444444444444444',
@@ -250,8 +249,24 @@ mod tests {
             .to_string(),
         ))
         .await
-        .expect("insert api key without matching wallet user_id");
+        .expect("insert api key with account_id only");
 
         assert_eq!(count(&conn, "SELECT COUNT(*) AS count FROM api_key").await, 1);
+        assert_eq!(
+            count(
+                &conn,
+                "SELECT COUNT(*) AS count FROM pragma_table_info('api_key') WHERE name = 'user_id'",
+            )
+            .await,
+            0
+        );
+        assert_eq!(
+            count(
+                &conn,
+                "SELECT COUNT(*) AS count FROM pragma_table_info('wallet') WHERE name = 'user_id'",
+            )
+            .await,
+            0
+        );
     }
 }

@@ -850,7 +850,7 @@
     "create_success": "API token created successfully",
     "create_button": "Generate token",
     "name": "Token name",
-    "user_id": "User subject",
+    "account_id": "Account ID",
     "expiration": "Expiration",
     "description": "Description",
     "key": "Secret key",
@@ -859,7 +859,7 @@
     "key_display_message": "Save your token and keep it secure, do not share it publicly or expose it in code repositories. This token will never be displayed anymore."
   },
   "api_key_list": {
-    "user": "User",
+    "account": "Account",
     "name": "Name",
     "scopes": "Scopes",
     "description": "Description",

@@ -3,6 +3,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use bcrypt::{hash, verify, DEFAULT_COST};
 use serde_bolt::bitcoin::hashes::{sha256, Hash};
+use tokio::sync::OnceCell;
 
 use tracing::{debug, trace};
 
@@ -12,7 +13,7 @@ use crate::{
         composition::AuthProvider,
         errors::{ApplicationError, AuthenticationError, DataError},
     },
-    domains::wallet::Wallet,
+    domains::bitcoin::BtcNetwork,
     infra::jwt::JWTAuthenticator,
 };
 
@@ -25,7 +26,8 @@ pub struct AuthService {
     jwt_authenticator: Arc<dyn JWTAuthenticator>,
     store: AppStore,
     provider: AuthProvider,
-    active_asset_id: uuid::Uuid,
+    active_bitcoin_network: BtcNetwork,
+    active_asset_id: OnceCell<uuid::Uuid>,
 }
 
 impl AuthService {
@@ -33,18 +35,36 @@ impl AuthService {
         jwt_authenticator: Arc<dyn JWTAuthenticator>,
         store: AppStore,
         provider: AuthProvider,
-        active_asset_id: uuid::Uuid,
+        active_bitcoin_network: BtcNetwork,
     ) -> Self {
         AuthService {
             jwt_authenticator,
             store,
             provider,
-            active_asset_id,
+            active_bitcoin_network,
+            active_asset_id: OnceCell::new(),
         }
     }
 
-    async fn active_wallet(&self, account_id: uuid::Uuid) -> Result<Wallet, ApplicationError> {
-        Ok(self.store.wallet.upsert(account_id, self.active_asset_id).await?)
+    async fn active_asset_id(&self) -> Result<uuid::Uuid, ApplicationError> {
+        Ok(*self
+            .active_asset_id
+            .get_or_try_init(|| async {
+                let asset = self
+                    .store
+                    .asset
+                    .find_native_btc_by_network(self.active_bitcoin_network)
+                    .await?
+                    .ok_or_else(|| {
+                        DataError::Inconsistency(format!(
+                            "Missing native BTC asset for active network {}",
+                            self.active_bitcoin_network
+                        ))
+                    })?;
+
+                Ok::<_, ApplicationError>(asset.id)
+            })
+            .await?)
     }
 }
 
@@ -170,13 +190,8 @@ impl AuthUseCases for AuthService {
             claims.permissions
         };
 
-        let wallet = self.active_wallet(account.id).await?;
-
-        trace!(
-            wallet_id = %wallet.id,
-            account_id = %account.id,
-            "Account active asset wallet available after authentication"
-        );
+        let active_asset_id = self.active_asset_id().await?;
+        let wallet = self.store.wallet.upsert(account.id, active_asset_id).await?;
 
         let user = User {
             account_id: account.id,
@@ -185,7 +200,6 @@ impl AuthUseCases for AuthService {
             permissions,
         };
 
-        trace!(?user, "Authentication successful");
         Ok(user)
     }
 
@@ -202,16 +216,16 @@ impl AuthUseCases for AuthService {
             }
         };
 
-        let wallet = self.active_wallet(api_key.account_id).await?;
+        let active_asset_id = self.active_asset_id().await?;
+        let wallet = self.store.wallet.upsert(api_key.account_id, active_asset_id).await?;
 
         let user = User {
             account_id: api_key.account_id,
-            id: api_key.user_id,
+            id: api_key.account_id.to_string(),
             wallet_id: wallet.id,
             permissions: api_key.permissions,
         };
 
-        trace!(?user, "Authentication successful");
         Ok(user)
     }
 }
@@ -224,6 +238,8 @@ mod tests {
     use crate::{
         application::composition::MockAppStoreBuilder,
         domains::{
+            asset::Asset,
+            bitcoin::BtcNetwork,
             user::{Account, ApiKey, AuthClaims, AuthIdentity},
             wallet::Wallet,
         },
@@ -232,21 +248,8 @@ mod tests {
 
     use super::*;
 
-    fn active_asset_id() -> Uuid {
-        Uuid::from_u128(0x00000000000040008000000000000001)
-    }
-
     fn service(jwt: MockJWTAuthenticator, store: MockAppStoreBuilder, provider: AuthProvider) -> AuthService {
-        service_with_active_asset(jwt, store, provider, active_asset_id())
-    }
-
-    fn service_with_active_asset(
-        jwt: MockJWTAuthenticator,
-        store: MockAppStoreBuilder,
-        provider: AuthProvider,
-        active_asset_id: Uuid,
-    ) -> AuthService {
-        AuthService::new(Arc::new(jwt), store.build(), provider, active_asset_id)
+        AuthService::new(Arc::new(jwt), store.build(), provider, BtcNetwork::Regtest)
     }
 
     fn claims(sub: &str) -> AuthClaims {
@@ -255,6 +258,21 @@ mod tests {
             iat: 0,
             sub: sub.to_string(),
             permissions: vec![Permission::ReadWallet],
+        }
+    }
+
+    fn asset_fixture(id: Uuid) -> Asset {
+        Asset {
+            id,
+            code: "BTC".to_string(),
+            name: Some("Bitcoin regtest".to_string()),
+            protocol: swissknife_types::AssetProtocol::Bitcoin,
+            network: swissknife_types::AssetNetwork::BitcoinRegtest,
+            asset_ref: "native".to_string(),
+            display_ticker: "rBTC".to_string(),
+            decimals: 11,
+            created_at: chrono::Utc::now(),
+            updated_at: None,
         }
     }
 
@@ -667,8 +685,14 @@ mod tests {
                     .withf(move |account, asset| *account == account_id && *asset == asset_id)
                     .times(1)
                     .returning(move |account, asset| Ok(wallet_fixture(wallet_id, account, asset)));
+                store
+                    .asset
+                    .expect_find_native_btc_by_network()
+                    .withf(|network| *network == BtcNetwork::Regtest)
+                    .times(1)
+                    .returning(move |_| Ok(Some(asset_fixture(asset_id))));
 
-                let service = service_with_active_asset(jwt, store, AuthProvider::Jwt, asset_id);
+                let service = service(jwt, store, AuthProvider::Jwt);
 
                 let user = service.authenticate_jwt("token").await.unwrap();
 
@@ -732,7 +756,6 @@ mod tests {
                 let mut store = MockAppStoreBuilder::new();
                 store.api_key.expect_find_by_key_hash().times(1).returning(move |_| {
                     Ok(Some(ApiKey {
-                        user_id: "alice".to_string(),
                         account_id,
                         permissions: vec![Permission::ReadWallet],
                         ..Default::default()
@@ -744,12 +767,18 @@ mod tests {
                     .withf(move |account, asset| *account == account_id && *asset == asset_id)
                     .times(1)
                     .returning(move |account, asset| Ok(wallet_fixture(wallet_id, account, asset)));
+                store
+                    .asset
+                    .expect_find_native_btc_by_network()
+                    .withf(|network| *network == BtcNetwork::Regtest)
+                    .times(1)
+                    .returning(move |_| Ok(Some(asset_fixture(asset_id))));
 
-                let service =
-                    service_with_active_asset(MockJWTAuthenticator::new(), store, AuthProvider::Jwt, asset_id);
+                let service = service(MockJWTAuthenticator::new(), store, AuthProvider::Jwt);
 
                 let user = service.authenticate_api_key(vec![1, 2, 3]).await.unwrap();
 
+                assert_eq!(user.id, account_id.to_string());
                 assert_eq!(user.account_id, account_id);
                 assert_eq!(user.wallet_id, wallet_id);
                 assert_eq!(user.permissions, vec![Permission::ReadWallet]);

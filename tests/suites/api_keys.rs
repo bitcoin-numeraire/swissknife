@@ -1,5 +1,5 @@
 //! `/v1/api-keys` — admin API-key management, permission-gated (`*:api_key`).
-//! The admin endpoint mints a key for an explicit `user_id`; minting a key for
+//! The admin endpoint mints a key for an explicit `account_id`; minting a key for
 //! oneself is the `/v1/me/api-keys` path (the `api_key` fixture). Also exercises
 //! that a minted key authenticates and carries exactly its scopes.
 
@@ -10,9 +10,9 @@ use swissknife_types::{ApiKey, CreateApiKeyRequest, CreateWalletRequest, Permiss
 use crate::common::fixtures::unique;
 use crate::common::{app, assert_error, assert_status, Auth};
 
-fn new_key(user_id: &str, permissions: Vec<Permission>) -> CreateApiKeyRequest {
+fn new_key(account_id: uuid::Uuid, permissions: Vec<Permission>) -> CreateApiKeyRequest {
     CreateApiKeyRequest {
-        user_id: Some(user_id.to_string()),
+        account_id: Some(account_id),
         name: unique("key"),
         permissions,
         description: None,
@@ -24,22 +24,22 @@ mod create {
     use super::*;
 
     #[tokio::test]
-    async fn creates_a_key_for_the_named_user_that_authenticates() {
+    async fn creates_a_key_for_the_requested_account_that_authenticates() {
         let app = app().await;
         let token = app.admin_token().await;
-        let subject = unique("key-owner");
+        let account_id = uuid::Uuid::new_v4();
 
         let res = app
             .api()
             .post(
                 "/v1/api-keys",
                 Auth::Bearer(token),
-                new_key(&subject, vec![Permission::ReadWallet]),
+                new_key(account_id, vec![Permission::ReadWallet]),
             )
             .await;
         assert_status(&res, StatusCode::OK);
         let created = res.parse::<ApiKey>();
-        assert_eq!(created.user_id, subject, "key belongs to the named subject");
+        assert_eq!(created.account_id, account_id, "key belongs to the requested account");
         assert_eq!(
             created.permissions,
             vec![Permission::ReadWallet],
@@ -60,7 +60,11 @@ mod create {
 
         let res = app
             .api()
-            .post("/v1/api-keys", Auth::ApiKey(&key), new_key("anyone", vec![]))
+            .post(
+                "/v1/api-keys",
+                Auth::ApiKey(&key),
+                new_key(uuid::Uuid::new_v4(), vec![]),
+            )
             .await;
         assert_error(&res, StatusCode::FORBIDDEN);
     }
@@ -70,7 +74,7 @@ mod create {
         let app = app().await;
         let res = app
             .api()
-            .post("/v1/api-keys", Auth::None, new_key("anyone", vec![]))
+            .post("/v1/api-keys", Auth::None, new_key(uuid::Uuid::new_v4(), vec![]))
             .await;
         assert_error(&res, StatusCode::UNAUTHORIZED);
     }
@@ -107,14 +111,14 @@ mod manage {
     async fn get_list_then_revoke() {
         let app = app().await;
         let token = app.admin_token().await;
-        let subject = unique("key-managed");
+        let account_id = uuid::Uuid::new_v4();
 
         let created = app
             .api()
             .post(
                 "/v1/api-keys",
                 Auth::Bearer(token),
-                new_key(&subject, vec![Permission::ReadApiKey]),
+                new_key(account_id, vec![Permission::ReadApiKey]),
             )
             .await
             .parse::<ApiKey>();

@@ -1,10 +1,7 @@
 use std::sync::Arc;
 
 use crate::{
-    application::{
-        composition::{AppAdapters, AppConfig},
-        errors::{ApplicationError, DataError},
-    },
+    application::composition::{AppAdapters, AppConfig},
     domains::{
         bitcoin::{BitcoinService, BitcoinUseCases},
         event::{EventService, EventUseCases},
@@ -34,7 +31,7 @@ pub struct AppServices {
 }
 
 impl AppServices {
-    pub async fn new(config: AppConfig, adapters: AppAdapters) -> Result<Self, ApplicationError> {
+    pub fn new(config: AppConfig, adapters: AppAdapters) -> Self {
         let AppConfig {
             domain,
             host,
@@ -77,20 +74,11 @@ impl AppServices {
         );
         let ln_address = LnAddressService::new(store.clone());
         let active_bitcoin_network = bitcoin_wallet.network();
-        let active_asset = store
-            .asset
-            .find_native_btc_by_network(active_bitcoin_network)
-            .await?
-            .ok_or_else(|| {
-                DataError::Inconsistency(format!(
-                    "Missing native BTC asset for active network {active_bitcoin_network}"
-                ))
-            })?;
         let wallet = WalletService::new(store.clone());
-        let auth = AuthService::new(jwt_authenticator, store.clone(), auth_provider, active_asset.id);
+        let auth = AuthService::new(jwt_authenticator, store.clone(), auth_provider, active_bitcoin_network);
         let system = Arc::new(SystemService::new(store.clone(), ln_client.clone()));
         let nostr = NostrService::new(store.clone());
-        let api_key = ApiKeyService::new(store.clone(), auth_provider);
+        let api_key = ApiKeyService::new(store.clone());
         let bitcoin = BitcoinService::new(
             store.clone(),
             bitcoin_wallet,
@@ -99,7 +87,7 @@ impl AppServices {
             system.clone(),
         );
 
-        Ok(AppServices {
+        AppServices {
             invoice: Box::new(invoices),
             payment: Box::new(payments),
             wallet: Box::new(wallet),
@@ -111,7 +99,7 @@ impl AppServices {
             api_key: Box::new(api_key),
             bitcoin: Box::new(bitcoin),
             event,
-        })
+        }
     }
 }
 

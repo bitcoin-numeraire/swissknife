@@ -70,8 +70,8 @@ mod wallet {
         // /me is auth-only: a key carrying no scopes still works for its wallet.
         let app = app().await;
         let token = app.admin_token().await;
-        let subject = unique("me-noperm");
-        let key = app.user_api_key(token, &subject, vec![]).await;
+        let _subject = unique("me-noperm");
+        let key = app.user_api_key(token, uuid::Uuid::new_v4(), vec![]).await;
 
         let res = app.api().get("/v1/me", Auth::ApiKey(&key)).await;
         assert_status(&res, StatusCode::OK);
@@ -481,7 +481,7 @@ mod api_keys {
                 "/v1/me/api-keys",
                 Auth::ApiKey(&user.key),
                 CreateApiKeyRequest {
-                    user_id: None,
+                    account_id: None,
                     name: unique("me-key"),
                     permissions: vec![Permission::ReadWallet],
                     description: None,
@@ -526,7 +526,7 @@ mod api_keys {
                 "/v1/me/api-keys",
                 Auth::ApiKey(&alice.key),
                 CreateApiKeyRequest {
-                    user_id: None,
+                    account_id: None,
                     name: unique("me-key-a"),
                     permissions: vec![],
                     description: None,

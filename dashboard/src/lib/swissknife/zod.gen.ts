@@ -3,6 +3,23 @@
 import * as z from 'zod';
 
 /**
+ * Asset settlement network.
+ */
+export const zAssetNetwork = z.enum([
+  'bitcoin/mainnet',
+  'bitcoin/testnet',
+  'bitcoin/testnet4',
+  'bitcoin/regtest',
+  'bitcoin/simnet',
+  'bitcoin/signet',
+]);
+
+/**
+ * Asset settlement protocol.
+ */
+export const zAssetProtocol = z.enum(['bitcoin', 'taproot_assets']);
+
+/**
  * A spendable asset on one protocol/network.
  */
 export const zAsset = z.object({
@@ -16,8 +33,8 @@ export const zAsset = z.object({
   display_ticker: z.string(),
   id: z.uuid(),
   name: z.string().nullish(),
-  network: z.string(),
-  protocol: z.string(),
+  network: zAssetNetwork,
+  protocol: zAssetProtocol,
   updated_at: z.iso.datetime().nullish(),
 });
 
@@ -415,13 +432,13 @@ export const zApiKey = z.object({
   key: z.string().nullish(),
   name: z.string(),
   permissions: z.array(zPermission),
-  user_id: z.string(),
 });
 
 /**
  * Create API Key Request
  */
 export const zCreateApiKeyRequest = z.object({
+  account_id: z.uuid().nullish(),
   description: z.string().nullish(),
   expiry: z
     .int()
@@ -430,7 +447,6 @@ export const zCreateApiKeyRequest = z.object({
     .nullish(),
   name: z.string(),
   permissions: z.array(zPermission),
-  user_id: z.string().nullish(),
 });
 
 /**
@@ -602,7 +618,6 @@ export const zRevokeApiKeysQuery = z.object({
     })
     .nullish(),
   ids: z.array(z.uuid()).nullish(),
-  user_id: z.string().nullish(),
   account_id: z.uuid().nullish(),
   order_direction: zOrderDirection.optional(),
 });
@@ -633,7 +648,6 @@ export const zListApiKeysQuery = z.object({
     })
     .nullish(),
   ids: z.array(z.uuid()).nullish(),
-  user_id: z.string().nullish(),
   account_id: z.uuid().nullish(),
   order_direction: zOrderDirection.optional(),
 });
@@ -957,7 +971,6 @@ export const zRevokeWalletApiKeysQuery = z.object({
     })
     .nullish(),
   ids: z.array(z.uuid()).nullish(),
-  user_id: z.string().nullish(),
   account_id: z.uuid().nullish(),
   order_direction: zOrderDirection.optional(),
 });
@@ -988,7 +1001,6 @@ export const zListWalletApiKeysQuery = z.object({
     })
     .nullish(),
   ids: z.array(z.uuid()).nullish(),
-  user_id: z.string().nullish(),
   account_id: z.uuid().nullish(),
   order_direction: zOrderDirection.optional(),
 });

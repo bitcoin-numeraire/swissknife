@@ -70,8 +70,14 @@ where
             .await
             .map_err(|e| DatabaseError::FindRelated(e.to_string()))?;
         let contacts = self.find_contacts(id).await?;
+        let asset = AssetEntity::find_by_id(model.asset_id)
+            .one(self.db.connection())
+            .await
+            .map_err(|e| DatabaseError::FindOne(e.to_string()))?;
 
-        let mut wallet = self.hydrate(model).await?;
+        let mut wallet: Wallet = model.into();
+        wallet.asset = asset.map(Into::into);
+        wallet.balance = self.get_balance(wallet.id).await?;
         wallet.payments = payments_with_output.into_iter().map(Into::into).collect();
         wallet.invoices = invoices_with_output
             .into_iter()
@@ -100,9 +106,17 @@ where
             .await
             .map_err(|e| DatabaseError::FindOne(e.to_string()))?;
 
-        match model {
-            Some(model) => Ok(Some(self.hydrate(model).await?)),
-            None => Ok(None),
+        if let Some(model) = model {
+            let asset = AssetEntity::find_by_id(model.asset_id)
+                .one(self.db.connection())
+                .await
+                .map_err(|e| DatabaseError::FindOne(e.to_string()))?;
+            let mut wallet: Wallet = model.into();
+            wallet.asset = asset.map(Into::into);
+            wallet.balance = self.get_balance(wallet.id).await?;
+            Ok(Some(wallet))
+        } else {
+            Ok(None)
         }
     }
 
@@ -125,7 +139,14 @@ where
 
         let mut wallets = Vec::with_capacity(models.len());
         for model in models {
-            wallets.push(self.hydrate(model).await?);
+            let asset = AssetEntity::find_by_id(model.asset_id)
+                .one(self.db.connection())
+                .await
+                .map_err(|e| DatabaseError::FindOne(e.to_string()))?;
+            let mut wallet: Wallet = model.into();
+            wallet.asset = asset.map(Into::into);
+            wallet.balance = self.get_balance(wallet.id).await?;
+            wallets.push(wallet);
         }
 
         Ok(wallets)
@@ -227,15 +248,10 @@ where
     }
 
     async fn upsert(&self, account_id: Uuid, asset_id: Uuid) -> Result<Wallet, DatabaseError> {
-        if let Some(wallet) = self.find_by_account_and_asset(account_id, asset_id).await? {
-            return Ok(wallet);
-        }
-
         let now = Utc::now().naive_utc();
         let id = Uuid::new_v4();
         let model = ActiveModel {
             id: Set(id),
-            user_id: Set(id.to_string()),
             account_id: Set(account_id),
             asset_id: Set(asset_id),
             available_amount: Set(0),
@@ -335,24 +351,5 @@ where
             .map_err(|e| DatabaseError::Delete(e.to_string()))?;
 
         Ok(result.rows_affected)
-    }
-}
-
-impl<C> SeaOrmWalletRepository<C>
-where
-    C: SeaOrmConnection,
-{
-    async fn hydrate(
-        &self,
-        model: crate::infra::database::sea_orm::models::wallet::Model,
-    ) -> Result<Wallet, DatabaseError> {
-        let asset = AssetEntity::find_by_id(model.asset_id)
-            .one(self.db.connection())
-            .await
-            .map_err(|e| DatabaseError::FindOne(e.to_string()))?;
-        let mut wallet: Wallet = model.into();
-        wallet.asset = asset.map(Into::into);
-        wallet.balance = self.get_balance(wallet.id).await?;
-        Ok(wallet)
     }
 }

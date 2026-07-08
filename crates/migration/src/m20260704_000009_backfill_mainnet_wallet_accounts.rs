@@ -14,8 +14,8 @@ impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         let db = manager.get_connection();
 
-        execute(
-            db,
+        db.execute(Statement::from_string(
+            db.get_database_backend(),
             format!(
                 r#"
                 UPDATE wallet
@@ -51,15 +51,16 @@ impl MigrationTrait for Migration {
                 asset_ref = NATIVE_ASSET_REF,
                 currency = LEGACY_BTC_CURRENCY,
             ),
-        )
+        ))
         .await?;
 
         assert_wallets_backfilled(db).await
     }
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        execute(
-            manager.get_connection(),
+        let db = manager.get_connection();
+        db.execute(Statement::from_string(
+            db.get_database_backend(),
             r#"
             UPDATE wallet
             SET account_id = NULL,
@@ -69,15 +70,16 @@ impl MigrationTrait for Migration {
                 updated_at = CURRENT_TIMESTAMP
             "#
             .to_string(),
-        )
+        ))
         .await
+        .map(|_| ())
     }
 }
 
 async fn assert_wallets_backfilled(db: &dyn ConnectionTrait) -> Result<(), DbErr> {
     let missing = db
-        .query_one(statement(
-            db,
+        .query_one(Statement::from_string(
+            db.get_database_backend(),
             "SELECT COUNT(*) AS count FROM wallet WHERE account_id IS NULL OR asset_id IS NULL".to_string(),
         ))
         .await?
@@ -91,12 +93,4 @@ async fn assert_wallets_backfilled(db: &dyn ConnectionTrait) -> Result<(), DbErr
     }
 
     Ok(())
-}
-
-async fn execute(db: &dyn ConnectionTrait, sql: String) -> Result<(), DbErr> {
-    db.execute(statement(db, sql)).await.map(|_| ())
-}
-
-fn statement(db: &dyn ConnectionTrait, sql: String) -> Statement {
-    Statement::from_string(db.get_database_backend(), sql)
 }

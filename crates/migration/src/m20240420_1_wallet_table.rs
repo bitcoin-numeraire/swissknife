@@ -12,7 +12,7 @@ impl MigrationTrait for Migration {
                     .table(Wallet::Table)
                     .if_not_exists()
                     .col(uuid(Wallet::Id).primary_key())
-                    .col(string_len_uniq(Wallet::UserId, 255))
+                    .col(string_len_null(Wallet::UserId, 255))
                     .col(timestamp(Wallet::CreatedAt).default(Expr::current_timestamp()))
                     .col(timestamp_null(Wallet::UpdatedAt))
                     .to_owned(),

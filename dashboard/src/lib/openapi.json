@@ -276,21 +276,9 @@
             }
           },
           {
-            "name": "user_id",
-            "in": "query",
-            "description": "Auth provider subject to filter by.\n\nUser-scoped endpoints populate this with your own subject.",
-            "required": false,
-            "schema": {
-              "type": [
-                "string",
-                "null"
-              ]
-            }
-          },
-          {
             "name": "account_id",
             "in": "query",
-            "description": "Owning account ID.",
+            "description": "Owning account ID.\n\nUser-scoped endpoints populate this from the authenticated account.",
             "required": false,
             "schema": {
               "type": [
@@ -375,7 +363,7 @@
           "API Keys"
         ],
         "summary": "Generate a new API Key",
-        "description": "Returns the generated API Key for the given user. Users can create API keys with permissions as a subset of his current permissions.",
+        "description": "Returns the generated API Key for the requested account. Users can create API keys with permissions\nas a subset of their current permissions.",
         "operationId": "create_api_key",
         "requestBody": {
           "content": {
@@ -508,21 +496,9 @@
             }
           },
           {
-            "name": "user_id",
-            "in": "query",
-            "description": "Auth provider subject to filter by.\n\nUser-scoped endpoints populate this with your own subject.",
-            "required": false,
-            "schema": {
-              "type": [
-                "string",
-                "null"
-              ]
-            }
-          },
-          {
             "name": "account_id",
             "in": "query",
-            "description": "Owning account ID.",
+            "description": "Owning account ID.\n\nUser-scoped endpoints populate this from the authenticated account.",
             "required": false,
             "schema": {
               "type": [
@@ -3001,21 +2977,9 @@
             }
           },
           {
-            "name": "user_id",
-            "in": "query",
-            "description": "Auth provider subject to filter by.\n\nUser-scoped endpoints populate this with your own subject.",
-            "required": false,
-            "schema": {
-              "type": [
-                "string",
-                "null"
-              ]
-            }
-          },
-          {
             "name": "account_id",
             "in": "query",
-            "description": "Owning account ID.",
+            "description": "Owning account ID.\n\nUser-scoped endpoints populate this from the authenticated account.",
             "required": false,
             "schema": {
               "type": [
@@ -3089,7 +3053,7 @@
           "User Wallet"
         ],
         "summary": "Generate a new API Key",
-        "description": "Returns the generated API Key for the given user. Users can create API keys with permissions as a subset of his current permissions.",
+        "description": "Returns the generated API Key for the authenticated account. Users can create API keys with\npermissions as a subset of their current permissions.",
         "operationId": "create_wallet_api_key",
         "requestBody": {
           "content": {
@@ -3211,21 +3175,9 @@
             }
           },
           {
-            "name": "user_id",
-            "in": "query",
-            "description": "Auth provider subject to filter by.\n\nUser-scoped endpoints populate this with your own subject.",
-            "required": false,
-            "schema": {
-              "type": [
-                "string",
-                "null"
-              ]
-            }
-          },
-          {
             "name": "account_id",
             "in": "query",
-            "description": "Owning account ID.",
+            "description": "Owning account ID.\n\nUser-scoped endpoints populate this from the authenticated account.",
             "required": false,
             "schema": {
               "type": [
@@ -5789,7 +5741,7 @@
           {
             "name": "account_id",
             "in": "query",
-            "description": "Owning account ID",
+            "description": "Owning account ID.\n\nUser-scoped endpoints populate this from the authenticated account.",
             "required": false,
             "schema": {
               "type": [
@@ -6126,7 +6078,6 @@
         "description": "API Key",
         "required": [
           "id",
-          "user_id",
           "account_id",
           "name",
           "permissions",
@@ -6180,11 +6131,6 @@
               "$ref": "#/components/schemas/Permission"
             },
             "description": "List of permissions for this API key"
-          },
-          "user_id": {
-            "type": "string",
-            "description": "Auth provider subject this key authenticates as.\n\nOwnership is enforced through `account_id`; this subject is the\nrequest-time actor label returned by authentication.",
-            "example": "auth0|numeraire"
           }
         }
       },
@@ -6242,14 +6188,12 @@
             "example": "Bitcoin"
           },
           "network": {
-            "type": "string",
-            "description": "Settlement network, such as bitcoin/mainnet or bitcoin/regtest",
-            "example": "bitcoin/mainnet"
+            "$ref": "#/components/schemas/AssetNetwork",
+            "description": "Settlement network."
           },
           "protocol": {
-            "type": "string",
-            "description": "Settlement protocol, such as bitcoin or taproot_assets",
-            "example": "bitcoin"
+            "$ref": "#/components/schemas/AssetProtocol",
+            "description": "Settlement protocol."
           },
           "updated_at": {
             "type": [
@@ -6260,6 +6204,26 @@
             "description": "Date of update in database"
           }
         }
+      },
+      "AssetNetwork": {
+        "type": "string",
+        "description": "Asset settlement network.",
+        "enum": [
+          "bitcoin/mainnet",
+          "bitcoin/testnet",
+          "bitcoin/testnet4",
+          "bitcoin/regtest",
+          "bitcoin/simnet",
+          "bitcoin/signet"
+        ]
+      },
+      "AssetProtocol": {
+        "type": "string",
+        "description": "Asset settlement protocol.",
+        "enum": [
+          "bitcoin",
+          "taproot_assets"
+        ]
       },
       "Balance": {
         "type": "object",
@@ -6523,6 +6487,14 @@
           "permissions"
         ],
         "properties": {
+          "account_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "Owning account ID.\n\nUser-scoped endpoints populate this with your own account."
+          },
           "description": {
             "type": [
               "string",
@@ -6549,14 +6521,6 @@
               "$ref": "#/components/schemas/Permission"
             },
             "description": "List of permissions for this API key"
-          },
-          "user_id": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "Auth provider subject to mint the key for.\n\nUser-scoped endpoints populate this with your own subject.",
-            "example": "auth0|numeraire"
           }
         }
       },

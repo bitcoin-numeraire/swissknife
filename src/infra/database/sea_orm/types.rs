@@ -33,8 +33,8 @@ impl From<AssetModel> for Asset {
             id: model.id,
             code: model.code,
             name: model.name,
-            protocol: model.protocol,
-            network: model.network,
+            protocol: model.protocol.parse().expect(ASSERTION_MSG),
+            network: model.network.parse().expect(ASSERTION_MSG),
             asset_ref: model.asset_ref,
             display_ticker: model.display_ticker,
             decimals: model.decimals,
@@ -235,7 +235,6 @@ impl From<ApiKeyModel> for ApiKey {
     fn from(model: ApiKeyModel) -> Self {
         ApiKey {
             id: model.id,
-            user_id: model.user_id,
             account_id: model.account_id,
             name: model.name,
             key: None,

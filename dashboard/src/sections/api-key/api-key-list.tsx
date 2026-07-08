@@ -275,7 +275,7 @@ function applyFilter({
   if (name) {
     inputData = inputData.filter(
       (apiKey) =>
-        apiKey.user_id.toLowerCase().indexOf(name.toLowerCase()) !== -1 ||
+        apiKey.account_id.toLowerCase().indexOf(name.toLowerCase()) !== -1 ||
         apiKey.id.toLowerCase().indexOf(name.toLowerCase()) !== -1 ||
         apiKey.name.toLowerCase().indexOf(name.toLowerCase()) !== -1
     );

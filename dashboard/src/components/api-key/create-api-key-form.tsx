@@ -58,7 +58,7 @@ export function CreateApiKeyForm({ onSuccess, isAdmin }: Props) {
     resolver: zodResolver(zCreateApiKeyRequest),
     defaultValues: {
       name: '',
-      user_id: user?.sub,
+      account_id: isAdmin ? '' : undefined,
       expiry: expiryOptions[2].value,
       permissions: [],
     },
@@ -71,7 +71,10 @@ export function CreateApiKeyForm({ onSuccess, isAdmin }: Props) {
   } = methods;
 
   const onSubmit = handleSubmit(async (data) => {
-    const body = data as CreateApiKeyRequest;
+    const body = {
+      ...data,
+      account_id: data.account_id || undefined,
+    } as CreateApiKeyRequest;
     try {
       if (isAdmin) {
         const { data: apiKeyData } = await createApiKey({ body });
@@ -164,8 +167,8 @@ export function CreateApiKeyForm({ onSuccess, isAdmin }: Props) {
           {isAdmin && (
             <RHFTextField
               variant="outlined"
-              name="user_id"
-              label={t('create_api_key_form.user_id')}
+              name="account_id"
+              label={t('create_api_key_form.account_id')}
             />
           )}
 

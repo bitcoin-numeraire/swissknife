@@ -91,7 +91,7 @@ async fn every_admin_endpoint_enforces_its_permission() {
         Permission::WriteApiKey,
         id,
         body(CreateApiKeyRequest {
-            user_id: None,
+            account_id: Some(uuid::Uuid::new_v4()),
             name: unique("guard"),
             permissions: vec![],
             description: None,

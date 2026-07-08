@@ -71,6 +71,8 @@ export {
 export {
   type ApiKey,
   type Asset,
+  AssetNetwork,
+  AssetProtocol,
   type Balance,
   type BtcAddress,
   BtcAddressType,

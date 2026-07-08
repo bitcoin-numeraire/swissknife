@@ -12,7 +12,6 @@ impl MigrationTrait for Migration {
                     .table(ApiKey::Table)
                     .if_not_exists()
                     .col(uuid(ApiKey::Id).primary_key())
-                    .col(string_len(ApiKey::UserId, 255))
                     .col(string_len(ApiKey::Name, 255))
                     .col(binary_len_uniq(ApiKey::KeyHash, 32))
                     .col(json(ApiKey::Permissions))
@@ -33,7 +32,6 @@ impl MigrationTrait for Migration {
 pub(crate) enum ApiKey {
     Table,
     Id,
-    UserId,
     Name,
     KeyHash,
     Permissions,
