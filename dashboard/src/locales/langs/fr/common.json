@@ -490,6 +490,7 @@
   },
   "wallet_list": {
     "user": "Utilisateur",
+    "account": "Compte",
     "ln_address": "Addresse LN",
     "balance": "Montant",
     "invoices": "Factures",
@@ -534,6 +535,7 @@
     "fees_paid": "Frais payés",
     "identity": "Identité",
     "user": "Utilisateur",
+    "account": "Compte",
     "updated": "Mis à jour",
     "counts": "Compteurs d'activité",
     "bitcoin_addresses": "Adresses Bitcoin",
@@ -750,6 +752,8 @@
   },
   "register_wallet": {
     "title": "Nouveau portefeuille",
+    "account_id": "ID du compte",
+    "asset_id": "ID de l'actif",
     "success_wallet_registration": "Portefeuille enregistré avec succès"
   },
   "register_ln_address": {
@@ -845,6 +849,7 @@
     "create_success": "Jeton API créé avec succès",
     "create_button": "Générer un jeton",
     "name": "Nom du jeton",
+    "user_id": "Sujet utilisateur",
     "expiration": "Expiration",
     "description": "Description",
     "key": "Clé secrète",

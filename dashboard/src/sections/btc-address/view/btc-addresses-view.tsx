@@ -17,6 +17,7 @@ import { useTheme } from '@mui/material/styles';
 import Typography from '@mui/material/Typography';
 import IconButton from '@mui/material/IconButton';
 
+import { displayLnAddress } from 'src/utils/lnurl';
 import { shouldFail, handleActionError } from 'src/utils/errors';
 
 import { useTranslate } from 'src/locales';
@@ -65,7 +66,9 @@ const drawerSx = {
 };
 
 function walletDisplayName(wallet: Wallet) {
-  return wallet.ln_address?.username ?? wallet.user_id ?? wallet.id;
+  if (wallet.ln_address?.username) return displayLnAddress(wallet.ln_address.username);
+
+  return wallet.label ?? wallet.account_id;
 }
 
 function compactId(id: string) {

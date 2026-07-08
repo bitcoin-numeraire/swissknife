@@ -30,7 +30,6 @@ import { RHFSelect, RHFTextField, RHFMultiCheckbox } from 'src/components/hook-f
 import { useAuthContext } from 'src/auth/hooks';
 
 import { CopyButton } from '../copy';
-import { WalletSelectDropdown } from '../wallet';
 
 // ----------------------------------------------------------------------
 
@@ -162,7 +161,13 @@ export function CreateApiKeyForm({ onSuccess, isAdmin }: Props) {
             </Alert>
           )}
 
-          {isAdmin && <WalletSelectDropdown name="user_id" />}
+          {isAdmin && (
+            <RHFTextField
+              variant="outlined"
+              name="user_id"
+              label={t('create_api_key_form.user_id')}
+            />
+          )}
 
           <Button
             type="submit"

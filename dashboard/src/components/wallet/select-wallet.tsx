@@ -1,5 +1,8 @@
+import type { Wallet } from 'src/lib/swissknife';
+
 import { Box } from '@mui/material';
 
+import { displayLnAddress } from 'src/utils/lnurl';
 import { handleActionError } from 'src/utils/errors';
 
 import { useListWallets } from 'src/actions/wallet';
@@ -9,12 +12,21 @@ import { RHFAutocomplete } from 'src/components/hook-form';
 // ----------------------------------------------------------------------
 
 type WalletSelectProps = {
-  name?: 'user_id' | 'wallet_id';
+  name?: 'account_id' | 'wallet_id';
 };
+
+function walletFieldValue(wallet: Wallet, name: WalletSelectProps['name']) {
+  return name === 'wallet_id' ? wallet.id : wallet.account_id;
+}
+
+function walletOptionLabel(wallet: Wallet) {
+  if (wallet.ln_address?.username) return displayLnAddress(wallet.ln_address.username);
+
+  return wallet.label ?? wallet.account_id;
+}
 
 export function WalletSelectDropdown({ name = 'wallet_id' }: WalletSelectProps) {
   const { wallets, walletsError, walletsLoading } = useListWallets();
-  const selectorField = name === 'wallet_id' ? 'id' : name;
 
   if (walletsError) {
     handleActionError(walletsError);
@@ -29,10 +41,12 @@ export function WalletSelectDropdown({ name = 'wallet_id' }: WalletSelectProps) 
       <RHFAutocomplete
         name={name}
         label="Select wallet"
-        options={wallets.map((wallet) => wallet[selectorField])}
-        getOptionLabel={(option: string) =>
-          wallets.find((w) => w[selectorField] === option)!.user_id
-        }
+        options={wallets.map((wallet) => walletFieldValue(wallet, name))}
+        getOptionLabel={(option: string) => {
+          const wallet = wallets.find((item) => walletFieldValue(item, name) === option);
+
+          return wallet ? walletOptionLabel(wallet) : option;
+        }}
       />
     )
   );
