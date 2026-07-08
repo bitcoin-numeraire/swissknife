@@ -248,7 +248,6 @@ where
     }
 
     async fn upsert(&self, account_id: Uuid, asset_id: Uuid) -> Result<Wallet, DatabaseError> {
-        let now = Utc::now().naive_utc();
         let id = Uuid::new_v4();
         let model = ActiveModel {
             id: Set(id),
@@ -256,7 +255,7 @@ where
             asset_id: Set(asset_id),
             available_amount: Set(0),
             reserved_amount: Set(0),
-            created_at: Set(now),
+            created_at: Set(Utc::now().naive_utc()),
             ..Default::default()
         };
 

@@ -240,12 +240,6 @@ impl AuthUseCases for AuthService {
             None => self.store.wallet.upsert(api_key.account_id, asset_id).await?,
         };
 
-        trace!(
-            wallet_id = %wallet.id,
-            account_id = %api_key.account_id,
-            "Account active asset wallet available after authentication"
-        );
-
         let user = User {
             account_id: api_key.account_id,
             wallet_id: wallet.id,
