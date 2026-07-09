@@ -17,10 +17,10 @@ use uuid::Uuid;
 
 use crate::application::composition::Ledger;
 use crate::application::errors::{ApplicationError, DataError};
+use crate::domains::account::{AccountFilter, AccountRepository, AuthProvider, Permission};
 use crate::domains::event::EventProjectionUnitOfWork;
 use crate::domains::invoice::{Invoice, InvoiceRepository};
 use crate::domains::payment::{LnPayment, Payment, PaymentStatus, PaymentUnitOfWork};
-use crate::domains::user::{AccountFilter, AccountRepository, AuthProvider, Permission};
 use crate::domains::{asset::AssetRepository, bitcoin::BtcNetwork, wallet::WalletRepository};
 
 use super::models::{prelude::Wallet, wallet};

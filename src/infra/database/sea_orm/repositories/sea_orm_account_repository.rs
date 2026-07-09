@@ -11,7 +11,7 @@ use uuid::Uuid;
 
 use crate::{
     application::errors::DatabaseError,
-    domains::user::{Account, AccountFilter, AccountPreferences, AccountRepository, AuthProvider, Permission},
+    domains::account::{Account, AccountFilter, AccountPreferences, AccountRepository, AuthProvider, Permission},
     infra::database::sea_orm::models::{
         account, account_preference, auth_identity,
         prelude::{Account as AccountEntity, AccountPreference, AuthIdentity},

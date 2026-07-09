@@ -5,12 +5,12 @@ use chrono::Utc;
 use crate::{
     application::composition::Ledger,
     domains::{
+        account::{Account, AccountPreferences, ApiKey, AuthIdentity},
         asset::Asset,
         bitcoin::{BtcAddress, BtcOutput},
         invoice::{Invoice, InvoiceStatus, LnInvoice},
         ln_address::LnAddress,
         payment::{BtcPayment, InternalPayment, LnPayment, Payment},
-        user::{Account, AccountPreferences, ApiKey, AuthIdentity},
         wallet::{Balance, Contact, Wallet},
     },
 };

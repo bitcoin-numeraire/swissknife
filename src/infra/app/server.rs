@@ -6,7 +6,7 @@ use crate::{
         docs::merged_openapi,
         errors::WebServerError,
     },
-    domains::{bitcoin, invoice, ln_address, lnurl, nostr, payment, system, user, wallet},
+    domains::{account, bitcoin, invoice, ln_address, lnurl, nostr, payment, system, wallet},
 };
 use axum::{routing::get, Router};
 use std::future::Future;
@@ -31,11 +31,11 @@ impl Server {
             .nest("/lnurlp", lnurl::router())
             .nest("/v1/invoices", invoice::router())
             .nest("/v1/payments", payment::router())
-            .nest("/v1/me", wallet::user_router())
+            .nest("/v1/me", wallet::account_router())
             .nest("/v1/wallets", wallet::router())
-            .nest("/v1/accounts", user::router())
-            .nest("/v1/auth", user::auth_router())
-            .nest("/v1/api-keys", user::api_key_router())
+            .nest("/v1/accounts", account::router())
+            .nest("/v1/auth", account::auth_router())
+            .nest("/v1/api-keys", account::api_key_router())
             .nest("/v1/lightning-addresses", ln_address::router())
             .nest("/v1/bitcoin/addresses", bitcoin::router())
             .merge(Scalar::with_url("/docs", merged_openapi()));

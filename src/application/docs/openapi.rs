@@ -3,6 +3,7 @@ use swissknife_types::{ErrorResponse, OrderDirection};
 use crate::{
     application::composition::Ledger,
     domains::{
+        account::{AccountHandler, ApiKeyHandler, AuthHandler},
         bitcoin::BtcAddressHandler,
         invoice::InvoiceHandler,
         ln_address::LnAddressHandler,
@@ -10,8 +11,7 @@ use crate::{
         nostr::NostrHandler,
         payment::PaymentHandler,
         system::SystemHandler,
-        user::{AccountHandler, ApiKeyHandler, AuthHandler},
-        wallet::{UserWalletHandler, WalletHandler},
+        wallet::{AccountWalletHandler, WalletHandler},
     },
 };
 use utoipa::{
@@ -26,7 +26,7 @@ use utoipa::{
 #[openapi(
     info(
         title = "Numeraire SwissKnife REST API",
-        description = "This API is available to anyone with a Numeraire account. The `Me` (`/me`) endpoints expose the authenticated account and wallet-scoped user operations.",
+        description = "This API is available to anyone with a Numeraire account. The `Me` (`/me`) endpoints expose the authenticated account and its wallet-scoped operations.",
     ),
     components(schemas(OrderDirection, Ledger, ErrorResponse), responses(ErrorResponse)),
     modifiers(&SecurityAddon),
@@ -39,7 +39,7 @@ pub fn merged_openapi() -> OpenApi {
 
     openapi.merge(AuthHandler::openapi());
     openapi.merge(AccountHandler::openapi());
-    openapi.merge(UserWalletHandler::openapi());
+    openapi.merge(AccountWalletHandler::openapi());
     openapi.merge(WalletHandler::openapi());
     openapi.merge(InvoiceHandler::openapi());
     openapi.merge(PaymentHandler::openapi());
@@ -91,7 +91,7 @@ pub const UNSUPPORTED_EXAMPLE: &str = r#"
 pub const CONFLICT_EXAMPLE: &str = r#"
 {
     "status": "409 Conflict",
-    "reason": "Admin user already created"
+    "reason": "Admin account already created"
 }
 "#;
 

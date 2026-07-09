@@ -1,6 +1,6 @@
 use thiserror::Error;
 
-use crate::domains::user::Permission;
+use crate::domains::account::Permission;
 
 #[derive(Debug, Error)]
 pub enum AuthorizationError {

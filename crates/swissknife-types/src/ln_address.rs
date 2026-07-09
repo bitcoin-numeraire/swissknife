@@ -36,7 +36,7 @@ pub struct LnAddress {
 /// Register Lightning Address Request
 #[derive(Debug, Deserialize, ToSchema, Serialize)]
 pub struct RegisterLnAddressRequest {
-    /// Owning account ID. Required for admin routes; user-scoped routes use the authenticated account.
+    /// Owning account ID. Required for admin routes; account-scoped routes use the authenticated account.
     pub account_id: Option<Uuid>,
 
     /// Username such as `username@domain`

@@ -2,7 +2,7 @@ use async_trait::async_trait;
 
 use crate::{
     application::errors::AuthenticationError,
-    domains::user::{Account, AuthClaims},
+    domains::account::{Account, AuthClaims},
 };
 
 #[cfg_attr(test, mockall::automock)]

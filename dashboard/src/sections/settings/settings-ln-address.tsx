@@ -20,7 +20,7 @@ import { useTranslate } from 'src/locales';
 import { endpointKeys } from 'src/actions/keys';
 import { useAccountContext } from 'src/contexts/account';
 import { zUpdateLnAddressRequest } from 'src/lib/swissknife/zod.gen';
-import { type LnAddress, updateWalletAddress, deleteWalletAddress } from 'src/lib/swissknife';
+import { type LnAddress, updateAccountAddress, deleteAccountAddress } from 'src/lib/swissknife';
 
 import { toast } from 'src/components/snackbar';
 import { Form, Field } from 'src/components/hook-form';
@@ -64,7 +64,7 @@ export function SettingsLnAddress({ lnAddress, onSuccess }: Props) {
     );
 
     try {
-      await updateWalletAddress({ body });
+      await updateAccountAddress({ body });
 
       toast.success(t('settings_ln_address.update_success'));
       mutate(endpointKeys.account.lnAddress.get);
@@ -79,7 +79,7 @@ export function SettingsLnAddress({ lnAddress, onSuccess }: Props) {
     isDeleting.onTrue();
 
     try {
-      await deleteWalletAddress();
+      await deleteAccountAddress();
 
       toast.success(t('settings_ln_address.delete_success'));
       mutate(endpointKeys.account.lnAddress.get);

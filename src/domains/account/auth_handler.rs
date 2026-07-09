@@ -39,7 +39,7 @@ pub fn auth_router() -> Router<Arc<AppServices>> {
 
 /// Sign up
 ///
-/// Creates the initial Admin user. Returns a JWT token to be used for authentication. The JWT token contains authentication and permissions. Sign up is only available for `JWT` Auth provider.
+/// Creates the initial admin account. Returns a JWT token containing the account's effective permissions. Sign-up is only available for the `JWT` provider.
 #[utoipa::path(
     post,
     path = "/sign-up",
@@ -47,7 +47,7 @@ pub fn auth_router() -> Router<Arc<AppServices>> {
     context_path = CONTEXT_PATH,
     request_body = SignUpRequest,
     responses(
-        (status = 200, description = "Admin user created", body = SignInResponse),
+        (status = 200, description = "Admin account created", body = SignInResponse),
         (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
         (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
         (status = 409, description = "Duplicate", body = ErrorResponse, example = json!(CONFLICT_EXAMPLE)),

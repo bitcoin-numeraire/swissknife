@@ -87,7 +87,7 @@ pub struct Asset {
     pub updated_at: Option<DateTime<Utc>>,
 }
 
-/// A user wallet with its balance and linked payments, invoices, Bitcoin addresses and contacts.
+/// An account wallet with its balance and linked payments, invoices, Bitcoin addresses and contacts.
 #[derive(Debug, Clone, Default, Deserialize, Serialize, ToSchema)]
 pub struct Wallet {
     /// Internal ID
@@ -104,7 +104,7 @@ pub struct Wallet {
     pub label: Option<String>,
     /// Lightning Address
     pub ln_address: Option<LnAddress>,
-    /// User Balance
+    /// Wallet balance
     pub balance: Balance,
     /// List of payments
     pub payments: Vec<Payment>,
@@ -176,7 +176,7 @@ pub struct WalletFilter {
     pub ids: Option<Vec<Uuid>>,
     /// Owning account ID.
     ///
-    /// User-scoped endpoints populate this from the authenticated account.
+    /// Account-scoped endpoints populate this from the authenticated account.
     pub account_id: Option<Uuid>,
     /// Asset ID
     pub asset_id: Option<Uuid>,

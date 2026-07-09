@@ -12,7 +12,7 @@ import { handleActionError } from 'src/utils/errors';
 import { CONFIG } from 'src/global-config';
 import { useTranslate } from 'src/locales';
 import { zRegisterLnAddressRequest } from 'src/lib/swissknife/zod.gen';
-import { registerAddress, registerWalletAddress } from 'src/lib/swissknife';
+import { registerAddress, registerAccountAddress } from 'src/lib/swissknife';
 
 import { toast } from 'src/components/snackbar';
 import { Form, RHFTextField } from 'src/components/hook-form';
@@ -49,7 +49,7 @@ export function RegisterLnAddressForm({ onSuccess, isAdmin }: Props) {
       if (isAdmin) {
         await registerAddress({ body });
       } else {
-        await registerWalletAddress({ body });
+        await registerAccountAddress({ body });
       }
       toast.success(t('register_ln_address.success_lightning_address_registration'));
       reset();

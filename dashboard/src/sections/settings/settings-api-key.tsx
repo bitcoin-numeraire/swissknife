@@ -17,8 +17,8 @@ import { useTranslate } from 'src/locales';
 import { endpointKeys } from 'src/actions/keys';
 import {
   type ApiKey,
-  revokeWalletApiKey,
-  type ListWalletApiKeysResponse,
+  revokeAccountApiKey,
+  type ListAccountApiKeysResponse,
 } from 'src/lib/swissknife';
 
 import { Label } from 'src/components/label';
@@ -33,7 +33,7 @@ import { CustomPopover } from 'src/components/custom-popover';
 // ----------------------------------------------------------------------
 
 type Props = {
-  apiKeys: ListWalletApiKeysResponse;
+  apiKeys: ListAccountApiKeysResponse;
 };
 
 export function SettingsApiKey({ apiKeys }: Props) {
@@ -114,7 +114,7 @@ function CollapsibleTableRow({ row }: CollapsibleTableRowProps) {
     isDeleting.onTrue();
 
     try {
-      await revokeWalletApiKey({ path: { id: row.id } });
+      await revokeAccountApiKey({ path: { id: row.id } });
 
       toast.success(t('settings_api_key.revoke_success'));
       mutate(endpointKeys.account.apiKeys.list);
@@ -165,7 +165,7 @@ function CollapsibleTableRow({ row }: CollapsibleTableRowProps) {
           <Collapse in={collapsible.value} timeout="auto" unmountOnExit>
             <Stack direction="row" spacing={1} sx={{ my: 2 }}>
               <Label variant="soft" color="secondary">
-                {t('api_key_list.user_wallet_permission')}
+                {t('api_key_list.account_wallet_permission')}
               </Label>
               {row.permissions.map((scope) => (
                 <Label key={scope} variant="soft" color="default">

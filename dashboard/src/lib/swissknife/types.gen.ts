@@ -379,7 +379,7 @@ export type CreateApiKeyRequest = {
   /**
    * Owning account ID.
    *
-   * User-scoped endpoints populate this with your own account.
+   * Account-scoped endpoints populate this with the authenticated account.
    */
   account_id?: string | null;
   /**
@@ -925,7 +925,7 @@ export type Protocol = (typeof Protocol)[keyof typeof Protocol];
  */
 export type RegisterLnAddressRequest = {
   /**
-   * Owning account ID. Required for admin routes; user-scoped routes use the authenticated account.
+   * Owning account ID. Required for admin routes; account-scoped routes use the authenticated account.
    */
   account_id?: string | null;
   /**
@@ -1075,7 +1075,7 @@ export type VersionInfo = {
 };
 
 /**
- * A user wallet with its balance and linked payments, invoices, Bitcoin addresses and contacts.
+ * An account wallet with its balance and linked payments, invoices, Bitcoin addresses and contacts.
  */
 export type Wallet = {
   /**
@@ -1088,7 +1088,7 @@ export type Wallet = {
    */
   asset_id: string;
   /**
-   * User Balance
+   * Wallet balance
    */
   balance: Balance;
   /**
@@ -1632,7 +1632,7 @@ export type RevokeApiKeysData = {
     /**
      * Owning account ID.
      *
-     * User-scoped endpoints populate this from the authenticated account.
+     * Account-scoped endpoints populate this from the authenticated account.
      */
     account_id?: string | null;
     /**
@@ -1692,7 +1692,7 @@ export type ListApiKeysData = {
     /**
      * Owning account ID.
      *
-     * User-scoped endpoints populate this from the authenticated account.
+     * Account-scoped endpoints populate this from the authenticated account.
      */
     account_id?: string | null;
     /**
@@ -1966,7 +1966,7 @@ export type SignUpError = SignUpErrors[keyof SignUpErrors];
 
 export type SignUpResponses = {
   /**
-   * Admin user created
+   * Admin account created
    */
   200: SignInResponse;
 };
@@ -2893,7 +2893,7 @@ export type UpdateCurrentAccountResponses = {
 export type UpdateCurrentAccountResponse =
   UpdateCurrentAccountResponses[keyof UpdateCurrentAccountResponses];
 
-export type RevokeWalletApiKeysData = {
+export type RevokeAccountApiKeysData = {
   body?: never;
   path?: never;
   query?: {
@@ -2912,7 +2912,7 @@ export type RevokeWalletApiKeysData = {
     /**
      * Owning account ID.
      *
-     * User-scoped endpoints populate this from the authenticated account.
+     * Account-scoped endpoints populate this from the authenticated account.
      */
     account_id?: string | null;
     /**
@@ -2923,7 +2923,7 @@ export type RevokeWalletApiKeysData = {
   url: '/v1/me/api-keys';
 };
 
-export type RevokeWalletApiKeysErrors = {
+export type RevokeAccountApiKeysErrors = {
   /**
    * Bad Request
    */
@@ -2938,19 +2938,20 @@ export type RevokeWalletApiKeysErrors = {
   500: ErrorResponse;
 };
 
-export type RevokeWalletApiKeysError = RevokeWalletApiKeysErrors[keyof RevokeWalletApiKeysErrors];
+export type RevokeAccountApiKeysError =
+  RevokeAccountApiKeysErrors[keyof RevokeAccountApiKeysErrors];
 
-export type RevokeWalletApiKeysResponses = {
+export type RevokeAccountApiKeysResponses = {
   /**
    * Success
    */
   200: number;
 };
 
-export type RevokeWalletApiKeysResponse =
-  RevokeWalletApiKeysResponses[keyof RevokeWalletApiKeysResponses];
+export type RevokeAccountApiKeysResponse =
+  RevokeAccountApiKeysResponses[keyof RevokeAccountApiKeysResponses];
 
-export type ListWalletApiKeysData = {
+export type ListAccountApiKeysData = {
   body?: never;
   path?: never;
   query?: {
@@ -2969,7 +2970,7 @@ export type ListWalletApiKeysData = {
     /**
      * Owning account ID.
      *
-     * User-scoped endpoints populate this from the authenticated account.
+     * Account-scoped endpoints populate this from the authenticated account.
      */
     account_id?: string | null;
     /**
@@ -2980,7 +2981,7 @@ export type ListWalletApiKeysData = {
   url: '/v1/me/api-keys';
 };
 
-export type ListWalletApiKeysErrors = {
+export type ListAccountApiKeysErrors = {
   /**
    * Bad Request
    */
@@ -2995,26 +2996,26 @@ export type ListWalletApiKeysErrors = {
   500: ErrorResponse;
 };
 
-export type ListWalletApiKeysError = ListWalletApiKeysErrors[keyof ListWalletApiKeysErrors];
+export type ListAccountApiKeysError = ListAccountApiKeysErrors[keyof ListAccountApiKeysErrors];
 
-export type ListWalletApiKeysResponses = {
+export type ListAccountApiKeysResponses = {
   /**
    * Success
    */
   200: Array<ApiKey>;
 };
 
-export type ListWalletApiKeysResponse =
-  ListWalletApiKeysResponses[keyof ListWalletApiKeysResponses];
+export type ListAccountApiKeysResponse =
+  ListAccountApiKeysResponses[keyof ListAccountApiKeysResponses];
 
-export type CreateWalletApiKeyData = {
+export type CreateAccountApiKeyData = {
   body: CreateApiKeyRequest;
   path?: never;
   query?: never;
   url: '/v1/me/api-keys';
 };
 
-export type CreateWalletApiKeyErrors = {
+export type CreateAccountApiKeyErrors = {
   /**
    * Bad Request
    */
@@ -3033,19 +3034,19 @@ export type CreateWalletApiKeyErrors = {
   500: ErrorResponse;
 };
 
-export type CreateWalletApiKeyError = CreateWalletApiKeyErrors[keyof CreateWalletApiKeyErrors];
+export type CreateAccountApiKeyError = CreateAccountApiKeyErrors[keyof CreateAccountApiKeyErrors];
 
-export type CreateWalletApiKeyResponses = {
+export type CreateAccountApiKeyResponses = {
   /**
    * API Key Created
    */
   200: ApiKey;
 };
 
-export type CreateWalletApiKeyResponse =
-  CreateWalletApiKeyResponses[keyof CreateWalletApiKeyResponses];
+export type CreateAccountApiKeyResponse =
+  CreateAccountApiKeyResponses[keyof CreateAccountApiKeyResponses];
 
-export type RevokeWalletApiKeyData = {
+export type RevokeAccountApiKeyData = {
   body?: never;
   path: {
     id: string;
@@ -3054,7 +3055,7 @@ export type RevokeWalletApiKeyData = {
   url: '/v1/me/api-keys/{id}';
 };
 
-export type RevokeWalletApiKeyErrors = {
+export type RevokeAccountApiKeyErrors = {
   /**
    * Bad Request
    */
@@ -3073,16 +3074,16 @@ export type RevokeWalletApiKeyErrors = {
   500: ErrorResponse;
 };
 
-export type RevokeWalletApiKeyError = RevokeWalletApiKeyErrors[keyof RevokeWalletApiKeyErrors];
+export type RevokeAccountApiKeyError = RevokeAccountApiKeyErrors[keyof RevokeAccountApiKeyErrors];
 
-export type RevokeWalletApiKeyResponses = {
+export type RevokeAccountApiKeyResponses = {
   /**
    * Revoked
    */
   200: unknown;
 };
 
-export type GetWalletApiKeyData = {
+export type GetAccountApiKeyData = {
   body?: never;
   path: {
     id: string;
@@ -3091,7 +3092,7 @@ export type GetWalletApiKeyData = {
   url: '/v1/me/api-keys/{id}';
 };
 
-export type GetWalletApiKeyErrors = {
+export type GetAccountApiKeyErrors = {
   /**
    * Bad Request
    */
@@ -3110,25 +3111,25 @@ export type GetWalletApiKeyErrors = {
   500: ErrorResponse;
 };
 
-export type GetWalletApiKeyError = GetWalletApiKeyErrors[keyof GetWalletApiKeyErrors];
+export type GetAccountApiKeyError = GetAccountApiKeyErrors[keyof GetAccountApiKeyErrors];
 
-export type GetWalletApiKeyResponses = {
+export type GetAccountApiKeyResponses = {
   /**
    * Found
    */
   200: ApiKey;
 };
 
-export type GetWalletApiKeyResponse = GetWalletApiKeyResponses[keyof GetWalletApiKeyResponses];
+export type GetAccountApiKeyResponse = GetAccountApiKeyResponses[keyof GetAccountApiKeyResponses];
 
-export type DeleteWalletAddressData = {
+export type DeleteAccountAddressData = {
   body?: never;
   path?: never;
   query?: never;
   url: '/v1/me/lightning-address';
 };
 
-export type DeleteWalletAddressErrors = {
+export type DeleteAccountAddressErrors = {
   /**
    * Bad Request
    */
@@ -3147,23 +3148,24 @@ export type DeleteWalletAddressErrors = {
   500: ErrorResponse;
 };
 
-export type DeleteWalletAddressError = DeleteWalletAddressErrors[keyof DeleteWalletAddressErrors];
+export type DeleteAccountAddressError =
+  DeleteAccountAddressErrors[keyof DeleteAccountAddressErrors];
 
-export type DeleteWalletAddressResponses = {
+export type DeleteAccountAddressResponses = {
   /**
    * Deleted
    */
   200: unknown;
 };
 
-export type GetWalletAddressData = {
+export type GetAccountAddressData = {
   body?: never;
   path?: never;
   query?: never;
   url: '/v1/me/lightning-address';
 };
 
-export type GetWalletAddressErrors = {
+export type GetAccountAddressErrors = {
   /**
    * Unauthorized
    */
@@ -3178,25 +3180,26 @@ export type GetWalletAddressErrors = {
   500: ErrorResponse;
 };
 
-export type GetWalletAddressError = GetWalletAddressErrors[keyof GetWalletAddressErrors];
+export type GetAccountAddressError = GetAccountAddressErrors[keyof GetAccountAddressErrors];
 
-export type GetWalletAddressResponses = {
+export type GetAccountAddressResponses = {
   /**
    * Found
    */
   200: null | LnAddress;
 };
 
-export type GetWalletAddressResponse = GetWalletAddressResponses[keyof GetWalletAddressResponses];
+export type GetAccountAddressResponse =
+  GetAccountAddressResponses[keyof GetAccountAddressResponses];
 
-export type RegisterWalletAddressData = {
+export type RegisterAccountAddressData = {
   body: RegisterLnAddressRequest;
   path?: never;
   query?: never;
   url: '/v1/me/lightning-address';
 };
 
-export type RegisterWalletAddressErrors = {
+export type RegisterAccountAddressErrors = {
   /**
    * Bad Request
    */
@@ -3215,27 +3218,27 @@ export type RegisterWalletAddressErrors = {
   500: ErrorResponse;
 };
 
-export type RegisterWalletAddressError =
-  RegisterWalletAddressErrors[keyof RegisterWalletAddressErrors];
+export type RegisterAccountAddressError =
+  RegisterAccountAddressErrors[keyof RegisterAccountAddressErrors];
 
-export type RegisterWalletAddressResponses = {
+export type RegisterAccountAddressResponses = {
   /**
    * LN Address Registered
    */
   200: LnAddress;
 };
 
-export type RegisterWalletAddressResponse =
-  RegisterWalletAddressResponses[keyof RegisterWalletAddressResponses];
+export type RegisterAccountAddressResponse =
+  RegisterAccountAddressResponses[keyof RegisterAccountAddressResponses];
 
-export type UpdateWalletAddressData = {
+export type UpdateAccountAddressData = {
   body: UpdateLnAddressRequest;
   path?: never;
   query?: never;
   url: '/v1/me/lightning-address';
 };
 
-export type UpdateWalletAddressErrors = {
+export type UpdateAccountAddressErrors = {
   /**
    * Bad Request
    */
@@ -3258,17 +3261,18 @@ export type UpdateWalletAddressErrors = {
   500: ErrorResponse;
 };
 
-export type UpdateWalletAddressError = UpdateWalletAddressErrors[keyof UpdateWalletAddressErrors];
+export type UpdateAccountAddressError =
+  UpdateAccountAddressErrors[keyof UpdateAccountAddressErrors];
 
-export type UpdateWalletAddressResponses = {
+export type UpdateAccountAddressResponses = {
   /**
    * LN Address Updated
    */
   200: LnAddress;
 };
 
-export type UpdateWalletAddressResponse =
-  UpdateWalletAddressResponses[keyof UpdateWalletAddressResponses];
+export type UpdateAccountAddressResponse =
+  UpdateAccountAddressResponses[keyof UpdateAccountAddressResponses];
 
 export type GetAccountPreferencesData = {
   body?: never;
@@ -3363,7 +3367,7 @@ export type ListAccountWalletsData = {
     /**
      * Owning account ID.
      *
-     * User-scoped endpoints populate this from the authenticated account.
+     * Account-scoped endpoints populate this from the authenticated account.
      */
     account_id?: string | null;
     /**
@@ -4460,7 +4464,7 @@ export type DeleteWalletsData = {
     /**
      * Owning account ID.
      *
-     * User-scoped endpoints populate this from the authenticated account.
+     * Account-scoped endpoints populate this from the authenticated account.
      */
     account_id?: string | null;
     /**

@@ -20,8 +20,8 @@ use crate::{
         errors::{ApplicationError, DataError},
     },
     domains::{
+        account::{Permission, User},
         bitcoin::{BtcAddress, BtcNetwork, BtcOutput, BtcOutputStatus},
-        user::{Permission, User},
     },
     infra::axum::{Json, Path, Query},
 };
@@ -51,7 +51,7 @@ pub fn router() -> Router<Arc<AppServices>> {
 
 /// Generate a new invoice
 ///
-/// Returns the generated invoice for the given user
+/// Returns the generated invoice for the selected wallet.
 #[utoipa::path(
     post,
     path = "",
@@ -143,7 +143,7 @@ async fn list_invoices(
 
 /// Delete an invoice
 ///
-/// Deletes an invoice by ID. Returns an empty body. Deleting an invoice has an effect on the user balance
+/// Deletes an invoice by ID. Returns an empty body. Deleting an invoice can affect the wallet balance.
 #[utoipa::path(
     delete,
     path = "/{id}",
@@ -171,7 +171,7 @@ async fn delete_invoice(
 
 /// Delete invoices
 ///
-/// Deletes all the invoices given a filter. Returns the number of deleted invoices. Deleting an invoice can have an effect on the user balance
+/// Deletes all invoices matching a filter. Returns the number deleted. Deleting an invoice can affect the wallet balance.
 #[utoipa::path(
     delete,
     path = "",

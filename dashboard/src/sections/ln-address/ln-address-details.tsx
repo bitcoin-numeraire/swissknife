@@ -26,7 +26,7 @@ import { CONFIG } from 'src/global-config';
 import { useTranslate } from 'src/locales';
 import { endpointKeys } from 'src/actions/keys';
 import { useAccountContext } from 'src/contexts/account';
-import { deleteAddress, deleteWalletAddress } from 'src/lib/swissknife';
+import { deleteAddress, deleteAccountAddress } from 'src/lib/swissknife';
 
 import { Label } from 'src/components/label';
 import { toast } from 'src/components/snackbar';
@@ -64,7 +64,7 @@ export function LnAddressDetails({ lnAddress, isAdmin }: Props) {
           await deleteAddress({ path: { id } });
           router.push(paths.admin.lnAddresses);
         } else {
-          await deleteWalletAddress();
+          await deleteAccountAddress();
         }
 
         mutate(endpointKeys.lightning.addresses.list);
