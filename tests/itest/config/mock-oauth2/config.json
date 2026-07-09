@@ -10,6 +10,8 @@
             "sub": "itest-oauth2-full",
             "aud": ["https://swissknife.itest/api"],
             "permissions": [
+              "read:account",
+              "write:account",
               "read:wallet",
               "write:wallet",
               "read:ln_address",

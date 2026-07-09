@@ -94,6 +94,20 @@ where
         Ok(Some(wallet))
     }
 
+    async fn exists_for_account(&self, account_id: Uuid, id: Uuid) -> Result<bool, DatabaseError> {
+        let wallet_id = WalletEntity::find()
+            .filter(Column::Id.eq(id))
+            .filter(Column::AccountId.eq(account_id))
+            .select_only()
+            .column(Column::Id)
+            .into_tuple::<Uuid>()
+            .one(self.db.connection())
+            .await
+            .map_err(|e| DatabaseError::FindOne(e.to_string()))?;
+
+        Ok(wallet_id.is_some())
+    }
+
     async fn find_by_account_and_asset(
         &self,
         account_id: Uuid,

@@ -4,6 +4,10 @@ use utoipa::ToSchema;
 /// An API access scope granted to a JWT or API key.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]
 pub enum Permission {
+    #[serde(rename = "read:account")]
+    ReadAccount,
+    #[serde(rename = "write:account")]
+    WriteAccount,
     #[serde(rename = "read:wallet")]
     ReadWallet,
     #[serde(rename = "write:wallet")]
@@ -33,6 +37,8 @@ pub enum Permission {
 impl Permission {
     pub fn all_permissions() -> Vec<Self> {
         vec![
+            Permission::ReadAccount,
+            Permission::WriteAccount,
             Permission::ReadWallet,
             Permission::WriteWallet,
             Permission::ReadLnAddress,

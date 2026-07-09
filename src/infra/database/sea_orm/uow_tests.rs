@@ -20,7 +20,7 @@ use crate::application::errors::{ApplicationError, DataError};
 use crate::domains::event::EventProjectionUnitOfWork;
 use crate::domains::invoice::{Invoice, InvoiceRepository};
 use crate::domains::payment::{LnPayment, Payment, PaymentStatus, PaymentUnitOfWork};
-use crate::domains::user::{AccountRepository, AuthProvider, Permission};
+use crate::domains::user::{AccountFilter, AccountRepository, AuthProvider, Permission};
 use crate::domains::{asset::AssetRepository, bitcoin::BtcNetwork, wallet::WalletRepository};
 
 use super::models::{prelude::Wallet, wallet};
@@ -152,8 +152,8 @@ async fn account_identity_upsert_is_idempotent() {
     let conn = connect().await;
     let repo = SeaOrmAccountRepository::new(conn.clone());
 
-    let first = repo.upsert(AuthProvider::Jwt, "alice", &[]).await.unwrap();
-    let second = repo.upsert(AuthProvider::Jwt, "alice", &[]).await.unwrap();
+    let first = repo.upsert(AuthProvider::Jwt, "alice", None, &[]).await.unwrap();
+    let second = repo.upsert(AuthProvider::Jwt, "alice", None, &[]).await.unwrap();
 
     assert_eq!(first.id, second.id);
     assert_eq!(
@@ -178,6 +178,7 @@ async fn account_identity_upsert_inserts_initial_permissions() {
         .upsert(
             AuthProvider::Jwt,
             "alice",
+            None,
             &[Permission::ReadWallet, Permission::ReadWallet],
         )
         .await
@@ -185,6 +186,74 @@ async fn account_identity_upsert_inserts_initial_permissions() {
 
     assert_eq!(account.permissions, Some(vec![Permission::ReadWallet]));
     assert_eq!(count(&conn, "SELECT COUNT(*) AS count FROM account").await, 1);
+}
+
+#[tokio::test]
+async fn account_repository_crud_keeps_the_aggregate_consistent() {
+    let conn = connect().await;
+    let repo = SeaOrmAccountRepository::new(conn.clone());
+    let account = repo
+        .upsert(
+            AuthProvider::Jwt,
+            "operator",
+            Some("Operator".to_string()),
+            &[Permission::ReadWallet],
+        )
+        .await
+        .unwrap();
+
+    let listed = repo
+        .find_many(AccountFilter {
+            ids: Some(vec![account.id]),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    assert_eq!(listed.len(), 1);
+    assert_eq!(listed[0].display_name.as_deref(), Some("Operator"));
+
+    let updated = repo
+        .update(account.id, Some("Treasury".to_string()))
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(updated.display_name.as_deref(), Some("Treasury"));
+
+    let updated = repo
+        .update_permissions(
+            account.id,
+            &[
+                Permission::ReadAccount,
+                Permission::ReadAccount,
+                Permission::WriteWallet,
+            ],
+        )
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        updated.permissions,
+        Some(vec![Permission::ReadAccount, Permission::WriteWallet])
+    );
+
+    let asset = SeaOrmAssetRepository::new(conn.clone())
+        .find_native_btc_by_network(BtcNetwork::Bitcoin)
+        .await
+        .unwrap()
+        .unwrap();
+    let wallet_repo = SeaOrmWalletRepository::new(conn.clone());
+    let wallet = wallet_repo.upsert(account.id, asset.id).await.unwrap();
+    assert!(wallet_repo.exists_for_account(account.id, wallet.id).await.unwrap());
+    assert!(!wallet_repo.exists_for_account(Uuid::new_v4(), wallet.id).await.unwrap());
+
+    assert!(repo.delete(account.id).await.unwrap());
+    assert_eq!(count(&conn, "SELECT COUNT(*) AS count FROM account").await, 0);
+    assert_eq!(count(&conn, "SELECT COUNT(*) AS count FROM auth_identity").await, 0);
+    assert_eq!(
+        count(&conn, "SELECT COUNT(*) AS count FROM account_preference").await,
+        0
+    );
+    assert_eq!(count(&conn, "SELECT COUNT(*) AS count FROM wallet").await, 0);
 }
 
 #[tokio::test]

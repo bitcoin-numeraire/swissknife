@@ -3,11 +3,13 @@
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
 import {
+  createAccountResponseTransformer,
   createAccountWalletResponseTransformer,
   createApiKeyResponseTransformer,
   createWalletApiKeyResponseTransformer,
   generateBtcAddressResponseTransformer,
   generateInvoiceResponseTransformer,
+  getAccountByIdResponseTransformer,
   getAccountPreferencesResponseTransformer,
   getAccountResponseTransformer,
   getAccountWalletResponseTransformer,
@@ -21,6 +23,7 @@ import {
   getWalletInvoiceResponseTransformer,
   getWalletPaymentResponseTransformer,
   getWalletResponseTransformer,
+  listAccountsResponseTransformer,
   listAccountWalletsResponseTransformer,
   listAddressesResponseTransformer,
   listApiKeysResponseTransformer,
@@ -40,8 +43,11 @@ import {
   registerAddressResponseTransformer,
   registerWalletAddressResponseTransformer,
   registerWalletResponseTransformer,
+  replaceAccountPermissionsResponseTransformer,
+  updateAccountByIdResponseTransformer,
   updateAccountPreferencesResponseTransformer,
   updateAddressResponseTransformer,
+  updateCurrentAccountResponseTransformer,
   updateWalletAddressResponseTransformer,
   walletPayResponseTransformer,
 } from './transformers.gen';
@@ -52,6 +58,9 @@ import type {
   ChangePasswordData,
   ChangePasswordErrors,
   ChangePasswordResponses,
+  CreateAccountData,
+  CreateAccountErrors,
+  CreateAccountResponses,
   CreateAccountWalletData,
   CreateAccountWalletErrors,
   CreateAccountWalletResponses,
@@ -61,6 +70,9 @@ import type {
   CreateWalletApiKeyData,
   CreateWalletApiKeyErrors,
   CreateWalletApiKeyResponses,
+  DeleteAccountByIdData,
+  DeleteAccountByIdErrors,
+  DeleteAccountByIdResponses,
   DeleteAddressData,
   DeleteAddressErrors,
   DeleteAddressesData,
@@ -106,6 +118,9 @@ import type {
   GenerateInvoiceData,
   GenerateInvoiceErrors,
   GenerateInvoiceResponses,
+  GetAccountByIdData,
+  GetAccountByIdErrors,
+  GetAccountByIdResponses,
   GetAccountData,
   GetAccountErrors,
   GetAccountPreferencesData,
@@ -151,6 +166,9 @@ import type {
   HealthCheckData,
   HealthCheckErrors,
   HealthCheckResponses,
+  ListAccountsData,
+  ListAccountsErrors,
+  ListAccountsResponses,
   ListAccountWalletsData,
   ListAccountWalletsErrors,
   ListAccountWalletsResponses,
@@ -213,6 +231,9 @@ import type {
   RegisterWalletData,
   RegisterWalletErrors,
   RegisterWalletResponses,
+  ReplaceAccountPermissionsData,
+  ReplaceAccountPermissionsErrors,
+  ReplaceAccountPermissionsResponses,
   RevokeApiKeyData,
   RevokeApiKeyErrors,
   RevokeApiKeyResponses,
@@ -234,12 +255,18 @@ import type {
   SignUpData,
   SignUpErrors,
   SignUpResponses,
+  UpdateAccountByIdData,
+  UpdateAccountByIdErrors,
+  UpdateAccountByIdResponses,
   UpdateAccountPreferencesData,
   UpdateAccountPreferencesErrors,
   UpdateAccountPreferencesResponses,
   UpdateAddressData,
   UpdateAddressErrors,
   UpdateAddressResponses,
+  UpdateCurrentAccountData,
+  UpdateCurrentAccountErrors,
+  UpdateCurrentAccountResponses,
   UpdateWalletAddressData,
   UpdateWalletAddressErrors,
   UpdateWalletAddressResponses,
@@ -314,6 +341,109 @@ export const callback = <ThrowOnError extends boolean = false>(
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/lnurlp/{username}/callback',
     ...options,
+  });
+
+/**
+ * List accounts.
+ */
+export const listAccounts = <ThrowOnError extends boolean = false>(
+  options?: Options<ListAccountsData, ThrowOnError>
+): RequestResult<ListAccountsResponses, ListAccountsErrors, ThrowOnError> =>
+  (options?.client ?? client).get<ListAccountsResponses, ListAccountsErrors, ThrowOnError>({
+    responseTransformer: listAccountsResponseTransformer,
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/accounts',
+    ...options,
+  });
+
+/**
+ * Create or return an account for one authentication identity.
+ */
+export const createAccount = <ThrowOnError extends boolean = false>(
+  options: Options<CreateAccountData, ThrowOnError>
+): RequestResult<CreateAccountResponses, CreateAccountErrors, ThrowOnError> =>
+  (options.client ?? client).post<CreateAccountResponses, CreateAccountErrors, ThrowOnError>({
+    responseTransformer: createAccountResponseTransformer,
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/accounts',
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
+
+/**
+ * Delete an account and its owned resources.
+ */
+export const deleteAccountById = <ThrowOnError extends boolean = false>(
+  options: Options<DeleteAccountByIdData, ThrowOnError>
+): RequestResult<DeleteAccountByIdResponses, DeleteAccountByIdErrors, ThrowOnError> =>
+  (options.client ?? client).delete<
+    DeleteAccountByIdResponses,
+    DeleteAccountByIdErrors,
+    ThrowOnError
+  >({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/accounts/{id}',
+    ...options,
+  });
+
+/**
+ * Get an account.
+ */
+export const getAccountById = <ThrowOnError extends boolean = false>(
+  options: Options<GetAccountByIdData, ThrowOnError>
+): RequestResult<GetAccountByIdResponses, GetAccountByIdErrors, ThrowOnError> =>
+  (options.client ?? client).get<GetAccountByIdResponses, GetAccountByIdErrors, ThrowOnError>({
+    responseTransformer: getAccountByIdResponseTransformer,
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/accounts/{id}',
+    ...options,
+  });
+
+/**
+ * Replace editable account profile fields.
+ */
+export const updateAccountById = <ThrowOnError extends boolean = false>(
+  options: Options<UpdateAccountByIdData, ThrowOnError>
+): RequestResult<UpdateAccountByIdResponses, UpdateAccountByIdErrors, ThrowOnError> =>
+  (options.client ?? client).put<UpdateAccountByIdResponses, UpdateAccountByIdErrors, ThrowOnError>(
+    {
+      responseTransformer: updateAccountByIdResponseTransformer,
+      security: [{ scheme: 'bearer', type: 'http' }],
+      url: '/v1/accounts/{id}',
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        ...options.headers,
+      },
+    }
+  );
+
+/**
+ * Replace permissions for a local JWT account.
+ */
+export const replaceAccountPermissions = <ThrowOnError extends boolean = false>(
+  options: Options<ReplaceAccountPermissionsData, ThrowOnError>
+): RequestResult<
+  ReplaceAccountPermissionsResponses,
+  ReplaceAccountPermissionsErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).put<
+    ReplaceAccountPermissionsResponses,
+    ReplaceAccountPermissionsErrors,
+    ThrowOnError
+  >({
+    responseTransformer: replaceAccountPermissionsResponseTransformer,
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/accounts/{id}/permissions',
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
   });
 
 /**
@@ -723,6 +853,27 @@ export const getAccount = <ThrowOnError extends boolean = false>(
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/v1/me',
     ...options,
+  });
+
+/**
+ * Update the authenticated account profile.
+ */
+export const updateCurrentAccount = <ThrowOnError extends boolean = false>(
+  options: Options<UpdateCurrentAccountData, ThrowOnError>
+): RequestResult<UpdateCurrentAccountResponses, UpdateCurrentAccountErrors, ThrowOnError> =>
+  (options.client ?? client).put<
+    UpdateCurrentAccountResponses,
+    UpdateCurrentAccountErrors,
+    ThrowOnError
+  >({
+    responseTransformer: updateCurrentAccountResponseTransformer,
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/me',
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
   });
 
 /**

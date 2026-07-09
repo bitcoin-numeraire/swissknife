@@ -1,15 +1,19 @@
 use async_trait::async_trait;
 use chrono::Utc;
-use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set, TransactionTrait};
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, QueryOrder, QuerySelect, QueryTrait,
+    Set, TransactionTrait,
+};
 use serde_json::{json, Value};
 use uuid::Uuid;
 
 use crate::{
     application::errors::DatabaseError,
-    domains::user::{Account, AccountPreferences, AccountRepository, AuthProvider, Permission},
+    domains::user::{Account, AccountFilter, AccountPreferences, AccountRepository, AuthProvider, Permission},
     infra::database::sea_orm::models::{
         account, account_preference, auth_identity,
-        prelude::{Account as AccountEntity, AccountPreference, AuthIdentity},
+        prelude::{Account as AccountEntity, AccountPreference, AuthIdentity, Wallet},
+        wallet,
     },
 };
 
@@ -88,10 +92,36 @@ impl AccountRepository for SeaOrmAccountRepository {
         Ok(Some(account))
     }
 
+    async fn find_many(&self, filter: AccountFilter) -> Result<Vec<Account>, DatabaseError> {
+        let models = AccountEntity::find()
+            .apply_if(filter.ids, |query, ids| query.filter(account::Column::Id.is_in(ids)))
+            .order_by(
+                account::Column::CreatedAt,
+                crate::infra::database::sea_orm::sea_order(&filter.order_direction),
+            )
+            .offset(filter.offset)
+            .limit(filter.limit)
+            .all(&self.db)
+            .await
+            .map_err(|e| DatabaseError::FindMany(e.to_string()))?;
+
+        let mut accounts = Vec::with_capacity(models.len());
+        for model in models {
+            let account = self
+                .find(model.id)
+                .await?
+                .ok_or_else(|| DatabaseError::FindRelated("account disappeared while listing".to_string()))?;
+            accounts.push(account);
+        }
+
+        Ok(accounts)
+    }
+
     async fn upsert(
         &self,
         provider: AuthProvider,
         subject: &str,
+        display_name: Option<String>,
         initial_permissions: &[Permission],
     ) -> Result<Account, DatabaseError> {
         let tx = self
@@ -113,6 +143,7 @@ impl AccountRepository for SeaOrmAccountRepository {
 
         let account_model = account::ActiveModel {
             id: Set(account_id),
+            display_name: Set(display_name),
             permissions: Set(permissions_json),
             created_at: Set(now),
             ..Default::default()
@@ -173,6 +204,54 @@ impl AccountRepository for SeaOrmAccountRepository {
         Ok(account)
     }
 
+    async fn update(&self, id: Uuid, display_name: Option<String>) -> Result<Option<Account>, DatabaseError> {
+        let Some(existing) = AccountEntity::find_by_id(id)
+            .one(&self.db)
+            .await
+            .map_err(|e| DatabaseError::FindOne(e.to_string()))?
+        else {
+            return Ok(None);
+        };
+
+        let mut account: account::ActiveModel = existing.into();
+        account.display_name = Set(display_name);
+        account.updated_at = Set(Some(Utc::now().naive_utc()));
+        account
+            .update(&self.db)
+            .await
+            .map_err(|e| DatabaseError::Update(e.to_string()))?;
+
+        self.find(id).await
+    }
+
+    async fn update_permissions(&self, id: Uuid, permissions: &[Permission]) -> Result<Option<Account>, DatabaseError> {
+        let Some(existing) = AccountEntity::find_by_id(id)
+            .one(&self.db)
+            .await
+            .map_err(|e| DatabaseError::FindOne(e.to_string()))?
+        else {
+            return Ok(None);
+        };
+
+        let mut unique_permissions = Vec::new();
+        for permission in permissions {
+            if !unique_permissions.contains(permission) {
+                unique_permissions.push(permission.clone());
+            }
+        }
+
+        let permissions = serde_json::to_value(unique_permissions).map_err(|e| DatabaseError::Update(e.to_string()))?;
+        let mut account: account::ActiveModel = existing.into();
+        account.permissions = Set(permissions);
+        account.updated_at = Set(Some(Utc::now().naive_utc()));
+        account
+            .update(&self.db)
+            .await
+            .map_err(|e| DatabaseError::Update(e.to_string()))?;
+
+        self.find(id).await
+    }
+
     async fn update_preferences(
         &self,
         id: Uuid,
@@ -198,5 +277,40 @@ impl AccountRepository for SeaOrmAccountRepository {
             .map_err(|e| DatabaseError::Update(e.to_string()))?;
 
         Ok(Some(preference.into()))
+    }
+
+    async fn delete(&self, id: Uuid) -> Result<bool, DatabaseError> {
+        let tx = self
+            .db
+            .begin()
+            .await
+            .map_err(|e| DatabaseError::Transaction(e.to_string()))?;
+
+        let exists = AccountEntity::find_by_id(id)
+            .one(&tx)
+            .await
+            .map_err(|e| DatabaseError::FindOne(e.to_string()))?
+            .is_some();
+        if !exists {
+            tx.rollback()
+                .await
+                .map_err(|e| DatabaseError::Transaction(e.to_string()))?;
+            return Ok(false);
+        }
+
+        Wallet::delete_many()
+            .filter(wallet::Column::AccountId.eq(id))
+            .exec(&tx)
+            .await
+            .map_err(|e| DatabaseError::Delete(e.to_string()))?;
+        AccountEntity::delete_by_id(id)
+            .exec(&tx)
+            .await
+            .map_err(|e| DatabaseError::Delete(e.to_string()))?;
+
+        tx.commit()
+            .await
+            .map_err(|e| DatabaseError::Transaction(e.to_string()))?;
+        Ok(true)
     }
 }

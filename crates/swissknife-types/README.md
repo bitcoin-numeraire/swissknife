@@ -13,12 +13,18 @@ generated client/SDK consume the same types.
   `Payment`, `Wallet`, `LnAddress`, `BtcAddress`, `BtcOutput`, `ApiKey`, … the
   core records. They serialize directly as the wire representation; there are no
   parallel `*Response` types.
-- **Requests** — `SendPaymentRequest`, `NewInvoiceRequest`, … the inputs decoded
-  from request bodies and query strings.
+- **Requests** — `CreateAccountRequest`, `UpdateAccountRequest`,
+  `UpdateAccountPermissionsRequest`, `SendPaymentRequest`,
+  `NewInvoiceRequest`, … the inputs decoded from request bodies and query
+  strings.
 - **Responses** — the few edge shapes with no entity: `SignInResponse`,
   `NostrNIP05Response`, `ErrorResponse`, `LnUrlCallback`.
 - **Shared enums** — `AuthProvider`, `Currency`, `Ledger`, `Permission`,
   `BtcNetwork`, `InvoiceStatus`, `PaymentStatus`, `BtcAddressType`, …
+
+Account management uses the `read:account` and `write:account` permissions.
+Stored permission updates apply only to local JWT accounts; OAuth2 token claims
+remain authoritative.
 
 ## Principles
 

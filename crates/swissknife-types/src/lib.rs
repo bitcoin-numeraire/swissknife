@@ -23,7 +23,10 @@ mod system;
 mod transaction;
 mod wallet;
 
-pub use account::{Account, AccountPreferences, AuthIdentity, UpdateAccountPreferencesRequest};
+pub use account::{
+    Account, AccountFilter, AccountPreferences, AuthIdentity, CreateAccountRequest, UpdateAccountPermissionsRequest,
+    UpdateAccountPreferencesRequest, UpdateAccountRequest,
+};
 pub use api_key::{ApiKey, ApiKeyFilter, CreateApiKeyRequest};
 pub use auth::{AuthProvider, ChangePasswordRequest, SignInRequest, SignInResponse, SignUpRequest};
 pub use bitcoin::{BtcAddress, BtcAddressFilter, BtcAddressType, BtcOutput, BtcOutputStatus, NewBtcAddressRequest};
