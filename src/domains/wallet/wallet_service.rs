@@ -51,6 +51,28 @@ impl WalletUseCases for WalletService {
         Ok(wallet)
     }
 
+    async fn get_by_account_id(&self, account_id: Uuid, id: Uuid) -> Result<Wallet, ApplicationError> {
+        trace!(%account_id, %id, "Fetching account wallet");
+
+        let wallets = self
+            .store
+            .wallet
+            .find_many(WalletFilter {
+                account_id: Some(account_id),
+                ids: Some(vec![id]),
+                ..Default::default()
+            })
+            .await?;
+
+        let wallet = wallets
+            .into_iter()
+            .next()
+            .ok_or_else(|| DataError::NotFound("Wallet not found.".to_string()))?;
+
+        debug!(%account_id, %id, "Account wallet fetched successfully");
+        Ok(wallet)
+    }
+
     async fn list(&self, filter: WalletFilter) -> Result<Vec<Wallet>, ApplicationError> {
         trace!(?filter, "Listing wallets");
 

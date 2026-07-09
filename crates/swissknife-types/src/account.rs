@@ -74,6 +74,14 @@ pub struct AccountPreferences {
     pub updated_at: Option<DateTime<Utc>>,
 }
 
+/// Replace account-scoped dashboard preferences.
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct UpdateAccountPreferencesRequest {
+    /// Versioned dashboard settings document stored by the server.
+    #[schema(example = json!({ "theme": "system" }))]
+    pub dashboard_settings: Value,
+}
+
 impl Default for AccountPreferences {
     fn default() -> Self {
         Self {

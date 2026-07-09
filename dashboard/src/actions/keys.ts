@@ -4,12 +4,19 @@ export const endpointKeys = {
   },
   userWallet: {
     get: 'userWallet',
-    balance: 'userWalletBalance',
+    balance: (walletId: string) => ['userWalletBalance', walletId] as const,
     lnAddress: { get: 'userWalletGetAddress' },
     btcAddresses: { list: 'userWalletListBtcAddresses' },
-    payments: { list: 'userWalletListPayments', get: 'userWalletGetPayment' },
-    invoices: { list: 'userWalletListInvoices', get: 'userWalletGetInvoice' },
-    contacts: { list: 'userWalletListContacts' },
+    payments: {
+      list: (walletId: string, limit?: number, offset?: number) =>
+        ['userWalletListPayments', walletId, limit, offset] as const,
+      get: (walletId: string, id: string) => ['userWalletGetPayment', walletId, id] as const,
+    },
+    invoices: {
+      list: (walletId: string) => ['userWalletListInvoices', walletId] as const,
+      get: (walletId: string, id: string) => ['userWalletGetInvoice', walletId, id] as const,
+    },
+    contacts: { list: (walletId: string) => ['userWalletListContacts', walletId] as const },
     apiKeys: { list: 'userWalletListApiKeys' },
   },
   system: {

@@ -113,7 +113,7 @@ pub enum InvoiceStatus {
 /// New Invoice Request
 #[derive(Deserialize, ToSchema, Serialize)]
 pub struct NewInvoiceRequest {
-    /// User ID. Will be populated with your own ID by default
+    /// Wallet ID to receive into. Required by admin endpoints; derived from the path on wallet-scoped endpoints.
     pub wallet_id: Option<Uuid>,
     /// Amount in millisatoshis
     pub amount_msat: u64,

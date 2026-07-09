@@ -9,8 +9,9 @@ use utoipa::OpenApi;
 use uuid::Uuid;
 
 use swissknife_types::{
-    CreateApiKeyRequest, ErrorResponse, NewBtcAddressRequest, NewInvoiceRequest, RegisterLnAddressRequest,
-    SendPaymentRequest, UpdateLnAddressRequest,
+    Account, AccountPreferences, CreateApiKeyRequest, CreateWalletRequest, ErrorResponse, NewBtcAddressRequest,
+    NewInvoiceRequest, RegisterLnAddressRequest, SendPaymentRequest, UpdateAccountPreferencesRequest,
+    UpdateLnAddressRequest,
 };
 
 use crate::{
@@ -29,22 +30,57 @@ use crate::{
     infra::axum::{Json, Path, Query},
 };
 
-use super::{Balance, Contact, Wallet};
+use super::{Balance, Contact, Wallet, WalletFilter};
 
 #[derive(OpenApi)]
 #[openapi(
     paths(
-        get_user_wallet, get_wallet_balance,
-        new_wallet_btc_address, list_wallet_btc_addresses,
-        get_wallet_address, register_wallet_address, update_wallet_address, delete_wallet_address,
-        wallet_pay, list_wallet_payments, get_wallet_payment, delete_failed_payments, list_wallet_invoices,
-        get_wallet_invoice, new_wallet_invoice, delete_expired_invoices,
+        get_account,
+        get_account_preferences,
+        update_account_preferences,
+        get_wallet_address,
+        register_wallet_address,
+        update_wallet_address,
+        delete_wallet_address,
+        create_wallet_api_key,
+        list_wallet_api_keys,
+        get_wallet_api_key,
+        revoke_wallet_api_key,
+        revoke_wallet_api_keys,
+        list_account_wallets,
+        create_account_wallet,
+        get_account_wallet,
+        get_wallet_balance,
+        new_wallet_btc_address,
+        list_wallet_btc_addresses,
+        new_wallet_invoice,
+        list_wallet_invoices,
+        get_wallet_invoice,
+        delete_expired_invoices,
+        wallet_pay,
+        list_wallet_payments,
+        get_wallet_payment,
+        delete_failed_payments,
         list_contacts,
-        create_wallet_api_key, list_wallet_api_keys, get_wallet_api_key, revoke_wallet_api_key, revoke_wallet_api_keys,
     ),
-    components(schemas(Wallet, Balance, Contact, LnAddress, BtcAddress)),
+    components(schemas(
+        Account,
+        AccountPreferences,
+        UpdateAccountPreferencesRequest,
+        CreateWalletRequest,
+        Wallet,
+        Balance,
+        Contact,
+        LnAddress,
+        BtcAddress,
+        SendPaymentRequest,
+        NewInvoiceRequest,
+        NewBtcAddressRequest,
+        CreateApiKeyRequest,
+        ApiKey
+    )),
     tags(
-        (name = "User Wallet", description = "User Wallet endpoints. Available to any authenticated user.")
+        (name = "Me", description = "Authenticated account endpoints. Wallet operations require an explicit account-owned wallet selector.")
     ),
 )]
 pub struct UserWalletHandler;
@@ -52,37 +88,157 @@ pub const CONTEXT_PATH: &str = "/v1/me";
 
 pub fn user_router() -> Router<Arc<AppServices>> {
     Router::new()
-        .route("/", get(get_user_wallet))
-        .route("/balance", get(get_wallet_balance))
-        .route("/bitcoin/address", post(new_wallet_btc_address))
-        .route("/bitcoin/addresses", get(list_wallet_btc_addresses))
+        .route("/", get(get_account))
+        .route("/preferences", get(get_account_preferences))
+        .route("/preferences", put(update_account_preferences))
         .route("/lightning-address", get(get_wallet_address))
         .route("/lightning-address", post(register_wallet_address))
         .route("/lightning-address", put(update_wallet_address))
         .route("/lightning-address", delete(delete_wallet_address))
-        .route("/payments", post(wallet_pay))
-        .route("/payments", get(list_wallet_payments))
-        .route("/payments/{id}", get(get_wallet_payment))
-        .route("/payments", delete(delete_failed_payments))
-        .route("/invoices", post(new_wallet_invoice))
-        .route("/invoices", get(list_wallet_invoices))
-        .route("/invoices/{id}", get(get_wallet_invoice))
-        .route("/invoices", delete(delete_expired_invoices))
-        .route("/contacts", get(list_contacts))
         .route("/api-keys", post(create_wallet_api_key))
         .route("/api-keys", get(list_wallet_api_keys))
         .route("/api-keys/{id}", get(get_wallet_api_key))
         .route("/api-keys/{id}", delete(revoke_wallet_api_key))
         .route("/api-keys", delete(revoke_wallet_api_keys))
+        .route("/wallets", get(list_account_wallets))
+        .route("/wallets", post(create_account_wallet))
+        .route("/wallets/{wallet_id}", get(get_account_wallet))
+        .route("/wallets/{wallet_id}/balance", get(get_wallet_balance))
+        .route("/wallets/{wallet_id}/bitcoin/addresses", get(list_wallet_btc_addresses))
+        .route("/wallets/{wallet_id}/bitcoin/addresses", post(new_wallet_btc_address))
+        .route("/wallets/{wallet_id}/invoices", post(new_wallet_invoice))
+        .route("/wallets/{wallet_id}/invoices", get(list_wallet_invoices))
+        .route("/wallets/{wallet_id}/invoices/{id}", get(get_wallet_invoice))
+        .route("/wallets/{wallet_id}/invoices", delete(delete_expired_invoices))
+        .route("/wallets/{wallet_id}/payments", post(wallet_pay))
+        .route("/wallets/{wallet_id}/payments", get(list_wallet_payments))
+        .route("/wallets/{wallet_id}/payments/{id}", get(get_wallet_payment))
+        .route("/wallets/{wallet_id}/payments", delete(delete_failed_payments))
+        .route("/wallets/{wallet_id}/contacts", get(list_contacts))
 }
 
-/// Get wallet
-///
-/// Returns the user wallet.
+/// Get account.
 #[utoipa::path(
     get,
     path = "",
-    tag = "User Wallet",
+    tag = "Me",
+    context_path = CONTEXT_PATH,
+    responses(
+        (status = 200, description = "Found", body = Account),
+        (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
+        (status = 404, description = "Not Found", body = ErrorResponse, example = json!(NOT_FOUND_EXAMPLE)),
+        (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
+    )
+)]
+async fn get_account(State(services): State<Arc<AppServices>>, user: User) -> Result<Json<Account>, ApplicationError> {
+    let mut account = services.account.get(user.account_id).await?;
+    account.permissions = Some(user.permissions);
+    Ok(Json(account))
+}
+
+/// Get account preferences.
+#[utoipa::path(
+    get,
+    path = "/preferences",
+    tag = "Me",
+    context_path = CONTEXT_PATH,
+    responses(
+        (status = 200, description = "Found", body = AccountPreferences),
+        (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
+        (status = 404, description = "Not Found", body = ErrorResponse, example = json!(NOT_FOUND_EXAMPLE)),
+        (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
+    )
+)]
+async fn get_account_preferences(
+    State(services): State<Arc<AppServices>>,
+    user: User,
+) -> Result<Json<AccountPreferences>, ApplicationError> {
+    let account = services.account.get(user.account_id).await?;
+    let preferences = account
+        .preferences
+        .ok_or_else(|| DataError::Inconsistency("Account preferences missing.".to_string()))?;
+    Ok(Json(preferences))
+}
+
+/// Replace account preferences.
+#[utoipa::path(
+    put,
+    path = "/preferences",
+    tag = "Me",
+    context_path = CONTEXT_PATH,
+    request_body = UpdateAccountPreferencesRequest,
+    responses(
+        (status = 200, description = "Updated", body = AccountPreferences),
+        (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
+        (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
+        (status = 422, description = "Unprocessable Entity", body = ErrorResponse, example = json!(UNPROCESSABLE_EXAMPLE)),
+        (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
+    )
+)]
+async fn update_account_preferences(
+    State(services): State<Arc<AppServices>>,
+    user: User,
+    Json(payload): Json<UpdateAccountPreferencesRequest>,
+) -> Result<Json<AccountPreferences>, ApplicationError> {
+    Ok(Json(
+        services
+            .account
+            .update_preferences(user.account_id, payload.dashboard_settings)
+            .await?,
+    ))
+}
+
+/// List account wallets.
+#[utoipa::path(
+    get,
+    path = "/wallets",
+    tag = "Me",
+    context_path = CONTEXT_PATH,
+    params(WalletFilter),
+    responses(
+        (status = 200, description = "Success", body = Vec<Wallet>),
+        (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
+        (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
+        (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
+    )
+)]
+async fn list_account_wallets(
+    State(services): State<Arc<AppServices>>,
+    user: User,
+    Query(mut filter): Query<WalletFilter>,
+) -> Result<Json<Vec<Wallet>>, ApplicationError> {
+    filter.account_id = Some(user.account_id);
+    Ok(Json(services.wallet.list(filter).await?))
+}
+
+/// Create or enable an asset wallet.
+#[utoipa::path(
+    post,
+    path = "/wallets",
+    tag = "Me",
+    context_path = CONTEXT_PATH,
+    request_body = CreateWalletRequest,
+    responses(
+        (status = 200, description = "Wallet Created", body = Wallet),
+        (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
+        (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
+        (status = 422, description = "Unprocessable Entity", body = ErrorResponse, example = json!(UNPROCESSABLE_EXAMPLE)),
+        (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
+    )
+)]
+async fn create_account_wallet(
+    State(services): State<Arc<AppServices>>,
+    user: User,
+    Json(payload): Json<CreateWalletRequest>,
+) -> Result<Json<Wallet>, ApplicationError> {
+    Ok(Json(services.wallet.create(user.account_id, payload.asset_id).await?))
+}
+
+/// Get one account wallet.
+#[utoipa::path(
+    get,
+    path = "/wallets/{wallet_id}",
+    tag = "Me",
     context_path = CONTEXT_PATH,
     responses(
         (status = 200, description = "Found", body = Wallet),
@@ -91,27 +247,28 @@ pub fn user_router() -> Router<Arc<AppServices>> {
         (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
     )
 )]
-async fn get_user_wallet(
+async fn get_account_wallet(
     State(services): State<Arc<AppServices>>,
     user: User,
+    Path(wallet_id): Path<Uuid>,
 ) -> Result<Json<Wallet>, ApplicationError> {
-    let wallet = services.wallet.get(user.wallet_id).await?;
-    Ok(Json(wallet))
+    Ok(Json(
+        services.wallet.get_by_account_id(user.account_id, wallet_id).await?,
+    ))
 }
 
-/// Generate a new Bitcoin address.
-///
-/// Returns the Bitcoin address for the given address type. The returned address is the same until used.
+/// Generate a new Bitcoin address for a wallet.
 #[utoipa::path(
     post,
-    path = "/bitcoin/address",
-    tag = "User Wallet",
+    path = "/wallets/{wallet_id}/bitcoin/addresses",
+    tag = "Me",
     context_path = CONTEXT_PATH,
     request_body = NewBtcAddressRequest,
     responses(
         (status = 200, description = "Bitcoin Address Created", body = BtcAddress),
         (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
         (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
+        (status = 404, description = "Not Found", body = ErrorResponse, example = json!(NOT_FOUND_EXAMPLE)),
         (status = 422, description = "Unprocessable Entity", body = ErrorResponse, example = json!(UNPROCESSABLE_EXAMPLE)),
         (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
     )
@@ -119,55 +276,57 @@ async fn get_user_wallet(
 async fn new_wallet_btc_address(
     State(services): State<Arc<AppServices>>,
     user: User,
+    Path(wallet_id): Path<Uuid>,
     Json(payload): Json<NewBtcAddressRequest>,
 ) -> Result<Json<BtcAddress>, ApplicationError> {
+    services.wallet.get_by_account_id(user.account_id, wallet_id).await?;
+
     let address = services
         .bitcoin
-        .new_deposit_address(user.wallet_id, payload.address_type)
+        .new_deposit_address(wallet_id, payload.address_type)
         .await?;
     Ok(Json(address))
 }
 
-/// List Bitcoin addresses
-///
-/// Returns the authenticated user's Bitcoin addresses given a filter.
+/// List Bitcoin addresses for a wallet.
 #[utoipa::path(
     get,
-    path = "/bitcoin/addresses",
-    tag = "User Wallet",
+    path = "/wallets/{wallet_id}/bitcoin/addresses",
+    tag = "Me",
     context_path = CONTEXT_PATH,
     params(BtcAddressFilter),
     responses(
         (status = 200, description = "Success", body = Vec<BtcAddress>),
         (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
         (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
+        (status = 404, description = "Not Found", body = ErrorResponse, example = json!(NOT_FOUND_EXAMPLE)),
         (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
     )
 )]
 async fn list_wallet_btc_addresses(
     State(services): State<Arc<AppServices>>,
     user: User,
+    Path(wallet_id): Path<Uuid>,
     Query(mut filter): Query<BtcAddressFilter>,
 ) -> Result<Json<Vec<BtcAddress>>, ApplicationError> {
-    filter.wallet_id = Some(user.wallet_id);
-    let addresses = services.bitcoin.list_addresses(filter).await?;
+    services.wallet.get_by_account_id(user.account_id, wallet_id).await?;
 
-    Ok(Json(addresses))
+    filter.wallet_id = Some(wallet_id);
+    Ok(Json(services.bitcoin.list_addresses(filter).await?))
 }
 
-/// Send payment
-///
-/// Pay for a LN invoice, LNURL, LN Address, On-chain or internally to an other user on the same instance. Returns the payment details.
+/// Send a payment from a wallet.
 #[utoipa::path(
     post,
-    path = "/payments",
-    tag = "User Wallet",
+    path = "/wallets/{wallet_id}/payments",
+    tag = "Me",
     context_path = CONTEXT_PATH,
     request_body = SendPaymentRequest,
     responses(
         (status = 200, description = "Payment Sent", body = Payment),
         (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
         (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
+        (status = 404, description = "Not Found", body = ErrorResponse, example = json!(NOT_FOUND_EXAMPLE)),
         (status = 422, description = "Unprocessable Entity", body = ErrorResponse, example = json!(UNPROCESSABLE_EXAMPLE)),
         (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
     )
@@ -175,51 +334,54 @@ async fn list_wallet_btc_addresses(
 async fn wallet_pay(
     State(services): State<Arc<AppServices>>,
     user: User,
+    Path(wallet_id): Path<Uuid>,
     Json(payload): Json<SendPaymentRequest>,
 ) -> Result<Json<Payment>, ApplicationError> {
+    services.wallet.get_by_account_id(user.account_id, wallet_id).await?;
+
     let payment = services
         .payment
-        .pay(payload.input, payload.amount_msat, payload.comment, user.wallet_id)
+        .pay(payload.input, payload.amount_msat, payload.comment, wallet_id)
         .await?;
 
     Ok(Json(payment))
 }
 
-/// Get wallet balance
-///
-/// Returns the wallet balance.
+/// Get wallet balance.
 #[utoipa::path(
     get,
-    path = "/balance",
-    tag = "User Wallet",
+    path = "/wallets/{wallet_id}/balance",
+    tag = "Me",
     context_path = CONTEXT_PATH,
     responses(
         (status = 200, description = "Found", body = Balance),
         (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
+        (status = 404, description = "Not Found", body = ErrorResponse, example = json!(NOT_FOUND_EXAMPLE)),
         (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
     )
 )]
 async fn get_wallet_balance(
     State(services): State<Arc<AppServices>>,
     user: User,
+    Path(wallet_id): Path<Uuid>,
 ) -> Result<Json<Balance>, ApplicationError> {
-    let balance = services.wallet.get_balance(user.wallet_id).await?;
-    Ok(balance.into())
+    services.wallet.get_by_account_id(user.account_id, wallet_id).await?;
+
+    Ok(Json(services.wallet.get_balance(wallet_id).await?))
 }
 
-/// Generate a new invoice
-///
-/// Returns the generated invoice
+/// Generate a new invoice for a wallet.
 #[utoipa::path(
     post,
-    path = "/invoices",
-    tag = "User Wallet",
+    path = "/wallets/{wallet_id}/invoices",
+    tag = "Me",
     context_path = CONTEXT_PATH,
     request_body = NewInvoiceRequest,
     responses(
         (status = 200, description = "Invoice Created", body = Invoice),
         (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
         (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
+        (status = 404, description = "Not Found", body = ErrorResponse, example = json!(NOT_FOUND_EXAMPLE)),
         (status = 422, description = "Unprocessable Entity", body = ErrorResponse, example = json!(UNPROCESSABLE_EXAMPLE)),
         (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
     )
@@ -227,23 +389,24 @@ async fn get_wallet_balance(
 async fn new_wallet_invoice(
     State(services): State<Arc<AppServices>>,
     user: User,
+    Path(wallet_id): Path<Uuid>,
     Json(payload): Json<NewInvoiceRequest>,
 ) -> Result<Json<Invoice>, ApplicationError> {
+    services.wallet.get_by_account_id(user.account_id, wallet_id).await?;
+
     let invoice = services
         .invoice
-        .invoice(user.wallet_id, payload.amount_msat, payload.description, payload.expiry)
+        .invoice(wallet_id, payload.amount_msat, payload.description, payload.expiry)
         .await?;
 
     Ok(Json(invoice))
 }
 
-/// Get LN Address
-///
-/// Returns the registered address
+/// Get account Lightning Address.
 #[utoipa::path(
     get,
     path = "/lightning-address",
-    tag = "User Wallet",
+    tag = "Me",
     context_path = CONTEXT_PATH,
     responses(
         (status = 200, description = "Found", body = Option<LnAddress>),
@@ -267,13 +430,11 @@ async fn get_wallet_address(
     Ok(Json(ln_addresses.into_iter().next()))
 }
 
-/// Register LN Address
-///
-/// Registers an address. Returns the address details. LN Addresses are ready to receive funds through the LNURL protocol upon registration.
+/// Register account Lightning Address.
 #[utoipa::path(
     post,
     path = "/lightning-address",
-    tag = "User Wallet",
+    tag = "Me",
     context_path = CONTEXT_PATH,
     request_body = RegisterLnAddressRequest,
     responses(
@@ -298,16 +459,14 @@ async fn register_wallet_address(
             payload.nostr_pubkey,
         )
         .await?;
-    Ok(ln_address.into())
+    Ok(Json(ln_address))
 }
 
-/// Update LN Address
-///
-/// Updates the address. Returns the address details.
+/// Update account Lightning Address.
 #[utoipa::path(
     put,
     path = "/lightning-address",
-    tag = "User Wallet",
+    tag = "Me",
     context_path = CONTEXT_PATH,
     request_body = UpdateLnAddressRequest,
     responses(
@@ -337,18 +496,14 @@ async fn update_wallet_address(
         .cloned()
         .ok_or_else(|| DataError::NotFound("LN Address not found.".to_string()))?;
 
-    let ln_address = services.ln_address.update(ln_address.id, payload).await?;
-
-    Ok(ln_address.into())
+    Ok(Json(services.ln_address.update(ln_address.id, payload).await?))
 }
 
-/// Delete LN Address
-///
-/// Deletes an address. Returns an empty body. Once the address is deleted, it will no longer be able to receive funds and its username can be claimed by another user.
+/// Delete account Lightning Address.
 #[utoipa::path(
     delete,
     path = "/lightning-address",
-    tag = "User Wallet",
+    tag = "Me",
     context_path = CONTEXT_PATH,
     responses(
         (status = 200, description = "Deleted"),
@@ -374,40 +529,38 @@ async fn delete_wallet_address(State(services): State<Arc<AppServices>>, user: U
     Ok(())
 }
 
-/// List payments
-///
-/// Returns all the payments given a filter
+/// List payments for a wallet.
 #[utoipa::path(
     get,
-    path = "/payments",
-    tag = "User Wallet",
+    path = "/wallets/{wallet_id}/payments",
+    tag = "Me",
     context_path = CONTEXT_PATH,
     params(PaymentFilter),
     responses(
         (status = 200, description = "Success", body = Vec<Payment>),
         (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
         (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
+        (status = 404, description = "Not Found", body = ErrorResponse, example = json!(NOT_FOUND_EXAMPLE)),
         (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
     )
 )]
 async fn list_wallet_payments(
     State(services): State<Arc<AppServices>>,
     user: User,
+    Path(wallet_id): Path<Uuid>,
     Query(mut query_params): Query<PaymentFilter>,
 ) -> Result<Json<Vec<Payment>>, ApplicationError> {
-    query_params.wallet_id = Some(user.wallet_id);
-    let payments = services.payment.list(query_params).await?;
+    services.wallet.get_by_account_id(user.account_id, wallet_id).await?;
 
-    Ok(Json(payments))
+    query_params.wallet_id = Some(wallet_id);
+    Ok(Json(services.payment.list(query_params).await?))
 }
 
-/// Find a payment
-///
-/// Returns the payment by its ID
+/// Get a wallet payment.
 #[utoipa::path(
     get,
-    path = "/payments/{id}",
-    tag = "User Wallet",
+    path = "/wallets/{wallet_id}/payments/{id}",
+    tag = "Me",
     context_path = CONTEXT_PATH,
     responses(
         (status = 200, description = "Found", body = Payment),
@@ -420,12 +573,14 @@ async fn list_wallet_payments(
 async fn get_wallet_payment(
     State(services): State<Arc<AppServices>>,
     user: User,
-    Path(id): Path<Uuid>,
+    Path((wallet_id, id)): Path<(Uuid, Uuid)>,
 ) -> Result<Json<Payment>, ApplicationError> {
+    services.wallet.get_by_account_id(user.account_id, wallet_id).await?;
+
     let payments = services
         .payment
         .list(PaymentFilter {
-            wallet_id: Some(user.wallet_id),
+            wallet_id: Some(wallet_id),
             ids: Some(vec![id]),
             ..Default::default()
         })
@@ -439,40 +594,38 @@ async fn get_wallet_payment(
     Ok(Json(payment))
 }
 
-/// List invoices
-///
-/// Returns all the invoices given a filter
+/// List invoices for a wallet.
 #[utoipa::path(
     get,
-    path = "/invoices",
-    tag = "User Wallet",
+    path = "/wallets/{wallet_id}/invoices",
+    tag = "Me",
     context_path = CONTEXT_PATH,
     params(InvoiceFilter),
     responses(
         (status = 200, description = "Success", body = Vec<Invoice>),
         (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
         (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
+        (status = 404, description = "Not Found", body = ErrorResponse, example = json!(NOT_FOUND_EXAMPLE)),
         (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
     )
 )]
 async fn list_wallet_invoices(
     State(services): State<Arc<AppServices>>,
     user: User,
+    Path(wallet_id): Path<Uuid>,
     Query(mut query_params): Query<InvoiceFilter>,
 ) -> Result<Json<Vec<Invoice>>, ApplicationError> {
-    query_params.wallet_id = Some(user.wallet_id);
-    let invoices = services.invoice.list(query_params).await?;
+    services.wallet.get_by_account_id(user.account_id, wallet_id).await?;
 
-    Ok(Json(invoices))
+    query_params.wallet_id = Some(wallet_id);
+    Ok(Json(services.invoice.list(query_params).await?))
 }
 
-/// Find an invoice
-///
-/// Returns the invoice by its ID
+/// Get a wallet invoice.
 #[utoipa::path(
     get,
-    path = "/invoices/{id}",
-    tag = "User Wallet",
+    path = "/wallets/{wallet_id}/invoices/{id}",
+    tag = "Me",
     context_path = CONTEXT_PATH,
     responses(
         (status = 200, description = "Found", body = Invoice),
@@ -485,12 +638,14 @@ async fn list_wallet_invoices(
 async fn get_wallet_invoice(
     State(services): State<Arc<AppServices>>,
     user: User,
-    Path(id): Path<Uuid>,
+    Path((wallet_id, id)): Path<(Uuid, Uuid)>,
 ) -> Result<Json<Invoice>, ApplicationError> {
+    services.wallet.get_by_account_id(user.account_id, wallet_id).await?;
+
     let invoices = services
         .invoice
         .list(InvoiceFilter {
-            wallet_id: Some(user.wallet_id),
+            wallet_id: Some(wallet_id),
             ids: Some(vec![id]),
             ..Default::default()
         })
@@ -504,95 +659,100 @@ async fn get_wallet_invoice(
     Ok(Json(invoice))
 }
 
-/// List contacts
-///
-/// Returns all the contacts
+/// List contacts for a wallet.
 #[utoipa::path(
     get,
-    path = "/contacts",
-    tag = "User Wallet",
+    path = "/wallets/{wallet_id}/contacts",
+    tag = "Me",
     context_path = CONTEXT_PATH,
     responses(
         (status = 200, description = "Success", body = Vec<Contact>),
         (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
         (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
+        (status = 404, description = "Not Found", body = ErrorResponse, example = json!(NOT_FOUND_EXAMPLE)),
         (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
     )
 )]
 async fn list_contacts(
     State(services): State<Arc<AppServices>>,
     user: User,
+    Path(wallet_id): Path<Uuid>,
 ) -> Result<Json<Vec<Contact>>, ApplicationError> {
-    let contacts = services.wallet.list_contacts(user.wallet_id).await?;
-    Ok(contacts.into())
+    services.wallet.get_by_account_id(user.account_id, wallet_id).await?;
+
+    Ok(Json(services.wallet.list_contacts(wallet_id).await?))
 }
 
-/// Delete expired invoices
-///
-/// Deletes all the invoices with status `Èxpired`. Returns the number of deleted invoices
+/// Delete expired invoices for a wallet.
 #[utoipa::path(
     delete,
-    path = "/invoices",
-    tag = "User Wallet",
+    path = "/wallets/{wallet_id}/invoices",
+    tag = "Me",
     context_path = CONTEXT_PATH,
     responses(
         (status = 200, description = "Success", body = u64),
         (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
+        (status = 404, description = "Not Found", body = ErrorResponse, example = json!(NOT_FOUND_EXAMPLE)),
         (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
     )
 )]
 async fn delete_expired_invoices(
     State(services): State<Arc<AppServices>>,
     user: User,
+    Path(wallet_id): Path<Uuid>,
 ) -> Result<Json<u64>, ApplicationError> {
+    services.wallet.get_by_account_id(user.account_id, wallet_id).await?;
+
     let n_deleted = services
         .invoice
         .delete_many(InvoiceFilter {
-            wallet_id: Some(user.wallet_id),
+            wallet_id: Some(wallet_id),
             status: Some(InvoiceStatus::Expired),
             ..Default::default()
         })
         .await?;
-    Ok(n_deleted.into())
+    Ok(Json(n_deleted))
 }
 
-/// Delete failed payments
-///
-/// Deletes all the payments with `Failed` status. Returns the number of deleted payments
+/// Delete failed payments for a wallet.
 #[utoipa::path(
     delete,
-    path = "/payments",
-    tag = "User Wallet",
+    path = "/wallets/{wallet_id}/payments",
+    tag = "Me",
     context_path = CONTEXT_PATH,
     responses(
         (status = 200, description = "Success", body = u64),
         (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
+        (status = 404, description = "Not Found", body = ErrorResponse, example = json!(NOT_FOUND_EXAMPLE)),
         (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
     )
 )]
 async fn delete_failed_payments(
     State(services): State<Arc<AppServices>>,
     user: User,
+    Path(wallet_id): Path<Uuid>,
 ) -> Result<Json<u64>, ApplicationError> {
+    services.wallet.get_by_account_id(user.account_id, wallet_id).await?;
+
     let n_deleted = services
         .payment
         .delete_many(PaymentFilter {
-            wallet_id: Some(user.wallet_id),
+            wallet_id: Some(wallet_id),
             status: Some(PaymentStatus::Failed),
             ..Default::default()
         })
         .await?;
-    Ok(n_deleted.into())
+    Ok(Json(n_deleted))
 }
 
 /// Generate a new API Key
 ///
-/// Returns the generated API Key for the authenticated account. Users can create API keys with
+/// Returns the generated API Key for the account. Users can create API keys with
 /// permissions as a subset of their current permissions.
 #[utoipa::path(
     post,
     path = "/api-keys",
-    tag = "User Wallet",
+    tag = "Me",
     context_path = CONTEXT_PATH,
     request_body = CreateApiKeyRequest,
     responses(
@@ -613,13 +773,11 @@ async fn create_wallet_api_key(
     Ok(Json(api_key))
 }
 
-/// Find an API Key
-///
-/// Returns the API Key by its ID.
+/// Get an account API key.
 #[utoipa::path(
     get,
     path = "/api-keys/{id}",
-    tag = "User Wallet",
+    tag = "Me",
     context_path = CONTEXT_PATH,
     responses(
         (status = 200, description = "Found", body = ApiKey),
@@ -651,13 +809,11 @@ async fn get_wallet_api_key(
     Ok(Json(api_key))
 }
 
-/// List API Keys
-///
-/// Returns all the API Keys given a filter
+/// List account API keys.
 #[utoipa::path(
     get,
     path = "/api-keys",
-    tag = "User Wallet",
+    tag = "Me",
     context_path = CONTEXT_PATH,
     params(ApiKeyFilter),
     responses(
@@ -678,13 +834,11 @@ async fn list_wallet_api_keys(
     Ok(Json(api_keys))
 }
 
-/// Revoke an API Key
-///
-/// Revokes an API Key by ID. Returns an empty body.
+/// Revoke an account API key.
 #[utoipa::path(
     delete,
     path = "/api-keys/{id}",
-    tag = "User Wallet",
+    tag = "Me",
     context_path = CONTEXT_PATH,
     responses(
         (status = 200, description = "Revoked"),
@@ -715,13 +869,11 @@ async fn revoke_wallet_api_key(
     Ok(())
 }
 
-/// Revoke API Keys
-///
-/// Revokes all the API Keys given a filter. Returns the number of revoked keys.
+/// Revoke account API keys.
 #[utoipa::path(
     delete,
     path = "/api-keys",
-    tag = "User Wallet",
+    tag = "Me",
     context_path = CONTEXT_PATH,
     params(ApiKeyFilter),
     responses(
@@ -756,13 +908,18 @@ mod tests {
 
     use super::*;
 
-    // The /v1/me endpoints take no permission gate; instead every call must be
-    // scoped to the authenticated user's wallet. These tests lock that invariant.
     fn user() -> User {
         User {
             account_id: Uuid::new_v4(),
-            wallet_id: Uuid::new_v4(),
             permissions: vec![],
+        }
+    }
+
+    fn wallet(id: Uuid, account_id: Uuid) -> Wallet {
+        Wallet {
+            id,
+            account_id,
+            ..Default::default()
         }
     }
 
@@ -778,23 +935,29 @@ mod tests {
         }
     }
 
-    mod get_user_wallet {
+    mod get_account {
         use super::*;
 
         #[tokio::test]
-        async fn fetches_the_authenticated_users_wallet() {
+        async fn delegates_to_account_service() {
             let caller = user();
-            let wallet_id = caller.wallet_id;
+            let account_id = caller.account_id;
 
             let mut builder = MockAppServicesBuilder::new();
-            builder
-                .wallet
-                .expect_get()
-                .withf(move |id| *id == wallet_id)
-                .times(1)
-                .returning(|_| Ok(Wallet::default()));
+            builder.account.expect_get().times(1).returning(move |id| {
+                assert_eq!(id, account_id);
+                Ok(Account {
+                    id,
+                    display_name: None,
+                    identity: None,
+                    permissions: None,
+                    preferences: None,
+                    created_at: Utc::now(),
+                    updated_at: None,
+                })
+            });
 
-            let result = get_user_wallet(State(Arc::new(builder.build())), caller).await;
+            let result = super::get_account(State(Arc::new(builder.build())), caller).await;
 
             assert!(result.is_ok());
         }
@@ -804,30 +967,63 @@ mod tests {
         use super::*;
 
         #[tokio::test]
-        async fn ignores_payload_wallet_id_and_uses_the_authenticated_user() {
+        async fn uses_the_path_wallet_after_ownership_check() {
             let caller = user();
-            let own_wallet = caller.wallet_id;
-            let attacker_wallet = Uuid::new_v4();
+            let account_id = caller.account_id;
+            let wallet_id = Uuid::new_v4();
 
             let mut builder = MockAppServicesBuilder::new();
             builder
+                .wallet
+                .expect_get_by_account_id()
+                .withf(move |account, id| *account == account_id && *id == wallet_id)
+                .times(1)
+                .returning(|account_id, id| Ok(wallet(id, account_id)));
+            builder
                 .payment
                 .expect_pay()
-                // Anti-IDOR: must use the caller's wallet, never the one in the body.
-                .withf(move |_, _, _, wallet_id| *wallet_id == own_wallet)
+                .withf(move |_, _, _, id| *id == wallet_id)
                 .times(1)
                 .returning(|_, _, _, _| Ok(Payment::default()));
 
             let payload = SendPaymentRequest {
-                wallet_id: Some(attacker_wallet),
+                wallet_id: None,
                 input: "bob@numeraire.tech".to_string(),
                 amount_msat: Some(1_000),
                 comment: None,
             };
 
-            let result = wallet_pay(State(Arc::new(builder.build())), caller, Json(payload)).await;
+            let result =
+                super::wallet_pay(State(Arc::new(builder.build())), caller, Path(wallet_id), Json(payload)).await;
 
             assert!(result.is_ok());
+        }
+
+        #[tokio::test]
+        async fn rejects_wallets_outside_the_account_scope() {
+            let caller = user();
+            let account_id = caller.account_id;
+            let wallet_id = Uuid::new_v4();
+
+            let mut builder = MockAppServicesBuilder::new();
+            builder
+                .wallet
+                .expect_get_by_account_id()
+                .withf(move |account, id| *account == account_id && *id == wallet_id)
+                .times(1)
+                .returning(|_, _| Err(DataError::NotFound("Wallet not found.".to_string()).into()));
+
+            let payload = SendPaymentRequest {
+                wallet_id: None,
+                input: "bob@numeraire.tech".to_string(),
+                amount_msat: Some(1_000),
+                comment: None,
+            };
+
+            let result =
+                super::wallet_pay(State(Arc::new(builder.build())), caller, Path(wallet_id), Json(payload)).await;
+
+            assert!(matches!(result, Err(ApplicationError::Data(_))));
         }
     }
 
@@ -835,11 +1031,18 @@ mod tests {
         use super::*;
 
         #[tokio::test]
-        async fn scopes_address_derivation_to_the_authenticated_user() {
+        async fn scopes_address_derivation_to_the_path_wallet() {
             let caller = user();
-            let wallet_id = caller.wallet_id;
+            let account_id = caller.account_id;
+            let wallet_id = Uuid::new_v4();
 
             let mut builder = MockAppServicesBuilder::new();
+            builder
+                .wallet
+                .expect_get_by_account_id()
+                .withf(move |account, id| *account == account_id && *id == wallet_id)
+                .times(1)
+                .returning(|account_id, id| Ok(wallet(id, account_id)));
             builder
                 .bitcoin
                 .expect_new_deposit_address()
@@ -848,60 +1051,13 @@ mod tests {
                 .returning(|id, _| Ok(btc_address(id)));
 
             let payload = NewBtcAddressRequest {
-                wallet_id: Some(Uuid::new_v4()),
+                wallet_id: None,
                 address_type: None,
             };
 
-            let result = new_wallet_btc_address(State(Arc::new(builder.build())), caller, Json(payload)).await;
-
-            assert!(result.is_ok());
-        }
-    }
-
-    mod list_wallet_btc_addresses {
-        use super::*;
-
-        #[tokio::test]
-        async fn lists_only_the_authenticated_users_addresses() {
-            let caller = user();
-            let wallet_id = caller.wallet_id;
-
-            let mut builder = MockAppServicesBuilder::new();
-            builder
-                .bitcoin
-                .expect_list_addresses()
-                .withf(move |filter| filter.wallet_id == Some(wallet_id))
-                .times(1)
-                .returning(|filter| Ok(vec![btc_address(filter.wallet_id.expect("wallet_id should be scoped"))]));
-
-            let filter = BtcAddressFilter {
-                wallet_id: Some(Uuid::new_v4()),
-                ..Default::default()
-            };
-
-            let result = list_wallet_btc_addresses(State(Arc::new(builder.build())), caller, Query(filter)).await;
-
-            assert!(result.is_ok());
-        }
-    }
-
-    mod get_wallet_address {
-        use super::*;
-
-        #[tokio::test]
-        async fn lists_only_the_authenticated_users_addresses() {
-            let caller = user();
-            let account_id = caller.account_id;
-
-            let mut builder = MockAppServicesBuilder::new();
-            builder
-                .ln_address
-                .expect_list()
-                .withf(move |filter| filter.account_id == Some(account_id))
-                .times(1)
-                .returning(|_| Ok(vec![]));
-
-            let result = get_wallet_address(State(Arc::new(builder.build())), caller).await;
+            let result =
+                super::new_wallet_btc_address(State(Arc::new(builder.build())), caller, Path(wallet_id), Json(payload))
+                    .await;
 
             assert!(result.is_ok());
         }

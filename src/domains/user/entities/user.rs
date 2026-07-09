@@ -7,11 +7,10 @@ use super::Permission;
 /// Runtime principal produced by authentication for one request.
 ///
 /// `Account` is the persisted owner aggregate. `User` is the effective actor:
-/// selected wallet context, account ID, and request-time permissions.
+/// account ID and request-time permissions.
 #[derive(Clone, Debug, Default)]
 pub struct User {
     pub account_id: Uuid,
-    pub wallet_id: Uuid,
     pub permissions: Vec<Permission>,
 }
 

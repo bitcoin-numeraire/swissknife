@@ -196,7 +196,6 @@ mod tests {
 
     fn user(permissions: Vec<Permission>) -> User {
         User {
-            wallet_id: Uuid::new_v4(),
             permissions,
             ..Default::default()
         }

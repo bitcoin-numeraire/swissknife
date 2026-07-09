@@ -166,7 +166,9 @@ export function InvoiceListView() {
             open={newInvoice.value}
             lnAddress={wallet?.ln_address}
             onClose={newInvoice.onFalse}
-            onSuccess={() => mutate(endpointKeys.userWallet.invoices.list)}
+            onSuccess={() => {
+              if (wallet?.id) mutate(endpointKeys.userWallet.invoices.list(wallet.id));
+            }}
           />
         </>
       )}

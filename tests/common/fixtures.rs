@@ -1,9 +1,12 @@
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 
+use sea_orm::{ConnectionTrait, Database, DatabaseBackend, Statement};
 use uuid::Uuid;
 
-use swissknife_types::{ApiKey, Balance, BtcAddress, CreateApiKeyRequest, NewBtcAddressRequest, Permission, Wallet};
+use swissknife_types::{
+    ApiKey, Balance, BtcAddress, CreateApiKeyRequest, CreateWalletRequest, NewBtcAddressRequest, Permission, Wallet,
+};
 
 use super::chain;
 use super::client::Auth;
@@ -11,6 +14,7 @@ use super::wait::wait_until;
 use super::TestApp;
 
 static COUNTER: AtomicU64 = AtomicU64::new(0);
+const REGTEST_BTC_ASSET_ID: &str = "00000000-0000-4000-8000-000000000004";
 
 /// A process-unique, lowercase identifier with the given prefix, so tests
 /// sharing one instance never collide on wallet user ids, usernames, etc.
@@ -20,17 +24,31 @@ pub fn unique(prefix: &str) -> String {
 }
 
 impl TestApp {
-    /// Provision a fresh account through API-key authentication and return its
-    /// active asset wallet. Behavioural tests use their own account wallet so
-    /// balances stay isolated on the shared instance.
+    /// Provision a fresh account and return its regtest BTC wallet. Behavioural
+    /// tests use their own account wallet so balances stay isolated on the
+    /// shared instance.
     pub async fn create_wallet(&self, token: &str, _label: &str) -> Wallet {
         let account_id = Uuid::new_v4();
-        let key = self
-            .user_api_key(token, account_id, Permission::all_permissions())
+        self.create_account_fixture(account_id).await;
+
+        let res = self
+            .api()
+            .post(
+                "/v1/wallets",
+                Auth::Bearer(token),
+                CreateWalletRequest {
+                    account_id: Some(account_id),
+                    asset_id: regtest_btc_asset_id(),
+                },
+            )
             .await;
-        let res = self.api().get("/v1/me", Auth::ApiKey(&key)).await;
-        assert_eq!(res.status.as_u16(), 200, "create_wallet /v1/me failed: {}", res.body);
-        res.parse()
+        assert_eq!(
+            res.status.as_u16(),
+            200,
+            "create_wallet /v1/wallets failed: {}",
+            res.body
+        );
+        res.parse::<Wallet>()
     }
 
     /// Current balance of `wallet_id`.
@@ -98,6 +116,8 @@ impl TestApp {
     /// Mint an API key for `account_id` via the admin endpoint with `permissions`,
     /// returning its secret. The key authenticates into that account.
     pub async fn user_api_key(&self, token: &str, account_id: Uuid, permissions: Vec<Permission>) -> String {
+        self.create_account_fixture(account_id).await;
+
         let res = self
             .api()
             .post(
@@ -118,15 +138,63 @@ impl TestApp {
             .expect("a freshly created key returns its secret")
     }
 
+    async fn create_account_fixture(&self, account_id: Uuid) {
+        let db = Database::connect(&self.database_url)
+            .await
+            .expect("connect to integration database");
+        let backend = db.get_database_backend();
+        let identity_id = uuid_literal(backend, Uuid::new_v4());
+        let subject = sql_string_literal(&format!("fixture:{account_id}"));
+        let account_id = uuid_literal(backend, account_id);
+
+        for sql in [
+            format!(
+                "INSERT INTO account (id, permissions, created_at) \
+                 VALUES ({account_id}, '[]', CURRENT_TIMESTAMP) \
+                 ON CONFLICT (id) DO NOTHING"
+            ),
+            format!(
+                "INSERT INTO auth_identity (id, account_id, provider, subject, created_at) \
+                 VALUES ({identity_id}, {account_id}, 'jwt', {subject}, CURRENT_TIMESTAMP) \
+                 ON CONFLICT (provider, subject) DO NOTHING"
+            ),
+            format!(
+                "INSERT INTO account_preference (account_id, dashboard_settings, created_at) \
+                 VALUES ({account_id}, '{{}}', CURRENT_TIMESTAMP) \
+                 ON CONFLICT (account_id) DO NOTHING"
+            ),
+        ] {
+            db.execute(Statement::from_string(backend, sql))
+                .await
+                .expect("seed integration account fixture");
+        }
+    }
+
     /// Register a fresh wallet and a full-permission API key for it: a distinct
     /// external account for exercising the `/me` endpoints.
     pub async fn create_user(&self, token: &str, _label: &str) -> TestUser {
+        let account_id = Uuid::new_v4();
         let key = self
-            .user_api_key(token, Uuid::new_v4(), Permission::all_permissions())
+            .user_api_key(token, account_id, Permission::all_permissions())
             .await;
-        let res = self.api().get("/v1/me", Auth::ApiKey(&key)).await;
-        assert_eq!(res.status.as_u16(), 200, "create_user /v1/me failed: {}", res.body);
-        let wallet = res.parse();
+        let res = self
+            .api()
+            .post(
+                "/v1/me/wallets",
+                Auth::ApiKey(&key),
+                CreateWalletRequest {
+                    account_id: None,
+                    asset_id: regtest_btc_asset_id(),
+                },
+            )
+            .await;
+        assert_eq!(
+            res.status.as_u16(),
+            200,
+            "create_user /v1/me/wallets failed: {}",
+            res.body
+        );
+        let wallet = res.parse::<Wallet>();
         TestUser { wallet, key }
     }
 }
@@ -135,4 +203,20 @@ impl TestApp {
 pub struct TestUser {
     pub wallet: Wallet,
     pub key: String,
+}
+
+fn uuid_literal(backend: DatabaseBackend, id: Uuid) -> String {
+    match backend {
+        DatabaseBackend::Sqlite => format!("X'{}'", id.as_simple()),
+        DatabaseBackend::Postgres => format!("'{id}'::uuid"),
+        DatabaseBackend::MySql => format!("'{id}'"),
+    }
+}
+
+fn regtest_btc_asset_id() -> Uuid {
+    Uuid::parse_str(REGTEST_BTC_ASSET_ID).expect("seeded regtest BTC asset ID is valid")
+}
+
+fn sql_string_literal(value: &str) -> String {
+    format!("'{}'", value.replace('\'', "''"))
 }

@@ -48,7 +48,7 @@ async fn every_admin_endpoint_enforces_its_permission() {
         Permission::WriteWallet,
         id,
         body(CreateWalletRequest {
-            account_id: uuid::Uuid::new_v4(),
+            account_id: Some(uuid::Uuid::new_v4()),
             asset_id: uuid::Uuid::new_v4(),
         }),
     ));
@@ -65,7 +65,7 @@ async fn every_admin_endpoint_enforces_its_permission() {
         Permission::WriteLnTransaction,
         id,
         body(NewInvoiceRequest {
-            wallet_id: None,
+            wallet_id: Some(uuid::Uuid::new_v4()),
             amount_msat: 1_000,
             description: None,
             expiry: None,
@@ -78,7 +78,7 @@ async fn every_admin_endpoint_enforces_its_permission() {
         Permission::WriteLnTransaction,
         id,
         body(SendPaymentRequest {
-            wallet_id: None,
+            wallet_id: Some(uuid::Uuid::new_v4()),
             input: "guard".to_string(),
             amount_msat: None,
             comment: None,
@@ -129,7 +129,7 @@ async fn every_admin_endpoint_enforces_its_permission() {
         Permission::WriteBtcAddress,
         id,
         body(NewBtcAddressRequest {
-            wallet_id: None,
+            wallet_id: Some(uuid::Uuid::new_v4()),
             address_type: None,
         }),
     ));

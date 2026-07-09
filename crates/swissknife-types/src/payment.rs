@@ -139,7 +139,7 @@ pub enum PaymentStatus {
 /// Send Payment Request
 #[derive(Debug, Deserialize, Clone, ToSchema, Serialize)]
 pub struct SendPaymentRequest {
-    /// Wallet ID. Will be populated with your own ID by default
+    /// Wallet ID to pay from. Required by admin endpoints; derived from the path on wallet-scoped endpoints.
     pub wallet_id: Option<Uuid>,
 
     /// Recipient. Can be a Bolt11 invoice, LNURL or LN Address.

@@ -17,7 +17,7 @@ use crate::{
             BAD_REQUEST_EXAMPLE, FORBIDDEN_EXAMPLE, INTERNAL_EXAMPLE, NOT_FOUND_EXAMPLE, UNAUTHORIZED_EXAMPLE,
             UNPROCESSABLE_EXAMPLE,
         },
-        errors::ApplicationError,
+        errors::{ApplicationError, DataError},
     },
     domains::{
         bitcoin::{BtcAddress, BtcNetwork, BtcOutput, BtcOutputStatus},
@@ -73,15 +73,13 @@ async fn generate_invoice(
     Json(payload): Json<NewInvoiceRequest>,
 ) -> Result<Json<Invoice>, ApplicationError> {
     user.check_permission(Permission::WriteLnTransaction)?;
+    let wallet_id = payload
+        .wallet_id
+        .ok_or_else(|| DataError::Malformed("wallet_id is required.".to_string()))?;
 
     let invoice = services
         .invoice
-        .invoice(
-            payload.wallet_id.unwrap_or(user.wallet_id),
-            payload.amount_msat,
-            payload.description,
-            payload.expiry,
-        )
+        .invoice(wallet_id, payload.amount_msat, payload.description, payload.expiry)
         .await?;
     Ok(Json(invoice))
 }
@@ -207,15 +205,14 @@ mod tests {
 
     fn user(permissions: Vec<Permission>) -> User {
         User {
-            wallet_id: Uuid::new_v4(),
             permissions,
             ..Default::default()
         }
     }
 
-    fn new_invoice_request(wallet_id: Option<Uuid>) -> NewInvoiceRequest {
+    fn new_invoice_request(wallet_id: Uuid) -> NewInvoiceRequest {
         NewInvoiceRequest {
-            wallet_id,
+            wallet_id: Some(wallet_id),
             amount_msat: 1_000,
             description: None,
             expiry: None,
@@ -232,20 +229,24 @@ mod tests {
             async fn is_forbidden_and_does_not_call_the_service() {
                 let services = MockAppServicesBuilder::new().build();
 
-                let result =
-                    generate_invoice(State(Arc::new(services)), user(vec![]), Json(new_invoice_request(None))).await;
+                let result = generate_invoice(
+                    State(Arc::new(services)),
+                    user(vec![]),
+                    Json(new_invoice_request(Uuid::new_v4())),
+                )
+                .await;
 
                 assert!(matches!(result, Err(ApplicationError::Authorization(_))));
             }
         }
 
-        mod when_wallet_id_is_omitted {
+        mod when_wallet_id_is_provided {
             use super::*;
 
             #[tokio::test]
-            async fn defaults_to_the_authenticated_users_wallet() {
+            async fn uses_the_explicit_wallet_id() {
                 let caller = user(vec![Permission::WriteLnTransaction]);
-                let expected_wallet = caller.wallet_id;
+                let expected_wallet = Uuid::new_v4();
 
                 let mut builder = MockAppServicesBuilder::new();
                 builder
@@ -258,7 +259,7 @@ mod tests {
                 let result = generate_invoice(
                     State(Arc::new(builder.build())),
                     caller,
-                    Json(new_invoice_request(None)),
+                    Json(new_invoice_request(expected_wallet)),
                 )
                 .await;
 

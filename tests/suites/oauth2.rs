@@ -5,12 +5,12 @@
 //!
 //! Together they exercise the whole OAuth2 path through real HTTP: discovery,
 //! signature validation against the fetched JWKS, audience/issuer/expiry checks,
-//! the `sub` -> wallet provisioning, and JWT-scope -> permission enforcement.
+//! the `sub` -> account/wallet provisioning, and JWT-scope -> permission enforcement.
 
 use reqwest::StatusCode;
 use serde_json::json;
 
-use swissknife_types::{RegisterLnAddressRequest, Wallet};
+use swissknife_types::{Account, RegisterLnAddressRequest, Wallet};
 
 use crate::common::fixtures::unique;
 use crate::common::oauth2::{oauth2_app, CLIENT_FULL, CLIENT_READONLY, CLIENT_WRONG_AUD};
@@ -20,8 +20,8 @@ mod accepts {
     use super::*;
 
     /// A token the provider signs — with the configured audience and issuer —
-    /// is accepted, and its `sub` is provisioned as (and stably mapped to) a
-    /// wallet.
+    /// is accepted, and its `sub` is provisioned as (and stably mapped to) an
+    /// account and active-network wallet.
     #[tokio::test]
     async fn a_valid_token_and_maps_the_subject_to_a_wallet() {
         let app = oauth2_app().await;
@@ -29,21 +29,32 @@ mod accepts {
 
         let res = app.api().get("/v1/me", Auth::Bearer(&token)).await;
         assert_status(&res, StatusCode::OK);
-        let wallet = res.parse::<Wallet>();
-        assert_ne!(
-            wallet.account_id,
-            uuid::Uuid::nil(),
-            "the token subject provisions an account"
-        );
+        let account = res.parse::<Account>();
+        assert_ne!(account.id, uuid::Uuid::nil(), "the token subject provisions an account");
+        let wallets = app.api().get("/v1/me/wallets", Auth::Bearer(&token)).await;
+        assert_status(&wallets, StatusCode::OK);
+        let wallet = wallets
+            .parse::<Vec<Wallet>>()
+            .into_iter()
+            .next()
+            .expect("authentication provisions an active wallet");
+        assert_eq!(wallet.account_id, account.id);
 
         // A second call with a fresh token for the same subject resolves to the
-        // same wallet (provisioned once, then looked up).
+        // same account and wallet (provisioned once, then looked up).
         let again = app.token(CLIENT_FULL).await;
         let res = app.api().get("/v1/me", Auth::Bearer(&again)).await;
         assert_status(&res, StatusCode::OK);
         assert_eq!(
-            res.parse::<Wallet>().account_id,
-            wallet.account_id,
+            res.parse::<Account>().id,
+            account.id,
+            "the subject maps to a stable account"
+        );
+        let wallets = app.api().get("/v1/me/wallets", Auth::Bearer(&again)).await;
+        assert_status(&wallets, StatusCode::OK);
+        assert_eq!(
+            wallets.parse::<Vec<Wallet>>()[0].id,
+            wallet.id,
             "the subject maps to a stable wallet"
         );
     }

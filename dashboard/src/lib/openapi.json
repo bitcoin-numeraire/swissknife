@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Numeraire SwissKnife REST API",
-    "description": "This API is available to anyone with a Numeraire account. The `User Wallet` (`/me`) endpoints are the main access point for users.",
+    "description": "This API is available to anyone with a Numeraire account. The `Me` (`/me`) endpoints expose the authenticated account and wallet-scoped user operations.",
     "contact": {
       "name": "Dario Anongba Varela",
       "email": "dario.varela@numeraire.tech"
@@ -2897,18 +2897,17 @@
     "/v1/me": {
       "get": {
         "tags": [
-          "User Wallet"
+          "Me"
         ],
-        "summary": "Get wallet",
-        "description": "Returns the user wallet.",
-        "operationId": "get_user_wallet",
+        "summary": "Get account.",
+        "operationId": "get_account",
         "responses": {
           "200": {
             "description": "Found",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Wallet"
+                  "$ref": "#/components/schemas/Account"
                 }
               }
             }
@@ -2952,10 +2951,9 @@
     "/v1/me/api-keys": {
       "get": {
         "tags": [
-          "User Wallet"
+          "Me"
         ],
-        "summary": "List API Keys",
-        "description": "Returns all the API Keys given a filter",
+        "summary": "List account API keys.",
         "operationId": "list_wallet_api_keys",
         "parameters": [
           {
@@ -3076,10 +3074,10 @@
       },
       "post": {
         "tags": [
-          "User Wallet"
+          "Me"
         ],
         "summary": "Generate a new API Key",
-        "description": "Returns the generated API Key for the authenticated account. Users can create API keys with\npermissions as a subset of their current permissions.",
+        "description": "Returns the generated API Key for the account. Users can create API keys with\npermissions as a subset of their current permissions.",
         "operationId": "create_wallet_api_key",
         "requestBody": {
           "content": {
@@ -3150,10 +3148,9 @@
       },
       "delete": {
         "tags": [
-          "User Wallet"
+          "Me"
         ],
-        "summary": "Revoke API Keys",
-        "description": "Revokes all the API Keys given a filter. Returns the number of revoked keys.",
+        "summary": "Revoke account API keys.",
         "operationId": "revoke_wallet_api_keys",
         "parameters": [
           {
@@ -3275,10 +3272,9 @@
     "/v1/me/api-keys/{id}": {
       "get": {
         "tags": [
-          "User Wallet"
+          "Me"
         ],
-        "summary": "Find an API Key",
-        "description": "Returns the API Key by its ID.",
+        "summary": "Get an account API key.",
         "operationId": "get_wallet_api_key",
         "parameters": [
           {
@@ -3350,10 +3346,9 @@
       },
       "delete": {
         "tags": [
-          "User Wallet"
+          "Me"
         ],
-        "summary": "Revoke an API Key",
-        "description": "Revokes an API Key by ID. Returns an empty body.",
+        "summary": "Revoke an account API key.",
         "operationId": "revoke_wallet_api_key",
         "parameters": [
           {
@@ -3417,21 +3412,27 @@
         }
       }
     },
-    "/v1/me/balance": {
+    "/v1/me/lightning-address": {
       "get": {
         "tags": [
-          "User Wallet"
+          "Me"
         ],
-        "summary": "Get wallet balance",
-        "description": "Returns the wallet balance.",
-        "operationId": "get_wallet_balance",
+        "summary": "Get account Lightning Address.",
+        "operationId": "get_wallet_address",
         "responses": {
           "200": {
             "description": "Found",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Balance"
+                  "oneOf": [
+                    {
+                      "type": "null"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LnAddress"
+                    }
+                  ]
                 }
               }
             }
@@ -3444,6 +3445,230 @@
                   "$ref": "#/components/schemas/ErrorResponse"
                 },
                 "example": "\n{\n    \"status\": \"401 Unauthorized\",\n    \"reason\": \"Invalid credentials\"\n}\n"
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"404 Not Found\",\n    \"reason\": \"Resource not found\"\n}\n"
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"500 Internal Server Error\",\n    \"reason\": \"Internal server error, Please contact your administrator or try later\"\n}\n"
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Me"
+        ],
+        "summary": "Update account Lightning Address.",
+        "operationId": "update_wallet_address",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateLnAddressRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "LN Address Updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LnAddress"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"400 Bad Request\",\n    \"reason\": \"Missing required parameter in request\"\n}\n"
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"401 Unauthorized\",\n    \"reason\": \"Invalid credentials\"\n}\n"
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"404 Not Found\",\n    \"reason\": \"Resource not found\"\n}\n"
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"422 Unprocessable Entity\",\n    \"reason\": \"Validation failed: ...\"\n}\n"
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"500 Internal Server Error\",\n    \"reason\": \"Internal server error, Please contact your administrator or try later\"\n}\n"
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Me"
+        ],
+        "summary": "Register account Lightning Address.",
+        "operationId": "register_wallet_address",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterLnAddressRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "LN Address Registered",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LnAddress"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"400 Bad Request\",\n    \"reason\": \"Missing required parameter in request\"\n}\n"
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"401 Unauthorized\",\n    \"reason\": \"Invalid credentials\"\n}\n"
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"422 Unprocessable Entity\",\n    \"reason\": \"Validation failed: ...\"\n}\n"
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"500 Internal Server Error\",\n    \"reason\": \"Internal server error, Please contact your administrator or try later\"\n}\n"
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Me"
+        ],
+        "summary": "Delete account Lightning Address.",
+        "operationId": "delete_wallet_address",
+        "responses": {
+          "200": {
+            "description": "Deleted"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"400 Bad Request\",\n    \"reason\": \"Missing required parameter in request\"\n}\n"
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"401 Unauthorized\",\n    \"reason\": \"Invalid credentials\"\n}\n"
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"404 Not Found\",\n    \"reason\": \"Resource not found\"\n}\n"
               }
             }
           },
@@ -3461,19 +3686,70 @@
         }
       }
     },
-    "/v1/me/bitcoin/address": {
-      "post": {
+    "/v1/me/preferences": {
+      "get": {
         "tags": [
-          "User Wallet"
+          "Me"
         ],
-        "summary": "Generate a new Bitcoin address.",
-        "description": "Returns the Bitcoin address for the given address type. The returned address is the same until used.",
-        "operationId": "new_wallet_btc_address",
+        "summary": "Get account preferences.",
+        "operationId": "get_account_preferences",
+        "responses": {
+          "200": {
+            "description": "Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountPreferences"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"401 Unauthorized\",\n    \"reason\": \"Invalid credentials\"\n}\n"
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"404 Not Found\",\n    \"reason\": \"Resource not found\"\n}\n"
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"500 Internal Server Error\",\n    \"reason\": \"Internal server error, Please contact your administrator or try later\"\n}\n"
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Me"
+        ],
+        "summary": "Replace account preferences.",
+        "operationId": "update_account_preferences",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/NewBtcAddressRequest"
+                "$ref": "#/components/schemas/UpdateAccountPreferencesRequest"
               }
             }
           },
@@ -3481,11 +3757,11 @@
         },
         "responses": {
           "200": {
-            "description": "Bitcoin Address Created",
+            "description": "Updated",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/BtcAddress"
+                  "$ref": "#/components/schemas/AccountPreferences"
                 }
               }
             }
@@ -3537,13 +3813,353 @@
         }
       }
     },
-    "/v1/me/bitcoin/addresses": {
+    "/v1/me/wallets": {
       "get": {
         "tags": [
-          "User Wallet"
+          "Me"
         ],
-        "summary": "List Bitcoin addresses",
-        "description": "Returns the authenticated user's Bitcoin addresses given a filter.",
+        "summary": "List account wallets.",
+        "operationId": "list_account_wallets",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Total amount of results to return",
+            "required": false,
+            "schema": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "int64",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "description": "Offset where to start returning results",
+            "required": false,
+            "schema": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "int64",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "ids",
+            "in": "query",
+            "description": "List of IDs",
+            "required": false,
+            "schema": {
+              "type": [
+                "array",
+                "null"
+              ],
+              "items": {
+                "type": "string",
+                "format": "uuid"
+              }
+            }
+          },
+          {
+            "name": "account_id",
+            "in": "query",
+            "description": "Owning account ID.\n\nUser-scoped endpoints populate this from the authenticated account.",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "asset_id",
+            "in": "query",
+            "description": "Asset ID",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "order_direction",
+            "in": "query",
+            "description": "Direction of the ordering of results",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/OrderDirection"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Wallet"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"400 Bad Request\",\n    \"reason\": \"Missing required parameter in request\"\n}\n"
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"401 Unauthorized\",\n    \"reason\": \"Invalid credentials\"\n}\n"
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"500 Internal Server Error\",\n    \"reason\": \"Internal server error, Please contact your administrator or try later\"\n}\n"
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Me"
+        ],
+        "summary": "Create or enable an asset wallet.",
+        "operationId": "create_account_wallet",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateWalletRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Wallet Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Wallet"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"400 Bad Request\",\n    \"reason\": \"Missing required parameter in request\"\n}\n"
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"401 Unauthorized\",\n    \"reason\": \"Invalid credentials\"\n}\n"
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"422 Unprocessable Entity\",\n    \"reason\": \"Validation failed: ...\"\n}\n"
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"500 Internal Server Error\",\n    \"reason\": \"Internal server error, Please contact your administrator or try later\"\n}\n"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/me/wallets/{wallet_id}": {
+      "get": {
+        "tags": [
+          "Me"
+        ],
+        "summary": "Get one account wallet.",
+        "operationId": "get_account_wallet",
+        "parameters": [
+          {
+            "name": "wallet_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Wallet"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"401 Unauthorized\",\n    \"reason\": \"Invalid credentials\"\n}\n"
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"404 Not Found\",\n    \"reason\": \"Resource not found\"\n}\n"
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"500 Internal Server Error\",\n    \"reason\": \"Internal server error, Please contact your administrator or try later\"\n}\n"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/me/wallets/{wallet_id}/balance": {
+      "get": {
+        "tags": [
+          "Me"
+        ],
+        "summary": "Get wallet balance.",
+        "operationId": "get_wallet_balance",
+        "parameters": [
+          {
+            "name": "wallet_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Balance"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"401 Unauthorized\",\n    \"reason\": \"Invalid credentials\"\n}\n"
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"404 Not Found\",\n    \"reason\": \"Resource not found\"\n}\n"
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"500 Internal Server Error\",\n    \"reason\": \"Internal server error, Please contact your administrator or try later\"\n}\n"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/me/wallets/{wallet_id}/bitcoin/addresses": {
+      "get": {
+        "tags": [
+          "Me"
+        ],
+        "summary": "List Bitcoin addresses for a wallet.",
         "operationId": "list_wallet_btc_addresses",
         "parameters": [
           {
@@ -3651,6 +4267,15 @@
             "schema": {
               "$ref": "#/components/schemas/OrderDirection"
             }
+          },
+          {
+            "name": "wallet_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
           }
         ],
         "responses": {
@@ -3689,6 +4314,112 @@
               }
             }
           },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"404 Not Found\",\n    \"reason\": \"Resource not found\"\n}\n"
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"500 Internal Server Error\",\n    \"reason\": \"Internal server error, Please contact your administrator or try later\"\n}\n"
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Me"
+        ],
+        "summary": "Generate a new Bitcoin address for a wallet.",
+        "operationId": "new_wallet_btc_address",
+        "parameters": [
+          {
+            "name": "wallet_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewBtcAddressRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Bitcoin Address Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BtcAddress"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"400 Bad Request\",\n    \"reason\": \"Missing required parameter in request\"\n}\n"
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"401 Unauthorized\",\n    \"reason\": \"Invalid credentials\"\n}\n"
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"404 Not Found\",\n    \"reason\": \"Resource not found\"\n}\n"
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"422 Unprocessable Entity\",\n    \"reason\": \"Validation failed: ...\"\n}\n"
+              }
+            }
+          },
           "500": {
             "description": "Internal Server Error",
             "content": {
@@ -3703,14 +4434,24 @@
         }
       }
     },
-    "/v1/me/contacts": {
+    "/v1/me/wallets/{wallet_id}/contacts": {
       "get": {
         "tags": [
-          "User Wallet"
+          "Me"
         ],
-        "summary": "List contacts",
-        "description": "Returns all the contacts",
+        "summary": "List contacts for a wallet.",
         "operationId": "list_contacts",
+        "parameters": [
+          {
+            "name": "wallet_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Success",
@@ -3747,6 +4488,17 @@
               }
             }
           },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"404 Not Found\",\n    \"reason\": \"Resource not found\"\n}\n"
+              }
+            }
+          },
           "500": {
             "description": "Internal Server Error",
             "content": {
@@ -3761,13 +4513,12 @@
         }
       }
     },
-    "/v1/me/invoices": {
+    "/v1/me/wallets/{wallet_id}/invoices": {
       "get": {
         "tags": [
-          "User Wallet"
+          "Me"
         ],
-        "summary": "List invoices",
-        "description": "Returns all the invoices given a filter",
+        "summary": "List invoices for a wallet.",
         "operationId": "list_wallet_invoices",
         "parameters": [
           {
@@ -3876,6 +4627,15 @@
             "schema": {
               "$ref": "#/components/schemas/OrderDirection"
             }
+          },
+          {
+            "name": "wallet_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
           }
         ],
         "responses": {
@@ -3914,6 +4674,17 @@
               }
             }
           },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"404 Not Found\",\n    \"reason\": \"Resource not found\"\n}\n"
+              }
+            }
+          },
           "500": {
             "description": "Internal Server Error",
             "content": {
@@ -3929,11 +4700,21 @@
       },
       "post": {
         "tags": [
-          "User Wallet"
+          "Me"
         ],
-        "summary": "Generate a new invoice",
-        "description": "Returns the generated invoice",
+        "summary": "Generate a new invoice for a wallet.",
         "operationId": "new_wallet_invoice",
+        "parameters": [
+          {
+            "name": "wallet_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -3977,6 +4758,17 @@
               }
             }
           },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"404 Not Found\",\n    \"reason\": \"Resource not found\"\n}\n"
+              }
+            }
+          },
           "422": {
             "description": "Unprocessable Entity",
             "content": {
@@ -4003,11 +4795,21 @@
       },
       "delete": {
         "tags": [
-          "User Wallet"
+          "Me"
         ],
-        "summary": "Delete expired invoices",
-        "description": "Deletes all the invoices with status `Èxpired`. Returns the number of deleted invoices",
+        "summary": "Delete expired invoices for a wallet.",
         "operationId": "delete_expired_invoices",
+        "parameters": [
+          {
+            "name": "wallet_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Success",
@@ -4032,6 +4834,17 @@
               }
             }
           },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"404 Not Found\",\n    \"reason\": \"Resource not found\"\n}\n"
+              }
+            }
+          },
           "500": {
             "description": "Internal Server Error",
             "content": {
@@ -4046,15 +4859,23 @@
         }
       }
     },
-    "/v1/me/invoices/{id}": {
+    "/v1/me/wallets/{wallet_id}/invoices/{id}": {
       "get": {
         "tags": [
-          "User Wallet"
+          "Me"
         ],
-        "summary": "Find an invoice",
-        "description": "Returns the invoice by its ID",
+        "summary": "Get a wallet invoice.",
         "operationId": "get_wallet_invoice",
         "parameters": [
+          {
+            "name": "wallet_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
           {
             "name": "id",
             "in": "path",
@@ -4123,291 +4944,12 @@
         }
       }
     },
-    "/v1/me/lightning-address": {
+    "/v1/me/wallets/{wallet_id}/payments": {
       "get": {
         "tags": [
-          "User Wallet"
+          "Me"
         ],
-        "summary": "Get LN Address",
-        "description": "Returns the registered address",
-        "operationId": "get_wallet_address",
-        "responses": {
-          "200": {
-            "description": "Found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "oneOf": [
-                    {
-                      "type": "null"
-                    },
-                    {
-                      "$ref": "#/components/schemas/LnAddress"
-                    }
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                },
-                "example": "\n{\n    \"status\": \"401 Unauthorized\",\n    \"reason\": \"Invalid credentials\"\n}\n"
-              }
-            }
-          },
-          "404": {
-            "description": "Not Found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                },
-                "example": "\n{\n    \"status\": \"404 Not Found\",\n    \"reason\": \"Resource not found\"\n}\n"
-              }
-            }
-          },
-          "500": {
-            "description": "Internal Server Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                },
-                "example": "\n{\n    \"status\": \"500 Internal Server Error\",\n    \"reason\": \"Internal server error, Please contact your administrator or try later\"\n}\n"
-              }
-            }
-          }
-        }
-      },
-      "put": {
-        "tags": [
-          "User Wallet"
-        ],
-        "summary": "Update LN Address",
-        "description": "Updates the address. Returns the address details.",
-        "operationId": "update_wallet_address",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdateLnAddressRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "LN Address Updated",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/LnAddress"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                },
-                "example": "\n{\n    \"status\": \"400 Bad Request\",\n    \"reason\": \"Missing required parameter in request\"\n}\n"
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                },
-                "example": "\n{\n    \"status\": \"401 Unauthorized\",\n    \"reason\": \"Invalid credentials\"\n}\n"
-              }
-            }
-          },
-          "404": {
-            "description": "Not Found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                },
-                "example": "\n{\n    \"status\": \"404 Not Found\",\n    \"reason\": \"Resource not found\"\n}\n"
-              }
-            }
-          },
-          "422": {
-            "description": "Unprocessable Entity",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                },
-                "example": "\n{\n    \"status\": \"422 Unprocessable Entity\",\n    \"reason\": \"Validation failed: ...\"\n}\n"
-              }
-            }
-          },
-          "500": {
-            "description": "Internal Server Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                },
-                "example": "\n{\n    \"status\": \"500 Internal Server Error\",\n    \"reason\": \"Internal server error, Please contact your administrator or try later\"\n}\n"
-              }
-            }
-          }
-        }
-      },
-      "post": {
-        "tags": [
-          "User Wallet"
-        ],
-        "summary": "Register LN Address",
-        "description": "Registers an address. Returns the address details. LN Addresses are ready to receive funds through the LNURL protocol upon registration.",
-        "operationId": "register_wallet_address",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/RegisterLnAddressRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "LN Address Registered",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/LnAddress"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                },
-                "example": "\n{\n    \"status\": \"400 Bad Request\",\n    \"reason\": \"Missing required parameter in request\"\n}\n"
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                },
-                "example": "\n{\n    \"status\": \"401 Unauthorized\",\n    \"reason\": \"Invalid credentials\"\n}\n"
-              }
-            }
-          },
-          "422": {
-            "description": "Unprocessable Entity",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                },
-                "example": "\n{\n    \"status\": \"422 Unprocessable Entity\",\n    \"reason\": \"Validation failed: ...\"\n}\n"
-              }
-            }
-          },
-          "500": {
-            "description": "Internal Server Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                },
-                "example": "\n{\n    \"status\": \"500 Internal Server Error\",\n    \"reason\": \"Internal server error, Please contact your administrator or try later\"\n}\n"
-              }
-            }
-          }
-        }
-      },
-      "delete": {
-        "tags": [
-          "User Wallet"
-        ],
-        "summary": "Delete LN Address",
-        "description": "Deletes an address. Returns an empty body. Once the address is deleted, it will no longer be able to receive funds and its username can be claimed by another user.",
-        "operationId": "delete_wallet_address",
-        "responses": {
-          "200": {
-            "description": "Deleted"
-          },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                },
-                "example": "\n{\n    \"status\": \"400 Bad Request\",\n    \"reason\": \"Missing required parameter in request\"\n}\n"
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                },
-                "example": "\n{\n    \"status\": \"401 Unauthorized\",\n    \"reason\": \"Invalid credentials\"\n}\n"
-              }
-            }
-          },
-          "404": {
-            "description": "Not Found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                },
-                "example": "\n{\n    \"status\": \"404 Not Found\",\n    \"reason\": \"Resource not found\"\n}\n"
-              }
-            }
-          },
-          "500": {
-            "description": "Internal Server Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                },
-                "example": "\n{\n    \"status\": \"500 Internal Server Error\",\n    \"reason\": \"Internal server error, Please contact your administrator or try later\"\n}\n"
-              }
-            }
-          }
-        }
-      }
-    },
-    "/v1/me/payments": {
-      "get": {
-        "tags": [
-          "User Wallet"
-        ],
-        "summary": "List payments",
-        "description": "Returns all the payments given a filter",
+        "summary": "List payments for a wallet.",
         "operationId": "list_wallet_payments",
         "parameters": [
           {
@@ -4537,6 +5079,15 @@
             "schema": {
               "$ref": "#/components/schemas/OrderDirection"
             }
+          },
+          {
+            "name": "wallet_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
           }
         ],
         "responses": {
@@ -4575,6 +5126,17 @@
               }
             }
           },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"404 Not Found\",\n    \"reason\": \"Resource not found\"\n}\n"
+              }
+            }
+          },
           "500": {
             "description": "Internal Server Error",
             "content": {
@@ -4590,11 +5152,21 @@
       },
       "post": {
         "tags": [
-          "User Wallet"
+          "Me"
         ],
-        "summary": "Send payment",
-        "description": "Pay for a LN invoice, LNURL, LN Address, On-chain or internally to an other user on the same instance. Returns the payment details.",
+        "summary": "Send a payment from a wallet.",
         "operationId": "wallet_pay",
+        "parameters": [
+          {
+            "name": "wallet_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -4638,6 +5210,17 @@
               }
             }
           },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"404 Not Found\",\n    \"reason\": \"Resource not found\"\n}\n"
+              }
+            }
+          },
           "422": {
             "description": "Unprocessable Entity",
             "content": {
@@ -4664,11 +5247,21 @@
       },
       "delete": {
         "tags": [
-          "User Wallet"
+          "Me"
         ],
-        "summary": "Delete failed payments",
-        "description": "Deletes all the payments with `Failed` status. Returns the number of deleted payments",
+        "summary": "Delete failed payments for a wallet.",
         "operationId": "delete_failed_payments",
+        "parameters": [
+          {
+            "name": "wallet_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Success",
@@ -4693,6 +5286,17 @@
               }
             }
           },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"404 Not Found\",\n    \"reason\": \"Resource not found\"\n}\n"
+              }
+            }
+          },
           "500": {
             "description": "Internal Server Error",
             "content": {
@@ -4707,15 +5311,23 @@
         }
       }
     },
-    "/v1/me/payments/{id}": {
+    "/v1/me/wallets/{wallet_id}/payments/{id}": {
       "get": {
         "tags": [
-          "User Wallet"
+          "Me"
         ],
-        "summary": "Find a payment",
-        "description": "Returns the payment by its ID",
+        "summary": "Get a wallet payment.",
         "operationId": "get_wallet_payment",
         "parameters": [
+          {
+            "name": "wallet_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
           {
             "name": "id",
             "in": "path",
@@ -6099,6 +6711,100 @@
   },
   "components": {
     "schemas": {
+      "Account": {
+        "type": "object",
+        "description": "An account is the owner and authorization boundary for identities, wallets,\nAPI keys, permissions, and account-scoped preferences.",
+        "required": [
+          "id",
+          "created_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Date of creation in database."
+          },
+          "display_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Optional human-readable name for the account.",
+            "example": "Numeraire"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Stable internal account ID."
+          },
+          "identity": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/AuthIdentity",
+                "description": "Login identity currently linked to this account."
+              }
+            ]
+          },
+          "permissions": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/Permission"
+            },
+            "description": "Permissions stored for this account.\n\nThese are authoritative for local JWT identities. OAuth2 requests use\ntoken claims as the effective permissions instead of mirroring claims\ninto this field."
+          },
+          "preferences": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/AccountPreferences",
+                "description": "Account-scoped dashboard and UI preferences."
+              }
+            ]
+          },
+          "updated_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "Date of update in database."
+          }
+        }
+      },
+      "AccountPreferences": {
+        "type": "object",
+        "description": "Account-scoped dashboard and UI preferences.",
+        "required": [
+          "dashboard_settings",
+          "created_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Date of creation in database."
+          },
+          "dashboard_settings": {
+            "description": "Versioned dashboard settings document stored by the server."
+          },
+          "updated_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "Date of update in database."
+          }
+        }
+      },
       "ApiKey": {
         "type": "object",
         "description": "API Key",
@@ -6230,6 +6936,45 @@
             "description": "Date of update in database"
           }
         }
+      },
+      "AuthIdentity": {
+        "type": "object",
+        "description": "A login identity from an authentication provider linked to an account.",
+        "required": [
+          "id",
+          "provider",
+          "subject",
+          "created_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Date of creation in database."
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Stable internal identity ID."
+          },
+          "provider": {
+            "$ref": "#/components/schemas/AuthProvider",
+            "description": "Authentication provider namespace, such as `jwt` or `oauth2`."
+          },
+          "subject": {
+            "type": "string",
+            "description": "Provider subject, such as a JWT username or OAuth2 `sub`.",
+            "example": "auth0|numeraire"
+          }
+        }
+      },
+      "AuthProvider": {
+        "type": "string",
+        "description": "Authentication provider namespace.",
+        "enum": [
+          "jwt",
+          "oauth2"
+        ]
       },
       "Balance": {
         "type": "object",
@@ -6534,14 +7279,16 @@
         "type": "object",
         "description": "Create Wallet Request",
         "required": [
-          "account_id",
           "asset_id"
         ],
         "properties": {
           "account_id": {
-            "type": "string",
+            "type": [
+              "string",
+              "null"
+            ],
             "format": "uuid",
-            "description": "Owning account ID"
+            "description": "Owning account ID. Required by admin endpoints; derived from the authenticated account on account-scoped endpoints."
           },
           "asset_id": {
             "type": "string",
@@ -7126,7 +7873,7 @@
               "null"
             ],
             "format": "uuid",
-            "description": "User ID. Will be populated with your own ID by default"
+            "description": "Wallet ID to receive into. Required by admin endpoints; derived from the path on wallet-scoped endpoints."
           }
         }
       },
@@ -7165,7 +7912,7 @@
               "null"
             ],
             "format": "uuid",
-            "description": "User ID. Will be populated with your own ID by default"
+            "description": "Wallet ID to receive into. Required by admin endpoints; derived from the path on wallet-scoped endpoints."
           }
         }
       },
@@ -7419,7 +8166,7 @@
               "null"
             ],
             "format": "uuid",
-            "description": "Wallet ID. Will be populated with your own ID by default"
+            "description": "Wallet ID to pay from. Required by admin endpoints; derived from the path on wallet-scoped endpoints."
           }
         }
       },
@@ -7480,6 +8227,18 @@
             "type": "string",
             "description": "User password",
             "example": "password"
+          }
+        }
+      },
+      "UpdateAccountPreferencesRequest": {
+        "type": "object",
+        "description": "Replace account-scoped dashboard preferences.",
+        "required": [
+          "dashboard_settings"
+        ],
+        "properties": {
+          "dashboard_settings": {
+            "description": "Versioned dashboard settings document stored by the server."
           }
         }
       },
@@ -7787,8 +8546,8 @@
       "description": "Some endpoints are public, but some require authentication. We provide all the required endpoints to create an account and authorize yourself."
     },
     {
-      "name": "User Wallet",
-      "description": "User Wallet endpoints. Available to any authenticated user."
+      "name": "Me",
+      "description": "Authenticated account endpoints. Wallet operations require an explicit account-owned wallet selector."
     },
     {
       "name": "Wallets",

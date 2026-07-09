@@ -16,7 +16,7 @@ use crate::common::{app, assert_error, assert_status, Auth, TestApp};
 async fn post_address(
     app: &TestApp,
     token: &str,
-    wallet_id: Option<uuid::Uuid>,
+    wallet_id: uuid::Uuid,
     address_type: Option<BtcAddressType>,
 ) -> TestResponse {
     app.api()
@@ -24,7 +24,7 @@ async fn post_address(
             "/v1/bitcoin/addresses",
             Auth::Bearer(token),
             NewBtcAddressRequest {
-                wallet_id,
+                wallet_id: Some(wallet_id),
                 address_type,
             },
         )
@@ -38,9 +38,10 @@ mod generate {
     async fn p2wpkh_and_p2tr_work_on_every_backend() {
         let app = app().await;
         let token = app.admin_token().await;
+        let wallet = app.create_wallet(token, "btc-types").await;
 
         for (ty, prefix) in [(BtcAddressType::P2wpkh, "bcrt1q"), (BtcAddressType::P2tr, "bcrt1p")] {
-            let res = post_address(app, token, None, Some(ty)).await;
+            let res = post_address(app, token, wallet.id, Some(ty)).await;
             assert_status(&res, StatusCode::OK);
             let addr = res.parse::<BtcAddress>();
             assert_eq!(addr.address_type, ty);
@@ -57,7 +58,8 @@ mod generate {
     async fn defaults_to_p2wpkh_when_type_is_omitted() {
         let app = app().await;
         let token = app.admin_token().await;
-        let res = post_address(app, token, None, None).await;
+        let wallet = app.create_wallet(token, "btc-default-type").await;
+        let res = post_address(app, token, wallet.id, None).await;
         assert_status(&res, StatusCode::OK);
         assert_eq!(res.parse::<BtcAddress>().address_type, BtcAddressType::P2wpkh);
     }
@@ -67,10 +69,10 @@ mod generate {
         let app = app().await;
         let token = app.admin_token().await;
         let wallet = app.create_wallet(token, "btc-reuse").await;
-        let first = post_address(app, token, Some(wallet.id), Some(BtcAddressType::P2wpkh))
+        let first = post_address(app, token, wallet.id, Some(BtcAddressType::P2wpkh))
             .await
             .parse::<BtcAddress>();
-        let second = post_address(app, token, Some(wallet.id), Some(BtcAddressType::P2wpkh))
+        let second = post_address(app, token, wallet.id, Some(BtcAddressType::P2wpkh))
             .await
             .parse::<BtcAddress>();
         assert_eq!(
@@ -89,7 +91,7 @@ mod generate {
                 "/v1/bitcoin/addresses",
                 Auth::None,
                 NewBtcAddressRequest {
-                    wallet_id: None,
+                    wallet_id: Some(uuid::Uuid::new_v4()),
                     address_type: None,
                 },
             )
@@ -107,7 +109,7 @@ mod query {
         let token = app.admin_token().await;
         let wallet = app.create_wallet(token, "btc-query").await;
 
-        let created = post_address(app, token, Some(wallet.id), Some(BtcAddressType::P2tr)).await;
+        let created = post_address(app, token, wallet.id, Some(BtcAddressType::P2tr)).await;
         assert_status(&created, StatusCode::OK);
         let created = created.parse::<BtcAddress>();
 
@@ -147,11 +149,11 @@ mod query {
 
         // Distinct types are distinct rows (an unused address is reused per type).
         assert_status(
-            &post_address(app, token, Some(wallet.id), Some(BtcAddressType::P2wpkh)).await,
+            &post_address(app, token, wallet.id, Some(BtcAddressType::P2wpkh)).await,
             StatusCode::OK,
         );
         assert_status(
-            &post_address(app, token, Some(wallet.id), Some(BtcAddressType::P2tr)).await,
+            &post_address(app, token, wallet.id, Some(BtcAddressType::P2tr)).await,
             StatusCode::OK,
         );
 
@@ -202,7 +204,7 @@ mod deposit {
         let token = app.admin_token().await;
         let wallet = app.create_wallet(token, "btc-deposit").await;
 
-        let res = post_address(app, token, Some(wallet.id), Some(BtcAddressType::P2tr)).await;
+        let res = post_address(app, token, wallet.id, Some(BtcAddressType::P2tr)).await;
         assert_status(&res, StatusCode::OK);
         let addr = res.parse::<BtcAddress>();
         assert!(!addr.used);
@@ -323,7 +325,7 @@ mod withdraw {
         let payee = app.create_wallet(token, "btc-int-payee").await;
         app.fund_onchain(token, payer.id, 1_000_000).await;
 
-        let payee_addr = post_address(app, token, Some(payee.id), None)
+        let payee_addr = post_address(app, token, payee.id, None)
             .await
             .parse::<BtcAddress>()
             .address;
@@ -395,7 +397,7 @@ mod withdraw {
         let app = app().await;
         let token = app.admin_token().await;
         let wallet = app.create_wallet(token, "btc-self").await;
-        let own = post_address(app, token, Some(wallet.id), None)
+        let own = post_address(app, token, wallet.id, None)
             .await
             .parse::<BtcAddress>()
             .address;
@@ -425,9 +427,7 @@ mod delete {
         let app = app().await;
         let token = app.admin_token().await;
         let wallet = app.create_wallet(token, "btc-del-one").await;
-        let addr = post_address(app, token, Some(wallet.id), None)
-            .await
-            .parse::<BtcAddress>();
+        let addr = post_address(app, token, wallet.id, None).await.parse::<BtcAddress>();
 
         let del = app
             .api()
@@ -448,11 +448,11 @@ mod delete {
         let token = app.admin_token().await;
         let wallet = app.create_wallet(token, "btc-del-bulk").await;
         assert_status(
-            &post_address(app, token, Some(wallet.id), Some(BtcAddressType::P2wpkh)).await,
+            &post_address(app, token, wallet.id, Some(BtcAddressType::P2wpkh)).await,
             StatusCode::OK,
         );
         assert_status(
-            &post_address(app, token, Some(wallet.id), Some(BtcAddressType::P2tr)).await,
+            &post_address(app, token, wallet.id, Some(BtcAddressType::P2tr)).await,
             StatusCode::OK,
         );
 

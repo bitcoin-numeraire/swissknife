@@ -7,6 +7,7 @@ import Button from '@mui/material/Button';
 import { handleActionError } from 'src/utils/errors';
 
 import { useTranslate } from 'src/locales';
+import { useGetUserWallet } from 'src/actions/user-wallet';
 import { deleteFailedPayments, deleteExpiredInvoices } from 'src/lib/swissknife';
 
 import { toast } from 'src/components/snackbar';
@@ -30,8 +31,11 @@ export function CleanTransactionsButton({
 }: Props) {
   const { t } = useTranslate();
   const isDeleting = useBoolean();
+  const { wallet } = useGetUserWallet();
 
   const handleCleanTransactions = async () => {
+    if (!wallet?.id) return;
+
     try {
       isDeleting.onTrue();
 
@@ -39,12 +43,12 @@ export function CleanTransactionsButton({
       let nPaymentsDeleted = 0;
 
       if (transactionType === TransactionType.INVOICE || !transactionType) {
-        const { data } = await deleteExpiredInvoices();
+        const { data } = await deleteExpiredInvoices({ path: { wallet_id: wallet.id } });
         nInvoicesDeleted = data!;
       }
 
       if (transactionType === TransactionType.PAYMENT || !transactionType) {
-        const { data } = await deleteFailedPayments();
+        const { data } = await deleteFailedPayments({ path: { wallet_id: wallet.id } });
         nPaymentsDeleted = data!;
       }
 

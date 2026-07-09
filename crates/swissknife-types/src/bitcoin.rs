@@ -92,7 +92,7 @@ impl From<BtcOutputStatus> for InvoiceStatus {
 /// New Bitcoin Address Request
 #[derive(Deserialize, ToSchema, Serialize)]
 pub struct NewBtcAddressRequest {
-    /// User ID. Will be populated with your own ID by default
+    /// Wallet ID to receive into. Required by admin endpoints; derived from the path on wallet-scoped endpoints.
     pub wallet_id: Option<Uuid>,
 
     /// Address type

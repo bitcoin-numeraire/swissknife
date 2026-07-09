@@ -17,7 +17,7 @@ use crate::{
             BAD_REQUEST_EXAMPLE, FORBIDDEN_EXAMPLE, INTERNAL_EXAMPLE, NOT_FOUND_EXAMPLE, UNAUTHORIZED_EXAMPLE,
             UNPROCESSABLE_EXAMPLE,
         },
-        errors::ApplicationError,
+        errors::{ApplicationError, DataError},
     },
     domains::{
         bitcoin::{BtcAddress, BtcAddressFilter, BtcAddressType, BtcNetwork},
@@ -70,10 +70,13 @@ async fn generate_btc_address(
     Json(payload): Json<NewBtcAddressRequest>,
 ) -> Result<Json<BtcAddress>, ApplicationError> {
     user.check_permission(Permission::WriteBtcAddress)?;
+    let wallet_id = payload
+        .wallet_id
+        .ok_or_else(|| DataError::Malformed("wallet_id is required.".to_string()))?;
 
     let address = services
         .bitcoin
-        .new_deposit_address(payload.wallet_id.unwrap_or(user.wallet_id), payload.address_type)
+        .new_deposit_address(wallet_id, payload.address_type)
         .await?;
     Ok(Json(address))
 }
@@ -201,7 +204,6 @@ mod tests {
 
     fn user(permissions: Vec<Permission>) -> User {
         User {
-            wallet_id: Uuid::new_v4(),
             permissions,
             ..Default::default()
         }
@@ -230,7 +232,7 @@ mod tests {
                 let services = MockAppServicesBuilder::new().build();
 
                 let payload = NewBtcAddressRequest {
-                    wallet_id: None,
+                    wallet_id: Some(Uuid::new_v4()),
                     address_type: None,
                 };
 
@@ -240,13 +242,13 @@ mod tests {
             }
         }
 
-        mod when_wallet_id_is_omitted {
+        mod when_wallet_id_is_provided {
             use super::*;
 
             #[tokio::test]
-            async fn defaults_to_the_authenticated_users_wallet() {
+            async fn uses_the_explicit_wallet_id() {
                 let caller = user(vec![Permission::WriteBtcAddress]);
-                let expected_wallet = caller.wallet_id;
+                let expected_wallet = Uuid::new_v4();
 
                 let mut builder = MockAppServicesBuilder::new();
                 builder
@@ -257,7 +259,7 @@ mod tests {
                     .returning(|wallet_id, _| Ok(btc_address(wallet_id)));
 
                 let payload = NewBtcAddressRequest {
-                    wallet_id: None,
+                    wallet_id: Some(expected_wallet),
                     address_type: None,
                 };
 

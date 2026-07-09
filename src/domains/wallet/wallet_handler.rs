@@ -18,7 +18,7 @@ use crate::{
             BAD_REQUEST_EXAMPLE, FORBIDDEN_EXAMPLE, INTERNAL_EXAMPLE, NOT_FOUND_EXAMPLE, UNAUTHORIZED_EXAMPLE,
             UNPROCESSABLE_EXAMPLE,
         },
-        errors::ApplicationError,
+        errors::{ApplicationError, DataError},
     },
     domains::user::{Permission, User},
     infra::axum::Json,
@@ -71,8 +71,11 @@ async fn register_wallet(
     Json(payload): Json<CreateWalletRequest>,
 ) -> Result<Json<Wallet>, ApplicationError> {
     user.check_permission(Permission::WriteWallet)?;
+    let account_id = payload
+        .account_id
+        .ok_or_else(|| DataError::Malformed("account_id is required.".to_string()))?;
 
-    let wallet = services.wallet.create(payload.account_id, payload.asset_id).await?;
+    let wallet = services.wallet.create(account_id, payload.asset_id).await?;
     Ok(Json(wallet))
 }
 
@@ -223,7 +226,6 @@ mod tests {
 
     fn user(permissions: Vec<Permission>) -> User {
         User {
-            wallet_id: Uuid::new_v4(),
             permissions,
             ..Default::default()
         }
@@ -244,7 +246,10 @@ mod tests {
                 let result = register_wallet(
                     State(Arc::new(services)),
                     user(vec![]),
-                    Json(CreateWalletRequest { account_id, asset_id }),
+                    Json(CreateWalletRequest {
+                        account_id: Some(account_id),
+                        asset_id,
+                    }),
                 )
                 .await;
 
@@ -270,7 +275,10 @@ mod tests {
                 let result = register_wallet(
                     State(Arc::new(builder.build())),
                     user(vec![Permission::WriteWallet]),
-                    Json(CreateWalletRequest { account_id, asset_id }),
+                    Json(CreateWalletRequest {
+                        account_id: Some(account_id),
+                        asset_id,
+                    }),
                 )
                 .await;
 

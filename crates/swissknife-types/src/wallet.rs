@@ -153,8 +153,8 @@ pub struct WalletOverview {
 /// Create Wallet Request
 #[derive(Debug, Deserialize, Clone, ToSchema, Serialize)]
 pub struct CreateWalletRequest {
-    /// Owning account ID
-    pub account_id: Uuid,
+    /// Owning account ID. Required by admin endpoints; derived from the authenticated account on account-scoped endpoints.
+    pub account_id: Option<Uuid>,
     /// Asset ID to enable for the account
     pub asset_id: Uuid,
 }
