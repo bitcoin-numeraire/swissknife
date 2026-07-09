@@ -1,3 +1,5 @@
+# AGENTS.md
+
 This file provides guidance to AI agents when working with code in this repository.
 
 ## Project Overview
@@ -14,6 +16,9 @@ make watch                     # Hot reload with cargo-watch
 make lint                      # Run clippy linter
 make fmt                       # Check formatting
 make fmt-fix                   # Fix formatting
+make test                      # Run unit tests
+make test-integration          # Run one black-box integration-test cell
+make check                     # Format, lint, build, and unit tests
 ```
 
 Before committing, ensure the linting and formatting pass successfully using `make lint` and `make fmt-fix`.
@@ -24,8 +29,10 @@ cd dashboard
 yarn install
 yarn dev                       # Runs on port 8080
 yarn build
+yarn test
 yarn lint
 yarn lint:fix
+yarn typecheck
 yarn fm:fix                    # Format with prettier
 yarn openapi-ts                # Regenerate API client from OpenAPI spec
 ```
@@ -39,9 +46,8 @@ make run-migrations                       # Run migrations
 make generate-models                      # Regenerate Sea-ORM models from schema
 ```
 
-You can generate new migrations using `make new-migration name=migration-name`.
-See other migrations under the `./migration` folder.
-Once a migration is added, you can work on it by modifying the file and then adding it in the `lib.rs` file.
+Generate migrations using `make new-migration name=migration-name`; do not hand-name migration files.
+See other migrations under `crates/migration/src/`. Once a migration is added, implement it and register it in `lib.rs`.
 The models are generated based on the schema and not the other way around.
 
 To generate the models, the process is to start a postgres database with `make up-postgres`
@@ -70,7 +76,7 @@ make shutdown                  # Stop and remove volumes
 - `docs/` - OpenAPI documentation
 
 **domains/** - Business logic organized by domain
-- Each domain (invoice, payment, wallet, ln_address, lnurl, user, system, nostr) contains:
+- Each domain (account/auth, asset, invoice, payment, wallet, ln_address, bitcoin, lnurl, system, nostr) contains the applicable:
   - `*_handler.rs` - Axum route handlers
   - `*_service.rs` - Business logic implementation
   - `*_use_cases.rs` - Trait defining use cases
@@ -109,13 +115,14 @@ Configured via `ln_provider` in config:
 - `/.well-known/lnurlp/:username` - LNURL-pay
 - `/.well-known/nostr.json` - NIP-05
 - `/v1/system` - Health and info
-- `/v1/invoices` - Invoice management
-- `/v1/payments` - Payment management
-- `/v1/wallets` - Wallet management
-- `/v1/me` - Current user wallet
+- `/v1/me` - Authenticated account profile, preferences, API keys, and explicitly selected account-wallet resources
+- `/v1/invoices` - Administrative invoice management
+- `/v1/payments` - Administrative payment management
+- `/v1/wallets` - Administrative wallet management
 - `/v1/auth` - Authentication
-- `/v1/api-keys` - API key management
-- `/v1/lightning-addresses` - Lightning address management
+- `/v1/api-keys` - Administrative API key management
+- `/v1/lightning-addresses` - Administrative Lightning Address management
+- `/v1/bitcoin/addresses` - Administrative Bitcoin address management
 - `/lnurlp` - LNURL-pay callbacks
 - `/docs` - Scalar API documentation
 
@@ -127,7 +134,7 @@ Configured via `ln_provider` in config:
 - **tokio** - Async runtime
 - **tracing** - Logging
 - **utoipa** - OpenAPI generation
-- **Dashboard**: Next.js 14, MUI, TypeScript, Yarn 4, Node 20
+- **Dashboard**: Next.js 16, React 19, MUI 9, TypeScript, Yarn 4, Node 24
 
 ## Code Review Guidelines
 

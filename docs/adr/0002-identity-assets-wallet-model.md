@@ -2,7 +2,7 @@
 
 | Field | Value |
 | --- | --- |
-| Status | Proposed |
+| Status | Accepted |
 | Date | 2026-07-02 |
 | Related issues | #297, #252, #254, #291, #292, #115, #237, #239, #240, #241 |
 | Scope | Identity, accounts, wallets, currencies/assets, network scoping, migration strategy |
