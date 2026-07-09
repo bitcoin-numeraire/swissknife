@@ -21,16 +21,12 @@ use crate::domains::event::EventProjectionUnitOfWork;
 use crate::domains::invoice::{Invoice, InvoiceRepository};
 use crate::domains::payment::{LnPayment, Payment, PaymentStatus, PaymentUnitOfWork};
 use crate::domains::user::{AccountRepository, AuthProvider, Permission};
-use crate::domains::{
-    asset::AssetRepository,
-    bitcoin::BtcNetwork,
-    wallet::{WalletBalanceRepository, WalletRepository},
-};
+use crate::domains::{asset::AssetRepository, bitcoin::BtcNetwork, wallet::WalletRepository};
 
 use super::models::{prelude::Wallet, wallet};
 use super::{
     SeaOrmAccountRepository, SeaOrmAssetRepository, SeaOrmEventProjectionUnitOfWork, SeaOrmInvoiceRepository,
-    SeaOrmPaymentUnitOfWork, SeaOrmWalletBalanceRepository, SeaOrmWalletRepository,
+    SeaOrmPaymentUnitOfWork, SeaOrmWalletRepository,
 };
 
 static COUNTER: AtomicU64 = AtomicU64::new(0);
@@ -95,8 +91,8 @@ async fn seed_wallet(conn: &DatabaseConnection, balance_msat: u64) -> Uuid {
         .await
         .expect("ensure wallet");
     if balance_msat > 0 {
-        SeaOrmWalletBalanceRepository::new(conn.clone())
-            .credit(wallet.id, &CURRENCY, balance_msat)
+        SeaOrmWalletRepository::new(conn.clone())
+            .credit(wallet.id, balance_msat)
             .await
             .expect("credit balance");
     }

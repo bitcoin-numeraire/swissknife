@@ -245,7 +245,7 @@ mod tests {
     use crate::{
         application::composition::MockAppStoreBuilder,
         domains::{
-            asset::Asset,
+            asset::{Asset, Protocol, NATIVE_ASSET_REF},
             bitcoin::BtcNetwork,
             user::{Account, ApiKey, AuthClaims, AuthIdentity},
             wallet::Wallet,
@@ -273,9 +273,9 @@ mod tests {
             id,
             code: "BTC".to_string(),
             name: Some("Bitcoin regtest".to_string()),
-            protocol: swissknife_types::Protocol::Bitcoin,
+            protocol: Protocol::Bitcoin,
             network: BtcNetwork::Regtest,
-            asset_ref: "native".to_string(),
+            asset_ref: NATIVE_ASSET_REF.to_string(),
             display_ticker: "rBTC".to_string(),
             decimals: 11,
             created_at: chrono::Utc::now(),

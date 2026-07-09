@@ -8,13 +8,13 @@ use crate::{
         event::EventProjectionUnitOfWork,
         invoice::{Invoice, InvoiceRepository},
         payment::{Payment, PaymentRepository, PaymentStatus, PaymentUnitOfWork},
-        wallet::WalletBalanceRepository,
+        wallet::WalletRepository,
     },
 };
 
 use super::{
     SeaOrmBitcoinAddressRepository, SeaOrmBitcoinOutputRepository, SeaOrmInvoiceRepository, SeaOrmPaymentRepository,
-    SeaOrmWalletBalanceRepository,
+    SeaOrmWalletRepository,
 };
 
 #[derive(Clone)]
@@ -37,11 +37,8 @@ impl PaymentUnitOfWork for SeaOrmPaymentUnitOfWork {
             .await
             .map_err(|e| DatabaseError::Transaction(e.to_string()))?;
 
-        let balance_repo = SeaOrmWalletBalanceRepository::new(&txn);
-        if !balance_repo
-            .reserve(payment.wallet_id, &payment.currency, reserve_amount_msat)
-            .await?
-        {
+        let wallet_repo = SeaOrmWalletRepository::new(&txn);
+        if !wallet_repo.reserve(payment.wallet_id, reserve_amount_msat).await? {
             return Err(DataError::InsufficientFunds(reserve_amount_msat as f64).into());
         }
         payment.reserved_amount = reserve_amount_msat;
@@ -99,24 +96,16 @@ impl PaymentUnitOfWork for SeaOrmPaymentUnitOfWork {
             .ok_or_else(|| DataError::NotFound(format!("Payment {} not found", payment.id)))?
             .reserved_amount;
 
-        let balance_repo = SeaOrmWalletBalanceRepository::new(&txn);
+        let wallet_repo = SeaOrmWalletRepository::new(&txn);
 
-        if reserved_amount > 0
-            && !balance_repo
-                .release(payment.wallet_id, &payment.currency, reserved_amount)
-                .await?
-        {
+        if reserved_amount > 0 && !wallet_repo.release(payment.wallet_id, reserved_amount).await? {
             return Err(
                 DataError::Inconsistency(format!("Reserved balance missing for payment {}", payment.id)).into(),
             );
         }
 
         let actual_msat = payment.amount_msat.saturating_add(payment.fee_msat.unwrap_or_default());
-        if actual_msat > 0
-            && !balance_repo
-                .debit_confirmed(payment.wallet_id, &payment.currency, actual_msat)
-                .await?
-        {
+        if actual_msat > 0 && !wallet_repo.debit_confirmed(payment.wallet_id, actual_msat).await? {
             return Err(
                 DataError::Inconsistency(format!("Wallet balance missing for settled payment {}", payment.id)).into(),
             );
@@ -161,12 +150,8 @@ impl PaymentUnitOfWork for SeaOrmPaymentUnitOfWork {
             return Ok(failed);
         }
 
-        let balance_repo = SeaOrmWalletBalanceRepository::new(&txn);
-        if payment.reserved_amount > 0
-            && !balance_repo
-                .release(payment.wallet_id, &payment.currency, payment.reserved_amount)
-                .await?
-        {
+        let wallet_repo = SeaOrmWalletRepository::new(&txn);
+        if payment.reserved_amount > 0 && !wallet_repo.release(payment.wallet_id, payment.reserved_amount).await? {
             return Err(
                 DataError::Inconsistency(format!("Reserved balance missing for payment {}", payment.id)).into(),
             );
@@ -189,7 +174,7 @@ impl PaymentUnitOfWork for SeaOrmPaymentUnitOfWork {
             .await
             .map_err(|e| DatabaseError::Transaction(e.to_string()))?;
 
-        let balance_repo = SeaOrmWalletBalanceRepository::new(&txn);
+        let wallet_repo = SeaOrmWalletRepository::new(&txn);
         let invoice_repo = SeaOrmInvoiceRepository::new(&txn);
 
         let existing_invoice = !invoice.id.is_nil();
@@ -198,11 +183,7 @@ impl PaymentUnitOfWork for SeaOrmPaymentUnitOfWork {
         }
 
         let debit_msat = payment.amount_msat.saturating_add(payment.fee_msat.unwrap_or_default());
-        if debit_msat > 0
-            && !balance_repo
-                .debit(payment.wallet_id, &payment.currency, debit_msat)
-                .await?
-        {
+        if debit_msat > 0 && !wallet_repo.debit(payment.wallet_id, debit_msat).await? {
             return Err(DataError::InsufficientFunds(debit_msat as f64).into());
         }
         payment.reserved_amount = 0;
@@ -210,16 +191,12 @@ impl PaymentUnitOfWork for SeaOrmPaymentUnitOfWork {
 
         if invoice.id.is_nil() {
             if let Some(received_msat) = invoice.amount_received_msat {
-                balance_repo
-                    .credit(invoice.wallet_id, &invoice.currency, received_msat)
-                    .await?;
+                wallet_repo.credit(invoice.wallet_id, received_msat).await?;
             }
             invoice_repo.insert(invoice).await?;
         } else {
             if let Some(received_msat) = invoice.amount_received_msat {
-                balance_repo
-                    .credit(invoice.wallet_id, &invoice.currency, received_msat)
-                    .await?;
+                wallet_repo.credit(invoice.wallet_id, received_msat).await?;
             }
         }
 
@@ -252,22 +229,18 @@ impl EventProjectionUnitOfWork for SeaOrmEventProjectionUnitOfWork {
             .map_err(|e| DatabaseError::Transaction(e.to_string()))?;
 
         let invoice_repo = SeaOrmInvoiceRepository::new(&txn);
-        let balance_repo = SeaOrmWalletBalanceRepository::new(&txn);
+        let wallet_repo = SeaOrmWalletRepository::new(&txn);
 
         let settled = if invoice.id.is_nil() {
             // New, already-settled incoming invoice (e.g. an on-chain deposit first seen confirmed).
             if let Some(received_msat) = invoice.amount_received_msat {
-                balance_repo
-                    .credit(invoice.wallet_id, &invoice.currency, received_msat)
-                    .await?;
+                wallet_repo.credit(invoice.wallet_id, received_msat).await?;
             }
             invoice_repo.insert(invoice).await?
         } else if invoice_repo.settle(&invoice).await? {
             // Pending invoice settled now: credit the receiver exactly once.
             if let Some(received_msat) = invoice.amount_received_msat {
-                balance_repo
-                    .credit(invoice.wallet_id, &invoice.currency, received_msat)
-                    .await?;
+                wallet_repo.credit(invoice.wallet_id, received_msat).await?;
             }
             invoice_repo
                 .find(invoice.id)
@@ -303,7 +276,7 @@ impl EventProjectionUnitOfWork for SeaOrmEventProjectionUnitOfWork {
         let output_repo = SeaOrmBitcoinOutputRepository::new(&txn);
         let address_repo = SeaOrmBitcoinAddressRepository::new(&txn);
         let invoice_repo = SeaOrmInvoiceRepository::new(&txn);
-        let balance_repo = SeaOrmWalletBalanceRepository::new(&txn);
+        let wallet_repo = SeaOrmWalletRepository::new(&txn);
 
         let stored_output = output_repo.upsert(output).await?;
 
@@ -322,9 +295,7 @@ impl EventProjectionUnitOfWork for SeaOrmEventProjectionUnitOfWork {
                     existing.amount_received_msat = deposit_invoice.amount_received_msat;
                     if invoice_repo.settle(&existing).await? {
                         if let Some(received_msat) = existing.amount_received_msat {
-                            balance_repo
-                                .credit(existing.wallet_id, &existing.currency, received_msat)
-                                .await?;
+                            wallet_repo.credit(existing.wallet_id, received_msat).await?;
                         }
                     }
                     invoice_repo
@@ -341,9 +312,7 @@ impl EventProjectionUnitOfWork for SeaOrmEventProjectionUnitOfWork {
                 deposit_invoice.btc_output_id = Some(stored_output.id);
                 if confirmed {
                     if let Some(received_msat) = deposit_invoice.amount_received_msat {
-                        balance_repo
-                            .credit(deposit_invoice.wallet_id, &deposit_invoice.currency, received_msat)
-                            .await?;
+                        wallet_repo.credit(deposit_invoice.wallet_id, received_msat).await?;
                     }
                 }
                 invoice_repo.insert(deposit_invoice).await?

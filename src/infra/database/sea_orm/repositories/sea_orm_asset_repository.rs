@@ -6,13 +6,11 @@ use super::SeaOrmConnection;
 use crate::{
     application::errors::DatabaseError,
     domains::{
-        asset::{Asset, AssetRepository, Protocol},
+        asset::{Asset, AssetRepository, Protocol, NATIVE_ASSET_REF},
         bitcoin::BtcNetwork,
     },
     infra::database::sea_orm::models::{asset::Column, prelude::Asset as AssetEntity},
 };
-
-const NATIVE_ASSET_REF: &str = "native";
 
 #[derive(Clone)]
 pub struct SeaOrmAssetRepository<C = DatabaseConnection> {

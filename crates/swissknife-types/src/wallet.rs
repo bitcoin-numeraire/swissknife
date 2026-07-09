@@ -17,6 +17,9 @@ pub enum Protocol {
     TaprootAssets,
 }
 
+/// Asset reference used for chain-native BTC.
+pub const NATIVE_ASSET_REF: &str = "native";
+
 /// A wallet's balance, in millisatoshis.
 #[derive(Debug, Clone, Deserialize, Serialize, Default, ToSchema)]
 pub struct Balance {

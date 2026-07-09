@@ -203,15 +203,13 @@ mod tests {
     use crate::{
         application::{composition::MockAppStoreBuilder, errors::DatabaseError},
         domains::{
-            asset::{Asset, Protocol},
+            asset::{Asset, Protocol, NATIVE_ASSET_REF},
             bitcoin::BtcNetwork,
             wallet::Wallet,
         },
     };
 
     use super::*;
-
-    const NATIVE_ASSET_REF: &str = "native";
 
     fn native_btc_asset() -> Asset {
         Asset {
