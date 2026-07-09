@@ -117,7 +117,6 @@ export {
   type CreateWalletApiKeyResponse,
   type CreateWalletApiKeyResponses,
   type CreateWalletRequest,
-  Currency,
   type DeleteAddressData,
   type DeleteAddressError,
   type DeleteAddressErrors,

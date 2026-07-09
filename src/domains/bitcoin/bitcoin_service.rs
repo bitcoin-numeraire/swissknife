@@ -6,7 +6,7 @@ use uuid::Uuid;
 
 use crate::{
     application::{
-        composition::{AppStore, Currency},
+        composition::AppStore,
         errors::{ApplicationError, DataError},
     },
     domains::{
@@ -137,14 +137,12 @@ impl BitcoinUseCases for BitcoinService {
         }
 
         let result = self.wallet.synchronize(cursor).await?;
-        let currency: Currency = self.wallet.network().into();
-
         let mut synced = 0;
 
         for transaction in result.events {
             match transaction {
                 OnchainTransaction::Deposit(output) => {
-                    if self.events.onchain_deposit(output.into(), currency.clone()).await? {
+                    if self.events.onchain_deposit(output.into()).await? {
                         synced += 1;
                     }
                 }
@@ -362,7 +360,7 @@ mod tests {
                 });
 
                 let mut events = MockEventUseCases::new();
-                events.expect_onchain_deposit().times(1).returning(|_, _| Ok(true));
+                events.expect_onchain_deposit().times(1).returning(|_| Ok(true));
                 events.expect_onchain_withdrawal().times(1).returning(|_| Ok(true));
 
                 let service = service(MockAppStoreBuilder::new(), wallet, events, system);

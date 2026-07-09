@@ -305,7 +305,6 @@ export function InvoiceDetails({ invoice, isAdmin }: Props) {
                 />
               )}
               <DetailRow label={t('transaction_details.ledger')} value={methodLabel} />
-              <DetailRow label={t('transaction_details.currency')} value={invoice.currency} />
               <DetailRow
                 label={t('transaction_details.created')}
                 value={formatDateTime(invoice.timestamp || invoice.created_at)}

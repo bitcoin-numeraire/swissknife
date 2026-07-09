@@ -5,7 +5,7 @@ use strum_macros::{Display, EnumString};
 use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
 
-use crate::{Currency, Ledger, LnUrlSuccessAction, OrderDirection};
+use crate::{Ledger, LnUrlSuccessAction, OrderDirection};
 
 /// An outgoing payment, over Lightning, on-chain, or internal to the instance.
 #[derive(Clone, Debug, Default, Deserialize, Serialize, ToSchema)]
@@ -34,9 +34,6 @@ pub struct Payment {
 
     /// Ledger
     pub ledger: Ledger,
-
-    /// Currency
-    pub currency: Currency,
 
     /// Payment time
     #[serde(skip_serializing_if = "Option::is_none")]

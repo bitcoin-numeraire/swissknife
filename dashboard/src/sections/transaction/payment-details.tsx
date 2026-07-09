@@ -281,7 +281,6 @@ export function PaymentDetails({ payment, isAdmin }: Props) {
                 />
               )}
               <DetailRow label={t('transaction_details.ledger')} value={methodLabel} />
-              <DetailRow label={t('transaction_details.currency')} value={payment.currency} />
               <DetailRow
                 label={t('transaction_details.created')}
                 value={formatDateTime(payment.created_at)}

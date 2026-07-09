@@ -26,6 +26,7 @@ mod m20260704_000008_wallet_account_asset_schema;
 mod m20260704_000009_backfill_mainnet_wallet_accounts;
 mod m20260704_000010_drop_api_key_user_id_fk;
 mod m20260704_000011_ln_address_account_routes;
+mod m20260704_000012_drop_legacy_wallet_contract;
 
 pub struct Migrator;
 
@@ -59,6 +60,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260704_000009_backfill_mainnet_wallet_accounts::Migration),
             Box::new(m20260704_000010_drop_api_key_user_id_fk::Migration),
             Box::new(m20260704_000011_ln_address_account_routes::Migration),
+            Box::new(m20260704_000012_drop_legacy_wallet_contract::Migration),
         ]
     }
 }
@@ -346,6 +348,38 @@ mod tests {
             )
             .await,
             1
+        );
+    }
+
+    #[async_std::test]
+    async fn drop_legacy_wallet_contract_removes_old_balance_and_currency_columns() {
+        let conn = sqlite().await;
+
+        Migrator::up(&conn, None).await.expect("run migrations");
+
+        assert_eq!(
+            count(
+                &conn,
+                "SELECT COUNT(*) AS count FROM sqlite_master WHERE type = 'table' AND name = 'wallet_balance'",
+            )
+            .await,
+            0
+        );
+        assert_eq!(
+            count(
+                &conn,
+                "SELECT COUNT(*) AS count FROM pragma_table_info('payment') WHERE name = 'currency'",
+            )
+            .await,
+            0
+        );
+        assert_eq!(
+            count(
+                &conn,
+                "SELECT COUNT(*) AS count FROM pragma_table_info('invoice') WHERE name = 'currency'",
+            )
+            .await,
+            0
         );
     }
 }

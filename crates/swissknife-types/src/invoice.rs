@@ -7,7 +7,7 @@ use strum_macros::{Display, EnumString};
 use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
 
-use crate::{BtcOutput, Currency, Ledger, OrderDirection};
+use crate::{BtcOutput, Ledger, OrderDirection};
 
 /// An incoming payment request, over Lightning and/or on-chain.
 #[derive(Clone, Debug, Default, Deserialize, Serialize, ToSchema)]
@@ -33,9 +33,6 @@ pub struct Invoice {
     pub status: InvoiceStatus,
     /// Ledger
     pub ledger: Ledger,
-    /// Currency
-    pub currency: Currency,
-
     /// Fees paid. Populated when a new channel is opened to receive the funds.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub fee_msat: Option<u64>,

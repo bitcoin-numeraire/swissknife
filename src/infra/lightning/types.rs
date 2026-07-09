@@ -1,8 +1,8 @@
 use chrono::{TimeZone, Utc};
-use lightning_invoice::{Bolt11Invoice, Bolt11InvoiceDescriptionRef, Currency as LNInvoiceCurrency};
+use lightning_invoice::{Bolt11Invoice, Bolt11InvoiceDescriptionRef};
 
 use crate::{
-    application::composition::{Currency, Ledger},
+    application::composition::Ledger,
     domains::{
         bitcoin::BtcNetwork,
         invoice::{Invoice, LnInvoice},
@@ -26,7 +26,6 @@ pub(crate) fn invoice_from_bolt11(val: Bolt11Invoice) -> Invoice {
 
     Invoice {
         ledger: Ledger::Lightning,
-        currency: currency_from_ln_invoice(val.currency()),
         amount_msat: val.amount_milli_satoshis(),
         timestamp,
         description: match val.description() {
@@ -47,18 +46,6 @@ pub(crate) fn invoice_from_bolt11(val: Bolt11Invoice) -> Invoice {
             expires_at: timestamp + val.expiry_time(),
         }),
         ..Default::default()
-    }
-}
-
-// Foreign-to-foreign conversion (lightning_invoice -> api-types), so it lives
-// as a free function here rather than a `From` impl (orphan rule).
-fn currency_from_ln_invoice(val: LNInvoiceCurrency) -> Currency {
-    match val {
-        LNInvoiceCurrency::Bitcoin => Currency::Bitcoin,
-        LNInvoiceCurrency::Regtest => Currency::Regtest,
-        LNInvoiceCurrency::Signet => Currency::Signet,
-        LNInvoiceCurrency::BitcoinTestnet => Currency::BitcoinTestnet,
-        LNInvoiceCurrency::Simnet => Currency::Simnet,
     }
 }
 

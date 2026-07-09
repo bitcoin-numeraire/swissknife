@@ -145,11 +145,6 @@ export const zCreateWalletRequest = z.object({
 });
 
 /**
- * The currency and network a transaction is denominated in.
- */
-export const zCurrency = z.enum(['Bitcoin', 'BitcoinTestnet', 'Regtest', 'Simnet', 'Signet']);
-
-/**
  * Application error response
  */
 export const zErrorResponse = z.object({
@@ -248,7 +243,6 @@ export const zInvoice = z.object({
     .nullish(),
   bitcoin_output: zBtcOutput.nullish(),
   created_at: z.iso.datetime(),
-  currency: zCurrency,
   description: z.string().nullish(),
   fee_msat: z.coerce
     .bigint()
@@ -371,7 +365,6 @@ export const zPayment = z.object({
   }),
   bitcoin: zBtcPayment.nullish(),
   created_at: z.iso.datetime(),
-  currency: zCurrency,
   description: z.string().nullish(),
   error: z.string().nullish(),
   fee_msat: z.coerce
