@@ -857,6 +857,11 @@
     "copy": "Copier le jeton",
     "key_display_message": "Sauvegardez votre jeton et gardez-le en sécurité, ne le partagez pas publiquement. Ce jeton ne sera plus jamais affiché."
   },
+  "wallet_switcher": {
+    "select": "Sélectionner un portefeuille",
+    "loading": "Chargement des portefeuilles",
+    "empty": "Aucun portefeuille"
+  },
   "api_key_list": {
     "account": "Compte",
     "name": "Nom",

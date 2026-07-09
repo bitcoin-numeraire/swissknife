@@ -25,6 +25,7 @@ import { encodeLNURL, displayLnAddress } from 'src/utils/lnurl';
 import { CONFIG } from 'src/global-config';
 import { useTranslate } from 'src/locales';
 import { endpointKeys } from 'src/actions/keys';
+import { useAccountContext } from 'src/contexts/account';
 import { deleteAddress, deleteWalletAddress } from 'src/lib/swissknife';
 
 import { Label } from 'src/components/label';
@@ -51,6 +52,7 @@ type Props = {
 export function LnAddressDetails({ lnAddress, isAdmin }: Props) {
   const { t } = useTranslate();
   const router = useRouter();
+  const { activeWalletId } = useAccountContext();
   const lnAddressDisplay = displayLnAddress(lnAddress.username);
   const encodedLnurl = encodeLNURL(lnAddress.username);
   const nostrDisplay = npub(lnAddress.nostr_pubkey);
@@ -66,13 +68,14 @@ export function LnAddressDetails({ lnAddress, isAdmin }: Props) {
         }
 
         mutate(endpointKeys.lightning.addresses.list);
-        mutate(endpointKeys.userWallet.lnAddress.get);
+        mutate(endpointKeys.account.lnAddress.get);
+        if (activeWalletId) mutate(endpointKeys.accountWallet.get(activeWalletId));
         toast.success(`Lightning address deleted successfully: ${id}`);
       } catch (error) {
         handleActionError(error);
       }
     },
-    [router, isAdmin]
+    [activeWalletId, router, isAdmin]
   );
 
   return (

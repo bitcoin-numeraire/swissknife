@@ -35,7 +35,7 @@ import { mergeAndSortTransactions } from 'src/utils/transactions';
 import { useTranslate } from 'src/locales';
 import { endpointKeys } from 'src/actions/keys';
 import { DashboardContent } from 'src/layouts/dashboard';
-import { useGetUserWallet } from 'src/actions/user-wallet';
+import { useActiveWallet } from 'src/actions/account-wallet';
 import { useFetchFiatPrices } from 'src/actions/mempool-space';
 
 import { Label } from 'src/components/label';
@@ -123,7 +123,7 @@ export function WalletView() {
   const [lastWalletSyncAt, setLastWalletSyncAt] = useState<Date | null>(null);
   const [isRefreshingWallet, setIsRefreshingWallet] = useState(false);
 
-  const { wallet, walletLoading, walletError } = useGetUserWallet();
+  const { wallet, walletLoading, walletError } = useActiveWallet();
   const { fiatPrices, fiatPricesError } = useFetchFiatPrices();
 
   const prices = fiatPrices ?? fallbackFiatPrices;
@@ -174,7 +174,9 @@ export function WalletView() {
     [wallet?.invoices]
   );
 
-  const onMutation = () => mutate(endpointKeys.userWallet.get);
+  const onMutation = () => {
+    if (wallet?.id) mutate(endpointKeys.accountWallet.get(wallet.id));
+  };
   const fiatValueAvailable = (prices[state.currency] ?? 0) > 0;
   const balancesHidden = state.hideBalances ?? false;
   const lnAddressDisplay = wallet?.ln_address?.username
@@ -200,7 +202,7 @@ export function WalletView() {
   const refreshWallet = async () => {
     try {
       setIsRefreshingWallet(true);
-      await mutate(endpointKeys.userWallet.get);
+      if (wallet?.id) await mutate(endpointKeys.accountWallet.get(wallet.id));
       setLastWalletSyncAt(new Date());
     } catch {
       toast.error(t('wallet_view.refresh_failed'));

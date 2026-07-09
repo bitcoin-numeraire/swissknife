@@ -6,7 +6,7 @@ import { shouldFail } from 'src/utils/errors';
 
 import { useTranslate } from 'src/locales';
 import { DashboardContent } from 'src/layouts/dashboard';
-import { useGetWalletPayment } from 'src/actions/user-wallet';
+import { useGetWalletPayment } from 'src/actions/account-wallet';
 
 import { ErrorView } from 'src/components/error/error-view';
 import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';

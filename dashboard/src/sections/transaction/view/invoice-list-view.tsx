@@ -20,7 +20,7 @@ import { useTranslate } from 'src/locales';
 import { endpointKeys } from 'src/actions/keys';
 import { DashboardContent } from 'src/layouts/dashboard';
 import { useFetchFiatPrices } from 'src/actions/mempool-space';
-import { useGetUserWallet, useListWalletInvoices } from 'src/actions/user-wallet';
+import { useActiveWallet, useListWalletInvoices } from 'src/actions/account-wallet';
 
 import { Iconify } from 'src/components/iconify';
 import { ErrorView } from 'src/components/error/error-view';
@@ -93,7 +93,7 @@ export function InvoiceListView() {
   const newInvoice = useBoolean();
 
   const { invoices, invoicesLoading, invoicesError, invoicesMutate } = useListWalletInvoices();
-  const { wallet, walletLoading, walletError } = useGetUserWallet();
+  const { wallet, walletLoading, walletError } = useActiveWallet();
   const { fiatPrices, fiatPricesLoading, fiatPricesError } = useFetchFiatPrices();
 
   const errors = [invoicesError, fiatPricesError, walletError];
@@ -167,7 +167,7 @@ export function InvoiceListView() {
             lnAddress={wallet?.ln_address}
             onClose={newInvoice.onFalse}
             onSuccess={() => {
-              if (wallet?.id) mutate(endpointKeys.userWallet.invoices.list(wallet.id));
+              if (wallet?.id) mutate(endpointKeys.accountWallet.invoices.list(wallet.id));
             }}
           />
         </>

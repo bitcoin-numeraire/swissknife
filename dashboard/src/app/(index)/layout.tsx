@@ -1,4 +1,5 @@
 import { CONFIG } from 'src/global-config';
+import { AccountProvider } from 'src/contexts/account';
 import { DashboardLayout } from 'src/layouts/dashboard';
 
 import { AuthGuard } from 'src/auth/guard';
@@ -11,12 +12,18 @@ type Props = {
 
 export default function Layout({ children }: Props) {
   if (CONFIG.auth.skip) {
-    return <DashboardLayout>{children}</DashboardLayout>;
+    return (
+      <AccountProvider>
+        <DashboardLayout>{children}</DashboardLayout>
+      </AccountProvider>
+    );
   }
 
   return (
     <AuthGuard>
-      <DashboardLayout>{children}</DashboardLayout>
+      <AccountProvider>
+        <DashboardLayout>{children}</DashboardLayout>
+      </AccountProvider>
     </AuthGuard>
   );
 }

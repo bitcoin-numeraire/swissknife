@@ -858,6 +858,11 @@
     "copy": "Copy token",
     "key_display_message": "Save your token and keep it secure, do not share it publicly or expose it in code repositories. This token will never be displayed anymore."
   },
+  "wallet_switcher": {
+    "select": "Select wallet",
+    "loading": "Loading wallets",
+    "empty": "No wallets"
+  },
   "api_key_list": {
     "account": "Account",
     "name": "Name",

@@ -29,6 +29,7 @@ import { fFromNow } from 'src/utils/format-time';
 
 import { useTranslate } from 'src/locales';
 import { endpointKeys } from 'src/actions/keys';
+import { useAccountContext } from 'src/contexts/account';
 
 import { Label } from 'src/components/label';
 import { Iconify } from 'src/components/iconify';
@@ -69,6 +70,7 @@ interface Props extends CardProps {
 
 export function RecentTransactions({ title, tableData, isAdmin, ...other }: Props) {
   const { t } = useTranslate();
+  const { activeWalletId } = useAccountContext();
 
   return (
     <Card {...other}>
@@ -100,7 +102,9 @@ export function RecentTransactions({ title, tableData, isAdmin, ...other }: Prop
             <Tooltip title={t('recent_transactions.clean_failed_expired')} placement="top" arrow>
               <Box>
                 <CleanTransactionsButton
-                  onSuccess={() => mutate(endpointKeys.userWallet.get)}
+                  onSuccess={() => {
+                    if (activeWalletId) mutate(endpointKeys.accountWallet.get(activeWalletId));
+                  }}
                   buttonProps={{
                     size: 'small',
                     color: 'error',

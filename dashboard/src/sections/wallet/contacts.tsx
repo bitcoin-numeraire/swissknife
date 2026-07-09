@@ -21,6 +21,7 @@ import { fFromNow } from 'src/utils/format-time';
 
 import { useTranslate } from 'src/locales';
 import { endpointKeys } from 'src/actions/keys';
+import { useAccountContext } from 'src/contexts/account';
 
 import { Iconify } from 'src/components/iconify';
 
@@ -36,6 +37,7 @@ interface Props extends CardProps {
 
 export function Contacts({ title, fiatPrices, list, ...other }: Props) {
   const { t } = useTranslate();
+  const { activeWalletId } = useAccountContext();
   const [input, setInput] = useState('');
   const confirm = useBoolean();
 
@@ -92,7 +94,9 @@ export function Contacts({ title, fiatPrices, list, ...other }: Props) {
         initialInput={input}
         open={confirm.value}
         onClose={handleClose}
-        onSuccess={() => mutate(endpointKeys.userWallet.get)}
+        onSuccess={() => {
+          if (activeWalletId) mutate(endpointKeys.accountWallet.get(activeWalletId));
+        }}
         fiatPrices={fiatPrices}
       />
     </Card>

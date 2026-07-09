@@ -2,22 +2,26 @@ export const endpointKeys = {
   mempoolSpace: {
     prices: 'mempoolSpacePrices',
   },
-  userWallet: {
-    get: 'userWallet',
-    balance: (walletId: string) => ['userWalletBalance', walletId] as const,
-    lnAddress: { get: 'userWalletGetAddress' },
-    btcAddresses: { list: 'userWalletListBtcAddresses' },
+  account: {
+    get: 'account',
+    wallets: 'accountWallets',
+    lnAddress: { get: 'accountLnAddress' },
+    apiKeys: { list: 'accountApiKeys' },
+  },
+  accountWallet: {
+    get: (walletId: string) => ['accountWallet', walletId] as const,
+    balance: (walletId: string) => ['accountWalletBalance', walletId] as const,
+    btcAddresses: { list: 'accountWalletBtcAddresses' },
     payments: {
       list: (walletId: string, limit?: number, offset?: number) =>
-        ['userWalletListPayments', walletId, limit, offset] as const,
-      get: (walletId: string, id: string) => ['userWalletGetPayment', walletId, id] as const,
+        ['accountWalletPayments', walletId, limit, offset] as const,
+      get: (walletId: string, id: string) => ['accountWalletPayment', walletId, id] as const,
     },
     invoices: {
-      list: (walletId: string) => ['userWalletListInvoices', walletId] as const,
-      get: (walletId: string, id: string) => ['userWalletGetInvoice', walletId, id] as const,
+      list: (walletId: string) => ['accountWalletInvoices', walletId] as const,
+      get: (walletId: string, id: string) => ['accountWalletInvoice', walletId, id] as const,
     },
-    contacts: { list: (walletId: string) => ['userWalletListContacts', walletId] as const },
-    apiKeys: { list: 'userWalletListApiKeys' },
+    contacts: { list: (walletId: string) => ['accountWalletContacts', walletId] as const },
   },
   system: {
     health: 'systemHealth',

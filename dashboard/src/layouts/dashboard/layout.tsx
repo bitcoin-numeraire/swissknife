@@ -35,17 +35,16 @@ import { layoutClasses } from '../core/classes';
 import { NavHorizontal } from './nav-horizontal';
 import { MainSection } from '../core/main-section';
 import { Searchbar } from '../components/searchbar';
-import { _workspaces } from '../nav-config-workspace';
 import { MenuButton } from '../components/menu-button';
 import { HeaderSection } from '../core/header-section';
 import { LayoutSection } from '../core/layout-section';
 import { ModuleDebugPanel } from './module-debug-panel';
 import { AccountDrawer } from '../components/account-drawer';
 import { SettingsButton } from '../components/settings-button';
+import { WalletsPopover } from '../components/wallets-popover';
 import { LanguagePopover } from '../components/language-popover';
 import { CurrencyPopover } from '../components/currency-popover';
 import { navData as accountNavData } from '../nav-config-account';
-import { WorkspacesPopover } from '../components/workspaces-popover';
 import { dashboardLayoutVars, dashboardNavColorVars } from './css-vars';
 import {
   getDashboardFlags,
@@ -154,11 +153,8 @@ export function DashboardLayout({
             <VerticalDivider sx={{ [theme.breakpoints.up(layoutQuery)]: { display: 'flex' } }} />
           )}
 
-          {/** @slot Workspace popover */}
-          <WorkspacesPopover
-            data={_workspaces}
-            sx={{ color: 'var(--layout-nav-text-primary-color)' }}
-          />
+          {/** @slot Wallet popover */}
+          <WalletsPopover sx={{ color: 'var(--layout-nav-text-primary-color)' }} />
         </>
       ),
       rightArea: (
