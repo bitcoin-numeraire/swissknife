@@ -4,7 +4,7 @@
 | --- | --- |
 | Status | Accepted |
 | Date | 2026-07-02 |
-| Related issues | #297, #252, #254, #291, #292, #115, #237, #239, #240, #241 |
+| Related issues | #297, #252, #254, #291, #292, #337, #115, #237, #239, #240, #241 |
 | Scope | Identity, accounts, wallets, currencies/assets, network scoping, migration strategy |
 
 ## Summary
@@ -158,7 +158,9 @@ Initial seed assets map the existing enum values into explicit assets:
 
 `BitcoinTestnet` currently cannot distinguish testnet3 from testnet4 by itself because `BtcNetwork::Testnet` and `BtcNetwork::Testnet4` both convert to `Currency::BitcoinTestnet`. During migration, use the configured node network when available; if a database has historical mixed testnet3/testnet4 activity, require explicit operator reconciliation rather than silently merging networks.
 
-Network is a database concern, not only a rendering concern. It is persisted exactly once, on `asset`; wallets, payments, invoices, and addresses derive it through their FKs and never duplicate it. It must live in the database for three reasons: payment validation compares the network encoded in the instrument (BOLT11 HRPs `lnbc`/`lntb`/`lntbs`/`lnbcrt`, on-chain address prefixes) against the wallet asset's network; rows must stay attributed to the network they were created on even if the deployment configuration later changes; and the testnet3/testnet4 reconciliation above is only expressible if network is data. What is genuinely frontend-only is pricing and formatting: testnet assets have no market value, so fiat conversion and ticker styling (`tBTC`) are display-layer decisions on top of the persisted network. As an operational guard, startup should verify that the configured node network matches the network of every asset with active wallets and refuse to run on mismatch, instead of discovering the mismatch one rejected payment at a time.
+Network is a database concern, not only a rendering concern. It is persisted exactly once, on `asset`; wallets, payments, invoices, and addresses derive it through their FKs and never duplicate it. It must live in the database for three reasons: payment validation compares the network encoded in the instrument (BOLT11 HRPs `lnbc`/`lntb`/`lntbs`/`lnbcrt`, on-chain address prefixes) against the wallet asset's network; rows must stay attributed to the network they were created on even if the deployment configuration later changes; and the testnet3/testnet4 reconciliation above is only expressible if network is data. What is genuinely frontend-only is pricing and formatting: testnet assets have no market value, so fiat conversion and ticker styling (`tBTC`) are display-layer decisions on top of the persisted network.
+
+A SwissKnife database may contain wallets for several networks at the same time. The configured Lightning or chain provider describes the settlement capability available to a running instance; it does not constrain which network-scoped wallets may exist in the catalog. Every money-moving or address-producing operation must validate the selected wallet asset against both the instrument network and the provider network, and reject an incompatible request before reserving funds or creating provider state. Startup must not reject a database merely because it contains wallets that the current provider cannot service. This keeps historical attribution intact and allows a future runtime to attach additional liquidity providers without another wallet-schema change.
 
 ### 3. Make wallets asset-scoped spendable balances
 
