@@ -139,7 +139,7 @@ async fn get_account(State(services): State<Arc<AppServices>>, user: User) -> Re
     Ok(Json(account))
 }
 
-/// Update the authenticated account profile.
+/// Update your account profile.
 #[utoipa::path(
     put,
     path = "",
@@ -158,9 +158,9 @@ async fn get_account(State(services): State<Arc<AppServices>>, user: User) -> Re
 async fn update_current_account(
     State(services): State<Arc<AppServices>>,
     user: User,
-    Json(payload): Json<UpdateAccountRequest>,
+    Json(UpdateAccountRequest { display_name }): Json<UpdateAccountRequest>,
 ) -> Result<Json<Account>, ApplicationError> {
-    let mut account = services.account.update(user.account_id, payload).await?;
+    let mut account = services.account.update(user.account_id, display_name).await?;
     account.permissions = Some(user.permissions);
     Ok(Json(account))
 }
@@ -308,10 +308,7 @@ async fn new_wallet_btc_address(
     Path(wallet_id): Path<Uuid>,
     Json(payload): Json<NewBtcAddressRequest>,
 ) -> Result<Json<BtcAddress>, ApplicationError> {
-    services
-        .wallet
-        .verify_account_ownership(user.account_id, wallet_id)
-        .await?;
+    services.wallet.verify_ownership(user.account_id, wallet_id).await?;
 
     let address = services
         .bitcoin
@@ -341,10 +338,7 @@ async fn list_wallet_btc_addresses(
     Path(wallet_id): Path<Uuid>,
     Query(mut filter): Query<BtcAddressFilter>,
 ) -> Result<Json<Vec<BtcAddress>>, ApplicationError> {
-    services
-        .wallet
-        .verify_account_ownership(user.account_id, wallet_id)
-        .await?;
+    services.wallet.verify_ownership(user.account_id, wallet_id).await?;
 
     filter.wallet_id = Some(wallet_id);
     Ok(Json(services.bitcoin.list_addresses(filter).await?))
@@ -372,10 +366,7 @@ async fn wallet_pay(
     Path(wallet_id): Path<Uuid>,
     Json(payload): Json<SendPaymentRequest>,
 ) -> Result<Json<Payment>, ApplicationError> {
-    services
-        .wallet
-        .verify_account_ownership(user.account_id, wallet_id)
-        .await?;
+    services.wallet.verify_ownership(user.account_id, wallet_id).await?;
 
     let payment = services
         .payment
@@ -403,10 +394,7 @@ async fn get_wallet_balance(
     user: User,
     Path(wallet_id): Path<Uuid>,
 ) -> Result<Json<Balance>, ApplicationError> {
-    services
-        .wallet
-        .verify_account_ownership(user.account_id, wallet_id)
-        .await?;
+    services.wallet.verify_ownership(user.account_id, wallet_id).await?;
 
     Ok(Json(services.wallet.get_balance(wallet_id).await?))
 }
@@ -433,10 +421,7 @@ async fn new_wallet_invoice(
     Path(wallet_id): Path<Uuid>,
     Json(payload): Json<NewInvoiceRequest>,
 ) -> Result<Json<Invoice>, ApplicationError> {
-    services
-        .wallet
-        .verify_account_ownership(user.account_id, wallet_id)
-        .await?;
+    services.wallet.verify_ownership(user.account_id, wallet_id).await?;
 
     let invoice = services
         .invoice
@@ -594,10 +579,7 @@ async fn list_wallet_payments(
     Path(wallet_id): Path<Uuid>,
     Query(mut query_params): Query<PaymentFilter>,
 ) -> Result<Json<Vec<Payment>>, ApplicationError> {
-    services
-        .wallet
-        .verify_account_ownership(user.account_id, wallet_id)
-        .await?;
+    services.wallet.verify_ownership(user.account_id, wallet_id).await?;
 
     query_params.wallet_id = Some(wallet_id);
     Ok(Json(services.payment.list(query_params).await?))
@@ -622,10 +604,7 @@ async fn get_wallet_payment(
     user: User,
     Path((wallet_id, id)): Path<(Uuid, Uuid)>,
 ) -> Result<Json<Payment>, ApplicationError> {
-    services
-        .wallet
-        .verify_account_ownership(user.account_id, wallet_id)
-        .await?;
+    services.wallet.verify_ownership(user.account_id, wallet_id).await?;
 
     let payments = services
         .payment
@@ -665,10 +644,7 @@ async fn list_wallet_invoices(
     Path(wallet_id): Path<Uuid>,
     Query(mut query_params): Query<InvoiceFilter>,
 ) -> Result<Json<Vec<Invoice>>, ApplicationError> {
-    services
-        .wallet
-        .verify_account_ownership(user.account_id, wallet_id)
-        .await?;
+    services.wallet.verify_ownership(user.account_id, wallet_id).await?;
 
     query_params.wallet_id = Some(wallet_id);
     Ok(Json(services.invoice.list(query_params).await?))
@@ -693,10 +669,7 @@ async fn get_wallet_invoice(
     user: User,
     Path((wallet_id, id)): Path<(Uuid, Uuid)>,
 ) -> Result<Json<Invoice>, ApplicationError> {
-    services
-        .wallet
-        .verify_account_ownership(user.account_id, wallet_id)
-        .await?;
+    services.wallet.verify_ownership(user.account_id, wallet_id).await?;
 
     let invoices = services
         .invoice
@@ -734,10 +707,7 @@ async fn list_contacts(
     user: User,
     Path(wallet_id): Path<Uuid>,
 ) -> Result<Json<Vec<Contact>>, ApplicationError> {
-    services
-        .wallet
-        .verify_account_ownership(user.account_id, wallet_id)
-        .await?;
+    services.wallet.verify_ownership(user.account_id, wallet_id).await?;
 
     Ok(Json(services.wallet.list_contacts(wallet_id).await?))
 }
@@ -760,10 +730,7 @@ async fn delete_expired_invoices(
     user: User,
     Path(wallet_id): Path<Uuid>,
 ) -> Result<Json<u64>, ApplicationError> {
-    services
-        .wallet
-        .verify_account_ownership(user.account_id, wallet_id)
-        .await?;
+    services.wallet.verify_ownership(user.account_id, wallet_id).await?;
 
     let n_deleted = services
         .invoice
@@ -794,10 +761,7 @@ async fn delete_failed_payments(
     user: User,
     Path(wallet_id): Path<Uuid>,
 ) -> Result<Json<u64>, ApplicationError> {
-    services
-        .wallet
-        .verify_account_ownership(user.account_id, wallet_id)
-        .await?;
+    services.wallet.verify_ownership(user.account_id, wallet_id).await?;
 
     let n_deleted = services
         .payment
@@ -1002,12 +966,12 @@ mod tests {
             builder
                 .account
                 .expect_update()
-                .withf(move |id, request| *id == account_id && request.display_name.as_deref() == Some("Alice"))
+                .withf(move |id, display_name| *id == account_id && display_name.as_deref() == Some("Alice"))
                 .times(1)
-                .returning(move |id, request| {
+                .returning(move |id, display_name| {
                     Ok(Account {
                         id,
-                        display_name: request.display_name,
+                        display_name,
                         ..Default::default()
                     })
                 });
@@ -1066,7 +1030,7 @@ mod tests {
             let mut builder = MockAppServicesBuilder::new();
             builder
                 .wallet
-                .expect_verify_account_ownership()
+                .expect_verify_ownership()
                 .withf(move |account, id| *account == account_id && *id == wallet_id)
                 .times(1)
                 .returning(|_, _| Ok(()));
@@ -1099,7 +1063,7 @@ mod tests {
             let mut builder = MockAppServicesBuilder::new();
             builder
                 .wallet
-                .expect_verify_account_ownership()
+                .expect_verify_ownership()
                 .withf(move |account, id| *account == account_id && *id == wallet_id)
                 .times(1)
                 .returning(|_, _| Err(DataError::NotFound("Wallet not found.".to_string()).into()));
@@ -1130,7 +1094,7 @@ mod tests {
             let mut builder = MockAppServicesBuilder::new();
             builder
                 .wallet
-                .expect_verify_account_ownership()
+                .expect_verify_ownership()
                 .withf(move |account, id| *account == account_id && *id == wallet_id)
                 .times(1)
                 .returning(|_, _| Ok(()));

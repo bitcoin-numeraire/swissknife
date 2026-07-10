@@ -7,6 +7,7 @@ use sea_orm::{
 use uuid::Uuid;
 
 use super::SeaOrmConnection;
+use crate::infra::database::sea_orm::sea_order;
 
 use crate::{
     application::errors::DatabaseError,
@@ -141,10 +142,7 @@ where
             })
             .apply_if(filter.asset_id, |q, asset_id| q.filter(Column::AssetId.eq(asset_id)))
             .apply_if(filter.ids, |q, ids| q.filter(Column::Id.is_in(ids)))
-            .order_by(
-                Column::CreatedAt,
-                crate::infra::database::sea_orm::sea_order(&filter.order_direction),
-            )
+            .order_by(Column::CreatedAt, sea_order(&filter.order_direction))
             .offset(filter.offset)
             .limit(filter.limit)
             .all(self.db.connection())

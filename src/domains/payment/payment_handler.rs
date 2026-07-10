@@ -80,7 +80,7 @@ async fn pay(
     user: User,
     Json(payload): Json<SendPaymentRequest>,
 ) -> Result<Json<Payment>, ApplicationError> {
-    user.check_permission(Permission::WriteLnTransaction)?;
+    user.check_permission(Permission::WriteTransaction)?;
     let wallet_id = payload
         .wallet_id
         .ok_or_else(|| DataError::Malformed("wallet_id is required.".to_string()))?;
@@ -115,7 +115,7 @@ async fn get_payment(
     user: User,
     Path(id): Path<Uuid>,
 ) -> Result<Json<Payment>, ApplicationError> {
-    user.check_permission(Permission::ReadLnTransaction)?;
+    user.check_permission(Permission::ReadTransaction)?;
 
     let payment = services.payment.get(id).await?;
     Ok(Json(payment))
@@ -143,7 +143,7 @@ async fn list_payments(
     user: User,
     Query(query_params): Query<PaymentFilter>,
 ) -> Result<Json<Vec<Payment>>, ApplicationError> {
-    user.check_permission(Permission::ReadLnTransaction)?;
+    user.check_permission(Permission::ReadTransaction)?;
 
     let payments = services.payment.list(query_params).await?;
 
@@ -172,7 +172,7 @@ async fn delete_payment(
     user: User,
     Path(id): Path<Uuid>,
 ) -> Result<(), ApplicationError> {
-    user.check_permission(Permission::WriteLnTransaction)?;
+    user.check_permission(Permission::WriteTransaction)?;
 
     services.payment.delete(id).await?;
     Ok(())
@@ -200,7 +200,7 @@ async fn delete_payments(
     user: User,
     Query(query_params): Query<PaymentFilter>,
 ) -> Result<Json<u64>, ApplicationError> {
-    user.check_permission(Permission::WriteLnTransaction)?;
+    user.check_permission(Permission::WriteTransaction)?;
 
     let n_deleted = services.payment.delete_many(query_params).await?;
     Ok(n_deleted.into())
@@ -267,7 +267,7 @@ mod tests {
 
                 let result = pay(
                     State(Arc::new(builder.build())),
-                    user(vec![Permission::WriteLnTransaction]),
+                    user(vec![Permission::WriteTransaction]),
                     Json(send_request(explicit)),
                 )
                 .await;
@@ -310,7 +310,7 @@ mod tests {
 
                 let result = get_payment(
                     State(Arc::new(builder.build())),
-                    user(vec![Permission::ReadLnTransaction]),
+                    user(vec![Permission::ReadTransaction]),
                     Path(id),
                 )
                 .await;

@@ -277,12 +277,151 @@ mod tests {
     }
 
     #[async_std::test]
+    async fn account_deletion_cascades_owned_resources() {
+        let conn = sqlite().await;
+
+        Migrator::up(&conn, None).await.expect("run migrations");
+        conn.execute(Statement::from_string(
+            DatabaseBackend::Sqlite,
+            r#"
+            INSERT INTO account (id, permissions, created_at)
+            VALUES (X'22222222222242228222222222222222', '[]', CURRENT_TIMESTAMP)
+            "#
+            .to_string(),
+        ))
+        .await
+        .expect("insert account");
+        conn.execute(Statement::from_string(
+            DatabaseBackend::Sqlite,
+            r#"
+            INSERT INTO wallet (
+                id, account_id, asset_id, available_amount, reserved_amount, created_at
+            )
+            VALUES (
+                X'11111111111141118111111111111111',
+                X'22222222222242228222222222222222',
+                X'00000000000040008000000000000001',
+                0,
+                0,
+                CURRENT_TIMESTAMP
+            )
+            "#
+            .to_string(),
+        ))
+        .await
+        .expect("insert account wallet");
+        conn.execute(Statement::from_string(
+            DatabaseBackend::Sqlite,
+            r#"
+            INSERT INTO api_key (id, account_id, name, key_hash, permissions, created_at)
+            VALUES (
+                X'33333333333343338333333333333333',
+                X'22222222222242228222222222222222',
+                'ci',
+                X'4444444444444444444444444444444444444444444444444444444444444444',
+                '[]',
+                CURRENT_TIMESTAMP
+            )
+            "#
+            .to_string(),
+        ))
+        .await
+        .expect("insert API key");
+        conn.execute(Statement::from_string(
+            DatabaseBackend::Sqlite,
+            r#"
+            INSERT INTO ln_address (
+                id, account_id, wallet_id, username, active, allows_nostr, created_at
+            )
+            VALUES (
+                X'55555555555545558555555555555555',
+                X'22222222222242228222222222222222',
+                X'11111111111141118111111111111111',
+                'alice',
+                1,
+                0,
+                CURRENT_TIMESTAMP
+            )
+            "#
+            .to_string(),
+        ))
+        .await
+        .expect("insert lightning address");
+
+        assert_eq!(
+            count(
+                &conn,
+                "SELECT COUNT(*) AS count FROM pragma_table_info('wallet') WHERE name IN ('account_id', 'asset_id') AND \"notnull\" = 1",
+            )
+            .await,
+            2
+        );
+        assert_eq!(
+            count(
+                &conn,
+                r#"
+                SELECT COUNT(*) AS count
+                FROM pragma_foreign_key_list('wallet')
+                WHERE "table" = 'account' AND "on_delete" = 'CASCADE'
+                "#,
+            )
+            .await,
+            1
+        );
+        assert_eq!(
+            count(
+                &conn,
+                r#"
+                SELECT COUNT(*) AS count
+                FROM pragma_foreign_key_list('api_key')
+                WHERE "table" = 'account' AND "on_delete" = 'CASCADE'
+                "#,
+            )
+            .await,
+            1
+        );
+        assert_eq!(
+            count(
+                &conn,
+                r#"
+                SELECT COUNT(*) AS count
+                FROM pragma_foreign_key_list('ln_address')
+                WHERE "table" = 'account' AND "on_delete" = 'CASCADE'
+                "#,
+            )
+            .await,
+            1
+        );
+
+        conn.execute(Statement::from_string(
+            DatabaseBackend::Sqlite,
+            "DELETE FROM account WHERE id = X'22222222222242228222222222222222'".to_string(),
+        ))
+        .await
+        .expect("delete account");
+
+        assert_eq!(count(&conn, "SELECT COUNT(*) AS count FROM wallet").await, 0);
+        assert_eq!(count(&conn, "SELECT COUNT(*) AS count FROM api_key").await, 0);
+        assert_eq!(count(&conn, "SELECT COUNT(*) AS count FROM ln_address").await, 0);
+    }
+
+    #[async_std::test]
     async fn ln_address_account_routes_backfill_from_receiving_wallets() {
         let conn = sqlite().await;
 
         Migrator::up(&conn, Some(MIGRATIONS_BEFORE_LN_ADDRESS_ACCOUNT_ROUTES))
             .await
             .expect("run migrations before ln address account routes");
+        conn.execute(Statement::from_string(
+            DatabaseBackend::Sqlite,
+            r#"
+            INSERT INTO account (id, permissions, created_at)
+            VALUES (X'22222222222242228222222222222222', '[]', CURRENT_TIMESTAMP)
+            "#
+            .to_string(),
+        ))
+        .await
+        .expect("insert account");
         conn.execute(Statement::from_string(
             DatabaseBackend::Sqlite,
             r#"
@@ -297,7 +436,7 @@ mod tests {
             VALUES (
                 X'11111111111141118111111111111111',
                 X'22222222222242228222222222222222',
-                X'33333333333343338333333333333333',
+                X'00000000000040008000000000000001',
                 0,
                 0,
                 CURRENT_TIMESTAMP

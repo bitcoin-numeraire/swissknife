@@ -17,9 +17,9 @@ pub enum Permission {
     #[serde(rename = "write:ln_address")]
     WriteLnAddress,
     #[serde(rename = "read:transaction")]
-    ReadLnTransaction,
+    ReadTransaction,
     #[serde(rename = "write:transaction")]
-    WriteLnTransaction,
+    WriteTransaction,
     #[serde(rename = "read:ln_node")]
     ReadLnNode,
     #[serde(rename = "write:ln_node")]
@@ -43,8 +43,8 @@ impl Permission {
             Permission::WriteWallet,
             Permission::ReadLnAddress,
             Permission::WriteLnAddress,
-            Permission::ReadLnTransaction,
-            Permission::WriteLnTransaction,
+            Permission::ReadTransaction,
+            Permission::WriteTransaction,
             Permission::ReadLnNode,
             Permission::WriteLnNode,
             Permission::ReadApiKey,

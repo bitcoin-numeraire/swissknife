@@ -8,8 +8,6 @@ pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
     pub id: Uuid,
     #[sea_orm(unique)]
-    pub account_id: Uuid,
-    #[sea_orm(unique)]
     pub wallet_id: Uuid,
     #[sea_orm(unique)]
     pub username: String,
@@ -18,6 +16,8 @@ pub struct Model {
     pub updated_at: Option<DateTime>,
     pub allows_nostr: bool,
     pub nostr_pubkey: Option<String>,
+    #[sea_orm(unique)]
+    pub account_id: Uuid,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

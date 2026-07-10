@@ -61,7 +61,7 @@ That works for the BTC-only era because testnet/regtest BTC are often treated as
 ## Terminology
 
 - **Account**: the internal owner/authorization aggregate: the person or organization boundary, never a balance container. It has a stable UUID and owns wallets, API keys, account permissions, and identity-level settings.
-- **Auth identity**: a login identity from a provider, for example an OAuth2 subject or a local JWT username. Multiple identities may later point at one account, but the first migration creates one identity per account.
+- **Auth identity**: a login identity from a provider, for example an OAuth2 subject or a local JWT username. Migrated and authentication-provisioned accounts start with one identity; an administrator can create an account without one. Multiple identities may later point at one account.
 - **Currency**: the human-facing unit/ticker such as BTC or USDT.
 - **Network**: the settlement environment such as Bitcoin mainnet, testnet4, signet, or regtest.
 - **Asset**: the balance key: a currency on a specific network/protocol, optionally with a protocol-specific asset identifier. Assets, not currencies alone, are what wallets hold. Taproot Assets belongs here as an asset protocol, not as a balance ledger.
@@ -264,10 +264,14 @@ POST /v1/me/wallets/{id}/bitcoin/addresses
 Admin `/v1/wallets` endpoints should stop registering users implicitly. Split them into account management and wallet management:
 
 ```text
-POST /v1/accounts                 -> create an account / auth identity when admin-managed creation is needed
+POST /v1/accounts                 -> create an account without implicitly creating a login identity
 POST /v1/accounts/{id}/wallets    -> create an asset wallet for that account
 GET /v1/wallets                   -> admin list of wallets
 ```
+
+Authentication sign-up and first-login provisioning create the initial identity
+when they create an account. Explicitly linking an identity to an existing
+administrator-created account belongs to the future identity-management API.
 
 Exact endpoint naming can be adjusted with dashboard/API review, but the separation must be preserved.
 

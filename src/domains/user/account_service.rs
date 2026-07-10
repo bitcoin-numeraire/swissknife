@@ -8,10 +8,7 @@ use crate::application::{
     errors::{ApplicationError, DataError},
 };
 
-use super::{
-    Account, AccountFilter, AccountPreferences, AccountUseCases, AuthProvider, CreateAccountRequest, Permission,
-    UpdateAccountRequest,
-};
+use super::{Account, AccountFilter, AccountPreferences, AccountUseCases, CreateAccountRequest, Permission};
 
 pub struct AccountService {
     store: AppStore,
@@ -26,26 +23,15 @@ impl AccountService {
 #[async_trait]
 impl AccountUseCases for AccountService {
     async fn create(&self, request: CreateAccountRequest) -> Result<Account, ApplicationError> {
-        debug!(provider = %request.provider, subject = %request.subject, "Creating account");
-
-        if request.provider == AuthProvider::OAuth2 && !request.permissions.is_empty() {
-            return Err(
-                DataError::Validation("OAuth2 account permissions are provided by token claims.".to_string()).into(),
-            );
-        }
+        debug!("Creating account");
 
         let account = self
             .store
             .account
-            .upsert(
-                request.provider,
-                &request.subject,
-                request.display_name,
-                &request.permissions,
-            )
+            .insert(request.display_name, &request.permissions)
             .await?;
 
-        info!(id = %account.id, "Account created or already existed");
+        info!(id = %account.id, "Account created successfully");
         Ok(account)
     }
 
@@ -72,13 +58,13 @@ impl AccountUseCases for AccountService {
         Ok(accounts)
     }
 
-    async fn update(&self, id: Uuid, request: UpdateAccountRequest) -> Result<Account, ApplicationError> {
+    async fn update(&self, id: Uuid, display_name: Option<String>) -> Result<Account, ApplicationError> {
         debug!(%id, "Updating account");
 
         let account = self
             .store
             .account
-            .update(id, request.display_name)
+            .update(id, display_name)
             .await?
             .ok_or_else(|| DataError::NotFound("Account not found.".to_string()))?;
 
@@ -88,13 +74,6 @@ impl AccountUseCases for AccountService {
 
     async fn update_permissions(&self, id: Uuid, permissions: Vec<Permission>) -> Result<Account, ApplicationError> {
         debug!(%id, "Updating account permissions");
-
-        let account = self.get(id).await?;
-        if account.identity.as_ref().map(|identity| identity.provider) == Some(AuthProvider::OAuth2) {
-            return Err(
-                DataError::Validation("OAuth2 account permissions are provided by token claims.".to_string()).into(),
-            );
-        }
 
         let account = self
             .store
@@ -128,12 +107,30 @@ impl AccountUseCases for AccountService {
     async fn delete(&self, id: Uuid) -> Result<(), ApplicationError> {
         debug!(%id, "Deleting account");
 
-        if !self.store.account.delete(id).await? {
+        let n_deleted = self
+            .store
+            .account
+            .delete_many(AccountFilter {
+                ids: Some(vec![id]),
+                ..Default::default()
+            })
+            .await?;
+
+        if n_deleted == 0 {
             return Err(DataError::NotFound("Account not found.".to_string()).into());
         }
 
         info!(%id, "Account deleted successfully");
         Ok(())
+    }
+
+    async fn delete_many(&self, filter: AccountFilter) -> Result<u64, ApplicationError> {
+        debug!(?filter, "Deleting accounts");
+
+        let n_deleted = self.store.account.delete_many(filter.clone()).await?;
+
+        info!(?filter, n_deleted, "Accounts deleted successfully");
+        Ok(n_deleted)
     }
 }
 
@@ -142,16 +139,10 @@ mod tests {
     use crate::application::composition::MockAppStoreBuilder;
 
     use super::*;
-    use crate::domains::user::AuthIdentity;
 
-    fn account_fixture(id: Uuid, provider: AuthProvider) -> Account {
+    fn account_fixture(id: Uuid) -> Account {
         Account {
             id,
-            identity: Some(AuthIdentity {
-                provider,
-                subject: "subject".to_string(),
-                ..Default::default()
-            }),
             ..Default::default()
         }
     }
@@ -160,50 +151,29 @@ mod tests {
         use super::*;
 
         #[tokio::test]
-        async fn delegates_local_account_creation_to_the_repository() {
+        async fn creates_an_account_without_an_identity() {
             let account_id = Uuid::new_v4();
             let mut store = MockAppStoreBuilder::new();
             store
                 .account
-                .expect_upsert()
-                .withf(|provider, subject, display_name, permissions| {
-                    *provider == AuthProvider::Jwt
-                        && subject == "operator"
-                        && display_name.as_deref() == Some("Operator")
-                        && permissions == [Permission::ReadWallet]
+                .expect_insert()
+                .withf(|display_name, permissions| {
+                    display_name.as_deref() == Some("Operator") && permissions == [Permission::ReadWallet]
                 })
                 .times(1)
-                .returning(move |_, _, _, _| Ok(account_fixture(account_id, AuthProvider::Jwt)));
+                .returning(move |_, _| Ok(account_fixture(account_id)));
             let service = AccountService::new(store.build());
 
             let account = service
                 .create(CreateAccountRequest {
                     display_name: Some("Operator".to_string()),
-                    provider: AuthProvider::Jwt,
-                    subject: "operator".to_string(),
                     permissions: vec![Permission::ReadWallet],
                 })
                 .await
                 .unwrap();
 
             assert_eq!(account.id, account_id);
-        }
-
-        #[tokio::test]
-        async fn rejects_database_permissions_for_oauth2_accounts() {
-            let service = AccountService::new(MockAppStoreBuilder::new().build());
-
-            let error = service
-                .create(CreateAccountRequest {
-                    display_name: None,
-                    provider: AuthProvider::OAuth2,
-                    subject: "oauth-subject".to_string(),
-                    permissions: vec![Permission::ReadWallet],
-                })
-                .await
-                .unwrap_err();
-
-            assert!(matches!(error, ApplicationError::Data(DataError::Validation(_))));
+            assert!(account.identity.is_none());
         }
     }
 
@@ -219,7 +189,7 @@ mod tests {
                 .expect_find_many()
                 .withf(|filter| filter.limit == Some(10))
                 .times(1)
-                .returning(move |_| Ok(vec![account_fixture(account_id, AuthProvider::Jwt)]));
+                .returning(move |_| Ok(vec![account_fixture(account_id)]));
             let service = AccountService::new(store.build());
 
             let accounts = service
@@ -244,10 +214,7 @@ mod tests {
             store.account.expect_update().times(1).returning(|_, _| Ok(None));
             let service = AccountService::new(store.build());
 
-            let error = service
-                .update(Uuid::new_v4(), UpdateAccountRequest { display_name: None })
-                .await
-                .unwrap_err();
+            let error = service.update(Uuid::new_v4(), None).await.unwrap_err();
 
             assert!(matches!(error, ApplicationError::Data(DataError::NotFound(_))));
         }
@@ -257,36 +224,11 @@ mod tests {
         use super::*;
 
         #[tokio::test]
-        async fn rejects_oauth2_accounts() {
+        async fn replaces_account_permissions() {
             let account_id = Uuid::new_v4();
-            let mut store = MockAppStoreBuilder::new();
-            store
-                .account
-                .expect_find()
-                .withf(move |id| *id == account_id)
-                .times(1)
-                .returning(move |_| Ok(Some(account_fixture(account_id, AuthProvider::OAuth2))));
-            let service = AccountService::new(store.build());
-
-            let error = service
-                .update_permissions(account_id, vec![Permission::ReadWallet])
-                .await
-                .unwrap_err();
-
-            assert!(matches!(error, ApplicationError::Data(DataError::Validation(_))));
-        }
-
-        #[tokio::test]
-        async fn replaces_local_account_permissions() {
-            let account_id = Uuid::new_v4();
-            let mut updated = account_fixture(account_id, AuthProvider::Jwt);
+            let mut updated = account_fixture(account_id);
             updated.permissions = Some(vec![Permission::ReadAccount]);
             let mut store = MockAppStoreBuilder::new();
-            store
-                .account
-                .expect_find()
-                .times(1)
-                .returning(move |_| Ok(Some(account_fixture(account_id, AuthProvider::Jwt))));
             store
                 .account
                 .expect_update_permissions()
@@ -310,12 +252,32 @@ mod tests {
         #[tokio::test]
         async fn reports_a_missing_account() {
             let mut store = MockAppStoreBuilder::new();
-            store.account.expect_delete().times(1).returning(|_| Ok(false));
+            store
+                .account
+                .expect_delete_many()
+                .withf(|filter| filter.ids.as_ref().is_some_and(|ids| ids.len() == 1))
+                .times(1)
+                .returning(|_| Ok(0));
             let service = AccountService::new(store.build());
 
             let error = service.delete(Uuid::new_v4()).await.unwrap_err();
 
             assert!(matches!(error, ApplicationError::Data(DataError::NotFound(_))));
+        }
+    }
+
+    mod delete_many {
+        use super::*;
+
+        #[tokio::test]
+        async fn returns_the_number_of_deleted_accounts() {
+            let mut store = MockAppStoreBuilder::new();
+            store.account.expect_delete_many().times(1).returning(|_| Ok(3));
+            let service = AccountService::new(store.build());
+
+            let deleted = service.delete_many(AccountFilter::default()).await.unwrap();
+
+            assert_eq!(deleted, 3);
         }
     }
 }

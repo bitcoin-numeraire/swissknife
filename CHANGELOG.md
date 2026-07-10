@@ -16,6 +16,8 @@ release notes when a tag is published.
 - Added account-shaped `/v1/me` APIs and wallet-scoped authenticated routes for
   balances, payments, invoices, Bitcoin addresses, contacts, and API keys
   ([#319]).
+- Added administrative account CRUD. Accounts created by administrators do not
+  implicitly create a login identity ([#331]).
 
 ### Changed
 

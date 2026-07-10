@@ -22,10 +22,6 @@ generated client/SDK consume the same types.
 - **Shared enums** — `AuthProvider`, `Currency`, `Ledger`, `Permission`,
   `BtcNetwork`, `InvoiceStatus`, `PaymentStatus`, `BtcAddressType`, …
 
-Account management uses the `read:account` and `write:account` permissions.
-Stored permission updates apply only to local JWT accounts; OAuth2 token claims
-remain authoritative.
-
 ## Principles
 
 - **Pure data.** The types carry no behaviour — validation and business rules

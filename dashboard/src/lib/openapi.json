@@ -348,7 +348,7 @@
         "tags": [
           "Accounts"
         ],
-        "summary": "Create or return an account for one authentication identity.",
+        "summary": "Create an account.",
         "operationId": "create_account",
         "requestBody": {
           "content": {
@@ -362,7 +362,7 @@
         },
         "responses": {
           "200": {
-            "description": "Account created or already existed",
+            "description": "Created",
             "content": {
               "application/json": {
                 "schema": {
@@ -404,14 +404,135 @@
               }
             }
           },
-          "422": {
-            "description": "Unprocessable Entity",
+          "500": {
+            "description": "Internal Server Error",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
                 },
-                "example": "\n{\n    \"status\": \"422 Unprocessable Entity\",\n    \"reason\": \"Validation failed: ...\"\n}\n"
+                "example": "\n{\n    \"status\": \"500 Internal Server Error\",\n    \"reason\": \"Internal server error, Please contact your administrator or try later\"\n}\n"
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Accounts"
+        ],
+        "summary": "Delete accounts.",
+        "description": "Deletes the accounts selected by `ids` and returns the number deleted. The\nauthenticated account cannot be included.",
+        "operationId": "delete_accounts",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Total amount of results to return.",
+            "required": false,
+            "schema": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "int64",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "description": "Offset where to start returning results.",
+            "required": false,
+            "schema": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "int64",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "ids",
+            "in": "query",
+            "description": "Account IDs to include.",
+            "required": false,
+            "schema": {
+              "type": [
+                "array",
+                "null"
+              ],
+              "items": {
+                "type": "string",
+                "format": "uuid"
+              }
+            }
+          },
+          {
+            "name": "order_direction",
+            "in": "query",
+            "description": "Direction of the ordering by creation date.",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/OrderDirection"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "integer",
+                  "format": "int64",
+                  "minimum": 0
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"400 Bad Request\",\n    \"reason\": \"Missing required parameter in request\"\n}\n"
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"401 Unauthorized\",\n    \"reason\": \"Invalid credentials\"\n}\n"
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"403 Forbidden\",\n    \"reason\": \"Missing permissions\"\n}\n"
+              }
+            }
+          },
+          "409": {
+            "description": "Cannot delete the authenticated account",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"409 Conflict\",\n    \"reason\": \"Admin user already created\"\n}\n"
               }
             }
           },
@@ -597,17 +718,6 @@
               }
             }
           },
-          "422": {
-            "description": "Unprocessable Entity",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                },
-                "example": "\n{\n    \"status\": \"422 Unprocessable Entity\",\n    \"reason\": \"Validation failed: ...\"\n}\n"
-              }
-            }
-          },
           "500": {
             "description": "Internal Server Error",
             "content": {
@@ -716,7 +826,7 @@
         "tags": [
           "Accounts"
         ],
-        "summary": "Replace permissions for a local JWT account.",
+        "summary": "Replace permissions stored for an account.",
         "operationId": "replace_account_permissions",
         "parameters": [
           {
@@ -791,17 +901,6 @@
                   "$ref": "#/components/schemas/ErrorResponse"
                 },
                 "example": "\n{\n    \"status\": \"404 Not Found\",\n    \"reason\": \"Resource not found\"\n}\n"
-              }
-            }
-          },
-          "422": {
-            "description": "OAuth2 claims are authoritative",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                },
-                "example": "\n{\n    \"status\": \"422 Unprocessable Entity\",\n    \"reason\": \"Validation failed: ...\"\n}\n"
               }
             }
           },
@@ -3548,7 +3647,7 @@
         "tags": [
           "Me"
         ],
-        "summary": "Update the authenticated account profile.",
+        "summary": "Update your account profile.",
         "operationId": "update_current_account",
         "requestBody": {
           "content": {
@@ -7425,7 +7524,7 @@
               },
               {
                 "$ref": "#/components/schemas/AuthIdentity",
-                "description": "Login identity currently linked to this account."
+                "description": "Login identity currently linked to this account, when one exists."
               }
             ]
           },
@@ -7437,7 +7536,7 @@
             "items": {
               "$ref": "#/components/schemas/Permission"
             },
-            "description": "Permissions stored for this account.\n\nThese are authoritative for local JWT identities. OAuth2 requests use\ntoken claims as the effective permissions instead of mirroring claims\ninto this field."
+            "description": "Permissions stored for this account."
           },
           "preferences": {
             "oneOf": [
@@ -7913,11 +8012,7 @@
       },
       "CreateAccountRequest": {
         "type": "object",
-        "description": "Create an account and its login identity.",
-        "required": [
-          "provider",
-          "subject"
-        ],
+        "description": "Create an account.",
         "properties": {
           "display_name": {
             "type": [
@@ -7932,16 +8027,7 @@
             "items": {
               "$ref": "#/components/schemas/Permission"
             },
-            "description": "Initial permissions for a local JWT account.\n\nOAuth2 permissions come from token claims and this list must be empty."
-          },
-          "provider": {
-            "$ref": "#/components/schemas/AuthProvider",
-            "description": "Authentication provider that owns the login identity."
-          },
-          "subject": {
-            "type": "string",
-            "description": "Provider subject, unique within the provider namespace.",
-            "example": "auth0|numeraire"
+            "description": "Initial permissions stored for the account."
           }
         }
       },
@@ -8928,7 +9014,7 @@
       },
       "UpdateAccountPermissionsRequest": {
         "type": "object",
-        "description": "Replace permissions stored for a local JWT account.",
+        "description": "Replace permissions stored for an account.",
         "required": [
           "permissions"
         ],

@@ -19,15 +19,11 @@ pub struct Account {
     #[schema(example = "Numeraire")]
     pub display_name: Option<String>,
 
-    /// Login identity currently linked to this account.
+    /// Login identity currently linked to this account, when one exists.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub identity: Option<AuthIdentity>,
 
     /// Permissions stored for this account.
-    ///
-    /// These are authoritative for local JWT identities. OAuth2 requests use
-    /// token claims as the effective permissions instead of mirroring claims
-    /// into this field.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub permissions: Option<Vec<Permission>>,
 
@@ -83,23 +79,14 @@ pub struct UpdateAccountPreferencesRequest {
     pub dashboard_settings: Value,
 }
 
-/// Create an account and its login identity.
+/// Create an account.
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 pub struct CreateAccountRequest {
     /// Optional human-readable name for the account.
     #[schema(example = "Numeraire")]
     pub display_name: Option<String>,
 
-    /// Authentication provider that owns the login identity.
-    pub provider: AuthProvider,
-
-    /// Provider subject, unique within the provider namespace.
-    #[schema(example = "auth0|numeraire")]
-    pub subject: String,
-
-    /// Initial permissions for a local JWT account.
-    ///
-    /// OAuth2 permissions come from token claims and this list must be empty.
+    /// Initial permissions stored for the account.
     #[serde(default)]
     pub permissions: Vec<Permission>,
 }
@@ -112,7 +99,7 @@ pub struct UpdateAccountRequest {
     pub display_name: Option<String>,
 }
 
-/// Replace permissions stored for a local JWT account.
+/// Replace permissions stored for an account.
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 pub struct UpdateAccountPermissionsRequest {
     /// Complete permission set to persist for the account.

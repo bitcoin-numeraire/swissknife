@@ -79,13 +79,17 @@ async fn connect() -> DatabaseConnection {
 
 /// Register a wallet and credit it `balance_msat` of available funds.
 async fn seed_wallet(conn: &DatabaseConnection, balance_msat: u64) -> Uuid {
+    let account = SeaOrmAccountRepository::new(conn.clone())
+        .insert(None, &[])
+        .await
+        .expect("create account");
     let asset = SeaOrmAssetRepository::new(conn.clone())
         .find_native_btc_by_network(BtcNetwork::Bitcoin)
         .await
         .expect("find native BTC asset")
         .expect("native BTC asset");
     let wallet = SeaOrmWalletRepository::new(conn.clone())
-        .upsert(Uuid::new_v4(), asset.id)
+        .upsert(account.id, asset.id)
         .await
         .expect("ensure wallet");
     if balance_msat > 0 {
@@ -189,18 +193,48 @@ async fn account_identity_upsert_inserts_initial_permissions() {
 }
 
 #[tokio::test]
+async fn account_repository_lists_accounts_with_and_without_identities() {
+    let conn = connect().await;
+    let repo = SeaOrmAccountRepository::new(conn);
+    let managed = repo.insert(Some("Managed".to_string()), &[]).await.unwrap();
+    let login = repo.upsert(AuthProvider::Jwt, "alice", None, &[]).await.unwrap();
+
+    let accounts = repo
+        .find_many(AccountFilter {
+            ids: Some(vec![managed.id, login.id]),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+
+    assert_eq!(accounts.len(), 2);
+    assert!(accounts
+        .iter()
+        .find(|account| account.id == managed.id)
+        .unwrap()
+        .identity
+        .is_none());
+    assert_eq!(
+        accounts
+            .iter()
+            .find(|account| account.id == login.id)
+            .unwrap()
+            .identity
+            .as_ref()
+            .map(|identity| identity.subject.as_str()),
+        Some("alice")
+    );
+}
+
+#[tokio::test]
 async fn account_repository_crud_keeps_the_aggregate_consistent() {
     let conn = connect().await;
     let repo = SeaOrmAccountRepository::new(conn.clone());
     let account = repo
-        .upsert(
-            AuthProvider::Jwt,
-            "operator",
-            Some("Operator".to_string()),
-            &[Permission::ReadWallet],
-        )
+        .insert(Some("Operator".to_string()), &[Permission::ReadWallet])
         .await
         .unwrap();
+    assert!(account.identity.is_none());
 
     let listed = repo
         .find_many(AccountFilter {
@@ -246,7 +280,15 @@ async fn account_repository_crud_keeps_the_aggregate_consistent() {
     assert!(wallet_repo.exists_for_account(account.id, wallet.id).await.unwrap());
     assert!(!wallet_repo.exists_for_account(Uuid::new_v4(), wallet.id).await.unwrap());
 
-    assert!(repo.delete(account.id).await.unwrap());
+    assert_eq!(
+        repo.delete_many(AccountFilter {
+            ids: Some(vec![account.id]),
+            ..Default::default()
+        })
+        .await
+        .unwrap(),
+        1
+    );
     assert_eq!(count(&conn, "SELECT COUNT(*) AS count FROM account").await, 0);
     assert_eq!(count(&conn, "SELECT COUNT(*) AS count FROM auth_identity").await, 0);
     assert_eq!(

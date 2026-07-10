@@ -73,6 +73,9 @@ import type {
   DeleteAccountByIdData,
   DeleteAccountByIdErrors,
   DeleteAccountByIdResponses,
+  DeleteAccountsData,
+  DeleteAccountsErrors,
+  DeleteAccountsResponses,
   DeleteAddressData,
   DeleteAddressErrors,
   DeleteAddressesData,
@@ -344,6 +347,21 @@ export const callback = <ThrowOnError extends boolean = false>(
   });
 
 /**
+ * Delete accounts.
+ *
+ * Deletes the accounts selected by `ids` and returns the number deleted. The
+ * authenticated account cannot be included.
+ */
+export const deleteAccounts = <ThrowOnError extends boolean = false>(
+  options?: Options<DeleteAccountsData, ThrowOnError>
+): RequestResult<DeleteAccountsResponses, DeleteAccountsErrors, ThrowOnError> =>
+  (options?.client ?? client).delete<DeleteAccountsResponses, DeleteAccountsErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/accounts',
+    ...options,
+  });
+
+/**
  * List accounts.
  */
 export const listAccounts = <ThrowOnError extends boolean = false>(
@@ -357,7 +375,7 @@ export const listAccounts = <ThrowOnError extends boolean = false>(
   });
 
 /**
- * Create or return an account for one authentication identity.
+ * Create an account.
  */
 export const createAccount = <ThrowOnError extends boolean = false>(
   options: Options<CreateAccountData, ThrowOnError>
@@ -422,7 +440,7 @@ export const updateAccountById = <ThrowOnError extends boolean = false>(
   );
 
 /**
- * Replace permissions for a local JWT account.
+ * Replace permissions stored for an account.
  */
 export const replaceAccountPermissions = <ThrowOnError extends boolean = false>(
   options: Options<ReplaceAccountPermissionsData, ThrowOnError>
@@ -856,7 +874,7 @@ export const getAccount = <ThrowOnError extends boolean = false>(
   });
 
 /**
- * Update the authenticated account profile.
+ * Update your account profile.
  */
 export const updateCurrentAccount = <ThrowOnError extends boolean = false>(
   options: Options<UpdateCurrentAccountData, ThrowOnError>

@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use async_trait::async_trait;
 use chrono::Utc;
 use sea_orm::{
@@ -12,9 +14,9 @@ use crate::{
     domains::user::{Account, AccountFilter, AccountPreferences, AccountRepository, AuthProvider, Permission},
     infra::database::sea_orm::models::{
         account, account_preference, auth_identity,
-        prelude::{Account as AccountEntity, AccountPreference, AuthIdentity, Wallet},
-        wallet,
+        prelude::{Account as AccountEntity, AccountPreference, AuthIdentity},
     },
+    infra::database::sea_orm::sea_order,
 };
 
 #[derive(Clone)]
@@ -53,14 +55,13 @@ impl AccountRepository for SeaOrmAccountRepository {
             .filter(auth_identity::Column::AccountId.eq(id))
             .one(&self.db)
             .await
-            .map_err(|e| DatabaseError::FindOne(e.to_string()))?
-            .ok_or_else(|| DatabaseError::FindRelated("account does not reference an auth identity".to_string()))?;
+            .map_err(|e| DatabaseError::FindOne(e.to_string()))?;
 
         let preference_model = preference_model
             .ok_or_else(|| DatabaseError::FindRelated("account does not reference preferences".to_string()))?;
 
         let mut account: Account = account_model.into();
-        account.identity = Some(identity.into());
+        account.identity = identity.map(Into::into);
         account.preferences = Some(preference_model.into());
 
         Ok(Some(account))
@@ -95,26 +96,103 @@ impl AccountRepository for SeaOrmAccountRepository {
     async fn find_many(&self, filter: AccountFilter) -> Result<Vec<Account>, DatabaseError> {
         let models = AccountEntity::find()
             .apply_if(filter.ids, |query, ids| query.filter(account::Column::Id.is_in(ids)))
-            .order_by(
-                account::Column::CreatedAt,
-                crate::infra::database::sea_orm::sea_order(&filter.order_direction),
-            )
+            .order_by(account::Column::CreatedAt, sea_order(&filter.order_direction))
             .offset(filter.offset)
             .limit(filter.limit)
             .all(&self.db)
             .await
             .map_err(|e| DatabaseError::FindMany(e.to_string()))?;
 
+        if models.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let account_ids = models.iter().map(|model| model.id).collect::<Vec<_>>();
+        let identities = AuthIdentity::find()
+            .filter(auth_identity::Column::AccountId.is_in(account_ids.clone()))
+            .order_by_asc(auth_identity::Column::CreatedAt)
+            .all(&self.db)
+            .await
+            .map_err(|e| DatabaseError::FindMany(e.to_string()))?;
+        let preferences = AccountPreference::find()
+            .filter(account_preference::Column::AccountId.is_in(account_ids))
+            .all(&self.db)
+            .await
+            .map_err(|e| DatabaseError::FindMany(e.to_string()))?;
+
+        let mut identities_by_account = HashMap::new();
+        for identity in identities {
+            identities_by_account.entry(identity.account_id).or_insert(identity);
+        }
+        let mut preferences_by_account = preferences
+            .into_iter()
+            .map(|preference| (preference.account_id, preference))
+            .collect::<HashMap<_, _>>();
+
         let mut accounts = Vec::with_capacity(models.len());
         for model in models {
-            let account = self
-                .find(model.id)
-                .await?
-                .ok_or_else(|| DatabaseError::FindRelated("account disappeared while listing".to_string()))?;
+            let account_id = model.id;
+            let preference = preferences_by_account
+                .remove(&account_id)
+                .ok_or_else(|| DatabaseError::FindRelated("account does not reference preferences".to_string()))?;
+            let mut account: Account = model.into();
+            account.identity = identities_by_account.remove(&account_id).map(Into::into);
+            account.preferences = Some(preference.into());
             accounts.push(account);
         }
 
         Ok(accounts)
+    }
+
+    async fn insert(
+        &self,
+        display_name: Option<String>,
+        initial_permissions: &[Permission],
+    ) -> Result<Account, DatabaseError> {
+        let tx = self
+            .db
+            .begin()
+            .await
+            .map_err(|e| DatabaseError::Transaction(e.to_string()))?;
+
+        let account_id = Uuid::new_v4();
+        let now = Utc::now().naive_utc();
+        let mut permissions = Vec::new();
+        for permission in initial_permissions {
+            if !permissions.contains(permission) {
+                permissions.push(permission.clone());
+            }
+        }
+        let permissions = serde_json::to_value(permissions).map_err(|e| DatabaseError::Insert(e.to_string()))?;
+
+        let account_model = account::ActiveModel {
+            id: Set(account_id),
+            display_name: Set(display_name),
+            permissions: Set(permissions),
+            created_at: Set(now),
+            ..Default::default()
+        }
+        .insert(&tx)
+        .await
+        .map_err(|e| DatabaseError::Insert(e.to_string()))?;
+
+        let preference_model = account_preference::ActiveModel {
+            account_id: Set(account_id),
+            dashboard_settings: Set(json!({})),
+            created_at: Set(now),
+            ..Default::default()
+        }
+        .insert(&tx)
+        .await
+        .map_err(|e| DatabaseError::Insert(e.to_string()))?;
+
+        tx.commit()
+            .await
+            .map_err(|e| DatabaseError::Transaction(e.to_string()))?;
+
+        let mut account: Account = account_model.into();
+        account.preferences = Some(preference_model.into());
+        Ok(account)
     }
 
     async fn upsert(
@@ -279,38 +357,13 @@ impl AccountRepository for SeaOrmAccountRepository {
         Ok(Some(preference.into()))
     }
 
-    async fn delete(&self, id: Uuid) -> Result<bool, DatabaseError> {
-        let tx = self
-            .db
-            .begin()
-            .await
-            .map_err(|e| DatabaseError::Transaction(e.to_string()))?;
-
-        let exists = AccountEntity::find_by_id(id)
-            .one(&tx)
-            .await
-            .map_err(|e| DatabaseError::FindOne(e.to_string()))?
-            .is_some();
-        if !exists {
-            tx.rollback()
-                .await
-                .map_err(|e| DatabaseError::Transaction(e.to_string()))?;
-            return Ok(false);
-        }
-
-        Wallet::delete_many()
-            .filter(wallet::Column::AccountId.eq(id))
-            .exec(&tx)
-            .await
-            .map_err(|e| DatabaseError::Delete(e.to_string()))?;
-        AccountEntity::delete_by_id(id)
-            .exec(&tx)
+    async fn delete_many(&self, filter: AccountFilter) -> Result<u64, DatabaseError> {
+        let result = AccountEntity::delete_many()
+            .apply_if(filter.ids, |query, ids| query.filter(account::Column::Id.is_in(ids)))
+            .exec(&self.db)
             .await
             .map_err(|e| DatabaseError::Delete(e.to_string()))?;
 
-        tx.commit()
-            .await
-            .map_err(|e| DatabaseError::Transaction(e.to_string()))?;
-        Ok(true)
+        Ok(result.rows_affected)
     }
 }

@@ -24,10 +24,6 @@ export type Account = {
   identity?: null | AuthIdentity;
   /**
    * Permissions stored for this account.
-   *
-   * These are authoritative for local JWT identities. OAuth2 requests use
-   * token claims as the effective permissions instead of mirroring claims
-   * into this field.
    */
   permissions?: Array<Permission> | null;
   preferences?: null | AccountPreferences;
@@ -363,7 +359,7 @@ export type Contact = {
 };
 
 /**
- * Create an account and its login identity.
+ * Create an account.
  */
 export type CreateAccountRequest = {
   /**
@@ -371,19 +367,9 @@ export type CreateAccountRequest = {
    */
   display_name?: string | null;
   /**
-   * Initial permissions for a local JWT account.
-   *
-   * OAuth2 permissions come from token claims and this list must be empty.
+   * Initial permissions stored for the account.
    */
   permissions?: Array<Permission>;
-  /**
-   * Authentication provider that owns the login identity.
-   */
-  provider: AuthProvider;
-  /**
-   * Provider subject, unique within the provider namespace.
-   */
-  subject: string;
 };
 
 /**
@@ -1023,7 +1009,7 @@ export type SignUpRequest = {
 };
 
 /**
- * Replace permissions stored for a local JWT account.
+ * Replace permissions stored for an account.
  */
 export type UpdateAccountPermissionsRequest = {
   /**
@@ -1301,6 +1287,64 @@ export type CallbackResponses = {
 
 export type CallbackResponse = CallbackResponses[keyof CallbackResponses];
 
+export type DeleteAccountsData = {
+  body?: never;
+  path?: never;
+  query?: {
+    /**
+     * Total amount of results to return.
+     */
+    limit?: number | null;
+    /**
+     * Offset where to start returning results.
+     */
+    offset?: number | null;
+    /**
+     * Account IDs to include.
+     */
+    ids?: Array<string> | null;
+    /**
+     * Direction of the ordering by creation date.
+     */
+    order_direction?: OrderDirection;
+  };
+  url: '/v1/accounts';
+};
+
+export type DeleteAccountsErrors = {
+  /**
+   * Bad Request
+   */
+  400: ErrorResponse;
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Forbidden
+   */
+  403: ErrorResponse;
+  /**
+   * Cannot delete the authenticated account
+   */
+  409: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
+
+export type DeleteAccountsError = DeleteAccountsErrors[keyof DeleteAccountsErrors];
+
+export type DeleteAccountsResponses = {
+  /**
+   * Success
+   */
+  200: number;
+};
+
+export type DeleteAccountsResponse = DeleteAccountsResponses[keyof DeleteAccountsResponses];
+
 export type ListAccountsData = {
   body?: never;
   path?: never;
@@ -1376,10 +1420,6 @@ export type CreateAccountErrors = {
    */
   403: ErrorResponse;
   /**
-   * Unprocessable Entity
-   */
-  422: ErrorResponse;
-  /**
    * Internal Server Error
    */
   500: ErrorResponse;
@@ -1389,7 +1429,7 @@ export type CreateAccountError = CreateAccountErrors[keyof CreateAccountErrors];
 
 export type CreateAccountResponses = {
   /**
-   * Account created or already existed
+   * Created
    */
   200: Account;
 };
@@ -1511,10 +1551,6 @@ export type UpdateAccountByIdErrors = {
    */
   404: ErrorResponse;
   /**
-   * Unprocessable Entity
-   */
-  422: ErrorResponse;
-  /**
    * Internal Server Error
    */
   500: ErrorResponse;
@@ -1558,10 +1594,6 @@ export type ReplaceAccountPermissionsErrors = {
    * Not Found
    */
   404: ErrorResponse;
-  /**
-   * OAuth2 claims are authoritative
-   */
-  422: ErrorResponse;
   /**
    * Internal Server Error
    */

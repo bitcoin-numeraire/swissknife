@@ -18,7 +18,7 @@ use crate::{
         composition::AppServices,
         docs::{
             BAD_REQUEST_EXAMPLE, CONFLICT_EXAMPLE, FORBIDDEN_EXAMPLE, INTERNAL_EXAMPLE, NOT_FOUND_EXAMPLE,
-            UNAUTHORIZED_EXAMPLE, UNPROCESSABLE_EXAMPLE,
+            UNAUTHORIZED_EXAMPLE,
         },
         errors::{ApplicationError, DataError},
     },
@@ -35,7 +35,8 @@ use super::{Permission, User};
         get_account_by_id,
         update_account_by_id,
         replace_account_permissions,
-        delete_account_by_id
+        delete_account_by_id,
+        delete_accounts
     ),
     components(schemas(Account, CreateAccountRequest, UpdateAccountRequest, UpdateAccountPermissionsRequest)),
     tags(
@@ -49,13 +50,14 @@ pub fn router() -> Router<Arc<AppServices>> {
     Router::new()
         .route("/", post(create_account))
         .route("/", get(list_accounts))
+        .route("/", delete(delete_accounts))
         .route("/{id}", get(get_account_by_id))
         .route("/{id}", put(update_account_by_id))
         .route("/{id}/permissions", put(replace_account_permissions))
         .route("/{id}", delete(delete_account_by_id))
 }
 
-/// Create or return an account for one authentication identity.
+/// Create an account.
 #[utoipa::path(
     post,
     path = "",
@@ -63,11 +65,10 @@ pub fn router() -> Router<Arc<AppServices>> {
     context_path = CONTEXT_PATH,
     request_body = CreateAccountRequest,
     responses(
-        (status = 200, description = "Account created or already existed", body = Account),
+        (status = 200, description = "Created", body = Account),
         (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
         (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
         (status = 403, description = "Forbidden", body = ErrorResponse, example = json!(FORBIDDEN_EXAMPLE)),
-        (status = 422, description = "Unprocessable Entity", body = ErrorResponse, example = json!(UNPROCESSABLE_EXAMPLE)),
         (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
     )
 )]
@@ -141,7 +142,6 @@ async fn get_account_by_id(
         (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
         (status = 403, description = "Forbidden", body = ErrorResponse, example = json!(FORBIDDEN_EXAMPLE)),
         (status = 404, description = "Not Found", body = ErrorResponse, example = json!(NOT_FOUND_EXAMPLE)),
-        (status = 422, description = "Unprocessable Entity", body = ErrorResponse, example = json!(UNPROCESSABLE_EXAMPLE)),
         (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
     )
 )]
@@ -149,13 +149,13 @@ async fn update_account_by_id(
     State(services): State<Arc<AppServices>>,
     user: User,
     Path(id): Path<Uuid>,
-    Json(payload): Json<UpdateAccountRequest>,
+    Json(UpdateAccountRequest { display_name }): Json<UpdateAccountRequest>,
 ) -> Result<Json<Account>, ApplicationError> {
     user.check_permission(Permission::WriteAccount)?;
-    Ok(Json(services.account.update(id, payload).await?))
+    Ok(Json(services.account.update(id, display_name).await?))
 }
 
-/// Replace permissions for a local JWT account.
+/// Replace permissions stored for an account.
 #[utoipa::path(
     put,
     path = "/{id}/permissions",
@@ -168,7 +168,6 @@ async fn update_account_by_id(
         (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
         (status = 403, description = "Forbidden", body = ErrorResponse, example = json!(FORBIDDEN_EXAMPLE)),
         (status = 404, description = "Not Found", body = ErrorResponse, example = json!(NOT_FOUND_EXAMPLE)),
-        (status = 422, description = "OAuth2 claims are authoritative", body = ErrorResponse, example = json!(UNPROCESSABLE_EXAMPLE)),
         (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
     )
 )]
@@ -211,6 +210,39 @@ async fn delete_account_by_id(
     }
 
     services.account.delete(id).await
+}
+
+/// Delete accounts.
+///
+/// Deletes the accounts selected by `ids` and returns the number deleted. The
+/// authenticated account cannot be included.
+#[utoipa::path(
+    delete,
+    path = "",
+    tag = "Accounts",
+    context_path = CONTEXT_PATH,
+    params(AccountFilter),
+    responses(
+        (status = 200, description = "Success", body = u64),
+        (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
+        (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
+        (status = 403, description = "Forbidden", body = ErrorResponse, example = json!(FORBIDDEN_EXAMPLE)),
+        (status = 409, description = "Cannot delete the authenticated account", body = ErrorResponse, example = json!(CONFLICT_EXAMPLE)),
+        (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
+    )
+)]
+async fn delete_accounts(
+    State(services): State<Arc<AppServices>>,
+    user: User,
+    Query(filter): Query<AccountFilter>,
+) -> Result<Json<u64>, ApplicationError> {
+    user.check_permission(Permission::WriteAccount)?;
+
+    if filter.ids.as_ref().is_none_or(|ids| ids.contains(&user.account_id)) {
+        return Err(DataError::Conflict("The authenticated account cannot delete itself.".to_string()).into());
+    }
+
+    Ok(services.account.delete_many(filter).await?.into())
 }
 
 #[cfg(test)]
@@ -266,6 +298,24 @@ mod tests {
             State(Arc::new(services)),
             user(account_id, vec![Permission::WriteAccount]),
             Path(account_id),
+        )
+        .await;
+
+        assert!(matches!(result, Err(ApplicationError::Data(DataError::Conflict(_)))));
+    }
+
+    #[tokio::test]
+    async fn delete_many_rejects_the_authenticated_account() {
+        let account_id = Uuid::new_v4();
+        let services = MockAppServicesBuilder::new().build();
+
+        let result = delete_accounts(
+            State(Arc::new(services)),
+            user(account_id, vec![Permission::WriteAccount]),
+            Query(AccountFilter {
+                ids: Some(vec![account_id]),
+                ..Default::default()
+            }),
         )
         .await;
 

@@ -63,7 +63,7 @@ impl WalletUseCases for WalletService {
         Ok(wallet)
     }
 
-    async fn verify_account_ownership(&self, account_id: Uuid, id: Uuid) -> Result<(), ApplicationError> {
+    async fn verify_ownership(&self, account_id: Uuid, id: Uuid) -> Result<(), ApplicationError> {
         trace!(%account_id, %id, "Verifying account wallet ownership");
 
         if !self.store.wallet.exists_for_account(account_id, id).await? {
@@ -266,7 +266,7 @@ mod tests {
         }
     }
 
-    mod verify_account_ownership {
+    mod verify_ownership {
         use super::*;
 
         #[tokio::test]
@@ -279,10 +279,7 @@ mod tests {
                 .returning(|_, _| Ok(true));
             let service = WalletService::new(store.build());
 
-            assert!(service
-                .verify_account_ownership(Uuid::new_v4(), Uuid::new_v4())
-                .await
-                .is_ok());
+            assert!(service.verify_ownership(Uuid::new_v4(), Uuid::new_v4()).await.is_ok());
         }
 
         #[tokio::test]
@@ -296,7 +293,7 @@ mod tests {
             let service = WalletService::new(store.build());
 
             let error = service
-                .verify_account_ownership(Uuid::new_v4(), Uuid::new_v4())
+                .verify_ownership(Uuid::new_v4(), Uuid::new_v4())
                 .await
                 .unwrap_err();
 

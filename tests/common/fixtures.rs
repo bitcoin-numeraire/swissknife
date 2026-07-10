@@ -5,7 +5,8 @@ use sea_orm::{ConnectionTrait, Database, DatabaseBackend, Statement};
 use uuid::Uuid;
 
 use swissknife_types::{
-    ApiKey, Balance, BtcAddress, CreateApiKeyRequest, CreateWalletRequest, NewBtcAddressRequest, Permission, Wallet,
+    Account, ApiKey, Balance, BtcAddress, CreateAccountRequest, CreateApiKeyRequest, CreateWalletRequest,
+    NewBtcAddressRequest, Permission, Wallet,
 };
 
 use super::chain;
@@ -24,6 +25,23 @@ pub fn unique(prefix: &str) -> String {
 }
 
 impl TestApp {
+    /// Create an administrator-managed account without a login identity.
+    pub async fn create_account(&self, token: &str, display_name: &str) -> Account {
+        let res = self
+            .api()
+            .post(
+                "/v1/accounts",
+                Auth::Bearer(token),
+                CreateAccountRequest {
+                    display_name: Some(display_name.to_string()),
+                    permissions: vec![],
+                },
+            )
+            .await;
+        assert_eq!(res.status.as_u16(), 200, "create account failed: {}", res.body);
+        res.parse::<Account>()
+    }
+
     /// Provision a fresh account and return its regtest BTC wallet. Behavioural
     /// tests use their own account wallet so balances stay isolated on the
     /// shared instance.

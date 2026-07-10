@@ -433,13 +433,11 @@ export const zApiKey = z.object({
 });
 
 /**
- * Create an account and its login identity.
+ * Create an account.
  */
 export const zCreateAccountRequest = z.object({
   display_name: z.string().nullish(),
   permissions: z.array(zPermission).optional(),
-  provider: zAuthProvider,
-  subject: z.string(),
 });
 
 /**
@@ -537,7 +535,7 @@ export const zSignUpRequest = z.object({
 });
 
 /**
- * Replace permissions stored for a local JWT account.
+ * Replace permissions stored for an account.
  */
 export const zUpdateAccountPermissionsRequest = z.object({
   permissions: z.array(zPermission),
@@ -655,6 +653,35 @@ export const zCallbackQuery = z.object({
  */
 export const zCallbackResponse = zLnUrlCallback;
 
+export const zDeleteAccountsQuery = z.object({
+  limit: z.coerce
+    .bigint()
+    .gte(BigInt(0))
+    .max(BigInt('9223372036854775807'), {
+      error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
+    })
+    .nullish(),
+  offset: z.coerce
+    .bigint()
+    .gte(BigInt(0))
+    .max(BigInt('9223372036854775807'), {
+      error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
+    })
+    .nullish(),
+  ids: z.array(z.uuid()).nullish(),
+  order_direction: zOrderDirection.optional(),
+});
+
+/**
+ * Success
+ */
+export const zDeleteAccountsResponse = z.coerce
+  .bigint()
+  .gte(BigInt(0))
+  .max(BigInt('9223372036854775807'), {
+    error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
+  });
+
 export const zListAccountsQuery = z.object({
   limit: z.coerce
     .bigint()
@@ -682,7 +709,7 @@ export const zListAccountsResponse = z.array(zAccount);
 export const zCreateAccountBody = zCreateAccountRequest;
 
 /**
- * Account created or already existed
+ * Created
  */
 export const zCreateAccountResponse = zAccount;
 
