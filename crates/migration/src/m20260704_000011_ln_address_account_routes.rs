@@ -1,9 +1,7 @@
 use sea_orm::{ConnectionTrait, DatabaseBackend, Statement};
 use sea_orm_migration::{prelude::*, schema::*};
 
-use crate::{
-    m20240420_1_wallet_table::Wallet, m20240420_2_ln_address_table::LnAddress, m20260704_000001_account_table::Account,
-};
+use crate::{m20240420_1_wallet_table::Wallet, m20240420_2_ln_address_table::LnAddress};
 
 #[derive(DeriveMigrationName)]
 pub struct Migration;
@@ -11,6 +9,10 @@ pub struct Migration;
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        if manager.get_database_backend() != DatabaseBackend::Postgres {
+            return Ok(());
+        }
+
         manager
             .alter_table(
                 Table::alter()
@@ -21,9 +23,8 @@ impl MigrationTrait for Migration {
             .await?;
 
         let db = manager.get_connection();
-        let backend = db.get_database_backend();
-        db.execute(Statement::from_string(
-            backend,
+        execute(
+            db,
             format!(
                 r#"
                 UPDATE {ln_address}
@@ -41,20 +42,16 @@ impl MigrationTrait for Migration {
                 wallet_id = Wallet::Id.to_string(),
                 ln_address_wallet_id = LnAddress::WalletId.to_string(),
             ),
-        ))
+        )
         .await?;
 
         let missing = db
             .query_one(Statement::from_string(
-                backend,
+                DatabaseBackend::Postgres,
                 format!(
-                    r#"
-                    SELECT COUNT(*) AS count
-                    FROM {ln_address}
-                    WHERE {account_id} IS NULL
-                    "#,
-                    ln_address = LnAddress::Table.to_string(),
-                    account_id = LnAddress::AccountId.to_string(),
+                    "SELECT COUNT(*) AS count FROM {} WHERE {} IS NULL",
+                    LnAddress::Table.to_string(),
+                    LnAddress::AccountId.to_string(),
                 ),
             ))
             .await?
@@ -66,23 +63,31 @@ impl MigrationTrait for Migration {
             )));
         }
 
-        match backend {
-            DatabaseBackend::Postgres => {
-                execute(
-                    db,
-                    backend,
-                    r#"
-                    ALTER TABLE ln_address
-                        ALTER COLUMN account_id SET NOT NULL,
-                        ADD CONSTRAINT fk_ln_address_account
-                            FOREIGN KEY (account_id) REFERENCES account(id) ON DELETE CASCADE
-                    "#,
-                )
-                .await?;
-            }
-            DatabaseBackend::Sqlite => rebuild_sqlite_ln_address(manager).await?,
-            DatabaseBackend::MySql => {}
-        }
+        execute(
+            db,
+            r#"
+            ALTER TABLE ln_address
+                DROP CONSTRAINT IF EXISTS fk_user,
+                DROP CONSTRAINT IF EXISTS fk_ln_address_wallet
+            "#
+            .to_string(),
+        )
+        .await?;
+
+        execute(
+            db,
+            r#"
+            ALTER TABLE ln_address
+                ALTER COLUMN account_id SET NOT NULL,
+                ADD CONSTRAINT fk_ln_address_account
+                    FOREIGN KEY (account_id) REFERENCES account(id) ON DELETE CASCADE,
+                ADD CONSTRAINT fk_ln_address_wallet
+                    FOREIGN KEY (account_id, wallet_id)
+                    REFERENCES wallet(account_id, id) ON DELETE CASCADE
+            "#
+            .to_string(),
+        )
+        .await?;
 
         manager
             .create_index(
@@ -103,72 +108,8 @@ impl MigrationTrait for Migration {
     }
 }
 
-async fn rebuild_sqlite_ln_address(manager: &SchemaManager<'_>) -> Result<(), DbErr> {
-    let db = manager.get_connection();
-    let backup = Alias::new("ln_address_backup");
-
-    execute(db, DatabaseBackend::Sqlite, "PRAGMA foreign_keys = OFF").await?;
-    execute(
-        db,
-        DatabaseBackend::Sqlite,
-        r#"
-        CREATE TABLE ln_address_backup AS
-        SELECT id, wallet_id, username, active, created_at, updated_at, allows_nostr, nostr_pubkey, account_id
-        FROM ln_address
-        "#,
-    )
-    .await?;
-    manager
-        .drop_table(Table::drop().table(LnAddress::Table).to_owned())
-        .await?;
-    manager
-        .create_table(
-            Table::create()
-                .table(LnAddress::Table)
-                .col(uuid(LnAddress::Id).primary_key())
-                .col(uuid_uniq(LnAddress::WalletId))
-                .col(string_len_uniq(LnAddress::Username, 255))
-                .col(boolean(LnAddress::Active).default(true))
-                .col(timestamp(LnAddress::CreatedAt).default(Expr::current_timestamp()))
-                .col(timestamp_null(LnAddress::UpdatedAt))
-                .col(boolean(LnAddress::AllowsNostr).default(false))
-                .col(string_len_null(LnAddress::NostrPubkey, 255))
-                .col(uuid(LnAddress::AccountId))
-                .foreign_key(
-                    ForeignKey::create()
-                        .name("fk_ln_address_wallet")
-                        .from(LnAddress::Table, LnAddress::WalletId)
-                        .to(Wallet::Table, Wallet::Id)
-                        .on_delete(ForeignKeyAction::Cascade),
-                )
-                .foreign_key(
-                    ForeignKey::create()
-                        .name("fk_ln_address_account")
-                        .from(LnAddress::Table, LnAddress::AccountId)
-                        .to(Account::Table, Account::Id)
-                        .on_delete(ForeignKeyAction::Cascade),
-                )
-                .to_owned(),
-        )
-        .await?;
-    execute(
-        db,
-        DatabaseBackend::Sqlite,
-        r#"
-        INSERT INTO ln_address (
-            id, wallet_id, username, active, created_at, updated_at, allows_nostr, nostr_pubkey, account_id
-        )
-        SELECT id, wallet_id, username, active, created_at, updated_at, allows_nostr, nostr_pubkey, account_id
-        FROM ln_address_backup
-        "#,
-    )
-    .await?;
-    manager.drop_table(Table::drop().table(backup).to_owned()).await?;
-    execute(db, DatabaseBackend::Sqlite, "PRAGMA foreign_keys = ON").await
-}
-
-async fn execute(db: &dyn ConnectionTrait, backend: DatabaseBackend, sql: &str) -> Result<(), DbErr> {
-    db.execute(Statement::from_string(backend, sql.to_string()))
+async fn execute(db: &dyn ConnectionTrait, sql: String) -> Result<(), DbErr> {
+    db.execute(Statement::from_string(DatabaseBackend::Postgres, sql))
         .await
         .map(|_| ())
 }

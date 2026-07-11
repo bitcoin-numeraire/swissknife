@@ -32,8 +32,8 @@ use super::{
 static COUNTER: AtomicU64 = AtomicU64::new(0);
 
 /// Provision a fresh database (a sqlite file or a new postgres db) from
-/// `SWISSKNIFE_ITEST_DATABASE`, run migrations, and return a connection.
-async fn connect() -> DatabaseConnection {
+/// `SWISSKNIFE_ITEST_DATABASE` and return a connection.
+async fn connect_unmigrated() -> DatabaseConnection {
     let kind = std::env::var("SWISSKNIFE_ITEST_DATABASE").unwrap_or_else(|_| "sqlite".to_string());
     let n = COUNTER.fetch_add(1, Ordering::Relaxed);
 
@@ -72,7 +72,11 @@ async fn connect() -> DatabaseConnection {
 
     let mut opt = ConnectOptions::new(url);
     opt.max_connections(max_conn);
-    let conn = Database::connect(opt).await.expect("connect test database");
+    Database::connect(opt).await.expect("connect test database")
+}
+
+async fn connect() -> DatabaseConnection {
+    let conn = connect_unmigrated().await;
     Migrator::up(&conn, None).await.expect("run migrations");
     conn
 }
@@ -149,6 +153,120 @@ async fn count(conn: &DatabaseConnection, sql: &str) -> i64 {
         .expect("count row")
         .try_get::<i64>("", "count")
         .expect("count value")
+}
+
+#[tokio::test]
+async fn postgres_migrates_legacy_oauth2_wallet_data() {
+    if std::env::var("SWISSKNIFE_ITEST_DATABASE").as_deref() != Ok("postgres") {
+        return;
+    }
+
+    let conn = connect_unmigrated().await;
+    Migrator::up(&conn, Some(16)).await.expect("run pre-account migrations");
+    conn.execute_unprepared(
+        r#"
+        INSERT INTO wallet (id, user_id, created_at)
+        VALUES ('11111111-1111-4111-8111-111111111111', 'auth0|alice', CURRENT_TIMESTAMP);
+
+        INSERT INTO wallet_balance (
+            wallet_id, currency, available_amount, reserved_amount, created_at
+        ) VALUES (
+            '11111111-1111-4111-8111-111111111111', 'Bitcoin', 12345, 678, CURRENT_TIMESTAMP
+        );
+
+        INSERT INTO ln_address (
+            id, wallet_id, username, active, allows_nostr, created_at
+        ) VALUES (
+            '44444444-4444-4444-8444-444444444444',
+            '11111111-1111-4111-8111-111111111111',
+            'alice',
+            TRUE,
+            FALSE,
+            CURRENT_TIMESTAMP
+        );
+        "#,
+    )
+    .await
+    .expect("insert legacy production-shaped data");
+
+    Migrator::up(&conn, None).await.expect("run account cutover");
+
+    assert_eq!(
+        count(
+            &conn,
+            r#"
+            SELECT COUNT(*) AS count
+            FROM wallet
+            JOIN auth_identity ON auth_identity.account_id = wallet.account_id
+            JOIN asset ON asset.id = wallet.asset_id
+            WHERE wallet.id = '11111111-1111-4111-8111-111111111111'
+              AND auth_identity.provider = 'oauth2'
+              AND auth_identity.subject = 'auth0|alice'
+              AND asset.protocol = 'bitcoin'
+              AND asset.network = 'Bitcoin'
+              AND asset.asset_ref = 'native'
+              AND wallet.available_amount = 12345
+              AND wallet.reserved_amount = 678
+            "#,
+        )
+        .await,
+        1
+    );
+    assert_eq!(
+        count(
+            &conn,
+            r#"
+            SELECT COUNT(*) AS count
+            FROM ln_address
+            JOIN wallet ON wallet.id = ln_address.wallet_id
+            WHERE ln_address.account_id = wallet.account_id
+            "#,
+        )
+        .await,
+        1
+    );
+    assert_eq!(
+        count(
+            &conn,
+            r#"
+            SELECT COUNT(*) AS count
+            FROM information_schema.columns
+            WHERE table_schema = 'public'
+              AND table_name IN ('wallet', 'api_key')
+              AND column_name = 'user_id'
+            "#,
+        )
+        .await,
+        0
+    );
+    assert_eq!(
+        count(
+            &conn,
+            r#"
+            SELECT COUNT(*) AS count
+            FROM pg_indexes
+            WHERE schemaname = 'public'
+              AND indexname IN (
+                'idx_api_key_account_id',
+                'idx_asset_protocol_network_ref',
+                'idx_auth_identity_account_id',
+                'idx_auth_identity_provider_subject',
+                'idx_btc_address_wallet_used',
+                'idx_btc_output_txid_output_index',
+                'idx_invoice_btc_output_id',
+                'idx_invoice_ln_address_id',
+                'idx_invoice_wallet_created_at',
+                'idx_ln_address_account',
+                'idx_payment_wallet_created_at',
+                'idx_wallet_account_asset',
+                'idx_wallet_account_id',
+                'idx_wallet_asset_id'
+              )
+            "#,
+        )
+        .await,
+        14
+    );
 }
 
 #[tokio::test]

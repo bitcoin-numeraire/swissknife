@@ -24,9 +24,10 @@ mod m20260704_000006_api_key_account_id;
 mod m20260704_000007_backfill_oauth2_accounts;
 mod m20260704_000008_wallet_account_asset_schema;
 mod m20260704_000009_backfill_mainnet_wallet_accounts;
-mod m20260704_000010_drop_api_key_user_id_fk;
+mod m20260704_000010_finalize_wallet_schema;
 mod m20260704_000011_ln_address_account_routes;
 mod m20260704_000012_drop_legacy_wallet_contract;
+mod m20260710_234825_add_relationship_indexes;
 
 pub struct Migrator;
 
@@ -58,9 +59,10 @@ impl MigratorTrait for Migrator {
             Box::new(m20260704_000007_backfill_oauth2_accounts::Migration),
             Box::new(m20260704_000008_wallet_account_asset_schema::Migration),
             Box::new(m20260704_000009_backfill_mainnet_wallet_accounts::Migration),
-            Box::new(m20260704_000010_drop_api_key_user_id_fk::Migration),
+            Box::new(m20260704_000010_finalize_wallet_schema::Migration),
             Box::new(m20260704_000011_ln_address_account_routes::Migration),
             Box::new(m20260704_000012_drop_legacy_wallet_contract::Migration),
+            Box::new(m20260710_234825_add_relationship_indexes::Migration),
         ]
     }
 }
@@ -70,11 +72,6 @@ mod tests {
     use sea_orm::{ConnectionTrait, Database, DatabaseBackend, Statement};
 
     use super::*;
-
-    const MIGRATIONS_BEFORE_IDENTITY_ASSETS: u32 = 16;
-    const IDENTITY_ASSET_MIGRATION_COUNT: u32 = 9;
-    const MIGRATIONS_BEFORE_LN_ADDRESS_ACCOUNT_ROUTES: u32 =
-        MIGRATIONS_BEFORE_IDENTITY_ASSETS + IDENTITY_ASSET_MIGRATION_COUNT;
 
     async fn sqlite() -> sea_orm::DatabaseConnection {
         Database::connect("sqlite::memory:")
@@ -129,70 +126,33 @@ mod tests {
     }
 
     #[async_std::test]
-    async fn identity_asset_migration_backfills_oauth2_accounts() {
+    async fn fresh_sqlite_schema_has_required_relationships_and_indexes() {
         let conn = sqlite().await;
 
-        Migrator::up(&conn, Some(MIGRATIONS_BEFORE_IDENTITY_ASSETS))
-            .await
-            .expect("run migrations before identity assets");
-        conn.execute(Statement::from_string(
-            DatabaseBackend::Sqlite,
-            r#"
-            INSERT INTO wallet (id, user_id, created_at)
-            VALUES (X'11111111111141118111111111111111', 'alice', CURRENT_TIMESTAMP)
-            "#
-            .to_string(),
-        ))
-        .await
-        .expect("insert legacy wallet");
-        conn.execute(Statement::from_string(
-            DatabaseBackend::Sqlite,
-            r#"
-            INSERT INTO wallet_balance (wallet_id, currency, available_amount, reserved_amount, created_at)
-            VALUES (X'11111111111141118111111111111111', 'Bitcoin', 12345, 678, CURRENT_TIMESTAMP)
-            "#
-            .to_string(),
-        ))
-        .await
-        .expect("insert legacy wallet balance");
+        Migrator::up(&conn, None).await.expect("run migrations");
 
-        Migrator::up(&conn, Some(IDENTITY_ASSET_MIGRATION_COUNT))
-            .await
-            .expect("run identity assets migration");
-
-        assert_eq!(count(&conn, "SELECT COUNT(*) AS count FROM account").await, 1);
         assert_eq!(
             count(
                 &conn,
-                "SELECT COUNT(*) AS count FROM auth_identity WHERE provider = 'oauth2' AND subject = 'alice'",
+                r#"
+                SELECT COUNT(*) AS count
+                FROM sqlite_master AS tables
+                JOIN pragma_foreign_key_list(tables.name) AS fk
+                WHERE tables.type = 'table'
+                "#,
             )
             .await,
-            1
-        );
-        assert_eq!(
-            count(
-                &conn,
-                "SELECT COUNT(*) AS count FROM auth_identity WHERE length(id) = 16 AND length(account_id) = 16",
-            )
-            .await,
-            1
-        );
-        assert_eq!(
-            count(&conn, "SELECT COUNT(*) AS count FROM account WHERE permissions = '[]'").await,
-            1
+            13
         );
         assert_eq!(
             count(
                 &conn,
                 r#"
                 SELECT COUNT(*) AS count
-                FROM account_preference
-                WHERE account_id = (
-                    SELECT account_id
-                    FROM auth_identity
-                    WHERE provider = 'oauth2'
-                      AND subject = 'alice'
-                )
+                FROM pragma_foreign_key_list('invoice')
+                WHERE "table" = 'btc_output'
+                  AND "from" = 'btc_output_id'
+                  AND "on_delete" = 'SET NULL'
                 "#,
             )
             .await,
@@ -203,23 +163,77 @@ mod tests {
                 &conn,
                 r#"
                 SELECT COUNT(*) AS count
-                FROM wallet
-                JOIN asset ON wallet.asset_id = asset.id
-                WHERE wallet.account_id = (
-                    SELECT account_id
-                    FROM auth_identity
-                    WHERE provider = 'oauth2'
-                      AND subject = 'alice'
-                )
-                  AND asset.protocol = 'bitcoin'
-                  AND asset.network = 'Bitcoin'
-                  AND asset.asset_ref = 'native'
-                  AND wallet.available_amount = 12345
-                  AND wallet.reserved_amount = 678
+                FROM pragma_foreign_key_list('wallet')
+                WHERE "table" = 'asset'
+                  AND "from" = 'asset_id'
+                  AND "on_delete" = 'RESTRICT'
                 "#,
             )
             .await,
             1
+        );
+        assert_eq!(
+            count(
+                &conn,
+                r#"
+                SELECT COUNT(*) AS count
+                FROM sqlite_master
+                WHERE type = 'index'
+                  AND name IN (
+                    'idx_api_key_account_id',
+                    'idx_asset_protocol_network_ref',
+                    'idx_auth_identity_account_id',
+                    'idx_auth_identity_provider_subject',
+                    'idx_btc_address_wallet_used',
+                    'idx_btc_output_txid_output_index',
+                    'idx_invoice_btc_output_id',
+                    'idx_invoice_ln_address_id',
+                    'idx_invoice_wallet_created_at',
+                    'idx_payment_wallet_created_at',
+                    'idx_wallet_asset_id'
+                  )
+                "#,
+            )
+            .await,
+            11
+        );
+        assert_eq!(
+            count(
+                &conn,
+                r#"
+                SELECT COUNT(*) AS count
+                FROM pragma_index_list('invoice')
+                WHERE name = 'idx_invoice_btc_output_id' AND "unique" = 1
+                "#,
+            )
+            .await,
+            1
+        );
+        assert_eq!(
+            count(
+                &conn,
+                r#"
+                SELECT COUNT(*) AS count
+                FROM pragma_table_info('wallet')
+                WHERE name IN (
+                    'account_id', 'asset_id', 'available_amount', 'reserved_amount'
+                ) AND "notnull" = 1
+                "#,
+            )
+            .await,
+            4
+        );
+        assert_eq!(
+            count(
+                &conn,
+                r#"
+                SELECT COUNT(*) AS count
+                FROM pragma_table_info('auth_identity')
+                WHERE name IN ('account_id', 'provider', 'subject') AND "notnull" = 1
+                "#,
+            )
+            .await,
+            3
         );
     }
 
@@ -232,13 +246,20 @@ mod tests {
         conn.execute(Statement::from_string(
             DatabaseBackend::Sqlite,
             r#"
-            INSERT INTO account (id, permissions, created_at)
-            VALUES (X'22222222222242228222222222222222', '[]', CURRENT_TIMESTAMP)
+            INSERT INTO account (id, created_at)
+            VALUES (X'22222222222242228222222222222222', CURRENT_TIMESTAMP)
             "#
             .to_string(),
         ))
         .await
         .expect("insert account");
+
+        assert_eq!(
+            count(&conn, "SELECT COUNT(*) AS count FROM account WHERE permissions = '[]'").await,
+            1
+        );
+        assert_eq!(count(&conn, "SELECT COUNT(*) AS count FROM auth_identity").await, 0);
+
         conn.execute(Statement::from_string(
             DatabaseBackend::Sqlite,
             r#"
@@ -294,6 +315,52 @@ mod tests {
         conn.execute(Statement::from_string(
             DatabaseBackend::Sqlite,
             r#"
+            INSERT INTO auth_identity (id, account_id, provider, subject, created_at)
+            VALUES (
+                X'88888888888848888888888888888888',
+                X'22222222222242228222222222222222',
+                'oauth2',
+                'auth0|alice',
+                CURRENT_TIMESTAMP
+            )
+            "#
+            .to_string(),
+        ))
+        .await
+        .expect("insert auth identity");
+        conn.execute(Statement::from_string(
+            DatabaseBackend::Sqlite,
+            r#"
+            INSERT INTO account_preference (account_id, created_at)
+            VALUES (X'22222222222242228222222222222222', CURRENT_TIMESTAMP)
+            "#
+            .to_string(),
+        ))
+        .await
+        .expect("insert account preferences");
+        let negative_reservation = conn
+            .execute(Statement::from_string(
+                DatabaseBackend::Sqlite,
+                r#"
+                INSERT INTO wallet (
+                    id, account_id, asset_id, available_amount, reserved_amount, created_at
+                ) VALUES (
+                    X'99999999999949998999999999999999',
+                    X'22222222222242228222222222222222',
+                    X'00000000000040008000000000000001',
+                    0,
+                    -1,
+                    CURRENT_TIMESTAMP
+                )
+                "#
+                .to_string(),
+            ))
+            .await;
+        assert!(negative_reservation.is_err());
+
+        conn.execute(Statement::from_string(
+            DatabaseBackend::Sqlite,
+            r#"
             INSERT INTO wallet (
                 id, account_id, asset_id, available_amount, reserved_amount, created_at
             )
@@ -310,6 +377,64 @@ mod tests {
         ))
         .await
         .expect("insert account wallet");
+        let duplicate_asset_wallet = conn
+            .execute(Statement::from_string(
+                DatabaseBackend::Sqlite,
+                r#"
+                INSERT INTO wallet (
+                    id, account_id, asset_id, available_amount, reserved_amount, created_at
+                ) VALUES (
+                    X'aaaaaaaaaaaa4aaa8aaaaaaaaaaaaaaa',
+                    X'22222222222242228222222222222222',
+                    X'00000000000040008000000000000001',
+                    0,
+                    0,
+                    CURRENT_TIMESTAMP
+                )
+                "#
+                .to_string(),
+            ))
+            .await;
+        assert!(duplicate_asset_wallet.is_err());
+        let delete_asset_in_use = conn
+            .execute(Statement::from_string(
+                DatabaseBackend::Sqlite,
+                "DELETE FROM asset WHERE id = X'00000000000040008000000000000001'".to_string(),
+            ))
+            .await;
+        assert!(delete_asset_in_use.is_err());
+
+        conn.execute(Statement::from_string(
+            DatabaseBackend::Sqlite,
+            r#"
+            INSERT INTO account (id, permissions, created_at)
+            VALUES (X'66666666666646668666666666666666', '[]', CURRENT_TIMESTAMP)
+            "#
+            .to_string(),
+        ))
+        .await
+        .expect("insert second account");
+        let mismatched_owner = conn
+            .execute(Statement::from_string(
+                DatabaseBackend::Sqlite,
+                r#"
+                INSERT INTO ln_address (
+                    id, account_id, wallet_id, username, active, allows_nostr, created_at
+                ) VALUES (
+                    X'77777777777747778777777777777777',
+                    X'66666666666646668666666666666666',
+                    X'11111111111141118111111111111111',
+                    'wrong-owner',
+                    1,
+                    0,
+                    CURRENT_TIMESTAMP
+                )
+                "#
+                .to_string(),
+            ))
+            .await;
+        assert!(mismatched_owner.is_err());
+
         conn.execute(Statement::from_string(
             DatabaseBackend::Sqlite,
             r#"
@@ -403,91 +528,12 @@ mod tests {
         assert_eq!(count(&conn, "SELECT COUNT(*) AS count FROM wallet").await, 0);
         assert_eq!(count(&conn, "SELECT COUNT(*) AS count FROM api_key").await, 0);
         assert_eq!(count(&conn, "SELECT COUNT(*) AS count FROM ln_address").await, 0);
-    }
-
-    #[async_std::test]
-    async fn ln_address_account_routes_backfill_from_receiving_wallets() {
-        let conn = sqlite().await;
-
-        Migrator::up(&conn, Some(MIGRATIONS_BEFORE_LN_ADDRESS_ACCOUNT_ROUTES))
-            .await
-            .expect("run migrations before ln address account routes");
-        conn.execute(Statement::from_string(
-            DatabaseBackend::Sqlite,
-            r#"
-            INSERT INTO account (id, permissions, created_at)
-            VALUES (X'22222222222242228222222222222222', '[]', CURRENT_TIMESTAMP)
-            "#
-            .to_string(),
-        ))
-        .await
-        .expect("insert account");
-        conn.execute(Statement::from_string(
-            DatabaseBackend::Sqlite,
-            r#"
-            INSERT INTO wallet (
-                id,
-                account_id,
-                asset_id,
-                available_amount,
-                reserved_amount,
-                created_at
-            )
-            VALUES (
-                X'11111111111141118111111111111111',
-                X'22222222222242228222222222222222',
-                X'00000000000040008000000000000001',
-                0,
-                0,
-                CURRENT_TIMESTAMP
-            )
-            "#
-            .to_string(),
-        ))
-        .await
-        .expect("insert asset wallet");
-        conn.execute(Statement::from_string(
-            DatabaseBackend::Sqlite,
-            r#"
-            INSERT INTO ln_address (
-                id,
-                wallet_id,
-                username,
-                active,
-                allows_nostr,
-                created_at
-            )
-            VALUES (
-                X'44444444444444448444444444444444',
-                X'11111111111141118111111111111111',
-                'alice',
-                1,
-                0,
-                CURRENT_TIMESTAMP
-            )
-            "#
-            .to_string(),
-        ))
-        .await
-        .expect("insert legacy ln address");
-
-        Migrator::up(&conn, None)
-            .await
-            .expect("run ln address account routes migration");
-
+        assert_eq!(count(&conn, "SELECT COUNT(*) AS count FROM auth_identity").await, 0);
         assert_eq!(
-            count(
-                &conn,
-                r#"
-                SELECT COUNT(*) AS count
-                FROM ln_address
-                WHERE account_id = X'22222222222242228222222222222222'
-                  AND wallet_id = X'11111111111141118111111111111111'
-                "#,
-            )
-            .await,
-            1
+            count(&conn, "SELECT COUNT(*) AS count FROM account_preference").await,
+            0
         );
+        assert_eq!(count(&conn, "SELECT COUNT(*) AS count FROM asset").await, 6);
     }
 
     #[async_std::test]

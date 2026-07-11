@@ -32,10 +32,11 @@ pub enum Relation {
     Account,
     #[sea_orm(has_many = "super::invoice::Entity")]
     Invoice,
+    // Codegen 1.1.19 duplicates AccountId here because it participates in both account and wallet FKs.
     #[sea_orm(
         belongs_to = "super::wallet::Entity",
-        from = "Column::WalletId",
-        to = "super::wallet::Column::Id",
+        from = "(Column::AccountId, Column::WalletId)",
+        to = "(super::wallet::Column::AccountId, super::wallet::Column::Id)",
         on_update = "NoAction",
         on_delete = "Cascade"
     )]
