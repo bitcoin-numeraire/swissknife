@@ -20,7 +20,7 @@ use crate::application::errors::{ApplicationError, DataError};
 use crate::domains::event::EventProjectionUnitOfWork;
 use crate::domains::invoice::{Invoice, InvoiceRepository};
 use crate::domains::payment::{LnPayment, Payment, PaymentStatus, PaymentUnitOfWork};
-use crate::domains::user::{AccountRepository, AuthProvider, Permission};
+use crate::domains::user::{AccountFilter, AccountRepository, AuthProvider, Permission};
 use crate::domains::{asset::AssetRepository, bitcoin::BtcNetwork, wallet::WalletRepository};
 
 use super::models::{prelude::Wallet, wallet};
@@ -32,8 +32,8 @@ use super::{
 static COUNTER: AtomicU64 = AtomicU64::new(0);
 
 /// Provision a fresh database (a sqlite file or a new postgres db) from
-/// `SWISSKNIFE_ITEST_DATABASE`, run migrations, and return a connection.
-async fn connect() -> DatabaseConnection {
+/// `SWISSKNIFE_ITEST_DATABASE` and return a connection.
+async fn connect_unmigrated() -> DatabaseConnection {
     let kind = std::env::var("SWISSKNIFE_ITEST_DATABASE").unwrap_or_else(|_| "sqlite".to_string());
     let n = COUNTER.fetch_add(1, Ordering::Relaxed);
 
@@ -72,20 +72,28 @@ async fn connect() -> DatabaseConnection {
 
     let mut opt = ConnectOptions::new(url);
     opt.max_connections(max_conn);
-    let conn = Database::connect(opt).await.expect("connect test database");
+    Database::connect(opt).await.expect("connect test database")
+}
+
+async fn connect() -> DatabaseConnection {
+    let conn = connect_unmigrated().await;
     Migrator::up(&conn, None).await.expect("run migrations");
     conn
 }
 
 /// Register a wallet and credit it `balance_msat` of available funds.
 async fn seed_wallet(conn: &DatabaseConnection, balance_msat: u64) -> Uuid {
+    let account = SeaOrmAccountRepository::new(conn.clone())
+        .insert(None, &[])
+        .await
+        .expect("create account");
     let asset = SeaOrmAssetRepository::new(conn.clone())
         .find_native_btc_by_network(BtcNetwork::Bitcoin)
         .await
         .expect("find native BTC asset")
         .expect("native BTC asset");
     let wallet = SeaOrmWalletRepository::new(conn.clone())
-        .upsert(Uuid::new_v4(), asset.id)
+        .upsert(account.id, asset.id)
         .await
         .expect("ensure wallet");
     if balance_msat > 0 {
@@ -148,12 +156,126 @@ async fn count(conn: &DatabaseConnection, sql: &str) -> i64 {
 }
 
 #[tokio::test]
+async fn postgres_migrates_legacy_oauth2_wallet_data() {
+    if std::env::var("SWISSKNIFE_ITEST_DATABASE").as_deref() != Ok("postgres") {
+        return;
+    }
+
+    let conn = connect_unmigrated().await;
+    Migrator::up(&conn, Some(16)).await.expect("run pre-account migrations");
+    conn.execute_unprepared(
+        r#"
+        INSERT INTO wallet (id, user_id, created_at)
+        VALUES ('11111111-1111-4111-8111-111111111111', 'auth0|alice', CURRENT_TIMESTAMP);
+
+        INSERT INTO wallet_balance (
+            wallet_id, currency, available_amount, reserved_amount, created_at
+        ) VALUES (
+            '11111111-1111-4111-8111-111111111111', 'Bitcoin', 12345, 678, CURRENT_TIMESTAMP
+        );
+
+        INSERT INTO ln_address (
+            id, wallet_id, username, active, allows_nostr, created_at
+        ) VALUES (
+            '44444444-4444-4444-8444-444444444444',
+            '11111111-1111-4111-8111-111111111111',
+            'alice',
+            TRUE,
+            FALSE,
+            CURRENT_TIMESTAMP
+        );
+        "#,
+    )
+    .await
+    .expect("insert legacy production-shaped data");
+
+    Migrator::up(&conn, None).await.expect("run account cutover");
+
+    assert_eq!(
+        count(
+            &conn,
+            r#"
+            SELECT COUNT(*) AS count
+            FROM wallet
+            JOIN auth_identity ON auth_identity.account_id = wallet.account_id
+            JOIN asset ON asset.id = wallet.asset_id
+            WHERE wallet.id = '11111111-1111-4111-8111-111111111111'
+              AND auth_identity.provider = 'oauth2'
+              AND auth_identity.subject = 'auth0|alice'
+              AND asset.protocol = 'bitcoin'
+              AND asset.network = 'Bitcoin'
+              AND asset.asset_ref = 'native'
+              AND wallet.available_amount = 12345
+              AND wallet.reserved_amount = 678
+            "#,
+        )
+        .await,
+        1
+    );
+    assert_eq!(
+        count(
+            &conn,
+            r#"
+            SELECT COUNT(*) AS count
+            FROM ln_address
+            JOIN wallet ON wallet.id = ln_address.wallet_id
+            WHERE ln_address.account_id = wallet.account_id
+            "#,
+        )
+        .await,
+        1
+    );
+    assert_eq!(
+        count(
+            &conn,
+            r#"
+            SELECT COUNT(*) AS count
+            FROM information_schema.columns
+            WHERE table_schema = 'public'
+              AND table_name IN ('wallet', 'api_key')
+              AND column_name = 'user_id'
+            "#,
+        )
+        .await,
+        0
+    );
+    assert_eq!(
+        count(
+            &conn,
+            r#"
+            SELECT COUNT(*) AS count
+            FROM pg_indexes
+            WHERE schemaname = 'public'
+              AND indexname IN (
+                'idx_api_key_account_id',
+                'idx_asset_protocol_network_ref',
+                'idx_auth_identity_account_id',
+                'idx_auth_identity_provider_subject',
+                'idx_btc_address_wallet_used',
+                'idx_btc_output_txid_output_index',
+                'idx_invoice_btc_output_id',
+                'idx_invoice_ln_address_id',
+                'idx_invoice_wallet_created_at',
+                'idx_ln_address_account',
+                'idx_payment_wallet_created_at',
+                'idx_wallet_account_asset',
+                'idx_wallet_account_id',
+                'idx_wallet_asset_id'
+              )
+            "#,
+        )
+        .await,
+        14
+    );
+}
+
+#[tokio::test]
 async fn account_identity_upsert_is_idempotent() {
     let conn = connect().await;
     let repo = SeaOrmAccountRepository::new(conn.clone());
 
-    let first = repo.upsert(AuthProvider::Jwt, "alice", &[]).await.unwrap();
-    let second = repo.upsert(AuthProvider::Jwt, "alice", &[]).await.unwrap();
+    let first = repo.upsert(AuthProvider::Jwt, "alice", None, &[]).await.unwrap();
+    let second = repo.upsert(AuthProvider::Jwt, "alice", None, &[]).await.unwrap();
 
     assert_eq!(first.id, second.id);
     assert_eq!(
@@ -178,6 +300,7 @@ async fn account_identity_upsert_inserts_initial_permissions() {
         .upsert(
             AuthProvider::Jwt,
             "alice",
+            None,
             &[Permission::ReadWallet, Permission::ReadWallet],
         )
         .await
@@ -185,6 +308,101 @@ async fn account_identity_upsert_inserts_initial_permissions() {
 
     assert_eq!(account.permissions, Some(vec![Permission::ReadWallet]));
     assert_eq!(count(&conn, "SELECT COUNT(*) AS count FROM account").await, 1);
+}
+
+#[tokio::test]
+async fn account_repository_lists_accounts_with_and_without_identities() {
+    let conn = connect().await;
+    let repo = SeaOrmAccountRepository::new(conn);
+    let managed = repo.insert(Some("Managed".to_string()), &[]).await.unwrap();
+    let login = repo.upsert(AuthProvider::Jwt, "alice", None, &[]).await.unwrap();
+
+    let accounts = repo
+        .find_many(AccountFilter {
+            ids: Some(vec![managed.id, login.id]),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+
+    assert_eq!(accounts.len(), 2);
+    assert!(accounts
+        .iter()
+        .find(|account| account.id == managed.id)
+        .unwrap()
+        .identity
+        .is_none());
+    assert_eq!(
+        accounts
+            .iter()
+            .find(|account| account.id == login.id)
+            .unwrap()
+            .identity
+            .as_ref()
+            .map(|identity| identity.subject.as_str()),
+        Some("alice")
+    );
+}
+
+#[tokio::test]
+async fn account_repository_crud_keeps_the_aggregate_consistent() {
+    let conn = connect().await;
+    let repo = SeaOrmAccountRepository::new(conn.clone());
+    let account = repo
+        .insert(Some("Operator".to_string()), &[Permission::ReadWallet])
+        .await
+        .unwrap();
+    assert!(account.identity.is_none());
+
+    let listed = repo
+        .find_many(AccountFilter {
+            ids: Some(vec![account.id]),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    assert_eq!(listed.len(), 1);
+    assert_eq!(listed[0].display_name.as_deref(), Some("Operator"));
+
+    let mut updated = account.clone();
+    updated.display_name = Some("Treasury".to_string());
+    let updated = repo.update(updated).await.unwrap();
+    assert_eq!(updated.display_name.as_deref(), Some("Treasury"));
+
+    let mut updated = updated;
+    updated.permissions = Some(vec![Permission::ReadAccount, Permission::WriteWallet]);
+    let updated = repo.update(updated).await.unwrap();
+    assert_eq!(
+        updated.permissions,
+        Some(vec![Permission::ReadAccount, Permission::WriteWallet])
+    );
+
+    let asset = SeaOrmAssetRepository::new(conn.clone())
+        .find_native_btc_by_network(BtcNetwork::Bitcoin)
+        .await
+        .unwrap()
+        .unwrap();
+    let wallet_repo = SeaOrmWalletRepository::new(conn.clone());
+    let wallet = wallet_repo.upsert(account.id, asset.id).await.unwrap();
+    assert!(wallet_repo.exists_for_account(account.id, wallet.id).await.unwrap());
+    assert!(!wallet_repo.exists_for_account(Uuid::new_v4(), wallet.id).await.unwrap());
+
+    assert_eq!(
+        repo.delete_many(AccountFilter {
+            ids: Some(vec![account.id]),
+            ..Default::default()
+        })
+        .await
+        .unwrap(),
+        1
+    );
+    assert_eq!(count(&conn, "SELECT COUNT(*) AS count FROM account").await, 0);
+    assert_eq!(count(&conn, "SELECT COUNT(*) AS count FROM auth_identity").await, 0);
+    assert_eq!(
+        count(&conn, "SELECT COUNT(*) AS count FROM account_preference").await,
+        0
+    );
+    assert_eq!(count(&conn, "SELECT COUNT(*) AS count FROM wallet").await, 0);
 }
 
 #[tokio::test]

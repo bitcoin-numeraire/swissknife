@@ -10,7 +10,7 @@ use crate::{
         nostr::NostrHandler,
         payment::PaymentHandler,
         system::SystemHandler,
-        user::{ApiKeyHandler, AuthHandler},
+        user::{AccountHandler, ApiKeyHandler, AuthHandler},
         wallet::{UserWalletHandler, WalletHandler},
     },
 };
@@ -38,6 +38,7 @@ pub fn merged_openapi() -> OpenApi {
     let mut openapi = ApiDoc::openapi();
 
     openapi.merge(AuthHandler::openapi());
+    openapi.merge(AccountHandler::openapi());
     openapi.merge(UserWalletHandler::openapi());
     openapi.merge(WalletHandler::openapi());
     openapi.merge(InvoiceHandler::openapi());

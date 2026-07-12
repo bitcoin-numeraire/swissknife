@@ -92,7 +92,7 @@ impl AuthUseCases for AuthService {
         let account = self
             .store
             .account
-            .upsert(self.provider, BOOTSTRAP_ADMIN_SUBJECT, &permissions)
+            .upsert(self.provider, BOOTSTRAP_ADMIN_SUBJECT, None, &permissions)
             .await?;
 
         let token = self.jwt_authenticator.encode(account)?;
@@ -127,7 +127,7 @@ impl AuthUseCases for AuthService {
                     None => {
                         self.store
                             .account
-                            .upsert(self.provider, BOOTSTRAP_ADMIN_SUBJECT, &[])
+                            .upsert(self.provider, BOOTSTRAP_ADMIN_SUBJECT, None, &[])
                             .await?
                     }
                 };
@@ -180,7 +180,7 @@ impl AuthUseCases for AuthService {
         let claims = self.jwt_authenticator.decode(token).await?;
         let account = match self.store.account.find_by_identity(self.provider, &claims.sub).await? {
             Some(account) => account,
-            None => self.store.account.upsert(self.provider, &claims.sub, &[]).await?,
+            None => self.store.account.upsert(self.provider, &claims.sub, None, &[]).await?,
         };
         let permissions = if self.provider == AuthProvider::Jwt {
             account.permissions.unwrap_or_default()
@@ -370,13 +370,14 @@ mod tests {
                 store
                     .account
                     .expect_upsert()
-                    .withf(|provider, subject, granted| {
+                    .withf(|provider, subject, display_name, granted| {
                         *provider == AuthProvider::Jwt
                             && subject == "admin"
+                            && display_name.is_none()
                             && granted == Permission::all_permissions().as_slice()
                     })
                     .times(1)
-                    .returning(move |provider, subject, permissions| {
+                    .returning(move |provider, subject, _, permissions| {
                         Ok(account_fixture(account_id, provider, subject, permissions.to_vec()))
                     });
 
@@ -469,11 +470,14 @@ mod tests {
                 store
                     .account
                     .expect_upsert()
-                    .withf(|provider, subject, granted| {
-                        *provider == AuthProvider::Jwt && subject == "admin" && granted.is_empty()
+                    .withf(|provider, subject, display_name, granted| {
+                        *provider == AuthProvider::Jwt
+                            && subject == "admin"
+                            && display_name.is_none()
+                            && granted.is_empty()
                     })
                     .times(1)
-                    .returning(move |provider, subject, _| {
+                    .returning(move |provider, subject, _, _| {
                         Ok(account_fixture(
                             account_id,
                             provider,
@@ -674,11 +678,14 @@ mod tests {
                 store
                     .account
                     .expect_upsert()
-                    .withf(|provider, subject, granted| {
-                        *provider == AuthProvider::Jwt && subject == "alice" && granted.is_empty()
+                    .withf(|provider, subject, display_name, granted| {
+                        *provider == AuthProvider::Jwt
+                            && subject == "alice"
+                            && display_name.is_none()
+                            && granted.is_empty()
                     })
                     .times(1)
-                    .returning(move |provider, subject, _| {
+                    .returning(move |provider, subject, _, _| {
                         Ok(account_fixture(
                             account_id,
                             provider,

@@ -8,7 +8,23 @@ release notes when a tag is published.
 
 ## [Unreleased]
 
+### Added
+
+- Added explicit accounts, authentication identities, account preferences, and
+  an asset catalog. Accounts can own multiple wallets, with each wallet holding
+  exactly one asset on one settlement network ([#297]).
+- Added account-shaped `/v1/me` APIs and wallet-scoped authenticated routes for
+  balances, payments, invoices, Bitcoin addresses, contacts, and API keys
+  ([#319]).
+- Added administrative account CRUD. Accounts created by administrators do not
+  implicitly create a login identity ([#331]).
+
 ### Changed
+
+- Replaced the legacy wallet-as-user contract with account-owned, asset-scoped
+  wallets. Payments and invoices now derive their asset and network from the
+  selected wallet, without legacy currency fallbacks ([#314], [#315], [#317],
+  [#318], [#320], [#321]).
 
 - Migrated CLN Lightning payments from the deprecated `pay` RPC to `xpay`, and
   refreshed the vendored CLN and LND gRPC protos to CLN v26.06 and LND v0.21
@@ -98,5 +114,13 @@ release notes when a tag is published.
 [#267]: https://github.com/bitcoin-numeraire/swissknife/issues/267
 [#276]: https://github.com/bitcoin-numeraire/swissknife/pull/276
 [#282]: https://github.com/bitcoin-numeraire/swissknife/pull/282
+[#297]: https://github.com/bitcoin-numeraire/swissknife/issues/297
+[#314]: https://github.com/bitcoin-numeraire/swissknife/pull/314
+[#315]: https://github.com/bitcoin-numeraire/swissknife/pull/315
+[#317]: https://github.com/bitcoin-numeraire/swissknife/pull/317
+[#318]: https://github.com/bitcoin-numeraire/swissknife/pull/318
+[#319]: https://github.com/bitcoin-numeraire/swissknife/pull/319
+[#320]: https://github.com/bitcoin-numeraire/swissknife/pull/320
+[#321]: https://github.com/bitcoin-numeraire/swissknife/pull/321
 [#324]: https://github.com/bitcoin-numeraire/swissknife/pull/324
 [398e89f]: https://github.com/bitcoin-numeraire/swissknife/commit/398e89f

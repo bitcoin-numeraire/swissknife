@@ -15,10 +15,18 @@ const LEGACY_AUTH_PROVIDER: &str = "oauth2";
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        if manager.get_database_backend() != DatabaseBackend::Postgres {
+            return Ok(());
+        }
+
         backfill_accounts(manager.get_connection()).await
     }
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        if manager.get_database_backend() != DatabaseBackend::Postgres {
+            return Ok(());
+        }
+
         let db = manager.get_connection();
         let backend = db.get_database_backend();
 
@@ -62,6 +70,7 @@ async fn backfill_accounts(db: &dyn ConnectionTrait) -> Result<(), DbErr> {
                 r#"
                 SELECT DISTINCT {user_id}
                 FROM {wallet}
+                WHERE {user_id} IS NOT NULL
                 ORDER BY {user_id}
                 "#,
                 user_id = Wallet::UserId.to_string(),
@@ -74,8 +83,8 @@ async fn backfill_accounts(db: &dyn ConnectionTrait) -> Result<(), DbErr> {
         let user_id = row.try_get::<String>("", "user_id")?;
         let account_id = Uuid::new_v4().to_string();
         let auth_identity_id = Uuid::new_v4().to_string();
-        let account_id = uuid_literal(backend, &account_id)?;
-        let auth_identity_id = uuid_literal(backend, &auth_identity_id)?;
+        let account_id = uuid_literal(&account_id)?;
+        let auth_identity_id = uuid_literal(&auth_identity_id)?;
 
         execute(
             db,
@@ -128,12 +137,9 @@ fn sql_literal(value: &str) -> String {
     value.replace('\'', "''")
 }
 
-fn uuid_literal(backend: DatabaseBackend, value: &str) -> Result<String, DbErr> {
+fn uuid_literal(value: &str) -> Result<String, DbErr> {
     let uuid =
         Uuid::parse_str(value).map_err(|err| DbErr::Migration(format!("invalid UUID literal {value}: {err}")))?;
 
-    Ok(match backend {
-        DatabaseBackend::Sqlite => format!("X'{}'", uuid.simple()),
-        _ => format!("'{uuid}'"),
-    })
+    Ok(format!("'{uuid}'"))
 }

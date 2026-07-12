@@ -1,3 +1,4 @@
+use sea_orm::DatabaseBackend;
 use sea_orm_migration::{prelude::*, schema::*};
 
 use crate::m20240420_1_wallet_table::Wallet;
@@ -8,6 +9,10 @@ pub struct Migration;
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        if manager.get_database_backend() != DatabaseBackend::Postgres {
+            return Ok(());
+        }
+
         add_wallet_column(manager, uuid_null(Wallet::AccountId)).await?;
         add_wallet_column(manager, uuid_null(Wallet::AssetId)).await?;
         add_wallet_column(manager, text_null(Wallet::Label)).await?;
@@ -30,10 +35,35 @@ impl MigrationTrait for Migration {
                     .unique()
                     .to_owned(),
             )
+            .await?;
+
+        manager
+            .create_index(
+                Index::create()
+                    .name("idx_wallet_account_id")
+                    .table(Wallet::Table)
+                    .col(Wallet::AccountId)
+                    .col(Wallet::Id)
+                    .unique()
+                    .to_owned(),
+            )
             .await
     }
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        if manager.get_database_backend() != DatabaseBackend::Postgres {
+            return Ok(());
+        }
+
+        manager
+            .drop_index(
+                Index::drop()
+                    .name("idx_wallet_account_id")
+                    .table(Wallet::Table)
+                    .to_owned(),
+            )
+            .await?;
+
         manager
             .drop_index(
                 Index::drop()

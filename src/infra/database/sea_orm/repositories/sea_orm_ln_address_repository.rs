@@ -13,6 +13,7 @@ use crate::infra::database::sea_orm::models::{
     ln_address::{ActiveModel, Column},
     prelude::LnAddress as LnAddressEntity,
 };
+use crate::infra::database::sea_orm::sea_order;
 
 #[derive(Clone)]
 pub struct SeaOrmLnAddressRepository {
@@ -63,10 +64,7 @@ impl LnAddressRepository for SeaOrmLnAddressRepository {
             .apply_if(filter.username, |q, username| q.filter(Column::Username.eq(username)))
             .apply_if(filter.ids, |q, ids| q.filter(Column::Id.is_in(ids)))
             .apply_if(filter.active, |q, active| q.filter(Column::Active.eq(active)))
-            .order_by(
-                Column::CreatedAt,
-                crate::infra::database::sea_orm::sea_order(&filter.order_direction),
-            )
+            .order_by(Column::CreatedAt, sea_order(&filter.order_direction))
             .offset(filter.offset)
             .limit(filter.limit)
             .all(&self.db)

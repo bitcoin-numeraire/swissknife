@@ -11,7 +11,7 @@ use uuid::Uuid;
 use swissknife_types::{
     Account, AccountPreferences, CreateApiKeyRequest, CreateWalletRequest, ErrorResponse, NewBtcAddressRequest,
     NewInvoiceRequest, RegisterLnAddressRequest, SendPaymentRequest, UpdateAccountPreferencesRequest,
-    UpdateLnAddressRequest,
+    UpdateAccountRequest, UpdateLnAddressRequest,
 };
 
 use crate::{
@@ -36,6 +36,7 @@ use super::{Balance, Contact, Wallet, WalletFilter};
 #[openapi(
     paths(
         get_account,
+        update_current_account,
         get_account_preferences,
         update_account_preferences,
         get_wallet_address,
@@ -66,6 +67,7 @@ use super::{Balance, Contact, Wallet, WalletFilter};
     components(schemas(
         Account,
         AccountPreferences,
+        UpdateAccountRequest,
         UpdateAccountPreferencesRequest,
         CreateWalletRequest,
         Wallet,
@@ -89,6 +91,7 @@ pub const CONTEXT_PATH: &str = "/v1/me";
 pub fn user_router() -> Router<Arc<AppServices>> {
     Router::new()
         .route("/", get(get_account))
+        .route("/", put(update_current_account))
         .route("/preferences", get(get_account_preferences))
         .route("/preferences", put(update_account_preferences))
         .route("/lightning-address", get(get_wallet_address))
@@ -132,6 +135,32 @@ pub fn user_router() -> Router<Arc<AppServices>> {
 )]
 async fn get_account(State(services): State<Arc<AppServices>>, user: User) -> Result<Json<Account>, ApplicationError> {
     let mut account = services.account.get(user.account_id).await?;
+    account.permissions = Some(user.permissions);
+    Ok(Json(account))
+}
+
+/// Update your account profile.
+#[utoipa::path(
+    put,
+    path = "",
+    tag = "Me",
+    context_path = CONTEXT_PATH,
+    request_body = UpdateAccountRequest,
+    responses(
+        (status = 200, description = "Updated", body = Account),
+        (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
+        (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
+        (status = 404, description = "Not Found", body = ErrorResponse, example = json!(NOT_FOUND_EXAMPLE)),
+        (status = 422, description = "Unprocessable Entity", body = ErrorResponse, example = json!(UNPROCESSABLE_EXAMPLE)),
+        (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
+    )
+)]
+async fn update_current_account(
+    State(services): State<Arc<AppServices>>,
+    user: User,
+    Json(UpdateAccountRequest { display_name }): Json<UpdateAccountRequest>,
+) -> Result<Json<Account>, ApplicationError> {
+    let mut account = services.account.update(user.account_id, display_name).await?;
     account.permissions = Some(user.permissions);
     Ok(Json(account))
 }
@@ -279,7 +308,7 @@ async fn new_wallet_btc_address(
     Path(wallet_id): Path<Uuid>,
     Json(payload): Json<NewBtcAddressRequest>,
 ) -> Result<Json<BtcAddress>, ApplicationError> {
-    services.wallet.get_by_account_id(user.account_id, wallet_id).await?;
+    services.wallet.verify_ownership(user.account_id, wallet_id).await?;
 
     let address = services
         .bitcoin
@@ -309,7 +338,7 @@ async fn list_wallet_btc_addresses(
     Path(wallet_id): Path<Uuid>,
     Query(mut filter): Query<BtcAddressFilter>,
 ) -> Result<Json<Vec<BtcAddress>>, ApplicationError> {
-    services.wallet.get_by_account_id(user.account_id, wallet_id).await?;
+    services.wallet.verify_ownership(user.account_id, wallet_id).await?;
 
     filter.wallet_id = Some(wallet_id);
     Ok(Json(services.bitcoin.list_addresses(filter).await?))
@@ -337,7 +366,7 @@ async fn wallet_pay(
     Path(wallet_id): Path<Uuid>,
     Json(payload): Json<SendPaymentRequest>,
 ) -> Result<Json<Payment>, ApplicationError> {
-    services.wallet.get_by_account_id(user.account_id, wallet_id).await?;
+    services.wallet.verify_ownership(user.account_id, wallet_id).await?;
 
     let payment = services
         .payment
@@ -365,7 +394,7 @@ async fn get_wallet_balance(
     user: User,
     Path(wallet_id): Path<Uuid>,
 ) -> Result<Json<Balance>, ApplicationError> {
-    services.wallet.get_by_account_id(user.account_id, wallet_id).await?;
+    services.wallet.verify_ownership(user.account_id, wallet_id).await?;
 
     Ok(Json(services.wallet.get_balance(wallet_id).await?))
 }
@@ -392,7 +421,7 @@ async fn new_wallet_invoice(
     Path(wallet_id): Path<Uuid>,
     Json(payload): Json<NewInvoiceRequest>,
 ) -> Result<Json<Invoice>, ApplicationError> {
-    services.wallet.get_by_account_id(user.account_id, wallet_id).await?;
+    services.wallet.verify_ownership(user.account_id, wallet_id).await?;
 
     let invoice = services
         .invoice
@@ -550,7 +579,7 @@ async fn list_wallet_payments(
     Path(wallet_id): Path<Uuid>,
     Query(mut query_params): Query<PaymentFilter>,
 ) -> Result<Json<Vec<Payment>>, ApplicationError> {
-    services.wallet.get_by_account_id(user.account_id, wallet_id).await?;
+    services.wallet.verify_ownership(user.account_id, wallet_id).await?;
 
     query_params.wallet_id = Some(wallet_id);
     Ok(Json(services.payment.list(query_params).await?))
@@ -575,7 +604,7 @@ async fn get_wallet_payment(
     user: User,
     Path((wallet_id, id)): Path<(Uuid, Uuid)>,
 ) -> Result<Json<Payment>, ApplicationError> {
-    services.wallet.get_by_account_id(user.account_id, wallet_id).await?;
+    services.wallet.verify_ownership(user.account_id, wallet_id).await?;
 
     let payments = services
         .payment
@@ -615,7 +644,7 @@ async fn list_wallet_invoices(
     Path(wallet_id): Path<Uuid>,
     Query(mut query_params): Query<InvoiceFilter>,
 ) -> Result<Json<Vec<Invoice>>, ApplicationError> {
-    services.wallet.get_by_account_id(user.account_id, wallet_id).await?;
+    services.wallet.verify_ownership(user.account_id, wallet_id).await?;
 
     query_params.wallet_id = Some(wallet_id);
     Ok(Json(services.invoice.list(query_params).await?))
@@ -640,7 +669,7 @@ async fn get_wallet_invoice(
     user: User,
     Path((wallet_id, id)): Path<(Uuid, Uuid)>,
 ) -> Result<Json<Invoice>, ApplicationError> {
-    services.wallet.get_by_account_id(user.account_id, wallet_id).await?;
+    services.wallet.verify_ownership(user.account_id, wallet_id).await?;
 
     let invoices = services
         .invoice
@@ -678,7 +707,7 @@ async fn list_contacts(
     user: User,
     Path(wallet_id): Path<Uuid>,
 ) -> Result<Json<Vec<Contact>>, ApplicationError> {
-    services.wallet.get_by_account_id(user.account_id, wallet_id).await?;
+    services.wallet.verify_ownership(user.account_id, wallet_id).await?;
 
     Ok(Json(services.wallet.list_contacts(wallet_id).await?))
 }
@@ -701,7 +730,7 @@ async fn delete_expired_invoices(
     user: User,
     Path(wallet_id): Path<Uuid>,
 ) -> Result<Json<u64>, ApplicationError> {
-    services.wallet.get_by_account_id(user.account_id, wallet_id).await?;
+    services.wallet.verify_ownership(user.account_id, wallet_id).await?;
 
     let n_deleted = services
         .invoice
@@ -732,7 +761,7 @@ async fn delete_failed_payments(
     user: User,
     Path(wallet_id): Path<Uuid>,
 ) -> Result<Json<u64>, ApplicationError> {
-    services.wallet.get_by_account_id(user.account_id, wallet_id).await?;
+    services.wallet.verify_ownership(user.account_id, wallet_id).await?;
 
     let n_deleted = services
         .payment
@@ -902,7 +931,6 @@ mod tests {
         domains::{
             bitcoin::{BtcAddress, BtcAddressType},
             payment::Payment,
-            wallet::Wallet,
         },
     };
 
@@ -915,14 +943,6 @@ mod tests {
         }
     }
 
-    fn wallet(id: Uuid, account_id: Uuid) -> Wallet {
-        Wallet {
-            id,
-            account_id,
-            ..Default::default()
-        }
-    }
-
     fn btc_address(wallet_id: Uuid) -> BtcAddress {
         BtcAddress {
             id: Uuid::new_v4(),
@@ -932,6 +952,41 @@ mod tests {
             address_type: BtcAddressType::P2wpkh,
             created_at: Utc::now(),
             updated_at: None,
+        }
+    }
+
+    mod update_account {
+        use super::*;
+
+        #[tokio::test]
+        async fn updates_only_the_authenticated_account() {
+            let caller = user();
+            let account_id = caller.account_id;
+            let mut builder = MockAppServicesBuilder::new();
+            builder
+                .account
+                .expect_update()
+                .withf(move |id, display_name| *id == account_id && display_name.as_deref() == Some("Alice"))
+                .times(1)
+                .returning(move |id, display_name| {
+                    Ok(Account {
+                        id,
+                        display_name,
+                        ..Default::default()
+                    })
+                });
+
+            let result = super::update_current_account(
+                State(Arc::new(builder.build())),
+                caller,
+                Json(UpdateAccountRequest {
+                    display_name: Some("Alice".to_string()),
+                }),
+            )
+            .await
+            .unwrap();
+
+            assert_eq!(result.0.display_name.as_deref(), Some("Alice"));
         }
     }
 
@@ -975,10 +1030,10 @@ mod tests {
             let mut builder = MockAppServicesBuilder::new();
             builder
                 .wallet
-                .expect_get_by_account_id()
+                .expect_verify_ownership()
                 .withf(move |account, id| *account == account_id && *id == wallet_id)
                 .times(1)
-                .returning(|account_id, id| Ok(wallet(id, account_id)));
+                .returning(|_, _| Ok(()));
             builder
                 .payment
                 .expect_pay()
@@ -1008,7 +1063,7 @@ mod tests {
             let mut builder = MockAppServicesBuilder::new();
             builder
                 .wallet
-                .expect_get_by_account_id()
+                .expect_verify_ownership()
                 .withf(move |account, id| *account == account_id && *id == wallet_id)
                 .times(1)
                 .returning(|_, _| Err(DataError::NotFound("Wallet not found.".to_string()).into()));
@@ -1039,10 +1094,10 @@ mod tests {
             let mut builder = MockAppServicesBuilder::new();
             builder
                 .wallet
-                .expect_get_by_account_id()
+                .expect_verify_ownership()
                 .withf(move |account, id| *account == account_id && *id == wallet_id)
                 .times(1)
-                .returning(|account_id, id| Ok(wallet(id, account_id)));
+                .returning(|_, _| Ok(()));
             builder
                 .bitcoin
                 .expect_new_deposit_address()

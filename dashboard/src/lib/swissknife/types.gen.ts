@@ -24,10 +24,6 @@ export type Account = {
   identity?: null | AuthIdentity;
   /**
    * Permissions stored for this account.
-   *
-   * These are authoritative for local JWT identities. OAuth2 requests use
-   * token claims as the effective permissions instead of mirroring claims
-   * into this field.
    */
   permissions?: Array<Permission> | null;
   preferences?: null | AccountPreferences;
@@ -360,6 +356,20 @@ export type Contact = {
    * Lightning Address
    */
   ln_address: string;
+};
+
+/**
+ * Create an account.
+ */
+export type CreateAccountRequest = {
+  /**
+   * Optional human-readable name for the account.
+   */
+  display_name?: string | null;
+  /**
+   * Initial permissions stored for the account.
+   */
+  permissions?: Array<Permission>;
 };
 
 /**
@@ -879,6 +889,8 @@ export type PaymentStatus = (typeof PaymentStatus)[keyof typeof PaymentStatus];
  * An API access scope granted to a JWT or API key.
  */
 export const Permission = {
+  READ_ACCOUNT: 'read:account',
+  WRITE_ACCOUNT: 'write:account',
   READ_WALLET: 'read:wallet',
   WRITE_WALLET: 'write:wallet',
   READ_LN_ADDRESS: 'read:ln_address',
@@ -997,6 +1009,16 @@ export type SignUpRequest = {
 };
 
 /**
+ * Replace permissions stored for an account.
+ */
+export type UpdateAccountPermissionsRequest = {
+  /**
+   * Complete permission set to persist for the account.
+   */
+  permissions: Array<Permission>;
+};
+
+/**
  * Replace account-scoped dashboard preferences.
  */
 export type UpdateAccountPreferencesRequest = {
@@ -1004,6 +1026,16 @@ export type UpdateAccountPreferencesRequest = {
    * Versioned dashboard settings document stored by the server.
    */
   dashboard_settings: unknown;
+};
+
+/**
+ * Replace the editable account profile fields.
+ */
+export type UpdateAccountRequest = {
+  /**
+   * Human-readable name for the account. Use `null` to clear it.
+   */
+  display_name?: string | null;
 };
 
 /**
@@ -1254,6 +1286,332 @@ export type CallbackResponses = {
 };
 
 export type CallbackResponse = CallbackResponses[keyof CallbackResponses];
+
+export type DeleteAccountsData = {
+  body?: never;
+  path?: never;
+  query?: {
+    /**
+     * Total amount of results to return.
+     */
+    limit?: number | null;
+    /**
+     * Offset where to start returning results.
+     */
+    offset?: number | null;
+    /**
+     * Account IDs to include.
+     */
+    ids?: Array<string> | null;
+    /**
+     * Direction of the ordering by creation date.
+     */
+    order_direction?: OrderDirection;
+  };
+  url: '/v1/accounts';
+};
+
+export type DeleteAccountsErrors = {
+  /**
+   * Bad Request
+   */
+  400: ErrorResponse;
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Forbidden
+   */
+  403: ErrorResponse;
+  /**
+   * Cannot delete the authenticated account
+   */
+  409: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
+
+export type DeleteAccountsError = DeleteAccountsErrors[keyof DeleteAccountsErrors];
+
+export type DeleteAccountsResponses = {
+  /**
+   * Success
+   */
+  200: number;
+};
+
+export type DeleteAccountsResponse = DeleteAccountsResponses[keyof DeleteAccountsResponses];
+
+export type ListAccountsData = {
+  body?: never;
+  path?: never;
+  query?: {
+    /**
+     * Total amount of results to return.
+     */
+    limit?: number | null;
+    /**
+     * Offset where to start returning results.
+     */
+    offset?: number | null;
+    /**
+     * Account IDs to include.
+     */
+    ids?: Array<string> | null;
+    /**
+     * Direction of the ordering by creation date.
+     */
+    order_direction?: OrderDirection;
+  };
+  url: '/v1/accounts';
+};
+
+export type ListAccountsErrors = {
+  /**
+   * Bad Request
+   */
+  400: ErrorResponse;
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Forbidden
+   */
+  403: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
+
+export type ListAccountsError = ListAccountsErrors[keyof ListAccountsErrors];
+
+export type ListAccountsResponses = {
+  /**
+   * Success
+   */
+  200: Array<Account>;
+};
+
+export type ListAccountsResponse = ListAccountsResponses[keyof ListAccountsResponses];
+
+export type CreateAccountData = {
+  body: CreateAccountRequest;
+  path?: never;
+  query?: never;
+  url: '/v1/accounts';
+};
+
+export type CreateAccountErrors = {
+  /**
+   * Bad Request
+   */
+  400: ErrorResponse;
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Forbidden
+   */
+  403: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
+
+export type CreateAccountError = CreateAccountErrors[keyof CreateAccountErrors];
+
+export type CreateAccountResponses = {
+  /**
+   * Created
+   */
+  200: Account;
+};
+
+export type CreateAccountResponse = CreateAccountResponses[keyof CreateAccountResponses];
+
+export type DeleteAccountByIdData = {
+  body?: never;
+  path: {
+    id: string;
+  };
+  query?: never;
+  url: '/v1/accounts/{id}';
+};
+
+export type DeleteAccountByIdErrors = {
+  /**
+   * Bad Request
+   */
+  400: ErrorResponse;
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Forbidden
+   */
+  403: ErrorResponse;
+  /**
+   * Not Found
+   */
+  404: ErrorResponse;
+  /**
+   * Cannot delete the authenticated account
+   */
+  409: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
+
+export type DeleteAccountByIdError = DeleteAccountByIdErrors[keyof DeleteAccountByIdErrors];
+
+export type DeleteAccountByIdResponses = {
+  /**
+   * Deleted
+   */
+  200: unknown;
+};
+
+export type GetAccountByIdData = {
+  body?: never;
+  path: {
+    id: string;
+  };
+  query?: never;
+  url: '/v1/accounts/{id}';
+};
+
+export type GetAccountByIdErrors = {
+  /**
+   * Bad Request
+   */
+  400: ErrorResponse;
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Forbidden
+   */
+  403: ErrorResponse;
+  /**
+   * Not Found
+   */
+  404: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
+
+export type GetAccountByIdError = GetAccountByIdErrors[keyof GetAccountByIdErrors];
+
+export type GetAccountByIdResponses = {
+  /**
+   * Found
+   */
+  200: Account;
+};
+
+export type GetAccountByIdResponse = GetAccountByIdResponses[keyof GetAccountByIdResponses];
+
+export type UpdateAccountByIdData = {
+  body: UpdateAccountRequest;
+  path: {
+    id: string;
+  };
+  query?: never;
+  url: '/v1/accounts/{id}';
+};
+
+export type UpdateAccountByIdErrors = {
+  /**
+   * Bad Request
+   */
+  400: ErrorResponse;
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Forbidden
+   */
+  403: ErrorResponse;
+  /**
+   * Not Found
+   */
+  404: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
+
+export type UpdateAccountByIdError = UpdateAccountByIdErrors[keyof UpdateAccountByIdErrors];
+
+export type UpdateAccountByIdResponses = {
+  /**
+   * Updated
+   */
+  200: Account;
+};
+
+export type UpdateAccountByIdResponse =
+  UpdateAccountByIdResponses[keyof UpdateAccountByIdResponses];
+
+export type ReplaceAccountPermissionsData = {
+  body: UpdateAccountPermissionsRequest;
+  path: {
+    id: string;
+  };
+  query?: never;
+  url: '/v1/accounts/{id}/permissions';
+};
+
+export type ReplaceAccountPermissionsErrors = {
+  /**
+   * Bad Request
+   */
+  400: ErrorResponse;
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Forbidden
+   */
+  403: ErrorResponse;
+  /**
+   * Not Found
+   */
+  404: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
+
+export type ReplaceAccountPermissionsError =
+  ReplaceAccountPermissionsErrors[keyof ReplaceAccountPermissionsErrors];
+
+export type ReplaceAccountPermissionsResponses = {
+  /**
+   * Updated
+   */
+  200: Account;
+};
+
+export type ReplaceAccountPermissionsResponse =
+  ReplaceAccountPermissionsResponses[keyof ReplaceAccountPermissionsResponses];
 
 export type RevokeApiKeysData = {
   body?: never;
@@ -2491,6 +2849,49 @@ export type GetAccountResponses = {
 };
 
 export type GetAccountResponse = GetAccountResponses[keyof GetAccountResponses];
+
+export type UpdateCurrentAccountData = {
+  body: UpdateAccountRequest;
+  path?: never;
+  query?: never;
+  url: '/v1/me';
+};
+
+export type UpdateCurrentAccountErrors = {
+  /**
+   * Bad Request
+   */
+  400: ErrorResponse;
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Not Found
+   */
+  404: ErrorResponse;
+  /**
+   * Unprocessable Entity
+   */
+  422: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
+
+export type UpdateCurrentAccountError =
+  UpdateCurrentAccountErrors[keyof UpdateCurrentAccountErrors];
+
+export type UpdateCurrentAccountResponses = {
+  /**
+   * Updated
+   */
+  200: Account;
+};
+
+export type UpdateCurrentAccountResponse =
+  UpdateCurrentAccountResponses[keyof UpdateCurrentAccountResponses];
 
 export type RevokeWalletApiKeysData = {
   body?: never;

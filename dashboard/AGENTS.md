@@ -6,11 +6,14 @@ This file provides guidance to AI Agents when working with code in this reposito
 yarn install                   # Install dependencies (Yarn 4 required)
 yarn dev                       # Start dev server on port 8080
 yarn build                     # Production build
+yarn test                      # Run Vitest tests
+yarn test:e2e                  # Run Playwright tests
 yarn lint                      # Run ESLint
 yarn lint:fix                  # Fix ESLint errors
 yarn fm:fix                    # Format with Prettier
 yarn fix:all                   # Run both lint:fix and fm:fix
 yarn openapi-ts                # Regenerate API client from OpenAPI spec
+yarn typecheck                 # Type-check once
 yarn tsc:watch                 # Type-check in watch mode
 ```
 
@@ -26,7 +29,7 @@ Uses the Next.js 16 App Router (React 19, MUI v9) with route groups:
 
 Main route sections:
 - `/wallet/*` - End-user wallet views (dashboard, payments, invoices, contacts)
-- `/admin/*` - Administrative account resources (transactions, addresses, api keys)
+- `/admin/*` - Administrative accounts, wallets, transactions, addresses, and API keys
 - `/settings` - User settings
 - `/welcome` - Onboarding flow
 
@@ -116,8 +119,7 @@ See `.env.example` for full list including Auth0/Supabase config.
 ## Code Review Guidelines
 
 ### General
-- Run `yarn lint` and `yarn build` before committing
-- Ensure TypeScript has no type errors (`yarn tsc:watch`)
+- Run `yarn lint`, `yarn typecheck`, `yarn test`, and `yarn build` before committing
 - Format code with `yarn fix:all`
 
 ### React/Next.js

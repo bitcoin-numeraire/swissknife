@@ -388,6 +388,8 @@ export const zPayment = z.object({
  * An API access scope granted to a JWT or API key.
  */
 export const zPermission = z.enum([
+  'read:account',
+  'write:account',
   'read:wallet',
   'write:wallet',
   'read:ln_address',
@@ -428,6 +430,14 @@ export const zApiKey = z.object({
   key: z.string().nullish(),
   name: z.string(),
   permissions: z.array(zPermission),
+});
+
+/**
+ * Create an account.
+ */
+export const zCreateAccountRequest = z.object({
+  display_name: z.string().nullish(),
+  permissions: z.array(zPermission).optional(),
 });
 
 /**
@@ -525,10 +535,24 @@ export const zSignUpRequest = z.object({
 });
 
 /**
+ * Replace permissions stored for an account.
+ */
+export const zUpdateAccountPermissionsRequest = z.object({
+  permissions: z.array(zPermission),
+});
+
+/**
  * Replace account-scoped dashboard preferences.
  */
 export const zUpdateAccountPreferencesRequest = z.object({
   dashboard_settings: z.unknown(),
+});
+
+/**
+ * Replace the editable account profile fields.
+ */
+export const zUpdateAccountRequest = z.object({
+  display_name: z.string().nullish(),
 });
 
 /**
@@ -628,6 +652,101 @@ export const zCallbackQuery = z.object({
  * Found
  */
 export const zCallbackResponse = zLnUrlCallback;
+
+export const zDeleteAccountsQuery = z.object({
+  limit: z.coerce
+    .bigint()
+    .gte(BigInt(0))
+    .max(BigInt('9223372036854775807'), {
+      error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
+    })
+    .nullish(),
+  offset: z.coerce
+    .bigint()
+    .gte(BigInt(0))
+    .max(BigInt('9223372036854775807'), {
+      error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
+    })
+    .nullish(),
+  ids: z.array(z.uuid()).nullish(),
+  order_direction: zOrderDirection.optional(),
+});
+
+/**
+ * Success
+ */
+export const zDeleteAccountsResponse = z.coerce
+  .bigint()
+  .gte(BigInt(0))
+  .max(BigInt('9223372036854775807'), {
+    error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
+  });
+
+export const zListAccountsQuery = z.object({
+  limit: z.coerce
+    .bigint()
+    .gte(BigInt(0))
+    .max(BigInt('9223372036854775807'), {
+      error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
+    })
+    .nullish(),
+  offset: z.coerce
+    .bigint()
+    .gte(BigInt(0))
+    .max(BigInt('9223372036854775807'), {
+      error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
+    })
+    .nullish(),
+  ids: z.array(z.uuid()).nullish(),
+  order_direction: zOrderDirection.optional(),
+});
+
+/**
+ * Success
+ */
+export const zListAccountsResponse = z.array(zAccount);
+
+export const zCreateAccountBody = zCreateAccountRequest;
+
+/**
+ * Created
+ */
+export const zCreateAccountResponse = zAccount;
+
+export const zDeleteAccountByIdPath = z.object({
+  id: z.uuid(),
+});
+
+export const zGetAccountByIdPath = z.object({
+  id: z.uuid(),
+});
+
+/**
+ * Found
+ */
+export const zGetAccountByIdResponse = zAccount;
+
+export const zUpdateAccountByIdBody = zUpdateAccountRequest;
+
+export const zUpdateAccountByIdPath = z.object({
+  id: z.uuid(),
+});
+
+/**
+ * Updated
+ */
+export const zUpdateAccountByIdResponse = zAccount;
+
+export const zReplaceAccountPermissionsBody = zUpdateAccountPermissionsRequest;
+
+export const zReplaceAccountPermissionsPath = z.object({
+  id: z.uuid(),
+});
+
+/**
+ * Updated
+ */
+export const zReplaceAccountPermissionsResponse = zAccount;
 
 export const zRevokeApiKeysQuery = z.object({
   limit: z.coerce
@@ -983,6 +1102,13 @@ export const zUpdateAddressResponse = zLnAddress;
  * Found
  */
 export const zGetAccountResponse = zAccount;
+
+export const zUpdateCurrentAccountBody = zUpdateAccountRequest;
+
+/**
+ * Updated
+ */
+export const zUpdateCurrentAccountResponse = zAccount;
 
 export const zRevokeWalletApiKeysQuery = z.object({
   limit: z.coerce

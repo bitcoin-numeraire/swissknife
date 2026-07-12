@@ -27,7 +27,7 @@ mod create {
     async fn creates_a_key_for_the_requested_account_that_authenticates() {
         let app = app().await;
         let token = app.admin_token().await;
-        let account_id = uuid::Uuid::new_v4();
+        let account_id = app.create_account(token, &unique("account")).await.id;
 
         let res = app
             .api()
@@ -111,7 +111,7 @@ mod manage {
     async fn get_list_then_revoke() {
         let app = app().await;
         let token = app.admin_token().await;
-        let account_id = uuid::Uuid::new_v4();
+        let account_id = app.create_account(token, &unique("account")).await.id;
 
         let created = app
             .api()

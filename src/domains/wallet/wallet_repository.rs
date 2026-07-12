@@ -9,6 +9,7 @@ use super::{Balance, Contact, Wallet, WalletFilter, WalletOverview};
 #[async_trait]
 pub trait WalletRepository: Send + Sync {
     async fn find(&self, id: Uuid) -> Result<Option<Wallet>, DatabaseError>;
+    async fn exists_for_account(&self, account_id: Uuid, id: Uuid) -> Result<bool, DatabaseError>;
     async fn find_by_account_and_asset(
         &self,
         account_id: Uuid,

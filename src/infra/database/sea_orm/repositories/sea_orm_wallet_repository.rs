@@ -7,6 +7,7 @@ use sea_orm::{
 use uuid::Uuid;
 
 use super::SeaOrmConnection;
+use crate::infra::database::sea_orm::sea_order;
 
 use crate::{
     application::errors::DatabaseError,
@@ -94,6 +95,20 @@ where
         Ok(Some(wallet))
     }
 
+    async fn exists_for_account(&self, account_id: Uuid, id: Uuid) -> Result<bool, DatabaseError> {
+        let wallet_id = WalletEntity::find()
+            .filter(Column::Id.eq(id))
+            .filter(Column::AccountId.eq(account_id))
+            .select_only()
+            .column(Column::Id)
+            .into_tuple::<Uuid>()
+            .one(self.db.connection())
+            .await
+            .map_err(|e| DatabaseError::FindOne(e.to_string()))?;
+
+        Ok(wallet_id.is_some())
+    }
+
     async fn find_by_account_and_asset(
         &self,
         account_id: Uuid,
@@ -127,10 +142,7 @@ where
             })
             .apply_if(filter.asset_id, |q, asset_id| q.filter(Column::AssetId.eq(asset_id)))
             .apply_if(filter.ids, |q, ids| q.filter(Column::Id.is_in(ids)))
-            .order_by(
-                Column::CreatedAt,
-                crate::infra::database::sea_orm::sea_order(&filter.order_direction),
-            )
+            .order_by(Column::CreatedAt, sea_order(&filter.order_direction))
             .offset(filter.offset)
             .limit(filter.limit)
             .all(self.db.connection())

@@ -1,4 +1,4 @@
-use sea_orm::{ConnectionTrait, Statement};
+use sea_orm::{ConnectionTrait, DatabaseBackend, Statement};
 use sea_orm_migration::{prelude::*, schema::*};
 
 use crate::{m20240420_1_wallet_table::Wallet, m20240420_2_ln_address_table::LnAddress};
@@ -9,6 +9,10 @@ pub struct Migration;
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        if manager.get_database_backend() != DatabaseBackend::Postgres {
+            return Ok(());
+        }
+
         manager
             .alter_table(
                 Table::alter()
@@ -19,9 +23,8 @@ impl MigrationTrait for Migration {
             .await?;
 
         let db = manager.get_connection();
-        let backend = db.get_database_backend();
-        db.execute(Statement::from_string(
-            backend,
+        execute(
+            db,
             format!(
                 r#"
                 UPDATE {ln_address}
@@ -39,20 +42,16 @@ impl MigrationTrait for Migration {
                 wallet_id = Wallet::Id.to_string(),
                 ln_address_wallet_id = LnAddress::WalletId.to_string(),
             ),
-        ))
+        )
         .await?;
 
         let missing = db
             .query_one(Statement::from_string(
-                backend,
+                DatabaseBackend::Postgres,
                 format!(
-                    r#"
-                    SELECT COUNT(*) AS count
-                    FROM {ln_address}
-                    WHERE {account_id} IS NULL
-                    "#,
-                    ln_address = LnAddress::Table.to_string(),
-                    account_id = LnAddress::AccountId.to_string(),
+                    "SELECT COUNT(*) AS count FROM {} WHERE {} IS NULL",
+                    LnAddress::Table.to_string(),
+                    LnAddress::AccountId.to_string(),
                 ),
             ))
             .await?
@@ -63,6 +62,32 @@ impl MigrationTrait for Migration {
                 "{missing} lightning address rows could not be mapped to an account"
             )));
         }
+
+        execute(
+            db,
+            r#"
+            ALTER TABLE ln_address
+                DROP CONSTRAINT IF EXISTS fk_user,
+                DROP CONSTRAINT IF EXISTS fk_ln_address_wallet
+            "#
+            .to_string(),
+        )
+        .await?;
+
+        execute(
+            db,
+            r#"
+            ALTER TABLE ln_address
+                ALTER COLUMN account_id SET NOT NULL,
+                ADD CONSTRAINT fk_ln_address_account
+                    FOREIGN KEY (account_id) REFERENCES account(id) ON DELETE CASCADE,
+                ADD CONSTRAINT fk_ln_address_wallet
+                    FOREIGN KEY (account_id, wallet_id)
+                    REFERENCES wallet(account_id, id) ON DELETE CASCADE
+            "#
+            .to_string(),
+        )
+        .await?;
 
         manager
             .create_index(
@@ -76,23 +101,15 @@ impl MigrationTrait for Migration {
             .await
     }
 
-    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        manager
-            .drop_index(
-                Index::drop()
-                    .name("idx_ln_address_account")
-                    .table(LnAddress::Table)
-                    .to_owned(),
-            )
-            .await?;
-
-        manager
-            .alter_table(
-                Table::alter()
-                    .table(LnAddress::Table)
-                    .drop_column(LnAddress::AccountId)
-                    .to_owned(),
-            )
-            .await
+    async fn down(&self, _manager: &SchemaManager) -> Result<(), DbErr> {
+        Err(DbErr::Migration(
+            "the lightning address account cutover is irreversible".to_string(),
+        ))
     }
+}
+
+async fn execute(db: &dyn ConnectionTrait, sql: String) -> Result<(), DbErr> {
+    db.execute(Statement::from_string(DatabaseBackend::Postgres, sql))
+        .await
+        .map(|_| ())
 }

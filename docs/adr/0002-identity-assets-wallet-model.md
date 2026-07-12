@@ -2,7 +2,7 @@
 
 | Field | Value |
 | --- | --- |
-| Status | Proposed |
+| Status | Accepted |
 | Date | 2026-07-02 |
 | Related issues | #297, #252, #254, #291, #292, #115, #237, #239, #240, #241 |
 | Scope | Identity, accounts, wallets, currencies/assets, network scoping, migration strategy |
@@ -61,7 +61,7 @@ That works for the BTC-only era because testnet/regtest BTC are often treated as
 ## Terminology
 
 - **Account**: the internal owner/authorization aggregate: the person or organization boundary, never a balance container. It has a stable UUID and owns wallets, API keys, account permissions, and identity-level settings.
-- **Auth identity**: a login identity from a provider, for example an OAuth2 subject or a local JWT username. Multiple identities may later point at one account, but the first migration creates one identity per account.
+- **Auth identity**: a login identity from a provider, for example an OAuth2 subject or a local JWT username. Migrated and authentication-provisioned accounts start with one identity; an administrator can create an account without one. Multiple identities may later point at one account.
 - **Currency**: the human-facing unit/ticker such as BTC or USDT.
 - **Network**: the settlement environment such as Bitcoin mainnet, testnet4, signet, or regtest.
 - **Asset**: the balance key: a currency on a specific network/protocol, optionally with a protocol-specific asset identifier. Assets, not currencies alone, are what wallets hold. Taproot Assets belongs here as an asset protocol, not as a balance ledger.
@@ -170,7 +170,7 @@ wallet(
   account_id UUID NOT NULL references account(id),
   asset_id UUID NOT NULL references asset(id),
   label TEXT NULL,
-  available_amount BIGINT NOT NULL DEFAULT 0 CHECK (available_amount >= 0),
+  available_amount BIGINT NOT NULL DEFAULT 0,
   reserved_amount BIGINT NOT NULL DEFAULT 0 CHECK (reserved_amount >= 0),
   created_at TIMESTAMP NOT NULL,
   updated_at TIMESTAMP NULL,
@@ -180,7 +180,7 @@ wallet(
 
 A user can own many wallets. Each wallet has exactly one asset. This is intentionally stricter than "one wallet row with many `wallet_balance` rows" because payments and invoices need one FK that fully identifies the spendable balance being mutated.
 
-`wallet.asset_id` is immutable after creation: payments and invoices derive their denomination through this FK, so changing it would silently redenominate history. The `CHECK` constraints are a portable backstop on both engines: the conditional reserve `UPDATE` already guards `available_amount`, but a reservation-release bug could otherwise drive `reserved_amount` negative without any error.
+`wallet.asset_id` is immutable after creation: payments and invoices derive their denomination through this FK, so changing it would silently redenominate history. `reserved_amount` has a portable non-negative `CHECK` constraint on both engines because a reservation-release bug must not create a negative hold. `available_amount` deliberately has no equivalent constraint: admission-time debits and reservations reject insufficient funds, but a provider-confirmed external spend must still be recorded when its final fee exceeds the reservation, surfacing the deficit as a negative available balance for reconciliation instead of stranding a settled payment.
 
 `wallet_balance` is dropped as part of the cutover once balances are copied onto asset-scoped wallets; until then it is only a migration source from ADR 0001. If we later need full reconciliation/audit history, add a real ledger-entry or reservation table; do not keep a second authoritative balance table next to `wallet`.
 
@@ -264,10 +264,14 @@ POST /v1/me/wallets/{id}/bitcoin/addresses
 Admin `/v1/wallets` endpoints should stop registering users implicitly. Split them into account management and wallet management:
 
 ```text
-POST /v1/accounts                 -> create an account / auth identity when admin-managed creation is needed
+POST /v1/accounts                 -> create an account without implicitly creating a login identity
 POST /v1/accounts/{id}/wallets    -> create an asset wallet for that account
 GET /v1/wallets                   -> admin list of wallets
 ```
+
+Authentication sign-up and first-login provisioning create the initial identity
+when they create an account. Explicitly linking an identity to an existing
+administrator-created account belongs to the future identity-management API.
 
 Exact endpoint naming can be adjusted with dashboard/API review, but the separation must be preserved.
 
@@ -354,7 +358,7 @@ The migration must support SQLite and Postgres and must preserve existing wallet
 
 3. For each `(old_wallet_id, currency)` present in `wallet_balance`, `payment`, or `invoice`, create exactly one asset-scoped wallet.
 4. Backfill wallet balances from `wallet_balance.available_amount` and `wallet_balance.reserved_amount`. If no `wallet_balance` row exists, derive the same values from settled invoices, settled payments, and pending reservations using the ADR 0001 formula.
-5. Fail loudly if balances would become negative in a way the new model cannot represent.
+5. Fail loudly if historical reserved balances are negative or historical available balances require operator reconciliation before cutover.
 
 ### Phase 3: Repoint resource FKs
 

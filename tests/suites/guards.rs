@@ -61,8 +61,8 @@ async fn every_admin_endpoint_enforces_its_permission() {
 
     cases.extend(crud(
         "/v1/invoices",
-        Permission::ReadLnTransaction,
-        Permission::WriteLnTransaction,
+        Permission::ReadTransaction,
+        Permission::WriteTransaction,
         id,
         body(NewInvoiceRequest {
             wallet_id: Some(uuid::Uuid::new_v4()),
@@ -74,8 +74,8 @@ async fn every_admin_endpoint_enforces_its_permission() {
 
     cases.extend(crud(
         "/v1/payments",
-        Permission::ReadLnTransaction,
-        Permission::WriteLnTransaction,
+        Permission::ReadTransaction,
+        Permission::WriteTransaction,
         id,
         body(SendPaymentRequest {
             wallet_id: Some(uuid::Uuid::new_v4()),

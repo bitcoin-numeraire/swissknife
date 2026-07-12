@@ -16,6 +16,7 @@ use sea_orm::{
 use uuid::Uuid;
 
 use super::SeaOrmConnection;
+use crate::infra::database::sea_orm::sea_order;
 
 #[derive(Clone)]
 pub struct SeaOrmInvoiceRepository<C = DatabaseConnection> {
@@ -105,10 +106,7 @@ where
                 ),
             })
             .apply_if(filter.ledger, |q, l| q.filter(Column::Ledger.eq(l.to_string())))
-            .order_by(
-                order_by_column,
-                crate::infra::database::sea_orm::sea_order(&filter.order_direction),
-            )
+            .order_by(order_by_column, sea_order(&filter.order_direction))
             .offset(filter.offset)
             .limit(filter.limit)
             .find_also_related(BtcOutput)

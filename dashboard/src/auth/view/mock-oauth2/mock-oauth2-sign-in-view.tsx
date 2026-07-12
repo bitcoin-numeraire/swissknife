@@ -45,6 +45,8 @@ const PERSONAS: MockOAuth2Persona[] = [
     description: 'All dashboard permissions',
     icon: 'solar:shield-keyhole-bold-duotone',
     permissions: [
+      Permission.READ_ACCOUNT,
+      Permission.WRITE_ACCOUNT,
       Permission.READ_WALLET,
       Permission.WRITE_WALLET,
       Permission.READ_LN_ADDRESS,

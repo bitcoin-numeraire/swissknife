@@ -54,23 +54,28 @@ impl WalletUseCases for WalletService {
     async fn get_by_account_id(&self, account_id: Uuid, id: Uuid) -> Result<Wallet, ApplicationError> {
         trace!(%account_id, %id, "Fetching account wallet");
 
-        let wallets = self
+        let wallet = self
             .store
             .wallet
-            .find_many(WalletFilter {
-                account_id: Some(account_id),
-                ids: Some(vec![id]),
-                ..Default::default()
-            })
-            .await?;
-
-        let wallet = wallets
-            .into_iter()
-            .next()
+            .find(id)
+            .await?
             .ok_or_else(|| DataError::NotFound("Wallet not found.".to_string()))?;
+        if wallet.account_id != account_id {
+            return Err(DataError::NotFound("Wallet not found.".to_string()).into());
+        }
 
         debug!(%account_id, %id, "Account wallet fetched successfully");
         Ok(wallet)
+    }
+
+    async fn verify_ownership(&self, account_id: Uuid, id: Uuid) -> Result<(), ApplicationError> {
+        trace!(%account_id, %id, "Verifying account wallet ownership");
+
+        if !self.store.wallet.exists_for_account(account_id, id).await? {
+            return Err(DataError::NotFound("Wallet not found.".to_string()).into());
+        }
+
+        Ok(())
     }
 
     async fn list(&self, filter: WalletFilter) -> Result<Vec<Wallet>, ApplicationError> {
@@ -225,6 +230,79 @@ mod tests {
 
                 assert!(matches!(err, ApplicationError::Data(DataError::NotFound(_))));
             }
+        }
+    }
+
+    mod get_by_account_id {
+        use super::*;
+
+        #[tokio::test]
+        async fn returns_the_hydrated_wallet_for_its_account() {
+            let id = Uuid::new_v4();
+            let account_id = Uuid::new_v4();
+            let mut store = MockAppStoreBuilder::new();
+            store
+                .wallet
+                .expect_find()
+                .times(1)
+                .returning(move |_| Ok(Some(wallet_fixture(id, account_id, Uuid::new_v4()))));
+            let service = WalletService::new(store.build());
+
+            let wallet = service.get_by_account_id(account_id, id).await.unwrap();
+
+            assert_eq!(wallet.id, id);
+            assert_eq!(wallet.account_id, account_id);
+        }
+
+        #[tokio::test]
+        async fn hides_a_wallet_owned_by_another_account() {
+            let id = Uuid::new_v4();
+            let mut store = MockAppStoreBuilder::new();
+            store
+                .wallet
+                .expect_find()
+                .times(1)
+                .returning(move |_| Ok(Some(wallet_fixture(id, Uuid::new_v4(), Uuid::new_v4()))));
+            let service = WalletService::new(store.build());
+
+            let error = service.get_by_account_id(Uuid::new_v4(), id).await.unwrap_err();
+
+            assert!(matches!(error, ApplicationError::Data(DataError::NotFound(_))));
+        }
+    }
+
+    mod verify_ownership {
+        use super::*;
+
+        #[tokio::test]
+        async fn succeeds_when_the_repository_finds_the_pair() {
+            let mut store = MockAppStoreBuilder::new();
+            store
+                .wallet
+                .expect_exists_for_account()
+                .times(1)
+                .returning(|_, _| Ok(true));
+            let service = WalletService::new(store.build());
+
+            assert!(service.verify_ownership(Uuid::new_v4(), Uuid::new_v4()).await.is_ok());
+        }
+
+        #[tokio::test]
+        async fn reports_not_found_when_the_pair_does_not_exist() {
+            let mut store = MockAppStoreBuilder::new();
+            store
+                .wallet
+                .expect_exists_for_account()
+                .times(1)
+                .returning(|_, _| Ok(false));
+            let service = WalletService::new(store.build());
+
+            let error = service
+                .verify_ownership(Uuid::new_v4(), Uuid::new_v4())
+                .await
+                .unwrap_err();
+
+            assert!(matches!(error, ApplicationError::Data(DataError::NotFound(_))));
         }
     }
 

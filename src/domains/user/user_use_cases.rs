@@ -6,7 +6,7 @@ use swissknife_types::CreateApiKeyRequest;
 
 use crate::application::errors::ApplicationError;
 
-use super::{Account, AccountPreferences, ApiKey, ApiKeyFilter, User};
+use super::{Account, AccountFilter, AccountPreferences, ApiKey, ApiKeyFilter, CreateAccountRequest, Permission, User};
 
 #[cfg_attr(test, mockall::automock)]
 #[async_trait]
@@ -21,12 +21,18 @@ pub trait AuthUseCases: Send + Sync {
 #[cfg_attr(test, mockall::automock)]
 #[async_trait]
 pub trait AccountUseCases: Send + Sync {
+    async fn create(&self, request: CreateAccountRequest) -> Result<Account, ApplicationError>;
     async fn get(&self, id: Uuid) -> Result<Account, ApplicationError>;
+    async fn list(&self, filter: AccountFilter) -> Result<Vec<Account>, ApplicationError>;
+    async fn update(&self, id: Uuid, display_name: Option<String>) -> Result<Account, ApplicationError>;
+    async fn update_permissions(&self, id: Uuid, permissions: Vec<Permission>) -> Result<Account, ApplicationError>;
     async fn update_preferences(
         &self,
         id: Uuid,
         dashboard_settings: Value,
     ) -> Result<AccountPreferences, ApplicationError>;
+    async fn delete(&self, id: Uuid) -> Result<(), ApplicationError>;
+    async fn delete_many(&self, filter: AccountFilter) -> Result<u64, ApplicationError>;
 }
 
 #[cfg_attr(test, mockall::automock)]

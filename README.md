@@ -20,15 +20,16 @@ If you like what we do, consider starring, sharing and contributing!
 - [`Lightning Address`](https://lightningaddress.com/). Deploy your own Lightning Address infrastructure. Like email, anyone can use identifiers (`username@your.domain`) to send and receive payments.
 - [`Nostr`](https://github.com/nostr-protocol/nips/blob/master/05.md). NIP-05 and Zap support through your Lightning Address.
 - Generate invoices.
-- Account segregation. Support any amount of users.
+- Explicit accounts and authentication identities, with any number of asset-scoped wallets per account.
+- Wallet balances scoped to one asset and one settlement network.
 - Internal ledger for instant payments on the same SwissKnife instance.
 - REST API.
 - Frequent contacts.
-- `JWKS` with automatic public key retrieval
-- `JWT` token authentication` (tested with Auth0, Supabase).
-- `RBAC`. Fine grained authorization per route.
+- OIDC/OAuth2 authentication with automatic JWKS discovery and key refresh (tested with Auth0).
+- Local JWT authentication for self-hosted deployments.
+- `RBAC`. Fine-grained authorization per route and attenuated API key.
 - Data availability through pagination and advanced search.
-- API keys authentication
+- Account-scoped API key authentication
 
 Numeraire SwissKnife ships with a [Dashboard](https://github.com/bitcoin-numeraire/swissknife/dashboard).
 
@@ -114,4 +115,4 @@ Developer documentation:
 #### Smart contracts
 
 - [ ] [RGB](https://rgb.tech/) Smart contracts
-- [x] [Taproot Assets](https://docs.lightning.engineering/the-lightning-network/taproot-assets).
+- [ ] [Taproot Assets](https://docs.lightning.engineering/the-lightning-network/taproot-assets) settlement adapter (the asset-scoped wallet model is ready for it).

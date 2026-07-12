@@ -8,8 +8,6 @@ pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
     pub id: Uuid,
     #[sea_orm(unique)]
-    pub account_id: Uuid,
-    #[sea_orm(unique)]
     pub wallet_id: Uuid,
     #[sea_orm(unique)]
     pub username: String,
@@ -18,6 +16,8 @@ pub struct Model {
     pub updated_at: Option<DateTime>,
     pub allows_nostr: bool,
     pub nostr_pubkey: Option<String>,
+    #[sea_orm(unique)]
+    pub account_id: Uuid,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
@@ -32,10 +32,11 @@ pub enum Relation {
     Account,
     #[sea_orm(has_many = "super::invoice::Entity")]
     Invoice,
+    // Codegen 1.1.19 duplicates AccountId here because it participates in both account and wallet FKs.
     #[sea_orm(
         belongs_to = "super::wallet::Entity",
-        from = "Column::WalletId",
-        to = "super::wallet::Column::Id",
+        from = "(Column::AccountId, Column::WalletId)",
+        to = "(super::wallet::Column::AccountId, super::wallet::Column::Id)",
         on_update = "NoAction",
         on_delete = "Cascade"
     )]

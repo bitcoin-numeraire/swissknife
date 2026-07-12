@@ -72,7 +72,7 @@ async fn generate_invoice(
     user: User,
     Json(payload): Json<NewInvoiceRequest>,
 ) -> Result<Json<Invoice>, ApplicationError> {
-    user.check_permission(Permission::WriteLnTransaction)?;
+    user.check_permission(Permission::WriteTransaction)?;
     let wallet_id = payload
         .wallet_id
         .ok_or_else(|| DataError::Malformed("wallet_id is required.".to_string()))?;
@@ -106,7 +106,7 @@ async fn get_invoice(
     user: User,
     Path(id): Path<Uuid>,
 ) -> Result<Json<Invoice>, ApplicationError> {
-    user.check_permission(Permission::ReadLnTransaction)?;
+    user.check_permission(Permission::ReadTransaction)?;
 
     let invoice = services.invoice.get(id).await?;
     Ok(Json(invoice))
@@ -134,7 +134,7 @@ async fn list_invoices(
     user: User,
     Query(filter): Query<InvoiceFilter>,
 ) -> Result<Json<Vec<Invoice>>, ApplicationError> {
-    user.check_permission(Permission::ReadLnTransaction)?;
+    user.check_permission(Permission::ReadTransaction)?;
 
     let invoices = services.invoice.list(filter).await?;
 
@@ -163,7 +163,7 @@ async fn delete_invoice(
     user: User,
     Path(id): Path<Uuid>,
 ) -> Result<(), ApplicationError> {
-    user.check_permission(Permission::WriteLnTransaction)?;
+    user.check_permission(Permission::WriteTransaction)?;
 
     services.invoice.delete(id).await?;
     Ok(())
@@ -191,7 +191,7 @@ async fn delete_invoices(
     user: User,
     Query(query_params): Query<InvoiceFilter>,
 ) -> Result<Json<u64>, ApplicationError> {
-    user.check_permission(Permission::WriteLnTransaction)?;
+    user.check_permission(Permission::WriteTransaction)?;
 
     let n_deleted = services.invoice.delete_many(query_params).await?;
     Ok(n_deleted.into())
@@ -245,7 +245,7 @@ mod tests {
 
             #[tokio::test]
             async fn uses_the_explicit_wallet_id() {
-                let caller = user(vec![Permission::WriteLnTransaction]);
+                let caller = user(vec![Permission::WriteTransaction]);
                 let expected_wallet = Uuid::new_v4();
 
                 let mut builder = MockAppServicesBuilder::new();

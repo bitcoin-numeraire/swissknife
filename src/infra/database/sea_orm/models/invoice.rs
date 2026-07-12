@@ -28,6 +28,7 @@ pub struct Model {
     pub created_at: DateTime,
     pub updated_at: Option<DateTime>,
     pub expires_at: Option<DateTime>,
+    #[sea_orm(unique)]
     pub btc_output_id: Option<Uuid>,
 }
 

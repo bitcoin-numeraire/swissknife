@@ -13,6 +13,8 @@
             "picture": "/logo/logo_square.png",
             "aud": ["https://swissknife.local/api"],
             "permissions": [
+              "read:account",
+              "write:account",
               "read:wallet",
               "write:wallet",
               "read:ln_address",
