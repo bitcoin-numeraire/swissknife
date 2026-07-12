@@ -364,25 +364,14 @@ async fn account_repository_crud_keeps_the_aggregate_consistent() {
     assert_eq!(listed.len(), 1);
     assert_eq!(listed[0].display_name.as_deref(), Some("Operator"));
 
-    let updated = repo
-        .update(account.id, Some("Treasury".to_string()))
-        .await
-        .unwrap()
-        .unwrap();
+    let mut updated = account.clone();
+    updated.display_name = Some("Treasury".to_string());
+    let updated = repo.update(updated).await.unwrap();
     assert_eq!(updated.display_name.as_deref(), Some("Treasury"));
 
-    let updated = repo
-        .update_permissions(
-            account.id,
-            &[
-                Permission::ReadAccount,
-                Permission::ReadAccount,
-                Permission::WriteWallet,
-            ],
-        )
-        .await
-        .unwrap()
-        .unwrap();
+    let mut updated = updated;
+    updated.permissions = Some(vec![Permission::ReadAccount, Permission::WriteWallet]);
+    let updated = repo.update(updated).await.unwrap();
     assert_eq!(
         updated.permissions,
         Some(vec![Permission::ReadAccount, Permission::WriteWallet])

@@ -54,7 +54,12 @@ impl WalletUseCases for WalletService {
     async fn get_by_account_id(&self, account_id: Uuid, id: Uuid) -> Result<Wallet, ApplicationError> {
         trace!(%account_id, %id, "Fetching account wallet");
 
-        let wallet = self.get(id).await?;
+        let wallet = self
+            .store
+            .wallet
+            .find(id)
+            .await?
+            .ok_or_else(|| DataError::NotFound("Wallet not found.".to_string()))?;
         if wallet.account_id != account_id {
             return Err(DataError::NotFound("Wallet not found.".to_string()).into());
         }

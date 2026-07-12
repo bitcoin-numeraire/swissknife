@@ -282,52 +282,30 @@ impl AccountRepository for SeaOrmAccountRepository {
         Ok(account)
     }
 
-    async fn update(&self, id: Uuid, display_name: Option<String>) -> Result<Option<Account>, DatabaseError> {
-        let Some(existing) = AccountEntity::find_by_id(id)
-            .one(&self.db)
-            .await
-            .map_err(|e| DatabaseError::FindOne(e.to_string()))?
-        else {
-            return Ok(None);
-        };
+    async fn update(&self, account: Account) -> Result<Account, DatabaseError> {
+        let permissions = account
+            .permissions
+            .as_ref()
+            .ok_or_else(|| DatabaseError::Update("account permissions are missing".to_string()))?;
+        let permissions = serde_json::to_value(permissions).map_err(|e| DatabaseError::Update(e.to_string()))?;
+        let identity = account.identity;
+        let preferences = account.preferences;
 
-        let mut account: account::ActiveModel = existing.into();
-        account.display_name = Set(display_name);
-        account.updated_at = Set(Some(Utc::now().naive_utc()));
-        account
-            .update(&self.db)
-            .await
-            .map_err(|e| DatabaseError::Update(e.to_string()))?;
-
-        self.find(id).await
-    }
-
-    async fn update_permissions(&self, id: Uuid, permissions: &[Permission]) -> Result<Option<Account>, DatabaseError> {
-        let Some(existing) = AccountEntity::find_by_id(id)
-            .one(&self.db)
-            .await
-            .map_err(|e| DatabaseError::FindOne(e.to_string()))?
-        else {
-            return Ok(None);
-        };
-
-        let mut unique_permissions = Vec::new();
-        for permission in permissions {
-            if !unique_permissions.contains(permission) {
-                unique_permissions.push(permission.clone());
-            }
+        let account_model = account::ActiveModel {
+            id: Set(account.id),
+            display_name: Set(account.display_name),
+            permissions: Set(permissions),
+            updated_at: Set(Some(Utc::now().naive_utc())),
+            ..Default::default()
         }
+        .update(&self.db)
+        .await
+        .map_err(|e| DatabaseError::Update(e.to_string()))?;
 
-        let permissions = serde_json::to_value(unique_permissions).map_err(|e| DatabaseError::Update(e.to_string()))?;
-        let mut account: account::ActiveModel = existing.into();
-        account.permissions = Set(permissions);
-        account.updated_at = Set(Some(Utc::now().naive_utc()));
-        account
-            .update(&self.db)
-            .await
-            .map_err(|e| DatabaseError::Update(e.to_string()))?;
-
-        self.find(id).await
+        let mut account: Account = account_model.into();
+        account.identity = identity;
+        account.preferences = preferences;
+        Ok(account)
     }
 
     async fn update_preferences(

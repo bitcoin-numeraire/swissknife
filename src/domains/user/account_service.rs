@@ -61,12 +61,14 @@ impl AccountUseCases for AccountService {
     async fn update(&self, id: Uuid, display_name: Option<String>) -> Result<Account, ApplicationError> {
         debug!(%id, "Updating account");
 
-        let account = self
+        let mut account = self
             .store
             .account
-            .update(id, display_name)
+            .find(id)
             .await?
             .ok_or_else(|| DataError::NotFound("Account not found.".to_string()))?;
+        account.display_name = display_name;
+        let account = self.store.account.update(account).await?;
 
         info!(%id, "Account updated successfully");
         Ok(account)
@@ -75,12 +77,20 @@ impl AccountUseCases for AccountService {
     async fn update_permissions(&self, id: Uuid, permissions: Vec<Permission>) -> Result<Account, ApplicationError> {
         debug!(%id, "Updating account permissions");
 
-        let account = self
+        let mut account = self
             .store
             .account
-            .update_permissions(id, &permissions)
+            .find(id)
             .await?
             .ok_or_else(|| DataError::NotFound("Account not found.".to_string()))?;
+        let mut unique_permissions = Vec::new();
+        for permission in permissions {
+            if !unique_permissions.contains(&permission) {
+                unique_permissions.push(permission);
+            }
+        }
+        account.permissions = Some(unique_permissions);
+        let account = self.store.account.update(account).await?;
 
         info!(%id, "Account permissions updated successfully");
         Ok(account)
@@ -211,7 +221,7 @@ mod tests {
         #[tokio::test]
         async fn reports_a_missing_account() {
             let mut store = MockAppStoreBuilder::new();
-            store.account.expect_update().times(1).returning(|_, _| Ok(None));
+            store.account.expect_find().times(1).returning(|_| Ok(None));
             let service = AccountService::new(store.build());
 
             let error = service.update(Uuid::new_v4(), None).await.unwrap_err();
@@ -231,14 +241,22 @@ mod tests {
             let mut store = MockAppStoreBuilder::new();
             store
                 .account
-                .expect_update_permissions()
-                .withf(move |id, permissions| *id == account_id && permissions == [Permission::ReadAccount])
+                .expect_find()
+                .withf(move |id| *id == account_id)
                 .times(1)
-                .returning(move |_, _| Ok(Some(updated.clone())));
+                .returning(move |_| Ok(Some(account_fixture(account_id))));
+            store
+                .account
+                .expect_update()
+                .withf(move |account| {
+                    account.id == account_id && account.permissions == Some(vec![Permission::ReadAccount])
+                })
+                .times(1)
+                .returning(move |_| Ok(updated.clone()));
             let service = AccountService::new(store.build());
 
             let account = service
-                .update_permissions(account_id, vec![Permission::ReadAccount])
+                .update_permissions(account_id, vec![Permission::ReadAccount, Permission::ReadAccount])
                 .await
                 .unwrap();
 

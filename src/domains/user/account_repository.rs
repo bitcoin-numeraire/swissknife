@@ -23,8 +23,7 @@ pub trait AccountRepository: Send + Sync {
         display_name: Option<String>,
         initial_permissions: &[Permission],
     ) -> Result<Account, DatabaseError>;
-    async fn update(&self, id: Uuid, display_name: Option<String>) -> Result<Option<Account>, DatabaseError>;
-    async fn update_permissions(&self, id: Uuid, permissions: &[Permission]) -> Result<Option<Account>, DatabaseError>;
+    async fn update(&self, account: Account) -> Result<Account, DatabaseError>;
     async fn update_preferences(
         &self,
         id: Uuid,
