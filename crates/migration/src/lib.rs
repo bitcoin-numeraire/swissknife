@@ -96,6 +96,10 @@ mod tests {
 
         assert_eq!(count(&conn, "SELECT COUNT(*) AS count FROM asset").await, 6);
         assert_eq!(
+            count(&conn, "SELECT COUNT(*) AS count FROM asset WHERE name = 'Bitcoin'").await,
+            6
+        );
+        assert_eq!(
             count(&conn, "SELECT COUNT(*) AS count FROM asset WHERE length(id) = 16").await,
             6
         );

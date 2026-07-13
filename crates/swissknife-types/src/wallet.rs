@@ -63,7 +63,7 @@ pub struct Asset {
     /// Stable server asset code, independent of network-specific UI ticker.
     #[schema(example = "BTC")]
     pub code: String,
-    /// Optional display name
+    /// Optional human-readable asset name, independent of its settlement network.
     #[serde(skip_serializing_if = "Option::is_none")]
     #[schema(example = "Bitcoin")]
     pub name: Option<String>,

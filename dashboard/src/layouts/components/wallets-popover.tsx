@@ -163,7 +163,7 @@ export function WalletsPopover({ sx, ...other }: ButtonBaseProps) {
 
               <ListItemText
                 primary={walletName(wallet)}
-                secondary={`${walletTicker(wallet)} - ${walletNetwork(wallet)}`}
+                secondary={wallet.label ? wallet.asset?.name : undefined}
                 sx={{ mx: 1.5 }}
               />
 
