@@ -15,6 +15,7 @@ import { useAccountContext } from 'src/contexts/account';
 import { zCreateWalletRequest } from 'src/lib/swissknife/zod.gen';
 
 import { toast } from 'src/components/snackbar';
+import { AccountSelect } from 'src/components/account';
 import { Form, RHFTextField } from 'src/components/hook-form';
 
 // ----------------------------------------------------------------------
@@ -65,12 +66,16 @@ export function RegisterWalletForm({ accountId, onSuccess }: NewWalletFormProps)
   return (
     <Form methods={methods} onSubmit={handleSubmit(onSubmit)}>
       <Stack spacing={3}>
-        <RHFTextField
-          variant="outlined"
-          name="account_id"
-          label={t('register_wallet.account_id')}
-          disabled={Boolean(accountId)}
-        />
+        {accountId ? (
+          <RHFTextField
+            variant="outlined"
+            name="account_id"
+            label={t('register_wallet.account_id')}
+            disabled
+          />
+        ) : (
+          <AccountSelect />
+        )}
         <Button
           type="submit"
           variant="contained"
