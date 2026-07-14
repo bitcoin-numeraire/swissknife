@@ -146,7 +146,7 @@ export function ApiKeyTableRow({ row, selected, onSelectRow, onDeleteRow }: Prop
         <TableCell sx={{ py: 0 }} colSpan={8}>
           <Collapse in={collapsible.value} timeout="auto" unmountOnExit>
             <Stack direction="row" spacing={0.5} sx={{ my: 2, flexWrap: 'wrap' }}>
-              <Label color="secondary">{t('api_key_list.account_wallet_permission')}</Label>
+              <Label color="secondary">{t('api_key_list.account_wallet_access')}</Label>
 
               {permissions.map((permission, i) => (
                 <Label key={i}>{permission}</Label>

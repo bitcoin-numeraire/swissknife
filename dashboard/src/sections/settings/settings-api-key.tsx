@@ -165,7 +165,7 @@ function CollapsibleTableRow({ row }: CollapsibleTableRowProps) {
           <Collapse in={collapsible.value} timeout="auto" unmountOnExit>
             <Stack direction="row" spacing={1} sx={{ my: 2 }}>
               <Label variant="soft" color="secondary">
-                {t('api_key_list.account_wallet_permission')}
+                {t('api_key_list.account_wallet_access')}
               </Label>
               {row.permissions.map((scope) => (
                 <Label key={scope} variant="soft" color="default">

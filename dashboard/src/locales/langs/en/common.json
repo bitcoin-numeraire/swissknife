@@ -878,6 +878,6 @@
     "never": "Never",
     "scope_count_one": "{{count}} scope",
     "scope_count_other": "{{count}} scopes",
-    "account_wallet_permission": "read:wallet"
+    "account_wallet_access": "Account wallets"
   }
 }
