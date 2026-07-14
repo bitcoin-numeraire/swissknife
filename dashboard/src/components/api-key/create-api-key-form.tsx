@@ -158,7 +158,7 @@ export function CreateApiKeyForm({ onSuccess, isAdmin }: Props) {
           ) : (
             <Alert variant="filled" severity="info">
               {t('create_api_key_form.no_permissions')}:{' '}
-              <Link href={`${CONFIG.serverUrl}/docs#tag/user-wallet`} target="_blank">
+              <Link href={`${CONFIG.serverUrl}/docs#tag/me`} target="_blank">
                 See Docs
               </Link>
             </Alert>

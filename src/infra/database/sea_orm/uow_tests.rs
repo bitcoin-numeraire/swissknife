@@ -17,7 +17,7 @@ use uuid::Uuid;
 
 use crate::application::composition::Ledger;
 use crate::application::errors::{ApplicationError, DataError};
-use crate::domains::account::{AccountFilter, AccountRepository, AuthProvider, Permission};
+use crate::domains::account::{AccountFilter, AccountRepository, ApiKey, ApiKeyRepository, AuthProvider, Permission};
 use crate::domains::event::EventProjectionUnitOfWork;
 use crate::domains::invoice::{Invoice, InvoiceRepository};
 use crate::domains::payment::{LnPayment, Payment, PaymentStatus, PaymentUnitOfWork};
@@ -25,8 +25,8 @@ use crate::domains::{asset::AssetRepository, bitcoin::BtcNetwork, wallet::Wallet
 
 use super::models::{prelude::Wallet, wallet};
 use super::{
-    SeaOrmAccountRepository, SeaOrmAssetRepository, SeaOrmEventProjectionUnitOfWork, SeaOrmInvoiceRepository,
-    SeaOrmPaymentUnitOfWork, SeaOrmWalletRepository,
+    SeaOrmAccountRepository, SeaOrmApiKeyRepository, SeaOrmAssetRepository, SeaOrmEventProjectionUnitOfWork,
+    SeaOrmInvoiceRepository, SeaOrmPaymentUnitOfWork, SeaOrmWalletRepository,
 };
 
 static COUNTER: AtomicU64 = AtomicU64::new(0);
@@ -386,6 +386,16 @@ async fn account_repository_crud_keeps_the_aggregate_consistent() {
     let wallet = wallet_repo.upsert(account.id, asset.id).await.unwrap();
     assert!(wallet_repo.exists_for_account(account.id, wallet.id).await.unwrap());
     assert!(!wallet_repo.exists_for_account(Uuid::new_v4(), wallet.id).await.unwrap());
+    SeaOrmApiKeyRepository::new(conn.clone())
+        .insert(ApiKey {
+            account_id: account.id,
+            name: "operator key".to_string(),
+            key_hash: vec![42; 32],
+            permissions: vec![Permission::ReadWallet],
+            ..Default::default()
+        })
+        .await
+        .unwrap();
 
     assert_eq!(
         repo.delete_many(AccountFilter {
@@ -403,6 +413,7 @@ async fn account_repository_crud_keeps_the_aggregate_consistent() {
         0
     );
     assert_eq!(count(&conn, "SELECT COUNT(*) AS count FROM wallet").await, 0);
+    assert_eq!(count(&conn, "SELECT COUNT(*) AS count FROM api_key").await, 0);
 }
 
 #[tokio::test]

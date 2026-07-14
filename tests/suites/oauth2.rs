@@ -7,13 +7,14 @@
 //! signature validation against the fetched JWKS, audience/issuer/expiry checks,
 //! the `sub` -> account/wallet provisioning, and JWT-scope -> permission enforcement.
 
+use futures_util::future::join_all;
 use reqwest::StatusCode;
 use serde_json::json;
 
 use swissknife_types::{Account, RegisterLnAddressRequest, Wallet};
 
 use crate::common::fixtures::unique;
-use crate::common::oauth2::{oauth2_app, CLIENT_FULL, CLIENT_READONLY, CLIENT_WRONG_AUD};
+use crate::common::oauth2::{oauth2_app, CLIENT_CONCURRENT, CLIENT_FULL, CLIENT_READONLY, CLIENT_WRONG_AUD};
 use crate::common::{assert_error, assert_status, Auth};
 
 mod accepts {
@@ -67,6 +68,31 @@ mod accepts {
 
         let res = app.api().get("/v1/wallets", Auth::Bearer(&token)).await;
         assert_status(&res, StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn concurrent_first_requests_provision_one_account_and_wallet_without_server_errors() {
+        let app = oauth2_app().await;
+        let token = app.token(CLIENT_CONCURRENT).await;
+        let responses = join_all((0..8).map(|_| {
+            let api = app.api();
+            let token = token.clone();
+            async move { api.get("/v1/me", Auth::Bearer(&token)).await }
+        }))
+        .await;
+
+        let mut account_id = None;
+        for response in responses {
+            assert_status(&response, StatusCode::OK);
+            let current = response.parse::<Account>().id;
+            assert_eq!(*account_id.get_or_insert(current), current);
+        }
+
+        let wallets = app.api().get("/v1/me/wallets", Auth::Bearer(&token)).await;
+        assert_status(&wallets, StatusCode::OK);
+        let wallets = wallets.parse::<Vec<Wallet>>();
+        assert_eq!(wallets.len(), 1, "concurrent authentication provisions one wallet");
+        assert_eq!(wallets[0].account_id, account_id.expect("provisioned account ID"));
     }
 }
 

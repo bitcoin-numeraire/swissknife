@@ -47,7 +47,7 @@ pub fn api_key_router() -> Router<Arc<AppServices>> {
 
 /// Generate a new API Key
 ///
-/// Returns the generated API Key for the requested account. Users can create API keys with permissions
+/// Returns the generated API Key for the requested account. Callers can create API keys with permissions
 /// as a subset of their current permissions.
 #[utoipa::path(
     post,

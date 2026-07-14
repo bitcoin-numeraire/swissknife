@@ -17,7 +17,7 @@ use tokio::{
 use super::client::{ApiClient, Auth};
 use super::db::TestDatabase;
 
-/// Password for the bootstrap admin user created during [`TestApp::start`].
+/// Password for the bootstrap admin account created during [`TestApp::start`].
 pub const ADMIN_PASSWORD: &str = "integration-admin-password";
 
 const STARTUP_TIMEOUT: Duration = Duration::from_secs(90);
@@ -66,7 +66,6 @@ pub async fn app() -> &'static TestApp {
 pub struct TestApp {
     pub base_url: String,
     pub database: String,
-    pub database_url: String,
     pub provider: String,
     admin_jwt: String,
     stdout_path: PathBuf,
@@ -84,7 +83,6 @@ pub fn matrix_cell() -> (String, String) {
 /// A spawned, ready SwissKnife instance: its base URL and log paths.
 pub struct Spawned {
     pub base_url: String,
-    pub database_url: String,
     pub stdout_path: PathBuf,
     pub stderr_path: PathBuf,
 }
@@ -101,7 +99,6 @@ pub async fn spawn_instance(database: &str, provider: &str, label: &str, extra_e
     let root = repo_root();
 
     let db = TestDatabase::provision(database, &root, label).await;
-    let database_url = db.url().to_string();
     let port = free_port();
     let base_url = format!("http://127.0.0.1:{port}");
 
@@ -141,7 +138,6 @@ pub async fn spawn_instance(database: &str, provider: &str, label: &str, extra_e
 
     Spawned {
         base_url,
-        database_url,
         stdout_path,
         stderr_path,
     }
@@ -160,7 +156,6 @@ impl TestApp {
         TestApp {
             base_url: spawned.base_url,
             database,
-            database_url: spawned.database_url,
             provider,
             admin_jwt,
             stdout_path: spawned.stdout_path,
@@ -198,18 +193,6 @@ async fn bootstrap_admin(api: &ApiClient) -> String {
         .as_str()
         .expect("auth response contains a token")
         .to_string();
-
-    // The admin's wallet is provisioned lazily on the first authenticated
-    // request, and that path is a non-atomic find-then-insert (see the itest
-    // follow-up issue). Trigger it once here, serially, so parallel tests never
-    // race to create the same wallet.
-    let warmup = api.get("/v1/me", Auth::Bearer(&token)).await;
-    assert_eq!(
-        warmup.status.as_u16(),
-        200,
-        "admin warmup (/v1/me) failed: {}",
-        warmup.body
-    );
 
     token
 }

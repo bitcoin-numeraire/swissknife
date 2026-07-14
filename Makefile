@@ -24,7 +24,7 @@ ITEST_ENV = SWISSKNIFE_ITEST_COMPOSE_PROJECT=$(ITEST_PROJECT) \
 	SWISSKNIFE_ITEST_DATABASE=$(ITEST_DATABASE) \
 	SWISSKNIFE_ITEST_PROVIDER=$(ITEST_PROVIDER)
 
-.PHONY: watch up up-swissknife up-server up-postgres up-pgadmin up-oauth2 down-oauth2 oauth2-token shutdown down generate-certs build protos build-docker build-docker-server build-docker-dashboard run-docker lint fmt fmt-fix test test-unit test-integration test-persistence itest-up itest-down itest-shutdown itest-logs coverage coverage-html coverage-lcov coverage-matrix clean check deps-upgrade deps-outdated install-tools generate-models new-migration run-migrations fresh-migrations
+.PHONY: watch up up-swissknife up-server up-postgres up-pgadmin up-oauth2 down-oauth2 oauth2-token shutdown down generate-certs build protos build-docker build-docker-server build-docker-dashboard run-docker lint fmt fmt-fix test test-unit test-integration test-integration-fresh test-persistence itest-up itest-down itest-shutdown itest-logs coverage coverage-html coverage-lcov coverage-matrix clean check deps-upgrade deps-outdated install-tools generate-models new-migration run-migrations fresh-migrations
 
 watch:
 	@cargo watch -x run
@@ -133,6 +133,11 @@ test-unit:
 # Narrow to a suite/test with TEST=... and pass runner flags with TESTARGS=...
 test-integration: itest-up
 	@$(ITEST_ENV) cargo test --features itest --test api $(TEST) -- $(TESTARGS)
+
+# Recreate dependency volumes before a liquidity-sensitive integration run.
+test-integration-fresh:
+	@$(MAKE) itest-shutdown
+	@$(MAKE) test-integration ITEST_DATABASE=$(ITEST_DATABASE) ITEST_PROVIDER=$(ITEST_PROVIDER) ITEST_PROJECT=$(ITEST_PROJECT) TESTARGS="$(TESTARGS) --test-threads=1"
 
 # Run the persistence / Unit-of-Work tests for one database cell: real-DB
 # coverage of the reservation/settlement balance invariants and concurrency.

@@ -776,7 +776,7 @@ async fn delete_failed_payments(
 
 /// Generate a new API Key
 ///
-/// Returns the generated API Key for the account. Users can create API keys with
+/// Returns the generated API Key for the account. Callers can create API keys with
 /// permissions as a subset of their current permissions.
 #[utoipa::path(
     post,

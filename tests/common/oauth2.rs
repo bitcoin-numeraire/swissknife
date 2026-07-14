@@ -13,7 +13,7 @@ use reqwest::Client;
 use serde_json::Value;
 use tokio::sync::OnceCell;
 
-use super::client::{ApiClient, Auth};
+use super::client::ApiClient;
 use super::harness::{matrix_cell, spawn_instance};
 
 /// Audience the IdP mints into tokens and the instance is configured to require.
@@ -26,6 +26,7 @@ pub const ISSUER_ID: &str = "default";
 /// `client_id`s the IdP config maps to specific claim sets.
 pub const CLIENT_FULL: &str = "itest-full"; // all permissions
 pub const CLIENT_READONLY: &str = "itest-readonly"; // read:wallet only
+pub const CLIENT_CONCURRENT: &str = "itest-concurrent"; // fresh provisioning subject
 pub const CLIENT_WRONG_AUD: &str = "itest-wrong-aud"; // mismatched audience
 
 /// Host:port at which both the binary and the tests reach the IdP, so the
@@ -71,28 +72,9 @@ impl OAuth2App {
         )
         .await;
 
-        let app = OAuth2App {
+        OAuth2App {
             base_url: spawned.base_url,
             idp_base,
-        };
-        app.warmup().await;
-        app
-    }
-
-    /// Provision the wallets for the fixed subjects up front, serially, so
-    /// parallel tests never race the non-atomic first-login wallet creation
-    /// (see bitcoin-numeraire/swissknife#254). `/v1/me` runs no permission check,
-    /// so any authenticated token reaches it.
-    async fn warmup(&self) {
-        for client_id in [CLIENT_FULL, CLIENT_READONLY] {
-            let token = self.token(client_id).await;
-            let res = self.api().get("/v1/me", Auth::Bearer(&token)).await;
-            assert_eq!(
-                res.status.as_u16(),
-                200,
-                "oauth2 warmup (/v1/me) for {client_id} failed: {}",
-                res.body
-            );
         }
     }
 

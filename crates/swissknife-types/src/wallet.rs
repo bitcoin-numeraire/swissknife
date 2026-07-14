@@ -138,7 +138,7 @@ pub struct WalletOverview {
     pub label: Option<String>,
     /// Lightning Address
     pub ln_address: Option<LnAddress>,
-    /// User Balance
+    /// Wallet balance
     pub balance: Balance,
     /// Number of payments
     pub n_payments: u32,

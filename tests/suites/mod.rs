@@ -2,6 +2,7 @@
 
 mod accounts;
 mod api_keys;
+mod asset_scoping;
 mod auth;
 mod bitcoin;
 mod guards;

@@ -38,6 +38,15 @@
         },
         {
           "requestParam": "client_id",
+          "match": "itest-concurrent",
+          "claims": {
+            "sub": "itest-oauth2-concurrent",
+            "aud": ["https://swissknife.itest/api"],
+            "permissions": ["read:wallet"]
+          }
+        },
+        {
+          "requestParam": "client_id",
           "match": "itest-wrong-aud",
           "claims": {
             "sub": "itest-oauth2-wrong-aud",

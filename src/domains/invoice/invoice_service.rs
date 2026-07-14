@@ -10,7 +10,11 @@ use crate::{
         composition::{AppStore, Ledger},
         errors::{ApplicationError, DataError},
     },
-    domains::event::{EventUseCases, LnInvoicePaidEvent},
+    domains::{
+        asset::{Protocol, NATIVE_ASSET_REF},
+        bitcoin::BtcNetwork,
+        event::{EventUseCases, LnInvoicePaidEvent},
+    },
     infra::lightning::LnClient,
 };
 
@@ -23,6 +27,7 @@ pub struct InvoiceService {
     ln_client: Arc<dyn LnClient>,
     invoice_expiry: u32,
     events: Arc<dyn EventUseCases>,
+    network: BtcNetwork,
 }
 
 impl InvoiceService {
@@ -31,13 +36,38 @@ impl InvoiceService {
         ln_client: Arc<dyn LnClient>,
         invoice_expiry: u32,
         events: Arc<dyn EventUseCases>,
+        network: BtcNetwork,
     ) -> Self {
         InvoiceService {
             store,
             ln_client,
             invoice_expiry,
             events,
+            network,
         }
+    }
+
+    async fn ensure_wallet_network(&self, wallet_id: Uuid) -> Result<(), ApplicationError> {
+        let wallet = self
+            .store
+            .wallet
+            .find(wallet_id)
+            .await?
+            .ok_or_else(|| DataError::NotFound(format!("Wallet {wallet_id} not found")))?;
+        let asset = wallet.asset.ok_or_else(|| {
+            DataError::Inconsistency(format!(
+                "Wallet {wallet_id} is missing asset metadata for invoice validation"
+            ))
+        })?;
+        if asset.protocol == Protocol::Bitcoin && asset.asset_ref == NATIVE_ASSET_REF && asset.network == self.network {
+            return Ok(());
+        }
+
+        Err(DataError::Validation(format!(
+            "Wallet {wallet_id} holds {} on {}, but invoice creation requires native BTC on {}",
+            asset.display_ticker, asset.network, self.network
+        ))
+        .into())
     }
 }
 
@@ -51,6 +81,8 @@ impl InvoiceUseCases for InvoiceService {
         expiry: Option<u32>,
     ) -> Result<Invoice, ApplicationError> {
         debug!(%wallet_id, "Generating invoice");
+
+        self.ensure_wallet_network(wallet_id).await?;
 
         let invoice_id = Uuid::new_v4();
         let mut invoice = self
@@ -190,7 +222,7 @@ mod tests {
             composition::MockAppStoreBuilder,
             errors::{DatabaseError, LightningError},
         },
-        domains::{event::MockEventUseCases, invoice::LnInvoice},
+        domains::{asset::Asset, event::MockEventUseCases, invoice::LnInvoice, wallet::Wallet},
         infra::lightning::MockLnClient,
     };
 
@@ -198,8 +230,40 @@ mod tests {
 
     const EXPIRY: u32 = 3_600;
 
-    fn service(store: MockAppStoreBuilder, ln_client: MockLnClient, events: MockEventUseCases) -> InvoiceService {
-        InvoiceService::new(store.build(), Arc::new(ln_client), EXPIRY, Arc::new(events))
+    fn service(mut store: MockAppStoreBuilder, ln_client: MockLnClient, events: MockEventUseCases) -> InvoiceService {
+        store.wallet.expect_find().returning(|wallet_id| {
+            Ok(Some(Wallet {
+                id: wallet_id,
+                asset: Some(native_btc_asset(BtcNetwork::Regtest)),
+                ..Default::default()
+            }))
+        });
+        raw_service(store, ln_client, events)
+    }
+
+    fn raw_service(store: MockAppStoreBuilder, ln_client: MockLnClient, events: MockEventUseCases) -> InvoiceService {
+        InvoiceService::new(
+            store.build(),
+            Arc::new(ln_client),
+            EXPIRY,
+            Arc::new(events),
+            BtcNetwork::Regtest,
+        )
+    }
+
+    fn native_btc_asset(network: BtcNetwork) -> Asset {
+        Asset {
+            id: Uuid::new_v4(),
+            code: "BTC".to_string(),
+            name: Some("Bitcoin".to_string()),
+            protocol: Protocol::Bitcoin,
+            network,
+            asset_ref: NATIVE_ASSET_REF.to_string(),
+            display_ticker: "BTC".to_string(),
+            decimals: 11,
+            created_at: Utc::now(),
+            updated_at: None,
+        }
     }
 
     fn lightning_invoice(payment_hash: &str, status: InvoiceStatus) -> Invoice {
@@ -300,6 +364,29 @@ mod tests {
                 let err = service.invoice(Uuid::new_v4(), 1_000, None, None).await.unwrap_err();
 
                 assert!(matches!(err, ApplicationError::Database(DatabaseError::Insert(_))));
+            }
+        }
+
+        mod when_wallet_network_differs_from_the_node {
+            use super::*;
+
+            #[tokio::test]
+            async fn rejects_before_requesting_an_invoice() {
+                let wallet_id = Uuid::new_v4();
+                let mut store = MockAppStoreBuilder::new();
+                store.wallet.expect_find().times(1).returning(move |_| {
+                    Ok(Some(Wallet {
+                        id: wallet_id,
+                        asset: Some(native_btc_asset(BtcNetwork::Bitcoin)),
+                        ..Default::default()
+                    }))
+                });
+
+                let service = raw_service(store, MockLnClient::new(), MockEventUseCases::new());
+
+                let err = service.invoice(wallet_id, 1_000, None, None).await.unwrap_err();
+
+                assert!(matches!(err, ApplicationError::Data(DataError::Validation(_))));
             }
         }
     }

@@ -496,7 +496,7 @@ export const listApiKeys = <ThrowOnError extends boolean = false>(
 /**
  * Generate a new API Key
  *
- * Returns the generated API Key for the requested account. Users can create API keys with permissions
+ * Returns the generated API Key for the requested account. Callers can create API keys with permissions
  * as a subset of their current permissions.
  */
 export const createApiKey = <ThrowOnError extends boolean = false>(
@@ -930,7 +930,7 @@ export const listAccountApiKeys = <ThrowOnError extends boolean = false>(
 /**
  * Generate a new API Key
  *
- * Returns the generated API Key for the account. Users can create API keys with
+ * Returns the generated API Key for the account. Callers can create API keys with
  * permissions as a subset of their current permissions.
  */
 export const createAccountApiKey = <ThrowOnError extends boolean = false>(

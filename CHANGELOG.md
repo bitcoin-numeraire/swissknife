@@ -21,6 +21,10 @@ release notes when a tag is published.
 - Added an authenticated dashboard account context and header wallet selector;
   wallet-scoped pages now use an explicit persisted wallet selection instead of
   inferring the first wallet ([#326]).
+- Added administrative account CRUD and permission grant APIs, including
+  aggregate deletion of wallets and API keys ([#327]).
+- Added black-box account lifecycle, concurrent provisioning, explicit wallet
+  routing, and cross-network balance isolation coverage ([#329]).
 
 ### Changed
 
@@ -31,6 +35,8 @@ release notes when a tag is published.
 - Renamed internal user-as-account modules, handlers, generated operations, and
   dashboard actions to the account vocabulary. `User` now refers only to the
   authenticated runtime principal ([#330]).
+- Account-scoped wallet child routes now use a lightweight ownership check
+  before loading their resource collections ([#328]).
 
 - Migrated CLN Lightning payments from the deprecated `pay` RPC to `xpay`, and
   refreshed the vendored CLN and LND gRPC protos to CLN v26.06 and LND v0.21
@@ -44,6 +50,10 @@ release notes when a tag is published.
 
 ### Fixed
 
+- Made concurrent local sign-up return one success and deterministic conflicts
+  instead of leaking database uniqueness errors as HTTP 500 responses ([#329]).
+- Rejected Lightning invoice creation when the selected wallet's native BTC
+  network does not match the configured node network ([#329]).
 - Fixed CLN REST Lightning payments charging the routing fee twice for payments
   that incur a non-zero fee ([#282]).
 
@@ -130,6 +140,9 @@ release notes when a tag is published.
 [#321]: https://github.com/bitcoin-numeraire/swissknife/pull/321
 [#324]: https://github.com/bitcoin-numeraire/swissknife/pull/324
 [#326]: https://github.com/bitcoin-numeraire/swissknife/issues/326
+[#327]: https://github.com/bitcoin-numeraire/swissknife/issues/327
+[#328]: https://github.com/bitcoin-numeraire/swissknife/issues/328
+[#329]: https://github.com/bitcoin-numeraire/swissknife/issues/329
 [#330]: https://github.com/bitcoin-numeraire/swissknife/issues/330
 [#331]: https://github.com/bitcoin-numeraire/swissknife/pull/331
 [398e89f]: https://github.com/bitcoin-numeraire/swissknife/commit/398e89f

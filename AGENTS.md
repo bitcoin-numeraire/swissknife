@@ -18,6 +18,7 @@ make fmt                       # Check formatting
 make fmt-fix                   # Fix formatting
 make test                      # Run unit tests
 make test-integration          # Run one black-box integration-test cell
+make test-integration-fresh    # Recreate volumes before a liquidity-sensitive cell
 make check                     # Format, lint, build, and unit tests
 ```
 

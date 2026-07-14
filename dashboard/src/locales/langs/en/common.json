@@ -477,7 +477,7 @@
     "use_unused_address": "Use unused address",
     "copy_unused_address": "Copy unused address",
     "unused_address_available": "An unused address of this type is already available.",
-    "btc_addresses_unavailable": "Bitcoin address list is unavailable. The backend may need read:btc_address for this user.",
+    "btc_addresses_unavailable": "Bitcoin address list is unavailable. The backend may need read:btc_address for this account.",
     "loading_addresses": "Loading addresses...",
     "used": "Used",
     "unused": "Unused",
@@ -581,7 +581,7 @@
     "search_placeholder": "Search ID, wallet, address or type"
   },
   "wallet_toolbar": {
-    "search_placeholder": "Search ID, User or LN Address"
+    "search_placeholder": "Search ID, Account or LN Address"
   },
   "transaction_list": {
     "description": "Description",
