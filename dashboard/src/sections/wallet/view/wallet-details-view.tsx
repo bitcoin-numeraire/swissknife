@@ -212,6 +212,8 @@ function RecentTransactionRow({ transaction }: { transaction: WalletTransaction 
         justifyContent: 'stretch',
         textAlign: 'left',
         borderRadius: 1,
+        bgcolor: 'background.neutral',
+        '&:hover': { bgcolor: 'action.hover' },
       }}
     >
       <Stack
@@ -222,7 +224,6 @@ function RecentTransactionRow({ transaction }: { transaction: WalletTransaction 
           width: 1,
           alignItems: { sm: 'center' },
           borderRadius: 1,
-          bgcolor: 'background.neutral',
         }}
       >
         <Stack spacing={0.5} sx={{ minWidth: 0, flex: 1 }}>
