@@ -4,7 +4,7 @@
 | --- | --- |
 | Status | Accepted |
 | Date | 2026-07-02 |
-| Related issues | #297, #252, #254, #291, #292, #115, #237, #239, #240, #241 |
+| Related issues | #297, #252, #254, #291, #292, #337, #115, #237, #239, #240, #241 |
 | Scope | Identity, accounts, wallets, currencies/assets, network scoping, migration strategy |
 
 ## Summary
@@ -158,7 +158,9 @@ Initial seed assets map the existing enum values into explicit assets:
 
 `BitcoinTestnet` currently cannot distinguish testnet3 from testnet4 by itself because `BtcNetwork::Testnet` and `BtcNetwork::Testnet4` both convert to `Currency::BitcoinTestnet`. During migration, use the configured node network when available; if a database has historical mixed testnet3/testnet4 activity, require explicit operator reconciliation rather than silently merging networks.
 
-Network is a database concern, not only a rendering concern. It is persisted exactly once, on `asset`; wallets, payments, invoices, and addresses derive it through their FKs and never duplicate it. It must live in the database for three reasons: payment validation compares the network encoded in the instrument (BOLT11 HRPs `lnbc`/`lntb`/`lntbs`/`lnbcrt`, on-chain address prefixes) against the wallet asset's network; rows must stay attributed to the network they were created on even if the deployment configuration later changes; and the testnet3/testnet4 reconciliation above is only expressible if network is data. What is genuinely frontend-only is pricing and formatting: testnet assets have no market value, so fiat conversion and ticker styling (`tBTC`) are display-layer decisions on top of the persisted network. As an operational guard, startup should verify that the configured node network matches the network of every asset with active wallets and refuse to run on mismatch, instead of discovering the mismatch one rejected payment at a time.
+Network is a database concern, not only a rendering concern. It is persisted exactly once, on `asset`; wallets, payments, invoices, and addresses derive it through their FKs and never duplicate it. It must live in the database for three reasons: payment validation compares the network encoded in the instrument (BOLT11 HRPs `lnbc`/`lntb`/`lntbs`/`lnbcrt`, on-chain address prefixes) against the wallet asset's network; rows must stay attributed to the network they were created on even if the deployment configuration later changes; and the testnet3/testnet4 reconciliation above is only expressible if network is data. What is genuinely frontend-only is pricing and formatting: testnet assets have no market value, so fiat conversion and ticker styling (`tBTC`) are display-layer decisions on top of the persisted network.
+
+A SwissKnife database may contain wallets for several networks at the same time. The configured Lightning or chain provider describes the settlement capability available to a running instance; it does not constrain which network-scoped wallets may exist in the catalog. Every money-moving or address-producing operation must validate the selected wallet asset against both the instrument network and the provider network, and reject an incompatible request before reserving funds or creating provider state. Startup must not reject a database merely because it contains wallets that the current provider cannot service. This keeps historical attribution intact and allows a future runtime to attach additional liquidity providers without another wallet-schema change.
 
 ### 3. Make wallets asset-scoped spendable balances
 
@@ -336,37 +338,52 @@ Both display as USDT, but they are different assets and therefore different wall
 
 ## Migration strategy
 
-The migration must support SQLite and Postgres and must preserve existing wallets, invoices, payments, balances, addresses, API keys, and Lightning addresses.
+The migration supports SQLite and Postgres and preserves the production wallets, invoices,
+payments, balances, Bitcoin addresses, and Lightning addresses. After this ADR was accepted, the
+production data audit narrowed the executable backfill to the data that actually exists:
+
+- every legacy identity is an OAuth2/Auth0 subject;
+- every legacy wallet is native BTC on Bitcoin mainnet;
+- there is no testnet data or mixed-currency wallet data;
+- the legacy API-key table is empty, so the schema changes but no API keys are backfilled; and
+- no migration-only provider or network configuration is required.
+
+These are migration preconditions, not limitations of the target account/asset/wallet model. The
+operator must verify them before deployment; the migrations intentionally contain no synthetic
+identity, provider-selection, API-key, or network-inference branches outside this audited shape.
 
 ### Phase 1: Add identity and asset tables
 
 1. Create `account`, `auth_identity`, `account_preference`, and `asset`.
-2. Seed assets for all existing `Currency` enum values.
-3. Backfill one `account` per distinct `wallet.user_id`.
-4. Backfill one `auth_identity` per old wallet user ID using the configured auth provider when known; otherwise require an operator-supplied provider mapping before migration.
-5. Add `account_id` to `api_key` and backfill through `wallet.user_id`.
-6. Grant the full permission set in `account.permissions` to the bootstrap admin's account when the deployment uses local JWT. OAuth2 deployments backfill nothing, because token claims stay authoritative. `api_key.permissions` rows are unchanged.
+2. Seed the supported native-BTC network assets.
+3. Backfill one `account` and preference row per distinct `wallet.user_id`.
+4. Backfill one `auth_identity(provider = oauth2, subject = wallet.user_id)` per account.
+5. Add `account_id` to `api_key`; require the legacy table to be empty instead of manufacturing
+   account ownership for unused keys.
+6. Leave account permissions empty because OAuth2 token claims are authoritative.
 
 ### Phase 2: Convert wallet rows into asset wallets
 
-1. Add `wallet.account_id`, `wallet.asset_id`, `wallet.available_amount`, `wallet.reserved_amount`, and `wallet.label`.
-2. Build a temporary mapping table:
-
-   ```text
-   wallet_asset_migration(old_wallet_id, old_currency, new_wallet_id)
-   ```
-
-3. For each `(old_wallet_id, currency)` present in `wallet_balance`, `payment`, or `invoice`, create exactly one asset-scoped wallet.
-4. Backfill wallet balances from `wallet_balance.available_amount` and `wallet_balance.reserved_amount`. If no `wallet_balance` row exists, derive the same values from settled invoices, settled payments, and pending reservations using the ADR 0001 formula.
-5. Fail loudly if historical reserved balances are negative or historical available balances require operator reconciliation before cutover.
+1. Add nullable `wallet.account_id`, `wallet.asset_id`, `wallet.available_amount`,
+   `wallet.reserved_amount`, and `wallet.label` columns in a schema migration.
+2. Reuse each legacy wallet row as the account's native-BTC mainnet asset wallet. Resolve
+   `account_id` through its OAuth2 identity and resolve `asset_id` through
+   `(bitcoin, bitcoin/mainnet, native)`.
+3. Backfill available and reserved amounts from the legacy `Bitcoin` wallet-balance row, defaulting
+   missing rows to zero.
+4. Fail if any wallet remains without an account or asset after the data migration.
+5. Make account/asset ownership authoritative and drop the legacy columns only after the backfill
+   succeeds.
 
 ### Phase 3: Repoint resource FKs
 
-1. Update `payment.wallet_id` by joining `(old wallet_id, payment.currency)` through the migration mapping.
-2. Update `invoice.wallet_id` by joining `(old wallet_id, invoice.currency)` through the migration mapping.
-3. Move `btc_address.wallet_id` to the account's native BTC wallet for the active Bitcoin network. Existing `btc_address` rows do not carry their own currency, so this must use deployment/network configuration or a documented manual fallback.
-4. Add `ln_address.account_id` and keep the old `wallet_id` column as the invoice-receiving wallet route.
-5. Resolve the receiving wallet from `(account_id, active native BTC asset)` in service code and cover it with integration tests. This avoids accepting mismatched wallets or networks at the API boundary.
+1. Keep payment, invoice, and Bitcoin-address foreign keys on their reused wallet row; no synthetic
+   wallet mapping or FK rewrite is needed for the audited BTC-mainnet data.
+2. Add `ln_address.account_id`, deriving it from the receiving wallet, and keep `wallet_id` as the
+   concrete invoice-receiving route.
+3. Drop payment/invoice currency columns only after wallet asset ownership is populated.
+4. Resolve new Lightning Address receiving wallets from `(account_id, active native BTC asset)` in
+   service code and cover the network behavior with integration tests.
 
 ### Phase 4: Cut over services
 
@@ -408,16 +425,14 @@ The migration must support SQLite and Postgres and must preserve existing wallet
 
 ### Migration/backfill tests
 
-Cover existing databases containing:
+Cover the audited production shape on SQLite and Postgres:
 
-- one user with no activity;
-- one user with settled invoices and settled payments;
-- pending outgoing payments with `reserved_amount`;
-- multiple old `wallet_balance` currencies under one old wallet;
-- API keys referencing old `wallet.user_id`;
-- Lightning addresses and generated invoices;
-- Bitcoin addresses;
-- an imported `BitcoinTestnet` database where network choice must come from configuration.
+- OAuth2/Auth0 subjects become accounts with identities and preferences;
+- legacy native-BTC mainnet wallets retain available and reserved balances;
+- existing payment, invoice, Bitcoin-address, and Lightning-address relationships remain attached to
+  the reused wallet;
+- the migration requires an empty legacy API-key table; and
+- no testnet/provider inference or migration-only environment variables are introduced.
 
 ### Authorization tests
 
