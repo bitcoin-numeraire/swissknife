@@ -16,7 +16,7 @@ import { endpointKeys } from 'src/actions/keys';
 import { Permission } from 'src/lib/swissknife';
 import { useListApiKeys } from 'src/actions/api-key';
 import { DashboardContent } from 'src/layouts/dashboard';
-import { useListWalletApiKeys } from 'src/actions/user-wallet';
+import { useListAccountApiKeys } from 'src/actions/account-wallet';
 
 import { Iconify } from 'src/components/iconify';
 import { ErrorView } from 'src/components/error/error-view';
@@ -45,7 +45,7 @@ const tableHead = (t: TFunction) => [
 export function ApiKeyListView() {
   const { t } = useTranslate();
 
-  const { apiKeys, apiKeysLoading, apiKeysError } = useListWalletApiKeys();
+  const { apiKeys, apiKeysLoading, apiKeysError } = useListAccountApiKeys();
 
   const errors = [apiKeysError];
   const data = [apiKeys];

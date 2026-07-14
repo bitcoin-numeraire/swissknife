@@ -43,6 +43,8 @@ Main route sections:
 
 **`src/actions/`** - Data-fetching hooks using SWR. Server actions marked with `'use server'`.
 
+**`src/contexts/account/`** - Authenticated account bootstrap, complete wallet list, and the explicit active-wallet selection persisted in account preferences.
+
 **`src/auth/`** - Pluggable authentication system supporting JWT (default), Auth0, and Supabase. Selection via `NEXT_PUBLIC_AUTH_METHOD` env var.
 
 **`src/lib/swissknife/`** - Auto-generated API client from OpenAPI spec. **Do not edit manually** - regenerate with `yarn openapi-ts`.
@@ -53,12 +55,13 @@ Main route sections:
 
 1. Page imports section view from `src/sections/`
 2. Section uses SWR hooks from `src/actions/` for data fetching
-3. Forms use react-hook-form with Zod schemas from generated API client
-4. API calls go through `src/lib/swissknife/sdk.gen.ts`
+3. Wallet-scoped hooks read the selected wallet ID from `AccountContext`; never infer it with `limit=1`
+4. Forms use react-hook-form with Zod schemas from generated API client
+5. API calls go through `src/lib/swissknife/sdk.gen.ts`
 
 ### State Management
 
-- **React Context** for auth state and UI settings (theme, language)
+- **React Context** for auth, account/active-wallet state, and UI settings (theme, language)
 - **SWR** for all server data (caching, revalidation, mutations)
 - **react-hook-form** for form state with Zod validation
 - No Redux/Zustand - intentionally lightweight

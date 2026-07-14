@@ -18,6 +18,9 @@ release notes when a tag is published.
   ([#319]).
 - Added administrative account CRUD. Accounts created by administrators do not
   implicitly create a login identity ([#331]).
+- Added an authenticated dashboard account context and header wallet selector;
+  wallet-scoped pages now use an explicit persisted wallet selection instead of
+  inferring the first wallet ([#326]).
 
 ### Changed
 
@@ -123,4 +126,6 @@ release notes when a tag is published.
 [#320]: https://github.com/bitcoin-numeraire/swissknife/pull/320
 [#321]: https://github.com/bitcoin-numeraire/swissknife/pull/321
 [#324]: https://github.com/bitcoin-numeraire/swissknife/pull/324
+[#326]: https://github.com/bitcoin-numeraire/swissknife/issues/326
+[#331]: https://github.com/bitcoin-numeraire/swissknife/pull/331
 [398e89f]: https://github.com/bitcoin-numeraire/swissknife/commit/398e89f

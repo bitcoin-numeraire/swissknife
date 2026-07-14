@@ -89,7 +89,7 @@ export function SettingsApiKey({ apiKeys }: Props) {
         open={newApiKey.value}
         onClose={newApiKey.onFalse}
         onSuccess={() => {
-          mutate(endpointKeys.userWallet.apiKeys.list);
+          mutate(endpointKeys.account.apiKeys.list);
         }}
       />
     </Card>
@@ -117,7 +117,7 @@ function CollapsibleTableRow({ row }: CollapsibleTableRowProps) {
       await revokeWalletApiKey({ path: { id: row.id } });
 
       toast.success(t('settings_api_key.revoke_success'));
-      mutate(endpointKeys.userWallet.apiKeys.list);
+      mutate(endpointKeys.account.apiKeys.list);
     } catch (error) {
       handleActionError(error);
     } finally {

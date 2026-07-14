@@ -7,7 +7,7 @@ import Button from '@mui/material/Button';
 import { handleActionError } from 'src/utils/errors';
 
 import { useTranslate } from 'src/locales';
-import { useGetUserWallet } from 'src/actions/user-wallet';
+import { useActiveWallet } from 'src/actions/account-wallet';
 import { deleteFailedPayments, deleteExpiredInvoices } from 'src/lib/swissknife';
 
 import { toast } from 'src/components/snackbar';
@@ -31,7 +31,7 @@ export function CleanTransactionsButton({
 }: Props) {
   const { t } = useTranslate();
   const isDeleting = useBoolean();
-  const { wallet } = useGetUserWallet();
+  const { wallet } = useActiveWallet();
 
   const handleCleanTransactions = async () => {
     if (!wallet?.id) return;

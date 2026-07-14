@@ -7696,7 +7696,7 @@
               "string",
               "null"
             ],
-            "description": "Optional display name",
+            "description": "Optional human-readable asset name, independent of its settlement network.",
             "example": "Bitcoin"
           },
           "network": {

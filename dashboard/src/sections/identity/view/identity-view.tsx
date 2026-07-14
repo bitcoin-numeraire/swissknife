@@ -35,7 +35,7 @@ import { useTranslate } from 'src/locales';
 import { endpointKeys } from 'src/actions/keys';
 import { DashboardContent } from 'src/layouts/dashboard';
 import { BtcAddressType, newWalletBtcAddress } from 'src/lib/swissknife';
-import { useGetUserWallet, useListWalletBtcAddresses } from 'src/actions/user-wallet';
+import { useActiveWallet, useListWalletBtcAddresses } from 'src/actions/account-wallet';
 
 import { Label } from 'src/components/label';
 import { toast } from 'src/components/snackbar';
@@ -116,7 +116,7 @@ export function IdentityView() {
   const registerDrawer = useBoolean();
   const manageDrawer = useBoolean();
 
-  const { wallet, walletLoading, walletError } = useGetUserWallet();
+  const { wallet, walletLoading, walletError } = useActiveWallet();
   const { btcAddresses, btcAddressesLoading, btcAddressesError, btcAddressesMutate } =
     useListWalletBtcAddresses();
 
@@ -144,7 +144,7 @@ export function IdentityView() {
         body: { type: addressType },
       });
       btcAddressesMutate();
-      mutate(endpointKeys.userWallet.get);
+      if (wallet?.id) mutate(endpointKeys.accountWallet.get(wallet.id));
     } catch (error) {
       handleActionError(error);
     } finally {
@@ -167,8 +167,8 @@ export function IdentityView() {
   };
 
   const handleIdentityChanged = () => {
-    mutate(endpointKeys.userWallet.get);
-    mutate(endpointKeys.userWallet.lnAddress.get);
+    if (wallet?.id) mutate(endpointKeys.accountWallet.get(wallet.id));
+    mutate(endpointKeys.account.lnAddress.get);
   };
 
   const handleRegisterSuccess = () => {

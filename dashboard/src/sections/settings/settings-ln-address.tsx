@@ -18,6 +18,7 @@ import { handleActionError } from 'src/utils/errors';
 import { CONFIG } from 'src/global-config';
 import { useTranslate } from 'src/locales';
 import { endpointKeys } from 'src/actions/keys';
+import { useAccountContext } from 'src/contexts/account';
 import { zUpdateLnAddressRequest } from 'src/lib/swissknife/zod.gen';
 import { type LnAddress, updateWalletAddress, deleteWalletAddress } from 'src/lib/swissknife';
 
@@ -34,6 +35,7 @@ type Props = {
 
 export function SettingsLnAddress({ lnAddress, onSuccess }: Props) {
   const { t } = useTranslate();
+  const { activeWalletId } = useAccountContext();
   const confirm = useBoolean();
   const isDeleting = useBoolean();
 
@@ -65,7 +67,8 @@ export function SettingsLnAddress({ lnAddress, onSuccess }: Props) {
       await updateWalletAddress({ body });
 
       toast.success(t('settings_ln_address.update_success'));
-      mutate(endpointKeys.userWallet.lnAddress.get);
+      mutate(endpointKeys.account.lnAddress.get);
+      if (activeWalletId) mutate(endpointKeys.accountWallet.get(activeWalletId));
       onSuccess?.();
     } catch (error) {
       handleActionError(error);
@@ -79,7 +82,8 @@ export function SettingsLnAddress({ lnAddress, onSuccess }: Props) {
       await deleteWalletAddress();
 
       toast.success(t('settings_ln_address.delete_success'));
-      mutate(endpointKeys.userWallet.lnAddress.get);
+      mutate(endpointKeys.account.lnAddress.get);
+      if (activeWalletId) mutate(endpointKeys.accountWallet.get(activeWalletId));
       onSuccess?.();
     } catch (error) {
       handleActionError(error);

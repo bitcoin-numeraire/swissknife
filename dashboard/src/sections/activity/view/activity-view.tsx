@@ -51,7 +51,7 @@ import { endpointKeys } from 'src/actions/keys';
 import { useListPayments } from 'src/actions/payments';
 import { useListInvoices } from 'src/actions/invoices';
 import { DashboardContent } from 'src/layouts/dashboard';
-import { useGetUserWallet } from 'src/actions/user-wallet';
+import { useActiveWallet } from 'src/actions/account-wallet';
 import { Permission, deleteInvoice, deletePayment } from 'src/lib/swissknife';
 
 import { Label } from 'src/components/label';
@@ -307,7 +307,7 @@ function WalletActivityLedger({
   kind: ActivityTransactionKind;
   initialDetailId?: string | null;
 }) {
-  const { wallet, walletLoading, walletError } = useGetUserWallet();
+  const { wallet, walletLoading, walletError } = useActiveWallet();
 
   return (
     <ActivityLedger
@@ -319,7 +319,9 @@ function WalletActivityLedger({
       data={[wallet]}
       isLoading={[walletLoading]}
       initialDetailId={initialDetailId}
-      onCleanSuccess={() => mutate(endpointKeys.userWallet.get)}
+      onCleanSuccess={() => {
+        if (wallet?.id) mutate(endpointKeys.accountWallet.get(wallet.id));
+      }}
     />
   );
 }

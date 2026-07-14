@@ -118,7 +118,7 @@ export type Asset = {
    */
   id: string;
   /**
-   * Optional display name
+   * Optional human-readable asset name, independent of its settlement network.
    */
   name?: string | null;
   /**

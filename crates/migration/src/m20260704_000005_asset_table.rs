@@ -19,7 +19,7 @@ const ASSETS: &[SeedAsset] = &[
     SeedAsset {
         id: "00000000-0000-4000-8000-000000000002",
         code: "BTC",
-        name: "Bitcoin testnet",
+        name: "Bitcoin",
         protocol: "bitcoin",
         network: "Testnet",
         asset_ref: "native",
@@ -29,7 +29,7 @@ const ASSETS: &[SeedAsset] = &[
     SeedAsset {
         id: "00000000-0000-4000-8000-000000000003",
         code: "BTC",
-        name: "Bitcoin testnet4",
+        name: "Bitcoin",
         protocol: "bitcoin",
         network: "Testnet4",
         asset_ref: "native",
@@ -39,7 +39,7 @@ const ASSETS: &[SeedAsset] = &[
     SeedAsset {
         id: "00000000-0000-4000-8000-000000000004",
         code: "BTC",
-        name: "Bitcoin regtest",
+        name: "Bitcoin",
         protocol: "bitcoin",
         network: "Regtest",
         asset_ref: "native",
@@ -49,7 +49,7 @@ const ASSETS: &[SeedAsset] = &[
     SeedAsset {
         id: "00000000-0000-4000-8000-000000000005",
         code: "BTC",
-        name: "Bitcoin simnet",
+        name: "Bitcoin",
         protocol: "bitcoin",
         network: "Simnet",
         asset_ref: "native",
@@ -59,7 +59,7 @@ const ASSETS: &[SeedAsset] = &[
     SeedAsset {
         id: "00000000-0000-4000-8000-000000000006",
         code: "BTC",
-        name: "Bitcoin signet",
+        name: "Bitcoin",
         protocol: "bitcoin",
         network: "Signet",
         asset_ref: "native",

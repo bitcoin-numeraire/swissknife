@@ -18,11 +18,11 @@ import { endpointKeys } from 'src/actions/keys';
 import { DashboardContent } from 'src/layouts/dashboard';
 import { useFetchFiatPrices } from 'src/actions/mempool-space';
 import {
-  useGetUserWallet,
+  useActiveWallet,
   useGetWalletBalance,
   useListWalletContacts,
   useListWalletPayments,
-} from 'src/actions/user-wallet';
+} from 'src/actions/account-wallet';
 
 import { Iconify } from 'src/components/iconify';
 import { ErrorView } from 'src/components/error/error-view';
@@ -92,7 +92,7 @@ export function PaymentListView() {
   const { t } = useTranslate();
   const theme = useTheme();
 
-  const { wallet } = useGetUserWallet();
+  const { wallet } = useActiveWallet();
   const { payments, paymentsLoading, paymentsError, paymentsMutate } = useListWalletPayments();
   const { userBalance, userBalanceLoading, userBalanceError } = useGetWalletBalance();
   const { contacts, contactsLoading, contactsError } = useListWalletContacts();
@@ -171,7 +171,7 @@ export function PaymentListView() {
             onClose={newPayment.onFalse}
             contacts={contacts!}
             onSuccess={() => {
-              if (wallet?.id) mutate(endpointKeys.userWallet.payments.list(wallet.id));
+              if (wallet?.id) mutate(endpointKeys.accountWallet.payments.list(wallet.id));
             }}
           />
         </>

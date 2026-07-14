@@ -41,7 +41,7 @@ import { CONFIG } from 'src/global-config';
 import { useTranslate } from 'src/locales';
 import { useListWallets } from 'src/actions/wallet';
 import { useListBtcAddresses } from 'src/actions/btc-addresses';
-import { useGetUserWallet, useListWalletBtcAddresses } from 'src/actions/user-wallet';
+import { useActiveWallet, useListWalletBtcAddresses } from 'src/actions/account-wallet';
 import {
   pay,
   walletPay,
@@ -532,7 +532,7 @@ export function SendMoneyDrawer({
   const { t } = useTranslate();
   const { state } = useSettingsContext();
   const scanQR = useBoolean();
-  const { wallet } = useGetUserWallet();
+  const { wallet } = useActiveWallet();
 
   const [input, setInput] = useState(initialInput ?? '');
   const [amountValue, setAmountValue] = useState('');
@@ -1099,7 +1099,7 @@ export function ReceiveMoneyDrawer({
   const { t } = useTranslate();
   const { state } = useSettingsContext();
   const { copy } = useCopyToClipboard();
-  const { wallet } = useGetUserWallet();
+  const { wallet } = useActiveWallet();
 
   const [activePayload, setActivePayload] = useState<ReceivePayload>(
     lnAddress ? 'identity' : 'unified'

@@ -4,6 +4,10 @@ Next.js dashboard for SwissKnife accounts and their asset-scoped wallets. The
 dashboard uses the generated OpenAPI client under `src/lib/swissknife`; do not
 edit generated client files manually.
 
+Authenticated pages bootstrap the account and its wallets through
+`src/contexts/account`. The header wallet selector controls the explicit wallet
+ID used by balance, payment, invoice, contact, and Bitcoin-address requests.
+
 ## Development
 
 Node 24 and Yarn 4 are required.

@@ -32,7 +32,7 @@ import { shouldFail, handleActionError } from 'src/utils/errors';
 import { CONFIG } from 'src/global-config';
 import { useTranslate } from 'src/locales';
 import { DashboardContent } from 'src/layouts/dashboard';
-import { useGetWalletLnAddress } from 'src/actions/user-wallet';
+import { useGetAccountLnAddress } from 'src/actions/account-wallet';
 import { BtcAddressType, changePassword } from 'src/lib/swissknife';
 
 import { Label } from 'src/components/label';
@@ -81,7 +81,7 @@ export function SettingsView() {
     requestedTab === 'lnaddress' ? 'receive' : 'preferences'
   );
 
-  const { lnAddress, lnAddressLoading, lnAddressError } = useGetWalletLnAddress();
+  const { lnAddress, lnAddressLoading, lnAddressError } = useGetAccountLnAddress();
 
   const errors = [lnAddressError];
   const isLoading = [lnAddressLoading];
