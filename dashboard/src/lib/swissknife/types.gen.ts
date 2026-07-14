@@ -31,6 +31,14 @@ export type Account = {
    * Date of update in database.
    */
   updated_at?: Date | null;
+  /**
+   * Wallets owned by this account.
+   *
+   * These include asset metadata, balances, and the linked Lightning
+   * Address, but not payments, invoices, Bitcoin addresses, or contacts.
+   * Fetch a wallet by ID when those related resources are needed.
+   */
+  wallets: Array<Wallet>;
 };
 
 /**

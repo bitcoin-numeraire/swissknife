@@ -405,20 +405,6 @@ export const zPermission = z.enum([
 ]);
 
 /**
- * An account is the owner and authorization boundary for identities, wallets,
- * API keys, permissions, and account-scoped preferences.
- */
-export const zAccount = z.object({
-  created_at: z.iso.datetime(),
-  display_name: z.string().nullish(),
-  id: z.uuid(),
-  identity: zAuthIdentity.nullish(),
-  permissions: z.array(zPermission).nullish(),
-  preferences: zAccountPreferences.nullish(),
-  updated_at: z.iso.datetime().nullish(),
-});
-
-/**
  * API Key
  */
 export const zApiKey = z.object({
@@ -590,6 +576,21 @@ export const zWallet = z.object({
   ln_address: zLnAddress.nullish(),
   payments: z.array(zPayment),
   updated_at: z.iso.datetime().nullish(),
+});
+
+/**
+ * An account is the owner and authorization boundary for identities, wallets,
+ * API keys, permissions, and account-scoped preferences.
+ */
+export const zAccount = z.object({
+  created_at: z.iso.datetime(),
+  display_name: z.string().nullish(),
+  id: z.uuid(),
+  identity: zAuthIdentity.nullish(),
+  permissions: z.array(zPermission).nullish(),
+  preferences: zAccountPreferences.nullish(),
+  updated_at: z.iso.datetime().nullish(),
+  wallets: z.array(zWallet),
 });
 
 /**

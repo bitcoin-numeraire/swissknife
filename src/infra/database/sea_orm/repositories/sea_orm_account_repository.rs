@@ -3,18 +3,28 @@ use std::collections::HashMap;
 use async_trait::async_trait;
 use chrono::Utc;
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, QueryOrder, QuerySelect, QueryTrait,
-    Set, TransactionTrait,
+    sea_query::Expr, ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, LoaderTrait, ModelTrait,
+    QueryFilter, QueryOrder, QuerySelect, QueryTrait, Set, TransactionTrait,
 };
 use serde_json::{json, Value};
 use uuid::Uuid;
 
 use crate::{
     application::errors::DatabaseError,
-    domains::account::{Account, AccountFilter, AccountPreferences, AccountRepository, AuthProvider, Permission},
+    domains::{
+        account::{Account, AccountFilter, AccountPreferences, AccountRepository, AuthProvider, Permission},
+        payment::PaymentStatus,
+        wallet::Wallet as AccountWallet,
+    },
     infra::database::sea_orm::models::{
         account, account_preference, auth_identity,
-        prelude::{Account as AccountEntity, AccountPreference, AuthIdentity},
+        invoice::Column as InvoiceColumn,
+        payment::Column as PaymentColumn,
+        prelude::{
+            Account as AccountEntity, AccountPreference, Asset as AssetEntity, AuthIdentity, Invoice as InvoiceEntity,
+            LnAddress as LnAddressEntity, Payment as PaymentEntity, Wallet as WalletEntity,
+        },
+        wallet,
     },
     infra::database::sea_orm::sea_order,
 };
@@ -29,13 +39,75 @@ impl SeaOrmAccountRepository {
         Self { db }
     }
 
-    async fn find_preferences(&self, id: Uuid) -> Result<Option<AccountPreferences>, DatabaseError> {
-        let preference = AccountPreference::find_by_id(id)
-            .one(&self.db)
-            .await
-            .map_err(|e| DatabaseError::FindOne(e.to_string()))?;
+    async fn hydrate_wallets(
+        &self,
+        wallet_groups: Vec<Vec<wallet::Model>>,
+    ) -> Result<Vec<Vec<AccountWallet>>, DatabaseError> {
+        let group_lengths = wallet_groups.iter().map(Vec::len).collect::<Vec<_>>();
+        let models = wallet_groups.into_iter().flatten().collect::<Vec<_>>();
+        if models.is_empty() {
+            return Ok(group_lengths.into_iter().map(|_| Vec::new()).collect());
+        }
 
-        Ok(preference.map(Into::into))
+        let assets = models
+            .load_one(AssetEntity, &self.db)
+            .await
+            .map_err(|e| DatabaseError::FindRelated(e.to_string()))?;
+        let ln_addresses = models
+            .load_one(LnAddressEntity, &self.db)
+            .await
+            .map_err(|e| DatabaseError::FindRelated(e.to_string()))?;
+
+        let wallet_ids = models.iter().map(|model| model.id).collect::<Vec<_>>();
+        let mut received_by_wallet = InvoiceEntity::find()
+            .filter(InvoiceColumn::WalletId.is_in(wallet_ids.clone()))
+            .select_only()
+            .column(InvoiceColumn::WalletId)
+            .column_as(
+                Expr::cust("CAST(SUM(invoice.amount_received_msat) AS BIGINT)"),
+                "received_msat",
+            )
+            .group_by(InvoiceColumn::WalletId)
+            .into_tuple::<(Uuid, Option<i64>)>()
+            .all(&self.db)
+            .await
+            .map_err(|e| DatabaseError::FindRelated(e.to_string()))?
+            .into_iter()
+            .collect::<HashMap<_, _>>();
+        let mut spent_by_wallet = PaymentEntity::find()
+            .filter(PaymentColumn::WalletId.is_in(wallet_ids))
+            .filter(PaymentColumn::Status.eq(PaymentStatus::Settled.to_string()))
+            .select_only()
+            .column(PaymentColumn::WalletId)
+            .column_as(Expr::cust("CAST(SUM(payment.amount_msat) AS BIGINT)"), "sent_msat")
+            .column_as(Expr::cust("CAST(SUM(payment.fee_msat) AS BIGINT)"), "fees_paid_msat")
+            .group_by(PaymentColumn::WalletId)
+            .into_tuple::<(Uuid, Option<i64>, Option<i64>)>()
+            .all(&self.db)
+            .await
+            .map_err(|e| DatabaseError::FindRelated(e.to_string()))?
+            .into_iter()
+            .map(|(id, sent, fees)| (id, (sent, fees)))
+            .collect::<HashMap<_, _>>();
+
+        let mut wallets = Vec::with_capacity(models.len());
+        for ((wallet_model, asset_model), ln_address_model) in models.into_iter().zip(assets).zip(ln_addresses) {
+            let mut wallet: AccountWallet = wallet_model.into();
+            let received_msat = received_by_wallet.remove(&wallet.id).flatten().unwrap_or(0);
+            let (sent_msat, fees_paid_msat) = spent_by_wallet.remove(&wallet.id).unwrap_or((None, None));
+            wallet.balance.received_msat = received_msat as u64;
+            wallet.balance.sent_msat = sent_msat.unwrap_or(0) as u64;
+            wallet.balance.fees_paid_msat = fees_paid_msat.unwrap_or(0) as u64;
+            wallet.asset = asset_model.map(Into::into);
+            wallet.ln_address = ln_address_model.map(Into::into);
+            wallets.push(wallet);
+        }
+
+        let mut wallets = wallets.into_iter();
+        Ok(group_lengths
+            .into_iter()
+            .map(|length| wallets.by_ref().take(length).collect())
+            .collect())
     }
 }
 
@@ -51,11 +123,18 @@ impl AccountRepository for SeaOrmAccountRepository {
             return Ok(None);
         };
 
-        let identity = AuthIdentity::find()
-            .filter(auth_identity::Column::AccountId.eq(id))
+        let identity = account_model
+            .find_related(AuthIdentity)
+            .order_by_asc(auth_identity::Column::CreatedAt)
             .one(&self.db)
             .await
             .map_err(|e| DatabaseError::FindOne(e.to_string()))?;
+        let wallet_models = account_model
+            .find_related(WalletEntity)
+            .order_by_asc(wallet::Column::CreatedAt)
+            .all(&self.db)
+            .await
+            .map_err(|e| DatabaseError::FindRelated(e.to_string()))?;
 
         let preference_model = preference_model
             .ok_or_else(|| DatabaseError::FindRelated("account does not reference preferences".to_string()))?;
@@ -63,6 +142,11 @@ impl AccountRepository for SeaOrmAccountRepository {
         let mut account: Account = account_model.into();
         account.identity = identity.map(Into::into);
         account.preferences = Some(preference_model.into());
+        account.wallets = self
+            .hydrate_wallets(vec![wallet_models])
+            .await?
+            .pop()
+            .unwrap_or_default();
 
         Ok(Some(account))
     }
@@ -86,9 +170,26 @@ impl AccountRepository for SeaOrmAccountRepository {
             None => return Ok(None),
         };
 
+        let preference_model = account_model
+            .find_related(AccountPreference)
+            .one(&self.db)
+            .await
+            .map_err(|e| DatabaseError::FindRelated(e.to_string()))?;
+        let wallet_models = account_model
+            .find_related(WalletEntity)
+            .order_by_asc(wallet::Column::CreatedAt)
+            .all(&self.db)
+            .await
+            .map_err(|e| DatabaseError::FindRelated(e.to_string()))?;
+
         let mut account: Account = account_model.into();
         account.identity = Some(identity.into());
-        account.preferences = self.find_preferences(account.id).await?;
+        account.preferences = preference_model.map(Into::into);
+        account.wallets = self
+            .hydrate_wallets(vec![wallet_models])
+            .await?
+            .pop()
+            .unwrap_or_default();
 
         Ok(Some(account))
     }
@@ -107,37 +208,33 @@ impl AccountRepository for SeaOrmAccountRepository {
             return Ok(Vec::new());
         }
 
-        let account_ids = models.iter().map(|model| model.id).collect::<Vec<_>>();
-        let identities = AuthIdentity::find()
-            .filter(auth_identity::Column::AccountId.is_in(account_ids.clone()))
-            .order_by_asc(auth_identity::Column::CreatedAt)
-            .all(&self.db)
+        let identities = models
+            .load_many(
+                AuthIdentity::find().order_by_asc(auth_identity::Column::CreatedAt),
+                &self.db,
+            )
             .await
-            .map_err(|e| DatabaseError::FindMany(e.to_string()))?;
-        let preferences = AccountPreference::find()
-            .filter(account_preference::Column::AccountId.is_in(account_ids))
-            .all(&self.db)
+            .map_err(|e| DatabaseError::FindRelated(e.to_string()))?;
+        let preferences = models
+            .load_one(AccountPreference, &self.db)
             .await
-            .map_err(|e| DatabaseError::FindMany(e.to_string()))?;
-
-        let mut identities_by_account = HashMap::new();
-        for identity in identities {
-            identities_by_account.entry(identity.account_id).or_insert(identity);
-        }
-        let mut preferences_by_account = preferences
-            .into_iter()
-            .map(|preference| (preference.account_id, preference))
-            .collect::<HashMap<_, _>>();
+            .map_err(|e| DatabaseError::FindRelated(e.to_string()))?;
+        let wallet_models = models
+            .load_many(WalletEntity::find().order_by_asc(wallet::Column::CreatedAt), &self.db)
+            .await
+            .map_err(|e| DatabaseError::FindRelated(e.to_string()))?;
+        let wallets = self.hydrate_wallets(wallet_models).await?;
 
         let mut accounts = Vec::with_capacity(models.len());
-        for model in models {
-            let account_id = model.id;
-            let preference = preferences_by_account
-                .remove(&account_id)
+        for (((model, identities), preference), wallets) in
+            models.into_iter().zip(identities).zip(preferences).zip(wallets)
+        {
+            let preference = preference
                 .ok_or_else(|| DatabaseError::FindRelated("account does not reference preferences".to_string()))?;
             let mut account: Account = model.into();
-            account.identity = identities_by_account.remove(&account_id).map(Into::into);
+            account.identity = identities.into_iter().next().map(Into::into);
             account.preferences = Some(preference.into());
+            account.wallets = wallets;
             accounts.push(account);
         }
 
@@ -290,6 +387,7 @@ impl AccountRepository for SeaOrmAccountRepository {
         let permissions = serde_json::to_value(permissions).map_err(|e| DatabaseError::Update(e.to_string()))?;
         let identity = account.identity;
         let preferences = account.preferences;
+        let wallets = account.wallets;
 
         let account_model = account::ActiveModel {
             id: Set(account.id),
@@ -305,6 +403,7 @@ impl AccountRepository for SeaOrmAccountRepository {
         let mut account: Account = account_model.into();
         account.identity = identity;
         account.preferences = preferences;
+        account.wallets = wallets;
         Ok(account)
     }
 

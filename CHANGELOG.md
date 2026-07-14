@@ -25,6 +25,8 @@ release notes when a tag is published.
   aggregate deletion of wallets and API keys ([#327]).
 - Added black-box account lifecycle, concurrent provisioning, explicit wallet
   routing, and cross-network balance isolation coverage ([#329]).
+- Added lightweight wallets with asset, balance, and Lightning Address metadata
+  to account responses ([#335]).
 
 ### Changed
 

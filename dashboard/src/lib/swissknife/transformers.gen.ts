@@ -63,6 +63,97 @@ const accountPreferencesSchemaResponseTransformer = (data: any) => {
   return data;
 };
 
+const assetSchemaResponseTransformer = (data: any) => {
+  data.created_at = new Date(data.created_at);
+  if (data.updated_at) {
+    data.updated_at = new Date(data.updated_at);
+  }
+  return data;
+};
+
+const btcAddressSchemaResponseTransformer = (data: any) => {
+  data.created_at = new Date(data.created_at);
+  if (data.updated_at) {
+    data.updated_at = new Date(data.updated_at);
+  }
+  return data;
+};
+
+const contactSchemaResponseTransformer = (data: any) => {
+  data.contact_since = new Date(data.contact_since);
+  return data;
+};
+
+const btcOutputSchemaResponseTransformer = (data: any) => {
+  data.created_at = new Date(data.created_at);
+  if (data.updated_at) {
+    data.updated_at = new Date(data.updated_at);
+  }
+  return data;
+};
+
+const lnInvoiceSchemaResponseTransformer = (data: any) => {
+  data.expires_at = new Date(data.expires_at);
+  return data;
+};
+
+const invoiceSchemaResponseTransformer = (data: any) => {
+  if (data.bitcoin_output) {
+    data.bitcoin_output = btcOutputSchemaResponseTransformer(data.bitcoin_output);
+  }
+  data.created_at = new Date(data.created_at);
+  if (data.ln_invoice) {
+    data.ln_invoice = lnInvoiceSchemaResponseTransformer(data.ln_invoice);
+  }
+  if (data.payment_time) {
+    data.payment_time = new Date(data.payment_time);
+  }
+  data.timestamp = new Date(data.timestamp);
+  if (data.updated_at) {
+    data.updated_at = new Date(data.updated_at);
+  }
+  return data;
+};
+
+const lnAddressSchemaResponseTransformer = (data: any) => {
+  data.created_at = new Date(data.created_at);
+  if (data.updated_at) {
+    data.updated_at = new Date(data.updated_at);
+  }
+  return data;
+};
+
+const paymentSchemaResponseTransformer = (data: any) => {
+  data.created_at = new Date(data.created_at);
+  if (data.payment_time) {
+    data.payment_time = new Date(data.payment_time);
+  }
+  if (data.updated_at) {
+    data.updated_at = new Date(data.updated_at);
+  }
+  return data;
+};
+
+const walletSchemaResponseTransformer = (data: any) => {
+  if (data.asset) {
+    data.asset = assetSchemaResponseTransformer(data.asset);
+  }
+  data.btc_addresses = data.btc_addresses.map((item: any) =>
+    btcAddressSchemaResponseTransformer(item)
+  );
+  data.contacts = data.contacts.map((item: any) => contactSchemaResponseTransformer(item));
+  data.created_at = new Date(data.created_at);
+  data.invoices = data.invoices.map((item: any) => invoiceSchemaResponseTransformer(item));
+  if (data.ln_address) {
+    data.ln_address = lnAddressSchemaResponseTransformer(data.ln_address);
+  }
+  data.payments = data.payments.map((item: any) => paymentSchemaResponseTransformer(item));
+  if (data.updated_at) {
+    data.updated_at = new Date(data.updated_at);
+  }
+  return data;
+};
+
 const accountSchemaResponseTransformer = (data: any) => {
   data.created_at = new Date(data.created_at);
   if (data.identity) {
@@ -74,6 +165,7 @@ const accountSchemaResponseTransformer = (data: any) => {
   if (data.updated_at) {
     data.updated_at = new Date(data.updated_at);
   }
+  data.wallets = data.wallets.map((item: any) => walletSchemaResponseTransformer(item));
   return data;
 };
 
@@ -133,14 +225,6 @@ export const getApiKeyResponseTransformer = async (data: any): Promise<GetApiKey
   return data;
 };
 
-const btcAddressSchemaResponseTransformer = (data: any) => {
-  data.created_at = new Date(data.created_at);
-  if (data.updated_at) {
-    data.updated_at = new Date(data.updated_at);
-  }
-  return data;
-};
-
 export const listBtcAddressesResponseTransformer = async (
   data: any
 ): Promise<ListBtcAddressesResponse> => {
@@ -162,37 +246,6 @@ export const getBtcAddressResponseTransformer = async (
   return data;
 };
 
-const btcOutputSchemaResponseTransformer = (data: any) => {
-  data.created_at = new Date(data.created_at);
-  if (data.updated_at) {
-    data.updated_at = new Date(data.updated_at);
-  }
-  return data;
-};
-
-const lnInvoiceSchemaResponseTransformer = (data: any) => {
-  data.expires_at = new Date(data.expires_at);
-  return data;
-};
-
-const invoiceSchemaResponseTransformer = (data: any) => {
-  if (data.bitcoin_output) {
-    data.bitcoin_output = btcOutputSchemaResponseTransformer(data.bitcoin_output);
-  }
-  data.created_at = new Date(data.created_at);
-  if (data.ln_invoice) {
-    data.ln_invoice = lnInvoiceSchemaResponseTransformer(data.ln_invoice);
-  }
-  if (data.payment_time) {
-    data.payment_time = new Date(data.payment_time);
-  }
-  data.timestamp = new Date(data.timestamp);
-  if (data.updated_at) {
-    data.updated_at = new Date(data.updated_at);
-  }
-  return data;
-};
-
 export const listInvoicesResponseTransformer = async (data: any): Promise<ListInvoicesResponse> => {
   data = data.map((item: any) => invoiceSchemaResponseTransformer(item));
   return data;
@@ -207,14 +260,6 @@ export const generateInvoiceResponseTransformer = async (
 
 export const getInvoiceResponseTransformer = async (data: any): Promise<GetInvoiceResponse> => {
   data = invoiceSchemaResponseTransformer(data);
-  return data;
-};
-
-const lnAddressSchemaResponseTransformer = (data: any) => {
-  data.created_at = new Date(data.created_at);
-  if (data.updated_at) {
-    data.updated_at = new Date(data.updated_at);
-  }
   return data;
 };
 
@@ -311,50 +356,6 @@ export const updateAccountPreferencesResponseTransformer = async (
   data: any
 ): Promise<UpdateAccountPreferencesResponse> => {
   data = accountPreferencesSchemaResponseTransformer(data);
-  return data;
-};
-
-const assetSchemaResponseTransformer = (data: any) => {
-  data.created_at = new Date(data.created_at);
-  if (data.updated_at) {
-    data.updated_at = new Date(data.updated_at);
-  }
-  return data;
-};
-
-const contactSchemaResponseTransformer = (data: any) => {
-  data.contact_since = new Date(data.contact_since);
-  return data;
-};
-
-const paymentSchemaResponseTransformer = (data: any) => {
-  data.created_at = new Date(data.created_at);
-  if (data.payment_time) {
-    data.payment_time = new Date(data.payment_time);
-  }
-  if (data.updated_at) {
-    data.updated_at = new Date(data.updated_at);
-  }
-  return data;
-};
-
-const walletSchemaResponseTransformer = (data: any) => {
-  if (data.asset) {
-    data.asset = assetSchemaResponseTransformer(data.asset);
-  }
-  data.btc_addresses = data.btc_addresses.map((item: any) =>
-    btcAddressSchemaResponseTransformer(item)
-  );
-  data.contacts = data.contacts.map((item: any) => contactSchemaResponseTransformer(item));
-  data.created_at = new Date(data.created_at);
-  data.invoices = data.invoices.map((item: any) => invoiceSchemaResponseTransformer(item));
-  if (data.ln_address) {
-    data.ln_address = lnAddressSchemaResponseTransformer(data.ln_address);
-  }
-  data.payments = data.payments.map((item: any) => paymentSchemaResponseTransformer(item));
-  if (data.updated_at) {
-    data.updated_at = new Date(data.updated_at);
-  }
   return data;
 };
 

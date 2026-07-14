@@ -7496,6 +7496,7 @@
         "description": "An account is the owner and authorization boundary for identities, wallets,\nAPI keys, permissions, and account-scoped preferences.",
         "required": [
           "id",
+          "wallets",
           "created_at"
         ],
         "properties": {
@@ -7556,6 +7557,13 @@
             ],
             "format": "date-time",
             "description": "Date of update in database."
+          },
+          "wallets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Wallet"
+            },
+            "description": "Wallets owned by this account.\n\nThese include asset metadata, balances, and the linked Lightning\nAddress, but not payments, invoices, Bitcoin addresses, or contacts.\nFetch a wallet by ID when those related resources are needed."
           }
         }
       },

@@ -61,6 +61,7 @@ impl From<AccountModel> for Account {
             identity: None,
             permissions: serde_json::from_value(model.permissions).expect(ASSERTION_MSG),
             preferences: None,
+            wallets: Vec::new(),
             created_at: model.created_at.and_utc(),
             updated_at: model.updated_at.map(|t| t.and_utc()),
         }

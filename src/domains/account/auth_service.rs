@@ -302,6 +302,7 @@ mod tests {
             }),
             permissions: Some(permissions),
             preferences: None,
+            wallets: Vec::new(),
             created_at: Utc::now(),
             updated_at: None,
         }
