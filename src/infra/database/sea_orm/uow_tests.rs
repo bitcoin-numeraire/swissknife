@@ -21,13 +21,14 @@ use crate::domains::account::{AccountFilter, AccountRepository, ApiKey, ApiKeyRe
 use crate::domains::event::EventProjectionUnitOfWork;
 use crate::domains::invoice::{Invoice, InvoiceRepository};
 use crate::domains::ln_address::LnAddressRepository;
-use crate::domains::payment::{LnPayment, Payment, PaymentStatus, PaymentUnitOfWork};
+use crate::domains::payment::{LnPayment, Payment, PaymentRepository, PaymentStatus, PaymentUnitOfWork};
 use crate::domains::{asset::AssetRepository, bitcoin::BtcNetwork, wallet::WalletRepository};
 
 use super::models::{prelude::Wallet, wallet};
 use super::{
     SeaOrmAccountRepository, SeaOrmApiKeyRepository, SeaOrmAssetRepository, SeaOrmEventProjectionUnitOfWork,
-    SeaOrmInvoiceRepository, SeaOrmLnAddressRepository, SeaOrmPaymentUnitOfWork, SeaOrmWalletRepository,
+    SeaOrmInvoiceRepository, SeaOrmLnAddressRepository, SeaOrmPaymentRepository, SeaOrmPaymentUnitOfWork,
+    SeaOrmWalletRepository,
 };
 
 static COUNTER: AtomicU64 = AtomicU64::new(0);
@@ -386,6 +387,19 @@ async fn account_repository_crud_keeps_the_aggregate_consistent() {
     let wallet_repo = SeaOrmWalletRepository::new(conn.clone());
     let wallet = wallet_repo.upsert(account.id, asset.id).await.unwrap();
     wallet_repo.credit(wallet.id, 42_000).await.unwrap();
+    let mut invoice = pending_invoice(wallet.id, 42_000);
+    invoice.payment_time = Some(Utc::now());
+    SeaOrmInvoiceRepository::new(conn.clone())
+        .insert(invoice)
+        .await
+        .unwrap();
+    let mut payment = pending_payment(wallet.id, 10_000, 250);
+    payment.status = PaymentStatus::Settled;
+    payment.payment_time = Some(Utc::now());
+    SeaOrmPaymentRepository::new(conn.clone())
+        .insert(payment)
+        .await
+        .unwrap();
     assert!(wallet_repo.exists_for_account(account.id, wallet.id).await.unwrap());
     assert!(!wallet_repo.exists_for_account(Uuid::new_v4(), wallet.id).await.unwrap());
     let ln_address = SeaOrmLnAddressRepository::new(conn.clone())
@@ -397,6 +411,9 @@ async fn account_repository_crud_keeps_the_aggregate_consistent() {
     assert_eq!(aggregate.wallets.len(), 1);
     assert_eq!(aggregate.wallets[0].id, wallet.id);
     assert_eq!(aggregate.wallets[0].balance.available_msat, 42_000);
+    assert_eq!(aggregate.wallets[0].balance.received_msat, 42_000);
+    assert_eq!(aggregate.wallets[0].balance.sent_msat, 10_000);
+    assert_eq!(aggregate.wallets[0].balance.fees_paid_msat, 250);
     assert_eq!(
         aggregate.wallets[0].asset.as_ref().map(|asset| asset.id),
         Some(asset.id)
@@ -409,6 +426,16 @@ async fn account_repository_crud_keeps_the_aggregate_consistent() {
     assert!(aggregate.wallets[0].invoices.is_empty());
     assert!(aggregate.wallets[0].btc_addresses.is_empty());
     assert!(aggregate.wallets[0].contacts.is_empty());
+    let listed = repo
+        .find_many(AccountFilter {
+            ids: Some(vec![account.id]),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    assert_eq!(listed[0].wallets[0].balance.received_msat, 42_000);
+    assert_eq!(listed[0].wallets[0].balance.sent_msat, 10_000);
+    assert_eq!(listed[0].wallets[0].balance.fees_paid_msat, 250);
     SeaOrmApiKeyRepository::new(conn.clone())
         .insert(ApiKey {
             account_id: account.id,
