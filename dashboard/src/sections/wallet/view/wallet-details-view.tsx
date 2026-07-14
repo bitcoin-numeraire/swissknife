@@ -32,8 +32,8 @@ import { useTranslate } from 'src/locales';
 import { endpointKeys } from 'src/actions/keys';
 import { useGetWallet } from 'src/actions/wallet';
 import { DashboardContent } from 'src/layouts/dashboard';
-import { Permission, deleteWallet } from 'src/lib/swissknife';
 import { useFetchFiatPrices } from 'src/actions/mempool-space';
+import { Protocol, Permission, deleteWallet } from 'src/lib/swissknife';
 
 import { Label } from 'src/components/label';
 import { toast } from 'src/components/snackbar';
@@ -43,6 +43,7 @@ import { SatsWithIcon } from 'src/components/bitcoin';
 import { ErrorView } from 'src/components/error/error-view';
 import { EmptyContent } from 'src/components/empty-content';
 import { ConfirmDialog } from 'src/components/custom-dialog';
+import { RegisterLnAddressDrawer } from 'src/components/ln-address';
 import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';
 
 import { SendMoneyDrawer, ReceiveMoneyDrawer } from 'src/sections/wallet/money-drawers';
@@ -269,10 +270,13 @@ export function WalletDetailsView({ id }: Props) {
   const { user } = useAuthContext();
   const newPayment = useBoolean();
   const newInvoice = useBoolean();
+  const newLnAddress = useBoolean();
   const confirmDelete = useBoolean();
   const isDeleting = useBoolean();
   const canReadLnAddresses =
     CONFIG.auth.skip || hasAllPermissions([Permission.READ_LN_ADDRESS], user?.permissions);
+  const canWriteLnAddresses =
+    CONFIG.auth.skip || hasAllPermissions([Permission.WRITE_LN_ADDRESS], user?.permissions);
   const { wallet, walletLoading, walletError } = useGetWallet(id);
   const { fiatPrices } = useFetchFiatPrices();
 
@@ -289,6 +293,7 @@ export function WalletDetailsView({ id }: Props) {
     mutate(endpointKeys.wallets.listOverviews);
     mutate(endpointKeys.invoices.list);
     mutate(endpointKeys.payments.list);
+    mutate(endpointKeys.lightning.addresses.list);
   };
 
   const handleDeleteWallet = async () => {
@@ -464,9 +469,19 @@ export function WalletDetailsView({ id }: Props) {
                     <DetailRow
                       label={t('lightning_address')}
                       value={
-                        wallet!.ln_address?.username
-                          ? displayLnAddress(wallet!.ln_address.username)
-                          : undefined
+                        wallet!.ln_address?.username ? (
+                          displayLnAddress(wallet!.ln_address.username)
+                        ) : canWriteLnAddresses && wallet!.asset?.protocol === Protocol.BITCOIN ? (
+                          <Button
+                            size="small"
+                            color="inherit"
+                            variant="outlined"
+                            onClick={newLnAddress.onTrue}
+                            startIcon={<Iconify icon="mingcute:add-line" />}
+                          >
+                            {t('identity_view.claim_lightning')}
+                          </Button>
+                        ) : undefined
                       }
                       copyValue={
                         wallet!.ln_address?.username
@@ -624,6 +639,17 @@ export function WalletDetailsView({ id }: Props) {
               lnAddress={wallet!.ln_address}
               onClose={newInvoice.onFalse}
               onSuccess={refreshWallet}
+            />
+
+            <RegisterLnAddressDrawer
+              isAdmin
+              accountId={wallet!.account_id}
+              open={newLnAddress.value}
+              onClose={newLnAddress.onFalse}
+              onSuccess={() => {
+                newLnAddress.onFalse();
+                refreshWallet();
+              }}
             />
 
             <ConfirmDialog

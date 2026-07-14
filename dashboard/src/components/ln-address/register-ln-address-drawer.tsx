@@ -23,9 +23,17 @@ type Props = DrawerProps & {
   title?: string;
   onSuccess: VoidFunction;
   isAdmin?: boolean;
+  accountId?: string;
 };
 
-export function RegisterLnAddressDrawer({ title, isAdmin, open, onClose, onSuccess }: Props) {
+export function RegisterLnAddressDrawer({
+  title,
+  isAdmin,
+  open,
+  onClose,
+  onSuccess,
+  accountId,
+}: Props) {
   return (
     <Drawer anchor="right" open={open} onClose={onClose} slotProps={{ paper: { sx: drawerSx } }}>
       <Stack
@@ -41,7 +49,7 @@ export function RegisterLnAddressDrawer({ title, isAdmin, open, onClose, onSucce
       <Divider />
 
       <Box sx={{ p: 3 }}>
-        <RegisterLnAddressForm isAdmin={isAdmin} onSuccess={onSuccess} />
+        <RegisterLnAddressForm isAdmin={isAdmin} accountId={accountId} onSuccess={onSuccess} />
       </Box>
     </Drawer>
   );
