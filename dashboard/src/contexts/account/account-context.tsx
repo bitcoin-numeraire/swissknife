@@ -1,6 +1,7 @@
 'use client';
 
 import type { Wallet, Account } from 'src/lib/swissknife';
+import type { DashboardPreferenceUpdate } from './dashboard-preferences';
 
 import { createContext } from 'react';
 
@@ -16,6 +17,7 @@ export type AccountContextValue = {
   walletsError?: Error;
   activeWalletError?: Error;
   selectWallet: (walletId: string) => Promise<void>;
+  updateDashboardPreferences: (update: DashboardPreferenceUpdate) => Promise<void>;
   refreshAccount: () => Promise<unknown>;
   refreshWallets: () => Promise<unknown>;
   refreshActiveWallet: () => Promise<unknown>;

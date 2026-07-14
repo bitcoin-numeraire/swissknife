@@ -13,6 +13,7 @@ import Grid from '@mui/material/Grid';
 import Card from '@mui/material/Card';
 import Alert from '@mui/material/Alert';
 import Stack from '@mui/material/Stack';
+import Avatar from '@mui/material/Avatar';
 import Button from '@mui/material/Button';
 import Switch from '@mui/material/Switch';
 import Divider from '@mui/material/Divider';
@@ -20,7 +21,6 @@ import IconButton from '@mui/material/IconButton';
 import ButtonBase from '@mui/material/ButtonBase';
 import Typography from '@mui/material/Typography';
 import ToggleButton from '@mui/material/ToggleButton';
-import { useColorScheme } from '@mui/material/styles';
 import InputAdornment from '@mui/material/InputAdornment';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 
@@ -32,20 +32,37 @@ import { shouldFail, handleActionError } from 'src/utils/errors';
 import { CONFIG } from 'src/global-config';
 import { useTranslate } from 'src/locales';
 import { DashboardContent } from 'src/layouts/dashboard';
+import { useAccountContext } from 'src/contexts/account';
 import { useGetAccountLnAddress } from 'src/actions/account-wallet';
 import { BtcAddressType, changePassword } from 'src/lib/swissknife';
 
 import { Label } from 'src/components/label';
 import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
+import { CopyButton } from 'src/components/copy';
 import { ErrorView } from 'src/components/error';
 import { Form, Field } from 'src/components/hook-form';
 import { useSettingsContext } from 'src/components/settings';
 import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';
 
+import { useAuthContext } from 'src/auth/hooks';
+
 // ----------------------------------------------------------------------
 
-type SettingsSection = 'preferences' | 'receive' | 'security';
+type SettingsSection = 'profile' | 'preferences' | 'receive' | 'security';
+
+type SessionUserProfile = {
+  sub?: string;
+  name?: string;
+  email?: string;
+  picture?: string;
+  photoURL?: string;
+  displayName?: string;
+  email_verified?: boolean;
+  permissions?: unknown[];
+  identities?: Array<{ provider?: string }>;
+  app_metadata?: { provider?: string };
+};
 
 const MIN_PASSWORD_LENGTH = 12;
 
@@ -68,29 +85,74 @@ const addressTypeOptions = [
   },
 ] as const;
 
+const identityProviderLabels: Record<string, string> = {
+  apple: 'Apple',
+  auth0: 'Auth0',
+  facebook: 'Facebook',
+  github: 'GitHub',
+  google: 'Google',
+  'google-oauth2': 'Google',
+  email: 'Email',
+  jwt: 'JWT',
+  linkedin: 'LinkedIn',
+  oauth2: 'OAuth2',
+  twitter: 'X',
+  'twitter-v2': 'X',
+  windowslive: 'Microsoft',
+};
+
+function compactValue(value: string) {
+  return value.length > 28 ? `${value.slice(0, 12)}...${value.slice(-8)}` : value;
+}
+
+function identityProviderLabel(user: SessionUserProfile | null, provider?: string) {
+  const explicitProvider = user?.identities?.[0]?.provider ?? user?.app_metadata?.provider;
+  const subjectProvider = user?.sub?.includes('|') ? user.sub.split('|')[0] : undefined;
+  const providerKey = String(explicitProvider ?? subjectProvider ?? provider ?? '').toLowerCase();
+
+  if (identityProviderLabels[providerKey]) return identityProviderLabels[providerKey];
+  if (provider === 'oauth2' && CONFIG.auth.method === 'auth0') return 'Auth0';
+  return providerKey || 'Unknown';
+}
+
 // ----------------------------------------------------------------------
 
 export function SettingsView() {
   const { t } = useTranslate();
+  const { user } = useAuthContext();
+  const sessionUser = user as SessionUserProfile | null;
   const settings = useSettingsContext();
-  const { mode, setMode } = useColorScheme();
+  const { account, accountLoading, accountError, updateDashboardPreferences } = useAccountContext();
   const searchParams = useSearchParams();
   const showPassword = useBoolean();
   const requestedTab = searchParams.get('tab');
   const [section, setSection] = useState<SettingsSection>(
-    requestedTab === 'lnaddress' ? 'receive' : 'preferences'
+    requestedTab === 'lnaddress' ? 'receive' : 'profile'
   );
 
   const { lnAddress, lnAddressLoading, lnAddressError } = useGetAccountLnAddress();
 
-  const errors = [lnAddressError];
-  const isLoading = [lnAddressLoading];
-  const failed = shouldFail(errors, [], isLoading);
+  const errors = [accountError, lnAddressError];
+  const isLoading = [accountLoading, lnAddressLoading];
+  const failed = shouldFail(errors, [account], isLoading);
   const supportsLocalPasswordSettings = CONFIG.auth.method === 'jwt';
-  const currentMode = settings.state.mode ?? mode ?? 'system';
+  const currentMode = settings.state.mode ?? 'system';
   const currentDisplayUnit = settings.state.displayUnit ?? 'bip177';
   const currentHideBalances = settings.state.hideBalances ?? false;
   const currentAddressType = settings.state.defaultAddressType ?? BtcAddressType.P2TR;
+  const profileName =
+    sessionUser?.displayName ||
+    sessionUser?.name ||
+    account?.display_name ||
+    account?.identity?.subject ||
+    t('settings_view.profile_fallback');
+  const profileEmail = sessionUser?.email;
+  const profilePhoto = sessionUser?.photoURL || sessionUser?.picture;
+  const identitySubject = account?.identity?.subject || sessionUser?.sub;
+  const providerLabel = identityProviderLabel(sessionUser, account?.identity?.provider);
+  const effectivePermissions = Array.isArray(sessionUser?.permissions)
+    ? sessionUser.permissions.filter((permission: unknown) => typeof permission === 'string')
+    : [];
 
   const changePasswordSchema = useMemo(
     () =>
@@ -168,24 +230,23 @@ export function SettingsView() {
   ) => {
     if (!value) return;
 
-    setMode(value);
-    settings.setState({ mode: value });
+    updateDashboardPreferences({ mode: value }).catch(handleActionError);
   };
 
   const handleDisplayUnitChange = (_: MouseEvent<HTMLElement>, value: 'bip177' | 'sats' | null) => {
     if (!value) return;
 
-    settings.setState({ displayUnit: value });
+    updateDashboardPreferences({ displayUnit: value }).catch(handleActionError);
   };
 
   const handleHideBalancesChange = (event: ChangeEvent<HTMLInputElement>) => {
-    settings.setState({ hideBalances: event.target.checked });
+    updateDashboardPreferences({ hideBalances: event.target.checked }).catch(handleActionError);
   };
 
   const handleAddressTypeChange = (_: MouseEvent<HTMLElement>, value: 'p2tr' | 'p2wpkh' | null) => {
     if (!value) return;
 
-    settings.setState({ defaultAddressType: value });
+    updateDashboardPreferences({ defaultAddressType: value }).catch(handleActionError);
   };
 
   return (
@@ -211,6 +272,12 @@ export function SettingsView() {
               <Card sx={{ p: 1, borderRadius: 1 }}>
                 <Stack spacing={0.5}>
                   <SettingsNavButton
+                    active={section === 'profile'}
+                    icon="solar:user-id-bold-duotone"
+                    title={t('settings_view.profile_section')}
+                    onClick={() => setSection('profile')}
+                  />
+                  <SettingsNavButton
                     active={section === 'preferences'}
                     icon="solar:slider-minimalistic-horizontal-bold-duotone"
                     title={t('settings_view.preferences_section')}
@@ -235,6 +302,99 @@ export function SettingsView() {
             </Grid>
 
             <Grid size={{ xs: 12, md: 9 }}>
+              {section === 'profile' && (
+                <SettingsPanel
+                  title={t('settings_view.profile_section')}
+                  description={t('settings_view.profile_description')}
+                >
+                  <Stack
+                    direction={{ xs: 'column', sm: 'row' }}
+                    spacing={2}
+                    sx={{ alignItems: { sm: 'center' } }}
+                  >
+                    <Avatar
+                      src={profilePhoto}
+                      alt={profileName}
+                      sx={{ width: 72, height: 72, typography: 'h4' }}
+                    >
+                      {profileName.charAt(0).toUpperCase()}
+                    </Avatar>
+                    <Stack spacing={0.5} sx={{ minWidth: 0 }}>
+                      <Typography variant="h5" noWrap>
+                        {profileName}
+                      </Typography>
+                      {profileEmail && (
+                        <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+                          <Typography variant="body2" color="text.secondary" noWrap>
+                            {profileEmail}
+                          </Typography>
+                          {typeof sessionUser?.email_verified === 'boolean' && (
+                            <Label color={sessionUser.email_verified ? 'success' : 'warning'}>
+                              {t(
+                                sessionUser.email_verified
+                                  ? 'settings_view.email_verified'
+                                  : 'settings_view.email_unverified'
+                              )}
+                            </Label>
+                          )}
+                        </Stack>
+                      )}
+                    </Stack>
+                  </Stack>
+
+                  <Divider />
+
+                  <SettingRow
+                    title={t('accounts_view.account_id')}
+                    description={t('settings_view.account_id_description')}
+                  >
+                    {account?.id && <Identifier value={account.id} />}
+                  </SettingRow>
+
+                  <Divider />
+
+                  <SettingRow
+                    title={t('settings_view.sign_in_provider')}
+                    description={t('settings_view.sign_in_provider_description')}
+                  >
+                    <Label color="info">{providerLabel}</Label>
+                  </SettingRow>
+
+                  {identitySubject && (
+                    <>
+                      <Divider />
+                      <SettingRow
+                        title={t('settings_view.identity_subject')}
+                        description={t('settings_view.identity_subject_description')}
+                      >
+                        <Identifier value={identitySubject} />
+                      </SettingRow>
+                    </>
+                  )}
+
+                  {effectivePermissions.length > 0 && (
+                    <>
+                      <Divider />
+                      <Stack spacing={1.5}>
+                        <Stack spacing={0.5}>
+                          <Typography variant="subtitle1">
+                            {t('settings_view.effective_permissions')}
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            {t('settings_view.effective_permissions_description')}
+                          </Typography>
+                        </Stack>
+                        <Stack direction="row" spacing={0.75} useFlexGap sx={{ flexWrap: 'wrap' }}>
+                          {effectivePermissions.map((permission: string) => (
+                            <Label key={permission}>{permission}</Label>
+                          ))}
+                        </Stack>
+                      </Stack>
+                    </>
+                  )}
+                </SettingsPanel>
+              )}
+
               {section === 'preferences' && (
                 <SettingsPanel
                   title={t('settings_view.preferences_section')}
@@ -243,7 +403,6 @@ export function SettingsView() {
                   <SettingRow
                     title={t('settings_view.display_unit')}
                     description={t('settings_view.display_unit_description')}
-                    status={t('settings_view.local_until_backend')}
                   >
                     <ToggleButtonGroup
                       exclusive
@@ -261,7 +420,6 @@ export function SettingsView() {
                   <SettingRow
                     title={t('settings_view.hide_balances')}
                     description={t('settings_view.hide_balances_description')}
-                    status={t('settings_view.local_until_backend')}
                   >
                     <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
                       <Iconify
@@ -305,7 +463,6 @@ export function SettingsView() {
                   <SettingRow
                     title={t('settings_view.default_address_type')}
                     description={t('settings_view.default_address_type_description')}
-                    status={t('settings_view.local_until_backend')}
                   >
                     <ToggleButtonGroup
                       exclusive
@@ -437,6 +594,19 @@ function SettingsNavButton({
       <Iconify icon={icon} width={22} />
       <Typography variant="subtitle2">{title}</Typography>
     </ButtonBase>
+  );
+}
+
+function Identifier({ value }: { value: string }) {
+  const { t } = useTranslate();
+
+  return (
+    <Stack direction="row" spacing={0.25} sx={{ alignItems: 'center', minWidth: 0 }}>
+      <Typography variant="body2" sx={{ fontFamily: 'monospace' }} noWrap>
+        {compactValue(value)}
+      </Typography>
+      <CopyButton value={value} title={t('copy')} />
+    </Stack>
   );
 }
 

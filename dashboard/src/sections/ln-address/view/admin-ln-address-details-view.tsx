@@ -51,7 +51,7 @@ export function AdminLnAddressDetailsView({ id }: Props) {
                   name: t('lightning_addresses'),
                   href: paths.admin.lnAddresses,
                 },
-                { name: lnAddress!.id.toUpperCase() },
+                { name: displayLnAddress(lnAddress!.username) },
               ]}
               sx={{ mb: { xs: 3, md: 5 } }}
             />

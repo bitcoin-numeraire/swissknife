@@ -23,6 +23,14 @@ impl WalletUseCases for WalletService {
     async fn create(&self, account_id: Uuid, asset_id: Uuid) -> Result<Wallet, ApplicationError> {
         debug!(%account_id, %asset_id, "Creating account asset wallet");
 
+        if self.store.account.find(account_id).await?.is_none() {
+            return Err(DataError::NotFound("Account not found.".to_string()).into());
+        }
+
+        if self.store.asset.find(asset_id).await?.is_none() {
+            return Err(DataError::NotFound("Asset not found.".to_string()).into());
+        }
+
         let wallet = match self
             .store
             .wallet
@@ -147,6 +155,10 @@ impl WalletUseCases for WalletService {
 #[cfg(test)]
 mod tests {
     use crate::application::{composition::MockAppStoreBuilder, errors::DatabaseError};
+    use crate::domains::{
+        asset::{Asset, Protocol, NATIVE_ASSET_REF},
+        bitcoin::BtcNetwork,
+    };
 
     use super::*;
 
@@ -156,6 +168,21 @@ mod tests {
             account_id,
             asset_id,
             ..Default::default()
+        }
+    }
+
+    fn asset_fixture(id: Uuid) -> Asset {
+        Asset {
+            id,
+            code: "BTC".to_string(),
+            name: Some("Bitcoin".to_string()),
+            protocol: Protocol::Bitcoin,
+            network: BtcNetwork::Regtest,
+            asset_ref: NATIVE_ASSET_REF.to_string(),
+            display_ticker: "rBTC".to_string(),
+            decimals: 11,
+            created_at: chrono::Utc::now(),
+            updated_at: None,
         }
     }
 
@@ -169,6 +196,23 @@ mod tests {
             let wallet_id = Uuid::new_v4();
 
             let mut store = MockAppStoreBuilder::new();
+            store
+                .account
+                .expect_find()
+                .withf(move |id| *id == account_id)
+                .times(1)
+                .returning(move |_| {
+                    Ok(Some(crate::domains::account::Account {
+                        id: account_id,
+                        ..Default::default()
+                    }))
+                });
+            store
+                .asset
+                .expect_find()
+                .withf(move |id| *id == asset_id)
+                .times(1)
+                .returning(move |_| Ok(Some(asset_fixture(asset_id))));
             store
                 .wallet
                 .expect_find_by_account_and_asset()
@@ -189,6 +233,46 @@ mod tests {
             assert_eq!(wallet.id, wallet_id);
             assert_eq!(wallet.account_id, account_id);
             assert_eq!(wallet.asset_id, asset_id);
+        }
+
+        #[tokio::test]
+        async fn rejects_a_missing_account_before_persistence() {
+            let mut store = MockAppStoreBuilder::new();
+            store.account.expect_find().times(1).returning(|_| Ok(None));
+            store.asset.expect_find().times(0);
+            store.wallet.expect_find_by_account_and_asset().times(0);
+            store.wallet.expect_upsert().times(0);
+
+            let service = WalletService::new(store.build());
+            let err = service.create(Uuid::new_v4(), Uuid::new_v4()).await.unwrap_err();
+
+            assert!(matches!(
+                err,
+                ApplicationError::Data(DataError::NotFound(reason)) if reason == "Account not found."
+            ));
+        }
+
+        #[tokio::test]
+        async fn rejects_a_missing_asset_before_persistence() {
+            let account_id = Uuid::new_v4();
+            let mut store = MockAppStoreBuilder::new();
+            store.account.expect_find().times(1).returning(move |_| {
+                Ok(Some(crate::domains::account::Account {
+                    id: account_id,
+                    ..Default::default()
+                }))
+            });
+            store.asset.expect_find().times(1).returning(|_| Ok(None));
+            store.wallet.expect_find_by_account_and_asset().times(0);
+            store.wallet.expect_upsert().times(0);
+
+            let service = WalletService::new(store.build());
+            let err = service.create(account_id, Uuid::new_v4()).await.unwrap_err();
+
+            assert!(matches!(
+                err,
+                ApplicationError::Data(DataError::NotFound(reason)) if reason == "Asset not found."
+            ));
         }
     }
 

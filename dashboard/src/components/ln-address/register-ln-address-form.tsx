@@ -15,6 +15,7 @@ import { zRegisterLnAddressRequest } from 'src/lib/swissknife/zod.gen';
 import { registerAddress, registerAccountAddress } from 'src/lib/swissknife';
 
 import { toast } from 'src/components/snackbar';
+import { AccountSelect } from 'src/components/account';
 import { Form, RHFTextField } from 'src/components/hook-form';
 
 // ----------------------------------------------------------------------
@@ -22,16 +23,17 @@ import { Form, RHFTextField } from 'src/components/hook-form';
 type Props = {
   onSuccess: VoidFunction;
   isAdmin?: boolean;
+  accountId?: string;
 };
 
-export function RegisterLnAddressForm({ onSuccess, isAdmin }: Props) {
+export function RegisterLnAddressForm({ onSuccess, isAdmin, accountId }: Props) {
   const { t } = useTranslate();
 
   const methods = useForm({
     resolver: zodResolver(zRegisterLnAddressRequest),
     defaultValues: {
       username: '',
-      account_id: null,
+      account_id: accountId ?? null,
     },
   });
 
@@ -41,7 +43,7 @@ export function RegisterLnAddressForm({ onSuccess, isAdmin }: Props) {
     watch,
     formState: { isSubmitting, isValid },
   } = methods;
-  const accountId = watch('account_id');
+  const selectedAccountId = watch('account_id');
 
   const onSubmit = handleSubmit(async (data) => {
     const body = data as RegisterLnAddressRequest;
@@ -77,13 +79,17 @@ export function RegisterLnAddressForm({ onSuccess, isAdmin }: Props) {
           }}
         />
 
-        {isAdmin && (
-          <RHFTextField
-            variant="outlined"
-            name="account_id"
-            label={t('register_wallet.account_id')}
-          />
-        )}
+        {isAdmin &&
+          (accountId ? (
+            <RHFTextField
+              variant="outlined"
+              name="account_id"
+              label={t('account_selector.label')}
+              disabled
+            />
+          ) : (
+            <AccountSelect />
+          ))}
 
         <Button
           type="submit"
@@ -91,7 +97,7 @@ export function RegisterLnAddressForm({ onSuccess, isAdmin }: Props) {
           color="inherit"
           size="large"
           loading={isSubmitting}
-          disabled={!isValid || (isAdmin && !accountId)}
+          disabled={!isValid || (isAdmin && !selectedAccountId)}
         >
           {t('register')}
         </Button>

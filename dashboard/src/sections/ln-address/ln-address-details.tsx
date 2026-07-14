@@ -176,7 +176,20 @@ export function LnAddressDetails({ lnAddress, isAdmin }: Props) {
                   <Grid size={{ xs: 12, sm: 4 }}>
                     <MetricTile
                       title={t('ln_address_details.belongs_to')}
-                      value={truncateText(lnAddress.account_id, 15)}
+                      value={
+                        isAdmin ? (
+                          <Link
+                            component={RouterLink}
+                            href={paths.admin.account(lnAddress.account_id)}
+                            color="inherit"
+                            underline="hover"
+                          >
+                            {truncateText(lnAddress.account_id, 15)}
+                          </Link>
+                        ) : (
+                          truncateText(lnAddress.account_id, 15)
+                        )
+                      }
                     />
                   </Grid>
                 </Grid>
@@ -273,7 +286,20 @@ export function LnAddressDetails({ lnAddress, isAdmin }: Props) {
               />
               <DetailRow
                 label={t('ln_address_details.belongs_to')}
-                value={lnAddress.account_id}
+                value={
+                  isAdmin ? (
+                    <Link
+                      component={RouterLink}
+                      href={paths.admin.account(lnAddress.account_id)}
+                      color="inherit"
+                      underline="hover"
+                    >
+                      {lnAddress.account_id}
+                    </Link>
+                  ) : (
+                    lnAddress.account_id
+                  )
+                }
                 copyValue={lnAddress.account_id}
                 mono
               />
@@ -283,7 +309,7 @@ export function LnAddressDetails({ lnAddress, isAdmin }: Props) {
                   isAdmin ? (
                     <Link
                       component={RouterLink}
-                      href={paths.account(lnAddress.wallet_id)}
+                      href={paths.admin.wallet(lnAddress.wallet_id)}
                       color="inherit"
                       underline="hover"
                     >

@@ -10,6 +10,8 @@ import Alert from '@mui/material/Alert';
 import Button from '@mui/material/Button';
 import Typography from '@mui/material/Typography';
 
+import { paths } from 'src/routes/paths';
+
 import { getLedgerLabel } from 'src/utils/transactions';
 import { compactBitcoinAddress } from 'src/utils/bitcoin-request';
 import {
@@ -119,11 +121,14 @@ export function InvoiceDetails({ invoice, isAdmin }: Props) {
                       : t('invoice_details.amount_requested')}
                   </Typography>
                   {isOpenAmount && !isOnchain ? (
-                    <Typography variant="h3">{t('wallet_view.open_amount')}</Typography>
+                    <Typography variant="h3" sx={{ fontWeight: 400 }}>
+                      {t('wallet_view.open_amount')}
+                    </Typography>
                   ) : (
                     <SatsWithIcon
                       amountMSats={isOnchain ? receivedAmount : invoice.amount_msat || 0}
                       variant="h3"
+                      sx={{ fontWeight: 400 }}
                     />
                   )}
                 </Stack>
@@ -332,6 +337,9 @@ export function InvoiceDetails({ invoice, isAdmin }: Props) {
                 label={t('transaction_details.wallet_id')}
                 value={invoice.wallet_id}
                 copyValue={invoice.wallet_id}
+                href={isAdmin ? paths.admin.wallet(invoice.wallet_id) : undefined}
+                hrefLabel={t('accounts_view.open_wallet')}
+                targetBlank={false}
                 mono
               />
               {isOnchain && (

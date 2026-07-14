@@ -11,6 +11,10 @@ import MenuList from '@mui/material/MenuList';
 import MenuItem from '@mui/material/MenuItem';
 import IconButton from '@mui/material/IconButton';
 
+import { handleActionError } from 'src/utils/errors';
+
+import { useAccountContext } from 'src/contexts/account';
+
 import { Label } from 'src/components/label';
 import { useSettingsContext } from 'src/components/settings';
 import { CustomPopover } from 'src/components/custom-popover';
@@ -24,17 +28,18 @@ export type CurrencyPopoverProps = IconButtonProps & {
 
 export function CurrencyPopover({ data = [], sx, ...other }: CurrencyPopoverProps) {
   const { open, anchorEl, onClose, onOpen } = usePopover();
-  const { state, setState } = useSettingsContext();
+  const { state } = useSettingsContext();
+  const { updateDashboardPreferences } = useAccountContext();
   const { currency } = state;
 
   const handleChangeCurrency = useCallback(
     (newCurr: CurrencyValue) => {
       if (newCurr !== currency) {
-        setState({ currency: newCurr });
+        updateDashboardPreferences({ currency: newCurr }).catch(handleActionError);
       }
       onClose();
     },
-    [setState, onClose, currency]
+    [currency, onClose, updateDashboardPreferences]
   );
 
   const renderMenuList = () => (

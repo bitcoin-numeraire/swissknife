@@ -25,6 +25,7 @@ import { zCreateApiKeyRequest } from 'src/lib/swissknife/zod.gen';
 import { createApiKey, createAccountApiKey } from 'src/lib/swissknife';
 
 import { toast } from 'src/components/snackbar';
+import { AccountSelect } from 'src/components/account';
 import { RHFSelect, RHFTextField, RHFMultiCheckbox } from 'src/components/hook-form';
 
 import { useAuthContext } from 'src/auth/hooks';
@@ -66,9 +67,11 @@ export function CreateApiKeyForm({ onSuccess, isAdmin }: Props) {
 
   const {
     reset,
+    watch,
     handleSubmit,
     formState: { isSubmitting, isValid },
   } = methods;
+  const accountId = watch('account_id');
 
   const onSubmit = handleSubmit(async (data) => {
     const body = {
@@ -164,13 +167,7 @@ export function CreateApiKeyForm({ onSuccess, isAdmin }: Props) {
             </Alert>
           )}
 
-          {isAdmin && (
-            <RHFTextField
-              variant="outlined"
-              name="account_id"
-              label={t('create_api_key_form.account_id')}
-            />
-          )}
+          {isAdmin && <AccountSelect />}
 
           <Button
             type="submit"
@@ -178,7 +175,7 @@ export function CreateApiKeyForm({ onSuccess, isAdmin }: Props) {
             color="inherit"
             size="large"
             loading={isSubmitting}
-            disabled={!isValid}
+            disabled={!isValid || (isAdmin && !accountId)}
           >
             {t('create_api_key_form.create_button')}
           </Button>

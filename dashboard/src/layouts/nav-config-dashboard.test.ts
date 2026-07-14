@@ -29,7 +29,7 @@ describe('dashboard permission gating', () => {
     const titles = itemTitles(
       filterDashboardNavData(
         navData,
-        [Permission.READ_WALLET, Permission.READ_TRANSACTION],
+        [Permission.READ_ACCOUNT, Permission.READ_TRANSACTION],
         'server'
       )
     );

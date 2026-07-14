@@ -32,8 +32,8 @@ import { useTranslate } from 'src/locales';
 import { endpointKeys } from 'src/actions/keys';
 import { useGetWallet } from 'src/actions/wallet';
 import { DashboardContent } from 'src/layouts/dashboard';
-import { Permission, deleteWallet } from 'src/lib/swissknife';
 import { useFetchFiatPrices } from 'src/actions/mempool-space';
+import { Protocol, Permission, deleteWallet } from 'src/lib/swissknife';
 
 import { Label } from 'src/components/label';
 import { toast } from 'src/components/snackbar';
@@ -43,6 +43,7 @@ import { SatsWithIcon } from 'src/components/bitcoin';
 import { ErrorView } from 'src/components/error/error-view';
 import { EmptyContent } from 'src/components/empty-content';
 import { ConfirmDialog } from 'src/components/custom-dialog';
+import { RegisterLnAddressDrawer } from 'src/components/ln-address';
 import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';
 
 import { SendMoneyDrawer, ReceiveMoneyDrawer } from 'src/sections/wallet/money-drawers';
@@ -77,9 +78,15 @@ type WalletTransaction = {
 };
 
 function walletName(wallet: Wallet) {
+  if (wallet.label) return wallet.label;
   if (wallet.ln_address?.username) return displayLnAddress(wallet.ln_address.username);
+  if (wallet.asset) return `${wallet.asset.display_ticker} · ${wallet.asset.network}`;
 
-  return wallet.label ?? wallet.account_id;
+  return wallet.id;
+}
+
+function compactId(value: string) {
+  return value.length > 18 ? `${value.slice(0, 6)}...${value.slice(-4)}` : value;
 }
 
 function addressTypeLabel(address: BtcAddress) {
@@ -87,6 +94,12 @@ function addressTypeLabel(address: BtcAddress) {
   if (address.address_type === 'p2wpkh') return 'Native SegWit';
   if (address.address_type === 'p2pkh') return 'Legacy';
   return address.address_type.toUpperCase();
+}
+
+function protocolLabel(protocol?: Protocol) {
+  if (protocol === Protocol.BITCOIN) return 'Bitcoin';
+  if (protocol === Protocol.TAPROOT_ASSETS) return 'Taproot Assets';
+  return protocol;
 }
 
 function StatTile({
@@ -206,6 +219,8 @@ function RecentTransactionRow({ transaction }: { transaction: WalletTransaction 
         justifyContent: 'stretch',
         textAlign: 'left',
         borderRadius: 1,
+        bgcolor: 'background.neutral',
+        '&:hover': { bgcolor: 'action.hover' },
       }}
     >
       <Stack
@@ -216,7 +231,6 @@ function RecentTransactionRow({ transaction }: { transaction: WalletTransaction 
           width: 1,
           alignItems: { sm: 'center' },
           borderRadius: 1,
-          bgcolor: 'background.neutral',
         }}
       >
         <Stack spacing={0.5} sx={{ minWidth: 0, flex: 1 }}>
@@ -262,10 +276,16 @@ export function WalletDetailsView({ id }: Props) {
   const { user } = useAuthContext();
   const newPayment = useBoolean();
   const newInvoice = useBoolean();
+  const newLnAddress = useBoolean();
+  const newBtcAddress = useBoolean();
   const confirmDelete = useBoolean();
   const isDeleting = useBoolean();
   const canReadLnAddresses =
     CONFIG.auth.skip || hasAllPermissions([Permission.READ_LN_ADDRESS], user?.permissions);
+  const canWriteLnAddresses =
+    CONFIG.auth.skip || hasAllPermissions([Permission.WRITE_LN_ADDRESS], user?.permissions);
+  const canWriteBtcAddresses =
+    CONFIG.auth.skip || hasAllPermissions([Permission.WRITE_BTC_ADDRESS], user?.permissions);
   const { wallet, walletLoading, walletError } = useGetWallet(id);
   const { fiatPrices } = useFetchFiatPrices();
 
@@ -282,6 +302,7 @@ export function WalletDetailsView({ id }: Props) {
     mutate(endpointKeys.wallets.listOverviews);
     mutate(endpointKeys.invoices.list);
     mutate(endpointKeys.payments.list);
+    mutate(endpointKeys.lightning.addresses.list);
   };
 
   const handleDeleteWallet = async () => {
@@ -291,7 +312,7 @@ export function WalletDetailsView({ id }: Props) {
       await deleteWallet({ path: { id } });
       toast.success(t('wallet_list.delete_success'));
       mutate(endpointKeys.wallets.listOverviews);
-      router.push(paths.accounts);
+      router.push(paths.admin.wallets);
     } catch (error) {
       handleActionError(error);
     } finally {
@@ -310,8 +331,8 @@ export function WalletDetailsView({ id }: Props) {
             <CustomBreadcrumbs
               heading={walletName(wallet!)}
               links={[
-                { name: t('accounts') },
-                { name: t('accounts_directory'), href: paths.accounts },
+                { name: t('wallets') },
+                { name: t('wallets_directory'), href: paths.admin.wallets },
                 { name: t('details') },
               ]}
               action={
@@ -376,13 +397,10 @@ export function WalletDetailsView({ id }: Props) {
                           sx={{ alignItems: 'center', flexWrap: 'wrap' }}
                         >
                           <Typography variant="h4">{walletName(wallet!)}</Typography>
-                          <Label
-                            variant="soft"
-                            color={wallet!.ln_address?.active ? 'success' : 'default'}
-                          >
-                            {wallet!.ln_address?.active
-                              ? t('accounts_view.ready')
-                              : t('accounts_view.missing')}
+                          <Label variant="soft" color="info">
+                            {wallet!.asset
+                              ? `${wallet!.asset.display_ticker} · ${wallet!.asset.network}`
+                              : t('wallets_view.unknown_asset')}
                           </Label>
                         </Stack>
                         <Stack
@@ -435,16 +453,19 @@ export function WalletDetailsView({ id }: Props) {
               </Card>
 
               <Grid container spacing={3}>
-                <Grid size={{ xs: 12, md: 5 }}>
+                <Grid size={{ xs: 12, md: 6 }}>
                   <DetailCard
-                    title={t('wallet_details.identity')}
+                    title={t('wallet_details.wallet_record')}
                     icon="solar:user-id-bold-duotone"
                     color="info"
                   >
                     <DetailRow
                       label={t('wallet_details.account')}
-                      value={wallet!.account_id}
+                      value={compactId(wallet!.account_id)}
                       copyValue={wallet!.account_id}
+                      href={paths.admin.account(wallet!.account_id)}
+                      hrefLabel={t('details')}
+                      targetBlank={false}
                     />
                     <DetailRow
                       label={t('wallet_list.created')}
@@ -457,9 +478,19 @@ export function WalletDetailsView({ id }: Props) {
                     <DetailRow
                       label={t('lightning_address')}
                       value={
-                        wallet!.ln_address?.username
-                          ? displayLnAddress(wallet!.ln_address.username)
-                          : undefined
+                        wallet!.ln_address?.username ? (
+                          displayLnAddress(wallet!.ln_address.username)
+                        ) : canWriteLnAddresses && wallet!.asset?.protocol === Protocol.BITCOIN ? (
+                          <Button
+                            size="small"
+                            color="inherit"
+                            variant="outlined"
+                            onClick={newLnAddress.onTrue}
+                            startIcon={<Iconify icon="mingcute:add-line" />}
+                          >
+                            {t('identity_view.claim_lightning')}
+                          </Button>
+                        ) : undefined
                       }
                       copyValue={
                         wallet!.ln_address?.username
@@ -491,7 +522,38 @@ export function WalletDetailsView({ id }: Props) {
                   </DetailCard>
                 </Grid>
 
-                <Grid size={{ xs: 12, md: 7 }}>
+                <Grid size={{ xs: 12, md: 6 }}>
+                  <DetailCard
+                    title={t('wallet_details.asset')}
+                    icon="solar:database-bold-duotone"
+                    color="warning"
+                  >
+                    <DetailRow
+                      label={t('wallet_details.asset_id')}
+                      value={compactId(wallet!.asset_id)}
+                      copyValue={wallet!.asset_id}
+                      mono
+                    />
+                    <DetailRow
+                      label={t('wallet_details.ticker')}
+                      value={wallet!.asset?.display_ticker}
+                    />
+                    <DetailRow label={t('wallet_details.code')} value={wallet!.asset?.code} />
+                    <DetailRow label={t('wallet_details.network')} value={wallet!.asset?.network} />
+                    <DetailRow
+                      label={t('wallet_details.protocol')}
+                      value={protocolLabel(wallet!.asset?.protocol)}
+                    />
+                    <DetailRow
+                      label={t('wallet_details.asset_ref')}
+                      value={wallet!.asset?.asset_ref}
+                      copyValue={wallet!.asset?.asset_ref}
+                      mono
+                    />
+                  </DetailCard>
+                </Grid>
+
+                <Grid size={{ xs: 12 }}>
                   <DetailCard
                     title={t('wallet_details.counts')}
                     icon="solar:chart-square-bold-duotone"
@@ -559,6 +621,20 @@ export function WalletDetailsView({ id }: Props) {
                     ) : (
                       <EmptyContent
                         title={t('wallet_details.no_bitcoin_addresses')}
+                        action={
+                          canWriteBtcAddresses && wallet!.asset?.protocol === Protocol.BITCOIN ? (
+                            <Button
+                              size="small"
+                              color="inherit"
+                              variant="outlined"
+                              onClick={newBtcAddress.onTrue}
+                              startIcon={<Iconify icon="mingcute:add-line" />}
+                              sx={{ mt: 2 }}
+                            >
+                              {t('identity_view.generate_fresh')}
+                            </Button>
+                          ) : undefined
+                        }
                         sx={{ py: 3 }}
                       />
                     )}
@@ -581,11 +657,26 @@ export function WalletDetailsView({ id }: Props) {
             <ReceiveMoneyDrawer
               isAdmin
               walletId={id}
-              open={newInvoice.value}
+              initialPayload={newBtcAddress.value ? 'onchain' : undefined}
+              open={newInvoice.value || newBtcAddress.value}
               fiatPrices={safeFiatPrices}
               lnAddress={wallet!.ln_address}
-              onClose={newInvoice.onFalse}
+              onClose={() => {
+                newInvoice.onFalse();
+                newBtcAddress.onFalse();
+              }}
               onSuccess={refreshWallet}
+            />
+
+            <RegisterLnAddressDrawer
+              isAdmin
+              accountId={wallet!.account_id}
+              open={newLnAddress.value}
+              onClose={newLnAddress.onFalse}
+              onSuccess={() => {
+                newLnAddress.onFalse();
+                refreshWallet();
+              }}
             />
 
             <ConfirmDialog

@@ -7080,6 +7080,17 @@
               }
             }
           },
+          "404": {
+            "description": "Account or asset not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"404 Not Found\",\n    \"reason\": \"Resource not found\"\n}\n"
+              }
+            }
+          },
           "422": {
             "description": "Unprocessable Entity",
             "content": {
