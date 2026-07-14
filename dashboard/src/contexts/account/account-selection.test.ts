@@ -6,6 +6,7 @@ import {
   selectInitialWalletId,
   ACTIVE_WALLET_SETTING,
   settingsWithActiveWallet,
+  DASHBOARD_SETTINGS_SCHEMA_VERSION,
 } from './account-selection';
 
 const wallet = (id: string) => ({ id }) as Wallet;
@@ -36,6 +37,7 @@ describe('settingsWithActiveWallet', () => {
   it('preserves unrelated dashboard settings', () => {
     expect(settingsWithActiveWallet({ theme: 'dark' }, 'wallet-2')).toEqual({
       theme: 'dark',
+      schema_version: DASHBOARD_SETTINGS_SCHEMA_VERSION,
       [ACTIVE_WALLET_SETTING]: 'wallet-2',
     });
   });

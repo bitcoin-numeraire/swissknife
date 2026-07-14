@@ -4,9 +4,12 @@ export const endpointKeys = {
   },
   account: {
     get: 'account',
-    wallets: 'accountWallets',
     lnAddress: { get: 'accountLnAddress' },
     apiKeys: { list: 'accountApiKeys' },
+  },
+  accounts: {
+    list: 'listAccounts',
+    get: (id: string) => ['getAccount', id] as const,
   },
   accountWallet: {
     get: (walletId: string) => ['accountWallet', walletId] as const,

@@ -1,6 +1,7 @@
 'use client';
 
 import type { TFunction } from 'i18next';
+import type { IFiatPrices } from 'src/types/bitcoin';
 import type { LabelColor } from 'src/components/label';
 import type { Invoice, Payment } from 'src/lib/swissknife';
 import type { ITransaction, ITransactionTableFilters } from 'src/types/transaction';
@@ -37,7 +38,7 @@ import { useRouter, useSearchParams } from 'src/routes/hooks';
 
 import { composeBip21 } from 'src/utils/bitcoin-request';
 import { shouldFail, handleActionError } from 'src/utils/errors';
-import { fDate, fTime, fIsAfter, fDateTime, fIsBetween } from 'src/utils/format-time';
+import { fDate, fTime, fIsAfter, fIsBetween } from 'src/utils/format-time';
 import {
   LEDGERS,
   getLedgerLabel,
@@ -52,6 +53,7 @@ import { useListPayments } from 'src/actions/payments';
 import { useListInvoices } from 'src/actions/invoices';
 import { DashboardContent } from 'src/layouts/dashboard';
 import { useActiveWallet } from 'src/actions/account-wallet';
+import { useFetchFiatPrices } from 'src/actions/mempool-space';
 import { Permission, deleteInvoice, deletePayment } from 'src/lib/swissknife';
 
 import { Label } from 'src/components/label';
@@ -78,6 +80,7 @@ import {
   TablePaginationCustom,
 } from 'src/components/table';
 
+import { SendMoneyDrawer, ReceiveMoneyDrawer } from 'src/sections/wallet/money-drawers';
 import { TransactionQuickDrawer } from 'src/sections/transaction/transaction-quick-drawer';
 import { TransactionTableToolbar } from 'src/sections/transaction/transaction-table-toolbar';
 import { TransactionTableFiltersResult } from 'src/sections/transaction/transaction-table-filters-result';
@@ -101,6 +104,12 @@ type ActivityRow = ITransaction & {
   amount_total_msat: number;
   description_label: string;
 };
+
+const fallbackFiatPrices: IFiatPrices = { USD: 0, EUR: 0, CHF: 0 };
+
+function compactId(id: string) {
+  return id.length > 20 ? `${id.slice(0, 8)}...${id.slice(-6)}` : id;
+}
 
 type ActivityTab = {
   title: string;
@@ -295,9 +304,17 @@ export function ActivityView() {
 export function AdminTransactionsView() {
   const searchParams = useSearchParams();
   const id = searchParams.get('id');
+  const walletId = searchParams.get('wallet_id');
   const kind = normalizeTransactionKind(searchParams.get('type'));
 
-  return <AdminActivityLedger kind={kind} initialDetailId={id} route="adminTransactions" />;
+  return (
+    <AdminActivityLedger
+      kind={kind}
+      initialDetailId={id}
+      initialWalletId={walletId}
+      route="adminTransactions"
+    />
+  );
 }
 
 function WalletActivityLedger({
@@ -307,32 +324,59 @@ function WalletActivityLedger({
   kind: ActivityTransactionKind;
   initialDetailId?: string | null;
 }) {
+  const sendDrawer = useBoolean();
+  const receiveDrawer = useBoolean();
   const { wallet, walletLoading, walletError } = useActiveWallet();
+  const { fiatPrices } = useFetchFiatPrices();
+
+  const refreshWallet = () => {
+    if (wallet?.id) mutate(endpointKeys.accountWallet.get(wallet.id));
+  };
 
   return (
-    <ActivityLedger
-      scope="wallet"
-      kind={kind}
-      invoices={wallet?.invoices || []}
-      payments={wallet?.payments || []}
-      errors={[walletError]}
-      data={[wallet]}
-      isLoading={[walletLoading]}
-      initialDetailId={initialDetailId}
-      onCleanSuccess={() => {
-        if (wallet?.id) mutate(endpointKeys.accountWallet.get(wallet.id));
-      }}
-    />
+    <>
+      <ActivityLedger
+        scope="wallet"
+        kind={kind}
+        invoices={wallet?.invoices || []}
+        payments={wallet?.payments || []}
+        errors={[walletError]}
+        data={[wallet]}
+        isLoading={[walletLoading]}
+        initialDetailId={initialDetailId}
+        onSend={sendDrawer.onTrue}
+        onReceive={receiveDrawer.onTrue}
+        onCleanSuccess={refreshWallet}
+      />
+
+      <SendMoneyDrawer
+        open={sendDrawer.value}
+        contacts={wallet?.contacts ?? []}
+        fiatPrices={fiatPrices ?? fallbackFiatPrices}
+        balance={wallet?.balance.available_msat}
+        onClose={sendDrawer.onFalse}
+        onSuccess={refreshWallet}
+      />
+      <ReceiveMoneyDrawer
+        open={receiveDrawer.value}
+        fiatPrices={fiatPrices ?? fallbackFiatPrices}
+        lnAddress={wallet?.ln_address}
+        onClose={receiveDrawer.onFalse}
+        onSuccess={refreshWallet}
+      />
+    </>
   );
 }
 
 function AdminActivityLedger({
   kind,
   initialDetailId,
+  initialWalletId,
   route = 'activity',
 }: {
   kind: ActivityTransactionKind;
   initialDetailId?: string | null;
+  initialWalletId?: string | null;
   route?: ActivityRoute;
 }) {
   const { invoices, invoicesLoading, invoicesError } = useListInvoices();
@@ -349,6 +393,7 @@ function AdminActivityLedger({
         data={[invoices, payments]}
         isLoading={[invoicesLoading, paymentsLoading]}
         initialDetailId={initialDetailId}
+        initialWalletId={initialWalletId}
         route={route}
         onCleanSuccess={() => {
           mutate(endpointKeys.invoices.list);
@@ -368,7 +413,10 @@ function ActivityLedger({
   data,
   isLoading,
   initialDetailId,
+  initialWalletId,
   route = 'activity',
+  onSend,
+  onReceive,
   onCleanSuccess,
 }: {
   scope: ActivityScope;
@@ -379,7 +427,10 @@ function ActivityLedger({
   data: (object | null | undefined)[];
   isLoading: boolean[];
   initialDetailId?: string | null;
+  initialWalletId?: string | null;
   route?: ActivityRoute;
+  onSend?: VoidFunction;
+  onReceive?: VoidFunction;
   onCleanSuccess: VoidFunction;
 }) {
   const { t } = useTranslate();
@@ -394,7 +445,7 @@ function ActivityLedger({
   const [flowLens, setFlowLens] = useState<FlowLens>(kind === 'payment' ? 'expenses' : 'income');
   const [detailRow, setDetailRow] = useState<ActivityRow | null>(null);
   const filters = useSetState<ITransactionTableFilters>({
-    name: '',
+    name: initialWalletId ?? '',
     ledger: [],
     status: 'all',
     startDate: null,
@@ -591,22 +642,48 @@ function ActivityLedger({
               { name: isAdminTransactionsRoute ? t('transactions') : t('activity') },
             ]}
             action={
-              <Tooltip title={t('recent_transactions.clean_failed_expired')} placement="top" arrow>
-                <span>
-                  <CleanTransactionsButton
-                    onSuccess={onCleanSuccess}
-                    transactionType={transactionTypeForKind(kind)}
-                    buttonProps={{
-                      color: 'error',
-                      variant: 'outlined',
-                      disabled: !hasFailedOrExpired,
-                      startIcon: <Iconify icon="solar:trash-bin-trash-bold" />,
-                    }}
+              <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: 'wrap' }}>
+                {onSend && (
+                  <Button
+                    color="inherit"
+                    variant="outlined"
+                    onClick={onSend}
+                    startIcon={<Iconify icon="solar:arrow-up-linear" />}
                   >
-                    {t('clean')}
-                  </CleanTransactionsButton>
-                </span>
-              </Tooltip>
+                    {t('wallet_view.send_money')}
+                  </Button>
+                )}
+                {onReceive && (
+                  <Button
+                    color="inherit"
+                    variant="contained"
+                    onClick={onReceive}
+                    startIcon={<Iconify icon="solar:arrow-down-linear" />}
+                  >
+                    {t('wallet_view.receive_money')}
+                  </Button>
+                )}
+                <Tooltip
+                  title={t('recent_transactions.clean_failed_expired')}
+                  placement="top"
+                  arrow
+                >
+                  <span>
+                    <CleanTransactionsButton
+                      onSuccess={onCleanSuccess}
+                      transactionType={transactionTypeForKind(kind)}
+                      buttonProps={{
+                        color: 'error',
+                        variant: 'outlined',
+                        disabled: !hasFailedOrExpired,
+                        startIcon: <Iconify icon="solar:trash-bin-trash-bold" />,
+                      }}
+                    >
+                      {t('clean')}
+                    </CleanTransactionsButton>
+                  </span>
+                </Tooltip>
+              </Stack>
             }
             sx={{ mb: { xs: 3, md: 5 } }}
           />
@@ -859,9 +936,11 @@ function ActivityTableRow({
           <ListItemText
             primary={row.description_label}
             secondary={
-              scope === 'admin'
-                ? `${row.wallet_id} · ${fDateTime(row.created_at)} · ${methodLabel}`
-                : `${fDateTime(row.created_at)} · ${methodLabel}`
+              scope === 'admin' ? (
+                <Tooltip title={row.wallet_id} placement="top" arrow>
+                  <span>{compactId(row.wallet_id)}</span>
+                </Tooltip>
+              ) : undefined
             }
             slotProps={{
               primary: { noWrap: true, sx: { typography: 'body2' } },

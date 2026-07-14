@@ -129,8 +129,15 @@ export const navData: Array<NavGroupWithPermissions> = [
     items: [
       {
         title: 'accounts_directory',
-        path: paths.accounts,
+        path: paths.admin.accounts,
         icon: ICONS.accounts,
+        permissions: [Permission.READ_ACCOUNT],
+        modes: ['server', 'self-hosted', 'merchant'],
+      },
+      {
+        title: 'wallets_directory',
+        path: paths.admin.wallets,
+        icon: ICONS.adminWallets,
         permissions: [Permission.READ_WALLET],
         modes: ['server', 'self-hosted', 'merchant'],
       },

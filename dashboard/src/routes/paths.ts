@@ -29,7 +29,7 @@ function activityHref(
   return query ? `/activity?${query}` : '/activity';
 }
 
-function adminTransactionsHref(kind?: ActivityTransactionKind, id?: string) {
+function adminTransactionsHref(kind?: ActivityTransactionKind, id?: string, walletId?: string) {
   const params = new URLSearchParams();
 
   if (kind) {
@@ -38,6 +38,10 @@ function adminTransactionsHref(kind?: ActivityTransactionKind, id?: string) {
 
   if (id) {
     params.set('id', id);
+  }
+
+  if (walletId) {
+    params.set('wallet_id', walletId);
   }
 
   const query = params.toString();
@@ -55,8 +59,6 @@ export const paths = {
   activityInvoice: (id: string, scope: ActivityScope = 'wallet') =>
     activityHref('invoice', id, scope),
   identity: '/identity',
-  accounts: '/accounts',
-  account: (id: string) => `/accounts?id=${id}`,
   build: {
     apiKeys: '/build/api-keys',
   },
@@ -74,8 +76,13 @@ export const paths = {
     contacts: '/wallet/contacts',
   },
   admin: {
+    accounts: '/admin/accounts',
+    account: (id: string) => `/admin/accounts?id=${id}`,
+    wallets: '/admin/wallets',
+    wallet: (id: string) => `/admin/wallets?id=${id}`,
     transactions: '/admin/transactions',
     transactionList: (kind?: ActivityTransactionKind) => adminTransactionsHref(kind),
+    walletTransactions: (walletId: string) => adminTransactionsHref(undefined, undefined, walletId),
     transactionPayment: (id: string) => adminTransactionsHref('payment', id),
     transactionInvoice: (id: string) => adminTransactionsHref('invoice', id),
     transactionPaymentDetail: (id: string) => `/admin/transactions/payments?id=${id}`,

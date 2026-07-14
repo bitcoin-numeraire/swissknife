@@ -87,7 +87,7 @@ export function BtcAddressTableRow({ row, selected, onSelectRow, onDeleteRow }: 
           <Link
             noWrap
             component={RouterLink}
-            href={paths.account(wallet_id)}
+            href={paths.admin.wallet(wallet_id)}
             variant="body2"
             sx={{ color: 'text.secondary' }}
           >
@@ -145,12 +145,12 @@ export function BtcAddressTableRow({ row, selected, onSelectRow, onDeleteRow }: 
         <MenuList>
           <MenuItem
             onClick={() => {
-              router.push(paths.account(wallet_id));
+              router.push(paths.admin.wallet(wallet_id));
               popover.onClose();
             }}
           >
             <Iconify icon="solar:safe-square-bold-duotone" />
-            {t('wallets')}
+            {t('wallet')}
           </MenuItem>
 
           <CopyMenuItem value={address} title={t('copy')} />

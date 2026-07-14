@@ -26,7 +26,7 @@ type Props = DrawerProps &
     onClose: VoidFunction;
   };
 
-export function RegisterWalletDrawer({ title, open, onClose, onSuccess }: Props) {
+export function RegisterWalletDrawer({ title, open, accountId, onClose, onSuccess }: Props) {
   const { t } = useTranslate();
 
   return (
@@ -44,7 +44,7 @@ export function RegisterWalletDrawer({ title, open, onClose, onSuccess }: Props)
       <Divider />
 
       <Box sx={{ p: 3 }}>
-        <RegisterWalletForm onSuccess={onSuccess} />
+        <RegisterWalletForm accountId={accountId} onSuccess={onSuccess} />
       </Box>
     </Drawer>
   );

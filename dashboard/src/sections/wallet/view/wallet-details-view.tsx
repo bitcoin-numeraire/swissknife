@@ -77,9 +77,15 @@ type WalletTransaction = {
 };
 
 function walletName(wallet: Wallet) {
+  if (wallet.label) return wallet.label;
   if (wallet.ln_address?.username) return displayLnAddress(wallet.ln_address.username);
+  if (wallet.asset) return `${wallet.asset.display_ticker} · ${wallet.asset.network}`;
 
-  return wallet.label ?? wallet.account_id;
+  return wallet.id;
+}
+
+function compactId(value: string) {
+  return value.length > 18 ? `${value.slice(0, 6)}...${value.slice(-4)}` : value;
 }
 
 function addressTypeLabel(address: BtcAddress) {
@@ -291,7 +297,7 @@ export function WalletDetailsView({ id }: Props) {
       await deleteWallet({ path: { id } });
       toast.success(t('wallet_list.delete_success'));
       mutate(endpointKeys.wallets.listOverviews);
-      router.push(paths.accounts);
+      router.push(paths.admin.wallets);
     } catch (error) {
       handleActionError(error);
     } finally {
@@ -310,8 +316,8 @@ export function WalletDetailsView({ id }: Props) {
             <CustomBreadcrumbs
               heading={walletName(wallet!)}
               links={[
-                { name: t('accounts') },
-                { name: t('accounts_directory'), href: paths.accounts },
+                { name: t('wallets') },
+                { name: t('wallets_directory'), href: paths.admin.wallets },
                 { name: t('details') },
               ]}
               action={
@@ -376,13 +382,10 @@ export function WalletDetailsView({ id }: Props) {
                           sx={{ alignItems: 'center', flexWrap: 'wrap' }}
                         >
                           <Typography variant="h4">{walletName(wallet!)}</Typography>
-                          <Label
-                            variant="soft"
-                            color={wallet!.ln_address?.active ? 'success' : 'default'}
-                          >
-                            {wallet!.ln_address?.active
-                              ? t('accounts_view.ready')
-                              : t('accounts_view.missing')}
+                          <Label variant="soft" color="info">
+                            {wallet!.asset
+                              ? `${wallet!.asset.display_ticker} · ${wallet!.asset.network}`
+                              : t('wallets_view.unknown_asset')}
                           </Label>
                         </Stack>
                         <Stack
@@ -435,16 +438,19 @@ export function WalletDetailsView({ id }: Props) {
               </Card>
 
               <Grid container spacing={3}>
-                <Grid size={{ xs: 12, md: 5 }}>
+                <Grid size={{ xs: 12, md: 6 }}>
                   <DetailCard
-                    title={t('wallet_details.identity')}
+                    title={t('wallet_details.wallet_record')}
                     icon="solar:user-id-bold-duotone"
                     color="info"
                   >
                     <DetailRow
                       label={t('wallet_details.account')}
-                      value={wallet!.account_id}
+                      value={compactId(wallet!.account_id)}
                       copyValue={wallet!.account_id}
+                      href={paths.admin.account(wallet!.account_id)}
+                      hrefLabel={t('details')}
+                      targetBlank={false}
                     />
                     <DetailRow
                       label={t('wallet_list.created')}
@@ -491,7 +497,38 @@ export function WalletDetailsView({ id }: Props) {
                   </DetailCard>
                 </Grid>
 
-                <Grid size={{ xs: 12, md: 7 }}>
+                <Grid size={{ xs: 12, md: 6 }}>
+                  <DetailCard
+                    title={t('wallet_details.asset')}
+                    icon="solar:database-bold-duotone"
+                    color="warning"
+                  >
+                    <DetailRow
+                      label={t('wallet_details.asset_id')}
+                      value={compactId(wallet!.asset_id)}
+                      copyValue={wallet!.asset_id}
+                      mono
+                    />
+                    <DetailRow
+                      label={t('wallet_details.ticker')}
+                      value={wallet!.asset?.display_ticker}
+                    />
+                    <DetailRow label={t('wallet_details.code')} value={wallet!.asset?.code} />
+                    <DetailRow label={t('wallet_details.network')} value={wallet!.asset?.network} />
+                    <DetailRow
+                      label={t('wallet_details.protocol')}
+                      value={wallet!.asset?.protocol}
+                    />
+                    <DetailRow
+                      label={t('wallet_details.asset_ref')}
+                      value={wallet!.asset?.asset_ref}
+                      copyValue={wallet!.asset?.asset_ref}
+                      mono
+                    />
+                  </DetailCard>
+                </Grid>
+
+                <Grid size={{ xs: 12 }}>
                   <DetailCard
                     title={t('wallet_details.counts')}
                     icon="solar:chart-square-bold-duotone"

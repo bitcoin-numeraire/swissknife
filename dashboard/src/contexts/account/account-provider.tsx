@@ -1,20 +1,24 @@
 'use client';
 
 import type { Wallet, Account } from 'src/lib/swissknife';
+import type { DashboardPreferenceUpdate } from './dashboard-preferences';
 
 import useSWR from 'swr';
-import { useMemo, useState, useEffect, useCallback } from 'react';
+import { useRef, useMemo, useState, useEffect, useCallback } from 'react';
+
+import { useColorScheme } from '@mui/material/styles';
 
 import { endpointKeys } from 'src/actions/keys';
-import {
-  getAccount,
-  getAccountWallet,
-  listAccountWallets,
-  updateAccountPreferences,
-} from 'src/lib/swissknife';
+import { getAccount, getAccountWallet, updateAccountPreferences } from 'src/lib/swissknife';
+
+import { defaultSettings, useSettingsContext } from 'src/components/settings';
 
 import { AccountContext } from './account-context';
 import { selectInitialWalletId, settingsWithActiveWallet } from './account-selection';
+import {
+  settingsWithUiPreferences,
+  uiSettingsFromDashboardSettings,
+} from './dashboard-preferences';
 
 type AccountProviderProps = {
   children: React.ReactNode;
@@ -22,31 +26,36 @@ type AccountProviderProps = {
 
 export function AccountProvider({ children }: AccountProviderProps) {
   const [activeWalletId, setActiveWalletId] = useState<string>();
+  const hydratedAccountId = useRef<string | undefined>(undefined);
+  const { setMode } = useColorScheme();
+  const { state: settingsState, setState: setSettingsState } = useSettingsContext();
 
   const accountResult = useSWR<Account>(endpointKeys.account.get, async () => {
     const response = await getAccount<true>();
     return response.data;
   });
-  const walletsResult = useSWR<Wallet[]>(endpointKeys.account.wallets, async () => {
-    const response = await listAccountWallets<true>();
-    return response.data;
-  });
-
   const account = accountResult.data;
-  const wallets = useMemo(() => walletsResult.data ?? [], [walletsResult.data]);
+  const wallets = useMemo(() => account?.wallets ?? [], [account?.wallets]);
 
   useEffect(() => {
-    if (accountResult.isLoading || walletsResult.isLoading) return;
+    if (!account || hydratedAccountId.current === account.id) return;
+
+    const persistedSettings = uiSettingsFromDashboardSettings(
+      account.preferences?.dashboard_settings,
+      defaultSettings
+    );
+    hydratedAccountId.current = account.id;
+    setSettingsState(persistedSettings);
+    setMode(persistedSettings.mode ?? defaultSettings.mode ?? 'system');
+  }, [account, setMode, setSettingsState]);
+
+  useEffect(() => {
+    if (accountResult.isLoading) return;
 
     setActiveWalletId((currentWalletId) =>
       selectInitialWalletId(wallets, currentWalletId, account?.preferences?.dashboard_settings)
     );
-  }, [
-    account?.preferences?.dashboard_settings,
-    accountResult.isLoading,
-    wallets,
-    walletsResult.isLoading,
-  ]);
+  }, [account?.preferences?.dashboard_settings, accountResult.isLoading, wallets]);
 
   const activeWalletResult = useSWR<Wallet>(
     activeWalletId ? endpointKeys.accountWallet.get(activeWalletId) : null,
@@ -54,6 +63,40 @@ export function AccountProvider({ children }: AccountProviderProps) {
       const response = await getAccountWallet<true>({ path: { wallet_id: activeWalletId! } });
       return response.data;
     }
+  );
+
+  const updateDashboardPreferences = useCallback(
+    async (update: DashboardPreferenceUpdate) => {
+      const previousSettings = settingsState;
+      const nextSettings = { ...settingsState, ...update };
+      setSettingsState(update);
+      if (update.mode) setMode(update.mode);
+
+      try {
+        const response = await updateAccountPreferences<true>({
+          body: {
+            dashboard_settings: settingsWithUiPreferences(
+              account?.preferences?.dashboard_settings,
+              nextSettings
+            ),
+          },
+        });
+        await accountResult.mutate(
+          account
+            ? {
+                ...account,
+                preferences: response.data,
+              }
+            : undefined,
+          { revalidate: false }
+        );
+      } catch (error) {
+        setSettingsState(previousSettings);
+        if (update.mode) setMode(previousSettings.mode ?? 'system');
+        throw error;
+      }
+    },
+    [account, accountResult, setMode, setSettingsState, settingsState]
   );
 
   const selectWallet = useCallback(
@@ -97,15 +140,15 @@ export function AccountProvider({ children }: AccountProviderProps) {
       activeWallet: activeWalletResult.data,
       activeWalletId,
       accountLoading: accountResult.isLoading,
-      walletsLoading: walletsResult.isLoading,
-      activeWalletLoading:
-        accountResult.isLoading || walletsResult.isLoading || activeWalletResult.isLoading,
+      walletsLoading: accountResult.isLoading,
+      activeWalletLoading: accountResult.isLoading || activeWalletResult.isLoading,
       accountError: accountResult.error,
-      walletsError: walletsResult.error,
+      walletsError: accountResult.error,
       activeWalletError: activeWalletResult.error,
       selectWallet,
+      updateDashboardPreferences,
       refreshAccount: accountResult.mutate,
-      refreshWallets: walletsResult.mutate,
+      refreshWallets: accountResult.mutate,
       refreshActiveWallet: activeWalletResult.mutate,
     }),
     [
@@ -114,14 +157,12 @@ export function AccountProvider({ children }: AccountProviderProps) {
       activeWalletResult.data,
       activeWalletId,
       accountResult.isLoading,
-      walletsResult.isLoading,
       activeWalletResult.isLoading,
       accountResult.error,
-      walletsResult.error,
       activeWalletResult.error,
       selectWallet,
+      updateDashboardPreferences,
       accountResult.mutate,
-      walletsResult.mutate,
       activeWalletResult.mutate,
     ]
   );

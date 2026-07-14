@@ -7,6 +7,8 @@ import Stack from '@mui/material/Stack';
 import Alert from '@mui/material/Alert';
 import Typography from '@mui/material/Typography';
 
+import { paths } from 'src/routes/paths';
+
 import { fSats } from 'src/utils/format-number';
 import { getLedgerLabel } from 'src/utils/transactions';
 import { compactBitcoinAddress } from 'src/utils/bitcoin-request';
@@ -308,6 +310,9 @@ export function PaymentDetails({ payment, isAdmin }: Props) {
                 label={t('transaction_details.wallet_id')}
                 value={payment.wallet_id}
                 copyValue={payment.wallet_id}
+                href={isAdmin ? paths.admin.wallet(payment.wallet_id) : undefined}
+                hrefLabel={t('accounts_view.open_wallet')}
+                targetBlank={false}
                 mono
               />
               {isLightning && (

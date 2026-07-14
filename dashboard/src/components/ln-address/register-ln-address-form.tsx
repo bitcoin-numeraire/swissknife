@@ -15,6 +15,7 @@ import { zRegisterLnAddressRequest } from 'src/lib/swissknife/zod.gen';
 import { registerAddress, registerAccountAddress } from 'src/lib/swissknife';
 
 import { toast } from 'src/components/snackbar';
+import { AccountSelect } from 'src/components/account';
 import { Form, RHFTextField } from 'src/components/hook-form';
 
 // ----------------------------------------------------------------------
@@ -77,13 +78,7 @@ export function RegisterLnAddressForm({ onSuccess, isAdmin }: Props) {
           }}
         />
 
-        {isAdmin && (
-          <RHFTextField
-            variant="outlined"
-            name="account_id"
-            label={t('register_wallet.account_id')}
-          />
-        )}
+        {isAdmin && <AccountSelect />}
 
         <Button
           type="submit"

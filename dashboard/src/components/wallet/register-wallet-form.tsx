@@ -18,16 +18,17 @@ import { Form, RHFTextField } from 'src/components/hook-form';
 // ----------------------------------------------------------------------
 
 export type NewWalletFormProps = {
+  accountId?: string;
   onSuccess: VoidFunction;
 };
 
-export function RegisterWalletForm({ onSuccess }: NewWalletFormProps) {
+export function RegisterWalletForm({ accountId, onSuccess }: NewWalletFormProps) {
   const { t } = useTranslate();
 
   const methods = useForm<CreateWalletRequest>({
     resolver: zodResolver(zCreateWalletRequest),
     defaultValues: {
-      account_id: '',
+      account_id: accountId ?? '',
       asset_id: '',
     },
   });
@@ -39,7 +40,7 @@ export function RegisterWalletForm({ onSuccess }: NewWalletFormProps) {
     watch,
   } = methods;
 
-  const accountId = watch('account_id');
+  const selectedAccountId = watch('account_id');
   const assetId = watch('asset_id');
 
   const onSubmit = async (body: CreateWalletRequest) => {
@@ -60,6 +61,7 @@ export function RegisterWalletForm({ onSuccess }: NewWalletFormProps) {
           variant="outlined"
           name="account_id"
           label={t('register_wallet.account_id')}
+          disabled={Boolean(accountId)}
         />
         <RHFTextField variant="outlined" name="asset_id" label={t('register_wallet.asset_id')} />
 
@@ -69,7 +71,7 @@ export function RegisterWalletForm({ onSuccess }: NewWalletFormProps) {
           color="inherit"
           size="large"
           loading={isSubmitting}
-          disabled={!accountId || !assetId || isSubmitting}
+          disabled={!selectedAccountId || !assetId || isSubmitting}
         >
           {t('register')}
         </Button>
