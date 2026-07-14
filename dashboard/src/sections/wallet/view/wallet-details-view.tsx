@@ -271,12 +271,15 @@ export function WalletDetailsView({ id }: Props) {
   const newPayment = useBoolean();
   const newInvoice = useBoolean();
   const newLnAddress = useBoolean();
+  const newBtcAddress = useBoolean();
   const confirmDelete = useBoolean();
   const isDeleting = useBoolean();
   const canReadLnAddresses =
     CONFIG.auth.skip || hasAllPermissions([Permission.READ_LN_ADDRESS], user?.permissions);
   const canWriteLnAddresses =
     CONFIG.auth.skip || hasAllPermissions([Permission.WRITE_LN_ADDRESS], user?.permissions);
+  const canWriteBtcAddresses =
+    CONFIG.auth.skip || hasAllPermissions([Permission.WRITE_BTC_ADDRESS], user?.permissions);
   const { wallet, walletLoading, walletError } = useGetWallet(id);
   const { fiatPrices } = useFetchFiatPrices();
 
@@ -612,6 +615,20 @@ export function WalletDetailsView({ id }: Props) {
                     ) : (
                       <EmptyContent
                         title={t('wallet_details.no_bitcoin_addresses')}
+                        action={
+                          canWriteBtcAddresses && wallet!.asset?.protocol === Protocol.BITCOIN ? (
+                            <Button
+                              size="small"
+                              color="inherit"
+                              variant="outlined"
+                              onClick={newBtcAddress.onTrue}
+                              startIcon={<Iconify icon="mingcute:add-line" />}
+                              sx={{ mt: 2 }}
+                            >
+                              {t('identity_view.generate_fresh')}
+                            </Button>
+                          ) : undefined
+                        }
                         sx={{ py: 3 }}
                       />
                     )}
@@ -634,10 +651,14 @@ export function WalletDetailsView({ id }: Props) {
             <ReceiveMoneyDrawer
               isAdmin
               walletId={id}
-              open={newInvoice.value}
+              initialPayload={newBtcAddress.value ? 'onchain' : undefined}
+              open={newInvoice.value || newBtcAddress.value}
               fiatPrices={safeFiatPrices}
               lnAddress={wallet!.ln_address}
-              onClose={newInvoice.onFalse}
+              onClose={() => {
+                newInvoice.onFalse();
+                newBtcAddress.onFalse();
+              }}
               onSuccess={refreshWallet}
             />
 

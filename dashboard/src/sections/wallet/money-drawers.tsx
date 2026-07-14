@@ -90,6 +90,7 @@ type ReceiveMoneyDrawerProps = {
   onSuccess?: VoidFunction;
   isAdmin?: boolean;
   walletId?: string;
+  initialPayload?: ReceivePayload;
 };
 
 type RecipientKind =
@@ -1095,15 +1096,15 @@ export function ReceiveMoneyDrawer({
   onSuccess,
   isAdmin = false,
   walletId,
+  initialPayload,
 }: ReceiveMoneyDrawerProps) {
   const { t } = useTranslate();
   const { state } = useSettingsContext();
   const { copy } = useCopyToClipboard();
   const { wallet } = useActiveWallet();
 
-  const [activePayload, setActivePayload] = useState<ReceivePayload>(
-    lnAddress ? 'identity' : 'unified'
-  );
+  const defaultPayload = initialPayload ?? (lnAddress ? 'identity' : 'unified');
+  const [activePayload, setActivePayload] = useState<ReceivePayload>(defaultPayload);
   const [amountValue, setAmountValue] = useState('');
   const [amountUnit, setAmountUnit] = useState<AmountUnit>('sats');
   const [description, setDescription] = useState('');
@@ -1220,6 +1221,10 @@ export function ReceiveMoneyDrawer({
   }, [walletId]);
 
   useEffect(() => {
+    if (open) setActivePayload(defaultPayload);
+  }, [defaultPayload, open]);
+
+  useEffect(() => {
     if (!invoiceExpiresAt) return undefined;
 
     setNowMs(Date.now());
@@ -1229,7 +1234,7 @@ export function ReceiveMoneyDrawer({
   }, [invoiceExpiresAt]);
 
   const handleClose = useCallback(() => {
-    setActivePayload(lnAddress ? 'identity' : 'unified');
+    setActivePayload(defaultPayload);
     setAmountValue('');
     setAmountUnit('sats');
     setDescription('');
@@ -1239,7 +1244,7 @@ export function ReceiveMoneyDrawer({
     setAddressError(undefined);
     setSelectedWalletId(walletId ?? '');
     onClose();
-  }, [lnAddress, onClose, walletId]);
+  }, [defaultPayload, onClose, walletId]);
 
   const handleGenerate = async () => {
     if (needsWallet || !requestNeedsGeneration) return;
