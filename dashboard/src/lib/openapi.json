@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Numeraire SwissKnife REST API",
-    "description": "This API is available to anyone with a Numeraire account. The `Me` (`/me`) endpoints expose the authenticated account and wallet-scoped user operations.",
+    "description": "This API is available to anyone with a Numeraire account. The `Me` (`/me`) endpoints expose the authenticated account and its wallet-scoped operations.",
     "contact": {
       "name": "Dario Anongba Varela",
       "email": "dario.varela@numeraire.tech"
@@ -803,7 +803,7 @@
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
                 },
-                "example": "\n{\n    \"status\": \"409 Conflict\",\n    \"reason\": \"Admin user already created\"\n}\n"
+                "example": "\n{\n    \"status\": \"409 Conflict\",\n    \"reason\": \"Admin account already created\"\n}\n"
               }
             }
           },
@@ -974,7 +974,7 @@
           {
             "name": "account_id",
             "in": "query",
-            "description": "Owning account ID.\n\nUser-scoped endpoints populate this from the authenticated account.",
+            "description": "Owning account ID.\n\nAccount-scoped endpoints populate this from the authenticated account.",
             "required": false,
             "schema": {
               "type": [
@@ -1194,7 +1194,7 @@
           {
             "name": "account_id",
             "in": "query",
-            "description": "Owning account ID.\n\nUser-scoped endpoints populate this from the authenticated account.",
+            "description": "Owning account ID.\n\nAccount-scoped endpoints populate this from the authenticated account.",
             "required": false,
             "schema": {
               "type": [
@@ -1608,7 +1608,7 @@
           "Authentication"
         ],
         "summary": "Sign up",
-        "description": "Creates the initial Admin user. Returns a JWT token to be used for authentication. The JWT token contains authentication and permissions. Sign up is only available for `JWT` Auth provider.",
+        "description": "Creates the initial admin account. Returns a JWT token containing the account's effective permissions. Sign-up is only available for the `JWT` provider.",
         "operationId": "sign_up",
         "requestBody": {
           "content": {
@@ -1622,7 +1622,7 @@
         },
         "responses": {
           "200": {
-            "description": "Admin user created",
+            "description": "Admin account created",
             "content": {
               "application/json": {
                 "schema": {
@@ -1671,7 +1671,7 @@
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
                 },
-                "example": "\n{\n    \"status\": \"409 Conflict\",\n    \"reason\": \"Admin user already created\"\n}\n"
+                "example": "\n{\n    \"status\": \"409 Conflict\",\n    \"reason\": \"Admin account already created\"\n}\n"
               }
             }
           }
@@ -1859,7 +1859,7 @@
           "Bitcoin Addresses"
         ],
         "summary": "Generate a new Bitcoin address",
-        "description": "Returns the generated Bitcoin address for the given user",
+        "description": "Returns the generated Bitcoin address for the selected wallet.",
         "operationId": "generate_btc_address",
         "requestBody": {
           "content": {
@@ -1944,7 +1944,7 @@
           "Bitcoin Addresses"
         ],
         "summary": "Delete Bitcoin addresses",
-        "description": "Deletes all the Bitcoin addresses given a filter. Returns the number of deleted addresses. Deleting an address can have an effect on the user balance",
+        "description": "Deletes all Bitcoin addresses matching a filter. Returns the number deleted.",
         "operationId": "delete_btc_addresses",
         "parameters": [
           {
@@ -2206,7 +2206,7 @@
           "Bitcoin Addresses"
         ],
         "summary": "Delete a Bitcoin address",
-        "description": "Deletes an Bitcoin address by ID. Returns an empty body. Deleting a Bitcoin address has an effect on the user balance",
+        "description": "Deletes a Bitcoin address by ID. Returns an empty body.",
         "operationId": "delete_btc_address",
         "parameters": [
           {
@@ -2463,7 +2463,7 @@
           "Invoices"
         ],
         "summary": "Generate a new invoice",
-        "description": "Returns the generated invoice for the given user",
+        "description": "Returns the generated invoice for the selected wallet.",
         "operationId": "generate_invoice",
         "requestBody": {
           "content": {
@@ -2548,7 +2548,7 @@
           "Invoices"
         ],
         "summary": "Delete invoices",
-        "description": "Deletes all the invoices given a filter. Returns the number of deleted invoices. Deleting an invoice can have an effect on the user balance",
+        "description": "Deletes all invoices matching a filter. Returns the number deleted. Deleting an invoice can affect the wallet balance.",
         "operationId": "delete_invoices",
         "parameters": [
           {
@@ -2811,7 +2811,7 @@
           "Invoices"
         ],
         "summary": "Delete an invoice",
-        "description": "Deletes an invoice by ID. Returns an empty body. Deleting an invoice has an effect on the user balance",
+        "description": "Deletes an invoice by ID. Returns an empty body. Deleting an invoice can affect the wallet balance.",
         "operationId": "delete_invoice",
         "parameters": [
           {
@@ -3734,7 +3734,7 @@
           "Me"
         ],
         "summary": "List account API keys.",
-        "operationId": "list_wallet_api_keys",
+        "operationId": "list_account_api_keys",
         "parameters": [
           {
             "name": "limit",
@@ -3783,7 +3783,7 @@
           {
             "name": "account_id",
             "in": "query",
-            "description": "Owning account ID.\n\nUser-scoped endpoints populate this from the authenticated account.",
+            "description": "Owning account ID.\n\nAccount-scoped endpoints populate this from the authenticated account.",
             "required": false,
             "schema": {
               "type": [
@@ -3858,7 +3858,7 @@
         ],
         "summary": "Generate a new API Key",
         "description": "Returns the generated API Key for the account. Users can create API keys with\npermissions as a subset of their current permissions.",
-        "operationId": "create_wallet_api_key",
+        "operationId": "create_account_api_key",
         "requestBody": {
           "content": {
             "application/json": {
@@ -3931,7 +3931,7 @@
           "Me"
         ],
         "summary": "Revoke account API keys.",
-        "operationId": "revoke_wallet_api_keys",
+        "operationId": "revoke_account_api_keys",
         "parameters": [
           {
             "name": "limit",
@@ -3980,7 +3980,7 @@
           {
             "name": "account_id",
             "in": "query",
-            "description": "Owning account ID.\n\nUser-scoped endpoints populate this from the authenticated account.",
+            "description": "Owning account ID.\n\nAccount-scoped endpoints populate this from the authenticated account.",
             "required": false,
             "schema": {
               "type": [
@@ -4055,7 +4055,7 @@
           "Me"
         ],
         "summary": "Get an account API key.",
-        "operationId": "get_wallet_api_key",
+        "operationId": "get_account_api_key",
         "parameters": [
           {
             "name": "id",
@@ -4129,7 +4129,7 @@
           "Me"
         ],
         "summary": "Revoke an account API key.",
-        "operationId": "revoke_wallet_api_key",
+        "operationId": "revoke_account_api_key",
         "parameters": [
           {
             "name": "id",
@@ -4198,7 +4198,7 @@
           "Me"
         ],
         "summary": "Get account Lightning Address.",
-        "operationId": "get_wallet_address",
+        "operationId": "get_account_address",
         "responses": {
           "200": {
             "description": "Found",
@@ -4257,7 +4257,7 @@
           "Me"
         ],
         "summary": "Update account Lightning Address.",
-        "operationId": "update_wallet_address",
+        "operationId": "update_account_address",
         "requestBody": {
           "content": {
             "application/json": {
@@ -4341,7 +4341,7 @@
           "Me"
         ],
         "summary": "Register account Lightning Address.",
-        "operationId": "register_wallet_address",
+        "operationId": "register_account_address",
         "requestBody": {
           "content": {
             "application/json": {
@@ -4414,7 +4414,7 @@
           "Me"
         ],
         "summary": "Delete account Lightning Address.",
-        "operationId": "delete_wallet_address",
+        "operationId": "delete_account_address",
         "responses": {
           "200": {
             "description": "Deleted"
@@ -4648,7 +4648,7 @@
           {
             "name": "account_id",
             "in": "query",
-            "description": "Owning account ID.\n\nUser-scoped endpoints populate this from the authenticated account.",
+            "description": "Owning account ID.\n\nAccount-scoped endpoints populate this from the authenticated account.",
             "required": false,
             "schema": {
               "type": [
@@ -6379,7 +6379,7 @@
           "Payments"
         ],
         "summary": "Send a payment",
-        "description": "Pay for a LN invoice, LNURL, LN Address, On-chain or internally to an other user on the same instance. Returns the payment details.",
+        "description": "Pay a Lightning invoice, LNURL, Lightning Address, on-chain address, or another account on this instance.",
         "operationId": "pay",
         "requestBody": {
           "content": {
@@ -6464,7 +6464,7 @@
           "Payments"
         ],
         "summary": "Delete payments",
-        "description": "Deletes all the payments given a filter. Returns the number of deleted payments. Deleting a payment can have an effect on the user balance",
+        "description": "Deletes all payments matching a filter. Returns the number deleted. Deleting a payment can affect the wallet balance.",
         "operationId": "delete_payments",
         "parameters": [
           {
@@ -6748,7 +6748,7 @@
           "Payments"
         ],
         "summary": "Delete a payment",
-        "description": "Deletes a payment by ID. Returns an empty body. Deleting a payment has an effect on the user balance",
+        "description": "Deletes a payment by ID. Returns an empty body. Deleting a payment can affect the wallet balance.",
         "operationId": "delete_payment",
         "parameters": [
           {
@@ -7159,7 +7159,7 @@
           {
             "name": "account_id",
             "in": "query",
-            "description": "Owning account ID.\n\nUser-scoped endpoints populate this from the authenticated account.",
+            "description": "Owning account ID.\n\nAccount-scoped endpoints populate this from the authenticated account.",
             "required": false,
             "schema": {
               "type": [
@@ -8045,7 +8045,7 @@
               "null"
             ],
             "format": "uuid",
-            "description": "Owning account ID.\n\nUser-scoped endpoints populate this with your own account."
+            "description": "Owning account ID.\n\nAccount-scoped endpoints populate this with the authenticated account."
           },
           "description": {
             "type": [
@@ -8894,7 +8894,7 @@
               "null"
             ],
             "format": "uuid",
-            "description": "Owning account ID. Required for admin routes; user-scoped routes use the authenticated account."
+            "description": "Owning account ID. Required for admin routes; account-scoped routes use the authenticated account."
           },
           "allows_nostr": {
             "type": "boolean",
@@ -9111,7 +9111,7 @@
       },
       "Wallet": {
         "type": "object",
-        "description": "A user wallet with its balance and linked payments, invoices, Bitcoin addresses and contacts.",
+        "description": "An account wallet with its balance and linked payments, invoices, Bitcoin addresses and contacts.",
         "required": [
           "id",
           "account_id",
@@ -9147,7 +9147,7 @@
           },
           "balance": {
             "$ref": "#/components/schemas/Balance",
-            "description": "User Balance"
+            "description": "Wallet balance"
           },
           "btc_addresses": {
             "type": "array",

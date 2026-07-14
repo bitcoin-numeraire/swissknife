@@ -3,7 +3,7 @@ import { it, expect, describe } from 'vitest';
 import { getReceiveAddressListState } from './receive-address-list';
 
 describe('getReceiveAddressListState', () => {
-  it('uses the user-scoped address list for the regular receive drawer', () => {
+  it('uses the account-wallet address list for the regular receive drawer', () => {
     expect(
       getReceiveAddressListState({
         open: true,

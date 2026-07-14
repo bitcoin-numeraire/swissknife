@@ -3,12 +3,14 @@
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
 import {
+  createAccountApiKeyResponseTransformer,
   createAccountResponseTransformer,
   createAccountWalletResponseTransformer,
   createApiKeyResponseTransformer,
-  createWalletApiKeyResponseTransformer,
   generateBtcAddressResponseTransformer,
   generateInvoiceResponseTransformer,
+  getAccountAddressResponseTransformer,
+  getAccountApiKeyResponseTransformer,
   getAccountByIdResponseTransformer,
   getAccountPreferencesResponseTransformer,
   getAccountResponseTransformer,
@@ -18,11 +20,10 @@ import {
   getBtcAddressResponseTransformer,
   getInvoiceResponseTransformer,
   getPaymentResponseTransformer,
-  getWalletAddressResponseTransformer,
-  getWalletApiKeyResponseTransformer,
   getWalletInvoiceResponseTransformer,
   getWalletPaymentResponseTransformer,
   getWalletResponseTransformer,
+  listAccountApiKeysResponseTransformer,
   listAccountsResponseTransformer,
   listAccountWalletsResponseTransformer,
   listAddressesResponseTransformer,
@@ -31,7 +32,6 @@ import {
   listContactsResponseTransformer,
   listInvoicesResponseTransformer,
   listPaymentsResponseTransformer,
-  listWalletApiKeysResponseTransformer,
   listWalletBtcAddressesResponseTransformer,
   listWalletInvoicesResponseTransformer,
   listWalletOverviewsResponseTransformer,
@@ -40,15 +40,15 @@ import {
   newWalletBtcAddressResponseTransformer,
   newWalletInvoiceResponseTransformer,
   payResponseTransformer,
+  registerAccountAddressResponseTransformer,
   registerAddressResponseTransformer,
-  registerWalletAddressResponseTransformer,
   registerWalletResponseTransformer,
   replaceAccountPermissionsResponseTransformer,
+  updateAccountAddressResponseTransformer,
   updateAccountByIdResponseTransformer,
   updateAccountPreferencesResponseTransformer,
   updateAddressResponseTransformer,
   updateCurrentAccountResponseTransformer,
-  updateWalletAddressResponseTransformer,
   walletPayResponseTransformer,
 } from './transformers.gen';
 import type {
@@ -58,6 +58,9 @@ import type {
   ChangePasswordData,
   ChangePasswordErrors,
   ChangePasswordResponses,
+  CreateAccountApiKeyData,
+  CreateAccountApiKeyErrors,
+  CreateAccountApiKeyResponses,
   CreateAccountData,
   CreateAccountErrors,
   CreateAccountResponses,
@@ -67,9 +70,9 @@ import type {
   CreateApiKeyData,
   CreateApiKeyErrors,
   CreateApiKeyResponses,
-  CreateWalletApiKeyData,
-  CreateWalletApiKeyErrors,
-  CreateWalletApiKeyResponses,
+  DeleteAccountAddressData,
+  DeleteAccountAddressErrors,
+  DeleteAccountAddressResponses,
   DeleteAccountByIdData,
   DeleteAccountByIdErrors,
   DeleteAccountByIdResponses,
@@ -106,9 +109,6 @@ import type {
   DeletePaymentsData,
   DeletePaymentsErrors,
   DeletePaymentsResponses,
-  DeleteWalletAddressData,
-  DeleteWalletAddressErrors,
-  DeleteWalletAddressResponses,
   DeleteWalletData,
   DeleteWalletErrors,
   DeleteWalletResponses,
@@ -121,6 +121,12 @@ import type {
   GenerateInvoiceData,
   GenerateInvoiceErrors,
   GenerateInvoiceResponses,
+  GetAccountAddressData,
+  GetAccountAddressErrors,
+  GetAccountAddressResponses,
+  GetAccountApiKeyData,
+  GetAccountApiKeyErrors,
+  GetAccountApiKeyResponses,
   GetAccountByIdData,
   GetAccountByIdErrors,
   GetAccountByIdResponses,
@@ -148,12 +154,6 @@ import type {
   GetPaymentData,
   GetPaymentErrors,
   GetPaymentResponses,
-  GetWalletAddressData,
-  GetWalletAddressErrors,
-  GetWalletAddressResponses,
-  GetWalletApiKeyData,
-  GetWalletApiKeyErrors,
-  GetWalletApiKeyResponses,
   GetWalletBalanceData,
   GetWalletBalanceErrors,
   GetWalletBalanceResponses,
@@ -169,6 +169,9 @@ import type {
   HealthCheckData,
   HealthCheckErrors,
   HealthCheckResponses,
+  ListAccountApiKeysData,
+  ListAccountApiKeysErrors,
+  ListAccountApiKeysResponses,
   ListAccountsData,
   ListAccountsErrors,
   ListAccountsResponses,
@@ -193,9 +196,6 @@ import type {
   ListPaymentsData,
   ListPaymentsErrors,
   ListPaymentsResponses,
-  ListWalletApiKeysData,
-  ListWalletApiKeysErrors,
-  ListWalletApiKeysResponses,
   ListWalletBtcAddressesData,
   ListWalletBtcAddressesErrors,
   ListWalletBtcAddressesResponses,
@@ -225,30 +225,30 @@ import type {
   PayResponses,
   ReadinessCheckData,
   ReadinessCheckResponses,
+  RegisterAccountAddressData,
+  RegisterAccountAddressErrors,
+  RegisterAccountAddressResponses,
   RegisterAddressData,
   RegisterAddressErrors,
   RegisterAddressResponses,
-  RegisterWalletAddressData,
-  RegisterWalletAddressErrors,
-  RegisterWalletAddressResponses,
   RegisterWalletData,
   RegisterWalletErrors,
   RegisterWalletResponses,
   ReplaceAccountPermissionsData,
   ReplaceAccountPermissionsErrors,
   ReplaceAccountPermissionsResponses,
+  RevokeAccountApiKeyData,
+  RevokeAccountApiKeyErrors,
+  RevokeAccountApiKeyResponses,
+  RevokeAccountApiKeysData,
+  RevokeAccountApiKeysErrors,
+  RevokeAccountApiKeysResponses,
   RevokeApiKeyData,
   RevokeApiKeyErrors,
   RevokeApiKeyResponses,
   RevokeApiKeysData,
   RevokeApiKeysErrors,
   RevokeApiKeysResponses,
-  RevokeWalletApiKeyData,
-  RevokeWalletApiKeyErrors,
-  RevokeWalletApiKeyResponses,
-  RevokeWalletApiKeysData,
-  RevokeWalletApiKeysErrors,
-  RevokeWalletApiKeysResponses,
   SetupCheckData,
   SetupCheckErrors,
   SetupCheckResponses,
@@ -258,6 +258,9 @@ import type {
   SignUpData,
   SignUpErrors,
   SignUpResponses,
+  UpdateAccountAddressData,
+  UpdateAccountAddressErrors,
+  UpdateAccountAddressResponses,
   UpdateAccountByIdData,
   UpdateAccountByIdErrors,
   UpdateAccountByIdResponses,
@@ -270,9 +273,6 @@ import type {
   UpdateCurrentAccountData,
   UpdateCurrentAccountErrors,
   UpdateCurrentAccountResponses,
-  UpdateWalletAddressData,
-  UpdateWalletAddressErrors,
-  UpdateWalletAddressResponses,
   VersionCheckData,
   VersionCheckResponses,
   WalletPayData,
@@ -581,7 +581,7 @@ export const signIn = <ThrowOnError extends boolean = false>(
 /**
  * Sign up
  *
- * Creates the initial Admin user. Returns a JWT token to be used for authentication. The JWT token contains authentication and permissions. Sign up is only available for `JWT` Auth provider.
+ * Creates the initial admin account. Returns a JWT token containing the account's effective permissions. Sign-up is only available for the `JWT` provider.
  */
 export const signUp = <ThrowOnError extends boolean = false>(
   options: Options<SignUpData, ThrowOnError>
@@ -599,7 +599,7 @@ export const signUp = <ThrowOnError extends boolean = false>(
 /**
  * Delete Bitcoin addresses
  *
- * Deletes all the Bitcoin addresses given a filter. Returns the number of deleted addresses. Deleting an address can have an effect on the user balance
+ * Deletes all Bitcoin addresses matching a filter. Returns the number deleted.
  */
 export const deleteBtcAddresses = <ThrowOnError extends boolean = false>(
   options?: Options<DeleteBtcAddressesData, ThrowOnError>
@@ -632,7 +632,7 @@ export const listBtcAddresses = <ThrowOnError extends boolean = false>(
 /**
  * Generate a new Bitcoin address
  *
- * Returns the generated Bitcoin address for the given user
+ * Returns the generated Bitcoin address for the selected wallet.
  */
 export const generateBtcAddress = <ThrowOnError extends boolean = false>(
   options: Options<GenerateBtcAddressData, ThrowOnError>
@@ -655,7 +655,7 @@ export const generateBtcAddress = <ThrowOnError extends boolean = false>(
 /**
  * Delete a Bitcoin address
  *
- * Deletes an Bitcoin address by ID. Returns an empty body. Deleting a Bitcoin address has an effect on the user balance
+ * Deletes a Bitcoin address by ID. Returns an empty body.
  */
 export const deleteBtcAddress = <ThrowOnError extends boolean = false>(
   options: Options<DeleteBtcAddressData, ThrowOnError>
@@ -688,7 +688,7 @@ export const getBtcAddress = <ThrowOnError extends boolean = false>(
 /**
  * Delete invoices
  *
- * Deletes all the invoices given a filter. Returns the number of deleted invoices. Deleting an invoice can have an effect on the user balance
+ * Deletes all invoices matching a filter. Returns the number deleted. Deleting an invoice can affect the wallet balance.
  */
 export const deleteInvoices = <ThrowOnError extends boolean = false>(
   options?: Options<DeleteInvoicesData, ThrowOnError>
@@ -717,7 +717,7 @@ export const listInvoices = <ThrowOnError extends boolean = false>(
 /**
  * Generate a new invoice
  *
- * Returns the generated invoice for the given user
+ * Returns the generated invoice for the selected wallet.
  */
 export const generateInvoice = <ThrowOnError extends boolean = false>(
   options: Options<GenerateInvoiceData, ThrowOnError>
@@ -736,7 +736,7 @@ export const generateInvoice = <ThrowOnError extends boolean = false>(
 /**
  * Delete an invoice
  *
- * Deletes an invoice by ID. Returns an empty body. Deleting an invoice has an effect on the user balance
+ * Deletes an invoice by ID. Returns an empty body. Deleting an invoice can affect the wallet balance.
  */
 export const deleteInvoice = <ThrowOnError extends boolean = false>(
   options: Options<DeleteInvoiceData, ThrowOnError>
@@ -897,12 +897,12 @@ export const updateCurrentAccount = <ThrowOnError extends boolean = false>(
 /**
  * Revoke account API keys.
  */
-export const revokeWalletApiKeys = <ThrowOnError extends boolean = false>(
-  options?: Options<RevokeWalletApiKeysData, ThrowOnError>
-): RequestResult<RevokeWalletApiKeysResponses, RevokeWalletApiKeysErrors, ThrowOnError> =>
+export const revokeAccountApiKeys = <ThrowOnError extends boolean = false>(
+  options?: Options<RevokeAccountApiKeysData, ThrowOnError>
+): RequestResult<RevokeAccountApiKeysResponses, RevokeAccountApiKeysErrors, ThrowOnError> =>
   (options?.client ?? client).delete<
-    RevokeWalletApiKeysResponses,
-    RevokeWalletApiKeysErrors,
+    RevokeAccountApiKeysResponses,
+    RevokeAccountApiKeysErrors,
     ThrowOnError
   >({
     security: [{ scheme: 'bearer', type: 'http' }],
@@ -913,15 +913,15 @@ export const revokeWalletApiKeys = <ThrowOnError extends boolean = false>(
 /**
  * List account API keys.
  */
-export const listWalletApiKeys = <ThrowOnError extends boolean = false>(
-  options?: Options<ListWalletApiKeysData, ThrowOnError>
-): RequestResult<ListWalletApiKeysResponses, ListWalletApiKeysErrors, ThrowOnError> =>
+export const listAccountApiKeys = <ThrowOnError extends boolean = false>(
+  options?: Options<ListAccountApiKeysData, ThrowOnError>
+): RequestResult<ListAccountApiKeysResponses, ListAccountApiKeysErrors, ThrowOnError> =>
   (options?.client ?? client).get<
-    ListWalletApiKeysResponses,
-    ListWalletApiKeysErrors,
+    ListAccountApiKeysResponses,
+    ListAccountApiKeysErrors,
     ThrowOnError
   >({
-    responseTransformer: listWalletApiKeysResponseTransformer,
+    responseTransformer: listAccountApiKeysResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/v1/me/api-keys',
     ...options,
@@ -933,15 +933,15 @@ export const listWalletApiKeys = <ThrowOnError extends boolean = false>(
  * Returns the generated API Key for the account. Users can create API keys with
  * permissions as a subset of their current permissions.
  */
-export const createWalletApiKey = <ThrowOnError extends boolean = false>(
-  options: Options<CreateWalletApiKeyData, ThrowOnError>
-): RequestResult<CreateWalletApiKeyResponses, CreateWalletApiKeyErrors, ThrowOnError> =>
+export const createAccountApiKey = <ThrowOnError extends boolean = false>(
+  options: Options<CreateAccountApiKeyData, ThrowOnError>
+): RequestResult<CreateAccountApiKeyResponses, CreateAccountApiKeyErrors, ThrowOnError> =>
   (options.client ?? client).post<
-    CreateWalletApiKeyResponses,
-    CreateWalletApiKeyErrors,
+    CreateAccountApiKeyResponses,
+    CreateAccountApiKeyErrors,
     ThrowOnError
   >({
-    responseTransformer: createWalletApiKeyResponseTransformer,
+    responseTransformer: createAccountApiKeyResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/v1/me/api-keys',
     ...options,
@@ -954,12 +954,12 @@ export const createWalletApiKey = <ThrowOnError extends boolean = false>(
 /**
  * Revoke an account API key.
  */
-export const revokeWalletApiKey = <ThrowOnError extends boolean = false>(
-  options: Options<RevokeWalletApiKeyData, ThrowOnError>
-): RequestResult<RevokeWalletApiKeyResponses, RevokeWalletApiKeyErrors, ThrowOnError> =>
+export const revokeAccountApiKey = <ThrowOnError extends boolean = false>(
+  options: Options<RevokeAccountApiKeyData, ThrowOnError>
+): RequestResult<RevokeAccountApiKeyResponses, RevokeAccountApiKeyErrors, ThrowOnError> =>
   (options.client ?? client).delete<
-    RevokeWalletApiKeyResponses,
-    RevokeWalletApiKeyErrors,
+    RevokeAccountApiKeyResponses,
+    RevokeAccountApiKeyErrors,
     ThrowOnError
   >({
     security: [{ scheme: 'bearer', type: 'http' }],
@@ -970,11 +970,11 @@ export const revokeWalletApiKey = <ThrowOnError extends boolean = false>(
 /**
  * Get an account API key.
  */
-export const getWalletApiKey = <ThrowOnError extends boolean = false>(
-  options: Options<GetWalletApiKeyData, ThrowOnError>
-): RequestResult<GetWalletApiKeyResponses, GetWalletApiKeyErrors, ThrowOnError> =>
-  (options.client ?? client).get<GetWalletApiKeyResponses, GetWalletApiKeyErrors, ThrowOnError>({
-    responseTransformer: getWalletApiKeyResponseTransformer,
+export const getAccountApiKey = <ThrowOnError extends boolean = false>(
+  options: Options<GetAccountApiKeyData, ThrowOnError>
+): RequestResult<GetAccountApiKeyResponses, GetAccountApiKeyErrors, ThrowOnError> =>
+  (options.client ?? client).get<GetAccountApiKeyResponses, GetAccountApiKeyErrors, ThrowOnError>({
+    responseTransformer: getAccountApiKeyResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/v1/me/api-keys/{id}',
     ...options,
@@ -983,12 +983,12 @@ export const getWalletApiKey = <ThrowOnError extends boolean = false>(
 /**
  * Delete account Lightning Address.
  */
-export const deleteWalletAddress = <ThrowOnError extends boolean = false>(
-  options?: Options<DeleteWalletAddressData, ThrowOnError>
-): RequestResult<DeleteWalletAddressResponses, DeleteWalletAddressErrors, ThrowOnError> =>
+export const deleteAccountAddress = <ThrowOnError extends boolean = false>(
+  options?: Options<DeleteAccountAddressData, ThrowOnError>
+): RequestResult<DeleteAccountAddressResponses, DeleteAccountAddressErrors, ThrowOnError> =>
   (options?.client ?? client).delete<
-    DeleteWalletAddressResponses,
-    DeleteWalletAddressErrors,
+    DeleteAccountAddressResponses,
+    DeleteAccountAddressErrors,
     ThrowOnError
   >({
     security: [{ scheme: 'bearer', type: 'http' }],
@@ -999,11 +999,15 @@ export const deleteWalletAddress = <ThrowOnError extends boolean = false>(
 /**
  * Get account Lightning Address.
  */
-export const getWalletAddress = <ThrowOnError extends boolean = false>(
-  options?: Options<GetWalletAddressData, ThrowOnError>
-): RequestResult<GetWalletAddressResponses, GetWalletAddressErrors, ThrowOnError> =>
-  (options?.client ?? client).get<GetWalletAddressResponses, GetWalletAddressErrors, ThrowOnError>({
-    responseTransformer: getWalletAddressResponseTransformer,
+export const getAccountAddress = <ThrowOnError extends boolean = false>(
+  options?: Options<GetAccountAddressData, ThrowOnError>
+): RequestResult<GetAccountAddressResponses, GetAccountAddressErrors, ThrowOnError> =>
+  (options?.client ?? client).get<
+    GetAccountAddressResponses,
+    GetAccountAddressErrors,
+    ThrowOnError
+  >({
+    responseTransformer: getAccountAddressResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/v1/me/lightning-address',
     ...options,
@@ -1012,15 +1016,15 @@ export const getWalletAddress = <ThrowOnError extends boolean = false>(
 /**
  * Register account Lightning Address.
  */
-export const registerWalletAddress = <ThrowOnError extends boolean = false>(
-  options: Options<RegisterWalletAddressData, ThrowOnError>
-): RequestResult<RegisterWalletAddressResponses, RegisterWalletAddressErrors, ThrowOnError> =>
+export const registerAccountAddress = <ThrowOnError extends boolean = false>(
+  options: Options<RegisterAccountAddressData, ThrowOnError>
+): RequestResult<RegisterAccountAddressResponses, RegisterAccountAddressErrors, ThrowOnError> =>
   (options.client ?? client).post<
-    RegisterWalletAddressResponses,
-    RegisterWalletAddressErrors,
+    RegisterAccountAddressResponses,
+    RegisterAccountAddressErrors,
     ThrowOnError
   >({
-    responseTransformer: registerWalletAddressResponseTransformer,
+    responseTransformer: registerAccountAddressResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/v1/me/lightning-address',
     ...options,
@@ -1033,15 +1037,15 @@ export const registerWalletAddress = <ThrowOnError extends boolean = false>(
 /**
  * Update account Lightning Address.
  */
-export const updateWalletAddress = <ThrowOnError extends boolean = false>(
-  options: Options<UpdateWalletAddressData, ThrowOnError>
-): RequestResult<UpdateWalletAddressResponses, UpdateWalletAddressErrors, ThrowOnError> =>
+export const updateAccountAddress = <ThrowOnError extends boolean = false>(
+  options: Options<UpdateAccountAddressData, ThrowOnError>
+): RequestResult<UpdateAccountAddressResponses, UpdateAccountAddressErrors, ThrowOnError> =>
   (options.client ?? client).put<
-    UpdateWalletAddressResponses,
-    UpdateWalletAddressErrors,
+    UpdateAccountAddressResponses,
+    UpdateAccountAddressErrors,
     ThrowOnError
   >({
-    responseTransformer: updateWalletAddressResponseTransformer,
+    responseTransformer: updateAccountAddressResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/v1/me/lightning-address',
     ...options,
@@ -1332,7 +1336,7 @@ export const getWalletPayment = <ThrowOnError extends boolean = false>(
 /**
  * Delete payments
  *
- * Deletes all the payments given a filter. Returns the number of deleted payments. Deleting a payment can have an effect on the user balance
+ * Deletes all payments matching a filter. Returns the number deleted. Deleting a payment can affect the wallet balance.
  */
 export const deletePayments = <ThrowOnError extends boolean = false>(
   options?: Options<DeletePaymentsData, ThrowOnError>
@@ -1361,7 +1365,7 @@ export const listPayments = <ThrowOnError extends boolean = false>(
 /**
  * Send a payment
  *
- * Pay for a LN invoice, LNURL, LN Address, On-chain or internally to an other user on the same instance. Returns the payment details.
+ * Pay a Lightning invoice, LNURL, Lightning Address, on-chain address, or another account on this instance.
  */
 export const pay = <ThrowOnError extends boolean = false>(
   options: Options<PayData, ThrowOnError>
@@ -1380,7 +1384,7 @@ export const pay = <ThrowOnError extends boolean = false>(
 /**
  * Delete a payment
  *
- * Deletes a payment by ID. Returns an empty body. Deleting a payment has an effect on the user balance
+ * Deletes a payment by ID. Returns an empty body. Deleting a payment can affect the wallet balance.
  */
 export const deletePayment = <ThrowOnError extends boolean = false>(
   options: Options<DeletePaymentData, ThrowOnError>

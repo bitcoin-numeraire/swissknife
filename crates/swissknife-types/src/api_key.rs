@@ -36,7 +36,7 @@ pub struct ApiKey {
 pub struct CreateApiKeyRequest {
     /// Owning account ID.
     ///
-    /// User-scoped endpoints populate this with your own account.
+    /// Account-scoped endpoints populate this with the authenticated account.
     pub account_id: Option<Uuid>,
     /// API key name
     pub name: String,
@@ -62,7 +62,7 @@ pub struct ApiKeyFilter {
     pub ids: Option<Vec<Uuid>>,
     /// Owning account ID.
     ///
-    /// User-scoped endpoints populate this from the authenticated account.
+    /// Account-scoped endpoints populate this from the authenticated account.
     pub account_id: Option<Uuid>,
     /// Direction of the ordering of results
     #[serde(default)]

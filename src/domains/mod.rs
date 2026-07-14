@@ -1,3 +1,4 @@
+pub mod account;
 pub mod asset;
 pub mod bitcoin;
 pub mod event;
@@ -7,5 +8,4 @@ pub mod lnurl;
 pub mod nostr;
 pub mod payment;
 pub mod system;
-pub mod user;
 pub mod wallet;

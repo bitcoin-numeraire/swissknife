@@ -21,8 +21,8 @@ use crate::{
         errors::{ApplicationError, DataError},
     },
     domains::{
+        account::{Permission, User},
         lnurl::LnUrlSuccessAction,
-        user::{Permission, User},
     },
     infra::axum::{Json, Path},
 };
@@ -59,7 +59,7 @@ pub fn router() -> Router<Arc<AppServices>> {
 
 /// Send a payment
 ///
-/// Pay for a LN invoice, LNURL, LN Address, On-chain or internally to an other user on the same instance. Returns the payment details.
+/// Pay a Lightning invoice, LNURL, Lightning Address, on-chain address, or another account on this instance.
 #[utoipa::path(
     post,
     path = "",
@@ -152,7 +152,7 @@ async fn list_payments(
 
 /// Delete a payment
 ///
-/// Deletes a payment by ID. Returns an empty body. Deleting a payment has an effect on the user balance
+/// Deletes a payment by ID. Returns an empty body. Deleting a payment can affect the wallet balance.
 #[utoipa::path(
     delete,
     path = "/{id}",
@@ -180,7 +180,7 @@ async fn delete_payment(
 
 /// Delete payments
 ///
-/// Deletes all the payments given a filter. Returns the number of deleted payments. Deleting a payment can have an effect on the user balance
+/// Deletes all payments matching a filter. Returns the number deleted. Deleting a payment can affect the wallet balance.
 #[utoipa::path(
     delete,
     path = "",

@@ -20,8 +20,8 @@ use crate::{
         errors::{ApplicationError, DataError},
     },
     domains::{
+        account::{Permission, User},
         bitcoin::{BtcAddress, BtcAddressFilter, BtcAddressType, BtcNetwork},
-        user::{Permission, User},
     },
     infra::axum::{Json, Path, Query},
 };
@@ -48,7 +48,7 @@ pub fn router() -> Router<Arc<AppServices>> {
 
 /// Generate a new Bitcoin address
 ///
-/// Returns the generated Bitcoin address for the given user
+/// Returns the generated Bitcoin address for the selected wallet.
 #[utoipa::path(
     post,
     path = "",
@@ -140,7 +140,7 @@ async fn list_btc_addresses(
 
 /// Delete a Bitcoin address
 ///
-/// Deletes an Bitcoin address by ID. Returns an empty body. Deleting a Bitcoin address has an effect on the user balance
+/// Deletes a Bitcoin address by ID. Returns an empty body.
 #[utoipa::path(
     delete,
     path = "/{id}",
@@ -168,7 +168,7 @@ async fn delete_btc_address(
 
 /// Delete Bitcoin addresses
 ///
-/// Deletes all the Bitcoin addresses given a filter. Returns the number of deleted addresses. Deleting an address can have an effect on the user balance
+/// Deletes all Bitcoin addresses matching a filter. Returns the number deleted.
 #[utoipa::path(
     delete,
     path = "",

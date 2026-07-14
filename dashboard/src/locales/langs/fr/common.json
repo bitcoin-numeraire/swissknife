@@ -877,6 +877,6 @@
     "never": "Jamais",
     "scope_count_one": "{{count}} permission",
     "scope_count_other": "{{count}} permissions",
-    "user_wallet_permission": "read:user_wallet"
+    "account_wallet_access": "Portefeuilles du compte"
   }
 }

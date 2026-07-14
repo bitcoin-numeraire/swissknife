@@ -574,7 +574,7 @@ export const zVersionInfo = z.object({
 });
 
 /**
- * A user wallet with its balance and linked payments, invoices, Bitcoin addresses and contacts.
+ * An account wallet with its balance and linked payments, invoices, Bitcoin addresses and contacts.
  */
 export const zWallet = z.object({
   account_id: z.uuid(),
@@ -840,7 +840,7 @@ export const zSignInResponse2 = zSignInResponse;
 export const zSignUpBody = zSignUpRequest;
 
 /**
- * Admin user created
+ * Admin account created
  */
 export const zSignUpResponse = zSignInResponse;
 
@@ -1110,7 +1110,7 @@ export const zUpdateCurrentAccountBody = zUpdateAccountRequest;
  */
 export const zUpdateCurrentAccountResponse = zAccount;
 
-export const zRevokeWalletApiKeysQuery = z.object({
+export const zRevokeAccountApiKeysQuery = z.object({
   limit: z.coerce
     .bigint()
     .gte(BigInt(0))
@@ -1133,14 +1133,14 @@ export const zRevokeWalletApiKeysQuery = z.object({
 /**
  * Success
  */
-export const zRevokeWalletApiKeysResponse = z.coerce
+export const zRevokeAccountApiKeysResponse = z.coerce
   .bigint()
   .gte(BigInt(0))
   .max(BigInt('9223372036854775807'), {
     error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
   });
 
-export const zListWalletApiKeysQuery = z.object({
+export const zListAccountApiKeysQuery = z.object({
   limit: z.coerce
     .bigint()
     .gte(BigInt(0))
@@ -1163,46 +1163,46 @@ export const zListWalletApiKeysQuery = z.object({
 /**
  * Success
  */
-export const zListWalletApiKeysResponse = z.array(zApiKey);
+export const zListAccountApiKeysResponse = z.array(zApiKey);
 
-export const zCreateWalletApiKeyBody = zCreateApiKeyRequest;
+export const zCreateAccountApiKeyBody = zCreateApiKeyRequest;
 
 /**
  * API Key Created
  */
-export const zCreateWalletApiKeyResponse = zApiKey;
+export const zCreateAccountApiKeyResponse = zApiKey;
 
-export const zRevokeWalletApiKeyPath = z.object({
+export const zRevokeAccountApiKeyPath = z.object({
   id: z.uuid(),
 });
 
-export const zGetWalletApiKeyPath = z.object({
+export const zGetAccountApiKeyPath = z.object({
   id: z.uuid(),
 });
 
 /**
  * Found
  */
-export const zGetWalletApiKeyResponse = zApiKey;
+export const zGetAccountApiKeyResponse = zApiKey;
 
 /**
  * Found
  */
-export const zGetWalletAddressResponse = zLnAddress.nullable();
+export const zGetAccountAddressResponse = zLnAddress.nullable();
 
-export const zRegisterWalletAddressBody = zRegisterLnAddressRequest;
+export const zRegisterAccountAddressBody = zRegisterLnAddressRequest;
 
 /**
  * LN Address Registered
  */
-export const zRegisterWalletAddressResponse = zLnAddress;
+export const zRegisterAccountAddressResponse = zLnAddress;
 
-export const zUpdateWalletAddressBody = zUpdateLnAddressRequest;
+export const zUpdateAccountAddressBody = zUpdateLnAddressRequest;
 
 /**
  * LN Address Updated
  */
-export const zUpdateWalletAddressResponse = zLnAddress;
+export const zUpdateAccountAddressResponse = zLnAddress;
 
 /**
  * Found

@@ -190,7 +190,7 @@ async fn revoke_api_keys(
 
 #[cfg(test)]
 mod tests {
-    use crate::{application::composition::MockAppServicesBuilder, domains::user::ApiKey};
+    use crate::{application::composition::MockAppServicesBuilder, domains::account::ApiKey};
 
     use super::*;
 

@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use crate::application::errors::AuthenticationError;
-use crate::domains::user::{Account, AuthClaims};
+use crate::domains::account::{Account, AuthClaims};
 use crate::infra::jwt::JWTAuthenticator;
 use async_trait::async_trait;
 

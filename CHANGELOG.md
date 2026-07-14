@@ -28,6 +28,9 @@ release notes when a tag is published.
   wallets. Payments and invoices now derive their asset and network from the
   selected wallet, without legacy currency fallbacks ([#314], [#315], [#317],
   [#318], [#320], [#321]).
+- Renamed internal user-as-account modules, handlers, generated operations, and
+  dashboard actions to the account vocabulary. `User` now refers only to the
+  authenticated runtime principal ([#330]).
 
 - Migrated CLN Lightning payments from the deprecated `pay` RPC to `xpay`, and
   refreshed the vendored CLN and LND gRPC protos to CLN v26.06 and LND v0.21
@@ -127,5 +130,6 @@ release notes when a tag is published.
 [#321]: https://github.com/bitcoin-numeraire/swissknife/pull/321
 [#324]: https://github.com/bitcoin-numeraire/swissknife/pull/324
 [#326]: https://github.com/bitcoin-numeraire/swissknife/issues/326
+[#330]: https://github.com/bitcoin-numeraire/swissknife/issues/330
 [#331]: https://github.com/bitcoin-numeraire/swissknife/pull/331
 [398e89f]: https://github.com/bitcoin-numeraire/swissknife/commit/398e89f

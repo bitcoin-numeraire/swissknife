@@ -21,11 +21,11 @@ use crate::{
         errors::{ApplicationError, DataError},
     },
     domains::{
+        account::{ApiKey, ApiKeyFilter, User},
         bitcoin::{BtcAddress, BtcAddressFilter},
         invoice::{Invoice, InvoiceFilter, InvoiceStatus},
         ln_address::{LnAddress, LnAddressFilter},
         payment::{Payment, PaymentFilter, PaymentStatus},
-        user::{ApiKey, ApiKeyFilter, User},
     },
     infra::axum::{Json, Path, Query},
 };
@@ -39,15 +39,15 @@ use super::{Balance, Contact, Wallet, WalletFilter};
         update_current_account,
         get_account_preferences,
         update_account_preferences,
-        get_wallet_address,
-        register_wallet_address,
-        update_wallet_address,
-        delete_wallet_address,
-        create_wallet_api_key,
-        list_wallet_api_keys,
-        get_wallet_api_key,
-        revoke_wallet_api_key,
-        revoke_wallet_api_keys,
+        get_account_address,
+        register_account_address,
+        update_account_address,
+        delete_account_address,
+        create_account_api_key,
+        list_account_api_keys,
+        get_account_api_key,
+        revoke_account_api_key,
+        revoke_account_api_keys,
         list_account_wallets,
         create_account_wallet,
         get_account_wallet,
@@ -85,24 +85,24 @@ use super::{Balance, Contact, Wallet, WalletFilter};
         (name = "Me", description = "Authenticated account endpoints. Wallet operations require an explicit account-owned wallet selector.")
     ),
 )]
-pub struct UserWalletHandler;
+pub struct AccountWalletHandler;
 pub const CONTEXT_PATH: &str = "/v1/me";
 
-pub fn user_router() -> Router<Arc<AppServices>> {
+pub fn account_router() -> Router<Arc<AppServices>> {
     Router::new()
         .route("/", get(get_account))
         .route("/", put(update_current_account))
         .route("/preferences", get(get_account_preferences))
         .route("/preferences", put(update_account_preferences))
-        .route("/lightning-address", get(get_wallet_address))
-        .route("/lightning-address", post(register_wallet_address))
-        .route("/lightning-address", put(update_wallet_address))
-        .route("/lightning-address", delete(delete_wallet_address))
-        .route("/api-keys", post(create_wallet_api_key))
-        .route("/api-keys", get(list_wallet_api_keys))
-        .route("/api-keys/{id}", get(get_wallet_api_key))
-        .route("/api-keys/{id}", delete(revoke_wallet_api_key))
-        .route("/api-keys", delete(revoke_wallet_api_keys))
+        .route("/lightning-address", get(get_account_address))
+        .route("/lightning-address", post(register_account_address))
+        .route("/lightning-address", put(update_account_address))
+        .route("/lightning-address", delete(delete_account_address))
+        .route("/api-keys", post(create_account_api_key))
+        .route("/api-keys", get(list_account_api_keys))
+        .route("/api-keys/{id}", get(get_account_api_key))
+        .route("/api-keys/{id}", delete(revoke_account_api_key))
+        .route("/api-keys", delete(revoke_account_api_keys))
         .route("/wallets", get(list_account_wallets))
         .route("/wallets", post(create_account_wallet))
         .route("/wallets/{wallet_id}", get(get_account_wallet))
@@ -444,7 +444,7 @@ async fn new_wallet_invoice(
         (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
     )
 )]
-async fn get_wallet_address(
+async fn get_account_address(
     State(services): State<Arc<AppServices>>,
     user: User,
 ) -> Result<Json<Option<LnAddress>>, ApplicationError> {
@@ -474,7 +474,7 @@ async fn get_wallet_address(
         (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
     )
 )]
-async fn register_wallet_address(
+async fn register_account_address(
     State(services): State<Arc<AppServices>>,
     user: User,
     Json(payload): Json<RegisterLnAddressRequest>,
@@ -507,7 +507,7 @@ async fn register_wallet_address(
         (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
     )
 )]
-async fn update_wallet_address(
+async fn update_account_address(
     State(services): State<Arc<AppServices>>,
     user: User,
     Json(payload): Json<UpdateLnAddressRequest>,
@@ -542,7 +542,7 @@ async fn update_wallet_address(
         (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
     )
 )]
-async fn delete_wallet_address(State(services): State<Arc<AppServices>>, user: User) -> Result<(), ApplicationError> {
+async fn delete_account_address(State(services): State<Arc<AppServices>>, user: User) -> Result<(), ApplicationError> {
     let n_deleted = services
         .ln_address
         .delete_many(LnAddressFilter {
@@ -792,7 +792,7 @@ async fn delete_failed_payments(
         (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
     )
 )]
-async fn create_wallet_api_key(
+async fn create_account_api_key(
     State(services): State<Arc<AppServices>>,
     user: User,
     Json(mut payload): Json<CreateApiKeyRequest>,
@@ -816,7 +816,7 @@ async fn create_wallet_api_key(
         (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
     )
 )]
-async fn get_wallet_api_key(
+async fn get_account_api_key(
     State(services): State<Arc<AppServices>>,
     user: User,
     Path(id): Path<Uuid>,
@@ -852,7 +852,7 @@ async fn get_wallet_api_key(
         (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
     )
 )]
-async fn list_wallet_api_keys(
+async fn list_account_api_keys(
     State(services): State<Arc<AppServices>>,
     user: User,
     Query(mut filter): Query<ApiKeyFilter>,
@@ -877,7 +877,7 @@ async fn list_wallet_api_keys(
         (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
     )
 )]
-async fn revoke_wallet_api_key(
+async fn revoke_account_api_key(
     State(services): State<Arc<AppServices>>,
     user: User,
     Path(id): Path<Uuid>,
@@ -912,7 +912,7 @@ async fn revoke_wallet_api_key(
         (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
     )
 )]
-async fn revoke_wallet_api_keys(
+async fn revoke_account_api_keys(
     State(services): State<Arc<AppServices>>,
     user: User,
     Query(mut filter): Query<ApiKeyFilter>,

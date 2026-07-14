@@ -128,7 +128,7 @@ impl ApiKeyUseCases for ApiKeyService {
 mod tests {
     use crate::{
         application::{composition::MockAppStoreBuilder, errors::DatabaseError},
-        domains::user::Permission,
+        domains::account::Permission,
     };
 
     use super::*;

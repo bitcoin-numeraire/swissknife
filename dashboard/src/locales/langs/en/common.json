@@ -854,7 +854,7 @@
     "expiration": "Expiration",
     "description": "Description",
     "key": "Secret key",
-    "no_permissions": "This API token can access User Wallet endpoints.",
+    "no_permissions": "This API token can access account-wallet endpoints.",
     "copy": "Copy token",
     "key_display_message": "Save your token and keep it secure, do not share it publicly or expose it in code repositories. This token will never be displayed anymore."
   },
@@ -874,10 +874,10 @@
     "delete_multiple_success": "{{count}} API keys deleted successfully",
     "instance_title": "Instance API keys",
     "instance_description": "Manage tokens that can operate across wallets and administrative API scopes.",
-    "search_placeholder": "Search ID, User or Name",
+    "search_placeholder": "Search ID, Account or Name",
     "never": "Never",
     "scope_count_one": "{{count}} scope",
     "scope_count_other": "{{count}} scopes",
-    "user_wallet_permission": "read:user_wallet"
+    "account_wallet_access": "Account wallets"
   }
 }

@@ -78,7 +78,7 @@ impl AuthUseCases for AuthService {
         }
 
         if self.store.config.find(PASSWORD_HASH_KEY).await?.is_some() {
-            return Err(DataError::Conflict("Admin user already created".into()).into());
+            return Err(DataError::Conflict("Admin account already created".into()).into());
         }
 
         let password_hash = hash(&password, DEFAULT_COST).map_err(|e| AuthenticationError::Hash(e.to_string()))?;
@@ -97,7 +97,7 @@ impl AuthUseCases for AuthService {
 
         let token = self.jwt_authenticator.encode(account)?;
 
-        debug!("Admin user created successfully");
+        debug!("Admin account created successfully");
         Ok(token)
     }
 
@@ -245,9 +245,9 @@ mod tests {
     use crate::{
         application::composition::MockAppStoreBuilder,
         domains::{
+            account::{Account, ApiKey, AuthClaims, AuthIdentity},
             asset::{Asset, Protocol, NATIVE_ASSET_REF},
             bitcoin::BtcNetwork,
-            user::{Account, ApiKey, AuthClaims, AuthIdentity},
             wallet::Wallet,
         },
         infra::jwt::MockJWTAuthenticator,

@@ -3,6 +3,7 @@ use std::sync::Arc;
 use crate::{
     application::composition::{AppAdapters, AppConfig},
     domains::{
+        account::{AccountService, AccountUseCases, ApiKeyService, ApiKeyUseCases, AuthService, AuthUseCases},
         bitcoin::{BitcoinService, BitcoinUseCases},
         event::{EventService, EventUseCases},
         invoice::{InvoiceService, InvoiceUseCases},
@@ -11,7 +12,6 @@ use crate::{
         nostr::{NostrService, NostrUseCases},
         payment::{PaymentService, PaymentsUseCases},
         system::{SystemService, SystemUseCases},
-        user::{AccountService, AccountUseCases, ApiKeyService, ApiKeyUseCases, AuthService, AuthUseCases},
         wallet::{WalletService, WalletUseCases},
     },
 };
@@ -121,11 +121,11 @@ pub struct MockAppServicesBuilder {
     pub wallet: crate::domains::wallet::MockWalletUseCases,
     pub lnurl: crate::domains::lnurl::MockLnUrlUseCases,
     pub ln_address: crate::domains::ln_address::MockLnAddressUseCases,
-    pub account: crate::domains::user::MockAccountUseCases,
-    pub auth: crate::domains::user::MockAuthUseCases,
+    pub account: crate::domains::account::MockAccountUseCases,
+    pub auth: crate::domains::account::MockAuthUseCases,
     pub system: crate::domains::system::MockSystemUseCases,
     pub nostr: crate::domains::nostr::MockNostrUseCases,
-    pub api_key: crate::domains::user::MockApiKeyUseCases,
+    pub api_key: crate::domains::account::MockApiKeyUseCases,
     pub bitcoin: crate::domains::bitcoin::MockBitcoinUseCases,
     pub event: crate::domains::event::MockEventUseCases,
 }
@@ -139,11 +139,11 @@ impl MockAppServicesBuilder {
             wallet: crate::domains::wallet::MockWalletUseCases::new(),
             lnurl: crate::domains::lnurl::MockLnUrlUseCases::new(),
             ln_address: crate::domains::ln_address::MockLnAddressUseCases::new(),
-            account: crate::domains::user::MockAccountUseCases::new(),
-            auth: crate::domains::user::MockAuthUseCases::new(),
+            account: crate::domains::account::MockAccountUseCases::new(),
+            auth: crate::domains::account::MockAuthUseCases::new(),
             system: crate::domains::system::MockSystemUseCases::new(),
             nostr: crate::domains::nostr::MockNostrUseCases::new(),
-            api_key: crate::domains::user::MockApiKeyUseCases::new(),
+            api_key: crate::domains::account::MockApiKeyUseCases::new(),
             bitcoin: crate::domains::bitcoin::MockBitcoinUseCases::new(),
             event: crate::domains::event::MockEventUseCases::new(),
         }

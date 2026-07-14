@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use crate::domains::{
+    account::{AccountRepository, ApiKeyRepository},
     asset::AssetRepository,
     bitcoin::{BtcAddressRepository, BtcOutputRepository},
     event::EventProjectionUnitOfWork,
@@ -8,7 +9,6 @@ use crate::domains::{
     ln_address::LnAddressRepository,
     payment::{PaymentRepository, PaymentUnitOfWork},
     system::{ConfigRepository, HealthProbe},
-    user::{AccountRepository, ApiKeyRepository},
     wallet::WalletRepository,
 };
 
@@ -70,9 +70,9 @@ pub struct MockAppStoreBuilder {
     pub payment: crate::domains::payment::MockPaymentRepository,
     pub invoice: crate::domains::invoice::MockInvoiceRepository,
     pub wallet: crate::domains::wallet::MockWalletRepository,
-    pub account: crate::domains::user::MockAccountRepository,
+    pub account: crate::domains::account::MockAccountRepository,
     pub asset: crate::domains::asset::MockAssetRepository,
-    pub api_key: crate::domains::user::MockApiKeyRepository,
+    pub api_key: crate::domains::account::MockApiKeyRepository,
     pub config: crate::domains::system::MockConfigRepository,
     pub btc_address: crate::domains::bitcoin::MockBtcAddressRepository,
     pub btc_output: crate::domains::bitcoin::MockBtcOutputRepository,
@@ -89,9 +89,9 @@ impl MockAppStoreBuilder {
             payment: crate::domains::payment::MockPaymentRepository::new(),
             invoice: crate::domains::invoice::MockInvoiceRepository::new(),
             wallet: crate::domains::wallet::MockWalletRepository::new(),
-            account: crate::domains::user::MockAccountRepository::new(),
+            account: crate::domains::account::MockAccountRepository::new(),
             asset: crate::domains::asset::MockAssetRepository::new(),
-            api_key: crate::domains::user::MockApiKeyRepository::new(),
+            api_key: crate::domains::account::MockApiKeyRepository::new(),
             config: crate::domains::system::MockConfigRepository::new(),
             btc_address: crate::domains::bitcoin::MockBtcAddressRepository::new(),
             btc_output: crate::domains::bitcoin::MockBtcOutputRepository::new(),

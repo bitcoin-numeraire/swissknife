@@ -8,7 +8,7 @@ use crate::{
         composition::AppStore,
         errors::{ApplicationError, DataError},
     },
-    domains::{bitcoin::OnchainSyncCursor, user::PASSWORD_HASH_KEY},
+    domains::{account::PASSWORD_HASH_KEY, bitcoin::OnchainSyncCursor},
     infra::lightning::LnClient,
 };
 

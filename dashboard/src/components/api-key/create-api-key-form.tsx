@@ -22,7 +22,7 @@ import { handleActionError } from 'src/utils/errors';
 import { useTranslate } from 'src/locales';
 import { CONFIG } from 'src/global-config';
 import { zCreateApiKeyRequest } from 'src/lib/swissknife/zod.gen';
-import { createApiKey, createWalletApiKey } from 'src/lib/swissknife';
+import { createApiKey, createAccountApiKey } from 'src/lib/swissknife';
 
 import { toast } from 'src/components/snackbar';
 import { RHFSelect, RHFTextField, RHFMultiCheckbox } from 'src/components/hook-form';
@@ -80,7 +80,7 @@ export function CreateApiKeyForm({ onSuccess, isAdmin }: Props) {
         const { data: apiKeyData } = await createApiKey({ body });
         setApiKey(apiKeyData);
       } else {
-        const { data: apiKeyData } = await createWalletApiKey({ body });
+        const { data: apiKeyData } = await createAccountApiKey({ body });
         setApiKey(apiKeyData);
       }
       toast.success(t('create_api_key_form.create_success'));

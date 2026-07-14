@@ -20,7 +20,7 @@ use crate::{
         },
         errors::{ApplicationError, DataError},
     },
-    domains::user::{Permission, User},
+    domains::account::{Permission, User},
     infra::axum::Json,
 };
 

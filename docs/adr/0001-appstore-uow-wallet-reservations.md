@@ -2,7 +2,7 @@
 
 | Field | Value |
 | --- | --- |
-| Status | Proposed |
+| Status | Accepted; wallet identity and balance shape superseded by ADR 0002 |
 | Date | 2026-06-05 |
 | Related issues | #15, #229, #235, #236, #237, #238, #239, #240, #241 |
 | Scope | Backend service dependency injection, repository ports, database transactions, wallet accounting |
@@ -10,6 +10,11 @@
 ## Summary
 
 SwissKnife should split dependency injection from database transaction mechanics and introduce a durable, currency-scoped wallet balance/reservation model before the next production-facing release.
+
+ADR 0002 later replaced the temporary `wallet_balance(wallet_id, currency)` shape
+with account-owned, asset-scoped wallets. The Unit-of-Work and atomic reservation
+decisions in this ADR remain in force; its wallet-as-user discussion is retained
+as historical context.
 
 The target architecture is:
 

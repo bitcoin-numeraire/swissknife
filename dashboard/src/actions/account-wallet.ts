@@ -1,5 +1,5 @@
 import type {
-  ListWalletApiKeysData,
+  ListAccountApiKeysData,
   ListWalletInvoicesData,
   ListWalletBtcAddressesData,
 } from 'src/lib/swissknife';
@@ -12,11 +12,11 @@ import {
   listContacts,
   InvoiceOrderBy,
   OrderDirection,
-  getWalletAddress,
   getWalletBalance,
   getWalletInvoice,
   getWalletPayment,
-  listWalletApiKeys,
+  getAccountAddress,
+  listAccountApiKeys,
   listWalletInvoices,
   listWalletPayments,
   listWalletBtcAddresses,
@@ -157,7 +157,7 @@ export function useGetWalletPayment(id: string, walletId?: string) {
 }
 
 export function useGetAccountLnAddress(shouldRetryOnError: boolean = false) {
-  const result = useSWR(endpointKeys.account.lnAddress.get, () => getWalletAddress<true>(), {
+  const result = useSWR(endpointKeys.account.lnAddress.get, () => getAccountAddress<true>(), {
     shouldRetryOnError,
   });
 
@@ -235,8 +235,8 @@ export function useListWalletContacts(walletId?: string) {
   );
 }
 
-export function useListAccountApiKeys(query?: ListWalletApiKeysData) {
-  const result = useSWR(endpointKeys.account.apiKeys.list, () => listWalletApiKeys<true>(query));
+export function useListAccountApiKeys(query?: ListAccountApiKeysData) {
+  const result = useSWR(endpointKeys.account.apiKeys.list, () => listAccountApiKeys<true>(query));
 
   return useMemo(
     () => ({

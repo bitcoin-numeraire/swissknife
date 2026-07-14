@@ -1,6 +1,6 @@
 use crate::{
     application::errors::DatabaseError,
-    domains::user::{ApiKey, ApiKeyFilter, ApiKeyRepository},
+    domains::account::{ApiKey, ApiKeyFilter, ApiKeyRepository},
     infra::database::sea_orm::models::{
         api_key::{ActiveModel, Column},
         prelude::ApiKey as ApiKeyEntity,

@@ -89,7 +89,7 @@ export type DashboardModuleDiagnostic = {
 
 export const navData: Array<NavGroupWithPermissions> = [
   /**
-   * User Wallet
+   * Account wallet
    */
   {
     subheader: 'wallet',
