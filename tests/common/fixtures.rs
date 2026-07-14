@@ -1,7 +1,6 @@
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 
-use sea_orm::{ConnectionTrait, Database, DatabaseBackend, Statement};
 use uuid::Uuid;
 
 use swissknife_types::{
@@ -15,10 +14,12 @@ use super::wait::wait_until;
 use super::TestApp;
 
 static COUNTER: AtomicU64 = AtomicU64::new(0);
+const MAINNET_BTC_ASSET_ID: &str = "00000000-0000-4000-8000-000000000001";
 const REGTEST_BTC_ASSET_ID: &str = "00000000-0000-4000-8000-000000000004";
+const SIGNET_BTC_ASSET_ID: &str = "00000000-0000-4000-8000-000000000006";
 
 /// A process-unique, lowercase identifier with the given prefix, so tests
-/// sharing one instance never collide on wallet user ids, usernames, etc.
+/// sharing one instance never collide on identity subjects, usernames, etc.
 pub fn unique(prefix: &str) -> String {
     let n = COUNTER.fetch_add(1, Ordering::Relaxed);
     format!("{prefix}-{}-{n}", std::process::id()).to_ascii_lowercase()
@@ -27,6 +28,16 @@ pub fn unique(prefix: &str) -> String {
 impl TestApp {
     /// Create an administrator-managed account without a login identity.
     pub async fn create_account(&self, token: &str, display_name: &str) -> Account {
+        self.create_account_with_permissions(token, display_name, vec![]).await
+    }
+
+    /// Create an administrator-managed account with the requested stored permissions.
+    pub async fn create_account_with_permissions(
+        &self,
+        token: &str,
+        display_name: &str,
+        permissions: Vec<Permission>,
+    ) -> Account {
         let res = self
             .api()
             .post(
@@ -34,7 +45,7 @@ impl TestApp {
                 Auth::Bearer(token),
                 CreateAccountRequest {
                     display_name: Some(display_name.to_string()),
-                    permissions: vec![],
+                    permissions,
                 },
             )
             .await;
@@ -45,9 +56,8 @@ impl TestApp {
     /// Provision a fresh account and return its regtest BTC wallet. Behavioural
     /// tests use their own account wallet so balances stay isolated on the
     /// shared instance.
-    pub async fn create_wallet(&self, token: &str, _label: &str) -> Wallet {
-        let account_id = Uuid::new_v4();
-        self.create_account_fixture(account_id).await;
+    pub async fn create_wallet(&self, token: &str, label: &str) -> Wallet {
+        let account = self.create_account(token, label).await;
 
         let res = self
             .api()
@@ -55,7 +65,7 @@ impl TestApp {
                 "/v1/wallets",
                 Auth::Bearer(token),
                 CreateWalletRequest {
-                    account_id: Some(account_id),
+                    account_id: Some(account.id),
                     asset_id: regtest_btc_asset_id(),
                 },
             )
@@ -131,11 +141,10 @@ impl TestApp {
             .expect("a freshly created key returns its secret")
     }
 
-    /// Mint an API key for `account_id` via the admin endpoint with `permissions`,
-    /// returning its secret. The key authenticates into that account.
-    pub async fn user_api_key(&self, token: &str, account_id: Uuid, permissions: Vec<Permission>) -> String {
-        self.create_account_fixture(account_id).await;
-
+    /// Mint an API key for `account_id` via the admin endpoint with
+    /// `permissions`, returning its secret. The key authenticates into that
+    /// account.
+    pub async fn account_api_key(&self, token: &str, account_id: Uuid, permissions: Vec<Permission>) -> String {
         let res = self
             .api()
             .post(
@@ -143,57 +152,25 @@ impl TestApp {
                 Auth::Bearer(token),
                 CreateApiKeyRequest {
                     account_id: Some(account_id),
-                    name: unique("user-key"),
+                    name: unique("account-key"),
                     permissions,
                     description: None,
                     expiry: None,
                 },
             )
             .await;
-        assert_eq!(res.status.as_u16(), 200, "mint user key failed: {}", res.body);
+        assert_eq!(res.status.as_u16(), 200, "mint account key failed: {}", res.body);
         res.parse::<ApiKey>()
             .key
             .expect("a freshly created key returns its secret")
     }
 
-    async fn create_account_fixture(&self, account_id: Uuid) {
-        let db = Database::connect(&self.database_url)
-            .await
-            .expect("connect to integration database");
-        let backend = db.get_database_backend();
-        let identity_id = uuid_literal(backend, Uuid::new_v4());
-        let subject = sql_string_literal(&format!("fixture:{account_id}"));
-        let account_id = uuid_literal(backend, account_id);
-
-        for sql in [
-            format!(
-                "INSERT INTO account (id, permissions, created_at) \
-                 VALUES ({account_id}, '[]', CURRENT_TIMESTAMP) \
-                 ON CONFLICT (id) DO NOTHING"
-            ),
-            format!(
-                "INSERT INTO auth_identity (id, account_id, provider, subject, created_at) \
-                 VALUES ({identity_id}, {account_id}, 'jwt', {subject}, CURRENT_TIMESTAMP) \
-                 ON CONFLICT (provider, subject) DO NOTHING"
-            ),
-            format!(
-                "INSERT INTO account_preference (account_id, dashboard_settings, created_at) \
-                 VALUES ({account_id}, '{{}}', CURRENT_TIMESTAMP) \
-                 ON CONFLICT (account_id) DO NOTHING"
-            ),
-        ] {
-            db.execute(Statement::from_string(backend, sql))
-                .await
-                .expect("seed integration account fixture");
-        }
-    }
-
-    /// Register a fresh wallet and a full-permission API key for it: a distinct
-    /// external account for exercising the `/me` endpoints.
-    pub async fn create_user(&self, token: &str, _label: &str) -> TestUser {
-        let account_id = Uuid::new_v4();
+    /// Create a fresh account, a full-permission API key, and its regtest BTC
+    /// wallet through public HTTP endpoints for exercising `/v1/me` routes.
+    pub async fn create_account_with_wallet(&self, token: &str, label: &str) -> TestAccount {
+        let account = self.create_account(token, label).await;
         let key = self
-            .user_api_key(token, account_id, Permission::all_permissions())
+            .account_api_key(token, account.id, Permission::all_permissions())
             .await;
         let res = self
             .api()
@@ -206,35 +183,31 @@ impl TestApp {
                 },
             )
             .await;
-        assert_eq!(
-            res.status.as_u16(),
-            200,
-            "create_user /v1/me/wallets failed: {}",
-            res.body
-        );
+        assert_eq!(res.status.as_u16(), 200, "create account wallet failed: {}", res.body);
         let wallet = res.parse::<Wallet>();
-        TestUser { wallet, key }
+        TestAccount { account, wallet, key }
     }
 }
 
-/// A distinct user (own wallet) with an API-key credential, for `/me` tests.
-pub struct TestUser {
+/// A distinct account with an API-key credential and regtest BTC wallet.
+pub struct TestAccount {
+    pub account: Account,
     pub wallet: Wallet,
     pub key: String,
 }
 
-fn uuid_literal(backend: DatabaseBackend, id: Uuid) -> String {
-    match backend {
-        DatabaseBackend::Sqlite => format!("X'{}'", id.as_simple()),
-        DatabaseBackend::Postgres => format!("'{id}'::uuid"),
-        DatabaseBackend::MySql => format!("'{id}'"),
-    }
+pub fn regtest_btc_asset_id() -> Uuid {
+    seeded_asset_id(REGTEST_BTC_ASSET_ID)
 }
 
-fn regtest_btc_asset_id() -> Uuid {
-    Uuid::parse_str(REGTEST_BTC_ASSET_ID).expect("seeded regtest BTC asset ID is valid")
+pub fn mainnet_btc_asset_id() -> Uuid {
+    seeded_asset_id(MAINNET_BTC_ASSET_ID)
 }
 
-fn sql_string_literal(value: &str) -> String {
-    format!("'{}'", value.replace('\'', "''"))
+pub fn signet_btc_asset_id() -> Uuid {
+    seeded_asset_id(SIGNET_BTC_ASSET_ID)
+}
+
+fn seeded_asset_id(value: &str) -> Uuid {
+    Uuid::parse_str(value).expect("seeded BTC asset ID is valid")
 }

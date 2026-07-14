@@ -1,5 +1,6 @@
 //! `/v1/auth/*` (local JWT) plus auth-middleware enforcement on protected routes.
 
+use futures_util::future::join_all;
 use reqwest::StatusCode;
 
 use swissknife_types::{ChangePasswordRequest, SignInRequest, SignInResponse, SignUpRequest};
@@ -65,6 +66,48 @@ mod sign_up {
             )
             .await;
         assert_error(&res, StatusCode::CONFLICT);
+    }
+
+    #[tokio::test]
+    async fn concurrent_sign_ups_have_one_winner_and_no_server_errors() {
+        let (database, provider) = matrix_cell();
+        let label = format!("{database}-{provider}-auth-concurrent-sign-up");
+        let spawned = spawn_instance(&database, &provider, &label, &[]).await;
+        let api = ApiClient::new(spawned.base_url);
+
+        let responses = join_all((0..8).map(|_| {
+            let api = api.clone();
+            async move {
+                api.post(
+                    "/v1/auth/sign-up",
+                    Auth::None,
+                    SignUpRequest {
+                        password: ADMIN_PASSWORD.to_string(),
+                    },
+                )
+                .await
+            }
+        }))
+        .await;
+
+        let mut winner = None;
+        let mut conflicts = 0;
+        for response in responses {
+            match response.status {
+                StatusCode::OK => winner = Some(response.parse::<SignInResponse>().token),
+                StatusCode::CONFLICT => conflicts += 1,
+                status => panic!("concurrent sign-up returned {status}: {}", response.body),
+            }
+        }
+        assert!(winner.is_some(), "one sign-up must create the admin account");
+        assert_eq!(conflicts, 7, "all losing sign-ups must report conflict");
+
+        let token = winner.expect("sign-up winner token");
+        let profile = api.get("/v1/me", Auth::Bearer(&token)).await;
+        assert_status(&profile, StatusCode::OK);
+        let wallets = api.get("/v1/me/wallets", Auth::Bearer(&token)).await;
+        assert_status(&wallets, StatusCode::OK);
+        assert_eq!(wallets.parse::<Vec<swissknife_types::Wallet>>().len(), 1);
     }
 }
 
@@ -170,12 +213,7 @@ mod change_password {
             )
             .await;
         assert_status(&res, StatusCode::OK);
-        let token = res.parse::<SignInResponse>().token;
-
-        let warmup = api.get("/v1/me", Auth::Bearer(&token)).await;
-        assert_status(&warmup, StatusCode::OK);
-
-        token
+        res.parse::<SignInResponse>().token
     }
 }
 

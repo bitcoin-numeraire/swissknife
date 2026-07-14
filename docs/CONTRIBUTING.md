@@ -31,6 +31,7 @@ database behavior should also run at least one black-box integration cell:
 
 ```bash
 make test-integration ITEST_DATABASE=sqlite ITEST_PROVIDER=lnd_grpc
+make test-integration-fresh ITEST_DATABASE=sqlite ITEST_PROVIDER=lnd_grpc
 ```
 
 Dashboard changes should be checked from `dashboard/`:

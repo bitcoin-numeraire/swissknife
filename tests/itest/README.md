@@ -33,12 +33,20 @@ config/itest.toml   all static SwissKnife test config (RUN_MODE=itest)
 make itest-up                      # bring up + initialize the regtest stack (idempotent)
 make test-integration              # default cell: sqlite + lnd_grpc
 make test-integration ITEST_DATABASE=postgres ITEST_PROVIDER=cln_grpc
+make test-integration-fresh        # recreate volumes, then run sqlite + lnd_grpc
 make itest-shutdown                # stop stack + delete runtime/artifacts
 ```
 
 `make test-integration` brings the stack up first, then runs
 `cargo test --features itest --test api` for the selected cell. A plain
 `cargo test` runs only unit tests (the suite is feature-gated).
+
+Use `make test-integration-fresh` before a local liquidity-sensitive run when
+the previous channel balances or chain state are unknown. The fresh target runs
+test cases serially to avoid unrelated SQLite writers contending for the same
+database; concurrency scenarios still issue simultaneous requests inside their
+test case. CI jobs start with a new runner and therefore already get fresh
+dependency volumes.
 
 ## Persistence (Unit-of-Work) tests
 
@@ -90,8 +98,19 @@ audience must match the harness-set `SWISSKNIFE_OAUTH2__AUDIENCE`.
 One shared SwissKnife instance per `(database, provider)` cell (plus the shared
 OAuth2 instance once the oauth2 suite runs); each gets its own database. Tests
 isolate by creating uniquely-named entities and asserting on presence rather
-than global totals. The admin (JWT) and the OAuth2 subjects' wallets are
-provisioned once during startup.
+than global totals.
+
+Fixtures are explicit and use the same public API as clients: the harness signs
+up the local admin, while behavioral tests create their account with
+`POST /v1/accounts`, mint an account API key, and create the required asset
+wallets before exercising `/v1/me`. OAuth2 tests deliberately provision their
+subjects on the request under test, including simultaneous first requests. No
+account, identity, or wallet rows are inserted directly by the test harness.
+
+The `asset_scoping` suite creates mainnet, regtest, and signet BTC wallets for
+one account. It verifies that balances, resources, reservations, and overview
+aggregates stay attached to the concrete wallet and that the regtest runtime
+rejects invoice/payment operations through incompatible network wallets.
 
 ## Coverage
 
