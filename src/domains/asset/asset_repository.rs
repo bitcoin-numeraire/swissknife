@@ -9,6 +9,6 @@ use crate::{
 #[cfg_attr(test, mockall::automock)]
 #[async_trait]
 pub trait AssetRepository: Send + Sync {
-    async fn exists(&self, id: Uuid) -> Result<bool, DatabaseError>;
+    async fn find(&self, id: Uuid) -> Result<Option<Asset>, DatabaseError>;
     async fn find_native_btc_by_network(&self, network: BtcNetwork) -> Result<Option<Asset>, DatabaseError>;
 }

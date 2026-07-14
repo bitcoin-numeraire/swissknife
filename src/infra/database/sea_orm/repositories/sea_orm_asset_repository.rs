@@ -29,12 +29,13 @@ impl<C> AssetRepository for SeaOrmAssetRepository<C>
 where
     C: SeaOrmConnection,
 {
-    async fn exists(&self, id: Uuid) -> Result<bool, DatabaseError> {
-        AssetEntity::find_by_id(id)
+    async fn find(&self, id: Uuid) -> Result<Option<Asset>, DatabaseError> {
+        let model = AssetEntity::find_by_id(id)
             .one(self.db.connection())
             .await
-            .map(|asset| asset.is_some())
-            .map_err(|e| DatabaseError::FindOne(e.to_string()))
+            .map_err(|e| DatabaseError::FindOne(e.to_string()))?;
+
+        Ok(model.map(Into::into))
     }
 
     async fn find_native_btc_by_network(&self, network: BtcNetwork) -> Result<Option<Asset>, DatabaseError> {

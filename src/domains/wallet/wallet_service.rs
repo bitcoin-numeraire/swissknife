@@ -27,7 +27,7 @@ impl WalletUseCases for WalletService {
             return Err(DataError::NotFound("Account not found.".to_string()).into());
         }
 
-        if !self.store.asset.exists(asset_id).await? {
+        if self.store.asset.find(asset_id).await?.is_none() {
             return Err(DataError::NotFound("Asset not found.".to_string()).into());
         }
 
@@ -155,6 +155,10 @@ impl WalletUseCases for WalletService {
 #[cfg(test)]
 mod tests {
     use crate::application::{composition::MockAppStoreBuilder, errors::DatabaseError};
+    use crate::domains::{
+        asset::{Asset, Protocol, NATIVE_ASSET_REF},
+        bitcoin::BtcNetwork,
+    };
 
     use super::*;
 
@@ -164,6 +168,21 @@ mod tests {
             account_id,
             asset_id,
             ..Default::default()
+        }
+    }
+
+    fn asset_fixture(id: Uuid) -> Asset {
+        Asset {
+            id,
+            code: "BTC".to_string(),
+            name: Some("Bitcoin".to_string()),
+            protocol: Protocol::Bitcoin,
+            network: BtcNetwork::Regtest,
+            asset_ref: NATIVE_ASSET_REF.to_string(),
+            display_ticker: "rBTC".to_string(),
+            decimals: 11,
+            created_at: chrono::Utc::now(),
+            updated_at: None,
         }
     }
 
@@ -190,10 +209,10 @@ mod tests {
                 });
             store
                 .asset
-                .expect_exists()
+                .expect_find()
                 .withf(move |id| *id == asset_id)
                 .times(1)
-                .returning(|_| Ok(true));
+                .returning(move |_| Ok(Some(asset_fixture(asset_id))));
             store
                 .wallet
                 .expect_find_by_account_and_asset()
@@ -220,7 +239,7 @@ mod tests {
         async fn rejects_a_missing_account_before_persistence() {
             let mut store = MockAppStoreBuilder::new();
             store.account.expect_find().times(1).returning(|_| Ok(None));
-            store.asset.expect_exists().times(0);
+            store.asset.expect_find().times(0);
             store.wallet.expect_find_by_account_and_asset().times(0);
             store.wallet.expect_upsert().times(0);
 
@@ -243,7 +262,7 @@ mod tests {
                     ..Default::default()
                 }))
             });
-            store.asset.expect_exists().times(1).returning(|_| Ok(false));
+            store.asset.expect_find().times(1).returning(|_| Ok(None));
             store.wallet.expect_find_by_account_and_asset().times(0);
             store.wallet.expect_upsert().times(0);
 
