@@ -96,6 +96,12 @@ function addressTypeLabel(address: BtcAddress) {
   return address.address_type.toUpperCase();
 }
 
+function protocolLabel(protocol?: Protocol) {
+  if (protocol === Protocol.BITCOIN) return 'Bitcoin';
+  if (protocol === Protocol.TAPROOT_ASSETS) return 'Taproot Assets';
+  return protocol;
+}
+
 function StatTile({
   label,
   amountMSats,
@@ -536,7 +542,7 @@ export function WalletDetailsView({ id }: Props) {
                     <DetailRow label={t('wallet_details.network')} value={wallet!.asset?.network} />
                     <DetailRow
                       label={t('wallet_details.protocol')}
-                      value={wallet!.asset?.protocol}
+                      value={protocolLabel(wallet!.asset?.protocol)}
                     />
                     <DetailRow
                       label={t('wallet_details.asset_ref')}
