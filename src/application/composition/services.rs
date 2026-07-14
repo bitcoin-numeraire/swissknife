@@ -65,6 +65,7 @@ impl AppServices {
             ln_client.clone(),
             invoice_expiry.as_secs() as u32,
             event.clone(),
+            bitcoin_wallet.network(),
         );
         let lnurl = LnUrlService::new(
             store.clone(),

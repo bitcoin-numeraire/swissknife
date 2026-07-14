@@ -83,17 +83,21 @@ impl AuthUseCases for AuthService {
 
         let password_hash = hash(&password, DEFAULT_COST).map_err(|e| AuthenticationError::Hash(e.to_string()))?;
 
-        self.store
-            .config
-            .insert(PASSWORD_HASH_KEY, password_hash.into())
-            .await?;
-
         let permissions = Permission::all_permissions();
         let account = self
             .store
             .account
             .upsert(self.provider, BOOTSTRAP_ADMIN_SUBJECT, None, &permissions)
             .await?;
+
+        if !self
+            .store
+            .config
+            .insert_if_absent(PASSWORD_HASH_KEY, password_hash.into())
+            .await?
+        {
+            return Err(DataError::Conflict("Admin account already created".into()).into());
+        }
 
         let token = self.jwt_authenticator.encode(account)?;
 
@@ -117,20 +121,14 @@ impl AuthUseCases for AuthService {
                     return Err(AuthenticationError::InvalidCredentials.into());
                 }
 
-                let account = match self
+                let account = self
                     .store
                     .account
                     .find_by_identity(self.provider, BOOTSTRAP_ADMIN_SUBJECT)
                     .await?
-                {
-                    Some(account) => account,
-                    None => {
-                        self.store
-                            .account
-                            .upsert(self.provider, BOOTSTRAP_ADMIN_SUBJECT, None, &[])
-                            .await?
-                    }
-                };
+                    .ok_or_else(|| {
+                        DataError::Inconsistency("Admin credentials exist without an account identity".to_string())
+                    })?;
 
                 let token = self.jwt_authenticator.encode(account)?;
 
@@ -243,7 +241,7 @@ mod tests {
     use uuid::Uuid;
 
     use crate::{
-        application::composition::MockAppStoreBuilder,
+        application::{composition::MockAppStoreBuilder, errors::DatabaseError},
         domains::{
             account::{Account, ApiKey, AuthClaims, AuthIdentity},
             asset::{Asset, Protocol, NATIVE_ASSET_REF},
@@ -363,10 +361,10 @@ mod tests {
                 store.config.expect_find().times(1).returning(|_| Ok(None));
                 store
                     .config
-                    .expect_insert()
+                    .expect_insert_if_absent()
                     .withf(|key, _| key == PASSWORD_HASH_KEY)
                     .times(1)
-                    .returning(|_, _| Ok(()));
+                    .returning(|_, _| Ok(true));
                 store
                     .account
                     .expect_upsert()
@@ -399,6 +397,63 @@ mod tests {
                 let token = service.sign_up("password".to_string()).await.unwrap();
 
                 assert_eq!(token, "token");
+            }
+        }
+
+        mod when_another_request_claims_the_admin_during_sign_up {
+            use super::*;
+
+            #[tokio::test]
+            async fn returns_conflict() {
+                let account_id = Uuid::new_v4();
+                let mut store = MockAppStoreBuilder::new();
+                store.config.expect_find().times(1).returning(|_| Ok(None));
+                store
+                    .account
+                    .expect_upsert()
+                    .withf(|provider, subject, display_name, granted| {
+                        *provider == AuthProvider::Jwt
+                            && subject == "admin"
+                            && display_name.is_none()
+                            && granted == Permission::all_permissions().as_slice()
+                    })
+                    .times(1)
+                    .returning(move |provider, subject, _, permissions| {
+                        Ok(account_fixture(account_id, provider, subject, permissions.to_vec()))
+                    });
+                store
+                    .config
+                    .expect_insert_if_absent()
+                    .withf(|key, _| key == PASSWORD_HASH_KEY)
+                    .times(1)
+                    .returning(|_, _| Ok(false));
+
+                let service = service(MockJWTAuthenticator::new(), store, AuthProvider::Jwt);
+
+                let err = service.sign_up("password".to_string()).await.unwrap_err();
+
+                assert!(matches!(err, ApplicationError::Data(DataError::Conflict(_))));
+            }
+        }
+
+        mod when_admin_account_creation_fails {
+            use super::*;
+
+            #[tokio::test]
+            async fn does_not_claim_the_password() {
+                let mut store = MockAppStoreBuilder::new();
+                store.config.expect_find().times(1).returning(|_| Ok(None));
+                store
+                    .account
+                    .expect_upsert()
+                    .times(1)
+                    .returning(|_, _, _, _| Err(DatabaseError::Insert("boom".to_string())));
+
+                let service = service(MockJWTAuthenticator::new(), store, AuthProvider::Jwt);
+
+                let err = service.sign_up("password".to_string()).await.unwrap_err();
+
+                assert!(matches!(err, ApplicationError::Database(DatabaseError::Insert(_))));
             }
         }
     }
@@ -447,12 +502,11 @@ mod tests {
             }
         }
 
-        mod with_the_correct_password {
+        mod with_the_correct_password_but_missing_account_identity {
             use super::*;
 
             #[tokio::test]
-            async fn returns_token() {
-                let account_id = Uuid::new_v4();
+            async fn returns_inconsistency_without_recreating_the_account() {
                 let stored_hash = hash("correct", 4).unwrap();
 
                 let mut store = MockAppStoreBuilder::new();
@@ -467,33 +521,53 @@ mod tests {
                     .withf(|provider, subject| *provider == AuthProvider::Jwt && subject == "admin")
                     .times(1)
                     .returning(|_, _| Ok(None));
+                let service = service(MockJWTAuthenticator::new(), store, AuthProvider::Jwt);
+
+                let err = service.sign_in("correct".to_string()).await.unwrap_err();
+
+                assert!(matches!(err, ApplicationError::Data(DataError::Inconsistency(_))));
+            }
+        }
+
+        mod with_the_correct_password_and_account_identity {
+            use super::*;
+
+            #[tokio::test]
+            async fn returns_token() {
+                let account_id = Uuid::new_v4();
+                let stored_hash = hash("correct", 4).unwrap();
+                let permissions = Permission::all_permissions();
+
+                let mut store = MockAppStoreBuilder::new();
+                store
+                    .config
+                    .expect_find()
+                    .times(1)
+                    .returning(move |_| Ok(Some(stored_hash.clone().into())));
+                let account_permissions = permissions.clone();
                 store
                     .account
-                    .expect_upsert()
-                    .withf(|provider, subject, display_name, granted| {
-                        *provider == AuthProvider::Jwt
-                            && subject == "admin"
-                            && display_name.is_none()
-                            && granted.is_empty()
-                    })
+                    .expect_find_by_identity()
+                    .withf(|provider, subject| *provider == AuthProvider::Jwt && subject == "admin")
                     .times(1)
-                    .returning(move |provider, subject, _, _| {
-                        Ok(account_fixture(
+                    .returning(move |provider, subject| {
+                        Ok(Some(account_fixture(
                             account_id,
                             provider,
                             subject,
-                            vec![Permission::ReadWallet],
-                        ))
+                            account_permissions.clone(),
+                        )))
                     });
 
+                let expected_permissions = permissions.clone();
                 let mut jwt = MockJWTAuthenticator::new();
                 jwt.expect_encode()
-                    .withf(|account| {
+                    .withf(move |account| {
                         account
                             .identity
                             .as_ref()
                             .is_some_and(|identity| identity.subject == "admin")
-                            && account.permissions.as_deref() == Some(&[Permission::ReadWallet][..])
+                            && account.permissions.as_ref() == Some(&expected_permissions)
                     })
                     .times(1)
                     .returning(|_| Ok("token".to_string()));
