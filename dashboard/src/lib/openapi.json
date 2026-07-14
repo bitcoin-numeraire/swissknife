@@ -532,7 +532,7 @@
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
                 },
-                "example": "\n{\n    \"status\": \"409 Conflict\",\n    \"reason\": \"Admin user already created\"\n}\n"
+                "example": "\n{\n    \"status\": \"409 Conflict\",\n    \"reason\": \"Admin account already created\"\n}\n"
               }
             }
           },
@@ -1059,7 +1059,7 @@
           "API Keys"
         ],
         "summary": "Generate a new API Key",
-        "description": "Returns the generated API Key for the requested account. Users can create API keys with permissions\nas a subset of their current permissions.",
+        "description": "Returns the generated API Key for the requested account. Callers can create API keys with permissions\nas a subset of their current permissions.",
         "operationId": "create_api_key",
         "requestBody": {
           "content": {
@@ -3857,7 +3857,7 @@
           "Me"
         ],
         "summary": "Generate a new API Key",
-        "description": "Returns the generated API Key for the account. Users can create API keys with\npermissions as a subset of their current permissions.",
+        "description": "Returns the generated API Key for the account. Callers can create API keys with\npermissions as a subset of their current permissions.",
         "operationId": "create_account_api_key",
         "requestBody": {
           "content": {
@@ -8962,7 +8962,7 @@
         "properties": {
           "sign_up_complete": {
             "type": "boolean",
-            "description": "Whether the admin user has been created"
+            "description": "Whether the admin account has been created"
           },
           "welcome_complete": {
             "type": "boolean",
@@ -9252,7 +9252,7 @@
           },
           "balance": {
             "$ref": "#/components/schemas/Balance",
-            "description": "User Balance"
+            "description": "Wallet balance"
           },
           "created_at": {
             "type": "string",

@@ -969,7 +969,7 @@ export type SendPaymentRequest = {
  */
 export type SetupInfo = {
   /**
-   * Whether the admin user has been created
+   * Whether the admin account has been created
    */
   sign_up_complete: boolean;
   /**
@@ -1140,7 +1140,7 @@ export type WalletOverview = {
    */
   asset_id: string;
   /**
-   * User Balance
+   * Wallet balance
    */
   balance: Balance;
   /**
