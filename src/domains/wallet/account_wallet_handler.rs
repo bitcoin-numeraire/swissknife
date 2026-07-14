@@ -1007,6 +1007,7 @@ mod tests {
                     identity: None,
                     permissions: None,
                     preferences: None,
+                    wallets: Vec::new(),
                     created_at: Utc::now(),
                     updated_at: None,
                 })

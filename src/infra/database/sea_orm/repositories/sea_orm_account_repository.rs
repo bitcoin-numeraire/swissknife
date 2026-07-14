@@ -11,10 +11,17 @@ use uuid::Uuid;
 
 use crate::{
     application::errors::DatabaseError,
-    domains::account::{Account, AccountFilter, AccountPreferences, AccountRepository, AuthProvider, Permission},
+    domains::{
+        account::{Account, AccountFilter, AccountPreferences, AccountRepository, AuthProvider, Permission},
+        wallet::Wallet as AccountWallet,
+    },
     infra::database::sea_orm::models::{
-        account, account_preference, auth_identity,
-        prelude::{Account as AccountEntity, AccountPreference, AuthIdentity},
+        account, account_preference, auth_identity, ln_address,
+        prelude::{
+            Account as AccountEntity, AccountPreference, Asset as AssetEntity, AuthIdentity,
+            LnAddress as LnAddressEntity, Wallet as WalletEntity,
+        },
+        wallet,
     },
     infra::database::sea_orm::sea_order,
 };
@@ -36,6 +43,38 @@ impl SeaOrmAccountRepository {
             .map_err(|e| DatabaseError::FindOne(e.to_string()))?;
 
         Ok(preference.map(Into::into))
+    }
+
+    async fn find_wallets(&self, account_ids: &[Uuid]) -> Result<HashMap<Uuid, Vec<AccountWallet>>, DatabaseError> {
+        if account_ids.is_empty() {
+            return Ok(HashMap::new());
+        }
+
+        let models = WalletEntity::find()
+            .filter(wallet::Column::AccountId.is_in(account_ids.to_vec()))
+            .order_by_asc(wallet::Column::CreatedAt)
+            .find_also_related(AssetEntity)
+            .all(&self.db)
+            .await
+            .map_err(|e| DatabaseError::FindRelated(e.to_string()))?;
+        let mut ln_addresses = LnAddressEntity::find()
+            .filter(ln_address::Column::AccountId.is_in(account_ids.to_vec()))
+            .all(&self.db)
+            .await
+            .map_err(|e| DatabaseError::FindRelated(e.to_string()))?
+            .into_iter()
+            .map(|address| (address.wallet_id, address))
+            .collect::<HashMap<_, _>>();
+
+        let mut wallets_by_account = HashMap::<Uuid, Vec<AccountWallet>>::new();
+        for (wallet_model, asset_model) in models {
+            let mut wallet: AccountWallet = wallet_model.into();
+            wallet.asset = asset_model.map(Into::into);
+            wallet.ln_address = ln_addresses.remove(&wallet.id).map(Into::into);
+            wallets_by_account.entry(wallet.account_id).or_default().push(wallet);
+        }
+
+        Ok(wallets_by_account)
     }
 }
 
@@ -63,6 +102,7 @@ impl AccountRepository for SeaOrmAccountRepository {
         let mut account: Account = account_model.into();
         account.identity = identity.map(Into::into);
         account.preferences = Some(preference_model.into());
+        account.wallets = self.find_wallets(&[id]).await?.remove(&id).unwrap_or_default();
 
         Ok(Some(account))
     }
@@ -89,6 +129,11 @@ impl AccountRepository for SeaOrmAccountRepository {
         let mut account: Account = account_model.into();
         account.identity = Some(identity.into());
         account.preferences = self.find_preferences(account.id).await?;
+        account.wallets = self
+            .find_wallets(&[account.id])
+            .await?
+            .remove(&account.id)
+            .unwrap_or_default();
 
         Ok(Some(account))
     }
@@ -115,10 +160,11 @@ impl AccountRepository for SeaOrmAccountRepository {
             .await
             .map_err(|e| DatabaseError::FindMany(e.to_string()))?;
         let preferences = AccountPreference::find()
-            .filter(account_preference::Column::AccountId.is_in(account_ids))
+            .filter(account_preference::Column::AccountId.is_in(account_ids.clone()))
             .all(&self.db)
             .await
             .map_err(|e| DatabaseError::FindMany(e.to_string()))?;
+        let mut wallets_by_account = self.find_wallets(&account_ids).await?;
 
         let mut identities_by_account = HashMap::new();
         for identity in identities {
@@ -138,6 +184,7 @@ impl AccountRepository for SeaOrmAccountRepository {
             let mut account: Account = model.into();
             account.identity = identities_by_account.remove(&account_id).map(Into::into);
             account.preferences = Some(preference.into());
+            account.wallets = wallets_by_account.remove(&account_id).unwrap_or_default();
             accounts.push(account);
         }
 
@@ -290,6 +337,7 @@ impl AccountRepository for SeaOrmAccountRepository {
         let permissions = serde_json::to_value(permissions).map_err(|e| DatabaseError::Update(e.to_string()))?;
         let identity = account.identity;
         let preferences = account.preferences;
+        let wallets = account.wallets;
 
         let account_model = account::ActiveModel {
             id: Set(account.id),
@@ -305,6 +353,7 @@ impl AccountRepository for SeaOrmAccountRepository {
         let mut account: Account = account_model.into();
         account.identity = identity;
         account.preferences = preferences;
+        account.wallets = wallets;
         Ok(account)
     }
 

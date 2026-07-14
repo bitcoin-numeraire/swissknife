@@ -5,11 +5,11 @@ use serde_with::{serde_as, DisplayFromStr};
 use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
 
-use crate::{AuthProvider, OrderDirection, Permission};
+use crate::{AuthProvider, OrderDirection, Permission, Wallet};
 
 /// An account is the owner and authorization boundary for identities, wallets,
 /// API keys, permissions, and account-scoped preferences.
-#[derive(Clone, Debug, Default, PartialEq, Deserialize, Serialize, ToSchema)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, ToSchema)]
 pub struct Account {
     /// Stable internal account ID.
     pub id: Uuid,
@@ -30,6 +30,13 @@ pub struct Account {
     /// Account-scoped dashboard and UI preferences.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub preferences: Option<AccountPreferences>,
+
+    /// Wallets owned by this account.
+    ///
+    /// These include asset metadata, balances, and the linked Lightning
+    /// Address, but not payments, invoices, Bitcoin addresses, or contacts.
+    /// Fetch a wallet by ID when those related resources are needed.
+    pub wallets: Vec<Wallet>,
 
     /// Date of creation in database.
     pub created_at: DateTime<Utc>,

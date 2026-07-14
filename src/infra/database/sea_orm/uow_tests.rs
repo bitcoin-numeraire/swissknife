@@ -20,13 +20,14 @@ use crate::application::errors::{ApplicationError, DataError};
 use crate::domains::account::{AccountFilter, AccountRepository, ApiKey, ApiKeyRepository, AuthProvider, Permission};
 use crate::domains::event::EventProjectionUnitOfWork;
 use crate::domains::invoice::{Invoice, InvoiceRepository};
+use crate::domains::ln_address::LnAddressRepository;
 use crate::domains::payment::{LnPayment, Payment, PaymentStatus, PaymentUnitOfWork};
 use crate::domains::{asset::AssetRepository, bitcoin::BtcNetwork, wallet::WalletRepository};
 
 use super::models::{prelude::Wallet, wallet};
 use super::{
     SeaOrmAccountRepository, SeaOrmApiKeyRepository, SeaOrmAssetRepository, SeaOrmEventProjectionUnitOfWork,
-    SeaOrmInvoiceRepository, SeaOrmPaymentUnitOfWork, SeaOrmWalletRepository,
+    SeaOrmInvoiceRepository, SeaOrmLnAddressRepository, SeaOrmPaymentUnitOfWork, SeaOrmWalletRepository,
 };
 
 static COUNTER: AtomicU64 = AtomicU64::new(0);
@@ -384,8 +385,30 @@ async fn account_repository_crud_keeps_the_aggregate_consistent() {
         .unwrap();
     let wallet_repo = SeaOrmWalletRepository::new(conn.clone());
     let wallet = wallet_repo.upsert(account.id, asset.id).await.unwrap();
+    wallet_repo.credit(wallet.id, 42_000).await.unwrap();
     assert!(wallet_repo.exists_for_account(account.id, wallet.id).await.unwrap());
     assert!(!wallet_repo.exists_for_account(Uuid::new_v4(), wallet.id).await.unwrap());
+    let ln_address = SeaOrmLnAddressRepository::new(conn.clone())
+        .insert(account.id, wallet.id, "operator", false, None)
+        .await
+        .unwrap();
+    let aggregate = repo.find(account.id).await.unwrap().unwrap();
+    assert!(aggregate.identity.is_none());
+    assert_eq!(aggregate.wallets.len(), 1);
+    assert_eq!(aggregate.wallets[0].id, wallet.id);
+    assert_eq!(aggregate.wallets[0].balance.available_msat, 42_000);
+    assert_eq!(
+        aggregate.wallets[0].asset.as_ref().map(|asset| asset.id),
+        Some(asset.id)
+    );
+    assert_eq!(
+        aggregate.wallets[0].ln_address.as_ref().map(|address| address.id),
+        Some(ln_address.id)
+    );
+    assert!(aggregate.wallets[0].payments.is_empty());
+    assert!(aggregate.wallets[0].invoices.is_empty());
+    assert!(aggregate.wallets[0].btc_addresses.is_empty());
+    assert!(aggregate.wallets[0].contacts.is_empty());
     SeaOrmApiKeyRepository::new(conn.clone())
         .insert(ApiKey {
             account_id: account.id,

@@ -104,6 +104,27 @@ mod lifecycle {
             .await;
         assert_status(&lightning_address, StatusCode::OK);
         let lightning_address = lightning_address.parse::<swissknife_types::LnAddress>();
+        let aggregate = app
+            .api()
+            .get(&format!("/v1/accounts/{}", created.id), Auth::Bearer(admin))
+            .await;
+        assert_status(&aggregate, StatusCode::OK);
+        let aggregate = aggregate.parse::<Account>();
+        assert!(aggregate.identity.is_none());
+        assert_eq!(aggregate.wallets.len(), 1);
+        assert_eq!(aggregate.wallets[0].id, wallet.id);
+        assert_eq!(
+            aggregate.wallets[0].asset.as_ref().map(|asset| asset.id),
+            Some(regtest_btc_asset_id())
+        );
+        assert_eq!(
+            aggregate.wallets[0].ln_address.as_ref().map(|address| address.id),
+            Some(lightning_address.id)
+        );
+        assert!(aggregate.wallets[0].payments.is_empty());
+        assert!(aggregate.wallets[0].invoices.is_empty());
+        assert!(aggregate.wallets[0].btc_addresses.is_empty());
+        assert!(aggregate.wallets[0].contacts.is_empty());
         let account_key = app
             .account_api_key(admin, created.id, Permission::all_permissions())
             .await;
