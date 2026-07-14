@@ -1,5 +1,6 @@
 import type { CreateWalletRequest } from 'src/lib/swissknife';
 
+import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 
@@ -10,6 +11,7 @@ import { handleActionError } from 'src/utils/errors';
 
 import { useTranslate } from 'src/locales';
 import { registerWallet } from 'src/lib/swissknife';
+import { useAccountContext } from 'src/contexts/account';
 import { zCreateWalletRequest } from 'src/lib/swissknife/zod.gen';
 
 import { toast } from 'src/components/snackbar';
@@ -24,30 +26,36 @@ export type NewWalletFormProps = {
 
 export function RegisterWalletForm({ accountId, onSuccess }: NewWalletFormProps) {
   const { t } = useTranslate();
+  const { activeWalletId, wallets, walletsLoading } = useAccountContext();
+  const activeAssetId = wallets.find((wallet) => wallet.id === activeWalletId)?.asset_id ?? '';
 
   const methods = useForm<CreateWalletRequest>({
     resolver: zodResolver(zCreateWalletRequest),
     defaultValues: {
       account_id: accountId ?? '',
-      asset_id: '',
+      asset_id: activeAssetId,
     },
   });
 
   const {
     reset,
+    setValue,
     handleSubmit,
     formState: { isSubmitting },
     watch,
   } = methods;
 
   const selectedAccountId = watch('account_id');
-  const assetId = watch('asset_id');
+
+  useEffect(() => {
+    setValue('asset_id', activeAssetId, { shouldValidate: true });
+  }, [activeAssetId, setValue]);
 
   const onSubmit = async (body: CreateWalletRequest) => {
     try {
       await registerWallet({ body });
       toast.success(t('register_wallet.success_wallet_registration'));
-      reset();
+      reset({ account_id: accountId ?? '', asset_id: activeAssetId });
       onSuccess();
     } catch (error) {
       handleActionError(error);
@@ -63,15 +71,13 @@ export function RegisterWalletForm({ accountId, onSuccess }: NewWalletFormProps)
           label={t('register_wallet.account_id')}
           disabled={Boolean(accountId)}
         />
-        <RHFTextField variant="outlined" name="asset_id" label={t('register_wallet.asset_id')} />
-
         <Button
           type="submit"
           variant="contained"
           color="inherit"
           size="large"
           loading={isSubmitting}
-          disabled={!selectedAccountId || !assetId || isSubmitting}
+          disabled={!selectedAccountId || !activeAssetId || walletsLoading || isSubmitting}
         >
           {t('register')}
         </Button>

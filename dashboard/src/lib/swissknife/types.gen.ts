@@ -4575,6 +4575,10 @@ export type RegisterWalletErrors = {
    */
   403: ErrorResponse;
   /**
+   * Account or asset not found
+   */
+  404: ErrorResponse;
+  /**
    * Unprocessable Entity
    */
   422: ErrorResponse;

@@ -1,5 +1,6 @@
 use async_trait::async_trait;
 use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter};
+use uuid::Uuid;
 
 use super::SeaOrmConnection;
 
@@ -28,6 +29,14 @@ impl<C> AssetRepository for SeaOrmAssetRepository<C>
 where
     C: SeaOrmConnection,
 {
+    async fn exists(&self, id: Uuid) -> Result<bool, DatabaseError> {
+        AssetEntity::find_by_id(id)
+            .one(self.db.connection())
+            .await
+            .map(|asset| asset.is_some())
+            .map_err(|e| DatabaseError::FindOne(e.to_string()))
+    }
+
     async fn find_native_btc_by_network(&self, network: BtcNetwork) -> Result<Option<Asset>, DatabaseError> {
         let model = AssetEntity::find()
             .filter(Column::Protocol.eq(Protocol::Bitcoin.to_string()))
