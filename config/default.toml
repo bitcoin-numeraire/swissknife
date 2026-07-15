@@ -51,6 +51,9 @@ reorg_buffer_blocks = 2
 [lnd_grpc_config]
 endpoint = "https://localhost:10009"
 cert_path = "certs/lnd/tls.cert"
+# Dev-only workaround for LND certificates that are incorrectly marked as CAs.
+# The server must present this exact certificate and prove possession of its private key.
+pin_server_certificate = false
 macaroon_path = "certs/lnd/admin.macaroon"
 payment_timeout = "60s"
 fee_limit_msat = 25000

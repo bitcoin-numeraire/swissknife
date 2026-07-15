@@ -4711,6 +4711,7 @@ dependencies = [
  "regex",
  "reqwest",
  "rust_socketio",
+ "rustls",
  "sea-orm",
  "serde",
  "serde_bolt",

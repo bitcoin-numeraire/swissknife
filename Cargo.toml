@@ -41,6 +41,7 @@ tower-http = { version = "0.7.0", features = [
     "cors",
 ] }
 regex = "1"
+rustls = { version = "0.23.41", default-features = false, features = ["ring", "std", "tls12"] }
 sea-orm = { version = "1.1.20", features = [
     "sqlx-postgres",
     "sqlx-sqlite",

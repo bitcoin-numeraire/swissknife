@@ -1,9 +1,15 @@
-use std::{collections::HashMap, error::Error as StdError, path::PathBuf, str::FromStr, time::Duration};
+use std::{collections::HashMap, error::Error as StdError, path::PathBuf, str::FromStr, sync::Arc, time::Duration};
 
 use async_trait::async_trait;
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 use chrono::{TimeZone, Utc};
 use lightning_invoice::Bolt11Invoice;
+use rustls::{
+    client::danger::{HandshakeSignatureValid, ServerCertVerified, ServerCertVerifier},
+    crypto::{ring, verify_tls12_signature, verify_tls13_signature, WebPkiSupportedAlgorithms},
+    pki_types::{pem::PemObject, CertificateDer, ServerName, UnixTime},
+    CertificateError, DigitallySignedStruct, Error as TlsError, SignatureScheme,
+};
 use serde::Deserialize;
 use serde_bolt::bitcoin::hashes::{sha256, Hash};
 use tokio::{fs, time::timeout};
@@ -97,11 +103,69 @@ pub(crate) type LndChannel = InterceptedService<Channel, MacaroonInterceptor>;
 pub struct LndGrpcClientConfig {
     pub endpoint: String,
     pub cert_path: String,
+    #[serde(default)]
+    pub pin_server_certificate: bool,
     pub macaroon_path: String,
     pub fee_limit_msat: u64,
     #[serde(deserialize_with = "deserialize_duration")]
     pub payment_timeout: Duration,
     pub reorg_buffer_blocks: u32,
+}
+
+#[derive(Debug)]
+struct PinnedServerCertificateVerifier {
+    certificate: CertificateDer<'static>,
+    supported_algorithms: WebPkiSupportedAlgorithms,
+}
+
+impl PinnedServerCertificateVerifier {
+    fn new(certificate: CertificateDer<'static>) -> Self {
+        Self {
+            certificate,
+            supported_algorithms: ring::default_provider().signature_verification_algorithms,
+        }
+    }
+}
+
+impl ServerCertVerifier for PinnedServerCertificateVerifier {
+    fn verify_server_cert(
+        &self,
+        end_entity: &CertificateDer<'_>,
+        _intermediates: &[CertificateDer<'_>],
+        _server_name: &ServerName<'_>,
+        _ocsp_response: &[u8],
+        _now: UnixTime,
+    ) -> Result<ServerCertVerified, TlsError> {
+        if end_entity.as_ref() != self.certificate.as_ref() {
+            return Err(TlsError::InvalidCertificate(
+                CertificateError::ApplicationVerificationFailure,
+            ));
+        }
+
+        Ok(ServerCertVerified::assertion())
+    }
+
+    fn verify_tls12_signature(
+        &self,
+        message: &[u8],
+        certificate: &CertificateDer<'_>,
+        signature: &DigitallySignedStruct,
+    ) -> Result<HandshakeSignatureValid, TlsError> {
+        verify_tls12_signature(message, certificate, signature, &self.supported_algorithms)
+    }
+
+    fn verify_tls13_signature(
+        &self,
+        message: &[u8],
+        certificate: &CertificateDer<'_>,
+        signature: &DigitallySignedStruct,
+    ) -> Result<HandshakeSignatureValid, TlsError> {
+        verify_tls13_signature(message, certificate, signature, &self.supported_algorithms)
+    }
+
+    fn supported_verify_schemes(&self) -> Vec<SignatureScheme> {
+        self.supported_algorithms.supported_schemes()
+    }
 }
 
 pub struct LndGrpcClient {
@@ -148,16 +212,28 @@ impl LndGrpcClient {
         let tls_cert = fs::read(PathBuf::from(&config.cert_path))
             .await
             .map_err(|e| LightningError::ReadCertificates(e.to_string()))?;
-        let ca_certificate = Certificate::from_pem(tls_cert);
+        let endpoint =
+            Channel::from_shared(config.endpoint.clone()).map_err(|e| LightningError::ParseConfig(e.to_string()))?;
+        let endpoint = if config.pin_server_certificate {
+            let pinned_certificate = CertificateDer::from_pem_slice(&tls_cert)
+                .map_err(|e| LightningError::ReadCertificates(e.to_string()))?;
+            endpoint
+                .tls_config_with_verifier(
+                    ClientTlsConfig::new().domain_name(tls_domain),
+                    Arc::new(PinnedServerCertificateVerifier::new(pinned_certificate)),
+                )
+                .map_err(|e| LightningError::ParseConfig(e.to_string()))?
+        } else {
+            endpoint
+                .tls_config(
+                    ClientTlsConfig::new()
+                        .ca_certificate(Certificate::from_pem(tls_cert))
+                        .domain_name(tls_domain),
+                )
+                .map_err(|e| LightningError::ParseConfig(e.to_string()))?
+        };
 
-        let tls_config = ClientTlsConfig::new()
-            .ca_certificate(ca_certificate)
-            .domain_name(tls_domain);
-
-        let channel = Channel::from_shared(config.endpoint.clone())
-            .map_err(|e| LightningError::ParseConfig(e.to_string()))?
-            .tls_config(tls_config)
-            .map_err(|e| LightningError::ParseConfig(e.to_string()))?
+        let channel = endpoint
             .connect()
             .await
             .map_err(|e| LightningError::Connect(Self::format_transport_error(&e)))?;
@@ -696,5 +772,30 @@ impl BitcoinWallet for LndGrpcClient {
 
     fn network(&self) -> BtcNetwork {
         self.network
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn pinned_server_certificate_accepts_only_exact_certificate() {
+        let pinned_certificate = CertificateDer::from(vec![1, 2, 3]);
+        let verifier = PinnedServerCertificateVerifier::new(pinned_certificate.clone());
+        let server_name = ServerName::try_from("localhost").unwrap();
+        let now = UnixTime::since_unix_epoch(Duration::ZERO);
+
+        assert!(verifier
+            .verify_server_cert(&pinned_certificate, &[], &server_name, &[], now)
+            .is_ok());
+
+        let other_certificate = CertificateDer::from(vec![4, 5, 6]);
+        assert!(matches!(
+            verifier.verify_server_cert(&other_certificate, &[], &server_name, &[], now),
+            Err(TlsError::InvalidCertificate(
+                CertificateError::ApplicationVerificationFailure
+            ))
+        ));
     }
 }
