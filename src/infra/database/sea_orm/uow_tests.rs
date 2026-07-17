@@ -18,7 +18,7 @@ use uuid::Uuid;
 use crate::application::composition::Ledger;
 use crate::application::errors::{ApplicationError, DataError};
 use crate::domains::account::{AccountFilter, AccountRepository, ApiKey, ApiKeyRepository, AuthProvider, Permission};
-use crate::domains::event::EventProjectionUnitOfWork;
+use crate::domains::event::{ClientEventRepository, ClientEventType, EventProjectionUnitOfWork};
 use crate::domains::invoice::{Invoice, InvoiceRepository};
 use crate::domains::ln_address::LnAddressRepository;
 use crate::domains::lnurl::LnUrlPaySuccessAction;
@@ -27,9 +27,9 @@ use crate::domains::{asset::AssetRepository, bitcoin::BtcNetwork, wallet::Wallet
 
 use super::models::{prelude::Wallet, wallet};
 use super::{
-    SeaOrmAccountRepository, SeaOrmApiKeyRepository, SeaOrmAssetRepository, SeaOrmEventProjectionUnitOfWork,
-    SeaOrmInvoiceRepository, SeaOrmLnAddressRepository, SeaOrmPaymentRepository, SeaOrmPaymentUnitOfWork,
-    SeaOrmWalletRepository,
+    SeaOrmAccountRepository, SeaOrmApiKeyRepository, SeaOrmAssetRepository, SeaOrmClientEventRepository,
+    SeaOrmEventProjectionUnitOfWork, SeaOrmInvoiceRepository, SeaOrmLnAddressRepository, SeaOrmPaymentRepository,
+    SeaOrmPaymentUnitOfWork, SeaOrmWalletRepository,
 };
 
 static COUNTER: AtomicU64 = AtomicU64::new(0);
@@ -277,6 +277,8 @@ async fn postgres_migrates_legacy_oauth2_wallet_data() {
                 'idx_auth_identity_provider_subject',
                 'idx_btc_address_wallet_used',
                 'idx_btc_output_txid_output_index',
+                'idx_client_event_type_resource',
+                'idx_client_event_wallet_id',
                 'idx_invoice_btc_output_id',
                 'idx_invoice_ln_address_id',
                 'idx_invoice_wallet_created_at',
@@ -289,7 +291,7 @@ async fn postgres_migrates_legacy_oauth2_wallet_data() {
             "#,
         )
         .await,
-        14
+        16
     );
 }
 
@@ -574,6 +576,14 @@ async fn duplicate_fail_does_not_double_release() {
     let second = uow(&conn).fail(payment).await.expect("second fail");
     assert_eq!(second.status, PaymentStatus::Failed);
     assert_eq!(balance(&conn, wallet).await, (200_000, 0));
+
+    let events = SeaOrmClientEventRepository::new(conn)
+        .find_after(wallet, 0, 10)
+        .await
+        .expect("read events");
+    assert_eq!(events.len(), 1);
+    assert_eq!(events[0].event_type, ClientEventType::PaymentFailed);
+    assert_eq!(events[0].resource_id, first.id);
 }
 
 #[tokio::test]
@@ -640,6 +650,15 @@ async fn duplicate_settle_does_not_double_debit() {
     let second = uow(&conn).settle(payment).await.expect("second settle");
     assert_eq!(second.status, PaymentStatus::Settled);
     assert_eq!(balance(&conn, wallet).await, (99_000, 0));
+
+    let events = SeaOrmClientEventRepository::new(conn)
+        .find_after(wallet, 0, 10)
+        .await
+        .expect("read events");
+    assert_eq!(events.len(), 1);
+    assert_eq!(events[0].event_type, ClientEventType::PaymentSettled);
+    assert_eq!(events[0].resource_id, first.id);
+    assert_eq!(events[0].data["status"], "Settled");
 }
 
 #[tokio::test]
@@ -690,6 +709,14 @@ async fn settle_internal_is_atomic() {
     assert_eq!(settled.status, PaymentStatus::Settled);
     assert_eq!(balance(&conn, payer).await, (150_000, 0), "payer debited");
     assert_eq!(balance(&conn, payee).await, (50_000, 0), "payee credited");
+
+    let event_repo = SeaOrmClientEventRepository::new(conn);
+    let payer_events = event_repo.find_after(payer, 0, 10).await.expect("payer events");
+    let payee_events = event_repo.find_after(payee, 0, 10).await.expect("payee events");
+    assert_eq!(payer_events.len(), 1);
+    assert_eq!(payer_events[0].event_type, ClientEventType::PaymentSettled);
+    assert_eq!(payee_events.len(), 1);
+    assert_eq!(payee_events[0].event_type, ClientEventType::InvoicePaid);
 }
 
 #[tokio::test]
@@ -777,4 +804,11 @@ async fn settle_incoming_invoice_credits_once_under_replay() {
         (30_000, 0),
         "no double credit on replay"
     );
+
+    let events = SeaOrmClientEventRepository::new(conn)
+        .find_after(receiver, 0, 10)
+        .await
+        .expect("read events");
+    assert_eq!(events.len(), 1);
+    assert_eq!(events[0].event_type, ClientEventType::InvoicePaid);
 }

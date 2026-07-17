@@ -7,6 +7,7 @@ pub use super::asset::Entity as Asset;
 pub use super::auth_identity::Entity as AuthIdentity;
 pub use super::btc_address::Entity as BtcAddress;
 pub use super::btc_output::Entity as BtcOutput;
+pub use super::client_event::Entity as ClientEvent;
 pub use super::config::Entity as Config;
 pub use super::invoice::Entity as Invoice;
 pub use super::ln_address::Entity as LnAddress;
