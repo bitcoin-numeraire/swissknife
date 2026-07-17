@@ -129,6 +129,23 @@ export const zChangePasswordRequest = z.object({
 });
 
 /**
+ * Stable event names shared by SSE and webhook delivery.
+ */
+export const zClientEventType = z.enum(['invoice.paid', 'payment.settled', 'payment.failed']);
+
+/**
+ * A durable event emitted after an invoice or payment changes state.
+ */
+export const zClientEvent = z.object({
+  created_at: z.iso.datetime(),
+  data: z.record(z.string(), z.unknown()),
+  event_type: zClientEventType,
+  id: z.string(),
+  resource_id: z.uuid(),
+  wallet_id: z.uuid(),
+});
+
+/**
  * A counterparty the wallet has paid, with the date of first contact.
  */
 export const zContact = z.object({
@@ -1319,6 +1336,23 @@ export const zListContactsPath = z.object({
  * Success
  */
 export const zListContactsResponse = z.array(zContact);
+
+export const zStreamWalletEventsPath = z.object({
+  wallet_id: z.uuid(),
+});
+
+export const zStreamWalletEventsQuery = z.object({
+  after: z
+    .int()
+    .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
+    .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
+    .optional(),
+});
+
+/**
+ * Server-sent event stream
+ */
+export const zStreamWalletEventsResponse = zClientEvent;
 
 export const zDeleteExpiredInvoicesPath = z.object({
   wallet_id: z.uuid(),

@@ -29,6 +29,7 @@ mod m20260704_000011_ln_address_account_routes;
 mod m20260704_000012_drop_legacy_wallet_contract;
 mod m20260710_234825_add_relationship_indexes;
 mod m20260717_105719_persist_lnurl_success_action;
+mod m20260717_170449_add_client_event_log;
 
 pub struct Migrator;
 
@@ -65,6 +66,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260704_000012_drop_legacy_wallet_contract::Migration),
             Box::new(m20260710_234825_add_relationship_indexes::Migration),
             Box::new(m20260717_105719_persist_lnurl_success_action::Migration),
+            Box::new(m20260717_170449_add_client_event_log::Migration),
         ]
     }
 }
@@ -148,7 +150,7 @@ mod tests {
                 "#,
             )
             .await,
-            13
+            14
         );
         assert_eq!(
             count(
@@ -192,6 +194,8 @@ mod tests {
                     'idx_auth_identity_provider_subject',
                     'idx_btc_address_wallet_used',
                     'idx_btc_output_txid_output_index',
+                    'idx_client_event_type_resource',
+                    'idx_client_event_wallet_id',
                     'idx_invoice_btc_output_id',
                     'idx_invoice_ln_address_id',
                     'idx_invoice_wallet_created_at',
@@ -201,7 +205,7 @@ mod tests {
                 "#,
             )
             .await,
-            11
+            13
         );
         assert_eq!(
             count(
@@ -245,6 +249,20 @@ mod tests {
             count(
                 &conn,
                 "SELECT COUNT(*) AS count FROM pragma_table_info('payment') WHERE name = 'raw_success_action'",
+            )
+            .await,
+            1
+        );
+        assert_eq!(
+            count(
+                &conn,
+                r#"
+                SELECT COUNT(*) AS count
+                FROM pragma_foreign_key_list('client_event')
+                WHERE "table" = 'wallet'
+                  AND "from" = 'wallet_id'
+                  AND "on_delete" = 'CASCADE'
+                "#,
             )
             .await,
             1
