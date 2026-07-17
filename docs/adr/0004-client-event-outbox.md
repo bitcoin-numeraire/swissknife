@@ -45,9 +45,22 @@ The server checks the shared database once per second when a stream is idle. Thi
 
 Delivery is at least once: a disconnect after a client receives an event but before it persists the cursor can cause replay. Consumers must use the event ID for deduplication. The dashboard safely responds by revalidating idempotent SWR cache keys.
 
-### Reuse the log for webhooks
+### Reuse the log for signed webhooks
 
-Webhook delivery will consume this same durable event log rather than creating a second set of settlement hooks. Subscription and delivery-attempt state belong in separate tables; delivery must not hold or retry the wallet settlement transaction.
+Webhook delivery consumes this same durable event log rather than creating a second set of settlement hooks. Account-scoped CRUD endpoints under `/v1/me/wallets/{wallet_id}/webhooks` manage an HTTPS endpoint and a non-empty event filter. A new subscription starts at the current event cursor; it does not unexpectedly replay historical payments. Disabling a subscription exhausts pending attempts and advances its cursor, so re-enabling it resumes with new events rather than producing a backlog. An attempt already claimed before the disable may still complete.
+
+Subscriptions and delivery-attempt state live in separate tables. A background worker first fans matching outbox rows into unique `(subscription_id, client_event_id)` delivery rows, then claims due work with a 60-second database lease. This supports multiple application replicas and keeps all external I/O outside wallet settlement transactions. Delivery is at least once: an endpoint must deduplicate using `X-SwissKnife-Delivery`, and event order is not guaranteed across concurrent attempts.
+
+The JSON body contains the stable event ID and type, wallet and resource IDs, timestamp, and committed public snapshot. Requests include:
+
+- `X-SwissKnife-Event`
+- `X-SwissKnife-Delivery`
+- `X-SwissKnife-Timestamp`
+- `X-SwissKnife-Signature: v1=<hex HMAC-SHA256>`
+
+The signed message is `<timestamp>.<raw request body>`. A random 256-bit base64url secret is returned only on subscription creation or explicit rotation. Consumers should reject old timestamps and compare signatures in constant time. A rotation affects subsequent attempts; an attempt already claimed by a worker may still carry the previous signature.
+
+Only public HTTPS destinations are delivered. The worker rejects credentials and fragments, resolves DNS itself, rejects any private, loopback, link-local, multicast, or reserved result, pins the verified address for the request, disables redirects, and uses a ten-second timeout. Network failures, HTTP 408/409/425/429, and 5xx responses retry exponentially from one minute up to one hour. Other non-2xx responses are permanent failures. Delivery exhausts after eight attempts and remains visible through the delivery-history endpoint.
 
 ## Consequences
 
@@ -55,4 +68,5 @@ Webhook delivery will consume this same durable event log rather than creating a
 - Listener replay, synchronous/listener races, process restarts, and multiple application replicas preserve one committed event per transition.
 - Event history begins when this migration is deployed; existing terminal payments and invoices are not backfilled.
 - The event log currently has no retention job. Retention can be added only with an explicit minimum replay window and webhook-delivery watermark so undelivered events are never removed.
+- Webhook signing secrets are stored in the application database because SwissKnife has no deployment-wide envelope-encryption facility today. Database access must therefore be treated as secret access; a future key-management integration can encrypt the column without changing the wire contract.
 - WebSocket support is deferred. It should be added only if a real bidirectional protocol appears; deployment in separate pods alone is not a reason to maintain two transports.

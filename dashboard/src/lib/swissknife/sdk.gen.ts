@@ -14,6 +14,7 @@ import {
   createAccountResponseTransformer,
   createAccountWalletResponseTransformer,
   createApiKeyResponseTransformer,
+  createWebhookResponseTransformer,
   generateBtcAddressResponseTransformer,
   generateInvoiceResponseTransformer,
   getAccountAddressResponseTransformer,
@@ -44,6 +45,8 @@ import {
   listWalletOverviewsResponseTransformer,
   listWalletPaymentsResponseTransformer,
   listWalletsResponseTransformer,
+  listWebhookDeliveriesResponseTransformer,
+  listWebhooksResponseTransformer,
   newWalletBtcAddressResponseTransformer,
   newWalletInvoiceResponseTransformer,
   payResponseTransformer,
@@ -57,6 +60,7 @@ import {
   updateAccountPreferencesResponseTransformer,
   updateAddressResponseTransformer,
   updateCurrentAccountResponseTransformer,
+  updateWebhookResponseTransformer,
   walletPayResponseTransformer,
 } from './transformers.gen';
 import type {
@@ -78,6 +82,9 @@ import type {
   CreateApiKeyData,
   CreateApiKeyErrors,
   CreateApiKeyResponses,
+  CreateWebhookData,
+  CreateWebhookErrors,
+  CreateWebhookResponses,
   DeleteAccountAddressData,
   DeleteAccountAddressErrors,
   DeleteAccountAddressResponses,
@@ -123,6 +130,9 @@ import type {
   DeleteWalletsData,
   DeleteWalletsErrors,
   DeleteWalletsResponses,
+  DeleteWebhookData,
+  DeleteWebhookErrors,
+  DeleteWebhookResponses,
   GenerateBtcAddressData,
   GenerateBtcAddressErrors,
   GenerateBtcAddressResponses,
@@ -219,6 +229,12 @@ import type {
   ListWalletsData,
   ListWalletsErrors,
   ListWalletsResponses,
+  ListWebhookDeliveriesData,
+  ListWebhookDeliveriesErrors,
+  ListWebhookDeliveriesResponses,
+  ListWebhooksData,
+  ListWebhooksErrors,
+  ListWebhooksResponses,
   MarkWelcomeCompleteData,
   MarkWelcomeCompleteErrors,
   MarkWelcomeCompleteResponses,
@@ -257,6 +273,9 @@ import type {
   RevokeApiKeysData,
   RevokeApiKeysErrors,
   RevokeApiKeysResponses,
+  RotateWebhookSecretData,
+  RotateWebhookSecretErrors,
+  RotateWebhookSecretResponses,
   SetupCheckData,
   SetupCheckErrors,
   SetupCheckResponses,
@@ -285,6 +304,9 @@ import type {
   UpdateCurrentAccountData,
   UpdateCurrentAccountErrors,
   UpdateCurrentAccountResponses,
+  UpdateWebhookData,
+  UpdateWebhookErrors,
+  UpdateWebhookResponses,
   VersionCheckData,
   VersionCheckResponses,
   WalletPayData,
@@ -1362,6 +1384,80 @@ export const getWalletPayment = <ThrowOnError extends boolean = false>(
     responseTransformer: getWalletPaymentResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/v1/me/wallets/{wallet_id}/payments/{id}',
+    ...options,
+  });
+
+export const listWebhooks = <ThrowOnError extends boolean = false>(
+  options: Options<ListWebhooksData, ThrowOnError>
+): RequestResult<ListWebhooksResponses, ListWebhooksErrors, ThrowOnError> =>
+  (options.client ?? client).get<ListWebhooksResponses, ListWebhooksErrors, ThrowOnError>({
+    responseTransformer: listWebhooksResponseTransformer,
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/me/wallets/{wallet_id}/webhooks',
+    ...options,
+  });
+
+export const createWebhook = <ThrowOnError extends boolean = false>(
+  options: Options<CreateWebhookData, ThrowOnError>
+): RequestResult<CreateWebhookResponses, CreateWebhookErrors, ThrowOnError> =>
+  (options.client ?? client).post<CreateWebhookResponses, CreateWebhookErrors, ThrowOnError>({
+    responseTransformer: createWebhookResponseTransformer,
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/me/wallets/{wallet_id}/webhooks',
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
+
+export const deleteWebhook = <ThrowOnError extends boolean = false>(
+  options: Options<DeleteWebhookData, ThrowOnError>
+): RequestResult<DeleteWebhookResponses, DeleteWebhookErrors, ThrowOnError> =>
+  (options.client ?? client).delete<DeleteWebhookResponses, DeleteWebhookErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/me/wallets/{wallet_id}/webhooks/{id}',
+    ...options,
+  });
+
+export const updateWebhook = <ThrowOnError extends boolean = false>(
+  options: Options<UpdateWebhookData, ThrowOnError>
+): RequestResult<UpdateWebhookResponses, UpdateWebhookErrors, ThrowOnError> =>
+  (options.client ?? client).put<UpdateWebhookResponses, UpdateWebhookErrors, ThrowOnError>({
+    responseTransformer: updateWebhookResponseTransformer,
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/me/wallets/{wallet_id}/webhooks/{id}',
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
+
+export const listWebhookDeliveries = <ThrowOnError extends boolean = false>(
+  options: Options<ListWebhookDeliveriesData, ThrowOnError>
+): RequestResult<ListWebhookDeliveriesResponses, ListWebhookDeliveriesErrors, ThrowOnError> =>
+  (options.client ?? client).get<
+    ListWebhookDeliveriesResponses,
+    ListWebhookDeliveriesErrors,
+    ThrowOnError
+  >({
+    responseTransformer: listWebhookDeliveriesResponseTransformer,
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/me/wallets/{wallet_id}/webhooks/{id}/deliveries',
+    ...options,
+  });
+
+export const rotateWebhookSecret = <ThrowOnError extends boolean = false>(
+  options: Options<RotateWebhookSecretData, ThrowOnError>
+): RequestResult<RotateWebhookSecretResponses, RotateWebhookSecretErrors, ThrowOnError> =>
+  (options.client ?? client).post<
+    RotateWebhookSecretResponses,
+    RotateWebhookSecretErrors,
+    ThrowOnError
+  >({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/me/wallets/{wallet_id}/webhooks/{id}/rotate-secret',
     ...options,
   });
 

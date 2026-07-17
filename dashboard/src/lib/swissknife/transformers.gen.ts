@@ -5,6 +5,7 @@ import type {
   CreateAccountResponse,
   CreateAccountWalletResponse,
   CreateApiKeyResponse,
+  CreateWebhookResponse,
   GenerateBtcAddressResponse,
   GenerateInvoiceResponse,
   GetAccountAddressResponse,
@@ -35,6 +36,8 @@ import type {
   ListWalletOverviewsResponse,
   ListWalletPaymentsResponse,
   ListWalletsResponse,
+  ListWebhookDeliveriesResponse,
+  ListWebhooksResponse,
   NewWalletBtcAddressResponse,
   NewWalletInvoiceResponse,
   PayResponse,
@@ -48,6 +51,7 @@ import type {
   UpdateAccountPreferencesResponse,
   UpdateAddressResponse,
   UpdateCurrentAccountResponse,
+  UpdateWebhookResponse,
   WalletPayResponse,
 } from './types.gen';
 
@@ -449,6 +453,56 @@ export const getWalletPaymentResponseTransformer = async (
   data: any
 ): Promise<GetWalletPaymentResponse> => {
   data = paymentSchemaResponseTransformer(data);
+  return data;
+};
+
+const webhookSubscriptionSchemaResponseTransformer = (data: any) => {
+  data.created_at = new Date(data.created_at);
+  if (data.updated_at) {
+    data.updated_at = new Date(data.updated_at);
+  }
+  return data;
+};
+
+export const listWebhooksResponseTransformer = async (data: any): Promise<ListWebhooksResponse> => {
+  data = data.map((item: any) => webhookSubscriptionSchemaResponseTransformer(item));
+  return data;
+};
+
+const createdWebhookSubscriptionSchemaResponseTransformer = (data: any) => {
+  data = webhookSubscriptionSchemaResponseTransformer(data);
+  return data;
+};
+
+export const createWebhookResponseTransformer = async (
+  data: any
+): Promise<CreateWebhookResponse> => {
+  data = createdWebhookSubscriptionSchemaResponseTransformer(data);
+  return data;
+};
+
+export const updateWebhookResponseTransformer = async (
+  data: any
+): Promise<UpdateWebhookResponse> => {
+  data = webhookSubscriptionSchemaResponseTransformer(data);
+  return data;
+};
+
+const webhookDeliverySchemaResponseTransformer = (data: any) => {
+  data.created_at = new Date(data.created_at);
+  if (data.delivered_at) {
+    data.delivered_at = new Date(data.delivered_at);
+  }
+  if (data.updated_at) {
+    data.updated_at = new Date(data.updated_at);
+  }
+  return data;
+};
+
+export const listWebhookDeliveriesResponseTransformer = async (
+  data: any
+): Promise<ListWebhookDeliveriesResponse> => {
+  data = data.map((item: any) => webhookDeliverySchemaResponseTransformer(item));
   return data;
 };
 

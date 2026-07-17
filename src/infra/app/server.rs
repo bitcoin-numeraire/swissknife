@@ -38,6 +38,7 @@ impl Server {
             .nest("/v1/api-keys", account::api_key_router())
             .nest("/v1/lightning-addresses", ln_address::router())
             .nest("/v1/bitcoin/addresses", bitcoin::router())
+            .merge(event::webhook_router())
             .merge(Scalar::with_url("/docs", merged_openapi()))
             .layer(adapters.timeout_layer);
 
