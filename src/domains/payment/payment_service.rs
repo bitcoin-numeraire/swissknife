@@ -16,7 +16,7 @@ use crate::{
         bitcoin::{BitcoinWallet, BtcNetwork},
         event::{EventUseCases, LnPayFailureEvent, LnPaySuccessEvent},
         invoice::{Invoice, InvoiceStatus},
-        lnurl::{process_success_action, validate_lnurl_pay, LnUrlPayRequestData, LnUrlPaySuccessAction},
+        lnurl::{process_success_action, validate_lnurl_pay, LnUrlPayRequestData},
     },
     infra::lightning::LnClient,
 };
@@ -400,7 +400,7 @@ impl PaymentService {
                 )
                 .await;
 
-            self.handle_processed_payment(pending_payment, result, None).await
+            self.handle_processed_payment(pending_payment, result).await
         } else {
             Err(DataError::Validation("Amount must be defined for zero-amount invoices.".to_string()).into())
         }
@@ -436,6 +436,7 @@ impl PaymentService {
                             .expect("should not fail or malformed callback")
                             .payment_hash()
                             .to_string(),
+                        raw_success_action: cb.success_action.clone(),
                         ..Default::default()
                     }),
                     ..Default::default()
@@ -446,15 +447,13 @@ impl PaymentService {
 
         let result = self.ln_client.pay(cb.pr, None, pending_payment.id.to_string()).await;
 
-        self.handle_processed_payment(pending_payment, result, cb.success_action)
-            .await
+        self.handle_processed_payment(pending_payment, result).await
     }
 
     async fn handle_processed_payment(
         &self,
         mut pending_payment: Payment,
         result: Result<Payment, LightningError>,
-        success_action: Option<LnUrlPaySuccessAction>,
     ) -> Result<Payment, ApplicationError> {
         match result {
             Ok(mut settled_payment) => {
@@ -464,16 +463,25 @@ impl PaymentService {
                 settled_payment.reserved_amount = pending_payment.reserved_amount;
                 settled_payment.status = PaymentStatus::Settled;
 
+                let pending_raw_success_action = pending_payment
+                    .lightning
+                    .as_ref()
+                    .and_then(|lightning| lightning.raw_success_action.clone());
+                let lightning = settled_payment.lightning.get_or_insert_with(Default::default);
+                if lightning.raw_success_action.is_none() {
+                    lightning.raw_success_action = pending_raw_success_action;
+                }
                 let success_action = match (
-                    success_action,
-                    settled_payment
-                        .lightning
-                        .as_ref()
-                        .and_then(|lightning| lightning.payment_preimage.as_deref()),
+                    lightning.raw_success_action.clone(),
+                    lightning.payment_preimage.as_deref(),
                 ) {
                     (Some(sa), Some(preimage)) => process_success_action(sa, preimage),
                     _ => None,
                 };
+                if success_action.is_some() {
+                    lightning.success_action.clone_from(&success_action);
+                    lightning.raw_success_action = None;
+                }
 
                 let mut payment = self.store.payment_uow.settle(settled_payment).await?;
 
@@ -485,6 +493,7 @@ impl PaymentService {
                     let lightning = payment.lightning.get_or_insert_with(Default::default);
                     if lightning.success_action.is_none() {
                         lightning.success_action = Some(success_action);
+                        lightning.raw_success_action = None;
                         payment = self.store.payment.update(payment).await?;
                     }
                 }
@@ -726,6 +735,7 @@ mod tests {
             bitcoin::{BtcAddress, BtcAddressType, BtcNetwork, BtcPreparedTransaction, MockBitcoinWallet},
             event::MockEventUseCases,
             ln_address::LnAddress,
+            lnurl::LnUrlPaySuccessAction,
             wallet::Wallet,
         },
         infra::lightning::MockLnClient,
@@ -1758,12 +1768,65 @@ mod tests {
                     ..Default::default()
                 };
 
-                let payment = service
-                    .handle_processed_payment(pending, Ok(settled), None)
-                    .await
-                    .unwrap();
+                let payment = service.handle_processed_payment(pending, Ok(settled)).await.unwrap();
 
                 assert_eq!(payment.status, PaymentStatus::Settled);
+            }
+
+            #[tokio::test]
+            async fn projects_the_persisted_lnurl_success_action() {
+                let pending_id = Uuid::new_v4();
+                let mut store = MockAppStoreBuilder::new();
+                store
+                    .payment_uow
+                    .expect_settle()
+                    .withf(move |payment| {
+                        payment.id == pending_id
+                            && payment.lightning.as_ref().is_some_and(|lightning| {
+                                lightning.raw_success_action.is_none()
+                                    && lightning.success_action.as_ref().is_some_and(|action| {
+                                        action.tag == "message" && action.message.as_deref() == Some("Thanks")
+                                    })
+                            })
+                    })
+                    .times(1)
+                    .returning(Ok);
+
+                let service = service(
+                    store,
+                    MockLnClient::new(),
+                    MockBitcoinWallet::new(),
+                    MockEventUseCases::new(),
+                );
+                let pending = Payment {
+                    id: pending_id,
+                    status: PaymentStatus::Pending,
+                    lightning: Some(LnPayment {
+                        raw_success_action: Some(LnUrlPaySuccessAction::Message {
+                            message: "Thanks".to_string(),
+                        }),
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                };
+                let settled = Payment {
+                    status: PaymentStatus::Settled,
+                    lightning: Some(LnPayment {
+                        payment_preimage: Some("preimage".to_string()),
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                };
+
+                let payment = service.handle_processed_payment(pending, Ok(settled)).await.unwrap();
+
+                assert_eq!(
+                    payment
+                        .lightning
+                        .and_then(|lightning| lightning.success_action)
+                        .and_then(|action| action.message),
+                    Some("Thanks".to_string())
+                );
             }
         }
 
@@ -1793,7 +1856,7 @@ mod tests {
                 };
 
                 let err = service
-                    .handle_processed_payment(pending, Err(LightningError::Pay("boom".to_string())), None)
+                    .handle_processed_payment(pending, Err(LightningError::Pay("boom".to_string())))
                     .await
                     .unwrap_err();
 

@@ -37,6 +37,25 @@ pub struct LnUrlSuccessAction {
     pub url: Option<String>,
 }
 
+/// Validated LNURL success action retained internally until payment settlement.
+///
+/// This is deliberately not part of the public payment JSON contract. AES
+/// actions must remain encrypted until the Lightning preimage is available.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(tag = "tag", rename_all = "camelCase")]
+pub enum LnUrlPaySuccessAction {
+    #[serde(rename = "message")]
+    Message { message: String },
+    #[serde(rename = "url")]
+    Url { description: String, url: String },
+    #[serde(rename = "aes")]
+    Aes {
+        description: String,
+        ciphertext: String,
+        iv: String,
+    },
+}
+
 /// LNURL-pay `payRequest` response served at the well-known endpoint (LUD-06).
 #[derive(Debug, Deserialize, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
