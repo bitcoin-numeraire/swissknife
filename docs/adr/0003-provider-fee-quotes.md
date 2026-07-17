@@ -57,3 +57,10 @@ The quote is informational. The execution-time maximum is guaranteed for Lightni
 - Route-estimation failure degrades to a clearly represented maximum instead of blocking payments.
 - Quote requests for LNURL/Lightning Address inputs perform the LNURL callback needed to obtain a BOLT11 invoice.
 - Provider estimates remain graph snapshots. A future durable quote token could avoid re-estimation, but it is unnecessary for the current user-triggered flow.
+
+## References
+
+- [LND `EstimateRouteFee`](https://api.lightning.community/api/lnd/router/estimate-route-fee/index.html)
+- [LND payment fee limits](https://docs.lightning.engineering/lightning-network-tools/lnd/payments)
+- [Core Lightning `getroutes`](https://docs.corelightning.org/reference/getroutes)
+- [Core Lightning `xpay`](https://docs.corelightning.org/reference/xpay)
