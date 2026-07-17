@@ -56,6 +56,19 @@ pub struct PayRequest {
 }
 
 #[derive(Debug, Serialize)]
+pub struct RouteFeeRequest {
+    pub dest: String,
+    pub amt_sat: String,
+}
+
+#[serde_as]
+#[derive(Debug, Deserialize)]
+pub struct RouteFeeResponse {
+    #[serde_as(as = "DisplayFromStr")]
+    pub routing_fee_msat: u64,
+}
+
+#[derive(Debug, Serialize)]
 pub struct TrackPaymentRequest {
     pub no_inflight_updates: bool,
 }
@@ -315,5 +328,17 @@ impl From<TransactionResponse> for BtcTransaction {
             outputs,
             is_outgoing,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::RouteFeeResponse;
+
+    #[test]
+    fn deserializes_route_fee_from_lnd_rest_string() {
+        let response: RouteFeeResponse = serde_json::from_str(r#"{"routing_fee_msat":"1250"}"#).unwrap();
+
+        assert_eq!(response.routing_fee_msat, 1_250);
     }
 }

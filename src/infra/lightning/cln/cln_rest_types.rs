@@ -154,7 +154,35 @@ pub struct GetinfoRequest {}
 
 #[derive(Debug, Deserialize)]
 pub struct GetinfoResponse {
+    pub id: String,
     pub network: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct GetRoutesRequest {
+    pub source: String,
+    pub destination: String,
+    pub amount_msat: u64,
+    pub layers: Vec<String>,
+    pub maxfee_msat: u64,
+    pub final_cltv: u32,
+    pub maxparts: u32,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct GetRoutesResponse {
+    pub routes: Vec<GetRoutesRoute>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct GetRoutesRoute {
+    pub amount_msat: u64,
+    pub path: Vec<GetRoutesPath>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct GetRoutesPath {
+    pub amount_in_msat: Option<u64>,
 }
 
 #[derive(Debug, Serialize)]

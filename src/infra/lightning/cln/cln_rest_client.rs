@@ -28,17 +28,20 @@ use crate::{
     },
     infra::{
         config::config_rs::deserialize_duration,
-        lightning::{bitcoin_utils::parse_psbt, cln::ListFundsResponse, types::parse_network, LnClient},
+        lightning::{
+            bitcoin_utils::parse_psbt, cln::ListFundsResponse, cln_fee_limit_msat, payment_target,
+            types::parse_network, LnClient, LnFeeEstimate,
+        },
     },
 };
 
 use super::{
-    DelInvoiceRequest, DelInvoiceResponse, ErrorResponse, GetinfoRequest, GetinfoResponse, InvoiceRequest,
-    InvoiceResponse, ListChainMovesRequest, ListChainMovesResponse, ListFundsRequest, ListInvoicesRequest,
-    ListInvoicesResponse, ListPaysRequest, ListPaysResponse, ListTransactionsRequest, ListTransactionsResponse,
-    NewAddrRequest, NewAddrResponse, SetPsbtVersionRequest, SetPsbtVersionResponse, TxDiscardRequest,
-    TxDiscardResponse, TxPrepareOutput, TxPrepareRequest, TxPrepareResponse, TxSendRequest, TxSendResponse,
-    XpayRequest, XpayResponse,
+    DelInvoiceRequest, DelInvoiceResponse, ErrorResponse, GetRoutesRequest, GetRoutesResponse, GetinfoRequest,
+    GetinfoResponse, InvoiceRequest, InvoiceResponse, ListChainMovesRequest, ListChainMovesResponse, ListFundsRequest,
+    ListInvoicesRequest, ListInvoicesResponse, ListPaysRequest, ListPaysResponse, ListTransactionsRequest,
+    ListTransactionsResponse, NewAddrRequest, NewAddrResponse, SetPsbtVersionRequest, SetPsbtVersionResponse,
+    TxDiscardRequest, TxDiscardResponse, TxPrepareOutput, TxPrepareRequest, TxPrepareResponse, TxSendRequest,
+    TxSendResponse, XpayRequest, XpayResponse,
 };
 
 #[derive(Clone, Debug, Deserialize)]
@@ -189,14 +192,63 @@ impl LnClient for ClnRestClient {
         Ok(crate::infra::lightning::types::invoice_from_bolt11(bolt11))
     }
 
-    async fn pay(&self, bolt11: String, amount_msat: Option<u64>, label: String) -> Result<Payment, LightningError> {
+    async fn estimate_fee(&self, bolt11: String, amount_msat: Option<u64>) -> Result<LnFeeEstimate, LightningError> {
+        let target = payment_target(&bolt11, amount_msat)?;
+        let fee_limit_msat = self.fee_limit_msat(target.amount_msat);
+        let node: GetinfoResponse = self
+            .post_request("getinfo", &GetinfoRequest {})
+            .await
+            .map_err(|err| LightningError::NodeInfo(err.to_string()))?;
+        let response: GetRoutesResponse = self
+            .post_request(
+                "getroutes",
+                &GetRoutesRequest {
+                    source: node.id,
+                    destination: hex::encode(target.destination),
+                    amount_msat: target.amount_msat,
+                    layers: vec!["auto.localchans".to_string(), "auto.sourcefree".to_string()],
+                    maxfee_msat: fee_limit_msat,
+                    final_cltv: target.final_cltv_delta,
+                    maxparts: 1,
+                },
+            )
+            .await
+            .map_err(|err| LightningError::Pay(format!("Failed to estimate route fee: {err}")))?;
+        if response.routes.is_empty() {
+            return Err(LightningError::Pay("No route available for fee estimation".to_string()));
+        }
+        let estimated_fee_msat = response.routes.into_iter().try_fold(0_u64, |total, route| {
+            let sent = route
+                .path
+                .first()
+                .and_then(|hop| hop.amount_in_msat)
+                .ok_or_else(|| LightningError::Pay("Estimated route has no first hop amount".to_string()))?;
+            total
+                .checked_add(sent.saturating_sub(route.amount_msat))
+                .ok_or_else(|| LightningError::Pay("Estimated route fee overflows".to_string()))
+        })?;
+
+        Ok(LnFeeEstimate { estimated_fee_msat })
+    }
+
+    fn fee_limit_msat(&self, amount_msat: u64) -> u64 {
+        cln_fee_limit_msat(self.maxfee, amount_msat)
+    }
+
+    async fn pay(
+        &self,
+        bolt11: String,
+        amount_msat: Option<u64>,
+        fee_limit_msat: u64,
+        label: String,
+    ) -> Result<Payment, LightningError> {
         let response: XpayResponse = self
             .post_request(
                 "xpay",
                 &XpayRequest {
                     invstring: bolt11,
                     amount_msat,
-                    maxfee: self.maxfee,
+                    maxfee: Some(fee_limit_msat),
                     retry_for: self.retry_for,
                     label: Some(label),
                 },

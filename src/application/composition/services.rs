@@ -37,7 +37,6 @@ impl AppServices {
             domain,
             host,
             invoice_expiry,
-            fee_buffer,
             auth_provider,
             bitcoin_address_type,
             ..
@@ -57,7 +56,6 @@ impl AppServices {
             ln_client.clone(),
             bitcoin_wallet.clone(),
             domain.clone(),
-            fee_buffer.unwrap_or_default(),
             event.clone(),
         );
         let invoices = InvoiceService::new(

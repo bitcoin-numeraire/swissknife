@@ -55,8 +55,11 @@ import {
   generateInvoice,
   type BtcAddress,
   newWalletInvoice,
+  estimatePaymentFee,
   generateBtcAddress,
   newWalletBtcAddress,
+  type PaymentFeeEstimate,
+  estimateWalletPaymentFee,
 } from 'src/lib/swissknife';
 
 import { Label } from 'src/components/label';
@@ -66,6 +69,7 @@ import { CopyButton } from 'src/components/copy';
 import { SatsWithIcon } from 'src/components/bitcoin';
 import { useSettingsContext } from 'src/components/settings';
 
+import { getFeeEstimateState } from './fee-estimate';
 import { getReceiveAddressListState } from './receive-address-list';
 
 // ----------------------------------------------------------------------
@@ -540,7 +544,9 @@ export function SendMoneyDrawer({
   const [amountUnit, setAmountUnit] = useState<AmountUnit>('sats');
   const [comment, setComment] = useState('');
   const [payment, setPayment] = useState<Payment>();
+  const [feeEstimate, setFeeEstimate] = useState<PaymentFeeEstimate>();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isEstimatingFee, setIsEstimatingFee] = useState(false);
   const [nowMs, setNowMs] = useState(0);
   const [selectedWalletId, setSelectedWalletId] = useState(walletId ?? '');
 
@@ -575,6 +581,8 @@ export function SendMoneyDrawer({
   const amountMSats = amountSats * 1000;
   const amountExceedsAvailable =
     balance != null && amountSats > 0 && amountMSats > Math.max(balance, 0);
+  const feeEstimateState = getFeeEstimateState(feeEstimate, balance);
+  const feeExceedsAvailable = feeEstimateState.exceedsAvailable;
   const canEnterAmount =
     input.trim().length > 0 &&
     embeddedAmountSats === 0 &&
@@ -597,6 +605,7 @@ export function SendMoneyDrawer({
     !hasInvalidBip21Amount &&
     !hasInvalidBitcoinAddress &&
     !amountExceedsAvailable &&
+    !feeExceedsAvailable &&
     !needsWallet;
   const canEstimateFee =
     kind !== 'unknown' &&
@@ -605,7 +614,9 @@ export function SendMoneyDrawer({
     !amountExceedsAvailable &&
     !hasUnsupportedBip21Params &&
     !hasInvalidBip21Amount &&
-    !hasInvalidBitcoinAddress;
+    !hasInvalidBitcoinAddress &&
+    !expiredInvoiceBlocksSubmit &&
+    !needsWallet;
   const submitLabel =
     (input.trim() && kind === 'unknown' && t('send_money.unsupported_request')) ||
     ((kind === 'bitcoin' || (kind === 'bip21' && !bitcoinRequest.lightning)) &&
@@ -663,12 +674,17 @@ export function SendMoneyDrawer({
     [amountExceedsAvailable, amountMSats, amountSats, canSendComment, comment, input]
   );
 
+  useEffect(() => {
+    setFeeEstimate(undefined);
+  }, [activeWalletId, requestBody]);
+
   const handleClose = useCallback(() => {
     setInput('');
     setAmountValue('');
     setAmountUnit('sats');
     setComment('');
     setPayment(undefined);
+    setFeeEstimate(undefined);
     setSelectedWalletId(walletId ?? '');
     onClose();
   }, [onClose, walletId]);
@@ -708,14 +724,36 @@ export function SendMoneyDrawer({
     setAmountValue(satsToAmountValue(currentAmountSats, nextUnit, fiatPrices, state.currency));
   };
 
-  const handleEstimateFee = () => {
-    toast.info(t('send_money.fee_estimate_unavailable'));
+  const handleEstimateFee = async () => {
+    try {
+      setIsEstimatingFee(true);
+      const { data, error } = isAdmin
+        ? await estimatePaymentFee({ body: { ...requestBody, wallet_id: activeWalletId! } })
+        : await estimateWalletPaymentFee({
+            path: { wallet_id: activeWalletId! },
+            body: {
+              input: requestBody.input,
+              comment: requestBody.comment,
+              amount_msat: requestBody.amount_msat,
+              wallet_id: null,
+            },
+          });
+      if (error) throw error;
+      if (!data) throw new Error(t('send_money.fee_estimate_failed'));
+
+      setFeeEstimate(data);
+    } catch (error) {
+      handleActionError(error);
+    } finally {
+      setIsEstimatingFee(false);
+    }
   };
 
   const handleClearInput = () => {
     setInput('');
     setAmountValue('');
     setComment('');
+    setFeeEstimate(undefined);
   };
 
   return (
@@ -921,6 +959,31 @@ export function SendMoneyDrawer({
                           <Typography variant="caption">
                             {t('send_money.no_network_fee')}
                           </Typography>
+                        ) : feeEstimate ? (
+                          <Stack spacing={0.25} sx={{ alignItems: 'flex-end' }}>
+                            <SatsWithIcon
+                              amountMSats={feeEstimateState.displayFeeMsat ?? 0}
+                              variant="caption"
+                              showMillisatsTooltip
+                            />
+                            {feeEstimateState.maximumOnly ? (
+                              <Typography variant="caption" color="text.secondary">
+                                {t('send_money.maximum_fee_only')}
+                              </Typography>
+                            ) : feeEstimateState.hasDistinctMaximum ? (
+                              <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
+                                <Typography variant="caption" color="text.secondary">
+                                  {t('send_money.maximum_fee')}
+                                </Typography>
+                                <SatsWithIcon
+                                  amountMSats={feeEstimate.maximum_fee_msat}
+                                  variant="caption"
+                                  color="text.secondary"
+                                  showMillisatsTooltip
+                                />
+                              </Stack>
+                            ) : null}
+                          </Stack>
                         ) : (
                           <Button
                             size="small"
@@ -928,6 +991,7 @@ export function SendMoneyDrawer({
                             variant="outlined"
                             disabled={!canEstimateFee}
                             onClick={handleEstimateFee}
+                            loading={isEstimatingFee}
                             startIcon={<Iconify icon="solar:calculator-minimalistic-bold" />}
                             sx={{
                               minHeight: 28,
@@ -958,6 +1022,18 @@ export function SendMoneyDrawer({
                     {amountExceedsAvailable && (
                       <Alert severity="warning" variant="outlined">
                         {t('send_money.amount_exceeds_available')}
+                      </Alert>
+                    )}
+
+                    {feeExceedsAvailable && (
+                      <Alert severity="warning" variant="outlined">
+                        {t('send_money.amount_and_fee_exceed_available')}
+                      </Alert>
+                    )}
+
+                    {feeEstimate?.ledger === 'Onchain' && (
+                      <Alert severity="info" variant="outlined">
+                        {t('send_money.onchain_estimate_disclaimer')}
                       </Alert>
                     )}
 

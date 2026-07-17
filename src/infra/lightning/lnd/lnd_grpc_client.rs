@@ -46,8 +46,9 @@ use crate::{
                     GetTransactionRequest, TxTemplate,
                 },
             },
+            payment_target,
             types::parse_network,
-            LnClient,
+            LnClient, LnFeeEstimate,
         },
     },
 };
@@ -331,11 +332,42 @@ impl LnClient for LndGrpcClient {
         Ok(crate::infra::lightning::types::invoice_from_bolt11(bolt11))
     }
 
-    async fn pay(&self, bolt11: String, amount_msat: Option<u64>, _label: String) -> Result<Payment, LightningError> {
+    async fn estimate_fee(&self, bolt11: String, amount_msat: Option<u64>) -> Result<LnFeeEstimate, LightningError> {
+        let target = payment_target(&bolt11, amount_msat)?;
+        let amount_sat = i64::try_from(target.amount_msat.div_ceil(1000))
+            .map_err(|_| LightningError::Pay("Payment amount exceeds LND integer range".to_string()))?;
+        let mut router = self.router.clone();
+        let response = router
+            .estimate_route_fee(routerrpc::RouteFeeRequest {
+                dest: target.destination,
+                amt_sat: amount_sat,
+                ..Default::default()
+            })
+            .await
+            .map_err(|err| LightningError::Pay(format!("Failed to estimate route fee: {}", err.message())))?
+            .into_inner();
+        let estimated_fee_msat = u64::try_from(response.routing_fee_msat)
+            .map_err(|_| LightningError::Pay("LND returned a negative routing fee".to_string()))?;
+
+        Ok(LnFeeEstimate { estimated_fee_msat })
+    }
+
+    fn fee_limit_msat(&self, _amount_msat: u64) -> u64 {
+        self.fee_limit_msat
+    }
+
+    async fn pay(
+        &self,
+        bolt11: String,
+        amount_msat: Option<u64>,
+        fee_limit_msat: u64,
+        _label: String,
+    ) -> Result<Payment, LightningError> {
         let request = routerrpc::SendPaymentRequest {
             payment_request: bolt11,
             amt_msat: amount_msat.map(|v| v as i64).unwrap_or_default(),
-            fee_limit_msat: self.fee_limit_msat as i64,
+            fee_limit_msat: i64::try_from(fee_limit_msat)
+                .map_err(|_| LightningError::Pay("Fee limit exceeds LND integer range".to_string()))?,
             timeout_seconds: self.payment_timeout.as_secs() as i32,
             no_inflight_updates: true,
             ..Default::default()

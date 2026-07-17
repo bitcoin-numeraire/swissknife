@@ -149,6 +149,35 @@ pub struct SendPaymentRequest {
     pub comment: Option<String>,
 }
 
+/// Fee quote for a prospective outgoing payment.
+///
+/// `estimated_fee_msat` is the route or transaction fee expected at quote time.
+/// It can be absent when the Lightning node cannot find a graph route while the
+/// configured payment policy still permits an execution attempt. The maximum is
+/// the hard cap passed to the Lightning provider (or the prepared on-chain fee).
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq, ToSchema)]
+pub struct PaymentFeeEstimate {
+    /// Ledger selected for this payment input.
+    pub ledger: Ledger,
+
+    /// Amount delivered to the recipient, in millisatoshis.
+    pub amount_msat: u64,
+
+    /// Provider-derived fee expected at quote time, in millisatoshis.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub estimated_fee_msat: Option<u64>,
+
+    /// Lightning execution cap or current prepared on-chain fee, in millisatoshis.
+    pub maximum_fee_msat: u64,
+
+    /// Expected amount plus fee, in millisatoshis.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub estimated_total_msat: Option<u64>,
+
+    /// Amount plus the Lightning cap or current on-chain fee, in millisatoshis.
+    pub maximum_total_msat: u64,
+}
+
 /// Payment query filter.
 #[serde_as]
 #[derive(Clone, Debug, Deserialize, Serialize, Default, IntoParams, ToSchema)]

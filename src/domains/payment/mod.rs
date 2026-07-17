@@ -10,4 +10,6 @@ pub use payment_repository::*;
 pub use payment_service::*;
 pub use payment_unit_of_work::*;
 pub use payment_use_cases::*;
-pub use swissknife_types::{BtcPayment, InternalPayment, LnPayment, Payment, PaymentFilter, PaymentStatus};
+pub use swissknife_types::{
+    BtcPayment, InternalPayment, LnPayment, Payment, PaymentFeeEstimate, PaymentFilter, PaymentStatus,
+};
