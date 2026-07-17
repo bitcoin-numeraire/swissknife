@@ -30,6 +30,7 @@ mod m20260704_000012_drop_legacy_wallet_contract;
 mod m20260710_234825_add_relationship_indexes;
 mod m20260717_105719_persist_lnurl_success_action;
 mod m20260717_170449_add_client_event_log;
+mod m20260717_173942_add_webhook_delivery;
 
 pub struct Migrator;
 
@@ -67,6 +68,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260710_234825_add_relationship_indexes::Migration),
             Box::new(m20260717_105719_persist_lnurl_success_action::Migration),
             Box::new(m20260717_170449_add_client_event_log::Migration),
+            Box::new(m20260717_173942_add_webhook_delivery::Migration),
         ]
     }
 }
@@ -150,7 +152,7 @@ mod tests {
                 "#,
             )
             .await,
-            14
+            19
         );
         assert_eq!(
             count(
@@ -200,12 +202,16 @@ mod tests {
                     'idx_invoice_ln_address_id',
                     'idx_invoice_wallet_created_at',
                     'idx_payment_wallet_created_at',
+                    'idx_webhook_delivery_due',
+                    'idx_webhook_delivery_subscription_event',
+                    'idx_webhook_subscription_account_wallet',
+                    'idx_webhook_subscription_wallet_url',
                     'idx_wallet_asset_id'
                   )
                 "#,
             )
             .await,
-            13
+            17
         );
         assert_eq!(
             count(
