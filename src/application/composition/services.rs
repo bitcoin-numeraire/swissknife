@@ -5,7 +5,7 @@ use crate::{
     domains::{
         account::{AccountService, AccountUseCases, ApiKeyService, ApiKeyUseCases, AuthService, AuthUseCases},
         bitcoin::{BitcoinService, BitcoinUseCases},
-        event::{EventService, EventUseCases},
+        event::{ClientEventService, ClientEventUseCases, EventService, EventUseCases},
         invoice::{InvoiceService, InvoiceUseCases},
         ln_address::{LnAddressService, LnAddressUseCases},
         lnurl::{LnUrlService, LnUrlUseCases},
@@ -29,6 +29,7 @@ pub struct AppServices {
     pub api_key: Box<dyn ApiKeyUseCases>,
     pub bitcoin: Box<dyn BitcoinUseCases>,
     pub event: Arc<dyn EventUseCases>,
+    pub client_event: Box<dyn ClientEventUseCases>,
 }
 
 impl AppServices {
@@ -51,6 +52,7 @@ impl AppServices {
         } = adapters;
 
         let event = Arc::new(EventService::new(store.clone()));
+        let client_event = ClientEventService::new(store.clone());
         let payments = PaymentService::new(
             store.clone(),
             ln_client.clone(),
@@ -105,6 +107,7 @@ impl AppServices {
             api_key: Box::new(api_key),
             bitcoin: Box::new(bitcoin),
             event,
+            client_event: Box::new(client_event),
         }
     }
 }
@@ -127,6 +130,7 @@ pub struct MockAppServicesBuilder {
     pub api_key: crate::domains::account::MockApiKeyUseCases,
     pub bitcoin: crate::domains::bitcoin::MockBitcoinUseCases,
     pub event: crate::domains::event::MockEventUseCases,
+    pub client_event: crate::domains::event::MockClientEventUseCases,
 }
 
 #[cfg(test)]
@@ -145,6 +149,7 @@ impl MockAppServicesBuilder {
             api_key: crate::domains::account::MockApiKeyUseCases::new(),
             bitcoin: crate::domains::bitcoin::MockBitcoinUseCases::new(),
             event: crate::domains::event::MockEventUseCases::new(),
+            client_event: crate::domains::event::MockClientEventUseCases::new(),
         }
     }
 
@@ -162,6 +167,7 @@ impl MockAppServicesBuilder {
             api_key: Box::new(self.api_key),
             bitcoin: Box::new(self.bitcoin),
             event: Arc::new(self.event),
+            client_event: Box::new(self.client_event),
         }
     }
 }

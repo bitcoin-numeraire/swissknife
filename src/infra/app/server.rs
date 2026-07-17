@@ -6,7 +6,7 @@ use crate::{
         docs::merged_openapi,
         errors::WebServerError,
     },
-    domains::{account, bitcoin, invoice, ln_address, lnurl, nostr, payment, system, wallet},
+    domains::{account, bitcoin, event, invoice, ln_address, lnurl, nostr, payment, system, wallet},
 };
 use axum::{routing::get, Router};
 use std::future::Future;
@@ -25,7 +25,7 @@ pub struct Server {
 
 impl Server {
     pub fn new(adapters: AppAdapters, services: Arc<AppServices>, dashboard_dir: Option<&str>) -> Self {
-        let router = Router::new()
+        let api_router = Router::new()
             .nest("/.well-known", Self::well_known_router())
             .nest("/v1/system", system::router())
             .nest("/lnurlp", lnurl::router())
@@ -38,7 +38,12 @@ impl Server {
             .nest("/v1/api-keys", account::api_key_router())
             .nest("/v1/lightning-addresses", ln_address::router())
             .nest("/v1/bitcoin/addresses", bitcoin::router())
-            .merge(Scalar::with_url("/docs", merged_openapi()));
+            .merge(Scalar::with_url("/docs", merged_openapi()))
+            .layer(adapters.timeout_layer);
+
+        // The request timeout must not wrap the long-lived SSE response. Heartbeats
+        // keep proxies from treating an idle wallet as a dead connection.
+        let router = api_router.merge(event::client_event_router());
 
         let router = match dashboard_dir {
             Some(dir) => router
@@ -48,7 +53,6 @@ impl Server {
 
         let router = router
             .layer(TraceLayer::new_for_http())
-            .layer(adapters.timeout_layer)
             .layer(CorsLayer::permissive())
             .with_state(services);
 
