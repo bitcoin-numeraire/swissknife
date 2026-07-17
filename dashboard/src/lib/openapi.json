@@ -5293,6 +5293,105 @@
         }
       }
     },
+    "/v1/me/wallets/{wallet_id}/events": {
+      "get": {
+        "tags": [
+          "Events"
+        ],
+        "summary": "Stream durable wallet events.",
+        "description": "A fresh connection starts after the latest committed event. Send `Last-Event-ID`\non reconnect (or `after` for a deliberate replay) to receive missed events.",
+        "operationId": "stream_wallet_events",
+        "parameters": [
+          {
+            "name": "wallet_id",
+            "in": "path",
+            "description": "Account-owned wallet ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "description": "Replay events strictly after this event ID. `Last-Event-ID` takes precedence.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Server-sent event stream",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClientEvent"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid replay cursor",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"400 Bad Request\",\n    \"reason\": \"Missing required parameter in request\"\n}\n"
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"401 Unauthorized\",\n    \"reason\": \"Invalid credentials\"\n}\n"
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"403 Forbidden\",\n    \"reason\": \"Missing permissions\"\n}\n"
+              }
+            }
+          },
+          "404": {
+            "description": "Wallet not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"404 Not Found\",\n    \"reason\": \"Resource not found\"\n}\n"
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"500 Internal Server Error\",\n    \"reason\": \"Internal server error, Please contact your administrator or try later\"\n}\n"
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/me/wallets/{wallet_id}/invoices": {
       "get": {
         "tags": [
@@ -8009,6 +8108,56 @@
           }
         }
       },
+      "ClientEvent": {
+        "type": "object",
+        "description": "A durable event emitted after an invoice or payment changes state.",
+        "required": [
+          "id",
+          "event_type",
+          "wallet_id",
+          "resource_id",
+          "data",
+          "created_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Time the event was committed to the event log."
+          },
+          "data": {
+            "type": "object",
+            "description": "Full invoice or payment snapshot at the time the event was committed."
+          },
+          "event_type": {
+            "$ref": "#/components/schemas/ClientEventType",
+            "description": "Stable event name. The SSE `event` field contains the same value."
+          },
+          "id": {
+            "type": "string",
+            "description": "Monotonic cursor used by SSE `Last-Event-ID` replay."
+          },
+          "resource_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Invoice or payment ID represented by `data`."
+          },
+          "wallet_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Wallet whose state changed."
+          }
+        }
+      },
+      "ClientEventType": {
+        "type": "string",
+        "description": "Stable event names shared by SSE and webhook delivery.",
+        "enum": [
+          "invoice.paid",
+          "payment.settled",
+          "payment.failed"
+        ]
+      },
       "Contact": {
         "type": "object",
         "description": "A counterparty the wallet has paid, with the date of first contact.",
@@ -9419,6 +9568,10 @@
     {
       "name": "Bitcoin Addresses",
       "description": "Bitcoin Address management endpoints. Require `read:btc_address` or `write:btc_address` permissions."
+    },
+    {
+      "name": "Events",
+      "description": "Authenticated, wallet-scoped server-sent events."
     }
   ]
 }

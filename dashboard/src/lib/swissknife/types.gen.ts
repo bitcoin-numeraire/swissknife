@@ -353,6 +353,52 @@ export type ChangePasswordRequest = {
 };
 
 /**
+ * A durable event emitted after an invoice or payment changes state.
+ */
+export type ClientEvent = {
+  /**
+   * Time the event was committed to the event log.
+   */
+  created_at: Date;
+  /**
+   * Full invoice or payment snapshot at the time the event was committed.
+   */
+  data: {
+    [key: string]: unknown;
+  };
+  /**
+   * Stable event name. The SSE `event` field contains the same value.
+   */
+  event_type: ClientEventType;
+  /**
+   * Monotonic cursor used by SSE `Last-Event-ID` replay.
+   */
+  id: string;
+  /**
+   * Invoice or payment ID represented by `data`.
+   */
+  resource_id: string;
+  /**
+   * Wallet whose state changed.
+   */
+  wallet_id: string;
+};
+
+/**
+ * Stable event names shared by SSE and webhook delivery.
+ */
+export const ClientEventType = {
+  INVOICE_PAID: 'invoice.paid',
+  PAYMENT_SETTLED: 'payment.settled',
+  PAYMENT_FAILED: 'payment.failed',
+} as const;
+
+/**
+ * Stable event names shared by SSE and webhook delivery.
+ */
+export type ClientEventType = (typeof ClientEventType)[keyof typeof ClientEventType];
+
+/**
  * A counterparty the wallet has paid, with the date of first contact.
  */
 export type Contact = {
@@ -3681,6 +3727,58 @@ export type ListContactsResponses = {
 };
 
 export type ListContactsResponse = ListContactsResponses[keyof ListContactsResponses];
+
+export type StreamWalletEventsData = {
+  body?: never;
+  path: {
+    /**
+     * Account-owned wallet ID
+     */
+    wallet_id: string;
+  };
+  query?: {
+    /**
+     * Replay events strictly after this event ID. `Last-Event-ID` takes precedence.
+     */
+    after?: number;
+  };
+  url: '/v1/me/wallets/{wallet_id}/events';
+};
+
+export type StreamWalletEventsErrors = {
+  /**
+   * Invalid replay cursor
+   */
+  400: ErrorResponse;
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Forbidden
+   */
+  403: ErrorResponse;
+  /**
+   * Wallet not found
+   */
+  404: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
+
+export type StreamWalletEventsError = StreamWalletEventsErrors[keyof StreamWalletEventsErrors];
+
+export type StreamWalletEventsResponses = {
+  /**
+   * Server-sent event stream
+   */
+  200: ClientEvent;
+};
+
+export type StreamWalletEventsResponse =
+  StreamWalletEventsResponses[keyof StreamWalletEventsResponses];
 
 export type DeleteExpiredInvoicesData = {
   body?: never;

@@ -9,11 +9,17 @@ import { useRef, useMemo, useState, useEffect, useCallback } from 'react';
 import { useColorScheme } from '@mui/material/styles';
 
 import { endpointKeys } from 'src/actions/keys';
-import { getAccount, getAccountWallet, updateAccountPreferences } from 'src/lib/swissknife';
+import {
+  Permission,
+  getAccount,
+  getAccountWallet,
+  updateAccountPreferences,
+} from 'src/lib/swissknife';
 
 import { defaultSettings, useSettingsContext } from 'src/components/settings';
 
 import { AccountContext } from './account-context';
+import { useAccountEventStream } from './account-event-stream';
 import { selectInitialWalletId, settingsWithActiveWallet } from './account-selection';
 import {
   settingsWithUiPreferences,
@@ -36,6 +42,11 @@ export function AccountProvider({ children }: AccountProviderProps) {
   });
   const account = accountResult.data;
   const wallets = useMemo(() => account?.wallets ?? [], [account?.wallets]);
+
+  useAccountEventStream(
+    activeWalletId,
+    account?.permissions?.includes(Permission.READ_TRANSACTION) ?? false
+  );
 
   useEffect(() => {
     if (!account || hydratedAccountId.current === account.id) return;
