@@ -14,7 +14,8 @@ use crate::{
             OnchainWithdrawalEvent,
         },
         invoice::{Invoice, InvoiceStatus},
-        payment::PaymentStatus,
+        lnurl::process_success_action,
+        payment::{Payment, PaymentStatus},
     },
 };
 
@@ -34,6 +35,19 @@ impl EventService {
         match block_height {
             Some(height) if height > 0 => BtcOutputStatus::Confirmed,
             _ => BtcOutputStatus::Unconfirmed,
+        }
+    }
+
+    fn project_lightning_settlement(payment: &mut Payment, event: &LnPaySuccessEvent) {
+        let lightning = payment.lightning.get_or_insert_with(Default::default);
+        lightning.payment_preimage = Some(event.payment_preimage.clone());
+        if lightning.success_action.is_none() {
+            if let Some(raw_action) = lightning.raw_success_action.clone() {
+                if let Some(success_action) = process_success_action(raw_action, &event.payment_preimage) {
+                    lightning.success_action = Some(success_action);
+                    lightning.raw_success_action = None;
+                }
+            }
         }
     }
 }
@@ -71,7 +85,15 @@ impl EventUseCases for EventService {
 
         if let Some(mut payment_retrieved) = payment_option {
             if payment_retrieved.status == PaymentStatus::Settled {
-                debug!(id = %payment_retrieved.id,"Lightning payment already settled");
+                let payment_id = payment_retrieved.id;
+                let has_unprocessed_action = payment_retrieved.lightning.as_ref().is_some_and(|lightning| {
+                    lightning.success_action.is_none() && lightning.raw_success_action.is_some()
+                });
+                if has_unprocessed_action {
+                    Self::project_lightning_settlement(&mut payment_retrieved, &event);
+                    self.store.payment.update(payment_retrieved).await?;
+                }
+                debug!(id = %payment_id,"Lightning payment already settled");
                 return Ok(());
             }
 
@@ -79,8 +101,7 @@ impl EventUseCases for EventService {
             payment_retrieved.payment_time = Some(event.payment_time);
             payment_retrieved.amount_msat = event.amount_msat;
             payment_retrieved.fee_msat = Some(event.fees_msat);
-            let lightning = payment_retrieved.lightning.get_or_insert_with(Default::default);
-            lightning.payment_preimage = Some(event.payment_preimage);
+            Self::project_lightning_settlement(&mut payment_retrieved, &event);
 
             let payment = self.store.payment_uow.settle(payment_retrieved).await?;
 
@@ -210,7 +231,11 @@ mod tests {
 
     use crate::{
         application::composition::MockAppStoreBuilder,
-        domains::{bitcoin::BtcAddress, payment::Payment},
+        domains::{
+            bitcoin::BtcAddress,
+            lnurl::LnUrlPaySuccessAction,
+            payment::{LnPayment, Payment},
+        },
     };
 
     use super::*;
@@ -331,6 +356,38 @@ mod tests {
 
                 assert!(service(store).outgoing_payment(event()).await.is_ok());
             }
+
+            #[tokio::test]
+            async fn projects_the_persisted_lnurl_success_action() {
+                let mut store = MockAppStoreBuilder::new();
+                store.payment.expect_find_by_payment_hash().times(1).returning(|_| {
+                    Ok(Some(Payment {
+                        status: PaymentStatus::Pending,
+                        lightning: Some(LnPayment {
+                            raw_success_action: Some(LnUrlPaySuccessAction::Message {
+                                message: "Thanks".to_string(),
+                            }),
+                            ..Default::default()
+                        }),
+                        ..Default::default()
+                    }))
+                });
+                store
+                    .payment_uow
+                    .expect_settle()
+                    .withf(|payment| {
+                        payment.lightning.as_ref().is_some_and(|lightning| {
+                            lightning.raw_success_action.is_none()
+                                && lightning.success_action.as_ref().is_some_and(|action| {
+                                    action.tag == "message" && action.message.as_deref() == Some("Thanks")
+                                })
+                        })
+                    })
+                    .times(1)
+                    .returning(Ok);
+
+                assert!(service(store).outgoing_payment(event()).await.is_ok());
+            }
         }
 
         mod when_payment_is_already_settled {
@@ -346,6 +403,39 @@ mod tests {
                     }))
                 });
                 // update is intentionally not expected.
+
+                assert!(service(store).outgoing_payment(event()).await.is_ok());
+            }
+
+            #[tokio::test]
+            async fn repairs_an_unprocessed_lnurl_success_action() {
+                let mut store = MockAppStoreBuilder::new();
+                store.payment.expect_find_by_payment_hash().times(1).returning(|_| {
+                    Ok(Some(Payment {
+                        status: PaymentStatus::Settled,
+                        lightning: Some(LnPayment {
+                            raw_success_action: Some(LnUrlPaySuccessAction::Message {
+                                message: "Recovered".to_string(),
+                            }),
+                            ..Default::default()
+                        }),
+                        ..Default::default()
+                    }))
+                });
+                store
+                    .payment
+                    .expect_update()
+                    .withf(|payment| {
+                        payment.lightning.as_ref().is_some_and(|lightning| {
+                            lightning.raw_success_action.is_none()
+                                && lightning
+                                    .success_action
+                                    .as_ref()
+                                    .is_some_and(|action| action.message.as_deref() == Some("Recovered"))
+                        })
+                    })
+                    .times(1)
+                    .returning(Ok);
 
                 assert!(service(store).outgoing_payment(event()).await.is_ok());
             }

@@ -147,6 +147,7 @@ impl From<PaymentModel> for Payment {
             payment_preimage: model.payment_preimage.clone(),
             metadata: model.metadata.clone(),
             success_action: serde_json::from_value(model.success_action.clone().unwrap_or_default()).ok(),
+            raw_success_action: serde_json::from_value(model.raw_success_action.clone().unwrap_or_default()).ok(),
         });
 
         let bitcoin = (ledger == Ledger::Onchain).then(|| BtcPayment {

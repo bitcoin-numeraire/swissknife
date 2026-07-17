@@ -33,7 +33,7 @@ pub use bitcoin::{BtcAddress, BtcAddressFilter, BtcAddressType, BtcOutput, BtcOu
 pub use error::ErrorResponse;
 pub use invoice::{Invoice, InvoiceFilter, InvoiceOrderBy, InvoiceStatus, LnInvoice, NewInvoiceRequest};
 pub use ln_address::{LnAddress, LnAddressFilter, RegisterLnAddressRequest, UpdateLnAddressRequest};
-pub use lnurl::{LNUrlpInvoiceQueryParams, LnURLPayRequest, LnUrlCallback, LnUrlSuccessAction};
+pub use lnurl::{LNUrlpInvoiceQueryParams, LnURLPayRequest, LnUrlCallback, LnUrlPaySuccessAction, LnUrlSuccessAction};
 pub use network::BtcNetwork;
 pub use nostr::{NostrNIP05QueryParams, NostrNIP05Response};
 pub use payment::{BtcPayment, InternalPayment, LnPayment, Payment, PaymentFilter, PaymentStatus, SendPaymentRequest};

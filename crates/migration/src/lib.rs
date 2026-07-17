@@ -28,6 +28,7 @@ mod m20260704_000010_finalize_wallet_schema;
 mod m20260704_000011_ln_address_account_routes;
 mod m20260704_000012_drop_legacy_wallet_contract;
 mod m20260710_234825_add_relationship_indexes;
+mod m20260717_105719_persist_lnurl_success_action;
 
 pub struct Migrator;
 
@@ -63,6 +64,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260704_000011_ln_address_account_routes::Migration),
             Box::new(m20260704_000012_drop_legacy_wallet_contract::Migration),
             Box::new(m20260710_234825_add_relationship_indexes::Migration),
+            Box::new(m20260717_105719_persist_lnurl_success_action::Migration),
         ]
     }
 }
@@ -238,6 +240,14 @@ mod tests {
             )
             .await,
             3
+        );
+        assert_eq!(
+            count(
+                &conn,
+                "SELECT COUNT(*) AS count FROM pragma_table_info('payment') WHERE name = 'raw_success_action'",
+            )
+            .await,
+            1
         );
     }
 
