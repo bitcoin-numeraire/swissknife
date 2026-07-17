@@ -26,7 +26,7 @@ use crate::{
     },
     infra::{
         config::config_rs::deserialize_duration,
-        lightning::{bitcoin_utils::parse_psbt, types::parse_network, LnClient},
+        lightning::{bitcoin_utils::parse_psbt, payment_target, types::parse_network, LnClient, LnFeeEstimate},
     },
 };
 use async_trait::async_trait;
@@ -266,11 +266,39 @@ impl LnClient for LndRestClient {
         Ok(response.into())
     }
 
-    async fn pay(&self, bolt11: String, amount_msat: Option<u64>, _label: String) -> Result<Payment, LightningError> {
+    async fn estimate_fee(&self, bolt11: String, amount_msat: Option<u64>) -> Result<LnFeeEstimate, LightningError> {
+        let target = payment_target(&bolt11, amount_msat)?;
+        let response: RouteFeeResponse = self
+            .post_request(
+                "v2/router/route/estimatefee",
+                &RouteFeeRequest {
+                    dest: STANDARD.encode(target.destination),
+                    amt_sat: target.amount_msat.div_ceil(1000).to_string(),
+                },
+            )
+            .await
+            .map_err(|err| LightningError::Pay(format!("Failed to estimate route fee: {err}")))?;
+
+        Ok(LnFeeEstimate {
+            estimated_fee_msat: response.routing_fee_msat,
+        })
+    }
+
+    fn fee_limit_msat(&self, _amount_msat: u64) -> u64 {
+        self.fee_limit_msat
+    }
+
+    async fn pay(
+        &self,
+        bolt11: String,
+        amount_msat: Option<u64>,
+        fee_limit_msat: u64,
+        _label: String,
+    ) -> Result<Payment, LightningError> {
         let payload = PayRequest {
             payment_request: bolt11,
             amt_msat: amount_msat,
-            fee_limit_msat: self.fee_limit_msat,
+            fee_limit_msat,
             timeout_seconds: self.retry_for,
             no_inflight_updates: true,
         };

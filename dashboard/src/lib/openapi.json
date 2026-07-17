@@ -6091,6 +6091,103 @@
         }
       }
     },
+    "/v1/me/wallets/{wallet_id}/payments/fee-estimate": {
+      "post": {
+        "tags": [
+          "Me"
+        ],
+        "summary": "Estimate a payment fee for an account-owned wallet.",
+        "operationId": "estimate_wallet_payment_fee",
+        "parameters": [
+          {
+            "name": "wallet_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendPaymentRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Fee estimated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentFeeEstimate"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"400 Bad Request\",\n    \"reason\": \"Missing required parameter in request\"\n}\n"
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"401 Unauthorized\",\n    \"reason\": \"Invalid credentials\"\n}\n"
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"404 Not Found\",\n    \"reason\": \"Resource not found\"\n}\n"
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"422 Unprocessable Entity\",\n    \"reason\": \"Validation failed: ...\"\n}\n"
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"500 Internal Server Error\",\n    \"reason\": \"Internal server error, Please contact your administrator or try later\"\n}\n"
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/me/wallets/{wallet_id}/payments/{id}": {
       "get": {
         "tags": [
@@ -6639,6 +6736,93 @@
                   "$ref": "#/components/schemas/ErrorResponse"
                 },
                 "example": "\n{\n    \"status\": \"403 Forbidden\",\n    \"reason\": \"Missing permissions\"\n}\n"
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"500 Internal Server Error\",\n    \"reason\": \"Internal server error, Please contact your administrator or try later\"\n}\n"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/payments/fee-estimate": {
+      "post": {
+        "tags": [
+          "Payments"
+        ],
+        "summary": "Estimate an outgoing payment fee",
+        "description": "Returns the provider-derived expected fee and the hard maximum used during payment execution.",
+        "operationId": "estimate_payment_fee",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendPaymentRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Fee estimated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentFeeEstimate"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"400 Bad Request\",\n    \"reason\": \"Missing required parameter in request\"\n}\n"
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"401 Unauthorized\",\n    \"reason\": \"Invalid credentials\"\n}\n"
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"403 Forbidden\",\n    \"reason\": \"Missing permissions\"\n}\n"
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"422 Unprocessable Entity\",\n    \"reason\": \"Validation failed: ...\"\n}\n"
               }
             }
           },
@@ -8860,6 +9044,58 @@
             "type": "string",
             "format": "uuid",
             "description": "Wallet ID"
+          }
+        }
+      },
+      "PaymentFeeEstimate": {
+        "type": "object",
+        "description": "Fee quote for a prospective outgoing payment.\n\n`estimated_fee_msat` is the route or transaction fee expected at quote time.\nIt can be absent when the Lightning node cannot find a graph route while the\nconfigured payment policy still permits an execution attempt. The maximum is\nthe hard cap passed to the Lightning provider (or the prepared on-chain fee).",
+        "required": [
+          "ledger",
+          "amount_msat",
+          "maximum_fee_msat",
+          "maximum_total_msat"
+        ],
+        "properties": {
+          "amount_msat": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Amount delivered to the recipient, in millisatoshis.",
+            "minimum": 0
+          },
+          "estimated_fee_msat": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Provider-derived fee expected at quote time, in millisatoshis.",
+            "minimum": 0
+          },
+          "estimated_total_msat": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Expected amount plus fee, in millisatoshis.",
+            "minimum": 0
+          },
+          "ledger": {
+            "$ref": "#/components/schemas/Ledger",
+            "description": "Ledger selected for this payment input."
+          },
+          "maximum_fee_msat": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Lightning execution cap or current prepared on-chain fee, in millisatoshis.",
+            "minimum": 0
+          },
+          "maximum_total_msat": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Amount plus the Lightning cap or current on-chain fee, in millisatoshis.",
+            "minimum": 0
           }
         }
       },

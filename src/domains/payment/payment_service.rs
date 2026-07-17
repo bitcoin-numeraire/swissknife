@@ -23,7 +23,8 @@ use crate::{
 
 use super::{
     payment_input::{parse_payment_input, BitcoinAddressData, ParsedBolt11Invoice, PaymentInput},
-    BtcPayment, InternalPayment, LnPayment, Payment, PaymentFilter, PaymentStatus, PaymentsUseCases,
+    BtcPayment, InternalPayment, LnPayment, Payment, PaymentFeeEstimate, PaymentFilter, PaymentStatus,
+    PaymentsUseCases,
 };
 
 const DEFAULT_INTERNAL_INVOICE_DESCRIPTION: &str = "Numeraire Invoice";
@@ -34,7 +35,6 @@ pub struct PaymentService {
     store: AppStore,
     ln_client: Arc<dyn LnClient>,
     bitcoin_wallet: Arc<dyn BitcoinWallet>,
-    fee_buffer: f64,
     events: Arc<dyn EventUseCases>,
 }
 
@@ -44,7 +44,6 @@ impl PaymentService {
         ln_client: Arc<dyn LnClient>,
         bitcoin_wallet: Arc<dyn BitcoinWallet>,
         domain: String,
-        fee_buffer: f64,
         events: Arc<dyn EventUseCases>,
     ) -> Self {
         PaymentService {
@@ -52,7 +51,6 @@ impl PaymentService {
             ln_client,
             bitcoin_wallet,
             domain,
-            fee_buffer,
             events,
         }
     }
@@ -68,25 +66,57 @@ impl PaymentService {
         Ok(amount)
     }
 
-    /// Amount to reserve for an outgoing payment: `amount + fee` when the fee is known, otherwise
-    /// `ceil(amount * (1 + fee_buffer))` as headroom for unknown Lightning routing fees.
-    fn reserve_amount_msat(amount_msat: u64, fee_msat: Option<u64>, fee_buffer: f64) -> Result<u64, ApplicationError> {
-        if let Some(fee_msat) = fee_msat {
-            return amount_msat
-                .checked_add(fee_msat)
-                .ok_or_else(|| DataError::Validation("Payment amount plus fee overflows".to_string()).into());
-        }
+    fn reserve_amount_msat(amount_msat: u64, fee_msat: u64) -> Result<u64, ApplicationError> {
+        amount_msat
+            .checked_add(fee_msat)
+            .ok_or_else(|| DataError::Validation("Payment amount plus fee overflows".to_string()).into())
+    }
 
-        if !fee_buffer.is_finite() || fee_buffer < 0.0 {
-            return Err(DataError::Validation("Fee buffer must be a finite non-negative value".to_string()).into());
-        }
+    fn fee_estimate(
+        ledger: Ledger,
+        amount_msat: u64,
+        estimated_fee_msat: Option<u64>,
+        maximum_fee_msat: u64,
+    ) -> Result<PaymentFeeEstimate, ApplicationError> {
+        let estimated_total_msat = estimated_fee_msat
+            .map(|fee| Self::reserve_amount_msat(amount_msat, fee))
+            .transpose()?;
+        let maximum_total_msat = Self::reserve_amount_msat(amount_msat, maximum_fee_msat)?;
 
-        let reserve_amount = (amount_msat as f64 * (1.0 + fee_buffer)).ceil();
-        if reserve_amount > u64::MAX as f64 {
-            return Err(DataError::Validation("Payment reserve amount exceeds integer range".to_string()).into());
-        }
+        Ok(PaymentFeeEstimate {
+            ledger,
+            amount_msat,
+            estimated_fee_msat,
+            maximum_fee_msat,
+            estimated_total_msat,
+            maximum_total_msat,
+        })
+    }
 
-        Ok(reserve_amount as u64)
+    async fn lightning_fee_estimate(
+        &self,
+        bolt11: String,
+        invoice_amount_msat: Option<u64>,
+        amount_msat: u64,
+    ) -> Result<PaymentFeeEstimate, ApplicationError> {
+        let maximum_fee_msat = self.ln_client.fee_limit_msat(amount_msat);
+        match self.ln_client.estimate_fee(bolt11, invoice_amount_msat).await {
+            Ok(estimate) if estimate.estimated_fee_msat <= maximum_fee_msat => Self::fee_estimate(
+                Ledger::Lightning,
+                amount_msat,
+                Some(estimate.estimated_fee_msat),
+                maximum_fee_msat,
+            ),
+            Ok(estimate) => Err(DataError::Validation(format!(
+                "Estimated Lightning fee {} msat exceeds the configured maximum of {maximum_fee_msat} msat",
+                estimate.estimated_fee_msat
+            ))
+            .into()),
+            Err(err) => {
+                warn!(%err, amount_msat, maximum_fee_msat, "Route fee estimate unavailable; using provider fee cap");
+                Self::fee_estimate(Ledger::Lightning, amount_msat, None, maximum_fee_msat)
+            }
+        }
     }
 
     async fn send_internal(
@@ -166,7 +196,9 @@ impl PaymentService {
         }
 
         if let Some(amount) = specified_amount {
-            let amount_msat = amount * 1000;
+            let amount_msat = amount
+                .checked_mul(1000)
+                .ok_or_else(|| DataError::Validation("Payment amount overflows".to_string()))?;
             let description: Option<String> = comment.or(data.message);
 
             if let Some(recipient_address) = self.store.btc_address.find_by_address(&data.address).await? {
@@ -217,8 +249,11 @@ impl PaymentService {
                 .prepare_transaction(data.address.clone(), amount, None)
                 .await?;
 
-            let reserve_amount =
-                Self::reserve_amount_msat(amount_msat, Some(prepared_tx.fee_sat.saturating_mul(1000)), 0.0)?;
+            let fee_msat = prepared_tx
+                .fee_sat
+                .checked_mul(1000)
+                .ok_or_else(|| DataError::Validation("On-chain fee overflows".to_string()))?;
+            let reserve_amount = Self::reserve_amount_msat(amount_msat, fee_msat)?;
 
             let pending_payment = match self
                 .store
@@ -227,7 +262,7 @@ impl PaymentService {
                     Payment {
                         wallet_id,
                         amount_msat,
-                        fee_msat: Some(prepared_tx.fee_sat.saturating_mul(1000)),
+                        fee_msat: Some(fee_msat),
                         status: PaymentStatus::Pending,
                         ledger: Ledger::Onchain,
                         description,
@@ -367,6 +402,11 @@ impl PaymentService {
             // External  payment
             debug!(%wallet_id, %amount, ledger="Lightning", "Sending bolt11 payment");
 
+            let variable_amount = invoice.amount_msat.is_none().then_some(amount);
+            let fee_estimate = self
+                .lightning_fee_estimate(invoice.bolt11.clone(), variable_amount, amount)
+                .await?;
+
             let pending_payment = self
                 .store
                 .payment_uow
@@ -383,7 +423,7 @@ impl PaymentService {
                         }),
                         ..Default::default()
                     },
-                    Self::reserve_amount_msat(amount, None, self.fee_buffer)?,
+                    fee_estimate.maximum_total_msat,
                 )
                 .await?;
 
@@ -396,6 +436,7 @@ impl PaymentService {
                     } else {
                         Some(amount)
                     },
+                    fee_estimate.maximum_fee_msat,
                     pending_payment.id.to_string(),
                 )
                 .await;
@@ -419,6 +460,7 @@ impl PaymentService {
         let cb = validate_lnurl_pay(amount, &comment, &data)
             .await
             .map_err(|e| DataError::Validation(e.to_string()))?;
+        let fee_estimate = self.lightning_fee_estimate(cb.pr.clone(), None, amount).await?;
 
         let pending_payment = self
             .store
@@ -440,11 +482,19 @@ impl PaymentService {
                     }),
                     ..Default::default()
                 },
-                Self::reserve_amount_msat(amount, None, self.fee_buffer)?,
+                fee_estimate.maximum_total_msat,
             )
             .await?;
 
-        let result = self.ln_client.pay(cb.pr, None, pending_payment.id.to_string()).await;
+        let result = self
+            .ln_client
+            .pay(
+                cb.pr,
+                None,
+                fee_estimate.maximum_fee_msat,
+                pending_payment.id.to_string(),
+            )
+            .await;
 
         self.handle_processed_payment(pending_payment, result, cb.success_action)
             .await
@@ -543,6 +593,107 @@ impl PaymentService {
 
 #[async_trait]
 impl PaymentsUseCases for PaymentService {
+    async fn estimate_fee(
+        &self,
+        input: String,
+        amount_msat: Option<u64>,
+        comment: Option<String>,
+        wallet_id: Uuid,
+    ) -> Result<PaymentFeeEstimate, ApplicationError> {
+        debug!(%input, %wallet_id, "Received fee estimate request");
+
+        if self.is_internal_payment(&input) {
+            let amount = Self::validate_amount(amount_msat)?;
+            self.ensure_wallet_network(wallet_id, self.bitcoin_wallet.network())
+                .await?;
+            let (username, _) = input
+                .split_once('@')
+                .ok_or_else(|| DataError::Validation("Invalid internal Lightning address".to_string()))?;
+            let address = self
+                .store
+                .ln_address
+                .find_by_username(username)
+                .await?
+                .filter(|address| address.active)
+                .ok_or_else(|| DataError::NotFound("Recipient not found.".to_string()))?;
+            if address.wallet_id == wallet_id {
+                return Err(DataError::Validation("Cannot pay to yourself.".to_string()).into());
+            }
+
+            return Self::fee_estimate(Ledger::Internal, amount, Some(0), 0);
+        }
+
+        let input_type = parse_payment_input(&input).await.map_err(DataError::Validation)?;
+        let expected_network = match &input_type {
+            PaymentInput::BitcoinAddress(address) => address.network,
+            PaymentInput::Bolt11(invoice) => self.bolt11_network(invoice),
+            PaymentInput::LnUrlPay(_) => self.bitcoin_wallet.network(),
+        };
+        self.ensure_wallet_network(wallet_id, expected_network).await?;
+
+        match input_type {
+            PaymentInput::BitcoinAddress(data) => {
+                let amount_sat = data
+                    .amount_sat
+                    .or_else(|| amount_msat.map(|amount| amount / 1000))
+                    .filter(|amount| *amount > 0)
+                    .ok_or_else(|| {
+                        DataError::Validation("Amount must be defined for on-chain transactions.".to_string())
+                    })?;
+                let amount_msat = amount_sat
+                    .checked_mul(1000)
+                    .ok_or_else(|| DataError::Validation("Payment amount overflows".to_string()))?;
+
+                if let Some(recipient_address) = self.store.btc_address.find_by_address(&data.address).await? {
+                    if recipient_address.wallet_id == wallet_id {
+                        return Err(
+                            DataError::Validation("Cannot pay to your own bitcoin address.".to_string()).into(),
+                        );
+                    }
+                    return Self::fee_estimate(Ledger::Internal, amount_msat, Some(0), 0);
+                }
+
+                let prepared = self
+                    .bitcoin_wallet
+                    .prepare_transaction(data.address, amount_sat, None)
+                    .await?;
+                self.bitcoin_wallet.release_prepared_transaction(&prepared).await?;
+                let fee_msat = prepared
+                    .fee_sat
+                    .checked_mul(1000)
+                    .ok_or_else(|| DataError::Validation("On-chain fee overflows".to_string()))?;
+
+                Self::fee_estimate(Ledger::Onchain, amount_msat, Some(fee_msat), fee_msat)
+            }
+            PaymentInput::Bolt11(invoice) => {
+                let amount = invoice
+                    .amount_msat
+                    .or(amount_msat)
+                    .filter(|amount| *amount > 0)
+                    .ok_or_else(|| {
+                        DataError::Validation("Amount must be defined for zero-amount invoices.".to_string())
+                    })?;
+                if let Some(stored_invoice) = self.store.invoice.find_by_payment_hash(&invoice.payment_hash).await? {
+                    if stored_invoice.wallet_id == wallet_id {
+                        return Err(DataError::Validation("Cannot pay for own invoice.".to_string()).into());
+                    }
+                    return Self::fee_estimate(Ledger::Internal, amount, Some(0), 0);
+                }
+
+                let variable_amount = invoice.amount_msat.is_none().then_some(amount);
+                self.lightning_fee_estimate(invoice.bolt11, variable_amount, amount)
+                    .await
+            }
+            PaymentInput::LnUrlPay(data) => {
+                let amount = Self::validate_amount(amount_msat)?;
+                let callback = validate_lnurl_pay(amount, &comment, &data)
+                    .await
+                    .map_err(|err| DataError::Validation(err.to_string()))?;
+                self.lightning_fee_estimate(callback.pr, None, amount).await
+            }
+        }
+    }
+
     async fn get(&self, id: Uuid) -> Result<Payment, ApplicationError> {
         trace!(%id, "Fetching payment");
 
@@ -728,14 +879,12 @@ mod tests {
             ln_address::LnAddress,
             wallet::Wallet,
         },
-        infra::lightning::MockLnClient,
+        infra::lightning::{LnFeeEstimate, MockLnClient},
     };
 
     use super::*;
 
     const DOMAIN: &str = "numeraire.tech";
-    const FEE_BUFFER: f64 = 0.02;
-
     fn service(
         store: MockAppStoreBuilder,
         ln_client: MockLnClient,
@@ -747,7 +896,6 @@ mod tests {
             Arc::new(ln_client),
             Arc::new(bitcoin_wallet),
             DOMAIN.to_string(),
-            FEE_BUFFER,
             Arc::new(events),
         )
     }
@@ -881,6 +1029,107 @@ mod tests {
             fn rejects_zero() {
                 assert_validation_error(Some(0));
             }
+        }
+    }
+
+    mod fee_estimate {
+        use super::*;
+
+        #[test]
+        fn computes_non_zero_expected_and_maximum_totals() {
+            let estimate = PaymentService::fee_estimate(Ledger::Lightning, 100_000, Some(1_250), 5_000).unwrap();
+
+            assert_eq!(estimate.estimated_fee_msat, Some(1_250));
+            assert_eq!(estimate.maximum_fee_msat, 5_000);
+            assert_eq!(estimate.estimated_total_msat, Some(101_250));
+            assert_eq!(estimate.maximum_total_msat, 105_000);
+        }
+
+        #[test]
+        fn rejects_an_overflowing_maximum_total() {
+            let err = PaymentService::fee_estimate(Ledger::Lightning, u64::MAX, Some(0), 1).unwrap_err();
+
+            assert!(matches!(err, ApplicationError::Data(DataError::Validation(_))));
+        }
+    }
+
+    mod lightning_fee_estimate {
+        use super::*;
+
+        #[tokio::test]
+        async fn returns_provider_route_estimate_and_policy_cap() {
+            let mut ln_client = MockLnClient::new();
+            ln_client.expect_fee_limit_msat().times(1).return_const(5_000_u64);
+            ln_client.expect_estimate_fee().times(1).returning(|_, _| {
+                Ok(LnFeeEstimate {
+                    estimated_fee_msat: 900,
+                })
+            });
+            let service = service(
+                MockAppStoreBuilder::new(),
+                ln_client,
+                MockBitcoinWallet::new(),
+                MockEventUseCases::new(),
+            );
+
+            let estimate = service
+                .lightning_fee_estimate("bolt11".to_string(), None, 100_000)
+                .await
+                .unwrap();
+
+            assert_eq!(estimate.estimated_fee_msat, Some(900));
+            assert_eq!(estimate.maximum_fee_msat, 5_000);
+            assert_eq!(estimate.maximum_total_msat, 105_000);
+        }
+
+        #[tokio::test]
+        async fn falls_back_to_policy_cap_when_route_estimation_fails() {
+            let mut ln_client = MockLnClient::new();
+            ln_client.expect_fee_limit_msat().times(1).return_const(5_000_u64);
+            ln_client
+                .expect_estimate_fee()
+                .times(1)
+                .returning(|_, _| Err(LightningError::Pay("route unavailable".to_string())));
+            let service = service(
+                MockAppStoreBuilder::new(),
+                ln_client,
+                MockBitcoinWallet::new(),
+                MockEventUseCases::new(),
+            );
+
+            let estimate = service
+                .lightning_fee_estimate("bolt11".to_string(), None, 100_000)
+                .await
+                .unwrap();
+
+            assert_eq!(estimate.estimated_fee_msat, None);
+            assert_eq!(estimate.maximum_fee_msat, 5_000);
+            assert_eq!(estimate.maximum_total_msat, 105_000);
+        }
+
+        #[tokio::test]
+        async fn rejects_a_route_estimate_above_the_execution_cap() {
+            let mut ln_client = MockLnClient::new();
+            ln_client.expect_fee_limit_msat().times(1).return_const(5_000_u64);
+            ln_client.expect_estimate_fee().times(1).returning(|_, _| {
+                Ok(LnFeeEstimate {
+                    estimated_fee_msat: 5_001,
+                })
+            });
+            let service = service(
+                MockAppStoreBuilder::new(),
+                ln_client,
+                MockBitcoinWallet::new(),
+                MockEventUseCases::new(),
+            );
+
+            let err = service
+                .lightning_fee_estimate("bolt11".to_string(), None, 100_000)
+                .await
+                .unwrap_err();
+
+            assert!(matches!(err, ApplicationError::Data(DataError::Validation(_))));
+            assert!(err.to_string().contains("exceeds the configured maximum"));
         }
     }
 
@@ -1043,6 +1292,56 @@ mod tests {
                 let network = service.bolt11_network(&invoice);
                 service.ensure_wallet_network(wallet_id, network).await.unwrap();
             }
+        }
+    }
+
+    mod estimate_fee_request {
+        use super::*;
+
+        #[tokio::test]
+        async fn prepares_and_releases_an_onchain_quote() {
+            let wallet_id = Uuid::new_v4();
+            let mut store = MockAppStoreBuilder::new();
+            store.wallet.expect_find().times(1).returning(move |_| {
+                Ok(Some(wallet_with_asset(
+                    wallet_id,
+                    native_btc_asset(BtcNetwork::Bitcoin),
+                )))
+            });
+            store
+                .btc_address
+                .expect_find_by_address()
+                .times(1)
+                .returning(|_| Ok(None));
+
+            let mut bitcoin_wallet = MockBitcoinWallet::new();
+            bitcoin_wallet
+                .expect_prepare_transaction()
+                .withf(|address, amount_sat, fee_rate| {
+                    address == "1BoatSLRHtKNngkdXEeobR76b53LETtpyT" && *amount_sat == 1_000 && fee_rate.is_none()
+                })
+                .times(1)
+                .returning(|_, _, _| Ok(prepared_tx()));
+            bitcoin_wallet
+                .expect_release_prepared_transaction()
+                .withf(|prepared| prepared.txid == "txid")
+                .times(1)
+                .returning(|_| Ok(()));
+
+            let service = service(store, MockLnClient::new(), bitcoin_wallet, MockEventUseCases::new());
+            let estimate = service
+                .estimate_fee(
+                    "1BoatSLRHtKNngkdXEeobR76b53LETtpyT".to_string(),
+                    Some(1_000_000),
+                    None,
+                    wallet_id,
+                )
+                .await
+                .unwrap();
+
+            assert_eq!(estimate.ledger, Ledger::Onchain);
+            assert_eq!(estimate.estimated_fee_msat, Some(10_000));
+            assert_eq!(estimate.maximum_total_msat, 1_010_000);
         }
     }
 
@@ -1648,7 +1947,7 @@ mod tests {
                     .payment_uow
                     .expect_reserve()
                     .withf(|payment, reserve_amount_msat| {
-                        payment.ledger == Ledger::Lightning && *reserve_amount_msat > payment.amount_msat
+                        payment.ledger == Ledger::Lightning && *reserve_amount_msat == 6_000
                     })
                     .times(1)
                     .returning(|payment, _| Ok(payment));
@@ -1660,16 +1959,26 @@ mod tests {
                     .returning(Ok);
 
                 let mut ln_client = MockLnClient::new();
-                ln_client.expect_pay().times(1).returning(|_, _, _| {
-                    Ok(Payment {
-                        status: PaymentStatus::Settled,
-                        lightning: Some(LnPayment {
-                            payment_preimage: Some("preimage".to_string()),
-                            ..Default::default()
-                        }),
-                        ..Default::default()
+                ln_client.expect_fee_limit_msat().times(1).return_const(5_000_u64);
+                ln_client.expect_estimate_fee().times(1).returning(|_, _| {
+                    Ok(LnFeeEstimate {
+                        estimated_fee_msat: 125,
                     })
                 });
+                ln_client
+                    .expect_pay()
+                    .withf(|_, _, fee_limit_msat, _| *fee_limit_msat == 5_000)
+                    .times(1)
+                    .returning(|_, _, _, _| {
+                        Ok(Payment {
+                            status: PaymentStatus::Settled,
+                            lightning: Some(LnPayment {
+                                payment_preimage: Some("preimage".to_string()),
+                                ..Default::default()
+                            }),
+                            ..Default::default()
+                        })
+                    });
 
                 let service = service(store, ln_client, MockBitcoinWallet::new(), MockEventUseCases::new());
 
@@ -1706,10 +2015,16 @@ mod tests {
                     .returning(Ok);
 
                 let mut ln_client = MockLnClient::new();
+                ln_client.expect_fee_limit_msat().times(1).return_const(5_000_u64);
+                ln_client.expect_estimate_fee().times(1).returning(|_, _| {
+                    Ok(LnFeeEstimate {
+                        estimated_fee_msat: 125,
+                    })
+                });
                 ln_client
                     .expect_pay()
                     .times(1)
-                    .returning(|_, _, _| Err(LightningError::Pay("no route".to_string())));
+                    .returning(|_, _, _, _| Err(LightningError::Pay("no route".to_string())));
 
                 let service = service(store, ln_client, MockBitcoinWallet::new(), MockEventUseCases::new());
 

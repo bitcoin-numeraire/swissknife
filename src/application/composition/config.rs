@@ -30,7 +30,6 @@ pub struct AppConfig {
     pub jwt: Option<JwtConfig>,
     #[serde(deserialize_with = "deserialize_duration")]
     pub invoice_expiry: Duration,
-    pub fee_buffer: Option<f64>,
     #[serde(default)]
     pub bitcoin_address_type: BtcAddressType,
     pub ln_provider: LightningProvider,

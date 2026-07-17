@@ -4,8 +4,8 @@ use async_trait::async_trait;
 use bitcoin::{Address, Network, ScriptBuf};
 use chrono::{TimeZone, Utc};
 use cln::{
-    node_client::NodeClient, Amount, Feerate, GetinfoRequest, ListinvoicesRequest, NewaddrRequest, OutputDesc,
-    SetpsbtversionRequest, TxdiscardRequest, TxprepareRequest, TxsendRequest, XpayRequest,
+    node_client::NodeClient, Amount, Feerate, GetinfoRequest, GetroutesRequest, ListinvoicesRequest, NewaddrRequest,
+    OutputDesc, SetpsbtversionRequest, TxdiscardRequest, TxprepareRequest, TxsendRequest, XpayRequest,
 };
 use hex::decode;
 use lightning_invoice::Bolt11Invoice;
@@ -38,8 +38,9 @@ use crate::{
                 listchainmoves_request::ListchainmovesIndex, listpays_pays::ListpaysPaysStatus,
                 newaddr_request::NewaddrAddresstype, DelinvoiceRequest, ListchainmovesRequest, ListpaysRequest,
             },
+            cln_fee_limit_msat, payment_target,
             types::parse_network,
-            LnClient,
+            LnClient, LnFeeEstimate,
         },
     },
 };
@@ -197,14 +198,69 @@ impl LnClient for ClnGrpcClient {
         Ok(crate::infra::lightning::types::invoice_from_bolt11(bolt11))
     }
 
-    async fn pay(&self, bolt11: String, amount_msat: Option<u64>, label: String) -> Result<Payment, LightningError> {
+    async fn estimate_fee(&self, bolt11: String, amount_msat: Option<u64>) -> Result<LnFeeEstimate, LightningError> {
+        let target = payment_target(&bolt11, amount_msat)?;
+        let fee_limit_msat = self.fee_limit_msat(target.amount_msat);
+        let mut client = self.client.clone();
+        let source = client
+            .getinfo(GetinfoRequest {})
+            .await
+            .map_err(|err| LightningError::NodeInfo(err.message().to_string()))?
+            .into_inner()
+            .id;
+        let response = client
+            .get_routes(GetroutesRequest {
+                source,
+                destination: target.destination,
+                amount_msat: Some(Amount {
+                    msat: target.amount_msat,
+                }),
+                layers: vec!["auto.localchans".to_string(), "auto.sourcefree".to_string()],
+                maxfee_msat: Some(Amount { msat: fee_limit_msat }),
+                final_cltv: target.final_cltv_delta,
+                maxparts: Some(1),
+                ..Default::default()
+            })
+            .await
+            .map_err(|err| LightningError::Pay(format!("Failed to estimate route fee: {}", err.message())))?
+            .into_inner();
+        if response.routes.is_empty() {
+            return Err(LightningError::Pay("No route available for fee estimation".to_string()));
+        }
+        let estimated_fee_msat = response.routes.into_iter().try_fold(0_u64, |total, route| {
+            let delivered = route.amount_msat.as_ref().map(|amount| amount.msat).unwrap_or_default();
+            let sent = route
+                .path
+                .first()
+                .and_then(|hop| hop.amount_in_msat.as_ref())
+                .map(|amount| amount.msat)
+                .ok_or_else(|| LightningError::Pay("Estimated route has no first hop amount".to_string()))?;
+            total
+                .checked_add(sent.saturating_sub(delivered))
+                .ok_or_else(|| LightningError::Pay("Estimated route fee overflows".to_string()))
+        })?;
+
+        Ok(LnFeeEstimate { estimated_fee_msat })
+    }
+
+    fn fee_limit_msat(&self, amount_msat: u64) -> u64 {
+        cln_fee_limit_msat(self.maxfee, amount_msat)
+    }
+
+    async fn pay(
+        &self,
+        bolt11: String,
+        amount_msat: Option<u64>,
+        fee_limit_msat: u64,
+        label: String,
+    ) -> Result<Payment, LightningError> {
         let mut client = self.client.clone();
 
         let response = client
             .xpay(XpayRequest {
                 invstring: bolt11,
                 amount_msat: amount_msat.map(|msat| cln::Amount { msat }),
-                maxfee: self.maxfee.map(|msat| cln::Amount { msat }),
+                maxfee: Some(cln::Amount { msat: fee_limit_msat }),
                 retry_for: self.retry_for,
                 label: Some(label),
                 ..Default::default()

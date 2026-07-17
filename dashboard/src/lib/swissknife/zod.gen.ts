@@ -352,6 +352,41 @@ export const zNostrNip05Response = z.object({
 export const zOrderDirection = z.enum(['Asc', 'Desc']);
 
 /**
+ * Fee quote for a prospective outgoing payment.
+ *
+ * `estimated_fee_msat` is the route or transaction fee expected at quote time.
+ * It can be absent when the Lightning node cannot find a graph route while the
+ * configured payment policy still permits an execution attempt. The maximum is
+ * the hard cap passed to the Lightning provider (or the prepared on-chain fee).
+ */
+export const zPaymentFeeEstimate = z.object({
+  amount_msat: z.coerce.bigint().gte(BigInt(0)).max(BigInt('9223372036854775807'), {
+    error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
+  }),
+  estimated_fee_msat: z.coerce
+    .bigint()
+    .gte(BigInt(0))
+    .max(BigInt('9223372036854775807'), {
+      error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
+    })
+    .nullish(),
+  estimated_total_msat: z.coerce
+    .bigint()
+    .gte(BigInt(0))
+    .max(BigInt('9223372036854775807'), {
+      error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
+    })
+    .nullish(),
+  ledger: zLedger,
+  maximum_fee_msat: z.coerce.bigint().gte(BigInt(0)).max(BigInt('9223372036854775807'), {
+    error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
+  }),
+  maximum_total_msat: z.coerce.bigint().gte(BigInt(0)).max(BigInt('9223372036854775807'), {
+    error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
+  }),
+});
+
+/**
  * Lifecycle status of a payment.
  */
 export const zPaymentStatus = z.enum(['Pending', 'Settled', 'Failed']);
@@ -1445,6 +1480,17 @@ export const zWalletPayPath = z.object({
  */
 export const zWalletPayResponse = zPayment;
 
+export const zEstimateWalletPaymentFeeBody = zSendPaymentRequest;
+
+export const zEstimateWalletPaymentFeePath = z.object({
+  wallet_id: z.uuid(),
+});
+
+/**
+ * Fee estimated
+ */
+export const zEstimateWalletPaymentFeeResponse = zPaymentFeeEstimate;
+
 export const zGetWalletPaymentPath = z.object({
   wallet_id: z.uuid(),
   id: z.uuid(),
@@ -1524,6 +1570,13 @@ export const zPayBody = zSendPaymentRequest;
  * Payment Sent
  */
 export const zPayResponse = zPayment;
+
+export const zEstimatePaymentFeeBody = zSendPaymentRequest;
+
+/**
+ * Fee estimated
+ */
+export const zEstimatePaymentFeeResponse = zPaymentFeeEstimate;
 
 export const zDeletePaymentPath = z.object({
   id: z.uuid(),
