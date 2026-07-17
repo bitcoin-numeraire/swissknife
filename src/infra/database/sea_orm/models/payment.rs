@@ -28,6 +28,8 @@ pub struct Model {
     pub btc_address: Option<String>,
     pub btc_block_height: Option<i32>,
     pub reserved_amount: i64,
+    #[sea_orm(column_type = "JsonBinary", nullable)]
+    pub raw_success_action: Option<Json>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

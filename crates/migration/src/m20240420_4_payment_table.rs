@@ -82,4 +82,6 @@ pub(crate) enum Payment {
     BtcBlockHeight,
     // Wallet balance reservations (added in m20260609_143600)
     ReservedAmount,
+    // Raw LNURL success action (added in m20260717_105719)
+    RawSuccessAction,
 }

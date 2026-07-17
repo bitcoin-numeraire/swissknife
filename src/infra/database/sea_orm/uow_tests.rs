@@ -21,6 +21,7 @@ use crate::domains::account::{AccountFilter, AccountRepository, ApiKey, ApiKeyRe
 use crate::domains::event::EventProjectionUnitOfWork;
 use crate::domains::invoice::{Invoice, InvoiceRepository};
 use crate::domains::ln_address::LnAddressRepository;
+use crate::domains::lnurl::LnUrlPaySuccessAction;
 use crate::domains::payment::{LnPayment, Payment, PaymentRepository, PaymentStatus, PaymentUnitOfWork};
 use crate::domains::{asset::AssetRepository, bitcoin::BtcNetwork, wallet::WalletRepository};
 
@@ -142,6 +143,27 @@ fn pending_invoice(wallet_id: Uuid, amount_msat: u64) -> Invoice {
         ledger: Ledger::Internal,
         ..Default::default()
     }
+}
+
+#[tokio::test]
+async fn raw_lnurl_success_action_round_trips_before_settlement() {
+    let conn = connect().await;
+    let wallet_id = seed_wallet(&conn, 10_000).await;
+    let mut payment = pending_payment(wallet_id, 1_000, 0);
+    payment.lightning.as_mut().unwrap().raw_success_action = Some(LnUrlPaySuccessAction::Message {
+        message: "Thanks for the sats".to_string(),
+    });
+
+    let repo = SeaOrmPaymentRepository::new(conn.clone());
+    let stored = repo.insert(payment).await.unwrap();
+    let loaded = repo.find(stored.id).await.unwrap().unwrap();
+
+    assert_eq!(
+        loaded.lightning.unwrap().raw_success_action,
+        Some(LnUrlPaySuccessAction::Message {
+            message: "Thanks for the sats".to_string(),
+        })
+    );
 }
 
 fn uow(conn: &DatabaseConnection) -> SeaOrmPaymentUnitOfWork {
