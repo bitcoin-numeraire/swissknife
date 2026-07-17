@@ -3,30 +3,50 @@
 use sea_orm::entity::prelude::*;
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
-#[sea_orm(table_name = "client_event")]
+#[sea_orm(table_name = "webhook_subscription")]
 pub struct Model {
-    #[sea_orm(primary_key)]
-    pub id: i32,
+    #[sea_orm(primary_key, auto_increment = false)]
+    pub id: Uuid,
+    pub account_id: Uuid,
     pub wallet_id: Uuid,
-    pub event_type: String,
-    pub resource_id: Uuid,
+    #[sea_orm(column_type = "Text")]
+    pub url: String,
     #[sea_orm(column_type = "JsonBinary")]
-    pub payload: Json,
+    pub event_types: Json,
+    #[sea_orm(column_type = "Text")]
+    pub signing_secret: String,
+    pub active: bool,
+    pub last_event_id: i32,
     pub created_at: DateTime,
+    pub updated_at: Option<DateTime>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
     #[sea_orm(
+        belongs_to = "super::account::Entity",
+        from = "Column::AccountId",
+        to = "super::account::Column::Id",
+        on_update = "NoAction",
+        on_delete = "Cascade"
+    )]
+    Account,
+    #[sea_orm(
         belongs_to = "super::wallet::Entity",
-        from = "Column::WalletId",
-        to = "super::wallet::Column::Id",
+        from = "(Column::AccountId, Column::WalletId)",
+        to = "(super::wallet::Column::AccountId, super::wallet::Column::Id)",
         on_update = "NoAction",
         on_delete = "Cascade"
     )]
     Wallet,
     #[sea_orm(has_many = "super::webhook_delivery::Entity")]
     WebhookDelivery,
+}
+
+impl Related<super::account::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::Account.def()
+    }
 }
 
 impl Related<super::wallet::Entity> for Entity {

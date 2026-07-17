@@ -6,15 +6,18 @@ use std::{process::exit, sync::Arc};
 
 #[cfg(debug_assertions)]
 use dotenvy::dotenv;
-use tokio::signal::{
-    ctrl_c,
-    unix::{signal, SignalKind},
+use tokio::{
+    signal::{
+        ctrl_c,
+        unix::{signal, SignalKind},
+    },
+    sync::watch,
 };
 use tracing::{debug, error, info};
 
 use crate::application::composition::{AppAdapters, AppServices};
 use crate::infra::{
-    app::{EventListener, Server},
+    app::{EventListener, Server, WebhookWorker},
     config::config_rs::load_config,
     logging::tracing::setup_tracing,
 };
@@ -63,14 +66,27 @@ async fn main() {
     }
 
     // We start accepting external requests only when everything is synced and ready
+    let (webhook_shutdown_tx, webhook_shutdown_rx) = watch::channel(false);
+    let webhook_worker = WebhookWorker::new(adapters.store.clone()).start(webhook_shutdown_rx);
     let app = Server::new(adapters.clone(), services.clone(), config.dashboard_dir.as_deref());
-    if let Err(err) = app.start(&config.web.addr, shutdown_signal(adapters.clone())).await {
+    if let Err(err) = app
+        .start(
+            &config.web.addr,
+            shutdown_signal(adapters.clone(), webhook_shutdown_tx.clone()),
+        )
+        .await
+    {
+        let _ = webhook_shutdown_tx.send(true);
         error!(%err, "failed to start API server");
         exit(1);
     }
+
+    if let Err(error) = webhook_worker.await {
+        error!(%error, "Webhook delivery worker failed to stop cleanly");
+    }
 }
 
-async fn shutdown_signal(adapters: AppAdapters) {
+async fn shutdown_signal(adapters: AppAdapters, webhook_shutdown: watch::Sender<bool>) {
     let ctrl_c = async {
         if let Err(err) = ctrl_c().await {
             error!(%err, "Failed to install Ctrl+C handler");
@@ -96,6 +112,8 @@ async fn shutdown_signal(adapters: AppAdapters) {
         _ = ctrl_c => {},
         _ = terminate => {},
     }
+
+    let _ = webhook_shutdown.send(true);
 
     if let Err(err) = adapters.ln_client.disconnect().await {
         error!(%err, "Failed to shutdown gracefully");

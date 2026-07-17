@@ -162,6 +162,14 @@ export const zCreateWalletRequest = z.object({
 });
 
 /**
+ * Create a server-to-server webhook for one account-owned wallet.
+ */
+export const zCreateWebhookSubscriptionRequest = z.object({
+  event_types: z.array(zClientEventType),
+  url: z.string(),
+});
+
+/**
  * Application error response
  */
 export const zErrorResponse = z.object({
@@ -493,6 +501,14 @@ export const zRegisterLnAddressRequest = z.object({
 });
 
 /**
+ * Secret rotation response. Subsequent attempts use the new secret; an attempt
+ * already claimed by a worker may still carry the previous signature.
+ */
+export const zRotateWebhookSecretResponse = z.object({
+  signing_secret: z.string(),
+});
+
+/**
  * Send Payment Request
  */
 export const zSendPaymentRequest = z.object({
@@ -569,6 +585,15 @@ export const zUpdateLnAddressRequest = z.object({
 });
 
 /**
+ * Update a webhook endpoint, event filter, or enabled state.
+ */
+export const zUpdateWebhookSubscriptionRequest = z.object({
+  active: z.boolean().nullish(),
+  event_types: z.array(zClientEventType).nullish(),
+  url: z.string().nullish(),
+});
+
+/**
  * App version info.
  */
 export const zVersionInfo = z.object({
@@ -636,6 +661,54 @@ export const zWalletOverview = z.object({
     .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
   updated_at: z.iso.datetime().nullish(),
 });
+
+export const zWebhookDeliveryStatus = z.enum(['Pending', 'Delivered', 'Exhausted']);
+
+/**
+ * Delivery state for webhook observability.
+ */
+export const zWebhookDelivery = z.object({
+  attempt_count: z
+    .int()
+    .gte(0)
+    .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
+  created_at: z.iso.datetime(),
+  delivered_at: z.iso.datetime().nullish(),
+  event_id: z.string(),
+  id: z.uuid(),
+  last_error: z.string().nullish(),
+  response_status: z
+    .int()
+    .gte(0)
+    .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
+    .nullish(),
+  status: zWebhookDeliveryStatus,
+  subscription_id: z.uuid(),
+  updated_at: z.iso.datetime().nullish(),
+});
+
+/**
+ * Webhook configuration. The signing secret is never returned after creation or rotation.
+ */
+export const zWebhookSubscription = z.object({
+  account_id: z.uuid(),
+  active: z.boolean(),
+  created_at: z.iso.datetime(),
+  event_types: z.array(zClientEventType),
+  id: z.uuid(),
+  updated_at: z.iso.datetime().nullish(),
+  url: z.string(),
+  wallet_id: z.uuid(),
+});
+
+/**
+ * Creation response containing the secret exactly once.
+ */
+export const zCreatedWebhookSubscription = zWebhookSubscription.and(
+  z.object({
+    signing_secret: z.string(),
+  })
+);
 
 export const zWellKnownPath = z.object({
   username: z.string(),
@@ -1488,6 +1561,68 @@ export const zGetWalletPaymentPath = z.object({
  * Found
  */
 export const zGetWalletPaymentResponse = zPayment;
+
+export const zListWebhooksPath = z.object({
+  wallet_id: z.uuid(),
+});
+
+/**
+ * Subscriptions
+ */
+export const zListWebhooksResponse = z.array(zWebhookSubscription);
+
+export const zCreateWebhookBody = zCreateWebhookSubscriptionRequest;
+
+export const zCreateWebhookPath = z.object({
+  wallet_id: z.uuid(),
+});
+
+/**
+ * Created; save the signing secret because it is returned only once
+ */
+export const zCreateWebhookResponse = zCreatedWebhookSubscription;
+
+export const zDeleteWebhookPath = z.object({
+  wallet_id: z.uuid(),
+  id: z.uuid(),
+});
+
+/**
+ * Deleted
+ */
+export const zDeleteWebhookResponse = z.void();
+
+export const zUpdateWebhookBody = zUpdateWebhookSubscriptionRequest;
+
+export const zUpdateWebhookPath = z.object({
+  wallet_id: z.uuid(),
+  id: z.uuid(),
+});
+
+/**
+ * Updated
+ */
+export const zUpdateWebhookResponse = zWebhookSubscription;
+
+export const zListWebhookDeliveriesPath = z.object({
+  wallet_id: z.uuid(),
+  id: z.uuid(),
+});
+
+/**
+ * Newest 100 delivery records
+ */
+export const zListWebhookDeliveriesResponse = z.array(zWebhookDelivery);
+
+export const zRotateWebhookSecretPath = z.object({
+  wallet_id: z.uuid(),
+  id: z.uuid(),
+});
+
+/**
+ * Rotated; save the new secret because it is returned only once
+ */
+export const zRotateWebhookSecretResponse2 = zRotateWebhookSecretResponse;
 
 export const zDeletePaymentsQuery = z.object({
   limit: z.coerce
