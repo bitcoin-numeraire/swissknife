@@ -76,7 +76,7 @@ where
     }
 
     async fn insert(&self, payment: Payment) -> Result<Payment, DatabaseError> {
-        let (ln_address, payment_hash, payment_preimage, metadata, success_action) = payment
+        let (ln_address, payment_hash, payment_preimage, metadata, success_action, raw_success_action) = payment
             .lightning
             .as_ref()
             .map(|lightning| {
@@ -89,9 +89,13 @@ where
                         .success_action
                         .clone()
                         .and_then(|action| serde_json::to_value(action).ok()),
+                    lightning
+                        .raw_success_action
+                        .clone()
+                        .and_then(|action| serde_json::to_value(action).ok()),
                 )
             })
-            .unwrap_or((None, None, None, None, None));
+            .unwrap_or((None, None, None, None, None, None));
 
         let (btc_address, btc_txid, block_height) = payment
             .bitcoin
@@ -132,6 +136,7 @@ where
             description: Set(payment.description),
             metadata: Set(metadata),
             success_action: Set(success_action),
+            raw_success_action: Set(raw_success_action),
             payment_preimage: Set(payment_preimage),
             btc_block_height: Set(block_height.map(|h| h as i32)),
             ..Default::default()
@@ -144,7 +149,7 @@ where
     }
 
     async fn update(&self, payment: Payment) -> Result<Payment, DatabaseError> {
-        let (ln_address, payment_hash, payment_preimage, metadata, success_action) = payment
+        let (ln_address, payment_hash, payment_preimage, metadata, success_action, raw_success_action) = payment
             .lightning
             .as_ref()
             .map(|lightning| {
@@ -157,9 +162,13 @@ where
                         .success_action
                         .clone()
                         .and_then(|action| serde_json::to_value(action).ok()),
+                    lightning
+                        .raw_success_action
+                        .clone()
+                        .and_then(|action| serde_json::to_value(action).ok()),
                 )
             })
-            .unwrap_or((None, None, None, None, None));
+            .unwrap_or((None, None, None, None, None, None));
 
         let (btc_address, btc_txid, block_height) = payment
             .bitcoin
@@ -210,6 +219,7 @@ where
             btc_address,
             btc_block_height: Set(block_height.map(|h| h as i32)),
             success_action: Set(success_action),
+            raw_success_action: Set(raw_success_action),
             updated_at: Set(Some(Utc::now().naive_utc())),
             ..Default::default()
         };

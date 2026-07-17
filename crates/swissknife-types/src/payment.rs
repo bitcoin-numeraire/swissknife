@@ -5,7 +5,7 @@ use strum_macros::{Display, EnumString};
 use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
 
-use crate::{Ledger, LnUrlSuccessAction, OrderDirection};
+use crate::{Ledger, LnUrlPaySuccessAction, LnUrlSuccessAction, OrderDirection};
 
 /// An outgoing payment, over Lightning, on-chain, or internal to the instance.
 #[derive(Clone, Debug, Default, Deserialize, Serialize, ToSchema)]
@@ -89,6 +89,10 @@ pub struct LnPayment {
     /// Success Action. Populated when sending to a LNURL or LN Address
     #[serde(skip_serializing_if = "Option::is_none")]
     pub success_action: Option<LnUrlSuccessAction>,
+
+    /// Validated callback action retained internally until the payment preimage is known.
+    #[serde(skip)]
+    pub raw_success_action: Option<LnUrlPaySuccessAction>,
 }
 
 /// On-chain Bitcoin details of a payment.
