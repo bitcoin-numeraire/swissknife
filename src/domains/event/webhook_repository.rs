@@ -42,10 +42,17 @@ pub trait WebhookRepository: Send + Sync {
         locked_until: DateTime<Utc>,
         limit: u64,
     ) -> Result<Vec<ClaimedWebhookDelivery>, DatabaseError>;
-    async fn mark_delivered(&self, id: Uuid, response_status: u16) -> Result<(), DatabaseError>;
+    /// Apply an attempt outcome only if the caller still owns the claimed lease.
+    async fn mark_delivered(
+        &self,
+        id: Uuid,
+        lease_expires_at: DateTime<Utc>,
+        response_status: u16,
+    ) -> Result<(), DatabaseError>;
     async fn mark_failed(
         &self,
         id: Uuid,
+        lease_expires_at: DateTime<Utc>,
         response_status: Option<u16>,
         error: String,
         next_attempt_at: DateTime<Utc>,
