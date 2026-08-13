@@ -41,6 +41,8 @@ The payload is the full public invoice or payment snapshot committed by that tra
 
 A fresh connection starts after the wallet's latest event, so it observes new changes without replaying its entire history. A reconnect sends `Last-Event-ID`; a client that deliberately wants history may send `after`. Events are returned in increasing ID order.
 
+The dashboard retains the last durable event ID outside an individual generated stream instance. It reopens the stream with that cursor after both transport errors and a clean response-body end, covering proxy shutdowns and rolling server restarts that surface as an ordinary EOF rather than a fetch error. Each successful connection also revalidates wallet caches after the server establishes its cursor, closing the snapshot-to-stream handoff window.
+
 The server checks the shared database once per second when a stream is idle. This adds at most one second of delivery latency, works for SQLite and PostgreSQL, and catches events committed by any application replica without requiring replica-local pub/sub. Heartbeats address proxy idle timeouts but are not durable events and carry no ID.
 
 Delivery is at least once: a disconnect after a client receives an event but before it persists the cursor can cause replay. Consumers must use the event ID for deduplication. The dashboard safely responds by revalidating idempotent SWR cache keys.

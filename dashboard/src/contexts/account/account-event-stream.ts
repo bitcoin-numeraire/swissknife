@@ -24,6 +24,16 @@ const WALLET_EVENT_KEY_PREFIXES = new Set([
   'accountWalletPayment',
 ]);
 
+const STREAM_RECONNECT_DELAY_MS = 1_000;
+
+type WalletEventStreamConsumerOptions = {
+  signal: AbortSignal;
+  openStream: (lastEventId: string | undefined) => Promise<AsyncIterable<ClientEvent>>;
+  onEvent: (event: ClientEvent) => Promise<unknown>;
+  onError?: (error: unknown) => void;
+  waitForReconnect?: (signal: AbortSignal) => Promise<void>;
+};
+
 export function isWalletEventCacheKey(key: unknown, walletId: string) {
   if (GLOBAL_EVENT_KEYS.has(key)) return true;
 
@@ -51,6 +61,56 @@ export function createWalletEventFetch(
   };
 }
 
+function reconnectDelay(signal: AbortSignal) {
+  return new Promise<void>((resolve) => {
+    if (signal.aborted) {
+      resolve();
+      return;
+    }
+
+    const onAbort = () => {
+      clearTimeout(timeout);
+      resolve();
+    };
+    const timeout = setTimeout(() => {
+      signal.removeEventListener('abort', onAbort);
+      resolve();
+    }, STREAM_RECONNECT_DELAY_MS);
+
+    signal.addEventListener('abort', onAbort, { once: true });
+  });
+}
+
+export async function consumeWalletEventStreams({
+  signal,
+  openStream,
+  onEvent,
+  onError,
+  waitForReconnect = reconnectDelay,
+}: WalletEventStreamConsumerOptions) {
+  let lastEventId: string | undefined;
+
+  while (!signal.aborted) {
+    try {
+      const stream = await openStream(lastEventId);
+
+      for await (const event of stream) {
+        if (signal.aborted) return;
+
+        lastEventId = event.id;
+        await onEvent(event);
+      }
+    } catch (error) {
+      if (signal.aborted) return;
+      onError?.(error);
+    }
+
+    if (!signal.aborted) {
+      await waitForReconnect(signal);
+    }
+  }
+}
+
 export function useAccountEventStream(walletId: string | undefined, enabled: boolean) {
   const { mutate } = useSWRConfig();
 
@@ -59,34 +119,35 @@ export function useAccountEventStream(walletId: string | undefined, enabled: boo
 
     const controller = new AbortController();
 
-    const consume = async () => {
-      const { stream } = await streamWalletEvents({
-        path: { wallet_id: walletId },
-        signal: controller.signal,
-        fetch: createWalletEventFetch(controller.signal, () =>
-          mutate((key) => isWalletEventCacheKey(key, walletId))
-        ),
-        sseDefaultRetryDelay: 1_000,
-        sseMaxRetryDelay: 30_000,
-        onSseError: (error) => {
-          if (!controller.signal.aborted) {
-            console.warn('Wallet event stream disconnected; reconnecting.', error);
-          }
-        },
-      });
+    void consumeWalletEventStreams({
+      signal: controller.signal,
+      openStream: async (lastEventId) => {
+        const { stream } = await streamWalletEvents({
+          path: { wallet_id: walletId },
+          headers: lastEventId ? { 'Last-Event-ID': lastEventId } : undefined,
+          signal: controller.signal,
+          fetch: createWalletEventFetch(controller.signal, () =>
+            mutate((key) => isWalletEventCacheKey(key, walletId))
+          ),
+          sseDefaultRetryDelay: 1_000,
+          sseMaxRetryDelay: 30_000,
+          onSseError: (error) => {
+            if (!controller.signal.aborted) {
+              console.warn('Wallet event stream disconnected; reconnecting.', error);
+            }
+          },
+        });
 
-      for await (const event of stream) {
-        const clientEvent = event as ClientEvent;
-        if (controller.signal.aborted || clientEvent.wallet_id !== walletId) continue;
-
-        await mutate((key) => isWalletEventCacheKey(key, walletId));
-      }
-    };
-
-    void consume().catch((error) => {
-      if (!controller.signal.aborted) {
-        console.warn('Wallet event stream stopped.', error);
-      }
+        return stream as AsyncIterable<ClientEvent>;
+      },
+      onEvent: async (clientEvent) => {
+        if (clientEvent.wallet_id === walletId) {
+          await mutate((key) => isWalletEventCacheKey(key, walletId));
+        }
+      },
+      onError: (error) => {
+        console.warn('Wallet event stream ended; reconnecting.', error);
+      },
     });
 
     return () => controller.abort();
