@@ -26,7 +26,7 @@
     "tsc:watch": "tsc --noEmit --watch",
     "typecheck": "tsc --noEmit",
     "tsc:print": "npx tsc --showConfig",
-    "openapi-ts": "rm -rf src/lib/swissknife && openapi-ts"
+    "openapi-ts": "rm -rf src/lib/swissknife && openapi-ts && prettier --write \"src/lib/swissknife/**/*.{js,jsx,ts,tsx}\""
   },
   "dependencies": {
     "@auth0/auth0-react": "^2.20.0",
