@@ -7,8 +7,9 @@ use serde_json::json;
 
 use swissknife_types::{
     Account, AccountPreferences, ApiKey, Balance, BtcAddress, Contact, CreateApiKeyRequest, Invoice, LnAddress,
-    NewBtcAddressRequest, NewInvoiceRequest, Payment, PaymentStatus, Permission, RegisterLnAddressRequest,
-    SendPaymentRequest, UpdateAccountPreferencesRequest, UpdateAccountRequest, UpdateLnAddressRequest, Wallet,
+    NewBtcAddressRequest, NewInvoiceRequest, Payment, PaymentFeeEstimate, PaymentStatus, Permission,
+    RegisterLnAddressRequest, SendPaymentRequest, UpdateAccountPreferencesRequest, UpdateAccountRequest,
+    UpdateLnAddressRequest, Wallet,
 };
 
 use crate::common::fixtures::unique;
@@ -310,6 +311,95 @@ mod invoices {
 
 mod payments {
     use super::*;
+
+    #[tokio::test]
+    async fn fee_estimate_requires_authentication() {
+        let app = app().await;
+        let res = app
+            .api()
+            .post(
+                &format!("/v1/me/wallets/{}/payments/fee-estimate", uuid::Uuid::new_v4()),
+                Auth::None,
+                SendPaymentRequest {
+                    wallet_id: None,
+                    input: "not-a-payment".to_string(),
+                    amount_msat: None,
+                    comment: None,
+                },
+            )
+            .await;
+
+        assert_error(&res, StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
+    async fn fee_estimate_rejects_another_accounts_wallet() {
+        let app = app().await;
+        let token = app.admin_token().await;
+        let alice = app.create_account_with_wallet(token, "me-quote-owner").await;
+        let bob = app.create_account_with_wallet(token, "me-quote-other").await;
+        let res = app
+            .api()
+            .post(
+                &format!("/v1/me/wallets/{}/payments/fee-estimate", bob.wallet.id),
+                Auth::ApiKey(&alice.key),
+                SendPaymentRequest {
+                    wallet_id: None,
+                    input: "not-a-payment".to_string(),
+                    amount_msat: None,
+                    comment: None,
+                },
+            )
+            .await;
+
+        assert_error(&res, StatusCode::NOT_FOUND);
+    }
+
+    #[tokio::test]
+    async fn fee_estimate_uses_the_owned_path_wallet_and_ignores_the_body_wallet() {
+        let app = app().await;
+        let token = app.admin_token().await;
+        let payer = app.create_account_with_wallet(token, "me-quote-payer").await;
+        let payee = app.create_account_with_wallet(token, "me-quote-payee").await;
+        let bolt11 = app
+            .api()
+            .post(
+                &format!("/v1/me/wallets/{}/invoices", payee.wallet.id),
+                Auth::ApiKey(&payee.key),
+                NewInvoiceRequest {
+                    wallet_id: None,
+                    amount_msat: 50_000_000,
+                    description: None,
+                    expiry: None,
+                },
+            )
+            .await
+            .parse::<Invoice>()
+            .ln_invoice
+            .expect("a bolt11 invoice")
+            .bolt11;
+
+        let res = app
+            .api()
+            .post(
+                &format!("/v1/me/wallets/{}/payments/fee-estimate", payer.wallet.id),
+                Auth::ApiKey(&payer.key),
+                SendPaymentRequest {
+                    // The account endpoint must use the owned path wallet, not this field.
+                    wallet_id: Some(payee.wallet.id),
+                    input: bolt11,
+                    amount_msat: None,
+                    comment: None,
+                },
+            )
+            .await;
+
+        assert_status(&res, StatusCode::OK);
+        let quote = res.parse::<PaymentFeeEstimate>();
+        assert_eq!(quote.ledger, swissknife_types::Ledger::Internal);
+        assert_eq!(quote.estimated_fee_msat, Some(0));
+        assert_eq!(quote.maximum_fee_msat, 0);
+    }
 
     #[tokio::test]
     async fn rejects_an_unparseable_input() {

@@ -5,8 +5,11 @@
 
 use reqwest::StatusCode;
 
-use swissknife_types::{Invoice, Ledger, NewInvoiceRequest, Payment, PaymentStatus, SendPaymentRequest};
+use swissknife_types::{
+    Invoice, Ledger, NewInvoiceRequest, Payment, PaymentFeeEstimate, PaymentStatus, SendPaymentRequest,
+};
 
+use crate::common::chain;
 use crate::common::counterparty::Counterparty;
 use crate::common::fixtures::unique;
 use crate::common::{app, assert_error, assert_status, Auth, TestApp};
@@ -36,6 +39,109 @@ fn pay(wallet_id: uuid::Uuid, input: String) -> SendPaymentRequest {
         input,
         amount_msat: None,
         comment: None,
+    }
+}
+
+mod fee_estimate {
+    use super::*;
+
+    #[tokio::test]
+    async fn requires_authentication() {
+        let app = app().await;
+        let res = app
+            .api()
+            .post(
+                "/v1/payments/fee-estimate",
+                Auth::None,
+                pay(uuid::Uuid::new_v4(), "not-a-payment".to_string()),
+            )
+            .await;
+
+        assert_error(&res, StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
+    async fn requires_an_explicit_wallet_on_the_admin_endpoint() {
+        let app = app().await;
+        let token = app.admin_token().await;
+        let res = app
+            .api()
+            .post(
+                "/v1/payments/fee-estimate",
+                Auth::Bearer(token),
+                SendPaymentRequest {
+                    wallet_id: None,
+                    input: "not-a-payment".to_string(),
+                    amount_msat: None,
+                    comment: None,
+                },
+            )
+            .await;
+
+        assert_error(&res, StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn rejects_an_unparseable_input() {
+        let app = app().await;
+        let token = app.admin_token().await;
+        let wallet = app.create_wallet(token, "quote-badinput").await;
+        let res = app
+            .api()
+            .post(
+                "/v1/payments/fee-estimate",
+                Auth::Bearer(token),
+                pay(wallet.id, "not-a-payment".to_string()),
+            )
+            .await;
+
+        assert_error(&res, StatusCode::UNPROCESSABLE_ENTITY);
+    }
+
+    #[tokio::test]
+    async fn prepares_and_releases_a_real_onchain_quote_without_creating_a_payment() {
+        let app = app().await;
+        let token = app.admin_token().await;
+        let wallet = app.create_wallet(token, "quote-onchain").await;
+        let address = chain::new_address().await;
+        let amount_msat = 50_000_000;
+        let request = SendPaymentRequest {
+            wallet_id: Some(wallet.id),
+            input: address,
+            amount_msat: Some(amount_msat),
+            comment: None,
+        };
+
+        let first = app
+            .api()
+            .post("/v1/payments/fee-estimate", Auth::Bearer(token), request.clone())
+            .await;
+        assert_status(&first, StatusCode::OK);
+        let first = first.parse::<PaymentFeeEstimate>();
+        assert_eq!(first.ledger, Ledger::Onchain);
+        assert_eq!(first.amount_msat, amount_msat);
+        let fee_msat = first.estimated_fee_msat.expect("on-chain quote has a fee");
+        assert!(fee_msat > 0, "a real prepared transaction has a non-zero fee");
+        assert_eq!(first.maximum_fee_msat, fee_msat);
+        assert_eq!(first.estimated_total_msat, Some(amount_msat + fee_msat));
+        assert_eq!(first.maximum_total_msat, amount_msat + fee_msat);
+
+        // A second quote proves the first prepared transaction was released.
+        let second = app
+            .api()
+            .post("/v1/payments/fee-estimate", Auth::Bearer(token), request)
+            .await;
+        assert_status(&second, StatusCode::OK);
+
+        let payments = app
+            .api()
+            .get(&format!("/v1/payments?wallet_id={}", wallet.id), Auth::Bearer(token))
+            .await;
+        assert_status(&payments, StatusCode::OK);
+        assert!(
+            payments.parse::<Vec<Payment>>().is_empty(),
+            "quoting must not create a payment"
+        );
     }
 }
 

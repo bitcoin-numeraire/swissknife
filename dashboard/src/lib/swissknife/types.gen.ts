@@ -880,6 +880,41 @@ export type Payment = {
 };
 
 /**
+ * Fee quote for a prospective outgoing payment.
+ *
+ * `estimated_fee_msat` is the route or transaction fee expected at quote time.
+ * It can be absent when the Lightning node cannot find a graph route while the
+ * configured payment policy still permits an execution attempt. The maximum is
+ * the hard cap passed to the Lightning provider (or the prepared on-chain fee).
+ */
+export type PaymentFeeEstimate = {
+  /**
+   * Amount delivered to the recipient, in millisatoshis.
+   */
+  amount_msat: number;
+  /**
+   * Provider-derived fee expected at quote time, in millisatoshis.
+   */
+  estimated_fee_msat?: number | null;
+  /**
+   * Expected amount plus fee, in millisatoshis.
+   */
+  estimated_total_msat?: number | null;
+  /**
+   * Ledger selected for this payment input.
+   */
+  ledger: Ledger;
+  /**
+   * Lightning execution cap or current prepared on-chain fee, in millisatoshis.
+   */
+  maximum_fee_msat: number;
+  /**
+   * Amount plus the Lightning cap or current on-chain fee, in millisatoshis.
+   */
+  maximum_total_msat: number;
+};
+
+/**
  * Lifecycle status of a payment.
  */
 export const PaymentStatus = {
@@ -4032,6 +4067,51 @@ export type WalletPayResponses = {
 
 export type WalletPayResponse = WalletPayResponses[keyof WalletPayResponses];
 
+export type EstimateWalletPaymentFeeData = {
+  body: SendPaymentRequest;
+  path: {
+    wallet_id: string;
+  };
+  query?: never;
+  url: '/v1/me/wallets/{wallet_id}/payments/fee-estimate';
+};
+
+export type EstimateWalletPaymentFeeErrors = {
+  /**
+   * Bad Request
+   */
+  400: ErrorResponse;
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Not Found
+   */
+  404: ErrorResponse;
+  /**
+   * Unprocessable Entity
+   */
+  422: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
+
+export type EstimateWalletPaymentFeeError =
+  EstimateWalletPaymentFeeErrors[keyof EstimateWalletPaymentFeeErrors];
+
+export type EstimateWalletPaymentFeeResponses = {
+  /**
+   * Fee estimated
+   */
+  200: PaymentFeeEstimate;
+};
+
+export type EstimateWalletPaymentFeeResponse =
+  EstimateWalletPaymentFeeResponses[keyof EstimateWalletPaymentFeeResponses];
+
 export type GetWalletPaymentData = {
   body?: never;
   path: {
@@ -4260,6 +4340,48 @@ export type PayResponses = {
 };
 
 export type PayResponse = PayResponses[keyof PayResponses];
+
+export type EstimatePaymentFeeData = {
+  body: SendPaymentRequest;
+  path?: never;
+  query?: never;
+  url: '/v1/payments/fee-estimate';
+};
+
+export type EstimatePaymentFeeErrors = {
+  /**
+   * Bad Request
+   */
+  400: ErrorResponse;
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Forbidden
+   */
+  403: ErrorResponse;
+  /**
+   * Unprocessable Entity
+   */
+  422: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
+
+export type EstimatePaymentFeeError = EstimatePaymentFeeErrors[keyof EstimatePaymentFeeErrors];
+
+export type EstimatePaymentFeeResponses = {
+  /**
+   * Fee estimated
+   */
+  200: PaymentFeeEstimate;
+};
+
+export type EstimatePaymentFeeResponse =
+  EstimatePaymentFeeResponses[keyof EstimatePaymentFeeResponses];
 
 export type DeletePaymentData = {
   body?: never;

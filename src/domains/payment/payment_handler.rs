@@ -27,13 +27,14 @@ use crate::{
     infra::axum::{Json, Path},
 };
 
-use super::{BtcPayment, InternalPayment, LnPayment, Payment, PaymentFilter, PaymentStatus};
+use super::{BtcPayment, InternalPayment, LnPayment, Payment, PaymentFeeEstimate, PaymentFilter, PaymentStatus};
 
 #[derive(OpenApi)]
 #[openapi(
-    paths(pay, get_payment, list_payments, delete_payment, delete_payments),
+    paths(estimate_payment_fee, pay, get_payment, list_payments, delete_payment, delete_payments),
     components(schemas(
         Payment,
+        PaymentFeeEstimate,
         LnPayment,
         BtcPayment,
         InternalPayment,
@@ -50,11 +51,47 @@ pub const CONTEXT_PATH: &str = "/v1/payments";
 
 pub fn router() -> Router<Arc<AppServices>> {
     Router::new()
+        .route("/fee-estimate", post(estimate_payment_fee))
         .route("/", post(pay))
         .route("/", get(list_payments))
         .route("/{id}", get(get_payment))
         .route("/{id}", delete(delete_payment))
         .route("/", delete(delete_payments))
+}
+
+/// Estimate an outgoing payment fee
+///
+/// Returns the provider-derived expected fee and the hard maximum used during payment execution.
+#[utoipa::path(
+    post,
+    path = "/fee-estimate",
+    tag = "Payments",
+    context_path = CONTEXT_PATH,
+    request_body = SendPaymentRequest,
+    responses(
+        (status = 200, description = "Fee estimated", body = PaymentFeeEstimate),
+        (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
+        (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
+        (status = 403, description = "Forbidden", body = ErrorResponse, example = json!(FORBIDDEN_EXAMPLE)),
+        (status = 422, description = "Unprocessable Entity", body = ErrorResponse, example = json!(UNPROCESSABLE_EXAMPLE)),
+        (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
+    )
+)]
+async fn estimate_payment_fee(
+    State(services): State<Arc<AppServices>>,
+    user: User,
+    Json(payload): Json<SendPaymentRequest>,
+) -> Result<Json<PaymentFeeEstimate>, ApplicationError> {
+    user.check_permission(Permission::WriteTransaction)?;
+    let wallet_id = payload
+        .wallet_id
+        .ok_or_else(|| DataError::Malformed("wallet_id is required.".to_string()))?;
+    let estimate = services
+        .payment
+        .estimate_fee(payload.input, payload.amount_msat, payload.comment, wallet_id)
+        .await?;
+
+    Ok(Json(estimate))
 }
 
 /// Send a payment
@@ -225,6 +262,57 @@ mod tests {
             input: "bob@numeraire.tech".to_string(),
             amount_msat: Some(1_000),
             comment: None,
+        }
+    }
+
+    fn fee_estimate() -> PaymentFeeEstimate {
+        PaymentFeeEstimate {
+            ledger: crate::application::composition::Ledger::Lightning,
+            amount_msat: 1_000,
+            estimated_fee_msat: Some(10),
+            maximum_fee_msat: 100,
+            estimated_total_msat: Some(1_010),
+            maximum_total_msat: 1_100,
+        }
+    }
+
+    mod estimate_payment_fee {
+        use super::*;
+
+        #[tokio::test]
+        async fn requires_write_transaction_permission() {
+            let services = MockAppServicesBuilder::new().build();
+
+            let result = estimate_payment_fee(
+                State(Arc::new(services)),
+                user(vec![]),
+                Json(send_request(Uuid::new_v4())),
+            )
+            .await;
+
+            assert!(matches!(result, Err(ApplicationError::Authorization(_))));
+        }
+
+        #[tokio::test]
+        async fn estimates_for_the_explicit_wallet() {
+            let wallet_id = Uuid::new_v4();
+            let mut builder = MockAppServicesBuilder::new();
+            builder
+                .payment
+                .expect_estimate_fee()
+                .withf(move |_, _, _, selected_wallet_id| *selected_wallet_id == wallet_id)
+                .times(1)
+                .returning(|_, _, _, _| Ok(fee_estimate()));
+
+            let result = estimate_payment_fee(
+                State(Arc::new(builder.build())),
+                user(vec![Permission::WriteTransaction]),
+                Json(send_request(wallet_id)),
+            )
+            .await
+            .unwrap();
+
+            assert_eq!(result.0.maximum_fee_msat, 100);
         }
     }
 

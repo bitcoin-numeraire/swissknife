@@ -30,7 +30,7 @@ use crate::{
             OnchainTransaction,
         },
         invoice::{Invoice, InvoiceStatus},
-        payment::{LnPayment, Payment, PaymentStatus},
+        payment::{LnPayment, LnPaymentTarget, Payment, PaymentStatus},
         system::HealthStatus,
     },
     infra::{
@@ -331,11 +331,36 @@ impl LnClient for LndGrpcClient {
         Ok(crate::infra::lightning::types::invoice_from_bolt11(bolt11))
     }
 
-    async fn pay(&self, bolt11: String, amount_msat: Option<u64>, _label: String) -> Result<Payment, LightningError> {
+    async fn estimate_fee(&self, target: LnPaymentTarget) -> Result<u64, LightningError> {
+        let mut router = self.router.clone();
+        let response = router
+            .estimate_route_fee(routerrpc::RouteFeeRequest {
+                dest: target.destination,
+                amt_sat: target.amount_msat.div_ceil(1000) as i64,
+                ..Default::default()
+            })
+            .await
+            .map_err(|err| LightningError::EstimateFee(err.message().to_string()))?
+            .into_inner();
+
+        Ok((response.routing_fee_msat as u64).min(self.fee_limit_msat(target.amount_msat)))
+    }
+
+    fn fee_limit_msat(&self, _amount_msat: u64) -> u64 {
+        self.fee_limit_msat
+    }
+
+    async fn pay(
+        &self,
+        bolt11: String,
+        amount_msat: Option<u64>,
+        fee_limit_msat: u64,
+        _label: String,
+    ) -> Result<Payment, LightningError> {
         let request = routerrpc::SendPaymentRequest {
             payment_request: bolt11,
             amt_msat: amount_msat.map(|v| v as i64).unwrap_or_default(),
-            fee_limit_msat: self.fee_limit_msat as i64,
+            fee_limit_msat: fee_limit_msat as i64,
             timeout_seconds: self.payment_timeout.as_secs() as i32,
             no_inflight_updates: true,
             ..Default::default()

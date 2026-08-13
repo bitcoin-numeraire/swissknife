@@ -21,7 +21,7 @@ use crate::{
             BtcPreparedTransaction, BtcTransaction, OnchainSyncBatch, OnchainSyncCursor, OnchainTransaction,
         },
         invoice::Invoice,
-        payment::{LnPayment, Payment, PaymentStatus},
+        payment::{LnPayment, LnPaymentTarget, Payment, PaymentStatus},
         system::HealthStatus,
     },
     infra::{
@@ -266,11 +266,36 @@ impl LnClient for LndRestClient {
         Ok(response.into())
     }
 
-    async fn pay(&self, bolt11: String, amount_msat: Option<u64>, _label: String) -> Result<Payment, LightningError> {
+    async fn estimate_fee(&self, target: LnPaymentTarget) -> Result<u64, LightningError> {
+        let response: RouteFeeResponse = self
+            .post_request(
+                "v2/router/route/estimatefee",
+                &RouteFeeRequest {
+                    dest: STANDARD.encode(target.destination),
+                    amt_sat: target.amount_msat.div_ceil(1000).to_string(),
+                },
+            )
+            .await
+            .map_err(|err| LightningError::EstimateFee(err.to_string()))?;
+
+        Ok(response.routing_fee_msat.min(self.fee_limit_msat(target.amount_msat)))
+    }
+
+    fn fee_limit_msat(&self, _amount_msat: u64) -> u64 {
+        self.fee_limit_msat
+    }
+
+    async fn pay(
+        &self,
+        bolt11: String,
+        amount_msat: Option<u64>,
+        fee_limit_msat: u64,
+        _label: String,
+    ) -> Result<Payment, LightningError> {
         let payload = PayRequest {
             payment_request: bolt11,
             amt_msat: amount_msat,
-            fee_limit_msat: self.fee_limit_msat,
+            fee_limit_msat,
             timeout_seconds: self.retry_for,
             no_inflight_updates: true,
         };

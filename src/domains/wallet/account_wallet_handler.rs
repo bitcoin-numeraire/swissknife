@@ -10,8 +10,8 @@ use uuid::Uuid;
 
 use swissknife_types::{
     Account, AccountPreferences, CreateApiKeyRequest, CreateWalletRequest, ErrorResponse, NewBtcAddressRequest,
-    NewInvoiceRequest, RegisterLnAddressRequest, SendPaymentRequest, UpdateAccountPreferencesRequest,
-    UpdateAccountRequest, UpdateLnAddressRequest,
+    NewInvoiceRequest, PaymentFeeEstimate, RegisterLnAddressRequest, SendPaymentRequest,
+    UpdateAccountPreferencesRequest, UpdateAccountRequest, UpdateLnAddressRequest,
 };
 
 use crate::{
@@ -59,6 +59,7 @@ use super::{Balance, Contact, Wallet, WalletFilter};
         get_wallet_invoice,
         delete_expired_invoices,
         wallet_pay,
+        estimate_wallet_payment_fee,
         list_wallet_payments,
         get_wallet_payment,
         delete_failed_payments,
@@ -76,6 +77,7 @@ use super::{Balance, Contact, Wallet, WalletFilter};
         LnAddress,
         BtcAddress,
         SendPaymentRequest,
+        PaymentFeeEstimate,
         NewInvoiceRequest,
         NewBtcAddressRequest,
         CreateApiKeyRequest,
@@ -114,6 +116,10 @@ pub fn account_router() -> Router<Arc<AppServices>> {
         .route("/wallets/{wallet_id}/invoices/{id}", get(get_wallet_invoice))
         .route("/wallets/{wallet_id}/invoices", delete(delete_expired_invoices))
         .route("/wallets/{wallet_id}/payments", post(wallet_pay))
+        .route(
+            "/wallets/{wallet_id}/payments/fee-estimate",
+            post(estimate_wallet_payment_fee),
+        )
         .route("/wallets/{wallet_id}/payments", get(list_wallet_payments))
         .route("/wallets/{wallet_id}/payments/{id}", get(get_wallet_payment))
         .route("/wallets/{wallet_id}/payments", delete(delete_failed_payments))
@@ -374,6 +380,37 @@ async fn wallet_pay(
         .await?;
 
     Ok(Json(payment))
+}
+
+/// Estimate a payment fee for an account-owned wallet.
+#[utoipa::path(
+    post,
+    path = "/wallets/{wallet_id}/payments/fee-estimate",
+    tag = "Me",
+    context_path = CONTEXT_PATH,
+    request_body = SendPaymentRequest,
+    responses(
+        (status = 200, description = "Fee estimated", body = PaymentFeeEstimate),
+        (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
+        (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
+        (status = 404, description = "Not Found", body = ErrorResponse, example = json!(NOT_FOUND_EXAMPLE)),
+        (status = 422, description = "Unprocessable Entity", body = ErrorResponse, example = json!(UNPROCESSABLE_EXAMPLE)),
+        (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
+    )
+)]
+async fn estimate_wallet_payment_fee(
+    State(services): State<Arc<AppServices>>,
+    user: User,
+    Path(wallet_id): Path<Uuid>,
+    Json(payload): Json<SendPaymentRequest>,
+) -> Result<Json<PaymentFeeEstimate>, ApplicationError> {
+    services.wallet.verify_ownership(user.account_id, wallet_id).await?;
+    let estimate = services
+        .payment
+        .estimate_fee(payload.input, payload.amount_msat, payload.comment, wallet_id)
+        .await?;
+
+    Ok(Json(estimate))
 }
 
 /// Get wallet balance.
@@ -955,6 +992,17 @@ mod tests {
         }
     }
 
+    fn fee_estimate() -> PaymentFeeEstimate {
+        PaymentFeeEstimate {
+            ledger: crate::application::composition::Ledger::Lightning,
+            amount_msat: 1_000,
+            estimated_fee_msat: Some(10),
+            maximum_fee_msat: 100,
+            estimated_total_msat: Some(1_010),
+            maximum_total_msat: 1_100,
+        }
+    }
+
     mod update_account {
         use super::*;
 
@@ -1078,6 +1126,78 @@ mod tests {
 
             let result =
                 super::wallet_pay(State(Arc::new(builder.build())), caller, Path(wallet_id), Json(payload)).await;
+
+            assert!(matches!(result, Err(ApplicationError::Data(_))));
+        }
+    }
+
+    mod estimate_wallet_payment_fee {
+        use super::*;
+
+        #[tokio::test]
+        async fn uses_the_path_wallet_after_ownership_check() {
+            let caller = user();
+            let account_id = caller.account_id;
+            let wallet_id = Uuid::new_v4();
+
+            let mut builder = MockAppServicesBuilder::new();
+            builder
+                .wallet
+                .expect_verify_ownership()
+                .withf(move |account, id| *account == account_id && *id == wallet_id)
+                .times(1)
+                .returning(|_, _| Ok(()));
+            builder
+                .payment
+                .expect_estimate_fee()
+                .withf(move |_, _, _, id| *id == wallet_id)
+                .times(1)
+                .returning(|_, _, _, _| Ok(fee_estimate()));
+
+            let payload = SendPaymentRequest {
+                wallet_id: Some(Uuid::new_v4()),
+                input: "bob@numeraire.tech".to_string(),
+                amount_msat: Some(1_000),
+                comment: None,
+            };
+
+            let result = super::estimate_wallet_payment_fee(
+                State(Arc::new(builder.build())),
+                caller,
+                Path(wallet_id),
+                Json(payload),
+            )
+            .await
+            .unwrap();
+
+            assert_eq!(result.0.maximum_fee_msat, 100);
+        }
+
+        #[tokio::test]
+        async fn rejects_wallets_outside_the_account_scope() {
+            let caller = user();
+            let wallet_id = Uuid::new_v4();
+            let mut builder = MockAppServicesBuilder::new();
+            builder
+                .wallet
+                .expect_verify_ownership()
+                .times(1)
+                .returning(|_, _| Err(DataError::NotFound("Wallet not found.".to_string()).into()));
+
+            let payload = SendPaymentRequest {
+                wallet_id: None,
+                input: "bob@numeraire.tech".to_string(),
+                amount_msat: Some(1_000),
+                comment: None,
+            };
+
+            let result = super::estimate_wallet_payment_fee(
+                State(Arc::new(builder.build())),
+                caller,
+                Path(wallet_id),
+                Json(payload),
+            )
+            .await;
 
             assert!(matches!(result, Err(ApplicationError::Data(_))));
         }

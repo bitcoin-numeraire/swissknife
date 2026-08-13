@@ -4,8 +4,8 @@ use async_trait::async_trait;
 use bitcoin::{Address, Network, ScriptBuf};
 use chrono::{TimeZone, Utc};
 use cln::{
-    node_client::NodeClient, Amount, Feerate, GetinfoRequest, ListinvoicesRequest, NewaddrRequest, OutputDesc,
-    SetpsbtversionRequest, TxdiscardRequest, TxprepareRequest, TxsendRequest, XpayRequest,
+    node_client::NodeClient, Amount, Feerate, GetinfoRequest, GetroutesRequest, ListinvoicesRequest, NewaddrRequest,
+    OutputDesc, SetpsbtversionRequest, TxdiscardRequest, TxprepareRequest, TxsendRequest, XpayRequest,
 };
 use hex::decode;
 use lightning_invoice::Bolt11Invoice;
@@ -25,7 +25,7 @@ use crate::{
         },
         event::OnchainWithdrawalEvent,
         invoice::Invoice,
-        payment::{LnPayment, Payment, PaymentStatus},
+        payment::{LnPayment, LnPaymentTarget, Payment, PaymentStatus},
         system::HealthStatus,
     },
     infra::{
@@ -68,6 +68,7 @@ const DEFAULT_CA_CRT_FILENAME: &str = "ca.pem";
 
 pub struct ClnGrpcClient {
     client: NodeClient<Channel>,
+    node_id: Vec<u8>,
     maxfee: Option<u64>,
     retry_for: Option<u32>,
     network: BtcNetwork,
@@ -75,19 +76,20 @@ pub struct ClnGrpcClient {
 
 impl ClnGrpcClient {
     pub async fn new(config: ClnClientConfig) -> Result<Self, LightningError> {
-        let client = Self::connect(&config).await?;
+        let mut client = Self::connect(&config).await?;
+        let node = client
+            .getinfo(GetinfoRequest {})
+            .await
+            .map_err(|e| LightningError::NodeInfo(e.message().to_string()))?
+            .into_inner();
 
-        let mut cln_client = Self {
-            client: client.clone(),
+        Ok(Self {
+            client,
+            node_id: node.id,
             maxfee: config.maxfee,
             retry_for: Some(config.payment_timeout.as_secs() as u32),
-            network: BtcNetwork::default(),
-        };
-
-        let network = cln_client.network().await?;
-        cln_client.network = network;
-
-        Ok(cln_client)
+            network: parse_network(&node.network),
+        })
     }
 
     pub async fn connect(config: &ClnClientConfig) -> Result<NodeClient<Channel>, LightningError> {
@@ -148,17 +150,6 @@ impl ClnGrpcClient {
 
         Ok((identity, ca_certificate))
     }
-
-    async fn network(&self) -> Result<BtcNetwork, LightningError> {
-        let mut client = self.client.clone();
-        let response = client
-            .getinfo(GetinfoRequest {})
-            .await
-            .map_err(|e| LightningError::NodeInfo(e.message().to_string()))?
-            .into_inner();
-
-        Ok(parse_network(&response.network))
-    }
 }
 
 #[async_trait]
@@ -197,14 +188,64 @@ impl LnClient for ClnGrpcClient {
         Ok(crate::infra::lightning::types::invoice_from_bolt11(bolt11))
     }
 
-    async fn pay(&self, bolt11: String, amount_msat: Option<u64>, label: String) -> Result<Payment, LightningError> {
+    async fn estimate_fee(&self, target: LnPaymentTarget) -> Result<u64, LightningError> {
+        let fee_limit_msat = self.fee_limit_msat(target.amount_msat);
+        let mut client = self.client.clone();
+        let response = client
+            .get_routes(GetroutesRequest {
+                source: self.node_id.clone(),
+                destination: target.destination,
+                amount_msat: Some(Amount {
+                    msat: target.amount_msat,
+                }),
+                layers: vec!["auto.localchans".to_string(), "auto.sourcefree".to_string()],
+                maxfee_msat: Some(Amount { msat: fee_limit_msat }),
+                final_cltv: target.final_cltv_delta,
+                ..Default::default()
+            })
+            .await
+            .map_err(|err| LightningError::EstimateFee(err.message().to_string()))?
+            .into_inner();
+        if response.routes.is_empty() {
+            return Err(LightningError::EstimateFee("No route available".to_string()));
+        }
+
+        let estimated_fee_msat = response.routes.iter().try_fold(0_u64, |total, route| {
+            let delivered =
+                route.amount_msat.as_ref().map(|amount| amount.msat).ok_or_else(|| {
+                    LightningError::EstimateFee("Estimated route has no delivered amount".to_string())
+                })?;
+            let sent = route
+                .path
+                .first()
+                .and_then(|hop| hop.amount_in_msat.as_ref())
+                .map(|amount| amount.msat)
+                .ok_or_else(|| LightningError::EstimateFee("Estimated route has no first hop amount".to_string()))?;
+
+            Ok(total.saturating_add(sent.saturating_sub(delivered)))
+        })?;
+
+        Ok(estimated_fee_msat.min(fee_limit_msat))
+    }
+
+    fn fee_limit_msat(&self, amount_msat: u64) -> u64 {
+        self.maxfee.unwrap_or_else(|| amount_msat.div_ceil(100).max(5_000))
+    }
+
+    async fn pay(
+        &self,
+        bolt11: String,
+        amount_msat: Option<u64>,
+        fee_limit_msat: u64,
+        label: String,
+    ) -> Result<Payment, LightningError> {
         let mut client = self.client.clone();
 
         let response = client
             .xpay(XpayRequest {
                 invstring: bolt11,
                 amount_msat: amount_msat.map(|msat| cln::Amount { msat }),
-                maxfee: self.maxfee.map(|msat| cln::Amount { msat }),
+                maxfee: Some(cln::Amount { msat: fee_limit_msat }),
                 retry_for: self.retry_for,
                 label: Some(label),
                 ..Default::default()

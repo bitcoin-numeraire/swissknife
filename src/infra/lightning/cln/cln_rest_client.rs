@@ -23,7 +23,7 @@ use crate::{
         },
         event::OnchainWithdrawalEvent,
         invoice::Invoice,
-        payment::{LnPayment, Payment, PaymentStatus},
+        payment::{LnPayment, LnPaymentTarget, Payment, PaymentStatus},
         system::HealthStatus,
     },
     infra::{
@@ -33,12 +33,12 @@ use crate::{
 };
 
 use super::{
-    DelInvoiceRequest, DelInvoiceResponse, ErrorResponse, GetinfoRequest, GetinfoResponse, InvoiceRequest,
-    InvoiceResponse, ListChainMovesRequest, ListChainMovesResponse, ListFundsRequest, ListInvoicesRequest,
-    ListInvoicesResponse, ListPaysRequest, ListPaysResponse, ListTransactionsRequest, ListTransactionsResponse,
-    NewAddrRequest, NewAddrResponse, SetPsbtVersionRequest, SetPsbtVersionResponse, TxDiscardRequest,
-    TxDiscardResponse, TxPrepareOutput, TxPrepareRequest, TxPrepareResponse, TxSendRequest, TxSendResponse,
-    XpayRequest, XpayResponse,
+    DelInvoiceRequest, DelInvoiceResponse, ErrorResponse, GetRoutesRequest, GetRoutesResponse, GetinfoRequest,
+    GetinfoResponse, InvoiceRequest, InvoiceResponse, ListChainMovesRequest, ListChainMovesResponse, ListFundsRequest,
+    ListInvoicesRequest, ListInvoicesResponse, ListPaysRequest, ListPaysResponse, ListTransactionsRequest,
+    ListTransactionsResponse, NewAddrRequest, NewAddrResponse, SetPsbtVersionRequest, SetPsbtVersionResponse,
+    TxDiscardRequest, TxDiscardResponse, TxPrepareOutput, TxPrepareRequest, TxPrepareResponse, TxSendRequest,
+    TxSendResponse, XpayRequest, XpayResponse,
 };
 
 #[derive(Clone, Debug, Deserialize)]
@@ -67,6 +67,7 @@ pub struct ClnRestClientConfig {
 pub struct ClnRestClient {
     client: Client,
     base_url: String,
+    node_id: String,
     maxfee: Option<u64>,
     retry_for: Option<u32>,
     network: BtcNetwork,
@@ -106,13 +107,15 @@ impl ClnRestClient {
         let mut cln_client = Self {
             client,
             base_url: config.endpoint.clone(),
+            node_id: String::new(),
             maxfee: config.maxfee,
             retry_for: Some(config.payment_timeout.as_secs() as u32),
             network: BtcNetwork::default(),
         };
 
-        let network = cln_client.network().await?;
-        cln_client.network = network;
+        let node = cln_client.node_info().await?;
+        cln_client.network = parse_network(&node.network);
+        cln_client.node_id = node.id;
 
         Ok(cln_client)
     }
@@ -146,13 +149,10 @@ impl ClnRestClient {
         Ok(result)
     }
 
-    async fn network(&self) -> Result<BtcNetwork, LightningError> {
-        let response: GetinfoResponse = self
-            .post_request("getinfo", &GetinfoRequest {})
+    async fn node_info(&self) -> Result<GetinfoResponse, LightningError> {
+        self.post_request("getinfo", &GetinfoRequest {})
             .await
-            .map_err(|e| LightningError::NodeInfo(e.to_string()))?;
-
-        Ok(parse_network(&response.network))
+            .map_err(|e| LightningError::NodeInfo(e.to_string()))
     }
 }
 
@@ -189,14 +189,56 @@ impl LnClient for ClnRestClient {
         Ok(crate::infra::lightning::types::invoice_from_bolt11(bolt11))
     }
 
-    async fn pay(&self, bolt11: String, amount_msat: Option<u64>, label: String) -> Result<Payment, LightningError> {
+    async fn estimate_fee(&self, target: LnPaymentTarget) -> Result<u64, LightningError> {
+        let fee_limit_msat = self.fee_limit_msat(target.amount_msat);
+        let response: GetRoutesResponse = self
+            .post_request(
+                "getroutes",
+                &GetRoutesRequest {
+                    source: self.node_id.clone(),
+                    destination: hex::encode(target.destination),
+                    amount_msat: target.amount_msat,
+                    layers: vec!["auto.localchans".to_string(), "auto.sourcefree".to_string()],
+                    maxfee_msat: fee_limit_msat,
+                    final_cltv: target.final_cltv_delta,
+                },
+            )
+            .await
+            .map_err(|err| LightningError::EstimateFee(err.to_string()))?;
+        if response.routes.is_empty() {
+            return Err(LightningError::EstimateFee("No route available".to_string()));
+        }
+
+        let estimated_fee_msat = response.routes.iter().try_fold(0_u64, |total, route| {
+            let sent =
+                route.path.first().and_then(|hop| hop.amount_in_msat).ok_or_else(|| {
+                    LightningError::EstimateFee("Estimated route has no first hop amount".to_string())
+                })?;
+
+            Ok(total.saturating_add(sent.saturating_sub(route.amount_msat)))
+        })?;
+
+        Ok(estimated_fee_msat.min(fee_limit_msat))
+    }
+
+    fn fee_limit_msat(&self, amount_msat: u64) -> u64 {
+        self.maxfee.unwrap_or_else(|| amount_msat.div_ceil(100).max(5_000))
+    }
+
+    async fn pay(
+        &self,
+        bolt11: String,
+        amount_msat: Option<u64>,
+        fee_limit_msat: u64,
+        label: String,
+    ) -> Result<Payment, LightningError> {
         let response: XpayResponse = self
             .post_request(
                 "xpay",
                 &XpayRequest {
                     invstring: bolt11,
                     amount_msat,
-                    maxfee: self.maxfee,
+                    maxfee: Some(fee_limit_msat),
                     retry_for: self.retry_for,
                     label: Some(label),
                 },

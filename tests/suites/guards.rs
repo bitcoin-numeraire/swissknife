@@ -84,6 +84,17 @@ async fn every_admin_endpoint_enforces_its_permission() {
             comment: None,
         }),
     ));
+    cases.push((
+        Method::POST,
+        "/v1/payments/fee-estimate".to_string(),
+        Permission::WriteTransaction,
+        body(SendPaymentRequest {
+            wallet_id: Some(uuid::Uuid::new_v4()),
+            input: "guard".to_string(),
+            amount_msat: None,
+            comment: None,
+        }),
+    ));
 
     cases.extend(crud(
         "/v1/api-keys",

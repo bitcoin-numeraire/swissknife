@@ -3,11 +3,18 @@ use uuid::Uuid;
 
 use crate::application::errors::ApplicationError;
 
-use super::{Payment, PaymentFilter};
+use super::{Payment, PaymentFeeEstimate, PaymentFilter};
 
 #[cfg_attr(test, mockall::automock)]
 #[async_trait]
 pub trait PaymentsUseCases: Send + Sync {
+    async fn estimate_fee(
+        &self,
+        input: String,
+        amount_msat: Option<u64>,
+        comment: Option<String>,
+        wallet_id: Uuid,
+    ) -> Result<PaymentFeeEstimate, ApplicationError>;
     async fn pay(
         &self,
         input: String,

@@ -2,8 +2,8 @@
 export default {
   input: 'src/lib/openapi.json',
   output: {
-    format: 'prettier',
     path: 'src/lib/swissknife',
+    postProcess: ['prettier'],
   },
   plugins: [
     '@hey-api/client-fetch',

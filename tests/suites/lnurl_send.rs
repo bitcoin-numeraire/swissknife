@@ -13,7 +13,7 @@
 use reqwest::StatusCode;
 use serde_json::json;
 
-use swissknife_types::{Ledger, Payment, PaymentStatus, SendPaymentRequest};
+use swissknife_types::{Ledger, Payment, PaymentFeeEstimate, PaymentStatus, SendPaymentRequest};
 
 use crate::common::counterparty::Counterparty;
 use crate::common::fixtures::unique;
@@ -55,6 +55,23 @@ mod pay {
         mock.mount_callback_invoice_with_message(&bolt11, "Thanks for the sats!")
             .await;
 
+        let quote = app
+            .api()
+            .post(
+                "/v1/payments/fee-estimate",
+                Auth::Bearer(token),
+                pay(wallet.id, mock.lnurlp_url(&user), amount_msat, None),
+            )
+            .await;
+        assert_status(&quote, StatusCode::OK);
+        let quote = quote.parse::<PaymentFeeEstimate>();
+        assert_eq!(quote.ledger, Ledger::Lightning);
+        assert_eq!(quote.amount_msat, amount_msat);
+        let estimated_fee_msat = quote
+            .estimated_fee_msat
+            .expect("the real Lightning provider returns an LNURL route estimate");
+        assert!(estimated_fee_msat <= quote.maximum_fee_msat);
+
         let res = app
             .api()
             .post(
@@ -85,6 +102,10 @@ mod pay {
 
         // The wallet is debited by the amount plus the routing fee.
         let fee = payment.fee_msat.unwrap_or_default() as i64;
+        assert!(
+            fee as u64 <= quote.maximum_fee_msat,
+            "settled fee stays within the quoted cap"
+        );
         let after = app.wallet_balance(token, wallet.id).await.available_msat;
         assert_eq!(
             after,
@@ -95,7 +116,7 @@ mod pay {
         // The mock must have been asked for an invoice for exactly this amount:
         // proof SwissKnife sent the expected outbound request.
         let callbacks = mock.callback_requests().await;
-        assert_eq!(callbacks.len(), 1, "the advertised callback was hit exactly once");
+        assert_eq!(callbacks.len(), 2, "the quote and payment each requested an invoice");
         let amount_param = callbacks[0]
             .url
             .query_pairs()

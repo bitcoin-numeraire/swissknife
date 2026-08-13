@@ -36,7 +36,10 @@ pub use ln_address::{LnAddress, LnAddressFilter, RegisterLnAddressRequest, Updat
 pub use lnurl::{LNUrlpInvoiceQueryParams, LnURLPayRequest, LnUrlCallback, LnUrlSuccessAction};
 pub use network::BtcNetwork;
 pub use nostr::{NostrNIP05QueryParams, NostrNIP05Response};
-pub use payment::{BtcPayment, InternalPayment, LnPayment, Payment, PaymentFilter, PaymentStatus, SendPaymentRequest};
+pub use payment::{
+    BtcPayment, InternalPayment, LnPayment, Payment, PaymentFeeEstimate, PaymentFilter, PaymentStatus,
+    SendPaymentRequest,
+};
 pub use permission::Permission;
 pub use query::OrderDirection;
 pub use system::{HealthCheck, HealthStatus, SetupInfo, VersionInfo};

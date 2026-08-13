@@ -115,6 +115,12 @@ import type {
   DeleteWalletsData,
   DeleteWalletsErrors,
   DeleteWalletsResponses,
+  EstimatePaymentFeeData,
+  EstimatePaymentFeeErrors,
+  EstimatePaymentFeeResponses,
+  EstimateWalletPaymentFeeData,
+  EstimateWalletPaymentFeeErrors,
+  EstimateWalletPaymentFeeResponses,
   GenerateBtcAddressData,
   GenerateBtcAddressErrors,
   GenerateBtcAddressResponses,
@@ -1321,6 +1327,26 @@ export const walletPay = <ThrowOnError extends boolean = false>(
   });
 
 /**
+ * Estimate a payment fee for an account-owned wallet.
+ */
+export const estimateWalletPaymentFee = <ThrowOnError extends boolean = false>(
+  options: Options<EstimateWalletPaymentFeeData, ThrowOnError>
+): RequestResult<EstimateWalletPaymentFeeResponses, EstimateWalletPaymentFeeErrors, ThrowOnError> =>
+  (options.client ?? client).post<
+    EstimateWalletPaymentFeeResponses,
+    EstimateWalletPaymentFeeErrors,
+    ThrowOnError
+  >({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/me/wallets/{wallet_id}/payments/fee-estimate',
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
+
+/**
  * Get a wallet payment.
  */
 export const getWalletPayment = <ThrowOnError extends boolean = false>(
@@ -1374,6 +1400,28 @@ export const pay = <ThrowOnError extends boolean = false>(
     responseTransformer: payResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/v1/payments',
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
+
+/**
+ * Estimate an outgoing payment fee
+ *
+ * Returns the provider-derived expected fee and the hard maximum used during payment execution.
+ */
+export const estimatePaymentFee = <ThrowOnError extends boolean = false>(
+  options: Options<EstimatePaymentFeeData, ThrowOnError>
+): RequestResult<EstimatePaymentFeeResponses, EstimatePaymentFeeErrors, ThrowOnError> =>
+  (options.client ?? client).post<
+    EstimatePaymentFeeResponses,
+    EstimatePaymentFeeErrors,
+    ThrowOnError
+  >({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/payments/fee-estimate',
     ...options,
     headers: {
       'Content-Type': 'application/json',
