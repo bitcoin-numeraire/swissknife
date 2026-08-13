@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use nostr_sdk::PublicKey;
+use nostr_sdk::prelude::PublicKey;
 use regex::Regex;
 use tracing::{debug, info, trace};
 use uuid::Uuid;
