@@ -40,6 +40,15 @@ pub struct ParsedBolt11Invoice {
     pub payment_hash: String,
     pub description: Option<String>,
     pub currency: Currency,
+    pub destination: Vec<u8>,
+    pub final_cltv_delta: u32,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct LnPaymentTarget {
+    pub destination: Vec<u8>,
+    pub amount_msat: u64,
+    pub final_cltv_delta: u32,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -117,7 +126,7 @@ pub async fn parse_payment_input(input: &str) -> Result<PaymentInput, String> {
     Err("Unsupported payment input".to_string())
 }
 
-fn parse_bolt11(input: &str) -> Result<ParsedBolt11Invoice, String> {
+pub(super) fn parse_bolt11(input: &str) -> Result<ParsedBolt11Invoice, String> {
     let normalized = strip_lightning_scheme(input);
     let invoice = Bolt11Invoice::from_str(normalized).map_err(|err| err.to_string())?;
     parsed_bolt11_from_invoice(normalized.to_string(), invoice)
@@ -135,6 +144,14 @@ fn parsed_bolt11_from_invoice(bolt11: String, invoice: Bolt11Invoice) -> Result<
         payment_hash: invoice.payment_hash().to_string(),
         description,
         currency: currency_from_bolt11(invoice.currency()),
+        destination: invoice
+            .payee_pub_key()
+            .copied()
+            .unwrap_or_else(|| invoice.recover_payee_pub_key())
+            .serialize()
+            .to_vec(),
+        final_cltv_delta: u32::try_from(invoice.min_final_cltv_expiry_delta())
+            .map_err(|_| "Invoice final CLTV delta is too large".to_string())?,
     })
 }
 

@@ -1,8 +1,7 @@
-use std::{str::FromStr, sync::Arc};
+use std::sync::Arc;
 
 use async_trait::async_trait;
 use chrono::Utc;
-use lightning_invoice::Bolt11Invoice;
 use tracing::{debug, info, trace, warn};
 use uuid::Uuid;
 
@@ -22,7 +21,9 @@ use crate::{
 };
 
 use super::{
-    payment_input::{parse_payment_input, BitcoinAddressData, ParsedBolt11Invoice, PaymentInput},
+    payment_input::{
+        parse_bolt11, parse_payment_input, BitcoinAddressData, LnPaymentTarget, ParsedBolt11Invoice, PaymentInput,
+    },
     BtcPayment, InternalPayment, LnPayment, Payment, PaymentFeeEstimate, PaymentFilter, PaymentStatus,
     PaymentsUseCases,
 };
@@ -93,23 +94,35 @@ impl PaymentService {
         })
     }
 
-    async fn lightning_fee_estimate(
-        &self,
-        bolt11: String,
-        invoice_amount_msat: Option<u64>,
-        amount_msat: u64,
-    ) -> Result<PaymentFeeEstimate, ApplicationError> {
+    fn ln_payment_target(
+        invoice: &ParsedBolt11Invoice,
+        amount_msat: Option<u64>,
+    ) -> Result<LnPaymentTarget, ApplicationError> {
+        let amount_msat = invoice
+            .amount_msat
+            .or(amount_msat)
+            .filter(|amount| *amount > 0)
+            .ok_or_else(|| DataError::Validation("Amount is required for a zero-amount invoice".to_string()))?;
+
+        Ok(LnPaymentTarget {
+            destination: invoice.destination.clone(),
+            amount_msat,
+            final_cltv_delta: invoice.final_cltv_delta,
+        })
+    }
+
+    async fn lightning_fee_estimate(&self, target: LnPaymentTarget) -> Result<PaymentFeeEstimate, ApplicationError> {
+        let amount_msat = target.amount_msat;
         let maximum_fee_msat = self.ln_client.fee_limit_msat(amount_msat);
-        match self.ln_client.estimate_fee(bolt11, invoice_amount_msat).await {
-            Ok(estimate) if estimate.estimated_fee_msat <= maximum_fee_msat => Self::fee_estimate(
+        match self.ln_client.estimate_fee(target).await {
+            Ok(estimated_fee_msat) if estimated_fee_msat <= maximum_fee_msat => Self::fee_estimate(
                 Ledger::Lightning,
                 amount_msat,
-                Some(estimate.estimated_fee_msat),
+                Some(estimated_fee_msat),
                 maximum_fee_msat,
             ),
-            Ok(estimate) => Err(DataError::Validation(format!(
-                "Estimated Lightning fee {} msat exceeds the configured maximum of {maximum_fee_msat} msat",
-                estimate.estimated_fee_msat
+            Ok(estimated_fee_msat) => Err(DataError::Validation(format!(
+                "Estimated Lightning fee {estimated_fee_msat} msat exceeds the configured maximum of {maximum_fee_msat} msat",
             ))
             .into()),
             Err(err) => {
@@ -403,9 +416,8 @@ impl PaymentService {
             debug!(%wallet_id, %amount, ledger="Lightning", "Sending bolt11 payment");
 
             let variable_amount = invoice.amount_msat.is_none().then_some(amount);
-            let fee_estimate = self
-                .lightning_fee_estimate(invoice.bolt11.clone(), variable_amount, amount)
-                .await?;
+            let target = Self::ln_payment_target(&invoice, variable_amount)?;
+            let fee_estimate = self.lightning_fee_estimate(target).await?;
 
             let pending_payment = self
                 .store
@@ -460,7 +472,9 @@ impl PaymentService {
         let cb = validate_lnurl_pay(amount, &comment, &data)
             .await
             .map_err(|e| DataError::Validation(e.to_string()))?;
-        let fee_estimate = self.lightning_fee_estimate(cb.pr.clone(), None, amount).await?;
+        let invoice = parse_bolt11(&cb.pr).map_err(DataError::Validation)?;
+        let target = Self::ln_payment_target(&invoice, None)?;
+        let fee_estimate = self.lightning_fee_estimate(target).await?;
 
         let pending_payment = self
             .store
@@ -474,10 +488,7 @@ impl PaymentService {
                     ledger: Ledger::Lightning,
                     lightning: Some(LnPayment {
                         ln_address: data.ln_address.clone(),
-                        payment_hash: Bolt11Invoice::from_str(&cb.pr)
-                            .expect("should not fail or malformed callback")
-                            .payment_hash()
-                            .to_string(),
+                        payment_hash: invoice.payment_hash,
                         ..Default::default()
                     }),
                     ..Default::default()
@@ -681,15 +692,17 @@ impl PaymentsUseCases for PaymentService {
                 }
 
                 let variable_amount = invoice.amount_msat.is_none().then_some(amount);
-                self.lightning_fee_estimate(invoice.bolt11, variable_amount, amount)
-                    .await
+                let target = Self::ln_payment_target(&invoice, variable_amount)?;
+                self.lightning_fee_estimate(target).await
             }
             PaymentInput::LnUrlPay(data) => {
                 let amount = Self::validate_amount(amount_msat)?;
                 let callback = validate_lnurl_pay(amount, &comment, &data)
                     .await
                     .map_err(|err| DataError::Validation(err.to_string()))?;
-                self.lightning_fee_estimate(callback.pr, None, amount).await
+                let invoice = parse_bolt11(&callback.pr).map_err(DataError::Validation)?;
+                let target = Self::ln_payment_target(&invoice, None)?;
+                self.lightning_fee_estimate(target).await
             }
         }
     }
@@ -879,7 +892,7 @@ mod tests {
             ln_address::LnAddress,
             wallet::Wallet,
         },
-        infra::lightning::{LnFeeEstimate, MockLnClient},
+        infra::lightning::MockLnClient,
     };
 
     use super::*;
@@ -982,7 +995,13 @@ mod tests {
             payment_hash: "ph".to_string(),
             description: None,
             currency: Currency::Bitcoin,
+            destination: vec![2; 33],
+            final_cltv_delta: 18,
         }
+    }
+
+    fn ln_payment_target(amount_msat: u64) -> LnPaymentTarget {
+        PaymentService::ln_payment_target(&bolt11(Some(amount_msat)), None).unwrap()
     }
 
     fn prepared_tx() -> BtcPreparedTransaction {
@@ -1053,6 +1072,33 @@ mod tests {
         }
     }
 
+    mod ln_payment_target {
+        use super::*;
+
+        #[test]
+        fn uses_the_invoice_amount_when_present() {
+            let target = PaymentService::ln_payment_target(&bolt11(Some(1_000)), Some(2_000)).unwrap();
+
+            assert_eq!(target.amount_msat, 1_000);
+            assert_eq!(target.destination, vec![2; 33]);
+            assert_eq!(target.final_cltv_delta, 18);
+        }
+
+        #[test]
+        fn uses_the_requested_amount_for_a_zero_amount_invoice() {
+            let target = PaymentService::ln_payment_target(&bolt11(None), Some(2_000)).unwrap();
+
+            assert_eq!(target.amount_msat, 2_000);
+        }
+
+        #[test]
+        fn rejects_a_zero_amount_invoice_without_an_amount() {
+            let err = PaymentService::ln_payment_target(&bolt11(None), None).unwrap_err();
+
+            assert!(matches!(err, ApplicationError::Data(DataError::Validation(_))));
+        }
+    }
+
     mod lightning_fee_estimate {
         use super::*;
 
@@ -1060,11 +1106,11 @@ mod tests {
         async fn returns_provider_route_estimate_and_policy_cap() {
             let mut ln_client = MockLnClient::new();
             ln_client.expect_fee_limit_msat().times(1).return_const(5_000_u64);
-            ln_client.expect_estimate_fee().times(1).returning(|_, _| {
-                Ok(LnFeeEstimate {
-                    estimated_fee_msat: 900,
-                })
-            });
+            ln_client
+                .expect_estimate_fee()
+                .withf(|target| target.amount_msat == 100_000)
+                .times(1)
+                .returning(|_| Ok(900));
             let service = service(
                 MockAppStoreBuilder::new(),
                 ln_client,
@@ -1073,7 +1119,7 @@ mod tests {
             );
 
             let estimate = service
-                .lightning_fee_estimate("bolt11".to_string(), None, 100_000)
+                .lightning_fee_estimate(ln_payment_target(100_000))
                 .await
                 .unwrap();
 
@@ -1089,7 +1135,7 @@ mod tests {
             ln_client
                 .expect_estimate_fee()
                 .times(1)
-                .returning(|_, _| Err(LightningError::Pay("route unavailable".to_string())));
+                .returning(|_| Err(LightningError::EstimateFee("route unavailable".to_string())));
             let service = service(
                 MockAppStoreBuilder::new(),
                 ln_client,
@@ -1098,7 +1144,7 @@ mod tests {
             );
 
             let estimate = service
-                .lightning_fee_estimate("bolt11".to_string(), None, 100_000)
+                .lightning_fee_estimate(ln_payment_target(100_000))
                 .await
                 .unwrap();
 
@@ -1111,11 +1157,7 @@ mod tests {
         async fn rejects_a_route_estimate_above_the_execution_cap() {
             let mut ln_client = MockLnClient::new();
             ln_client.expect_fee_limit_msat().times(1).return_const(5_000_u64);
-            ln_client.expect_estimate_fee().times(1).returning(|_, _| {
-                Ok(LnFeeEstimate {
-                    estimated_fee_msat: 5_001,
-                })
-            });
+            ln_client.expect_estimate_fee().times(1).returning(|_| Ok(5_001));
             let service = service(
                 MockAppStoreBuilder::new(),
                 ln_client,
@@ -1124,7 +1166,7 @@ mod tests {
             );
 
             let err = service
-                .lightning_fee_estimate("bolt11".to_string(), None, 100_000)
+                .lightning_fee_estimate(ln_payment_target(100_000))
                 .await
                 .unwrap_err();
 
@@ -1960,11 +2002,7 @@ mod tests {
 
                 let mut ln_client = MockLnClient::new();
                 ln_client.expect_fee_limit_msat().times(1).return_const(5_000_u64);
-                ln_client.expect_estimate_fee().times(1).returning(|_, _| {
-                    Ok(LnFeeEstimate {
-                        estimated_fee_msat: 125,
-                    })
-                });
+                ln_client.expect_estimate_fee().times(1).returning(|_| Ok(125));
                 ln_client
                     .expect_pay()
                     .withf(|_, _, fee_limit_msat, _| *fee_limit_msat == 5_000)
@@ -2016,11 +2054,7 @@ mod tests {
 
                 let mut ln_client = MockLnClient::new();
                 ln_client.expect_fee_limit_msat().times(1).return_const(5_000_u64);
-                ln_client.expect_estimate_fee().times(1).returning(|_, _| {
-                    Ok(LnFeeEstimate {
-                        estimated_fee_msat: 125,
-                    })
-                });
+                ln_client.expect_estimate_fee().times(1).returning(|_| Ok(125));
                 ln_client
                     .expect_pay()
                     .times(1)

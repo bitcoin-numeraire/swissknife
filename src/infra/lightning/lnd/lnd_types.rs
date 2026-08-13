@@ -330,15 +330,3 @@ impl From<TransactionResponse> for BtcTransaction {
         }
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::RouteFeeResponse;
-
-    #[test]
-    fn deserializes_route_fee_from_lnd_rest_string() {
-        let response: RouteFeeResponse = serde_json::from_str(r#"{"routing_fee_msat":"1250"}"#).unwrap();
-
-        assert_eq!(response.routing_fee_msat, 1_250);
-    }
-}

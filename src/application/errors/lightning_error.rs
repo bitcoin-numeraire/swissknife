@@ -29,6 +29,9 @@ pub enum LightningError {
     #[error("Failed to get Lightning node info: {0}")]
     NodeInfo(String),
 
+    #[error("Failed to estimate Lightning fee: {0}")]
+    EstimateFee(String),
+
     #[error("Failed to send payment: {0}")]
     Pay(String),
 

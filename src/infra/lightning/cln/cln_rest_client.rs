@@ -23,15 +23,12 @@ use crate::{
         },
         event::OnchainWithdrawalEvent,
         invoice::Invoice,
-        payment::{LnPayment, Payment, PaymentStatus},
+        payment::{LnPayment, LnPaymentTarget, Payment, PaymentStatus},
         system::HealthStatus,
     },
     infra::{
         config::config_rs::deserialize_duration,
-        lightning::{
-            bitcoin_utils::parse_psbt, cln::ListFundsResponse, cln_fee_limit_msat, payment_target,
-            types::parse_network, LnClient, LnFeeEstimate,
-        },
+        lightning::{bitcoin_utils::parse_psbt, cln::ListFundsResponse, types::parse_network, LnClient},
     },
 };
 
@@ -192,13 +189,12 @@ impl LnClient for ClnRestClient {
         Ok(crate::infra::lightning::types::invoice_from_bolt11(bolt11))
     }
 
-    async fn estimate_fee(&self, bolt11: String, amount_msat: Option<u64>) -> Result<LnFeeEstimate, LightningError> {
-        let target = payment_target(&bolt11, amount_msat)?;
+    async fn estimate_fee(&self, target: LnPaymentTarget) -> Result<u64, LightningError> {
         let fee_limit_msat = self.fee_limit_msat(target.amount_msat);
         let node: GetinfoResponse = self
             .post_request("getinfo", &GetinfoRequest {})
             .await
-            .map_err(|err| LightningError::NodeInfo(err.to_string()))?;
+            .map_err(|err| LightningError::EstimateFee(err.to_string()))?;
         let response: GetRoutesResponse = self
             .post_request(
                 "getroutes",
@@ -213,26 +209,22 @@ impl LnClient for ClnRestClient {
                 },
             )
             .await
-            .map_err(|err| LightningError::Pay(format!("Failed to estimate route fee: {err}")))?;
-        if response.routes.is_empty() {
-            return Err(LightningError::Pay("No route available for fee estimation".to_string()));
-        }
-        let estimated_fee_msat = response.routes.into_iter().try_fold(0_u64, |total, route| {
-            let sent = route
-                .path
-                .first()
-                .and_then(|hop| hop.amount_in_msat)
-                .ok_or_else(|| LightningError::Pay("Estimated route has no first hop amount".to_string()))?;
-            total
-                .checked_add(sent.saturating_sub(route.amount_msat))
-                .ok_or_else(|| LightningError::Pay("Estimated route fee overflows".to_string()))
-        })?;
+            .map_err(|err| LightningError::EstimateFee(err.to_string()))?;
+        let route = response
+            .routes
+            .first()
+            .ok_or_else(|| LightningError::EstimateFee("No route available".to_string()))?;
+        let sent = route
+            .path
+            .first()
+            .and_then(|hop| hop.amount_in_msat)
+            .ok_or_else(|| LightningError::EstimateFee("Estimated route has no first hop amount".to_string()))?;
 
-        Ok(LnFeeEstimate { estimated_fee_msat })
+        Ok(sent.saturating_sub(route.amount_msat))
     }
 
     fn fee_limit_msat(&self, amount_msat: u64) -> u64 {
-        cln_fee_limit_msat(self.maxfee, amount_msat)
+        self.maxfee.unwrap_or_else(|| amount_msat.div_ceil(100).max(5_000))
     }
 
     async fn pay(
