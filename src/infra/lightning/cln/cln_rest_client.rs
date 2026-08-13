@@ -67,6 +67,7 @@ pub struct ClnRestClientConfig {
 pub struct ClnRestClient {
     client: Client,
     base_url: String,
+    node_id: String,
     maxfee: Option<u64>,
     retry_for: Option<u32>,
     network: BtcNetwork,
@@ -106,13 +107,15 @@ impl ClnRestClient {
         let mut cln_client = Self {
             client,
             base_url: config.endpoint.clone(),
+            node_id: String::new(),
             maxfee: config.maxfee,
             retry_for: Some(config.payment_timeout.as_secs() as u32),
             network: BtcNetwork::default(),
         };
 
-        let network = cln_client.network().await?;
-        cln_client.network = network;
+        let node = cln_client.node_info().await?;
+        cln_client.network = parse_network(&node.network);
+        cln_client.node_id = node.id;
 
         Ok(cln_client)
     }
@@ -146,13 +149,10 @@ impl ClnRestClient {
         Ok(result)
     }
 
-    async fn network(&self) -> Result<BtcNetwork, LightningError> {
-        let response: GetinfoResponse = self
-            .post_request("getinfo", &GetinfoRequest {})
+    async fn node_info(&self) -> Result<GetinfoResponse, LightningError> {
+        self.post_request("getinfo", &GetinfoRequest {})
             .await
-            .map_err(|e| LightningError::NodeInfo(e.to_string()))?;
-
-        Ok(parse_network(&response.network))
+            .map_err(|e| LightningError::NodeInfo(e.to_string()))
     }
 }
 
@@ -191,36 +191,32 @@ impl LnClient for ClnRestClient {
 
     async fn estimate_fee(&self, target: LnPaymentTarget) -> Result<u64, LightningError> {
         let fee_limit_msat = self.fee_limit_msat(target.amount_msat);
-        let node: GetinfoResponse = self
-            .post_request("getinfo", &GetinfoRequest {})
-            .await
-            .map_err(|err| LightningError::EstimateFee(err.to_string()))?;
         let response: GetRoutesResponse = self
             .post_request(
                 "getroutes",
                 &GetRoutesRequest {
-                    source: node.id,
+                    source: self.node_id.clone(),
                     destination: hex::encode(target.destination),
                     amount_msat: target.amount_msat,
                     layers: vec!["auto.localchans".to_string(), "auto.sourcefree".to_string()],
                     maxfee_msat: fee_limit_msat,
                     final_cltv: target.final_cltv_delta,
-                    maxparts: 1,
                 },
             )
             .await
             .map_err(|err| LightningError::EstimateFee(err.to_string()))?;
-        let route = response
-            .routes
-            .first()
-            .ok_or_else(|| LightningError::EstimateFee("No route available".to_string()))?;
-        let sent = route
-            .path
-            .first()
-            .and_then(|hop| hop.amount_in_msat)
-            .ok_or_else(|| LightningError::EstimateFee("Estimated route has no first hop amount".to_string()))?;
+        if response.routes.is_empty() {
+            return Err(LightningError::EstimateFee("No route available".to_string()));
+        }
 
-        Ok(sent.saturating_sub(route.amount_msat))
+        response.routes.iter().try_fold(0_u64, |total, route| {
+            let sent =
+                route.path.first().and_then(|hop| hop.amount_in_msat).ok_or_else(|| {
+                    LightningError::EstimateFee("Estimated route has no first hop amount".to_string())
+                })?;
+
+            Ok(total + sent.saturating_sub(route.amount_msat))
+        })
     }
 
     fn fee_limit_msat(&self, amount_msat: u64) -> u64 {

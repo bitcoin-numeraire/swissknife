@@ -166,7 +166,6 @@ pub struct GetRoutesRequest {
     pub layers: Vec<String>,
     pub maxfee_msat: u64,
     pub final_cltv: u32,
-    pub maxparts: u32,
 }
 
 #[derive(Debug, Deserialize)]

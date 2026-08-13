@@ -68,6 +68,7 @@ const DEFAULT_CA_CRT_FILENAME: &str = "ca.pem";
 
 pub struct ClnGrpcClient {
     client: NodeClient<Channel>,
+    node_id: Vec<u8>,
     maxfee: Option<u64>,
     retry_for: Option<u32>,
     network: BtcNetwork,
@@ -75,19 +76,20 @@ pub struct ClnGrpcClient {
 
 impl ClnGrpcClient {
     pub async fn new(config: ClnClientConfig) -> Result<Self, LightningError> {
-        let client = Self::connect(&config).await?;
+        let mut client = Self::connect(&config).await?;
+        let node = client
+            .getinfo(GetinfoRequest {})
+            .await
+            .map_err(|e| LightningError::NodeInfo(e.message().to_string()))?
+            .into_inner();
 
-        let mut cln_client = Self {
-            client: client.clone(),
+        Ok(Self {
+            client,
+            node_id: node.id,
             maxfee: config.maxfee,
             retry_for: Some(config.payment_timeout.as_secs() as u32),
-            network: BtcNetwork::default(),
-        };
-
-        let network = cln_client.network().await?;
-        cln_client.network = network;
-
-        Ok(cln_client)
+            network: parse_network(&node.network),
+        })
     }
 
     pub async fn connect(config: &ClnClientConfig) -> Result<NodeClient<Channel>, LightningError> {
@@ -148,17 +150,6 @@ impl ClnGrpcClient {
 
         Ok((identity, ca_certificate))
     }
-
-    async fn network(&self) -> Result<BtcNetwork, LightningError> {
-        let mut client = self.client.clone();
-        let response = client
-            .getinfo(GetinfoRequest {})
-            .await
-            .map_err(|e| LightningError::NodeInfo(e.message().to_string()))?
-            .into_inner();
-
-        Ok(parse_network(&response.network))
-    }
 }
 
 #[async_trait]
@@ -200,15 +191,9 @@ impl LnClient for ClnGrpcClient {
     async fn estimate_fee(&self, target: LnPaymentTarget) -> Result<u64, LightningError> {
         let fee_limit_msat = self.fee_limit_msat(target.amount_msat);
         let mut client = self.client.clone();
-        let source = client
-            .getinfo(GetinfoRequest {})
-            .await
-            .map_err(|err| LightningError::EstimateFee(err.message().to_string()))?
-            .into_inner()
-            .id;
         let response = client
             .get_routes(GetroutesRequest {
-                source,
+                source: self.node_id.clone(),
                 destination: target.destination,
                 amount_msat: Some(Amount {
                     msat: target.amount_msat,
@@ -216,29 +201,29 @@ impl LnClient for ClnGrpcClient {
                 layers: vec!["auto.localchans".to_string(), "auto.sourcefree".to_string()],
                 maxfee_msat: Some(Amount { msat: fee_limit_msat }),
                 final_cltv: target.final_cltv_delta,
-                maxparts: Some(1),
                 ..Default::default()
             })
             .await
             .map_err(|err| LightningError::EstimateFee(err.message().to_string()))?
             .into_inner();
-        let route = response
-            .routes
-            .first()
-            .ok_or_else(|| LightningError::EstimateFee("No route available".to_string()))?;
-        let delivered = route
-            .amount_msat
-            .as_ref()
-            .map(|amount| amount.msat)
-            .ok_or_else(|| LightningError::EstimateFee("Estimated route has no delivered amount".to_string()))?;
-        let sent = route
-            .path
-            .first()
-            .and_then(|hop| hop.amount_in_msat.as_ref())
-            .map(|amount| amount.msat)
-            .ok_or_else(|| LightningError::EstimateFee("Estimated route has no first hop amount".to_string()))?;
+        if response.routes.is_empty() {
+            return Err(LightningError::EstimateFee("No route available".to_string()));
+        }
 
-        Ok(sent.saturating_sub(delivered))
+        response.routes.iter().try_fold(0_u64, |total, route| {
+            let delivered =
+                route.amount_msat.as_ref().map(|amount| amount.msat).ok_or_else(|| {
+                    LightningError::EstimateFee("Estimated route has no delivered amount".to_string())
+                })?;
+            let sent = route
+                .path
+                .first()
+                .and_then(|hop| hop.amount_in_msat.as_ref())
+                .map(|amount| amount.msat)
+                .ok_or_else(|| LightningError::EstimateFee("Estimated route has no first hop amount".to_string()))?;
+
+            Ok(total + sent.saturating_sub(delivered))
+        })
     }
 
     fn fee_limit_msat(&self, amount_msat: u64) -> u64 {
