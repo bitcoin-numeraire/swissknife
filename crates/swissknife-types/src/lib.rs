@@ -32,7 +32,11 @@ pub use api_key::{ApiKey, ApiKeyFilter, CreateApiKeyRequest};
 pub use auth::{AuthProvider, ChangePasswordRequest, SignInRequest, SignInResponse, SignUpRequest};
 pub use bitcoin::{BtcAddress, BtcAddressFilter, BtcAddressType, BtcOutput, BtcOutputStatus, NewBtcAddressRequest};
 pub use error::ErrorResponse;
-pub use event::{ClientEvent, ClientEventType};
+pub use event::{
+    ClientEvent, ClientEventType, CreateWebhookSubscriptionRequest, CreatedWebhookSubscription,
+    RotateWebhookSecretResponse, UpdateWebhookSubscriptionRequest, WebhookDelivery, WebhookDeliveryStatus,
+    WebhookSubscription,
+};
 pub use invoice::{Invoice, InvoiceFilter, InvoiceOrderBy, InvoiceStatus, LnInvoice, NewInvoiceRequest};
 pub use ln_address::{LnAddress, LnAddressFilter, RegisterLnAddressRequest, UpdateLnAddressRequest};
 pub use lnurl::{LNUrlpInvoiceQueryParams, LnURLPayRequest, LnUrlCallback, LnUrlPaySuccessAction, LnUrlSuccessAction};

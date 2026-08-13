@@ -6,6 +6,10 @@ mod entities;
 mod event_service;
 mod event_unit_of_work;
 mod event_use_cases;
+mod webhook_handler;
+mod webhook_repository;
+mod webhook_service;
+mod webhook_use_cases;
 
 pub use client_event_handler::*;
 pub use client_event_repository::*;
@@ -15,3 +19,7 @@ pub use entities::*;
 pub use event_service::*;
 pub use event_unit_of_work::*;
 pub use event_use_cases::*;
+pub use webhook_handler::*;
+pub use webhook_repository::*;
+pub use webhook_service::*;
+pub use webhook_use_cases::*;

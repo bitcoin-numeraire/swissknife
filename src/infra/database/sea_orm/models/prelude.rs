@@ -13,3 +13,5 @@ pub use super::invoice::Entity as Invoice;
 pub use super::ln_address::Entity as LnAddress;
 pub use super::payment::Entity as Payment;
 pub use super::wallet::Entity as Wallet;
+pub use super::webhook_delivery::Entity as WebhookDelivery;
+pub use super::webhook_subscription::Entity as WebhookSubscription;
