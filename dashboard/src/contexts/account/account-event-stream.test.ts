@@ -1,8 +1,14 @@
+import type { ClientEvent } from 'src/lib/swissknife';
+
 import { it, vi, expect, describe } from 'vitest';
 
 import { endpointKeys } from 'src/actions/keys';
 
-import { isWalletEventCacheKey, createWalletEventFetch } from './account-event-stream';
+import {
+  isWalletEventCacheKey,
+  createWalletEventFetch,
+  consumeWalletEventStreams,
+} from './account-event-stream';
 
 describe('wallet event cache invalidation', () => {
   const walletId = 'wallet-1';
@@ -57,5 +63,41 @@ describe('wallet event cache invalidation', () => {
     await eventFetch('https://example.com/events');
 
     expect(refresh).not.toHaveBeenCalled();
+  });
+
+  it('reopens a normally-ended stream from its last durable event ID', async () => {
+    const controller = new AbortController();
+    const received: Array<string> = [];
+    const cursors: Array<string | undefined> = [];
+
+    async function* stream(id: string) {
+      yield {
+        id,
+        event_type: 'payment.settled',
+        wallet_id: walletId,
+        resource_id: 'payment-1',
+        data: {},
+        created_at: new Date('2026-08-13T18:00:00Z'),
+      } satisfies ClientEvent;
+    }
+
+    const openStream = vi.fn(async (lastEventId: string | undefined) => {
+      cursors.push(lastEventId);
+      return stream(lastEventId ? '42' : '41');
+    });
+
+    await consumeWalletEventStreams({
+      signal: controller.signal,
+      openStream,
+      onEvent: async (event) => {
+        received.push(event.id);
+        if (event.id === '42') controller.abort();
+      },
+      waitForReconnect: async () => undefined,
+    });
+
+    expect(received).toEqual(['41', '42']);
+    expect(cursors).toEqual([undefined, '41']);
+    expect(openStream).toHaveBeenCalledTimes(2);
   });
 });
