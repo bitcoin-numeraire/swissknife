@@ -22,7 +22,7 @@ Lightning graph estimates cannot be guaranteed. Channel balances are private, ro
 `LnClient` exposes a provider-specific graph estimate and an amount-aware hard fee policy. Payment execution receives that hard limit explicitly.
 
 - LND uses `EstimateRouteFee` with destination plus amount, which selects its fast graph-based mode.
-- Core Lightning uses `getroutes` with `auto.localchans` and `auto.sourcefree`, one part, and the configured fee budget.
+- Core Lightning uses `getroutes` with `auto.localchans`, `auto.sourcefree`, and the configured fee budget. It keeps the provider's default multipart behavior and sums the fee across every returned route part.
 - LND keeps its configured absolute `fee_limit_msat`.
 - Core Lightning keeps its configured `maxfee`; when omitted, SwissKnife mirrors `xpay`'s `max(1%, 5000 msat)` default.
 
