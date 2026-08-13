@@ -35,6 +35,22 @@ export function isWalletEventCacheKey(key: unknown, walletId: string) {
   );
 }
 
+export function createWalletEventFetch(
+  signal: AbortSignal,
+  onOpen: () => Promise<unknown>,
+  fetchImpl: typeof fetch = globalThis.fetch
+): typeof fetch {
+  return async (input, init) => {
+    const response = await fetchImpl(input, init);
+
+    if (response.ok && !signal.aborted) {
+      await onOpen();
+    }
+
+    return response;
+  };
+}
+
 export function useAccountEventStream(walletId: string | undefined, enabled: boolean) {
   const { mutate } = useSWRConfig();
 
@@ -47,6 +63,9 @@ export function useAccountEventStream(walletId: string | undefined, enabled: boo
       const { stream } = await streamWalletEvents({
         path: { wallet_id: walletId },
         signal: controller.signal,
+        fetch: createWalletEventFetch(controller.signal, () =>
+          mutate((key) => isWalletEventCacheKey(key, walletId))
+        ),
         sseDefaultRetryDelay: 1_000,
         sseMaxRetryDelay: 30_000,
         onSseError: (error) => {
