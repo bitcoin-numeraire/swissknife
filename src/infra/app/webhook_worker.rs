@@ -95,7 +95,12 @@ impl WebhookWorker {
         let result = send_delivery(&delivery).await;
         match result {
             Ok(status) => {
-                if let Err(error) = self.store.webhook.mark_delivered(delivery.id, status.as_u16()).await {
+                if let Err(error) = self
+                    .store
+                    .webhook
+                    .mark_delivered(delivery.id, delivery.lease_expires_at, status.as_u16())
+                    .await
+                {
                     error!(%error, delivery_id = %delivery.id, "Failed to record successful webhook delivery");
                 }
             }
@@ -109,6 +114,7 @@ impl WebhookWorker {
                     .webhook
                     .mark_failed(
                         delivery.id,
+                        delivery.lease_expires_at,
                         failure.status.map(|status| status.as_u16()),
                         error_message.clone(),
                         next_attempt_at,
@@ -386,6 +392,7 @@ mod tests {
             url: "https://hooks.example.com/swissknife".to_string(),
             signing_secret: URL_SAFE_NO_PAD.encode(b"test secret"),
             attempt_count: 0,
+            lease_expires_at: Utc.timestamp_opt(1_700_000_060, 0).unwrap(),
         }
     }
 

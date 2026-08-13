@@ -368,6 +368,7 @@ impl WebhookRepository for SeaOrmWebhookRepository {
                 url: subscription.url,
                 signing_secret: subscription.signing_secret,
                 attempt_count: candidate.attempt_count as u32,
+                lease_expires_at: locked_until,
             });
         }
 
@@ -378,7 +379,12 @@ impl WebhookRepository for SeaOrmWebhookRepository {
         Ok(claimed)
     }
 
-    async fn mark_delivered(&self, id: Uuid, response_status: u16) -> Result<(), DatabaseError> {
+    async fn mark_delivered(
+        &self,
+        id: Uuid,
+        lease_expires_at: DateTime<Utc>,
+        response_status: u16,
+    ) -> Result<(), DatabaseError> {
         WebhookDeliveryEntity::update_many()
             .col_expr(webhook_delivery::Column::Status, Expr::value(DELIVERED))
             .col_expr(
@@ -403,6 +409,8 @@ impl WebhookRepository for SeaOrmWebhookRepository {
                 Expr::value(Some(Utc::now().naive_utc())),
             )
             .filter(webhook_delivery::Column::Id.eq(id))
+            .filter(webhook_delivery::Column::Status.eq(PENDING))
+            .filter(webhook_delivery::Column::LockedUntil.eq(lease_expires_at.naive_utc()))
             .exec(&self.db)
             .await
             .map_err(|e| DatabaseError::Update(e.to_string()))?;
@@ -412,6 +420,7 @@ impl WebhookRepository for SeaOrmWebhookRepository {
     async fn mark_failed(
         &self,
         id: Uuid,
+        lease_expires_at: DateTime<Utc>,
         response_status: Option<u16>,
         error: String,
         next_attempt_at: DateTime<Utc>,
@@ -444,6 +453,8 @@ impl WebhookRepository for SeaOrmWebhookRepository {
                 Expr::value(Some(Utc::now().naive_utc())),
             )
             .filter(webhook_delivery::Column::Id.eq(id))
+            .filter(webhook_delivery::Column::Status.eq(PENDING))
+            .filter(webhook_delivery::Column::LockedUntil.eq(lease_expires_at.naive_utc()))
             .exec(&self.db)
             .await
             .map_err(|e| DatabaseError::Update(e.to_string()))?;

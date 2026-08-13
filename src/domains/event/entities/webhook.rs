@@ -56,4 +56,5 @@ pub struct ClaimedWebhookDelivery {
     pub url: String,
     pub signing_secret: String,
     pub attempt_count: u32,
+    pub lease_expires_at: DateTime<Utc>,
 }

@@ -900,6 +900,7 @@ async fn webhook_outbox_filters_deduplicates_leases_and_retries() {
     webhooks
         .mark_failed(
             claimed[0].id,
+            claimed[0].lease_expires_at,
             Some(503),
             "temporarily unavailable".to_string(),
             Utc::now() - chrono::Duration::seconds(1),
@@ -913,8 +914,20 @@ async fn webhook_outbox_filters_deduplicates_leases_and_retries() {
         .expect("claim retry");
     assert_eq!(retry.len(), 1);
     assert_eq!(retry[0].attempt_count, 1);
+
     webhooks
-        .mark_delivered(retry[0].id, 204)
+        .mark_delivered(claimed[0].id, claimed[0].lease_expires_at, 204)
+        .await
+        .expect("ignore stale lease outcome");
+    let history = webhooks
+        .list_deliveries(wallet.account_id, wallet_id, subscription.id, 100)
+        .await
+        .expect("delivery history");
+    assert_eq!(history[0].status, WebhookDeliveryStatus::Pending);
+    assert_eq!(history[0].attempt_count, 1);
+
+    webhooks
+        .mark_delivered(retry[0].id, retry[0].lease_expires_at, 204)
         .await
         .expect("record delivery");
 
