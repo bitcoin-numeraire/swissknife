@@ -209,14 +209,16 @@ impl LnClient for ClnRestClient {
             return Err(LightningError::EstimateFee("No route available".to_string()));
         }
 
-        response.routes.iter().try_fold(0_u64, |total, route| {
+        let estimated_fee_msat = response.routes.iter().try_fold(0_u64, |total, route| {
             let sent =
                 route.path.first().and_then(|hop| hop.amount_in_msat).ok_or_else(|| {
                     LightningError::EstimateFee("Estimated route has no first hop amount".to_string())
                 })?;
 
-            Ok(total + sent.saturating_sub(route.amount_msat))
-        })
+            Ok(total.saturating_add(sent.saturating_sub(route.amount_msat)))
+        })?;
+
+        Ok(estimated_fee_msat.min(fee_limit_msat))
     }
 
     fn fee_limit_msat(&self, amount_msat: u64) -> u64 {

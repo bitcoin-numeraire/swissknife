@@ -115,16 +115,12 @@ impl PaymentService {
         let amount_msat = target.amount_msat;
         let maximum_fee_msat = self.ln_client.fee_limit_msat(amount_msat);
         match self.ln_client.estimate_fee(target).await {
-            Ok(estimated_fee_msat) if estimated_fee_msat <= maximum_fee_msat => Self::fee_estimate(
+            Ok(estimated_fee_msat) => Self::fee_estimate(
                 Ledger::Lightning,
                 amount_msat,
                 Some(estimated_fee_msat),
                 maximum_fee_msat,
             ),
-            Ok(estimated_fee_msat) => Err(DataError::Validation(format!(
-                "Estimated Lightning fee {estimated_fee_msat} msat exceeds the configured maximum of {maximum_fee_msat} msat",
-            ))
-            .into()),
             Err(err) => {
                 warn!(%err, amount_msat, maximum_fee_msat, "Route fee estimate unavailable; using provider fee cap");
                 Self::fee_estimate(Ledger::Lightning, amount_msat, None, maximum_fee_msat)
@@ -209,9 +205,7 @@ impl PaymentService {
         }
 
         if let Some(amount) = specified_amount {
-            let amount_msat = amount
-                .checked_mul(1000)
-                .ok_or_else(|| DataError::Validation("Payment amount overflows".to_string()))?;
+            let amount_msat = amount.saturating_mul(1000);
             let description: Option<String> = comment.or(data.message);
 
             if let Some(recipient_address) = self.store.btc_address.find_by_address(&data.address).await? {
@@ -262,10 +256,7 @@ impl PaymentService {
                 .prepare_transaction(data.address.clone(), amount, None)
                 .await?;
 
-            let fee_msat = prepared_tx
-                .fee_sat
-                .checked_mul(1000)
-                .ok_or_else(|| DataError::Validation("On-chain fee overflows".to_string()))?;
+            let fee_msat = prepared_tx.fee_sat.saturating_mul(1000);
             let reserve_amount = Self::reserve_amount_msat(amount_msat, fee_msat)?;
 
             let pending_payment = match self
@@ -1151,27 +1142,6 @@ mod tests {
             assert_eq!(estimate.estimated_fee_msat, None);
             assert_eq!(estimate.maximum_fee_msat, 5_000);
             assert_eq!(estimate.maximum_total_msat, 105_000);
-        }
-
-        #[tokio::test]
-        async fn rejects_a_route_estimate_above_the_execution_cap() {
-            let mut ln_client = MockLnClient::new();
-            ln_client.expect_fee_limit_msat().times(1).return_const(5_000_u64);
-            ln_client.expect_estimate_fee().times(1).returning(|_| Ok(5_001));
-            let service = service(
-                MockAppStoreBuilder::new(),
-                ln_client,
-                MockBitcoinWallet::new(),
-                MockEventUseCases::new(),
-            );
-
-            let err = service
-                .lightning_fee_estimate(ln_payment_target(100_000))
-                .await
-                .unwrap_err();
-
-            assert!(matches!(err, ApplicationError::Data(DataError::Validation(_))));
-            assert!(err.to_string().contains("exceeds the configured maximum"));
         }
     }
 

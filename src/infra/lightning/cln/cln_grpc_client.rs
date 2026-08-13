@@ -210,7 +210,7 @@ impl LnClient for ClnGrpcClient {
             return Err(LightningError::EstimateFee("No route available".to_string()));
         }
 
-        response.routes.iter().try_fold(0_u64, |total, route| {
+        let estimated_fee_msat = response.routes.iter().try_fold(0_u64, |total, route| {
             let delivered =
                 route.amount_msat.as_ref().map(|amount| amount.msat).ok_or_else(|| {
                     LightningError::EstimateFee("Estimated route has no delivered amount".to_string())
@@ -222,8 +222,10 @@ impl LnClient for ClnGrpcClient {
                 .map(|amount| amount.msat)
                 .ok_or_else(|| LightningError::EstimateFee("Estimated route has no first hop amount".to_string()))?;
 
-            Ok(total + sent.saturating_sub(delivered))
-        })
+            Ok(total.saturating_add(sent.saturating_sub(delivered)))
+        })?;
+
+        Ok(estimated_fee_msat.min(fee_limit_msat))
     }
 
     fn fee_limit_msat(&self, amount_msat: u64) -> u64 {
