@@ -15,7 +15,7 @@
 //! raw-URL path drives the identical resolve→callback→validate→pay logic. Each
 //! test gets its own server (own port), so mounts never collide.
 
-use lnurl::pay::{LnURLPayInvoice, PayResponse};
+use lnurl::pay::{AesParams, LnURLPayInvoice, PayResponse};
 use lnurl::Tag;
 use serde::Serialize;
 use serde_json::{json, Value};
@@ -81,12 +81,28 @@ impl MockLnurl {
             .await;
     }
 
-    /// Mount the callback so it returns `bolt11` plus a `message` success action.
-    /// Raw JSON: `LnURLPayInvoice`'s success-action field is private with no setter.
-    pub async fn mount_callback_invoice_with_message(&self, bolt11: &str, message: &str) {
+    /// Mount the callback so it returns `bolt11` plus an AES success action
+    /// encrypted with the invoice preimage. Raw JSON is required because
+    /// `LnURLPayInvoice`'s success-action field is private with no setter.
+    pub async fn mount_callback_invoice_with_aes(
+        &self,
+        bolt11: &str,
+        description: &str,
+        plaintext: &str,
+        preimage: &[u8; 32],
+    ) {
+        let aes = AesParams::new(description.to_string(), plaintext, preimage).expect("encrypt LNURL success action");
         self.mount_get(
             CALLBACK_PATH.to_string(),
-            json!({ "pr": bolt11, "successAction": { "tag": "message", "message": message } }),
+            json!({
+                "pr": bolt11,
+                "successAction": {
+                    "tag": "aes",
+                    "description": aes.description,
+                    "ciphertext": aes.ciphertext,
+                    "iv": aes.iv,
+                }
+            }),
         )
         .await;
     }

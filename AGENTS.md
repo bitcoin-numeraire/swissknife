@@ -24,6 +24,11 @@ make check                     # Format, lint, build, and unit tests
 
 Before committing, ensure the linting and formatting pass successfully using `make lint` and `make fmt-fix`.
 
+### Test Placement
+
+- Cover new public endpoints and user-visible behavior with black-box integration tests under `tests/`. Exercise the compiled SwissKnife binary through its public API and include authentication, authorization, validation, persistence, and relevant real-provider behavior.
+- Keep `src/infra/database/sea_orm/uow_tests.rs` for database transaction and concurrency guarantees, or behavior that cannot be exercised through the public API. Do not use it for ordinary repository CRUD or serialization round trips that an integration test can cover.
+
 ### Dashboard (Next.js)
 ```bash
 cd dashboard
