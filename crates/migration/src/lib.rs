@@ -29,6 +29,7 @@ mod m20260704_000011_ln_address_account_routes;
 mod m20260704_000012_drop_legacy_wallet_contract;
 mod m20260710_234825_add_relationship_indexes;
 mod m20260717_105719_persist_lnurl_success_action;
+mod m20260814_151430_promote_wallet_account_unique_constraint;
 
 pub struct Migrator;
 
@@ -65,6 +66,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260704_000012_drop_legacy_wallet_contract::Migration),
             Box::new(m20260710_234825_add_relationship_indexes::Migration),
             Box::new(m20260717_105719_persist_lnurl_success_action::Migration),
+            Box::new(m20260814_151430_promote_wallet_account_unique_constraint::Migration),
         ]
     }
 }

@@ -261,7 +261,7 @@ async fn postgres_migrates_legacy_oauth2_wallet_data() {
                 'idx_ln_address_account',
                 'idx_payment_wallet_created_at',
                 'idx_wallet_account_asset',
-                'idx_wallet_account_id',
+                'uq_wallet_account_id',
                 'idx_wallet_asset_id'
               )
             "#,
