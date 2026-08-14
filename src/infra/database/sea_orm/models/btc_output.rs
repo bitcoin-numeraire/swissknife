@@ -10,11 +10,11 @@ pub struct Model {
     #[sea_orm(unique)]
     pub outpoint: String,
     pub txid: String,
-    pub output_index: i32,
+    pub output_index: i64,
     pub address: String,
     pub amount_sat: i64,
     pub status: String,
-    pub block_height: Option<i32>,
+    pub block_height: Option<i64>,
     pub created_at: DateTime,
     pub updated_at: Option<DateTime>,
 }

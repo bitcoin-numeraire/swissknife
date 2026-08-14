@@ -23,7 +23,7 @@ impl MigrationTrait for Migration {
             .await?;
 
         let db = manager.get_connection();
-        execute(
+        execute_raw(
             db,
             format!(
                 r#"
@@ -46,7 +46,7 @@ impl MigrationTrait for Migration {
         .await?;
 
         let missing = db
-            .query_one(Statement::from_string(
+            .query_one_raw(Statement::from_string(
                 DatabaseBackend::Postgres,
                 format!(
                     "SELECT COUNT(*) AS count FROM {} WHERE {} IS NULL",
@@ -63,7 +63,7 @@ impl MigrationTrait for Migration {
             )));
         }
 
-        execute(
+        execute_raw(
             db,
             r#"
             ALTER TABLE ln_address
@@ -74,7 +74,7 @@ impl MigrationTrait for Migration {
         )
         .await?;
 
-        execute(
+        execute_raw(
             db,
             r#"
             ALTER TABLE ln_address
@@ -108,8 +108,8 @@ impl MigrationTrait for Migration {
     }
 }
 
-async fn execute(db: &dyn ConnectionTrait, sql: String) -> Result<(), DbErr> {
-    db.execute(Statement::from_string(DatabaseBackend::Postgres, sql))
+async fn execute_raw(db: &impl ConnectionTrait, sql: String) -> Result<(), DbErr> {
+    db.execute_raw(Statement::from_string(DatabaseBackend::Postgres, sql))
         .await
         .map(|_| ())
 }

@@ -18,7 +18,7 @@ impl MigrationTrait for Migration {
 
         let db = manager.get_connection();
 
-        db.execute(Statement::from_string(
+        db.execute_raw(Statement::from_string(
             db.get_database_backend(),
             format!(
                 r#"
@@ -67,7 +67,7 @@ impl MigrationTrait for Migration {
         }
 
         let db = manager.get_connection();
-        db.execute(Statement::from_string(
+        db.execute_raw(Statement::from_string(
             db.get_database_backend(),
             r#"
             UPDATE wallet
@@ -84,9 +84,9 @@ impl MigrationTrait for Migration {
     }
 }
 
-async fn assert_wallets_backfilled(db: &dyn ConnectionTrait) -> Result<(), DbErr> {
+async fn assert_wallets_backfilled(db: &impl ConnectionTrait) -> Result<(), DbErr> {
     let missing = db
-        .query_one(Statement::from_string(
+        .query_one_raw(Statement::from_string(
             db.get_database_backend(),
             "SELECT COUNT(*) AS count FROM wallet WHERE account_id IS NULL OR asset_id IS NULL".to_string(),
         ))

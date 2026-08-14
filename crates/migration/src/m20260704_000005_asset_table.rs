@@ -131,7 +131,7 @@ impl MigrationTrait for Migration {
     }
 }
 
-async fn seed_assets(db: &dyn ConnectionTrait) -> Result<(), DbErr> {
+async fn seed_assets(db: &impl ConnectionTrait) -> Result<(), DbErr> {
     let backend = db.get_database_backend();
 
     for asset in ASSETS {
@@ -176,14 +176,14 @@ async fn seed_assets(db: &dyn ConnectionTrait) -> Result<(), DbErr> {
             display_ticker = sql_literal(asset.display_ticker),
             decimals = asset.decimals,
         );
-        execute(db, backend, sql).await?;
+        execute_raw(db, backend, sql).await?;
     }
 
     Ok(())
 }
 
-async fn execute(db: &dyn ConnectionTrait, backend: DatabaseBackend, sql: String) -> Result<(), DbErr> {
-    db.execute(Statement::from_string(backend, sql)).await?;
+async fn execute_raw(db: &impl ConnectionTrait, backend: DatabaseBackend, sql: String) -> Result<(), DbErr> {
+    db.execute_raw(Statement::from_string(backend, sql)).await?;
     Ok(())
 }
 

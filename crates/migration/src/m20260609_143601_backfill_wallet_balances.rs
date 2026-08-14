@@ -80,13 +80,13 @@ impl MigrationTrait for Migration {
 
         let negative_count = match db.get_database_backend() {
             DatabaseBackend::Postgres => db
-                .query_one(Statement::from_string(
+                .query_one_raw(Statement::from_string(
                     DatabaseBackend::Postgres,
                     "SELECT COUNT(*)::BIGINT AS negative_count FROM wallet_balance WHERE available_amount < 0 OR reserved_amount < 0",
                 ))
                 .await?,
             backend => db
-                .query_one(Statement::from_string(
+                .query_one_raw(Statement::from_string(
                     backend,
                     "SELECT COUNT(*) AS negative_count FROM wallet_balance WHERE available_amount < 0 OR reserved_amount < 0",
                 ))

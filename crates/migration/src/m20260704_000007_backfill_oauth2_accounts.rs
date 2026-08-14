@@ -30,7 +30,7 @@ impl MigrationTrait for Migration {
         let db = manager.get_connection();
         let backend = db.get_database_backend();
 
-        execute(
+        execute_raw(
             db,
             backend,
             format!(
@@ -61,10 +61,10 @@ impl MigrationTrait for Migration {
     }
 }
 
-async fn backfill_accounts(db: &dyn ConnectionTrait) -> Result<(), DbErr> {
+async fn backfill_accounts(db: &impl ConnectionTrait) -> Result<(), DbErr> {
     let backend = db.get_database_backend();
     let users = db
-        .query_all(Statement::from_string(
+        .query_all_raw(Statement::from_string(
             backend,
             format!(
                 r#"
@@ -86,7 +86,7 @@ async fn backfill_accounts(db: &dyn ConnectionTrait) -> Result<(), DbErr> {
         let account_id = uuid_literal(&account_id)?;
         let auth_identity_id = uuid_literal(&auth_identity_id)?;
 
-        execute(
+        execute_raw(
             db,
             backend,
             format!(
@@ -98,7 +98,7 @@ async fn backfill_accounts(db: &dyn ConnectionTrait) -> Result<(), DbErr> {
         )
         .await?;
 
-        execute(
+        execute_raw(
             db,
             backend,
             format!(
@@ -112,7 +112,7 @@ async fn backfill_accounts(db: &dyn ConnectionTrait) -> Result<(), DbErr> {
         )
         .await?;
 
-        execute(
+        execute_raw(
             db,
             backend,
             format!(
@@ -128,8 +128,8 @@ async fn backfill_accounts(db: &dyn ConnectionTrait) -> Result<(), DbErr> {
     Ok(())
 }
 
-async fn execute(db: &dyn ConnectionTrait, backend: DatabaseBackend, sql: String) -> Result<(), DbErr> {
-    db.execute(Statement::from_string(backend, sql)).await?;
+async fn execute_raw(db: &impl ConnectionTrait, backend: DatabaseBackend, sql: String) -> Result<(), DbErr> {
+    db.execute_raw(Statement::from_string(backend, sql)).await?;
     Ok(())
 }
 

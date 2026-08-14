@@ -45,7 +45,7 @@ impl MigrationTrait for Migration {
     }
 }
 
-async fn drop_sqlite(db: &dyn ConnectionTrait) -> Result<(), DbErr> {
+async fn drop_sqlite(db: &impl ConnectionTrait) -> Result<(), DbErr> {
     db.execute_unprepared("PRAGMA foreign_keys = OFF").await?;
     db.execute_unprepared("DROP TABLE wallet_balance").await?;
     db.execute_unprepared("ALTER TABLE payment DROP COLUMN currency")

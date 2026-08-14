@@ -4,9 +4,7 @@ use crate::{
     infra::database::sea_orm::models::{config, config::ActiveModel, prelude::Config},
 };
 use async_trait::async_trait;
-use sea_orm::{
-    sea_query::OnConflict, ActiveModelTrait, ConnectionTrait, DatabaseConnection, EntityTrait, QueryTrait, Set,
-};
+use sea_orm::{sea_query::OnConflict, ActiveModelTrait, DatabaseConnection, EntityTrait, Set};
 use serde_json::Value;
 
 #[derive(Clone)]
@@ -54,16 +52,13 @@ impl ConfigRepository for SeaOrmConfigRepository {
             key: Set(key.to_string()),
             value: Set(Some(value)),
         };
-        let statement = Config::insert(model)
+        let rows_affected = Config::insert(model)
             .on_conflict(OnConflict::column(config::Column::Key).do_nothing().to_owned())
-            .build(self.db.get_database_backend());
-        let result = self
-            .db
-            .execute(statement)
+            .exec_without_returning(&self.db)
             .await
             .map_err(|e| DatabaseError::Insert(e.to_string()))?;
 
-        Ok(result.rows_affected() == 1)
+        Ok(rows_affected == 1)
     }
 
     async fn upsert(&self, key: &str, value: Value) -> Result<(), DatabaseError> {

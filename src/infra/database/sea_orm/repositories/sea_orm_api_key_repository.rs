@@ -9,7 +9,7 @@ use crate::{
 use async_trait::async_trait;
 use chrono::Utc;
 use sea_orm::{
-    sea_query::Expr, ActiveModelTrait, ColumnTrait, Condition, DatabaseConnection, EntityTrait, QueryFilter,
+    sea_query::Expr, ActiveModelTrait, ColumnTrait, Condition, DatabaseConnection, EntityTrait, ExprTrait, QueryFilter,
     QueryOrder, QuerySelect, QueryTrait, Set,
 };
 use uuid::Uuid;
