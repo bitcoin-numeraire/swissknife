@@ -1,5 +1,5 @@
 use chrono::{DateTime, Utc};
-use nostr::PublicKey;
+use nostr::key::PublicKey;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 use utoipa::{IntoParams, ToSchema};

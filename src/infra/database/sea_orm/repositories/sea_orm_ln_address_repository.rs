@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use chrono::Utc;
-use nostr_sdk::PublicKey;
+use nostr_sdk::prelude::PublicKey;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, QueryOrder, QuerySelect, QueryTrait,
     Set, Unchanged,

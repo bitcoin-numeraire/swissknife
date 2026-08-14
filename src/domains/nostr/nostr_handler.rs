@@ -49,7 +49,7 @@ pub async fn well_known_nostr(
 
 #[cfg(test)]
 mod tests {
-    use nostr_sdk::PublicKey;
+    use nostr_sdk::prelude::PublicKey;
 
     use crate::application::{composition::MockAppServicesBuilder, errors::DataError};
 
