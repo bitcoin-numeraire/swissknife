@@ -162,4 +162,6 @@ jobs:
           tool: cargo-audit
 
       - name: Run cargo audit
-        run: cargo audit
+        # rust_decimal's optional rkyv feature is not enabled, but Cargo.lock
+        # records optional dependencies and cargo-audit scans them unconditionally.
+        run: cargo audit --ignore RUSTSEC-2026-0235

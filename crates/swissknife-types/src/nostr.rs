@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use nostr::PublicKey;
+use nostr::key::PublicKey;
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 
