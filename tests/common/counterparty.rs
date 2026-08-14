@@ -99,6 +99,36 @@ impl Counterparty {
         }
     }
 
+    /// Create an invoice whose payment preimage is known to the test. LNURL
+    /// AES success actions use that preimage as their decryption key.
+    pub fn invoice_with_preimage(&self, amount_msat: u64, label: &str, preimage: &[u8; 32]) -> String {
+        let preimage = hex::encode(preimage);
+        match self.kind {
+            Kind::Lnd => {
+                let amount = format!("--amt_msat={amount_msat}");
+                let preimage = format!("--preimage={preimage}");
+                let v = self.run_json(&["lncli", "--network=regtest", "addinvoice", &amount, &preimage]);
+                v["payment_request"].as_str().expect("lnd payment_request").to_string()
+            }
+            Kind::Cln => {
+                let amount = format!("amount_msat={amount_msat}");
+                let label = format!("label={label}");
+                let preimage = format!("preimage={preimage}");
+                let v = self.run_json(&[
+                    "lightning-cli",
+                    "--network=regtest",
+                    "-k",
+                    "invoice",
+                    &amount,
+                    &label,
+                    "description=itest",
+                    &preimage,
+                ]);
+                v["bolt11"].as_str().expect("cln bolt11").to_string()
+            }
+        }
+    }
+
     /// Pay a bolt11 from the counterparty (so the SUT receives).
     pub fn pay(&self, bolt11: &str) {
         match self.kind {

@@ -36,7 +36,7 @@ mod pay {
     /// follow its callback to a counterparty-issued bolt11, pay it, settle, and
     /// debit the wallet — asserting the mock saw the expected callback request.
     #[tokio::test]
-    async fn settles_against_an_external_lnurl_service_and_debits_the_wallet() {
+    async fn settles_decrypts_and_persists_the_success_action() {
         let app = app().await;
         let token = app.admin_token().await;
         let wallet = app.create_wallet(token, "lnurl-send").await;
@@ -47,12 +47,21 @@ mod pay {
         let amount_msat = 100_000_000u64;
         // The invoice the mock hands back must be payable on the regtest network,
         // so it is issued by the counterparty for exactly the requested amount.
-        let bolt11 = Counterparty::for_provider(&app.provider).invoice(amount_msat, &unique("lnurl-cp"));
+        let first_half = uuid::Uuid::new_v4();
+        let second_half = uuid::Uuid::new_v4();
+        let mut payment_preimage = [0u8; 32];
+        payment_preimage[..16].copy_from_slice(first_half.as_bytes());
+        payment_preimage[16..].copy_from_slice(second_half.as_bytes());
+        let bolt11 = Counterparty::for_provider(&app.provider).invoice_with_preimage(
+            amount_msat,
+            &unique("lnurl-cp"),
+            &payment_preimage,
+        );
 
         let user = unique("payee");
         let mock = MockLnurl::start().await;
         mock.mount_pay_request(&user, 1_000, 250_000_000_000, 255).await;
-        mock.mount_callback_invoice_with_message(&bolt11, "Thanks for the sats!")
+        mock.mount_callback_invoice_with_aes(&bolt11, "LNURL receipt", "Thanks for the sats!", &payment_preimage)
             .await;
 
         let quote = app
@@ -90,15 +99,34 @@ mod pay {
         assert_eq!(payment.ledger, Ledger::Lightning);
         assert_eq!(payment.amount_msat, amount_msat);
 
-        // The callback's success action is mapped onto the payment and persisted by the
-        // synchronous pay path, which stays authoritative over the async settlement
-        // listener (the listener carries no action), so it is present deterministically.
+        // The callback action is persisted before paying. Whether the synchronous
+        // request or the provider listener wins settlement, the preimage projects it
+        // onto the public payment deterministically.
         let success_action = payment
             .lightning
             .as_ref()
             .and_then(|ln| ln.success_action.as_ref())
             .expect("LNURL success action present on the settled payment");
+        assert_eq!(success_action.tag, "message");
         assert_eq!(success_action.message.as_deref(), Some("Thanks for the sats!"));
+        assert_eq!(success_action.description.as_deref(), Some("LNURL receipt"));
+
+        // Re-read through the public API rather than trusting the POST response:
+        // this proves the action survived the database serialization boundary.
+        let persisted = app
+            .api()
+            .get(&format!("/v1/payments/{}", payment.id), Auth::Bearer(token))
+            .await;
+        assert_status(&persisted, StatusCode::OK);
+        let persisted = persisted.parse::<Payment>();
+        let persisted_action = persisted
+            .lightning
+            .as_ref()
+            .and_then(|ln| ln.success_action.as_ref())
+            .expect("LNURL success action persisted on the settled payment");
+        assert_eq!(persisted_action.tag, "message");
+        assert_eq!(persisted_action.message.as_deref(), Some("Thanks for the sats!"));
+        assert_eq!(persisted_action.description.as_deref(), Some("LNURL receipt"));
 
         // The wallet is debited by the amount plus the routing fee.
         let fee = payment.fee_msat.unwrap_or_default() as i64;
