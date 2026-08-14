@@ -128,20 +128,20 @@ const unusedImportsConfig = {
  * Enforces strict sorting of imports, exports, and objects for better readability.
  */
 const customGroups = {
-  mui: ['custom-mui'],
-  auth: ['custom-auth'],
-  hooks: ['custom-hooks'],
-  utils: ['custom-utils'],
-  types: ['custom-types'],
-  routes: ['custom-routes'],
-  sections: ['custom-sections'],
-  components: ['custom-components'],
+  mui: 'custom-mui',
+  auth: 'custom-auth',
+  hooks: 'custom-hooks',
+  utils: 'custom-utils',
+  types: 'custom-types',
+  routes: 'custom-routes',
+  sections: 'custom-sections',
+  components: 'custom-components',
 };
 
 const typeGroups = [
-  ['type', 'external-type', 'builtin-type'],
-  { newlinesBetween: 'never' },
-  ['index-type', 'parent-type', 'sibling-type', 'internal-type'],
+  ['type-external', 'type-builtin'],
+  { newlinesBetween: 0 },
+  ['type-index', 'type-parent', 'type-sibling', 'type-internal'],
 ];
 
 const perfectionistConfig = {
@@ -156,7 +156,7 @@ const perfectionistConfig = {
       {
         order: 'asc',
         type: 'line-length',
-        groupKind: 'values-first',
+        groups: ['value-export', 'type-export'],
       },
     ],
     'perfectionist/sort-imports': [
@@ -167,7 +167,7 @@ const perfectionistConfig = {
         type: 'line-length',
         environment: 'node',
         maxLineLength: undefined,
-        newlinesBetween: 'always',
+        newlinesBetween: 1,
         internalPattern: ['^src/.+'],
         groups: [
           'style',
@@ -184,21 +184,51 @@ const perfectionistConfig = {
           customGroups.auth,
           customGroups.types,
           ['parent', 'sibling', 'index'],
-          'object',
+          'import',
           'unknown',
         ],
-        customGroups: {
-          value: {
-            [customGroups.mui]: ['^@mui/.+'],
-            [customGroups.auth]: ['^src/auth/.+'],
-            [customGroups.hooks]: ['^src/hooks/.+'],
-            [customGroups.utils]: ['^src/utils/.+'],
-            [customGroups.types]: ['^src/types/.+'],
-            [customGroups.routes]: ['^src/routes/.+'],
-            [customGroups.sections]: ['^src/sections/.+'],
-            [customGroups.components]: ['^src/components/.+'],
+        customGroups: [
+          {
+            groupName: customGroups.mui,
+            elementNamePattern: '^@mui/.+',
+            modifiers: ['value'],
           },
-        },
+          {
+            groupName: customGroups.auth,
+            elementNamePattern: '^src/auth/.+',
+            modifiers: ['value'],
+          },
+          {
+            groupName: customGroups.hooks,
+            elementNamePattern: '^src/hooks/.+',
+            modifiers: ['value'],
+          },
+          {
+            groupName: customGroups.utils,
+            elementNamePattern: '^src/utils/.+',
+            modifiers: ['value'],
+          },
+          {
+            groupName: customGroups.types,
+            elementNamePattern: '^src/types/.+',
+            modifiers: ['value'],
+          },
+          {
+            groupName: customGroups.routes,
+            elementNamePattern: '^src/routes/.+',
+            modifiers: ['value'],
+          },
+          {
+            groupName: customGroups.sections,
+            elementNamePattern: '^src/sections/.+',
+            modifiers: ['value'],
+          },
+          {
+            groupName: customGroups.components,
+            elementNamePattern: '^src/components/.+',
+            modifiers: ['value'],
+          },
+        ],
       },
     ],
   },
