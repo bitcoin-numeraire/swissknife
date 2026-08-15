@@ -63,7 +63,7 @@ async fn connect_unmigrated() -> DatabaseConnection {
                 format!("CREATE DATABASE \"{name}\""),
             ] {
                 admin
-                    .execute(Statement::from_string(DatabaseBackend::Postgres, stmt))
+                    .execute_raw(Statement::from_string(DatabaseBackend::Postgres, stmt))
                     .await
                     .expect("provision postgres db");
             }
@@ -149,7 +149,7 @@ fn uow(conn: &DatabaseConnection) -> SeaOrmPaymentUnitOfWork {
 }
 
 async fn count(conn: &DatabaseConnection, sql: &str) -> i64 {
-    conn.query_one(Statement::from_string(conn.get_database_backend(), sql.to_string()))
+    conn.query_one_raw(Statement::from_string(conn.get_database_backend(), sql.to_string()))
         .await
         .expect("query count")
         .expect("count row")
@@ -261,7 +261,7 @@ async fn postgres_migrates_legacy_oauth2_wallet_data() {
                 'idx_ln_address_account',
                 'idx_payment_wallet_created_at',
                 'idx_wallet_account_asset',
-                'idx_wallet_account_id',
+                'uq_wallet_account_id',
                 'idx_wallet_asset_id'
               )
             "#,

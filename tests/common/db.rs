@@ -57,7 +57,7 @@ impl TestDatabase {
             format!("CREATE DATABASE \"{name}\""),
         ] {
             admin
-                .execute(Statement::from_string(DatabaseBackend::Postgres, stmt))
+                .execute_raw(Statement::from_string(DatabaseBackend::Postgres, stmt))
                 .await
                 .expect("provision postgres test database");
         }

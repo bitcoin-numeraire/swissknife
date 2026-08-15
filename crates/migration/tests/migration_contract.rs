@@ -8,7 +8,7 @@ async fn sqlite() -> DatabaseConnection {
 }
 
 async fn count(conn: &DatabaseConnection, sql: &str) -> i64 {
-    conn.query_one(Statement::from_string(DatabaseBackend::Sqlite, sql.to_owned()))
+    conn.query_one_raw(Statement::from_string(DatabaseBackend::Sqlite, sql.to_owned()))
         .await
         .expect("query count")
         .expect("count row")
@@ -37,7 +37,7 @@ fn renamed_modules_preserve_deployed_migration_names() {
     );
 }
 
-#[async_std::test]
+#[tokio::test]
 async fn fresh_sqlite_schema_preserves_migration_contracts() {
     let conn = sqlite().await;
 

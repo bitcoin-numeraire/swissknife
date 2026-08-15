@@ -48,11 +48,11 @@ where
             let active_model = ActiveModel {
                 id: Unchanged(existing.id),
                 txid: Set(output.txid.clone()),
-                output_index: Set(output.output_index as i32),
+                output_index: Set(i64::from(output.output_index)),
                 address: Set(output.address.clone()),
                 amount_sat: Set(output.amount_sat as i64),
                 status: Set(output.status.to_string()),
-                block_height: Set(output.block_height.map(|h| h as i32)),
+                block_height: Set(output.block_height.map(i64::from)),
                 updated_at: Set(Some(Utc::now().naive_utc())),
                 ..Default::default()
             };
@@ -69,11 +69,11 @@ where
             id: Set(Uuid::new_v4()),
             outpoint: Set(output.outpoint.clone()),
             txid: Set(output.txid.clone()),
-            output_index: Set(output.output_index as i32),
+            output_index: Set(i64::from(output.output_index)),
             address: Set(output.address.clone()),
             amount_sat: Set(output.amount_sat as i64),
             status: Set(output.status.to_string()),
-            block_height: Set(output.block_height.map(|h| h as i32)),
+            block_height: Set(output.block_height.map(i64::from)),
             ..Default::default()
         };
 
@@ -88,7 +88,7 @@ where
     async fn max_block_height(&self) -> Result<Option<u32>, DatabaseError> {
         #[derive(FromQueryResult)]
         struct MaxBlockHeight {
-            max: Option<i32>,
+            max: Option<i64>,
         }
 
         let result = BtcOutputEntity::find()

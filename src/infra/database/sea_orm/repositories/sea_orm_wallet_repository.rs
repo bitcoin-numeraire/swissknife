@@ -2,7 +2,8 @@ use async_trait::async_trait;
 use chrono::Utc;
 use sea_orm::{
     sea_query::{Expr, OnConflict},
-    ColumnTrait, DatabaseConnection, EntityTrait, ModelTrait, QueryFilter, QueryOrder, QuerySelect, QueryTrait, Set,
+    ColumnTrait, DatabaseConnection, EntityTrait, ExprTrait, ModelTrait, QueryFilter, QueryOrder, QuerySelect,
+    QueryTrait, Set,
 };
 use uuid::Uuid;
 

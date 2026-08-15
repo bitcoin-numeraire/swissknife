@@ -138,7 +138,7 @@ where
             success_action: Set(success_action),
             raw_success_action: Set(raw_success_action),
             payment_preimage: Set(payment_preimage),
-            btc_block_height: Set(block_height.map(|h| h as i32)),
+            btc_block_height: Set(block_height.map(i64::from)),
             ..Default::default()
         }
         .insert(self.db.connection())
@@ -217,7 +217,7 @@ where
             metadata: Set(metadata),
             ln_address,
             btc_address,
-            btc_block_height: Set(block_height.map(|h| h as i32)),
+            btc_block_height: Set(block_height.map(i64::from)),
             success_action: Set(success_action),
             raw_success_action: Set(raw_success_action),
             updated_at: Set(Some(Utc::now().naive_utc())),
@@ -265,7 +265,7 @@ where
     async fn max_btc_block_height(&self) -> Result<Option<u32>, DatabaseError> {
         #[derive(FromQueryResult)]
         struct MaxBlockHeight {
-            max: Option<i32>,
+            max: Option<i64>,
         }
 
         let result = PaymentEntity::find()
