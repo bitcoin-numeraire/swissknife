@@ -1,6 +1,6 @@
 use sea_orm_migration::{prelude::*, schema::*};
 
-use crate::m20240420_1_wallet_table::Wallet;
+use crate::m20240420_000001_wallet_table::Wallet;
 
 #[derive(DeriveMigrationName)]
 pub struct Migration;

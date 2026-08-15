@@ -3,8 +3,14 @@ use sea_orm_migration::{prelude::*, schema::*};
 
 use crate::m20260704_000001_account_table::Account;
 
-#[derive(DeriveMigrationName)]
 pub struct Migration;
+
+// Preserve the identifier already recorded in deployed databases.
+impl MigrationName for Migration {
+    fn name(&self) -> &str {
+        "m20241009_6_api_key_table"
+    }
+}
 
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {

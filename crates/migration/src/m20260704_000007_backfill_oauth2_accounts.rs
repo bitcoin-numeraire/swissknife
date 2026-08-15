@@ -3,7 +3,7 @@ use sea_orm_migration::prelude::*;
 use uuid::Uuid;
 
 use crate::{
-    m20240420_1_wallet_table::Wallet, m20260704_000001_account_table::Account,
+    m20240420_000001_wallet_table::Wallet, m20260704_000001_account_table::Account,
     m20260704_000002_auth_identity_table::AuthIdentity,
 };
 
