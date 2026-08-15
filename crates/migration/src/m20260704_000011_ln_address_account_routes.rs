@@ -1,7 +1,7 @@
 use sea_orm::{ConnectionTrait, DatabaseBackend, Statement};
 use sea_orm_migration::{prelude::*, schema::*};
 
-use crate::{m20240420_1_wallet_table::Wallet, m20240420_2_ln_address_table::LnAddress};
+use crate::{m20240420_000001_wallet_table::Wallet, m20240420_000002_ln_address_table::LnAddress};
 
 #[derive(DeriveMigrationName)]
 pub struct Migration;

@@ -2,12 +2,18 @@ use sea_orm::DatabaseBackend;
 use sea_orm_migration::{prelude::*, schema::*};
 
 use crate::{
-    m20240420_1_wallet_table::Wallet, m20240420_2_ln_address_table::LnAddress,
+    m20240420_000001_wallet_table::Wallet, m20240420_000002_ln_address_table::LnAddress,
     m20251224_162542_btc_output_table::BtcOutput,
 };
 
-#[derive(DeriveMigrationName)]
 pub struct Migration;
+
+// Preserve the identifier already recorded in deployed databases.
+impl MigrationName for Migration {
+    fn name(&self) -> &str {
+        "m20240420_3_invoice_table"
+    }
+}
 
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {

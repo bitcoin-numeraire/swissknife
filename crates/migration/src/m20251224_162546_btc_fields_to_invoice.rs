@@ -1,7 +1,7 @@
 use sea_orm::DatabaseBackend;
 use sea_orm_migration::{prelude::*, schema::*};
 
-use crate::{m20240420_3_invoice_table::Invoice, m20251224_162542_btc_output_table::BtcOutput};
+use crate::{m20240420_000003_invoice_table::Invoice, m20251224_162542_btc_output_table::BtcOutput};
 
 #[derive(DeriveMigrationName)]
 pub struct Migration;

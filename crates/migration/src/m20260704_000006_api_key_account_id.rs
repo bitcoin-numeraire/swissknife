@@ -1,7 +1,7 @@
 use sea_orm::DatabaseBackend;
 use sea_orm_migration::{prelude::*, schema::*};
 
-use crate::{m20241009_6_api_key_table::ApiKey, m20260704_000001_account_table::Account};
+use crate::{m20241009_000006_api_key_table::ApiKey, m20260704_000001_account_table::Account};
 
 #[derive(DeriveMigrationName)]
 pub struct Migration;

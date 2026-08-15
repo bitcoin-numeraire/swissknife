@@ -2,7 +2,7 @@ use sea_orm::{ConnectionTrait, DatabaseBackend};
 use sea_orm_migration::prelude::*;
 
 use crate::{
-    m20240420_3_invoice_table::Invoice, m20240420_4_payment_table::Payment,
+    m20240420_000003_invoice_table::Invoice, m20240420_000004_payment_table::Payment,
     m20260609_143600_wallet_balance_table::WalletBalance,
 };
 

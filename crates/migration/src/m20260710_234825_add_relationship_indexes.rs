@@ -1,8 +1,8 @@
 use sea_orm_migration::prelude::*;
 
 use crate::{
-    m20240420_1_wallet_table::Wallet, m20240420_3_invoice_table::Invoice, m20240420_4_payment_table::Payment,
-    m20260704_000002_auth_identity_table::AuthIdentity,
+    m20240420_000001_wallet_table::Wallet, m20240420_000003_invoice_table::Invoice,
+    m20240420_000004_payment_table::Payment, m20260704_000002_auth_identity_table::AuthIdentity,
 };
 
 #[derive(DeriveMigrationName)]

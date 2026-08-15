@@ -3,10 +3,16 @@ use sea_orm_migration::{
     schema::{boolean, string_len_null},
 };
 
-use crate::m20240420_2_ln_address_table::LnAddress;
+use crate::m20240420_000002_ln_address_table::LnAddress;
 
-#[derive(DeriveMigrationName)]
 pub struct Migration;
+
+// Preserve the identifier already recorded in deployed databases.
+impl MigrationName for Migration {
+    fn name(&self) -> &str {
+        "m20241005_5_ln_address_nostr"
+    }
+}
 
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
