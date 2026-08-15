@@ -79,6 +79,22 @@ impl ApiClient {
         self.request(Method::GET, path, auth, None).await
     }
 
+    /// Open an SSE response without consuming its body. The caller owns the
+    /// response and can read event frames incrementally with `Response::chunk`.
+    pub async fn event_stream(&self, path: &str, auth: Auth<'_>, last_event_id: Option<&str>) -> reqwest::Response {
+        let mut req = self.http.get(self.url(path)).header("accept", "text/event-stream");
+        req = match auth {
+            Auth::None => req,
+            Auth::Bearer(token) => req.bearer_auth(token),
+            Auth::ApiKey(key) => req.header("api-key", key),
+        };
+        if let Some(last_event_id) = last_event_id {
+            req = req.header("last-event-id", last_event_id);
+        }
+
+        req.send().await.expect("SSE request should complete")
+    }
+
     pub async fn post(&self, path: &str, auth: Auth<'_>, body: impl Serialize) -> TestResponse {
         self.request(Method::POST, path, auth, Some(to_value(body))).await
     }
