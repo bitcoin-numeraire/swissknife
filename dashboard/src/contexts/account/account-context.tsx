@@ -1,6 +1,6 @@
 'use client';
 
-import type { Wallet, Account } from 'src/lib/swissknife';
+import type { Wallet, Account, ClientEvent } from 'src/lib/swissknife';
 import type { DashboardPreferenceUpdate } from './dashboard-preferences';
 
 import { createContext } from 'react';
@@ -10,6 +10,7 @@ export type AccountContextValue = {
   wallets: Wallet[];
   activeWallet?: Wallet;
   activeWalletId?: string;
+  recentClientEvents: readonly ClientEvent[];
   accountLoading: boolean;
   walletsLoading: boolean;
   activeWalletLoading: boolean;
