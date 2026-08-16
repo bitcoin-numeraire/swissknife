@@ -7,6 +7,7 @@ import { endpointKeys } from 'src/actions/keys';
 import {
   isAccountEventCacheKey,
   createAccountEventFetch,
+  appendRecentClientEvent,
   consumeAccountEventStreams,
 } from './account-event-stream';
 
@@ -57,6 +58,24 @@ describe('account event cache invalidation', () => {
   it('refreshes every cached account wallet after a connection establishes its cursor', () => {
     expect(isAccountEventCacheKey(endpointKeys.accountWallet.get('wallet-1'))).toBe(true);
     expect(isAccountEventCacheKey(endpointKeys.accountWallet.get('wallet-2'))).toBe(true);
+  });
+});
+
+describe('recent account events', () => {
+  it('preserves burst events for consumers that need an earlier notification', () => {
+    const first = appendRecentClientEvent(undefined, 'account-1', event('41'));
+    const second = appendRecentClientEvent(first, 'account-1', event('42'));
+
+    expect(second.events.map((clientEvent) => clientEvent.id)).toEqual(['41', '42']);
+  });
+
+  it('deduplicates replayed IDs and clears events when the account changes', () => {
+    const first = appendRecentClientEvent(undefined, 'account-1', event('41'));
+    const replayed = appendRecentClientEvent(first, 'account-1', event('41'));
+    const otherAccount = appendRecentClientEvent(replayed, 'account-2', event('42'));
+
+    expect(replayed.events).toHaveLength(1);
+    expect(otherAccount.events.map((clientEvent) => clientEvent.id)).toEqual(['42']);
   });
 });
 

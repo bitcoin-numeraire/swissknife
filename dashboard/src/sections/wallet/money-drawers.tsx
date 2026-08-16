@@ -1204,7 +1204,7 @@ export function ReceiveMoneyDrawer({
   const { state } = useSettingsContext();
   const { copy } = useCopyToClipboard();
   const { wallet } = useActiveWallet();
-  const { lastClientEvent } = useAccountContext();
+  const { recentClientEvents } = useAccountContext();
 
   const defaultPayload = initialPayload ?? (lnAddress ? 'identity' : 'unified');
   const [activePayload, setActivePayload] = useState<ReceivePayload>(defaultPayload);
@@ -1340,12 +1340,16 @@ export function ReceiveMoneyDrawer({
   useEffect(() => {
     if (isAdmin) return;
 
-    const settledInvoice = invoiceAfterClientEvent(invoice, lastClientEvent, addressWalletId);
+    const settledInvoice = recentClientEvents.reduce(
+      (currentInvoice, clientEvent) =>
+        invoiceAfterClientEvent(currentInvoice, clientEvent, addressWalletId),
+      invoice
+    );
     if (settledInvoice === invoice) return;
 
     setInvoice(settledInvoice);
     toast.success(t('receive_money.payment_received'));
-  }, [addressWalletId, invoice, isAdmin, lastClientEvent, t]);
+  }, [addressWalletId, invoice, isAdmin, recentClientEvents, t]);
 
   const handleClose = useCallback(() => {
     setActivePayload(defaultPayload);

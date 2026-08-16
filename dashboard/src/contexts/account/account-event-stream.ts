@@ -28,6 +28,13 @@ const WALLET_EVENT_KEY_PREFIXES = new Set([
 ]);
 
 const STREAM_RECONNECT_DELAY_MS = 1_000;
+const RECENT_EVENT_LIMIT = 50;
+const NO_CLIENT_EVENTS: readonly ClientEvent[] = [];
+
+type RecentClientEvents = {
+  accountId: string;
+  events: ClientEvent[];
+};
 
 type AccountEventStreamConsumerOptions = {
   signal: AbortSignal;
@@ -50,6 +57,20 @@ export function isAccountEventCacheKey(key: unknown, event?: ClientEvent) {
     WALLET_EVENT_KEY_PREFIXES.has(key[0]) &&
     (!event || key[1] === event.wallet_id)
   );
+}
+
+export function appendRecentClientEvent(
+  current: RecentClientEvents | undefined,
+  accountId: string,
+  event: ClientEvent
+): RecentClientEvents {
+  const accountEvents = current?.accountId === accountId ? current.events : [];
+  const uniqueEvents = accountEvents.filter((candidate) => candidate.id !== event.id);
+
+  return {
+    accountId,
+    events: [...uniqueEvents, event].slice(-RECENT_EVENT_LIMIT),
+  };
 }
 
 export function createAccountEventFetch(
@@ -143,10 +164,7 @@ export async function consumeAccountEventStreams({
 
 export function useAccountEventStream(accountId: string | undefined, enabled: boolean) {
   const { mutate } = useSWRConfig();
-  const [lastEvent, setLastEvent] = useState<{
-    accountId: string;
-    event: ClientEvent;
-  }>();
+  const [recentEvents, setRecentEvents] = useState<RecentClientEvents>();
 
   useEffect(() => {
     if (!accountId || !enabled) return undefined;
@@ -182,7 +200,7 @@ export function useAccountEventStream(accountId: string | undefined, enabled: bo
         return stream as AsyncIterable<ClientEvent>;
       },
       onEvent: async (clientEvent) => {
-        setLastEvent({ accountId, event: clientEvent });
+        setRecentEvents((current) => appendRecentClientEvent(current, accountId, clientEvent));
         await refreshCachedState(clientEvent);
       },
       onCursorReset: () => refreshCachedState(),
@@ -194,6 +212,6 @@ export function useAccountEventStream(accountId: string | undefined, enabled: bo
     return () => controller.abort();
   }, [accountId, enabled, mutate]);
 
-  if (!enabled || !accountId || !lastEvent || lastEvent.accountId !== accountId) return undefined;
-  return lastEvent.event;
+  if (!enabled || !accountId || recentEvents?.accountId !== accountId) return NO_CLIENT_EVENTS;
+  return recentEvents.events;
 }
