@@ -1,5 +1,8 @@
 import { it, expect, describe } from 'vitest';
 
+import { type Invoice, InvoiceStatus, ClientEventType, type ClientEvent } from 'src/lib/swissknife';
+
+import { invoiceAfterClientEvent } from './money-drawers';
 import { getReceiveAddressListState } from './receive-address-list';
 
 describe('getReceiveAddressListState', () => {
@@ -57,5 +60,35 @@ describe('getReceiveAddressListState', () => {
       adminEnabled: false,
       walletEnabled: false,
     });
+  });
+});
+
+describe('invoiceAfterClientEvent', () => {
+  const invoice = {
+    id: 'invoice-1',
+    wallet_id: 'wallet-1',
+    status: InvoiceStatus.PENDING,
+  } as Invoice;
+  const paidEvent = {
+    id: '41',
+    event_type: ClientEventType.INVOICE_PAID,
+    wallet_id: 'wallet-1',
+    resource_id: 'invoice-1',
+    data: {},
+    created_at: new Date('2026-08-16T12:00:00Z'),
+  } satisfies ClientEvent;
+
+  it('marks the displayed invoice paid when its durable event arrives', () => {
+    expect(invoiceAfterClientEvent(invoice, paidEvent, 'wallet-1')).toMatchObject({
+      status: InvoiceStatus.SETTLED,
+      payment_time: paidEvent.created_at,
+    });
+  });
+
+  it('ignores events for a different resource or wallet', () => {
+    expect(
+      invoiceAfterClientEvent(invoice, { ...paidEvent, resource_id: 'invoice-2' }, 'wallet-1')
+    ).toBe(invoice);
+    expect(invoiceAfterClientEvent(invoice, paidEvent, 'wallet-2')).toBe(invoice);
   });
 });

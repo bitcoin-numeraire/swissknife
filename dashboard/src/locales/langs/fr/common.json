@@ -410,6 +410,8 @@
     "copy_onchain_address": "Copier l'adresse on-chain",
     "separate_copy_options": "Copier une méthode séparément",
     "waiting_for_payment": "En attente du paiement",
+    "payment_received": "Paiement reçu",
+    "payment_received_description": "Cette demande a été payée. Le solde et l’activité du portefeuille se mettent à jour automatiquement.",
     "identity": "Identité réutilisable :"
   },
   "admin_wallet_picker": {
