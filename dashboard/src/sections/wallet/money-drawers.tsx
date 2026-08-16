@@ -40,6 +40,7 @@ import { composeBip21, parseBitcoinUri, compactBitcoinAddress } from 'src/utils/
 import { CONFIG } from 'src/global-config';
 import { useTranslate } from 'src/locales';
 import { useListWallets } from 'src/actions/wallet';
+import { useAccountContext } from 'src/contexts/account';
 import { useListBtcAddresses } from 'src/actions/btc-addresses';
 import { useActiveWallet, useListWalletBtcAddresses } from 'src/actions/account-wallet';
 import {
@@ -52,8 +53,10 @@ import {
   InvoiceStatus,
   BtcAddressType,
   type LnAddress,
+  ClientEventType,
   generateInvoice,
   type BtcAddress,
+  type ClientEvent,
   newWalletInvoice,
   estimatePaymentFee,
   generateBtcAddress,
@@ -141,6 +144,29 @@ const addressTypeOptions = [
     helperKey: 'bitcoin_address_type.native_segwit_helper',
   },
 ] as const;
+
+export function invoiceAfterClientEvent(
+  invoice: Invoice | undefined,
+  clientEvent: ClientEvent | undefined,
+  walletId: string | undefined
+) {
+  if (
+    !invoice ||
+    !clientEvent ||
+    invoice.status === InvoiceStatus.SETTLED ||
+    clientEvent.event_type !== ClientEventType.INVOICE_PAID ||
+    clientEvent.wallet_id !== walletId ||
+    clientEvent.resource_id !== invoice.id
+  ) {
+    return invoice;
+  }
+
+  return {
+    ...invoice,
+    status: InvoiceStatus.SETTLED,
+    payment_time: clientEvent.created_at,
+  };
+}
 
 function stripLightningScheme(input: string) {
   return input.trim().replace(/^lightning:/i, '');
@@ -1178,6 +1204,7 @@ export function ReceiveMoneyDrawer({
   const { state } = useSettingsContext();
   const { copy } = useCopyToClipboard();
   const { wallet } = useActiveWallet();
+  const { lastClientEvent } = useAccountContext();
 
   const defaultPayload = initialPayload ?? (lnAddress ? 'identity' : 'unified');
   const [activePayload, setActivePayload] = useState<ReceivePayload>(defaultPayload);
@@ -1276,8 +1303,9 @@ export function ReceiveMoneyDrawer({
     (typeof invoiceExpiryMs === 'number' &&
       Number.isFinite(invoiceExpiryMs) &&
       invoiceExpiryMs <= nowMs);
+  const invoiceHasBeenPaid = invoice?.status === InvoiceStatus.SETTLED;
   const showInvoiceExpiry = selectedLightningInvoice && Boolean(invoice?.ln_invoice);
-  const primaryPayloadDisabled = showInvoiceExpiry && invoiceHasExpired;
+  const primaryPayloadDisabled = showInvoiceExpiry && (invoiceHasExpired || invoiceHasBeenPaid);
   const invoiceExpiryRelative = invoiceExpiresAt ? fToNow(invoiceExpiresAt) : '';
   const invoiceExpiryAbsolute = invoiceExpiresAt ? fDateTime(invoiceExpiresAt) : '';
   const shouldGetFreshOnchainAddress = selectedPayload === 'onchain' && displayedBtcAddress?.used;
@@ -1308,6 +1336,16 @@ export function ReceiveMoneyDrawer({
 
     return () => window.clearInterval(interval);
   }, [invoiceExpiresAt]);
+
+  useEffect(() => {
+    if (isAdmin) return;
+
+    const settledInvoice = invoiceAfterClientEvent(invoice, lastClientEvent, addressWalletId);
+    if (settledInvoice === invoice) return;
+
+    setInvoice(settledInvoice);
+    toast.success(t('receive_money.payment_received'));
+  }, [addressWalletId, invoice, isAdmin, lastClientEvent, t]);
 
   const handleClose = useCallback(() => {
     setActivePayload(defaultPayload);
@@ -1589,6 +1627,12 @@ export function ReceiveMoneyDrawer({
 
         {addressError && <Alert severity="warning">{addressError}</Alert>}
 
+        {invoiceHasBeenPaid && (
+          <Alert severity="success" variant="outlined">
+            {t('receive_money.payment_received_description')}
+          </Alert>
+        )}
+
         {qrValue ? (
           <Stack spacing={2}>
             <Box
@@ -1622,7 +1666,10 @@ export function ReceiveMoneyDrawer({
                 <Label color={selectedPayload === 'unified' ? 'success' : 'info'}>
                   {payloadLabel}
                 </Label>
-                {selectedLightningInvoice && !invoiceHasExpired && (
+                {selectedLightningInvoice && invoiceHasBeenPaid && (
+                  <Label color="success">{t('receive_money.payment_received')}</Label>
+                )}
+                {selectedLightningInvoice && !invoiceHasExpired && !invoiceHasBeenPaid && (
                   <Label color="success">{t('receive_money.waiting_for_payment')}</Label>
                 )}
               </Stack>
@@ -1672,7 +1719,7 @@ export function ReceiveMoneyDrawer({
                 </Button>
               </Stack>
 
-              {showInvoiceExpiry && (
+              {showInvoiceExpiry && !invoiceHasBeenPaid && (
                 <Typography
                   variant="caption"
                   color={invoiceHasExpired ? 'warning.main' : 'text.secondary'}

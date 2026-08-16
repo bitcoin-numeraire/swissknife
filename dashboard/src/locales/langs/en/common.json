@@ -411,6 +411,8 @@
     "copy_onchain_address": "Copy on-chain address",
     "separate_copy_options": "Copy one method instead",
     "waiting_for_payment": "Waiting for payment",
+    "payment_received": "Payment received",
+    "payment_received_description": "This request has been paid. The wallet balance and activity update automatically.",
     "identity": "Reusable identity:"
   },
   "admin_wallet_picker": {
