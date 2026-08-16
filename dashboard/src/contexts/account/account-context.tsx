@@ -10,7 +10,7 @@ export type AccountContextValue = {
   wallets: Wallet[];
   activeWallet?: Wallet;
   activeWalletId?: string;
-  lastClientEvent?: ClientEvent;
+  recentClientEvents: readonly ClientEvent[];
   accountLoading: boolean;
   walletsLoading: boolean;
   activeWalletLoading: boolean;

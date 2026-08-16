@@ -42,7 +42,7 @@ export function AccountProvider({ children }: AccountProviderProps) {
   });
   const account = accountResult.data;
   const wallets = useMemo(() => account?.wallets ?? [], [account?.wallets]);
-  const lastClientEvent = useAccountEventStream(
+  const recentClientEvents = useAccountEventStream(
     account?.id,
     account?.permissions?.includes(Permission.READ_TRANSACTION) ?? false
   );
@@ -149,7 +149,7 @@ export function AccountProvider({ children }: AccountProviderProps) {
       wallets,
       activeWallet: activeWalletResult.data,
       activeWalletId,
-      lastClientEvent,
+      recentClientEvents,
       accountLoading: accountResult.isLoading,
       walletsLoading: accountResult.isLoading,
       activeWalletLoading: accountResult.isLoading || activeWalletResult.isLoading,
@@ -167,7 +167,7 @@ export function AccountProvider({ children }: AccountProviderProps) {
       wallets,
       activeWalletResult.data,
       activeWalletId,
-      lastClientEvent,
+      recentClientEvents,
       accountResult.isLoading,
       activeWalletResult.isLoading,
       accountResult.error,
