@@ -3211,6 +3211,53 @@ export type GetAccountApiKeyResponses = {
 
 export type GetAccountApiKeyResponse = GetAccountApiKeyResponses[keyof GetAccountApiKeyResponses];
 
+export type StreamAccountEventsData = {
+  body?: never;
+  path?: never;
+  query?: {
+    /**
+     * Replay events strictly after this event ID. `Last-Event-ID` takes precedence.
+     */
+    after?: number;
+  };
+  url: '/v1/me/events';
+};
+
+export type StreamAccountEventsErrors = {
+  /**
+   * Invalid replay cursor
+   */
+  400: ErrorResponse;
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Forbidden
+   */
+  403: ErrorResponse;
+  /**
+   * Replay cursor has expired
+   */
+  409: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
+
+export type StreamAccountEventsError = StreamAccountEventsErrors[keyof StreamAccountEventsErrors];
+
+export type StreamAccountEventsResponses = {
+  /**
+   * Server-sent event stream
+   */
+  200: ClientEvent;
+};
+
+export type StreamAccountEventsResponse =
+  StreamAccountEventsResponses[keyof StreamAccountEventsResponses];
+
 export type DeleteAccountAddressData = {
   body?: never;
   path?: never;
@@ -3762,58 +3809,6 @@ export type ListContactsResponses = {
 };
 
 export type ListContactsResponse = ListContactsResponses[keyof ListContactsResponses];
-
-export type StreamWalletEventsData = {
-  body?: never;
-  path: {
-    /**
-     * Account-owned wallet ID
-     */
-    wallet_id: string;
-  };
-  query?: {
-    /**
-     * Replay events strictly after this event ID. `Last-Event-ID` takes precedence.
-     */
-    after?: number;
-  };
-  url: '/v1/me/wallets/{wallet_id}/events';
-};
-
-export type StreamWalletEventsErrors = {
-  /**
-   * Invalid replay cursor
-   */
-  400: ErrorResponse;
-  /**
-   * Unauthorized
-   */
-  401: ErrorResponse;
-  /**
-   * Forbidden
-   */
-  403: ErrorResponse;
-  /**
-   * Wallet not found
-   */
-  404: ErrorResponse;
-  /**
-   * Internal Server Error
-   */
-  500: ErrorResponse;
-};
-
-export type StreamWalletEventsError = StreamWalletEventsErrors[keyof StreamWalletEventsErrors];
-
-export type StreamWalletEventsResponses = {
-  /**
-   * Server-sent event stream
-   */
-  200: ClientEvent;
-};
-
-export type StreamWalletEventsResponse =
-  StreamWalletEventsResponses[keyof StreamWalletEventsResponses];
 
 export type DeleteExpiredInvoicesData = {
   body?: never;

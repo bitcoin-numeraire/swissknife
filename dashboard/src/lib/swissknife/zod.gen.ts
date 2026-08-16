@@ -1238,6 +1238,19 @@ export const zGetAccountApiKeyPath = z.object({
  */
 export const zGetAccountApiKeyResponse = zApiKey;
 
+export const zStreamAccountEventsQuery = z.object({
+  after: z
+    .int()
+    .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
+    .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
+    .optional(),
+});
+
+/**
+ * Server-sent event stream
+ */
+export const zStreamAccountEventsResponse = zClientEvent;
+
 /**
  * Found
  */
@@ -1371,23 +1384,6 @@ export const zListContactsPath = z.object({
  * Success
  */
 export const zListContactsResponse = z.array(zContact);
-
-export const zStreamWalletEventsPath = z.object({
-  wallet_id: z.uuid(),
-});
-
-export const zStreamWalletEventsQuery = z.object({
-  after: z
-    .int()
-    .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
-    .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
-    .optional(),
-});
-
-/**
- * Server-sent event stream
- */
-export const zStreamWalletEventsResponse = zClientEvent;
 
 export const zDeleteExpiredInvoicesPath = z.object({
   wallet_id: z.uuid(),

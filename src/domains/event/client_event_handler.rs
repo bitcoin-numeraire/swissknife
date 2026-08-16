@@ -18,16 +18,22 @@ use swissknife_types::{ClientEvent, ClientEventType, ErrorResponse};
 use crate::{
     application::{
         composition::AppServices,
-        docs::{BAD_REQUEST_EXAMPLE, FORBIDDEN_EXAMPLE, INTERNAL_EXAMPLE, NOT_FOUND_EXAMPLE, UNAUTHORIZED_EXAMPLE},
+        docs::{BAD_REQUEST_EXAMPLE, FORBIDDEN_EXAMPLE, INTERNAL_EXAMPLE, UNAUTHORIZED_EXAMPLE},
         errors::{ApplicationError, DataError},
     },
     domains::account::{Permission, User},
-    infra::axum::{Path, Query},
+    infra::axum::Query,
 };
 
 const LAST_EVENT_ID: &str = "last-event-id";
 const EVENT_POLL_INTERVAL: Duration = Duration::from_secs(1);
 const KEEP_ALIVE_INTERVAL: Duration = Duration::from_secs(15);
+const CURSOR_EXPIRED_EXAMPLE: &str = r#"
+{
+    "status": "409 Conflict",
+    "reason": "Client event cursor expired. Refresh state and reconnect without Last-Event-ID."
+}
+"#;
 
 #[derive(Debug, Deserialize, IntoParams)]
 #[into_params(parameter_in = Query)]
@@ -38,50 +44,53 @@ pub struct ClientEventStreamQuery {
 
 #[derive(OpenApi)]
 #[openapi(
-    paths(stream_wallet_events),
+    paths(stream_account_events),
     components(schemas(ClientEvent, ClientEventType)),
-    tags((name = "Events", description = "Authenticated, wallet-scoped server-sent events."))
+    tags((name = "Events", description = "Authenticated, account-scoped server-sent events."))
 )]
 pub struct ClientEventHandler;
 
 pub fn client_event_router() -> Router<Arc<AppServices>> {
-    Router::new().route("/v1/me/wallets/{wallet_id}/events", get(stream_wallet_events))
+    Router::new().route("/v1/me/events", get(stream_account_events))
 }
 
-/// Stream durable wallet events.
+/// Stream durable events for every wallet owned by the authenticated account.
 ///
-/// A fresh connection starts after the latest committed event. Send `Last-Event-ID`
-/// on reconnect (or `after` for a deliberate replay) to receive missed events.
+/// A fresh connection starts after the latest committed account event. Send
+/// `Last-Event-ID` on reconnect (or `after` for deliberate replay) to receive
+/// missed events. If that cursor is older than the retained replay window,
+/// refresh REST state and reconnect without a cursor.
 #[utoipa::path(
     get,
-    path = "/v1/me/wallets/{wallet_id}/events",
+    path = "/v1/me/events",
     tag = "Events",
-    params(("wallet_id" = Uuid, Path, description = "Account-owned wallet ID"), ClientEventStreamQuery),
+    params(ClientEventStreamQuery),
     responses(
         (status = 200, description = "Server-sent event stream", body = ClientEvent, content_type = "text/event-stream"),
         (status = 400, description = "Invalid replay cursor", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
         (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
         (status = 403, description = "Forbidden", body = ErrorResponse, example = json!(FORBIDDEN_EXAMPLE)),
-        (status = 404, description = "Wallet not found", body = ErrorResponse, example = json!(NOT_FOUND_EXAMPLE)),
+        (status = 409, description = "Replay cursor has expired", body = ErrorResponse, example = json!(CURSOR_EXPIRED_EXAMPLE)),
         (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
     )
 )]
-async fn stream_wallet_events(
+async fn stream_account_events(
     State(services): State<Arc<AppServices>>,
     user: User,
-    Path(wallet_id): Path<Uuid>,
     Query(query): Query<ClientEventStreamQuery>,
     headers: HeaderMap,
 ) -> Result<impl IntoResponse, ApplicationError> {
     user.check_permission(Permission::ReadTransaction)?;
-    services.wallet.verify_ownership(user.account_id, wallet_id).await?;
 
     let cursor = match replay_cursor(&headers, query.after)? {
-        Some(cursor) => cursor,
-        None => services.client_event.latest_id(wallet_id).await?,
+        Some(cursor) => {
+            services.client_event.ensure_cursor_available(cursor).await?;
+            cursor
+        }
+        None => services.client_event.latest_id(user.account_id).await?,
     };
 
-    let stream = wallet_event_stream(services, wallet_id, cursor);
+    let stream = account_event_stream(services, user.account_id, cursor);
     let sse = Sse::new(stream).keep_alive(
         axum::response::sse::KeepAlive::new()
             .interval(KEEP_ALIVE_INTERVAL)
@@ -102,38 +111,43 @@ async fn stream_wallet_events(
 
 fn replay_cursor(headers: &HeaderMap, query_after: Option<i32>) -> Result<Option<i32>, ApplicationError> {
     let Some(raw) = headers.get(LAST_EVENT_ID) else {
-        return Ok(query_after);
+        return query_after.map(validate_cursor).transpose();
     };
 
     let raw = raw
         .to_str()
-        .map_err(|_| DataError::Malformed("Last-Event-ID must be a positive integer.".to_string()))?;
+        .map_err(|_| DataError::Malformed("Last-Event-ID must be a non-negative integer.".to_string()))?;
     let cursor = raw
         .parse::<i32>()
-        .map_err(|_| DataError::Malformed("Last-Event-ID must be a positive integer.".to_string()))?;
+        .map_err(|_| DataError::Malformed("Last-Event-ID must be a non-negative integer.".to_string()))?;
+
+    Ok(Some(validate_cursor(cursor)?))
+}
+
+fn validate_cursor(cursor: i32) -> Result<i32, ApplicationError> {
     if cursor < 0 {
-        return Err(DataError::Malformed("Last-Event-ID must be a positive integer.".to_string()).into());
+        return Err(DataError::Malformed("Event cursor must be a non-negative integer.".to_string()).into());
     }
 
-    Ok(Some(cursor))
+    Ok(cursor)
 }
 
 struct EventStreamState {
     services: Arc<AppServices>,
-    wallet_id: Uuid,
+    account_id: Uuid,
     cursor: i32,
     pending: VecDeque<ClientEvent>,
 }
 
-fn wallet_event_stream(
+fn account_event_stream(
     services: Arc<AppServices>,
-    wallet_id: Uuid,
+    account_id: Uuid,
     cursor: i32,
 ) -> impl Stream<Item = Result<Event, Infallible>> {
     stream::unfold(
         EventStreamState {
             services,
-            wallet_id,
+            account_id,
             cursor,
             pending: VecDeque::new(),
         },
@@ -159,13 +173,17 @@ fn wallet_event_stream(
                 match state
                     .services
                     .client_event
-                    .list_after(state.wallet_id, state.cursor)
+                    .list_after(state.account_id, state.cursor)
                     .await
                 {
                     Ok(events) if !events.is_empty() => state.pending.extend(events),
                     Ok(_) => tokio::time::sleep(EVENT_POLL_INTERVAL).await,
+                    Err(ApplicationError::Data(DataError::Conflict(error))) => {
+                        warn!(%error, account_id = %state.account_id, "Client event cursor expired while streaming");
+                        return None;
+                    }
                     Err(error) => {
-                        warn!(%error, wallet_id = %state.wallet_id, "Failed to read the client event log");
+                        warn!(%error, account_id = %state.account_id, "Failed to read the client event log");
                         tokio::time::sleep(EVENT_POLL_INTERVAL).await;
                     }
                 }
@@ -206,14 +224,21 @@ mod tests {
         ));
     }
 
+    #[test]
+    fn rejects_a_negative_query_cursor() {
+        assert!(matches!(
+            replay_cursor(&HeaderMap::new(), Some(-1)),
+            Err(ApplicationError::Data(DataError::Malformed(_)))
+        ));
+    }
+
     #[tokio::test]
     async fn requires_transaction_read_permission() {
         let services = MockAppServicesBuilder::new().build();
 
-        let result = stream_wallet_events(
+        let result = stream_account_events(
             State(Arc::new(services)),
             user(Uuid::new_v4(), vec![]),
-            Path(Uuid::new_v4()),
             Query(ClientEventStreamQuery { after: None }),
             HeaderMap::new(),
         )
@@ -223,28 +248,42 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn verifies_wallet_ownership_and_starts_fresh_at_the_latest_event() {
+    async fn fresh_stream_starts_at_the_accounts_latest_event() {
         let account_id = Uuid::new_v4();
-        let wallet_id = Uuid::new_v4();
         let mut services = MockAppServicesBuilder::new();
-        services
-            .wallet
-            .expect_verify_ownership()
-            .withf(move |account, wallet| *account == account_id && *wallet == wallet_id)
-            .times(1)
-            .returning(|_, _| Ok(()));
         services
             .client_event
             .expect_latest_id()
-            .withf(move |wallet| *wallet == wallet_id)
+            .withf(move |account| *account == account_id)
             .times(1)
             .returning(|_| Ok(42));
 
-        let result = stream_wallet_events(
+        let result = stream_account_events(
             State(Arc::new(services.build())),
             user(account_id, vec![Permission::ReadTransaction]),
-            Path(wallet_id),
             Query(ClientEventStreamQuery { after: None }),
+            HeaderMap::new(),
+        )
+        .await;
+
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn explicit_replay_validates_the_cursor_before_opening() {
+        let account_id = Uuid::new_v4();
+        let mut services = MockAppServicesBuilder::new();
+        services
+            .client_event
+            .expect_ensure_cursor_available()
+            .withf(|cursor| *cursor == 42)
+            .times(1)
+            .returning(|_| Ok(()));
+
+        let result = stream_account_events(
+            State(Arc::new(services.build())),
+            user(account_id, vec![Permission::ReadTransaction]),
+            Query(ClientEventStreamQuery { after: Some(42) }),
             HeaderMap::new(),
         )
         .await;

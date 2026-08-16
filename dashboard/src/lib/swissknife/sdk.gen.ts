@@ -51,7 +51,7 @@ import {
   registerAddressResponseTransformer,
   registerWalletResponseTransformer,
   replaceAccountPermissionsResponseTransformer,
-  streamWalletEventsResponseTransformer,
+  streamAccountEventsResponseTransformer,
   updateAccountAddressResponseTransformer,
   updateAccountByIdResponseTransformer,
   updateAccountPreferencesResponseTransformer,
@@ -272,10 +272,10 @@ import type {
   SignUpData,
   SignUpErrors,
   SignUpResponses,
-  StreamWalletEventsData,
-  StreamWalletEventsErrors,
-  StreamWalletEventsResponse,
-  StreamWalletEventsResponses,
+  StreamAccountEventsData,
+  StreamAccountEventsErrors,
+  StreamAccountEventsResponse,
+  StreamAccountEventsResponses,
   UpdateAccountAddressData,
   UpdateAccountAddressErrors,
   UpdateAccountAddressResponses,
@@ -999,6 +999,28 @@ export const getAccountApiKey = <ThrowOnError extends boolean = false>(
   });
 
 /**
+ * Stream durable events for every wallet owned by the authenticated account.
+ *
+ * A fresh connection starts after the latest committed account event. Send
+ * `Last-Event-ID` on reconnect (or `after` for deliberate replay) to receive
+ * missed events. If that cursor is older than the retained replay window,
+ * refresh REST state and reconnect without a cursor.
+ */
+export const streamAccountEvents = <ThrowOnError extends boolean = false>(
+  options?: Options<StreamAccountEventsData, ThrowOnError, StreamAccountEventsResponse>
+): Promise<ServerSentEventsResult<StreamAccountEventsResponses>> =>
+  (options?.client ?? client).sse.get<
+    StreamAccountEventsResponses,
+    StreamAccountEventsErrors,
+    ThrowOnError
+  >({
+    responseTransformer: streamAccountEventsResponseTransformer,
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/me/events',
+    ...options,
+  });
+
+/**
  * Delete account Lightning Address.
  */
 export const deleteAccountAddress = <ThrowOnError extends boolean = false>(
@@ -1222,26 +1244,6 @@ export const listContacts = <ThrowOnError extends boolean = false>(
     responseTransformer: listContactsResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/v1/me/wallets/{wallet_id}/contacts',
-    ...options,
-  });
-
-/**
- * Stream durable wallet events.
- *
- * A fresh connection starts after the latest committed event. Send `Last-Event-ID`
- * on reconnect (or `after` for a deliberate replay) to receive missed events.
- */
-export const streamWalletEvents = <ThrowOnError extends boolean = false>(
-  options: Options<StreamWalletEventsData, ThrowOnError, StreamWalletEventsResponse>
-): Promise<ServerSentEventsResult<StreamWalletEventsResponses>> =>
-  (options.client ?? client).sse.get<
-    StreamWalletEventsResponses,
-    StreamWalletEventsErrors,
-    ThrowOnError
-  >({
-    responseTransformer: streamWalletEventsResponseTransformer,
-    security: [{ scheme: 'bearer', type: 'http' }],
-    url: '/v1/me/wallets/{wallet_id}/events',
     ...options,
   });
 

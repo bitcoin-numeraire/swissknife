@@ -38,6 +38,7 @@ impl AppServices {
             domain,
             host,
             invoice_expiry,
+            client_events,
             auth_provider,
             bitcoin_address_type,
             ..
@@ -52,7 +53,7 @@ impl AppServices {
         } = adapters;
 
         let event = Arc::new(EventService::new(store.clone()));
-        let client_event = ClientEventService::new(store.clone());
+        let client_event = ClientEventService::new(store.clone(), client_events.retention);
         let payments = PaymentService::new(
             store.clone(),
             ln_client.clone(),

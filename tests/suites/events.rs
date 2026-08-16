@@ -1,16 +1,21 @@
-//! `/v1/me/wallets/{wallet_id}/events` — authenticated, permission-gated,
-//! wallet-scoped durable SSE delivery. The settlement test pays real invoices
+//! `/v1/me/events` — authenticated, permission-gated, account-scoped durable
+//! SSE delivery. The settlement test pays real invoices
 //! through the matrix counterparty, so the same public behavior is exercised
 //! against every configured LND and CLN transport.
 
 use std::time::Duration;
 
 use reqwest::{header, Response, StatusCode};
+use sea_orm::{
+    sea_query::{Alias, Query},
+    ConnectionTrait, Database,
+};
 
 use swissknife_types::{ClientEvent, ClientEventType, Invoice, NewInvoiceRequest};
 
 use crate::common::counterparty::Counterparty;
 use crate::common::fixtures::unique;
+use crate::common::wait::wait_until;
 use crate::common::{app, assert_error, assert_status, Auth, TestApp};
 
 const EVENT_TIMEOUT: Duration = Duration::from_secs(60);
@@ -37,6 +42,38 @@ async fn invoice(app: &TestApp, key: &str, wallet_id: uuid::Uuid, amount_msat: u
         .await;
     assert_status(&response, StatusCode::OK);
     response.parse::<Invoice>()
+}
+
+async fn insert_client_event(app: &TestApp, wallet_id: uuid::Uuid) {
+    let connection = Database::connect(&app.database_url)
+        .await
+        .expect("connect to isolated event database");
+    let resource_id = uuid::Uuid::new_v4();
+    let statement = Query::insert()
+        .into_table(Alias::new("client_event"))
+        .columns([
+            Alias::new("wallet_id"),
+            Alias::new("event_type"),
+            Alias::new("resource_id"),
+            Alias::new("payload"),
+        ])
+        .values_panic([
+            wallet_id.into(),
+            ClientEventType::PaymentFailed.to_string().into(),
+            resource_id.into(),
+            serde_json::json!({
+                "id": resource_id,
+                "wallet_id": wallet_id,
+                "status": "Failed"
+            })
+            .into(),
+        ])
+        .to_owned();
+    let statement = connection.get_database_backend().build(&statement);
+    connection
+        .execute_raw(statement)
+        .await
+        .expect("insert durable client event");
 }
 
 fn assert_stream_headers(response: &Response) {
@@ -109,7 +146,7 @@ async fn next_event(response: &mut Response) -> SseMessage {
         }
     })
     .await
-    .expect("timed out waiting for a wallet event")
+    .expect("timed out waiting for an account event")
 }
 
 mod stream {
@@ -118,10 +155,7 @@ mod stream {
     #[tokio::test]
     async fn requires_authentication() {
         let app = app().await;
-        let response = app
-            .api()
-            .get(&format!("/v1/me/wallets/{}/events", uuid::Uuid::new_v4()), Auth::None)
-            .await;
+        let response = app.api().get("/v1/me/events", Auth::None).await;
 
         assert_error(&response, StatusCode::UNAUTHORIZED);
     }
@@ -132,32 +166,9 @@ mod stream {
         let admin = app.admin_token().await;
         let account = app.create_account_with_wallet(admin, "event-permission").await;
         let key = app.account_api_key(admin, account.account.id, vec![]).await;
-        let response = app
-            .api()
-            .get(
-                &format!("/v1/me/wallets/{}/events", account.wallet.id),
-                Auth::ApiKey(&key),
-            )
-            .await;
+        let response = app.api().get("/v1/me/events", Auth::ApiKey(&key)).await;
 
         assert_error(&response, StatusCode::FORBIDDEN);
-    }
-
-    #[tokio::test]
-    async fn rejects_another_accounts_wallet() {
-        let app = app().await;
-        let admin = app.admin_token().await;
-        let alice = app.create_account_with_wallet(admin, "event-owner-a").await;
-        let bob = app.create_account_with_wallet(admin, "event-owner-b").await;
-        let response = app
-            .api()
-            .get(
-                &format!("/v1/me/wallets/{}/events", bob.wallet.id),
-                Auth::ApiKey(&alice.key),
-            )
-            .await;
-
-        assert_error(&response, StatusCode::NOT_FOUND);
     }
 
     #[tokio::test]
@@ -167,14 +178,23 @@ mod stream {
         let account = app.create_account_with_wallet(admin, "event-cursor").await;
         let response = app
             .api()
-            .event_stream(
-                &format!("/v1/me/wallets/{}/events", account.wallet.id),
-                Auth::ApiKey(&account.key),
-                Some("not-an-event-id"),
-            )
+            .event_stream("/v1/me/events", Auth::ApiKey(&account.key), Some("not-an-event-id"))
             .await;
 
         assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn rejects_a_negative_query_cursor() {
+        let app = app().await;
+        let admin = app.admin_token().await;
+        let account = app.create_account_with_wallet(admin, "event-negative-cursor").await;
+        let response = app
+            .api()
+            .get("/v1/me/events?after=-1", Auth::ApiKey(&account.key))
+            .await;
+
+        assert_error(&response, StatusCode::BAD_REQUEST);
     }
 
     #[tokio::test]
@@ -182,7 +202,8 @@ mod stream {
         let app = app().await;
         let admin = app.admin_token().await;
         let account = app.create_account_with_wallet(admin, "event-settlement").await;
-        let path = format!("/v1/me/wallets/{}/events", account.wallet.id);
+        let other = app.create_account_with_wallet(admin, "event-other-account").await;
+        let path = "/v1/me/events";
 
         let first_invoice = invoice(app, &account.key, account.wallet.id, 25_000_000).await;
         let first_bolt11 = first_invoice
@@ -191,11 +212,21 @@ mod stream {
             .expect("invoice has a bolt11")
             .bolt11
             .clone();
+        let other_invoice = invoice(app, &other.key, other.wallet.id, 20_000_000).await;
+        let other_bolt11 = other_invoice
+            .ln_invoice
+            .as_ref()
+            .expect("invoice has a bolt11")
+            .bolt11
+            .clone();
 
         // A fresh stream starts after the current durable cursor. Paying after
         // the response is established must deliver the new settlement.
-        let mut first_stream = app.api().event_stream(&path, Auth::ApiKey(&account.key), None).await;
+        let mut first_stream = app.api().event_stream(path, Auth::ApiKey(&account.key), None).await;
         assert_stream_headers(&first_stream);
+        // This event has a lower global ID but belongs to another account. If
+        // account scoping regresses it will be the first frame and fail below.
+        Counterparty::for_provider(&app.provider).pay(&other_bolt11);
         Counterparty::for_provider(&app.provider).pay(&first_bolt11);
 
         let first = next_event(&mut first_stream).await;
@@ -233,5 +264,48 @@ mod stream {
             second.id.parse::<i32>().expect("numeric second cursor")
                 > first.id.parse::<i32>().expect("numeric first cursor")
         );
+    }
+
+    #[tokio::test]
+    async fn expired_replay_cursor_requires_a_rest_reset() {
+        let app = TestApp::isolated(
+            &unique("event-retention"),
+            &[
+                ("SWISSKNIFE_CLIENT_EVENTS__RETENTION", "3s".to_string()),
+                ("SWISSKNIFE_CLIENT_EVENTS__CLEANUP_INTERVAL", "100ms".to_string()),
+            ],
+        )
+        .await;
+        let admin = app.admin_token().await;
+        let account = app.create_account_with_wallet(admin, "event-retention").await;
+        let mut stream = app
+            .api()
+            .event_stream("/v1/me/events", Auth::ApiKey(&account.key), None)
+            .await;
+        assert_stream_headers(&stream);
+        // The real-settlement test above covers LND/CLN event production. This
+        // test inserts at the durable-log boundary so it can exercise the
+        // short retention window without racing two node listeners in parallel.
+        insert_client_event(&app, account.wallet.id).await;
+        let event = next_event(&mut stream).await;
+        drop(stream);
+
+        wait_until(Duration::from_secs(15), "client event cursor expires", || async {
+            app.api()
+                .event_stream("/v1/me/events", Auth::ApiKey(&account.key), Some(&event.id))
+                .await
+                .status()
+                == StatusCode::CONFLICT
+        })
+        .await;
+
+        // Resetting from REST means reconnecting without the stale cursor. A
+        // fresh stream must remain valid even when every account event was
+        // pruned and its latest retained ID is absent.
+        let fresh = app
+            .api()
+            .event_stream("/v1/me/events", Auth::ApiKey(&account.key), None)
+            .await;
+        assert_stream_headers(&fresh);
     }
 }

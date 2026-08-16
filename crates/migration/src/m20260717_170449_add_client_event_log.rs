@@ -51,6 +51,16 @@ impl MigrationTrait for Migration {
                     .unique()
                     .to_owned(),
             )
+            .await?;
+
+        manager
+            .create_index(
+                Index::create()
+                    .name("idx_client_event_created_at")
+                    .table(ClientEvent::Table)
+                    .col(ClientEvent::CreatedAt)
+                    .to_owned(),
+            )
             .await
     }
 

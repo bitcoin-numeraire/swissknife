@@ -42,7 +42,7 @@ import type {
   RegisterAddressResponse,
   RegisterWalletResponse,
   ReplaceAccountPermissionsResponse,
-  StreamWalletEventsResponse,
+  StreamAccountEventsResponse,
   UpdateAccountAddressResponse,
   UpdateAccountByIdResponse,
   UpdateAccountPreferencesResponse,
@@ -323,6 +323,18 @@ export const getAccountApiKeyResponseTransformer = async (
   return data;
 };
 
+const clientEventSchemaResponseTransformer = (data: any) => {
+  data.created_at = new Date(data.created_at);
+  return data;
+};
+
+export const streamAccountEventsResponseTransformer = async (
+  data: any
+): Promise<StreamAccountEventsResponse> => {
+  data = clientEventSchemaResponseTransformer(data);
+  return data;
+};
+
 export const getAccountAddressResponseTransformer = async (
   data: any
 ): Promise<GetAccountAddressResponse> => {
@@ -397,18 +409,6 @@ export const newWalletBtcAddressResponseTransformer = async (
 
 export const listContactsResponseTransformer = async (data: any): Promise<ListContactsResponse> => {
   data = data.map((item: any) => contactSchemaResponseTransformer(item));
-  return data;
-};
-
-const clientEventSchemaResponseTransformer = (data: any) => {
-  data.created_at = new Date(data.created_at);
-  return data;
-};
-
-export const streamWalletEventsResponseTransformer = async (
-  data: any
-): Promise<StreamWalletEventsResponse> => {
-  data = clientEventSchemaResponseTransformer(data);
   return data;
 };
 

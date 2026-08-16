@@ -86,13 +86,14 @@ async fn fresh_sqlite_schema_preserves_migration_contracts() {
             FROM sqlite_master
             WHERE type = 'index'
               AND name IN (
+                'idx_client_event_created_at',
                 'idx_client_event_type_resource',
                 'idx_client_event_wallet_id'
               )
             "#,
         )
         .await,
-        2
+        3
     );
     assert!(
         count(

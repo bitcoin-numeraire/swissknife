@@ -4192,6 +4192,95 @@
         }
       }
     },
+    "/v1/me/events": {
+      "get": {
+        "tags": [
+          "Events"
+        ],
+        "summary": "Stream durable events for every wallet owned by the authenticated account.",
+        "description": "A fresh connection starts after the latest committed account event. Send\n`Last-Event-ID` on reconnect (or `after` for deliberate replay) to receive\nmissed events. If that cursor is older than the retained replay window,\nrefresh REST state and reconnect without a cursor.",
+        "operationId": "stream_account_events",
+        "parameters": [
+          {
+            "name": "after",
+            "in": "query",
+            "description": "Replay events strictly after this event ID. `Last-Event-ID` takes precedence.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Server-sent event stream",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClientEvent"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid replay cursor",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"400 Bad Request\",\n    \"reason\": \"Missing required parameter in request\"\n}\n"
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"401 Unauthorized\",\n    \"reason\": \"Invalid credentials\"\n}\n"
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"403 Forbidden\",\n    \"reason\": \"Missing permissions\"\n}\n"
+              }
+            }
+          },
+          "409": {
+            "description": "Replay cursor has expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"409 Conflict\",\n    \"reason\": \"Client event cursor expired. Refresh state and reconnect without Last-Event-ID.\"\n}\n"
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"500 Internal Server Error\",\n    \"reason\": \"Internal server error, Please contact your administrator or try later\"\n}\n"
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/me/lightning-address": {
       "get": {
         "tags": [
@@ -5270,105 +5359,6 @@
           },
           "404": {
             "description": "Not Found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                },
-                "example": "\n{\n    \"status\": \"404 Not Found\",\n    \"reason\": \"Resource not found\"\n}\n"
-              }
-            }
-          },
-          "500": {
-            "description": "Internal Server Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                },
-                "example": "\n{\n    \"status\": \"500 Internal Server Error\",\n    \"reason\": \"Internal server error, Please contact your administrator or try later\"\n}\n"
-              }
-            }
-          }
-        }
-      }
-    },
-    "/v1/me/wallets/{wallet_id}/events": {
-      "get": {
-        "tags": [
-          "Events"
-        ],
-        "summary": "Stream durable wallet events.",
-        "description": "A fresh connection starts after the latest committed event. Send `Last-Event-ID`\non reconnect (or `after` for a deliberate replay) to receive missed events.",
-        "operationId": "stream_wallet_events",
-        "parameters": [
-          {
-            "name": "wallet_id",
-            "in": "path",
-            "description": "Account-owned wallet ID",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          },
-          {
-            "name": "after",
-            "in": "query",
-            "description": "Replay events strictly after this event ID. `Last-Event-ID` takes precedence.",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "format": "int32"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Server-sent event stream",
-            "content": {
-              "text/event-stream": {
-                "schema": {
-                  "$ref": "#/components/schemas/ClientEvent"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid replay cursor",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                },
-                "example": "\n{\n    \"status\": \"400 Bad Request\",\n    \"reason\": \"Missing required parameter in request\"\n}\n"
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                },
-                "example": "\n{\n    \"status\": \"401 Unauthorized\",\n    \"reason\": \"Invalid credentials\"\n}\n"
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                },
-                "example": "\n{\n    \"status\": \"403 Forbidden\",\n    \"reason\": \"Missing permissions\"\n}\n"
-              }
-            }
-          },
-          "404": {
-            "description": "Wallet not found",
             "content": {
               "application/json": {
                 "schema": {
@@ -9807,7 +9797,7 @@
     },
     {
       "name": "Events",
-      "description": "Authenticated, wallet-scoped server-sent events."
+      "description": "Authenticated, account-scoped server-sent events."
     }
   ]
 }

@@ -5,7 +5,7 @@ use crate::{
     application::errors::{ApplicationError, DataError, DatabaseError},
     domains::{
         bitcoin::{BtcAddress, BtcAddressRepository, BtcOutput, BtcOutputRepository},
-        event::{ClientEventRepository, EventProjectionUnitOfWork, NewClientEvent},
+        event::{EventProjectionUnitOfWork, NewClientEvent},
         invoice::{Invoice, InvoiceRepository},
         payment::{Payment, PaymentRepository, PaymentStatus, PaymentUnitOfWork},
         wallet::WalletRepository,
@@ -118,7 +118,7 @@ impl PaymentUnitOfWork for SeaOrmPaymentUnitOfWork {
         let payment = payment_repo.update(payment).await?;
 
         SeaOrmClientEventRepository::new(&txn)
-            .append(NewClientEvent::payment(&payment)?)
+            .append_event(NewClientEvent::payment(&payment)?)
             .await?;
 
         txn.commit()
@@ -165,7 +165,7 @@ impl PaymentUnitOfWork for SeaOrmPaymentUnitOfWork {
         let payment = payment_repo.update(payment).await?;
 
         SeaOrmClientEventRepository::new(&txn)
-            .append(NewClientEvent::payment(&payment)?)
+            .append_event(NewClientEvent::payment(&payment)?)
             .await?;
 
         txn.commit()
@@ -210,8 +210,8 @@ impl PaymentUnitOfWork for SeaOrmPaymentUnitOfWork {
         };
 
         let event_repo = SeaOrmClientEventRepository::new(&txn);
-        event_repo.append(NewClientEvent::payment(&payment)?).await?;
-        event_repo.append(NewClientEvent::invoice_paid(&invoice)?).await?;
+        event_repo.append_event(NewClientEvent::payment(&payment)?).await?;
+        event_repo.append_event(NewClientEvent::invoice_paid(&invoice)?).await?;
 
         txn.commit()
             .await
@@ -275,7 +275,7 @@ impl EventProjectionUnitOfWork for SeaOrmEventProjectionUnitOfWork {
 
         if should_emit {
             SeaOrmClientEventRepository::new(&txn)
-                .append(NewClientEvent::invoice_paid(&settled)?)
+                .append_event(NewClientEvent::invoice_paid(&settled)?)
                 .await?;
         }
 
@@ -351,7 +351,7 @@ impl EventProjectionUnitOfWork for SeaOrmEventProjectionUnitOfWork {
 
         if should_emit {
             SeaOrmClientEventRepository::new(&txn)
-                .append(NewClientEvent::invoice_paid(&invoice)?)
+                .append_event(NewClientEvent::invoice_paid(&invoice)?)
                 .await?;
         }
 
