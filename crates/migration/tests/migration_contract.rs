@@ -64,6 +64,37 @@ async fn fresh_sqlite_schema_preserves_migration_contracts() {
         .await,
         2
     );
+    assert_eq!(
+        count(
+            &conn,
+            r#"
+            SELECT COUNT(*) AS count
+            FROM pragma_foreign_key_list('client_event')
+            WHERE "table" = 'wallet'
+              AND "from" = 'wallet_id'
+              AND "on_delete" = 'CASCADE'
+            "#,
+        )
+        .await,
+        1
+    );
+    assert_eq!(
+        count(
+            &conn,
+            r#"
+            SELECT COUNT(*) AS count
+            FROM sqlite_master
+            WHERE type = 'index'
+              AND name IN (
+                'idx_client_event_created_at',
+                'idx_client_event_type_resource',
+                'idx_client_event_wallet_id'
+              )
+            "#,
+        )
+        .await,
+        3
+    );
     assert!(
         count(
             &conn,

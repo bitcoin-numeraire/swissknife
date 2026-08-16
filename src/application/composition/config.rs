@@ -30,6 +30,7 @@ pub struct AppConfig {
     pub jwt: Option<JwtConfig>,
     #[serde(deserialize_with = "deserialize_duration")]
     pub invoice_expiry: Duration,
+    pub client_events: ClientEventConfig,
     #[serde(default)]
     pub bitcoin_address_type: BtcAddressType,
     pub ln_provider: LightningProvider,
@@ -40,6 +41,14 @@ pub struct AppConfig {
     pub lnd_rest_config: Option<LndRestClientConfig>,
     pub web: AxumServerConfig,
     pub logging: TracingLoggerConfig,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct ClientEventConfig {
+    #[serde(deserialize_with = "deserialize_duration")]
+    pub retention: Duration,
+    #[serde(deserialize_with = "deserialize_duration")]
+    pub cleanup_interval: Duration,
 }
 
 fn deserialize_optional_string<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>

@@ -65,6 +65,7 @@ pub async fn app() -> &'static TestApp {
 
 pub struct TestApp {
     pub base_url: String,
+    pub database_url: String,
     pub database: String,
     pub provider: String,
     admin_jwt: String,
@@ -83,6 +84,7 @@ pub fn matrix_cell() -> (String, String) {
 /// A spawned, ready SwissKnife instance: its base URL and log paths.
 pub struct Spawned {
     pub base_url: String,
+    pub database_url: String,
     pub stdout_path: PathBuf,
     pub stderr_path: PathBuf,
 }
@@ -138,6 +140,7 @@ pub async fn spawn_instance(database: &str, provider: &str, label: &str, extra_e
 
     Spawned {
         base_url,
+        database_url: db.url().to_string(),
         stdout_path,
         stderr_path,
     }
@@ -155,6 +158,27 @@ impl TestApp {
 
         TestApp {
             base_url: spawned.base_url,
+            database_url: spawned.database_url,
+            database,
+            provider,
+            admin_jwt,
+            stdout_path: spawned.stdout_path,
+            stderr_path: spawned.stderr_path,
+        }
+    }
+
+    /// Spawn a separate instance for tests that need configuration different
+    /// from the process-wide shared app.
+    pub async fn isolated(label: &str, extra_env: &[(&str, String)]) -> TestApp {
+        let (database, provider) = matrix_cell();
+        let label = format!("{database}-{provider}-{label}");
+        let spawned = spawn_instance(&database, &provider, &label, extra_env).await;
+        let api = ApiClient::new(spawned.base_url.clone());
+        let admin_jwt = bootstrap_admin(&api).await;
+
+        TestApp {
+            base_url: spawned.base_url,
+            database_url: spawned.database_url,
             database,
             provider,
             admin_jwt,

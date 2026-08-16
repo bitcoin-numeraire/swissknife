@@ -353,6 +353,52 @@ export type ChangePasswordRequest = {
 };
 
 /**
+ * A durable event emitted after an invoice or payment changes state.
+ */
+export type ClientEvent = {
+  /**
+   * Time the event was committed to the event log.
+   */
+  created_at: Date;
+  /**
+   * Full invoice or payment snapshot at the time the event was committed.
+   */
+  data: {
+    [key: string]: unknown;
+  };
+  /**
+   * Stable event name. The SSE `event` field contains the same value.
+   */
+  event_type: ClientEventType;
+  /**
+   * Monotonic cursor used by SSE `Last-Event-ID` replay.
+   */
+  id: string;
+  /**
+   * Invoice or payment ID represented by `data`.
+   */
+  resource_id: string;
+  /**
+   * Wallet whose state changed.
+   */
+  wallet_id: string;
+};
+
+/**
+ * Stable event names shared by SSE and webhook delivery.
+ */
+export const ClientEventType = {
+  INVOICE_PAID: 'invoice.paid',
+  PAYMENT_SETTLED: 'payment.settled',
+  PAYMENT_FAILED: 'payment.failed',
+} as const;
+
+/**
+ * Stable event names shared by SSE and webhook delivery.
+ */
+export type ClientEventType = (typeof ClientEventType)[keyof typeof ClientEventType];
+
+/**
  * A counterparty the wallet has paid, with the date of first contact.
  */
 export type Contact = {
@@ -3164,6 +3210,53 @@ export type GetAccountApiKeyResponses = {
 };
 
 export type GetAccountApiKeyResponse = GetAccountApiKeyResponses[keyof GetAccountApiKeyResponses];
+
+export type StreamAccountEventsData = {
+  body?: never;
+  path?: never;
+  query?: {
+    /**
+     * Replay events strictly after this event ID. `Last-Event-ID` takes precedence.
+     */
+    after?: number;
+  };
+  url: '/v1/me/events';
+};
+
+export type StreamAccountEventsErrors = {
+  /**
+   * Invalid replay cursor
+   */
+  400: ErrorResponse;
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Forbidden
+   */
+  403: ErrorResponse;
+  /**
+   * Replay cursor has expired
+   */
+  409: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
+
+export type StreamAccountEventsError = StreamAccountEventsErrors[keyof StreamAccountEventsErrors];
+
+export type StreamAccountEventsResponses = {
+  /**
+   * Server-sent event stream
+   */
+  200: ClientEvent;
+};
+
+export type StreamAccountEventsResponse =
+  StreamAccountEventsResponses[keyof StreamAccountEventsResponses];
 
 export type DeleteAccountAddressData = {
   body?: never;

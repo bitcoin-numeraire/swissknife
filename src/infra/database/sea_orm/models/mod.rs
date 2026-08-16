@@ -9,6 +9,7 @@ pub mod asset;
 pub mod auth_identity;
 pub mod btc_address;
 pub mod btc_output;
+pub mod client_event;
 pub mod config;
 pub mod contact;
 pub mod invoice;
