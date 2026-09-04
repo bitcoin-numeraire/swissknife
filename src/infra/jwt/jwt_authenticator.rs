@@ -8,6 +8,6 @@ use crate::{
 #[cfg_attr(test, mockall::automock)]
 #[async_trait]
 pub trait JWTAuthenticator: Send + Sync {
-    fn encode(&self, account: Account) -> Result<String, AuthenticationError>;
+    fn encode(&self, account: Account, revision: uuid::Uuid) -> Result<String, AuthenticationError>;
     async fn decode(&self, token: &str) -> Result<AuthClaims, AuthenticationError>;
 }

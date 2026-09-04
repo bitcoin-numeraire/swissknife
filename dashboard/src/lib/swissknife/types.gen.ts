@@ -347,7 +347,7 @@ export type ChangePasswordRequest = {
    */
   current_password: string;
   /**
-   * New user password
+   * New password: at least 15 Unicode characters and at most 1024 UTF-8 bytes.
    */
   new_password: string;
 };
@@ -460,6 +460,13 @@ export type CreateApiKeyRequest = {
    * List of permissions for this API key
    */
   permissions: Array<Permission>;
+};
+
+/**
+ * Add a local login to an account. The response contains a one-time activation code.
+ */
+export type CreateLocalLoginRequest = {
+  username: string;
 };
 
 /**
@@ -826,6 +833,24 @@ export type LnUrlSuccessAction = {
 };
 
 /**
+ * Non-secret local login information for account administrators.
+ */
+export type LocalLogin = {
+  enabled: boolean;
+  password_set: boolean;
+  reset_expires_at?: Date | null;
+  username: string;
+};
+
+/**
+ * One-time activation or reset code. Shown only in this response.
+ */
+export type LocalLoginReset = {
+  code: string;
+  expires_at: Date;
+};
+
+/**
  * New Bitcoin Address Request
  */
 export type NewBtcAddressRequest = {
@@ -1040,6 +1065,17 @@ export type RegisterLnAddressRequest = {
 };
 
 /**
+ * Redeem a local login activation/reset code and choose a password.
+ */
+export type ResetLocalPasswordRequest = {
+  code: string;
+  /**
+   * At least 15 Unicode characters and at most 1024 UTF-8 bytes.
+   */
+  new_password: string;
+};
+
+/**
  * Send Payment Request
  */
 export type SendPaymentRequest = {
@@ -1083,6 +1119,10 @@ export type SignInRequest = {
    * User password
    */
   password: string;
+  /**
+   * Local login username. Omission selects the existing bootstrap owner.
+   */
+  username?: string;
 };
 
 /**
@@ -1100,7 +1140,7 @@ export type SignInResponse = {
  */
 export type SignUpRequest = {
   /**
-   * User password
+   * Owner password: at least 15 Unicode characters and at most 1024 UTF-8 bytes.
    */
   password: string;
 };
@@ -1155,6 +1195,13 @@ export type UpdateLnAddressRequest = {
    * Username such as `username@domain`
    */
   username?: string | null;
+};
+
+/**
+ * Enable or disable password login for this account.
+ */
+export type UpdateLocalLoginRequest = {
+  enabled: boolean;
 };
 
 /**
@@ -1665,6 +1712,101 @@ export type UpdateAccountByIdResponses = {
 export type UpdateAccountByIdResponse =
   UpdateAccountByIdResponses[keyof UpdateAccountByIdResponses];
 
+export type GetLocalLoginData = {
+  body?: never;
+  path: {
+    id: string;
+  };
+  query?: never;
+  url: '/v1/accounts/{id}/local-login';
+};
+
+export type GetLocalLoginErrors = {
+  401: ErrorResponse;
+  403: ErrorResponse;
+};
+
+export type GetLocalLoginError = GetLocalLoginErrors[keyof GetLocalLoginErrors];
+
+export type GetLocalLoginResponses = {
+  200: null | LocalLogin;
+};
+
+export type GetLocalLoginResponse = GetLocalLoginResponses[keyof GetLocalLoginResponses];
+
+export type CreateLocalLoginData = {
+  body: CreateLocalLoginRequest;
+  path: {
+    id: string;
+  };
+  query?: never;
+  url: '/v1/accounts/{id}/local-login';
+};
+
+export type CreateLocalLoginErrors = {
+  401: ErrorResponse;
+  403: ErrorResponse;
+  404: ErrorResponse;
+  409: ErrorResponse;
+  422: ErrorResponse;
+};
+
+export type CreateLocalLoginError = CreateLocalLoginErrors[keyof CreateLocalLoginErrors];
+
+export type CreateLocalLoginResponses = {
+  200: LocalLoginReset;
+};
+
+export type CreateLocalLoginResponse = CreateLocalLoginResponses[keyof CreateLocalLoginResponses];
+
+export type UpdateLocalLoginData = {
+  body: UpdateLocalLoginRequest;
+  path: {
+    id: string;
+  };
+  query?: never;
+  url: '/v1/accounts/{id}/local-login';
+};
+
+export type UpdateLocalLoginErrors = {
+  401: ErrorResponse;
+  403: ErrorResponse;
+  404: ErrorResponse;
+  409: ErrorResponse;
+};
+
+export type UpdateLocalLoginError = UpdateLocalLoginErrors[keyof UpdateLocalLoginErrors];
+
+export type UpdateLocalLoginResponses = {
+  204: void;
+};
+
+export type UpdateLocalLoginResponse = UpdateLocalLoginResponses[keyof UpdateLocalLoginResponses];
+
+export type ResetLocalLoginData = {
+  body?: never;
+  path: {
+    id: string;
+  };
+  query?: never;
+  url: '/v1/accounts/{id}/local-login/reset';
+};
+
+export type ResetLocalLoginErrors = {
+  401: ErrorResponse;
+  403: ErrorResponse;
+  404: ErrorResponse;
+  409: ErrorResponse;
+};
+
+export type ResetLocalLoginError = ResetLocalLoginErrors[keyof ResetLocalLoginErrors];
+
+export type ResetLocalLoginResponses = {
+  200: LocalLoginReset;
+};
+
+export type ResetLocalLoginResponse = ResetLocalLoginResponses[keyof ResetLocalLoginResponses];
+
 export type ReplaceAccountPermissionsData = {
   body: UpdateAccountPermissionsRequest;
   path: {
@@ -1976,13 +2118,17 @@ export type ChangePasswordErrors = {
    */
   404: ErrorResponse;
   /**
-   * Unsupported
+   * Credentials changed concurrently
    */
-  405: ErrorResponse;
+  409: ErrorResponse;
   /**
    * Validation failed
    */
   422: ErrorResponse;
+  /**
+   * Authentication throttled; retry later
+   */
+  429: ErrorResponse;
 };
 
 export type ChangePasswordError = ChangePasswordErrors[keyof ChangePasswordErrors];
@@ -1995,6 +2141,44 @@ export type ChangePasswordResponses = {
 };
 
 export type ChangePasswordResponse = ChangePasswordResponses[keyof ChangePasswordResponses];
+
+export type ResetLocalPasswordData = {
+  body: ResetLocalPasswordRequest;
+  path?: never;
+  query?: never;
+  url: '/v1/auth/reset-password';
+};
+
+export type ResetLocalPasswordErrors = {
+  /**
+   * Invalid or expired code
+   */
+  401: ErrorResponse;
+  /**
+   * Credential changed concurrently
+   */
+  409: ErrorResponse;
+  /**
+   * Invalid password
+   */
+  422: ErrorResponse;
+  /**
+   * Try again later
+   */
+  429: ErrorResponse;
+};
+
+export type ResetLocalPasswordError = ResetLocalPasswordErrors[keyof ResetLocalPasswordErrors];
+
+export type ResetLocalPasswordResponses = {
+  /**
+   * Password set; sign in to continue
+   */
+  204: void;
+};
+
+export type ResetLocalPasswordResponse =
+  ResetLocalPasswordResponses[keyof ResetLocalPasswordResponses];
 
 export type SignInData = {
   body: SignInRequest;
@@ -2013,13 +2197,13 @@ export type SignInErrors = {
    */
   401: ErrorResponse;
   /**
-   * Not Found
+   * Credentials changed concurrently; retry sign-in
    */
-  404: ErrorResponse;
+  409: ErrorResponse;
   /**
-   * Unsupported
+   * Authentication throttled; retry later
    */
-  405: ErrorResponse;
+  429: ErrorResponse;
 };
 
 export type SignInError = SignInErrors[keyof SignInErrors];
@@ -2050,13 +2234,17 @@ export type SignUpErrors = {
    */
   401: ErrorResponse;
   /**
-   * Unsupported
-   */
-  405: ErrorResponse;
-  /**
    * Duplicate
    */
   409: ErrorResponse;
+  /**
+   * Invalid password
+   */
+  422: ErrorResponse;
+  /**
+   * Authentication throttled; retry later
+   */
+  429: ErrorResponse;
 };
 
 export type SignUpError = SignUpErrors[keyof SignUpErrors];

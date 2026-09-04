@@ -36,7 +36,7 @@ impl LocalAuthenticator {
 
 #[async_trait]
 impl JWTAuthenticator for LocalAuthenticator {
-    fn encode(&self, account: Account) -> Result<String, AuthenticationError> {
+    fn encode(&self, account: Account, revision: uuid::Uuid) -> Result<String, AuthenticationError> {
         let now = chrono::Utc::now().timestamp();
         let expiration = now + self.token_expiry.as_secs() as i64;
         let identity = account
@@ -45,6 +45,8 @@ impl JWTAuthenticator for LocalAuthenticator {
 
         let claims = AuthClaims {
             sub: identity.subject,
+            local_identity_id: Some(identity.id),
+            credential_revision: Some(revision),
             exp: expiration as usize,
             iat: now as usize,
             permissions: account.permissions.unwrap_or_default(),

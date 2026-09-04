@@ -48,6 +48,10 @@ impl IntoResponse for AuthorizationError {
 
 impl IntoResponse for AuthenticationError {
     fn into_response(self) -> Response {
+        if matches!(self, AuthenticationError::RateLimited) {
+            let status = StatusCode::TOO_MANY_REQUESTS;
+            return (status, generate_body(status, self.to_string())).into_response();
+        }
         let (error_message, header_message) = match self {
             AuthenticationError::InvalidCredentials => ("Invalid credentials", ""),
             AuthenticationError::MissingAuthorizationHeader => (
