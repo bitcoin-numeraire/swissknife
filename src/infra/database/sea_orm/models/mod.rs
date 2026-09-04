@@ -13,5 +13,6 @@ pub mod config;
 pub mod contact;
 pub mod invoice;
 pub mod ln_address;
+pub mod local_credential;
 pub mod payment;
 pub mod wallet;

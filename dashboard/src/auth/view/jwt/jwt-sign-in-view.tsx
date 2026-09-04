@@ -43,6 +43,7 @@ export function JwtSignInView() {
   const methods = useForm({
     resolver: zodResolver(zSignInRequest),
     defaultValues: {
+      username: 'admin',
       password: '',
     },
   });
@@ -72,8 +73,10 @@ export function JwtSignInView() {
 
   const renderForm = () => (
     <Box sx={{ gap: 3, display: 'flex', flexDirection: 'column' }}>
+      <Field.Text name="username" label={t('local_login.username')} autoComplete="username" />
       <Field.Text
         name="password"
+        autoComplete="current-password"
         label={t('sign_in.password')}
         type={showPassword.value ? 'text' : 'password'}
         slotProps={{
@@ -112,6 +115,7 @@ export function JwtSignInView() {
       >
         {t('sign_in.sign_in')}
       </Button>
+      <Button href="/reset-password">{t('local_login.have_code')}</Button>
     </Box>
   );
 

@@ -12,8 +12,27 @@ use super::{Account, AccountFilter, AccountPreferences, ApiKey, ApiKeyFilter, Cr
 #[async_trait]
 pub trait AuthUseCases: Send + Sync {
     async fn sign_up(&self, password: String) -> Result<String, ApplicationError>;
-    async fn sign_in(&self, password: String) -> Result<String, ApplicationError>;
-    async fn change_password(&self, current_password: String, new_password: String) -> Result<(), ApplicationError>;
+    async fn sign_in(&self, username: String, password: String) -> Result<String, ApplicationError>;
+    async fn change_password(
+        &self,
+        account_id: Uuid,
+        current_password: String,
+        new_password: String,
+    ) -> Result<(), ApplicationError>;
+    async fn get_local_login(&self, account_id: Uuid)
+        -> Result<Option<swissknife_types::LocalLogin>, ApplicationError>;
+    async fn create_local_login(
+        &self,
+        account_id: Uuid,
+        username: String,
+    ) -> Result<swissknife_types::LocalLoginReset, ApplicationError>;
+    async fn update_local_login(&self, actor: User, account_id: Uuid, enabled: bool) -> Result<(), ApplicationError>;
+    async fn reset_local_login(
+        &self,
+        actor: User,
+        account_id: Uuid,
+    ) -> Result<swissknife_types::LocalLoginReset, ApplicationError>;
+    async fn reset_local_password(&self, code: String, new_password: String) -> Result<(), ApplicationError>;
     async fn authenticate_jwt(&self, token: &str) -> Result<User, ApplicationError>;
     async fn authenticate_api_key(&self, token: Vec<u8>) -> Result<User, ApplicationError>;
 }

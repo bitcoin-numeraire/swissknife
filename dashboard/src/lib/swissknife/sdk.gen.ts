@@ -7,6 +7,7 @@ import {
   createAccountResponseTransformer,
   createAccountWalletResponseTransformer,
   createApiKeyResponseTransformer,
+  createLocalLoginResponseTransformer,
   generateBtcAddressResponseTransformer,
   generateInvoiceResponseTransformer,
   getAccountAddressResponseTransformer,
@@ -19,6 +20,7 @@ import {
   getApiKeyResponseTransformer,
   getBtcAddressResponseTransformer,
   getInvoiceResponseTransformer,
+  getLocalLoginResponseTransformer,
   getPaymentResponseTransformer,
   getWalletInvoiceResponseTransformer,
   getWalletPaymentResponseTransformer,
@@ -44,6 +46,7 @@ import {
   registerAddressResponseTransformer,
   registerWalletResponseTransformer,
   replaceAccountPermissionsResponseTransformer,
+  resetLocalLoginResponseTransformer,
   updateAccountAddressResponseTransformer,
   updateAccountByIdResponseTransformer,
   updateAccountPreferencesResponseTransformer,
@@ -70,6 +73,9 @@ import type {
   CreateApiKeyData,
   CreateApiKeyErrors,
   CreateApiKeyResponses,
+  CreateLocalLoginData,
+  CreateLocalLoginErrors,
+  CreateLocalLoginResponses,
   DeleteAccountAddressData,
   DeleteAccountAddressErrors,
   DeleteAccountAddressResponses,
@@ -157,6 +163,9 @@ import type {
   GetInvoiceData,
   GetInvoiceErrors,
   GetInvoiceResponses,
+  GetLocalLoginData,
+  GetLocalLoginErrors,
+  GetLocalLoginResponses,
   GetPaymentData,
   GetPaymentErrors,
   GetPaymentResponses,
@@ -243,6 +252,12 @@ import type {
   ReplaceAccountPermissionsData,
   ReplaceAccountPermissionsErrors,
   ReplaceAccountPermissionsResponses,
+  ResetLocalLoginData,
+  ResetLocalLoginErrors,
+  ResetLocalLoginResponses,
+  ResetLocalPasswordData,
+  ResetLocalPasswordErrors,
+  ResetLocalPasswordResponses,
   RevokeAccountApiKeyData,
   RevokeAccountApiKeyErrors,
   RevokeAccountApiKeyResponses,
@@ -279,6 +294,9 @@ import type {
   UpdateCurrentAccountData,
   UpdateCurrentAccountErrors,
   UpdateCurrentAccountResponses,
+  UpdateLocalLoginData,
+  UpdateLocalLoginErrors,
+  UpdateLocalLoginResponses,
   VersionCheckData,
   VersionCheckResponses,
   WalletPayData,
@@ -446,6 +464,65 @@ export const updateAccountById = <ThrowOnError extends boolean = false>(
   );
 
 /**
+ * Read local login state without exposing credentials.
+ */
+export const getLocalLogin = <ThrowOnError extends boolean = false>(
+  options: Options<GetLocalLoginData, ThrowOnError>
+): RequestResult<GetLocalLoginResponses, GetLocalLoginErrors, ThrowOnError> =>
+  (options.client ?? client).get<GetLocalLoginResponses, GetLocalLoginErrors, ThrowOnError>({
+    responseTransformer: getLocalLoginResponseTransformer,
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/accounts/{id}/local-login',
+    ...options,
+  });
+
+/**
+ * Create a local login and return a single-use activation code.
+ */
+export const createLocalLogin = <ThrowOnError extends boolean = false>(
+  options: Options<CreateLocalLoginData, ThrowOnError>
+): RequestResult<CreateLocalLoginResponses, CreateLocalLoginErrors, ThrowOnError> =>
+  (options.client ?? client).post<CreateLocalLoginResponses, CreateLocalLoginErrors, ThrowOnError>({
+    responseTransformer: createLocalLoginResponseTransformer,
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/accounts/{id}/local-login',
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
+
+/**
+ * Enable or disable local login. API keys retain their independent grants.
+ */
+export const updateLocalLogin = <ThrowOnError extends boolean = false>(
+  options: Options<UpdateLocalLoginData, ThrowOnError>
+): RequestResult<UpdateLocalLoginResponses, UpdateLocalLoginErrors, ThrowOnError> =>
+  (options.client ?? client).put<UpdateLocalLoginResponses, UpdateLocalLoginErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/accounts/{id}/local-login',
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
+
+/**
+ * Revoke local sessions and issue a single-use password reset code.
+ */
+export const resetLocalLogin = <ThrowOnError extends boolean = false>(
+  options: Options<ResetLocalLoginData, ThrowOnError>
+): RequestResult<ResetLocalLoginResponses, ResetLocalLoginErrors, ThrowOnError> =>
+  (options.client ?? client).post<ResetLocalLoginResponses, ResetLocalLoginErrors, ThrowOnError>({
+    responseTransformer: resetLocalLoginResponseTransformer,
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/accounts/{id}/local-login/reset',
+    ...options,
+  });
+
+/**
  * Replace permissions stored for an account.
  */
 export const replaceAccountPermissions = <ThrowOnError extends boolean = false>(
@@ -551,7 +628,7 @@ export const getApiKey = <ThrowOnError extends boolean = false>(
 /**
  * Change Password
  *
- * Changes the local owner password for `JWT` auth provider deployments.
+ * Changes the authenticated account password and revokes its local sessions for `JWT` auth provider deployments.
  */
 export const changePassword = <ThrowOnError extends boolean = false>(
   options: Options<ChangePasswordData, ThrowOnError>
@@ -559,6 +636,26 @@ export const changePassword = <ThrowOnError extends boolean = false>(
   (options.client ?? client).post<ChangePasswordResponses, ChangePasswordErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/v1/auth/change-password',
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
+
+/**
+ * Redeem a single-use local activation or reset code. Sign in after choosing a password.
+ */
+export const resetLocalPassword = <ThrowOnError extends boolean = false>(
+  options: Options<ResetLocalPasswordData, ThrowOnError>
+): RequestResult<ResetLocalPasswordResponses, ResetLocalPasswordErrors, ThrowOnError> =>
+  (options.client ?? client).post<
+    ResetLocalPasswordResponses,
+    ResetLocalPasswordErrors,
+    ThrowOnError
+  >({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/auth/reset-password',
     ...options,
     headers: {
       'Content-Type': 'application/json',

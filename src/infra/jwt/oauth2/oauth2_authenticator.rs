@@ -134,7 +134,7 @@ impl OAuth2Authenticator {
 
 #[async_trait]
 impl JWTAuthenticator for OAuth2Authenticator {
-    fn encode(&self, _: Account) -> Result<String, AuthenticationError> {
+    fn encode(&self, _: Account, _: uuid::Uuid) -> Result<String, AuthenticationError> {
         Err(AuthenticationError::UnsupportedOperation)
     }
 

@@ -83,6 +83,7 @@ pub fn matrix_cell() -> (String, String) {
 /// A spawned, ready SwissKnife instance: its base URL and log paths.
 pub struct Spawned {
     pub base_url: String,
+    pub database_url: String,
     pub stdout_path: PathBuf,
     pub stderr_path: PathBuf,
 }
@@ -138,6 +139,7 @@ pub async fn spawn_instance(database: &str, provider: &str, label: &str, extra_e
 
     Spawned {
         base_url,
+        database_url: db.url().to_string(),
         stdout_path,
         stderr_path,
     }

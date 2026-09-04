@@ -5,6 +5,7 @@ import type {
   CreateAccountResponse,
   CreateAccountWalletResponse,
   CreateApiKeyResponse,
+  CreateLocalLoginResponse,
   GenerateBtcAddressResponse,
   GenerateInvoiceResponse,
   GetAccountAddressResponse,
@@ -17,6 +18,7 @@ import type {
   GetApiKeyResponse,
   GetBtcAddressResponse,
   GetInvoiceResponse,
+  GetLocalLoginResponse,
   GetPaymentResponse,
   GetWalletInvoiceResponse,
   GetWalletPaymentResponse,
@@ -42,6 +44,7 @@ import type {
   RegisterAddressResponse,
   RegisterWalletResponse,
   ReplaceAccountPermissionsResponse,
+  ResetLocalLoginResponse,
   UpdateAccountAddressResponse,
   UpdateAccountByIdResponse,
   UpdateAccountPreferencesResponse,
@@ -192,6 +195,41 @@ export const updateAccountByIdResponseTransformer = async (
   data: any
 ): Promise<UpdateAccountByIdResponse> => {
   data = accountSchemaResponseTransformer(data);
+  return data;
+};
+
+const localLoginSchemaResponseTransformer = (data: any) => {
+  if (data.reset_expires_at) {
+    data.reset_expires_at = new Date(data.reset_expires_at);
+  }
+  return data;
+};
+
+export const getLocalLoginResponseTransformer = async (
+  data: any
+): Promise<GetLocalLoginResponse> => {
+  if (data) {
+    data = localLoginSchemaResponseTransformer(data);
+  }
+  return data;
+};
+
+const localLoginResetSchemaResponseTransformer = (data: any) => {
+  data.expires_at = new Date(data.expires_at);
+  return data;
+};
+
+export const createLocalLoginResponseTransformer = async (
+  data: any
+): Promise<CreateLocalLoginResponse> => {
+  data = localLoginResetSchemaResponseTransformer(data);
+  return data;
+};
+
+export const resetLocalLoginResponseTransformer = async (
+  data: any
+): Promise<ResetLocalLoginResponse> => {
+  data = localLoginResetSchemaResponseTransformer(data);
   return data;
 };
 
