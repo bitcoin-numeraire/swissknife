@@ -9677,6 +9677,7 @@
         "type": "object",
         "description": "Sign In Request",
         "required": [
+          "username",
           "password"
         ],
         "properties": {
@@ -9687,7 +9688,7 @@
           },
           "username": {
             "type": "string",
-            "description": "Local login username. Omission selects the existing bootstrap owner."
+            "description": "Local login username."
           }
         }
       },

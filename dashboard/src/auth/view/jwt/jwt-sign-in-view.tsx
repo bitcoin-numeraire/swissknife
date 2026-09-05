@@ -43,7 +43,7 @@ export function JwtSignInView() {
   const methods = useForm({
     resolver: zodResolver(zSignInRequest),
     defaultValues: {
-      username: 'admin',
+      username: '',
       password: '',
     },
   });

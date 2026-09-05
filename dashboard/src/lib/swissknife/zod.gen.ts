@@ -572,7 +572,7 @@ export const zSetupInfo = z.object({
  */
 export const zSignInRequest = z.object({
   password: z.string(),
-  username: z.string().optional(),
+  username: z.string(),
 });
 
 /**

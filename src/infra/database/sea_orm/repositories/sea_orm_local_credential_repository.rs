@@ -1,8 +1,8 @@
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use sea_orm::{
-    sea_query::{Expr, ExprTrait, Func, OnConflict},
-    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set, TransactionTrait,
+    sea_query::OnConflict, ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set,
+    TransactionTrait,
 };
 use serde_json::json;
 use uuid::Uuid;
@@ -186,44 +186,29 @@ impl LocalCredentialRepository for SeaOrmLocalCredentialRepository {
             .one(&tx)
             .await
             .map_err(|e| DatabaseError::FindOne(e.to_string()))?;
+        if existing.is_some() {
+            return Err(DataError::Conflict("Account already has a login identity".into()).into());
+        }
         let now = Utc::now().naive_utc();
-        let identity_id = match existing {
-            Some(identity) if identity.provider == "jwt" && identity.subject == subject => identity.id,
-            Some(_) => return Err(DataError::Conflict("Account already has a different login identity".into()).into()),
-            None => {
-                // Reserve the canonical spelling against older case-sensitive JWT subjects.
-                if auth_identity::Entity::find()
-                    .filter(auth_identity::Column::Provider.eq("jwt"))
-                    .filter(Expr::expr(Func::lower(Expr::col(auth_identity::Column::Subject))).eq(subject.clone()))
-                    .one(&tx)
-                    .await
-                    .map_err(|e| DatabaseError::FindOne(e.to_string()))?
-                    .is_some()
-                {
-                    return Err(DataError::Conflict("Username is already in use".into()).into());
-                }
-                let identity_id = Uuid::new_v4();
-                let inserted = auth_identity::Entity::insert(auth_identity::ActiveModel {
-                    id: Set(identity_id),
-                    account_id: Set(account_id),
-                    provider: Set("jwt".into()),
-                    subject: Set(subject),
-                    created_at: Set(now),
-                })
-                .on_conflict(
-                    OnConflict::columns([auth_identity::Column::Provider, auth_identity::Column::Subject])
-                        .do_nothing()
-                        .to_owned(),
-                )
-                .exec_without_returning(&tx)
-                .await
-                .map_err(|e| DatabaseError::Insert(e.to_string()))?;
-                if inserted != 1 {
-                    return Err(DataError::Conflict("Username is already in use".into()).into());
-                }
-                identity_id
-            }
-        };
+        let identity_id = Uuid::new_v4();
+        let inserted = auth_identity::Entity::insert(auth_identity::ActiveModel {
+            id: Set(identity_id),
+            account_id: Set(account_id),
+            provider: Set("jwt".into()),
+            subject: Set(subject),
+            created_at: Set(now),
+        })
+        .on_conflict(
+            OnConflict::columns([auth_identity::Column::Provider, auth_identity::Column::Subject])
+                .do_nothing()
+                .to_owned(),
+        )
+        .exec_without_returning(&tx)
+        .await
+        .map_err(|e| DatabaseError::Insert(e.to_string()))?;
+        if inserted != 1 {
+            return Err(DataError::Conflict("Username is already in use".into()).into());
+        }
         local_credential::ActiveModel {
             account_id: Set(account_id),
             identity_id: Set(identity_id),

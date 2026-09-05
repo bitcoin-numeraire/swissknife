@@ -13,6 +13,20 @@ mod sign_in {
     use super::*;
 
     #[tokio::test]
+    async fn requires_a_username() {
+        let app = app().await;
+        let res = app
+            .api()
+            .post(
+                "/v1/auth/sign-in",
+                Auth::None,
+                serde_json::json!({ "password": ADMIN_PASSWORD }),
+            )
+            .await;
+        assert_error(&res, StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
     async fn with_the_correct_password_returns_a_token() {
         let app = app().await;
         app.admin_token().await; // ensure the admin exists
@@ -22,7 +36,7 @@ mod sign_in {
                 "/v1/auth/sign-in",
                 Auth::None,
                 SignInRequest {
-                    username: "admin".into(),
+                    username: " Admin ".into(),
                     password: ADMIN_PASSWORD.to_string(),
                 },
             )
@@ -703,16 +717,16 @@ async fn operator_recovery_targets_an_existing_account_without_reopening_setup()
 }
 
 #[tokio::test]
-async fn local_tokens_without_credential_binding_require_sign_in_after_upgrade() {
+async fn rejects_local_tokens_without_credential_binding() {
     use jsonwebtoken::{encode, EncodingKey, Header};
     use serde_json::json;
     let app = app().await;
     app.admin_token().await;
-    let legacy = encode(&Header::default(), &json!({
+    let token = encode(&Header::default(), &json!({
         "sub":"admin", "iat":chrono::Utc::now().timestamp(), "exp":chrono::Utc::now().timestamp() + 3600, "permissions":[]
     }), &EncodingKey::from_secret(b"integration-test-secret")).unwrap();
     assert_error(
-        &app.api().get("/v1/me", Auth::Bearer(&legacy)).await,
+        &app.api().get("/v1/me", Auth::Bearer(&token)).await,
         StatusCode::UNAUTHORIZED,
     );
 }

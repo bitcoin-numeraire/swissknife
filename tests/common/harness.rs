@@ -185,9 +185,13 @@ async fn bootstrap_admin(api: &ApiClient) -> String {
     let body = match signup.status.as_u16() {
         200 => signup.body,
         409 => {
-            api.post("/v1/auth/sign-in", Auth::None, json!({ "password": ADMIN_PASSWORD }))
-                .await
-                .body
+            api.post(
+                "/v1/auth/sign-in",
+                Auth::None,
+                json!({ "username": "admin", "password": ADMIN_PASSWORD }),
+            )
+            .await
+            .body
         }
         other => panic!("admin bootstrap: unexpected sign-up status {other}: {}", signup.body),
     };

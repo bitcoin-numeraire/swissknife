@@ -50,6 +50,21 @@ impl AuthService {
         }
     }
 
+    fn normalize_username(username: String) -> Result<String, ApplicationError> {
+        let username = username.trim().to_ascii_lowercase();
+        if !(3..=64).contains(&username.len())
+            || !username
+                .bytes()
+                .all(|c| c.is_ascii_alphanumeric() || b"._-".contains(&c))
+        {
+            return Err(DataError::Validation(
+                "Username must contain 3 to 64 ASCII letters, digits, dots, underscores, or hyphens".into(),
+            )
+            .into());
+        }
+        Ok(username)
+    }
+
     async fn limit_login(&self, username: &str) -> Result<(), ApplicationError> {
         let mut attempts = self.login_attempts.lock().await;
         let now = Instant::now();
@@ -155,35 +170,21 @@ impl AuthUseCases for AuthService {
 
     async fn sign_in(&self, username: String, password: String) -> Result<String, ApplicationError> {
         self.require_local()?;
-        if username.len() > 1024 {
-            return Err(AuthenticationError::InvalidCredentials.into());
-        }
-        let normalized = username.trim().to_ascii_lowercase();
-        self.limit_login(&normalized).await?;
-        // Preserve exact legacy subjects; new handles also accept their normalized spelling.
-        let credential = match self.store.local_credential.find_by_subject(&username).await? {
-            Some(credential) => Some(credential),
-            None if normalized != username => self.store.local_credential.find_by_subject(&normalized).await?,
-            None => None,
-        };
+        let username = Self::normalize_username(username).map_err(|_| AuthenticationError::InvalidCredentials)?;
+        self.limit_login(&username).await?;
+        let credential = self.store.local_credential.find_by_subject(&username).await?;
         let hash = credential
             .as_ref()
             .filter(|c| c.enabled)
             .and_then(|c| c.password_hash.clone());
-        let needs_upgrade = hash.as_ref().is_some_and(|h| h.starts_with("$2"));
-        let valid = self.passwords.verify(password.clone(), hash).await?;
-        let mut credential = credential
+        let valid = self.passwords.verify(password, hash).await?;
+        let credential = credential
             .filter(|c| c.enabled && valid)
             .ok_or(AuthenticationError::InvalidCredentials)?;
         let account_id = credential.account_id;
         let revision = credential.revision;
-        if needs_upgrade {
-            credential.password_hash = Some(self.passwords.hash(password).await?);
-            // Rehashing the same password preserves sessions, but cannot overwrite a concurrent reset.
-            self.store.local_credential.replace(credential, revision).await?;
-        }
         let token = self.token(account_id, revision).await?;
-        self.login_attempts.lock().await.remove(&normalized);
+        self.login_attempts.lock().await.remove(&username);
         debug!(%account_id, "Local user signed in");
         Ok(token)
     }
@@ -230,31 +231,7 @@ impl AuthUseCases for AuthService {
         username: String,
     ) -> Result<LocalLoginReset, ApplicationError> {
         self.require_local()?;
-        let account = self
-            .store
-            .account
-            .find(account_id)
-            .await?
-            .ok_or_else(|| DataError::NotFound("Account not found".into()))?;
-        let username = if let Some(identity) = account.identity {
-            if identity.provider != AuthProvider::Jwt || identity.subject != username {
-                return Err(DataError::Conflict("Use the account's existing JWT subject".into()).into());
-            }
-            identity.subject
-        } else {
-            let username = username.trim().to_ascii_lowercase();
-            if !(3..=64).contains(&username.len())
-                || !username
-                    .bytes()
-                    .all(|c| c.is_ascii_alphanumeric() || b"._-".contains(&c))
-            {
-                return Err(DataError::Validation(
-                    "Username must contain 3 to 64 ASCII letters, digits, dots, underscores, or hyphens".into(),
-                )
-                .into());
-            }
-            username
-        };
+        let username = Self::normalize_username(username)?;
         let (grant, hash) = Self::reset_grant();
         self.store
             .local_credential
@@ -527,14 +504,11 @@ mod tests {
             use super::*;
             #[tokio::test]
             async fn rejects_it_before_creating_credentials() {
-                let mut store = MockAppStoreBuilder::new();
-                store.account.expect_find().times(1).returning(|id| {
-                    Ok(Some(Account {
-                        id,
-                        ..Default::default()
-                    }))
-                });
-                let service = service(MockJWTAuthenticator::new(), store, AuthProvider::Jwt);
+                let service = service(
+                    MockJWTAuthenticator::new(),
+                    MockAppStoreBuilder::new(),
+                    AuthProvider::Jwt,
+                );
                 let result = service
                     .create_local_login(Uuid::new_v4(), "name with spaces".into())
                     .await;
@@ -547,12 +521,6 @@ mod tests {
             async fn stores_only_a_hash_of_the_activation_code() {
                 let id = Uuid::new_v4();
                 let mut store = MockAppStoreBuilder::new();
-                store.account.expect_find().times(1).returning(|id| {
-                    Ok(Some(Account {
-                        id,
-                        ..Default::default()
-                    }))
-                });
                 store
                     .local_credential
                     .expect_create()
@@ -565,28 +533,6 @@ mod tests {
                 let grant = service.create_local_login(id, " Alice ".into()).await.unwrap();
                 assert_eq!(grant.code.len(), 43);
             }
-        }
-    }
-
-    mod activate_legacy_identity {
-        use super::*;
-        #[tokio::test]
-        async fn retains_an_existing_subject_and_account_id() {
-            let id = Uuid::new_v4();
-            let mut store = MockAppStoreBuilder::new();
-            store
-                .account
-                .expect_find()
-                .times(1)
-                .returning(move |_| Ok(Some(account_fixture(id, AuthProvider::Jwt, "Existing|Subject", vec![]))));
-            store
-                .local_credential
-                .expect_create()
-                .withf(move |account_id, subject, _, _| *account_id == id && subject == "Existing|Subject")
-                .times(1)
-                .returning(|_, _, _, _| Ok(()));
-            let service = service(MockJWTAuthenticator::new(), store, AuthProvider::Jwt);
-            assert!(service.create_local_login(id, "Existing|Subject".into()).await.is_ok());
         }
     }
 
