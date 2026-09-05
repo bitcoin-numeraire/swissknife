@@ -38,7 +38,7 @@ export function LocalLoginCard({ account }: { account: Account }) {
   const { account: currentAccount } = useAccountContext();
   const { data, error, isLoading, mutate: refresh } = useLocalLogin(account.id);
   const login = data?.data;
-  const [username, setUsername] = useState(account.identity?.subject ?? '');
+  const [username, setUsername] = useState('');
   const [grant, setGrant] = useState<LocalLoginReset | null>(null);
   const [pending, setPending] = useState(false);
   const [confirmation, setConfirmation] = useState<'reset' | 'disable' | null>(null);
@@ -117,7 +117,6 @@ export function LocalLoginCard({ account }: { account: Account }) {
                   <TextField
                     label={t('local_login.username')}
                     helperText={t('local_login.username_help')}
-                    disabled={!!account.identity}
                     value={username}
                     onChange={(event) => setUsername(event.target.value)}
                     autoComplete="off"
@@ -126,7 +125,7 @@ export function LocalLoginCard({ account }: { account: Account }) {
                   <Button
                     variant="contained"
                     loading={pending}
-                    disabled={!account.identity && !/^[a-z0-9._-]{3,64}$/i.test(username.trim())}
+                    disabled={!/^[a-z0-9._-]{3,64}$/i.test(username.trim())}
                     onClick={() => run('create')}
                     sx={{ alignSelf: 'flex-start' }}
                   >

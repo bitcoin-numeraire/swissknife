@@ -23,8 +23,7 @@ pub struct SignUpRequest {
 /// Sign In Request
 #[derive(Debug, Deserialize, ToSchema, Serialize)]
 pub struct SignInRequest {
-    /// Local login username. Omission selects the existing bootstrap owner.
-    #[serde(default = "default_username")]
+    /// Local login username.
     pub username: String,
     /// User password
     #[schema(example = "password")]
@@ -48,10 +47,6 @@ pub struct SignInResponse {
     /// JWT token
     #[schema(example = "eyJ0eXAiOiJKV1QiLCJhbGciOiJ...")]
     pub token: String,
-}
-
-fn default_username() -> String {
-    "admin".into()
 }
 
 /// Add a local login to an account. The response contains a one-time activation code.

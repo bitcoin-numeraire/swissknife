@@ -85,12 +85,8 @@ impl PasswordService {
         let valid = tokio::task::spawn_blocking(move || {
             let _permit = permit;
             let _admitted = admitted;
-            if stored.starts_with("$2") {
-                bcrypt::verify(password, &stored).unwrap_or(false)
-            } else {
-                PasswordHash::new(&stored)
-                    .is_ok_and(|hash| Argon2::default().verify_password(password.as_bytes(), &hash).is_ok())
-            }
+            PasswordHash::new(&stored)
+                .is_ok_and(|hash| Argon2::default().verify_password(password.as_bytes(), &hash).is_ok())
         })
         .await
         .map_err(|_| AuthenticationError::Hash("Password worker failed".into()))?;
@@ -116,17 +112,7 @@ mod tests {
     mod verify {
         use super::*;
         #[tokio::test]
-        async fn supports_legacy_bcrypt_without_accepting_an_incorrect_password() {
-            let service = PasswordService::new();
-            let hash = bcrypt::hash("legacy-password", 4).unwrap();
-            assert!(service
-                .verify("legacy-password".into(), Some(hash.clone()))
-                .await
-                .unwrap());
-            assert!(!service.verify("wrong-password".into(), Some(hash)).await.unwrap());
-        }
-        #[tokio::test]
-        async fn hashes_the_whole_passphrase_instead_of_truncating_at_bcrypts_limit() {
+        async fn verifies_the_entire_long_passphrase() {
             let service = PasswordService::new();
             let password = format!("{}first", "x".repeat(72));
             let hash = service.hash(password.clone()).await.unwrap();

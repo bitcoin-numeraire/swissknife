@@ -7,11 +7,9 @@
 
 ## Context
 
-Local JWT deployments already use the account aggregate introduced by ADR 0002,
-but authentication still checks one bcrypt password hash in `config`. Sign-in
-implicitly selects the `jwt/admin` identity, password changes update that global
-hash, and token authentication can provision a missing local identity. This does
-not provide independent credentials, safe account removal, or user management.
+Local JWT authentication needs independent credentials and user management on top
+of the account aggregate introduced by ADR 0002. Production deployments use Auth0;
+there are no existing local JWT users to migrate.
 
 This decision defines local login on top of the existing account ownership model.
 An account remains the owner of permissions, API keys, preferences, and asset-scoped
@@ -42,9 +40,8 @@ credential revision, and lifecycle timestamps. Reset grants store only the hash
 of a cryptographically random, expiring, single-use secret. Stored password and
 reset-token hashes stay internal and are excluded from account DTOs and logs.
 
-New passwords use Argon2id; existing bcrypt hashes are migrated without knowing
-the password, verified on the next successful login, then upgraded. Hashing and
-verification run outside the async executor with bounded concurrency. Validate
+Passwords use Argon2id. Hashing and verification run outside the async executor
+with bounded concurrency. Validate
 password length before hashing, allow password-manager paste and passphrases,
 and never truncate passwords silently. The concrete hash parameters, input
 bounds, and login throttling are part of the implementation contract below.
@@ -63,8 +60,8 @@ New local JWTs bind the username, immutable identity ID, and credential revision
 Authentication verifies the signature and expiry, resolves the existing identity
 and credential, checks enabled state and revision, and loads the account's current
 permissions. A missing local identity is unauthorized and is never provisioned
-from a token. Tokens without the new binding require sign-in after the upgrade.
-OAuth2 first-login provisioning keeps its existing separate path.
+from a token. Local tokens require this credential binding. OAuth2 first-login
+provisioning uses the identity provider's claims.
 
 Password changes, resets, and login state transitions rotate the revision.
 This invalidates all of that local identity's existing sessions on subsequent
@@ -89,7 +86,7 @@ no database constraint or runtime rule that designates one permanent admin.
 | Operation | Contract |
 | --- | --- |
 | `POST /v1/auth/sign-up` | One-time owner setup; creates `jwt/admin`, its account and credentials, and a permanent setup marker in one transaction. |
-| `POST /v1/auth/sign-in` | `{ username, password }`; username omission retains the bootstrap `admin` default for existing clients. |
+| `POST /v1/auth/sign-in` | Requires both `{ username, password }`. |
 | `POST /v1/auth/change-password` | Authenticated caller's current and new passwords; `204`, then sign in again. |
 | `GET /v1/accounts/{id}/local-login` | Requires `read:account`; returns non-secret login state or `null`. |
 | `POST /v1/accounts/{id}/local-login` | Requires `write:account`; attaches a username and returns one activation code. Conflicts do not create another account. |
@@ -97,14 +94,11 @@ no database constraint or runtime rule that designates one permanent admin.
 | `POST /v1/accounts/{id}/local-login/reset` | Requires `write:account`; revokes the password and sessions and returns a replacement reset code. |
 | `POST /v1/auth/reset-password` | Public code redemption with a new password; `204`, then ordinary sign-in. |
 
-New usernames normalize surrounding whitespace and ASCII case, then require 3–64
-ASCII letters, digits, dots, underscores, or hyphens. Uniqueness remains
-`(provider, subject)`. An existing JWT identity without a credential can be
-activated only with its exact existing subject, including legacy spellings outside
-the new handle rules. Sign-in first resolves the exact subject, then the normalized
-spelling if the exact one has no credential. New handles cannot claim the
-case-folded spelling of an existing JWT subject. Local credential creation cannot link
-an OAuth2 identity or silently change an existing account's identity.
+Username creation and sign-in normalize surrounding whitespace and ASCII case,
+then require 3–64 ASCII letters, digits, dots, underscores, or hyphens. Uniqueness
+is enforced by `(provider, subject)`. Creating local credentials atomically adds
+a JWT identity to an account without a login identity. An account that already
+has an identity cannot receive another one through this operation.
 
 The login card shows **Enabled**, **Disabled**, or **Awaiting password**, the
 username, and reset expiry. Create/reset codes are shown once, with a copy action;
@@ -146,8 +140,7 @@ restoring an obsolete password or consuming a code twice.
 
 - Argon2id uses a random salt and the PHC format, with 19 MiB memory, two iterations,
   and one lane. New passwords require 15 Unicode scalar values and accept at most
-  1024 UTF-8 bytes. Existing bcrypt passwords remain usable regardless of the new
-  minimum until the user changes them; successful login upgrades their hashes.
+  1024 UTF-8 bytes.
 - Each process admits at most 32 password jobs, running at most four blocking
   workers. Sign-in allows ten attempts per normalized username in a rolling
   minute, cleared after successful authentication. The in-memory table is bounded
@@ -156,8 +149,7 @@ restoring an obsolete password or consuming a code twice.
   deployment-wide limits. This is temporary throttling, not persistent account
   disabling.
 - Missing, disabled, unactivated, and incorrect-password logins return the same
-  `401` response. Missing/disabled credentials perform dummy hash verification;
-  bcrypt compatibility can still have different verification cost during rollout.
+  `401` response. Missing/disabled credentials perform dummy hash verification.
 - Activation/reset codes contain 32 random bytes, encoded as base64url without
   padding; only their SHA-256 digest is stored. They expire after 30 minutes and
   are checked before password hashing. Redemption, password change, and disable
@@ -172,29 +164,16 @@ and [OWASP reset-token guidance](https://cheatsheetseries.owasp.org/cheatsheets/
 Passwords authenticate a SwissKnife account; they do not derive or recover wallet
 private keys, unlock a Lightning node, or replace a wallet backup.
 
-### Migration and first-owner setup
+### Schema and first-owner setup
 
-Upgrade the backend and generated dashboard client together. Existing local JWTs
-lack the credential binding and require sign-in again. Fresh installations keep
-the welcome/owner setup flow; it identifies the first login as `admin`. Ordinary
-users use the username field, including on single-owner installations after an
-upgrade.
+The schema migration creates the local-credential table, unique constraints, and
+foreign keys on PostgreSQL and SQLite. Owner setup creates the first local login
+as `admin`; all users supply their username when signing in.
 
-The migration runs transactionally on PostgreSQL and SQLite. If `config.password_hash`
-exists, it moves that hash onto the existing `jwt/admin` identity and account,
-creates the non-secret `local_auth_initialized` marker, and removes the global
-hash. It preserves permissions, identities, preferences, API keys, wallet IDs,
-assets, balances, and transaction history. A missing admin identity or malformed
-legacy hash value fails the migration and rolls it back for operator reconciliation;
-it must never guess which account owns the credentials. Other JWT identities
-remain without credentials until explicitly activated by an administrator.
-
-A fresh database claims `local_auth_initialized` atomically with owner creation.
+Owner setup claims `local_auth_initialized` atomically with account creation.
 The marker survives account deletion and every credential reset or disable.
 Public sign-up therefore never reopens just because there are no usable local
 logins. OAuth2 deployments do not create local credentials from their identities.
-Rollback to the shared-password binary requires the pre-upgrade backup, because
-multiple independent passwords cannot be represented by one global hash.
 
 ### Deployment experience and recovery
 
@@ -227,9 +206,9 @@ required. Do not delete the initialization marker to regain access.
 The implementation is covered through public API tests for independent local
 accounts, permissions, password change, disable/enable, reset-code replay and
 concurrent redemption, username reuse after deletion, and operator recovery.
-Database migration tests cover retaining the existing aggregate and rolling back
-an inconsistent legacy installation on both supported engines. Dashboard tests
-cover code redemption, validation, and failure recovery.
+Persistence tests exercise the schema on both supported engines and preserve the
+production Auth0 account migration coverage. Dashboard tests cover code redemption,
+validation, and failure recovery.
 
 JWT authorization now requires a credential lookup, trading stateless local
 sessions for prompt revocation. API-key grants remain independent and must be

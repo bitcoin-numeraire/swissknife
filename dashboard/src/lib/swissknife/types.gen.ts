@@ -1120,9 +1120,9 @@ export type SignInRequest = {
    */
   password: string;
   /**
-   * Local login username. Omission selects the existing bootstrap owner.
+   * Local login username.
    */
-  username?: string;
+  username: string;
 };
 
 /**
