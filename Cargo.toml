@@ -61,7 +61,6 @@ anyhow = "1.0.104"
 futures-util = "0.3.34"
 humantime = "2.4.0"
 rust_socketio = { version = "0.6.0", features = ["async"] }
-bcrypt = "0.19.3"
 migration = { path = "crates/migration" }
 swissknife-types = { path = "crates/swissknife-types" }
 utoipa = { version = "5.5.0", features = ["axum_extras", "chrono", "uuid"] }
@@ -74,6 +73,7 @@ tokio-tungstenite = { version = "0.30.0", features = ["native-tls"] }
 http = "1.5.0"
 bytes = "1.12.1"
 bitcoin = "=0.32.102"
+argon2 = "0.5.3"
 
 [build-dependencies]
 tonic-prost-build = "0.14.6"

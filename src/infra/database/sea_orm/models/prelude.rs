@@ -10,5 +10,6 @@ pub use super::btc_output::Entity as BtcOutput;
 pub use super::config::Entity as Config;
 pub use super::invoice::Entity as Invoice;
 pub use super::ln_address::Entity as LnAddress;
+pub use super::local_credential::Entity as LocalCredential;
 pub use super::payment::Entity as Payment;
 pub use super::wallet::Entity as Wallet;

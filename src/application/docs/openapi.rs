@@ -81,13 +81,6 @@ pub const NOT_FOUND_EXAMPLE: &str = r#"
 }
 "#;
 
-pub const UNSUPPORTED_EXAMPLE: &str = r#"
-{
-    "status": "405 Method Not Allowed",
-    "reason": "Sign in not allowed (not needed) for oauth2 provider"
-}
-"#;
-
 pub const CONFLICT_EXAMPLE: &str = r#"
 {
     "status": "409 Conflict",

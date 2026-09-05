@@ -26,7 +26,7 @@ If you like what we do, consider starring, sharing and contributing!
 - REST API.
 - Frequent contacts.
 - OIDC/OAuth2 authentication with automatic JWKS discovery and key refresh (tested with Auth0).
-- Local JWT authentication for self-hosted deployments.
+- Local JWT authentication with per-account passwords, administrator-managed activation/reset codes, and login disabling.
 - `RBAC`. Fine-grained authorization per route and attenuated API key.
 - Data availability through pagination and advanced search.
 - Account-scoped API key authentication
@@ -96,6 +96,7 @@ Developer documentation:
 - Architecture decisions:
   - [ADR 0001: AppStore, Unit of Work, and wallet reservations](docs/adr/0001-appstore-uow-wallet-reservations.md)
   - [ADR 0002: Identity, assets, and asset-scoped wallets](docs/adr/0002-identity-assets-wallet-model.md)
+  - [ADR 0004: Local JWT credentials and account management](docs/adr/0004-local-jwt-credentials.md)
 - [Code of conduct](docs/CODE_OF_CONDUCT.md)
 
 ## Work In Progress (WIP)

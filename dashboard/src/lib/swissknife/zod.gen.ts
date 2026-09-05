@@ -137,6 +137,13 @@ export const zContact = z.object({
 });
 
 /**
+ * Add a local login to an account. The response contains a one-time activation code.
+ */
+export const zCreateLocalLoginRequest = z.object({
+  username: z.string(),
+});
+
+/**
  * Create Wallet Request
  */
 export const zCreateWalletRequest = z.object({
@@ -313,6 +320,24 @@ export const zLnUrlCallback = z.object({
   pr: z.string(),
   routes: z.array(z.string()),
   successAction: zLnUrlSuccessAction.nullish(),
+});
+
+/**
+ * Non-secret local login information for account administrators.
+ */
+export const zLocalLogin = z.object({
+  enabled: z.boolean(),
+  password_set: z.boolean(),
+  reset_expires_at: z.iso.datetime().nullish(),
+  username: z.string(),
+});
+
+/**
+ * One-time activation or reset code. Shown only in this response.
+ */
+export const zLocalLoginReset = z.object({
+  code: z.string(),
+  expires_at: z.iso.datetime(),
 });
 
 /**
@@ -511,6 +536,14 @@ export const zRegisterLnAddressRequest = z.object({
 });
 
 /**
+ * Redeem a local login activation/reset code and choose a password.
+ */
+export const zResetLocalPasswordRequest = z.object({
+  code: z.string(),
+  new_password: z.string(),
+});
+
+/**
  * Send Payment Request
  */
 export const zSendPaymentRequest = z.object({
@@ -539,6 +572,7 @@ export const zSetupInfo = z.object({
  */
 export const zSignInRequest = z.object({
   password: z.string(),
+  username: z.string(),
 });
 
 /**
@@ -584,6 +618,13 @@ export const zUpdateLnAddressRequest = z.object({
   allows_nostr: z.boolean().nullish(),
   nostr_pubkey: z.string().nullish(),
   username: z.string().nullish(),
+});
+
+/**
+ * Enable or disable password login for this account.
+ */
+export const zUpdateLocalLoginRequest = z.object({
+  enabled: z.boolean(),
 });
 
 /**
@@ -773,6 +814,34 @@ export const zUpdateAccountByIdPath = z.object({
  */
 export const zUpdateAccountByIdResponse = zAccount;
 
+export const zGetLocalLoginPath = z.object({
+  id: z.uuid(),
+});
+
+export const zGetLocalLoginResponse = zLocalLogin.nullable();
+
+export const zCreateLocalLoginBody = zCreateLocalLoginRequest;
+
+export const zCreateLocalLoginPath = z.object({
+  id: z.uuid(),
+});
+
+export const zCreateLocalLoginResponse = zLocalLoginReset;
+
+export const zUpdateLocalLoginBody = zUpdateLocalLoginRequest;
+
+export const zUpdateLocalLoginPath = z.object({
+  id: z.uuid(),
+});
+
+export const zUpdateLocalLoginResponse = z.void();
+
+export const zResetLocalLoginPath = z.object({
+  id: z.uuid(),
+});
+
+export const zResetLocalLoginResponse = zLocalLoginReset;
+
 export const zReplaceAccountPermissionsBody = zUpdateAccountPermissionsRequest;
 
 export const zReplaceAccountPermissionsPath = z.object({
@@ -865,6 +934,13 @@ export const zChangePasswordBody = zChangePasswordRequest;
  * Password changed
  */
 export const zChangePasswordResponse = z.void();
+
+export const zResetLocalPasswordBody = zResetLocalPasswordRequest;
+
+/**
+ * Password set; sign in to continue
+ */
+export const zResetLocalPasswordResponse = z.void();
 
 export const zSignInBody = zSignInRequest;
 
