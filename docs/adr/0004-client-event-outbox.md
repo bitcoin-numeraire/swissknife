@@ -31,11 +31,14 @@ This is a transactional outbox: after a successful commit, both state and event 
 
 The initial event vocabulary is:
 
+- `invoice.pending`, emitted once when the selected node provider reports an on-chain deposit in the mempool
 - `invoice.paid`
 - `payment.settled`
 - `payment.failed`
 
-The payload is the full public invoice or payment snapshot committed by that transition. Internal fields such as balance reservations and encrypted LNURL success actions remain excluded by their existing serialization rules.
+The payload is the full public invoice or payment snapshot committed by that transition. An on-chain deposit keeps the same invoice resource ID as it moves from `invoice.pending` to `invoice.paid`; the pending snapshot includes its unconfirmed Bitcoin output. Internal fields such as balance reservations and encrypted LNURL success actions remain excluded by their existing serialization rules.
+
+LND reports zero-confirmation wallet transactions, so its on-chain lifecycle includes both events. Core Lightning currently registers wallet deposits only after confirmation; without a separate chain data source, its first observable transition remains `invoice.paid`.
 
 ### Provide at-least-once replay
 

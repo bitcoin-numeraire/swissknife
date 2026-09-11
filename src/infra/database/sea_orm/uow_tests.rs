@@ -22,7 +22,11 @@ use crate::domains::event::{ClientEventRepository, ClientEventType, EventProject
 use crate::domains::invoice::{Invoice, InvoiceRepository};
 use crate::domains::ln_address::LnAddressRepository;
 use crate::domains::payment::{LnPayment, Payment, PaymentRepository, PaymentStatus, PaymentUnitOfWork};
-use crate::domains::{asset::AssetRepository, bitcoin::BtcNetwork, wallet::WalletRepository};
+use crate::domains::{
+    asset::AssetRepository,
+    bitcoin::{BtcAddressRepository, BtcAddressType, BtcNetwork, BtcOutput, BtcOutputStatus},
+    wallet::WalletRepository,
+};
 
 use super::models::{
     client_event,
@@ -30,9 +34,9 @@ use super::models::{
     wallet,
 };
 use super::{
-    SeaOrmAccountRepository, SeaOrmApiKeyRepository, SeaOrmAssetRepository, SeaOrmClientEventRepository,
-    SeaOrmEventProjectionUnitOfWork, SeaOrmInvoiceRepository, SeaOrmLnAddressRepository, SeaOrmPaymentRepository,
-    SeaOrmPaymentUnitOfWork, SeaOrmWalletRepository,
+    SeaOrmAccountRepository, SeaOrmApiKeyRepository, SeaOrmAssetRepository, SeaOrmBitcoinAddressRepository,
+    SeaOrmClientEventRepository, SeaOrmEventProjectionUnitOfWork, SeaOrmInvoiceRepository, SeaOrmLnAddressRepository,
+    SeaOrmPaymentRepository, SeaOrmPaymentUnitOfWork, SeaOrmWalletRepository,
 };
 
 static COUNTER: AtomicU64 = AtomicU64::new(0);
@@ -883,4 +887,77 @@ async fn settle_incoming_invoice_credits_once_under_replay() {
         .expect("read events");
     assert_eq!(events.len(), 1);
     assert_eq!(events[0].event_type, ClientEventType::InvoicePaid);
+}
+
+#[tokio::test]
+async fn onchain_deposit_emits_pending_then_paid_once() {
+    let conn = connect().await;
+    let receiver = seed_wallet(&conn, 0).await;
+    let address = SeaOrmBitcoinAddressRepository::new(conn.clone())
+        .insert(receiver, "bcrt1qeventdeposit", BtcAddressType::P2wpkh)
+        .await
+        .expect("insert deposit address");
+    let projection = SeaOrmEventProjectionUnitOfWork::new(conn.clone());
+    let unconfirmed_output = BtcOutput {
+        outpoint: "event-deposit-tx:0".to_string(),
+        txid: "event-deposit-tx".to_string(),
+        address: address.address.clone(),
+        amount_sat: 30,
+        status: BtcOutputStatus::Unconfirmed,
+        ..Default::default()
+    };
+    let pending = Invoice {
+        wallet_id: receiver,
+        amount_msat: Some(30_000),
+        ledger: Ledger::Onchain,
+        description: Some("Bitcoin On-chain deposit".to_string()),
+        ..Default::default()
+    };
+
+    let stored = projection
+        .project_onchain_deposit(unconfirmed_output.clone(), address.clone(), pending.clone())
+        .await
+        .expect("project pending deposit");
+    assert_eq!(stored.status, crate::domains::invoice::InvoiceStatus::Pending);
+    assert_eq!(balance(&conn, receiver).await, (0, 0));
+
+    // Replaying the same mempool observation updates the projection without
+    // emitting a duplicate pending event.
+    projection
+        .project_onchain_deposit(unconfirmed_output.clone(), address.clone(), pending.clone())
+        .await
+        .expect("replay pending deposit");
+
+    let mut confirmed_output = unconfirmed_output;
+    confirmed_output.status = BtcOutputStatus::Confirmed;
+    confirmed_output.block_height = Some(42);
+    let mut confirmed = pending;
+    confirmed.amount_received_msat = Some(30_000);
+    confirmed.payment_time = Some(Utc::now());
+    let settled = projection
+        .project_onchain_deposit(confirmed_output.clone(), address.clone(), confirmed.clone())
+        .await
+        .expect("confirm deposit");
+    assert_eq!(settled.status, crate::domains::invoice::InvoiceStatus::Settled);
+    assert_eq!(balance(&conn, receiver).await, (30_000, 0));
+
+    // A confirmed replay neither credits nor emits twice.
+    projection
+        .project_onchain_deposit(confirmed_output, address, confirmed)
+        .await
+        .expect("replay confirmed deposit");
+    assert_eq!(balance(&conn, receiver).await, (30_000, 0));
+
+    let events = SeaOrmClientEventRepository::new(conn.clone())
+        .find_after(account_id(&conn, receiver).await, 0, 10)
+        .await
+        .expect("read events");
+    assert_eq!(events.len(), 2);
+    assert_eq!(events[0].event_type, ClientEventType::InvoicePending);
+    assert_eq!(events[0].resource_id, stored.id);
+    assert_eq!(events[0].data["status"], "Pending");
+    assert_eq!(events[0].data["bitcoin_output"]["status"], "Unconfirmed");
+    assert_eq!(events[1].event_type, ClientEventType::InvoicePaid);
+    assert_eq!(events[1].resource_id, stored.id);
+    assert_eq!(events[1].data["status"], "Settled");
 }

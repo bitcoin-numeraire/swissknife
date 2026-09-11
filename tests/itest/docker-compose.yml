@@ -16,7 +16,7 @@ services:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: postgres
     ports:
-      - "5432:5432"
+      - "${SWISSKNIFE_ITEST_POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres-data:/var/lib/postgresql
     healthcheck:
@@ -32,10 +32,10 @@ services:
       - ./config/bitcoin/bitcoin.conf:/etc/bitcoin/bitcoin.conf:ro
       - bitcoin-data:/home/bitcoin/.bitcoin
     ports:
-      - "18443:18443"
-      - "18444:18444"
-      - "28332:28332"
-      - "28333:28333"
+      - "${SWISSKNIFE_ITEST_BITCOIN_RPC_PORT:-18443}:18443"
+      - "${SWISSKNIFE_ITEST_BITCOIN_P2P_PORT:-18444}:18444"
+      - "${SWISSKNIFE_ITEST_BITCOIN_ZMQ_RAWBLOCK_PORT:-28332}:28332"
+      - "${SWISSKNIFE_ITEST_BITCOIN_ZMQ_RAWTX_PORT:-28333}:28333"
     healthcheck:
       test:
         [
@@ -60,9 +60,9 @@ services:
       - ./runtime/lnd/tls.cert:/root/.lnd/tls.cert
       - ./runtime/lnd/tls.key:/root/.lnd/tls.key
     ports:
-      - "10009:10009"
-      - "8080:8080"
-      - "9735:9735"
+      - "${SWISSKNIFE_ITEST_LND_GRPC_PORT:-10009}:10009"
+      - "${SWISSKNIFE_ITEST_LND_REST_PORT:-8080}:8080"
+      - "${SWISSKNIFE_ITEST_LND_P2P_PORT:-9735}:9735"
 
   cln:
     image: elementsproject/lightningd:v26.06.1
@@ -82,9 +82,9 @@ services:
       - ./runtime/cln/regtest/client.pem:/root/.lightning/regtest/client.pem
       - ./runtime/cln/regtest/client-key.pem:/root/.lightning/regtest/client-key.pem
     ports:
-      - "11002:11002"
-      - "3010:3010"
-      - "9736:9736"
+      - "${SWISSKNIFE_ITEST_CLN_GRPC_PORT:-11002}:11002"
+      - "${SWISSKNIFE_ITEST_CLN_REST_PORT:-3010}:3010"
+      - "${SWISSKNIFE_ITEST_CLN_P2P_PORT:-9736}:9736"
 
   # Mock OpenID Connect provider for the OAuth2/OIDC auth tests. Serves standard
   # discovery + JWKS and mints JWTs whose claims are shaped by the checked-in

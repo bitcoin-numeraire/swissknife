@@ -388,6 +388,7 @@ export type ClientEvent = {
  * Stable event names shared by SSE and webhook delivery.
  */
 export const ClientEventType = {
+  INVOICE_PENDING: 'invoice.pending',
   INVOICE_PAID: 'invoice.paid',
   PAYMENT_SETTLED: 'payment.settled',
   PAYMENT_FAILED: 'payment.failed',

@@ -5,7 +5,7 @@ use crate::{
     application::errors::{ApplicationError, DataError, DatabaseError},
     domains::{
         bitcoin::{BtcAddress, BtcAddressRepository, BtcOutput, BtcOutputRepository},
-        event::{EventProjectionUnitOfWork, NewClientEvent},
+        event::{ClientEventType, EventProjectionUnitOfWork, NewClientEvent},
         invoice::{Invoice, InvoiceRepository},
         payment::{Payment, PaymentRepository, PaymentStatus, PaymentUnitOfWork},
         wallet::WalletRepository,
@@ -312,7 +312,7 @@ impl EventProjectionUnitOfWork for SeaOrmEventProjectionUnitOfWork {
         // The caller only sets payment_time/amount_received once the deposit is confirmed.
         let confirmed = deposit_invoice.payment_time.is_some();
 
-        let (invoice, should_emit) = match invoice_repo.find_by_btc_output_id(stored_output.id).await? {
+        let (invoice, event_type) = match invoice_repo.find_by_btc_output_id(stored_output.id).await? {
             Some(mut existing) => {
                 if confirmed {
                     // Confirm the previously-pending deposit invoice exactly once.
@@ -329,12 +329,12 @@ impl EventProjectionUnitOfWork for SeaOrmEventProjectionUnitOfWork {
                             .find(existing.id)
                             .await?
                             .ok_or_else(|| DataError::NotFound("Invoice not found.".to_string()))?,
-                        newly_settled,
+                        newly_settled.then_some(ClientEventType::InvoicePaid),
                     )
                 } else {
                     // Still unconfirmed: keep the invoice linked to the (re-)seen output.
                     existing.btc_output_id = Some(stored_output.id);
-                    (invoice_repo.update(existing).await?, false)
+                    (invoice_repo.update(existing).await?, None)
                 }
             }
             None => {
@@ -344,15 +344,31 @@ impl EventProjectionUnitOfWork for SeaOrmEventProjectionUnitOfWork {
                         wallet_repo.credit(deposit_invoice.wallet_id, received_msat).await?;
                     }
                 }
-                let invoice = invoice_repo.insert(deposit_invoice).await?;
-                (invoice, confirmed)
+                let inserted = invoice_repo.insert(deposit_invoice).await?;
+                let invoice = invoice_repo
+                    .find(inserted.id)
+                    .await?
+                    .ok_or_else(|| DataError::NotFound("Invoice not found.".to_string()))?;
+                let event_type = if confirmed {
+                    ClientEventType::InvoicePaid
+                } else {
+                    ClientEventType::InvoicePending
+                };
+                (invoice, Some(event_type))
             }
         };
 
-        if should_emit {
-            SeaOrmClientEventRepository::new(&txn)
-                .append_event(NewClientEvent::invoice_paid(&invoice)?)
-                .await?;
+        if let Some(event_type) = event_type {
+            let event = match event_type {
+                ClientEventType::InvoicePending => NewClientEvent::invoice_pending(&invoice)?,
+                ClientEventType::InvoicePaid => NewClientEvent::invoice_paid(&invoice)?,
+                _ => {
+                    return Err(
+                        DataError::Inconsistency(format!("unsupported invoice client event {event_type}")).into(),
+                    )
+                }
+            };
+            SeaOrmClientEventRepository::new(&txn).append_event(event).await?;
         }
 
         txn.commit()

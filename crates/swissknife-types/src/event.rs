@@ -25,6 +25,9 @@ pub struct ClientEvent {
 /// Stable event names shared by SSE and webhook delivery.
 #[derive(Clone, Copy, Debug, Deserialize, Display, EnumString, Eq, PartialEq, Serialize, ToSchema)]
 pub enum ClientEventType {
+    #[serde(rename = "invoice.pending")]
+    #[strum(serialize = "invoice.pending")]
+    InvoicePending,
     #[serde(rename = "invoice.paid")]
     #[strum(serialize = "invoice.paid")]
     InvoicePaid,

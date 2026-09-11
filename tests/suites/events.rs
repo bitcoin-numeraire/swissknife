@@ -11,8 +11,12 @@ use sea_orm::{
     ConnectionTrait, Database,
 };
 
-use swissknife_types::{ClientEvent, ClientEventType, Invoice, NewInvoiceRequest};
+use swissknife_types::{
+    BtcAddress, BtcOutputStatus, ClientEvent, ClientEventType, Invoice, InvoiceStatus, Ledger, NewBtcAddressRequest,
+    NewInvoiceRequest,
+};
 
+use crate::common::chain;
 use crate::common::counterparty::Counterparty;
 use crate::common::fixtures::unique;
 use crate::common::wait::wait_until;
@@ -263,6 +267,74 @@ mod stream {
         assert!(
             second.id.parse::<i32>().expect("numeric second cursor")
                 > first.id.parse::<i32>().expect("numeric first cursor")
+        );
+    }
+
+    #[tokio::test]
+    async fn streams_a_real_onchain_deposit_lifecycle() {
+        let app = app().await;
+        let admin = app.admin_token().await;
+        let account = app.create_account_with_wallet(admin, "event-onchain-deposit").await;
+        let address = app
+            .api()
+            .post(
+                &format!("/v1/me/wallets/{}/bitcoin/addresses", account.wallet.id),
+                Auth::ApiKey(&account.key),
+                NewBtcAddressRequest {
+                    wallet_id: None,
+                    address_type: None,
+                },
+            )
+            .await;
+        assert_status(&address, StatusCode::OK);
+        let address = address.parse::<BtcAddress>();
+
+        let mut stream = app
+            .api()
+            .event_stream("/v1/me/events", Auth::ApiKey(&account.key), None)
+            .await;
+        assert_stream_headers(&stream);
+
+        chain::send_to_address(&address.address, 100_000).await;
+
+        // LND publishes zero-confirmation transaction updates. CLN currently
+        // registers wallet deposits only once confirmed, so its first observable
+        // transition is the paid event below.
+        let pending_resource_id = if app.provider.starts_with("lnd") {
+            let pending = next_event(&mut stream).await;
+            assert_eq!(pending.event_type, ClientEventType::InvoicePending.to_string());
+            assert_eq!(pending.payload.event_type, ClientEventType::InvoicePending);
+            assert_eq!(pending.payload.wallet_id, account.wallet.id);
+            let pending_invoice =
+                serde_json::from_value::<Invoice>(pending.payload.data).expect("pending invoice snapshot");
+            assert_eq!(pending_invoice.status, InvoiceStatus::Pending);
+            assert_eq!(pending_invoice.ledger, Ledger::Onchain);
+            assert_eq!(pending_invoice.amount_msat, Some(100_000_000));
+            assert_eq!(
+                pending_invoice.bitcoin_output.expect("pending bitcoin output").status,
+                BtcOutputStatus::Unconfirmed
+            );
+            Some(pending.payload.resource_id)
+        } else {
+            None
+        };
+
+        chain::mine(6).await;
+
+        let paid = next_event(&mut stream).await;
+        assert_eq!(paid.event_type, ClientEventType::InvoicePaid.to_string());
+        assert_eq!(paid.payload.event_type, ClientEventType::InvoicePaid);
+        assert_eq!(paid.payload.wallet_id, account.wallet.id);
+        if let Some(resource_id) = pending_resource_id {
+            assert_eq!(paid.payload.resource_id, resource_id);
+        }
+        let paid_invoice = serde_json::from_value::<Invoice>(paid.payload.data).expect("paid invoice snapshot");
+        assert_eq!(paid_invoice.status, InvoiceStatus::Settled);
+        assert_eq!(paid_invoice.ledger, Ledger::Onchain);
+        assert_eq!(paid_invoice.amount_received_msat, Some(100_000_000));
+        assert_eq!(
+            paid_invoice.bitcoin_output.expect("confirmed bitcoin output").status,
+            BtcOutputStatus::Confirmed
         );
     }
 

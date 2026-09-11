@@ -131,7 +131,12 @@ export const zChangePasswordRequest = z.object({
 /**
  * Stable event names shared by SSE and webhook delivery.
  */
-export const zClientEventType = z.enum(['invoice.paid', 'payment.settled', 'payment.failed']);
+export const zClientEventType = z.enum([
+  'invoice.pending',
+  'invoice.paid',
+  'payment.settled',
+  'payment.failed',
+]);
 
 /**
  * A durable event emitted after an invoice or payment changes state.

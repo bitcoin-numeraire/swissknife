@@ -8327,6 +8327,7 @@
         "type": "string",
         "description": "Stable event names shared by SSE and webhook delivery.",
         "enum": [
+          "invoice.pending",
           "invoice.paid",
           "payment.settled",
           "payment.failed"

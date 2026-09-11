@@ -17,6 +17,15 @@ pub struct NewClientEvent {
 }
 
 impl NewClientEvent {
+    pub fn invoice_pending(invoice: &Invoice) -> Result<Self, DatabaseError> {
+        Ok(Self {
+            event_type: ClientEventType::InvoicePending,
+            wallet_id: invoice.wallet_id,
+            resource_id: invoice.id,
+            data: serde_json::to_value(invoice).map_err(|e| DatabaseError::Insert(e.to_string()))?,
+        })
+    }
+
     pub fn invoice_paid(invoice: &Invoice) -> Result<Self, DatabaseError> {
         Ok(Self {
             event_type: ClientEventType::InvoicePaid,
