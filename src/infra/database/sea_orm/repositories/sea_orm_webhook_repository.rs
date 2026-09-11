@@ -3,7 +3,7 @@ use chrono::{DateTime, Utc};
 use sea_orm::{
     sea_query::{Expr, OnConflict},
     ActiveModelTrait, ColumnTrait, Condition, DatabaseConnection, DatabaseTransaction, EntityTrait, ExprTrait,
-    QueryFilter, QueryOrder, QuerySelect, Set, TransactionTrait,
+    QueryFilter, QueryOrder, QuerySelect, Set, SqlErr, TransactionTrait,
 };
 use uuid::Uuid;
 
@@ -28,6 +28,22 @@ use super::lock_client_event_log;
 const PENDING: &str = "Pending";
 const DELIVERED: &str = "Delivered";
 const EXHAUSTED: &str = "Exhausted";
+
+fn insert_error(error: sea_orm::DbErr) -> DatabaseError {
+    if matches!(error.sql_err(), Some(SqlErr::UniqueConstraintViolation(_))) {
+        DatabaseError::Conflict(error.to_string())
+    } else {
+        DatabaseError::Insert(error.to_string())
+    }
+}
+
+fn update_error(error: sea_orm::DbErr) -> DatabaseError {
+    if matches!(error.sql_err(), Some(SqlErr::UniqueConstraintViolation(_))) {
+        DatabaseError::Conflict(error.to_string())
+    } else {
+        DatabaseError::Update(error.to_string())
+    }
+}
 
 #[derive(Clone)]
 pub struct SeaOrmWebhookRepository {
@@ -127,7 +143,7 @@ impl WebhookRepository for SeaOrmWebhookRepository {
         }
         .insert(&tx)
         .await
-        .map_err(|e| DatabaseError::Insert(e.to_string()))?;
+        .map_err(insert_error)?;
 
         tx.commit()
             .await
@@ -218,10 +234,7 @@ impl WebhookRepository for SeaOrmWebhookRepository {
             }
         }
         model.updated_at = Set(Some(Utc::now().naive_utc()));
-        let model = model
-            .update(&tx)
-            .await
-            .map_err(|e| DatabaseError::Update(e.to_string()))?;
+        let model = model.update(&tx).await.map_err(update_error)?;
         tx.commit()
             .await
             .map_err(|e| DatabaseError::Transaction(e.to_string()))?;

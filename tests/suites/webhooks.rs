@@ -117,6 +117,51 @@ async fn keeps_subscriptions_and_secrets_with_the_owning_account() {
 }
 
 #[tokio::test]
+async fn concurrent_duplicate_urls_return_conflict() {
+    let app = app().await;
+    let admin = app.admin_token().await;
+    let account = app.create_account_with_wallet(admin, "webhook-concurrent-url").await;
+    let auth = Auth::ApiKey(&account.key);
+    let path = format!("/v1/me/wallets/{}/webhooks", account.wallet.id);
+    let api = app.api();
+    let request = json!({
+        "url": "https://example.com/concurrent-create",
+        "event_types": ["invoice.paid"]
+    });
+    let (first, second) = tokio::join!(api.post(&path, auth, request.clone()), api.post(&path, auth, request));
+    let mut statuses = [first.status, second.status];
+    statuses.sort_by_key(|status| status.as_u16());
+    assert_eq!(statuses, [StatusCode::CREATED, StatusCode::CONFLICT]);
+
+    let first = api
+        .post(
+            &path,
+            auth,
+            json!({"url": "https://example.com/update-a", "event_types": ["invoice.paid"]}),
+        )
+        .await
+        .parse::<CreatedWebhookSubscription>();
+    let second = api
+        .post(
+            &path,
+            auth,
+            json!({"url": "https://example.com/update-b", "event_types": ["invoice.paid"]}),
+        )
+        .await
+        .parse::<CreatedWebhookSubscription>();
+    let first_path = format!("{path}/{}", first.subscription.id);
+    let second_path = format!("{path}/{}", second.subscription.id);
+    let request = json!({"url": "https://example.com/concurrent-update"});
+    let (first, second) = tokio::join!(
+        api.put(&first_path, auth, request.clone()),
+        api.put(&second_path, auth, request)
+    );
+    let mut statuses = [first.status, second.status];
+    statuses.sort_by_key(|status| status.as_u16());
+    assert_eq!(statuses, [StatusCode::OK, StatusCode::CONFLICT]);
+}
+
+#[tokio::test]
 async fn fans_out_a_real_settlement_and_blocks_private_delivery_destinations() {
     let app = app().await;
     let admin = app.admin_token().await;

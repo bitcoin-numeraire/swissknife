@@ -4,7 +4,7 @@ use uuid::Uuid;
 
 use crate::application::{
     composition::AppStore,
-    errors::{ApplicationError, DataError},
+    errors::{ApplicationError, DataError, DatabaseError},
 };
 
 use super::{
@@ -14,6 +14,7 @@ use super::{
 };
 
 const DELIVERY_HISTORY_LIMIT: u64 = 100;
+const DUPLICATE_URL_MESSAGE: &str = "A webhook already exists for this URL.";
 
 pub struct WebhookService {
     store: AppStore,
@@ -27,6 +28,13 @@ impl WebhookService {
     fn generate_secret() -> String {
         let bytes: [u8; 32] = rand::random();
         URL_SAFE_NO_PAD.encode(bytes)
+    }
+
+    fn map_write_error(error: DatabaseError) -> ApplicationError {
+        match error {
+            DatabaseError::Conflict(_) => DataError::Conflict(DUPLICATE_URL_MESSAGE.to_string()).into(),
+            error => error.into(),
+        }
     }
 
     pub(crate) fn validate_url(url: &str) -> Result<(), DataError> {
@@ -98,7 +106,7 @@ impl WebhookUseCases for WebhookService {
             .iter()
             .any(|subscription| subscription.url == request.url)
         {
-            return Err(DataError::Conflict("A webhook already exists for this URL.".to_string()).into());
+            return Err(DataError::Conflict(DUPLICATE_URL_MESSAGE.to_string()).into());
         }
 
         let signing_secret = Self::generate_secret();
@@ -113,7 +121,8 @@ impl WebhookUseCases for WebhookService {
                 event_types,
                 signing_secret: signing_secret.clone(),
             })
-            .await?;
+            .await
+            .map_err(Self::map_write_error)?;
 
         Ok(CreatedWebhookSubscription {
             subscription: stored.into(),
@@ -155,13 +164,18 @@ impl WebhookUseCases for WebhookService {
                 .iter()
                 .any(|subscription| subscription.id != id && &subscription.url == url)
             {
-                return Err(DataError::Conflict("A webhook already exists for this URL.".to_string()).into());
+                return Err(DataError::Conflict(DUPLICATE_URL_MESSAGE.to_string()).into());
             }
         }
         if let Some(event_types) = request.event_types.take() {
             request.event_types = Some(Self::validate_event_types(event_types)?);
         }
-        let stored = self.store.webhook.update(id, request).await?;
+        let stored = self
+            .store
+            .webhook
+            .update(id, request)
+            .await
+            .map_err(Self::map_write_error)?;
         Ok(stored.into())
     }
 
@@ -229,6 +243,15 @@ mod tests {
             .unwrap(),
             vec![ClientEventType::InvoicePaid, ClientEventType::PaymentSettled]
         );
+    }
+
+    #[test]
+    fn maps_unique_storage_conflicts_to_the_public_duplicate_error() {
+        let error = WebhookService::map_write_error(DatabaseError::Conflict("unique violation".to_string()));
+        assert!(matches!(
+            error,
+            ApplicationError::Data(DataError::Conflict(message)) if message == DUPLICATE_URL_MESSAGE
+        ));
     }
 
     #[tokio::test]

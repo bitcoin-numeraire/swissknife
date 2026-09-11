@@ -8,7 +8,7 @@ impl MigratorTrait for PreWebhookMigrator {
     fn migrations() -> Vec<Box<dyn sea_orm_migration::MigrationTrait>> {
         Migrator::migrations()
             .into_iter()
-            .filter(|migration| migration.name() != "m20260717_173942_add_webhook_delivery")
+            .filter(|migration| migration.name() != "m20260911_232008_add_webhook_delivery")
             .collect()
     }
 }
