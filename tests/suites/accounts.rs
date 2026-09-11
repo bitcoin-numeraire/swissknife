@@ -31,16 +31,34 @@ mod lifecycle {
                 )
                 .await;
             assert_status(&response, StatusCode::OK);
-            ids.push(response.parse::<Account>().id);
+            let id = response.parse::<Account>().id;
+            let wallet = app
+                .api()
+                .post(
+                    "/v1/wallets",
+                    Auth::Bearer(admin),
+                    CreateWalletRequest {
+                        account_id: Some(id),
+                        asset_id: regtest_btc_asset_id(),
+                    },
+                )
+                .await;
+            assert_status(&wallet, StatusCode::OK);
+            ids.push((id, wallet.parse::<Wallet>().id));
         }
         tokio::join!(
             async {
-                for id in ids {
+                for (id, wallet_id) in ids {
                     let response = app
                         .api()
                         .delete(&format!("/v1/accounts/{id}"), Auth::Bearer(admin))
                         .await;
                     assert_status(&response, StatusCode::OK);
+                    let wallet = app
+                        .api()
+                        .get(&format!("/v1/wallets/{wallet_id}"), Auth::Bearer(admin))
+                        .await;
+                    assert_error(&wallet, StatusCode::NOT_FOUND);
                 }
             },
             async {
