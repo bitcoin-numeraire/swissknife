@@ -14,6 +14,49 @@ mod lifecycle {
     use super::*;
 
     #[tokio::test]
+    async fn listing_accounts_remains_valid_during_concurrent_deletion() {
+        let app = app().await;
+        let admin = app.admin_token().await;
+        let mut ids = Vec::new();
+        for _ in 0..30 {
+            let response = app
+                .api()
+                .post(
+                    "/v1/accounts",
+                    Auth::Bearer(admin),
+                    CreateAccountRequest {
+                        display_name: Some(unique("list-delete-race")),
+                        permissions: vec![],
+                    },
+                )
+                .await;
+            assert_status(&response, StatusCode::OK);
+            ids.push(response.parse::<Account>().id);
+        }
+        tokio::join!(
+            async {
+                for id in ids {
+                    let response = app
+                        .api()
+                        .delete(&format!("/v1/accounts/{id}"), Auth::Bearer(admin))
+                        .await;
+                    assert_status(&response, StatusCode::OK);
+                }
+            },
+            async {
+                for _ in 0..30 {
+                    let response = app.api().get("/v1/accounts?limit=1000", Auth::Bearer(admin)).await;
+                    assert_status(&response, StatusCode::OK);
+                    assert!(response
+                        .parse::<Vec<Account>>()
+                        .iter()
+                        .all(|account| account.preferences.is_some()));
+                }
+            }
+        );
+    }
+
+    #[tokio::test]
     async fn creates_lists_updates_permissions_and_deletes_an_account_aggregate() {
         let app = app().await;
         let admin = app.admin_token().await;
