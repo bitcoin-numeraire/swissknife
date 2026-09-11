@@ -227,7 +227,7 @@ This is the core fix for #291 and supersedes the narrower #254 first-login race.
 ### 7. Local JWT deployments should use the same account model
 
 The credential storage, password lifecycle, management APIs, and deployment UX
-follow-up is defined in [ADR 0004](0004-local-jwt-credentials.md) (#338).
+follow-up is defined in [ADR 0005](0005-local-jwt-credentials.md) (#338).
 
 The schema and service layer should support multiple accounts for every auth provider, including local JWT. That avoids baking a single-admin assumption into the remodel.
 
@@ -498,6 +498,6 @@ Each step should be a focused PR. The wallet conversion and service cutover may 
 
 ## Open follow-ups
 
-- Local JWT multi-user API/UX for Umbrel, desktop, and mobile deployments: addressed by [ADR 0004](0004-local-jwt-credentials.md) (#338).
+- Local JWT multi-user API/UX for Umbrel, desktop, and mobile deployments: addressed by [ADR 0005](0005-local-jwt-credentials.md) (#338).
 - Decide the exact asset catalog source of truth for Taproot Assets metadata once a Taproot Assets adapter is implemented.
 - Design the account/master-key model for #115 without assuming one old wallet equals one user.

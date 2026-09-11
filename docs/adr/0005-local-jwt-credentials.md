@@ -1,4 +1,4 @@
-# ADR 0004: Local JWT credentials and account management
+# ADR 0005: Local JWT credentials and account management
 
 - Status: Accepted
 - Date: 2026-09-04
