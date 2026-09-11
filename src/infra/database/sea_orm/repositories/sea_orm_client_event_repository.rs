@@ -1,12 +1,11 @@
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use sea_orm::{
-    sea_query::OnConflict, ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, QueryOrder,
-    QuerySelect, Set, TransactionTrait,
+    sea_query::OnConflict, ActiveModelTrait, ColumnTrait, DatabaseConnection, DatabaseTransaction, EntityTrait,
+    QueryFilter, QueryOrder, QuerySelect, Set, TransactionTrait,
 };
 use uuid::Uuid;
 
-use super::SeaOrmConnection;
 use crate::{
     application::errors::DatabaseError,
     domains::event::{ClientEvent, ClientEventRepository, ClientEventType, NewClientEvent},
@@ -20,6 +19,24 @@ use crate::{
 
 const PRUNED_THROUGH_KEY: &str = "client_event_pruned_through_id";
 
+// Hold this write lock until commit so sequence allocation follows commit order.
+// PostgreSQL sequences alone can expose a higher ID before a lower ID commits.
+pub(crate) async fn lock_client_event_log(txn: &DatabaseTransaction) -> Result<(), DatabaseError> {
+    ConfigEntity::insert(config::ActiveModel {
+        key: Set("client_event_append_lock".to_string()),
+        value: Set(None),
+    })
+    .on_conflict(
+        OnConflict::column(config::Column::Key)
+            .update_column(config::Column::Value)
+            .to_owned(),
+    )
+    .exec_without_returning(txn)
+    .await
+    .map_err(|error| DatabaseError::Update(error.to_string()))?;
+    Ok(())
+}
+
 #[derive(Clone)]
 pub struct SeaOrmClientEventRepository<C = DatabaseConnection> {
     db: C,
@@ -31,11 +48,9 @@ impl<C> SeaOrmClientEventRepository<C> {
     }
 }
 
-impl<C> SeaOrmClientEventRepository<C>
-where
-    C: SeaOrmConnection,
-{
+impl SeaOrmClientEventRepository<&DatabaseTransaction> {
     pub async fn append_event(&self, event: NewClientEvent) -> Result<(), DatabaseError> {
+        lock_client_event_log(self.db).await?;
         ClientEventEntity::insert(ActiveModel {
             wallet_id: Set(event.wallet_id),
             event_type: Set(event.event_type.to_string()),
@@ -48,7 +63,7 @@ where
                 .do_nothing()
                 .to_owned(),
         )
-        .exec_without_returning(self.db.connection())
+        .exec_without_returning(self.db)
         .await
         .map_err(|error| DatabaseError::Insert(error.to_string()))?;
 
@@ -119,6 +134,7 @@ impl ClientEventRepository for SeaOrmClientEventRepository<DatabaseConnection> {
             .begin()
             .await
             .map_err(|error| DatabaseError::Transaction(error.to_string()))?;
+        lock_client_event_log(&txn).await?;
         let watermark = ConfigEntity::find_by_id(PRUNED_THROUGH_KEY)
             .lock_exclusive()
             .one(&txn)

@@ -11,14 +11,14 @@ use chrono::Utc;
 use migration::{Migrator, MigratorTrait};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectOptions, ConnectionTrait, Database, DatabaseBackend, DatabaseConnection,
-    EntityTrait, QueryFilter, Set, Statement,
+    EntityTrait, QueryFilter, Set, Statement, TransactionTrait,
 };
 use uuid::Uuid;
 
 use crate::application::composition::Ledger;
 use crate::application::errors::{ApplicationError, DataError};
 use crate::domains::account::{AccountFilter, AccountRepository, ApiKey, ApiKeyRepository, AuthProvider, Permission};
-use crate::domains::event::{ClientEventRepository, ClientEventType, EventProjectionUnitOfWork};
+use crate::domains::event::{ClientEventRepository, ClientEventType, EventProjectionUnitOfWork, NewClientEvent};
 use crate::domains::invoice::{Invoice, InvoiceRepository};
 use crate::domains::ln_address::LnAddressRepository;
 use crate::domains::payment::{LnPayment, Payment, PaymentRepository, PaymentStatus, PaymentUnitOfWork};
@@ -653,6 +653,56 @@ async fn client_events_are_account_scoped_and_pruned_with_a_durable_watermark() 
             .len(),
         1,
         "retention must leave newer events intact"
+    );
+}
+
+#[tokio::test]
+async fn concurrent_event_appends_preserve_commit_order() {
+    let conn = connect().await;
+    let wallet = seed_wallet(&conn, 0).await;
+    let account = account_id(&conn, wallet).await;
+    let first_resource = Uuid::new_v4();
+    let second_resource = Uuid::new_v4();
+    let event = |resource_id| NewClientEvent {
+        wallet_id: wallet,
+        resource_id,
+        event_type: ClientEventType::PaymentFailed,
+        data: serde_json::json!({}),
+    };
+    let first = conn.begin().await.unwrap();
+    SeaOrmClientEventRepository::new(&first)
+        .append_event(event(first_resource))
+        .await
+        .unwrap();
+    let second_event = event(second_resource);
+    let second_conn = conn.clone();
+    let mut second = tokio::spawn(async move {
+        let txn = second_conn.begin().await.unwrap();
+        SeaOrmClientEventRepository::new(&txn)
+            .append_event(second_event)
+            .await
+            .unwrap();
+        txn.commit().await.unwrap();
+    });
+
+    assert!(
+        tokio::time::timeout(std::time::Duration::from_millis(100), &mut second)
+            .await
+            .is_err(),
+        "a later event must not commit before the earlier cursor"
+    );
+    first.commit().await.unwrap();
+    tokio::time::timeout(std::time::Duration::from_secs(5), second)
+        .await
+        .unwrap()
+        .unwrap();
+    let events = SeaOrmClientEventRepository::new(conn)
+        .find_after(account, 0, 10)
+        .await
+        .unwrap();
+    assert_eq!(
+        events.iter().map(|event| event.resource_id).collect::<Vec<_>>(),
+        vec![first_resource, second_resource]
     );
 }
 

@@ -27,6 +27,7 @@ use crate::{
 
 const LAST_EVENT_ID: &str = "last-event-id";
 const EVENT_POLL_INTERVAL: Duration = Duration::from_secs(1);
+const AUTH_RECHECK_INTERVAL: Duration = Duration::from_secs(15);
 const KEEP_ALIVE_INTERVAL: Duration = Duration::from_secs(15);
 const CURSOR_EXPIRED_EXAMPLE: &str = r#"
 {
@@ -90,7 +91,7 @@ async fn stream_account_events(
         None => services.client_event.latest_id(user.account_id).await?,
     };
 
-    let stream = account_event_stream(services, user.account_id, cursor);
+    let stream = account_event_stream(services, user.account_id, cursor, headers);
     let sse = Sse::new(stream).keep_alive(
         axum::response::sse::KeepAlive::new()
             .interval(KEEP_ALIVE_INTERVAL)
@@ -137,12 +138,15 @@ struct EventStreamState {
     account_id: Uuid,
     cursor: i32,
     pending: VecDeque<ClientEvent>,
+    headers: HeaderMap,
+    authenticated_at: tokio::time::Instant,
 }
 
 fn account_event_stream(
     services: Arc<AppServices>,
     account_id: Uuid,
     cursor: i32,
+    headers: HeaderMap,
 ) -> impl Stream<Item = Result<Event, Infallible>> {
     stream::unfold(
         EventStreamState {
@@ -150,9 +154,20 @@ fn account_event_stream(
             account_id,
             cursor,
             pending: VecDeque::new(),
+            headers,
+            authenticated_at: tokio::time::Instant::now(),
         },
         |mut state| async move {
             loop {
+                if state.authenticated_at.elapsed() >= AUTH_RECHECK_INTERVAL {
+                    let Ok(user) = User::authenticate_headers(&state.headers, &state.services).await else {
+                        return None;
+                    };
+                    if user.account_id != state.account_id || !user.has_permission(Permission::ReadTransaction) {
+                        return None;
+                    }
+                    state.authenticated_at = tokio::time::Instant::now();
+                }
                 if let Some(client_event) = state.pending.pop_front() {
                     state.cursor = client_event.id.parse().unwrap_or(state.cursor);
                     match serde_json::to_string(&client_event) {

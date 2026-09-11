@@ -21,11 +21,13 @@ Expose `GET /v1/me/events` as `text/event-stream`.
 
 SSE fits the one-way workload, works through ordinary HTTP infrastructure, and has a standard event cursor. The generated fetch client is used instead of the browser `EventSource` API so JWT and API-key `Authorization` headers remain available. The endpoint is excluded from the normal request timeout, emits a heartbeat every 15 seconds, disables nginx response buffering, and uses the existing permissive CORS policy.
 
-The authenticated principal must have `read:transaction`. The stream is scoped by the authenticated account and includes events from all wallets owned by that account. Every event retains its `wallet_id`, so one connection can drive an account-wide dashboard or client without leaking events across accounts.
+The authenticated principal must have `read:transaction`. The stream is scoped by the authenticated account and includes events from all wallets owned by that account. Open streams reauthenticate their credentials and permissions every 15 seconds, closing when tokens expire or access is revoked. Every event retains its `wallet_id`, so one connection can drive an account-wide dashboard or client without leaking events across accounts.
 
 ### Commit a durable event in the state-change transaction
 
 Add a `client_event` table containing a monotonic ID, wallet scope, stable event type, resource ID, JSON snapshot, and creation time. The payment and event-projection units of work append the event before committing the same transaction that changes the payment or invoice and its wallet balance.
+
+Event appends acquire a shared database write lock until their transaction commits, so concurrent PostgreSQL transactions cannot expose a higher cursor before a lower cursor. Retention takes the same lock.
 
 This is a transactional outbox: after a successful commit, both state and event exist; after a rollback, neither exists. A unique `(event_type, resource_id)` index makes listener replays idempotent while still permitting a failed payment to be corrected later by a distinct `payment.settled` event.
 
@@ -54,7 +56,7 @@ Delivery is at least once: a disconnect after a client receives an event but bef
 
 Retain events for a configurable minimum window (`client_events.retention`, 30 days by default) and prune them on a configurable interval (`client_events.cleanup_interval`, one hour by default). A zero retention disables pruning; a zero cleanup interval disables the worker. Cleanup is serialized across application replicas and records a monotonic durable watermark in the shared database.
 
-When `Last-Event-ID` or `after` is at or before that watermark, the server returns `409 Conflict` before opening the stream. The client must then refresh authoritative REST state and reconnect without a cursor. A fresh stream starts no earlier than the watermark, including for a new account with no retained events. The server checks the watermark both before and after each replay query so pruning cannot silently create a partial replay batch.
+When `Last-Event-ID` or `after` is before that watermark, the server returns `409 Conflict` before opening the stream. The client must then refresh authoritative REST state and reconnect without a cursor. A fresh stream starts no earlier than the watermark, including for a new account with no retained events. The server checks the watermark both before and after each replay query so pruning cannot silently create a partial replay batch.
 
 ### Reuse the log for webhooks
 

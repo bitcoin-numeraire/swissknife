@@ -157,6 +157,45 @@ mod stream {
     use super::*;
 
     #[tokio::test]
+    async fn closes_an_open_stream_after_its_api_key_is_revoked() {
+        let app = app().await;
+        let admin = app.admin_token().await;
+        let account = app.create_account_with_wallet(admin, "event-revoked").await;
+        let created = app
+            .api()
+            .post(
+                "/v1/api-keys",
+                Auth::Bearer(admin),
+                swissknife_types::CreateApiKeyRequest {
+                    account_id: Some(account.account.id),
+                    name: unique("event-key"),
+                    permissions: vec![swissknife_types::Permission::ReadTransaction],
+                    description: None,
+                    expiry: None,
+                },
+            )
+            .await;
+        assert_status(&created, StatusCode::OK);
+        let key = created.parse::<swissknife_types::ApiKey>();
+        let mut stream = app
+            .api()
+            .event_stream("/v1/me/events", Auth::ApiKey(key.key.as_ref().unwrap()), None)
+            .await;
+        assert_stream_headers(&stream);
+        let revoked = app
+            .api()
+            .delete(&format!("/v1/api-keys/{}", key.id), Auth::Bearer(admin))
+            .await;
+        assert_status(&revoked, StatusCode::OK);
+
+        tokio::time::timeout(Duration::from_secs(20), async {
+            while stream.chunk().await.expect("read revoked stream").is_some() {}
+        })
+        .await
+        .expect("revoking a key must terminate existing event access");
+    }
+
+    #[tokio::test]
     async fn requires_authentication() {
         let app = app().await;
         let response = app.api().get("/v1/me/events", Auth::None).await;
@@ -364,7 +403,11 @@ mod stream {
 
         wait_until(Duration::from_secs(15), "client event cursor expires", || async {
             app.api()
-                .event_stream("/v1/me/events", Auth::ApiKey(&account.key), Some(&event.id))
+                .event_stream(
+                    "/v1/me/events",
+                    Auth::ApiKey(&account.key),
+                    Some(&(event.id.parse::<i32>().unwrap() - 1).to_string()),
+                )
                 .await
                 .status()
                 == StatusCode::CONFLICT
@@ -374,10 +417,13 @@ mod stream {
         // Resetting from REST means reconnecting without the stale cursor. A
         // fresh stream must remain valid even when every account event was
         // pruned and its latest retained ID is absent.
-        let fresh = app
+        let mut fresh = app
             .api()
             .event_stream("/v1/me/events", Auth::ApiKey(&account.key), None)
             .await;
         assert_stream_headers(&fresh);
+        insert_client_event(&app, account.wallet.id).await;
+        let next = next_event(&mut fresh).await;
+        assert_ne!(next.id, event.id);
     }
 }

@@ -49,7 +49,7 @@ impl ClientEventUseCases for ClientEventService {
 
     async fn ensure_cursor_available(&self, after_id: i32) -> Result<(), ApplicationError> {
         let pruned_through = self.store.client_event.pruned_through().await?;
-        if pruned_through > 0 && after_id <= pruned_through {
+        if after_id < pruned_through {
             return Err(DataError::Conflict(EXPIRED_CURSOR_MESSAGE.to_string()).into());
         }
 
@@ -91,14 +91,23 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn rejects_a_cursor_at_or_before_the_pruned_watermark() {
+    async fn rejects_a_cursor_before_the_pruned_watermark() {
         let mut store = MockAppStoreBuilder::new();
         store.client_event.expect_pruned_through().return_once(|| Ok(42));
         let service = ClientEventService::new(store.build(), Duration::from_secs(60));
 
-        let error = service.ensure_cursor_available(42).await.unwrap_err();
+        let error = service.ensure_cursor_available(41).await.unwrap_err();
 
         assert!(matches!(error, ApplicationError::Data(DataError::Conflict(_))));
+    }
+
+    #[tokio::test]
+    async fn accepts_the_pruned_watermark_as_an_exclusive_cursor() {
+        let mut store = MockAppStoreBuilder::new();
+        store.client_event.expect_pruned_through().return_once(|| Ok(42));
+        let service = ClientEventService::new(store.build(), Duration::from_secs(60));
+
+        service.ensure_cursor_available(42).await.unwrap();
     }
 
     #[tokio::test]
