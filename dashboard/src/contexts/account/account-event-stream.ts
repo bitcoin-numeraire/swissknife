@@ -82,6 +82,14 @@ export function createAccountEventFetch(
   return async (input, init) => {
     const response = await fetchImpl(input, init);
 
+    if ((response.status === 401 || response.status === 403) && !signal.aborted) {
+      await response.body?.cancel();
+      // REST revalidation runs the auth error interceptors omitted by the SSE
+      // client, and refreshes account permissions after access is revoked.
+      await onOpen();
+      return response;
+    }
+
     if (response.status === 409 && !signal.aborted) {
       await response.body?.cancel();
       await onCursorExpired();

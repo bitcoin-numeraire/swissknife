@@ -153,11 +153,11 @@ describe('account event connection lifecycle', () => {
     expect(reset).toHaveBeenCalledOnce();
   });
 
-  it('does not refresh after an unsuccessful or cancelled connection', async () => {
+  it('does not refresh after a server error or cancelled connection', async () => {
     const controller = new AbortController();
     const fetchImpl = vi
       .fn()
-      .mockResolvedValueOnce(new Response(null, { status: 401 }))
+      .mockResolvedValueOnce(new Response(null, { status: 500 }))
       .mockResolvedValueOnce(new Response(null, { status: 200 })) as unknown as typeof fetch;
     const refresh = vi.fn().mockResolvedValue(undefined);
     const eventFetch = createAccountEventFetch(controller.signal, refresh, vi.fn(), fetchImpl);
@@ -231,5 +231,20 @@ describe('account event connection lifecycle', () => {
 
     expect(cursors).toEqual([undefined, '41', undefined]);
     expect(reset).toHaveBeenCalledOnce();
+  });
+});
+
+describe('stream authorization recovery', () => {
+  it.each([401, 403])('revalidates REST auth and permissions after HTTP %i', async (status) => {
+    const controller = new AbortController();
+    const cancel = vi.fn();
+    const response = new Response(new ReadableStream({ cancel }), { status });
+    const fetchImpl = vi.fn().mockResolvedValue(response) as unknown as typeof fetch;
+    const revalidate = vi.fn().mockResolvedValue(undefined);
+    const eventFetch = createAccountEventFetch(controller.signal, revalidate, vi.fn(), fetchImpl);
+
+    expect(await eventFetch('https://example.com/events')).toBe(response);
+    expect(cancel).toHaveBeenCalledOnce();
+    expect(revalidate).toHaveBeenCalledOnce();
   });
 });
