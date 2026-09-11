@@ -1,7 +1,7 @@
 use sea_orm_migration::{prelude::*, schema::*};
 
 use crate::{
-    m20240420_1_wallet_table::Wallet, m20260704_000001_account_table::Account,
+    m20240420_000001_wallet_table::Wallet, m20260704_000001_account_table::Account,
     m20260717_170449_add_client_event_log::ClientEvent,
 };
 

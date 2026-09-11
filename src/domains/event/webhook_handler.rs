@@ -76,7 +76,9 @@ pub fn webhook_router() -> Router<Arc<AppServices>> {
     request_body = CreateWebhookSubscriptionRequest,
     responses(
         (status = 201, description = "Created; save the signing secret because it is returned only once", body = CreatedWebhookSubscription),
-        (status = 400, description = "Invalid URL or event filter", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
+        (status = 400, description = "Malformed request body", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
+        (status = 409, description = "A subscription already exists for this wallet and URL", body = ErrorResponse),
+        (status = 422, description = "Invalid URL or empty event filter", body = ErrorResponse),
         (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
         (status = 403, description = "Forbidden", body = ErrorResponse, example = json!(FORBIDDEN_EXAMPLE)),
         (status = 404, description = "Wallet not found", body = ErrorResponse, example = json!(NOT_FOUND_EXAMPLE)),
@@ -90,6 +92,7 @@ async fn create_webhook(
     Json(request): Json<CreateWebhookSubscriptionRequest>,
 ) -> Result<(StatusCode, Json<CreatedWebhookSubscription>), ApplicationError> {
     user.check_permission(Permission::WriteTransaction)?;
+    user.check_permission(Permission::ReadTransaction)?;
     Ok((
         StatusCode::CREATED,
         Json(services.webhook.create(user.account_id, wallet_id, request).await?),
@@ -124,7 +127,9 @@ async fn list_webhooks(
     request_body = UpdateWebhookSubscriptionRequest,
     responses(
         (status = 200, description = "Updated", body = WebhookSubscription),
-        (status = 400, description = "Invalid URL or event filter", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
+        (status = 400, description = "Malformed request body", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
+        (status = 409, description = "A subscription already exists for this wallet and URL", body = ErrorResponse),
+        (status = 422, description = "Invalid URL or empty event filter", body = ErrorResponse),
         (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
         (status = 403, description = "Forbidden", body = ErrorResponse, example = json!(FORBIDDEN_EXAMPLE)),
         (status = 404, description = "Subscription not found", body = ErrorResponse, example = json!(NOT_FOUND_EXAMPLE)),
@@ -138,6 +143,7 @@ async fn update_webhook(
     Json(request): Json<UpdateWebhookSubscriptionRequest>,
 ) -> Result<Json<WebhookSubscription>, ApplicationError> {
     user.check_permission(Permission::WriteTransaction)?;
+    user.check_permission(Permission::ReadTransaction)?;
     Ok(Json(
         services.webhook.update(user.account_id, wallet_id, id, request).await?,
     ))
@@ -161,6 +167,7 @@ async fn delete_webhook(
     Path((wallet_id, id)): Path<(Uuid, Uuid)>,
 ) -> Result<StatusCode, ApplicationError> {
     user.check_permission(Permission::WriteTransaction)?;
+    user.check_permission(Permission::ReadTransaction)?;
     services.webhook.delete(user.account_id, wallet_id, id).await?;
     Ok(StatusCode::NO_CONTENT)
 }
@@ -183,6 +190,7 @@ async fn rotate_webhook_secret(
     Path((wallet_id, id)): Path<(Uuid, Uuid)>,
 ) -> Result<Json<RotateWebhookSecretResponse>, ApplicationError> {
     user.check_permission(Permission::WriteTransaction)?;
+    user.check_permission(Permission::ReadTransaction)?;
     Ok(Json(
         services.webhook.rotate_secret(user.account_id, wallet_id, id).await?,
     ))

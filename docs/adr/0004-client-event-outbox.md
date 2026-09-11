@@ -58,10 +58,6 @@ Retain events for a configurable minimum window (`client_events.retention`, 30 d
 
 When `Last-Event-ID` or `after` is before that watermark, the server returns `409 Conflict` before opening the stream. The client must then refresh authoritative REST state and reconnect without a cursor. A fresh stream starts no earlier than the watermark, including for a new account with no retained events. The server checks the watermark both before and after each replay query so pruning cannot silently create a partial replay batch.
 
-### Reuse the log for webhooks
-
-Webhook delivery will consume this same durable event log rather than creating a second set of settlement hooks. Subscription and delivery-attempt state belong in separate tables; delivery must not hold or retry the wallet settlement transaction. The webhook implementation must materialize delivery rows before advancing its durable cursor and must participate in retention safety before it is merged; the event-log foundation does not treat an in-memory worker position as durable consumption.
-
 ### Reuse the log for signed webhooks
 
 Webhook delivery consumes this same durable event log rather than creating a second set of settlement hooks. Account-scoped CRUD endpoints under `/v1/me/wallets/{wallet_id}/webhooks` manage an HTTPS endpoint and a non-empty event filter. A new subscription starts at the current event cursor; it does not unexpectedly replay historical payments. Disabling a subscription exhausts pending attempts and advances its cursor, so re-enabling it resumes with new events rather than producing a backlog. An attempt already claimed before the disable may still complete.
@@ -77,8 +73,12 @@ The JSON body contains the stable event ID and type, wallet and resource IDs, ti
 
 The signed message is `<timestamp>.<raw request body>`. A random 256-bit base64url secret is returned only on subscription creation or explicit rotation. Consumers should reject old timestamps and compare signatures in constant time. A rotation affects subsequent attempts; an attempt already claimed by a worker may still carry the previous signature.
 
-Only public HTTPS destinations are delivered. The worker rejects credentials and fragments, resolves DNS itself, rejects any private, loopback, link-local, multicast, or reserved result, pins the verified address for the request, disables redirects, and uses a ten-second timeout. Network failures, HTTP 408/409/425/429, and 5xx responses retry exponentially from one minute up to one hour. Other non-2xx responses are permanent failures. Delivery exhausts after eight attempts and remains visible through the delivery-history endpoint.
+Subscription mutations require both `read:transaction` and `write:transaction`; a write-only key cannot create a channel that reads future transactions.
 
+Only public HTTPS destinations are delivered. The worker rejects credentials and fragments, resolves DNS itself, rejects any private, loopback, link-local, multicast, or reserved result, pins the verified address for the request, disables redirects and environment proxies, and bounds DNS resolution and the complete request by ten seconds. Network failures, HTTP 408/409/425/429, and 5xx responses retry exponentially from one minute up to one hour. Other non-2xx responses are permanent failures. Delivery exhausts after eight attempts and remains visible through the delivery-history endpoint.
+
+
+Retention takes the same event-log lock as fan-out and subscription changes. It preserves events not yet consumed by an active subscription and events referenced by pending deliveries. Terminal delivery records are removed with their expired events; otherwise their foreign keys would prevent cleanup. Subscription updates modify only requested fields and cannot roll back a worker cursor or a rotated secret.
 
 ## Consequences
 
@@ -86,9 +86,6 @@ Only public HTTPS destinations are delivered. The worker rejects credentials and
 - Listener replay, synchronous/listener races, process restarts, and multiple application replicas preserve one committed event per transition.
 - Event history begins when this migration is deployed; existing terminal payments and invoices are not backfilled.
 - Event replay is bounded. A client offline longer than the configured window receives an explicit reset signal and must rebuild state from REST.
-- The dependent webhook branch must be adapted to the retention contract before merge; pruning events still referenced by durable delivery rows must remain prohibited.
-
-- The event log currently has no retention job. Retention can be added only with an explicit minimum replay window and webhook-delivery watermark so undelivered events are never removed.
 - Webhook signing secrets are stored in the application database because SwissKnife has no deployment-wide envelope-encryption facility today. Database access must therefore be treated as secret access; a future key-management integration can encrypt the column without changing the wire contract.
 
 - WebSocket support is deferred. It should be added only if a real bidirectional protocol appears; deployment in separate pods alone is not a reason to maintain two transports.

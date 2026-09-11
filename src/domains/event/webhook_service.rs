@@ -112,7 +112,6 @@ impl WebhookUseCases for WebhookService {
                 url: request.url,
                 event_types,
                 signing_secret: signing_secret.clone(),
-                last_event_id: self.store.client_event.latest_id(wallet_id).await?.unwrap_or_default(),
             })
             .await?;
 
@@ -144,38 +143,25 @@ impl WebhookUseCases for WebhookService {
         id: Uuid,
         request: UpdateWebhookSubscriptionRequest,
     ) -> Result<WebhookSubscription, ApplicationError> {
-        let mut stored = self.find_owned(account_id, wallet_id, id).await?;
-        if let Some(url) = request.url {
-            Self::validate_url(&url)?;
+        self.find_owned(account_id, wallet_id, id).await?;
+        let mut request = request;
+        if let Some(url) = &request.url {
+            Self::validate_url(url)?;
             if self
                 .store
                 .webhook
                 .find_many(account_id, wallet_id)
                 .await?
                 .iter()
-                .any(|subscription| subscription.id != id && subscription.url == url)
+                .any(|subscription| subscription.id != id && &subscription.url == url)
             {
                 return Err(DataError::Conflict("A webhook already exists for this URL.".to_string()).into());
             }
-            stored.url = url;
         }
-        if let Some(event_types) = request.event_types {
-            stored.event_types = Self::validate_event_types(event_types)?;
+        if let Some(event_types) = request.event_types.take() {
+            request.event_types = Some(Self::validate_event_types(event_types)?);
         }
-        if let Some(active) = request.active {
-            if stored.active != active {
-                stored.last_event_id = self.store.client_event.latest_id(wallet_id).await?.unwrap_or_default();
-            }
-            stored.active = active;
-        }
-
-        let stored = self.store.webhook.update(stored).await?;
-        if !stored.active {
-            self.store
-                .webhook
-                .cancel_pending(stored.id, "Subscription disabled.".to_string())
-                .await?;
-        }
+        let stored = self.store.webhook.update(id, request).await?;
         Ok(stored.into())
     }
 
@@ -192,10 +178,9 @@ impl WebhookUseCases for WebhookService {
         wallet_id: Uuid,
         id: Uuid,
     ) -> Result<RotateWebhookSecretResponse, ApplicationError> {
-        let mut stored = self.find_owned(account_id, wallet_id, id).await?;
+        self.find_owned(account_id, wallet_id, id).await?;
         let signing_secret = Self::generate_secret();
-        stored.signing_secret.clone_from(&signing_secret);
-        self.store.webhook.update(stored).await?;
+        self.store.webhook.rotate_secret(id, signing_secret.clone()).await?;
         Ok(RotateWebhookSecretResponse { signing_secret })
     }
 
@@ -263,18 +248,11 @@ mod tests {
             .times(1)
             .returning(|_, _| Ok(Vec::new()));
         store
-            .client_event
-            .expect_latest_id()
-            .withf(move |wallet| *wallet == wallet_id)
-            .times(1)
-            .returning(|_| Ok(Some(42)));
-        store
             .webhook
             .expect_insert()
             .withf(move |subscription| {
                 subscription.account_id == account_id
                     && subscription.wallet_id == wallet_id
-                    && subscription.last_event_id == 42
                     && subscription.signing_secret.len() == 43
             })
             .times(1)
@@ -287,7 +265,7 @@ mod tests {
                     event_types: subscription.event_types,
                     signing_secret: subscription.signing_secret,
                     active: true,
-                    last_event_id: subscription.last_event_id,
+                    last_event_id: 42,
                     created_at: Utc::now(),
                     updated_at: None,
                 })

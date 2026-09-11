@@ -156,14 +156,25 @@ struct DeliveryFailure {
 }
 
 async fn send_delivery(delivery: &ClaimedWebhookDelivery) -> Result<StatusCode, DeliveryFailure> {
-    let url = validate_and_resolve_url(&delivery.url).await?;
+    tokio::time::timeout(REQUEST_TIMEOUT, send_delivery_request(delivery))
+        .await
+        .map_err(|_| DeliveryFailure {
+            status: None,
+            message: "Webhook request timed out".to_string(),
+            permanent: false,
+        })?
+}
+
+async fn send_delivery_request(delivery: &ClaimedWebhookDelivery) -> Result<StatusCode, DeliveryFailure> {
+    let url = validate_url(&delivery.url)?;
     let timestamp = Utc::now().timestamp();
     let (body, signature) = signed_payload(delivery, timestamp)?;
 
-    let host = url.host_str().expect("validated webhook URL has a host");
+    let host = url.host_str().ok_or_else(private_address_failure)?;
     let port = url.port_or_known_default().unwrap_or(443);
-    let ip = resolve_public_ip(host, port).await?;
+    let ip = resolve_public_ip(host.trim_matches(['[', ']']), port).await?;
     let client = reqwest::Client::builder()
+        .no_proxy()
         .redirect(Policy::none())
         .timeout(REQUEST_TIMEOUT)
         .resolve(host, SocketAddr::new(ip, port))
@@ -219,7 +230,7 @@ async fn post_webhook(
         .await
         .map_err(|error| DeliveryFailure {
             status: None,
-            message: format!("Webhook request failed: {error}"),
+            message: format!("Webhook request failed: {}", error.without_url()),
             permanent: false,
         })?;
     let status = response.status();
@@ -234,7 +245,7 @@ async fn post_webhook(
     })
 }
 
-async fn validate_and_resolve_url(raw: &str) -> Result<Url, DeliveryFailure> {
+fn validate_url(raw: &str) -> Result<Url, DeliveryFailure> {
     let url = Url::parse(raw).map_err(|error| DeliveryFailure {
         status: None,
         message: format!("Invalid webhook URL: {error}"),
@@ -253,8 +264,6 @@ async fn validate_and_resolve_url(raw: &str) -> Result<Url, DeliveryFailure> {
         });
     }
 
-    let host = url.host_str().expect("checked above");
-    resolve_public_ip(host, url.port_or_known_default().unwrap_or(443)).await?;
     Ok(url)
 }
 
@@ -327,12 +336,16 @@ fn is_public_ipv6(ip: Ipv6Addr) -> bool {
         return is_public_ipv4(ipv4);
     }
     let segments = ip.segments();
-    !(ip.is_unspecified()
-        || ip.is_loopback()
-        || ip.is_multicast()
-        || (segments[0] & 0xfe00) == 0xfc00
-        || (segments[0] & 0xffc0) == 0xfe80
-        || (segments[0] == 0x2001 && segments[1] == 0x0db8))
+    (segments[0] & 0xe000) == 0x2000
+        && !(ip.is_unspecified()
+            || ip.is_loopback()
+            || ip.is_multicast()
+            || (segments[0] & 0xfe00) == 0xfc00
+            || (segments[0] & 0xffc0) == 0xfe80
+            || (segments[0] == 0x2001 && segments[1] < 0x0200)
+            || segments[0] == 0x2002
+            || (segments[0] == 0x3fff && segments[1] < 0x1000)
+            || (segments[0] == 0x2001 && segments[1] == 0x0db8))
 }
 
 fn sign_payload(secret: &str, timestamp: i64, body: &[u8]) -> Result<String, String> {
@@ -361,15 +374,22 @@ fn retry_delay(attempt_count: u32) -> chrono::Duration {
 
 fn truncate_error(mut error: String) -> String {
     if error.len() > MAX_ERROR_LENGTH {
-        error.truncate(MAX_ERROR_LENGTH);
+        let mut end = MAX_ERROR_LENGTH;
+        while !error.is_char_boundary(end) {
+            end -= 1;
+        }
+        error.truncate(end);
     }
     error
 }
 
 #[cfg(test)]
 mod tests {
+    #[cfg(feature = "itest")]
     use chrono::TimeZone;
+    #[cfg(feature = "itest")]
     use serde_json::json;
+    #[cfg(feature = "itest")]
     use wiremock::{
         matchers::{method, path},
         Mock, MockServer, ResponseTemplate,
@@ -377,6 +397,7 @@ mod tests {
 
     use super::*;
 
+    #[cfg(feature = "itest")]
     fn delivery() -> ClaimedWebhookDelivery {
         ClaimedWebhookDelivery {
             id: Uuid::parse_str("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa").unwrap(),
@@ -416,6 +437,11 @@ mod tests {
             "fc00::1",
             "fe80::1",
             "2001:db8::1",
+            "::ffff:127.0.0.1",
+            "64:ff9b::127.0.0.1",
+            "2002:7f00:0001::",
+            "2001::1",
+            "3fff::1",
         ] {
             assert!(!is_public_ip(ip.parse().unwrap()), "{ip} must not be accepted");
         }
@@ -434,12 +460,19 @@ mod tests {
     }
 
     #[test]
+    fn truncates_errors_at_a_utf8_boundary() {
+        let error = format!("{}é", "x".repeat(MAX_ERROR_LENGTH - 1));
+        assert_eq!(truncate_error(error).len(), MAX_ERROR_LENGTH - 1);
+    }
+
+    #[test]
     fn retry_backoff_caps_at_one_hour() {
         assert_eq!(retry_delay(0), chrono::Duration::minutes(1));
         assert_eq!(retry_delay(3), chrono::Duration::minutes(8));
         assert_eq!(retry_delay(7), chrono::Duration::hours(1));
     }
 
+    #[cfg(feature = "itest")]
     #[tokio::test]
     async fn posts_the_documented_signed_wire_contract() {
         let server = MockServer::start().await;

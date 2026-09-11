@@ -4379,7 +4379,7 @@ export type CreateWebhookData = {
 
 export type CreateWebhookErrors = {
   /**
-   * Invalid URL or event filter
+   * Malformed request body
    */
   400: ErrorResponse;
   /**
@@ -4394,6 +4394,14 @@ export type CreateWebhookErrors = {
    * Wallet not found
    */
   404: ErrorResponse;
+  /**
+   * A subscription already exists for this wallet and URL
+   */
+  409: ErrorResponse;
+  /**
+   * Invalid URL or empty event filter
+   */
+  422: ErrorResponse;
   /**
    * Internal Server Error
    */
@@ -4463,7 +4471,7 @@ export type UpdateWebhookData = {
 
 export type UpdateWebhookErrors = {
   /**
-   * Invalid URL or event filter
+   * Malformed request body
    */
   400: ErrorResponse;
   /**
@@ -4478,6 +4486,14 @@ export type UpdateWebhookErrors = {
    * Subscription not found
    */
   404: ErrorResponse;
+  /**
+   * A subscription already exists for this wallet and URL
+   */
+  409: ErrorResponse;
+  /**
+   * Invalid URL or empty event filter
+   */
+  422: ErrorResponse;
   /**
    * Internal Server Error
    */

@@ -16,7 +16,6 @@ pub struct NewWebhookSubscription {
     pub url: String,
     pub event_types: Vec<ClientEventType>,
     pub signing_secret: String,
-    pub last_event_id: i32,
 }
 
 #[derive(Clone, Debug)]

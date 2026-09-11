@@ -4,7 +4,10 @@ use uuid::Uuid;
 
 use crate::application::errors::DatabaseError;
 
-use super::{ClaimedWebhookDelivery, NewWebhookSubscription, StoredWebhookSubscription, WebhookDelivery};
+use super::{
+    ClaimedWebhookDelivery, NewWebhookSubscription, StoredWebhookSubscription, UpdateWebhookSubscriptionRequest,
+    WebhookDelivery,
+};
 
 #[cfg_attr(test, mockall::automock)]
 #[async_trait]
@@ -21,9 +24,12 @@ pub trait WebhookRepository: Send + Sync {
         wallet_id: Uuid,
         id: Uuid,
     ) -> Result<Option<StoredWebhookSubscription>, DatabaseError>;
-    async fn update(&self, subscription: StoredWebhookSubscription)
-        -> Result<StoredWebhookSubscription, DatabaseError>;
-    async fn cancel_pending(&self, subscription_id: Uuid, reason: String) -> Result<u64, DatabaseError>;
+    async fn update(
+        &self,
+        id: Uuid,
+        request: UpdateWebhookSubscriptionRequest,
+    ) -> Result<StoredWebhookSubscription, DatabaseError>;
+    async fn rotate_secret(&self, id: Uuid, signing_secret: String) -> Result<(), DatabaseError>;
     async fn delete_owned(&self, account_id: Uuid, wallet_id: Uuid, id: Uuid) -> Result<u64, DatabaseError>;
     async fn list_deliveries(
         &self,
