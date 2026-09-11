@@ -95,6 +95,19 @@ async fn fresh_sqlite_schema_preserves_migration_contracts() {
         .await,
         3
     );
+    assert_eq!(
+        count(
+            &conn,
+            r#"
+            SELECT COUNT(*) AS count
+            FROM sqlite_master
+            WHERE type = 'table'
+              AND name IN ('webhook_subscription', 'webhook_delivery')
+            "#,
+        )
+        .await,
+        2
+    );
     assert!(
         count(
             &conn,

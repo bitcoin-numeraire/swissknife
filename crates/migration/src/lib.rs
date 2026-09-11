@@ -69,8 +69,8 @@ impl MigratorTrait for Migrator {
             Box::new(m20260710_234825_add_relationship_indexes::Migration),
             Box::new(m20260717_105719_persist_lnurl_success_action::Migration),
             Box::new(m20260717_170449_add_client_event_log::Migration),
-            Box::new(m20260814_151430_promote_wallet_account_unique_constraint::Migration),
             Box::new(m20260717_173942_add_webhook_delivery::Migration),
+            Box::new(m20260814_151430_promote_wallet_account_unique_constraint::Migration),
         ]
     }
 }
