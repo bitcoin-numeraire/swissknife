@@ -20,6 +20,7 @@ import { defaultSettings, useSettingsContext } from 'src/components/settings';
 
 import { AccountContext } from './account-context';
 import { useAccountEventStream } from './account-event-stream';
+import { useAccountEventNotifications } from './account-event-notifications';
 import { selectInitialWalletId, settingsWithActiveWallet } from './account-selection';
 import {
   settingsWithUiPreferences,
@@ -46,6 +47,7 @@ export function AccountProvider({ children }: AccountProviderProps) {
     account?.id,
     account?.permissions?.includes(Permission.READ_TRANSACTION) ?? false
   );
+  useAccountEventNotifications(account?.id, recentClientEvents, wallets);
 
   useEffect(() => {
     if (!account || hydratedAccountId.current === account.id) return;

@@ -1,9 +1,15 @@
 import { it, expect, describe } from 'vitest';
 
-import { type Invoice, InvoiceStatus, ClientEventType, type ClientEvent } from 'src/lib/swissknife';
+import {
+  Ledger,
+  type Invoice,
+  InvoiceStatus,
+  ClientEventType,
+  type ClientEvent,
+} from 'src/lib/swissknife';
 
-import { invoiceAfterClientEvent } from './money-drawers';
 import { getReceiveAddressListState } from './receive-address-list';
+import { invoiceAfterClientEvent, receivePaymentSuccessAfterClientEvent } from './money-drawers';
 
 describe('getReceiveAddressListState', () => {
   it('uses the account-wallet address list for the regular receive drawer', () => {
@@ -74,13 +80,14 @@ describe('invoiceAfterClientEvent', () => {
     event_type: ClientEventType.INVOICE_PAID,
     wallet_id: 'wallet-1',
     resource_id: 'invoice-1',
-    data: {},
+    data: { amount_received_msat: 42_000 },
     created_at: new Date('2026-08-16T12:00:00Z'),
   } satisfies ClientEvent;
 
   it('marks the displayed invoice paid when its durable event arrives', () => {
     expect(invoiceAfterClientEvent(invoice, paidEvent, 'wallet-1')).toMatchObject({
       status: InvoiceStatus.SETTLED,
+      amount_received_msat: 42_000,
       payment_time: paidEvent.created_at,
     });
   });
@@ -90,5 +97,82 @@ describe('invoiceAfterClientEvent', () => {
       invoiceAfterClientEvent(invoice, { ...paidEvent, resource_id: 'invoice-2' }, 'wallet-1')
     ).toBe(invoice);
     expect(invoiceAfterClientEvent(invoice, paidEvent, 'wallet-2')).toBe(invoice);
+  });
+});
+
+describe('receivePaymentSuccessAfterClientEvent', () => {
+  const invoice = {
+    id: 'invoice-1',
+    wallet_id: 'wallet-1',
+    status: InvoiceStatus.PENDING,
+    ledger: Ledger.LIGHTNING,
+    amount_msat: 100_000_000,
+    description: 'Order 42',
+  } as Invoice;
+
+  const paidEvent = {
+    id: '42',
+    event_type: ClientEventType.INVOICE_PAID,
+    wallet_id: 'wallet-1',
+    resource_id: 'invoice-1',
+    data: {
+      amount_received_msat: 100_000_000,
+      ledger: Ledger.LIGHTNING,
+      description: 'Order 42',
+    },
+    created_at: new Date('2026-09-12T08:00:00Z'),
+  } satisfies ClientEvent;
+
+  it('recognizes settlement of the displayed Lightning invoice', () => {
+    expect(
+      receivePaymentSuccessAfterClientEvent(undefined, invoice, paidEvent, 'wallet-1', undefined)
+    ).toEqual({
+      invoiceId: 'invoice-1',
+      amountMsat: 100_000_000,
+      ledger: Ledger.LIGHTNING,
+      description: 'Order 42',
+    });
+  });
+
+  it('recognizes an on-chain payment to the address in a unified request', () => {
+    const onchainEvent = {
+      ...paidEvent,
+      resource_id: 'onchain-invoice-1',
+      data: {
+        amount_received_msat: 120_000_000,
+        ledger: Ledger.ONCHAIN,
+        bitcoin_output: { address: 'bcrt1qdisplayed' },
+      },
+    } satisfies ClientEvent;
+
+    expect(
+      receivePaymentSuccessAfterClientEvent(
+        undefined,
+        invoice,
+        onchainEvent,
+        'wallet-1',
+        'bcrt1qdisplayed'
+      )
+    ).toEqual({
+      invoiceId: 'onchain-invoice-1',
+      amountMsat: 120_000_000,
+      ledger: Ledger.ONCHAIN,
+      description: 'Order 42',
+    });
+  });
+
+  it('ignores payments for other invoices, addresses, and wallets', () => {
+    expect(
+      receivePaymentSuccessAfterClientEvent(
+        undefined,
+        invoice,
+        { ...paidEvent, resource_id: 'invoice-2' },
+        'wallet-1',
+        'bcrt1qdisplayed'
+      )
+    ).toBeUndefined();
+    expect(
+      receivePaymentSuccessAfterClientEvent(undefined, invoice, paidEvent, 'wallet-2', undefined)
+    ).toBeUndefined();
   });
 });

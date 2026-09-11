@@ -64,6 +64,17 @@
   "send": "Envoyer",
   "request": "Requête",
   "view_all": "Voir tous",
+  "event_notifications": {
+    "incoming_title": "{{amount}} sats entrants — en attente de confirmation",
+    "received_title": "{{amount}} sats reçus — confirmés",
+    "view_activity": "Voir l’activité",
+    "rail": {
+      "lightning": "Lightning",
+      "internal": "Interne",
+      "onchain": "On-chain",
+      "bitcoin": "Bitcoin"
+    }
+  },
   "need_help": "Besoin d'aide?",
   "auth_panel": {
     "eyebrow": "Centre de commande self-custody",
@@ -412,6 +423,9 @@
     "waiting_for_payment": "En attente du paiement",
     "payment_received": "Paiement reçu",
     "payment_received_description": "Cette demande a été payée. Le solde et l’activité du portefeuille se mettent à jour automatiquement.",
+    "success_eyebrow": "Reçu avec SwissKnife",
+    "success_title": "Paiement reçu!",
+    "success_description": "Le paiement est terminé et ton portefeuille a été mis à jour automatiquement.",
     "identity": "Identité réutilisable :"
   },
   "admin_wallet_picker": {

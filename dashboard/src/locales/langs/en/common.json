@@ -65,6 +65,17 @@
   "request": "Request",
   "important": "Important",
   "view_all": "View All",
+  "event_notifications": {
+    "incoming_title": "{{amount}} sats incoming — waiting for confirmation",
+    "received_title": "{{amount}} sats received — confirmed",
+    "view_activity": "View activity",
+    "rail": {
+      "lightning": "Lightning",
+      "internal": "Internal",
+      "onchain": "On-chain",
+      "bitcoin": "Bitcoin"
+    }
+  },
   "need_help": "Need help?",
   "auth_panel": {
     "eyebrow": "Self-custody command center",
@@ -413,6 +424,9 @@
     "waiting_for_payment": "Waiting for payment",
     "payment_received": "Payment received",
     "payment_received_description": "This request has been paid. The wallet balance and activity update automatically.",
+    "success_eyebrow": "Received with SwissKnife",
+    "success_title": "Payment received!",
+    "success_description": "The payment is complete and your wallet has updated automatically.",
     "identity": "Reusable identity:"
   },
   "admin_wallet_picker": {
