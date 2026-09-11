@@ -9,7 +9,11 @@ import {
 } from 'src/lib/swissknife';
 
 import { getReceiveAddressListState } from './receive-address-list';
-import { invoiceAfterClientEvent, receivePaymentSuccessAfterClientEvent } from './money-drawers';
+import {
+  invoiceAfterClientEvent,
+  receivePaymentSuccessFromInvoice,
+  receivePaymentSuccessAfterClientEvent,
+} from './money-drawers';
 
 describe('getReceiveAddressListState', () => {
   it('uses the account-wallet address list for the regular receive drawer', () => {
@@ -174,5 +178,31 @@ describe('receivePaymentSuccessAfterClientEvent', () => {
     expect(
       receivePaymentSuccessAfterClientEvent(undefined, invoice, paidEvent, 'wallet-2', undefined)
     ).toBeUndefined();
+  });
+});
+
+describe('receivePaymentSuccessFromInvoice', () => {
+  const invoice = {
+    id: 'missed-event-invoice',
+    wallet_id: 'wallet-1',
+    status: InvoiceStatus.SETTLED,
+    ledger: Ledger.LIGHTNING,
+    amount_msat: 100_000,
+    amount_received_msat: 120_000,
+  } as Invoice;
+
+  it('restores the receive success state from REST after a missed settlement event', () => {
+    expect(receivePaymentSuccessFromInvoice(invoice, 'wallet-1')).toMatchObject({
+      invoiceId: invoice.id,
+      amountMsat: 120_000,
+      ledger: Ledger.LIGHTNING,
+    });
+  });
+
+  it('does not claim success for a pending invoice or another wallet', () => {
+    expect(
+      receivePaymentSuccessFromInvoice({ ...invoice, status: InvoiceStatus.PENDING }, 'wallet-1')
+    ).toBeUndefined();
+    expect(receivePaymentSuccessFromInvoice(invoice, 'wallet-2')).toBeUndefined();
   });
 });

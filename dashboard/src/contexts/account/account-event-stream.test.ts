@@ -80,6 +80,54 @@ describe('recent account events', () => {
 });
 
 describe('account event connection lifecycle', () => {
+  it('cancels the response body when the initial REST refresh fails', async () => {
+    const cancel = vi.fn();
+    const response = new Response(new ReadableStream({ cancel }));
+    const controller = new AbortController();
+    const error = new Error('REST unavailable');
+    const eventFetch = createAccountEventFetch(
+      controller.signal,
+      async () => {
+        throw error;
+      },
+      vi.fn(),
+      vi.fn().mockResolvedValue(response) as unknown as typeof fetch
+    );
+    await expect(eventFetch('https://example.com/events')).rejects.toBe(error);
+    expect(cancel).toHaveBeenCalledOnce();
+  });
+
+  it('continues reconnecting if REST recovery after cursor expiry fails', async () => {
+    const controller = new AbortController();
+    const onError = vi.fn();
+    const cursors: Array<string | undefined> = [];
+    async function* stream(clientEvent?: ClientEvent) {
+      if (clientEvent) yield clientEvent;
+    }
+    await consumeAccountEventStreams({
+      signal: controller.signal,
+      openStream: async (cursor, expire) => {
+        cursors.push(cursor);
+        if (cursors.length === 1) return stream(event('41'));
+        if (cursors.length === 2) {
+          expire();
+          return stream();
+        }
+        return stream(event('42'));
+      },
+      onEvent: async (received) => {
+        if (received.id === '42') controller.abort();
+      },
+      onCursorReset: async () => {
+        throw new Error('REST unavailable');
+      },
+      onError,
+      waitForReconnect: async () => undefined,
+    });
+    expect(cursors).toEqual([undefined, '41', undefined]);
+    expect(onError).toHaveBeenCalledOnce();
+  });
+
   it('refreshes REST state after the event stream cursor is established', async () => {
     const controller = new AbortController();
     const response = new Response(null, { status: 200 });

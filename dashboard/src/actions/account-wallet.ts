@@ -95,9 +95,8 @@ export function useListWalletInvoices(query?: ListWalletInvoicesData['query'], w
 export function useGetWalletInvoice(id: string, walletId?: string) {
   const { activeWalletId, walletsLoading, walletsError } = useAccountContext();
   const selectedWalletId = walletId ?? activeWalletId;
-  const key = selectedWalletId
-    ? endpointKeys.accountWallet.invoices.get(selectedWalletId, id)
-    : null;
+  const key =
+    selectedWalletId && id ? endpointKeys.accountWallet.invoices.get(selectedWalletId, id) : null;
 
   const result = useSWR(key, () =>
     getWalletInvoice<true>({ path: { wallet_id: selectedWalletId!, id } })

@@ -95,7 +95,12 @@ export function createAccountEventFetch(
     }
 
     if (response.ok && !signal.aborted) {
-      await onOpen();
+      try {
+        await onOpen();
+      } catch (error) {
+        await response.body?.cancel();
+        throw error;
+      }
     }
 
     return response;
@@ -143,8 +148,8 @@ export async function consumeAccountEventStreams({
       for await (const event of stream) {
         if (signal.aborted) return;
 
-        lastEventId = event.id;
         await onEvent(event);
+        lastEventId = event.id;
       }
     } catch (error) {
       if (signal.aborted) return;
@@ -153,7 +158,12 @@ export async function consumeAccountEventStreams({
 
     if (cursorExpired) {
       lastEventId = undefined;
-      await onCursorReset?.();
+      try {
+        await onCursorReset?.();
+      } catch (error) {
+        if (signal.aborted) return;
+        onError?.(error);
+      }
     }
 
     if (!signal.aborted) {
@@ -177,17 +187,20 @@ export function useAccountEventStream(accountId: string | undefined, enabled: bo
       signal: controller.signal,
       openStream: async (lastEventId, onCursorExpired) => {
         let cursorExpired = false;
+        const attempt = new AbortController();
+        const signal = AbortSignal.any([controller.signal, attempt.signal]);
         const { stream } = await streamAccountEvents({
           headers: lastEventId ? { 'Last-Event-ID': lastEventId } : undefined,
-          signal: controller.signal,
+          signal,
           fetch: createAccountEventFetch(
-            controller.signal,
+            signal,
             () => refreshCachedState(),
             async () => {
               cursorExpired = true;
               onCursorExpired();
             }
           ),
+          sseMaxRetryAttempts: 1,
           sseDefaultRetryDelay: 1_000,
           sseMaxRetryDelay: 30_000,
           onSseError: (error) => {
@@ -197,7 +210,13 @@ export function useAccountEventStream(accountId: string | undefined, enabled: bo
           },
         });
 
-        return stream as AsyncIterable<ClientEvent>;
+        return (async function* scopedStream() {
+          try {
+            yield* stream as AsyncIterable<ClientEvent>;
+          } finally {
+            attempt.abort();
+          }
+        })();
       },
       onEvent: async (clientEvent) => {
         setRecentEvents((current) => appendRecentClientEvent(current, accountId, clientEvent));

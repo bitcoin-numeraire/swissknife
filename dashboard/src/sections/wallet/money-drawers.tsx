@@ -9,8 +9,8 @@ import { bech32, bech32m } from 'bech32';
 import { QRCode } from 'react-qrcode-logo';
 import { decode } from 'light-bolt11-decoder';
 import { Scanner } from '@yudiel/react-qr-scanner';
-import { useMemo, useState, useEffect, useCallback } from 'react';
 import { useBoolean, useCopyToClipboard } from 'minimal-shared/hooks';
+import { useRef, useMemo, useState, useEffect, useCallback } from 'react';
 
 import Box from '@mui/material/Box';
 import Chip from '@mui/material/Chip';
@@ -45,7 +45,11 @@ import { useTranslate } from 'src/locales';
 import { useListWallets } from 'src/actions/wallet';
 import { useAccountContext } from 'src/contexts/account';
 import { useListBtcAddresses } from 'src/actions/btc-addresses';
-import { useActiveWallet, useListWalletBtcAddresses } from 'src/actions/account-wallet';
+import {
+  useActiveWallet,
+  useGetWalletInvoice,
+  useListWalletBtcAddresses,
+} from 'src/actions/account-wallet';
 import {
   pay,
   Ledger,
@@ -180,6 +184,22 @@ export function invoiceAfterClientEvent(
         ? clientEvent.data.amount_received_msat
         : invoice.amount_received_msat,
     payment_time: clientEvent.created_at,
+  };
+}
+
+export function receivePaymentSuccessFromInvoice(
+  invoice: Invoice | undefined,
+  walletId: string | undefined
+): ReceivePaymentSuccess | undefined {
+  if (invoice?.status !== InvoiceStatus.SETTLED || invoice.wallet_id !== walletId) return undefined;
+  const amountMsat = invoice.amount_received_msat ?? invoice.amount_msat;
+  if (typeof amountMsat !== 'number' || !Number.isFinite(amountMsat) || amountMsat < 0)
+    return undefined;
+  return {
+    invoiceId: invoice.id,
+    amountMsat,
+    ledger: invoice.ledger,
+    description: invoice.description || undefined,
   };
 }
 
@@ -1472,6 +1492,7 @@ export function ReceiveMoneyDrawer({
   const [invoiceExpirySeconds, setInvoiceExpirySeconds] = useState(DEFAULT_BOLT11_EXPIRY_SECONDS);
   const [invoice, setInvoice] = useState<Invoice>();
   const [receivedPayment, setReceivedPayment] = useState<ReceivePaymentSuccess>();
+  const ignoredReceiveEvents = useRef(new Set<string>());
   const [btcAddress, setBtcAddress] = useState<BtcAddress>();
   const [addressType, setAddressType] = useState<BtcAddressType>(
     (state.defaultAddressType ?? BtcAddressType.P2TR) as BtcAddressType
@@ -1487,6 +1508,10 @@ export function ReceiveMoneyDrawer({
   );
   const activeWalletId = walletId || selectedWalletId;
   const addressWalletId = isAdmin ? activeWalletId : activeWalletId || wallet?.id;
+  const { invoice: refreshedInvoice } = useGetWalletInvoice(
+    open && !isAdmin ? (invoice?.id ?? '') : '',
+    addressWalletId
+  );
   const needsWallet = isAdmin && !activeWalletId;
   const hasFiatPrice = (fiatPrices[state.currency] ?? 0) > 0;
   const displayUnit = state.displayUnit ?? 'bip177';
@@ -1599,24 +1624,36 @@ export function ReceiveMoneyDrawer({
   }, [invoiceExpiresAt]);
 
   useEffect(() => {
+    if (open) ignoredReceiveEvents.current = new Set(recentClientEvents.map((event) => event.id));
+    // Capture the events already present when this receive session begins.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, addressWalletId]);
+
+  useEffect(() => {
     if (isAdmin || !open) return;
 
     const settledInvoice = recentClientEvents.reduce(
       (currentInvoice, clientEvent) =>
         invoiceAfterClientEvent(currentInvoice, clientEvent, addressWalletId),
-      invoice
+      refreshedInvoice?.id === invoice?.id && refreshedInvoice?.status === InvoiceStatus.SETTLED
+        ? refreshedInvoice
+        : invoice
     );
-    const success = recentClientEvents.reduce(
-      (currentSuccess, clientEvent) =>
-        receivePaymentSuccessAfterClientEvent(
-          currentSuccess,
-          invoice,
-          clientEvent,
-          addressWalletId,
-          displayedBtcAddress?.address
-        ),
-      receivedPayment
-    );
+    const restoredSuccess =
+      receivedPayment ?? receivePaymentSuccessFromInvoice(settledInvoice, addressWalletId);
+    const success = recentClientEvents
+      .filter((event) => !ignoredReceiveEvents.current.has(event.id))
+      .reduce(
+        (currentSuccess, clientEvent) =>
+          receivePaymentSuccessAfterClientEvent(
+            currentSuccess,
+            invoice,
+            clientEvent,
+            addressWalletId,
+            displayedBtcAddress?.address
+          ),
+        restoredSuccess
+      );
 
     if (settledInvoice !== invoice) setInvoice(settledInvoice);
     if (success !== receivedPayment) setReceivedPayment(success);
@@ -1628,6 +1665,7 @@ export function ReceiveMoneyDrawer({
     open,
     receivedPayment,
     recentClientEvents,
+    refreshedInvoice,
   ]);
 
   const handleClose = useCallback(() => {
