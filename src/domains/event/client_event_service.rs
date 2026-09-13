@@ -72,9 +72,7 @@ impl ClientEventUseCases for ClientEventService {
         // partial batch without telling the client to refresh is not.
         self.ensure_cursor_available(after_id).await?;
 
-        if !events.is_empty() {
-            debug!(%account_id, after_id, count = events.len(), "Client events listed successfully");
-        }
+        debug!(%account_id, after_id, count = events.len(), "Client events listed successfully");
         Ok(events)
     }
 
@@ -85,9 +83,7 @@ impl ClientEventUseCases for ClientEventService {
 
         trace!(%cutoff, "Pruning expired client events");
         let pruned = self.store.client_event.prune_before(cutoff).await?;
-        if pruned > 0 {
-            debug!(pruned, "Pruned expired client events");
-        }
+        debug!(pruned, "Pruned expired client events");
         Ok(pruned)
     }
 }

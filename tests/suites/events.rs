@@ -1,4 +1,4 @@
-//! `/v1/me/events` — authenticated, permission-gated, account-scoped durable
+//! `/v1/me/events` — authenticated, account-scoped durable
 //! SSE delivery. The settlement test pays real invoices
 //! through the matrix counterparty, so the same public behavior is exercised
 //! against every configured LND and CLN transport.
@@ -12,13 +12,15 @@ use sea_orm::{
 };
 
 use swissknife_types::{
-    BtcAddress, BtcOutputStatus, ClientEvent, ClientEventType, Invoice, InvoiceStatus, Ledger, NewBtcAddressRequest,
-    NewInvoiceRequest,
+    Account, ApiKey, BtcAddress, BtcOutputStatus, ClientEvent, ClientEventType, CreateApiKeyRequest, Invoice,
+    InvoiceStatus, Ledger, NewBtcAddressRequest, NewInvoiceRequest, Wallet,
 };
 
 use crate::common::chain;
 use crate::common::counterparty::Counterparty;
-use crate::common::fixtures::unique;
+use crate::common::fixtures::{unique, TestAccount};
+use crate::common::harness::matrix_cell;
+use crate::common::oauth2::{oauth2_app, CLIENT_ACCOUNT};
 use crate::common::wait::wait_until;
 use crate::common::{app, assert_error, assert_status, Auth, TestApp};
 
@@ -28,6 +30,13 @@ struct SseMessage {
     id: String,
     event_type: String,
     payload: ClientEvent,
+}
+
+async fn ordinary_account(app: &TestApp, label: &str) -> TestAccount {
+    let admin = app.admin_token().await;
+    let mut account = app.create_account_with_wallet(admin, label).await;
+    account.key = app.account_api_key(admin, account.account.id, vec![]).await;
+    account
 }
 
 async fn invoice(app: &TestApp, key: &str, wallet_id: uuid::Uuid, amount_msat: u64) -> Invoice {
@@ -160,23 +169,23 @@ mod stream {
     async fn closes_an_open_stream_after_its_api_key_is_revoked() {
         let app = app().await;
         let admin = app.admin_token().await;
-        let account = app.create_account_with_wallet(admin, "event-revoked").await;
+        let account = ordinary_account(app, "event-revoked").await;
         let created = app
             .api()
             .post(
                 "/v1/api-keys",
                 Auth::Bearer(admin),
-                swissknife_types::CreateApiKeyRequest {
+                CreateApiKeyRequest {
                     account_id: Some(account.account.id),
                     name: unique("event-key"),
-                    permissions: vec![swissknife_types::Permission::ReadTransaction],
+                    permissions: vec![],
                     description: None,
                     expiry: None,
                 },
             )
             .await;
         assert_status(&created, StatusCode::OK);
-        let key = created.parse::<swissknife_types::ApiKey>();
+        let key = created.parse::<ApiKey>();
         let mut stream = app
             .api()
             .event_stream("/v1/me/events", Auth::ApiKey(key.key.as_ref().unwrap()), None)
@@ -204,21 +213,69 @@ mod stream {
     }
 
     #[tokio::test]
-    async fn requires_read_transaction_permission() {
+    async fn ordinary_account_keeps_receiving_events_after_reauthentication() {
         let app = app().await;
-        let admin = app.admin_token().await;
-        let account = app.create_account_with_wallet(admin, "event-permission").await;
-        let key = app.account_api_key(admin, account.account.id, vec![]).await;
-        let response = app.api().get("/v1/me/events", Auth::ApiKey(&key)).await;
+        let account = ordinary_account(app, "event-no-permissions").await;
+        let profile = app.api().get("/v1/me", Auth::ApiKey(&account.key)).await;
+        assert_status(&profile, StatusCode::OK);
+        assert_eq!(profile.parse::<Account>().permissions, Some(vec![]));
+        let mut stream = app
+            .api()
+            .event_stream("/v1/me/events", Auth::ApiKey(&account.key), None)
+            .await;
+        assert_stream_headers(&stream);
 
-        assert_error(&response, StatusCode::FORBIDDEN);
+        // Exercise the 15-second credential recheck as well as initial access.
+        tokio::time::sleep(Duration::from_secs(16)).await;
+        insert_client_event(app, account.wallet.id).await;
+        let event = next_event(&mut stream).await;
+        assert_eq!(event.payload.wallet_id, account.wallet.id);
+    }
+
+    #[tokio::test]
+    async fn oauth2_account_without_permissions_receives_its_wallet_events() {
+        let app = oauth2_app().await;
+        let token = app.token(CLIENT_ACCOUNT).await;
+        let profile = app.api().get("/v1/me", Auth::Bearer(&token)).await;
+        assert_status(&profile, StatusCode::OK);
+        assert_eq!(profile.parse::<Account>().permissions, Some(vec![]));
+        let wallets = app.api().get("/v1/me/wallets", Auth::Bearer(&token)).await;
+        assert_status(&wallets, StatusCode::OK);
+        let wallet = wallets.parse::<Vec<Wallet>>().remove(0);
+        let response = app
+            .api()
+            .post(
+                &format!("/v1/me/wallets/{}/invoices", wallet.id),
+                Auth::Bearer(&token),
+                NewInvoiceRequest {
+                    wallet_id: None,
+                    amount_msat: 5_000_000,
+                    description: Some(unique("event-oauth2")),
+                    expiry: None,
+                },
+            )
+            .await;
+        assert_status(&response, StatusCode::OK);
+        let invoice = response.parse::<Invoice>();
+        let mut stream = app
+            .api()
+            .event_stream("/v1/me/events", Auth::Bearer(&token), None)
+            .await;
+        assert_stream_headers(&stream);
+
+        tokio::time::sleep(Duration::from_secs(16)).await;
+        let (_, provider) = matrix_cell();
+        Counterparty::for_provider(&provider).pay(&invoice.ln_invoice.as_ref().expect("Lightning invoice").bolt11);
+        let event = next_event(&mut stream).await;
+        assert_eq!(event.payload.event_type, ClientEventType::InvoicePaid);
+        assert_eq!(event.payload.wallet_id, wallet.id);
+        assert_eq!(event.payload.resource_id, invoice.id);
     }
 
     #[tokio::test]
     async fn rejects_a_malformed_resume_cursor() {
         let app = app().await;
-        let admin = app.admin_token().await;
-        let account = app.create_account_with_wallet(admin, "event-cursor").await;
+        let account = ordinary_account(app, "event-cursor").await;
         let response = app
             .api()
             .event_stream("/v1/me/events", Auth::ApiKey(&account.key), Some("not-an-event-id"))
@@ -230,8 +287,7 @@ mod stream {
     #[tokio::test]
     async fn rejects_a_negative_query_cursor() {
         let app = app().await;
-        let admin = app.admin_token().await;
-        let account = app.create_account_with_wallet(admin, "event-negative-cursor").await;
+        let account = ordinary_account(app, "event-negative-cursor").await;
         let response = app
             .api()
             .get("/v1/me/events?after=-1", Auth::ApiKey(&account.key))
@@ -243,9 +299,8 @@ mod stream {
     #[tokio::test]
     async fn streams_and_resumes_real_invoice_settlements() {
         let app = app().await;
-        let admin = app.admin_token().await;
-        let account = app.create_account_with_wallet(admin, "event-settlement").await;
-        let other = app.create_account_with_wallet(admin, "event-other-account").await;
+        let account = ordinary_account(app, "event-settlement").await;
+        let other = ordinary_account(app, "event-other-account").await;
         let path = "/v1/me/events";
 
         let first_invoice = invoice(app, &account.key, account.wallet.id, 25_000_000).await;
@@ -312,8 +367,7 @@ mod stream {
     #[tokio::test]
     async fn streams_a_real_onchain_deposit_lifecycle() {
         let app = app().await;
-        let admin = app.admin_token().await;
-        let account = app.create_account_with_wallet(admin, "event-onchain-deposit").await;
+        let account = ordinary_account(app, "event-onchain-deposit").await;
         let address = app
             .api()
             .post(
@@ -384,9 +438,7 @@ mod stream {
             &[("SWISSKNIFE_WEB__REQUEST_TIMEOUT", "2s".to_string())],
         )
         .await;
-        let account = app
-            .create_account_with_wallet(app.admin_token().await, "event-timeout")
-            .await;
+        let account = ordinary_account(&app, "event-timeout").await;
         let mut stream = app
             .api()
             .event_stream("/v1/me/events", Auth::ApiKey(&account.key), None)
@@ -410,8 +462,7 @@ mod stream {
             ],
         )
         .await;
-        let admin = app.admin_token().await;
-        let account = app.create_account_with_wallet(admin, "event-retention").await;
+        let account = ordinary_account(&app, "event-retention").await;
         let mut stream = app
             .api()
             .event_stream("/v1/me/events", Auth::ApiKey(&account.key), None)

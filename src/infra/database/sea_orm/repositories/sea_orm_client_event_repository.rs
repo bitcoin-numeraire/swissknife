@@ -4,11 +4,16 @@ use sea_orm::{
     sea_query::OnConflict, ActiveModelTrait, ColumnTrait, DatabaseConnection, DatabaseTransaction, EntityTrait,
     QueryFilter, QueryOrder, QuerySelect, Set, TransactionTrait,
 };
+use serde_json::Value;
 use uuid::Uuid;
 
 use crate::{
     application::errors::DatabaseError,
-    domains::event::{ClientEvent, ClientEventRepository},
+    domains::{
+        event::{ClientEvent, ClientEventRepository, ClientEventType},
+        invoice::Invoice,
+        payment::{Payment, PaymentStatus},
+    },
     infra::database::sea_orm::models::{
         client_event::{ActiveModel, Column},
         config,
@@ -17,9 +22,51 @@ use crate::{
     },
 };
 
-use super::super::types::NewClientEvent;
-
 const PRUNED_THROUGH_KEY: &str = "client_event_pruned_through_id";
+
+/// A snapshot to append; the database assigns its event ID and creation time.
+#[derive(Clone, Debug)]
+pub(in crate::infra::database::sea_orm) struct NewClientEvent {
+    pub event_type: ClientEventType,
+    pub wallet_id: Uuid,
+    pub resource_id: Uuid,
+    pub data: Value,
+}
+
+impl NewClientEvent {
+    pub fn invoice_pending(invoice: &Invoice) -> Self {
+        Self {
+            event_type: ClientEventType::InvoicePending,
+            wallet_id: invoice.wallet_id,
+            resource_id: invoice.id,
+            data: serde_json::to_value(invoice).expect("should serialize successfully by assertion"),
+        }
+    }
+
+    pub fn invoice_paid(invoice: &Invoice) -> Self {
+        Self {
+            event_type: ClientEventType::InvoicePaid,
+            wallet_id: invoice.wallet_id,
+            resource_id: invoice.id,
+            data: serde_json::to_value(invoice).expect("should serialize successfully by assertion"),
+        }
+    }
+
+    pub fn payment(payment: &Payment) -> Self {
+        let event_type = match payment.status {
+            PaymentStatus::Settled => ClientEventType::PaymentSettled,
+            PaymentStatus::Failed => ClientEventType::PaymentFailed,
+            _ => unreachable!("payment should be terminal by assertion"),
+        };
+
+        Self {
+            event_type,
+            wallet_id: payment.wallet_id,
+            resource_id: payment.id,
+            data: serde_json::to_value(payment).expect("should serialize successfully by assertion"),
+        }
+    }
+}
 
 // Hold this write lock until commit so sequence allocation follows commit order.
 // PostgreSQL sequences alone can expose a higher ID before a lower ID commits.
@@ -90,7 +137,7 @@ impl ClientEventRepository for SeaOrmClientEventRepository<DatabaseConnection> {
     }
 
     async fn find_after(&self, account_id: Uuid, after_id: i32, limit: u64) -> Result<Vec<ClientEvent>, DatabaseError> {
-        ClientEventEntity::find()
+        Ok(ClientEventEntity::find()
             .inner_join(WalletEntity)
             .filter(wallet::Column::AccountId.eq(account_id))
             .filter(Column::Id.gt(after_id))
@@ -100,8 +147,8 @@ impl ClientEventRepository for SeaOrmClientEventRepository<DatabaseConnection> {
             .await
             .map_err(|error| DatabaseError::FindMany(error.to_string()))?
             .into_iter()
-            .map(TryInto::try_into)
-            .collect()
+            .map(Into::into)
+            .collect())
     }
 
     async fn pruned_through(&self) -> Result<i32, DatabaseError> {

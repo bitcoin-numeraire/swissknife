@@ -110,6 +110,7 @@ export {
   type ChangePasswordResponse,
   type ChangePasswordResponses,
   type ClientEvent,
+  type ClientEventStreamQuery,
   ClientEventType,
   type ClientOptions,
   type Contact,

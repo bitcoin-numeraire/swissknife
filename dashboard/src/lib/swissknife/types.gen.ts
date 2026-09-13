@@ -384,6 +384,13 @@ export type ClientEvent = {
   wallet_id: string;
 };
 
+export type ClientEventStreamQuery = {
+  /**
+   * Replay events strictly after this event ID. `Last-Event-ID` takes precedence.
+   */
+  after?: number | null;
+};
+
 /**
  * Stable event names shared by SSE and webhook delivery.
  */
@@ -3233,10 +3240,6 @@ export type StreamAccountEventsErrors = {
    * Unauthorized
    */
   401: ErrorResponse;
-  /**
-   * Forbidden
-   */
-  403: ErrorResponse;
   /**
    * Replay cursor has expired
    */

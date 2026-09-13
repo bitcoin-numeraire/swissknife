@@ -1,7 +1,7 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use strum_macros::{Display, EnumString};
-use utoipa::ToSchema;
+use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
 
 /// A durable event emitted after an invoice or payment changes state.
@@ -37,4 +37,11 @@ pub enum ClientEventType {
     #[serde(rename = "payment.failed")]
     #[strum(serialize = "payment.failed")]
     PaymentFailed,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, Default, IntoParams, ToSchema)]
+#[into_params(parameter_in = Query)]
+pub struct ClientEventStreamQuery {
+    /// Replay events strictly after this event ID. `Last-Event-ID` takes precedence.
+    pub after: Option<i32>,
 }

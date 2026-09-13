@@ -5,8 +5,6 @@
 //! Gated behind `itest` so they stay out of the fast mocked unit run. The DB is
 //! provisioned from `SWISSKNIFE_ITEST_DATABASE`; run via `make test-persistence`.
 
-use super::types::NewClientEvent;
-
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use chrono::Utc;
@@ -36,9 +34,10 @@ use super::models::{
     wallet,
 };
 use super::{
-    SeaOrmAccountRepository, SeaOrmApiKeyRepository, SeaOrmAssetRepository, SeaOrmBitcoinAddressRepository,
-    SeaOrmClientEventRepository, SeaOrmEventProjectionUnitOfWork, SeaOrmInvoiceRepository, SeaOrmLnAddressRepository,
-    SeaOrmPaymentRepository, SeaOrmPaymentUnitOfWork, SeaOrmWalletRepository,
+    NewClientEvent, SeaOrmAccountRepository, SeaOrmApiKeyRepository, SeaOrmAssetRepository,
+    SeaOrmBitcoinAddressRepository, SeaOrmClientEventRepository, SeaOrmEventProjectionUnitOfWork,
+    SeaOrmInvoiceRepository, SeaOrmLnAddressRepository, SeaOrmPaymentRepository, SeaOrmPaymentUnitOfWork,
+    SeaOrmWalletRepository,
 };
 
 static COUNTER: AtomicU64 = AtomicU64::new(0);

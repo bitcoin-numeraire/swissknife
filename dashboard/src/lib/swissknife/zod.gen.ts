@@ -128,6 +128,14 @@ export const zChangePasswordRequest = z.object({
   new_password: z.string(),
 });
 
+export const zClientEventStreamQuery = z.object({
+  after: z
+    .int()
+    .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
+    .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
+    .nullish(),
+});
+
 /**
  * Stable event names shared by SSE and webhook delivery.
  */

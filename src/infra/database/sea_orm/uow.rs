@@ -1,4 +1,3 @@
-use super::types::NewClientEvent;
 use async_trait::async_trait;
 use sea_orm::{DatabaseConnection, TransactionTrait};
 
@@ -14,7 +13,7 @@ use crate::{
 };
 
 use super::{
-    SeaOrmBitcoinAddressRepository, SeaOrmBitcoinOutputRepository, SeaOrmClientEventRepository,
+    NewClientEvent, SeaOrmBitcoinAddressRepository, SeaOrmBitcoinOutputRepository, SeaOrmClientEventRepository,
     SeaOrmInvoiceRepository, SeaOrmPaymentRepository, SeaOrmWalletRepository,
 };
 
@@ -119,7 +118,7 @@ impl PaymentUnitOfWork for SeaOrmPaymentUnitOfWork {
         let payment = payment_repo.update(payment).await?;
 
         SeaOrmClientEventRepository::new(&txn)
-            .append_event(NewClientEvent::payment(&payment)?)
+            .append_event(NewClientEvent::payment(&payment))
             .await?;
 
         txn.commit()
@@ -166,7 +165,7 @@ impl PaymentUnitOfWork for SeaOrmPaymentUnitOfWork {
         let payment = payment_repo.update(payment).await?;
 
         SeaOrmClientEventRepository::new(&txn)
-            .append_event(NewClientEvent::payment(&payment)?)
+            .append_event(NewClientEvent::payment(&payment))
             .await?;
 
         txn.commit()
@@ -211,8 +210,8 @@ impl PaymentUnitOfWork for SeaOrmPaymentUnitOfWork {
         };
 
         let event_repo = SeaOrmClientEventRepository::new(&txn);
-        event_repo.append_event(NewClientEvent::payment(&payment)?).await?;
-        event_repo.append_event(NewClientEvent::invoice_paid(&invoice)?).await?;
+        event_repo.append_event(NewClientEvent::payment(&payment)).await?;
+        event_repo.append_event(NewClientEvent::invoice_paid(&invoice)).await?;
 
         txn.commit()
             .await
@@ -276,7 +275,7 @@ impl EventProjectionUnitOfWork for SeaOrmEventProjectionUnitOfWork {
 
         if should_emit {
             SeaOrmClientEventRepository::new(&txn)
-                .append_event(NewClientEvent::invoice_paid(&settled)?)
+                .append_event(NewClientEvent::invoice_paid(&settled))
                 .await?;
         }
 
@@ -361,13 +360,9 @@ impl EventProjectionUnitOfWork for SeaOrmEventProjectionUnitOfWork {
 
         if let Some(event_type) = event_type {
             let event = match event_type {
-                ClientEventType::InvoicePending => NewClientEvent::invoice_pending(&invoice)?,
-                ClientEventType::InvoicePaid => NewClientEvent::invoice_paid(&invoice)?,
-                _ => {
-                    return Err(
-                        DataError::Inconsistency(format!("unsupported invoice client event {event_type}")).into(),
-                    )
-                }
+                ClientEventType::InvoicePending => NewClientEvent::invoice_pending(&invoice),
+                ClientEventType::InvoicePaid => NewClientEvent::invoice_paid(&invoice),
+                _ => unreachable!("event should describe an invoice by assertion"),
             };
             SeaOrmClientEventRepository::new(&txn).append_event(event).await?;
         }
