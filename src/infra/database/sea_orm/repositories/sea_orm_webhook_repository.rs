@@ -1,8 +1,8 @@
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, NaiveDateTime, Utc};
 use sea_orm::{
     sea_query::{Expr, OnConflict},
-    ActiveModelTrait, ColumnTrait, Condition, DatabaseConnection, DatabaseTransaction, EntityTrait, ExprTrait,
+    ActiveModelTrait, ColumnTrait, Condition, DatabaseConnection, DatabaseTransaction, DbErr, EntityTrait, ExprTrait,
     QueryFilter, QueryOrder, QuerySelect, Set, SqlErr, TransactionTrait,
 };
 use uuid::Uuid;
@@ -11,7 +11,7 @@ use crate::{
     application::errors::DatabaseError,
     domains::event::{
         ClaimedWebhookDelivery, ClientEventType, NewWebhookSubscription, StoredWebhookSubscription,
-        UpdateWebhookSubscriptionRequest, WebhookDelivery, WebhookDeliveryStatus, WebhookRepository,
+        UpdateWebhookSubscriptionRequest, WebhookDelivery, WebhookRepository,
     },
     infra::database::sea_orm::models::{
         client_event,
@@ -29,7 +29,7 @@ const PENDING: &str = "Pending";
 const DELIVERED: &str = "Delivered";
 const EXHAUSTED: &str = "Exhausted";
 
-fn insert_error(error: sea_orm::DbErr) -> DatabaseError {
+fn insert_error(error: DbErr) -> DatabaseError {
     if matches!(error.sql_err(), Some(SqlErr::UniqueConstraintViolation(_))) {
         DatabaseError::Conflict(error.to_string())
     } else {
@@ -37,7 +37,7 @@ fn insert_error(error: sea_orm::DbErr) -> DatabaseError {
     }
 }
 
-fn update_error(error: sea_orm::DbErr) -> DatabaseError {
+fn update_error(error: DbErr) -> DatabaseError {
     if matches!(error.sql_err(), Some(SqlErr::UniqueConstraintViolation(_))) {
         DatabaseError::Conflict(error.to_string())
     } else {
@@ -67,43 +67,6 @@ async fn latest_wallet_event(tx: &DatabaseTransaction, wallet_id: Uuid) -> Resul
         .unwrap_or_default())
 }
 
-fn parse_event_types(value: serde_json::Value) -> Result<Vec<ClientEventType>, DatabaseError> {
-    serde_json::from_value(value).map_err(|e| DatabaseError::FindMany(e.to_string()))
-}
-
-fn stored_subscription(model: webhook_subscription::Model) -> Result<StoredWebhookSubscription, DatabaseError> {
-    Ok(StoredWebhookSubscription {
-        id: model.id,
-        account_id: model.account_id,
-        wallet_id: model.wallet_id,
-        url: model.url,
-        event_types: parse_event_types(model.event_types)?,
-        signing_secret: model.signing_secret,
-        active: model.active,
-        last_event_id: model.last_event_id,
-        created_at: model.created_at.and_utc(),
-        updated_at: model.updated_at.map(|value| value.and_utc()),
-    })
-}
-
-fn delivery(model: webhook_delivery::Model) -> Result<WebhookDelivery, DatabaseError> {
-    Ok(WebhookDelivery {
-        id: model.id,
-        subscription_id: model.subscription_id,
-        event_id: model.client_event_id.to_string(),
-        status: model
-            .status
-            .parse::<WebhookDeliveryStatus>()
-            .map_err(|e| DatabaseError::FindMany(e.to_string()))?,
-        attempt_count: model.attempt_count as u32,
-        response_status: model.response_status.map(|value| value as u16),
-        last_error: model.last_error,
-        delivered_at: model.delivered_at.map(|value| value.and_utc()),
-        created_at: model.created_at.and_utc(),
-        updated_at: model.updated_at.map(|value| value.and_utc()),
-    })
-}
-
 #[async_trait]
 impl WebhookRepository for SeaOrmWebhookRepository {
     async fn insert(&self, subscription: NewWebhookSubscription) -> Result<StoredWebhookSubscription, DatabaseError> {
@@ -115,7 +78,7 @@ impl WebhookRepository for SeaOrmWebhookRepository {
         lock_client_event_log(&tx).await?;
         let last_event_id = latest_wallet_event(&tx, subscription.wallet_id).await?;
         let event_types =
-            serde_json::to_value(&subscription.event_types).map_err(|e| DatabaseError::Insert(e.to_string()))?;
+            serde_json::to_value(&subscription.event_types).expect("should serialize successfully by assertion");
         let model = webhook_subscription::ActiveModel {
             id: Set(subscription.id),
             account_id: Set(subscription.account_id),
@@ -134,7 +97,7 @@ impl WebhookRepository for SeaOrmWebhookRepository {
         tx.commit()
             .await
             .map_err(|e| DatabaseError::Transaction(e.to_string()))?;
-        stored_subscription(model)
+        Ok(model.into())
     }
 
     async fn find_many(
@@ -142,7 +105,7 @@ impl WebhookRepository for SeaOrmWebhookRepository {
         account_id: Uuid,
         wallet_id: Uuid,
     ) -> Result<Vec<StoredWebhookSubscription>, DatabaseError> {
-        WebhookSubscriptionEntity::find()
+        Ok(WebhookSubscriptionEntity::find()
             .filter(webhook_subscription::Column::AccountId.eq(account_id))
             .filter(webhook_subscription::Column::WalletId.eq(wallet_id))
             .order_by_asc(webhook_subscription::Column::CreatedAt)
@@ -150,8 +113,8 @@ impl WebhookRepository for SeaOrmWebhookRepository {
             .await
             .map_err(|e| DatabaseError::FindMany(e.to_string()))?
             .into_iter()
-            .map(stored_subscription)
-            .collect()
+            .map(Into::into)
+            .collect())
     }
 
     async fn find_owned(
@@ -160,14 +123,13 @@ impl WebhookRepository for SeaOrmWebhookRepository {
         wallet_id: Uuid,
         id: Uuid,
     ) -> Result<Option<StoredWebhookSubscription>, DatabaseError> {
-        WebhookSubscriptionEntity::find_by_id(id)
+        Ok(WebhookSubscriptionEntity::find_by_id(id)
             .filter(webhook_subscription::Column::AccountId.eq(account_id))
             .filter(webhook_subscription::Column::WalletId.eq(wallet_id))
             .one(&self.db)
             .await
             .map_err(|e| DatabaseError::FindOne(e.to_string()))?
-            .map(stored_subscription)
-            .transpose()
+            .map(Into::into))
     }
 
     async fn update(
@@ -192,7 +154,7 @@ impl WebhookRepository for SeaOrmWebhookRepository {
             model.url = Set(url);
         }
         if let Some(events) = request.event_types {
-            model.event_types = Set(serde_json::to_value(events).map_err(|e| DatabaseError::Update(e.to_string()))?);
+            model.event_types = Set(serde_json::to_value(events).expect("should serialize successfully by assertion"));
         }
         if let Some(active) = transition {
             model.active = Set(active);
@@ -206,7 +168,7 @@ impl WebhookRepository for SeaOrmWebhookRepository {
                     )
                     .col_expr(
                         webhook_delivery::Column::LockedUntil,
-                        Expr::value(Option::<chrono::NaiveDateTime>::None),
+                        Expr::value(Option::<NaiveDateTime>::None),
                     )
                     .col_expr(
                         webhook_delivery::Column::UpdatedAt,
@@ -224,7 +186,7 @@ impl WebhookRepository for SeaOrmWebhookRepository {
         tx.commit()
             .await
             .map_err(|e| DatabaseError::Transaction(e.to_string()))?;
-        stored_subscription(model)
+        Ok(model.into())
     }
 
     async fn rotate_secret(&self, id: Uuid, signing_secret: String) -> Result<(), DatabaseError> {
@@ -270,7 +232,7 @@ impl WebhookRepository for SeaOrmWebhookRepository {
             return Ok(Vec::new());
         }
 
-        WebhookDeliveryEntity::find()
+        Ok(WebhookDeliveryEntity::find()
             .filter(webhook_delivery::Column::SubscriptionId.eq(subscription_id))
             .order_by_desc(webhook_delivery::Column::CreatedAt)
             .order_by_desc(webhook_delivery::Column::ClientEventId)
@@ -279,8 +241,8 @@ impl WebhookRepository for SeaOrmWebhookRepository {
             .await
             .map_err(|e| DatabaseError::FindMany(e.to_string()))?
             .into_iter()
-            .map(delivery)
-            .collect()
+            .map(Into::into)
+            .collect())
     }
 
     async fn prepare_deliveries(&self, batch_size: u64) -> Result<u64, DatabaseError> {
@@ -290,15 +252,17 @@ impl WebhookRepository for SeaOrmWebhookRepository {
             .await
             .map_err(|e| DatabaseError::Transaction(e.to_string()))?;
         lock_client_event_log(&transaction).await?;
-        let subscriptions = WebhookSubscriptionEntity::find()
+        let subscriptions: Vec<StoredWebhookSubscription> = WebhookSubscriptionEntity::find()
             .order_by_asc(webhook_subscription::Column::CreatedAt)
             .all(&transaction)
             .await
-            .map_err(|e| DatabaseError::FindMany(e.to_string()))?;
+            .map_err(|e| DatabaseError::FindMany(e.to_string()))?
+            .into_iter()
+            .map(Into::into)
+            .collect();
         let mut prepared = 0;
 
         for subscription in subscriptions {
-            let event_types = parse_event_types(subscription.event_types.clone())?;
             let events = ClientEventEntity::find()
                 .filter(client_event::Column::WalletId.eq(subscription.wallet_id))
                 .filter(client_event::Column::Id.gt(subscription.last_event_id))
@@ -312,8 +276,8 @@ impl WebhookRepository for SeaOrmWebhookRepository {
                 let event_type = event
                     .event_type
                     .parse::<ClientEventType>()
-                    .map_err(|e| DatabaseError::FindMany(e.to_string()))?;
-                if subscription.active && event_types.contains(&event_type) {
+                    .expect("should parse successfully by assertion");
+                if subscription.active && subscription.event_types.contains(&event_type) {
                     WebhookDeliveryEntity::insert(webhook_delivery::ActiveModel {
                         id: Set(Uuid::new_v4()),
                         subscription_id: Set(subscription.id),
@@ -417,7 +381,10 @@ impl WebhookRepository for SeaOrmWebhookRepository {
                 event: event.into(),
                 url: subscription.url,
                 signing_secret: subscription.signing_secret,
-                attempt_count: candidate.attempt_count as u32,
+                attempt_count: candidate
+                    .attempt_count
+                    .try_into()
+                    .expect("should parse successfully by assertion"),
                 lease_expires_at: locked_until,
             });
         }
@@ -452,7 +419,7 @@ impl WebhookRepository for SeaOrmWebhookRepository {
             )
             .col_expr(
                 webhook_delivery::Column::LockedUntil,
-                Expr::value(Option::<chrono::NaiveDateTime>::None),
+                Expr::value(Option::<NaiveDateTime>::None),
             )
             .col_expr(
                 webhook_delivery::Column::UpdatedAt,
@@ -496,7 +463,7 @@ impl WebhookRepository for SeaOrmWebhookRepository {
             )
             .col_expr(
                 webhook_delivery::Column::LockedUntil,
-                Expr::value(Option::<chrono::NaiveDateTime>::None),
+                Expr::value(Option::<NaiveDateTime>::None),
             )
             .col_expr(
                 webhook_delivery::Column::UpdatedAt,

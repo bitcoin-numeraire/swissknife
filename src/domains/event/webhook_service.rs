@@ -1,5 +1,7 @@
 use async_trait::async_trait;
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
+use reqwest::Url;
+use tracing::{debug, info, trace};
 use uuid::Uuid;
 
 use crate::application::{
@@ -9,8 +11,8 @@ use crate::application::{
 
 use super::{
     ClientEventType, CreateWebhookSubscriptionRequest, CreatedWebhookSubscription, NewWebhookSubscription,
-    RotateWebhookSecretResponse, UpdateWebhookSubscriptionRequest, WebhookDelivery, WebhookSubscription,
-    WebhookUseCases,
+    RotateWebhookSecretResponse, StoredWebhookSubscription, UpdateWebhookSubscriptionRequest, WebhookDelivery,
+    WebhookSubscription, WebhookUseCases,
 };
 
 const DELIVERY_HISTORY_LIMIT: u64 = 100;
@@ -38,8 +40,8 @@ impl WebhookService {
     }
 
     pub(crate) fn validate_url(url: &str) -> Result<(), DataError> {
-        let parsed = reqwest::Url::parse(url)
-            .map_err(|_| DataError::Validation("Webhook URL must be a valid HTTPS URL.".to_string()))?;
+        let parsed =
+            Url::parse(url).map_err(|_| DataError::Validation("Webhook URL must be a valid HTTPS URL.".to_string()))?;
         if parsed.scheme() != "https" || parsed.host_str().is_none() {
             return Err(DataError::Validation(
                 "Webhook URL must use HTTPS and include a host.".to_string(),
@@ -75,7 +77,7 @@ impl WebhookService {
         account_id: Uuid,
         wallet_id: Uuid,
         id: Uuid,
-    ) -> Result<super::StoredWebhookSubscription, ApplicationError> {
+    ) -> Result<StoredWebhookSubscription, ApplicationError> {
         self.store
             .webhook
             .find_owned(account_id, wallet_id, id)
@@ -92,6 +94,7 @@ impl WebhookUseCases for WebhookService {
         wallet_id: Uuid,
         request: CreateWebhookSubscriptionRequest,
     ) -> Result<CreatedWebhookSubscription, ApplicationError> {
+        debug!(%account_id, %wallet_id, "Creating webhook subscription");
         if !self.store.wallet.exists_for_account(account_id, wallet_id).await? {
             return Err(DataError::NotFound("Wallet not found.".to_string()).into());
         }
@@ -124,6 +127,7 @@ impl WebhookUseCases for WebhookService {
             .await
             .map_err(Self::map_write_error)?;
 
+        info!(%account_id, %wallet_id, subscription_id = %stored.id, "Webhook subscription created successfully");
         Ok(CreatedWebhookSubscription {
             subscription: stored.into(),
             signing_secret,
@@ -131,6 +135,7 @@ impl WebhookUseCases for WebhookService {
     }
 
     async fn list(&self, account_id: Uuid, wallet_id: Uuid) -> Result<Vec<WebhookSubscription>, ApplicationError> {
+        trace!(%account_id, %wallet_id, "Listing webhook subscriptions");
         if !self.store.wallet.exists_for_account(account_id, wallet_id).await? {
             return Err(DataError::NotFound("Wallet not found.".to_string()).into());
         }
@@ -152,6 +157,7 @@ impl WebhookUseCases for WebhookService {
         id: Uuid,
         request: UpdateWebhookSubscriptionRequest,
     ) -> Result<WebhookSubscription, ApplicationError> {
+        debug!(%account_id, %wallet_id, subscription_id = %id, "Updating webhook subscription");
         self.find_owned(account_id, wallet_id, id).await?;
         let mut request = request;
         if let Some(url) = &request.url {
@@ -176,13 +182,16 @@ impl WebhookUseCases for WebhookService {
             .update(id, request)
             .await
             .map_err(Self::map_write_error)?;
+        info!(%account_id, %wallet_id, subscription_id = %id, "Webhook subscription updated successfully");
         Ok(stored.into())
     }
 
     async fn delete(&self, account_id: Uuid, wallet_id: Uuid, id: Uuid) -> Result<(), ApplicationError> {
+        debug!(%account_id, %wallet_id, subscription_id = %id, "Deleting webhook subscription");
         if self.store.webhook.delete_owned(account_id, wallet_id, id).await? == 0 {
             return Err(DataError::NotFound("Webhook subscription not found.".to_string()).into());
         }
+        info!(%account_id, %wallet_id, subscription_id = %id, "Webhook subscription deleted successfully");
         Ok(())
     }
 
@@ -192,9 +201,11 @@ impl WebhookUseCases for WebhookService {
         wallet_id: Uuid,
         id: Uuid,
     ) -> Result<RotateWebhookSecretResponse, ApplicationError> {
+        debug!(%account_id, %wallet_id, subscription_id = %id, "Rotating webhook signing secret");
         self.find_owned(account_id, wallet_id, id).await?;
         let signing_secret = Self::generate_secret();
         self.store.webhook.rotate_secret(id, signing_secret.clone()).await?;
+        info!(%account_id, %wallet_id, subscription_id = %id, "Webhook signing secret rotated successfully");
         Ok(RotateWebhookSecretResponse { signing_secret })
     }
 
@@ -204,6 +215,7 @@ impl WebhookUseCases for WebhookService {
         wallet_id: Uuid,
         subscription_id: Uuid,
     ) -> Result<Vec<WebhookDelivery>, ApplicationError> {
+        trace!(%account_id, %wallet_id, %subscription_id, "Listing webhook deliveries");
         self.find_owned(account_id, wallet_id, subscription_id).await?;
         Ok(self
             .store
@@ -220,7 +232,6 @@ mod tests {
     use crate::application::composition::MockAppStoreBuilder;
 
     use super::*;
-    use crate::domains::event::StoredWebhookSubscription;
 
     #[test]
     fn validates_https_urls_and_nonempty_event_filters() {

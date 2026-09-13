@@ -4,11 +4,12 @@ use std::{
 };
 
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use futures_util::{stream, StreamExt};
 use hmac::{Hmac, Mac};
 use reqwest::{redirect::Policy, StatusCode, Url};
 use serde::Serialize;
+use serde_json::Value;
 use sha2::Sha256;
 use tokio::{sync::watch, task::JoinHandle};
 use tracing::{debug, error, warn};
@@ -75,13 +76,11 @@ impl WebhookWorker {
             .claim_due(now, now + chrono::Duration::seconds(LEASE_SECONDS), DELIVERY_BATCH_SIZE)
             .await?;
 
-        if prepared > 0 || !deliveries.is_empty() {
-            debug!(
-                prepared,
-                claimed = deliveries.len(),
-                "Processing durable webhook deliveries"
-            );
-        }
+        debug!(
+            prepared,
+            claimed = deliveries.len(),
+            "Processing durable webhook deliveries"
+        );
 
         stream::iter(deliveries)
             .for_each_concurrent(DELIVERY_CONCURRENCY, |delivery| async move {
@@ -144,8 +143,8 @@ struct WebhookEnvelope<'a> {
     event_type: ClientEventType,
     wallet_id: Uuid,
     resource_id: Uuid,
-    created_at: chrono::DateTime<Utc>,
-    data: &'a serde_json::Value,
+    created_at: DateTime<Utc>,
+    data: &'a Value,
 }
 
 #[derive(Debug)]
@@ -386,6 +385,8 @@ fn truncate_error(mut error: String) -> String {
 #[cfg(test)]
 mod tests {
     #[cfg(feature = "itest")]
+    use crate::domains::event::ClientEvent;
+    #[cfg(feature = "itest")]
     use chrono::TimeZone;
     #[cfg(feature = "itest")]
     use serde_json::json;
@@ -402,7 +403,7 @@ mod tests {
         ClaimedWebhookDelivery {
             id: Uuid::parse_str("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa").unwrap(),
             subscription_id: Uuid::parse_str("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb").unwrap(),
-            event: crate::domains::event::ClientEvent {
+            event: ClientEvent {
                 id: "42".to_string(),
                 event_type: ClientEventType::PaymentSettled,
                 wallet_id: Uuid::parse_str("cccccccc-cccc-4ccc-8ccc-cccccccccccc").unwrap(),
@@ -512,7 +513,7 @@ mod tests {
             format!("v1={signature}").as_str()
         );
         assert_eq!(
-            serde_json::from_slice::<serde_json::Value>(&request.body).unwrap(),
+            serde_json::from_slice::<Value>(&request.body).unwrap(),
             json!({
                 "id": "42",
                 "type": "payment.settled",
