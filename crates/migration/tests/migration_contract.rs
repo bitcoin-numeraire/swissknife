@@ -1,6 +1,18 @@
 use migration::{Migrator, MigratorTrait};
 use sea_orm_migration::sea_orm::{ConnectionTrait, Database, DatabaseBackend, DatabaseConnection, Statement};
 
+struct PreWebhookMigrator;
+
+#[sea_orm_migration::async_trait::async_trait]
+impl MigratorTrait for PreWebhookMigrator {
+    fn migrations() -> Vec<Box<dyn sea_orm_migration::MigrationTrait>> {
+        Migrator::migrations()
+            .into_iter()
+            .filter(|migration| migration.name() != "m20260911_232008_add_webhook_delivery")
+            .collect()
+    }
+}
+
 async fn sqlite() -> DatabaseConnection {
     Database::connect("sqlite::memory:")
         .await
@@ -95,6 +107,19 @@ async fn fresh_sqlite_schema_preserves_migration_contracts() {
         .await,
         3
     );
+    assert_eq!(
+        count(
+            &conn,
+            r#"
+            SELECT COUNT(*) AS count
+            FROM sqlite_master
+            WHERE type = 'table'
+              AND name IN ('webhook_subscription', 'webhook_delivery')
+            "#,
+        )
+        .await,
+        2
+    );
     assert!(
         count(
             &conn,
@@ -143,5 +168,37 @@ async fn fresh_sqlite_schema_preserves_migration_contracts() {
         )
         .await,
         0
+    );
+}
+
+#[tokio::test]
+async fn existing_schema_applies_new_webhook_migration() {
+    let conn = sqlite().await;
+
+    PreWebhookMigrator::up(&conn, None)
+        .await
+        .expect("run pre-webhook migrations");
+    assert_eq!(
+        count(
+            &conn,
+            "SELECT COUNT(*) AS count FROM sqlite_master WHERE type = 'table' AND name = 'webhook_subscription'",
+        )
+        .await,
+        0
+    );
+
+    Migrator::up(&conn, None).await.expect("run webhook migration");
+    assert_eq!(
+        count(
+            &conn,
+            r#"
+            SELECT COUNT(*) AS count
+            FROM sqlite_master
+            WHERE type = 'table'
+              AND name IN ('webhook_subscription', 'webhook_delivery')
+            "#,
+        )
+        .await,
+        2
     );
 }

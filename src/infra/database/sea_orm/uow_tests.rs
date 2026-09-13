@@ -18,7 +18,10 @@ use uuid::Uuid;
 use crate::application::composition::Ledger;
 use crate::application::errors::{ApplicationError, DataError};
 use crate::domains::account::{AccountFilter, AccountRepository, ApiKey, ApiKeyRepository, AuthProvider, Permission};
-use crate::domains::event::{ClientEventRepository, ClientEventType, EventProjectionUnitOfWork};
+use crate::domains::event::{
+    ClientEventRepository, ClientEventType, EventProjectionUnitOfWork, NewWebhookSubscription, WebhookDeliveryStatus,
+    WebhookRepository,
+};
 use crate::domains::invoice::{Invoice, InvoiceRepository};
 use crate::domains::ln_address::LnAddressRepository;
 use crate::domains::payment::{LnPayment, Payment, PaymentRepository, PaymentStatus, PaymentUnitOfWork};
@@ -37,7 +40,7 @@ use super::{
     NewClientEvent, SeaOrmAccountRepository, SeaOrmApiKeyRepository, SeaOrmAssetRepository,
     SeaOrmBitcoinAddressRepository, SeaOrmClientEventRepository, SeaOrmEventProjectionUnitOfWork,
     SeaOrmInvoiceRepository, SeaOrmLnAddressRepository, SeaOrmPaymentRepository, SeaOrmPaymentUnitOfWork,
-    SeaOrmWalletRepository,
+    SeaOrmWalletRepository, SeaOrmWebhookRepository,
 };
 
 static COUNTER: AtomicU64 = AtomicU64::new(0);
@@ -1011,4 +1014,304 @@ async fn onchain_deposit_emits_pending_then_paid_once() {
     assert_eq!(events[1].event_type, ClientEventType::InvoicePaid);
     assert_eq!(events[1].resource_id, stored.id);
     assert_eq!(events[1].data["status"], "Settled");
+}
+
+#[tokio::test]
+async fn webhook_outbox_filters_deduplicates_leases_and_retries() {
+    let conn = connect().await;
+    let wallet_id = seed_wallet(&conn, 0).await;
+    let wallet = Wallet::find_by_id(wallet_id)
+        .one(&conn)
+        .await
+        .expect("query wallet")
+        .expect("wallet");
+    let webhooks = SeaOrmWebhookRepository::new(conn.clone());
+
+    append_client_event(
+        &conn,
+        NewClientEvent {
+            event_type: ClientEventType::PaymentSettled,
+            wallet_id,
+            resource_id: Uuid::new_v4(),
+            data: serde_json::json!({"generation": "before-subscription"}),
+        },
+    )
+    .await
+    .expect("append historical event");
+    let subscription = webhooks
+        .insert(NewWebhookSubscription {
+            id: Uuid::new_v4(),
+            account_id: wallet.account_id,
+            wallet_id,
+            url: "https://hooks.example.com/swissknife".to_string(),
+            event_types: vec![ClientEventType::PaymentSettled],
+            signing_secret: "test-secret".to_string(),
+        })
+        .await
+        .expect("insert subscription");
+
+    // A non-matching event advances the cursor without creating a delivery;
+    // the following matching event creates exactly one durable attempt.
+    append_client_event(
+        &conn,
+        NewClientEvent {
+            event_type: ClientEventType::InvoicePaid,
+            wallet_id,
+            resource_id: Uuid::new_v4(),
+            data: serde_json::json!({"matches": false}),
+        },
+    )
+    .await
+    .expect("append filtered event");
+    append_client_event(
+        &conn,
+        NewClientEvent {
+            event_type: ClientEventType::PaymentSettled,
+            wallet_id,
+            resource_id: Uuid::new_v4(),
+            data: serde_json::json!({"matches": true}),
+        },
+    )
+    .await
+    .expect("append matching event");
+
+    assert_eq!(webhooks.prepare_deliveries(100).await.expect("prepare"), 1);
+    assert_eq!(webhooks.prepare_deliveries(100).await.expect("prepare replay"), 0);
+    let history = webhooks
+        .list_deliveries(wallet.account_id, wallet_id, subscription.id, 100)
+        .await
+        .expect("delivery history");
+    assert_eq!(history.len(), 1);
+    assert_eq!(history[0].status, WebhookDeliveryStatus::Pending);
+
+    let now = Utc::now();
+    let claimed = webhooks
+        .claim_due(now, now + chrono::Duration::minutes(1), 20)
+        .await
+        .expect("claim delivery");
+    assert_eq!(claimed.len(), 1);
+    assert_eq!(claimed[0].event.event_type, ClientEventType::PaymentSettled);
+    assert!(
+        webhooks
+            .claim_due(now, now + chrono::Duration::minutes(1), 20)
+            .await
+            .expect("second claim")
+            .is_empty(),
+        "active lease prevents a concurrent duplicate attempt"
+    );
+
+    webhooks
+        .mark_failed(
+            claimed[0].id,
+            claimed[0].lease_expires_at,
+            Some(503),
+            "temporarily unavailable".to_string(),
+            Utc::now() - chrono::Duration::seconds(1),
+            false,
+        )
+        .await
+        .expect("record retry");
+    let retry = webhooks
+        .claim_due(Utc::now(), Utc::now() + chrono::Duration::minutes(1), 20)
+        .await
+        .expect("claim retry");
+    assert_eq!(retry.len(), 1);
+    assert_eq!(retry[0].attempt_count, 1);
+
+    webhooks
+        .mark_delivered(claimed[0].id, claimed[0].lease_expires_at, 204)
+        .await
+        .expect("ignore stale lease outcome");
+    let history = webhooks
+        .list_deliveries(wallet.account_id, wallet_id, subscription.id, 100)
+        .await
+        .expect("delivery history");
+    assert_eq!(history[0].status, WebhookDeliveryStatus::Pending);
+    assert_eq!(history[0].attempt_count, 1);
+
+    webhooks
+        .mark_delivered(retry[0].id, retry[0].lease_expires_at, 204)
+        .await
+        .expect("record delivery");
+
+    let history = webhooks
+        .list_deliveries(wallet.account_id, wallet_id, subscription.id, 100)
+        .await
+        .expect("delivery history");
+    assert_eq!(history[0].status, WebhookDeliveryStatus::Delivered);
+    assert_eq!(history[0].attempt_count, 2);
+    assert_eq!(history[0].response_status, Some(204));
+
+    append_client_event(
+        &conn,
+        NewClientEvent {
+            event_type: ClientEventType::PaymentSettled,
+            wallet_id,
+            resource_id: Uuid::new_v4(),
+            data: serde_json::json!({"cancelled": true}),
+        },
+    )
+    .await
+    .expect("append event before disable");
+    assert_eq!(
+        webhooks.prepare_deliveries(100).await.expect("prepare before disable"),
+        1
+    );
+    webhooks
+        .update(
+            subscription.id,
+            swissknife_types::UpdateWebhookSubscriptionRequest {
+                active: Some(false),
+                url: None,
+                event_types: None,
+            },
+        )
+        .await
+        .expect("disable subscription atomically");
+    let history = webhooks
+        .list_deliveries(wallet.account_id, wallet_id, subscription.id, 100)
+        .await
+        .expect("delivery history");
+    assert_eq!(history[0].status, WebhookDeliveryStatus::Exhausted);
+    assert_eq!(history[0].attempt_count, 0);
+    assert_eq!(history[0].last_error.as_deref(), Some("Subscription disabled."));
+}
+
+async fn append_client_event(
+    conn: &DatabaseConnection,
+    event: NewClientEvent,
+) -> Result<(), crate::application::errors::DatabaseError> {
+    let tx = conn.begin().await.unwrap();
+    SeaOrmClientEventRepository::new(&tx).append_event(event).await?;
+    tx.commit().await.unwrap();
+    Ok(())
+}
+
+#[tokio::test]
+async fn webhook_retention_preserves_unconsumed_events_and_pending_deliveries() {
+    let conn = connect().await;
+    let wallet_id = seed_wallet(&conn, 0).await;
+    let account = account_id(&conn, wallet_id).await;
+    let webhooks = SeaOrmWebhookRepository::new(conn.clone());
+    let sub = webhooks
+        .insert(NewWebhookSubscription {
+            id: Uuid::new_v4(),
+            account_id: account,
+            wallet_id,
+            url: "https://hooks.example.com".into(),
+            signing_secret: "secret".into(),
+            event_types: vec![ClientEventType::PaymentFailed],
+        })
+        .await
+        .unwrap();
+    append_client_event(
+        &conn,
+        NewClientEvent {
+            wallet_id,
+            resource_id: Uuid::new_v4(),
+            event_type: ClientEventType::PaymentFailed,
+            data: serde_json::json!({}),
+        },
+    )
+    .await
+    .unwrap();
+    let events = SeaOrmClientEventRepository::new(conn.clone());
+    let event_id = events.latest_id(account).await.unwrap().unwrap();
+    ClientEventEntity::update_many()
+        .col_expr(
+            client_event::Column::CreatedAt,
+            sea_orm::sea_query::Expr::value((Utc::now() - chrono::Duration::days(2)).naive_utc()),
+        )
+        .exec(&conn)
+        .await
+        .unwrap();
+    let cutoff = Utc::now() - chrono::Duration::days(1);
+    assert_eq!(
+        events.prune_before(cutoff).await.unwrap(),
+        0,
+        "unconsumed event must survive"
+    );
+    assert_eq!(webhooks.prepare_deliveries(100).await.unwrap(), 1);
+    assert_eq!(
+        events.prune_before(cutoff).await.unwrap(),
+        0,
+        "pending delivery must survive"
+    );
+
+    webhooks.rotate_secret(sub.id, "rotated".into()).await.unwrap();
+    let updated = webhooks
+        .update(
+            sub.id,
+            swissknife_types::UpdateWebhookSubscriptionRequest {
+                url: Some("https://hooks.example.com/new".into()),
+                event_types: None,
+                active: None,
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        updated.last_event_id, event_id,
+        "editing must preserve the worker cursor"
+    );
+    assert_eq!(
+        updated.signing_secret, "rotated",
+        "editing must preserve secret rotation"
+    );
+    let now = Utc::now();
+    let claimed = webhooks
+        .claim_due(now, now + chrono::Duration::minutes(1), 20)
+        .await
+        .unwrap();
+    webhooks
+        .mark_delivered(claimed[0].id, claimed[0].lease_expires_at, 204)
+        .await
+        .unwrap();
+    assert_eq!(events.prune_before(cutoff).await.unwrap(), 1);
+    assert!(webhooks
+        .list_deliveries(account, wallet_id, sub.id, 100)
+        .await
+        .unwrap()
+        .is_empty());
+}
+
+#[tokio::test]
+async fn account_deletion_cascades_pending_webhooks_and_events() {
+    let conn = connect().await;
+    let wallet_id = seed_wallet(&conn, 0).await;
+    let account = account_id(&conn, wallet_id).await;
+    let webhooks = SeaOrmWebhookRepository::new(conn.clone());
+    webhooks
+        .insert(NewWebhookSubscription {
+            id: Uuid::new_v4(),
+            account_id: account,
+            wallet_id,
+            url: "https://example.com/cascade".to_string(),
+            event_types: vec![ClientEventType::PaymentSettled],
+            signing_secret: "test-secret".to_string(),
+        })
+        .await
+        .unwrap();
+    append_client_event(
+        &conn,
+        NewClientEvent {
+            event_type: ClientEventType::PaymentSettled,
+            wallet_id,
+            resource_id: Uuid::new_v4(),
+            data: serde_json::json!({}),
+        },
+    )
+    .await
+    .unwrap();
+    assert_eq!(webhooks.prepare_deliveries(100).await.unwrap(), 1);
+    assert_eq!(
+        SeaOrmAccountRepository::new(conn.clone())
+            .delete_many(AccountFilter {
+                ids: Some(vec![account]),
+                ..Default::default()
+            })
+            .await
+            .expect("delete account with pending webhook deliveries"),
+        1
+    );
 }
