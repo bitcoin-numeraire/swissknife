@@ -1,23 +1,35 @@
-use std::sync::Arc;
+use std::{collections::VecDeque, convert::Infallible, sync::Arc, time::Duration};
 
 use axum::{
     extract::State,
+    http::{header::CACHE_CONTROL, HeaderMap, HeaderName, HeaderValue},
+    response::{
+        sse::{Event, KeepAlive},
+        IntoResponse, Sse,
+    },
     routing::{delete, get, post, put},
     Router,
 };
+use futures_util::stream::{self, Stream};
+use tokio::time::{sleep, Instant};
+use tracing::warn;
 use utoipa::OpenApi;
 use uuid::Uuid;
 
 use swissknife_types::{
-    Account, AccountPreferences, CreateApiKeyRequest, CreateWalletRequest, ErrorResponse, NewBtcAddressRequest,
-    NewInvoiceRequest, PaymentFeeEstimate, RegisterLnAddressRequest, SendPaymentRequest,
-    UpdateAccountPreferencesRequest, UpdateAccountRequest, UpdateLnAddressRequest,
+    Account, AccountPreferences, ClientEvent, ClientEventStreamQuery, ClientEventType, CreateApiKeyRequest,
+    CreateWalletRequest, ErrorResponse, NewBtcAddressRequest, NewInvoiceRequest, PaymentFeeEstimate,
+    RegisterLnAddressRequest, SendPaymentRequest, UpdateAccountPreferencesRequest, UpdateAccountRequest,
+    UpdateLnAddressRequest,
 };
 
 use crate::{
     application::{
         composition::AppServices,
-        docs::{BAD_REQUEST_EXAMPLE, INTERNAL_EXAMPLE, NOT_FOUND_EXAMPLE, UNAUTHORIZED_EXAMPLE, UNPROCESSABLE_EXAMPLE},
+        docs::{
+            BAD_REQUEST_EXAMPLE, CONFLICT_EXAMPLE, INTERNAL_EXAMPLE, NOT_FOUND_EXAMPLE, UNAUTHORIZED_EXAMPLE,
+            UNPROCESSABLE_EXAMPLE,
+        },
         errors::{ApplicationError, DataError},
     },
     domains::{
@@ -36,6 +48,7 @@ use super::{Balance, Contact, Wallet, WalletFilter};
 #[openapi(
     paths(
         get_account,
+        stream_account_events,
         update_current_account,
         get_account_preferences,
         update_account_preferences,
@@ -68,6 +81,9 @@ use super::{Balance, Contact, Wallet, WalletFilter};
     components(schemas(
         Account,
         AccountPreferences,
+        ClientEvent,
+        ClientEventType,
+        ClientEventStreamQuery,
         UpdateAccountRequest,
         UpdateAccountPreferencesRequest,
         CreateWalletRequest,
@@ -90,9 +106,15 @@ use super::{Balance, Contact, Wallet, WalletFilter};
 pub struct AccountWalletHandler;
 pub const CONTEXT_PATH: &str = "/v1/me";
 
+const LAST_EVENT_ID: &str = "last-event-id";
+const EVENT_POLL_INTERVAL: Duration = Duration::from_secs(1);
+const AUTH_RECHECK_INTERVAL: Duration = Duration::from_secs(15);
+const KEEP_ALIVE_INTERVAL: Duration = Duration::from_secs(15);
+
 pub fn account_router() -> Router<Arc<AppServices>> {
     Router::new()
         .route("/", get(get_account))
+        .route("/events", get(stream_account_events))
         .route("/", put(update_current_account))
         .route("/preferences", get(get_account_preferences))
         .route("/preferences", put(update_account_preferences))
@@ -124,6 +146,152 @@ pub fn account_router() -> Router<Arc<AppServices>> {
         .route("/wallets/{wallet_id}/payments/{id}", get(get_wallet_payment))
         .route("/wallets/{wallet_id}/payments", delete(delete_failed_payments))
         .route("/wallets/{wallet_id}/contacts", get(list_contacts))
+}
+
+/// Stream durable events for every wallet owned by the authenticated account.
+///
+/// A fresh connection starts after the latest committed account event. Send
+/// `Last-Event-ID` on reconnect (or `after` for deliberate replay) to receive
+/// missed events. If that cursor is older than the retained replay window,
+/// refresh REST state and reconnect without a cursor.
+#[utoipa::path(
+    get,
+    path = "/events",
+    tag = "Me",
+    context_path = CONTEXT_PATH,
+    params(ClientEventStreamQuery),
+    responses(
+        (status = 200, description = "Server-sent event stream", body = ClientEvent, content_type = "text/event-stream"),
+        (status = 400, description = "Invalid replay cursor", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
+        (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
+        (status = 409, description = "Replay cursor has expired", body = ErrorResponse, example = json!(CONFLICT_EXAMPLE)),
+        (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
+    )
+)]
+async fn stream_account_events(
+    State(services): State<Arc<AppServices>>,
+    user: User,
+    Query(query): Query<ClientEventStreamQuery>,
+    headers: HeaderMap,
+) -> Result<impl IntoResponse, ApplicationError> {
+    let cursor = match replay_cursor(&headers, query.after)? {
+        Some(cursor) => {
+            services.client_event.ensure_cursor_available(cursor).await?;
+            cursor
+        }
+        None => services.client_event.latest_id(user.account_id).await?,
+    };
+
+    let stream = account_event_stream(services, user.account_id, cursor, headers);
+    let sse = Sse::new(stream).keep_alive(KeepAlive::new().interval(KEEP_ALIVE_INTERVAL).text("keep-alive"));
+
+    Ok((
+        [
+            (CACHE_CONTROL, HeaderValue::from_static("no-cache, no-transform")),
+            (
+                HeaderName::from_static("x-accel-buffering"),
+                HeaderValue::from_static("no"),
+            ),
+        ],
+        sse,
+    ))
+}
+
+fn replay_cursor(headers: &HeaderMap, query_after: Option<i32>) -> Result<Option<i32>, ApplicationError> {
+    let Some(raw) = headers.get(LAST_EVENT_ID) else {
+        return query_after.map(validate_cursor).transpose();
+    };
+
+    let raw = raw
+        .to_str()
+        .map_err(|_| DataError::Malformed("Last-Event-ID must be a non-negative integer.".to_string()))?;
+    let cursor = raw
+        .parse::<i32>()
+        .map_err(|_| DataError::Malformed("Last-Event-ID must be a non-negative integer.".to_string()))?;
+
+    Ok(Some(validate_cursor(cursor)?))
+}
+
+fn validate_cursor(cursor: i32) -> Result<i32, ApplicationError> {
+    if cursor < 0 {
+        return Err(DataError::Malformed("Event cursor must be a non-negative integer.".to_string()).into());
+    }
+
+    Ok(cursor)
+}
+
+struct EventStreamState {
+    services: Arc<AppServices>,
+    account_id: Uuid,
+    cursor: i32,
+    pending: VecDeque<ClientEvent>,
+    headers: HeaderMap,
+    authenticated_at: Instant,
+}
+
+fn account_event_stream(
+    services: Arc<AppServices>,
+    account_id: Uuid,
+    cursor: i32,
+    headers: HeaderMap,
+) -> impl Stream<Item = Result<Event, Infallible>> {
+    stream::unfold(
+        EventStreamState {
+            services,
+            account_id,
+            cursor,
+            pending: VecDeque::new(),
+            headers,
+            authenticated_at: Instant::now(),
+        },
+        |mut state| async move {
+            loop {
+                if state.authenticated_at.elapsed() >= AUTH_RECHECK_INTERVAL {
+                    let Ok(user) = User::authenticate_headers(&state.headers, &state.services).await else {
+                        return None;
+                    };
+                    if user.account_id != state.account_id {
+                        return None;
+                    }
+                    state.authenticated_at = Instant::now();
+                }
+                if let Some(client_event) = state.pending.pop_front() {
+                    state.cursor = client_event.id.parse().unwrap_or(state.cursor);
+                    match serde_json::to_string(&client_event) {
+                        Ok(data) => {
+                            let event = Event::default()
+                                .id(client_event.id)
+                                .event(client_event.event_type.to_string())
+                                .data(data);
+                            return Some((Ok(event), state));
+                        }
+                        Err(error) => {
+                            warn!(%error, "Failed to serialize a durable client event");
+                            continue;
+                        }
+                    }
+                }
+
+                match state
+                    .services
+                    .client_event
+                    .list_after(state.account_id, state.cursor)
+                    .await
+                {
+                    Ok(events) if !events.is_empty() => state.pending.extend(events),
+                    Ok(_) => sleep(EVENT_POLL_INTERVAL).await,
+                    Err(ApplicationError::Data(DataError::Conflict(error))) => {
+                        warn!(%error, account_id = %state.account_id, "Client event cursor expired while streaming");
+                        return None;
+                    }
+                    Err(error) => {
+                        warn!(%error, account_id = %state.account_id, "Failed to read the client event log");
+                        sleep(EVENT_POLL_INTERVAL).await;
+                    }
+                }
+            }
+        },
+    )
 }
 
 /// Get account.
@@ -1236,6 +1404,94 @@ mod tests {
                     .await;
 
             assert!(result.is_ok());
+        }
+    }
+
+    mod replay_cursor {
+        use super::*;
+
+        #[test]
+        fn last_event_id_takes_precedence_over_query_cursor() {
+            let mut headers = HeaderMap::new();
+            headers.insert(LAST_EVENT_ID, HeaderValue::from_static("42"));
+
+            assert_eq!(replay_cursor(&headers, Some(7)).unwrap(), Some(42));
+        }
+
+        #[test]
+        fn rejects_invalid_last_event_id() {
+            let mut headers = HeaderMap::new();
+            headers.insert(LAST_EVENT_ID, HeaderValue::from_static("not-an-id"));
+
+            assert!(matches!(
+                replay_cursor(&headers, None),
+                Err(ApplicationError::Data(DataError::Malformed(_)))
+            ));
+        }
+
+        #[test]
+        fn rejects_a_negative_query_cursor() {
+            assert!(matches!(
+                replay_cursor(&HeaderMap::new(), Some(-1)),
+                Err(ApplicationError::Data(DataError::Malformed(_)))
+            ));
+        }
+    }
+
+    mod stream_account_events {
+        use super::*;
+
+        mod without_a_replay_cursor {
+            use super::*;
+
+            #[tokio::test]
+            async fn fresh_stream_starts_at_the_accounts_latest_event() {
+                let caller = user();
+                let account_id = caller.account_id;
+                let mut services = MockAppServicesBuilder::new();
+                services
+                    .client_event
+                    .expect_latest_id()
+                    .withf(move |account| *account == account_id)
+                    .times(1)
+                    .returning(|_| Ok(42));
+
+                let result = stream_account_events(
+                    State(Arc::new(services.build())),
+                    caller,
+                    Query(ClientEventStreamQuery { after: None }),
+                    HeaderMap::new(),
+                )
+                .await;
+
+                assert!(result.is_ok());
+            }
+        }
+
+        mod with_a_replay_cursor {
+            use super::*;
+
+            #[tokio::test]
+            async fn explicit_replay_validates_the_cursor_before_opening() {
+                let caller = user();
+                let mut services = MockAppServicesBuilder::new();
+                services
+                    .client_event
+                    .expect_ensure_cursor_available()
+                    .withf(|cursor| *cursor == 42)
+                    .times(1)
+                    .returning(|_| Ok(()));
+
+                let result = stream_account_events(
+                    State(Arc::new(services.build())),
+                    caller,
+                    Query(ClientEventStreamQuery { after: Some(42) }),
+                    HeaderMap::new(),
+                )
+                .await;
+
+                assert!(result.is_ok());
+            }
         }
     }
 }

@@ -39,6 +39,8 @@ pub enum Relation {
     Asset,
     #[sea_orm(has_many = "super::btc_address::Entity")]
     BtcAddress,
+    #[sea_orm(has_many = "super::client_event::Entity")]
+    ClientEvent,
     #[sea_orm(has_many = "super::invoice::Entity")]
     Invoice,
     #[sea_orm(has_one = "super::ln_address::Entity")]
@@ -62,6 +64,12 @@ impl Related<super::asset::Entity> for Entity {
 impl Related<super::btc_address::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::BtcAddress.def()
+    }
+}
+
+impl Related<super::client_event::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::ClientEvent.def()
     }
 }
 

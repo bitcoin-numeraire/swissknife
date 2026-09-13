@@ -7,6 +7,11 @@ ln_provider = "cln_grpc"
 auth_provider = "jwt"
 dashboard_dir = "/var/www/swissknife-dashboard"
 
+# Durable client event replay. Set retention to "0s" to disable pruning.
+[client_events]
+retention = "30d"
+cleanup_interval = "1h"
+
 # Web server
 [web]
 addr = "0.0.0.0:3000"

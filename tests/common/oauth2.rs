@@ -24,6 +24,7 @@ pub const AUDIENCE: &str = "https://swissknife.itest/api";
 pub const ISSUER_ID: &str = "default";
 
 /// `client_id`s the IdP config maps to specific claim sets.
+pub const CLIENT_ACCOUNT: &str = "itest-account"; // ordinary account, no administrative permissions
 pub const CLIENT_FULL: &str = "itest-full"; // all permissions
 pub const CLIENT_READONLY: &str = "itest-readonly"; // read:wallet only
 pub const CLIENT_CONCURRENT: &str = "itest-concurrent"; // fresh provisioning subject
