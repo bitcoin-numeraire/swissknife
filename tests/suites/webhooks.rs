@@ -1,42 +1,35 @@
-//! Account-owned webhook lifecycle, permission boundaries, and durable fan-out.
+//! Account-owned webhook lifecycle, account boundaries, and durable fan-out.
 
 use std::time::Duration;
 
 use reqwest::StatusCode;
 use serde_json::json;
-use swissknife_types::{CreatedWebhookSubscription, Invoice, Permission, WebhookDelivery, WebhookDeliveryStatus};
+use swissknife_types::{CreatedWebhookSubscription, Invoice, WebhookDelivery, WebhookDeliveryStatus};
 
 use crate::common::counterparty::Counterparty;
+use crate::common::fixtures::TestAccount;
 use crate::common::wait::wait_until;
-use crate::common::{app, assert_error, assert_status, Auth};
+use crate::common::{app, assert_error, assert_status, Auth, TestApp};
+
+async fn ordinary_account(app: &TestApp, label: &str) -> TestAccount {
+    let admin = app.admin_token().await;
+    let mut account = app.create_account_with_wallet(admin, label).await;
+    account.key = app.account_api_key(admin, account.account.id, vec![]).await;
+    account
+}
 
 #[tokio::test]
-async fn requires_read_and_write_access_to_create_a_subscription() {
+async fn ordinary_accounts_can_create_subscriptions_but_anonymous_requests_cannot() {
     let app = app().await;
-    let admin = app.admin_token().await;
-    let account = app.create_account_with_wallet(admin, "webhook-permissions").await;
+    let account = ordinary_account(app, "webhook-no-permissions").await;
     let path = format!("/v1/me/wallets/{}/webhooks", account.wallet.id);
     let request = json!({"url": "https://example.com/webhook", "event_types": ["invoice.paid"]});
     assert_error(
         &app.api().post(&path, Auth::None, &request).await,
         StatusCode::UNAUTHORIZED,
     );
-    for permissions in [vec![Permission::ReadTransaction], vec![Permission::WriteTransaction]] {
-        let key = app.account_api_key(admin, account.account.id, permissions).await;
-        assert_error(
-            &app.api().post(&path, Auth::ApiKey(&key), &request).await,
-            StatusCode::FORBIDDEN,
-        );
-    }
-    let key = app
-        .account_api_key(
-            admin,
-            account.account.id,
-            vec![Permission::ReadTransaction, Permission::WriteTransaction],
-        )
-        .await;
     assert_status(
-        &app.api().post(&path, Auth::ApiKey(&key), &request).await,
+        &app.api().post(&path, Auth::ApiKey(&account.key), &request).await,
         StatusCode::CREATED,
     );
 }
@@ -44,9 +37,8 @@ async fn requires_read_and_write_access_to_create_a_subscription() {
 #[tokio::test]
 async fn keeps_subscriptions_and_secrets_with_the_owning_account() {
     let app = app().await;
-    let admin = app.admin_token().await;
-    let account = app.create_account_with_wallet(admin, "webhook-owner").await;
-    let other = app.create_account_with_wallet(admin, "webhook-other").await;
+    let account = ordinary_account(app, "webhook-owner").await;
+    let other = ordinary_account(app, "webhook-other").await;
     let path = format!("/v1/me/wallets/{}/webhooks", account.wallet.id);
     let auth = Auth::ApiKey(&account.key);
     for (request, status) in [
@@ -119,8 +111,7 @@ async fn keeps_subscriptions_and_secrets_with_the_owning_account() {
 #[tokio::test]
 async fn concurrent_duplicate_urls_return_conflict() {
     let app = app().await;
-    let admin = app.admin_token().await;
-    let account = app.create_account_with_wallet(admin, "webhook-concurrent-url").await;
+    let account = ordinary_account(app, "webhook-concurrent-url").await;
     let auth = Auth::ApiKey(&account.key);
     let path = format!("/v1/me/wallets/{}/webhooks", account.wallet.id);
     let api = app.api();
@@ -164,8 +155,7 @@ async fn concurrent_duplicate_urls_return_conflict() {
 #[tokio::test]
 async fn fans_out_a_real_settlement_and_blocks_private_delivery_destinations() {
     let app = app().await;
-    let admin = app.admin_token().await;
-    let account = app.create_account_with_wallet(admin, "webhook-settlement").await;
+    let account = ordinary_account(app, "webhook-settlement").await;
     let auth = Auth::ApiKey(&account.key);
     let path = format!("/v1/me/wallets/{}/webhooks", account.wallet.id);
     let old_invoice = app

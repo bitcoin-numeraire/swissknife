@@ -73,7 +73,7 @@ The JSON body contains the stable event ID and type, wallet and resource IDs, ti
 
 The signed message is `<timestamp>.<raw request body>`. A random 256-bit base64url secret is returned only on subscription creation or explicit rotation. Consumers should reject old timestamps and compare signatures in constant time. A rotation affects subsequent attempts; an attempt already claimed by a worker may still carry the previous signature.
 
-Subscription mutations require both `read:transaction` and `write:transaction`; a write-only key cannot create a channel that reads future transactions.
+The `/me/wallets/{wallet_id}/webhooks` endpoints authenticate the account and verify wallet ownership, like the other account wallet operations. Ordinary accounts can manage their subscriptions without administrative permissions.
 
 Only public HTTPS destinations are delivered. The worker rejects credentials and fragments, resolves DNS itself, rejects any private, loopback, link-local, multicast, or reserved result, pins the verified address for the request, disables redirects and environment proxies, and bounds DNS resolution and the complete request by ten seconds. Network failures, HTTP 408/409/425/429, and 5xx responses retry exponentially from one minute up to one hour. Other non-2xx responses are permanent failures. Delivery exhausts after eight attempts and remains visible through the delivery-history endpoint.
 

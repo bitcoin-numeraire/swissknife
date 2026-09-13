@@ -10,7 +10,7 @@ use uuid::Uuid;
 use crate::{
     application::errors::DatabaseError,
     domains::event::{
-        ClaimedWebhookDelivery, ClientEvent, ClientEventType, NewWebhookSubscription, StoredWebhookSubscription,
+        ClaimedWebhookDelivery, ClientEventType, NewWebhookSubscription, StoredWebhookSubscription,
         UpdateWebhookSubscriptionRequest, WebhookDelivery, WebhookDeliveryStatus, WebhookRepository,
     },
     infra::database::sea_orm::models::{
@@ -83,20 +83,6 @@ fn stored_subscription(model: webhook_subscription::Model) -> Result<StoredWebho
         last_event_id: model.last_event_id,
         created_at: model.created_at.and_utc(),
         updated_at: model.updated_at.map(|value| value.and_utc()),
-    })
-}
-
-fn client_event(model: client_event::Model) -> Result<ClientEvent, DatabaseError> {
-    Ok(ClientEvent {
-        id: model.id.to_string(),
-        event_type: model
-            .event_type
-            .parse::<ClientEventType>()
-            .map_err(|e| DatabaseError::FindMany(e.to_string()))?,
-        wallet_id: model.wallet_id,
-        resource_id: model.resource_id,
-        data: model.payload,
-        created_at: model.created_at.and_utc(),
     })
 }
 
@@ -428,7 +414,7 @@ impl WebhookRepository for SeaOrmWebhookRepository {
             claimed.push(ClaimedWebhookDelivery {
                 id: candidate.id,
                 subscription_id: subscription.id,
-                event: client_event(event)?,
+                event: event.into(),
                 url: subscription.url,
                 signing_secret: subscription.signing_secret,
                 attempt_count: candidate.attempt_count as u32,

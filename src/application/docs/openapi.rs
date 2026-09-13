@@ -5,7 +5,6 @@ use crate::{
     domains::{
         account::{AccountHandler, ApiKeyHandler, AuthHandler},
         bitcoin::BtcAddressHandler,
-        event::WebhookHandler,
         invoice::InvoiceHandler,
         ln_address::LnAddressHandler,
         lnurl::LnURLHandler,
@@ -50,7 +49,6 @@ pub fn merged_openapi() -> OpenApi {
     openapi.merge(SystemHandler::openapi());
     openapi.merge(ApiKeyHandler::openapi());
     openapi.merge(BtcAddressHandler::openapi());
-    openapi.merge(WebhookHandler::openapi());
 
     openapi
 }

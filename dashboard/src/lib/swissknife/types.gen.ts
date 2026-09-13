@@ -4344,10 +4344,6 @@ export type ListWebhooksErrors = {
    */
   401: ErrorResponse;
   /**
-   * Forbidden
-   */
-  403: ErrorResponse;
-  /**
    * Wallet not found
    */
   404: ErrorResponse;
@@ -4386,10 +4382,6 @@ export type CreateWebhookErrors = {
    * Unauthorized
    */
   401: ErrorResponse;
-  /**
-   * Forbidden
-   */
-  403: ErrorResponse;
   /**
    * Wallet not found
    */
@@ -4435,10 +4427,6 @@ export type DeleteWebhookErrors = {
    */
   401: ErrorResponse;
   /**
-   * Forbidden
-   */
-  403: ErrorResponse;
-  /**
    * Subscription not found
    */
   404: ErrorResponse;
@@ -4478,10 +4466,6 @@ export type UpdateWebhookErrors = {
    * Unauthorized
    */
   401: ErrorResponse;
-  /**
-   * Forbidden
-   */
-  403: ErrorResponse;
   /**
    * Subscription not found
    */
@@ -4527,10 +4511,6 @@ export type ListWebhookDeliveriesErrors = {
    */
   401: ErrorResponse;
   /**
-   * Forbidden
-   */
-  403: ErrorResponse;
-  /**
    * Subscription not found
    */
   404: ErrorResponse;
@@ -4568,10 +4548,6 @@ export type RotateWebhookSecretErrors = {
    * Unauthorized
    */
   401: ErrorResponse;
-  /**
-   * Forbidden
-   */
-  403: ErrorResponse;
   /**
    * Subscription not found
    */

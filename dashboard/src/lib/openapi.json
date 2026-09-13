@@ -4195,7 +4195,7 @@
     "/v1/me/events": {
       "get": {
         "tags": [
-          "Events"
+          "Me"
         ],
         "summary": "Stream durable events for every wallet owned by the authenticated account.",
         "description": "A fresh connection starts after the latest committed account event. Send\n`Last-Event-ID` on reconnect (or `after` for deliberate replay) to receive\nmissed events. If that cursor is older than the retained replay window,\nrefresh REST state and reconnect without a cursor.",
@@ -4245,17 +4245,6 @@
               }
             }
           },
-          "403": {
-            "description": "Forbidden",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                },
-                "example": "\n{\n    \"status\": \"403 Forbidden\",\n    \"reason\": \"Missing permissions\"\n}\n"
-              }
-            }
-          },
           "409": {
             "description": "Replay cursor has expired",
             "content": {
@@ -4263,7 +4252,7 @@
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
                 },
-                "example": "\n{\n    \"status\": \"409 Conflict\",\n    \"reason\": \"Client event cursor expired. Refresh state and reconnect without Last-Event-ID.\"\n}\n"
+                "example": "\n{\n    \"status\": \"409 Conflict\",\n    \"reason\": \"Admin account already created\"\n}\n"
               }
             }
           },
@@ -6365,7 +6354,7 @@
     "/v1/me/wallets/{wallet_id}/webhooks": {
       "get": {
         "tags": [
-          "Webhooks"
+          "Me"
         ],
         "operationId": "list_webhooks",
         "parameters": [
@@ -6404,17 +6393,6 @@
               }
             }
           },
-          "403": {
-            "description": "Forbidden",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                },
-                "example": "\n{\n    \"status\": \"403 Forbidden\",\n    \"reason\": \"Missing permissions\"\n}\n"
-              }
-            }
-          },
           "404": {
             "description": "Wallet not found",
             "content": {
@@ -6441,7 +6419,7 @@
       },
       "post": {
         "tags": [
-          "Webhooks"
+          "Me"
         ],
         "operationId": "create_webhook",
         "parameters": [
@@ -6498,17 +6476,6 @@
               }
             }
           },
-          "403": {
-            "description": "Forbidden",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                },
-                "example": "\n{\n    \"status\": \"403 Forbidden\",\n    \"reason\": \"Missing permissions\"\n}\n"
-              }
-            }
-          },
           "404": {
             "description": "Wallet not found",
             "content": {
@@ -6526,7 +6493,8 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
-                }
+                },
+                "example": "\n{\n    \"status\": \"409 Conflict\",\n    \"reason\": \"Admin account already created\"\n}\n"
               }
             }
           },
@@ -6536,7 +6504,8 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
-                }
+                },
+                "example": "\n{\n    \"status\": \"422 Unprocessable Entity\",\n    \"reason\": \"Validation failed: ...\"\n}\n"
               }
             }
           },
@@ -6557,7 +6526,7 @@
     "/v1/me/wallets/{wallet_id}/webhooks/{id}": {
       "put": {
         "tags": [
-          "Webhooks"
+          "Me"
         ],
         "operationId": "update_webhook",
         "parameters": [
@@ -6623,17 +6592,6 @@
               }
             }
           },
-          "403": {
-            "description": "Forbidden",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                },
-                "example": "\n{\n    \"status\": \"403 Forbidden\",\n    \"reason\": \"Missing permissions\"\n}\n"
-              }
-            }
-          },
           "404": {
             "description": "Subscription not found",
             "content": {
@@ -6651,7 +6609,8 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
-                }
+                },
+                "example": "\n{\n    \"status\": \"409 Conflict\",\n    \"reason\": \"Admin account already created\"\n}\n"
               }
             }
           },
@@ -6661,7 +6620,8 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
-                }
+                },
+                "example": "\n{\n    \"status\": \"422 Unprocessable Entity\",\n    \"reason\": \"Validation failed: ...\"\n}\n"
               }
             }
           },
@@ -6680,7 +6640,7 @@
       },
       "delete": {
         "tags": [
-          "Webhooks"
+          "Me"
         ],
         "operationId": "delete_webhook",
         "parameters": [
@@ -6718,17 +6678,6 @@
               }
             }
           },
-          "403": {
-            "description": "Forbidden",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                },
-                "example": "\n{\n    \"status\": \"403 Forbidden\",\n    \"reason\": \"Missing permissions\"\n}\n"
-              }
-            }
-          },
           "404": {
             "description": "Subscription not found",
             "content": {
@@ -6757,7 +6706,7 @@
     "/v1/me/wallets/{wallet_id}/webhooks/{id}/deliveries": {
       "get": {
         "tags": [
-          "Webhooks"
+          "Me"
         ],
         "operationId": "list_webhook_deliveries",
         "parameters": [
@@ -6805,17 +6754,6 @@
               }
             }
           },
-          "403": {
-            "description": "Forbidden",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                },
-                "example": "\n{\n    \"status\": \"403 Forbidden\",\n    \"reason\": \"Missing permissions\"\n}\n"
-              }
-            }
-          },
           "404": {
             "description": "Subscription not found",
             "content": {
@@ -6844,7 +6782,7 @@
     "/v1/me/wallets/{wallet_id}/webhooks/{id}/rotate-secret": {
       "post": {
         "tags": [
-          "Webhooks"
+          "Me"
         ],
         "operationId": "rotate_webhook_secret",
         "parameters": [
@@ -6886,17 +6824,6 @@
                   "$ref": "#/components/schemas/ErrorResponse"
                 },
                 "example": "\n{\n    \"status\": \"401 Unauthorized\",\n    \"reason\": \"Invalid credentials\"\n}\n"
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                },
-                "example": "\n{\n    \"status\": \"403 Forbidden\",\n    \"reason\": \"Missing permissions\"\n}\n"
               }
             }
           },
@@ -8886,6 +8813,19 @@
           }
         }
       },
+      "ClientEventStreamQuery": {
+        "type": "object",
+        "properties": {
+          "after": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "Replay events strictly after this event ID. `Last-Event-ID` takes precedence."
+          }
+        }
+      },
       "ClientEventType": {
         "type": "string",
         "description": "Stable event names shared by SSE and webhook delivery.",
@@ -10561,14 +10501,6 @@
     {
       "name": "Bitcoin Addresses",
       "description": "Bitcoin Address management endpoints. Require `read:btc_address` or `write:btc_address` permissions."
-    },
-    {
-      "name": "Events",
-      "description": "Authenticated, account-scoped server-sent events."
-    },
-    {
-      "name": "Webhooks",
-      "description": "Signed, durable server-to-server notifications for account-owned wallets."
     }
   ]
 }
