@@ -423,9 +423,8 @@
     "waiting_for_payment": "En attente du paiement",
     "payment_received": "Paiement reçu",
     "payment_received_description": "Cette demande a été payée. Le solde et l’activité du portefeuille se mettent à jour automatiquement.",
-    "success_eyebrow": "Reçu avec SwissKnife",
     "success_title": "Paiement reçu!",
-    "success_description": "Le paiement est terminé et ton portefeuille a été mis à jour automatiquement.",
+    "see_details": "Voir les détails",
     "identity": "Identité réutilisable :"
   },
   "admin_wallet_picker": {

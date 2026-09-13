@@ -424,9 +424,8 @@
     "waiting_for_payment": "Waiting for payment",
     "payment_received": "Payment received",
     "payment_received_description": "This request has been paid. The wallet balance and activity update automatically.",
-    "success_eyebrow": "Received with SwissKnife",
     "success_title": "Payment received!",
-    "success_description": "The payment is complete and your wallet has updated automatically.",
+    "see_details": "See details",
     "identity": "Reusable identity:"
   },
   "admin_wallet_picker": {

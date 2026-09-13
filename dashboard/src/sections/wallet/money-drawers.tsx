@@ -78,6 +78,7 @@ import { Iconify } from 'src/components/iconify';
 import { CopyButton } from 'src/components/copy';
 import { SatsWithIcon } from 'src/components/bitcoin';
 import { useSettingsContext } from 'src/components/settings';
+import { varFade, MotionContainer } from 'src/components/animate';
 
 import { useFeeEstimate } from './use-fee-estimate';
 import { getFeeEstimateState } from './fee-estimate';
@@ -1294,12 +1295,12 @@ function ReceivePaymentSuccessPanel({
   payment,
   walletName,
   onDone,
-  onViewActivity,
+  onViewDetails,
 }: {
   payment: ReceivePaymentSuccess;
   walletName: string;
   onDone: VoidFunction;
-  onViewActivity: VoidFunction;
+  onViewDetails: VoidFunction;
 }) {
   const { t } = useTranslate();
   const rail = t(`event_notifications.rail.${payment.ledger.toLowerCase()}`, {
@@ -1307,7 +1308,8 @@ function ReceivePaymentSuccessPanel({
   });
 
   return (
-    <Box
+    <MotionContainer
+      variants={varFade('in')}
       sx={(theme) => ({
         p: { xs: 3, sm: 4 },
         minHeight: { xs: 'calc(100dvh - 125px)', sm: 620 },
@@ -1365,7 +1367,7 @@ function ReceivePaymentSuccessPanel({
           />
           <Box
             component="img"
-            src="/logo/logo_single_negative.svg"
+            src={`${CONFIG.assetsDir}/logo/logo_single.svg`}
             alt="SwissKnife"
             sx={{
               width: 42,
@@ -1395,18 +1397,12 @@ function ReceivePaymentSuccessPanel({
         </Box>
 
         <Stack spacing={1} sx={{ alignItems: 'center' }}>
-          <Typography variant="overline" sx={{ color: 'warning.main', letterSpacing: 1.4 }}>
-            {t('receive_money.success_eyebrow')}
-          </Typography>
           <Typography variant="h3">{t('receive_money.success_title')}</Typography>
           <SatsWithIcon
             amountMSats={payment.amountMsat}
             variant="h2"
             sx={{ color: 'common.white' }}
           />
-          <Typography variant="body1" sx={{ maxWidth: 340, color: 'rgba(255,255,255,0.72)' }}>
-            {t('receive_money.success_description')}
-          </Typography>
         </Stack>
 
         <Stack
@@ -1450,18 +1446,18 @@ function ReceivePaymentSuccessPanel({
           <Button
             size="large"
             variant="contained"
-            onClick={onViewActivity}
+            onClick={onViewDetails}
             endIcon={<Iconify icon="solar:arrow-right-up-linear" />}
             sx={{ bgcolor: 'common.white', color: 'grey.900', '&:hover': { bgcolor: 'grey.200' } }}
           >
-            {t('event_notifications.view_activity')}
+            {t('receive_money.see_details')}
           </Button>
           <Button size="large" color="inherit" onClick={onDone} sx={{ color: 'common.white' }}>
             {t('done')}
           </Button>
         </Stack>
       </Stack>
-    </Box>
+    </MotionContainer>
   );
 }
 
@@ -1682,12 +1678,16 @@ export function ReceiveMoneyDrawer({
     onClose();
   }, [defaultPayload, onClose, walletId]);
 
-  const handleViewActivity = useCallback(() => {
+  const handleViewDetails = useCallback(() => {
     if (!receivedPayment) return;
 
-    router.push(paths.activityInvoice(receivedPayment.invoiceId));
+    router.push(
+      isAdmin
+        ? paths.admin.transactionInvoiceDetail(receivedPayment.invoiceId)
+        : paths.wallet.invoice(receivedPayment.invoiceId)
+    );
     handleClose();
-  }, [handleClose, receivedPayment, router]);
+  }, [handleClose, isAdmin, receivedPayment, router]);
 
   const handleGenerate = async () => {
     if (needsWallet || !requestNeedsGeneration) return;
@@ -1828,7 +1828,7 @@ export function ReceiveMoneyDrawer({
             payment={receivedPayment}
             walletName={receiveWalletName}
             onDone={handleClose}
-            onViewActivity={handleViewActivity}
+            onViewDetails={handleViewDetails}
           />
         </Stack>
       </Drawer>
