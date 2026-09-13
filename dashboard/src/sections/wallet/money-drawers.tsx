@@ -9,8 +9,8 @@ import { bech32, bech32m } from 'bech32';
 import { QRCode } from 'react-qrcode-logo';
 import { decode } from 'light-bolt11-decoder';
 import { Scanner } from '@yudiel/react-qr-scanner';
-import { useMemo, useState, useEffect, useCallback } from 'react';
 import { useBoolean, useCopyToClipboard } from 'minimal-shared/hooks';
+import { useRef, useMemo, useState, useEffect, useCallback } from 'react';
 
 import Box from '@mui/material/Box';
 import Chip from '@mui/material/Chip';
@@ -29,6 +29,9 @@ import DialogActions from '@mui/material/DialogActions';
 import InputAdornment from '@mui/material/InputAdornment';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 
+import { paths } from 'src/routes/paths';
+import { useRouter } from 'src/routes/hooks';
+
 import { satsToFiat } from 'src/utils/fiat';
 import { handleActionError } from 'src/utils/errors';
 import { truncateText } from 'src/utils/format-string';
@@ -40,10 +43,16 @@ import { composeBip21, parseBitcoinUri, compactBitcoinAddress } from 'src/utils/
 import { CONFIG } from 'src/global-config';
 import { useTranslate } from 'src/locales';
 import { useListWallets } from 'src/actions/wallet';
+import { useAccountContext } from 'src/contexts/account';
 import { useListBtcAddresses } from 'src/actions/btc-addresses';
-import { useActiveWallet, useListWalletBtcAddresses } from 'src/actions/account-wallet';
+import {
+  useActiveWallet,
+  useGetWalletInvoice,
+  useListWalletBtcAddresses,
+} from 'src/actions/account-wallet';
 import {
   pay,
+  Ledger,
   walletPay,
   type Wallet,
   type Contact,
@@ -52,8 +61,10 @@ import {
   InvoiceStatus,
   BtcAddressType,
   type LnAddress,
+  ClientEventType,
   generateInvoice,
   type BtcAddress,
+  type ClientEvent,
   newWalletInvoice,
   estimatePaymentFee,
   generateBtcAddress,
@@ -67,6 +78,7 @@ import { Iconify } from 'src/components/iconify';
 import { CopyButton } from 'src/components/copy';
 import { SatsWithIcon } from 'src/components/bitcoin';
 import { useSettingsContext } from 'src/components/settings';
+import { varFade, MotionContainer } from 'src/components/animate';
 
 import { useFeeEstimate } from './use-fee-estimate';
 import { getFeeEstimateState } from './fee-estimate';
@@ -101,6 +113,13 @@ type RecipientKind =
   'bip21' | 'bolt11' | 'lightning-address' | 'lnurl' | 'bitcoin' | 'internal' | 'unknown';
 type ReceivePayload = 'unified' | 'lightning' | 'onchain' | 'identity';
 type AmountUnit = 'sats' | 'btc' | 'fiat';
+
+export type ReceivePaymentSuccess = {
+  invoiceId: string;
+  amountMsat: number;
+  ledger: Invoice['ledger'];
+  description?: string;
+};
 
 type DecodedBolt11 = {
   description?: string;
@@ -141,6 +160,111 @@ const addressTypeOptions = [
     helperKey: 'bitcoin_address_type.native_segwit_helper',
   },
 ] as const;
+
+export function invoiceAfterClientEvent(
+  invoice: Invoice | undefined,
+  clientEvent: ClientEvent | undefined,
+  walletId: string | undefined
+) {
+  if (
+    !invoice ||
+    !clientEvent ||
+    invoice.status === InvoiceStatus.SETTLED ||
+    clientEvent.event_type !== ClientEventType.INVOICE_PAID ||
+    clientEvent.wallet_id !== walletId ||
+    clientEvent.resource_id !== invoice.id
+  ) {
+    return invoice;
+  }
+
+  return {
+    ...invoice,
+    status: InvoiceStatus.SETTLED,
+    amount_received_msat:
+      typeof clientEvent.data.amount_received_msat === 'number'
+        ? clientEvent.data.amount_received_msat
+        : invoice.amount_received_msat,
+    payment_time: clientEvent.created_at,
+  };
+}
+
+export function receivePaymentSuccessFromInvoice(
+  invoice: Invoice | undefined,
+  walletId: string | undefined
+): ReceivePaymentSuccess | undefined {
+  if (invoice?.status !== InvoiceStatus.SETTLED || invoice.wallet_id !== walletId) return undefined;
+  const amountMsat = invoice.amount_received_msat ?? invoice.amount_msat;
+  if (typeof amountMsat !== 'number' || !Number.isFinite(amountMsat) || amountMsat < 0)
+    return undefined;
+  return {
+    invoiceId: invoice.id,
+    amountMsat,
+    ledger: invoice.ledger,
+    description: invoice.description || undefined,
+  };
+}
+
+export function receivePaymentSuccessAfterClientEvent(
+  current: ReceivePaymentSuccess | undefined,
+  invoice: Invoice | undefined,
+  clientEvent: ClientEvent | undefined,
+  walletId: string | undefined,
+  bitcoinAddress: string | undefined
+) {
+  if (
+    current ||
+    !clientEvent ||
+    clientEvent.event_type !== ClientEventType.INVOICE_PAID ||
+    clientEvent.wallet_id !== walletId
+  ) {
+    return current;
+  }
+
+  const output = clientEvent.data.bitcoin_output;
+  const eventBitcoinAddress =
+    output &&
+    typeof output === 'object' &&
+    'address' in output &&
+    typeof output.address === 'string'
+      ? output.address
+      : undefined;
+  const matchesInvoice = Boolean(invoice?.id && clientEvent.resource_id === invoice.id);
+  const matchesBitcoinAddress = Boolean(bitcoinAddress && eventBitcoinAddress === bitcoinAddress);
+
+  if (!matchesInvoice && !matchesBitcoinAddress) return current;
+
+  const receivedAmount = clientEvent.data.amount_received_msat;
+  const requestedAmount = clientEvent.data.amount_msat;
+  const amountMsat =
+    typeof receivedAmount === 'number'
+      ? receivedAmount
+      : typeof requestedAmount === 'number'
+        ? requestedAmount
+        : (invoice?.amount_received_msat ?? invoice?.amount_msat);
+  const eventLedger = clientEvent.data.ledger;
+  const ledger =
+    eventLedger === Ledger.LIGHTNING ||
+    eventLedger === Ledger.INTERNAL ||
+    eventLedger === Ledger.ONCHAIN
+      ? eventLedger
+      : (invoice?.ledger ?? (matchesBitcoinAddress ? Ledger.ONCHAIN : undefined));
+
+  if (typeof amountMsat !== 'number' || !Number.isFinite(amountMsat) || amountMsat < 0 || !ledger) {
+    return current;
+  }
+
+  const eventDescription = clientEvent.data.description;
+
+  return {
+    invoiceId: clientEvent.resource_id,
+    amountMsat,
+    ledger,
+    description:
+      typeof eventDescription === 'string' && eventDescription.trim()
+        ? eventDescription.trim()
+        : invoice?.description || undefined,
+  };
+}
 
 function stripLightningScheme(input: string) {
   return input.trim().replace(/^lightning:/i, '');
@@ -1167,6 +1291,178 @@ function ScanQRDialog({ open, onClose, onResult }: ScanQRDialogProps) {
 
 // ----------------------------------------------------------------------
 
+function ReceivePaymentSuccessPanel({
+  payment,
+  walletName,
+  onDone,
+  onViewDetails,
+}: {
+  payment: ReceivePaymentSuccess;
+  walletName: string;
+  onDone: VoidFunction;
+  onViewDetails: VoidFunction;
+}) {
+  const { t } = useTranslate();
+  const rail = t(`event_notifications.rail.${payment.ledger.toLowerCase()}`, {
+    defaultValue: payment.ledger,
+  });
+
+  return (
+    <MotionContainer
+      variants={varFade('in')}
+      sx={(theme) => ({
+        p: { xs: 3, sm: 4 },
+        minHeight: { xs: 'calc(100dvh - 125px)', sm: 620 },
+        overflow: 'hidden',
+        position: 'relative',
+        borderRadius: 3,
+        color: 'common.white',
+        display: 'flex',
+        alignItems: 'center',
+        background: `linear-gradient(145deg, ${theme.palette.grey[900]} 0%, ${theme.palette.success.darker} 100%)`,
+        '&::before': {
+          content: '""',
+          width: 260,
+          height: 260,
+          top: -120,
+          right: -100,
+          opacity: 0.22,
+          borderRadius: '50%',
+          position: 'absolute',
+          background: theme.palette.warning.main,
+        },
+        '&::after': {
+          content: '""',
+          width: 220,
+          height: 220,
+          left: -130,
+          bottom: -110,
+          opacity: 0.16,
+          borderRadius: '50%',
+          position: 'absolute',
+          background: theme.palette.success.light,
+        },
+      })}
+    >
+      <Stack
+        spacing={3}
+        sx={{
+          width: 1,
+          zIndex: 1,
+          position: 'relative',
+          alignItems: 'center',
+          textAlign: 'center',
+        }}
+      >
+        <Box sx={{ width: 118, height: 118, position: 'relative' }}>
+          <Box
+            sx={{
+              inset: 0,
+              borderRadius: '50%',
+              position: 'absolute',
+              bgcolor: 'rgba(255,255,255,0.1)',
+              border: '1px solid rgba(255,255,255,0.22)',
+              boxShadow: '0 24px 60px rgba(0,0,0,0.28)',
+            }}
+          />
+          <Box
+            component="img"
+            src={`${CONFIG.assetsDir}/logo/logo_single.svg`}
+            alt="SwissKnife"
+            sx={{
+              width: 42,
+              height: 66,
+              top: 25,
+              left: 38,
+              position: 'absolute',
+              objectFit: 'contain',
+            }}
+          />
+          <Box
+            sx={{
+              width: 38,
+              height: 38,
+              right: -2,
+              bottom: 2,
+              display: 'grid',
+              borderRadius: '50%',
+              placeItems: 'center',
+              bgcolor: 'success.main',
+              border: '3px solid',
+              borderColor: 'grey.900',
+            }}
+          >
+            <Iconify icon="solar:check-read-bold" width={23} />
+          </Box>
+        </Box>
+
+        <Stack spacing={1} sx={{ alignItems: 'center' }}>
+          <Typography variant="h3">{t('receive_money.success_title')}</Typography>
+          <SatsWithIcon
+            amountMSats={payment.amountMsat}
+            variant="h2"
+            sx={{ color: 'common.white' }}
+          />
+        </Stack>
+
+        <Stack
+          spacing={1.25}
+          sx={{
+            width: 1,
+            p: 2,
+            textAlign: 'left',
+            borderRadius: 2,
+            bgcolor: 'rgba(255,255,255,0.08)',
+            border: '1px solid rgba(255,255,255,0.14)',
+          }}
+        >
+          <Stack direction="row" spacing={2} sx={{ justifyContent: 'space-between' }}>
+            <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.58)' }}>
+              {t('wallet')}
+            </Typography>
+            <Typography variant="subtitle2" noWrap>
+              {walletName}
+            </Typography>
+          </Stack>
+          <Stack direction="row" spacing={2} sx={{ justifyContent: 'space-between' }}>
+            <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.58)' }}>
+              {t('activity_view.rail')}
+            </Typography>
+            <Typography variant="subtitle2">{rail}</Typography>
+          </Stack>
+          {payment.description && (
+            <Stack direction="row" spacing={2} sx={{ justifyContent: 'space-between' }}>
+              <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.58)' }}>
+                {t('transaction_details.description')}
+              </Typography>
+              <Typography variant="subtitle2" sx={{ maxWidth: '68%', textAlign: 'right' }}>
+                {payment.description}
+              </Typography>
+            </Stack>
+          )}
+        </Stack>
+
+        <Stack spacing={1.25} sx={{ width: 1 }}>
+          <Button
+            size="large"
+            variant="contained"
+            onClick={onViewDetails}
+            endIcon={<Iconify icon="solar:arrow-right-up-linear" />}
+            sx={{ bgcolor: 'common.white', color: 'grey.900', '&:hover': { bgcolor: 'grey.200' } }}
+          >
+            {t('receive_money.see_details')}
+          </Button>
+          <Button size="large" color="inherit" onClick={onDone} sx={{ color: 'common.white' }}>
+            {t('done')}
+          </Button>
+        </Stack>
+      </Stack>
+    </MotionContainer>
+  );
+}
+
+// ----------------------------------------------------------------------
+
 export function ReceiveMoneyDrawer({
   open,
   lnAddress,
@@ -1177,10 +1473,12 @@ export function ReceiveMoneyDrawer({
   walletId,
   initialPayload,
 }: ReceiveMoneyDrawerProps) {
+  const router = useRouter();
   const { t } = useTranslate();
   const { state } = useSettingsContext();
   const { copy } = useCopyToClipboard();
   const { wallet } = useActiveWallet();
+  const { recentClientEvents } = useAccountContext();
 
   const defaultPayload = initialPayload ?? (lnAddress ? 'identity' : 'unified');
   const [activePayload, setActivePayload] = useState<ReceivePayload>(defaultPayload);
@@ -1189,6 +1487,8 @@ export function ReceiveMoneyDrawer({
   const [description, setDescription] = useState('');
   const [invoiceExpirySeconds, setInvoiceExpirySeconds] = useState(DEFAULT_BOLT11_EXPIRY_SECONDS);
   const [invoice, setInvoice] = useState<Invoice>();
+  const [receivedPayment, setReceivedPayment] = useState<ReceivePaymentSuccess>();
+  const ignoredReceiveEvents = useRef(new Set<string>());
   const [btcAddress, setBtcAddress] = useState<BtcAddress>();
   const [addressType, setAddressType] = useState<BtcAddressType>(
     (state.defaultAddressType ?? BtcAddressType.P2TR) as BtcAddressType
@@ -1204,6 +1504,10 @@ export function ReceiveMoneyDrawer({
   );
   const activeWalletId = walletId || selectedWalletId;
   const addressWalletId = isAdmin ? activeWalletId : activeWalletId || wallet?.id;
+  const { invoice: refreshedInvoice } = useGetWalletInvoice(
+    open && !isAdmin ? (invoice?.id ?? '') : '',
+    addressWalletId
+  );
   const needsWallet = isAdmin && !activeWalletId;
   const hasFiatPrice = (fiatPrices[state.currency] ?? 0) > 0;
   const displayUnit = state.displayUnit ?? 'bip177';
@@ -1279,8 +1583,11 @@ export function ReceiveMoneyDrawer({
     (typeof invoiceExpiryMs === 'number' &&
       Number.isFinite(invoiceExpiryMs) &&
       invoiceExpiryMs <= nowMs);
+  const invoiceHasBeenPaid = invoice?.status === InvoiceStatus.SETTLED;
+  const receiveWalletName =
+    wallet?.label || wallet?.asset?.name || wallet?.asset?.display_ticker || t('wallet');
   const showInvoiceExpiry = selectedLightningInvoice && Boolean(invoice?.ln_invoice);
-  const primaryPayloadDisabled = showInvoiceExpiry && invoiceHasExpired;
+  const primaryPayloadDisabled = showInvoiceExpiry && (invoiceHasExpired || invoiceHasBeenPaid);
   const invoiceExpiryRelative = invoiceExpiresAt ? fToNow(invoiceExpiresAt) : '';
   const invoiceExpiryAbsolute = invoiceExpiresAt ? fDateTime(invoiceExpiresAt) : '';
   const shouldGetFreshOnchainAddress = selectedPayload === 'onchain' && displayedBtcAddress?.used;
@@ -1312,6 +1619,51 @@ export function ReceiveMoneyDrawer({
     return () => window.clearInterval(interval);
   }, [invoiceExpiresAt]);
 
+  useEffect(() => {
+    if (open) ignoredReceiveEvents.current = new Set(recentClientEvents.map((event) => event.id));
+    // Capture the events already present when this receive session begins.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, addressWalletId]);
+
+  useEffect(() => {
+    if (isAdmin || !open) return;
+
+    const settledInvoice = recentClientEvents.reduce(
+      (currentInvoice, clientEvent) =>
+        invoiceAfterClientEvent(currentInvoice, clientEvent, addressWalletId),
+      refreshedInvoice?.id === invoice?.id && refreshedInvoice?.status === InvoiceStatus.SETTLED
+        ? refreshedInvoice
+        : invoice
+    );
+    const restoredSuccess =
+      receivedPayment ?? receivePaymentSuccessFromInvoice(settledInvoice, addressWalletId);
+    const success = recentClientEvents
+      .filter((event) => !ignoredReceiveEvents.current.has(event.id))
+      .reduce(
+        (currentSuccess, clientEvent) =>
+          receivePaymentSuccessAfterClientEvent(
+            currentSuccess,
+            invoice,
+            clientEvent,
+            addressWalletId,
+            displayedBtcAddress?.address
+          ),
+        restoredSuccess
+      );
+
+    if (settledInvoice !== invoice) setInvoice(settledInvoice);
+    if (success !== receivedPayment) setReceivedPayment(success);
+  }, [
+    addressWalletId,
+    displayedBtcAddress?.address,
+    invoice,
+    isAdmin,
+    open,
+    receivedPayment,
+    recentClientEvents,
+    refreshedInvoice,
+  ]);
+
   const handleClose = useCallback(() => {
     setActivePayload(defaultPayload);
     setAmountValue('');
@@ -1319,11 +1671,23 @@ export function ReceiveMoneyDrawer({
     setDescription('');
     setInvoiceExpirySeconds(DEFAULT_BOLT11_EXPIRY_SECONDS);
     setInvoice(undefined);
+    setReceivedPayment(undefined);
     setBtcAddress(undefined);
     setAddressError(undefined);
     setSelectedWalletId(walletId ?? '');
     onClose();
   }, [defaultPayload, onClose, walletId]);
+
+  const handleViewDetails = useCallback(() => {
+    if (!receivedPayment) return;
+
+    router.push(
+      isAdmin
+        ? paths.admin.transactionInvoiceDetail(receivedPayment.invoiceId)
+        : paths.wallet.invoice(receivedPayment.invoiceId)
+    );
+    handleClose();
+  }, [handleClose, isAdmin, receivedPayment, router]);
 
   const handleGenerate = async () => {
     if (needsWallet || !requestNeedsGeneration) return;
@@ -1338,6 +1702,7 @@ export function ReceiveMoneyDrawer({
       let nextBtcAddress: BtcAddress | undefined;
 
       if (shouldGenerateInvoice) setInvoice(undefined);
+      setReceivedPayment(undefined);
       if (shouldGenerateAddress) setBtcAddress(undefined);
 
       if (shouldGenerateInvoice) {
@@ -1446,6 +1811,29 @@ export function ReceiveMoneyDrawer({
     copy(value);
     toast.success(t('copied_to_clipboard'));
   };
+
+  if (receivedPayment) {
+    return (
+      <Drawer
+        anchor="right"
+        open={open}
+        onClose={handleClose}
+        slotProps={{ paper: { sx: drawerSx } }}
+      >
+        {drawerTitle(t('receive_money.title'), handleClose)}
+        <Divider />
+
+        <Stack sx={{ p: 3 }}>
+          <ReceivePaymentSuccessPanel
+            payment={receivedPayment}
+            walletName={receiveWalletName}
+            onDone={handleClose}
+            onViewDetails={handleViewDetails}
+          />
+        </Stack>
+      </Drawer>
+    );
+  }
 
   return (
     <Drawer
@@ -1625,7 +2013,10 @@ export function ReceiveMoneyDrawer({
                 <Label color={selectedPayload === 'unified' ? 'success' : 'info'}>
                   {payloadLabel}
                 </Label>
-                {selectedLightningInvoice && !invoiceHasExpired && (
+                {selectedLightningInvoice && invoiceHasBeenPaid && (
+                  <Label color="success">{t('receive_money.payment_received')}</Label>
+                )}
+                {selectedLightningInvoice && !invoiceHasExpired && !invoiceHasBeenPaid && (
                   <Label color="success">{t('receive_money.waiting_for_payment')}</Label>
                 )}
               </Stack>
@@ -1675,7 +2066,7 @@ export function ReceiveMoneyDrawer({
                 </Button>
               </Stack>
 
-              {showInvoiceExpiry && (
+              {showInvoiceExpiry && !invoiceHasBeenPaid && (
                 <Typography
                   variant="caption"
                   color={invoiceHasExpired ? 'warning.main' : 'text.secondary'}

@@ -126,6 +126,21 @@ const toastStyles = (theme: Theme): CSSObject => ({
     [`&:has(${snackbarClasses.closeBtnVisible})`]: {
       [`& .${snackbarClasses.content}`]: { paddingRight: 24 },
     },
+    [`&.${snackbarClasses.payment}`]: {
+      minHeight: 72,
+      padding: theme.spacing(1),
+      [`& .${snackbarClasses.content}`]: { minWidth: 0, paddingRight: 0 },
+      [`& .${snackbarClasses.title}`]: {
+        fontSize: theme.typography.pxToRem(14),
+        fontWeight: theme.typography.fontWeightSemiBold,
+      },
+      [`& .${snackbarClasses.description}`]: {
+        overflow: 'hidden',
+        display: '-webkit-box',
+        WebkitLineClamp: 2,
+        WebkitBoxOrient: 'vertical',
+      },
+    },
     [snackbarClasses.default]: {
       padding: theme.spacing(1, 1, 1, 1.5),
       color: theme.vars.palette.background.paper,
@@ -153,6 +168,10 @@ export const SnackbarRoot = styled(Toaster)(({ theme }) => ({
     to: { transform: 'rotate(1turn)' },
   },
   width: 300,
+  '&[data-x-position="center"]': {
+    width: 420,
+    maxWidth: 'calc(100vw - 32px)',
+  },
   ...toastStyles(theme),
   ...iconStyles(theme),
   ...contentStyles(theme),

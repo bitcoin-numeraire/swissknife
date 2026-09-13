@@ -14,6 +14,8 @@ import { getAccount, getAccountWallet, updateAccountPreferences } from 'src/lib/
 import { defaultSettings, useSettingsContext } from 'src/components/settings';
 
 import { AccountContext } from './account-context';
+import { useAccountEventStream } from './account-event-stream';
+import { useAccountEventNotifications } from './account-event-notifications';
 import { selectInitialWalletId, settingsWithActiveWallet } from './account-selection';
 import {
   settingsWithUiPreferences,
@@ -36,6 +38,8 @@ export function AccountProvider({ children }: AccountProviderProps) {
   });
   const account = accountResult.data;
   const wallets = useMemo(() => account?.wallets ?? [], [account?.wallets]);
+  const recentClientEvents = useAccountEventStream(account?.id);
+  useAccountEventNotifications(account?.id, recentClientEvents, wallets);
 
   useEffect(() => {
     if (!account || hydratedAccountId.current === account.id) return;
@@ -139,6 +143,7 @@ export function AccountProvider({ children }: AccountProviderProps) {
       wallets,
       activeWallet: activeWalletResult.data,
       activeWalletId,
+      recentClientEvents,
       accountLoading: accountResult.isLoading,
       walletsLoading: accountResult.isLoading,
       activeWalletLoading: accountResult.isLoading || activeWalletResult.isLoading,
@@ -156,6 +161,7 @@ export function AccountProvider({ children }: AccountProviderProps) {
       wallets,
       activeWalletResult.data,
       activeWalletId,
+      recentClientEvents,
       accountResult.isLoading,
       activeWalletResult.isLoading,
       accountResult.error,

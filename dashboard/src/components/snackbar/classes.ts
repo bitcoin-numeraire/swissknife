@@ -5,6 +5,7 @@ import { createClasses } from 'src/theme/create-classes';
 export const snackbarClasses = {
   root: createClasses('snackbar__root'),
   toast: createClasses('snackbar__toast'),
+  payment: createClasses('snackbar__payment'),
   /********/
   title: createClasses('snackbar__title'),
   content: createClasses('snackbar__content'),
