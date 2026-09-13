@@ -10,6 +10,10 @@ release notes when a tag is published.
 
 ### Added
 
+- Added per-account local JWT credentials, username sign-in, administrator-managed
+  activation/reset codes, local login disabling, and targeted operator recovery.
+  Password changes and resets revoke existing local sessions ([#338]).
+
 - Added explicit accounts, authentication identities, account preferences, and
   an asset catalog. Accounts can own multiple wallets, with each wallet holding
   exactly one asset on one settlement network ([#297]).
@@ -61,6 +65,8 @@ release notes when a tag is published.
 
 ### Security
 
+- Updated `h2` to 0.4.16 to address unbounded empty DATA frames
+  (RUSTSEC-2026-0258).
 - Updated `bcrypt` to 0.19.2, fixing a panic in `bcrypt::verify` on non-ASCII
   hash input (RUSTSEC-2026-0199), and moved the `bitcoin` crate off the yanked
   0.32.100 release ([#324]).
@@ -148,3 +154,4 @@ release notes when a tag is published.
 [#330]: https://github.com/bitcoin-numeraire/swissknife/issues/330
 [#331]: https://github.com/bitcoin-numeraire/swissknife/pull/331
 [398e89f]: https://github.com/bitcoin-numeraire/swissknife/commit/398e89f
+[#338]: https://github.com/bitcoin-numeraire/swissknife/issues/338

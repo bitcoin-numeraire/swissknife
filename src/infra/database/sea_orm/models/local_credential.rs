@@ -3,16 +3,21 @@
 use sea_orm::entity::prelude::*;
 
 #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
-#[sea_orm(table_name = "auth_identity")]
+#[sea_orm(table_name = "local_credential")]
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
-    pub id: Uuid,
     pub account_id: Uuid,
-    #[sea_orm(unique_key = "idx_auth_identity_provider_subject")]
-    pub provider: String,
-    #[sea_orm(unique_key = "idx_auth_identity_provider_subject")]
-    pub subject: String,
+    #[sea_orm(unique)]
+    pub identity_id: Uuid,
+    #[sea_orm(column_type = "Text", nullable)]
+    pub password_hash: Option<String>,
+    pub enabled: bool,
+    pub revision: Uuid,
+    #[sea_orm(unique)]
+    pub reset_hash: Option<String>,
+    pub reset_expires_at: Option<DateTime>,
     pub created_at: DateTime,
+    pub updated_at: Option<DateTime>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
@@ -25,8 +30,14 @@ pub enum Relation {
         on_delete = "Cascade"
     )]
     Account,
-    #[sea_orm(has_one = "super::local_credential::Entity")]
-    LocalCredential,
+    #[sea_orm(
+        belongs_to = "super::auth_identity::Entity",
+        from = "Column::IdentityId",
+        to = "super::auth_identity::Column::Id",
+        on_update = "NoAction",
+        on_delete = "Cascade"
+    )]
+    AuthIdentity,
 }
 
 impl Related<super::account::Entity> for Entity {
@@ -35,9 +46,9 @@ impl Related<super::account::Entity> for Entity {
     }
 }
 
-impl Related<super::local_credential::Entity> for Entity {
+impl Related<super::auth_identity::Entity> for Entity {
     fn to() -> RelationDef {
-        Relation::LocalCredential.def()
+        Relation::AuthIdentity.def()
     }
 }
 
