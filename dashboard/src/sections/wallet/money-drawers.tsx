@@ -58,7 +58,6 @@ import {
   estimatePaymentFee,
   generateBtcAddress,
   newWalletBtcAddress,
-  type PaymentFeeEstimate,
   estimateWalletPaymentFee,
 } from 'src/lib/swissknife';
 
@@ -69,6 +68,7 @@ import { CopyButton } from 'src/components/copy';
 import { SatsWithIcon } from 'src/components/bitcoin';
 import { useSettingsContext } from 'src/components/settings';
 
+import { useFeeEstimate } from './use-fee-estimate';
 import { getFeeEstimateState } from './fee-estimate';
 import { getReceiveAddressListState } from './receive-address-list';
 
@@ -544,9 +544,7 @@ export function SendMoneyDrawer({
   const [amountUnit, setAmountUnit] = useState<AmountUnit>('sats');
   const [comment, setComment] = useState('');
   const [payment, setPayment] = useState<Payment>();
-  const [feeEstimate, setFeeEstimate] = useState<PaymentFeeEstimate>();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isEstimatingFee, setIsEstimatingFee] = useState(false);
   const [nowMs, setNowMs] = useState(0);
   const [selectedWalletId, setSelectedWalletId] = useState(walletId ?? '');
 
@@ -581,6 +579,23 @@ export function SendMoneyDrawer({
   const amountMSats = amountSats * 1000;
   const amountExceedsAvailable =
     balance != null && amountSats > 0 && amountMSats > Math.max(balance, 0);
+  const activeWalletId = walletId || selectedWalletId || (!isAdmin ? wallet?.id : '');
+  const canSendComment = kind === 'lnurl' || kind === 'lightning-address' || kind === 'internal';
+  const requestBody = useMemo(
+    () => ({
+      input,
+      comment: canSendComment && comment ? comment : null,
+      amount_msat: amountSats && !amountExceedsAvailable ? amountMSats : null,
+    }),
+    [amountExceedsAvailable, amountMSats, amountSats, canSendComment, comment, input]
+  );
+
+  const {
+    feeEstimate,
+    isEstimatingFee,
+    estimate,
+    reset: resetFeeEstimate,
+  } = useFeeEstimate(JSON.stringify([open, activeWalletId, isAdmin, requestBody]));
   const feeEstimateState = getFeeEstimateState(feeEstimate, balance);
   const feeExceedsAvailable = feeEstimateState.exceedsAvailable;
   const canEnterAmount =
@@ -589,11 +604,9 @@ export function SendMoneyDrawer({
     kind !== 'unknown' &&
     !hasInvalidBip21Amount &&
     !hasUnsupportedBip21Params;
-  const activeWalletId = walletId || selectedWalletId || (!isAdmin ? wallet?.id : '');
   const needsWallet = isAdmin && !activeWalletId;
   const hasFiatPrice = (fiatPrices[state.currency] ?? 0) > 0;
   const displayUnit = state.displayUnit ?? 'bip177';
-  const canSendComment = kind === 'lnurl' || kind === 'lightning-address' || kind === 'internal';
   const canShowParsedInput = input.trim().length > 0;
   const canSubmit =
     kind !== 'unknown' &&
@@ -665,29 +678,16 @@ export function SendMoneyDrawer({
     return () => window.clearInterval(interval);
   }, [bolt11ExpiryMs]);
 
-  const requestBody = useMemo(
-    () => ({
-      input,
-      comment: canSendComment && comment ? comment : null,
-      amount_msat: amountSats && !amountExceedsAvailable ? amountMSats : null,
-    }),
-    [amountExceedsAvailable, amountMSats, amountSats, canSendComment, comment, input]
-  );
-
-  useEffect(() => {
-    setFeeEstimate(undefined);
-  }, [activeWalletId, requestBody]);
-
   const handleClose = useCallback(() => {
     setInput('');
     setAmountValue('');
     setAmountUnit('sats');
     setComment('');
     setPayment(undefined);
-    setFeeEstimate(undefined);
+    resetFeeEstimate();
     setSelectedWalletId(walletId ?? '');
     onClose();
-  }, [onClose, walletId]);
+  }, [onClose, resetFeeEstimate, walletId]);
 
   const handlePay = async () => {
     try {
@@ -726,26 +726,29 @@ export function SendMoneyDrawer({
 
   const handleEstimateFee = async () => {
     try {
-      setIsEstimatingFee(true);
-      const { data, error } = isAdmin
-        ? await estimatePaymentFee({ body: { ...requestBody, wallet_id: activeWalletId! } })
-        : await estimateWalletPaymentFee({
-            path: { wallet_id: activeWalletId! },
-            body: {
-              input: requestBody.input,
-              comment: requestBody.comment,
-              amount_msat: requestBody.amount_msat,
-              wallet_id: null,
-            },
-          });
-      if (error) throw error;
-      if (!data) throw new Error(t('send_money.fee_estimate_failed'));
+      await estimate(async (signal) => {
+        const { data, error } = isAdmin
+          ? await estimatePaymentFee({
+              signal,
+              body: { ...requestBody, wallet_id: activeWalletId! },
+            })
+          : await estimateWalletPaymentFee({
+              signal,
+              path: { wallet_id: activeWalletId! },
+              body: {
+                input: requestBody.input,
+                comment: requestBody.comment,
+                amount_msat: requestBody.amount_msat,
+                wallet_id: null,
+              },
+            });
+        if (error) throw error;
+        if (!data) throw new Error(t('send_money.fee_estimate_failed'));
 
-      setFeeEstimate(data);
+        return data;
+      });
     } catch (error) {
       handleActionError(error);
-    } finally {
-      setIsEstimatingFee(false);
     }
   };
 
@@ -753,7 +756,7 @@ export function SendMoneyDrawer({
     setInput('');
     setAmountValue('');
     setComment('');
-    setFeeEstimate(undefined);
+    resetFeeEstimate();
   };
 
   return (
