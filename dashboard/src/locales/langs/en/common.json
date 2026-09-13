@@ -68,7 +68,7 @@
   "event_notifications": {
     "incoming_title": "{{amount}} sats incoming — waiting for confirmation",
     "received_title": "{{amount}} sats received — confirmed",
-    "view_activity": "View activity",
+    "see_details": "See details",
     "rail": {
       "lightning": "Lightning",
       "internal": "Internal",

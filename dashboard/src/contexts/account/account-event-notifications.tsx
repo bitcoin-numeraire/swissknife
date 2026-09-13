@@ -1,18 +1,23 @@
 'use client';
 
+import type { ExternalToast } from 'src/components/snackbar';
 import type { Wallet, ClientEvent } from 'src/lib/swissknife';
 
 import { useRef, useEffect } from 'react';
 
+import Tooltip from '@mui/material/Tooltip';
+import IconButton from '@mui/material/IconButton';
+
 import { paths } from 'src/routes/paths';
-import { useRouter } from 'src/routes/hooks';
+import { RouterLink } from 'src/routes/components';
 
 import { fSats } from 'src/utils/format-number';
 
 import { useTranslate } from 'src/locales';
 import { ClientEventType } from 'src/lib/swissknife';
 
-import { toast } from 'src/components/snackbar';
+import { Iconify } from 'src/components/iconify';
+import { toast, snackbarClasses } from 'src/components/snackbar';
 
 export type InvoiceEventNotification = {
   eventId: string;
@@ -89,7 +94,6 @@ export function useAccountEventNotifications(
   events: readonly ClientEvent[],
   wallets: readonly Wallet[]
 ) {
-  const router = useRouter();
   const { t } = useTranslate();
   const notificationState = useRef<{ accountId?: string; seenEventIds: Set<string> }>({
     seenEventIds: new Set(),
@@ -120,14 +124,26 @@ export function useAccountEventNotifications(
       const description = [notification.walletName, rail, notification.description]
         .filter(Boolean)
         .join(' · ');
-      const options = {
-        id: `invoice-event-${notification.invoiceId}`,
+      const id = `invoice-event-${notification.invoiceId}`;
+      const options: ExternalToast = {
+        id,
         description,
         duration: 12_000,
-        action: {
-          label: t('event_notifications.view_activity'),
-          onClick: () => router.push(paths.activityInvoice(notification.invoiceId)),
-        },
+        position: 'top-center',
+        className: snackbarClasses.payment,
+        action: (
+          <Tooltip title={t('event_notifications.see_details')}>
+            <IconButton
+              component={RouterLink}
+              href={paths.wallet.invoice(notification.invoiceId)}
+              aria-label={t('event_notifications.see_details')}
+              onClick={() => toast.dismiss(id)}
+              sx={{ mr: 3, flexShrink: 0 }}
+            >
+              <Iconify icon="solar:eye-bold" />
+            </IconButton>
+          </Tooltip>
+        ),
       };
 
       if (notification.kind === 'pending') {
@@ -136,5 +152,5 @@ export function useAccountEventNotifications(
         toast.success(title, options);
       }
     }
-  }, [accountId, events, router, t, wallets]);
+  }, [accountId, events, t, wallets]);
 }
