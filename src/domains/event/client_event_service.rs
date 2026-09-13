@@ -2,6 +2,7 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
+use tracing::{debug, trace};
 use uuid::Uuid;
 
 use crate::application::{
@@ -38,6 +39,7 @@ impl ClientEventService {
 #[async_trait]
 impl ClientEventUseCases for ClientEventService {
     async fn latest_id(&self, account_id: Uuid) -> Result<i32, ApplicationError> {
+        trace!(%account_id, "Fetching latest client event cursor");
         let latest_id = self.store.client_event.latest_id(account_id).await?.unwrap_or_default();
         let pruned_through = self.store.client_event.pruned_through().await?;
 
@@ -48,6 +50,7 @@ impl ClientEventUseCases for ClientEventService {
     }
 
     async fn ensure_cursor_available(&self, after_id: i32) -> Result<(), ApplicationError> {
+        trace!(after_id, "Checking client event cursor availability");
         let pruned_through = self.store.client_event.pruned_through().await?;
         if after_id < pruned_through {
             return Err(DataError::Conflict(EXPIRED_CURSOR_MESSAGE.to_string()).into());
@@ -57,6 +60,7 @@ impl ClientEventUseCases for ClientEventService {
     }
 
     async fn list_after(&self, account_id: Uuid, after_id: i32) -> Result<Vec<ClientEvent>, ApplicationError> {
+        trace!(%account_id, after_id, "Listing client events");
         self.ensure_cursor_available(after_id).await?;
         let events = self
             .store
@@ -68,6 +72,9 @@ impl ClientEventUseCases for ClientEventService {
         // partial batch without telling the client to refresh is not.
         self.ensure_cursor_available(after_id).await?;
 
+        if !events.is_empty() {
+            debug!(%account_id, after_id, count = events.len(), "Client events listed successfully");
+        }
         Ok(events)
     }
 
@@ -76,7 +83,12 @@ impl ClientEventUseCases for ClientEventService {
             return Ok(0);
         };
 
-        Ok(self.store.client_event.prune_before(cutoff).await?)
+        trace!(%cutoff, "Pruning expired client events");
+        let pruned = self.store.client_event.prune_before(cutoff).await?;
+        if pruned > 0 {
+            debug!(pruned, "Pruned expired client events");
+        }
+        Ok(pruned)
     }
 }
 

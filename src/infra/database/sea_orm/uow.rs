@@ -1,3 +1,4 @@
+use super::types::NewClientEvent;
 use async_trait::async_trait;
 use sea_orm::{DatabaseConnection, TransactionTrait};
 
@@ -5,7 +6,7 @@ use crate::{
     application::errors::{ApplicationError, DataError, DatabaseError},
     domains::{
         bitcoin::{BtcAddress, BtcAddressRepository, BtcOutput, BtcOutputRepository},
-        event::{ClientEventType, EventProjectionUnitOfWork, NewClientEvent},
+        event::{ClientEventType, EventProjectionUnitOfWork},
         invoice::{Invoice, InvoiceRepository},
         payment::{Payment, PaymentRepository, PaymentStatus, PaymentUnitOfWork},
         wallet::WalletRepository,

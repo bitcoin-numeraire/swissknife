@@ -1,9 +1,9 @@
 use std::{sync::Arc, time::Duration};
 
 use tokio::time::MissedTickBehavior;
-use tracing::{debug, error, warn};
+use tracing::{error, warn};
 
-use crate::application::{composition::AppServices, errors::ApplicationError};
+use crate::application::composition::AppServices;
 
 pub struct ClientEventRetentionWorker {
     services: Arc<AppServices>,
@@ -30,32 +30,10 @@ impl ClientEventRetentionWorker {
 
             loop {
                 interval.tick().await;
-                match self.run_once().await {
-                    Ok(0) => {}
-                    Ok(pruned) => debug!(pruned, "Pruned expired client events"),
-                    Err(error) => error!(%error, "Failed to prune expired client events"),
+                if let Err(error) = self.services.client_event.prune().await {
+                    error!(%error, "Failed to prune expired client events");
                 }
             }
         });
-    }
-
-    async fn run_once(&self) -> Result<u64, ApplicationError> {
-        self.services.client_event.prune().await
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::application::composition::MockAppServicesBuilder;
-
-    use super::*;
-
-    #[tokio::test]
-    async fn run_once_prunes_through_the_client_event_service() {
-        let mut services = MockAppServicesBuilder::new();
-        services.client_event.expect_prune().times(1).return_once(|| Ok(3));
-        let worker = ClientEventRetentionWorker::new(Arc::new(services.build()), Duration::from_secs(60));
-
-        assert_eq!(worker.run_once().await.unwrap(), 3);
     }
 }

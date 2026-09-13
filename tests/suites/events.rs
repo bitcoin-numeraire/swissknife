@@ -378,6 +378,29 @@ mod stream {
     }
 
     #[tokio::test]
+    async fn stream_remains_open_past_request_timeout() {
+        let app = TestApp::isolated(
+            &unique("event-timeout"),
+            &[("SWISSKNIFE_WEB__REQUEST_TIMEOUT", "2s".to_string())],
+        )
+        .await;
+        let account = app
+            .create_account_with_wallet(app.admin_token().await, "event-timeout")
+            .await;
+        let mut stream = app
+            .api()
+            .event_stream("/v1/me/events", Auth::ApiKey(&account.key), None)
+            .await;
+        assert_stream_headers(&stream);
+
+        tokio::time::sleep(Duration::from_secs(3)).await;
+        insert_client_event(&app, account.wallet.id).await;
+
+        let event = next_event(&mut stream).await;
+        assert_eq!(event.payload.wallet_id, account.wallet.id);
+    }
+
+    #[tokio::test]
     async fn expired_replay_cursor_requires_a_rest_reset() {
         let app = TestApp::isolated(
             &unique("event-retention"),

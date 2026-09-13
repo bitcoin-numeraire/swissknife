@@ -1,13 +1,19 @@
 use std::time::Duration;
 
 use chrono::Utc;
+use serde_json::Value;
+use uuid::Uuid;
 
 use crate::{
-    application::composition::Ledger,
+    application::{
+        composition::Ledger,
+        errors::{DataError, DatabaseError},
+    },
     domains::{
         account::{Account, AccountPreferences, ApiKey, AuthIdentity},
         asset::Asset,
         bitcoin::{BtcAddress, BtcOutput},
+        event::{ClientEvent, ClientEventType},
         invoice::{Invoice, InvoiceStatus, LnInvoice},
         ln_address::LnAddress,
         payment::{BtcPayment, InternalPayment, LnPayment, Payment},
@@ -21,8 +27,9 @@ use swissknife_types::OrderDirection;
 use super::models::{
     account::Model as AccountModel, account_preference::Model as AccountPreferenceModel, api_key::Model as ApiKeyModel,
     asset::Model as AssetModel, auth_identity::Model as AuthIdentityModel, btc_address::Model as BitcoinAddressModel,
-    btc_output::Model as BitcoinOutputModel, contact::ContactModel, invoice::Model as InvoiceModel,
-    ln_address::Model as LnAddressModel, payment::Model as PaymentModel, wallet::Model as WalletModel,
+    btc_output::Model as BitcoinOutputModel, client_event::Model as ClientEventModel, contact::ContactModel,
+    invoice::Model as InvoiceModel, ln_address::Model as LnAddressModel, payment::Model as PaymentModel,
+    wallet::Model as WalletModel,
 };
 
 const ASSERTION_MSG: &str = "should parse successfully by assertion";
@@ -276,5 +283,72 @@ impl From<BitcoinAddressModel> for BtcAddress {
             created_at: model.created_at.and_utc(),
             updated_at: model.updated_at.map(|t| t.and_utc()),
         }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub(super) struct NewClientEvent {
+    pub event_type: ClientEventType,
+    pub wallet_id: Uuid,
+    pub resource_id: Uuid,
+    pub data: Value,
+}
+
+impl NewClientEvent {
+    pub fn invoice_pending(invoice: &Invoice) -> Result<Self, DataError> {
+        Ok(Self {
+            event_type: ClientEventType::InvoicePending,
+            wallet_id: invoice.wallet_id,
+            resource_id: invoice.id,
+            data: serde_json::to_value(invoice).map_err(|e| DataError::Inconsistency(e.to_string()))?,
+        })
+    }
+
+    pub fn invoice_paid(invoice: &Invoice) -> Result<Self, DataError> {
+        Ok(Self {
+            event_type: ClientEventType::InvoicePaid,
+            wallet_id: invoice.wallet_id,
+            resource_id: invoice.id,
+            data: serde_json::to_value(invoice).map_err(|e| DataError::Inconsistency(e.to_string()))?,
+        })
+    }
+
+    pub fn payment(payment: &Payment) -> Result<Self, DataError> {
+        let event_type = match payment.status {
+            crate::domains::payment::PaymentStatus::Settled => ClientEventType::PaymentSettled,
+            crate::domains::payment::PaymentStatus::Failed => ClientEventType::PaymentFailed,
+            _ => {
+                return Err(DataError::Inconsistency(format!(
+                    "cannot emit a terminal event for payment {} in status {}",
+                    payment.id, payment.status
+                )))
+            }
+        };
+
+        Ok(Self {
+            event_type,
+            wallet_id: payment.wallet_id,
+            resource_id: payment.id,
+            data: serde_json::to_value(payment).map_err(|e| DataError::Inconsistency(e.to_string()))?,
+        })
+    }
+}
+
+impl TryFrom<ClientEventModel> for ClientEvent {
+    type Error = DatabaseError;
+
+    fn try_from(model: ClientEventModel) -> Result<Self, Self::Error> {
+        let event_type = model.event_type.parse::<ClientEventType>().map_err(|error| {
+            DatabaseError::CorruptedData(format!("client event {} has an unsupported type: {error}", model.id))
+        })?;
+
+        Ok(Self {
+            id: model.id.to_string(),
+            event_type,
+            wallet_id: model.wallet_id,
+            resource_id: model.resource_id,
+            data: model.payload,
+            created_at: model.created_at.and_utc(),
+        })
     }
 }

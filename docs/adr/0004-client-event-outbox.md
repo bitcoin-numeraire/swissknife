@@ -19,7 +19,7 @@ The stream is server-to-client only. Clients never send commands over it; comman
 
 Expose `GET /v1/me/events` as `text/event-stream`.
 
-SSE fits the one-way workload, works through ordinary HTTP infrastructure, and has a standard event cursor. The generated fetch client is used instead of the browser `EventSource` API so JWT and API-key `Authorization` headers remain available. The endpoint is excluded from the normal request timeout, emits a heartbeat every 15 seconds, disables nginx response buffering, and uses the existing permissive CORS policy.
+SSE fits the one-way workload, works through ordinary HTTP infrastructure, and has a standard event cursor. The generated fetch client is used instead of the browser `EventSource` API so JWT and API-key `Authorization` headers remain available. The normal request timeout bounds authentication and initial cursor lookup; it ends once response headers are ready and does not limit the SSE body. The endpoint emits a heartbeat every 15 seconds, disables nginx response buffering, and uses the existing permissive CORS policy.
 
 The authenticated principal must have `read:transaction`. The stream is scoped by the authenticated account and includes events from all wallets owned by that account. Open streams reauthenticate their credentials and permissions every 15 seconds, closing when tokens expire or access is revoked. Every event retains its `wallet_id`, so one connection can drive an account-wide dashboard or client without leaking events across accounts.
 

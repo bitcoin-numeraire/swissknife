@@ -51,8 +51,8 @@ pub struct ClientEventStreamQuery {
 )]
 pub struct ClientEventHandler;
 
-pub fn client_event_router() -> Router<Arc<AppServices>> {
-    Router::new().route("/v1/me/events", get(stream_account_events))
+pub fn router() -> Router<Arc<AppServices>> {
+    Router::new().route("/events", get(stream_account_events))
 }
 
 /// Stream durable events for every wallet owned by the authenticated account.

@@ -8,14 +8,16 @@ use uuid::Uuid;
 
 use crate::{
     application::errors::DatabaseError,
-    domains::event::{ClientEvent, ClientEventRepository, ClientEventType, NewClientEvent},
+    domains::event::{ClientEvent, ClientEventRepository},
     infra::database::sea_orm::models::{
-        client_event::{ActiveModel, Column, Model},
+        client_event::{ActiveModel, Column},
         config,
         prelude::{ClientEvent as ClientEventEntity, Config as ConfigEntity, Wallet as WalletEntity},
         wallet,
     },
 };
+
+use super::super::types::NewClientEvent;
 
 const PRUNED_THROUGH_KEY: &str = "client_event_pruned_through_id";
 
@@ -49,7 +51,10 @@ impl<C> SeaOrmClientEventRepository<C> {
 }
 
 impl SeaOrmClientEventRepository<&DatabaseTransaction> {
-    pub async fn append_event(&self, event: NewClientEvent) -> Result<(), DatabaseError> {
+    pub(in crate::infra::database::sea_orm) async fn append_event(
+        &self,
+        event: NewClientEvent,
+    ) -> Result<(), DatabaseError> {
         lock_client_event_log(self.db).await?;
         ClientEventEntity::insert(ActiveModel {
             wallet_id: Set(event.wallet_id),
@@ -191,25 +196,5 @@ impl ClientEventRepository for SeaOrmClientEventRepository<DatabaseConnection> {
             .map_err(|error| DatabaseError::Transaction(error.to_string()))?;
 
         Ok(deleted.rows_affected)
-    }
-}
-
-impl TryFrom<Model> for ClientEvent {
-    type Error = DatabaseError;
-
-    fn try_from(model: Model) -> Result<Self, Self::Error> {
-        let event_type = model
-            .event_type
-            .parse::<ClientEventType>()
-            .map_err(|error| DatabaseError::FindMany(error.to_string()))?;
-
-        Ok(Self {
-            id: model.id.to_string(),
-            event_type,
-            wallet_id: model.wallet_id,
-            resource_id: model.resource_id,
-            data: model.payload,
-            created_at: model.created_at.and_utc(),
-        })
     }
 }

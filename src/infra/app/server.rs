@@ -25,25 +25,20 @@ pub struct Server {
 
 impl Server {
     pub fn new(adapters: AppAdapters, services: Arc<AppServices>, dashboard_dir: Option<&str>) -> Self {
-        let api_router = Router::new()
+        let router = Router::new()
             .nest("/.well-known", Self::well_known_router())
             .nest("/v1/system", system::router())
             .nest("/lnurlp", lnurl::router())
             .nest("/v1/invoices", invoice::router())
             .nest("/v1/payments", payment::router())
-            .nest("/v1/me", wallet::account_router())
+            .nest("/v1/me", wallet::account_router().merge(event::router()))
             .nest("/v1/wallets", wallet::router())
             .nest("/v1/accounts", account::router())
             .nest("/v1/auth", account::auth_router())
             .nest("/v1/api-keys", account::api_key_router())
             .nest("/v1/lightning-addresses", ln_address::router())
             .nest("/v1/bitcoin/addresses", bitcoin::router())
-            .merge(Scalar::with_url("/docs", merged_openapi()))
-            .layer(adapters.timeout_layer);
-
-        // The request timeout must not wrap the long-lived SSE response. Heartbeats
-        // keep proxies from treating an idle wallet as a dead connection.
-        let router = api_router.merge(event::client_event_router());
+            .merge(Scalar::with_url("/docs", merged_openapi()));
 
         let router = match dashboard_dir {
             Some(dir) => router
@@ -53,6 +48,7 @@ impl Server {
 
         let router = router
             .layer(TraceLayer::new_for_http())
+            .layer(adapters.timeout_layer)
             .layer(CorsLayer::permissive())
             .with_state(services);
 

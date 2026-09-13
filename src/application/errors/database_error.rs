@@ -14,6 +14,9 @@ pub enum DatabaseError {
     #[error("Failed to find multiple resources: {0}")]
     FindMany(String),
 
+    #[error("Corrupted database data: {0}")]
+    CorruptedData(String),
+
     #[error("Failed to find related resources: {0}")]
     FindRelated(String),
 

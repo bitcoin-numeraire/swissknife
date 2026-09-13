@@ -5,6 +5,8 @@
 //! Gated behind `itest` so they stay out of the fast mocked unit run. The DB is
 //! provisioned from `SWISSKNIFE_ITEST_DATABASE`; run via `make test-persistence`.
 
+use super::types::NewClientEvent;
+
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use chrono::Utc;
@@ -18,7 +20,7 @@ use uuid::Uuid;
 use crate::application::composition::Ledger;
 use crate::application::errors::{ApplicationError, DataError};
 use crate::domains::account::{AccountFilter, AccountRepository, ApiKey, ApiKeyRepository, AuthProvider, Permission};
-use crate::domains::event::{ClientEventRepository, ClientEventType, EventProjectionUnitOfWork, NewClientEvent};
+use crate::domains::event::{ClientEventRepository, ClientEventType, EventProjectionUnitOfWork};
 use crate::domains::invoice::{Invoice, InvoiceRepository};
 use crate::domains::ln_address::LnAddressRepository;
 use crate::domains::payment::{LnPayment, Payment, PaymentRepository, PaymentStatus, PaymentUnitOfWork};
