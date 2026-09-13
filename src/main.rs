@@ -14,7 +14,7 @@ use tracing::{debug, error, info};
 
 use crate::application::composition::{AppAdapters, AppServices};
 use crate::infra::{
-    app::{EventListener, Server},
+    app::{ClientEventRetentionWorker, EventListener, Server},
     config::config_rs::load_config,
     logging::tracing::setup_tracing,
 };
@@ -46,6 +46,8 @@ async fn main() {
     };
 
     let services = Arc::new(AppServices::new(config.clone(), adapters.clone()));
+
+    ClientEventRetentionWorker::new(services.clone(), config.client_events.cleanup_interval).start();
 
     let event_listener =
         match EventListener::new(config.clone(), adapters.bitcoin_wallet.clone(), services.clone()).await {

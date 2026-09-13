@@ -5,6 +5,15 @@
       "requestMappings": [
         {
           "requestParam": "client_id",
+          "match": "itest-account",
+          "claims": {
+            "sub": "itest-oauth2-account",
+            "aud": ["https://swissknife.itest/api"],
+            "permissions": []
+          }
+        },
+        {
+          "requestParam": "client_id",
           "match": "itest-full",
           "claims": {
             "sub": "itest-oauth2-full",

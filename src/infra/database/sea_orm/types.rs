@@ -8,6 +8,7 @@ use crate::{
         account::{Account, AccountPreferences, ApiKey, AuthIdentity},
         asset::Asset,
         bitcoin::{BtcAddress, BtcOutput},
+        event::ClientEvent,
         invoice::{Invoice, InvoiceStatus, LnInvoice},
         ln_address::LnAddress,
         payment::{BtcPayment, InternalPayment, LnPayment, Payment},
@@ -21,8 +22,9 @@ use swissknife_types::OrderDirection;
 use super::models::{
     account::Model as AccountModel, account_preference::Model as AccountPreferenceModel, api_key::Model as ApiKeyModel,
     asset::Model as AssetModel, auth_identity::Model as AuthIdentityModel, btc_address::Model as BitcoinAddressModel,
-    btc_output::Model as BitcoinOutputModel, contact::ContactModel, invoice::Model as InvoiceModel,
-    ln_address::Model as LnAddressModel, payment::Model as PaymentModel, wallet::Model as WalletModel,
+    btc_output::Model as BitcoinOutputModel, client_event::Model as ClientEventModel, contact::ContactModel,
+    invoice::Model as InvoiceModel, ln_address::Model as LnAddressModel, payment::Model as PaymentModel,
+    wallet::Model as WalletModel,
 };
 
 const ASSERTION_MSG: &str = "should parse successfully by assertion";
@@ -275,6 +277,19 @@ impl From<BitcoinAddressModel> for BtcAddress {
             used: model.used,
             created_at: model.created_at.and_utc(),
             updated_at: model.updated_at.map(|t| t.and_utc()),
+        }
+    }
+}
+
+impl From<ClientEventModel> for ClientEvent {
+    fn from(model: ClientEventModel) -> Self {
+        Self {
+            id: model.id.to_string(),
+            event_type: model.event_type.parse().expect(ASSERTION_MSG),
+            wallet_id: model.wallet_id,
+            resource_id: model.resource_id,
+            data: model.payload,
+            created_at: model.created_at.and_utc(),
         }
     }
 }

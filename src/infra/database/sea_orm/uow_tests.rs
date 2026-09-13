@@ -10,23 +10,32 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use chrono::Utc;
 use migration::{Migrator, MigratorTrait};
 use sea_orm::{
-    ColumnTrait, ConnectOptions, ConnectionTrait, Database, DatabaseBackend, DatabaseConnection, EntityTrait,
-    QueryFilter, Statement,
+    ActiveModelTrait, ColumnTrait, ConnectOptions, ConnectionTrait, Database, DatabaseBackend, DatabaseConnection,
+    EntityTrait, QueryFilter, Set, Statement, TransactionTrait,
 };
 use uuid::Uuid;
 
 use crate::application::composition::Ledger;
 use crate::application::errors::{ApplicationError, DataError};
 use crate::domains::account::{AccountFilter, AccountRepository, ApiKey, ApiKeyRepository, AuthProvider, Permission};
-use crate::domains::event::EventProjectionUnitOfWork;
+use crate::domains::event::{ClientEventRepository, ClientEventType, EventProjectionUnitOfWork};
 use crate::domains::invoice::{Invoice, InvoiceRepository};
 use crate::domains::ln_address::LnAddressRepository;
 use crate::domains::payment::{LnPayment, Payment, PaymentRepository, PaymentStatus, PaymentUnitOfWork};
-use crate::domains::{asset::AssetRepository, bitcoin::BtcNetwork, wallet::WalletRepository};
+use crate::domains::{
+    asset::AssetRepository,
+    bitcoin::{BtcAddressRepository, BtcAddressType, BtcNetwork, BtcOutput, BtcOutputStatus},
+    wallet::WalletRepository,
+};
 
-use super::models::{prelude::Wallet, wallet};
+use super::models::{
+    client_event,
+    prelude::{ClientEvent as ClientEventEntity, Wallet},
+    wallet,
+};
 use super::{
-    SeaOrmAccountRepository, SeaOrmApiKeyRepository, SeaOrmAssetRepository, SeaOrmEventProjectionUnitOfWork,
+    NewClientEvent, SeaOrmAccountRepository, SeaOrmApiKeyRepository, SeaOrmAssetRepository,
+    SeaOrmBitcoinAddressRepository, SeaOrmClientEventRepository, SeaOrmEventProjectionUnitOfWork,
     SeaOrmInvoiceRepository, SeaOrmLnAddressRepository, SeaOrmPaymentRepository, SeaOrmPaymentUnitOfWork,
     SeaOrmWalletRepository,
 };
@@ -115,6 +124,15 @@ async fn balance(conn: &DatabaseConnection, wallet_id: Uuid) -> (i64, i64) {
         .await
         .expect("query balance");
     row.map(|r| (r.available_amount, r.reserved_amount)).unwrap_or((0, 0))
+}
+
+async fn account_id(conn: &DatabaseConnection, wallet_id: Uuid) -> Uuid {
+    Wallet::find_by_id(wallet_id)
+        .one(conn)
+        .await
+        .expect("query wallet")
+        .expect("wallet exists")
+        .account_id
 }
 
 /// An outgoing Lightning payment with a unique payment hash.
@@ -255,6 +273,9 @@ async fn postgres_migrates_legacy_oauth2_wallet_data() {
                 'idx_auth_identity_provider_subject',
                 'idx_btc_address_wallet_used',
                 'idx_btc_output_txid_output_index',
+                'idx_client_event_created_at',
+                'idx_client_event_type_resource',
+                'idx_client_event_wallet_id',
                 'idx_invoice_btc_output_id',
                 'idx_invoice_ln_address_id',
                 'idx_invoice_wallet_created_at',
@@ -267,7 +288,7 @@ async fn postgres_migrates_legacy_oauth2_wallet_data() {
             "#,
         )
         .await,
-        14
+        17
     );
 }
 
@@ -552,6 +573,138 @@ async fn duplicate_fail_does_not_double_release() {
     let second = uow(&conn).fail(payment).await.expect("second fail");
     assert_eq!(second.status, PaymentStatus::Failed);
     assert_eq!(balance(&conn, wallet).await, (200_000, 0));
+
+    let events = SeaOrmClientEventRepository::new(conn.clone())
+        .find_after(account_id(&conn, wallet).await, 0, 10)
+        .await
+        .expect("read events");
+    assert_eq!(events.len(), 1);
+    assert_eq!(events[0].event_type, ClientEventType::PaymentFailed);
+    assert_eq!(events[0].resource_id, first.id);
+}
+
+#[tokio::test]
+async fn client_events_are_account_scoped_and_pruned_with_a_durable_watermark() {
+    let conn = connect().await;
+    let first_wallet = seed_wallet(&conn, 200_000).await;
+    let second_wallet = seed_wallet(&conn, 200_000).await;
+    let third_wallet = seed_wallet(&conn, 200_000).await;
+
+    for wallet in [first_wallet, second_wallet, third_wallet] {
+        let mut payment = uow(&conn)
+            .reserve(pending_payment(wallet, 10_000, 0), 10_000)
+            .await
+            .expect("reserve payment");
+        payment.status = PaymentStatus::Failed;
+        uow(&conn).fail(payment).await.expect("fail payment");
+    }
+
+    let first_account = account_id(&conn, first_wallet).await;
+    let second_account = account_id(&conn, second_wallet).await;
+    let third_account = account_id(&conn, third_wallet).await;
+    let repo = SeaOrmClientEventRepository::new(conn.clone());
+    let first_events = repo.find_after(first_account, 0, 10).await.expect("first events");
+    let second_events = repo.find_after(second_account, 0, 10).await.expect("second events");
+    let third_events = repo.find_after(third_account, 0, 10).await.expect("third events");
+    assert_eq!(first_events.len(), 1);
+    assert_eq!(first_events[0].wallet_id, first_wallet);
+    assert_eq!(second_events.len(), 1);
+    assert_eq!(second_events[0].wallet_id, second_wallet);
+    assert_eq!(third_events.len(), 1);
+    assert_eq!(third_events[0].wallet_id, third_wallet);
+
+    let first_id = first_events[0].id.parse::<i32>().expect("numeric event ID");
+    let second_id = second_events[0].id.parse::<i32>().expect("numeric event ID");
+    for (event_id, age) in [(first_id, 3), (second_id, 2)] {
+        let model = ClientEventEntity::find_by_id(event_id)
+            .one(&conn)
+            .await
+            .expect("query event")
+            .expect("event exists");
+        let mut model: client_event::ActiveModel = model.into();
+        model.created_at = Set((Utc::now() - chrono::Duration::days(age)).naive_utc());
+        model.update(&conn).await.expect("age event");
+    }
+
+    let older_only = repo.clone();
+    let all_expired = repo.clone();
+    let (older_count, all_count) = tokio::join!(
+        older_only.prune_before(Utc::now() - chrono::Duration::hours(60)),
+        all_expired.prune_before(Utc::now() - chrono::Duration::days(1)),
+    );
+    assert_eq!(
+        older_count.expect("prune oldest events") + all_count.expect("prune all expired events"),
+        2
+    );
+    assert_eq!(repo.pruned_through().await.expect("read prune watermark"), second_id);
+    assert!(repo
+        .find_after(first_account, 0, 10)
+        .await
+        .expect("first account after prune")
+        .is_empty());
+    assert!(repo
+        .find_after(second_account, 0, 10)
+        .await
+        .expect("second account after prune")
+        .is_empty());
+    assert_eq!(
+        repo.find_after(third_account, 0, 10)
+            .await
+            .expect("third account after prune")
+            .len(),
+        1,
+        "retention must leave newer events intact"
+    );
+}
+
+#[tokio::test]
+async fn concurrent_event_appends_preserve_commit_order() {
+    let conn = connect().await;
+    let wallet = seed_wallet(&conn, 0).await;
+    let account = account_id(&conn, wallet).await;
+    let first_resource = Uuid::new_v4();
+    let second_resource = Uuid::new_v4();
+    let event = |resource_id| NewClientEvent {
+        wallet_id: wallet,
+        resource_id,
+        event_type: ClientEventType::PaymentFailed,
+        data: serde_json::json!({}),
+    };
+    let first = conn.begin().await.unwrap();
+    SeaOrmClientEventRepository::new(&first)
+        .append_event(event(first_resource))
+        .await
+        .unwrap();
+    let second_event = event(second_resource);
+    let second_conn = conn.clone();
+    let mut second = tokio::spawn(async move {
+        let txn = second_conn.begin().await.unwrap();
+        SeaOrmClientEventRepository::new(&txn)
+            .append_event(second_event)
+            .await
+            .unwrap();
+        txn.commit().await.unwrap();
+    });
+
+    assert!(
+        tokio::time::timeout(std::time::Duration::from_millis(100), &mut second)
+            .await
+            .is_err(),
+        "a later event must not commit before the earlier cursor"
+    );
+    first.commit().await.unwrap();
+    tokio::time::timeout(std::time::Duration::from_secs(5), second)
+        .await
+        .unwrap()
+        .unwrap();
+    let events = SeaOrmClientEventRepository::new(conn)
+        .find_after(account, 0, 10)
+        .await
+        .unwrap();
+    assert_eq!(
+        events.iter().map(|event| event.resource_id).collect::<Vec<_>>(),
+        vec![first_resource, second_resource]
+    );
 }
 
 #[tokio::test]
@@ -618,6 +771,15 @@ async fn duplicate_settle_does_not_double_debit() {
     let second = uow(&conn).settle(payment).await.expect("second settle");
     assert_eq!(second.status, PaymentStatus::Settled);
     assert_eq!(balance(&conn, wallet).await, (99_000, 0));
+
+    let events = SeaOrmClientEventRepository::new(conn.clone())
+        .find_after(account_id(&conn, wallet).await, 0, 10)
+        .await
+        .expect("read events");
+    assert_eq!(events.len(), 1);
+    assert_eq!(events[0].event_type, ClientEventType::PaymentSettled);
+    assert_eq!(events[0].resource_id, first.id);
+    assert_eq!(events[0].data["status"], "Settled");
 }
 
 #[tokio::test]
@@ -668,6 +830,20 @@ async fn settle_internal_is_atomic() {
     assert_eq!(settled.status, PaymentStatus::Settled);
     assert_eq!(balance(&conn, payer).await, (150_000, 0), "payer debited");
     assert_eq!(balance(&conn, payee).await, (50_000, 0), "payee credited");
+
+    let event_repo = SeaOrmClientEventRepository::new(conn.clone());
+    let payer_events = event_repo
+        .find_after(account_id(&conn, payer).await, 0, 10)
+        .await
+        .expect("payer events");
+    let payee_events = event_repo
+        .find_after(account_id(&conn, payee).await, 0, 10)
+        .await
+        .expect("payee events");
+    assert_eq!(payer_events.len(), 1);
+    assert_eq!(payer_events[0].event_type, ClientEventType::PaymentSettled);
+    assert_eq!(payee_events.len(), 1);
+    assert_eq!(payee_events[0].event_type, ClientEventType::InvoicePaid);
 }
 
 #[tokio::test]
@@ -755,4 +931,84 @@ async fn settle_incoming_invoice_credits_once_under_replay() {
         (30_000, 0),
         "no double credit on replay"
     );
+
+    let events = SeaOrmClientEventRepository::new(conn.clone())
+        .find_after(account_id(&conn, receiver).await, 0, 10)
+        .await
+        .expect("read events");
+    assert_eq!(events.len(), 1);
+    assert_eq!(events[0].event_type, ClientEventType::InvoicePaid);
+}
+
+#[tokio::test]
+async fn onchain_deposit_emits_pending_then_paid_once() {
+    let conn = connect().await;
+    let receiver = seed_wallet(&conn, 0).await;
+    let address = SeaOrmBitcoinAddressRepository::new(conn.clone())
+        .insert(receiver, "bcrt1qeventdeposit", BtcAddressType::P2wpkh)
+        .await
+        .expect("insert deposit address");
+    let projection = SeaOrmEventProjectionUnitOfWork::new(conn.clone());
+    let unconfirmed_output = BtcOutput {
+        outpoint: "event-deposit-tx:0".to_string(),
+        txid: "event-deposit-tx".to_string(),
+        address: address.address.clone(),
+        amount_sat: 30,
+        status: BtcOutputStatus::Unconfirmed,
+        ..Default::default()
+    };
+    let pending = Invoice {
+        wallet_id: receiver,
+        amount_msat: Some(30_000),
+        ledger: Ledger::Onchain,
+        description: Some("Bitcoin On-chain deposit".to_string()),
+        ..Default::default()
+    };
+
+    let stored = projection
+        .project_onchain_deposit(unconfirmed_output.clone(), address.clone(), pending.clone())
+        .await
+        .expect("project pending deposit");
+    assert_eq!(stored.status, crate::domains::invoice::InvoiceStatus::Pending);
+    assert_eq!(balance(&conn, receiver).await, (0, 0));
+
+    // Replaying the same mempool observation updates the projection without
+    // emitting a duplicate pending event.
+    projection
+        .project_onchain_deposit(unconfirmed_output.clone(), address.clone(), pending.clone())
+        .await
+        .expect("replay pending deposit");
+
+    let mut confirmed_output = unconfirmed_output;
+    confirmed_output.status = BtcOutputStatus::Confirmed;
+    confirmed_output.block_height = Some(42);
+    let mut confirmed = pending;
+    confirmed.amount_received_msat = Some(30_000);
+    confirmed.payment_time = Some(Utc::now());
+    let settled = projection
+        .project_onchain_deposit(confirmed_output.clone(), address.clone(), confirmed.clone())
+        .await
+        .expect("confirm deposit");
+    assert_eq!(settled.status, crate::domains::invoice::InvoiceStatus::Settled);
+    assert_eq!(balance(&conn, receiver).await, (30_000, 0));
+
+    // A confirmed replay neither credits nor emits twice.
+    projection
+        .project_onchain_deposit(confirmed_output, address, confirmed)
+        .await
+        .expect("replay confirmed deposit");
+    assert_eq!(balance(&conn, receiver).await, (30_000, 0));
+
+    let events = SeaOrmClientEventRepository::new(conn.clone())
+        .find_after(account_id(&conn, receiver).await, 0, 10)
+        .await
+        .expect("read events");
+    assert_eq!(events.len(), 2);
+    assert_eq!(events[0].event_type, ClientEventType::InvoicePending);
+    assert_eq!(events[0].resource_id, stored.id);
+    assert_eq!(events[0].data["status"], "Pending");
+    assert_eq!(events[0].data["bitcoin_output"]["status"], "Unconfirmed");
+    assert_eq!(events[1].event_type, ClientEventType::InvoicePaid);
+    assert_eq!(events[1].resource_id, stored.id);
+    assert_eq!(events[1].data["status"], "Settled");
 }

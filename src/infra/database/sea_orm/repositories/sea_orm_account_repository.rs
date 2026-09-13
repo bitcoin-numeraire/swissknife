@@ -195,28 +195,26 @@ impl AccountRepository for SeaOrmAccountRepository {
     }
 
     async fn find_many(&self, filter: AccountFilter) -> Result<Vec<Account>, DatabaseError> {
-        let models = AccountEntity::find()
+        let rows = AccountEntity::find()
             .apply_if(filter.ids, |query, ids| query.filter(account::Column::Id.is_in(ids)))
             .order_by(account::Column::CreatedAt, sea_order(&filter.order_direction))
             .offset(filter.offset)
             .limit(filter.limit)
+            .find_also_related(AccountPreference)
             .all(&self.db)
             .await
             .map_err(|e| DatabaseError::FindMany(e.to_string()))?;
 
-        if models.is_empty() {
+        if rows.is_empty() {
             return Ok(Vec::new());
         }
 
+        let (models, preferences): (Vec<_>, Vec<_>) = rows.into_iter().unzip();
         let identities = models
             .load_many(
                 AuthIdentity::find().order_by_asc(auth_identity::Column::CreatedAt),
                 &self.db,
             )
-            .await
-            .map_err(|e| DatabaseError::FindRelated(e.to_string()))?;
-        let preferences = models
-            .load_one(AccountPreference, &self.db)
             .await
             .map_err(|e| DatabaseError::FindRelated(e.to_string()))?;
         let wallet_models = models

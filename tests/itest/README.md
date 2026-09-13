@@ -83,6 +83,12 @@ The matrix dimensions are selected via `SWISSKNIFE_ITEST_DATABASE`
 (`sqlite` \| `postgres`) and `SWISSKNIFE_ITEST_PROVIDER`
 (`lnd_grpc` \| `lnd_rest` \| `cln_grpc` \| `cln_rest`).
 
+Every compose host port is overridable with a `SWISSKNIFE_ITEST_*_PORT`
+variable. When another regtest environment is already using the defaults, also
+override the corresponding SwissKnife endpoint (for example
+`SWISSKNIFE_LND_GRPC_CONFIG__ENDPOINT`) and the test helper endpoint
+(`SWISSKNIFE_ITEST_BITCOIN_RPC_URL` or the Postgres URLs).
+
 ### OAuth2 / OIDC
 
 The `oauth2` suite spins up a *second* instance configured with

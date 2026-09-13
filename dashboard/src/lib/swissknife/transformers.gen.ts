@@ -42,6 +42,7 @@ import type {
   RegisterAddressResponse,
   RegisterWalletResponse,
   ReplaceAccountPermissionsResponse,
+  StreamAccountEventsResponse,
   UpdateAccountAddressResponse,
   UpdateAccountByIdResponse,
   UpdateAccountPreferencesResponse,
@@ -319,6 +320,18 @@ export const getAccountApiKeyResponseTransformer = async (
   data: any
 ): Promise<GetAccountApiKeyResponse> => {
   data = apiKeySchemaResponseTransformer(data);
+  return data;
+};
+
+const clientEventSchemaResponseTransformer = (data: any) => {
+  data.created_at = new Date(data.created_at);
+  return data;
+};
+
+export const streamAccountEventsResponseTransformer = async (
+  data: any
+): Promise<StreamAccountEventsResponse> => {
+  data = clientEventSchemaResponseTransformer(data);
   return data;
 };
 

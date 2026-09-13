@@ -310,10 +310,24 @@ wait_for_cln_synced() {
 # under test, the other acts as a counterparty with both inbound and outbound
 # liquidity, so real invoice/pay/receive flows work for every provider.
 ensure_channel() {
-  local existing
+  local existing cln_id deadline
   existing=$(lnd_cli listchannels 2>/dev/null \
     | python3 -c 'import sys,json; print(len(json.load(sys.stdin).get("channels",[])))' 2>/dev/null || echo 0)
+  cln_id=$(cln_cli getinfo | python3 -c 'import sys,json; print(json.load(sys.stdin)["id"])')
   if [[ "${existing}" -ge 1 ]]; then
+    # A persisted channel can be normal but inactive immediately after the
+    # containers restart. Reconnect and wait instead of treating the row's
+    # existence as payment readiness.
+    deadline=$((SECONDS + 120))
+    until [[ "$(lnd_cli listchannels 2>/dev/null \
+      | python3 -c 'import sys,json; print(sum(1 for c in json.load(sys.stdin).get("channels",[]) if c.get("active")))' 2>/dev/null || echo 0)" -ge 1 ]]; do
+      if (( SECONDS >= deadline )); then
+        echo "Persisted LND<->CLN channel did not become active" >&2
+        return 1
+      fi
+      lnd_cli connect "${cln_id}@cln:9736" >/dev/null 2>&1 || true
+      sleep 2
+    done
     return
   fi
 
@@ -325,7 +339,7 @@ ensure_channel() {
   bitcoin_cli -rpcwallet=miner sendtoaddress "${lnd_addr}" 1 >/dev/null
   bitcoin_cli -rpcwallet=miner generatetoaddress 6 "${miner_addr}" >/dev/null
 
-  local deadline=$((SECONDS + 120))
+  deadline=$((SECONDS + 120))
   until [[ "$(lnd_cli walletbalance 2>/dev/null \
     | python3 -c 'import sys,json; print(json.load(sys.stdin).get("confirmed_balance","0"))' 2>/dev/null || echo 0)" != "0" ]]; do
     if (( SECONDS >= deadline )); then
@@ -338,8 +352,6 @@ ensure_channel() {
 
   wait_for_cln_synced
 
-  local cln_id
-  cln_id=$(cln_cli getinfo | python3 -c 'import sys,json; print(json.load(sys.stdin)["id"])')
   lnd_cli connect "${cln_id}@cln:9736" >/dev/null 2>&1 || true
   lnd_cli openchannel --node_key="${cln_id}" --local_amt=5000000 --push_amt=2500000 >/dev/null
 
