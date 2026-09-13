@@ -235,7 +235,7 @@ describe('account event connection lifecycle', () => {
 });
 
 describe('stream authorization recovery', () => {
-  it.each([401, 403])('revalidates REST auth and permissions after HTTP %i', async (status) => {
+  it.each([401, 403])('revalidates REST authentication after HTTP %i', async (status) => {
     const controller = new AbortController();
     const cancel = vi.fn();
     const response = new Response(new ReadableStream({ cancel }), { status });

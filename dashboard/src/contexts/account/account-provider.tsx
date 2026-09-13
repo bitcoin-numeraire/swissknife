@@ -9,12 +9,7 @@ import { useRef, useMemo, useState, useEffect, useCallback } from 'react';
 import { useColorScheme } from '@mui/material/styles';
 
 import { endpointKeys } from 'src/actions/keys';
-import {
-  Permission,
-  getAccount,
-  getAccountWallet,
-  updateAccountPreferences,
-} from 'src/lib/swissknife';
+import { getAccount, getAccountWallet, updateAccountPreferences } from 'src/lib/swissknife';
 
 import { defaultSettings, useSettingsContext } from 'src/components/settings';
 
@@ -43,10 +38,7 @@ export function AccountProvider({ children }: AccountProviderProps) {
   });
   const account = accountResult.data;
   const wallets = useMemo(() => account?.wallets ?? [], [account?.wallets]);
-  const recentClientEvents = useAccountEventStream(
-    account?.id,
-    account?.permissions?.includes(Permission.READ_TRANSACTION) ?? false
-  );
+  const recentClientEvents = useAccountEventStream(account?.id);
   useAccountEventNotifications(account?.id, recentClientEvents, wallets);
 
   useEffect(() => {

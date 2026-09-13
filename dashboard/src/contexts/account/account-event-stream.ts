@@ -85,7 +85,7 @@ export function createAccountEventFetch(
     if ((response.status === 401 || response.status === 403) && !signal.aborted) {
       await response.body?.cancel();
       // REST revalidation runs the auth error interceptors omitted by the SSE
-      // client, and refreshes account permissions after access is revoked.
+      // client, and refreshes account state after access is revoked.
       await onOpen();
       return response;
     }
@@ -180,12 +180,12 @@ export async function consumeAccountEventStreams({
   }
 }
 
-export function useAccountEventStream(accountId: string | undefined, enabled: boolean) {
+export function useAccountEventStream(accountId: string | undefined) {
   const { mutate } = useSWRConfig();
   const [recentEvents, setRecentEvents] = useState<RecentClientEvents>();
 
   useEffect(() => {
-    if (!accountId || !enabled) return undefined;
+    if (!accountId) return undefined;
 
     const controller = new AbortController();
     const refreshCachedState = (event?: ClientEvent) =>
@@ -237,8 +237,8 @@ export function useAccountEventStream(accountId: string | undefined, enabled: bo
     });
 
     return () => controller.abort();
-  }, [accountId, enabled, mutate]);
+  }, [accountId, mutate]);
 
-  if (!enabled || !accountId || recentEvents?.accountId !== accountId) return NO_CLIENT_EVENTS;
+  if (!accountId || recentEvents?.accountId !== accountId) return NO_CLIENT_EVENTS;
   return recentEvents.events;
 }
