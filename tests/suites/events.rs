@@ -435,7 +435,7 @@ mod stream {
     async fn stream_remains_open_past_request_timeout() {
         let app = TestApp::isolated(
             &unique("event-timeout"),
-            &[("SWISSKNIFE_WEB__REQUEST_TIMEOUT", "2s".to_string())],
+            &[("SWISSKNIFE_WEB__REQUEST_TIMEOUT", "5s".to_string())],
         )
         .await;
         let account = ordinary_account(&app, "event-timeout").await;
@@ -445,7 +445,7 @@ mod stream {
             .await;
         assert_stream_headers(&stream);
 
-        tokio::time::sleep(Duration::from_secs(3)).await;
+        tokio::time::sleep(Duration::from_secs(6)).await;
         insert_client_event(&app, account.wallet.id).await;
 
         let event = next_event(&mut stream).await;
