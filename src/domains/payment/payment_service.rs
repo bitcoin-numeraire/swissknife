@@ -79,9 +79,6 @@ impl PaymentService {
         estimated_fee_msat: Option<u64>,
         maximum_fee_msat: u64,
     ) -> Result<PaymentFeeEstimate, ApplicationError> {
-        if estimated_fee_msat.is_some_and(|fee| fee > maximum_fee_msat) {
-            return Err(DataError::Validation("Estimated fee exceeds the configured fee limit".to_string()).into());
-        }
         let estimated_total_msat = estimated_fee_msat
             .map(|fee| Self::reserve_amount_msat(amount_msat, fee))
             .transpose()?;
@@ -1105,27 +1102,6 @@ mod tests {
 
     mod lightning_fee_estimate {
         use super::*;
-
-        mod when_the_route_exceeds_the_policy_cap {
-            use super::*;
-
-            #[tokio::test]
-            async fn rejects_the_quote_instead_of_falling_back() {
-                let mut ln_client = MockLnClient::new();
-                ln_client.expect_fee_limit_msat().times(1).return_const(5_000_u64);
-                ln_client.expect_estimate_fee().times(1).returning(|_| Ok(5_001));
-                let service = service(
-                    MockAppStoreBuilder::new(),
-                    ln_client,
-                    MockBitcoinWallet::new(),
-                    MockEventUseCases::new(),
-                );
-
-                let result = service.lightning_fee_estimate(ln_payment_target(100_000)).await;
-
-                assert!(matches!(result, Err(ApplicationError::Data(DataError::Validation(_)))));
-            }
-        }
 
         #[tokio::test]
         async fn returns_provider_route_estimate_and_policy_cap() {

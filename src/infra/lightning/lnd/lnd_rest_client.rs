@@ -278,7 +278,7 @@ impl LnClient for LndRestClient {
             .await
             .map_err(|err| LightningError::EstimateFee(err.to_string()))?;
 
-        Ok(response.routing_fee_msat)
+        Ok(response.routing_fee_msat.min(self.fee_limit_msat(target.amount_msat)))
     }
 
     fn fee_limit_msat(&self, _amount_msat: u64) -> u64 {

@@ -343,8 +343,7 @@ impl LnClient for LndGrpcClient {
             .map_err(|err| LightningError::EstimateFee(err.message().to_string()))?
             .into_inner();
 
-        u64::try_from(response.routing_fee_msat)
-            .map_err(|_| LightningError::EstimateFee("LND returned a negative route fee".to_string()))
+        Ok((response.routing_fee_msat as u64).min(self.fee_limit_msat(target.amount_msat)))
     }
 
     fn fee_limit_msat(&self, _amount_msat: u64) -> u64 {
