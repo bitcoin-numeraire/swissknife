@@ -135,6 +135,7 @@ function CollapsibleTableRow({ row }: CollapsibleTableRowProps) {
               size="small"
               color={collapsible.value ? 'inherit' : 'default'}
               onClick={collapsible.onToggle}
+              aria-label={t('api_key_list.scopes')}
             >
               <Iconify
                 icon={
@@ -154,7 +155,11 @@ function CollapsibleTableRow({ row }: CollapsibleTableRowProps) {
         <TableCell>{fFromNow(row.created_at)}</TableCell>
         <TableCell>{row.expires_at ? fFromNow(row.expires_at) : t('api_key_list.never')}</TableCell>
         <TableCell>
-          <IconButton color={popover.open ? 'inherit' : 'default'} onClick={popover.onOpen}>
+          <IconButton
+            aria-label={t('developers.actions')}
+            color={popover.open ? 'inherit' : 'default'}
+            onClick={popover.onOpen}
+          >
             <Iconify icon="eva:more-vertical-fill" />
           </IconButton>
         </TableCell>

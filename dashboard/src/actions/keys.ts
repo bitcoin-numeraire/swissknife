@@ -1,4 +1,5 @@
 export const endpointKeys = {
+  webhooks: 'webhooks',
   mempoolSpace: {
     prices: 'mempoolSpacePrices',
   },

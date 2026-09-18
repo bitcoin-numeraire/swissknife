@@ -8,7 +8,9 @@
           "match": "itest-account",
           "claims": {
             "sub": "itest-oauth2-account",
-            "aud": ["https://swissknife.itest/api"],
+            "aud": [
+              "https://swissknife.itest/api"
+            ],
             "permissions": []
           }
         },
@@ -17,7 +19,9 @@
           "match": "itest-full",
           "claims": {
             "sub": "itest-oauth2-full",
-            "aud": ["https://swissknife.itest/api"],
+            "aud": [
+              "https://swissknife.itest/api"
+            ],
             "permissions": [
               "read:account",
               "write:account",
@@ -32,7 +36,9 @@
               "read:api_key",
               "write:api_key",
               "read:btc_address",
-              "write:btc_address"
+              "write:btc_address",
+              "read:webhook",
+              "write:webhook"
             ]
           }
         },
@@ -41,8 +47,12 @@
           "match": "itest-readonly",
           "claims": {
             "sub": "itest-oauth2-readonly",
-            "aud": ["https://swissknife.itest/api"],
-            "permissions": ["read:wallet"]
+            "aud": [
+              "https://swissknife.itest/api"
+            ],
+            "permissions": [
+              "read:wallet"
+            ]
           }
         },
         {
@@ -50,8 +60,12 @@
           "match": "itest-concurrent",
           "claims": {
             "sub": "itest-oauth2-concurrent",
-            "aud": ["https://swissknife.itest/api"],
-            "permissions": ["read:wallet"]
+            "aud": [
+              "https://swissknife.itest/api"
+            ],
+            "permissions": [
+              "read:wallet"
+            ]
           }
         },
         {
@@ -59,8 +73,51 @@
           "match": "itest-wrong-aud",
           "claims": {
             "sub": "itest-oauth2-wrong-aud",
-            "aud": ["https://wrong.audience.itest/api"],
-            "permissions": ["read:wallet"]
+            "aud": [
+              "https://wrong.audience.itest/api"
+            ],
+            "permissions": [
+              "read:wallet"
+            ]
+          }
+        },
+        {
+          "requestParam": "client_id",
+          "match": "itest-webhooks-read",
+          "claims": {
+            "sub": "itest-webhooks-read",
+            "aud": [
+              "https://swissknife.itest/api"
+            ],
+            "permissions": [
+              "read:webhook",
+              "read:api_key"
+            ]
+          }
+        },
+        {
+          "requestParam": "client_id",
+          "match": "itest-webhooks-write",
+          "claims": {
+            "sub": "itest-webhooks-write",
+            "aud": [
+              "https://swissknife.itest/api"
+            ],
+            "permissions": [
+              "write:webhook",
+              "write:api_key"
+            ]
+          }
+        },
+        {
+          "requestParam": "client_id",
+          "match": "itest-webhooks-other",
+          "claims": {
+            "sub": "itest-webhooks-other",
+            "aud": [
+              "https://swissknife.itest/api"
+            ],
+            "permissions": []
           }
         }
       ]
