@@ -60,7 +60,9 @@ export const paths = {
     activityHref('invoice', id, scope),
   identity: '/identity',
   build: {
-    apiKeys: '/build/api-keys',
+    apiKeys: '/developers?tab=api-keys',
+    developers: '/developers',
+    webhooks: '/developers?tab=webhooks',
   },
   onboarding: {
     welcome: '/welcome',

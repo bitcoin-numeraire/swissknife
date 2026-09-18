@@ -23,7 +23,9 @@ import type {
   GetWalletInvoiceResponse,
   GetWalletPaymentResponse,
   GetWalletResponse,
+  GetWebhookDeliveryResponse,
   GetWebhookResponse,
+  GetWebhookSubscriptionDeliveryResponse,
   GetWebhookSubscriptionResponse,
   ListAccountApiKeysResponse,
   ListAccountsResponse,
@@ -51,6 +53,10 @@ import type {
   RegisterAddressResponse,
   RegisterWalletResponse,
   ReplaceAccountPermissionsResponse,
+  RetryWebhookDeliveryResponse,
+  RetryWebhookSubscriptionDeliveryResponse,
+  SendWebhookSubscriptionTestResponse,
+  SendWebhookTestResponse,
   StreamAccountEventsResponse,
   UpdateAccountAddressResponse,
   UpdateAccountByIdResponse,
@@ -505,6 +511,9 @@ const webhookDeliverySchemaResponseTransformer = (data: any) => {
   if (data.delivered_at) {
     data.delivered_at = new Date(data.delivered_at);
   }
+  if (data.next_attempt_at) {
+    data.next_attempt_at = new Date(data.next_attempt_at);
+  }
   if (data.updated_at) {
     data.updated_at = new Date(data.updated_at);
   }
@@ -515,6 +524,38 @@ export const listWebhookDeliveriesResponseTransformer = async (
   data: any
 ): Promise<ListWebhookDeliveriesResponse> => {
   data = data.map((item: any) => webhookDeliverySchemaResponseTransformer(item));
+  return data;
+};
+
+const webhookPayloadSchemaResponseTransformer = (data: any) => {
+  data.created_at = new Date(data.created_at);
+  return data;
+};
+
+const webhookDeliveryDetailsSchemaResponseTransformer = (data: any) => {
+  data = webhookDeliverySchemaResponseTransformer(data);
+  data.payload = webhookPayloadSchemaResponseTransformer(data.payload);
+  return data;
+};
+
+export const getWebhookDeliveryResponseTransformer = async (
+  data: any
+): Promise<GetWebhookDeliveryResponse> => {
+  data = webhookDeliveryDetailsSchemaResponseTransformer(data);
+  return data;
+};
+
+export const retryWebhookDeliveryResponseTransformer = async (
+  data: any
+): Promise<RetryWebhookDeliveryResponse> => {
+  data = webhookDeliverySchemaResponseTransformer(data);
+  return data;
+};
+
+export const sendWebhookTestResponseTransformer = async (
+  data: any
+): Promise<SendWebhookTestResponse> => {
+  data = webhookDeliverySchemaResponseTransformer(data);
   return data;
 };
 
@@ -610,5 +651,26 @@ export const listWebhookSubscriptionDeliveriesResponseTransformer = async (
   data: any
 ): Promise<ListWebhookSubscriptionDeliveriesResponse> => {
   data = data.map((item: any) => webhookDeliverySchemaResponseTransformer(item));
+  return data;
+};
+
+export const getWebhookSubscriptionDeliveryResponseTransformer = async (
+  data: any
+): Promise<GetWebhookSubscriptionDeliveryResponse> => {
+  data = webhookDeliveryDetailsSchemaResponseTransformer(data);
+  return data;
+};
+
+export const retryWebhookSubscriptionDeliveryResponseTransformer = async (
+  data: any
+): Promise<RetryWebhookSubscriptionDeliveryResponse> => {
+  data = webhookDeliverySchemaResponseTransformer(data);
+  return data;
+};
+
+export const sendWebhookSubscriptionTestResponseTransformer = async (
+  data: any
+): Promise<SendWebhookSubscriptionTestResponse> => {
+  data = webhookDeliverySchemaResponseTransformer(data);
   return data;
 };

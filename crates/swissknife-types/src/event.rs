@@ -133,6 +133,15 @@ pub struct WebhookDelivery {
     pub id: Uuid,
     pub subscription_id: Uuid,
     pub event_id: String,
+    pub event_type: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub resource_id: Option<Uuid>,
+    /// Next scheduled attempt, only while pending.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub next_attempt_at: Option<DateTime<Utc>>,
+    pub in_flight: bool,
+    /// Manual retries retain the delivery ID and consume this same attempt budget.
+    pub max_attempts: u32,
     pub status: WebhookDeliveryStatus,
     pub attempt_count: u32,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -144,4 +153,52 @@ pub struct WebhookDelivery {
     pub created_at: DateTime<Utc>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub updated_at: Option<DateTime<Utc>>,
+}
+
+/// Filters for a subscription's retained delivery history.
+#[serde_as]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, IntoParams)]
+pub struct WebhookDeliveryFilter {
+    #[serde_as(as = "Option<DisplayFromStr>")]
+    pub limit: Option<u64>,
+    #[serde_as(as = "Option<DisplayFromStr>")]
+    pub offset: Option<u64>,
+    pub status: Option<WebhookDeliveryStatus>,
+    #[serde(default)]
+    pub order_direction: OrderDirection,
+}
+
+/// The exact JSON envelope signed and sent to the receiver. Test events use
+/// `webhook.test` and have no invoice/payment resource.
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct WebhookPayload {
+    pub id: String,
+    #[serde(rename = "type")]
+    pub event_type: String,
+    pub wallet_id: Uuid,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub resource_id: Option<Uuid>,
+    pub created_at: DateTime<Utc>,
+    #[schema(value_type = Object)]
+    pub data: serde_json::Value,
+}
+
+impl From<ClientEvent> for WebhookPayload {
+    fn from(event: ClientEvent) -> Self {
+        Self {
+            id: event.id,
+            event_type: event.event_type.to_string(),
+            wallet_id: event.wallet_id,
+            resource_id: Some(event.resource_id),
+            created_at: event.created_at,
+            data: event.data,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct WebhookDeliveryDetails {
+    #[serde(flatten)]
+    pub delivery: WebhookDelivery,
+    pub payload: WebhookPayload,
 }

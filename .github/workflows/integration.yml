@@ -63,6 +63,49 @@ jobs:
           make itest-logs \
             ITEST_PROJECT=swissknife-itest-${{ matrix.database }}-${{ matrix.provider }} || true
 
+      - name: Set up Node.js for Developers acceptance
+        if: matrix.database == 'sqlite' && matrix.provider == 'lnd_grpc'
+        uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+
+      - name: Run Developers dashboard against the real API
+        if: matrix.database == 'sqlite' && matrix.provider == 'lnd_grpc'
+        env:
+          RUN_MODE: itest
+          SWISSKNIFE_AUTH_PROVIDER: oauth2
+          SWISSKNIFE_OAUTH2__DOMAIN: http://127.0.0.1:8090/default
+          SWISSKNIFE_OAUTH2__AUDIENCE: https://swissknife.itest/api
+          SWISSKNIFE_LN_PROVIDER: lnd_grpc
+          SWISSKNIFE_WEB__ADDR: 127.0.0.1:21993
+          SWISSKNIFE_HOST: http://127.0.0.1:21993
+          SWISSKNIFE_DATABASE__URL: sqlite://target/itest/dashboard-webhooks.db?mode=rwc
+          SWISSKNIFE_ITEST_COMPOSE_PROJECT: swissknife-itest-sqlite-lnd_grpc
+        run: |
+          target/debug/swissknife > target/itest/dashboard-backend.log 2>&1 &
+          backend_pid=$!
+          trap 'kill "$backend_pid" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:21993/v1/system/setup > /dev/null; then
+              break
+            fi
+            sleep 1
+          done
+          corepack enable
+          cd dashboard
+          yarn install --immutable
+          yarn playwright install --with-deps chromium
+          yarn test:e2e:webhooks
+
+      - name: Upload Developers browser failures
+        if: failure() && matrix.database == 'sqlite' && matrix.provider == 'lnd_grpc'
+        uses: actions/upload-artifact@v7
+        with:
+          name: developers-browser-failures
+          path: dashboard/test-results
+          if-no-files-found: ignore
+          retention-days: 7
+
       - name: Upload integration artifacts
         if: always()
         uses: actions/upload-artifact@v7

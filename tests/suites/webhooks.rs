@@ -561,3 +561,203 @@ mod administrative_access {
         assert!(paged.iter().all(|id| ids[..2].contains(id)));
     }
 }
+
+mod diagnostics {
+    use super::*;
+    use swissknife_types::WebhookDeliveryDetails;
+
+    async fn subscription(app: &TestApp, account: &TestAccount, suffix: &str) -> (String, uuid::Uuid) {
+        let path = format!("/v1/me/wallets/{}/webhooks", account.wallet.id);
+        let response = app
+            .api()
+            .post(
+                &path,
+                Auth::ApiKey(&account.key),
+                json!({
+                    "url": format!("https://127.0.0.1/{suffix}"), "event_types": ["invoice.paid"]
+                }),
+            )
+            .await;
+        assert_status(&response, StatusCode::CREATED);
+        let id = response.parse::<CreatedWebhookSubscription>().subscription.id;
+        (format!("{path}/{id}"), id)
+    }
+
+    #[tokio::test]
+    async fn test_events_are_subscription_local_throttled_and_inspectable() {
+        let app = app().await;
+        let owner = ordinary_account(app, "webhook-test-owner").await;
+        let auth = Auth::ApiKey(&owner.key);
+        let (item, _) = subscription(app, &owner, "diagnostics").await;
+        let (other, _) = subscription(app, &owner, "other-diagnostics").await;
+        let invoices = format!("/v1/me/wallets/{}/invoices", owner.wallet.id);
+        let before = app.api().get(&invoices, auth).await.body;
+        let response = app.api().post(&format!("{item}/test"), auth, json!({})).await;
+        assert_status(&response, StatusCode::ACCEPTED);
+        let delivery = response.parse::<WebhookDelivery>();
+        assert_eq!(delivery.event_type, "webhook.test");
+        assert_eq!(delivery.attempt_count, 0);
+        assert_eq!(delivery.max_attempts, 8);
+        assert!(delivery.next_attempt_at.is_some());
+        assert!(delivery.resource_id.is_none());
+        assert_error(
+            &app.api().post(&format!("{item}/test"), auth, json!({})).await,
+            StatusCode::CONFLICT,
+        );
+        let details = app.api().get(&format!("{item}/deliveries/{}", delivery.id), auth).await;
+        assert_status(&details, StatusCode::OK);
+        let details = details.parse::<WebhookDeliveryDetails>();
+        assert_eq!(details.payload.id, delivery.event_id);
+        assert_eq!(details.payload.event_type, "webhook.test");
+        assert_eq!(details.payload.wallet_id, owner.wallet.id);
+        assert!(details.payload.resource_id.is_none());
+        assert_eq!(app.api().get(&invoices, auth).await.body, before);
+        assert_eq!(
+            app.api().get(&format!("{other}/deliveries"), auth).await.body,
+            json!([])
+        );
+        assert_eq!(
+            app.api()
+                .get(&format!("{item}/deliveries?limit=1&offset=1"), auth)
+                .await
+                .body,
+            json!([])
+        );
+        assert_eq!(
+            app.api()
+                .get(&format!("{item}/deliveries?status=Delivered"), auth)
+                .await
+                .body,
+            json!([])
+        );
+        assert_error(
+            &app.api()
+                .get(&format!("{other}/deliveries/{}", delivery.id), auth)
+                .await,
+            StatusCode::NOT_FOUND,
+        );
+        assert_error(
+            &app.api()
+                .post(&format!("{other}/deliveries/{}/retry", delivery.id), auth, json!({}))
+                .await,
+            StatusCode::NOT_FOUND,
+        );
+    }
+
+    #[tokio::test]
+    async fn manual_retries_preserve_the_id_payload_and_lifetime_attempt_budget() {
+        let app = app().await;
+        let owner = ordinary_account(app, "webhook-retry-owner").await;
+        let auth = Auth::ApiKey(&owner.key);
+        let (item, _) = subscription(app, &owner, "retry").await;
+        let response = app.api().post(&format!("{item}/test"), auth, json!({})).await;
+        assert_status(&response, StatusCode::ACCEPTED);
+        let delivery = response.parse::<WebhookDelivery>();
+        let detail_path = format!("{item}/deliveries/{}", delivery.id);
+        let original = app
+            .api()
+            .get(&detail_path, auth)
+            .await
+            .parse::<WebhookDeliveryDetails>();
+        for attempt in 1..=delivery.max_attempts {
+            wait_until(Duration::from_secs(20), "test attempt completes", || async {
+                let current = app
+                    .api()
+                    .get(&detail_path, auth)
+                    .await
+                    .parse::<WebhookDeliveryDetails>();
+                current.delivery.status == WebhookDeliveryStatus::Exhausted && current.delivery.attempt_count == attempt
+            })
+            .await;
+            let current = app
+                .api()
+                .get(&detail_path, auth)
+                .await
+                .parse::<WebhookDeliveryDetails>();
+            assert_eq!(
+                serde_json::to_value(&current.payload).unwrap(),
+                serde_json::to_value(&original.payload).unwrap()
+            );
+            assert!(current.delivery.next_attempt_at.is_none());
+            let response = app.api().post(&format!("{detail_path}/retry"), auth, json!({})).await;
+            if attempt == delivery.max_attempts {
+                assert_error(&response, StatusCode::CONFLICT);
+            } else {
+                assert_status(&response, StatusCode::ACCEPTED);
+                let retried = response.parse::<WebhookDelivery>();
+                assert_eq!(retried.id, delivery.id);
+                assert_eq!(retried.attempt_count, attempt);
+            }
+        }
+        assert_status(
+            &app.api().put(&item, auth, json!({"active": false})).await,
+            StatusCode::OK,
+        );
+        assert_error(
+            &app.api().post(&format!("{item}/test"), auth, json!({})).await,
+            StatusCode::CONFLICT,
+        );
+    }
+
+    #[tokio::test]
+    async fn diagnostics_enforce_owner_and_independent_admin_permissions() {
+        let app = app().await;
+        let owner = ordinary_account(app, "webhook-diagnostics-owner").await;
+        let other = ordinary_account(app, "webhook-diagnostics-other").await;
+        let admin = app.admin_token().await;
+        let reader = app.api_key(admin, vec![Permission::ReadWebhook]).await;
+        let writer = app.api_key(admin, vec![Permission::WriteWebhook]).await;
+        let (item, id) = subscription(app, &owner, "permissions").await;
+        let admin_item = format!("/v1/webhooks/{id}");
+        for (auth, status) in [
+            (Auth::None, StatusCode::UNAUTHORIZED),
+            (Auth::ApiKey(&other.key), StatusCode::NOT_FOUND),
+        ] {
+            assert_error(&app.api().post(&format!("{item}/test"), auth, json!({})).await, status);
+        }
+        assert_error(
+            &app.api()
+                .post(&format!("{admin_item}/test"), Auth::ApiKey(&reader), json!({}))
+                .await,
+            StatusCode::FORBIDDEN,
+        );
+        assert_error(
+            &app.api()
+                .post(&format!("{admin_item}/test"), Auth::ApiKey(&owner.key), json!({}))
+                .await,
+            StatusCode::FORBIDDEN,
+        );
+        let queued = app
+            .api()
+            .post(&format!("{admin_item}/test"), Auth::ApiKey(&writer), json!({}))
+            .await;
+        assert_status(&queued, StatusCode::ACCEPTED);
+        let delivery_id = queued.parse::<WebhookDelivery>().id;
+        let admin_detail = format!("{admin_item}/deliveries/{delivery_id}");
+        let owned_detail = format!("{item}/deliveries/{delivery_id}");
+        assert_status(
+            &app.api().get(&admin_detail, Auth::ApiKey(&reader)).await,
+            StatusCode::OK,
+        );
+        assert_error(
+            &app.api().get(&admin_detail, Auth::ApiKey(&writer)).await,
+            StatusCode::FORBIDDEN,
+        );
+        assert_error(
+            &app.api()
+                .post(&format!("{admin_detail}/retry"), Auth::ApiKey(&reader), json!({}))
+                .await,
+            StatusCode::FORBIDDEN,
+        );
+        for (auth, status) in [
+            (Auth::None, StatusCode::UNAUTHORIZED),
+            (Auth::ApiKey(&other.key), StatusCode::NOT_FOUND),
+        ] {
+            assert_error(&app.api().get(&owned_detail, auth).await, status);
+            assert_error(
+                &app.api().post(&format!("{owned_detail}/retry"), auth, json!({})).await,
+                status,
+            );
+        }
+    }
+}

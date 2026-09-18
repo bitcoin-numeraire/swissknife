@@ -1078,7 +1078,7 @@ async fn webhook_outbox_filters_deduplicates_leases_and_retries() {
     assert_eq!(webhooks.prepare_deliveries(100).await.expect("prepare"), 1);
     assert_eq!(webhooks.prepare_deliveries(100).await.expect("prepare replay"), 0);
     let history = webhooks
-        .list_deliveries(subscription.id, 100)
+        .list_deliveries(subscription.id, Default::default())
         .await
         .expect("delivery history");
     assert_eq!(history.len(), 1);
@@ -1090,7 +1090,7 @@ async fn webhook_outbox_filters_deduplicates_leases_and_retries() {
         .await
         .expect("claim delivery");
     assert_eq!(claimed.len(), 1);
-    assert_eq!(claimed[0].event.event_type, ClientEventType::PaymentSettled);
+    assert_eq!(claimed[0].event.event_type, "payment.settled");
     assert!(
         webhooks
             .claim_due(now, now + chrono::Duration::minutes(1), 20)
@@ -1123,7 +1123,7 @@ async fn webhook_outbox_filters_deduplicates_leases_and_retries() {
         .await
         .expect("ignore stale lease outcome");
     let history = webhooks
-        .list_deliveries(subscription.id, 100)
+        .list_deliveries(subscription.id, Default::default())
         .await
         .expect("delivery history");
     assert_eq!(history[0].status, WebhookDeliveryStatus::Pending);
@@ -1135,7 +1135,7 @@ async fn webhook_outbox_filters_deduplicates_leases_and_retries() {
         .expect("record delivery");
 
     let history = webhooks
-        .list_deliveries(subscription.id, 100)
+        .list_deliveries(subscription.id, Default::default())
         .await
         .expect("delivery history");
     assert_eq!(history[0].status, WebhookDeliveryStatus::Delivered);
@@ -1169,7 +1169,7 @@ async fn webhook_outbox_filters_deduplicates_leases_and_retries() {
         .await
         .expect("disable subscription atomically");
     let history = webhooks
-        .list_deliveries(subscription.id, 100)
+        .list_deliveries(subscription.id, Default::default())
         .await
         .expect("delivery history");
     assert_eq!(history[0].status, WebhookDeliveryStatus::Exhausted);
@@ -1268,7 +1268,11 @@ async fn webhook_retention_preserves_unconsumed_events_and_pending_deliveries() 
         .await
         .unwrap();
     assert_eq!(events.prune_before(cutoff).await.unwrap(), 1);
-    assert!(webhooks.list_deliveries(sub.id, 100).await.unwrap().is_empty());
+    assert!(webhooks
+        .list_deliveries(sub.id, Default::default())
+        .await
+        .unwrap()
+        .is_empty());
 }
 
 #[tokio::test]
@@ -1309,5 +1313,245 @@ async fn account_deletion_cascades_pending_webhooks_and_events() {
             .await
             .expect("delete account with pending webhook deliveries"),
         1
+    );
+}
+
+#[tokio::test]
+async fn webhook_manual_retry_preserves_leases_and_serializes_competing_requests() {
+    let conn = connect().await;
+    let wallet_id = seed_wallet(&conn, 0).await;
+    let webhooks = SeaOrmWebhookRepository::new(conn.clone());
+    let sub = webhooks
+        .insert(NewWebhookSubscription {
+            id: Uuid::new_v4(),
+            account_id: account_id(&conn, wallet_id).await,
+            wallet_id,
+            url: "https://hooks.example.com".into(),
+            signing_secret: "secret".into(),
+            event_types: vec![ClientEventType::InvoicePaid],
+        })
+        .await
+        .unwrap();
+    let payload = swissknife_types::WebhookPayload {
+        id: Uuid::new_v4().to_string(),
+        event_type: "webhook.test".into(),
+        wallet_id,
+        resource_id: None,
+        created_at: Utc::now(),
+        data: serde_json::json!({"test": true}),
+    };
+    let (first, second) = tokio::join!(
+        webhooks.enqueue_test(sub.id, payload.clone()),
+        webhooks.enqueue_test(sub.id, payload)
+    );
+    assert_eq!(
+        usize::from(first.is_ok()) + usize::from(second.is_ok()),
+        1,
+        "test throttling must be atomic"
+    );
+    let delivery = first.or(second).unwrap();
+    let now = Utc::now();
+    let claimed = webhooks
+        .claim_due(now, now + chrono::Duration::minutes(1), 10)
+        .await
+        .unwrap();
+    assert_eq!(claimed.len(), 1);
+    for active in [false, true] {
+        webhooks
+            .update(
+                sub.id,
+                swissknife_types::UpdateWebhookSubscriptionRequest {
+                    active: Some(active),
+                    url: None,
+                    event_types: None,
+                },
+            )
+            .await
+            .unwrap();
+    }
+    assert!(
+        !webhooks.retry_delivery(sub.id, delivery.id).await.unwrap(),
+        "disabling must not release an in-flight lease"
+    );
+    assert!(webhooks
+        .claim_due(now, now + chrono::Duration::minutes(1), 10)
+        .await
+        .unwrap()
+        .is_empty());
+    conn.execute_unprepared("UPDATE webhook_delivery SET locked_until = NULL")
+        .await
+        .unwrap();
+    let (first, second) = tokio::join!(
+        webhooks.retry_delivery(sub.id, delivery.id),
+        webhooks.retry_delivery(sub.id, delivery.id)
+    );
+    assert_eq!(
+        usize::from(first.unwrap()) + usize::from(second.unwrap()),
+        1,
+        "only one concurrent retry may queue the delivery"
+    );
+    let retried = webhooks
+        .claim_due(Utc::now(), Utc::now() + chrono::Duration::minutes(1), 10)
+        .await
+        .unwrap();
+    assert_eq!(retried.len(), 1);
+    assert_eq!(retried[0].id, delivery.id);
+    assert_eq!(
+        retried[0].attempt_count, claimed[0].attempt_count,
+        "retry must preserve the recorded attempt count"
+    );
+    webhooks
+        .mark_delivered(delivery.id, retried[0].lease_expires_at, 204)
+        .await
+        .unwrap();
+    assert_eq!(
+        webhooks
+            .find_delivery(sub.id, delivery.id)
+            .await
+            .unwrap()
+            .unwrap()
+            .delivery
+            .attempt_count,
+        1
+    );
+}
+
+#[tokio::test]
+async fn webhook_test_retention_keeps_pending_payloads_without_wallet_events() {
+    let conn = connect().await;
+    let wallet_id = seed_wallet(&conn, 0).await;
+    let webhooks = SeaOrmWebhookRepository::new(conn.clone());
+    let sub = webhooks
+        .insert(NewWebhookSubscription {
+            id: Uuid::new_v4(),
+            account_id: account_id(&conn, wallet_id).await,
+            wallet_id,
+            url: "https://hooks.example.com".into(),
+            signing_secret: "secret".into(),
+            event_types: vec![ClientEventType::InvoicePaid],
+        })
+        .await
+        .unwrap();
+    let delivery = webhooks
+        .enqueue_test(
+            sub.id,
+            swissknife_types::WebhookPayload {
+                id: Uuid::new_v4().to_string(),
+                event_type: "webhook.test".into(),
+                wallet_id,
+                resource_id: None,
+                created_at: Utc::now(),
+                data: serde_json::json!({"test": true}),
+            },
+        )
+        .await
+        .unwrap();
+    conn.execute_unprepared("UPDATE webhook_delivery SET created_at = '2020-01-01 00:00:00'")
+        .await
+        .unwrap();
+    let events = SeaOrmClientEventRepository::new(conn.clone());
+    let cutoff = Utc::now() - chrono::Duration::days(1);
+    assert_eq!(events.prune_before(cutoff).await.unwrap(), 0);
+    assert!(webhooks.find_delivery(sub.id, delivery.id).await.unwrap().is_some());
+    let now = Utc::now();
+    let claimed = webhooks
+        .claim_due(now, now + chrono::Duration::minutes(1), 10)
+        .await
+        .unwrap();
+    webhooks
+        .mark_delivered(delivery.id, claimed[0].lease_expires_at, 204)
+        .await
+        .unwrap();
+    assert_eq!(
+        events.prune_before(cutoff).await.unwrap(),
+        0,
+        "no wallet event is fabricated for a test"
+    );
+    assert!(
+        webhooks.find_delivery(sub.id, delivery.id).await.unwrap().is_none(),
+        "terminal tests must expire even with an empty wallet event journal"
+    );
+}
+
+#[tokio::test]
+async fn webhook_diagnostics_migration_preserves_existing_delivery_and_constraints() {
+    let conn = connect_unmigrated().await;
+    Migrator::up(&conn, Some(32)).await.unwrap();
+    let wallet_id = seed_wallet(&conn, 0).await;
+    let account = account_id(&conn, wallet_id).await;
+    let webhooks = SeaOrmWebhookRepository::new(conn.clone());
+    let sub = webhooks
+        .insert(NewWebhookSubscription {
+            id: Uuid::new_v4(),
+            account_id: account,
+            wallet_id,
+            url: "https://hooks.example.com".into(),
+            signing_secret: "secret".into(),
+            event_types: vec![ClientEventType::PaymentFailed],
+        })
+        .await
+        .unwrap();
+    append_client_event(
+        &conn,
+        NewClientEvent {
+            wallet_id,
+            resource_id: Uuid::new_v4(),
+            event_type: ClientEventType::PaymentFailed,
+            data: serde_json::json!({"status": "Failed"}),
+        },
+    )
+    .await
+    .unwrap();
+    let event = SeaOrmClientEventRepository::new(conn.clone())
+        .latest_id(account)
+        .await
+        .unwrap()
+        .unwrap();
+    let id = Uuid::new_v4();
+    let insert = sea_orm::sea_query::Query::insert()
+        .into_table(sea_orm::sea_query::Alias::new("webhook_delivery"))
+        .columns(
+            [
+                "id",
+                "subscription_id",
+                "client_event_id",
+                "status",
+                "attempt_count",
+                "response_status",
+                "last_error",
+            ]
+            .map(sea_orm::sea_query::Alias::new),
+        )
+        .values_panic([
+            id.into(),
+            sub.id.into(),
+            event.into(),
+            "Exhausted".into(),
+            3.into(),
+            503.into(),
+            "HTTP 503".into(),
+        ])
+        .to_owned();
+    conn.execute_raw(conn.get_database_backend().build(&insert))
+        .await
+        .unwrap();
+    Migrator::up(&conn, None).await.unwrap();
+    let details = webhooks.find_delivery(sub.id, id).await.unwrap().unwrap();
+    assert_eq!(details.delivery.attempt_count, 3);
+    assert_eq!(details.delivery.response_status, Some(503));
+    assert_eq!(details.delivery.last_error.as_deref(), Some("HTTP 503"));
+    assert_eq!(details.payload.event_type, "payment.failed");
+    assert!(
+        conn.execute_unprepared("UPDATE webhook_delivery SET client_event_id = NULL")
+            .await
+            .is_err(),
+        "exactly one payload source is required"
+    );
+    assert!(webhooks.retry_delivery(sub.id, id).await.unwrap());
+    webhooks.delete(sub.id).await.unwrap();
+    assert_eq!(
+        count(&conn, "SELECT COUNT(*) AS count FROM webhook_delivery").await,
+        0,
+        "subscription deletion must still cascade"
     );
 }

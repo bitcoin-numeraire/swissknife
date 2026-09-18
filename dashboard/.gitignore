@@ -23,6 +23,7 @@ _static
 out
 dist
 build
+!src/app/(index)/build/
 
 # environment variables
 .env*.local

@@ -6882,6 +6882,55 @@
         "operationId": "list_webhook_deliveries",
         "parameters": [
           {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "int64",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "int64",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "oneOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "$ref": "#/components/schemas/WebhookDeliveryStatus"
+                }
+              ]
+            }
+          },
+          {
+            "name": "order_direction",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/OrderDirection"
+            }
+          },
+          {
             "name": "wallet_id",
             "in": "path",
             "required": true,
@@ -6902,7 +6951,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Newest 100 delivery records",
+            "description": "Paginated delivery history (up to 100 per page)",
             "content": {
               "application/json": {
                 "schema": {
@@ -6933,6 +6982,205 @@
                   "$ref": "#/components/schemas/ErrorResponse"
                 },
                 "example": "\n{\n    \"status\": \"404 Not Found\",\n    \"reason\": \"Resource not found\"\n}\n"
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"500 Internal Server Error\",\n    \"reason\": \"Internal server error, Please contact your administrator or try later\"\n}\n"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/me/wallets/{wallet_id}/webhooks/{id}/deliveries/{delivery_id}": {
+      "get": {
+        "tags": [
+          "Me"
+        ],
+        "summary": "Inspect a retained webhook delivery and its exact payload.",
+        "operationId": "get_webhook_delivery",
+        "parameters": [
+          {
+            "name": "wallet_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "delivery_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WebhookDeliveryDetails"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"400 Bad Request\",\n    \"reason\": \"Missing required parameter in request\"\n}\n"
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"401 Unauthorized\",\n    \"reason\": \"Invalid credentials\"\n}\n"
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"404 Not Found\",\n    \"reason\": \"Resource not found\"\n}\n"
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"500 Internal Server Error\",\n    \"reason\": \"Internal server error, Please contact your administrator or try later\"\n}\n"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/me/wallets/{wallet_id}/webhooks/{id}/deliveries/{delivery_id}/retry": {
+      "post": {
+        "tags": [
+          "Me"
+        ],
+        "summary": "Retry a terminal delivery using its existing ID and remaining attempt budget.",
+        "operationId": "retry_webhook_delivery",
+        "parameters": [
+          {
+            "name": "wallet_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "delivery_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Queued for delivery",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WebhookDelivery"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"400 Bad Request\",\n    \"reason\": \"Missing required parameter in request\"\n}\n"
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"401 Unauthorized\",\n    \"reason\": \"Invalid credentials\"\n}\n"
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"404 Not Found\",\n    \"reason\": \"Resource not found\"\n}\n"
+              }
+            }
+          },
+          "409": {
+            "description": "Subscription disabled, delivery pending, limit reached, or attempt in flight",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"409 Conflict\",\n    \"reason\": \"Admin account already created\"\n}\n"
               }
             }
           },
@@ -7006,6 +7254,102 @@
                   "$ref": "#/components/schemas/ErrorResponse"
                 },
                 "example": "\n{\n    \"status\": \"404 Not Found\",\n    \"reason\": \"Resource not found\"\n}\n"
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"500 Internal Server Error\",\n    \"reason\": \"Internal server error, Please contact your administrator or try later\"\n}\n"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/me/wallets/{wallet_id}/webhooks/{id}/test": {
+      "post": {
+        "tags": [
+          "Me"
+        ],
+        "summary": "Queue a subscription-local test event through the normal delivery worker.",
+        "operationId": "send_webhook_test",
+        "parameters": [
+          {
+            "name": "wallet_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Queued for delivery",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WebhookDelivery"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"400 Bad Request\",\n    \"reason\": \"Missing required parameter in request\"\n}\n"
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"401 Unauthorized\",\n    \"reason\": \"Invalid credentials\"\n}\n"
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"404 Not Found\",\n    \"reason\": \"Resource not found\"\n}\n"
+              }
+            }
+          },
+          "409": {
+            "description": "Subscription disabled, delivery pending, limit reached, or attempt in flight",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"409 Conflict\",\n    \"reason\": \"Admin account already created\"\n}\n"
               }
             }
           },
@@ -9135,6 +9479,55 @@
         "operationId": "list_webhook_subscription_deliveries",
         "parameters": [
           {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "int64",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "int64",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "oneOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "$ref": "#/components/schemas/WebhookDeliveryStatus"
+                }
+              ]
+            }
+          },
+          {
+            "name": "order_direction",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/OrderDirection"
+            }
+          },
+          {
             "name": "id",
             "in": "path",
             "required": true,
@@ -9146,7 +9539,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Newest 100 delivery records",
+            "description": "Paginated delivery history (up to 100 per page)",
             "content": {
               "application/json": {
                 "schema": {
@@ -9199,6 +9592,209 @@
                   "$ref": "#/components/schemas/ErrorResponse"
                 },
                 "example": "\n{\n    \"status\": \"404 Not Found\",\n    \"reason\": \"Resource not found\"\n}\n"
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"500 Internal Server Error\",\n    \"reason\": \"Internal server error, Please contact your administrator or try later\"\n}\n"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/webhooks/{id}/deliveries/{delivery_id}": {
+      "get": {
+        "tags": [
+          "Webhooks"
+        ],
+        "summary": "Inspect a retained webhook delivery and its exact payload.",
+        "operationId": "get_webhook_subscription_delivery",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "delivery_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WebhookDeliveryDetails"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"400 Bad Request\",\n    \"reason\": \"Missing required parameter in request\"\n}\n"
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"401 Unauthorized\",\n    \"reason\": \"Invalid credentials\"\n}\n"
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"403 Forbidden\",\n    \"reason\": \"Missing permissions\"\n}\n"
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"404 Not Found\",\n    \"reason\": \"Resource not found\"\n}\n"
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"500 Internal Server Error\",\n    \"reason\": \"Internal server error, Please contact your administrator or try later\"\n}\n"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/webhooks/{id}/deliveries/{delivery_id}/retry": {
+      "post": {
+        "tags": [
+          "Webhooks"
+        ],
+        "summary": "Retry a terminal delivery using its existing ID and remaining attempt budget.",
+        "operationId": "retry_webhook_subscription_delivery",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "delivery_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Queued for delivery",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WebhookDelivery"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"400 Bad Request\",\n    \"reason\": \"Missing required parameter in request\"\n}\n"
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"401 Unauthorized\",\n    \"reason\": \"Invalid credentials\"\n}\n"
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"403 Forbidden\",\n    \"reason\": \"Missing permissions\"\n}\n"
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"404 Not Found\",\n    \"reason\": \"Resource not found\"\n}\n"
+              }
+            }
+          },
+          "409": {
+            "description": "Subscription disabled, delivery pending, limit reached, or attempt in flight",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"409 Conflict\",\n    \"reason\": \"Admin account already created\"\n}\n"
               }
             }
           },
@@ -9286,6 +9882,104 @@
                   "$ref": "#/components/schemas/ErrorResponse"
                 },
                 "example": "\n{\n    \"status\": \"404 Not Found\",\n    \"reason\": \"Resource not found\"\n}\n"
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"500 Internal Server Error\",\n    \"reason\": \"Internal server error, Please contact your administrator or try later\"\n}\n"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/webhooks/{id}/test": {
+      "post": {
+        "tags": [
+          "Webhooks"
+        ],
+        "summary": "Queue a subscription-local test event through the normal delivery worker.",
+        "operationId": "send_webhook_subscription_test",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Queued for delivery",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WebhookDelivery"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"400 Bad Request\",\n    \"reason\": \"Missing required parameter in request\"\n}\n"
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"401 Unauthorized\",\n    \"reason\": \"Invalid credentials\"\n}\n"
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"403 Forbidden\",\n    \"reason\": \"Missing permissions\"\n}\n"
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"404 Not Found\",\n    \"reason\": \"Resource not found\"\n}\n"
+              }
+            }
+          },
+          "409": {
+            "description": "Subscription disabled, delivery pending, limit reached, or attempt in flight",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"409 Conflict\",\n    \"reason\": \"Admin account already created\"\n}\n"
               }
             }
           },
@@ -11346,6 +12040,9 @@
           "id",
           "subscription_id",
           "event_id",
+          "event_type",
+          "in_flight",
+          "max_attempts",
           "status",
           "attempt_count",
           "created_at"
@@ -11370,15 +12067,42 @@
           "event_id": {
             "type": "string"
           },
+          "event_type": {
+            "type": "string"
+          },
           "id": {
             "type": "string",
             "format": "uuid"
+          },
+          "in_flight": {
+            "type": "boolean"
           },
           "last_error": {
             "type": [
               "string",
               "null"
             ]
+          },
+          "max_attempts": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Manual retries retain the delivery ID and consume this same attempt budget.",
+            "minimum": 0
+          },
+          "next_attempt_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "Next scheduled attempt, only while pending."
+          },
+          "resource_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
           },
           "response_status": {
             "type": [
@@ -11404,6 +12128,24 @@
           }
         }
       },
+      "WebhookDeliveryDetails": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/WebhookDelivery"
+          },
+          {
+            "type": "object",
+            "required": [
+              "payload"
+            ],
+            "properties": {
+              "payload": {
+                "$ref": "#/components/schemas/WebhookPayload"
+              }
+            }
+          }
+        ]
+      },
       "WebhookDeliveryStatus": {
         "type": "string",
         "enum": [
@@ -11411,6 +12153,43 @@
           "Delivered",
           "Exhausted"
         ]
+      },
+      "WebhookPayload": {
+        "type": "object",
+        "description": "The exact JSON envelope signed and sent to the receiver. Test events use\n`webhook.test` and have no invoice/payment resource.",
+        "required": [
+          "id",
+          "type",
+          "wallet_id",
+          "created_at",
+          "data"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "data": {
+            "type": "object"
+          },
+          "id": {
+            "type": "string"
+          },
+          "resource_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "type": {
+            "type": "string"
+          },
+          "wallet_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
       },
       "WebhookSubscription": {
         "type": "object",
