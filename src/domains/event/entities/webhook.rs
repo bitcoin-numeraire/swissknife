@@ -3,11 +3,14 @@ use uuid::Uuid;
 
 pub use swissknife_types::{
     CreateWebhookSubscriptionRequest, CreatedWebhookSubscription, RotateWebhookSecretResponse,
-    UpdateWebhookSubscriptionRequest, WebhookDelivery, WebhookDeliveryStatus, WebhookSubscription,
-    WebhookSubscriptionFilter,
+    UpdateWebhookSubscriptionRequest, WebhookDelivery, WebhookDeliveryDetails, WebhookDeliveryFilter,
+    WebhookDeliveryStatus, WebhookPayload, WebhookSubscription, WebhookSubscriptionFilter,
 };
 
-use super::{ClientEvent, ClientEventType};
+use super::ClientEventType;
+
+pub const MAX_WEBHOOK_ATTEMPTS: u32 = 8;
+pub const WEBHOOK_TEST_COOLDOWN_SECONDS: i64 = 60;
 
 #[derive(Clone, Debug)]
 pub struct NewWebhookSubscription {
@@ -52,7 +55,7 @@ impl From<StoredWebhookSubscription> for WebhookSubscription {
 pub struct ClaimedWebhookDelivery {
     pub id: Uuid,
     pub subscription_id: Uuid,
-    pub event: ClientEvent,
+    pub event: WebhookPayload,
     pub url: String,
     pub signing_secret: String,
     pub attempt_count: u32,

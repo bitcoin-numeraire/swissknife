@@ -33,6 +33,7 @@ mod m20260717_170449_add_client_event_log;
 mod m20260814_151430_promote_wallet_account_unique_constraint;
 mod m20260904_192903_local_jwt_credentials;
 mod m20260911_232008_add_webhook_delivery;
+mod m20260918_083447_webhook_delivery_diagnostics;
 mod m20261105_223341_widen_btc_output_indexes;
 
 pub struct Migrator;
@@ -75,6 +76,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260904_192903_local_jwt_credentials::Migration),
             Box::new(m20261105_223341_widen_btc_output_indexes::Migration),
             Box::new(m20260911_232008_add_webhook_delivery::Migration),
+            Box::new(m20260918_083447_webhook_delivery_diagnostics::Migration),
         ]
     }
 }

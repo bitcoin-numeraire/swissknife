@@ -11,7 +11,9 @@ use crate::{
     application::errors::DatabaseError,
     domains::event::{
         ClaimedWebhookDelivery, ClientEventType, NewWebhookSubscription, StoredWebhookSubscription,
-        UpdateWebhookSubscriptionRequest, WebhookDelivery, WebhookRepository, WebhookSubscriptionFilter,
+        UpdateWebhookSubscriptionRequest, WebhookDelivery, WebhookDeliveryDetails, WebhookDeliveryFilter,
+        WebhookPayload, WebhookRepository, WebhookSubscriptionFilter, MAX_WEBHOOK_ATTEMPTS,
+        WEBHOOK_TEST_COOLDOWN_SECONDS,
     },
     infra::database::sea_orm::models::{
         client_event,
@@ -43,6 +45,20 @@ fn update_error(error: DbErr) -> DatabaseError {
         DatabaseError::Conflict(error.to_string())
     } else {
         DatabaseError::Update(error.to_string())
+    }
+}
+
+fn delivery_payload(
+    delivery: &webhook_delivery::Model,
+    event: Option<client_event::Model>,
+) -> Result<WebhookPayload, DatabaseError> {
+    if let Some(event) = event {
+        let event: crate::domains::event::ClientEvent = event.into();
+        Ok(event.into())
+    } else if let Some(payload) = &delivery.test_payload {
+        serde_json::from_value(payload.clone()).map_err(|e| DatabaseError::FindOne(e.to_string()))
+    } else {
+        Err(DatabaseError::FindOne("Webhook event no longer exists.".to_string()))
     }
 }
 
@@ -191,10 +207,6 @@ impl WebhookRepository for SeaOrmWebhookRepository {
                         Expr::value("Subscription disabled."),
                     )
                     .col_expr(
-                        webhook_delivery::Column::LockedUntil,
-                        Expr::value(Option::<NaiveDateTime>::None),
-                    )
-                    .col_expr(
                         webhook_delivery::Column::UpdatedAt,
                         Expr::value(Some(Utc::now().naive_utc())),
                     )
@@ -235,18 +247,161 @@ impl WebhookRepository for SeaOrmWebhookRepository {
         Ok(result.rows_affected)
     }
 
-    async fn list_deliveries(&self, subscription_id: Uuid, limit: u64) -> Result<Vec<WebhookDelivery>, DatabaseError> {
-        Ok(WebhookDeliveryEntity::find()
+    async fn list_deliveries(
+        &self,
+        subscription_id: Uuid,
+        filter: WebhookDeliveryFilter,
+    ) -> Result<Vec<WebhookDelivery>, DatabaseError> {
+        WebhookDeliveryEntity::find()
             .filter(webhook_delivery::Column::SubscriptionId.eq(subscription_id))
-            .order_by_desc(webhook_delivery::Column::CreatedAt)
-            .order_by_desc(webhook_delivery::Column::ClientEventId)
-            .limit(limit)
+            .apply_if(filter.status, |q, status| {
+                q.filter(webhook_delivery::Column::Status.eq(status.to_string()))
+            })
+            .order_by(webhook_delivery::Column::CreatedAt, sea_order(&filter.order_direction))
+            .order_by(
+                webhook_delivery::Column::ClientEventId,
+                sea_order(&filter.order_direction),
+            )
+            .order_by(webhook_delivery::Column::Id, sea_order(&filter.order_direction))
+            .offset(filter.offset)
+            .limit(filter.limit)
+            .find_also_related(ClientEventEntity)
             .all(&self.db)
             .await
             .map_err(|e| DatabaseError::FindMany(e.to_string()))?
             .into_iter()
-            .map(Into::into)
-            .collect())
+            .map(|(delivery, event)| {
+                let payload = delivery_payload(&delivery, event)?;
+                Ok(delivery.into_delivery(payload))
+            })
+            .collect()
+    }
+
+    async fn find_delivery(
+        &self,
+        subscription_id: Uuid,
+        id: Uuid,
+    ) -> Result<Option<WebhookDeliveryDetails>, DatabaseError> {
+        WebhookDeliveryEntity::find_by_id(id)
+            .filter(webhook_delivery::Column::SubscriptionId.eq(subscription_id))
+            .find_also_related(ClientEventEntity)
+            .one(&self.db)
+            .await
+            .map_err(|e| DatabaseError::FindOne(e.to_string()))?
+            .map(|(delivery, event)| {
+                let payload = delivery_payload(&delivery, event)?;
+                Ok(WebhookDeliveryDetails {
+                    delivery: delivery.into_delivery(payload.clone()),
+                    payload,
+                })
+            })
+            .transpose()
+    }
+
+    async fn enqueue_test(
+        &self,
+        subscription_id: Uuid,
+        payload: WebhookPayload,
+    ) -> Result<WebhookDelivery, DatabaseError> {
+        let tx = self
+            .db
+            .begin()
+            .await
+            .map_err(|e| DatabaseError::Transaction(e.to_string()))?;
+        lock_client_event_log(&tx).await?;
+        let active = WebhookSubscriptionEntity::find_by_id(subscription_id)
+            .filter(webhook_subscription::Column::Active.eq(true))
+            .one(&tx)
+            .await
+            .map_err(|e| DatabaseError::FindOne(e.to_string()))?;
+        if active.is_none() {
+            return Err(DatabaseError::Conflict(
+                "Enable the webhook before sending a test event.".to_string(),
+            ));
+        }
+        let recent = WebhookDeliveryEntity::find()
+            .filter(webhook_delivery::Column::SubscriptionId.eq(subscription_id))
+            .filter(webhook_delivery::Column::ClientEventId.is_null())
+            .filter(
+                Condition::any().add(webhook_delivery::Column::Status.eq(PENDING)).add(
+                    webhook_delivery::Column::CreatedAt
+                        .gt((Utc::now() - chrono::Duration::seconds(WEBHOOK_TEST_COOLDOWN_SECONDS)).naive_utc()),
+                ),
+            )
+            .one(&tx)
+            .await
+            .map_err(|e| DatabaseError::FindOne(e.to_string()))?;
+        if recent.is_some() {
+            return Err(DatabaseError::Conflict(
+                "Only one test event per minute is allowed, and the previous test must finish first.".to_string(),
+            ));
+        }
+        let model = webhook_delivery::ActiveModel {
+            id: Set(Uuid::new_v4()),
+            subscription_id: Set(subscription_id),
+            client_event_id: Set(None),
+            test_payload: Set(Some(
+                serde_json::to_value(&payload).map_err(|e| DatabaseError::Insert(e.to_string()))?,
+            )),
+            status: Set(PENDING.to_string()),
+            attempt_count: Set(0),
+            next_attempt_at: Set(Utc::now().naive_utc()),
+            ..Default::default()
+        }
+        .insert(&tx)
+        .await
+        .map_err(insert_error)?;
+        tx.commit()
+            .await
+            .map_err(|e| DatabaseError::Transaction(e.to_string()))?;
+        Ok(model.into_delivery(payload))
+    }
+
+    async fn retry_delivery(&self, subscription_id: Uuid, id: Uuid) -> Result<bool, DatabaseError> {
+        let tx = self
+            .db
+            .begin()
+            .await
+            .map_err(|e| DatabaseError::Transaction(e.to_string()))?;
+        // Serialize with retention, subscription changes, and other manual retries.
+        lock_client_event_log(&tx).await?;
+        let active = WebhookSubscriptionEntity::find_by_id(subscription_id)
+            .filter(webhook_subscription::Column::Active.eq(true))
+            .one(&tx)
+            .await
+            .map_err(|e| DatabaseError::FindOne(e.to_string()))?;
+        if active.is_none() {
+            return Ok(false);
+        }
+        let now = Utc::now().naive_utc();
+        let result = WebhookDeliveryEntity::update_many()
+            .col_expr(webhook_delivery::Column::Status, Expr::value(PENDING))
+            .col_expr(webhook_delivery::Column::NextAttemptAt, Expr::value(now))
+            .col_expr(
+                webhook_delivery::Column::LockedUntil,
+                Expr::value(Option::<NaiveDateTime>::None),
+            )
+            .col_expr(
+                webhook_delivery::Column::DeliveredAt,
+                Expr::value(Option::<NaiveDateTime>::None),
+            )
+            .col_expr(webhook_delivery::Column::UpdatedAt, Expr::value(Some(now)))
+            .filter(webhook_delivery::Column::SubscriptionId.eq(subscription_id))
+            .filter(webhook_delivery::Column::Id.eq(id))
+            .filter(webhook_delivery::Column::Status.ne(PENDING))
+            .filter(webhook_delivery::Column::AttemptCount.lt(MAX_WEBHOOK_ATTEMPTS as i32))
+            .filter(
+                Condition::any()
+                    .add(webhook_delivery::Column::LockedUntil.is_null())
+                    .add(webhook_delivery::Column::LockedUntil.lt(now)),
+            )
+            .exec(&tx)
+            .await
+            .map_err(|e| DatabaseError::Update(e.to_string()))?;
+        tx.commit()
+            .await
+            .map_err(|e| DatabaseError::Transaction(e.to_string()))?;
+        Ok(result.rows_affected == 1)
     }
 
     async fn prepare_deliveries(&self, batch_size: u64) -> Result<u64, DatabaseError> {
@@ -285,7 +440,7 @@ impl WebhookRepository for SeaOrmWebhookRepository {
                     WebhookDeliveryEntity::insert(webhook_delivery::ActiveModel {
                         id: Set(Uuid::new_v4()),
                         subscription_id: Set(subscription.id),
-                        client_event_id: Set(event.id),
+                        client_event_id: Set(Some(event.id)),
                         status: Set(PENDING.to_string()),
                         attempt_count: Set(0),
                         next_attempt_at: Set(Utc::now().naive_utc()),
@@ -374,15 +529,19 @@ impl WebhookRepository for SeaOrmWebhookRepository {
                 continue;
             }
 
-            let event = ClientEventEntity::find_by_id(candidate.client_event_id)
-                .one(&transaction)
-                .await
-                .map_err(|e| DatabaseError::FindOne(e.to_string()))?
-                .ok_or_else(|| DatabaseError::FindOne("Webhook event no longer exists.".to_string()))?;
+            let event = if let Some(id) = candidate.client_event_id {
+                ClientEventEntity::find_by_id(id)
+                    .one(&transaction)
+                    .await
+                    .map_err(|e| DatabaseError::FindOne(e.to_string()))?
+            } else {
+                None
+            };
+            let payload = delivery_payload(&candidate, event)?;
             claimed.push(ClaimedWebhookDelivery {
                 id: candidate.id,
                 subscription_id: subscription.id,
-                event: event.into(),
+                event: payload,
                 url: subscription.url,
                 signing_secret: subscription.signing_secret,
                 attempt_count: candidate

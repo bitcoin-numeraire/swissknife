@@ -1,5 +1,6 @@
 use async_trait::async_trait;
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
+use chrono::Utc;
 use reqwest::Url;
 use tracing::{debug, info, trace};
 use uuid::Uuid;
@@ -11,8 +12,8 @@ use crate::application::{
 
 use super::{
     ClientEventType, CreateWebhookSubscriptionRequest, CreatedWebhookSubscription, NewWebhookSubscription,
-    RotateWebhookSecretResponse, UpdateWebhookSubscriptionRequest, WebhookDelivery, WebhookSubscription,
-    WebhookSubscriptionFilter, WebhookUseCases,
+    RotateWebhookSecretResponse, UpdateWebhookSubscriptionRequest, WebhookDelivery, WebhookDeliveryDetails,
+    WebhookDeliveryFilter, WebhookPayload, WebhookSubscription, WebhookSubscriptionFilter, WebhookUseCases,
 };
 
 const DELIVERY_HISTORY_LIMIT: u64 = 100;
@@ -219,14 +220,64 @@ impl WebhookUseCases for WebhookService {
         Ok(RotateWebhookSecretResponse { signing_secret })
     }
 
-    async fn list_deliveries(&self, subscription_id: Uuid) -> Result<Vec<WebhookDelivery>, ApplicationError> {
+    async fn list_deliveries(
+        &self,
+        subscription_id: Uuid,
+        mut filter: WebhookDeliveryFilter,
+    ) -> Result<Vec<WebhookDelivery>, ApplicationError> {
         trace!(%subscription_id, "Listing webhook deliveries");
         self.get(subscription_id).await?;
-        Ok(self
+        filter.limit = Some(
+            filter
+                .limit
+                .unwrap_or(DELIVERY_HISTORY_LIMIT)
+                .clamp(1, DELIVERY_HISTORY_LIMIT),
+        );
+        Ok(self.store.webhook.list_deliveries(subscription_id, filter).await?)
+    }
+
+    async fn get_delivery(&self, subscription_id: Uuid, id: Uuid) -> Result<WebhookDeliveryDetails, ApplicationError> {
+        trace!(%subscription_id, %id, "Fetching webhook delivery");
+        self.get(subscription_id).await?;
+        self.store
+            .webhook
+            .find_delivery(subscription_id, id)
+            .await?
+            .ok_or_else(|| DataError::NotFound("Webhook delivery not found.".to_string()).into())
+    }
+
+    async fn send_test(&self, subscription_id: Uuid) -> Result<WebhookDelivery, ApplicationError> {
+        debug!(%subscription_id, "Queuing webhook test event");
+        let subscription = self.get(subscription_id).await?;
+        let payload = WebhookPayload {
+            id: Uuid::new_v4().to_string(),
+            event_type: "webhook.test".to_string(),
+            wallet_id: subscription.wallet_id,
+            resource_id: None,
+            created_at: Utc::now(),
+            data: serde_json::json!({"message": "This is a SwissKnife test webhook."}),
+        };
+        let delivery = self
             .store
             .webhook
-            .list_deliveries(subscription_id, DELIVERY_HISTORY_LIMIT)
-            .await?)
+            .enqueue_test(subscription_id, payload)
+            .await
+            .map_err(|error| match error {
+                DatabaseError::Conflict(message) => ApplicationError::from(DataError::Conflict(message)),
+                error => error.into(),
+            })?;
+        info!(%subscription_id, delivery_id = %delivery.id, "Webhook test event queued");
+        Ok(delivery)
+    }
+
+    async fn retry_delivery(&self, subscription_id: Uuid, id: Uuid) -> Result<WebhookDelivery, ApplicationError> {
+        debug!(%subscription_id, delivery_id = %id, "Retrying webhook delivery");
+        self.get_delivery(subscription_id, id).await?;
+        if !self.store.webhook.retry_delivery(subscription_id, id).await? {
+            return Err(DataError::Conflict("Only terminal deliveries with attempts remaining can be retried. Enable the subscription and wait for any in-flight attempt to finish.".to_string()).into());
+        }
+        info!(%subscription_id, delivery_id = %id, "Webhook delivery queued for retry");
+        Ok(self.get_delivery(subscription_id, id).await?.delivery)
     }
 }
 
