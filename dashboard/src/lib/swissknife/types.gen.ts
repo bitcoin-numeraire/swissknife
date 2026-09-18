@@ -477,6 +477,35 @@ export type CreateWalletRequest = {
 };
 
 /**
+ * Create a server-to-server webhook for one account-owned wallet.
+ */
+export type CreateWebhookSubscriptionRequest = {
+  /**
+   * Non-empty event filter.
+   */
+  event_types: Array<ClientEventType>;
+  /**
+   * Public HTTPS endpoint that receives signed POST requests.
+   */
+  url: string;
+  /**
+   * Target wallet. Required by administrative endpoints; account-scoped
+   * endpoints use the wallet in the path instead.
+   */
+  wallet_id?: string | null;
+};
+
+/**
+ * Creation response containing the secret exactly once.
+ */
+export type CreatedWebhookSubscription = WebhookSubscription & {
+  /**
+   * Base64url secret used to verify `X-SwissKnife-Signature`.
+   */
+  signing_secret: string;
+};
+
+/**
  * Application error response
  */
 export type ErrorResponse = {
@@ -998,6 +1027,8 @@ export const Permission = {
   WRITE_LN_NODE: 'write:ln_node',
   READ_API_KEY: 'read:api_key',
   WRITE_API_KEY: 'write:api_key',
+  READ_WEBHOOK: 'read:webhook',
+  WRITE_WEBHOOK: 'write:webhook',
   READ_BTC_ADDRESS: 'read:btc_address',
   WRITE_BTC_ADDRESS: 'write:btc_address',
 } as const;
@@ -1037,6 +1068,14 @@ export type RegisterLnAddressRequest = {
    * Username such as `username@domain`
    */
   username: string;
+};
+
+/**
+ * Secret rotation response. Subsequent attempts use the new secret; an attempt
+ * already claimed by a worker may still carry the previous signature.
+ */
+export type RotateWebhookSecretResponse = {
+  signing_secret: string;
 };
 
 /**
@@ -1158,6 +1197,15 @@ export type UpdateLnAddressRequest = {
 };
 
 /**
+ * Update a webhook endpoint, event filter, or enabled state.
+ */
+export type UpdateWebhookSubscriptionRequest = {
+  active?: boolean | null;
+  event_types?: Array<ClientEventType> | null;
+  url?: string | null;
+};
+
+/**
  * App version info.
  */
 export type VersionInfo = {
@@ -1269,6 +1317,45 @@ export type WalletOverview = {
    * Date of update in database
    */
   updated_at?: Date | null;
+};
+
+/**
+ * Delivery state for webhook observability.
+ */
+export type WebhookDelivery = {
+  attempt_count: number;
+  created_at: Date;
+  delivered_at?: Date | null;
+  event_id: string;
+  id: string;
+  last_error?: string | null;
+  response_status?: number | null;
+  status: WebhookDeliveryStatus;
+  subscription_id: string;
+  updated_at?: Date | null;
+};
+
+export const WebhookDeliveryStatus = {
+  PENDING: 'Pending',
+  DELIVERED: 'Delivered',
+  EXHAUSTED: 'Exhausted',
+} as const;
+
+export type WebhookDeliveryStatus =
+  (typeof WebhookDeliveryStatus)[keyof typeof WebhookDeliveryStatus];
+
+/**
+ * Webhook configuration. The signing secret is never returned after creation or rotation.
+ */
+export type WebhookSubscription = {
+  account_id: string;
+  active: boolean;
+  created_at: Date;
+  event_types: Array<ClientEventType>;
+  id: string;
+  updated_at?: Date | null;
+  url: string;
+  wallet_id: string;
 };
 
 export type WellKnownData = {
@@ -4249,6 +4336,361 @@ export type GetWalletPaymentResponses = {
 
 export type GetWalletPaymentResponse = GetWalletPaymentResponses[keyof GetWalletPaymentResponses];
 
+export type ListWebhooksData = {
+  body?: never;
+  path: {
+    wallet_id: string;
+  };
+  query?: {
+    /**
+     * Total amount of results to return.
+     */
+    limit?: number | null;
+    /**
+     * Offset where to start returning results.
+     */
+    offset?: number | null;
+    ids?: Array<string> | null;
+    /**
+     * Account-scoped endpoints populate this from the authenticated account.
+     */
+    account_id?: string | null;
+    /**
+     * Wallet-scoped endpoints populate this from the path.
+     */
+    wallet_id?: string | null;
+    active?: boolean | null;
+    order_direction?: OrderDirection;
+  };
+  url: '/v1/me/wallets/{wallet_id}/webhooks';
+};
+
+export type ListWebhooksErrors = {
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Wallet not found
+   */
+  404: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
+
+export type ListWebhooksError = ListWebhooksErrors[keyof ListWebhooksErrors];
+
+export type ListWebhooksResponses = {
+  /**
+   * Subscriptions
+   */
+  200: Array<WebhookSubscription>;
+};
+
+export type ListWebhooksResponse = ListWebhooksResponses[keyof ListWebhooksResponses];
+
+export type CreateWebhookData = {
+  body: CreateWebhookSubscriptionRequest;
+  path: {
+    wallet_id: string;
+  };
+  query?: never;
+  url: '/v1/me/wallets/{wallet_id}/webhooks';
+};
+
+export type CreateWebhookErrors = {
+  /**
+   * Malformed request body
+   */
+  400: ErrorResponse;
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Wallet not found
+   */
+  404: ErrorResponse;
+  /**
+   * A subscription already exists for this wallet and URL
+   */
+  409: ErrorResponse;
+  /**
+   * Invalid URL or empty event filter
+   */
+  422: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
+
+export type CreateWebhookError = CreateWebhookErrors[keyof CreateWebhookErrors];
+
+export type CreateWebhookResponses = {
+  /**
+   * Created; save the signing secret because it is returned only once
+   */
+  201: CreatedWebhookSubscription;
+};
+
+export type CreateWebhookResponse = CreateWebhookResponses[keyof CreateWebhookResponses];
+
+export type DeleteWebhookData = {
+  body?: never;
+  path: {
+    wallet_id: string;
+    id: string;
+  };
+  query?: never;
+  url: '/v1/me/wallets/{wallet_id}/webhooks/{id}';
+};
+
+export type DeleteWebhookErrors = {
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Subscription not found
+   */
+  404: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
+
+export type DeleteWebhookError = DeleteWebhookErrors[keyof DeleteWebhookErrors];
+
+export type DeleteWebhookResponses = {
+  /**
+   * Deleted
+   */
+  204: void;
+};
+
+export type DeleteWebhookResponse = DeleteWebhookResponses[keyof DeleteWebhookResponses];
+
+export type GetWebhookData = {
+  body?: never;
+  path: {
+    wallet_id: string;
+    id: string;
+  };
+  query?: never;
+  url: '/v1/me/wallets/{wallet_id}/webhooks/{id}';
+};
+
+export type GetWebhookErrors = {
+  /**
+   * Bad Request
+   */
+  400: ErrorResponse;
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Subscription not found
+   */
+  404: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
+
+export type GetWebhookError = GetWebhookErrors[keyof GetWebhookErrors];
+
+export type GetWebhookResponses = {
+  /**
+   * Found
+   */
+  200: WebhookSubscription;
+};
+
+export type GetWebhookResponse = GetWebhookResponses[keyof GetWebhookResponses];
+
+export type UpdateWebhookData = {
+  body: UpdateWebhookSubscriptionRequest;
+  path: {
+    wallet_id: string;
+    id: string;
+  };
+  query?: never;
+  url: '/v1/me/wallets/{wallet_id}/webhooks/{id}';
+};
+
+export type UpdateWebhookErrors = {
+  /**
+   * Malformed request body
+   */
+  400: ErrorResponse;
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Subscription not found
+   */
+  404: ErrorResponse;
+  /**
+   * A subscription already exists for this wallet and URL
+   */
+  409: ErrorResponse;
+  /**
+   * Invalid URL or empty event filter
+   */
+  422: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
+
+export type UpdateWebhookError = UpdateWebhookErrors[keyof UpdateWebhookErrors];
+
+export type UpdateWebhookResponses = {
+  /**
+   * Updated
+   */
+  200: WebhookSubscription;
+};
+
+export type UpdateWebhookResponse = UpdateWebhookResponses[keyof UpdateWebhookResponses];
+
+export type ListWebhookDeliveriesData = {
+  body?: never;
+  path: {
+    wallet_id: string;
+    id: string;
+  };
+  query?: never;
+  url: '/v1/me/wallets/{wallet_id}/webhooks/{id}/deliveries';
+};
+
+export type ListWebhookDeliveriesErrors = {
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Subscription not found
+   */
+  404: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
+
+export type ListWebhookDeliveriesError =
+  ListWebhookDeliveriesErrors[keyof ListWebhookDeliveriesErrors];
+
+export type ListWebhookDeliveriesResponses = {
+  /**
+   * Newest 100 delivery records
+   */
+  200: Array<WebhookDelivery>;
+};
+
+export type ListWebhookDeliveriesResponse =
+  ListWebhookDeliveriesResponses[keyof ListWebhookDeliveriesResponses];
+
+export type RotateWebhookSecretData = {
+  body?: never;
+  path: {
+    wallet_id: string;
+    id: string;
+  };
+  query?: never;
+  url: '/v1/me/wallets/{wallet_id}/webhooks/{id}/rotate-secret';
+};
+
+export type RotateWebhookSecretErrors = {
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Subscription not found
+   */
+  404: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
+
+export type RotateWebhookSecretError = RotateWebhookSecretErrors[keyof RotateWebhookSecretErrors];
+
+export type RotateWebhookSecretResponses = {
+  /**
+   * Rotated; save the new secret because it is returned only once
+   */
+  200: RotateWebhookSecretResponse;
+};
+
+export type RotateWebhookSecretResponse2 =
+  RotateWebhookSecretResponses[keyof RotateWebhookSecretResponses];
+
+export type ListAccountWebhooksData = {
+  body?: never;
+  path?: never;
+  query?: {
+    /**
+     * Total amount of results to return.
+     */
+    limit?: number | null;
+    /**
+     * Offset where to start returning results.
+     */
+    offset?: number | null;
+    ids?: Array<string> | null;
+    /**
+     * Account-scoped endpoints populate this from the authenticated account.
+     */
+    account_id?: string | null;
+    /**
+     * Wallet-scoped endpoints populate this from the path.
+     */
+    wallet_id?: string | null;
+    active?: boolean | null;
+    order_direction?: OrderDirection;
+  };
+  url: '/v1/me/webhooks';
+};
+
+export type ListAccountWebhooksErrors = {
+  /**
+   * Bad Request
+   */
+  400: ErrorResponse;
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
+
+export type ListAccountWebhooksError = ListAccountWebhooksErrors[keyof ListAccountWebhooksErrors];
+
+export type ListAccountWebhooksResponses = {
+  /**
+   * Subscriptions
+   */
+  200: Array<WebhookSubscription>;
+};
+
+export type ListAccountWebhooksResponse =
+  ListAccountWebhooksResponses[keyof ListAccountWebhooksResponses];
+
 export type DeletePaymentsData = {
   body?: never;
   path?: never;
@@ -4939,3 +5381,346 @@ export type GetWalletResponses = {
 };
 
 export type GetWalletResponse = GetWalletResponses[keyof GetWalletResponses];
+
+export type ListWebhookSubscriptionsData = {
+  body?: never;
+  path?: never;
+  query?: {
+    /**
+     * Total amount of results to return.
+     */
+    limit?: number | null;
+    /**
+     * Offset where to start returning results.
+     */
+    offset?: number | null;
+    ids?: Array<string> | null;
+    /**
+     * Account-scoped endpoints populate this from the authenticated account.
+     */
+    account_id?: string | null;
+    /**
+     * Wallet-scoped endpoints populate this from the path.
+     */
+    wallet_id?: string | null;
+    active?: boolean | null;
+    order_direction?: OrderDirection;
+  };
+  url: '/v1/webhooks';
+};
+
+export type ListWebhookSubscriptionsErrors = {
+  /**
+   * Bad Request
+   */
+  400: ErrorResponse;
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Forbidden
+   */
+  403: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
+
+export type ListWebhookSubscriptionsError =
+  ListWebhookSubscriptionsErrors[keyof ListWebhookSubscriptionsErrors];
+
+export type ListWebhookSubscriptionsResponses = {
+  /**
+   * Subscriptions
+   */
+  200: Array<WebhookSubscription>;
+};
+
+export type ListWebhookSubscriptionsResponse =
+  ListWebhookSubscriptionsResponses[keyof ListWebhookSubscriptionsResponses];
+
+export type CreateWebhookSubscriptionData = {
+  body: CreateWebhookSubscriptionRequest;
+  path?: never;
+  query?: never;
+  url: '/v1/webhooks';
+};
+
+export type CreateWebhookSubscriptionErrors = {
+  /**
+   * Bad Request
+   */
+  400: ErrorResponse;
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Forbidden
+   */
+  403: ErrorResponse;
+  /**
+   * Not Found
+   */
+  404: ErrorResponse;
+  /**
+   * A subscription already exists for this wallet and URL
+   */
+  409: ErrorResponse;
+  /**
+   * Invalid URL or empty event filter
+   */
+  422: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
+
+export type CreateWebhookSubscriptionError =
+  CreateWebhookSubscriptionErrors[keyof CreateWebhookSubscriptionErrors];
+
+export type CreateWebhookSubscriptionResponses = {
+  /**
+   * Created; save the signing secret because it is returned only once
+   */
+  201: CreatedWebhookSubscription;
+};
+
+export type CreateWebhookSubscriptionResponse =
+  CreateWebhookSubscriptionResponses[keyof CreateWebhookSubscriptionResponses];
+
+export type DeleteWebhookSubscriptionData = {
+  body?: never;
+  path: {
+    id: string;
+  };
+  query?: never;
+  url: '/v1/webhooks/{id}';
+};
+
+export type DeleteWebhookSubscriptionErrors = {
+  /**
+   * Bad Request
+   */
+  400: ErrorResponse;
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Forbidden
+   */
+  403: ErrorResponse;
+  /**
+   * Not Found
+   */
+  404: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
+
+export type DeleteWebhookSubscriptionError =
+  DeleteWebhookSubscriptionErrors[keyof DeleteWebhookSubscriptionErrors];
+
+export type DeleteWebhookSubscriptionResponses = {
+  /**
+   * Deleted
+   */
+  204: void;
+};
+
+export type DeleteWebhookSubscriptionResponse =
+  DeleteWebhookSubscriptionResponses[keyof DeleteWebhookSubscriptionResponses];
+
+export type GetWebhookSubscriptionData = {
+  body?: never;
+  path: {
+    id: string;
+  };
+  query?: never;
+  url: '/v1/webhooks/{id}';
+};
+
+export type GetWebhookSubscriptionErrors = {
+  /**
+   * Bad Request
+   */
+  400: ErrorResponse;
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Forbidden
+   */
+  403: ErrorResponse;
+  /**
+   * Not Found
+   */
+  404: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
+
+export type GetWebhookSubscriptionError =
+  GetWebhookSubscriptionErrors[keyof GetWebhookSubscriptionErrors];
+
+export type GetWebhookSubscriptionResponses = {
+  /**
+   * Found
+   */
+  200: WebhookSubscription;
+};
+
+export type GetWebhookSubscriptionResponse =
+  GetWebhookSubscriptionResponses[keyof GetWebhookSubscriptionResponses];
+
+export type UpdateWebhookSubscriptionData = {
+  body: UpdateWebhookSubscriptionRequest;
+  path: {
+    id: string;
+  };
+  query?: never;
+  url: '/v1/webhooks/{id}';
+};
+
+export type UpdateWebhookSubscriptionErrors = {
+  /**
+   * Bad Request
+   */
+  400: ErrorResponse;
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Forbidden
+   */
+  403: ErrorResponse;
+  /**
+   * Not Found
+   */
+  404: ErrorResponse;
+  /**
+   * A subscription already exists for this wallet and URL
+   */
+  409: ErrorResponse;
+  /**
+   * Invalid URL or empty event filter
+   */
+  422: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
+
+export type UpdateWebhookSubscriptionError =
+  UpdateWebhookSubscriptionErrors[keyof UpdateWebhookSubscriptionErrors];
+
+export type UpdateWebhookSubscriptionResponses = {
+  /**
+   * Updated
+   */
+  200: WebhookSubscription;
+};
+
+export type UpdateWebhookSubscriptionResponse =
+  UpdateWebhookSubscriptionResponses[keyof UpdateWebhookSubscriptionResponses];
+
+export type ListWebhookSubscriptionDeliveriesData = {
+  body?: never;
+  path: {
+    id: string;
+  };
+  query?: never;
+  url: '/v1/webhooks/{id}/deliveries';
+};
+
+export type ListWebhookSubscriptionDeliveriesErrors = {
+  /**
+   * Bad Request
+   */
+  400: ErrorResponse;
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Forbidden
+   */
+  403: ErrorResponse;
+  /**
+   * Not Found
+   */
+  404: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
+
+export type ListWebhookSubscriptionDeliveriesError =
+  ListWebhookSubscriptionDeliveriesErrors[keyof ListWebhookSubscriptionDeliveriesErrors];
+
+export type ListWebhookSubscriptionDeliveriesResponses = {
+  /**
+   * Newest 100 delivery records
+   */
+  200: Array<WebhookDelivery>;
+};
+
+export type ListWebhookSubscriptionDeliveriesResponse =
+  ListWebhookSubscriptionDeliveriesResponses[keyof ListWebhookSubscriptionDeliveriesResponses];
+
+export type RotateWebhookSubscriptionSecretData = {
+  body?: never;
+  path: {
+    id: string;
+  };
+  query?: never;
+  url: '/v1/webhooks/{id}/rotate-secret';
+};
+
+export type RotateWebhookSubscriptionSecretErrors = {
+  /**
+   * Bad Request
+   */
+  400: ErrorResponse;
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Forbidden
+   */
+  403: ErrorResponse;
+  /**
+   * Not Found
+   */
+  404: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
+
+export type RotateWebhookSubscriptionSecretError =
+  RotateWebhookSubscriptionSecretErrors[keyof RotateWebhookSubscriptionSecretErrors];
+
+export type RotateWebhookSubscriptionSecretResponses = {
+  /**
+   * Rotated; save the new secret because it is returned only once
+   */
+  200: RotateWebhookSecretResponse;
+};
+
+export type RotateWebhookSubscriptionSecretResponse =
+  RotateWebhookSubscriptionSecretResponses[keyof RotateWebhookSubscriptionSecretResponses];
