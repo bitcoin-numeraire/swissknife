@@ -6,7 +6,7 @@ use crate::application::errors::DatabaseError;
 
 use super::{
     ClaimedWebhookDelivery, NewWebhookSubscription, StoredWebhookSubscription, UpdateWebhookSubscriptionRequest,
-    WebhookDelivery, WebhookSubscriptionFilter,
+    WebhookDelivery, WebhookDeliveryDetails, WebhookDeliveryFilter, WebhookPayload, WebhookSubscriptionFilter,
 };
 
 #[cfg_attr(test, mockall::automock)]
@@ -31,7 +31,22 @@ pub trait WebhookRepository: Send + Sync {
     ) -> Result<StoredWebhookSubscription, DatabaseError>;
     async fn rotate_secret(&self, id: Uuid, signing_secret: String) -> Result<(), DatabaseError>;
     async fn delete(&self, id: Uuid) -> Result<u64, DatabaseError>;
-    async fn list_deliveries(&self, subscription_id: Uuid, limit: u64) -> Result<Vec<WebhookDelivery>, DatabaseError>;
+    async fn list_deliveries(
+        &self,
+        subscription_id: Uuid,
+        filter: WebhookDeliveryFilter,
+    ) -> Result<Vec<WebhookDelivery>, DatabaseError>;
+    async fn find_delivery(
+        &self,
+        subscription_id: Uuid,
+        id: Uuid,
+    ) -> Result<Option<WebhookDeliveryDetails>, DatabaseError>;
+    async fn enqueue_test(
+        &self,
+        subscription_id: Uuid,
+        payload: WebhookPayload,
+    ) -> Result<WebhookDelivery, DatabaseError>;
+    async fn retry_delivery(&self, subscription_id: Uuid, id: Uuid) -> Result<bool, DatabaseError>;
 
     /// Fan matching durable events into delivery rows and atomically advance each subscription cursor.
     async fn prepare_deliveries(&self, batch_size: u64) -> Result<u64, DatabaseError>;

@@ -726,8 +726,16 @@ export const zWebhookDelivery = z.object({
   created_at: z.iso.datetime(),
   delivered_at: z.iso.datetime().nullish(),
   event_id: z.string(),
+  event_type: z.string(),
   id: z.uuid(),
+  in_flight: z.boolean(),
   last_error: z.string().nullish(),
+  max_attempts: z
+    .int()
+    .gte(0)
+    .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
+  next_attempt_at: z.iso.datetime().nullish(),
+  resource_id: z.uuid().nullish(),
   response_status: z
     .int()
     .gte(0)
@@ -737,6 +745,25 @@ export const zWebhookDelivery = z.object({
   subscription_id: z.uuid(),
   updated_at: z.iso.datetime().nullish(),
 });
+
+/**
+ * The exact JSON envelope signed and sent to the receiver. Test events use
+ * `webhook.test` and have no invoice/payment resource.
+ */
+export const zWebhookPayload = z.object({
+  created_at: z.iso.datetime(),
+  data: z.record(z.string(), z.unknown()),
+  id: z.string(),
+  resource_id: z.uuid().nullish(),
+  type: z.string(),
+  wallet_id: z.uuid(),
+});
+
+export const zWebhookDeliveryDetails = zWebhookDelivery.and(
+  z.object({
+    payload: zWebhookPayload,
+  })
+);
 
 /**
  * Webhook configuration. The signing secret is never returned after creation or rotation.
@@ -1699,10 +1726,51 @@ export const zListWebhookDeliveriesPath = z.object({
   id: z.uuid(),
 });
 
+export const zListWebhookDeliveriesQuery = z.object({
+  limit: z.coerce
+    .bigint()
+    .gte(BigInt(0))
+    .max(BigInt('9223372036854775807'), {
+      error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
+    })
+    .nullish(),
+  offset: z.coerce
+    .bigint()
+    .gte(BigInt(0))
+    .max(BigInt('9223372036854775807'), {
+      error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
+    })
+    .nullish(),
+  status: zWebhookDeliveryStatus.nullish(),
+  order_direction: zOrderDirection.optional(),
+});
+
 /**
- * Newest 100 delivery records
+ * Paginated delivery history (up to 100 per page)
  */
 export const zListWebhookDeliveriesResponse = z.array(zWebhookDelivery);
+
+export const zGetWebhookDeliveryPath = z.object({
+  wallet_id: z.uuid(),
+  id: z.uuid(),
+  delivery_id: z.uuid(),
+});
+
+/**
+ * Found
+ */
+export const zGetWebhookDeliveryResponse = zWebhookDeliveryDetails;
+
+export const zRetryWebhookDeliveryPath = z.object({
+  wallet_id: z.uuid(),
+  id: z.uuid(),
+  delivery_id: z.uuid(),
+});
+
+/**
+ * Queued for delivery
+ */
+export const zRetryWebhookDeliveryResponse = zWebhookDelivery;
 
 export const zRotateWebhookSecretPath = z.object({
   wallet_id: z.uuid(),
@@ -1713,6 +1781,16 @@ export const zRotateWebhookSecretPath = z.object({
  * Rotated; save the new secret because it is returned only once
  */
 export const zRotateWebhookSecretResponse2 = zRotateWebhookSecretResponse;
+
+export const zSendWebhookTestPath = z.object({
+  wallet_id: z.uuid(),
+  id: z.uuid(),
+});
+
+/**
+ * Queued for delivery
+ */
+export const zSendWebhookTestResponse = zWebhookDelivery;
 
 export const zListAccountWebhooksQuery = z.object({
   limit: z.coerce
@@ -1984,10 +2062,49 @@ export const zListWebhookSubscriptionDeliveriesPath = z.object({
   id: z.uuid(),
 });
 
+export const zListWebhookSubscriptionDeliveriesQuery = z.object({
+  limit: z.coerce
+    .bigint()
+    .gte(BigInt(0))
+    .max(BigInt('9223372036854775807'), {
+      error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
+    })
+    .nullish(),
+  offset: z.coerce
+    .bigint()
+    .gte(BigInt(0))
+    .max(BigInt('9223372036854775807'), {
+      error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
+    })
+    .nullish(),
+  status: zWebhookDeliveryStatus.nullish(),
+  order_direction: zOrderDirection.optional(),
+});
+
 /**
- * Newest 100 delivery records
+ * Paginated delivery history (up to 100 per page)
  */
 export const zListWebhookSubscriptionDeliveriesResponse = z.array(zWebhookDelivery);
+
+export const zGetWebhookSubscriptionDeliveryPath = z.object({
+  id: z.uuid(),
+  delivery_id: z.uuid(),
+});
+
+/**
+ * Found
+ */
+export const zGetWebhookSubscriptionDeliveryResponse = zWebhookDeliveryDetails;
+
+export const zRetryWebhookSubscriptionDeliveryPath = z.object({
+  id: z.uuid(),
+  delivery_id: z.uuid(),
+});
+
+/**
+ * Queued for delivery
+ */
+export const zRetryWebhookSubscriptionDeliveryResponse = zWebhookDelivery;
 
 export const zRotateWebhookSubscriptionSecretPath = z.object({
   id: z.uuid(),
@@ -1997,3 +2114,12 @@ export const zRotateWebhookSubscriptionSecretPath = z.object({
  * Rotated; save the new secret because it is returned only once
  */
 export const zRotateWebhookSubscriptionSecretResponse = zRotateWebhookSecretResponse;
+
+export const zSendWebhookSubscriptionTestPath = z.object({
+  id: z.uuid(),
+});
+
+/**
+ * Queued for delivery
+ */
+export const zSendWebhookSubscriptionTestResponse = zWebhookDelivery;

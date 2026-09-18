@@ -10,7 +10,7 @@ pub struct Model {
     #[sea_orm(unique_key = "idx_webhook_delivery_subscription_event")]
     pub subscription_id: Uuid,
     #[sea_orm(unique_key = "idx_webhook_delivery_subscription_event")]
-    pub client_event_id: i32,
+    pub client_event_id: Option<i32>,
     pub status: String,
     pub attempt_count: i32,
     pub next_attempt_at: DateTime,
@@ -21,6 +21,8 @@ pub struct Model {
     pub delivered_at: Option<DateTime>,
     pub created_at: DateTime,
     pub updated_at: Option<DateTime>,
+    #[sea_orm(column_type = "JsonBinary", nullable)]
+    pub test_payload: Option<Json>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

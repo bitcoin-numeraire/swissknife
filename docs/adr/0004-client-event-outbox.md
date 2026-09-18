@@ -84,6 +84,41 @@ Only public HTTPS destinations are delivered. The worker rejects credentials and
 
 Retention takes the same event-log lock as fan-out and subscription changes. It preserves events not yet consumed by an active subscription and events referenced by pending deliveries. Terminal delivery records are removed with their expired events; otherwise their foreign keys would prevent cleanup. Subscription updates modify only requested fields and cannot roll back a worker cursor or a rotated secret.
 
+### Dashboard diagnostics and explicit delivery actions
+
+The Developers dashboard separates personal and instance scope for both API keys
+and webhooks. Personal operations use `/me` even for administrators. Administrative
+read and write permissions remain independent; write-only users supply known IDs
+without fetching other accounts or wallets. Secrets remain in transient component
+state until acknowledged, and are never stored in list/detail caches.
+
+Both webhook route families expose filtered, paginated `GET /{id}/deliveries`,
+`GET /{id}/deliveries/{delivery_id}` with the retained signed payload,
+`POST /{id}/test`, and `POST /{id}/deliveries/{delivery_id}/retry`. Reads require
+ownership or `read:webhook`; actions require ownership or `write:webhook`.
+
+Test deliveries use the ordinary durable delivery queue, destination checks,
+signing, leases, timeout and retry policy. Their payload type is `webhook.test`,
+the event ID is a UUID, and `resource_id` is absent. They never enter the wallet
+event journal or SSE stream, change balances, or fan out to other subscriptions.
+Each subscription allows one test per minute and must finish its previous test
+before queuing another. Disabling a subscription also stops queued tests.
+
+Manual redelivery only queues retained terminal deliveries on enabled
+subscriptions, with no live lease and fewer than eight recorded attempts. It
+preserves the delivery ID, original payload and cumulative attempt count; it does
+not reset the budget or replay an event to other subscriptions. A successful
+redelivery uses the current destination and signing secret. Receivers must still
+deduplicate the stable delivery ID. Disabling retains outstanding leases so a
+subsequent re-enable/retry cannot overlap a request already in flight. Concurrent
+manual actions serialize with retention and subscription changes.
+
+Test payloads are stored directly on delivery rows, with a database constraint
+requiring exactly one source: a wallet event or a test payload. Terminal tests
+expire under the same retention window as wallet events; pending tests survive
+cleanup. Upgrading preserves existing delivery IDs, attempt history and foreign
+key behavior on both SQLite and PostgreSQL.
+
 ## Consequences
 
 - Clients can stop polling wallet resources solely to notice settlement. REST remains authoritative for initial loads, explicit refresh, focus, and navigation.

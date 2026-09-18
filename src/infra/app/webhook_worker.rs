@@ -4,20 +4,17 @@ use std::{
 };
 
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
-use chrono::{DateTime, Utc};
+use chrono::Utc;
 use futures_util::{stream, StreamExt};
 use hmac::{Hmac, Mac};
 use reqwest::{redirect::Policy, StatusCode, Url};
-use serde::Serialize;
-use serde_json::Value;
 use sha2::Sha256;
 use tokio::{sync::watch, task::JoinHandle};
 use tracing::{debug, error, warn};
-use uuid::Uuid;
 
 use crate::{
     application::composition::AppStore,
-    domains::event::{ClaimedWebhookDelivery, ClientEventType},
+    domains::event::{ClaimedWebhookDelivery, MAX_WEBHOOK_ATTEMPTS},
 };
 
 const POLL_INTERVAL: Duration = Duration::from_secs(1);
@@ -26,7 +23,6 @@ const LEASE_SECONDS: i64 = 60;
 const PREPARE_BATCH_SIZE: u64 = 100;
 const DELIVERY_BATCH_SIZE: u64 = 20;
 const DELIVERY_CONCURRENCY: usize = 10;
-const MAX_ATTEMPTS: u32 = 8;
 const MAX_ERROR_LENGTH: usize = 2_000;
 
 type HmacSha256 = Hmac<Sha256>;
@@ -105,7 +101,7 @@ impl WebhookWorker {
             }
             Err(failure) => {
                 let attempt = delivery.attempt_count + 1;
-                let exhausted = failure.permanent || attempt >= MAX_ATTEMPTS;
+                let exhausted = failure.permanent || attempt >= MAX_WEBHOOK_ATTEMPTS;
                 let next_attempt_at = Utc::now() + retry_delay(delivery.attempt_count);
                 let error_message = truncate_error(failure.message);
                 if let Err(error) = self
@@ -134,17 +130,6 @@ impl WebhookWorker {
             }
         }
     }
-}
-
-#[derive(Serialize)]
-struct WebhookEnvelope<'a> {
-    id: &'a str,
-    #[serde(rename = "type")]
-    event_type: ClientEventType,
-    wallet_id: Uuid,
-    resource_id: Uuid,
-    created_at: DateTime<Utc>,
-    data: &'a Value,
 }
 
 #[derive(Debug)]
@@ -188,15 +173,7 @@ async fn send_delivery_request(delivery: &ClaimedWebhookDelivery) -> Result<Stat
 }
 
 fn signed_payload(delivery: &ClaimedWebhookDelivery, timestamp: i64) -> Result<(Vec<u8>, String), DeliveryFailure> {
-    let body = serde_json::to_vec(&WebhookEnvelope {
-        id: &delivery.event.id,
-        event_type: delivery.event.event_type,
-        wallet_id: delivery.event.wallet_id,
-        resource_id: delivery.event.resource_id,
-        created_at: delivery.event.created_at,
-        data: &delivery.event.data,
-    })
-    .map_err(|error| DeliveryFailure {
+    let body = serde_json::to_vec(&delivery.event).map_err(|error| DeliveryFailure {
         status: None,
         message: format!("Failed to serialize webhook body: {error}"),
         permanent: true,
@@ -385,11 +362,13 @@ fn truncate_error(mut error: String) -> String {
 #[cfg(test)]
 mod tests {
     #[cfg(feature = "itest")]
-    use crate::domains::event::ClientEvent;
+    use crate::domains::event::{ClientEvent, ClientEventType};
     #[cfg(feature = "itest")]
     use chrono::TimeZone;
     #[cfg(feature = "itest")]
-    use serde_json::json;
+    use serde_json::{json, Value};
+    #[cfg(feature = "itest")]
+    use uuid::Uuid;
     #[cfg(feature = "itest")]
     use wiremock::{
         matchers::{method, path},
@@ -410,7 +389,8 @@ mod tests {
                 resource_id: Uuid::parse_str("dddddddd-dddd-4ddd-8ddd-dddddddddddd").unwrap(),
                 data: json!({"status": "Settled"}),
                 created_at: Utc.timestamp_opt(1_700_000_000, 0).unwrap(),
-            },
+            }
+            .into(),
             url: "https://hooks.example.com/swissknife".to_string(),
             signing_secret: URL_SAFE_NO_PAD.encode(b"test secret"),
             attempt_count: 0,

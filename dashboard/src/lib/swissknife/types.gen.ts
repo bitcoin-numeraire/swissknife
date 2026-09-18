@@ -1327,12 +1327,27 @@ export type WebhookDelivery = {
   created_at: Date;
   delivered_at?: Date | null;
   event_id: string;
+  event_type: string;
   id: string;
+  in_flight: boolean;
   last_error?: string | null;
+  /**
+   * Manual retries retain the delivery ID and consume this same attempt budget.
+   */
+  max_attempts: number;
+  /**
+   * Next scheduled attempt, only while pending.
+   */
+  next_attempt_at?: Date | null;
+  resource_id?: string | null;
   response_status?: number | null;
   status: WebhookDeliveryStatus;
   subscription_id: string;
   updated_at?: Date | null;
+};
+
+export type WebhookDeliveryDetails = WebhookDelivery & {
+  payload: WebhookPayload;
 };
 
 export const WebhookDeliveryStatus = {
@@ -1343,6 +1358,21 @@ export const WebhookDeliveryStatus = {
 
 export type WebhookDeliveryStatus =
   (typeof WebhookDeliveryStatus)[keyof typeof WebhookDeliveryStatus];
+
+/**
+ * The exact JSON envelope signed and sent to the receiver. Test events use
+ * `webhook.test` and have no invoice/payment resource.
+ */
+export type WebhookPayload = {
+  created_at: Date;
+  data: {
+    [key: string]: unknown;
+  };
+  id: string;
+  resource_id?: string | null;
+  type: string;
+  wallet_id: string;
+};
 
 /**
  * Webhook configuration. The signing secret is never returned after creation or rotation.
@@ -4568,7 +4598,12 @@ export type ListWebhookDeliveriesData = {
     wallet_id: string;
     id: string;
   };
-  query?: never;
+  query?: {
+    limit?: number | null;
+    offset?: number | null;
+    status?: null | WebhookDeliveryStatus;
+    order_direction?: OrderDirection;
+  };
   url: '/v1/me/wallets/{wallet_id}/webhooks/{id}/deliveries';
 };
 
@@ -4592,13 +4627,102 @@ export type ListWebhookDeliveriesError =
 
 export type ListWebhookDeliveriesResponses = {
   /**
-   * Newest 100 delivery records
+   * Paginated delivery history (up to 100 per page)
    */
   200: Array<WebhookDelivery>;
 };
 
 export type ListWebhookDeliveriesResponse =
   ListWebhookDeliveriesResponses[keyof ListWebhookDeliveriesResponses];
+
+export type GetWebhookDeliveryData = {
+  body?: never;
+  path: {
+    wallet_id: string;
+    id: string;
+    delivery_id: string;
+  };
+  query?: never;
+  url: '/v1/me/wallets/{wallet_id}/webhooks/{id}/deliveries/{delivery_id}';
+};
+
+export type GetWebhookDeliveryErrors = {
+  /**
+   * Bad Request
+   */
+  400: ErrorResponse;
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Not Found
+   */
+  404: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
+
+export type GetWebhookDeliveryError = GetWebhookDeliveryErrors[keyof GetWebhookDeliveryErrors];
+
+export type GetWebhookDeliveryResponses = {
+  /**
+   * Found
+   */
+  200: WebhookDeliveryDetails;
+};
+
+export type GetWebhookDeliveryResponse =
+  GetWebhookDeliveryResponses[keyof GetWebhookDeliveryResponses];
+
+export type RetryWebhookDeliveryData = {
+  body?: never;
+  path: {
+    wallet_id: string;
+    id: string;
+    delivery_id: string;
+  };
+  query?: never;
+  url: '/v1/me/wallets/{wallet_id}/webhooks/{id}/deliveries/{delivery_id}/retry';
+};
+
+export type RetryWebhookDeliveryErrors = {
+  /**
+   * Bad Request
+   */
+  400: ErrorResponse;
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Not Found
+   */
+  404: ErrorResponse;
+  /**
+   * Subscription disabled, delivery pending, limit reached, or attempt in flight
+   */
+  409: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
+
+export type RetryWebhookDeliveryError =
+  RetryWebhookDeliveryErrors[keyof RetryWebhookDeliveryErrors];
+
+export type RetryWebhookDeliveryResponses = {
+  /**
+   * Queued for delivery
+   */
+  202: WebhookDelivery;
+};
+
+export type RetryWebhookDeliveryResponse =
+  RetryWebhookDeliveryResponses[keyof RetryWebhookDeliveryResponses];
 
 export type RotateWebhookSecretData = {
   body?: never;
@@ -4636,6 +4760,50 @@ export type RotateWebhookSecretResponses = {
 
 export type RotateWebhookSecretResponse2 =
   RotateWebhookSecretResponses[keyof RotateWebhookSecretResponses];
+
+export type SendWebhookTestData = {
+  body?: never;
+  path: {
+    wallet_id: string;
+    id: string;
+  };
+  query?: never;
+  url: '/v1/me/wallets/{wallet_id}/webhooks/{id}/test';
+};
+
+export type SendWebhookTestErrors = {
+  /**
+   * Bad Request
+   */
+  400: ErrorResponse;
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Not Found
+   */
+  404: ErrorResponse;
+  /**
+   * Subscription disabled, delivery pending, limit reached, or attempt in flight
+   */
+  409: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
+
+export type SendWebhookTestError = SendWebhookTestErrors[keyof SendWebhookTestErrors];
+
+export type SendWebhookTestResponses = {
+  /**
+   * Queued for delivery
+   */
+  202: WebhookDelivery;
+};
+
+export type SendWebhookTestResponse = SendWebhookTestResponses[keyof SendWebhookTestResponses];
 
 export type ListAccountWebhooksData = {
   body?: never;
@@ -5640,7 +5808,12 @@ export type ListWebhookSubscriptionDeliveriesData = {
   path: {
     id: string;
   };
-  query?: never;
+  query?: {
+    limit?: number | null;
+    offset?: number | null;
+    status?: null | WebhookDeliveryStatus;
+    order_direction?: OrderDirection;
+  };
   url: '/v1/webhooks/{id}/deliveries';
 };
 
@@ -5672,13 +5845,109 @@ export type ListWebhookSubscriptionDeliveriesError =
 
 export type ListWebhookSubscriptionDeliveriesResponses = {
   /**
-   * Newest 100 delivery records
+   * Paginated delivery history (up to 100 per page)
    */
   200: Array<WebhookDelivery>;
 };
 
 export type ListWebhookSubscriptionDeliveriesResponse =
   ListWebhookSubscriptionDeliveriesResponses[keyof ListWebhookSubscriptionDeliveriesResponses];
+
+export type GetWebhookSubscriptionDeliveryData = {
+  body?: never;
+  path: {
+    id: string;
+    delivery_id: string;
+  };
+  query?: never;
+  url: '/v1/webhooks/{id}/deliveries/{delivery_id}';
+};
+
+export type GetWebhookSubscriptionDeliveryErrors = {
+  /**
+   * Bad Request
+   */
+  400: ErrorResponse;
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Forbidden
+   */
+  403: ErrorResponse;
+  /**
+   * Not Found
+   */
+  404: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
+
+export type GetWebhookSubscriptionDeliveryError =
+  GetWebhookSubscriptionDeliveryErrors[keyof GetWebhookSubscriptionDeliveryErrors];
+
+export type GetWebhookSubscriptionDeliveryResponses = {
+  /**
+   * Found
+   */
+  200: WebhookDeliveryDetails;
+};
+
+export type GetWebhookSubscriptionDeliveryResponse =
+  GetWebhookSubscriptionDeliveryResponses[keyof GetWebhookSubscriptionDeliveryResponses];
+
+export type RetryWebhookSubscriptionDeliveryData = {
+  body?: never;
+  path: {
+    id: string;
+    delivery_id: string;
+  };
+  query?: never;
+  url: '/v1/webhooks/{id}/deliveries/{delivery_id}/retry';
+};
+
+export type RetryWebhookSubscriptionDeliveryErrors = {
+  /**
+   * Bad Request
+   */
+  400: ErrorResponse;
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Forbidden
+   */
+  403: ErrorResponse;
+  /**
+   * Not Found
+   */
+  404: ErrorResponse;
+  /**
+   * Subscription disabled, delivery pending, limit reached, or attempt in flight
+   */
+  409: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
+
+export type RetryWebhookSubscriptionDeliveryError =
+  RetryWebhookSubscriptionDeliveryErrors[keyof RetryWebhookSubscriptionDeliveryErrors];
+
+export type RetryWebhookSubscriptionDeliveryResponses = {
+  /**
+   * Queued for delivery
+   */
+  202: WebhookDelivery;
+};
+
+export type RetryWebhookSubscriptionDeliveryResponse =
+  RetryWebhookSubscriptionDeliveryResponses[keyof RetryWebhookSubscriptionDeliveryResponses];
 
 export type RotateWebhookSubscriptionSecretData = {
   body?: never;
@@ -5724,3 +5993,52 @@ export type RotateWebhookSubscriptionSecretResponses = {
 
 export type RotateWebhookSubscriptionSecretResponse =
   RotateWebhookSubscriptionSecretResponses[keyof RotateWebhookSubscriptionSecretResponses];
+
+export type SendWebhookSubscriptionTestData = {
+  body?: never;
+  path: {
+    id: string;
+  };
+  query?: never;
+  url: '/v1/webhooks/{id}/test';
+};
+
+export type SendWebhookSubscriptionTestErrors = {
+  /**
+   * Bad Request
+   */
+  400: ErrorResponse;
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Forbidden
+   */
+  403: ErrorResponse;
+  /**
+   * Not Found
+   */
+  404: ErrorResponse;
+  /**
+   * Subscription disabled, delivery pending, limit reached, or attempt in flight
+   */
+  409: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
+
+export type SendWebhookSubscriptionTestError =
+  SendWebhookSubscriptionTestErrors[keyof SendWebhookSubscriptionTestErrors];
+
+export type SendWebhookSubscriptionTestResponses = {
+  /**
+   * Queued for delivery
+   */
+  202: WebhookDelivery;
+};
+
+export type SendWebhookSubscriptionTestResponse =
+  SendWebhookSubscriptionTestResponses[keyof SendWebhookSubscriptionTestResponses];

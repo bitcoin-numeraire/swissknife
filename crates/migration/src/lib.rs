@@ -32,6 +32,7 @@ mod m20260717_105719_persist_lnurl_success_action;
 mod m20260717_170449_add_client_event_log;
 mod m20260814_151430_promote_wallet_account_unique_constraint;
 mod m20260911_232008_add_webhook_delivery;
+mod m20260918_083447_webhook_delivery_diagnostics;
 
 pub struct Migrator;
 
@@ -71,6 +72,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260717_170449_add_client_event_log::Migration),
             Box::new(m20260814_151430_promote_wallet_account_unique_constraint::Migration),
             Box::new(m20260911_232008_add_webhook_delivery::Migration),
+            Box::new(m20260918_083447_webhook_delivery_diagnostics::Migration),
         ]
     }
 }
