@@ -7,6 +7,8 @@ import Divider from '@mui/material/Divider';
 import Typography from '@mui/material/Typography';
 import IconButton from '@mui/material/IconButton';
 
+import { useTranslate } from 'src/locales';
+
 import { Iconify } from 'src/components/iconify';
 
 import { CreateApiKeyForm } from './create-api-key-form';
@@ -26,6 +28,7 @@ type Props = DrawerProps & {
 };
 
 export function CreateApiKeyDrawer({ title, isAdmin, open, onClose, onSuccess }: Props) {
+  const { t } = useTranslate();
   return (
     <Drawer anchor="right" open={open} onClose={onClose} slotProps={{ paper: { sx: drawerSx } }}>
       <Stack
@@ -33,7 +36,7 @@ export function CreateApiKeyDrawer({ title, isAdmin, open, onClose, onSuccess }:
         sx={{ alignItems: 'center', justifyContent: 'space-between', px: 3, py: 2 }}
       >
         <Typography variant="h6">{title || 'Create API key'}</Typography>
-        <IconButton onClick={onClose}>
+        <IconButton onClick={onClose} aria-label={t('close')}>
           <Iconify icon="mingcute:close-line" />
         </IconButton>
       </Stack>

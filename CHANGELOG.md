@@ -10,6 +10,10 @@ release notes when a tag is published.
 
 ### Added
 
+- Added a Developers dashboard with personal and administrative API-key and
+  webhook management, one-time signing secrets, delivery diagnostics, signed
+  test events, and bounded manual redelivery ([#359]).
+
 - Added explicit accounts, authentication identities, account preferences, and
   an asset catalog. Accounts can own multiple wallets, with each wallet holding
   exactly one asset on one settlement network ([#297]).
@@ -148,3 +152,5 @@ release notes when a tag is published.
 [#330]: https://github.com/bitcoin-numeraire/swissknife/issues/330
 [#331]: https://github.com/bitcoin-numeraire/swissknife/pull/331
 [398e89f]: https://github.com/bitcoin-numeraire/swissknife/commit/398e89f
+
+[#359]: https://github.com/bitcoin-numeraire/swissknife/issues/359

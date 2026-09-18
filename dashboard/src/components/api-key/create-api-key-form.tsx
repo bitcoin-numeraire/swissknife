@@ -22,7 +22,11 @@ import { handleActionError } from 'src/utils/errors';
 import { useTranslate } from 'src/locales';
 import { CONFIG } from 'src/global-config';
 import { zCreateApiKeyRequest } from 'src/lib/swissknife/zod.gen';
-import { createApiKey, createAccountApiKey } from 'src/lib/swissknife';
+import {
+  createApiKey,
+  createAccountApiKey,
+  Permission as PermissionValue,
+} from 'src/lib/swissknife';
 
 import { toast } from 'src/components/snackbar';
 import { AccountSelect } from 'src/components/account';
@@ -98,6 +102,7 @@ export function CreateApiKeyForm({ onSuccess, isAdmin }: Props) {
     <Stack spacing={2}>
       <Alert severity="warning">{t('create_api_key_form.key_display_message')}</Alert>
       <TextField
+        label={t('developers.api_token')}
         value={apiKey.key}
         slotProps={{
           input: {
@@ -167,7 +172,16 @@ export function CreateApiKeyForm({ onSuccess, isAdmin }: Props) {
             </Alert>
           )}
 
-          {isAdmin && <AccountSelect />}
+          {isAdmin &&
+            (user?.permissions.includes(PermissionValue.READ_ACCOUNT) ? (
+              <AccountSelect />
+            ) : (
+              <RHFTextField
+                name="account_id"
+                label={t('webhook.account_id')}
+                helperText={t('developers.account_id_help')}
+              />
+            ))}
 
           <Button
             type="submit"
