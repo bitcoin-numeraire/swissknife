@@ -6359,6 +6359,94 @@
         "operationId": "list_webhooks",
         "parameters": [
           {
+            "name": "limit",
+            "in": "query",
+            "description": "Total amount of results to return.",
+            "required": false,
+            "schema": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "int64",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "description": "Offset where to start returning results.",
+            "required": false,
+            "schema": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "int64",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "ids",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": [
+                "array",
+                "null"
+              ],
+              "items": {
+                "type": "string",
+                "format": "uuid"
+              }
+            }
+          },
+          {
+            "name": "account_id",
+            "in": "query",
+            "description": "Account-scoped endpoints populate this from the authenticated account.",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "wallet_id",
+            "in": "query",
+            "description": "Wallet-scoped endpoints populate this from the path.",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "active",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "order_direction",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/OrderDirection"
+            }
+          },
+          {
             "name": "wallet_id",
             "in": "path",
             "required": true,
@@ -6524,6 +6612,89 @@
       }
     },
     "/v1/me/wallets/{wallet_id}/webhooks/{id}": {
+      "get": {
+        "tags": [
+          "Me"
+        ],
+        "summary": "Get a webhook for an account-owned wallet.",
+        "operationId": "get_webhook",
+        "parameters": [
+          {
+            "name": "wallet_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WebhookSubscription"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"400 Bad Request\",\n    \"reason\": \"Missing required parameter in request\"\n}\n"
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"401 Unauthorized\",\n    \"reason\": \"Invalid credentials\"\n}\n"
+              }
+            }
+          },
+          "404": {
+            "description": "Subscription not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"404 Not Found\",\n    \"reason\": \"Resource not found\"\n}\n"
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"500 Internal Server Error\",\n    \"reason\": \"Internal server error, Please contact your administrator or try later\"\n}\n"
+              }
+            }
+          }
+        }
+      },
       "put": {
         "tags": [
           "Me"
@@ -6835,6 +7006,153 @@
                   "$ref": "#/components/schemas/ErrorResponse"
                 },
                 "example": "\n{\n    \"status\": \"404 Not Found\",\n    \"reason\": \"Resource not found\"\n}\n"
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"500 Internal Server Error\",\n    \"reason\": \"Internal server error, Please contact your administrator or try later\"\n}\n"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/me/webhooks": {
+      "get": {
+        "tags": [
+          "Me"
+        ],
+        "summary": "List webhooks across the authenticated account's wallets.",
+        "operationId": "list_account_webhooks",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Total amount of results to return.",
+            "required": false,
+            "schema": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "int64",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "description": "Offset where to start returning results.",
+            "required": false,
+            "schema": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "int64",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "ids",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": [
+                "array",
+                "null"
+              ],
+              "items": {
+                "type": "string",
+                "format": "uuid"
+              }
+            }
+          },
+          {
+            "name": "account_id",
+            "in": "query",
+            "description": "Account-scoped endpoints populate this from the authenticated account.",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "wallet_id",
+            "in": "query",
+            "description": "Wallet-scoped endpoints populate this from the path.",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "active",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "order_direction",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/OrderDirection"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Subscriptions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/WebhookSubscription"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"400 Bad Request\",\n    \"reason\": \"Missing required parameter in request\"\n}\n"
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"401 Unauthorized\",\n    \"reason\": \"Invalid credentials\"\n}\n"
               }
             }
           },
@@ -8261,6 +8579,729 @@
           }
         }
       }
+    },
+    "/v1/webhooks": {
+      "get": {
+        "tags": [
+          "Webhooks"
+        ],
+        "summary": "List webhook subscriptions across accounts.",
+        "operationId": "list_webhook_subscriptions",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Total amount of results to return.",
+            "required": false,
+            "schema": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "int64",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "description": "Offset where to start returning results.",
+            "required": false,
+            "schema": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "int64",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "ids",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": [
+                "array",
+                "null"
+              ],
+              "items": {
+                "type": "string",
+                "format": "uuid"
+              }
+            }
+          },
+          {
+            "name": "account_id",
+            "in": "query",
+            "description": "Account-scoped endpoints populate this from the authenticated account.",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "wallet_id",
+            "in": "query",
+            "description": "Wallet-scoped endpoints populate this from the path.",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "active",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "order_direction",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/OrderDirection"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Subscriptions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/WebhookSubscription"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"400 Bad Request\",\n    \"reason\": \"Missing required parameter in request\"\n}\n"
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"401 Unauthorized\",\n    \"reason\": \"Invalid credentials\"\n}\n"
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"403 Forbidden\",\n    \"reason\": \"Missing permissions\"\n}\n"
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"500 Internal Server Error\",\n    \"reason\": \"Internal server error, Please contact your administrator or try later\"\n}\n"
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Webhooks"
+        ],
+        "summary": "Create a webhook for a wallet owned by any account.",
+        "operationId": "create_webhook_subscription",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateWebhookSubscriptionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created; save the signing secret because it is returned only once",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreatedWebhookSubscription"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"400 Bad Request\",\n    \"reason\": \"Missing required parameter in request\"\n}\n"
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"401 Unauthorized\",\n    \"reason\": \"Invalid credentials\"\n}\n"
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"403 Forbidden\",\n    \"reason\": \"Missing permissions\"\n}\n"
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"404 Not Found\",\n    \"reason\": \"Resource not found\"\n}\n"
+              }
+            }
+          },
+          "409": {
+            "description": "A subscription already exists for this wallet and URL",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"409 Conflict\",\n    \"reason\": \"Admin account already created\"\n}\n"
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid URL or empty event filter",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"422 Unprocessable Entity\",\n    \"reason\": \"Validation failed: ...\"\n}\n"
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"500 Internal Server Error\",\n    \"reason\": \"Internal server error, Please contact your administrator or try later\"\n}\n"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/webhooks/{id}": {
+      "get": {
+        "tags": [
+          "Webhooks"
+        ],
+        "summary": "Get a webhook subscription.",
+        "operationId": "get_webhook_subscription",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WebhookSubscription"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"400 Bad Request\",\n    \"reason\": \"Missing required parameter in request\"\n}\n"
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"401 Unauthorized\",\n    \"reason\": \"Invalid credentials\"\n}\n"
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"403 Forbidden\",\n    \"reason\": \"Missing permissions\"\n}\n"
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"404 Not Found\",\n    \"reason\": \"Resource not found\"\n}\n"
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"500 Internal Server Error\",\n    \"reason\": \"Internal server error, Please contact your administrator or try later\"\n}\n"
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Webhooks"
+        ],
+        "summary": "Update a webhook endpoint, event filter, or enabled state.",
+        "operationId": "update_webhook_subscription",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateWebhookSubscriptionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WebhookSubscription"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"400 Bad Request\",\n    \"reason\": \"Missing required parameter in request\"\n}\n"
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"401 Unauthorized\",\n    \"reason\": \"Invalid credentials\"\n}\n"
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"403 Forbidden\",\n    \"reason\": \"Missing permissions\"\n}\n"
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"404 Not Found\",\n    \"reason\": \"Resource not found\"\n}\n"
+              }
+            }
+          },
+          "409": {
+            "description": "A subscription already exists for this wallet and URL",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"409 Conflict\",\n    \"reason\": \"Admin account already created\"\n}\n"
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid URL or empty event filter",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"422 Unprocessable Entity\",\n    \"reason\": \"Validation failed: ...\"\n}\n"
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"500 Internal Server Error\",\n    \"reason\": \"Internal server error, Please contact your administrator or try later\"\n}\n"
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Webhooks"
+        ],
+        "summary": "Delete a webhook subscription.",
+        "operationId": "delete_webhook_subscription",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"400 Bad Request\",\n    \"reason\": \"Missing required parameter in request\"\n}\n"
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"401 Unauthorized\",\n    \"reason\": \"Invalid credentials\"\n}\n"
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"403 Forbidden\",\n    \"reason\": \"Missing permissions\"\n}\n"
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"404 Not Found\",\n    \"reason\": \"Resource not found\"\n}\n"
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"500 Internal Server Error\",\n    \"reason\": \"Internal server error, Please contact your administrator or try later\"\n}\n"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/webhooks/{id}/deliveries": {
+      "get": {
+        "tags": [
+          "Webhooks"
+        ],
+        "summary": "List webhook delivery history.",
+        "operationId": "list_webhook_subscription_deliveries",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Newest 100 delivery records",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/WebhookDelivery"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"400 Bad Request\",\n    \"reason\": \"Missing required parameter in request\"\n}\n"
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"401 Unauthorized\",\n    \"reason\": \"Invalid credentials\"\n}\n"
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"403 Forbidden\",\n    \"reason\": \"Missing permissions\"\n}\n"
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"404 Not Found\",\n    \"reason\": \"Resource not found\"\n}\n"
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"500 Internal Server Error\",\n    \"reason\": \"Internal server error, Please contact your administrator or try later\"\n}\n"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/webhooks/{id}/rotate-secret": {
+      "post": {
+        "tags": [
+          "Webhooks"
+        ],
+        "summary": "Rotate a webhook signing secret.",
+        "operationId": "rotate_webhook_subscription_secret",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Rotated; save the new secret because it is returned only once",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RotateWebhookSecretResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"400 Bad Request\",\n    \"reason\": \"Missing required parameter in request\"\n}\n"
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"401 Unauthorized\",\n    \"reason\": \"Invalid credentials\"\n}\n"
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"403 Forbidden\",\n    \"reason\": \"Missing permissions\"\n}\n"
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"404 Not Found\",\n    \"reason\": \"Resource not found\"\n}\n"
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"500 Internal Server Error\",\n    \"reason\": \"Internal server error, Please contact your administrator or try later\"\n}\n"
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -8962,6 +10003,14 @@
           "url": {
             "type": "string",
             "description": "Public HTTPS endpoint that receives signed POST requests."
+          },
+          "wallet_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "Target wallet. Required by administrative endpoints; account-scoped\nendpoints use the wallet in the path instead."
           }
         }
       },
@@ -9808,6 +10857,8 @@
           "write:ln_node",
           "read:api_key",
           "write:api_key",
+          "read:webhook",
+          "write:webhook",
           "read:btc_address",
           "write:btc_address"
         ]
@@ -10497,6 +11548,10 @@
     {
       "name": "API Keys",
       "description": "API Key Management. Require `read:api_key` or `write:api_key` permissions. "
+    },
+    {
+      "name": "Webhooks",
+      "description": "Webhook management across accounts. Requires `read:webhook` or `write:webhook` permissions."
     },
     {
       "name": "Bitcoin Addresses",

@@ -3,7 +3,7 @@ use chrono::{DateTime, NaiveDateTime, Utc};
 use sea_orm::{
     sea_query::{Expr, OnConflict},
     ActiveModelTrait, ColumnTrait, Condition, DatabaseConnection, DatabaseTransaction, DbErr, EntityTrait, ExprTrait,
-    QueryFilter, QueryOrder, QuerySelect, Set, SqlErr, TransactionTrait,
+    QueryFilter, QueryOrder, QuerySelect, QueryTrait, Set, SqlErr, TransactionTrait,
 };
 use uuid::Uuid;
 
@@ -11,7 +11,7 @@ use crate::{
     application::errors::DatabaseError,
     domains::event::{
         ClaimedWebhookDelivery, ClientEventType, NewWebhookSubscription, StoredWebhookSubscription,
-        UpdateWebhookSubscriptionRequest, WebhookDelivery, WebhookRepository,
+        UpdateWebhookSubscriptionRequest, WebhookDelivery, WebhookRepository, WebhookSubscriptionFilter,
     },
     infra::database::sea_orm::models::{
         client_event,
@@ -24,6 +24,7 @@ use crate::{
 };
 
 use super::lock_client_event_log;
+use crate::infra::database::sea_orm::sea_order;
 
 const PENDING: &str = "Pending";
 const DELIVERED: &str = "Delivered";
@@ -100,15 +101,38 @@ impl WebhookRepository for SeaOrmWebhookRepository {
         Ok(model.into())
     }
 
+    async fn find(&self, id: Uuid) -> Result<Option<StoredWebhookSubscription>, DatabaseError> {
+        Ok(WebhookSubscriptionEntity::find_by_id(id)
+            .one(&self.db)
+            .await
+            .map_err(|e| DatabaseError::FindOne(e.to_string()))?
+            .map(Into::into))
+    }
+
     async fn find_many(
         &self,
-        account_id: Uuid,
-        wallet_id: Uuid,
+        filter: WebhookSubscriptionFilter,
     ) -> Result<Vec<StoredWebhookSubscription>, DatabaseError> {
         Ok(WebhookSubscriptionEntity::find()
-            .filter(webhook_subscription::Column::AccountId.eq(account_id))
-            .filter(webhook_subscription::Column::WalletId.eq(wallet_id))
-            .order_by_asc(webhook_subscription::Column::CreatedAt)
+            .apply_if(filter.account_id, |q, id| {
+                q.filter(webhook_subscription::Column::AccountId.eq(id))
+            })
+            .apply_if(filter.wallet_id, |q, id| {
+                q.filter(webhook_subscription::Column::WalletId.eq(id))
+            })
+            .apply_if(filter.ids, |q, ids| {
+                q.filter(webhook_subscription::Column::Id.is_in(ids))
+            })
+            .apply_if(filter.active, |q, active| {
+                q.filter(webhook_subscription::Column::Active.eq(active))
+            })
+            .order_by(
+                webhook_subscription::Column::CreatedAt,
+                sea_order(&filter.order_direction),
+            )
+            .order_by(webhook_subscription::Column::Id, sea_order(&filter.order_direction))
+            .offset(filter.offset)
+            .limit(filter.limit)
             .all(&self.db)
             .await
             .map_err(|e| DatabaseError::FindMany(e.to_string()))?
@@ -203,35 +227,15 @@ impl WebhookRepository for SeaOrmWebhookRepository {
         Ok(())
     }
 
-    async fn delete_owned(&self, account_id: Uuid, wallet_id: Uuid, id: Uuid) -> Result<u64, DatabaseError> {
-        let result = WebhookSubscriptionEntity::delete_many()
-            .filter(webhook_subscription::Column::Id.eq(id))
-            .filter(webhook_subscription::Column::AccountId.eq(account_id))
-            .filter(webhook_subscription::Column::WalletId.eq(wallet_id))
+    async fn delete(&self, id: Uuid) -> Result<u64, DatabaseError> {
+        let result = WebhookSubscriptionEntity::delete_by_id(id)
             .exec(&self.db)
             .await
             .map_err(|e| DatabaseError::Delete(e.to_string()))?;
         Ok(result.rows_affected)
     }
 
-    async fn list_deliveries(
-        &self,
-        account_id: Uuid,
-        wallet_id: Uuid,
-        subscription_id: Uuid,
-        limit: u64,
-    ) -> Result<Vec<WebhookDelivery>, DatabaseError> {
-        let owned = WebhookSubscriptionEntity::find_by_id(subscription_id)
-            .filter(webhook_subscription::Column::AccountId.eq(account_id))
-            .filter(webhook_subscription::Column::WalletId.eq(wallet_id))
-            .one(&self.db)
-            .await
-            .map_err(|e| DatabaseError::FindOne(e.to_string()))?
-            .is_some();
-        if !owned {
-            return Ok(Vec::new());
-        }
-
+    async fn list_deliveries(&self, subscription_id: Uuid, limit: u64) -> Result<Vec<WebhookDelivery>, DatabaseError> {
         Ok(WebhookDeliveryEntity::find()
             .filter(webhook_delivery::Column::SubscriptionId.eq(subscription_id))
             .order_by_desc(webhook_delivery::Column::CreatedAt)

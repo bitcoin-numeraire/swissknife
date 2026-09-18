@@ -1078,7 +1078,7 @@ async fn webhook_outbox_filters_deduplicates_leases_and_retries() {
     assert_eq!(webhooks.prepare_deliveries(100).await.expect("prepare"), 1);
     assert_eq!(webhooks.prepare_deliveries(100).await.expect("prepare replay"), 0);
     let history = webhooks
-        .list_deliveries(wallet.account_id, wallet_id, subscription.id, 100)
+        .list_deliveries(subscription.id, 100)
         .await
         .expect("delivery history");
     assert_eq!(history.len(), 1);
@@ -1123,7 +1123,7 @@ async fn webhook_outbox_filters_deduplicates_leases_and_retries() {
         .await
         .expect("ignore stale lease outcome");
     let history = webhooks
-        .list_deliveries(wallet.account_id, wallet_id, subscription.id, 100)
+        .list_deliveries(subscription.id, 100)
         .await
         .expect("delivery history");
     assert_eq!(history[0].status, WebhookDeliveryStatus::Pending);
@@ -1135,7 +1135,7 @@ async fn webhook_outbox_filters_deduplicates_leases_and_retries() {
         .expect("record delivery");
 
     let history = webhooks
-        .list_deliveries(wallet.account_id, wallet_id, subscription.id, 100)
+        .list_deliveries(subscription.id, 100)
         .await
         .expect("delivery history");
     assert_eq!(history[0].status, WebhookDeliveryStatus::Delivered);
@@ -1169,7 +1169,7 @@ async fn webhook_outbox_filters_deduplicates_leases_and_retries() {
         .await
         .expect("disable subscription atomically");
     let history = webhooks
-        .list_deliveries(wallet.account_id, wallet_id, subscription.id, 100)
+        .list_deliveries(subscription.id, 100)
         .await
         .expect("delivery history");
     assert_eq!(history[0].status, WebhookDeliveryStatus::Exhausted);
@@ -1268,11 +1268,7 @@ async fn webhook_retention_preserves_unconsumed_events_and_pending_deliveries() 
         .await
         .unwrap();
     assert_eq!(events.prune_before(cutoff).await.unwrap(), 1);
-    assert!(webhooks
-        .list_deliveries(account, wallet_id, sub.id, 100)
-        .await
-        .unwrap()
-        .is_empty());
+    assert!(webhooks.list_deliveries(sub.id, 100).await.unwrap().is_empty());
 }
 
 #[tokio::test]

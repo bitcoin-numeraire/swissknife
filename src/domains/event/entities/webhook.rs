@@ -4,6 +4,7 @@ use uuid::Uuid;
 pub use swissknife_types::{
     CreateWebhookSubscriptionRequest, CreatedWebhookSubscription, RotateWebhookSecretResponse,
     UpdateWebhookSubscriptionRequest, WebhookDelivery, WebhookDeliveryStatus, WebhookSubscription,
+    WebhookSubscriptionFilter,
 };
 
 use super::{ClientEvent, ClientEventType};

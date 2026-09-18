@@ -6,17 +6,17 @@ use crate::application::errors::DatabaseError;
 
 use super::{
     ClaimedWebhookDelivery, NewWebhookSubscription, StoredWebhookSubscription, UpdateWebhookSubscriptionRequest,
-    WebhookDelivery,
+    WebhookDelivery, WebhookSubscriptionFilter,
 };
 
 #[cfg_attr(test, mockall::automock)]
 #[async_trait]
 pub trait WebhookRepository: Send + Sync {
     async fn insert(&self, subscription: NewWebhookSubscription) -> Result<StoredWebhookSubscription, DatabaseError>;
+    async fn find(&self, id: Uuid) -> Result<Option<StoredWebhookSubscription>, DatabaseError>;
     async fn find_many(
         &self,
-        account_id: Uuid,
-        wallet_id: Uuid,
+        filter: WebhookSubscriptionFilter,
     ) -> Result<Vec<StoredWebhookSubscription>, DatabaseError>;
     async fn find_owned(
         &self,
@@ -30,14 +30,8 @@ pub trait WebhookRepository: Send + Sync {
         request: UpdateWebhookSubscriptionRequest,
     ) -> Result<StoredWebhookSubscription, DatabaseError>;
     async fn rotate_secret(&self, id: Uuid, signing_secret: String) -> Result<(), DatabaseError>;
-    async fn delete_owned(&self, account_id: Uuid, wallet_id: Uuid, id: Uuid) -> Result<u64, DatabaseError>;
-    async fn list_deliveries(
-        &self,
-        account_id: Uuid,
-        wallet_id: Uuid,
-        subscription_id: Uuid,
-        limit: u64,
-    ) -> Result<Vec<WebhookDelivery>, DatabaseError>;
+    async fn delete(&self, id: Uuid) -> Result<u64, DatabaseError>;
+    async fn list_deliveries(&self, subscription_id: Uuid, limit: u64) -> Result<Vec<WebhookDelivery>, DatabaseError>;
 
     /// Fan matching durable events into delivery rows and atomically advance each subscription cursor.
     async fn prepare_deliveries(&self, batch_size: u64) -> Result<u64, DatabaseError>;

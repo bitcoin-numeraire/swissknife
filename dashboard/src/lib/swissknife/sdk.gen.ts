@@ -15,6 +15,7 @@ import {
   createAccountWalletResponseTransformer,
   createApiKeyResponseTransformer,
   createWebhookResponseTransformer,
+  createWebhookSubscriptionResponseTransformer,
   generateBtcAddressResponseTransformer,
   generateInvoiceResponseTransformer,
   getAccountAddressResponseTransformer,
@@ -31,9 +32,12 @@ import {
   getWalletInvoiceResponseTransformer,
   getWalletPaymentResponseTransformer,
   getWalletResponseTransformer,
+  getWebhookResponseTransformer,
+  getWebhookSubscriptionResponseTransformer,
   listAccountApiKeysResponseTransformer,
   listAccountsResponseTransformer,
   listAccountWalletsResponseTransformer,
+  listAccountWebhooksResponseTransformer,
   listAddressesResponseTransformer,
   listApiKeysResponseTransformer,
   listBtcAddressesResponseTransformer,
@@ -47,6 +51,8 @@ import {
   listWalletsResponseTransformer,
   listWebhookDeliveriesResponseTransformer,
   listWebhooksResponseTransformer,
+  listWebhookSubscriptionDeliveriesResponseTransformer,
+  listWebhookSubscriptionsResponseTransformer,
   newWalletBtcAddressResponseTransformer,
   newWalletInvoiceResponseTransformer,
   payResponseTransformer,
@@ -61,6 +67,7 @@ import {
   updateAddressResponseTransformer,
   updateCurrentAccountResponseTransformer,
   updateWebhookResponseTransformer,
+  updateWebhookSubscriptionResponseTransformer,
   walletPayResponseTransformer,
 } from './transformers.gen';
 import type {
@@ -85,6 +92,9 @@ import type {
   CreateWebhookData,
   CreateWebhookErrors,
   CreateWebhookResponses,
+  CreateWebhookSubscriptionData,
+  CreateWebhookSubscriptionErrors,
+  CreateWebhookSubscriptionResponses,
   DeleteAccountAddressData,
   DeleteAccountAddressErrors,
   DeleteAccountAddressResponses,
@@ -133,6 +143,9 @@ import type {
   DeleteWebhookData,
   DeleteWebhookErrors,
   DeleteWebhookResponses,
+  DeleteWebhookSubscriptionData,
+  DeleteWebhookSubscriptionErrors,
+  DeleteWebhookSubscriptionResponses,
   EstimatePaymentFeeData,
   EstimatePaymentFeeErrors,
   EstimatePaymentFeeResponses,
@@ -190,6 +203,12 @@ import type {
   GetWalletPaymentErrors,
   GetWalletPaymentResponses,
   GetWalletResponses,
+  GetWebhookData,
+  GetWebhookErrors,
+  GetWebhookResponses,
+  GetWebhookSubscriptionData,
+  GetWebhookSubscriptionErrors,
+  GetWebhookSubscriptionResponses,
   HealthCheckData,
   HealthCheckErrors,
   HealthCheckResponses,
@@ -202,6 +221,9 @@ import type {
   ListAccountWalletsData,
   ListAccountWalletsErrors,
   ListAccountWalletsResponses,
+  ListAccountWebhooksData,
+  ListAccountWebhooksErrors,
+  ListAccountWebhooksResponses,
   ListAddressesData,
   ListAddressesErrors,
   ListAddressesResponses,
@@ -241,6 +263,12 @@ import type {
   ListWebhooksData,
   ListWebhooksErrors,
   ListWebhooksResponses,
+  ListWebhookSubscriptionDeliveriesData,
+  ListWebhookSubscriptionDeliveriesErrors,
+  ListWebhookSubscriptionDeliveriesResponses,
+  ListWebhookSubscriptionsData,
+  ListWebhookSubscriptionsErrors,
+  ListWebhookSubscriptionsResponses,
   MarkWelcomeCompleteData,
   MarkWelcomeCompleteErrors,
   MarkWelcomeCompleteResponses,
@@ -282,6 +310,9 @@ import type {
   RotateWebhookSecretData,
   RotateWebhookSecretErrors,
   RotateWebhookSecretResponses,
+  RotateWebhookSubscriptionSecretData,
+  RotateWebhookSubscriptionSecretErrors,
+  RotateWebhookSubscriptionSecretResponses,
   SetupCheckData,
   SetupCheckErrors,
   SetupCheckResponses,
@@ -313,6 +344,9 @@ import type {
   UpdateWebhookData,
   UpdateWebhookErrors,
   UpdateWebhookResponses,
+  UpdateWebhookSubscriptionData,
+  UpdateWebhookSubscriptionErrors,
+  UpdateWebhookSubscriptionResponses,
   VersionCheckData,
   VersionCheckResponses,
   WalletPayData,
@@ -1448,6 +1482,19 @@ export const deleteWebhook = <ThrowOnError extends boolean = false>(
     ...options,
   });
 
+/**
+ * Get a webhook for an account-owned wallet.
+ */
+export const getWebhook = <ThrowOnError extends boolean = false>(
+  options: Options<GetWebhookData, ThrowOnError>
+): RequestResult<GetWebhookResponses, GetWebhookErrors, ThrowOnError> =>
+  (options.client ?? client).get<GetWebhookResponses, GetWebhookErrors, ThrowOnError>({
+    responseTransformer: getWebhookResponseTransformer,
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/me/wallets/{wallet_id}/webhooks/{id}',
+    ...options,
+  });
+
 export const updateWebhook = <ThrowOnError extends boolean = false>(
   options: Options<UpdateWebhookData, ThrowOnError>
 ): RequestResult<UpdateWebhookResponses, UpdateWebhookErrors, ThrowOnError> =>
@@ -1486,6 +1533,23 @@ export const rotateWebhookSecret = <ThrowOnError extends boolean = false>(
   >({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/v1/me/wallets/{wallet_id}/webhooks/{id}/rotate-secret',
+    ...options,
+  });
+
+/**
+ * List webhooks across the authenticated account's wallets.
+ */
+export const listAccountWebhooks = <ThrowOnError extends boolean = false>(
+  options?: Options<ListAccountWebhooksData, ThrowOnError>
+): RequestResult<ListAccountWebhooksResponses, ListAccountWebhooksErrors, ThrowOnError> =>
+  (options?.client ?? client).get<
+    ListAccountWebhooksResponses,
+    ListAccountWebhooksErrors,
+    ThrowOnError
+  >({
+    responseTransformer: listAccountWebhooksResponseTransformer,
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/me/webhooks',
     ...options,
   });
 
@@ -1755,5 +1819,150 @@ export const getWallet = <ThrowOnError extends boolean = false>(
     responseTransformer: getWalletResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/v1/wallets/{id}',
+    ...options,
+  });
+
+/**
+ * List webhook subscriptions across accounts.
+ */
+export const listWebhookSubscriptions = <ThrowOnError extends boolean = false>(
+  options?: Options<ListWebhookSubscriptionsData, ThrowOnError>
+): RequestResult<ListWebhookSubscriptionsResponses, ListWebhookSubscriptionsErrors, ThrowOnError> =>
+  (options?.client ?? client).get<
+    ListWebhookSubscriptionsResponses,
+    ListWebhookSubscriptionsErrors,
+    ThrowOnError
+  >({
+    responseTransformer: listWebhookSubscriptionsResponseTransformer,
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/webhooks',
+    ...options,
+  });
+
+/**
+ * Create a webhook for a wallet owned by any account.
+ */
+export const createWebhookSubscription = <ThrowOnError extends boolean = false>(
+  options: Options<CreateWebhookSubscriptionData, ThrowOnError>
+): RequestResult<
+  CreateWebhookSubscriptionResponses,
+  CreateWebhookSubscriptionErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    CreateWebhookSubscriptionResponses,
+    CreateWebhookSubscriptionErrors,
+    ThrowOnError
+  >({
+    responseTransformer: createWebhookSubscriptionResponseTransformer,
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/webhooks',
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
+
+/**
+ * Delete a webhook subscription.
+ */
+export const deleteWebhookSubscription = <ThrowOnError extends boolean = false>(
+  options: Options<DeleteWebhookSubscriptionData, ThrowOnError>
+): RequestResult<
+  DeleteWebhookSubscriptionResponses,
+  DeleteWebhookSubscriptionErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).delete<
+    DeleteWebhookSubscriptionResponses,
+    DeleteWebhookSubscriptionErrors,
+    ThrowOnError
+  >({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/webhooks/{id}',
+    ...options,
+  });
+
+/**
+ * Get a webhook subscription.
+ */
+export const getWebhookSubscription = <ThrowOnError extends boolean = false>(
+  options: Options<GetWebhookSubscriptionData, ThrowOnError>
+): RequestResult<GetWebhookSubscriptionResponses, GetWebhookSubscriptionErrors, ThrowOnError> =>
+  (options.client ?? client).get<
+    GetWebhookSubscriptionResponses,
+    GetWebhookSubscriptionErrors,
+    ThrowOnError
+  >({
+    responseTransformer: getWebhookSubscriptionResponseTransformer,
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/webhooks/{id}',
+    ...options,
+  });
+
+/**
+ * Update a webhook endpoint, event filter, or enabled state.
+ */
+export const updateWebhookSubscription = <ThrowOnError extends boolean = false>(
+  options: Options<UpdateWebhookSubscriptionData, ThrowOnError>
+): RequestResult<
+  UpdateWebhookSubscriptionResponses,
+  UpdateWebhookSubscriptionErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).put<
+    UpdateWebhookSubscriptionResponses,
+    UpdateWebhookSubscriptionErrors,
+    ThrowOnError
+  >({
+    responseTransformer: updateWebhookSubscriptionResponseTransformer,
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/webhooks/{id}',
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
+
+/**
+ * List webhook delivery history.
+ */
+export const listWebhookSubscriptionDeliveries = <ThrowOnError extends boolean = false>(
+  options: Options<ListWebhookSubscriptionDeliveriesData, ThrowOnError>
+): RequestResult<
+  ListWebhookSubscriptionDeliveriesResponses,
+  ListWebhookSubscriptionDeliveriesErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    ListWebhookSubscriptionDeliveriesResponses,
+    ListWebhookSubscriptionDeliveriesErrors,
+    ThrowOnError
+  >({
+    responseTransformer: listWebhookSubscriptionDeliveriesResponseTransformer,
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/webhooks/{id}/deliveries',
+    ...options,
+  });
+
+/**
+ * Rotate a webhook signing secret.
+ */
+export const rotateWebhookSubscriptionSecret = <ThrowOnError extends boolean = false>(
+  options: Options<RotateWebhookSubscriptionSecretData, ThrowOnError>
+): RequestResult<
+  RotateWebhookSubscriptionSecretResponses,
+  RotateWebhookSubscriptionSecretErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    RotateWebhookSubscriptionSecretResponses,
+    RotateWebhookSubscriptionSecretErrors,
+    ThrowOnError
+  >({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/webhooks/{id}/rotate-secret',
     ...options,
   });

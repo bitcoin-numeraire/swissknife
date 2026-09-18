@@ -11,8 +11,8 @@ use crate::application::{
 
 use super::{
     ClientEventType, CreateWebhookSubscriptionRequest, CreatedWebhookSubscription, NewWebhookSubscription,
-    RotateWebhookSecretResponse, StoredWebhookSubscription, UpdateWebhookSubscriptionRequest, WebhookDelivery,
-    WebhookSubscription, WebhookUseCases,
+    RotateWebhookSecretResponse, UpdateWebhookSubscriptionRequest, WebhookDelivery, WebhookSubscription,
+    WebhookSubscriptionFilter, WebhookUseCases,
 };
 
 const DELIVERY_HISTORY_LIMIT: u64 = 100;
@@ -71,40 +71,33 @@ impl WebhookService {
         }
         Ok(unique)
     }
-
-    async fn find_owned(
-        &self,
-        account_id: Uuid,
-        wallet_id: Uuid,
-        id: Uuid,
-    ) -> Result<StoredWebhookSubscription, ApplicationError> {
-        self.store
-            .webhook
-            .find_owned(account_id, wallet_id, id)
-            .await?
-            .ok_or_else(|| DataError::NotFound("Webhook subscription not found.".to_string()).into())
-    }
 }
 
 #[async_trait]
 impl WebhookUseCases for WebhookService {
     async fn create(
         &self,
-        account_id: Uuid,
         wallet_id: Uuid,
         request: CreateWebhookSubscriptionRequest,
     ) -> Result<CreatedWebhookSubscription, ApplicationError> {
-        debug!(%account_id, %wallet_id, "Creating webhook subscription");
-        if !self.store.wallet.exists_for_account(account_id, wallet_id).await? {
-            return Err(DataError::NotFound("Wallet not found.".to_string()).into());
-        }
+        debug!(%wallet_id, "Creating webhook subscription");
+        let wallet = self
+            .store
+            .wallet
+            .find(wallet_id)
+            .await?
+            .ok_or_else(|| DataError::NotFound("Wallet not found.".to_string()))?;
+        let account_id = wallet.account_id;
         Self::validate_url(&request.url)?;
         let event_types = Self::validate_event_types(request.event_types)?;
 
         if self
             .store
             .webhook
-            .find_many(account_id, wallet_id)
+            .find_many(WebhookSubscriptionFilter {
+                wallet_id: Some(wallet_id),
+                ..Default::default()
+            })
             .await?
             .iter()
             .any(|subscription| subscription.url == request.url)
@@ -134,16 +127,37 @@ impl WebhookUseCases for WebhookService {
         })
     }
 
-    async fn list(&self, account_id: Uuid, wallet_id: Uuid) -> Result<Vec<WebhookSubscription>, ApplicationError> {
-        trace!(%account_id, %wallet_id, "Listing webhook subscriptions");
-        if !self.store.wallet.exists_for_account(account_id, wallet_id).await? {
-            return Err(DataError::NotFound("Wallet not found.".to_string()).into());
-        }
+    async fn get(&self, id: Uuid) -> Result<WebhookSubscription, ApplicationError> {
+        trace!(%id, "Fetching webhook subscription");
+        self.store
+            .webhook
+            .find(id)
+            .await?
+            .map(Into::into)
+            .ok_or_else(|| DataError::NotFound("Webhook subscription not found.".to_string()).into())
+    }
 
+    async fn get_by_account_id(
+        &self,
+        account_id: Uuid,
+        wallet_id: Uuid,
+        id: Uuid,
+    ) -> Result<WebhookSubscription, ApplicationError> {
+        trace!(%account_id, %wallet_id, %id, "Fetching account webhook subscription");
+        self.store
+            .webhook
+            .find_owned(account_id, wallet_id, id)
+            .await?
+            .map(Into::into)
+            .ok_or_else(|| DataError::NotFound("Webhook subscription not found.".to_string()).into())
+    }
+
+    async fn list(&self, filter: WebhookSubscriptionFilter) -> Result<Vec<WebhookSubscription>, ApplicationError> {
+        trace!(?filter, "Listing webhook subscriptions");
         Ok(self
             .store
             .webhook
-            .find_many(account_id, wallet_id)
+            .find_many(filter)
             .await?
             .into_iter()
             .map(Into::into)
@@ -152,20 +166,21 @@ impl WebhookUseCases for WebhookService {
 
     async fn update(
         &self,
-        account_id: Uuid,
-        wallet_id: Uuid,
         id: Uuid,
         request: UpdateWebhookSubscriptionRequest,
     ) -> Result<WebhookSubscription, ApplicationError> {
-        debug!(%account_id, %wallet_id, subscription_id = %id, "Updating webhook subscription");
-        self.find_owned(account_id, wallet_id, id).await?;
+        debug!(subscription_id = %id, "Updating webhook subscription");
+        let subscription = self.get(id).await?;
         let mut request = request;
         if let Some(url) = &request.url {
             Self::validate_url(url)?;
             if self
                 .store
                 .webhook
-                .find_many(account_id, wallet_id)
+                .find_many(WebhookSubscriptionFilter {
+                    wallet_id: Some(subscription.wallet_id),
+                    ..Default::default()
+                })
                 .await?
                 .iter()
                 .any(|subscription| subscription.id != id && &subscription.url == url)
@@ -182,45 +197,35 @@ impl WebhookUseCases for WebhookService {
             .update(id, request)
             .await
             .map_err(Self::map_write_error)?;
-        info!(%account_id, %wallet_id, subscription_id = %id, "Webhook subscription updated successfully");
+        info!(subscription_id = %id, "Webhook subscription updated successfully");
         Ok(stored.into())
     }
 
-    async fn delete(&self, account_id: Uuid, wallet_id: Uuid, id: Uuid) -> Result<(), ApplicationError> {
-        debug!(%account_id, %wallet_id, subscription_id = %id, "Deleting webhook subscription");
-        if self.store.webhook.delete_owned(account_id, wallet_id, id).await? == 0 {
+    async fn delete(&self, id: Uuid) -> Result<(), ApplicationError> {
+        debug!(subscription_id = %id, "Deleting webhook subscription");
+        if self.store.webhook.delete(id).await? == 0 {
             return Err(DataError::NotFound("Webhook subscription not found.".to_string()).into());
         }
-        info!(%account_id, %wallet_id, subscription_id = %id, "Webhook subscription deleted successfully");
+        info!(subscription_id = %id, "Webhook subscription deleted successfully");
         Ok(())
     }
 
-    async fn rotate_secret(
-        &self,
-        account_id: Uuid,
-        wallet_id: Uuid,
-        id: Uuid,
-    ) -> Result<RotateWebhookSecretResponse, ApplicationError> {
-        debug!(%account_id, %wallet_id, subscription_id = %id, "Rotating webhook signing secret");
-        self.find_owned(account_id, wallet_id, id).await?;
+    async fn rotate_secret(&self, id: Uuid) -> Result<RotateWebhookSecretResponse, ApplicationError> {
+        debug!(subscription_id = %id, "Rotating webhook signing secret");
+        self.get(id).await?;
         let signing_secret = Self::generate_secret();
         self.store.webhook.rotate_secret(id, signing_secret.clone()).await?;
-        info!(%account_id, %wallet_id, subscription_id = %id, "Webhook signing secret rotated successfully");
+        info!(subscription_id = %id, "Webhook signing secret rotated successfully");
         Ok(RotateWebhookSecretResponse { signing_secret })
     }
 
-    async fn list_deliveries(
-        &self,
-        account_id: Uuid,
-        wallet_id: Uuid,
-        subscription_id: Uuid,
-    ) -> Result<Vec<WebhookDelivery>, ApplicationError> {
-        trace!(%account_id, %wallet_id, %subscription_id, "Listing webhook deliveries");
-        self.find_owned(account_id, wallet_id, subscription_id).await?;
+    async fn list_deliveries(&self, subscription_id: Uuid) -> Result<Vec<WebhookDelivery>, ApplicationError> {
+        trace!(%subscription_id, "Listing webhook deliveries");
+        self.get(subscription_id).await?;
         Ok(self
             .store
             .webhook
-            .list_deliveries(account_id, wallet_id, subscription_id, DELIVERY_HISTORY_LIMIT)
+            .list_deliveries(subscription_id, DELIVERY_HISTORY_LIMIT)
             .await?)
     }
 }
@@ -229,7 +234,10 @@ impl WebhookUseCases for WebhookService {
 mod tests {
     use chrono::Utc;
 
-    use crate::application::composition::MockAppStoreBuilder;
+    use crate::{
+        application::composition::MockAppStoreBuilder,
+        domains::{event::StoredWebhookSubscription, wallet::Wallet},
+    };
 
     use super::*;
 
@@ -272,15 +280,17 @@ mod tests {
         let mut store = MockAppStoreBuilder::new();
         store
             .wallet
-            .expect_exists_for_account()
-            .withf(move |account, wallet| *account == account_id && *wallet == wallet_id)
+            .expect_find()
+            .withf(move |id| *id == wallet_id)
             .times(1)
-            .returning(|_, _| Ok(true));
-        store
-            .webhook
-            .expect_find_many()
-            .times(1)
-            .returning(|_, _| Ok(Vec::new()));
+            .returning(move |_| {
+                Ok(Some(Wallet {
+                    id: wallet_id,
+                    account_id,
+                    ..Default::default()
+                }))
+            });
+        store.webhook.expect_find_many().times(1).returning(|_| Ok(Vec::new()));
         store
             .webhook
             .expect_insert()
@@ -307,9 +317,9 @@ mod tests {
 
         let created = WebhookService::new(store.build())
             .create(
-                account_id,
                 wallet_id,
                 CreateWebhookSubscriptionRequest {
+                    wallet_id: None,
                     url: "https://hooks.example.com/swissknife".to_string(),
                     event_types: vec![ClientEventType::PaymentSettled],
                 },

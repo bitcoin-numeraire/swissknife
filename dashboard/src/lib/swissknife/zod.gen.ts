@@ -180,6 +180,7 @@ export const zCreateWalletRequest = z.object({
 export const zCreateWebhookSubscriptionRequest = z.object({
   event_types: z.array(zClientEventType),
   url: z.string(),
+  wallet_id: z.uuid().nullish(),
 });
 
 /**
@@ -473,6 +474,8 @@ export const zPermission = z.enum([
   'write:ln_node',
   'read:api_key',
   'write:api_key',
+  'read:webhook',
+  'write:webhook',
   'read:btc_address',
   'write:btc_address',
 ]);
@@ -1621,6 +1624,28 @@ export const zListWebhooksPath = z.object({
   wallet_id: z.uuid(),
 });
 
+export const zListWebhooksQuery = z.object({
+  limit: z.coerce
+    .bigint()
+    .gte(BigInt(0))
+    .max(BigInt('9223372036854775807'), {
+      error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
+    })
+    .nullish(),
+  offset: z.coerce
+    .bigint()
+    .gte(BigInt(0))
+    .max(BigInt('9223372036854775807'), {
+      error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
+    })
+    .nullish(),
+  ids: z.array(z.uuid()).nullish(),
+  account_id: z.uuid().nullish(),
+  wallet_id: z.uuid().nullish(),
+  active: z.boolean().nullish(),
+  order_direction: zOrderDirection.optional(),
+});
+
 /**
  * Subscriptions
  */
@@ -1646,6 +1671,16 @@ export const zDeleteWebhookPath = z.object({
  * Deleted
  */
 export const zDeleteWebhookResponse = z.void();
+
+export const zGetWebhookPath = z.object({
+  wallet_id: z.uuid(),
+  id: z.uuid(),
+});
+
+/**
+ * Found
+ */
+export const zGetWebhookResponse = zWebhookSubscription;
 
 export const zUpdateWebhookBody = zUpdateWebhookSubscriptionRequest;
 
@@ -1678,6 +1713,33 @@ export const zRotateWebhookSecretPath = z.object({
  * Rotated; save the new secret because it is returned only once
  */
 export const zRotateWebhookSecretResponse2 = zRotateWebhookSecretResponse;
+
+export const zListAccountWebhooksQuery = z.object({
+  limit: z.coerce
+    .bigint()
+    .gte(BigInt(0))
+    .max(BigInt('9223372036854775807'), {
+      error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
+    })
+    .nullish(),
+  offset: z.coerce
+    .bigint()
+    .gte(BigInt(0))
+    .max(BigInt('9223372036854775807'), {
+      error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
+    })
+    .nullish(),
+  ids: z.array(z.uuid()).nullish(),
+  account_id: z.uuid().nullish(),
+  wallet_id: z.uuid().nullish(),
+  active: z.boolean().nullish(),
+  order_direction: zOrderDirection.optional(),
+});
+
+/**
+ * Subscriptions
+ */
+export const zListAccountWebhooksResponse = z.array(zWebhookSubscription);
 
 export const zDeletePaymentsQuery = z.object({
   limit: z.coerce
@@ -1854,3 +1916,84 @@ export const zGetWalletPath = z.object({
  * Found
  */
 export const zGetWalletResponse = zWallet;
+
+export const zListWebhookSubscriptionsQuery = z.object({
+  limit: z.coerce
+    .bigint()
+    .gte(BigInt(0))
+    .max(BigInt('9223372036854775807'), {
+      error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
+    })
+    .nullish(),
+  offset: z.coerce
+    .bigint()
+    .gte(BigInt(0))
+    .max(BigInt('9223372036854775807'), {
+      error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
+    })
+    .nullish(),
+  ids: z.array(z.uuid()).nullish(),
+  account_id: z.uuid().nullish(),
+  wallet_id: z.uuid().nullish(),
+  active: z.boolean().nullish(),
+  order_direction: zOrderDirection.optional(),
+});
+
+/**
+ * Subscriptions
+ */
+export const zListWebhookSubscriptionsResponse = z.array(zWebhookSubscription);
+
+export const zCreateWebhookSubscriptionBody = zCreateWebhookSubscriptionRequest;
+
+/**
+ * Created; save the signing secret because it is returned only once
+ */
+export const zCreateWebhookSubscriptionResponse = zCreatedWebhookSubscription;
+
+export const zDeleteWebhookSubscriptionPath = z.object({
+  id: z.uuid(),
+});
+
+/**
+ * Deleted
+ */
+export const zDeleteWebhookSubscriptionResponse = z.void();
+
+export const zGetWebhookSubscriptionPath = z.object({
+  id: z.uuid(),
+});
+
+/**
+ * Found
+ */
+export const zGetWebhookSubscriptionResponse = zWebhookSubscription;
+
+export const zUpdateWebhookSubscriptionBody = zUpdateWebhookSubscriptionRequest;
+
+export const zUpdateWebhookSubscriptionPath = z.object({
+  id: z.uuid(),
+});
+
+/**
+ * Updated
+ */
+export const zUpdateWebhookSubscriptionResponse = zWebhookSubscription;
+
+export const zListWebhookSubscriptionDeliveriesPath = z.object({
+  id: z.uuid(),
+});
+
+/**
+ * Newest 100 delivery records
+ */
+export const zListWebhookSubscriptionDeliveriesResponse = z.array(zWebhookDelivery);
+
+export const zRotateWebhookSubscriptionSecretPath = z.object({
+  id: z.uuid(),
+});
+
+/**
+ * Rotated; save the new secret because it is returned only once
+ */
+export const zRotateWebhookSubscriptionSecretResponse = zRotateWebhookSecretResponse;

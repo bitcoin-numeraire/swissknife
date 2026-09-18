@@ -1,8 +1,11 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use serde_with::{serde_as, DisplayFromStr};
 use strum_macros::{Display, EnumString};
 use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
+
+use crate::OrderDirection;
 
 /// A durable event emitted after an invoice or payment changes state.
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
@@ -49,10 +52,34 @@ pub struct ClientEventStreamQuery {
 /// Create a server-to-server webhook for one account-owned wallet.
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 pub struct CreateWebhookSubscriptionRequest {
+    /// Target wallet. Required by administrative endpoints; account-scoped
+    /// endpoints use the wallet in the path instead.
+    pub wallet_id: Option<Uuid>,
     /// Public HTTPS endpoint that receives signed POST requests.
     pub url: String,
     /// Non-empty event filter.
     pub event_types: Vec<ClientEventType>,
+}
+
+/// Webhook subscription query filter.
+#[serde_as]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, IntoParams)]
+pub struct WebhookSubscriptionFilter {
+    /// Total amount of results to return.
+    #[serde_as(as = "Option<DisplayFromStr>")]
+    pub limit: Option<u64>,
+    /// Offset where to start returning results.
+    #[serde_as(as = "Option<DisplayFromStr>")]
+    pub offset: Option<u64>,
+    pub ids: Option<Vec<Uuid>>,
+    /// Account-scoped endpoints populate this from the authenticated account.
+    pub account_id: Option<Uuid>,
+    /// Wallet-scoped endpoints populate this from the path.
+    pub wallet_id: Option<Uuid>,
+    #[serde_as(as = "Option<DisplayFromStr>")]
+    pub active: Option<bool>,
+    #[serde(default)]
+    pub order_direction: OrderDirection,
 }
 
 /// Update a webhook endpoint, event filter, or enabled state.

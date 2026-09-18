@@ -4,7 +4,9 @@ use std::time::Duration;
 
 use reqwest::StatusCode;
 use serde_json::json;
-use swissknife_types::{CreatedWebhookSubscription, Invoice, WebhookDelivery, WebhookDeliveryStatus};
+use swissknife_types::{
+    CreatedWebhookSubscription, Invoice, Permission, WebhookDelivery, WebhookDeliveryStatus, WebhookSubscription,
+};
 
 use crate::common::counterparty::Counterparty;
 use crate::common::fixtures::TestAccount;
@@ -100,6 +102,7 @@ async fn keeps_subscriptions_and_secrets_with_the_owning_account() {
     let updated = app.api().put(&item, auth, json!({"active": false})).await;
     assert_status(&updated, StatusCode::OK);
     assert_eq!(updated.body["active"], false);
+    assert_status(&app.api().get(&item, auth).await, StatusCode::OK);
     assert!(updated.body.get("signing_secret").is_none());
     let rotated = app.api().post(&format!("{item}/rotate-secret"), auth, json!({})).await;
     assert_status(&rotated, StatusCode::OK);
@@ -228,4 +231,333 @@ async fn fans_out_a_real_settlement_and_blocks_private_delivery_destinations() {
     assert_eq!(deliveries[0].attempt_count, 1);
     assert!(deliveries[0].response_status.is_none());
     assert!(!response.body.to_string().contains("do-not-log-this"));
+    let reader = app
+        .api_key(app.admin_token().await, vec![Permission::ReadWebhook])
+        .await;
+    let admin_history = app
+        .api()
+        .get(
+            &format!("/v1/webhooks/{}/deliveries", created.subscription.id),
+            Auth::ApiKey(&reader),
+        )
+        .await;
+    assert_status(&admin_history, StatusCode::OK);
+    assert_eq!(admin_history.body, response.body);
+}
+
+mod administrative_access {
+    use super::*;
+
+    #[tokio::test]
+    async fn webhook_permissions_allow_managing_another_accounts_full_lifecycle() {
+        let app = app().await;
+        let owner = ordinary_account(app, "webhook-admin-owner").await;
+        let admin = app.admin_token().await;
+        let key = app
+            .api_key(admin, vec![Permission::ReadWebhook, Permission::WriteWebhook])
+            .await;
+        let auth = Auth::ApiKey(&key);
+        let request = json!({
+            "wallet_id": owner.wallet.id,
+            "url": "https://example.com/admin-webhook",
+            "event_types": ["invoice.paid", "payment.failed"]
+        });
+        let response = app.api().post("/v1/webhooks", auth, &request).await;
+        assert_status(&response, StatusCode::CREATED);
+        let created = response.parse::<CreatedWebhookSubscription>();
+        assert_eq!(created.subscription.account_id, owner.account.id);
+        assert_eq!(created.subscription.wallet_id, owner.wallet.id);
+        assert!(!created.signing_secret.is_empty());
+        let item = format!("/v1/webhooks/{}", created.subscription.id);
+        let owned_item = format!(
+            "/v1/me/wallets/{}/webhooks/{}",
+            owner.wallet.id, created.subscription.id
+        );
+        for (path, credential) in [(&item, auth), (&owned_item, Auth::ApiKey(&owner.key))] {
+            let got = app.api().get(path, credential).await;
+            assert_status(&got, StatusCode::OK);
+            assert_eq!(got.parse::<WebhookSubscription>().id, created.subscription.id);
+            assert!(got.body.get("signing_secret").is_none());
+        }
+        assert_error(
+            &app.api().post("/v1/webhooks", auth, request).await,
+            StatusCode::CONFLICT,
+        );
+        let listed = app
+            .api()
+            .get(&format!("/v1/webhooks?account_id={}", owner.account.id), auth)
+            .await;
+        assert_status(&listed, StatusCode::OK);
+        assert_eq!(listed.parse::<Vec<WebhookSubscription>>().len(), 1);
+        assert!(listed.body[0].get("signing_secret").is_none());
+        let updated = app
+            .api()
+            .put(
+                &item,
+                auth,
+                json!({
+                    "url": "https://example.com/updated-admin-webhook",
+                    "event_types": ["payment.settled"], "active": false
+                }),
+            )
+            .await;
+        assert_status(&updated, StatusCode::OK);
+        assert_eq!(updated.body["url"], "https://example.com/updated-admin-webhook");
+        assert_eq!(updated.body["event_types"], json!(["payment.settled"]));
+        assert_eq!(updated.body["active"], false);
+        assert!(updated.body.get("signing_secret").is_none());
+        let rotated = app.api().post(&format!("{item}/rotate-secret"), auth, json!({})).await;
+        assert_status(&rotated, StatusCode::OK);
+        assert_ne!(rotated.body["signing_secret"], created.signing_secret);
+        let history = app.api().get(&format!("{item}/deliveries"), auth).await;
+        assert_status(&history, StatusCode::OK);
+        assert_eq!(history.body, json!([]));
+        let resumed = app.api().put(&item, auth, json!({"active": true})).await;
+        assert_status(&resumed, StatusCode::OK);
+        assert_eq!(resumed.body["active"], true);
+        assert_status(&app.api().delete(&item, auth).await, StatusCode::NO_CONTENT);
+        assert_error(&app.api().get(&item, auth).await, StatusCode::NOT_FOUND);
+        assert_error(
+            &app.api().get(&owned_item, Auth::ApiKey(&owner.key)).await,
+            StatusCode::NOT_FOUND,
+        );
+    }
+
+    #[tokio::test]
+    async fn read_and_write_permissions_are_independent() {
+        let app = app().await;
+        let owner = ordinary_account(app, "webhook-permission-owner").await;
+        let admin = app.admin_token().await;
+        let reader = app.api_key(admin, vec![Permission::ReadWebhook]).await;
+        let writer = app.api_key(admin, vec![Permission::WriteWebhook]).await;
+        let request = json!({"wallet_id": owner.wallet.id, "url": "https://example.com/permissions", "event_types": ["invoice.paid"]});
+        let created = app.api().post("/v1/webhooks", Auth::ApiKey(&writer), &request).await;
+        assert_status(&created, StatusCode::CREATED);
+        let id = created.parse::<CreatedWebhookSubscription>().subscription.id;
+        let item = format!("/v1/webhooks/{id}");
+        for path in ["/v1/webhooks", &item, &format!("{item}/deliveries")] {
+            assert_status(&app.api().get(path, Auth::ApiKey(&reader)).await, StatusCode::OK);
+            assert_error(&app.api().get(path, Auth::ApiKey(&writer)).await, StatusCode::FORBIDDEN);
+        }
+        let read_auth = Auth::ApiKey(&reader);
+        assert_error(
+            &app.api().post("/v1/webhooks", read_auth, request).await,
+            StatusCode::FORBIDDEN,
+        );
+        assert_error(
+            &app.api().put(&item, read_auth, json!({"active": false})).await,
+            StatusCode::FORBIDDEN,
+        );
+        assert_error(
+            &app.api()
+                .post(&format!("{item}/rotate-secret"), read_auth, json!({}))
+                .await,
+            StatusCode::FORBIDDEN,
+        );
+        assert_error(&app.api().delete(&item, read_auth).await, StatusCode::FORBIDDEN);
+        let write_auth = Auth::ApiKey(&writer);
+        assert_status(
+            &app.api().put(&item, write_auth, json!({"active": false})).await,
+            StatusCode::OK,
+        );
+        assert_status(
+            &app.api()
+                .post(&format!("{item}/rotate-secret"), write_auth, json!({}))
+                .await,
+            StatusCode::OK,
+        );
+        assert_status(&app.api().delete(&item, write_auth).await, StatusCode::NO_CONTENT);
+    }
+
+    #[tokio::test]
+    async fn every_admin_route_requires_its_webhook_permission_and_authentication() {
+        let app = app().await;
+        let owner = ordinary_account(app, "webhook-no-admin-scope").await;
+        let unrelated = app
+            .api_key(
+                app.admin_token().await,
+                vec![Permission::ReadWallet, Permission::WriteWallet],
+            )
+            .await;
+        let item = format!("/v1/webhooks/{}", uuid::Uuid::new_v4());
+        for (auth, status) in [
+            (Auth::None, StatusCode::UNAUTHORIZED),
+            (Auth::ApiKey(&owner.key), StatusCode::FORBIDDEN),
+            (Auth::ApiKey(&unrelated), StatusCode::FORBIDDEN),
+        ] {
+            for path in ["/v1/webhooks", &item, &format!("{item}/deliveries")] {
+                assert_error(&app.api().get(path, auth).await, status);
+            }
+            assert_error(&app.api().post("/v1/webhooks", auth, json!({"wallet_id": owner.wallet.id, "url": "https://example.com/denied", "event_types": ["invoice.paid"]})).await, status);
+            assert_error(&app.api().put(&item, auth, json!({"active": false})).await, status);
+            assert_error(
+                &app.api().post(&format!("{item}/rotate-secret"), auth, json!({})).await,
+                status,
+            );
+            assert_error(&app.api().delete(&item, auth).await, status);
+        }
+    }
+
+    #[tokio::test]
+    async fn admin_creation_requires_an_existing_explicit_wallet() {
+        let app = app().await;
+        let admin = Auth::Bearer(app.admin_token().await);
+        let request = json!({"url": "https://example.com/missing-wallet", "event_types": ["invoice.paid"]});
+        assert_error(
+            &app.api().post("/v1/webhooks", admin, &request).await,
+            StatusCode::BAD_REQUEST,
+        );
+        let mut request = request;
+        request["wallet_id"] = json!(uuid::Uuid::new_v4());
+        assert_error(
+            &app.api().post("/v1/webhooks", admin, request).await,
+            StatusCode::NOT_FOUND,
+        );
+        let item = format!("/v1/webhooks/{}", uuid::Uuid::new_v4());
+        assert_error(&app.api().get(&item, admin).await, StatusCode::NOT_FOUND);
+        assert_error(
+            &app.api().put(&item, admin, json!({"active": false})).await,
+            StatusCode::NOT_FOUND,
+        );
+        assert_error(
+            &app.api().post(&format!("{item}/rotate-secret"), admin, json!({})).await,
+            StatusCode::NOT_FOUND,
+        );
+        assert_error(
+            &app.api().get(&format!("{item}/deliveries"), admin).await,
+            StatusCode::NOT_FOUND,
+        );
+        assert_error(&app.api().delete(&item, admin).await, StatusCode::NOT_FOUND);
+    }
+
+    #[tokio::test]
+    async fn account_routes_keep_ownership_even_with_admin_permissions_and_forged_filters() {
+        let app = app().await;
+        let admin = app.admin_token().await;
+        let owner = ordinary_account(app, "webhook-owned-filter").await;
+        let other = ordinary_account(app, "webhook-other-filter").await;
+        let key = app
+            .account_api_key(
+                admin,
+                owner.account.id,
+                vec![Permission::ReadWebhook, Permission::WriteWebhook],
+            )
+            .await;
+        let auth = Auth::ApiKey(&key);
+        let path = format!("/v1/me/wallets/{}/webhooks", owner.wallet.id);
+        let request = json!({"wallet_id": other.wallet.id, "url": "https://example.com/owned-filter", "event_types": ["invoice.paid"]});
+        let own = app.api().post(&path, auth, &request).await;
+        assert_status(&own, StatusCode::CREATED);
+        let own = own.parse::<CreatedWebhookSubscription>();
+        assert_eq!(
+            own.subscription.wallet_id, owner.wallet.id,
+            "path overrides request wallet"
+        );
+        let other_path = format!("/v1/me/wallets/{}/webhooks", other.wallet.id);
+        let other_sub = app
+            .api()
+            .post(&other_path, Auth::ApiKey(&other.key), request)
+            .await
+            .parse::<CreatedWebhookSubscription>();
+        for path in [
+            format!("/v1/me/webhooks?account_id={}", other.account.id),
+            format!("{path}?account_id={}&wallet_id={}", other.account.id, other.wallet.id),
+        ] {
+            let response = app.api().get(&path, auth).await;
+            assert_status(&response, StatusCode::OK);
+            let listed = response.parse::<Vec<WebhookSubscription>>();
+            assert_eq!(listed.len(), 1);
+            assert_eq!(listed[0].id, own.subscription.id);
+        }
+        for item in [
+            format!("{other_path}/{}", other_sub.subscription.id),
+            format!("{path}/{}", other_sub.subscription.id),
+        ] {
+            assert_error(&app.api().get(&item, auth).await, StatusCode::NOT_FOUND);
+            assert_error(
+                &app.api().put(&item, auth, json!({"active": false})).await,
+                StatusCode::NOT_FOUND,
+            );
+            assert_error(
+                &app.api().post(&format!("{item}/rotate-secret"), auth, json!({})).await,
+                StatusCode::NOT_FOUND,
+            );
+            assert_error(
+                &app.api().get(&format!("{item}/deliveries"), auth).await,
+                StatusCode::NOT_FOUND,
+            );
+            assert_error(&app.api().delete(&item, auth).await, StatusCode::NOT_FOUND);
+        }
+        assert_error(&app.api().get(&other_path, auth).await, StatusCode::NOT_FOUND);
+        assert_error(
+            &app.api()
+                .post(
+                    &other_path,
+                    auth,
+                    json!({"url":"https://example.com/forbidden", "event_types":["invoice.paid"]}),
+                )
+                .await,
+            StatusCode::NOT_FOUND,
+        );
+    }
+
+    #[tokio::test]
+    async fn list_filters_select_accounts_wallets_ids_states_and_pages() {
+        let app = app().await;
+        let owner = ordinary_account(app, "webhook-list-owner").await;
+        let other = ordinary_account(app, "webhook-list-other").await;
+        let admin = Auth::Bearer(app.admin_token().await);
+        let mut ids = Vec::new();
+        for (wallet_id, name) in [
+            (owner.wallet.id, "first"),
+            (owner.wallet.id, "second"),
+            (other.wallet.id, "other"),
+        ] {
+            let response = app.api().post("/v1/webhooks", admin, json!({"wallet_id": wallet_id, "url": format!("https://example.com/{name}"), "event_types":["invoice.paid"]})).await;
+            assert_status(&response, StatusCode::CREATED);
+            ids.push(response.parse::<CreatedWebhookSubscription>().subscription.id);
+        }
+        assert_status(
+            &app.api()
+                .put(&format!("/v1/webhooks/{}", ids[1]), admin, json!({"active":false}))
+                .await,
+            StatusCode::OK,
+        );
+        for (query, expected) in [
+            (format!("account_id={}&active=false", owner.account.id), vec![ids[1]]),
+            (format!("wallet_id={}&active=true", owner.wallet.id), vec![ids[0]]),
+            (format!("ids={}", ids[2]), vec![ids[2]]),
+            (
+                format!("account_id={}&wallet_id={}", owner.account.id, other.wallet.id),
+                vec![],
+            ),
+        ] {
+            let response = app.api().get(&format!("/v1/webhooks?{query}"), admin).await;
+            assert_status(&response, StatusCode::OK);
+            assert_eq!(
+                response
+                    .parse::<Vec<WebhookSubscription>>()
+                    .iter()
+                    .map(|s| s.id)
+                    .collect::<Vec<_>>(),
+                expected
+            );
+        }
+        let mut paged = Vec::new();
+        for offset in 0..2 {
+            let response = app
+                .api()
+                .get(
+                    &format!("/v1/webhooks?wallet_id={}&limit=1&offset={offset}", owner.wallet.id),
+                    admin,
+                )
+                .await;
+            assert_status(&response, StatusCode::OK);
+            let page = response.parse::<Vec<WebhookSubscription>>();
+            assert_eq!(page.len(), 1);
+            paged.push(page[0].id);
+        }
+        assert_ne!(paged[0], paged[1]);
+        assert!(paged.iter().all(|id| ids[..2].contains(id)));
+    }
 }
