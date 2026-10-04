@@ -10,7 +10,7 @@ name: swissknife-itest
 
 services:
   postgres:
-    image: postgres:18.1
+    image: postgres:18.6@sha256:5a5a84b19854a9ffaa54082c166ff4ec27473a361e496e5ea167f298f2da9722
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
@@ -26,7 +26,7 @@ services:
       retries: 30
 
   bitcoind:
-    image: bitcoin/bitcoin:31.0
+    image: bitcoin/bitcoin:31.1@sha256:da25cedc66b1daefff9f412ee196c901a899c3fa68a33b20849c3e08b5c40d63
     command: ["-conf=/etc/bitcoin/bitcoin.conf"]
     volumes:
       - ./config/bitcoin/bitcoin.conf:/etc/bitcoin/bitcoin.conf:ro
@@ -47,7 +47,7 @@ services:
       retries: 30
 
   lnd:
-    image: lightninglabs/lnd:v0.21.0-beta
+    image: lightninglabs/lnd:v0.21.4-beta@sha256:04d06edcc0f6e99a5e797ea34959f330add222226f840cd86afbc31f8f29627d
     depends_on:
       bitcoind:
         condition: service_healthy
@@ -65,7 +65,7 @@ services:
       - "${SWISSKNIFE_ITEST_LND_P2P_PORT:-9735}:9735"
 
   cln:
-    image: elementsproject/lightningd:v26.06.1
+    image: elementsproject/lightningd:v26.06.8@sha256:56f1cebe829fbb3c7d5674be8cd1212c7e02527ab32403b695033a29bcd2abce
     depends_on:
       bitcoind:
         condition: service_healthy
@@ -93,7 +93,7 @@ services:
   # agree. Container port 8080 is published on 8090 by default to avoid clashing
   # with LND's REST port (8080).
   mock-oauth2-server:
-    image: ghcr.io/navikt/mock-oauth2-server:4.0.1
+    image: ghcr.io/navikt/mock-oauth2-server:6.0.4@sha256:47374fe063995d9b6d39ebb6ea21eb5f765025bf0aa08b61b08b439eb91adaf0
     environment:
       JSON_CONFIG_PATH: /tmp/mock-oauth2-config.json
     volumes:
