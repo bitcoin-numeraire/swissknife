@@ -5,7 +5,7 @@
 # `make build` to regenerate the tonic bindings.
 #
 # Override the versions:
-#   CLN_VERSION=v26.06.9 LND_VERSION=v0.21.0-beta make protos
+#   CLN_VERSION=v26.06.9 LND_VERSION=v0.21.4-beta make protos
 #
 set -euo pipefail
 
@@ -13,7 +13,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 CLN_VERSION="${CLN_VERSION:-v26.06.9}"
-LND_VERSION="${LND_VERSION:-v0.21.0-beta}"
+LND_VERSION="${LND_VERSION:-v0.21.4-beta}"
 
 cln_url="https://raw.githubusercontent.com/ElementsProject/lightning/${CLN_VERSION}/cln-grpc/proto"
 lnd_url="https://raw.githubusercontent.com/lightningnetwork/lnd/${LND_VERSION}/lnrpc"
