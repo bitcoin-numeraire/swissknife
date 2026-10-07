@@ -71,6 +71,7 @@ pub struct TestApp {
     admin_jwt: String,
     stdout_path: PathBuf,
     stderr_path: PathBuf,
+    pid: u32,
 }
 
 /// The `(database, provider)` matrix cell under test, from env (defaults
@@ -87,6 +88,18 @@ pub struct Spawned {
     pub database_url: String,
     pub stdout_path: PathBuf,
     pub stderr_path: PathBuf,
+    pid: u32,
+}
+
+/// Resume an isolated instance even if a test panics while it is paused.
+pub struct PausedInstance {
+    pid: u32,
+}
+
+impl Drop for PausedInstance {
+    fn drop(&mut self) {
+        let _ = Command::new("kill").arg("-CONT").arg(self.pid.to_string()).status();
+    }
 }
 
 /// Spawn a SwissKnife instance against the regtest stack with `extra_env`
@@ -133,6 +146,7 @@ pub async fn spawn_instance(database: &str, provider: &str, label: &str, extra_e
     let child = command
         .spawn()
         .expect("spawn swissknife binary (run `make build` first)");
+    let pid = child.id();
     SPAWNED.lock().expect("spawned registry lock").push(child);
 
     let api = ApiClient::new(base_url.clone());
@@ -143,6 +157,7 @@ pub async fn spawn_instance(database: &str, provider: &str, label: &str, extra_e
         database_url: db.url().to_string(),
         stdout_path,
         stderr_path,
+        pid,
     }
 }
 
@@ -164,6 +179,7 @@ impl TestApp {
             admin_jwt,
             stdout_path: spawned.stdout_path,
             stderr_path: spawned.stderr_path,
+            pid: spawned.pid,
         }
     }
 
@@ -184,12 +200,25 @@ impl TestApp {
             admin_jwt,
             stdout_path: spawned.stdout_path,
             stderr_path: spawned.stderr_path,
+            pid: spawned.pid,
         }
     }
 
     /// A fresh HTTP client bound to this instance.
     pub fn api(&self) -> ApiClient {
         ApiClient::new(self.base_url.clone())
+    }
+
+    /// Pause an isolated process to accumulate provider updates without
+    /// disconnecting its listener. Dropping the guard resumes the process.
+    pub fn pause(&self) -> PausedInstance {
+        let status = Command::new("kill")
+            .arg("-STOP")
+            .arg(self.pid.to_string())
+            .status()
+            .expect("pause isolated SwissKnife process");
+        assert!(status.success(), "pause isolated SwissKnife process");
+        PausedInstance { pid: self.pid }
     }
 
     /// JWT for the bootstrap admin (all permissions), created during startup.

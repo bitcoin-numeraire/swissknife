@@ -9,12 +9,12 @@ use super::{
     cln::{
         listchainmoves_chainmoves::ListchainmovesChainmovesPrimaryTag,
         listchainmoves_request::ListchainmovesIndex,
+        listinvoices_invoices::ListinvoicesInvoicesStatus,
+        listinvoices_request::ListinvoicesIndex,
         node_client::NodeClient,
-        wait_invoices::WaitInvoicesStatus,
         wait_request::{WaitIndexname, WaitSubsystem},
         wait_sendpays::WaitSendpaysStatus,
-        waitinvoice_response::WaitinvoiceStatus,
-        ListchainmovesRequest, WaitRequest, WaitinvoiceRequest, WaitsendpayRequest,
+        ListchainmovesRequest, ListinvoicesRequest, WaitRequest, WaitsendpayRequest,
     },
     cln_grpc_client::{ClnClientConfig, ClnGrpcClient},
 };
@@ -49,7 +49,7 @@ impl ClnGrpcListener {
     }
 
     async fn listen_invoices(&self) -> Result<(), LightningError> {
-        let mut next_index = 0_u64;
+        let mut next_index = 1_u64;
 
         loop {
             trace!(next_index, "Waiting for invoice update...");
@@ -66,45 +66,43 @@ impl ClnGrpcListener {
                 .map_err(|e| LightningError::Listener(e.to_string()))?
                 .into_inner();
 
-            let updated_index = response.updated;
+            let updated_index = response
+                .updated
+                .ok_or_else(|| LightningError::Listener("Invoice wait response missing updated index".into()))?;
 
-            if let Some(invoices) = response.invoices {
-                match invoices.status() {
-                    WaitInvoicesStatus::Paid => {
-                        let Some(label) = invoices.label.clone() else {
-                            warn!("Invoice update missing label");
-                            if let Some(index) = updated_index {
-                                next_index = index.saturating_add(1);
-                            }
-                            continue;
-                        };
+            // `wait` is only a wake-up: its index can jump and its invoice
+            // details are optional. Replay every update from our own cursor.
+            let response = self
+                .client
+                .clone()
+                .list_invoices(ListinvoicesRequest {
+                    index: Some(ListinvoicesIndex::Updated as i32),
+                    start: Some(next_index),
+                    limit: Some(100),
+                    ..Default::default()
+                })
+                .await
+                .map_err(|e| LightningError::Listener(e.to_string()))?
+                .into_inner();
 
-                        let invoice = self
-                            .client
-                            .clone()
-                            .wait_invoice(WaitinvoiceRequest { label })
-                            .await
-                            .map_err(|e| LightningError::Listener(e.to_string()))?
-                            .into_inner();
-
-                        match invoice.status() {
-                            WaitinvoiceStatus::Paid => {
-                                if let Err(err) = self.services.event.invoice_paid(invoice.clone().into()).await {
-                                    return Err(LightningError::EventProcessing(err.to_string()));
-                                }
-                            }
-                            WaitinvoiceStatus::Expired => {}
-                        }
-                    }
-                    WaitInvoicesStatus::Expired | WaitInvoicesStatus::Unpaid => {}
+            let mut processed_index: Option<u64> = None;
+            for invoice in response.invoices {
+                let index = invoice
+                    .updated_index
+                    .ok_or_else(|| LightningError::Listener("Listed invoice update missing updated index".into()))?;
+                if invoice.status() == ListinvoicesInvoicesStatus::Paid {
+                    self.services
+                        .event
+                        .invoice_paid(invoice.into())
+                        .await
+                        .map_err(|err| LightningError::EventProcessing(err.to_string()))?;
                 }
-            } else if next_index != 0 {
-                warn!("Invoice wait response missing invoice details");
+                processed_index = Some(processed_index.map_or(index, |previous| previous.max(index)));
             }
 
-            if let Some(index) = updated_index {
-                next_index = index.saturating_add(1);
-            }
+            // A full page must not skip to the wait tip. Only an empty page
+            // can advance over updates whose invoices have since been deleted.
+            next_index = processed_index.unwrap_or(updated_index).saturating_add(1);
         }
     }
 

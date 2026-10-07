@@ -60,6 +60,8 @@ hex = "0.4.3"
 anyhow = "1.0.104"
 futures-util = "0.3.34"
 humantime = "2.4.0"
+hmac = "0.12.1"
+sha2 = "0.10.9"
 rust_socketio = { version = "0.6.0", features = ["async"] }
 bcrypt = "0.19.3"
 migration = { path = "crates/migration" }

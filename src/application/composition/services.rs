@@ -5,7 +5,9 @@ use crate::{
     domains::{
         account::{AccountService, AccountUseCases, ApiKeyService, ApiKeyUseCases, AuthService, AuthUseCases},
         bitcoin::{BitcoinService, BitcoinUseCases},
-        event::{ClientEventService, ClientEventUseCases, EventService, EventUseCases},
+        event::{
+            ClientEventService, ClientEventUseCases, EventService, EventUseCases, WebhookService, WebhookUseCases,
+        },
         invoice::{InvoiceService, InvoiceUseCases},
         ln_address::{LnAddressService, LnAddressUseCases},
         lnurl::{LnUrlService, LnUrlUseCases},
@@ -30,6 +32,7 @@ pub struct AppServices {
     pub bitcoin: Box<dyn BitcoinUseCases>,
     pub event: Arc<dyn EventUseCases>,
     pub client_event: Box<dyn ClientEventUseCases>,
+    pub webhook: Box<dyn WebhookUseCases>,
 }
 
 impl AppServices {
@@ -54,6 +57,7 @@ impl AppServices {
 
         let event = Arc::new(EventService::new(store.clone()));
         let client_event = ClientEventService::new(store.clone(), client_events.retention);
+        let webhook = WebhookService::new(store.clone());
         let payments = PaymentService::new(
             store.clone(),
             ln_client.clone(),
@@ -109,6 +113,7 @@ impl AppServices {
             bitcoin: Box::new(bitcoin),
             event,
             client_event: Box::new(client_event),
+            webhook: Box::new(webhook),
         }
     }
 }
@@ -132,6 +137,7 @@ pub struct MockAppServicesBuilder {
     pub bitcoin: crate::domains::bitcoin::MockBitcoinUseCases,
     pub event: crate::domains::event::MockEventUseCases,
     pub client_event: crate::domains::event::MockClientEventUseCases,
+    pub webhook: crate::domains::event::MockWebhookUseCases,
 }
 
 #[cfg(test)]
@@ -151,6 +157,7 @@ impl MockAppServicesBuilder {
             bitcoin: crate::domains::bitcoin::MockBitcoinUseCases::new(),
             event: crate::domains::event::MockEventUseCases::new(),
             client_event: crate::domains::event::MockClientEventUseCases::new(),
+            webhook: crate::domains::event::MockWebhookUseCases::new(),
         }
     }
 
@@ -169,6 +176,7 @@ impl MockAppServicesBuilder {
             bitcoin: Box::new(self.bitcoin),
             event: Arc::new(self.event),
             client_event: Box::new(self.client_event),
+            webhook: Box::new(self.webhook),
         }
     }
 }

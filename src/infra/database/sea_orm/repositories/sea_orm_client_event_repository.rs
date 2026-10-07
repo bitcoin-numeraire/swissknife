@@ -1,7 +1,8 @@
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use sea_orm::{
-    sea_query::OnConflict, ActiveModelTrait, ColumnTrait, DatabaseConnection, DatabaseTransaction, EntityTrait,
+    sea_query::{Expr, OnConflict, Query},
+    ActiveModelTrait, ColumnTrait, Condition, DatabaseConnection, DatabaseTransaction, EntityTrait, ExprTrait,
     QueryFilter, QueryOrder, QuerySelect, Set, TransactionTrait,
 };
 use serde_json::Value;
@@ -17,8 +18,11 @@ use crate::{
     infra::database::sea_orm::models::{
         client_event::{ActiveModel, Column},
         config,
-        prelude::{ClientEvent as ClientEventEntity, Config as ConfigEntity, Wallet as WalletEntity},
-        wallet,
+        prelude::{
+            ClientEvent as ClientEventEntity, Config as ConfigEntity, Wallet as WalletEntity,
+            WebhookDelivery as WebhookDeliveryEntity, WebhookSubscription as WebhookSubscriptionEntity,
+        },
+        wallet, webhook_delivery, webhook_subscription,
     },
 };
 
@@ -193,8 +197,35 @@ impl ClientEventRepository for SeaOrmClientEventRepository<DatabaseConnection> {
             .await
             .map_err(|error| DatabaseError::FindOne(error.to_string()))?
             .ok_or_else(|| DatabaseError::FindOne("client event prune watermark is missing".to_string()))?;
+        let unconsumed = Query::select()
+            .expr(Expr::value(1))
+            .from(WebhookSubscriptionEntity)
+            .and_where(Expr::col((WebhookSubscriptionEntity, webhook_subscription::Column::Active)).eq(true))
+            .and_where(
+                Expr::col((WebhookSubscriptionEntity, webhook_subscription::Column::WalletId))
+                    .equals((ClientEventEntity, Column::WalletId)),
+            )
+            .and_where(
+                Expr::col((WebhookSubscriptionEntity, webhook_subscription::Column::LastEventId))
+                    .lt(Expr::col((ClientEventEntity, Column::Id))),
+            )
+            .to_owned();
+        let pending = Query::select()
+            .expr(Expr::value(1))
+            .from(WebhookDeliveryEntity)
+            .and_where(Expr::col((WebhookDeliveryEntity, webhook_delivery::Column::Status)).eq("Pending"))
+            .and_where(
+                Expr::col((WebhookDeliveryEntity, webhook_delivery::Column::ClientEventId))
+                    .equals((ClientEventEntity, Column::Id)),
+            )
+            .to_owned();
         let first_retained_id = ClientEventEntity::find()
-            .filter(Column::CreatedAt.gte(cutoff.naive_utc()))
+            .filter(
+                Condition::any()
+                    .add(Column::CreatedAt.gte(cutoff.naive_utc()))
+                    .add(Expr::exists(unconsumed))
+                    .add(Expr::exists(pending)),
+            )
             .order_by_asc(Column::Id)
             .one(&txn)
             .await
@@ -219,6 +250,13 @@ impl ClientEventRepository for SeaOrmClientEventRepository<DatabaseConnection> {
             return Ok(0);
         };
 
+        WebhookDeliveryEntity::delete_many()
+            .filter(webhook_delivery::Column::ClientEventId.lte(last_expired.id))
+            .filter(webhook_delivery::Column::Status.ne("Pending"))
+            .exec(&txn)
+            .await
+            .map_err(|error| DatabaseError::Delete(error.to_string()))?;
+
         let deleted = ClientEventEntity::delete_many()
             .filter(Column::Id.lte(last_expired.id))
             .exec(&txn)
@@ -232,7 +270,7 @@ impl ClientEventRepository for SeaOrmClientEventRepository<DatabaseConnection> {
             .and_then(|value| i32::try_from(value).ok())
             .ok_or_else(|| DatabaseError::FindOne("client event prune watermark is malformed".to_string()))?;
         let mut watermark: config::ActiveModel = watermark.into();
-        watermark.value = Set(Some(serde_json::json!(previous_id.max(last_expired.id))));
+        watermark.value = Set(Some(serde_json::json!(std::cmp::max(previous_id, last_expired.id))));
         watermark
             .update(&txn)
             .await

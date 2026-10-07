@@ -27,11 +27,19 @@ pub enum Relation {
         on_delete = "Cascade"
     )]
     Wallet,
+    #[sea_orm(has_many = "super::webhook_delivery::Entity")]
+    WebhookDelivery,
 }
 
 impl Related<super::wallet::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::Wallet.def()
+    }
+}
+
+impl Related<super::webhook_delivery::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::WebhookDelivery.def()
     }
 }
 

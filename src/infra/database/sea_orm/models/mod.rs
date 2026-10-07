@@ -16,3 +16,5 @@ pub mod invoice;
 pub mod ln_address;
 pub mod payment;
 pub mod wallet;
+pub mod webhook_delivery;
+pub mod webhook_subscription;

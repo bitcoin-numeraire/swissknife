@@ -47,6 +47,8 @@ pub enum Relation {
     LnAddress,
     #[sea_orm(has_many = "super::payment::Entity")]
     Payment,
+    #[sea_orm(has_many = "super::webhook_subscription::Entity")]
+    WebhookSubscription,
 }
 
 impl Related<super::account::Entity> for Entity {
@@ -88,6 +90,12 @@ impl Related<super::ln_address::Entity> for Entity {
 impl Related<super::payment::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::Payment.def()
+    }
+}
+
+impl Related<super::webhook_subscription::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::WebhookSubscription.def()
     }
 }
 
