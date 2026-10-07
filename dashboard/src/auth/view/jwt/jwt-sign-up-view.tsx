@@ -35,7 +35,7 @@ import { FormHead } from '../../components/form-head';
 
 // ----------------------------------------------------------------------
 
-const MIN_PASSWORD_LENGTH = 12;
+const MIN_PASSWORD_LENGTH = 15;
 
 export type SignUpSchemaType = {
   password: string;
@@ -56,9 +56,14 @@ export function JwtSignUpView() {
     () =>
       zod
         .object({
-          password: zod.string().min(MIN_PASSWORD_LENGTH, {
-            message: t('sign_up.min_password', { count: MIN_PASSWORD_LENGTH }),
-          }),
+          password: zod
+            .string()
+            .refine(
+              (value) =>
+                Array.from(value).length >= MIN_PASSWORD_LENGTH &&
+                new TextEncoder().encode(value).length <= 1024,
+              { message: t('local_login.password_help') }
+            ),
           repeatPassword: zod.string().min(1, { message: t('sign_up.repeat_required') }),
         })
         .refine((data) => data.password === data.repeatPassword, {
@@ -79,7 +84,7 @@ export function JwtSignUpView() {
   });
 
   const password = methods.watch('password');
-  const passwordProgress = Math.min((password.length / MIN_PASSWORD_LENGTH) * 100, 100);
+  const passwordProgress = Math.min((Array.from(password).length / MIN_PASSWORD_LENGTH) * 100, 100);
 
   const {
     handleSubmit,

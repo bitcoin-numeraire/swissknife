@@ -8,10 +8,7 @@ use swissknife_types::{ChangePasswordRequest, ErrorResponse, SignInRequest, Sign
 use crate::{
     application::{
         composition::AppServices,
-        docs::{
-            BAD_REQUEST_EXAMPLE, CONFLICT_EXAMPLE, NOT_FOUND_EXAMPLE, UNAUTHORIZED_EXAMPLE, UNPROCESSABLE_EXAMPLE,
-            UNSUPPORTED_EXAMPLE,
-        },
+        docs::{BAD_REQUEST_EXAMPLE, CONFLICT_EXAMPLE, NOT_FOUND_EXAMPLE, UNAUTHORIZED_EXAMPLE, UNPROCESSABLE_EXAMPLE},
         errors::ApplicationError,
     },
     infra::axum::Json,
@@ -21,7 +18,7 @@ use super::User;
 
 #[derive(OpenApi)]
 #[openapi(
-    paths(sign_in, sign_up, change_password),
+    paths(sign_in, sign_up, change_password, reset_local_password),
     components(schemas(ChangePasswordRequest, SignUpRequest, SignInRequest, SignInResponse)),
     tags(
         (name = "Authentication", description = "Some endpoints are public, but some require authentication. We provide all the required endpoints to create an account and authorize yourself.")
@@ -35,6 +32,7 @@ pub fn auth_router() -> Router<Arc<AppServices>> {
         .route("/sign-up", post(sign_up))
         .route("/sign-in", post(sign_in))
         .route("/change-password", post(change_password))
+        .route("/reset-password", post(reset_local_password))
 }
 
 /// Sign up
@@ -51,7 +49,8 @@ pub fn auth_router() -> Router<Arc<AppServices>> {
         (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
         (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
         (status = 409, description = "Duplicate", body = ErrorResponse, example = json!(CONFLICT_EXAMPLE)),
-        (status = 405, description = "Unsupported", body = ErrorResponse, example = json!(UNSUPPORTED_EXAMPLE))
+        (status = 422, description = "Invalid password", body = ErrorResponse),
+        (status = 429, description = "Authentication throttled; retry later", body = ErrorResponse)
     )
 )]
 async fn sign_up(
@@ -75,21 +74,21 @@ async fn sign_up(
         (status = 200, description = "Token Created", body = SignInResponse),
         (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
         (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
-        (status = 404, description = "Not Found", body = ErrorResponse, example = json!(NOT_FOUND_EXAMPLE)),
-        (status = 405, description = "Unsupported", body = ErrorResponse, example = json!(UNSUPPORTED_EXAMPLE))
+        (status = 409, description = "Credentials changed concurrently; retry sign-in", body = ErrorResponse),
+        (status = 429, description = "Authentication throttled; retry later", body = ErrorResponse)
     )
 )]
 async fn sign_in(
     State(services): State<Arc<AppServices>>,
     Json(payload): Json<SignInRequest>,
 ) -> Result<Json<SignInResponse>, ApplicationError> {
-    let token = services.auth.sign_in(payload.password).await?;
+    let token = services.auth.sign_in(payload.username, payload.password).await?;
     Ok(SignInResponse { token }.into())
 }
 
 /// Change Password
 ///
-/// Changes the local owner password for `JWT` auth provider deployments.
+/// Changes the authenticated account password and revokes its local sessions for `JWT` auth provider deployments.
 #[utoipa::path(
     post,
     path = "/change-password",
@@ -101,19 +100,43 @@ async fn sign_in(
         (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
         (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
         (status = 404, description = "Not Found", body = ErrorResponse, example = json!(NOT_FOUND_EXAMPLE)),
+        (status = 409, description = "Credentials changed concurrently", body = ErrorResponse),
         (status = 422, description = "Validation failed", body = ErrorResponse, example = json!(UNPROCESSABLE_EXAMPLE)),
-        (status = 405, description = "Unsupported", body = ErrorResponse, example = json!(UNSUPPORTED_EXAMPLE))
+        (status = 429, description = "Authentication throttled; retry later", body = ErrorResponse)
     ),
     security(("jwt" = []))
 )]
 async fn change_password(
     State(services): State<Arc<AppServices>>,
-    _user: User,
+    user: User,
     Json(payload): Json<ChangePasswordRequest>,
 ) -> Result<impl IntoResponse, ApplicationError> {
     services
         .auth
-        .change_password(payload.current_password, payload.new_password)
+        .change_password(user.account_id, payload.current_password, payload.new_password)
+        .await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+/// Redeem a single-use local activation or reset code. Sign in after choosing a password.
+#[utoipa::path(
+    post, path = "/reset-password", tag = "Authentication", context_path = CONTEXT_PATH,
+    request_body = swissknife_types::ResetLocalPasswordRequest,
+    responses(
+        (status = 204, description = "Password set; sign in to continue"),
+        (status = 401, description = "Invalid or expired code", body = ErrorResponse),
+        (status = 409, description = "Credential changed concurrently", body = ErrorResponse),
+        (status = 422, description = "Invalid password", body = ErrorResponse),
+        (status = 429, description = "Try again later", body = ErrorResponse)
+    )
+)]
+async fn reset_local_password(
+    State(services): State<Arc<AppServices>>,
+    Json(payload): Json<swissknife_types::ResetLocalPasswordRequest>,
+) -> Result<StatusCode, ApplicationError> {
+    services
+        .auth
+        .reset_local_password(payload.code, payload.new_password)
         .await?;
     Ok(StatusCode::NO_CONTENT)
 }
@@ -160,11 +183,12 @@ mod tests {
                 .auth
                 .expect_sign_in()
                 .times(1)
-                .returning(|_| Err(DataError::NotFound("missing".to_string()).into()));
+                .returning(|_, _| Err(DataError::NotFound("missing".to_string()).into()));
 
             let result = sign_in(
                 State(Arc::new(builder.build())),
                 Json(SignInRequest {
+                    username: "admin".into(),
                     password: "secret".to_string(),
                 }),
             )
@@ -183,9 +207,9 @@ mod tests {
             builder
                 .auth
                 .expect_change_password()
-                .withf(|current_password, new_password| current_password == "old" && new_password == "new")
+                .withf(|_, current_password, new_password| current_password == "old" && new_password == "new")
                 .times(1)
-                .returning(|_, _| Ok(()));
+                .returning(|_, _, _| Ok(()));
 
             let response = change_password(
                 State(Arc::new(builder.build())),
