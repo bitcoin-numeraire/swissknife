@@ -2,12 +2,15 @@
 members = ["crates/migration", "crates/swissknife-types"]
 resolver = "2"
 
+[workspace.package]
+rust-version = "1.99"
+
 [package]
 name = "swissknife"
 version = "0.2.0"
 edition = "2021"
 authors = ["Dario Anongba Varela <dario.varela@numeraire.tech>"]
-rust-version = "1.99.0"
+rust-version.workspace = true
 license = "MIT"
 description = "Numeraire SwissKnife enables easy integration of Bitcoin, Lightning and smart contract protocols."
 repository = "https://github.com/bitcoin-numeraire/swissknife"
