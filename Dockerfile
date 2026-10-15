@@ -1,4 +1,5 @@
-FROM lukemathwalker/cargo-chef:latest-rust-1.99.0 AS chef
+FROM rust:1.99.0-trixie AS chef
+RUN cargo install --locked cargo-chef --version 0.1.78
 WORKDIR /app
 
 FROM chef AS planner
@@ -57,7 +58,7 @@ RUN --mount=type=cache,target=/app/dashboard/.next/cache \
 
 # Use debian:trixie-slim as minimal runtime base
 # Trixie = Debian 13
-# Matches cargo-chef GLIBC 2.38, includes OpenSSL for native-tls dependency
+# Match the builder's Debian release for GLIBC and OpenSSL compatibility.
 FROM debian:trixie-slim AS runtime-base
 
 # Install minimal runtime dependencies

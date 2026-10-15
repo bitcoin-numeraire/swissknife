@@ -107,6 +107,31 @@ jobs:
       - name: Run tests
         run: make test
 
+  docker-planner:
+    runs-on: ${{ matrix.platform == 'linux/arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [linux/amd64, linux/arm64]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7.0.1
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4.4.1
+
+      - name: Build Rust planner
+        uses: docker/build-push-action@v7.4.0
+        with:
+          context: .
+          target: planner
+          platforms: ${{ matrix.platform }}
+          push: false
+          cache-from: type=gha,scope=rust-planner-${{ matrix.platform }}
+          cache-to: type=gha,scope=rust-planner-${{ matrix.platform }},mode=max
+
   dashboard:
     runs-on: ubuntu-latest
     defaults:
