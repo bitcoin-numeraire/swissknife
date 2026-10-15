@@ -45,7 +45,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
 
       - name: Set up Rust
-        uses: dtolnay/rust-toolchain@1.96.0
+        uses: dtolnay/rust-toolchain@1.99.0
 
       - name: Cache Rust dependencies
         uses: swatinem/rust-cache@v2.9.2
@@ -97,7 +97,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
 
       - name: Set up Rust
-        uses: dtolnay/rust-toolchain@1.96.0
+        uses: dtolnay/rust-toolchain@1.99.0
 
       - name: Cache Rust dependencies
         uses: swatinem/rust-cache@v2.9.2
@@ -134,7 +134,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
 
       - name: Set up Rust
-        uses: dtolnay/rust-toolchain@1.96.0
+        uses: dtolnay/rust-toolchain@1.99.0
         with:
           components: llvm-tools-preview
 
