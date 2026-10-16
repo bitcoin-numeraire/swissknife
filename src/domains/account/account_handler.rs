@@ -31,6 +31,7 @@ use super::{Permission, User};
 #[openapi(
     paths(
         create_account,
+        get_local_login, create_local_login, update_local_login, reset_local_login,
         list_accounts,
         get_account_by_id,
         update_account_by_id,
@@ -54,6 +55,11 @@ pub fn router() -> Router<Arc<AppServices>> {
         .route("/{id}", get(get_account_by_id))
         .route("/{id}", put(update_account_by_id))
         .route("/{id}/permissions", put(replace_account_permissions))
+        .route(
+            "/{id}/local-login",
+            get(get_local_login).post(create_local_login).put(update_local_login),
+        )
+        .route("/{id}/local-login/reset", post(reset_local_login))
         .route("/{id}", delete(delete_account_by_id))
 }
 
@@ -243,6 +249,57 @@ async fn delete_accounts(
     }
 
     Ok(services.account.delete_many(filter).await?.into())
+}
+
+/// Read local login state without exposing credentials.
+#[utoipa::path(get, path = "/{id}/local-login", tag = "Accounts", context_path = CONTEXT_PATH,
+    responses((status = 200, body = Option<swissknife_types::LocalLogin>), (status = 401, body = ErrorResponse), (status = 403, body = ErrorResponse)))]
+async fn get_local_login(
+    State(services): State<Arc<AppServices>>,
+    user: User,
+    Path(id): Path<Uuid>,
+) -> Result<Json<Option<swissknife_types::LocalLogin>>, ApplicationError> {
+    user.check_permission(Permission::ReadAccount)?;
+    Ok(Json(services.auth.get_local_login(id).await?))
+}
+
+/// Create a local login and return a single-use activation code.
+#[utoipa::path(post, path = "/{id}/local-login", tag = "Accounts", context_path = CONTEXT_PATH,
+    request_body = swissknife_types::CreateLocalLoginRequest,
+    responses((status = 200, body = swissknife_types::LocalLoginReset), (status = 401, body = ErrorResponse), (status = 403, body = ErrorResponse), (status = 404, body = ErrorResponse), (status = 409, body = ErrorResponse), (status = 422, body = ErrorResponse)))]
+async fn create_local_login(
+    State(services): State<Arc<AppServices>>,
+    user: User,
+    Path(id): Path<Uuid>,
+    Json(payload): Json<swissknife_types::CreateLocalLoginRequest>,
+) -> Result<Json<swissknife_types::LocalLoginReset>, ApplicationError> {
+    user.check_permission(Permission::WriteAccount)?;
+    Ok(Json(services.auth.create_local_login(id, payload.username).await?))
+}
+
+/// Enable or disable local login. API keys retain their independent grants.
+#[utoipa::path(put, path = "/{id}/local-login", tag = "Accounts", context_path = CONTEXT_PATH,
+    request_body = swissknife_types::UpdateLocalLoginRequest,
+    responses((status = 204), (status = 401, body = ErrorResponse), (status = 403, body = ErrorResponse), (status = 404, body = ErrorResponse), (status = 409, body = ErrorResponse)))]
+async fn update_local_login(
+    State(services): State<Arc<AppServices>>,
+    user: User,
+    Path(id): Path<Uuid>,
+    Json(payload): Json<swissknife_types::UpdateLocalLoginRequest>,
+) -> Result<axum::http::StatusCode, ApplicationError> {
+    services.auth.update_local_login(user, id, payload.enabled).await?;
+    Ok(axum::http::StatusCode::NO_CONTENT)
+}
+
+/// Revoke local sessions and issue a single-use password reset code.
+#[utoipa::path(post, path = "/{id}/local-login/reset", tag = "Accounts", context_path = CONTEXT_PATH,
+    responses((status = 200, body = swissknife_types::LocalLoginReset), (status = 401, body = ErrorResponse), (status = 403, body = ErrorResponse), (status = 404, body = ErrorResponse), (status = 409, body = ErrorResponse)))]
+async fn reset_local_login(
+    State(services): State<Arc<AppServices>>,
+    user: User,
+    Path(id): Path<Uuid>,
+) -> Result<Json<swissknife_types::LocalLoginReset>, ApplicationError> {
+    Ok(Json(services.auth.reset_local_login(user, id).await?))
 }
 
 #[cfg(test)]

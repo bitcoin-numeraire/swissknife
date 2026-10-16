@@ -2,6 +2,8 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum AuthenticationError {
+    #[error("Too many authentication attempts; try again later")]
+    RateLimited,
     #[error("Failed to fetch JWKS: {0}")]
     Jwks(String),
 

@@ -33,6 +33,46 @@ async fn main() {
             exit(1);
         }
     };
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    if !args.is_empty() {
+        if args.len() != 2 || args[0] != "recover-local-login" {
+            eprintln!("Usage: swissknife [recover-local-login <account-uuid>]");
+            exit(1);
+        }
+        if config.auth_provider != application::composition::AuthProvider::Jwt {
+            eprintln!("Local login recovery requires JWT authentication");
+            exit(1);
+        }
+        let account_id = match uuid::Uuid::parse_str(&args[1]) {
+            Ok(id) => id,
+            Err(_) => {
+                eprintln!("Expected an account UUID");
+                exit(1);
+            }
+        };
+        let mut database = config.database.clone();
+        database.sqlx_logging = Some(false);
+        let result = async {
+            let store = infra::database::sea_orm::SeaOrmStore::connect(database).await?;
+            domains::account::recover_local_login(store.local_credential.as_ref(), account_id).await
+        }
+        .await;
+        match result {
+            Ok(grant) => {
+                println!("Local login enabled. Existing sessions and password revoked.");
+                println!(
+                    "Use this one-time code on this instance's /reset-password page before {}:",
+                    grant.expires_at
+                );
+                println!("{}", grant.code);
+            }
+            Err(error) => {
+                eprintln!("Local login recovery failed: {error}");
+                exit(1);
+            }
+        }
+        return;
+    }
     setup_tracing(config.logging.clone());
 
     info!("Numeraire SwissKnife version: {}", env!("CARGO_PKG_VERSION"));
