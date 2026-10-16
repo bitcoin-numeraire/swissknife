@@ -211,6 +211,136 @@ mod internal {
     use super::*;
 
     #[tokio::test]
+    async fn internal_bolt11_rejects_a_different_signed_request() {
+        use bitcoin::{
+            hashes::Hash,
+            secp256k1::{Secp256k1, SecretKey},
+        };
+        use lightning_invoice::{Bolt11Invoice, Currency, InvoiceBuilder, PaymentSecret};
+        use swissknife_types::InvoiceStatus;
+
+        let app = app().await;
+        let token = app.admin_token().await;
+        let payer = app.create_account_with_wallet(token, "bound-invoice-payer").await;
+        let payee = app.create_account_with_wallet(token, "bound-invoice-payee").await;
+        app.fund_onchain(token, payer.wallet.id, 200_000).await;
+        let payer_before = app.wallet_balance(token, payer.wallet.id).await;
+        let payee_before = app.wallet_balance(token, payee.wallet.id).await;
+        let response = app
+            .api()
+            .post(
+                &format!("/v1/me/wallets/{}/invoices", payee.wallet.id),
+                Auth::ApiKey(&payee.key),
+                NewInvoiceRequest {
+                    wallet_id: None,
+                    amount_msat: 50_000_000,
+                    description: None,
+                    expiry: None,
+                },
+            )
+            .await;
+        assert_status(&response, StatusCode::OK);
+        let issued = response.parse::<Invoice>();
+        let original = &issued.ln_invoice.as_ref().expect("issued BOLT11").bolt11;
+        let decoded = original.parse::<Bolt11Invoice>().unwrap();
+        // Local regtest only: a distinct signed request sharing the public hash
+        // must never authenticate the application invoice.
+        let key = SecretKey::from_slice(&[1; 32]).unwrap();
+        let different = InvoiceBuilder::new(Currency::Regtest)
+            .description("Invoice binding regression".to_string())
+            .payment_hash(bitcoin::hashes::sha256::Hash::from_byte_array(
+                decoded.payment_hash().to_byte_array(),
+            ))
+            .payment_secret(PaymentSecret([2; 32]))
+            .amount_milli_satoshis(1_000)
+            .duration_since_epoch(
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap(),
+            )
+            .min_final_cltv_expiry_delta(18)
+            .build_signed(|hash| Secp256k1::new().sign_ecdsa_recoverable(hash, &key))
+            .unwrap()
+            .to_string();
+        let path = format!("/v1/me/wallets/{}/payments", payer.wallet.id);
+        let request = SendPaymentRequest {
+            wallet_id: None,
+            input: different,
+            amount_msat: None,
+            comment: None,
+        };
+        let quote = app
+            .api()
+            .post(
+                &format!("{path}/fee-estimate"),
+                Auth::ApiKey(&payer.key),
+                request.clone(),
+            )
+            .await;
+        assert_error(&quote, StatusCode::UNPROCESSABLE_ENTITY);
+        let rejected = app.api().post(&path, Auth::ApiKey(&payer.key), request).await;
+        assert_error(&rejected, StatusCode::UNPROCESSABLE_ENTITY);
+
+        let unchanged = app
+            .api()
+            .get(
+                &format!("/v1/me/wallets/{}/invoices/{}", payee.wallet.id, issued.id),
+                Auth::ApiKey(&payee.key),
+            )
+            .await;
+        assert_status(&unchanged, StatusCode::OK);
+        let unchanged = unchanged.parse::<Invoice>();
+        assert_eq!(unchanged.status, InvoiceStatus::Pending);
+        assert!(unchanged.payment_time.is_none());
+        assert_eq!(
+            app.wallet_balance(token, payer.wallet.id).await.available_msat,
+            payer_before.available_msat
+        );
+        assert_eq!(
+            app.wallet_balance(token, payer.wallet.id).await.reserved_msat,
+            payer_before.reserved_msat
+        );
+        assert_eq!(
+            app.wallet_balance(token, payee.wallet.id).await.available_msat,
+            payee_before.available_msat
+        );
+        let history = app.api().get(&path, Auth::ApiKey(&payer.key)).await;
+        assert_status(&history, StatusCode::OK);
+        assert!(history.parse::<Vec<Payment>>().is_empty());
+
+        let genuine = SendPaymentRequest {
+            wallet_id: None,
+            input: format!("lightning:{}", original.to_uppercase()),
+            amount_msat: None,
+            comment: None,
+        };
+        let quote = app
+            .api()
+            .post(
+                &format!("{path}/fee-estimate"),
+                Auth::ApiKey(&payer.key),
+                genuine.clone(),
+            )
+            .await;
+        assert_status(&quote, StatusCode::OK);
+        assert_eq!(quote.parse::<PaymentFeeEstimate>().maximum_fee_msat, 0);
+        let settled = app.api().post(&path, Auth::ApiKey(&payer.key), genuine).await;
+        assert_status(&settled, StatusCode::OK);
+        let settled = settled.parse::<Payment>();
+        assert_eq!(settled.status, PaymentStatus::Settled);
+        assert_eq!(settled.ledger, Ledger::Internal);
+        assert_eq!(settled.amount_msat, 50_000_000);
+        assert_eq!(
+            app.wallet_balance(token, payer.wallet.id).await.available_msat,
+            payer_before.available_msat - 50_000_000
+        );
+        assert_eq!(
+            app.wallet_balance(token, payee.wallet.id).await.available_msat,
+            payee_before.available_msat + 50_000_000
+        );
+    }
+
+    #[tokio::test]
     async fn settles_a_bolt11_between_two_wallets() {
         let app = app().await;
         let token = app.admin_token().await;
