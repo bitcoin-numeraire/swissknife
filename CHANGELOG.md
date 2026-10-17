@@ -61,9 +61,6 @@ release notes when a tag is published.
 
 ### Security
 
-- Bind internal Lightning settlement and fee quotes to the locally issued signed
-  BOLT11 request and enforce the stored fixed amount; reject hash-only matches.
-
 - Updated `bcrypt` to 0.19.2, fixing a panic in `bcrypt::verify` on non-ASCII
   hash input (RUSTSEC-2026-0199), and moved the `bitcoin` crate off the yanked
   0.32.100 release ([#324]).

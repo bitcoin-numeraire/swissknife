@@ -335,11 +335,11 @@ impl PaymentService {
         let lightning = stored
             .ln_invoice
             .as_ref()
-            .ok_or_else(|| DataError::Inconsistency("Internal invoice has no Lightning details".to_string()))?;
+            .expect("Internal invoice must have Lightning details");
         let issued = lightning
             .bolt11
             .parse::<Bolt11Invoice>()
-            .map_err(|_| DataError::Inconsistency("Stored BOLT11 invoice is invalid".to_string()))?;
+            .expect("Stored BOLT11 invoice must be valid");
         let submitted = invoice
             .bolt11
             .parse::<Bolt11Invoice>()
@@ -1971,25 +1971,19 @@ mod tests {
         }
 
         #[test]
-        fn fails_closed_without_stored_lightning_details() {
+        #[should_panic(expected = "Internal invoice must have Lightning details")]
+        fn requires_stored_lightning_details() {
             let (submitted, mut stored) = issued_invoice(Some(1_000), 1);
             stored.ln_invoice = None;
-            let result = PaymentService::validate_internal_bolt11(&submitted, &stored, 1_000);
-            assert!(matches!(
-                result,
-                Err(ApplicationError::Data(DataError::Inconsistency(_)))
-            ));
+            let _ = PaymentService::validate_internal_bolt11(&submitted, &stored, 1_000);
         }
 
         #[test]
-        fn fails_closed_with_an_invalid_stored_request() {
+        #[should_panic(expected = "Stored BOLT11 invoice must be valid")]
+        fn requires_a_valid_stored_request() {
             let (submitted, mut stored) = issued_invoice(Some(1_000), 1);
             stored.ln_invoice.as_mut().unwrap().bolt11 = "invalid".to_string();
-            let result = PaymentService::validate_internal_bolt11(&submitted, &stored, 1_000);
-            assert!(matches!(
-                result,
-                Err(ApplicationError::Data(DataError::Inconsistency(_)))
-            ));
+            let _ = PaymentService::validate_internal_bolt11(&submitted, &stored, 1_000);
         }
 
         #[test]
