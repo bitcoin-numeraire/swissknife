@@ -127,6 +127,12 @@ test:
 test-unit:
 	@cargo test --workspace --bins $(TEST) -- $(TESTARGS)
 
+# Listener adapter components use loopback gRPC fixtures and mocked app ports;
+# enable itest without starting the regtest stack or database-backed tests.
+.PHONY: test-adapters
+test-adapters:
+	@cargo test --features itest --bin swissknife infra::lightning -- $(TESTARGS)
+
 # Run the integration suite for one (database, provider) cell. Brings
 # the regtest stack up first (idempotent); override the cell via
 # ITEST_DATABASE / ITEST_PROVIDER (e.g. `make test-integration ITEST_PROVIDER=cln_grpc`).
