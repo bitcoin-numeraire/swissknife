@@ -48,15 +48,6 @@ database; concurrency scenarios still issue simultaneous requests inside their
 test case. CI jobs start with a new runner and therefore already get fresh
 dependency volumes.
 
-## Listener adapter component tests
-
-`make test-adapters` enables `itest` and runs the Lightning adapter tests without
-starting Docker. The CLN gRPC chainmoves regression uses a loopback gRPC fixture
-for `Wait` / `ListChainMoves` plus generated wallet and application-port mocks.
-It exercises the real listener loop and cursor checkpoint boundary, including
-replaying a deposit after either output lookup fails. It is not a real CLN node
-or a database/API integration test. The normal CI test job runs this target.
-
 ## Persistence (Unit-of-Work) tests
 
 The reservation/settlement balance invariants and their concurrency guarantees

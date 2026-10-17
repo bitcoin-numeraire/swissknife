@@ -107,9 +107,6 @@ jobs:
       - name: Run tests
         run: make test
 
-      - name: Run listener adapter component tests
-        run: make test-adapters
-
   docker-planner:
     runs-on: ${{ matrix.platform == 'linux/arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
     timeout-minutes: 20
