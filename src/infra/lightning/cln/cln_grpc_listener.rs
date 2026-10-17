@@ -27,6 +27,10 @@ use crate::{
     infra::lightning::EventsListener,
 };
 
+#[cfg(all(test, feature = "itest"))]
+#[path = "cln_grpc_listener_chainmoves_tests.rs"]
+mod chainmoves_tests;
+
 pub struct ClnGrpcListener {
     client: NodeClient<Channel>,
     services: Arc<AppServices>,
@@ -302,16 +306,15 @@ impl ClnGrpcListener {
                         Ok(None) => self.wallet.get_output(&txid, Some(outnum), None, true).await,
                         other => other,
                     };
+                    // Abort on lookup errors so the supervisor can retry the unresolved
+                    // deposit from the unchanged cursor instead of checkpointing past it.
                     let output = match resolved {
                         Ok(Some(output)) => output,
                         Ok(None) => {
                             trace!(%txid, outnum, "Output not found in wallet, skipping chainmove");
                             continue;
                         }
-                        Err(err) => {
-                            warn!(%err, %txid, outnum, "Failed to get output from wallet");
-                            continue;
-                        }
+                        Err(err) => return Err(LightningError::Listener(err.to_string())),
                     };
 
                     // Propagate write failures so the cursor isn't advanced past a deposit we
