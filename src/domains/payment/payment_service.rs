@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use chrono::Utc;
+use lightning_invoice::Bolt11Invoice;
 use tracing::{debug, info, trace, warn};
 use uuid::Uuid;
 
@@ -326,6 +327,33 @@ impl PaymentService {
         }
     }
 
+    fn validate_internal_bolt11(
+        invoice: &ParsedBolt11Invoice,
+        stored: &Invoice,
+        amount_msat: u64,
+    ) -> Result<(), ApplicationError> {
+        let lightning = stored
+            .ln_invoice
+            .as_ref()
+            .expect("Internal invoice must have Lightning details");
+        let issued = lightning
+            .bolt11
+            .parse::<Bolt11Invoice>()
+            .expect("Stored BOLT11 invoice must be valid");
+        let submitted = invoice
+            .bolt11
+            .parse::<Bolt11Invoice>()
+            .map_err(|_| DataError::Validation("Invalid BOLT11 invoice".to_string()))?;
+        // A payment hash identifies a preimage, not the signed request we issued.
+        if submitted != issued {
+            return Err(DataError::Validation("BOLT11 does not match the issued invoice".to_string()).into());
+        }
+        if stored.amount_msat.is_some_and(|expected| expected != amount_msat) {
+            return Err(DataError::Validation("Payment amount does not match invoice amount".to_string()).into());
+        }
+        Ok(())
+    }
+
     async fn send_bolt11(
         &self,
         invoice: ParsedBolt11Invoice,
@@ -354,6 +382,7 @@ impl PaymentService {
                         return Err(DataError::Validation("Invoice is expired.".to_string()).into());
                     }
                     InvoiceStatus::Pending => {
+                        Self::validate_internal_bolt11(&invoice, &retrieved_invoice, amount)?;
                         // Internal payment
                         debug!(%wallet_id, %amount, ledger="Internal", "Sending bolt11 payment");
 
@@ -691,6 +720,7 @@ impl PaymentsUseCases for PaymentService {
                     if stored_invoice.wallet_id == wallet_id {
                         return Err(DataError::Validation("Cannot pay for own invoice.".to_string()).into());
                     }
+                    Self::validate_internal_bolt11(&invoice, &stored_invoice, amount)?;
                     return Self::fee_estimate(Ledger::Internal, amount, Some(0), 0);
                 }
 
@@ -1344,6 +1374,41 @@ mod tests {
     mod estimate_fee_request {
         use super::*;
 
+        mod when_a_hash_matches_but_the_issued_invoice_differs {
+            use super::*;
+
+            #[tokio::test]
+            async fn rejects_instead_of_quoting_an_internal_payment() {
+                let sender = Uuid::new_v4();
+                let (submitted, _) = issued_invoice(Some(1_000), 1);
+                let (_, stored) = issued_invoice(Some(50_000), 2);
+                let mut store = MockAppStoreBuilder::new();
+                store
+                    .wallet
+                    .expect_find()
+                    .times(1)
+                    .returning(move |_| Ok(Some(wallet_with_asset(sender, native_btc_asset(BtcNetwork::Bitcoin)))));
+                store
+                    .invoice
+                    .expect_find_by_payment_hash()
+                    .times(1)
+                    .return_once(move |_| Ok(Some(stored)));
+                let service = service(
+                    store,
+                    MockLnClient::new(),
+                    MockBitcoinWallet::new(),
+                    MockEventUseCases::new(),
+                );
+
+                let result = service.estimate_fee(submitted.bolt11, None, None, sender).await;
+
+                assert!(
+                    matches!(result, Err(ApplicationError::Data(DataError::Validation(_)))),
+                    "a different issued invoice must not receive an internal quote: {result:?}"
+                );
+            }
+        }
+
         #[tokio::test]
         async fn prepares_and_releases_an_onchain_quote() {
             let wallet_id = Uuid::new_v4();
@@ -1836,8 +1901,156 @@ mod tests {
         }
     }
 
+    fn issued_invoice(amount_msat: Option<u64>, signer: u8) -> (ParsedBolt11Invoice, Invoice) {
+        use bitcoin::{
+            hashes::Hash,
+            secp256k1::{Secp256k1, SecretKey},
+        };
+        use lightning_invoice::{Currency, InvoiceBuilder, PaymentSecret};
+
+        let key = SecretKey::from_slice(&[signer; 32]).unwrap();
+        let builder = InvoiceBuilder::new(Currency::Bitcoin)
+            .description("Internal payment test".to_string())
+            .payment_hash(bitcoin::hashes::sha256::Hash::from_byte_array([42; 32]))
+            .payment_secret(PaymentSecret([43; 32]))
+            .duration_since_epoch(std::time::Duration::from_secs(1_791_000_000))
+            .min_final_cltv_expiry_delta(18);
+        let builder = match amount_msat {
+            Some(amount) => builder.amount_milli_satoshis(amount),
+            None => builder,
+        };
+        let signed = builder
+            .build_signed(|hash| Secp256k1::new().sign_ecdsa_recoverable(hash, &key))
+            .unwrap();
+        let parsed = parse_bolt11(&signed.to_string()).unwrap();
+        let stored = Invoice {
+            wallet_id: Uuid::new_v4(),
+            status: InvoiceStatus::Pending,
+            amount_msat,
+            ln_invoice: Some(crate::domains::invoice::LnInvoice {
+                bolt11: signed.to_string(),
+                payment_hash: parsed.payment_hash.clone(),
+                payee_pubkey: hex::encode(&parsed.destination),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        (parsed, stored)
+    }
+
+    mod validate_internal_bolt11 {
+        use super::*;
+
+        #[test]
+        fn accepts_the_issued_request_in_uppercase() {
+            let (mut submitted, stored) = issued_invoice(Some(1_000), 1);
+            submitted.bolt11 = submitted.bolt11.to_uppercase();
+            PaymentService::validate_internal_bolt11(&submitted, &stored, 1_000).unwrap();
+        }
+
+        #[test]
+        fn accepts_a_positive_amount_for_an_amountless_issued_request() {
+            let (submitted, stored) = issued_invoice(None, 1);
+            PaymentService::validate_internal_bolt11(&submitted, &stored, 2_000).unwrap();
+        }
+
+        #[test]
+        fn rejects_a_different_signer_even_with_the_same_hash_and_amount() {
+            let (submitted, _) = issued_invoice(Some(1_000), 1);
+            let (_, stored) = issued_invoice(Some(1_000), 2);
+            let result = PaymentService::validate_internal_bolt11(&submitted, &stored, 1_000);
+            assert!(matches!(result, Err(ApplicationError::Data(DataError::Validation(_)))));
+        }
+
+        #[test]
+        fn rejects_a_changed_request_even_with_the_same_signer() {
+            let (submitted, _) = issued_invoice(Some(1_000), 1);
+            let (_, stored) = issued_invoice(Some(2_000), 1);
+            let result = PaymentService::validate_internal_bolt11(&submitted, &stored, 1_000);
+            assert!(matches!(result, Err(ApplicationError::Data(DataError::Validation(_)))));
+        }
+
+        #[test]
+        #[should_panic(expected = "Internal invoice must have Lightning details")]
+        fn requires_stored_lightning_details() {
+            let (submitted, mut stored) = issued_invoice(Some(1_000), 1);
+            stored.ln_invoice = None;
+            let _ = PaymentService::validate_internal_bolt11(&submitted, &stored, 1_000);
+        }
+
+        #[test]
+        #[should_panic(expected = "Stored BOLT11 invoice must be valid")]
+        fn requires_a_valid_stored_request() {
+            let (submitted, mut stored) = issued_invoice(Some(1_000), 1);
+            stored.ln_invoice.as_mut().unwrap().bolt11 = "invalid".to_string();
+            let _ = PaymentService::validate_internal_bolt11(&submitted, &stored, 1_000);
+        }
+
+        #[test]
+        fn rejects_an_invalid_submitted_request() {
+            let (mut submitted, stored) = issued_invoice(Some(1_000), 1);
+            submitted.bolt11 = "invalid".to_string();
+            let result = PaymentService::validate_internal_bolt11(&submitted, &stored, 1_000);
+            assert!(matches!(result, Err(ApplicationError::Data(DataError::Validation(_)))));
+        }
+    }
+
     mod send_bolt11 {
         use super::*;
+
+        mod when_a_hash_matches_but_the_issued_invoice_differs {
+            use super::*;
+
+            #[tokio::test]
+            async fn rejects_without_settling_or_cancelling() {
+                let (submitted, _) = issued_invoice(Some(1_000), 1);
+                let (_, stored) = issued_invoice(Some(50_000), 2);
+                let mut store = MockAppStoreBuilder::new();
+                store
+                    .invoice
+                    .expect_find_by_payment_hash()
+                    .times(1)
+                    .return_once(move |_| Ok(Some(stored)));
+                store.payment_uow.expect_settle_internal().never();
+                let mut ln_client = MockLnClient::new();
+                ln_client.expect_cancel_invoice().never();
+                let service = service(store, ln_client, MockBitcoinWallet::new(), MockEventUseCases::new());
+
+                let result = service.send_bolt11(submitted, None, None, Uuid::new_v4()).await;
+
+                assert!(
+                    matches!(result, Err(ApplicationError::Data(DataError::Validation(_)))),
+                    "a hash match must not authenticate a different issued invoice: {result:?}"
+                );
+            }
+        }
+
+        mod when_the_stored_fixed_amount_disagrees {
+            use super::*;
+
+            #[tokio::test]
+            async fn rejects_instead_of_settling_the_stored_amount_incorrectly() {
+                let (submitted, mut stored) = issued_invoice(Some(1_000), 1);
+                stored.amount_msat = Some(50_000);
+                let mut store = MockAppStoreBuilder::new();
+                store
+                    .invoice
+                    .expect_find_by_payment_hash()
+                    .times(1)
+                    .return_once(move |_| Ok(Some(stored)));
+                store.payment_uow.expect_settle_internal().never();
+                let mut ln_client = MockLnClient::new();
+                ln_client.expect_cancel_invoice().never();
+                let service = service(store, ln_client, MockBitcoinWallet::new(), MockEventUseCases::new());
+
+                let result = service.send_bolt11(submitted, None, None, Uuid::new_v4()).await;
+
+                assert!(
+                    matches!(result, Err(ApplicationError::Data(DataError::Validation(_)))),
+                    "the stored fixed amount must be respected: {result:?}"
+                );
+            }
+        }
 
         mod when_invoice_is_internal_and_pending {
             use super::*;
@@ -1846,19 +2059,15 @@ mod tests {
             async fn settles_internally_and_cancels_node_invoice() {
                 let sender = Uuid::new_v4();
                 let recipient = Uuid::new_v4();
+                let (submitted, mut stored) = issued_invoice(Some(1_000), 1);
+                stored.wallet_id = recipient;
 
                 let mut store = MockAppStoreBuilder::new();
                 store
                     .invoice
                     .expect_find_by_payment_hash()
                     .times(1)
-                    .returning(move |_| {
-                        Ok(Some(Invoice {
-                            wallet_id: recipient,
-                            status: InvoiceStatus::Pending,
-                            ..Default::default()
-                        }))
-                    });
+                    .return_once(move |_| Ok(Some(stored)));
                 store
                     .payment_uow
                     .expect_settle_internal()
@@ -1871,10 +2080,7 @@ mod tests {
 
                 let service = service(store, ln_client, MockBitcoinWallet::new(), MockEventUseCases::new());
 
-                let payment = service
-                    .send_bolt11(bolt11(Some(1_000)), None, None, sender)
-                    .await
-                    .unwrap();
+                let payment = service.send_bolt11(submitted, None, None, sender).await.unwrap();
 
                 assert_eq!(payment.status, PaymentStatus::Settled);
             }
