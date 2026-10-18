@@ -1487,6 +1487,11 @@ export function ReceiveMoneyDrawer({
   const [description, setDescription] = useState('');
   const [invoiceExpirySeconds, setInvoiceExpirySeconds] = useState(DEFAULT_BOLT11_EXPIRY_SECONDS);
   const [invoice, setInvoice] = useState<Invoice>();
+  const [invoiceRequest, setInvoiceRequest] = useState<{
+    amountSats: number;
+    description: string;
+    expirySeconds: number;
+  }>();
   const [receivedPayment, setReceivedPayment] = useState<ReceivePaymentSuccess>();
   const ignoredReceiveEvents = useRef(new Set<string>());
   const [btcAddress, setBtcAddress] = useState<BtcAddress>();
@@ -1511,7 +1516,11 @@ export function ReceiveMoneyDrawer({
   const needsWallet = isAdmin && !activeWalletId;
   const hasFiatPrice = (fiatPrices[state.currency] ?? 0) > 0;
   const displayUnit = state.displayUnit ?? 'bip177';
-  const bolt11 = invoice?.ln_invoice?.bolt11;
+  const invoiceMatchesRequest =
+    invoiceRequest?.amountSats === amountSats &&
+    invoiceRequest.description === description &&
+    invoiceRequest.expirySeconds === invoiceExpirySeconds;
+  const bolt11 = invoiceMatchesRequest ? invoice?.ln_invoice?.bolt11 : undefined;
   const invoiceExpiresAt = invoice?.ln_invoice?.expires_at ?? null;
   const invoiceExpiryMs = invoiceExpiresAt ? new Date(invoiceExpiresAt).getTime() : null;
   const identityAddress = lnAddress ? displayLnAddress(lnAddress.username) : '';
@@ -1671,6 +1680,7 @@ export function ReceiveMoneyDrawer({
     setDescription('');
     setInvoiceExpirySeconds(DEFAULT_BOLT11_EXPIRY_SECONDS);
     setInvoice(undefined);
+    setInvoiceRequest(undefined);
     setReceivedPayment(undefined);
     setBtcAddress(undefined);
     setAddressError(undefined);
@@ -1701,7 +1711,10 @@ export function ReceiveMoneyDrawer({
       let nextInvoice: Invoice | undefined;
       let nextBtcAddress: BtcAddress | undefined;
 
-      if (shouldGenerateInvoice) setInvoice(undefined);
+      if (shouldGenerateInvoice) {
+        setInvoice(undefined);
+        setInvoiceRequest(undefined);
+      }
       setReceivedPayment(undefined);
       if (shouldGenerateAddress) setBtcAddress(undefined);
 
@@ -1724,6 +1737,7 @@ export function ReceiveMoneyDrawer({
 
         nextInvoice = invoiceResult.data;
         setInvoice(nextInvoice);
+        setInvoiceRequest({ amountSats, description, expirySeconds: invoiceExpirySeconds });
       }
 
       if (shouldGenerateAddress) {
