@@ -38,7 +38,12 @@ import { truncateText } from 'src/utils/format-string';
 import { fToNow, fDateTime } from 'src/utils/format-time';
 import { fSats, fCurrency } from 'src/utils/format-number';
 import { encodeLNURL, displayLnAddress } from 'src/utils/lnurl';
-import { composeBip21, parseBitcoinUri, compactBitcoinAddress } from 'src/utils/bitcoin-request';
+import {
+  composeBip21,
+  parseBitcoinUri,
+  compactBitcoinAddress,
+  bitcoinUriWithoutLightning,
+} from 'src/utils/bitcoin-request';
 
 import { CONFIG } from 'src/global-config';
 import { useTranslate } from 'src/locales';
@@ -691,9 +696,11 @@ export function SendMoneyDrawer({
     (kind === 'bitcoin' || kind === 'bip21') &&
     looksLikeBitcoinAddress(bitcoinAddressForValidation) &&
     !isBitcoinAddress(bitcoinAddressForValidation);
-  const expiredInvoiceBlocksSubmit =
-    lightningInvoiceExpired &&
-    (kind === 'bolt11' || (kind === 'bip21' && !bitcoinRequest.amountSats));
+  const canSelectOnchain =
+    kind === 'bip21' &&
+    isBitcoinAddress(bitcoinRequest.address) &&
+    !hasInvalidBip21Amount &&
+    !hasUnsupportedBip21Params;
   const manualAmountSats = useMemo(
     () => amountValueToSats(amountValue, amountUnit, fiatPrices, state.currency),
     [amountUnit, amountValue, fiatPrices, state.currency]
@@ -737,7 +744,7 @@ export function SendMoneyDrawer({
     input.trim().length > 4 &&
     amountSats > 0 &&
     (amountUnit !== 'fiat' || hasFiatPrice || embeddedAmountSats > 0) &&
-    !expiredInvoiceBlocksSubmit &&
+    !lightningInvoiceExpired &&
     !hasUnsupportedBip21Params &&
     !hasInvalidBip21Amount &&
     !hasInvalidBitcoinAddress &&
@@ -752,7 +759,7 @@ export function SendMoneyDrawer({
     !hasUnsupportedBip21Params &&
     !hasInvalidBip21Amount &&
     !hasInvalidBitcoinAddress &&
-    !expiredInvoiceBlocksSubmit &&
+    !lightningInvoiceExpired &&
     !needsWallet;
   const submitLabel =
     (input.trim() && kind === 'unknown' && t('send_money.unsupported_request')) ||
@@ -1173,13 +1180,26 @@ export function SendMoneyDrawer({
                     )}
 
                     {lightningInvoiceExpired && (
-                      <Alert
-                        severity={expiredInvoiceBlocksSubmit ? 'warning' : 'info'}
-                        variant="outlined"
-                      >
-                        {expiredInvoiceBlocksSubmit
-                          ? t('send_money.invoice_expired_note')
-                          : t('send_money.invoice_fallback_expired_note')}
+                      <Alert severity="warning" variant="outlined">
+                        <Stack spacing={1}>
+                          {canSelectOnchain
+                            ? t('send_money.invoice_fallback_expired_note')
+                            : t('send_money.invoice_expired_note')}
+                          {canSelectOnchain && (
+                            <Button
+                              size="small"
+                              color="inherit"
+                              variant="outlined"
+                              onClick={() => {
+                                setInput(bitcoinUriWithoutLightning(input));
+                                setAmountValue('');
+                                resetFeeEstimate();
+                              }}
+                            >
+                              {t('send_money.use_onchain')}
+                            </Button>
+                          )}
+                        </Stack>
                       </Alert>
                     )}
 
