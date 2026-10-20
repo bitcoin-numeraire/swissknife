@@ -201,7 +201,7 @@ mod deposit {
     use std::{path::Path, process::Command};
 
     use serde_json::{json, Value};
-    use swissknife_types::{Invoice, InvoiceStatus, Ledger};
+    use swissknife_types::{BtcOutputStatus, Invoice, InvoiceStatus, Ledger};
 
     fn lnd_cli(args: &[&str]) -> Value {
         let project =
@@ -308,12 +308,23 @@ mod deposit {
                 })
         })
         .await;
-        let pending = app.api().get(&path, Auth::Bearer(token)).await.parse::<Vec<Invoice>>();
-        assert_eq!(pending.len(), 1, "unregistered change is not a tenant deposit");
-        assert_eq!(pending[0].status, InvoiceStatus::Pending);
-        assert_eq!(pending[0].ledger, Ledger::Onchain);
-        assert_eq!(pending[0].amount_msat, Some(sats * 1000));
-        assert_eq!(app.wallet_balance(token, wallet.id).await.available_msat, 0);
+        let observed = app.api().get(&path, Auth::Bearer(token)).await.parse::<Vec<Invoice>>();
+        assert_eq!(observed.len(), 1, "unregistered change is not a tenant deposit");
+        assert_eq!(observed[0].ledger, Ledger::Onchain);
+        assert_eq!(observed[0].amount_msat, Some(sats * 1000));
+        let output = observed[0].bitcoin_output.as_ref().expect("deposit output");
+        // Other integration tests share the miner and may confirm this transaction.
+        match observed[0].status {
+            InvoiceStatus::Pending => {
+                assert_eq!(observed[0].amount_received_msat, None);
+                assert_eq!(output.status, BtcOutputStatus::Unconfirmed);
+            }
+            InvoiceStatus::Settled => {
+                assert_eq!(observed[0].amount_received_msat, Some(sats * 1000));
+                assert_eq!(output.status, BtcOutputStatus::Confirmed);
+            }
+            InvoiceStatus::Expired => panic!("on-chain deposit must not expire"),
+        }
 
         mine(6).await;
         wait_until(Duration::from_secs(30), "LND-funded deposit credited", || async {
@@ -322,7 +333,7 @@ mod deposit {
         .await;
         let settled = app.api().get(&path, Auth::Bearer(token)).await.parse::<Vec<Invoice>>();
         assert_eq!(settled.len(), 1);
-        assert_eq!(settled[0].id, pending[0].id);
+        assert_eq!(settled[0].id, observed[0].id);
         assert_eq!(settled[0].status, InvoiceStatus::Settled);
         assert_eq!(settled[0].amount_received_msat, Some(sats * 1000));
         let output = settled[0].bitcoin_output.as_ref().expect("deposit output");
