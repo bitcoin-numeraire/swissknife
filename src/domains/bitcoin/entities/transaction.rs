@@ -27,7 +27,7 @@ pub struct BtcTransaction {
     pub txid: String,
     pub block_height: Option<u32>,
     pub outputs: Vec<BtcTransactionOutput>,
-    /// True if we spent any of the inputs (outgoing tx), false if this is a deposit to our wallet
+    /// True if we spent any input. The transaction may also pay our deposit addresses.
     pub is_outgoing: bool,
 }
 
