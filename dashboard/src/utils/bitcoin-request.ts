@@ -128,6 +128,20 @@ export function parseBitcoinUri(input: string): ParsedBitcoinUri {
   };
 }
 
+export function bitcoinUriWithoutLightning(input: string) {
+  const value = input.trim();
+  const queryIndex = value.indexOf('?');
+  if (!/^bitcoin:/i.test(value) || queryIndex < 0) return value;
+
+  const query = value
+    .slice(queryIndex + 1)
+    .split('&')
+    .filter((param) => safeDecode(param.split('=')[0]).toLowerCase() !== 'lightning')
+    .join('&');
+
+  return `${value.slice(0, queryIndex)}${query ? `?${query}` : ''}`;
+}
+
 export function composeBip21(
   address?: string | null,
   bolt11?: string | null,

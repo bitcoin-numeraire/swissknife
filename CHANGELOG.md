@@ -54,6 +54,9 @@ release notes when a tag is published.
 
 - Hide generated receive QR codes and copy/share actions when the amount, memo,
   or expiry changes, until the request is refreshed or the original values are restored.
+- Expired Unified requests now require an explicit on-chain selection before
+  fee estimation or sending, using the on-chain request's own amount instead of
+  submitting the expired Lightning invoice.
 - Made concurrent local sign-up return one success and deterministic conflicts
   instead of leaking database uniqueness errors as HTTP 500 responses ([#329]).
 - Rejected Lightning invoice creation when the selected wallet's native BTC
