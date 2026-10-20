@@ -153,32 +153,24 @@ impl LndGrpcListener {
     }
 
     async fn handle_transaction(&self, transaction: BtcTransaction) -> Result<(), LightningError> {
-        let relevant_outputs = transaction.outputs.iter().filter(|output| {
-            if transaction.is_outgoing {
-                !output.is_ours
-            } else {
-                output.is_ours
-            }
-        });
-
-        for output in relevant_outputs {
-            let result = if transaction.is_outgoing {
-                self.services
-                    .event
-                    .onchain_withdrawal(transaction.withdrawal_event())
-                    .await
-            } else {
-                self.services
-                    .event
-                    .onchain_deposit(transaction.deposit_event(output))
-                    .await
-            };
-
+        for output in transaction.outputs.iter().filter(|output| output.is_ours) {
             // Propagate write failures instead of swallowing them. The cursor must not
             // advance past an event we failed to persist or the deposit is lost; bubbling
             // the error exits the listener so the supervisor reconnects and `sync()` reruns
             // from the un-advanced cursor, reprocessing idempotently.
-            result.map_err(|e| LightningError::EventProcessing(e.to_string()))?;
+            self.services
+                .event
+                .onchain_deposit(transaction.deposit_event(output))
+                .await
+                .map_err(|e| LightningError::EventProcessing(e.to_string()))?;
+        }
+
+        if transaction.is_outgoing {
+            self.services
+                .event
+                .onchain_withdrawal(transaction.withdrawal_event())
+                .await
+                .map_err(|e| LightningError::EventProcessing(e.to_string()))?;
         }
 
         if let Some(block_height) = transaction.block_height.filter(|&h| h > 0) {

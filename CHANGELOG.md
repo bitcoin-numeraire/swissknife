@@ -52,6 +52,8 @@ release notes when a tag is published.
 
 ### Fixed
 
+- Fixed LND-funded on-chain transactions skipping deposits to SwissKnife wallet
+  addresses in both live notifications and transaction synchronization.
 - Made concurrent local sign-up return one success and deterministic conflicts
   instead of leaking database uniqueness errors as HTTP 500 responses ([#329]).
 - Rejected Lightning invoice creation when the selected wallet's native BTC
