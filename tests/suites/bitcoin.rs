@@ -198,6 +198,144 @@ mod query {
 mod deposit {
     use super::*;
 
+    use std::{path::Path, process::Command};
+
+    use serde_json::{json, Value};
+    use swissknife_types::{Invoice, InvoiceStatus, Ledger};
+
+    fn lnd_cli(args: &[&str]) -> Value {
+        let project =
+            std::env::var("SWISSKNIFE_ITEST_COMPOSE_PROJECT").unwrap_or_else(|_| "swissknife-itest".to_string());
+        let compose = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/itest/docker-compose.yml");
+        let output = Command::new("docker")
+            .args(["compose", "-p", &project, "-f"])
+            .arg(compose)
+            .args(["exec", "-T", "lnd", "lncli", "--network=regtest"])
+            .args(args)
+            .output()
+            .expect("run regtest LND CLI");
+        assert!(
+            output.status.success(),
+            "LND command failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        serde_json::from_slice(&output.stdout).expect("LND JSON response")
+    }
+
+    #[tokio::test]
+    async fn lnd_funded_transaction_credits_its_registered_deposit_output() {
+        assert_lnd_funded_deposit(true).await;
+    }
+
+    #[tokio::test]
+    async fn lnd_funded_transaction_with_only_owned_outputs_credits_the_deposit() {
+        assert_lnd_funded_deposit(false).await;
+    }
+
+    async fn assert_lnd_funded_deposit(with_external_output: bool) {
+        let app = app().await;
+        if !app.provider.starts_with("lnd") {
+            return;
+        }
+        let funding = lnd_cli(&["newaddress", "p2wkh"]);
+        let funding_address = funding["address"].as_str().expect("node funding address");
+        send_to_address(funding_address, 1_000_000).await;
+        mine(6).await;
+        wait_until(Duration::from_secs(30), "LND funding confirmed", || async {
+            lnd_cli(&["listunspent"])["utxos"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|output| output["address"] == funding_address && output["confirmations"].as_u64().unwrap() > 0)
+        })
+        .await;
+
+        let token = app.admin_token().await;
+        let wallet = app.create_wallet(token, "btc-lnd-self-transfer").await;
+        let address = post_address(app, token, wallet.id, None).await.parse::<BtcAddress>();
+        let sats = 100_000;
+        let mut destinations = json!({address.address.clone(): sats});
+        if with_external_output {
+            let external = crate::common::chain::new_address().await;
+            destinations[external] = json!(50_000);
+        }
+
+        // Bypass SwissKnife's internal-payment optimization: this is a real
+        // transaction spending LND inputs to a registered deposit address.
+        let sent = lnd_cli(&["sendmany", "--sat_per_vbyte=2", &destinations.to_string()]);
+        let txid = sent["txid"].as_str().expect("broadcast txid");
+        let listed = lnd_cli(&["listchaintxns"]);
+        let transaction = listed["transactions"]
+            .as_array()
+            .expect("LND transactions")
+            .iter()
+            .find(|tx| tx["tx_hash"] == txid)
+            .expect("broadcast transaction in LND");
+        assert!(transaction["previous_outpoints"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|input| input["is_our_output"] == true));
+        let owned_output = transaction["output_details"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|output| output["address"] == address.address)
+            .expect("registered output in LND transaction");
+        assert_eq!(owned_output["is_our_address"], true);
+        assert_eq!(
+            transaction["output_details"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|output| output["is_our_address"] == false),
+            with_external_output
+        );
+        let outpoint = format!("{txid}:{}", owned_output["output_index"].as_str().unwrap());
+
+        let path = format!("/v1/invoices?wallet_id={}", wallet.id);
+        wait_until(Duration::from_secs(30), "LND-funded deposit projected", || async {
+            app.api()
+                .get(&path, Auth::Bearer(token))
+                .await
+                .parse::<Vec<Invoice>>()
+                .iter()
+                .any(|invoice| {
+                    invoice
+                        .bitcoin_output
+                        .as_ref()
+                        .is_some_and(|output| output.outpoint == outpoint)
+                })
+        })
+        .await;
+        let pending = app.api().get(&path, Auth::Bearer(token)).await.parse::<Vec<Invoice>>();
+        assert_eq!(pending.len(), 1, "unregistered change is not a tenant deposit");
+        assert_eq!(pending[0].status, InvoiceStatus::Pending);
+        assert_eq!(pending[0].ledger, Ledger::Onchain);
+        assert_eq!(pending[0].amount_msat, Some(sats * 1000));
+        assert_eq!(app.wallet_balance(token, wallet.id).await.available_msat, 0);
+
+        mine(6).await;
+        wait_until(Duration::from_secs(30), "LND-funded deposit credited", || async {
+            app.wallet_balance(token, wallet.id).await.available_msat == (sats * 1000) as i64
+        })
+        .await;
+        let settled = app.api().get(&path, Auth::Bearer(token)).await.parse::<Vec<Invoice>>();
+        assert_eq!(settled.len(), 1);
+        assert_eq!(settled[0].id, pending[0].id);
+        assert_eq!(settled[0].status, InvoiceStatus::Settled);
+        assert_eq!(settled[0].amount_received_msat, Some(sats * 1000));
+        let output = settled[0].bitcoin_output.as_ref().expect("deposit output");
+        assert_eq!(output.outpoint, outpoint);
+        assert_eq!(output.address, address.address);
+        assert_eq!(output.amount_sat, sats);
+        let used = app
+            .api()
+            .get(&format!("/v1/bitcoin/addresses/{}", address.id), Auth::Bearer(token))
+            .await;
+        assert!(used.parse::<BtcAddress>().used);
+    }
+
     #[tokio::test]
     async fn a_taproot_deposit_credits_the_wallet_and_marks_the_address_used() {
         let app = app().await;

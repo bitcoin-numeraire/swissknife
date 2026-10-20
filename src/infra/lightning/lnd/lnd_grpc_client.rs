@@ -655,27 +655,24 @@ impl BitcoinWallet for LndGrpcClient {
                 max_height = Some(max_height.map_or(height, |current| current.max(height)));
             }
 
+            for output in transaction.outputs.iter().filter(|output| output.is_ours) {
+                result.push(OnchainTransaction::Deposit(BtcOutput {
+                    txid: transaction.txid.clone(),
+                    output_index: output.output_index,
+                    address: output.address.clone(),
+                    amount_sat: output.amount_sat,
+                    block_height: transaction.block_height,
+                    outpoint: format!("{}:{}", transaction.txid, output.output_index),
+                    status: if transaction.block_height.is_some() && transaction.block_height.unwrap() > 0 {
+                        BtcOutputStatus::Confirmed
+                    } else {
+                        BtcOutputStatus::Unconfirmed
+                    },
+                    ..Default::default()
+                }));
+            }
             if transaction.is_outgoing {
-                for _output in transaction.outputs.iter().filter(|output| !output.is_ours) {
-                    result.push(OnchainTransaction::Withdrawal(transaction.withdrawal_event()));
-                }
-            } else {
-                for output in transaction.outputs.iter().filter(|output| output.is_ours) {
-                    result.push(OnchainTransaction::Deposit(BtcOutput {
-                        txid: transaction.txid.clone(),
-                        output_index: output.output_index,
-                        address: output.address.clone(),
-                        amount_sat: output.amount_sat,
-                        block_height: transaction.block_height,
-                        outpoint: format!("{}:{}", transaction.txid, output.output_index),
-                        status: if transaction.block_height.is_some() && transaction.block_height.unwrap() > 0 {
-                            BtcOutputStatus::Confirmed
-                        } else {
-                            BtcOutputStatus::Unconfirmed
-                        },
-                        ..Default::default()
-                    }));
-                }
+                result.push(OnchainTransaction::Withdrawal(transaction.withdrawal_event()));
             }
         }
 
