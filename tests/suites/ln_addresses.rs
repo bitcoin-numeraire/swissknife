@@ -146,6 +146,76 @@ mod manage {
     use super::*;
 
     #[tokio::test]
+    async fn bulk_delete_requires_an_effective_filter() {
+        let app = crate::common::TestApp::isolated("ln-address-delete-filter", &[]).await;
+        let token = app.admin_token().await;
+        let first_wallet = app.create_wallet(token, "ln-filter-first").await;
+        let second_wallet = app.create_wallet(token, "ln-filter-second").await;
+        let mut addresses = Vec::new();
+        for wallet in [&first_wallet, &second_wallet] {
+            let created = app
+                .api()
+                .post(
+                    "/v1/lightning-addresses",
+                    Auth::Bearer(token),
+                    register_req(wallet, &unique("ln-filter")),
+                )
+                .await;
+            assert_status(&created, StatusCode::OK);
+            addresses.push(created.parse::<LnAddress>());
+        }
+
+        for query in [
+            "",
+            "?limit=1",
+            "?offset=1",
+            "?order_direction=Asc",
+            "?unknown=1",
+            "?active=true",
+        ] {
+            let response = app
+                .api()
+                .delete(&format!("/v1/lightning-addresses{query}"), Auth::Bearer(token))
+                .await;
+            assert_error(&response, StatusCode::UNPROCESSABLE_ENTITY);
+            for address in &addresses {
+                let retained = app
+                    .api()
+                    .get(&format!("/v1/lightning-addresses/{}", address.id), Auth::Bearer(token))
+                    .await;
+                assert_status(&retained, StatusCode::OK);
+                assert_eq!(retained.parse::<LnAddress>().id, address.id);
+            }
+        }
+
+        let deleted = app
+            .api()
+            .delete(
+                &format!("/v1/lightning-addresses?username={}", addresses[0].username),
+                Auth::Bearer(token),
+            )
+            .await;
+        assert_status(&deleted, StatusCode::OK);
+        assert_eq!(deleted.parse::<u64>(), 1);
+        let missing = app
+            .api()
+            .get(
+                &format!("/v1/lightning-addresses/{}", addresses[0].id),
+                Auth::Bearer(token),
+            )
+            .await;
+        assert_error(&missing, StatusCode::NOT_FOUND);
+        let retained = app
+            .api()
+            .get(
+                &format!("/v1/lightning-addresses/{}", addresses[1].id),
+                Auth::Bearer(token),
+            )
+            .await;
+        assert_status(&retained, StatusCode::OK);
+    }
+
+    #[tokio::test]
     async fn get_update_then_delete() {
         let app = app().await;
         let token = app.admin_token().await;

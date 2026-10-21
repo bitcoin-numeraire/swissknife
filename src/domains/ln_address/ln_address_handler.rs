@@ -207,6 +207,9 @@ async fn delete_address(
 /// Delete LN Addresses
 ///
 /// Deletes all the addresses given a filter. Returns the number of deleted addresses
+///
+/// Requires at least one effective selector: ids, account_id, wallet_id or username. Empty lists do not count as selectors.
+/// Pagination, ordering and other query-only fields do not scope deletion.
 #[utoipa::path(
     delete,
     path = "",
@@ -218,6 +221,7 @@ async fn delete_address(
         (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
         (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
         (status = 403, description = "Forbidden", body = ErrorResponse, example = json!(FORBIDDEN_EXAMPLE)),
+        (status = 422, description = "Missing effective deletion filter", body = ErrorResponse),
         (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
     )
 )]

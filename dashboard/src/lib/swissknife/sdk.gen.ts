@@ -618,6 +618,9 @@ export const signUp = <ThrowOnError extends boolean = false>(
  * Delete Bitcoin addresses
  *
  * Deletes all Bitcoin addresses matching a filter. Returns the number deleted.
+ *
+ * Requires at least one effective selector: ids, wallet_id or address. Empty lists do not count as selectors.
+ * Pagination, ordering and other query-only fields do not scope deletion.
  */
 export const deleteBtcAddresses = <ThrowOnError extends boolean = false>(
   options?: Options<DeleteBtcAddressesData, ThrowOnError>
@@ -707,6 +710,9 @@ export const getBtcAddress = <ThrowOnError extends boolean = false>(
  * Delete invoices
  *
  * Deletes all invoices matching a filter. Returns the number deleted. Deleting an invoice can affect the wallet balance.
+ *
+ * Requires at least one effective selector: ids, wallet_id, status or ledger. Empty lists do not count as selectors.
+ * Pagination, ordering and other query-only fields do not scope deletion.
  */
 export const deleteInvoices = <ThrowOnError extends boolean = false>(
   options?: Options<DeleteInvoicesData, ThrowOnError>
@@ -784,6 +790,9 @@ export const getInvoice = <ThrowOnError extends boolean = false>(
  * Delete LN Addresses
  *
  * Deletes all the addresses given a filter. Returns the number of deleted addresses
+ *
+ * Requires at least one effective selector: ids, account_id, wallet_id or username. Empty lists do not count as selectors.
+ * Pagination, ordering and other query-only fields do not scope deletion.
  */
 export const deleteAddresses = <ThrowOnError extends boolean = false>(
   options?: Options<DeleteAddressesData, ThrowOnError>
@@ -1397,6 +1406,9 @@ export const getWalletPayment = <ThrowOnError extends boolean = false>(
  * Delete payments
  *
  * Deletes all payments matching a filter. Returns the number deleted. Deleting a payment can affect the wallet balance.
+ *
+ * Requires at least one effective selector: ids, wallet_id, status, ln_addresses or btc_addresses. Empty lists do not count as selectors.
+ * Pagination, ordering and other query-only fields do not scope deletion.
  */
 export const deletePayments = <ThrowOnError extends boolean = false>(
   options?: Options<DeletePaymentsData, ThrowOnError>
@@ -1570,6 +1582,9 @@ export const versionCheck = <ThrowOnError extends boolean = false>(
  * Delete wallets
  *
  * Deletes all the wallets given a filter. Returns the number of deleted wallets. Deleting a wallet removes all data related to that wallet.
+ *
+ * Requires at least one effective selector: ids, account_id or asset_id. Empty lists do not count as selectors.
+ * Pagination, ordering and other query-only fields do not scope deletion.
  */
 export const deleteWallets = <ThrowOnError extends boolean = false>(
   options?: Options<DeleteWalletsData, ThrowOnError>
