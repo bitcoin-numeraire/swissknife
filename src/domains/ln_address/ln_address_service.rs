@@ -175,6 +175,17 @@ impl LnAddressUseCases for LnAddressService {
     async fn delete_many(&self, filter: LnAddressFilter) -> Result<u64, ApplicationError> {
         debug!(?filter, "Deleting lightning addresses");
 
+        if filter.ids.as_ref().is_none_or(Vec::is_empty)
+            && filter.account_id.is_none()
+            && filter.wallet_id.is_none()
+            && filter.username.is_none()
+        {
+            return Err(DataError::Validation(
+                "At least one Lightning address filter is required for bulk deletion.".to_string(),
+            )
+            .into());
+        }
+
         let n_deleted = self.store.ln_address.delete_many(filter.clone()).await?;
 
         info!(?filter, n_deleted, "Lightning addresses deleted successfully");
@@ -758,6 +769,22 @@ mod tests {
     mod delete_many {
         use super::*;
 
+        mod without_a_nonempty_filter {
+            use super::*;
+
+            #[tokio::test]
+            async fn rejects_empty_ids_without_querying_the_repository() {
+                let service = LnAddressService::new(MockAppStoreBuilder::new().build(), BtcNetwork::Regtest);
+                let result = service
+                    .delete_many(LnAddressFilter {
+                        ids: Some(vec![]),
+                        ..Default::default()
+                    })
+                    .await;
+                assert!(matches!(result, Err(ApplicationError::Data(DataError::Validation(_)))));
+            }
+        }
+
         #[tokio::test]
         async fn returns_deleted_count() {
             let mut store = MockAppStoreBuilder::new();
@@ -765,7 +792,13 @@ mod tests {
 
             let service = LnAddressService::new(store.build(), BtcNetwork::Regtest);
 
-            let deleted = service.delete_many(LnAddressFilter::default()).await.unwrap();
+            let deleted = service
+                .delete_many(LnAddressFilter {
+                    wallet_id: Some(Uuid::new_v4()),
+                    ..Default::default()
+                })
+                .await
+                .unwrap();
 
             assert_eq!(deleted, 3);
         }

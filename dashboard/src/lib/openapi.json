@@ -1944,7 +1944,7 @@
           "Bitcoin Addresses"
         ],
         "summary": "Delete Bitcoin addresses",
-        "description": "Deletes all Bitcoin addresses matching a filter. Returns the number deleted.",
+        "description": "Deletes all Bitcoin addresses matching a filter. Returns the number deleted.\n\nRequires at least one effective selector: ids, wallet_id or address. Empty lists do not count as selectors.\nPagination, ordering and other query-only fields do not scope deletion.",
         "operationId": "delete_btc_addresses",
         "parameters": [
           {
@@ -2097,6 +2097,16 @@
                   "$ref": "#/components/schemas/ErrorResponse"
                 },
                 "example": "\n{\n    \"status\": \"403 Forbidden\",\n    \"reason\": \"Missing permissions\"\n}\n"
+              }
+            }
+          },
+          "422": {
+            "description": "Missing effective deletion filter",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
               }
             }
           },
@@ -2548,7 +2558,7 @@
           "Invoices"
         ],
         "summary": "Delete invoices",
-        "description": "Deletes all invoices matching a filter. Returns the number deleted. Deleting an invoice can affect the wallet balance.",
+        "description": "Deletes all invoices matching a filter. Returns the number deleted. Deleting an invoice can affect the wallet balance.\n\nRequires at least one effective selector: ids, wallet_id, status or ledger. Empty lists do not count as selectors.\nPagination, ordering and other query-only fields do not scope deletion.",
         "operationId": "delete_invoices",
         "parameters": [
           {
@@ -2702,6 +2712,16 @@
                   "$ref": "#/components/schemas/ErrorResponse"
                 },
                 "example": "\n{\n    \"status\": \"403 Forbidden\",\n    \"reason\": \"Missing permissions\"\n}\n"
+              }
+            }
+          },
+          "422": {
+            "description": "Missing effective deletion filter",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
               }
             }
           },
@@ -3149,7 +3169,7 @@
           "Lightning Addresses"
         ],
         "summary": "Delete LN Addresses",
-        "description": "Deletes all the addresses given a filter. Returns the number of deleted addresses",
+        "description": "Deletes all the addresses given a filter. Returns the number of deleted addresses\n\nRequires at least one effective selector: ids, account_id, wallet_id or username. Empty lists do not count as selectors.\nPagination, ordering and other query-only fields do not scope deletion.",
         "operationId": "delete_addresses",
         "parameters": [
           {
@@ -3299,6 +3319,16 @@
                   "$ref": "#/components/schemas/ErrorResponse"
                 },
                 "example": "\n{\n    \"status\": \"403 Forbidden\",\n    \"reason\": \"Missing permissions\"\n}\n"
+              }
+            }
+          },
+          "422": {
+            "description": "Missing effective deletion filter",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
               }
             }
           },
@@ -6639,7 +6669,7 @@
           "Payments"
         ],
         "summary": "Delete payments",
-        "description": "Deletes all payments matching a filter. Returns the number deleted. Deleting a payment can affect the wallet balance.",
+        "description": "Deletes all payments matching a filter. Returns the number deleted. Deleting a payment can affect the wallet balance.\n\nRequires at least one effective selector: ids, wallet_id, status, ln_addresses or btc_addresses. Empty lists do not count as selectors.\nPagination, ordering and other query-only fields do not scope deletion.",
         "operationId": "delete_payments",
         "parameters": [
           {
@@ -6814,6 +6844,16 @@
                   "$ref": "#/components/schemas/ErrorResponse"
                 },
                 "example": "\n{\n    \"status\": \"403 Forbidden\",\n    \"reason\": \"Missing permissions\"\n}\n"
+              }
+            }
+          },
+          "422": {
+            "description": "Missing effective deletion filter",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
               }
             }
           },
@@ -7382,7 +7422,7 @@
           "Wallets"
         ],
         "summary": "Delete wallets",
-        "description": "Deletes all the wallets given a filter. Returns the number of deleted wallets. Deleting a wallet removes all data related to that wallet.",
+        "description": "Deletes all the wallets given a filter. Returns the number of deleted wallets. Deleting a wallet removes all data related to that wallet.\n\nRequires at least one effective selector: ids, account_id or asset_id. Empty lists do not count as selectors.\nPagination, ordering and other query-only fields do not scope deletion.",
         "operationId": "delete_wallets",
         "parameters": [
           {
@@ -7508,6 +7548,16 @@
                   "$ref": "#/components/schemas/ErrorResponse"
                 },
                 "example": "\n{\n    \"status\": \"403 Forbidden\",\n    \"reason\": \"Missing permissions\"\n}\n"
+              }
+            }
+          },
+          "422": {
+            "description": "Missing effective deletion filter",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
               }
             }
           },

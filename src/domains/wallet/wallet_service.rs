@@ -145,6 +145,12 @@ impl WalletUseCases for WalletService {
     async fn delete_many(&self, filter: WalletFilter) -> Result<u64, ApplicationError> {
         debug!(?filter, "Deleting wallets");
 
+        if filter.ids.as_ref().is_none_or(Vec::is_empty) && filter.account_id.is_none() && filter.asset_id.is_none() {
+            return Err(
+                DataError::Validation("At least one wallet filter is required for bulk deletion.".to_string()).into(),
+            );
+        }
+
         let n_deleted = self.store.wallet.delete_many(filter.clone()).await?;
 
         info!(?filter, n_deleted, "Wallets deleted successfully");
@@ -465,6 +471,26 @@ mod tests {
             let service = WalletService::new(store.build());
 
             assert_eq!(service.list_contacts(Uuid::new_v4()).await.unwrap().len(), 1);
+        }
+    }
+
+    mod delete_many {
+        use super::*;
+
+        mod without_a_nonempty_filter {
+            use super::*;
+
+            #[tokio::test]
+            async fn rejects_empty_ids_without_querying_the_repository() {
+                let service = WalletService::new(MockAppStoreBuilder::new().build());
+                let result = service
+                    .delete_many(WalletFilter {
+                        ids: Some(vec![]),
+                        ..Default::default()
+                    })
+                    .await;
+                assert!(matches!(result, Err(ApplicationError::Data(DataError::Validation(_)))));
+            }
         }
     }
 

@@ -218,6 +218,9 @@ async fn delete_payment(
 /// Delete payments
 ///
 /// Deletes all payments matching a filter. Returns the number deleted. Deleting a payment can affect the wallet balance.
+///
+/// Requires at least one effective selector: ids, wallet_id, status, ln_addresses or btc_addresses. Empty lists do not count as selectors.
+/// Pagination, ordering and other query-only fields do not scope deletion.
 #[utoipa::path(
     delete,
     path = "",
@@ -229,6 +232,7 @@ async fn delete_payment(
         (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
         (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
         (status = 403, description = "Forbidden", body = ErrorResponse, example = json!(FORBIDDEN_EXAMPLE)),
+        (status = 422, description = "Missing effective deletion filter", body = ErrorResponse),
         (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
     )
 )]

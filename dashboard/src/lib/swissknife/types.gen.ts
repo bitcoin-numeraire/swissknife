@@ -2124,6 +2124,10 @@ export type DeleteBtcAddressesErrors = {
    */
   403: ErrorResponse;
   /**
+   * Missing effective deletion filter
+   */
+  422: ErrorResponse;
+  /**
    * Internal Server Error
    */
   500: ErrorResponse;
@@ -2391,6 +2395,10 @@ export type DeleteInvoicesErrors = {
    */
   403: ErrorResponse;
   /**
+   * Missing effective deletion filter
+   */
+  422: ErrorResponse;
+  /**
    * Internal Server Error
    */
   500: ErrorResponse;
@@ -2655,6 +2663,10 @@ export type DeleteAddressesErrors = {
    * Forbidden
    */
   403: ErrorResponse;
+  /**
+   * Missing effective deletion filter
+   */
+  422: ErrorResponse;
   /**
    * Internal Server Error
    */
@@ -4307,6 +4319,10 @@ export type DeletePaymentsErrors = {
    */
   403: ErrorResponse;
   /**
+   * Missing effective deletion filter
+   */
+  422: ErrorResponse;
+  /**
    * Internal Server Error
    */
   500: ErrorResponse;
@@ -4719,6 +4735,10 @@ export type DeleteWalletsErrors = {
    * Forbidden
    */
   403: ErrorResponse;
+  /**
+   * Missing effective deletion filter
+   */
+  422: ErrorResponse;
   /**
    * Internal Server Error
    */
