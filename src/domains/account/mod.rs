@@ -20,3 +20,6 @@ pub use api_key_service::*;
 pub use auth_handler::*;
 pub use auth_service::*;
 pub use entities::*;
+mod local_credential;
+pub use local_credential::*;
+mod password;

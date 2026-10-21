@@ -25,11 +25,19 @@ pub enum Relation {
         on_delete = "Cascade"
     )]
     Account,
+    #[sea_orm(has_one = "super::local_credential::Entity")]
+    LocalCredential,
 }
 
 impl Related<super::account::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::Account.def()
+    }
+}
+
+impl Related<super::local_credential::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::LocalCredential.def()
     }
 }
 

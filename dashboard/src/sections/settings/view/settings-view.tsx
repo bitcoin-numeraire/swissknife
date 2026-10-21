@@ -46,6 +46,7 @@ import { useSettingsContext } from 'src/components/settings';
 import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';
 
 import { useAuthContext } from 'src/auth/hooks';
+import { clearSession } from 'src/auth/context/jwt';
 
 // ----------------------------------------------------------------------
 
@@ -64,7 +65,7 @@ type SessionUserProfile = {
   app_metadata?: { provider?: string };
 };
 
-const MIN_PASSWORD_LENGTH = 12;
+const MIN_PASSWORD_LENGTH = 15;
 
 type ChangePasswordFormValues = {
   current_password: string;
@@ -161,9 +162,14 @@ export function SettingsView() {
           current_password: zod
             .string()
             .min(1, { message: t('settings_view.current_password_required') }),
-          new_password: zod.string().min(MIN_PASSWORD_LENGTH, {
-            message: t('settings_view.min_password', { count: MIN_PASSWORD_LENGTH }),
-          }),
+          new_password: zod
+            .string()
+            .refine(
+              (value) =>
+                Array.from(value).length >= MIN_PASSWORD_LENGTH &&
+                new TextEncoder().encode(value).length <= 1024,
+              { message: t('local_login.password_help') }
+            ),
           confirm_password: zod
             .string()
             .min(1, { message: t('settings_view.confirm_password_required') }),
@@ -200,6 +206,8 @@ export function SettingsView() {
       });
       toast.success(t('settings_view.password_change_success'));
       resetPasswordForm();
+      clearSession();
+      window.location.replace(paths.auth.login);
     } catch (error) {
       handleActionError(error);
     }
