@@ -52,6 +52,8 @@ release notes when a tag is published.
 
 ### Fixed
 
+- Reject administrative bulk deletes without an effective row-selection filter;
+  pagination and query-only options no longer permit unscoped deletion.
 - Hide generated receive QR codes and copy/share actions when the amount, memo,
   or expiry changes, until the request is refreshed or the original values are restored.
 - Expired Unified requests now require an explicit on-chain selection before

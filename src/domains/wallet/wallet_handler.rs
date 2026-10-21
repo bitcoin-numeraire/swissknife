@@ -194,6 +194,9 @@ async fn delete_wallet(
 /// Delete wallets
 ///
 /// Deletes all the wallets given a filter. Returns the number of deleted wallets. Deleting a wallet removes all data related to that wallet.
+///
+/// Requires at least one effective selector: ids, account_id or asset_id. Empty lists do not count as selectors.
+/// Pagination, ordering and other query-only fields do not scope deletion.
 #[utoipa::path(
     delete,
     path = "",
@@ -205,6 +208,7 @@ async fn delete_wallet(
         (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
         (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
         (status = 403, description = "Forbidden", body = ErrorResponse, example = json!(FORBIDDEN_EXAMPLE)),
+        (status = 422, description = "Missing effective deletion filter", body = ErrorResponse),
         (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
     )
 )]

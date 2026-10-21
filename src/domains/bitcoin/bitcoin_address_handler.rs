@@ -169,6 +169,9 @@ async fn delete_btc_address(
 /// Delete Bitcoin addresses
 ///
 /// Deletes all Bitcoin addresses matching a filter. Returns the number deleted.
+///
+/// Requires at least one effective selector: ids, wallet_id or address. Empty lists do not count as selectors.
+/// Pagination, ordering and other query-only fields do not scope deletion.
 #[utoipa::path(
     delete,
     path = "",
@@ -180,6 +183,7 @@ async fn delete_btc_address(
         (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
         (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
         (status = 403, description = "Forbidden", body = ErrorResponse, example = json!(FORBIDDEN_EXAMPLE)),
+        (status = 422, description = "Missing effective deletion filter", body = ErrorResponse),
         (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
     )
 )]

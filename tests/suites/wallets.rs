@@ -246,6 +246,51 @@ mod delete {
     use super::*;
 
     #[tokio::test]
+    async fn bulk_delete_requires_an_effective_filter() {
+        let app = crate::common::TestApp::isolated("wallet-delete-filter", &[]).await;
+        let token = app.admin_token().await;
+        let first = app.create_wallet(token, "wallet-filter-first").await;
+        let second = app.create_wallet(token, "wallet-filter-second").await;
+
+        for query in ["", "?limit=1", "?offset=1", "?order_direction=Asc", "?unknown=1"] {
+            let response = app
+                .api()
+                .delete(&format!("/v1/wallets{query}"), Auth::Bearer(token))
+                .await;
+            assert_error(&response, StatusCode::UNPROCESSABLE_ENTITY);
+            for id in [first.id, second.id] {
+                let retained = app.api().get(&format!("/v1/wallets/{id}"), Auth::Bearer(token)).await;
+                assert_status(&retained, StatusCode::OK);
+                assert_eq!(retained.parse::<Wallet>().id, id);
+            }
+        }
+
+        let listed = app.api().get("/v1/wallets", Auth::Bearer(token)).await;
+        assert_status(&listed, StatusCode::OK);
+        assert!(listed.parse::<Vec<Wallet>>().iter().any(|wallet| wallet.id == first.id));
+
+        let deleted = app
+            .api()
+            .delete(
+                &format!("/v1/wallets?account_id={}", first.account_id),
+                Auth::Bearer(token),
+            )
+            .await;
+        assert_status(&deleted, StatusCode::OK);
+        assert_eq!(deleted.parse::<u64>(), 1);
+        let missing = app
+            .api()
+            .get(&format!("/v1/wallets/{}", first.id), Auth::Bearer(token))
+            .await;
+        assert_error(&missing, StatusCode::NOT_FOUND);
+        let retained = app
+            .api()
+            .get(&format!("/v1/wallets/{}", second.id), Auth::Bearer(token))
+            .await;
+        assert_status(&retained, StatusCode::OK);
+    }
+
+    #[tokio::test]
     async fn deletes_a_wallet() {
         let app = app().await;
         let token = app.admin_token().await;
