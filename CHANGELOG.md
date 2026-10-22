@@ -52,6 +52,9 @@ release notes when a tag is published.
 
 ### Fixed
 
+- Reject external on-chain fee quotes and sends before preparing a transaction
+  when the selected wallet cannot cover the payment amount. Sends still reserve
+  the final amount and fee atomically after preparation.
 - Reject administrative bulk deletes with HTTP 400 without an effective row-selection filter;
   pagination and query-only options no longer permit unscoped deletion.
 - Hide generated receive QR codes and copy/share actions when the amount, memo,

@@ -99,10 +99,49 @@ mod fee_estimate {
     }
 
     #[tokio::test]
+    async fn rejects_an_onchain_quote_when_the_wallet_cannot_cover_the_amount() {
+        let app = app().await;
+        let token = app.admin_token().await;
+        let wallet = app.create_wallet(token, "quote-unfunded").await;
+        let res = app
+            .api()
+            .post(
+                "/v1/payments/fee-estimate",
+                Auth::Bearer(token),
+                SendPaymentRequest {
+                    wallet_id: Some(wallet.id),
+                    input: chain::new_address().await,
+                    amount_msat: Some(50_000_000),
+                    comment: None,
+                },
+            )
+            .await;
+
+        assert_error(&res, StatusCode::UNPROCESSABLE_ENTITY);
+        assert!(res.body["reason"].as_str().unwrap().contains("Insufficient funds"));
+
+        let balance = app
+            .api()
+            .get(&format!("/v1/wallets/{}", wallet.id), Auth::Bearer(token))
+            .await;
+        assert_status(&balance, StatusCode::OK);
+        assert_eq!(balance.body["balance"]["available_msat"], 0);
+        assert_eq!(balance.body["balance"]["reserved_msat"], 0);
+
+        let payments = app
+            .api()
+            .get(&format!("/v1/payments?wallet_id={}", wallet.id), Auth::Bearer(token))
+            .await;
+        assert_status(&payments, StatusCode::OK);
+        assert!(payments.parse::<Vec<Payment>>().is_empty());
+    }
+
+    #[tokio::test]
     async fn prepares_and_releases_a_real_onchain_quote_without_creating_a_payment() {
         let app = app().await;
         let token = app.admin_token().await;
         let wallet = app.create_wallet(token, "quote-onchain").await;
+        app.fund_onchain(token, wallet.id, 100_000).await;
         let address = chain::new_address().await;
         let amount_msat = 50_000_000;
         let request = SendPaymentRequest {

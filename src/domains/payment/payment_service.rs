@@ -196,6 +196,14 @@ impl PaymentService {
         }
     }
 
+    async fn ensure_onchain_balance(&self, wallet_id: Uuid, amount_msat: u64) -> Result<(), ApplicationError> {
+        let balance = self.store.wallet.get_balance(wallet_id).await?;
+        if !u64::try_from(balance.available_msat).is_ok_and(|available| available >= amount_msat) {
+            return Err(DataError::InsufficientFunds(amount_msat as f64).into());
+        }
+        Ok(())
+    }
+
     async fn send_bitcoin(
         &self,
         data: BitcoinAddressData,
@@ -255,6 +263,7 @@ impl PaymentService {
                 return Ok(internal_payment);
             }
 
+            self.ensure_onchain_balance(wallet_id, amount_msat).await?;
             let prepared_tx = self
                 .bitcoin_wallet
                 .prepare_transaction(data.address.clone(), amount, None)
@@ -696,6 +705,7 @@ impl PaymentsUseCases for PaymentService {
                     return Self::fee_estimate(Ledger::Internal, amount_msat, Some(0), 0);
                 }
 
+                self.ensure_onchain_balance(wallet_id, amount_msat).await?;
                 let prepared = self
                     .bitcoin_wallet
                     .prepare_transaction(data.address, amount_sat, None)
@@ -1374,6 +1384,56 @@ mod tests {
     mod estimate_fee_request {
         use super::*;
 
+        mod when_the_wallet_cannot_cover_the_principal {
+            use super::*;
+
+            #[tokio::test]
+            async fn rejects_before_preparing_an_onchain_quote() {
+                let wallet_id = Uuid::new_v4();
+                let mut store = MockAppStoreBuilder::new();
+                store
+                    .wallet
+                    .expect_find()
+                    .withf(move |id| *id == wallet_id)
+                    .times(1)
+                    .returning(move |_| {
+                        Ok(Some(wallet_with_asset(
+                            wallet_id,
+                            native_btc_asset(BtcNetwork::Bitcoin),
+                        )))
+                    });
+                store
+                    .wallet
+                    .expect_get_balance()
+                    .withf(move |id| *id == wallet_id)
+                    .times(1)
+                    .returning(|_| Ok(Default::default()));
+                store
+                    .btc_address
+                    .expect_find_by_address()
+                    .times(1)
+                    .returning(|_| Ok(None));
+                let mut bitcoin_wallet = MockBitcoinWallet::new();
+                bitcoin_wallet.expect_prepare_transaction().never();
+                bitcoin_wallet.expect_release_prepared_transaction().never();
+                let service = service(store, MockLnClient::new(), bitcoin_wallet, MockEventUseCases::new());
+
+                let result = service
+                    .estimate_fee(
+                        "1BoatSLRHtKNngkdXEeobR76b53LETtpyT".to_string(),
+                        Some(1_000_000),
+                        None,
+                        wallet_id,
+                    )
+                    .await;
+
+                assert!(matches!(
+                    result,
+                    Err(ApplicationError::Data(DataError::InsufficientFunds(_)))
+                ));
+            }
+        }
+
         mod when_a_hash_matches_but_the_issued_invoice_differs {
             use super::*;
 
@@ -1413,6 +1473,12 @@ mod tests {
         async fn prepares_and_releases_an_onchain_quote() {
             let wallet_id = Uuid::new_v4();
             let mut store = MockAppStoreBuilder::new();
+            store.wallet.expect_get_balance().times(1).returning(|_| {
+                Ok(crate::domains::wallet::Balance {
+                    available_msat: 1_000_000,
+                    ..Default::default()
+                })
+            });
             store.wallet.expect_find().times(1).returning(move |_| {
                 Ok(Some(wallet_with_asset(
                     wallet_id,
@@ -1655,8 +1721,119 @@ mod tests {
         }
     }
 
+    mod ensure_onchain_balance {
+        use super::*;
+
+        mod when_available_balance_is_below_the_principal {
+            use super::*;
+
+            #[tokio::test]
+            async fn rejects_zero_negative_and_partially_funded_balances() {
+                for available_msat in [0, -1, 999_999] {
+                    let wallet_id = Uuid::new_v4();
+                    let mut store = MockAppStoreBuilder::new();
+                    store
+                        .wallet
+                        .expect_get_balance()
+                        .withf(move |id| *id == wallet_id)
+                        .times(1)
+                        .returning(move |_| {
+                            Ok(crate::domains::wallet::Balance {
+                                available_msat,
+                                ..Default::default()
+                            })
+                        });
+                    let service = service(
+                        store,
+                        MockLnClient::new(),
+                        MockBitcoinWallet::new(),
+                        MockEventUseCases::new(),
+                    );
+
+                    let result = service.ensure_onchain_balance(wallet_id, 1_000_000).await;
+
+                    assert!(
+                        matches!(result, Err(ApplicationError::Data(DataError::InsufficientFunds(_)))),
+                        "available balance: {available_msat}"
+                    );
+                }
+            }
+        }
+
+        mod when_balance_lookup_fails {
+            use super::*;
+
+            #[tokio::test]
+            async fn propagates_the_database_error() {
+                let wallet_id = Uuid::new_v4();
+                let mut store = MockAppStoreBuilder::new();
+                store
+                    .wallet
+                    .expect_get_balance()
+                    .withf(move |id| *id == wallet_id)
+                    .times(1)
+                    .returning(|_| {
+                        Err(crate::application::errors::DatabaseError::FindOne(
+                            "unavailable".to_string(),
+                        ))
+                    });
+                let service = service(
+                    store,
+                    MockLnClient::new(),
+                    MockBitcoinWallet::new(),
+                    MockEventUseCases::new(),
+                );
+
+                let result = service.ensure_onchain_balance(wallet_id, 1_000_000).await;
+
+                assert!(matches!(
+                    result,
+                    Err(ApplicationError::Database(
+                        crate::application::errors::DatabaseError::FindOne(_)
+                    ))
+                ));
+            }
+        }
+    }
+
     mod send_bitcoin {
         use super::*;
+
+        mod when_the_wallet_cannot_cover_the_principal {
+            use super::*;
+
+            #[tokio::test]
+            async fn rejects_before_preparing_or_reserving() {
+                let wallet_id = Uuid::new_v4();
+                let mut store = MockAppStoreBuilder::new();
+                store
+                    .btc_address
+                    .expect_find_by_address()
+                    .times(1)
+                    .returning(|_| Ok(None));
+                store
+                    .wallet
+                    .expect_get_balance()
+                    .withf(move |id| *id == wallet_id)
+                    .times(1)
+                    .returning(|_| Ok(Default::default()));
+                store.payment_uow.expect_reserve().never();
+                let mut bitcoin_wallet = MockBitcoinWallet::new();
+                bitcoin_wallet.expect_prepare_transaction().never();
+                bitcoin_wallet.expect_release_prepared_transaction().never();
+                bitcoin_wallet.expect_sign_send_transaction().never();
+                let service = service(store, MockLnClient::new(), bitcoin_wallet, MockEventUseCases::new());
+
+                let result = service
+                    .send_bitcoin(bitcoin_data(Some(1_000)), None, None, wallet_id)
+                    .await;
+
+                assert!(matches!(
+                    result,
+                    Err(ApplicationError::Data(DataError::InsufficientFunds(_)))
+                ));
+            }
+        }
 
         mod with_zero_amount {
             use super::*;
@@ -1778,6 +1955,12 @@ mod tests {
             #[tokio::test]
             async fn reserves_then_signs_and_returns_pending() {
                 let mut store = MockAppStoreBuilder::new();
+                store.wallet.expect_get_balance().times(1).returning(|_| {
+                    Ok(crate::domains::wallet::Balance {
+                        available_msat: 1_000_000,
+                        ..Default::default()
+                    })
+                });
                 store
                     .btc_address
                     .expect_find_by_address()
@@ -1819,6 +2002,12 @@ mod tests {
             #[tokio::test]
             async fn releases_the_prepared_transaction_and_propagates() {
                 let mut store = MockAppStoreBuilder::new();
+                store.wallet.expect_get_balance().times(1).returning(|_| {
+                    Ok(crate::domains::wallet::Balance {
+                        available_msat: 1_000_000,
+                        ..Default::default()
+                    })
+                });
                 store
                     .btc_address
                     .expect_find_by_address()
@@ -1858,6 +2047,12 @@ mod tests {
             #[tokio::test]
             async fn releases_lease_and_marks_payment_failed() {
                 let mut store = MockAppStoreBuilder::new();
+                store.wallet.expect_get_balance().times(1).returning(|_| {
+                    Ok(crate::domains::wallet::Balance {
+                        available_msat: 1_000_000,
+                        ..Default::default()
+                    })
+                });
                 store
                     .btc_address
                     .expect_find_by_address()
