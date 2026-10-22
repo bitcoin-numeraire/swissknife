@@ -52,6 +52,9 @@ release notes when a tag is published.
 
 ### Fixed
 
+- Reject external on-chain fee quotes and sends before preparing a transaction
+  when the selected wallet cannot cover the payment amount. Sends still reserve
+  the final amount and fee atomically after preparation.
 - Hide generated receive QR codes and copy/share actions when the amount, memo,
   or expiry changes, until the request is refreshed or the original values are restored.
 - Expired Unified requests now require an explicit on-chain selection before
