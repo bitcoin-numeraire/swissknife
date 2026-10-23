@@ -198,6 +198,313 @@ mod pay {
 
 mod validation {
     use super::*;
+    use std::time::Duration;
+    use wiremock::ResponseTemplate;
+
+    #[tokio::test]
+    async fn slow_metadata_is_bounded() {
+        let app = app().await;
+        let token = app.admin_token().await;
+        let wallet = app.create_wallet(token, "lnurl-slow-metadata").await;
+        let mock = MockLnurl::start().await;
+        let user = unique("payee");
+        mock.mount_response(
+            &format!("/.well-known/lnurlp/{user}"),
+            ResponseTemplate::new(200)
+                .set_body_json(json!({"tag": "notAPayRequest"}))
+                .set_delay(Duration::from_secs(20)),
+        )
+        .await;
+
+        let res = tokio::time::timeout(
+            Duration::from_secs(15),
+            app.api().post(
+                "/v1/payments/fee-estimate",
+                Auth::Bearer(token),
+                pay(wallet.id, mock.lnurlp_url(&user), 100_000, None),
+            ),
+        )
+        .await
+        .expect("metadata fetch must stop at its own 10-second deadline");
+        assert_error(&res, StatusCode::UNPROCESSABLE_ENTITY);
+        assert!(mock.callback_requests().await.is_empty());
+    }
+
+    #[tokio::test]
+    async fn slow_callback_is_bounded() {
+        let app = app().await;
+        let token = app.admin_token().await;
+        let wallet = app.create_wallet(token, "lnurl-slow-callback").await;
+        let mock = MockLnurl::start().await;
+        let user = unique("payee");
+        mock.mount_pay_request(&user, 1_000, 1_000_000, 0).await;
+        mock.mount_response(
+            "/lnurl/callback",
+            ResponseTemplate::new(200)
+                .set_body_json(json!({"status": "ERROR", "reason": "too late"}))
+                .set_delay(Duration::from_secs(20)),
+        )
+        .await;
+
+        let res = tokio::time::timeout(
+            Duration::from_secs(15),
+            app.api().post(
+                "/v1/payments",
+                Auth::Bearer(token),
+                pay(wallet.id, mock.lnurlp_url(&user), 100_000, None),
+            ),
+        )
+        .await
+        .expect("callback fetch must stop at its own 10-second deadline");
+        assert_error(&res, StatusCode::UNPROCESSABLE_ENTITY);
+        assert!(!res.body["reason"].as_str().unwrap_or_default().contains("too late"));
+        assert_eq!(mock.callback_requests().await.len(), 1);
+        let balance = app.wallet_balance(token, wallet.id).await;
+        assert_eq!(balance.available_msat, 0);
+        assert_eq!(balance.reserved_msat, 0);
+    }
+
+    #[tokio::test]
+    async fn metadata_at_the_size_limit_reaches_the_callback() {
+        let app = app().await;
+        let token = app.admin_token().await;
+        let wallet = app.create_wallet(token, "lnurl-boundary-metadata").await;
+        let mock = MockLnurl::start().await;
+        let user = unique("payee");
+        let mut metadata = json!({
+            "tag": "payRequest",
+            "callback": format!("{}/lnurl/callback", mock.uri()),
+            "minSendable": 1_000,
+            "maxSendable": 1_000_000,
+            "metadata": json!([
+                ["text/plain", "Large image metadata"],
+                ["image/png;base64", "A".repeat(136_536)],
+            ]).to_string(),
+            "padding": "",
+        });
+        let padding = 256 * 1024 - serde_json::to_vec(&metadata).unwrap().len();
+        metadata["padding"] = json!(" ".repeat(padding));
+        assert_eq!(serde_json::to_vec(&metadata).unwrap().len(), 256 * 1024);
+        mock.mount_metadata(&user, metadata).await;
+        mock.mount_callback_error("size boundary accepted").await;
+
+        let res = app
+            .api()
+            .post(
+                "/v1/payments/fee-estimate",
+                Auth::Bearer(token),
+                pay(wallet.id, mock.lnurlp_url(&user), 100_000, None),
+            )
+            .await;
+        assert_error(&res, StatusCode::UNPROCESSABLE_ENTITY);
+        assert!(res.body["reason"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("size boundary accepted"));
+        assert_eq!(mock.callback_requests().await.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn callback_at_the_size_limit_preserves_the_remote_reason() {
+        let app = app().await;
+        let token = app.admin_token().await;
+        let wallet = app.create_wallet(token, "lnurl-boundary-callback").await;
+        let mock = MockLnurl::start().await;
+        let user = unique("payee");
+        mock.mount_pay_request(&user, 1_000, 1_000_000, 0).await;
+        let mut body = json!({"status": "ERROR", "reason": "size boundary accepted", "padding": ""});
+        let padding = 256 * 1024 - serde_json::to_vec(&body).unwrap().len();
+        body["padding"] = json!(" ".repeat(padding));
+        assert_eq!(serde_json::to_vec(&body).unwrap().len(), 256 * 1024);
+        mock.mount_response("/lnurl/callback", ResponseTemplate::new(200).set_body_json(body))
+            .await;
+
+        let res = app
+            .api()
+            .post(
+                "/v1/payments",
+                Auth::Bearer(token),
+                pay(wallet.id, mock.lnurlp_url(&user), 100_000, None),
+            )
+            .await;
+        assert_error(&res, StatusCode::UNPROCESSABLE_ENTITY);
+        assert!(res.body["reason"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("size boundary accepted"));
+    }
+
+    #[tokio::test]
+    async fn chunked_metadata_without_content_length_is_limited() {
+        let app = app().await;
+        let token = app.admin_token().await;
+        let wallet = app.create_wallet(token, "lnurl-chunked-metadata").await;
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let url = format!("http://{}/", listener.local_addr().unwrap());
+        let router = axum::Router::new().route(
+            "/",
+            axum::routing::get(|| async {
+                axum::body::Body::from_stream(futures_util::stream::iter(
+                    (0..17).map(|_| Ok::<_, std::io::Error>(vec![b'a'; 16 * 1024])),
+                ))
+            }),
+        );
+        let server = tokio::spawn(async move {
+            axum::serve(listener, router).await.unwrap();
+        });
+        let probe = reqwest::get(&url).await.unwrap();
+        assert_eq!(probe.content_length(), None, "fixture must not advertise a body length");
+        drop(probe);
+
+        let res = app
+            .api()
+            .post(
+                "/v1/payments/fee-estimate",
+                Auth::Bearer(token),
+                pay(wallet.id, url, 100_000, None),
+            )
+            .await;
+        server.abort();
+        assert_error(&res, StatusCode::UNPROCESSABLE_ENTITY);
+        assert!(res.body["reason"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("LNURL response exceeds 262144 bytes"));
+    }
+
+    #[tokio::test]
+    async fn a_stalled_callback_body_is_bounded_after_headers() {
+        use futures_util::{stream, StreamExt};
+
+        let app = app().await;
+        let token = app.admin_token().await;
+        let wallet = app.create_wallet(token, "lnurl-stalled-body").await;
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let url = format!("http://{}/", listener.local_addr().unwrap());
+        let router = axum::Router::new().route(
+            "/",
+            axum::routing::get(|| async {
+                let chunks =
+                    stream::iter([Ok::<_, std::io::Error>("{\"status\":\"ERROR\",")]).chain(stream::once(async {
+                        tokio::time::sleep(Duration::from_secs(20)).await;
+                        Ok("\"reason\":\"too late\"}")
+                    }));
+                axum::body::Body::from_stream(chunks)
+            }),
+        );
+        let server = tokio::spawn(async move {
+            axum::serve(listener, router).await.unwrap();
+        });
+        let probe = tokio::time::timeout(Duration::from_secs(2), reqwest::get(&url))
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(probe.content_length(), None);
+        drop(probe);
+        let mock = MockLnurl::start().await;
+        let user = unique("payee");
+        mock.mount_metadata(
+            &user,
+            json!({
+                "tag": "payRequest", "callback": url,
+                "minSendable": 1_000, "maxSendable": 1_000_000, "metadata": "[]",
+            }),
+        )
+        .await;
+
+        let res = tokio::time::timeout(
+            Duration::from_secs(15),
+            app.api().post(
+                "/v1/payments",
+                Auth::Bearer(token),
+                pay(wallet.id, mock.lnurlp_url(&user), 100_000, None),
+            ),
+        )
+        .await
+        .expect("the deadline must include body consumption, not only response headers");
+        server.abort();
+        assert_error(&res, StatusCode::UNPROCESSABLE_ENTITY);
+        assert!(!res.body["reason"].as_str().unwrap_or_default().contains("too late"));
+    }
+
+    #[tokio::test]
+    async fn oversized_metadata_is_rejected_before_callback() {
+        let app = app().await;
+        let token = app.admin_token().await;
+        let wallet = app.create_wallet(token, "lnurl-large-metadata").await;
+        let mock = MockLnurl::start().await;
+        let user = unique("payee");
+        mock.mount_metadata(
+            &user,
+            json!({
+                "tag": "payRequest",
+                "callback": format!("{}/lnurl/callback", mock.uri()),
+                "minSendable": 1_000,
+                "maxSendable": 1_000_000,
+                "metadata": "[]",
+                "padding": "a".repeat(256 * 1024 + 1),
+            }),
+        )
+        .await;
+        mock.mount_callback_error("metadata was accepted").await;
+
+        for endpoint in ["/v1/payments/fee-estimate", "/v1/payments"] {
+            let res = app
+                .api()
+                .post(
+                    endpoint,
+                    Auth::Bearer(token),
+                    pay(wallet.id, mock.lnurlp_url(&user), 100_000, None),
+                )
+                .await;
+            assert_error(&res, StatusCode::UNPROCESSABLE_ENTITY);
+            assert!(res.body["reason"]
+                .as_str()
+                .unwrap_or_default()
+                .contains("LNURL response exceeds 262144 bytes"));
+        }
+        assert!(mock.callback_requests().await.is_empty());
+        let balance = app.wallet_balance(token, wallet.id).await;
+        assert_eq!(balance.available_msat, 0);
+        assert_eq!(balance.reserved_msat, 0);
+        let payments = app
+            .api()
+            .get(&format!("/v1/payments?wallet_id={}", wallet.id), Auth::Bearer(token))
+            .await;
+        assert_status(&payments, StatusCode::OK);
+        assert!(payments.parse::<Vec<Payment>>().is_empty());
+    }
+
+    #[tokio::test]
+    async fn oversized_callback_is_rejected_before_payment() {
+        let app = app().await;
+        let token = app.admin_token().await;
+        let wallet = app.create_wallet(token, "lnurl-large-callback").await;
+        let mock = MockLnurl::start().await;
+        let user = unique("payee");
+        mock.mount_pay_request(&user, 1_000, 1_000_000, 0).await;
+        mock.mount_callback_error(&"a".repeat(256 * 1024 + 1)).await;
+
+        for endpoint in ["/v1/payments/fee-estimate", "/v1/payments"] {
+            let res = app
+                .api()
+                .post(
+                    endpoint,
+                    Auth::Bearer(token),
+                    pay(wallet.id, mock.lnurlp_url(&user), 100_000, None),
+                )
+                .await;
+            assert_error(&res, StatusCode::UNPROCESSABLE_ENTITY);
+            assert!(res.body["reason"]
+                .as_str()
+                .unwrap_or_default()
+                .contains("LNURL response exceeds 262144 bytes"));
+        }
+        assert_eq!(mock.callback_requests().await.len(), 2);
+        let balance = app.wallet_balance(token, wallet.id).await;
+        assert_eq!(balance.available_msat, 0);
+        assert_eq!(balance.reserved_msat, 0);
+    }
 
     /// An `ERROR` response from the external callback is surfaced as a 422 with
     /// the remote reason preserved.

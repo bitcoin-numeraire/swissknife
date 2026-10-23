@@ -1,8 +1,7 @@
 use std::{borrow::Cow, str::FromStr};
 
 use ::lnurl::{
-    lightning_address::LightningAddress as LnurlLightningAddress, lnurl::LnUrl, AsyncClient as LnurlClient,
-    LnUrlResponse,
+    decode_ln_url_response, lightning_address::LightningAddress as LnurlLightningAddress, lnurl::LnUrl, LnUrlResponse,
 };
 use bip21::{
     de::{DeserializationError, DeserializationState, DeserializeParams, ParamKind},
@@ -15,7 +14,10 @@ use thiserror::Error;
 
 use crate::{
     application::composition::Currency,
-    domains::{bitcoin::BtcNetwork, lnurl::LnUrlPayRequestData},
+    domains::{
+        bitcoin::BtcNetwork,
+        lnurl::{fetch_lnurl_response, LnUrlPayRequestData},
+    },
 };
 
 #[derive(Debug)]
@@ -222,8 +224,10 @@ fn looks_like_lnurl(input: &str) -> bool {
 
 async fn resolve_lnurl_pay(input: &str) -> Result<LnUrlPayRequestData, String> {
     let (url, ln_address) = lnurl_endpoint(input)?;
-    let client = LnurlClient::from_client(reqwest::Client::new());
-    let response = client.make_request(&url).await.map_err(|err| err.to_string())?;
+    let text = fetch_lnurl_response(Url::parse(&url).map_err(|err| err.to_string())?)
+        .await
+        .map_err(|err| err.to_string())?;
+    let response = decode_ln_url_response(&text).map_err(|err| err.to_string())?;
 
     let LnUrlResponse::LnUrlPayResponse(pay) = response else {
         return Err("Unsupported LNURL response type".to_string());

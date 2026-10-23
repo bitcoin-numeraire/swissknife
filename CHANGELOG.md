@@ -52,6 +52,9 @@ release notes when a tag is published.
 
 ### Fixed
 
+- Bound LNURL metadata and invoice callback responses to 256 KiB and each HTTP
+  fetch to 10 seconds (3 seconds to connect), rejecting oversized or slow
+  services before payment reservation.
 - Reject external on-chain fee quotes and sends before preparing a transaction
   when the selected wallet cannot cover the payment amount. Sends still reserve
   the final amount and fee atomically after preparation.
