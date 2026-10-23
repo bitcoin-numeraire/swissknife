@@ -45,10 +45,10 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
 
       - name: Set up Rust
-        uses: dtolnay/rust-toolchain@1.99.0
+        uses: dtolnay/rust-toolchain@1.99.1
 
       - name: Cache Rust dependencies
-        uses: swatinem/rust-cache@v2.9.2
+        uses: swatinem/rust-cache@v2.9.3
 
       - name: Integration tests (${{ matrix.database }} / ${{ matrix.provider }})
         run: |
@@ -65,7 +65,7 @@ jobs:
 
       - name: Upload integration artifacts
         if: always()
-        uses: actions/upload-artifact@v7.0.1
+        uses: actions/upload-artifact@v7.0.2
         with:
           name: itest-${{ matrix.database }}-${{ matrix.provider }}
           path: target/itest
@@ -97,10 +97,10 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
 
       - name: Set up Rust
-        uses: dtolnay/rust-toolchain@1.99.0
+        uses: dtolnay/rust-toolchain@1.99.1
 
       - name: Cache Rust dependencies
-        uses: swatinem/rust-cache@v2.9.2
+        uses: swatinem/rust-cache@v2.9.3
 
       - name: Persistence (UoW) tests (${{ matrix.database }})
         run: |
@@ -134,23 +134,23 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
 
       - name: Set up Rust
-        uses: dtolnay/rust-toolchain@1.99.0
+        uses: dtolnay/rust-toolchain@1.99.1
         with:
           components: llvm-tools-preview
 
       - name: Install cargo-llvm-cov
-        uses: taiki-e/install-action@v2.87.24
+        uses: taiki-e/install-action@v2.87.30
         with:
           tool: cargo-llvm-cov
 
       - name: Cache Rust dependencies
-        uses: swatinem/rust-cache@v2.9.2
+        uses: swatinem/rust-cache@v2.9.3
 
       - name: Full-matrix merged coverage
         run: make coverage-matrix
 
       - name: Upload coverage artifact
-        uses: actions/upload-artifact@v7.0.1
+        uses: actions/upload-artifact@v7.0.2
         with:
           name: coverage-lcov
           path: lcov.info
