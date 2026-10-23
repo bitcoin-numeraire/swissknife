@@ -52,6 +52,9 @@ release notes when a tag is published.
 
 ### Fixed
 
+- Bound LNURL metadata and invoice callback responses to 256 KiB and each HTTP
+  fetch to 10 seconds (3 seconds to connect), rejecting oversized or slow
+  services before payment reservation.
 - Hide generated receive QR codes and copy/share actions when the amount, memo,
   or expiry changes, until the request is refreshed or the original values are restored.
 - Expired Unified requests now require an explicit on-chain selection before
