@@ -1,4 +1,12 @@
 target
+**/node_modules
+**/.next
+**/out
+**/.yarn/install-state.gz
+**/.yarn/unplugged
+**/coverage
+**/.env.local
+**/.env.*.local
 *.rs.bk
 *.log
 *.tmp
