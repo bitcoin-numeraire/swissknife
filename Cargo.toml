@@ -22,29 +22,29 @@ async-trait = "0.1.92"
 axum = { version = "0.8.9", features = ["macros"] }
 axum-extra = { version = "0.12.6", features = ["typed-header", "query"] }
 serde = { version = "1.0.229", features = ["derive"] }
-serde_json = "1.0.151"
+serde_json = "1.0.154"
 serde_bolt = "0.5.2"
-serde_with = "3.22.0"
-tokio = { version = "1.53", features = ["macros", "rt-multi-thread", "signal", "net", "sync", "time", "fs", "io-util"] }
+serde_with = "3.24.0"
+tokio = { version = "1.54.1", features = ["macros", "rt-multi-thread", "signal", "net", "sync", "time", "fs", "io-util"] }
 bip21 = { version = "0.5.0", features = ["std"] }
 lnurl = { package = "lnurl-rs", version = "0.10.0", default-features = false, features = ["async"] }
-config = { version = "0.15.25", features = ["yaml", "json", "toml"] }
+config = { version = "0.15.27", features = ["yaml", "json", "toml"] }
 dotenvy = "0.15.7"
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["json", "env-filter"] }
-jsonwebtoken = { version = "11.0.0", features = ["rust_crypto"] }
+jsonwebtoken = { version = "11.1.0", features = ["rust_crypto"] }
 reqwest = { version = "0.12.28", features = ["json"] }
-uuid = { version = "1.24.0", features = ["v4", "serde"] }
+uuid = { version = "1.29.0", features = ["v4", "serde"] }
 chrono = "0.4.45"
-thiserror = "2.0.20"
-tower-http = { version = "0.7.0", features = [
+thiserror = "2.0.21"
+tower-http = { version = "0.7.1", features = [
     "fs",
     "timeout",
     "trace",
     "cors",
 ] }
 regex = "1"
-sea-orm = { version = "2.0.2", features = [
+sea-orm = { version = "2.0.4", features = [
     "sqlx-postgres",
     "sqlx-sqlite",
     "runtime-tokio-rustls",
@@ -70,8 +70,8 @@ swissknife-types = { path = "crates/swissknife-types" }
 utoipa = { version = "5.5.0", features = ["axum_extras", "chrono", "uuid"] }
 utoipa-scalar = { version = "0.3.0", features = ["axum"] }
 native-tls = "0.2.18"
-nostr-sdk = "0.45.1"
-rand = "0.10.2"
+nostr-sdk = "0.45.4"
+rand = "0.10.3"
 base64 = "0.23.1"
 tokio-tungstenite = { version = "0.30.0", features = ["native-tls"] }
 http = "1.5.0"
