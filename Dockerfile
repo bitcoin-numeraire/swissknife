@@ -1,5 +1,10 @@
 FROM rust:1.99.1-trixie@sha256:931c2c0531a8b143e044f0f3914dfe802f15bb3d1955f0b657e9359327ac2ffc AS chef
-RUN cargo install --locked cargo-chef --version 0.1.78
+# The published cargo-chef lockfile pins vulnerable crossbeam-epoch.
+# Keep the tool version fixed while resolving compatible security fixes.
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get upgrade -y && \
+    rm -rf /var/lib/apt/lists/* && \
+    cargo install cargo-chef --version 0.1.78 --message-format=json
 WORKDIR /app
 
 FROM chef AS planner
