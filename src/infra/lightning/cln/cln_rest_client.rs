@@ -418,7 +418,7 @@ impl BitcoinWallet for ClnRestClient {
             },
         )
         .await
-        .map_err(|e| BitcoinError::FinalizeTransaction(e.to_string()))?;
+        .map_err(|e| BitcoinError::BroadcastTransaction(e.to_string()))?;
 
         Ok(None)
     }

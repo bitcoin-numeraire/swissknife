@@ -52,6 +52,10 @@ release notes when a tag is published.
 
 ### Fixed
 
+- Keep on-chain payments pending and their funds reserved when a broadcast
+  reply is lost or submission otherwise has an unknown outcome, rather than
+  reporting failure and making the same balance spendable again. Transactions
+  that were not broadcast may require manual reconciliation.
 - Hide generated receive QR codes and copy/share actions when the amount, memo,
   or expiry changes, until the request is refreshed or the original values are restored.
 - Expired Unified requests now require an explicit on-chain selection before
