@@ -52,6 +52,10 @@ release notes when a tag is published.
 
 ### Fixed
 
+- Keep on-chain payments pending and their funds reserved when a broadcast
+  reply is lost or submission otherwise has an unknown outcome, rather than
+  reporting failure and making the same balance spendable again. Transactions
+  that were not broadcast may require manual reconciliation.
 - Bound LNURL metadata and invoice callback responses to 256 KiB and each HTTP
   fetch to 10 seconds (3 seconds to connect), rejecting oversized or slow
   services before payment reservation.

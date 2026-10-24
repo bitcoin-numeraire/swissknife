@@ -436,10 +436,12 @@ mod withdraw {
         assert!(!btc.txid.is_empty(), "a broadcast transaction has a txid");
 
         // The reservation debits the wallet immediately (amount + on-chain fee).
+        let fee_msat = payment.fee_msat.expect("the prepared transaction has a known fee");
+        let expected_available = before - (amount_msat + fee_msat) as i64;
         let reserved = app.wallet_balance(token, wallet.id).await.available_msat;
-        assert!(
-            reserved <= before - amount_msat as i64,
-            "the wallet is debited by at least the amount (before={before}, after={reserved})"
+        assert_eq!(
+            reserved, expected_available,
+            "reserve the principal and the exact prepared fee"
         );
 
         // Confirm the broadcast; the on-chain listener settles the payment.
@@ -456,6 +458,24 @@ mod withdraw {
             },
         )
         .await;
+
+        let settled = app
+            .api()
+            .get(&format!("/v1/payments/{}", payment.id), Auth::Bearer(token))
+            .await;
+        assert_status(&settled, StatusCode::OK);
+        let settled = settled.parse::<Payment>();
+        assert_eq!(settled.id, payment.id);
+        assert_eq!(settled.wallet_id, wallet.id);
+        assert_eq!(settled.status, PaymentStatus::Settled);
+        assert_eq!(settled.amount_msat, amount_msat);
+        assert_eq!(settled.fee_msat, Some(fee_msat));
+        assert_eq!(settled.bitcoin.as_ref().unwrap().txid, btc.txid);
+        let balance = app.wallet_balance(token, wallet.id).await;
+        assert_eq!(balance.available_msat, expected_available);
+        assert_eq!(balance.reserved_msat, 0);
+        assert_eq!(balance.sent_msat, amount_msat);
+        assert_eq!(balance.fees_paid_msat, fee_msat);
 
         // The sats actually landed at the external address on-chain.
         assert!(
