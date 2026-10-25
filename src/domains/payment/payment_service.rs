@@ -597,6 +597,11 @@ impl PaymentService {
 
                 Ok(payment)
             }
+            Err(LightningError::PaymentOutcomeUnknown(reason)) => {
+                warn!(payment_id = %pending_payment.id, %reason, "Payment outcome unknown; preserving reservation");
+                // A listener may have committed a terminal result while the send response was lost.
+                self.get(pending_payment.id).await
+            }
             Err(error) => {
                 pending_payment.status = PaymentStatus::Failed;
                 pending_payment.error = Some(error.to_string());
@@ -2553,6 +2558,138 @@ mod tests {
 
     mod handle_processed_payment {
         use super::*;
+
+        mod when_payment_outcome_is_unknown {
+            use super::*;
+
+            #[tokio::test]
+            async fn returns_the_durable_payment_without_releasing_its_reservation() {
+                let pending = Payment {
+                    id: Uuid::new_v4(),
+                    wallet_id: Uuid::new_v4(),
+                    status: PaymentStatus::Pending,
+                    ledger: Ledger::Lightning,
+                    amount_msat: 100_000,
+                    reserved_amount: 105_000,
+                    lightning: Some(LnPayment {
+                        payment_hash: "ph".to_string(),
+                        raw_success_action: Some(LnUrlPaySuccessAction::Message {
+                            message: "Thanks".to_string(),
+                        }),
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                };
+                let durable = pending.clone();
+                let pending_id = pending.id;
+                let mut store = MockAppStoreBuilder::new();
+                store.payment_uow.expect_fail().never();
+                store.payment_uow.expect_settle().never();
+                store.payment.expect_update().never();
+                store
+                    .payment
+                    .expect_find()
+                    .withf(move |id| *id == pending_id)
+                    .times(1)
+                    .return_once(move |_| Ok(Some(durable)));
+                let mut ln_client = MockLnClient::new();
+                ln_client.expect_pay().never();
+                ln_client.expect_payment_by_hash().never();
+                let service = service(store, ln_client, MockBitcoinWallet::new(), MockEventUseCases::new());
+
+                let payment = service
+                    .handle_processed_payment(
+                        pending.clone(),
+                        Err(LightningError::PaymentOutcomeUnknown("stream closed".to_string())),
+                    )
+                    .await
+                    .unwrap();
+
+                assert_eq!(payment.id, pending.id);
+                assert_eq!(payment.wallet_id, pending.wallet_id);
+                assert_eq!(payment.status, PaymentStatus::Pending);
+                assert_eq!(payment.amount_msat, pending.amount_msat);
+                assert_eq!(payment.reserved_amount, pending.reserved_amount);
+                let lightning = payment.lightning.unwrap();
+                assert_eq!(lightning.payment_hash, "ph");
+                assert!(lightning.raw_success_action.is_some());
+                assert!(payment.error.is_none());
+            }
+
+            #[tokio::test]
+            async fn returns_a_concurrent_settlement_instead_of_stale_pending_state() {
+                let pending = Payment {
+                    id: Uuid::new_v4(),
+                    status: PaymentStatus::Pending,
+                    reserved_amount: 105_000,
+                    ..Default::default()
+                };
+                let pending_id = pending.id;
+                let settled = Payment {
+                    status: PaymentStatus::Settled,
+                    reserved_amount: 0,
+                    fee_msat: Some(10),
+                    ..pending.clone()
+                };
+                let mut store = MockAppStoreBuilder::new();
+                store.payment_uow.expect_fail().never();
+                store.payment_uow.expect_settle().never();
+                store.payment.expect_update().never();
+                store
+                    .payment
+                    .expect_find()
+                    .withf(move |id| *id == pending_id)
+                    .times(1)
+                    .return_once(move |_| Ok(Some(settled)));
+                let service = service(
+                    store,
+                    MockLnClient::new(),
+                    MockBitcoinWallet::new(),
+                    MockEventUseCases::new(),
+                );
+
+                let payment = service
+                    .handle_processed_payment(
+                        pending,
+                        Err(LightningError::PaymentOutcomeUnknown("stream closed".to_string())),
+                    )
+                    .await
+                    .unwrap();
+
+                assert_eq!(payment.id, pending_id);
+                assert_eq!(payment.status, PaymentStatus::Settled);
+                assert_eq!(payment.reserved_amount, 0);
+                assert_eq!(payment.fee_msat, Some(10));
+            }
+
+            #[tokio::test]
+            async fn propagates_a_read_error_without_releasing_the_reservation() {
+                let mut store = MockAppStoreBuilder::new();
+                store.payment_uow.expect_fail().never();
+                store.payment_uow.expect_settle().never();
+                store.payment.expect_update().never();
+                store.payment.expect_find().times(1).returning(|_| {
+                    Err(crate::application::errors::DatabaseError::FindOne(
+                        "unavailable".to_string(),
+                    ))
+                });
+                let service = service(
+                    store,
+                    MockLnClient::new(),
+                    MockBitcoinWallet::new(),
+                    MockEventUseCases::new(),
+                );
+
+                let result = service
+                    .handle_processed_payment(
+                        Payment::default(),
+                        Err(LightningError::PaymentOutcomeUnknown("stream closed".to_string())),
+                    )
+                    .await;
+
+                assert!(matches!(result, Err(ApplicationError::Database(_))));
+            }
+        }
 
         mod when_payment_succeeds {
             use super::*;

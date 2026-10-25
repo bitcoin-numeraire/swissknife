@@ -303,21 +303,21 @@ impl LnClient for LndRestClient {
         let response: StreamPayResponse = self
             .post_request_buffered("v2/router/send", &payload)
             .await
-            .map_err(|e| LightningError::Pay(e.to_string()))?;
+            .map_err(|e| LightningError::PaymentOutcomeUnknown(e.to_string()))?;
 
         if let Some(result) = response.result {
             match result.status.as_str() {
                 "SUCCEEDED" => Ok(result.into()),
                 "FAILED" => Err(LightningError::Pay(result.failure_reason.to_string())),
-                _ => Err(LightningError::UnexpectedStreamPayload(format!(
+                _ => Err(LightningError::PaymentOutcomeUnknown(format!(
                     "Unexpected status {}",
                     result.status
                 ))),
             }
         } else if let Some(error) = response.error {
-            Err(LightningError::Pay(error.message))
+            Err(LightningError::PaymentOutcomeUnknown(error.message))
         } else {
-            Err(LightningError::UnexpectedStreamPayload(
+            Err(LightningError::PaymentOutcomeUnknown(
                 "Missing result or error field.".to_string(),
             ))
         }

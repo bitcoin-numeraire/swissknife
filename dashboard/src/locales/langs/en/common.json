@@ -364,7 +364,9 @@
     "send": "Send",
     "send_onchain": "Send on-chain",
     "unsupported_request": "Unsupported request",
-    "sent": "Sent"
+    "sent": "Sent",
+    "pending": "Payment pending",
+    "pending_note": "The outcome is not final. Check the payment's status before trying again."
   },
   "receive_money": {
     "title": "Receive",

@@ -363,7 +363,9 @@
     "send": "Envoyer",
     "send_onchain": "Envoyer on-chain",
     "unsupported_request": "Demande non prise en charge",
-    "sent": "Envoyé"
+    "sent": "Envoyé",
+    "pending": "Paiement en attente",
+    "pending_note": "Le résultat n'est pas définitif. Vérifiez l'état du paiement avant de réessayer."
   },
   "receive_money": {
     "title": "Recevoir",

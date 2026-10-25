@@ -370,22 +370,25 @@ impl LnClient for LndGrpcClient {
         let mut router = self.router.clone();
         let stream = timeout(self.payment_timeout, router.send_payment_v2(request))
             .await
-            .map_err(|_| LightningError::Pay("Payment timed out".to_string()))?
-            .map_err(|e| LightningError::Pay(e.message().to_string()))?;
+            .map_err(|_| LightningError::PaymentOutcomeUnknown("Payment timed out".to_string()))?
+            .map_err(|e| LightningError::PaymentOutcomeUnknown(e.message().to_string()))?;
 
         let payment = stream
             .into_inner()
             .message()
             .await
-            .map_err(|e| LightningError::Pay(e.message().to_string()))?
-            .ok_or_else(|| LightningError::Pay("No payment response received".to_string()))?;
+            .map_err(|e| LightningError::PaymentOutcomeUnknown(e.message().to_string()))?
+            .ok_or_else(|| LightningError::PaymentOutcomeUnknown("No payment response received".to_string()))?;
 
         match payment.status() {
             lnrpc::payment::PaymentStatus::Succeeded => Ok(self.payment_from_lnrpc(payment)),
             lnrpc::payment::PaymentStatus::Failed => {
                 Err(LightningError::Pay(format!("{:?}", payment.failure_reason())))
             }
-            status => Err(LightningError::Pay(format!("Unexpected payment status: {:?}", status))),
+            status => Err(LightningError::PaymentOutcomeUnknown(format!(
+                "Unexpected payment status: {:?}",
+                status
+            ))),
         }
     }
 

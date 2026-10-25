@@ -652,6 +652,12 @@ function SendDetailRow({ label, value }: { label: string; value?: string | numbe
 
 // ----------------------------------------------------------------------
 
+const PAYMENT_FEEDBACK = {
+  Pending: { color: 'warning', icon: 'solar:clock-circle-bold', title: 'send_money.pending' },
+  Settled: { color: 'success', icon: 'solar:check-circle-bold', title: 'send_money.sent' },
+  Failed: { color: 'error', icon: 'solar:danger-bold', title: 'transaction_details.failed' },
+} as const;
+
 export function SendMoneyDrawer({
   open,
   balance,
@@ -673,6 +679,7 @@ export function SendMoneyDrawer({
   const [amountUnit, setAmountUnit] = useState<AmountUnit>('sats');
   const [comment, setComment] = useState('');
   const [payment, setPayment] = useState<Payment>();
+  const paymentFeedback = PAYMENT_FEEDBACK[payment?.status ?? 'Pending'];
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [nowMs, setNowMs] = useState(0);
   const [selectedWalletId, setSelectedWalletId] = useState(walletId ?? '');
@@ -912,18 +919,23 @@ export function SendMoneyDrawer({
                   borderRadius: 1,
                   placeItems: 'center',
                   mx: 'auto',
-                  color: 'success.main',
-                  bgcolor: 'success.lighter',
+                  color: `${paymentFeedback.color}.main`,
+                  bgcolor: `${paymentFeedback.color}.lighter`,
                 }}
               >
-                <Iconify icon="solar:check-circle-bold" width={42} />
+                <Iconify icon={paymentFeedback.icon} width={42} />
               </Box>
               <Stack spacing={1}>
-                <Typography variant="h5">{t('send_money.sent')}</Typography>
+                <Typography variant="h5">{t(paymentFeedback.title)}</Typography>
                 <SatsWithIcon amountMSats={payment.amount_msat} variant="h4" />
                 <Typography variant="body2" color="text.secondary">
                   {truncateText(input, 42)}
                 </Typography>
+                {payment.status === 'Pending' && (
+                  <Typography variant="body2" color="text.secondary">
+                    {t('send_money.pending_note')}
+                  </Typography>
+                )}
               </Stack>
               <Button variant="contained" color="inherit" onClick={handleClose}>
                 {t('done')}

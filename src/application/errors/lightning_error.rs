@@ -35,11 +35,12 @@ pub enum LightningError {
     #[error("Failed to send payment: {0}")]
     Pay(String),
 
+    /// The send response does not establish a terminal provider outcome.
+    #[error("Payment outcome unknown: {0}")]
+    PaymentOutcomeUnknown(String),
+
     #[error("Failed to cancel invoice: {0}")]
     CancelInvoice(String),
-
-    #[error("Unexpected stream payload: {0}")]
-    UnexpectedStreamPayload(String),
 
     #[error("Failed to get invoice by hash: {0}")]
     InvoiceByHash(String),
