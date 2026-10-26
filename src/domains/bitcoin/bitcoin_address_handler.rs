@@ -169,6 +169,9 @@ async fn delete_btc_address(
 /// Delete Bitcoin addresses
 ///
 /// Deletes all Bitcoin addresses matching a filter. Returns the number deleted.
+///
+/// Requires at least one effective selector: ids, wallet_id or address. Empty lists do not count as selectors.
+/// Pagination, ordering and other query-only fields do not scope deletion.
 #[utoipa::path(
     delete,
     path = "",
@@ -189,6 +192,16 @@ async fn delete_btc_addresses(
     Query(query_params): Query<BtcAddressFilter>,
 ) -> Result<Json<u64>, ApplicationError> {
     user.check_permission(Permission::WriteBtcAddress)?;
+
+    if query_params.ids.as_ref().is_none_or(Vec::is_empty)
+        && query_params.wallet_id.is_none()
+        && query_params.address.is_none()
+    {
+        return Err(DataError::Malformed(
+            "At least one Bitcoin address filter is required for bulk deletion.".to_string(),
+        )
+        .into());
+    }
 
     let n_deleted = services.bitcoin.delete_many_addresses(query_params).await?;
     Ok(n_deleted.into())
@@ -283,6 +296,47 @@ mod tests {
                 let result = get_btc_address(State(Arc::new(services)), user(vec![]), Path(Uuid::new_v4())).await;
 
                 assert!(matches!(result, Err(ApplicationError::Authorization(_))));
+            }
+        }
+    }
+
+    mod delete_btc_addresses {
+        use super::*;
+
+        mod without_an_effective_selector {
+            use super::*;
+
+            #[tokio::test]
+            async fn returns_bad_request_without_calling_the_service() {
+                for filter in [
+                    BtcAddressFilter::default(),
+                    BtcAddressFilter {
+                        ids: Some(vec![]),
+                        ..Default::default()
+                    },
+                    BtcAddressFilter {
+                        used: Some(false),
+                        ..Default::default()
+                    },
+                    BtcAddressFilter {
+                        address_type: Some(BtcAddressType::P2tr),
+                        ..Default::default()
+                    },
+                    BtcAddressFilter {
+                        limit: Some(1),
+                        offset: Some(1),
+                        ..Default::default()
+                    },
+                ] {
+                    let result = delete_btc_addresses(
+                        State(Arc::new(MockAppServicesBuilder::new().build())),
+                        user(vec![Permission::WriteBtcAddress]),
+                        Query(filter),
+                    )
+                    .await;
+
+                    assert!(matches!(result, Err(ApplicationError::Data(DataError::Malformed(_)))));
+                }
             }
         }
     }

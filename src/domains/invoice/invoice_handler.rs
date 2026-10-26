@@ -172,6 +172,9 @@ async fn delete_invoice(
 /// Delete invoices
 ///
 /// Deletes all invoices matching a filter. Returns the number deleted. Deleting an invoice can affect the wallet balance.
+///
+/// Requires at least one effective selector: ids, wallet_id, status or ledger. Empty lists do not count as selectors.
+/// Pagination, ordering and other query-only fields do not scope deletion.
 #[utoipa::path(
     delete,
     path = "",
@@ -192,6 +195,16 @@ async fn delete_invoices(
     Query(query_params): Query<InvoiceFilter>,
 ) -> Result<Json<u64>, ApplicationError> {
     user.check_permission(Permission::WriteTransaction)?;
+
+    if query_params.ids.as_ref().is_none_or(Vec::is_empty)
+        && query_params.wallet_id.is_none()
+        && query_params.status.is_none()
+        && query_params.ledger.is_none()
+    {
+        return Err(
+            DataError::Malformed("At least one invoice filter is required for bulk deletion.".to_string()).into(),
+        );
+    }
 
     let n_deleted = services.invoice.delete_many(query_params).await?;
     Ok(n_deleted.into())
@@ -281,6 +294,39 @@ mod tests {
                 let result = get_invoice(State(Arc::new(services)), user(vec![]), Path(Uuid::new_v4())).await;
 
                 assert!(matches!(result, Err(ApplicationError::Authorization(_))));
+            }
+        }
+    }
+
+    mod delete_invoices {
+        use super::*;
+
+        mod without_an_effective_selector {
+            use super::*;
+
+            #[tokio::test]
+            async fn returns_bad_request_without_calling_the_service() {
+                for filter in [
+                    InvoiceFilter::default(),
+                    InvoiceFilter {
+                        ids: Some(vec![]),
+                        ..Default::default()
+                    },
+                    InvoiceFilter {
+                        limit: Some(1),
+                        offset: Some(1),
+                        ..Default::default()
+                    },
+                ] {
+                    let result = delete_invoices(
+                        State(Arc::new(MockAppServicesBuilder::new().build())),
+                        user(vec![Permission::WriteTransaction]),
+                        Query(filter),
+                    )
+                    .await;
+
+                    assert!(matches!(result, Err(ApplicationError::Data(DataError::Malformed(_)))));
+                }
             }
         }
     }

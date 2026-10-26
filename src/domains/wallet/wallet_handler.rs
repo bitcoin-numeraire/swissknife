@@ -194,6 +194,9 @@ async fn delete_wallet(
 /// Delete wallets
 ///
 /// Deletes all the wallets given a filter. Returns the number of deleted wallets. Deleting a wallet removes all data related to that wallet.
+///
+/// Requires at least one effective selector: ids, account_id or asset_id. Empty lists do not count as selectors.
+/// Pagination, ordering and other query-only fields do not scope deletion.
 #[utoipa::path(
     delete,
     path = "",
@@ -214,6 +217,15 @@ async fn delete_wallets(
     Query(query_params): Query<WalletFilter>,
 ) -> Result<Json<u64>, ApplicationError> {
     user.check_permission(Permission::WriteWallet)?;
+
+    if query_params.ids.as_ref().is_none_or(Vec::is_empty)
+        && query_params.account_id.is_none()
+        && query_params.asset_id.is_none()
+    {
+        return Err(
+            DataError::Malformed("At least one wallet filter is required for bulk deletion.".to_string()).into(),
+        );
+    }
 
     let n_deleted = services.wallet.delete_many(query_params).await?;
     Ok(n_deleted.into())
@@ -301,6 +313,39 @@ mod tests {
                 let result = get_wallet(State(Arc::new(services)), user(vec![]), Path(Uuid::new_v4())).await;
 
                 assert!(matches!(result, Err(ApplicationError::Authorization(_))));
+            }
+        }
+    }
+
+    mod delete_wallets {
+        use super::*;
+
+        mod without_an_effective_selector {
+            use super::*;
+
+            #[tokio::test]
+            async fn returns_bad_request_without_calling_the_service() {
+                for filter in [
+                    WalletFilter::default(),
+                    WalletFilter {
+                        ids: Some(vec![]),
+                        ..Default::default()
+                    },
+                    WalletFilter {
+                        limit: Some(1),
+                        offset: Some(1),
+                        ..Default::default()
+                    },
+                ] {
+                    let result = delete_wallets(
+                        State(Arc::new(MockAppServicesBuilder::new().build())),
+                        user(vec![Permission::WriteWallet]),
+                        Query(filter),
+                    )
+                    .await;
+
+                    assert!(matches!(result, Err(ApplicationError::Data(DataError::Malformed(_)))));
+                }
             }
         }
     }

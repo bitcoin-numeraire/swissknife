@@ -4307,6 +4307,10 @@ export type DeletePaymentsErrors = {
    */
   403: ErrorResponse;
   /**
+   * Cannot delete pending payments
+   */
+  422: ErrorResponse;
+  /**
    * Internal Server Error
    */
   500: ErrorResponse;

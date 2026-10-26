@@ -572,6 +572,60 @@ mod delete {
     use super::*;
 
     #[tokio::test]
+    async fn bulk_delete_requires_an_effective_filter() {
+        let app = crate::common::TestApp::isolated("bitcoin-delete-filter", &[]).await;
+        let token = app.admin_token().await;
+        let first = app.create_wallet(token, "bitcoin-filter-first").await;
+        let second = app.create_wallet(token, "bitcoin-filter-second").await;
+        let first = post_address(&app, token, first.id, None).await.parse::<BtcAddress>();
+        let second = post_address(&app, token, second.id, None).await.parse::<BtcAddress>();
+
+        for query in [
+            "",
+            "?limit=1",
+            "?offset=1",
+            "?order_direction=Asc",
+            "?unknown=1",
+            "?used=false",
+            "?address_type=p2tr",
+        ] {
+            let response = app
+                .api()
+                .delete(&format!("/v1/bitcoin/addresses{query}"), Auth::Bearer(token))
+                .await;
+            assert_error(&response, StatusCode::BAD_REQUEST);
+            for id in [first.id, second.id] {
+                let retained = app
+                    .api()
+                    .get(&format!("/v1/bitcoin/addresses/{id}"), Auth::Bearer(token))
+                    .await;
+                assert_status(&retained, StatusCode::OK);
+                assert_eq!(retained.parse::<BtcAddress>().id, id);
+            }
+        }
+
+        let deleted = app
+            .api()
+            .delete(
+                &format!("/v1/bitcoin/addresses?address={}", first.address),
+                Auth::Bearer(token),
+            )
+            .await;
+        assert_status(&deleted, StatusCode::OK);
+        assert_eq!(deleted.parse::<u64>(), 1);
+        let missing = app
+            .api()
+            .get(&format!("/v1/bitcoin/addresses/{}", first.id), Auth::Bearer(token))
+            .await;
+        assert_error(&missing, StatusCode::NOT_FOUND);
+        let retained = app
+            .api()
+            .get(&format!("/v1/bitcoin/addresses/{}", second.id), Auth::Bearer(token))
+            .await;
+        assert_status(&retained, StatusCode::OK);
+    }
+
+    #[tokio::test]
     async fn deletes_a_single_unused_address() {
         let app = app().await;
         let token = app.admin_token().await;

@@ -178,6 +178,56 @@ mod delete {
     use super::*;
 
     #[tokio::test]
+    async fn bulk_delete_requires_an_effective_filter() {
+        let app = TestApp::isolated("invoice-delete-filter", &[]).await;
+        let token = app.admin_token().await;
+        let first_wallet = app.create_wallet(token, "invoice-filter-first").await;
+        let second_wallet = app.create_wallet(token, "invoice-filter-second").await;
+        let first = new_invoice(&app, token, first_wallet.id, 1_000).await;
+        let second = new_invoice(&app, token, second_wallet.id, 2_000).await;
+
+        for query in [
+            "",
+            "?limit=1",
+            "?offset=1",
+            "?order_direction=Asc",
+            "?order_by=CreatedAt",
+            "?unknown=1",
+        ] {
+            let response = app
+                .api()
+                .delete(&format!("/v1/invoices{query}"), Auth::Bearer(token))
+                .await;
+            assert_error(&response, StatusCode::BAD_REQUEST);
+            for id in [first.id, second.id] {
+                let retained = app.api().get(&format!("/v1/invoices/{id}"), Auth::Bearer(token)).await;
+                assert_status(&retained, StatusCode::OK);
+                assert_eq!(retained.parse::<Invoice>().id, id);
+            }
+        }
+
+        let deleted = app
+            .api()
+            .delete(
+                &format!("/v1/invoices?wallet_id={}", first_wallet.id),
+                Auth::Bearer(token),
+            )
+            .await;
+        assert_status(&deleted, StatusCode::OK);
+        assert_eq!(deleted.parse::<u64>(), 1);
+        let missing = app
+            .api()
+            .get(&format!("/v1/invoices/{}", first.id), Auth::Bearer(token))
+            .await;
+        assert_error(&missing, StatusCode::NOT_FOUND);
+        let retained = app
+            .api()
+            .get(&format!("/v1/invoices/{}", second.id), Auth::Bearer(token))
+            .await;
+        assert_status(&retained, StatusCode::OK);
+    }
+
+    #[tokio::test]
     async fn deletes_a_single_invoice() {
         let app = app().await;
         let token = app.admin_token().await;

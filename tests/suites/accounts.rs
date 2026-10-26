@@ -238,6 +238,23 @@ mod lifecycle {
     }
 
     #[tokio::test]
+    async fn bulk_delete_without_ids_preserves_the_authenticated_account() {
+        let app = app().await;
+        let admin = app.admin_token().await;
+        let before = app.api().get("/v1/me", Auth::Bearer(admin)).await.parse::<Account>();
+        for query in ["", "?limit=1&offset=1"] {
+            let response = app
+                .api()
+                .delete(&format!("/v1/accounts{query}"), Auth::Bearer(admin))
+                .await;
+            assert_error(&response, StatusCode::CONFLICT);
+        }
+        let retained = app.api().get("/v1/me", Auth::Bearer(admin)).await;
+        assert_status(&retained, StatusCode::OK);
+        assert_eq!(retained.parse::<Account>().id, before.id);
+    }
+
+    #[tokio::test]
     async fn cannot_delete_the_authenticated_account() {
         let app = app().await;
         let admin = app.admin_token().await;

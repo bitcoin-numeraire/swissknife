@@ -207,6 +207,76 @@ mod send {
     }
 }
 
+mod delete {
+    use super::*;
+
+    #[tokio::test]
+    async fn bulk_delete_requires_an_effective_filter() {
+        let app = TestApp::isolated("payment-delete-filter", &[]).await;
+        let token = app.admin_token().await;
+        let payer = app.create_wallet(token, "payment-filter-payer").await;
+        let payee = app.create_wallet(token, "payment-filter-payee").await;
+        app.fund_onchain(token, payer.id, 100_000).await;
+        let mut payments = Vec::new();
+        for _ in 0..3 {
+            let bolt11 = invoice_bolt11(&app, token, payee.id, 1_000).await;
+            let settled = app
+                .api()
+                .post("/v1/payments", Auth::Bearer(token), pay(payer.id, bolt11))
+                .await;
+            assert_status(&settled, StatusCode::OK);
+            let settled = settled.parse::<Payment>();
+            assert_eq!(settled.status, PaymentStatus::Settled);
+            payments.push(settled);
+        }
+
+        for query in [
+            "",
+            "?limit=1",
+            "?offset=1",
+            "?order_direction=Asc",
+            "?unknown=1",
+            "?ledger=Lightning",
+        ] {
+            let response = app
+                .api()
+                .delete(&format!("/v1/payments{query}"), Auth::Bearer(token))
+                .await;
+            assert_error(&response, StatusCode::BAD_REQUEST);
+            for payment in &payments {
+                let retained = app
+                    .api()
+                    .get(&format!("/v1/payments/{}", payment.id), Auth::Bearer(token))
+                    .await;
+                assert_status(&retained, StatusCode::OK);
+                assert_eq!(retained.parse::<Payment>().id, payment.id);
+            }
+        }
+
+        let deleted = app
+            .api()
+            .delete(
+                &format!("/v1/payments?ids={}&ids={}", payments[0].id, payments[1].id),
+                Auth::Bearer(token),
+            )
+            .await;
+        assert_status(&deleted, StatusCode::OK);
+        assert_eq!(deleted.parse::<u64>(), 2);
+        for payment in &payments[..2] {
+            let missing = app
+                .api()
+                .get(&format!("/v1/payments/{}", payment.id), Auth::Bearer(token))
+                .await;
+            assert_error(&missing, StatusCode::NOT_FOUND);
+        }
+        let retained = app
+            .api()
+            .get(&format!("/v1/payments/{}", payments[2].id), Auth::Bearer(token))
+            .await;
+        assert_status(&retained, StatusCode::OK);
+    }
+}
+
 mod internal {
     use super::*;
 

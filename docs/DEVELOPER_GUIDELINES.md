@@ -12,6 +12,8 @@ SwissKnife follows a clean architecture direction:
 - infrastructure modules implement repository, database, Lightning, wallet, authentication, server, and external adapter details
 - DTOs belong at API boundaries, while domain entities belong in business logic
 
+Validate request requirements, such as an effective selector for a bulk DELETE, in the inbound handler or extractor and return `DataError::Malformed` (HTTP 400). Keep these transport checks out of services; each new inbound adapter must validate its own requests before calling a use case. Business rules, such as rejecting deletion of a pending payment, remain in services.
+
 Keep dependencies pointing inward. Domain code should depend on traits and application errors, not on concrete infrastructure implementations.
 
 Do not add infrastructure shortcuts or test-only production seams to make unit tests easier. If a component is hard to test, improve the production design instead.

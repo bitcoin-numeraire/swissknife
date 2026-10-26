@@ -207,6 +207,9 @@ async fn delete_address(
 /// Delete LN Addresses
 ///
 /// Deletes all the addresses given a filter. Returns the number of deleted addresses
+///
+/// Requires at least one effective selector: ids, account_id, wallet_id or username. Empty lists do not count as selectors.
+/// Pagination, ordering and other query-only fields do not scope deletion.
 #[utoipa::path(
     delete,
     path = "",
@@ -227,6 +230,17 @@ async fn delete_addresses(
     Query(query_params): Query<LnAddressFilter>,
 ) -> Result<Json<u64>, ApplicationError> {
     user.check_permission(Permission::WriteLnAddress)?;
+
+    if query_params.ids.as_ref().is_none_or(Vec::is_empty)
+        && query_params.account_id.is_none()
+        && query_params.wallet_id.is_none()
+        && query_params.username.is_none()
+    {
+        return Err(DataError::Malformed(
+            "At least one Lightning address filter is required for bulk deletion.".to_string(),
+        )
+        .into());
+    }
 
     let n_deleted = services.ln_address.delete_many(query_params).await?;
     Ok(n_deleted.into())
@@ -352,6 +366,43 @@ mod tests {
                 let result = get_address(State(Arc::new(services)), user(vec![]), Path(Uuid::new_v4())).await;
 
                 assert!(matches!(result, Err(ApplicationError::Authorization(_))));
+            }
+        }
+    }
+
+    mod delete_addresses {
+        use super::*;
+
+        mod without_an_effective_selector {
+            use super::*;
+
+            #[tokio::test]
+            async fn returns_bad_request_without_calling_the_service() {
+                for filter in [
+                    LnAddressFilter::default(),
+                    LnAddressFilter {
+                        ids: Some(vec![]),
+                        ..Default::default()
+                    },
+                    LnAddressFilter {
+                        active: Some(true),
+                        ..Default::default()
+                    },
+                    LnAddressFilter {
+                        limit: Some(1),
+                        offset: Some(1),
+                        ..Default::default()
+                    },
+                ] {
+                    let result = delete_addresses(
+                        State(Arc::new(MockAppServicesBuilder::new().build())),
+                        user(vec![Permission::WriteLnAddress]),
+                        Query(filter),
+                    )
+                    .await;
+
+                    assert!(matches!(result, Err(ApplicationError::Data(DataError::Malformed(_)))));
+                }
             }
         }
     }

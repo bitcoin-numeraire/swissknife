@@ -218,6 +218,9 @@ async fn delete_payment(
 /// Delete payments
 ///
 /// Deletes all payments matching a filter. Returns the number deleted. Deleting a payment can affect the wallet balance.
+///
+/// Requires at least one effective selector: ids, wallet_id, status, ln_addresses or btc_addresses. Empty lists do not count as selectors.
+/// Pagination, ordering and other query-only fields do not scope deletion.
 #[utoipa::path(
     delete,
     path = "",
@@ -229,6 +232,7 @@ async fn delete_payment(
         (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
         (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
         (status = 403, description = "Forbidden", body = ErrorResponse, example = json!(FORBIDDEN_EXAMPLE)),
+        (status = 422, description = "Cannot delete pending payments", body = ErrorResponse),
         (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
     )
 )]
@@ -238,6 +242,17 @@ async fn delete_payments(
     Query(query_params): Query<PaymentFilter>,
 ) -> Result<Json<u64>, ApplicationError> {
     user.check_permission(Permission::WriteTransaction)?;
+
+    if query_params.ids.as_ref().is_none_or(Vec::is_empty)
+        && query_params.wallet_id.is_none()
+        && query_params.status.is_none()
+        && query_params.ln_addresses.as_ref().is_none_or(Vec::is_empty)
+        && query_params.btc_addresses.as_ref().is_none_or(Vec::is_empty)
+    {
+        return Err(
+            DataError::Malformed("At least one payment filter is required for bulk deletion.".to_string()).into(),
+        );
+    }
 
     let n_deleted = services.payment.delete_many(query_params).await?;
     Ok(n_deleted.into())
@@ -423,6 +438,82 @@ mod tests {
                     .unwrap_err();
 
                 assert!(matches!(err, ApplicationError::Authorization(_)));
+            }
+        }
+    }
+
+    mod delete_payments {
+        use super::*;
+
+        mod with_an_effective_selector {
+            use super::*;
+
+            #[tokio::test]
+            async fn preserves_the_pending_payment_business_error() {
+                let wallet_id = Uuid::new_v4();
+                let mut builder = MockAppServicesBuilder::new();
+                builder
+                    .payment
+                    .expect_delete_many()
+                    .withf(move |filter| filter.wallet_id == Some(wallet_id))
+                    .times(1)
+                    .returning(|_| Err(DataError::Validation("Cannot delete pending payments.".to_string()).into()));
+
+                let error = delete_payments(
+                    State(Arc::new(builder.build())),
+                    user(vec![Permission::WriteTransaction]),
+                    Query(PaymentFilter {
+                        wallet_id: Some(wallet_id),
+                        ..Default::default()
+                    }),
+                )
+                .await
+                .err()
+                .expect("pending payments must be rejected");
+
+                let response = axum::response::IntoResponse::into_response(error);
+                assert_eq!(response.status(), axum::http::StatusCode::UNPROCESSABLE_ENTITY);
+            }
+        }
+
+        mod without_an_effective_selector {
+            use super::*;
+
+            #[tokio::test]
+            async fn returns_bad_request_without_calling_the_service() {
+                for filter in [
+                    PaymentFilter::default(),
+                    PaymentFilter {
+                        ids: Some(vec![]),
+                        ..Default::default()
+                    },
+                    PaymentFilter {
+                        ln_addresses: Some(vec![]),
+                        ..Default::default()
+                    },
+                    PaymentFilter {
+                        btc_addresses: Some(vec![]),
+                        ..Default::default()
+                    },
+                    PaymentFilter {
+                        ledger: Some(crate::application::composition::Ledger::Lightning),
+                        ..Default::default()
+                    },
+                    PaymentFilter {
+                        limit: Some(1),
+                        offset: Some(1),
+                        ..Default::default()
+                    },
+                ] {
+                    let result = delete_payments(
+                        State(Arc::new(MockAppServicesBuilder::new().build())),
+                        user(vec![Permission::WriteTransaction]),
+                        Query(filter),
+                    )
+                    .await;
+
+                    assert!(matches!(result, Err(ApplicationError::Data(DataError::Malformed(_)))));
+                }
             }
         }
     }
