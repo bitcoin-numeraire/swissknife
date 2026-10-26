@@ -6,6 +6,17 @@ This file provides guidance to AI agents when working with code in this reposito
 
 SwissKnife is a self-custodial Bitcoin wallet and transaction orchestrator supporting Lightning Network, LNURL, Lightning Addresses, and Nostr protocols. It consists of a Rust backend API and a Next.js dashboard.
 
+### Liquidity Providers and Wallet Balances
+
+LND, CLN, and other nodes are liquidity providers. SwissKnife wallet balances are independent of the actual funds on those providers. Backing, solvency, and operational liquidity are the operator's responsibility; SwissKnife does not verify or enforce provider backing for its balances.
+
+- Switching providers must not rewrite or cap SwissKnife balances. Moving from an LND node with 1,000,000 sats to a CLN node with 50,000 sats does not change the wallet balances.
+- The product model permits authorized administrative credits above the provider's actual funds. Do not impose a node-balance cap or require an unallocated-reserves calculation for an administrative credit.
+- A real node-funded on-chain transaction paying a registered SwissKnife deposit address follows the normal deposit lifecycle, including a node self-transaction. Credit the receiving wallet once on confirmation even though the provider gains no new backing. Ordinary node change addresses remain excluded.
+- An out-of-band node transaction does not imply a debit from a SwissKnife wallet. Only settle an outgoing SwissKnife payment when an existing payment matches the provider transaction; do not fabricate a counterpart payment.
+- Keep authorization, exact amounts, atomic balance/history/event writes, and replay protection correct within SwissKnife. Wallet spend checks still use SwissKnife balances, and an external payment may fail when provider liquidity is insufficient.
+- A valid administrative credit or node self-transaction is not a backing warning. Use the normal audit/deposit logging for the operation.
+
 ## Build & Development Commands
 
 ### Backend (Rust)
@@ -143,6 +154,11 @@ Configured via `ln_provider` in config:
 - **Dashboard**: Next.js 16, React 19, MUI 9, TypeScript, Yarn 4, Node 24
 
 ## Code Review Guidelines
+
+### Changelog
+
+- Update `CHANGELOG.md` for user-facing behavior changes. Documentation, agent guidance, tests, and internal refactors without user-facing changes do not require a changelog entry.
+- Changelog CI validates the changelog's format; it does not require every PR to add an entry. Do not add an entry solely to satisfy that check.
 
 ### General
 - Verify all tests pass (`cargo test`)
