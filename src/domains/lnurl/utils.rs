@@ -18,6 +18,25 @@ use crate::domains::lnurl::{LnUrlPayCallbackResponse, LnUrlPayRequestData, LnUrl
 
 use super::LnUrlSuccessAction;
 
+pub(crate) async fn fetch_lnurl_response(url: Url) -> Result<String> {
+    // Leave room for LUD-06's optional 136536-character image plus JSON metadata.
+    const MAX_RESPONSE_BYTES: usize = 256 * 1024;
+
+    let client = reqwest::Client::builder()
+        .connect_timeout(std::time::Duration::from_secs(3))
+        .timeout(std::time::Duration::from_secs(10))
+        .build()?;
+    let mut response = client.get(url).send().await?.error_for_status()?;
+    let mut body = Vec::new();
+    while let Some(chunk) = response.chunk().await? {
+        if chunk.len() > MAX_RESPONSE_BYTES - body.len() {
+            return Err(anyhow!("LNURL response exceeds {MAX_RESPONSE_BYTES} bytes"));
+        }
+        body.extend_from_slice(&chunk);
+    }
+    Ok(String::from_utf8(body)?)
+}
+
 pub async fn validate_lnurl_pay(
     user_amount_msat: u64,
     comment: &Option<String>,
@@ -26,8 +45,7 @@ pub async fn validate_lnurl_pay(
     trace!(?req, "Validating LNURL pay request");
 
     let pay = lnurl_pay_response_from_request(req);
-    let callback_resp =
-        fetch_lnurl_pay_invoice(reqwest::Client::new(), &pay, user_amount_msat, comment.as_deref()).await?;
+    let callback_resp = fetch_lnurl_pay_invoice(&pay, user_amount_msat, comment.as_deref()).await?;
 
     validate_invoice(user_amount_msat, &callback_resp.pr)?;
 
@@ -55,14 +73,9 @@ fn lnurl_pay_response_from_request(req: &LnUrlPayRequestData) -> LnurlPayRespons
     }
 }
 
-async fn fetch_lnurl_pay_invoice(
-    client: reqwest::Client,
-    pay: &LnurlPayResponse,
-    msats: u64,
-    comment: Option<&str>,
-) -> Result<LnURLPayInvoice> {
+async fn fetch_lnurl_pay_invoice(pay: &LnurlPayResponse, msats: u64, comment: Option<&str>) -> Result<LnURLPayInvoice> {
     let url = lnurl_pay_callback_url(pay, msats, comment)?;
-    let response_text = client.get(url).send().await?.error_for_status()?.text().await?;
+    let response_text = fetch_lnurl_response(url).await?;
     parse_lnurl_pay_invoice_response(&response_text)
 }
 

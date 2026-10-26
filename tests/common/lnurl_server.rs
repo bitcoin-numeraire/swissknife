@@ -118,9 +118,14 @@ impl MockLnurl {
 
     /// Mount a `200 GET` returning `body` at `at`.
     async fn mount_get(&self, at: String, body: impl Serialize) {
+        self.mount_response(&at, ResponseTemplate::new(200).set_body_json(body))
+            .await;
+    }
+
+    pub async fn mount_response(&self, at: &str, response: ResponseTemplate) {
         Mock::given(method("GET"))
             .and(path(at))
-            .respond_with(ResponseTemplate::new(200).set_body_json(body))
+            .respond_with(response)
             .mount(&self.server)
             .await;
     }
