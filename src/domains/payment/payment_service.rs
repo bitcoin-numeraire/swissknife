@@ -828,18 +828,6 @@ impl PaymentsUseCases for PaymentService {
     async fn delete_many(&self, filter: PaymentFilter) -> Result<u64, ApplicationError> {
         debug!(?filter, "Deleting payments");
 
-        if filter.ids.as_ref().is_none_or(Vec::is_empty)
-            && filter.wallet_id.is_none()
-            && filter.status.is_none()
-            && filter.ln_addresses.as_ref().is_none_or(Vec::is_empty)
-            && filter.btc_addresses.as_ref().is_none_or(Vec::is_empty)
-        {
-            return Err(DataError::Validation(
-                "At least one payment filter is required for bulk deletion.".to_string(),
-            )
-            .into());
-        }
-
         let payments = self.store.payment.find_many(filter.clone()).await?;
         if payments.iter().any(|payment| payment.status == PaymentStatus::Pending) {
             return Err(DataError::Validation("Cannot delete pending payments.".to_string()).into());
@@ -2451,41 +2439,6 @@ mod tests {
         }
     }
 
-    mod delete_many {
-        use super::*;
-
-        mod without_a_nonempty_filter {
-            use super::*;
-
-            #[tokio::test]
-            async fn rejects_empty_ids_without_querying_the_repository() {
-                let service = service(
-                    MockAppStoreBuilder::new(),
-                    MockLnClient::new(),
-                    MockBitcoinWallet::new(),
-                    MockEventUseCases::new(),
-                );
-                for filter in [
-                    PaymentFilter {
-                        ids: Some(vec![]),
-                        ..Default::default()
-                    },
-                    PaymentFilter {
-                        ln_addresses: Some(vec![]),
-                        ..Default::default()
-                    },
-                    PaymentFilter {
-                        btc_addresses: Some(vec![]),
-                        ..Default::default()
-                    },
-                ] {
-                    let result = service.delete_many(filter).await;
-                    assert!(matches!(result, Err(ApplicationError::Data(DataError::Validation(_)))));
-                }
-            }
-        }
-    }
-
     mod delete {
         use super::*;
 
@@ -2584,13 +2537,7 @@ mod tests {
                     MockEventUseCases::new(),
                 );
 
-                let err = service
-                    .delete_many(PaymentFilter {
-                        wallet_id: Some(Uuid::new_v4()),
-                        ..Default::default()
-                    })
-                    .await
-                    .unwrap_err();
+                let err = service.delete_many(PaymentFilter::default()).await.unwrap_err();
 
                 assert!(matches!(err, ApplicationError::Data(DataError::Validation(_))));
             }

@@ -119,13 +119,6 @@ impl BitcoinUseCases for BitcoinService {
     async fn delete_many_addresses(&self, filter: BtcAddressFilter) -> Result<u64, ApplicationError> {
         debug!(?filter, "Deleting bitcoin addresses");
 
-        if filter.ids.as_ref().is_none_or(Vec::is_empty) && filter.wallet_id.is_none() && filter.address.is_none() {
-            return Err(DataError::Validation(
-                "At least one Bitcoin address filter is required for bulk deletion.".to_string(),
-            )
-            .into());
-        }
-
         let n_deleted = self.store.btc_address.delete_many(filter.clone()).await?;
 
         info!(?filter, n_deleted, "Bitcoin addresses deleted successfully");
@@ -300,31 +293,6 @@ mod tests {
                 let err = service.get_address(Uuid::new_v4()).await.unwrap_err();
 
                 assert!(matches!(err, ApplicationError::Data(DataError::NotFound(_))));
-            }
-        }
-    }
-
-    mod delete_many_addresses {
-        use super::*;
-
-        mod without_a_nonempty_filter {
-            use super::*;
-
-            #[tokio::test]
-            async fn rejects_empty_ids_without_querying_the_repository() {
-                let service = service(
-                    MockAppStoreBuilder::new(),
-                    MockBitcoinWallet::new(),
-                    MockEventUseCases::new(),
-                    MockSystemUseCases::new(),
-                );
-                let result = service
-                    .delete_many_addresses(BtcAddressFilter {
-                        ids: Some(vec![]),
-                        ..Default::default()
-                    })
-                    .await;
-                assert!(matches!(result, Err(ApplicationError::Data(DataError::Validation(_)))));
             }
         }
     }

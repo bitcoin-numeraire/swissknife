@@ -221,7 +221,6 @@ async fn delete_address(
         (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
         (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
         (status = 403, description = "Forbidden", body = ErrorResponse, example = json!(FORBIDDEN_EXAMPLE)),
-        (status = 422, description = "Missing effective deletion filter", body = ErrorResponse),
         (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
     )
 )]
@@ -231,6 +230,17 @@ async fn delete_addresses(
     Query(query_params): Query<LnAddressFilter>,
 ) -> Result<Json<u64>, ApplicationError> {
     user.check_permission(Permission::WriteLnAddress)?;
+
+    if query_params.ids.as_ref().is_none_or(Vec::is_empty)
+        && query_params.account_id.is_none()
+        && query_params.wallet_id.is_none()
+        && query_params.username.is_none()
+    {
+        return Err(DataError::Malformed(
+            "At least one Lightning address filter is required for bulk deletion.".to_string(),
+        )
+        .into());
+    }
 
     let n_deleted = services.ln_address.delete_many(query_params).await?;
     Ok(n_deleted.into())
@@ -356,6 +366,43 @@ mod tests {
                 let result = get_address(State(Arc::new(services)), user(vec![]), Path(Uuid::new_v4())).await;
 
                 assert!(matches!(result, Err(ApplicationError::Authorization(_))));
+            }
+        }
+    }
+
+    mod delete_addresses {
+        use super::*;
+
+        mod without_an_effective_selector {
+            use super::*;
+
+            #[tokio::test]
+            async fn returns_bad_request_without_calling_the_service() {
+                for filter in [
+                    LnAddressFilter::default(),
+                    LnAddressFilter {
+                        ids: Some(vec![]),
+                        ..Default::default()
+                    },
+                    LnAddressFilter {
+                        active: Some(true),
+                        ..Default::default()
+                    },
+                    LnAddressFilter {
+                        limit: Some(1),
+                        offset: Some(1),
+                        ..Default::default()
+                    },
+                ] {
+                    let result = delete_addresses(
+                        State(Arc::new(MockAppServicesBuilder::new().build())),
+                        user(vec![Permission::WriteLnAddress]),
+                        Query(filter),
+                    )
+                    .await;
+
+                    assert!(matches!(result, Err(ApplicationError::Data(DataError::Malformed(_)))));
+                }
             }
         }
     }

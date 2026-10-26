@@ -2100,16 +2100,6 @@
               }
             }
           },
-          "422": {
-            "description": "Missing effective deletion filter",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
           "500": {
             "description": "Internal Server Error",
             "content": {
@@ -2715,16 +2705,6 @@
               }
             }
           },
-          "422": {
-            "description": "Missing effective deletion filter",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
           "500": {
             "description": "Internal Server Error",
             "content": {
@@ -3319,16 +3299,6 @@
                   "$ref": "#/components/schemas/ErrorResponse"
                 },
                 "example": "\n{\n    \"status\": \"403 Forbidden\",\n    \"reason\": \"Missing permissions\"\n}\n"
-              }
-            }
-          },
-          "422": {
-            "description": "Missing effective deletion filter",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
               }
             }
           },
@@ -6848,7 +6818,7 @@
             }
           },
           "422": {
-            "description": "Missing effective deletion filter",
+            "description": "Cannot delete pending payments",
             "content": {
               "application/json": {
                 "schema": {
@@ -7548,16 +7518,6 @@
                   "$ref": "#/components/schemas/ErrorResponse"
                 },
                 "example": "\n{\n    \"status\": \"403 Forbidden\",\n    \"reason\": \"Missing permissions\"\n}\n"
-              }
-            }
-          },
-          "422": {
-            "description": "Missing effective deletion filter",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
               }
             }
           },

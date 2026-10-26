@@ -242,7 +242,7 @@ mod delete {
                 .api()
                 .delete(&format!("/v1/payments{query}"), Auth::Bearer(token))
                 .await;
-            assert_error(&response, StatusCode::UNPROCESSABLE_ENTITY);
+            assert_error(&response, StatusCode::BAD_REQUEST);
             for payment in &payments {
                 let retained = app
                     .api()

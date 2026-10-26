@@ -177,7 +177,7 @@ mod manage {
                 .api()
                 .delete(&format!("/v1/lightning-addresses{query}"), Auth::Bearer(token))
                 .await;
-            assert_error(&response, StatusCode::UNPROCESSABLE_ENTITY);
+            assert_error(&response, StatusCode::BAD_REQUEST);
             for address in &addresses {
                 let retained = app
                     .api()

@@ -593,7 +593,7 @@ mod delete {
                 .api()
                 .delete(&format!("/v1/bitcoin/addresses{query}"), Auth::Bearer(token))
                 .await;
-            assert_error(&response, StatusCode::UNPROCESSABLE_ENTITY);
+            assert_error(&response, StatusCode::BAD_REQUEST);
             for id in [first.id, second.id] {
                 let retained = app
                     .api()
