@@ -52,6 +52,8 @@ release notes when a tag is published.
 
 ### Fixed
 
+- Credit the received amount when CLN gRPC replays paid invoices after a restart
+  or reconnect, instead of recording settlement with a zero wallet credit.
 - Return the stored CLN Lightning payment and preserve its reservation after an
   `xpay` error, rather than immediately reporting failure. Even genuine no-route
   errors can remain pending and require manual reconciliation.
