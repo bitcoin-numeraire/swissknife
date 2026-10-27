@@ -68,6 +68,7 @@ pub struct TestApp {
     pub database_url: String,
     pub database: String,
     pub provider: String,
+    process_id: u32,
     admin_jwt: String,
     stdout_path: PathBuf,
     stderr_path: PathBuf,
@@ -87,6 +88,7 @@ pub struct Spawned {
     pub database_url: String,
     pub stdout_path: PathBuf,
     pub stderr_path: PathBuf,
+    process_id: u32,
 }
 
 /// Spawn a SwissKnife instance against the regtest stack with `extra_env`
@@ -101,6 +103,11 @@ pub async fn spawn_instance(database: &str, provider: &str, label: &str, extra_e
     let root = repo_root();
 
     let db = TestDatabase::provision(database, &root, label).await;
+    spawn_with_database(db.url(), provider, label, extra_env).await
+}
+
+async fn spawn_with_database(database_url: &str, provider: &str, label: &str, extra_env: &[(&str, String)]) -> Spawned {
+    let root = repo_root();
     let port = free_port();
     let base_url = format!("http://127.0.0.1:{port}");
 
@@ -116,7 +123,7 @@ pub async fn spawn_instance(database: &str, provider: &str, label: &str, extra_e
         .stderr(Stdio::from(File::create(&stderr_path).expect("create stderr log")))
         .env("RUN_MODE", "itest")
         .env("SWISSKNIFE_WEB__ADDR", format!("127.0.0.1:{port}"))
-        .env("SWISSKNIFE_DATABASE__URL", db.url())
+        .env("SWISSKNIFE_DATABASE__URL", database_url)
         .env("SWISSKNIFE_LN_PROVIDER", provider)
         // Advertise this ephemeral server as the public host so the callback
         // URL the LNURL well-known endpoint hands out is actually reachable.
@@ -133,6 +140,7 @@ pub async fn spawn_instance(database: &str, provider: &str, label: &str, extra_e
     let child = command
         .spawn()
         .expect("spawn swissknife binary (run `make build` first)");
+    let process_id = child.id();
     SPAWNED.lock().expect("spawned registry lock").push(child);
 
     let api = ApiClient::new(base_url.clone());
@@ -140,9 +148,10 @@ pub async fn spawn_instance(database: &str, provider: &str, label: &str, extra_e
 
     Spawned {
         base_url,
-        database_url: db.url().to_string(),
+        database_url: database_url.to_string(),
         stdout_path,
         stderr_path,
+        process_id,
     }
 }
 
@@ -161,6 +170,7 @@ impl TestApp {
             database_url: spawned.database_url,
             database,
             provider,
+            process_id: spawned.process_id,
             admin_jwt,
             stdout_path: spawned.stdout_path,
             stderr_path: spawned.stderr_path,
@@ -181,7 +191,40 @@ impl TestApp {
             database_url: spawned.database_url,
             database,
             provider,
+            process_id: spawned.process_id,
             admin_jwt,
+            stdout_path: spawned.stdout_path,
+            stderr_path: spawned.stderr_path,
+        }
+    }
+
+    /// Stop this process without removing its database, for recovery scenarios.
+    pub fn stop(&self) {
+        let child = {
+            let mut children = SPAWNED.lock().expect("spawned registry lock");
+            children
+                .iter()
+                .position(|child| child.id() == self.process_id)
+                .map(|index| children.swap_remove(index))
+        };
+        if let Some(mut child) = child {
+            child.kill().expect("stop test instance");
+            child.wait().expect("reap stopped test instance");
+        }
+    }
+
+    /// Restart against the same database. Pass any non-default test configuration again.
+    pub async fn restart(&self, label: &str, extra_env: &[(&str, String)]) -> Self {
+        self.stop();
+        let label = format!("{}-{}-{label}", self.database, self.provider);
+        let spawned = spawn_with_database(&self.database_url, &self.provider, &label, extra_env).await;
+        Self {
+            base_url: spawned.base_url,
+            database_url: spawned.database_url,
+            database: self.database.clone(),
+            provider: self.provider.clone(),
+            process_id: spawned.process_id,
+            admin_jwt: self.admin_jwt.clone(),
             stdout_path: spawned.stdout_path,
             stderr_path: spawned.stderr_path,
         }

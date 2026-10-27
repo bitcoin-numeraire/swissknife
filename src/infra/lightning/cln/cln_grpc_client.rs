@@ -251,7 +251,7 @@ impl LnClient for ClnGrpcClient {
                 ..Default::default()
             })
             .await
-            .map_err(|e| LightningError::Pay(e.message().to_string()))?
+            .map_err(|e| LightningError::PaymentOutcomeUnknown(e.message().to_string()))?
             .into_inner();
 
         Ok(response.into())

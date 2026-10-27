@@ -7,7 +7,7 @@ use std::time::Duration;
 use reqwest::StatusCode;
 
 use swissknife_types::{
-    Invoice, Ledger, NewInvoiceRequest, Payment, PaymentFeeEstimate, PaymentStatus, SendPaymentRequest,
+    Invoice, InvoiceStatus, Ledger, NewInvoiceRequest, Payment, PaymentFeeEstimate, PaymentStatus, SendPaymentRequest,
 };
 
 use crate::common::counterparty::Counterparty;
@@ -17,6 +17,50 @@ use crate::common::{app, assert_error, assert_status, Auth, TestApp};
 
 mod receive {
     use super::*;
+
+    #[tokio::test]
+    async fn a_payment_received_while_stopped_is_credited_on_restart() {
+        let app = TestApp::isolated("ln-offline-receive", &[]).await;
+        let token = app.admin_token().await;
+        let wallet = app.create_wallet(token, "ln-offline-receive").await;
+        let amount_msat = 100_000_000;
+        let created = app
+            .api()
+            .post(
+                "/v1/invoices",
+                Auth::Bearer(token),
+                NewInvoiceRequest {
+                    wallet_id: Some(wallet.id),
+                    amount_msat,
+                    description: Some("received while stopped".to_string()),
+                    expiry: None,
+                },
+            )
+            .await;
+        assert_status(&created, StatusCode::OK);
+        let invoice = created.parse::<Invoice>();
+        let bolt11 = &invoice.ln_invoice.as_ref().unwrap().bolt11;
+
+        app.stop();
+        Counterparty::for_provider(&app.provider).pay(bolt11);
+        let restarted = app.restart("ln-receive-replayed", &[]).await;
+        wait_until(Duration::from_secs(45), "offline invoice credit replayed", || async {
+            restarted.wallet_balance(token, wallet.id).await.available_msat == amount_msat as i64
+        })
+        .await;
+
+        let persisted = restarted
+            .api()
+            .get(&format!("/v1/invoices/{}", invoice.id), Auth::Bearer(token))
+            .await;
+        assert_status(&persisted, StatusCode::OK);
+        let persisted = persisted.parse::<Invoice>();
+        assert_eq!(persisted.id, invoice.id);
+        assert_eq!(persisted.wallet_id, wallet.id);
+        assert_eq!(persisted.status, InvoiceStatus::Settled);
+        assert_eq!(persisted.amount_msat, Some(amount_msat));
+        assert_eq!(persisted.amount_received_msat, Some(amount_msat));
+    }
 
     #[tokio::test]
     async fn a_counterparty_payment_credits_the_wallet() {
@@ -200,14 +244,11 @@ mod failure {
         );
     }
 
-    /// A payment whose amount exceeds the only channel's capacity (5,000,000 sat)
-    /// has no possible route, so the LN attempt fails. SwissKnife must mark it
-    /// failed and release the reservation, leaving the wallet whole — the invariant
-    /// the payment UoW enforces, exercised here over a real backend. Exceeding
-    /// channel *capacity* (not just current liquidity) keeps this deterministic
-    /// regardless of test order.
+    /// Exceeding the only channel's capacity makes routing fail independently
+    /// of current liquidity. LND exposes a terminal FAILED result; the CLN
+    /// adapters cannot distinguish an xpay RPC error from a lost send result.
     #[tokio::test]
-    async fn an_unroutable_payment_fails_and_releases_the_reservation() {
+    async fn an_unroutable_payment_releases_funds_only_for_a_definitive_failure() {
         let app = app().await;
         let token = app.admin_token().await;
         let wallet = app.create_wallet(token, "ln-unroutable").await;
@@ -220,21 +261,46 @@ mod failure {
         // 8M sat > 5M channel capacity: no route can carry it.
         let amount_msat = 8_000_000_000u64;
         let bolt11 = Counterparty::for_provider(&app.provider).invoice(amount_msat, &unique("cp-unroutable"));
-
-        let res = app
+        let request = SendPaymentRequest {
+            wallet_id: Some(wallet.id),
+            input: bolt11,
+            amount_msat: None,
+            comment: None,
+        };
+        let quote = app
             .api()
-            .post(
-                "/v1/payments",
-                Auth::Bearer(token),
-                SendPaymentRequest {
-                    wallet_id: Some(wallet.id),
-                    input: bolt11,
-                    amount_msat: None,
-                    comment: None,
-                },
-            )
+            .post("/v1/payments/fee-estimate", Auth::Bearer(token), request.clone())
             .await;
-        // A failed Lightning payment is a client-facing 422 (LightningError::Pay).
+        assert_status(&quote, StatusCode::OK);
+        let quote = quote.parse::<PaymentFeeEstimate>();
+
+        let res = app.api().post("/v1/payments", Auth::Bearer(token), request).await;
+        if app.provider.starts_with("cln_") {
+            assert_status(&res, StatusCode::OK);
+            let payment = res.parse::<Payment>();
+            assert_eq!(payment.status, PaymentStatus::Pending);
+            assert_eq!(payment.wallet_id, wallet.id);
+            assert_eq!(payment.amount_msat, amount_msat);
+            assert!(payment.error.is_none());
+            let balance = app.wallet_balance(token, wallet.id).await;
+            assert_eq!(balance.reserved_msat, quote.maximum_total_msat);
+            assert_eq!(balance.available_msat, before - quote.maximum_total_msat as i64);
+            let persisted = app
+                .api()
+                .get(&format!("/v1/payments/{}", payment.id), Auth::Bearer(token))
+                .await;
+            assert_status(&persisted, StatusCode::OK);
+            let persisted = persisted.parse::<Payment>();
+            assert_eq!(persisted.id, payment.id);
+            assert_eq!(persisted.status, PaymentStatus::Pending);
+            assert_eq!(persisted.amount_msat, amount_msat);
+            assert_eq!(
+                persisted.lightning.as_ref().unwrap().payment_hash,
+                payment.lightning.as_ref().unwrap().payment_hash
+            );
+            return;
+        }
+        // LND's explicit terminal FAILED result remains a client-facing 422.
         assert_error(&res, StatusCode::UNPROCESSABLE_ENTITY);
 
         // The reservation is released: the wallet is back where it started.
