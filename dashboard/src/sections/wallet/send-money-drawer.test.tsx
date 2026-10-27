@@ -67,7 +67,7 @@ function renderSendDrawer(input = unified, isAdmin = false) {
   );
 }
 
-describe('SendMoneyDrawer expired Unified requests', () => {
+describe('SendMoneyDrawer', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useFakeTimers({ toFake: ['Date'] });
@@ -93,6 +93,37 @@ describe('SendMoneyDrawer expired Unified requests', () => {
   });
 
   afterEach(() => vi.useRealTimers());
+
+  describe.each([false, true])('payment feedback (admin: %s)', (isAdmin) => {
+    it.each([
+      { status: PaymentStatus.PENDING, title: 'send_money.pending' },
+      { status: PaymentStatus.SETTLED, title: 'send_money.sent' },
+      { status: PaymentStatus.FAILED, title: 'transaction_details.failed' },
+    ])('shows $status from a successful HTTP response', async ({ status, title }) => {
+      vi.setSystemTime(new Date((invoiceTimestamp + 1) * 1000));
+      const payment = {
+        id: 'payment-1',
+        amount_msat: 2_000_000,
+        ledger: Ledger.LIGHTNING,
+        status,
+      } as Payment;
+      vi.mocked(walletPay).mockResolvedValue(response(payment));
+      vi.mocked(pay).mockResolvedValue(response(payment));
+      renderSendDrawer(unified, isAdmin);
+
+      fireEvent.click(screen.getByRole('button', { name: 'send_money.send' }));
+
+      expect(await screen.findByRole('heading', { name: title })).toBeInTheDocument();
+      expect(isAdmin ? pay : walletPay).toHaveBeenCalledOnce();
+      if (status !== PaymentStatus.SETTLED) {
+        expect(screen.queryByText('send_money.sent')).not.toBeInTheDocument();
+      }
+      if (status === PaymentStatus.PENDING) {
+        expect(screen.getByText('send_money.pending_note')).toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'send_money.send' })).not.toBeInTheDocument();
+      }
+    });
+  });
 
   it('blocks quote and send until the payer explicitly selects an on-chain request', () => {
     renderSendDrawer();

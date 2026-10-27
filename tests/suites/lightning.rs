@@ -13,7 +13,7 @@ use swissknife_types::{
 use crate::common::counterparty::Counterparty;
 use crate::common::fixtures::unique;
 use crate::common::wait::wait_until;
-use crate::common::{app, assert_error, assert_status, Auth};
+use crate::common::{app, assert_error, assert_status, Auth, TestApp};
 
 mod receive {
     use super::*;
@@ -126,11 +126,78 @@ mod send {
             before - amount_msat as i64 - fee,
             "wallet should be debited by amount + fee (before={before}, fee={fee})"
         );
+        assert_eq!(app.wallet_balance(token, wallet.id).await.reserved_msat, 0);
+        let persisted = app
+            .api()
+            .get(&format!("/v1/payments/{}", payment.id), Auth::Bearer(token))
+            .await;
+        assert_status(&persisted, StatusCode::OK);
+        let persisted = persisted.parse::<Payment>();
+        assert_eq!(persisted.id, payment.id);
+        assert_eq!(persisted.wallet_id, wallet.id);
+        assert_eq!(persisted.status, PaymentStatus::Settled);
+        assert_eq!(persisted.amount_msat, amount_msat);
+        assert_eq!(persisted.fee_msat, payment.fee_msat);
     }
 }
 
 mod failure {
     use super::*;
+
+    #[tokio::test]
+    async fn a_local_lnd_send_timeout_keeps_the_payment_and_reservation_pending() {
+        if crate::common::harness::matrix_cell().1 != "lnd_grpc" {
+            return;
+        }
+        let app = TestApp::isolated(
+            "ln-send-timeout",
+            &[("SWISSKNIFE_LND_GRPC_CONFIG__PAYMENT_TIMEOUT", "0s".to_string())],
+        )
+        .await;
+        let token = app.admin_token().await;
+        let wallet = app.create_wallet(token, "ln-timeout").await;
+        app.fund_onchain(token, wallet.id, 10_000_000).await;
+        let before = app.wallet_balance(token, wallet.id).await.available_msat;
+        let amount_msat = 8_000_000_000;
+        let bolt11 = Counterparty::for_provider(&app.provider).invoice(amount_msat, &unique("cp-timeout"));
+        let request = SendPaymentRequest {
+            wallet_id: Some(wallet.id),
+            input: bolt11,
+            amount_msat: None,
+            comment: None,
+        };
+        let quote = app
+            .api()
+            .post("/v1/payments/fee-estimate", Auth::Bearer(token), request.clone())
+            .await;
+        assert_status(&quote, StatusCode::OK);
+        let quote = quote.parse::<PaymentFeeEstimate>();
+
+        // This is a local establishment timeout, not proof of an accepted or in-flight HTLC.
+        let response = app.api().post("/v1/payments", Auth::Bearer(token), request).await;
+        assert_status(&response, StatusCode::OK);
+        let payment = response.parse::<Payment>();
+        assert_eq!(payment.status, PaymentStatus::Pending);
+        assert_eq!(payment.wallet_id, wallet.id);
+        assert_eq!(payment.amount_msat, amount_msat);
+        assert!(payment.error.is_none());
+        let balance = app.wallet_balance(token, wallet.id).await;
+        assert_eq!(balance.reserved_msat, quote.maximum_total_msat);
+        assert_eq!(balance.available_msat, before - quote.maximum_total_msat as i64);
+        let persisted = app
+            .api()
+            .get(&format!("/v1/payments/{}", payment.id), Auth::Bearer(token))
+            .await;
+        assert_status(&persisted, StatusCode::OK);
+        let persisted = persisted.parse::<Payment>();
+        assert_eq!(persisted.id, payment.id);
+        assert_eq!(persisted.status, PaymentStatus::Pending);
+        assert_eq!(persisted.amount_msat, amount_msat);
+        assert_eq!(
+            persisted.lightning.as_ref().unwrap().payment_hash,
+            payment.lightning.as_ref().unwrap().payment_hash
+        );
+    }
 
     /// A payment whose amount exceeds the only channel's capacity (5,000,000 sat)
     /// has no possible route, so the LN attempt fails. SwissKnife must mark it

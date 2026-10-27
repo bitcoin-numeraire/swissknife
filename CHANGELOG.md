@@ -52,6 +52,10 @@ release notes when a tag is published.
 
 ### Fixed
 
+- Keep LND Lightning payments pending and their funds reserved when the send
+  response does not establish a final outcome. Return the stored payment instead
+  of marking it failed; explicit terminal failures still release reserved funds.
+  Dashboard send confirmations now distinguish pending, settled, and failed payments.
 - Keep on-chain payments pending and their funds reserved when a broadcast
   reply is lost or submission otherwise has an unknown outcome, rather than
   reporting failure and making the same balance spendable again. Transactions
