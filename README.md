@@ -1,115 +1,124 @@
 <div align="center">
-  <img src="https://numeraire.fra1.cdn.digitaloceanspaces.com/development/LOGO_FULL_PNG_color_dark_9d58514132.png" height="200" alt="Numeraire"/>
+  <img src="https://numeraire.fra1.cdn.digitaloceanspaces.com/development/LOGO_FULL_PNG_color_dark_9d58514132.png" height="200"/>
   <h1>SwissKnife</h1>
-  <p>A Bitcoin wallet and transaction orchestrator with a Rust API and a Next.js dashboard.</p>
+  <h3>A self-custodial wallet & transaction orchestrator for Lightning, Nostr and Smart contract protocols on Bitcoin</h3>
 </div>
 
-[![GitHub stars](https://img.shields.io/github/stars/bitcoin-numeraire/swissknife.svg?style=social&label=Star)](https://github.com/bitcoin-numeraire/swissknife/stargazers)
+# SwissKnife
 
-SwissKnife connects your LND or Core Lightning node to accounts, wallets, and
-payment integrations. It supports on-chain Bitcoin, Lightning, and instant
-internal transfers, with a shared account model for hosted and self-hosted use.
+#### Numeraire SwissKnife is a wallet and transaction orchestrator enabling easy integration of Bitcoin, Lightning, Nostr and smart contract protocols to any entity that wishes so without the complexities of above technologies.
 
-See the [changelog](CHANGELOG.md) for release notes and the
-[upgrade guide](docs/UPGRADING.md) before upgrading from `0.2.0`.
+[![GitHub stars](https://img.shields.io/github/stars/bitcoin-numeraire/swissknife.svg?style=social&label=Star&maxAge=1)](https://github.com/bitcoin-numeraire/swissknife/stargazers)
+If you like what we do, consider starring, sharing and contributing!
+
+> Check the documentation [here](https://docs.numeraire.tech/swissknife).
 
 ## Features
 
-- Accounts with authentication identities, preferences, and multiple wallets.
-  Each wallet holds one asset on one settlement network.
-- On-chain addresses, Lightning invoices, LNURL-pay, Lightning Addresses,
-  Nostr NIP-05 verification, and Zaps.
-- Internal transfers, balance reservations, and provider-derived payment fee quotes.
-- Durable account settlement events over server-sent events, with reconnect replay
-  and live dashboard updates.
-- A dashboard for wallet activity, sending and receiving, contacts, identities,
-  API keys, and account and wallet administration.
-- OAuth2/OIDC with JWKS discovery and refresh, local JWT owner authentication,
-  account-owned API keys, and permission-based administrative access.
-- A documented REST API at `/docs`, with filtering and pagination.
+- [`Lightning Network`](https://github.com/lnurl/luds). Send and receive payments.
+- [`LNURL`](https://github.com/lnurl/luds) support.
+- [`Lightning Address`](https://lightningaddress.com/). Deploy your own Lightning Address infrastructure. Like email, anyone can use identifiers (`username@your.domain`) to send and receive payments.
+- [`Nostr`](https://github.com/nostr-protocol/nips/blob/master/05.md). NIP-05 and Zap support through your Lightning Address.
+- Generate invoices.
+- Explicit accounts and authentication identities, with any number of asset-scoped wallets per account.
+- Wallet balances scoped to one asset and one settlement network.
+- Internal ledger for instant payments on the same SwissKnife instance.
+- Provider-derived payment fee estimates and hard Lightning fee limits.
+- Durable account settlement events over SSE, with live dashboard updates.
+- REST API.
+- Frequent contacts.
+- OIDC/OAuth2 authentication with automatic JWKS discovery and key refresh (tested with Auth0).
+- Local JWT authentication for self-hosted deployments.
+- `RBAC`. Fine-grained authorization per route and attenuated API key.
+- Data availability through pagination and advanced search.
+- Account-scoped API key authentication
 
-The asset model distinguishes networks and can represent future asset protocols.
-The current provider adapters settle native BTC; Taproot Assets, RGB, BOLT12,
-webhooks, and desktop applications remain future work.
+Numeraire SwissKnife ships with a [Dashboard](https://github.com/bitcoin-numeraire/swissknife/tree/main/dashboard).
 
-## Liquidity providers
+## Lightning Providers
 
-SwissKnife supports LND and Core Lightning over gRPC or REST. You run the node
-and manage its keys and liquidity; SwissKnife does not bundle a Lightning node.
+SwissKnife allows direct Lightning integration with self-hosted node implementations:
 
-SwissKnife wallet balances are independent of funds held by the provider.
-Changing nodes does not rewrite those balances. Backing and liquidity are the
-operator's responsibility, and an external payment can fail if the node lacks
-liquidity even when its SwissKnife wallet has sufficient balance.
+- [`LND`](https://github.com/lightningnetwork/lnd)
+  - Run your own node
+  - Manage your own liquidity
+- [`Core Lightning`](https://corelightning.org/):
+  - Run your own node
+  - Manage your own liquidity.
 
 ## Installation
 
-The release workflow publishes three images for `linux/amd64` and `linux/arm64`:
+SwissKnife provides multiple Docker deployment options to suit different infrastructure needs:
 
-| Image                                         | Contents                     | Container port |
-| --------------------------------------------- | ---------------------------- | -------------- |
-| `bitcoinnumeraire/swissknife:0.3.0`           | Backend and static dashboard | `3000`         |
-| `bitcoinnumeraire/swissknife-server:0.3.0`    | Backend only                 | `3000`         |
-| `bitcoinnumeraire/swissknife-dashboard:0.3.0` | Standalone Next.js dashboard | `8080`         |
+Configure the backend database, Lightning provider and credentials before starting.
+Dashboard public settings are set at build time; see [dashboard configuration](dashboard/README.md#production-configuration) for your own deployment.
 
-Pin a release tag or digest for deployment. Configure the database, Lightning
-provider, TLS credentials, and authentication before starting the backend.
-Settings load from `config/default.toml`, an optional `config/<RUN_MODE>.toml`,
-and `SWISSKNIFE_` environment variables. Nested settings use `__`, for example
-`SWISSKNIFE_DATABASE__URL` and `SWISSKNIFE_LND_GRPC_CONFIG__ENDPOINT`.
+### Self-Contained Installation (Recommended)
 
-The backend needs a persistent database. SQLite defaults to
-`storage/swissknife.db`; mount `/storage` when using that default in a container.
-For PostgreSQL, set `SWISSKNIFE_DATABASE__URL` to the database connection URL.
-Mount provider certificates and credentials at their configured paths. For local
-JWT authentication, set a strong `SWISSKNIFE_JWT__SECRET` before initial sign-up.
-
-Dashboard `NEXT_PUBLIC_*` settings are compiled into its browser bundle. The
-checked-in production profile targets Numeraire's hosted Auth0 deployment.
-For your own deployment, edit `dashboard/.env.production` with your public API
-and authentication settings before building the bundled or dashboard image;
-changing container environment variables after the build does not change those
-browser settings. See the [dashboard guide](dashboard/README.md).
-
-From a configured source checkout, build the required image:
+The all-in-one image bundles the backend API and dashboard in a single container:
 
 ```bash
-make build-docker            # Backend + static dashboard
-make build-docker-server     # Backend only
-make build-docker-dashboard  # Standalone dashboard
+docker pull bitcoinnumeraire/swissknife:0.3.0
+docker run -p 3000:3000 bitcoinnumeraire/swissknife:0.3.0
 ```
 
-For Kubernetes, the [k8s-infra repository](https://github.com/bitcoin-numeraire/k8s-infra)
-contains the backend and dashboard Helm charts. See the
-[upgrade guide](docs/UPGRADING.md) for coordinated deployment and migration steps.
+This image includes:
+- Rust backend API server
+- Next.js dashboard (static export served by the backend)
+- Default configuration at `/config/default.toml`
 
-## Development
+### Separated Backend and Frontend
 
-Use the Rust toolchain pinned in `rust-toolchain.toml`, Protocol Buffers compiler
-(`protoc`), Docker Compose for integration tests, and Node 24 / Yarn 4 for the
-dashboard.
+For Kubernetes or microservices deployments, use the separated images:
 
+#### Backend Only
 ```bash
-make fmt
-make lint
-make test
-make test-integration-fresh ITEST_DATABASE=postgres ITEST_PROVIDER=cln_rest
+docker pull bitcoinnumeraire/swissknife-server:0.3.0
+docker run -p 3000:3000 bitcoinnumeraire/swissknife-server:0.3.0
 ```
 
-See [contributing](docs/CONTRIBUTING.md) for local setup and checks.
+#### Frontend Only (Standalone Next.js Server)
+```bash
+docker pull bitcoinnumeraire/swissknife-dashboard:0.3.0
+docker run -p 8080:8080 bitcoinnumeraire/swissknife-dashboard:0.3.0
+```
+
+When using separated deployment:
+- Configure the dashboard to point to your backend API endpoint
+- Backend runs without the dashboard (`SWISSKNIFE_DASHBOARD_DIR=""`)
+- Frontend runs as a standalone Node.js server on port 8080
+
+All images support both `linux/amd64` and `linux/arm64` architectures.
 
 ## Documentation
 
-- [Public documentation](https://docs.numeraire.tech/swissknife)
-- [Upgrading to 0.3.0](docs/UPGRADING.md)
-- [Preparing and publishing a release](docs/RELEASING.md)
-- [Dashboard development and configuration](dashboard/README.md)
-- [Database migrations](crates/migration/README.md)
+Extended documentation is available [here](https://docs.numeraire.tech/swissknife)
+
+Developer documentation:
+
+- [Contributing](docs/CONTRIBUTING.md)
 - [Developer guidelines](docs/DEVELOPER_GUIDELINES.md)
-- [Integration tests](tests/itest/README.md)
 - Architecture decisions:
-  - [0001: AppStore, Unit of Work, and wallet reservations](docs/adr/0001-appstore-uow-wallet-reservations.md)
-  - [0002: Identity, assets, and asset-scoped wallets](docs/adr/0002-identity-assets-wallet-model.md)
-  - [0003: Provider fee quotes and fee limits](docs/adr/0003-provider-fee-quotes.md)
-  - [0004: Durable client events and SSE](docs/adr/0004-client-event-outbox.md)
+  - [ADR 0001: AppStore, Unit of Work, and wallet reservations](docs/adr/0001-appstore-uow-wallet-reservations.md)
+  - [ADR 0002: Identity, assets, and asset-scoped wallets](docs/adr/0002-identity-assets-wallet-model.md)
+  - [ADR 0004: Durable client event log and server-sent events](docs/adr/0004-client-event-outbox.md)
 - [Code of conduct](docs/CODE_OF_CONDUCT.md)
+
+## Work In Progress (WIP)
+
+#### Features
+
+- [ ] Webhooks
+- [ ] BOLT12 (offers)
+- [ ] Notifications (Email, SMS by Twilio)
+- [ ] Desktop applications
+
+#### Lightning providers
+
+- [x] [`Core Lightning`](https://corelightning.org/)
+- [x] [`LND`](https://github.com/lightningnetwork/lnd)
+
+#### Smart contracts
+
+- [ ] [RGB](https://rgb.tech/) Smart contracts
+- [ ] [Taproot Assets](https://docs.lightning.engineering/the-lightning-network/taproot-assets) settlement adapter (the asset-scoped wallet model is ready for it).

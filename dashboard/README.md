@@ -52,8 +52,7 @@ BUILD_STATIC_EXPORT=true yarn build  # Static export in out/ for the backend
 
 From the repository root, `make build-docker-dashboard` builds the standalone
 image on port 8080; `make build-docker` bundles the static export with the backend
-on port 3000. See the root [README](../README.md) and
-[upgrade guide](../docs/UPGRADING.md) for deployment.
+on port 3000. See the root [README](../README.md) for deployment.
 
 ## Verification
 

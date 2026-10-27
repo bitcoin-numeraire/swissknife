@@ -1,9 +1,8 @@
 # Preparing and publishing a release
 
 `CHANGELOG.md` is the source of the GitHub release description. Keep release
-entries focused on user-visible behavior, breaking changes, security fixes, and
-upgrade instructions. Documentation, test, and internal refactor changes do not
-need individual changelog entries.
+entries focused on user-visible behavior, breaking changes, and security fixes.
+Documentation, test, and internal refactor changes do not need individual changelog entries.
 
 ## Prepare the release PR
 
@@ -15,13 +14,8 @@ need individual changelog entries.
 3. Set the same version in the root `Cargo.toml`, both workspace crate manifests,
    and `dashboard/package.json`. Refresh `Cargo.lock`, then run `make openapi`
    so the checked-in API document reports that version.
-4. Check the README and upgrade guide against the current configuration and API.
+4. Check the README and documentation against the current configuration and API.
    Run the relevant local checks and require green CI on the release commit.
-5. Rehearse schema changes against a private restored backup. Keep production
-   records, credentials, and generated data snapshots out of the repository,
-   CI artifacts, and release notes.
-
-The `0.3.0` PostgreSQL upgrade procedure is in [UPGRADING.md](UPGRADING.md).
 
 ## Extract the release description
 
@@ -81,5 +75,4 @@ gh release create v0.3.0 --verify-tag --title "0.3.0" \
 ```
 
 The tag workflow publishes images; it does not create the GitHub release or
-deploy production. Update k8s-infra and perform the
-[upgrade checks](UPGRADING.md) after the images are available.
+deploy production. Update k8s-infra after the images are available.

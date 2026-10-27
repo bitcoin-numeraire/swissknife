@@ -28,7 +28,3 @@ DATABASE_URL=postgres://postgres:postgres@localhost:5432/numeraire make generate
 
 Review generated model changes carefully and keep both database engines covered
 by migration or persistence tests.
-
-The 0.3.0 account cutover is irreversible. See the
-[upgrade guide](../../docs/UPGRADING.md) for the supported legacy PostgreSQL
-backfill, backup requirements, API-key ownership preservation, and rollback.

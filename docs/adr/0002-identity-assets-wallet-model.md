@@ -351,8 +351,6 @@ The executable backfill targets the audited production shape:
 These are migration preconditions, not limitations of the target account/asset/wallet model. The
 operator must verify them before deployment; the migrations intentionally contain no synthetic
 identity, provider-selection, or network-inference branches outside this audited shape.
-Legacy SQLite and local-JWT databases need a separate migration assessment; they are not
-covered by this PostgreSQL production backfill.
 
 ### Phase 1: Add identity and asset tables
 

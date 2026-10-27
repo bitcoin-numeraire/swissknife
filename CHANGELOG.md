@@ -31,10 +31,6 @@ release notes when a tag is published.
 
 ### Changed
 
-- **Upgrade:** deploy the matching backend and dashboard, update API
-  integrations, and take a fresh database backup before starting the new backend.
-  See the [upgrade guide](https://github.com/bitcoin-numeraire/swissknife/blob/v0.3.0/docs/UPGRADING.md)
-  for migration requirements, Auth0 permissions, configuration changes, and rollback.
 - **Breaking:** `/v1/me` returns an account. Wallet operations use explicit
   `/v1/me/wallets/{wallet_id}/...` routes, and assets and networks are derived
   from the selected wallet. The legacy wallet-as-user API is removed
