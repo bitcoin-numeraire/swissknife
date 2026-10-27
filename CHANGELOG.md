@@ -52,6 +52,9 @@ release notes when a tag is published.
 
 ### Fixed
 
+- Return the stored CLN Lightning payment and preserve its reservation after an
+  `xpay` error, rather than immediately reporting failure. Even genuine no-route
+  errors can remain pending and require manual reconciliation.
 - Preserve a Lightning payment's original amount when a completion event reports
   a different amount, keeping partial-payment events from settling the full payment
   and releasing its reservation prematurely.
