@@ -87,8 +87,7 @@ make shutdown                  # Stop and remove volumes
 ### Three-Layer Structure (`src/`)
 
 **application/** - Shared application concerns
-- `dtos/` - Data transfer objects for API requests/responses
-- `entities/` - App-wide entities and service wiring
+- `composition/` - Configuration, adapter/service wiring, and shared application ports
 - `errors/` - Error types (ApplicationError, AuthenticationError, etc.)
 - `docs/` - OpenAPI documentation
 
@@ -111,9 +110,9 @@ make shutdown                  # Stop and remove volumes
 ### Configuration
 
 Configuration files in `config/`:
-- `default.toml` - Base configuration
-- `development.toml` - Development overrides
-- `production.toml` - Production overrides
+- `default.toml` - Required base configuration
+- `<RUN_MODE>.toml` - Optional deployment/development overrides
+- `itest.toml` - Integration-test overrides
 
 Environment variable prefix: `SWISSKNIFE_` (e.g., `SWISSKNIFE_DATABASE__URL`)
 
@@ -145,7 +144,7 @@ Configured via `ln_provider` in config:
 
 ## Key Dependencies
 
-- **Rust 1.99.0** (see rust-toolchain.toml)
+- **Rust 1.99.1** (see rust-toolchain.toml)
 - **Axum** - Web framework
 - **Sea-ORM** - Database ORM (SQLite/PostgreSQL)
 - **tokio** - Async runtime
@@ -177,7 +176,7 @@ Configured via `ln_provider` in config:
 ### Architecture
 - Handlers should only handle HTTP concerns; business logic belongs in services
 - Repository traits should be used for data access, not direct database calls in services
-- DTOs should be used for API boundaries; domain entities for internal logic
+- Shared API entities and request/response types live in `crates/swissknife-types`
 - New routes must be documented with utoipa annotations for OpenAPI spec
 - Logging happens in use cases (services) and nowhere else in general except in  
   `infra` for listeners when they do not return errors and at the edges like `axum_response`.

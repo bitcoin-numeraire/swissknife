@@ -338,19 +338,21 @@ Both display as USDT, but they are different assets and therefore different wall
 
 ## Migration strategy
 
-The migration supports SQLite and Postgres and preserves the production wallets, invoices,
-payments, balances, Bitcoin addresses, and Lightning addresses. After this ADR was accepted, the
-production data audit narrowed the executable backfill to the data that actually exists:
+Fresh installations support SQLite and PostgreSQL. The legacy PostgreSQL backfill preserves
+wallets, invoices, payments, balances, Bitcoin addresses, Lightning addresses, and API keys.
+The executable backfill targets the audited production shape:
 
 - every legacy identity is an OAuth2/Auth0 subject;
 - every legacy wallet is native BTC on Bitcoin mainnet;
 - there is no testnet data or mixed-currency wallet data;
-- the legacy API-key table is empty, so the schema changes but no API keys are backfilled; and
+- legacy API keys may exist and are mapped to the accounts of their OAuth2 owners; and
 - no migration-only provider or network configuration is required.
 
 These are migration preconditions, not limitations of the target account/asset/wallet model. The
 operator must verify them before deployment; the migrations intentionally contain no synthetic
-identity, provider-selection, API-key, or network-inference branches outside this audited shape.
+identity, provider-selection, or network-inference branches outside this audited shape.
+Legacy SQLite and local-JWT databases need a separate migration assessment; they are not
+covered by this PostgreSQL production backfill.
 
 ### Phase 1: Add identity and asset tables
 
@@ -358,8 +360,10 @@ identity, provider-selection, API-key, or network-inference branches outside thi
 2. Seed the supported native-BTC network assets.
 3. Backfill one `account` and preference row per distinct `wallet.user_id`.
 4. Backfill one `auth_identity(provider = oauth2, subject = wallet.user_id)` per account.
-5. Add `account_id` to `api_key`; require the legacy table to be empty instead of manufacturing
-   account ownership for unused keys.
+5. Add nullable `account_id` to `api_key`. Before dropping `wallet.user_id`, map each key
+   through `auth_identity(provider = oauth2, subject = api_key.user_id)`, require an owner,
+   then remove the legacy key owner column and its foreign key. Preserve credentials,
+   permissions, expiry, and metadata; fail rather than assign an unknown owner.
 6. Leave account permissions empty because OAuth2 token claims are authoritative.
 
 ### Phase 2: Convert wallet rows into asset wallets
@@ -425,13 +429,13 @@ identity, provider-selection, API-key, or network-inference branches outside thi
 
 ### Migration/backfill tests
 
-Cover the audited production shape on SQLite and Postgres:
+Cover fresh installations on SQLite and PostgreSQL, and the audited legacy PostgreSQL upgrade:
 
 - OAuth2/Auth0 subjects become accounts with identities and preferences;
 - legacy native-BTC mainnet wallets retain available and reserved balances;
 - existing payment, invoice, Bitcoin-address, and Lightning-address relationships remain attached to
   the reused wallet;
-- the migration requires an empty legacy API-key table; and
+- existing API keys retain their credentials, permissions, expiry, metadata, and account owners; and
 - no testnet/provider inference or migration-only environment variables are introduced.
 
 ### Authorization tests

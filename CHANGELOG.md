@@ -8,93 +8,95 @@ release notes when a tag is published.
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-28
+
 ### Added
 
-- Added explicit accounts, authentication identities, account preferences, and
-  an asset catalog. Accounts can own multiple wallets, with each wallet holding
-  exactly one asset on one settlement network ([#297]).
-- Added account-shaped `/v1/me` APIs and wallet-scoped authenticated routes for
-  balances, payments, invoices, Bitcoin addresses, contacts, and API keys
-  ([#319]).
-- Added administrative account CRUD. Accounts created by administrators do not
-  implicitly create a login identity ([#331]).
-- Added an authenticated dashboard account context and header wallet selector;
-  wallet-scoped pages now use an explicit persisted wallet selection instead of
-  inferring the first wallet ([#326]).
-- Added administrative account CRUD and permission grant APIs, including
-  aggregate deletion of wallets and API keys ([#327]).
-- Added black-box account lifecycle, concurrent provisioning, explicit wallet
-  routing, and cross-network balance isolation coverage ([#329]).
-- Added lightweight wallets with asset, balance, and Lightning Address metadata
-  to account responses ([#335]).
+- Accounts with authentication identities, preferences, and multiple
+  asset-scoped wallets. Administrative account and wallet directories support
+  account creation and permission management
+  ([#297](https://github.com/bitcoin-numeraire/swissknife/issues/297),
+  [#331](https://github.com/bitcoin-numeraire/swissknife/pull/331),
+  [#342](https://github.com/bitcoin-numeraire/swissknife/pull/342)).
+- Payment fee quotes for Lightning, on-chain, and internal transfers. Lightning
+  quotes distinguish the estimated fee from the provider-enforced maximum
+  ([#345](https://github.com/bitcoin-numeraire/swissknife/pull/345)).
+- Durable account settlement events over server-sent events, with reconnect
+  replay and live dashboard balance and transaction updates
+  ([#347](https://github.com/bitcoin-numeraire/swissknife/pull/347),
+  [#353](https://github.com/bitcoin-numeraire/swissknife/pull/353)).
+- LNURL success actions retained through settlement
+  ([#346](https://github.com/bitcoin-numeraire/swissknife/pull/346)).
+- Password changes for the local JWT owner account.
 
 ### Changed
 
-- Replaced the legacy wallet-as-user contract with account-owned, asset-scoped
-  wallets. Payments and invoices now derive their asset and network from the
-  selected wallet, without legacy currency fallbacks ([#314], [#315], [#317],
-  [#318], [#320], [#321]).
-- Renamed internal user-as-account modules, handlers, generated operations, and
-  dashboard actions to the account vocabulary. `User` now refers only to the
-  authenticated runtime principal ([#330]).
-- Account-scoped wallet child routes now use a lightweight ownership check
-  before loading their resource collections ([#328]).
-
-- Migrated CLN Lightning payments from the deprecated `pay` RPC to `xpay`, and
-  refreshed the vendored CLN and LND gRPC protos to CLN v26.06 and LND v0.21
-  ([#282]).
-- Replaced the CLN `maxfeepercent` and `payment_exemptfee` settings with a single
-  absolute `maxfee` (msat); when left unset, the node applies its own default
-  ([#282]).
-- Upgraded backend and dashboard dependencies to their latest compatible
-  versions, including `lnurl-rs`, `tower-http`, and `mockall` on the backend and
-  the MUI, Next.js, and toolchain packages on the dashboard ([#324]).
+- **Upgrade:** deploy the matching backend and dashboard, update API
+  integrations, and take a fresh database backup before starting the new backend.
+  See the [upgrade guide](https://github.com/bitcoin-numeraire/swissknife/blob/v0.3.0/docs/UPGRADING.md)
+  for migration requirements, Auth0 permissions, configuration changes, and rollback.
+- **Breaking:** `/v1/me` returns an account. Wallet operations use explicit
+  `/v1/me/wallets/{wallet_id}/...` routes, and assets and networks are derived
+  from the selected wallet. The legacy wallet-as-user API is removed
+  ([#319](https://github.com/bitcoin-numeraire/swissknife/pull/319),
+  [#321](https://github.com/bitcoin-numeraire/swissknife/pull/321)).
+- Redesigned wallet, activity, identity, settings, and administration views,
+  with a persisted wallet selector and improved mobile payment and receive flows.
+- Core Lightning payments use `xpay`. Absolute provider fee limits replace the
+  old `fee_buffer`, `maxfeepercent`, and `payment_exemptfee` settings
+  ([#282](https://github.com/bitcoin-numeraire/swissknife/pull/282),
+  [#345](https://github.com/bitcoin-numeraire/swissknife/pull/345)).
 
 ### Fixed
 
-- Credit the received amount when CLN gRPC replays paid invoices after a restart
-  or reconnect, instead of recording settlement with a zero wallet credit.
-- Return the stored CLN Lightning payment and preserve its reservation after an
-  `xpay` error, rather than immediately reporting failure. Even genuine no-route
-  errors can remain pending and require manual reconciliation.
-- Preserve a Lightning payment's original amount when a completion event reports
-  a different amount, keeping partial-payment events from settling the full payment
-  and releasing its reservation prematurely.
-- Keep LND Lightning payments pending and their funds reserved when the send
-  response does not establish a final outcome. Return the stored payment instead
-  of marking it failed; explicit terminal failures still release reserved funds.
-  Dashboard send confirmations now distinguish pending, settled, and failed payments.
-- Keep on-chain payments pending and their funds reserved when a broadcast
-  reply is lost or submission otherwise has an unknown outcome, rather than
-  reporting failure and making the same balance spendable again. Transactions
-  that were not broadcast may require manual reconciliation.
-- Bound LNURL metadata and invoice callback responses to 256 KiB and each HTTP
-  fetch to 10 seconds (3 seconds to connect), rejecting oversized or slow
-  services before payment reservation.
-- Reject external on-chain fee quotes and sends before preparing a transaction
-  when the selected wallet cannot cover the payment amount. Sends still reserve
-  the final amount and fee atomically after preparation.
-- Reject administrative bulk deletes with HTTP 400 without an effective row-selection filter;
-  pagination and query-only options no longer permit unscoped deletion.
-- Hide generated receive QR codes and copy/share actions when the amount, memo,
-  or expiry changes, until the request is refreshed or the original values are restored.
-- Expired Unified requests now require an explicit on-chain selection before
-  fee estimation or sending, using the on-chain request's own amount instead of
-  submitting the expired Lightning invoice.
-- Made concurrent local sign-up return one success and deterministic conflicts
-  instead of leaking database uniqueness errors as HTTP 500 responses ([#329]).
-- Rejected Lightning invoice creation when the selected wallet's native BTC
-  network does not match the configured node network ([#329]).
-- Fixed CLN REST Lightning payments charging the routing fee twice for payments
-  that incur a non-zero fee ([#282]).
+- Preserve pending payments and their reservations when Lightning sends or
+  on-chain broadcasts have an unknown outcome. Dashboard confirmations now
+  distinguish pending, settled, and failed payments
+  ([#374](https://github.com/bitcoin-numeraire/swissknife/pull/374),
+  [#375](https://github.com/bitcoin-numeraire/swissknife/pull/375),
+  [#380](https://github.com/bitcoin-numeraire/swissknife/pull/380)).
+- Credit recovered CLN invoices and retry deposits after transient database
+  failures. LND node self-transfers to registered deposit addresses now credit
+  the receiving wallet
+  ([#316](https://github.com/bitcoin-numeraire/swissknife/pull/316),
+  [#369](https://github.com/bitcoin-numeraire/swissknife/pull/369),
+  [#380](https://github.com/bitcoin-numeraire/swissknife/pull/380)).
+- Preserve original Lightning payment amounts when completion events report
+  partial or different amounts, avoiding premature settlement and release of funds
+  ([#376](https://github.com/bitcoin-numeraire/swissknife/pull/376)).
+- Correct CLN REST routing-fee accounting and settlement when actual fees exceed
+  the reservation
+  ([#282](https://github.com/bitcoin-numeraire/swissknife/pull/282),
+  [#313](https://github.com/bitcoin-numeraire/swissknife/pull/313)).
+- Validate internal BOLT11 payments against the issued invoice's amount and signature
+  ([#365](https://github.com/bitcoin-numeraire/swissknife/pull/365)).
+- Reject on-chain quotes and sends before preparing a transaction when the wallet
+  cannot cover the payment amount; discard stale dashboard fee estimates
+  ([#358](https://github.com/bitcoin-numeraire/swissknife/pull/358),
+  [#371](https://github.com/bitcoin-numeraire/swissknife/pull/371)).
+- Keep receive QR codes consistent with their amount, memo, and expiry. Expired
+  Unified requests require explicit on-chain selection before sending
+  ([#367](https://github.com/bitcoin-numeraire/swissknife/pull/367),
+  [#368](https://github.com/bitcoin-numeraire/swissknife/pull/368)).
+- Reject administrative bulk deletes without an effective row-selection filter
+  with HTTP 400
+  ([#370](https://github.com/bitcoin-numeraire/swissknife/pull/370)).
+- Bound external LNURL responses to 256 KiB and each fetch to 10 seconds
+  ([#372](https://github.com/bitcoin-numeraire/swissknife/pull/372)).
+- Return deterministic conflicts for concurrent local sign-up and reject invoice
+  creation through a wallet on the wrong Bitcoin network
+  ([#334](https://github.com/bitcoin-numeraire/swissknife/pull/334)).
 
 ### Security
 
-- Switch JWT cryptography to AWS-LC, removing the vulnerable `crypto-bigint`
-  dependency (RUSTSEC-2026-0387) and the obsolete RSA audit exception.
-- Updated `bcrypt` to 0.19.2, fixing a panic in `bcrypt::verify` on non-ASCII
-  hash input (RUSTSEC-2026-0199), and moved the `bitcoin` crate off the yanked
-  0.32.100 release ([#324]).
+- Replace the vulnerable JWT cryptography backend with AWS-LC and remove the
+  obsolete RSA audit exception
+  ([#376](https://github.com/bitcoin-numeraire/swissknife/pull/376)).
+- Update password-hashing, TLS, application dependencies, and container runtimes
+  to address security advisories
+  ([#322](https://github.com/bitcoin-numeraire/swissknife/pull/322),
+  [#324](https://github.com/bitcoin-numeraire/swissknife/pull/324),
+  [#363](https://github.com/bitcoin-numeraire/swissknife/pull/363)).
 
 ## [0.2.0] - 2026-06-18
 
@@ -138,7 +140,8 @@ release notes when a tag is published.
 
 - Removed blink on the login page ([#175]).
 
-[Unreleased]: https://github.com/bitcoin-numeraire/swissknife/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/bitcoin-numeraire/swissknife/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/bitcoin-numeraire/swissknife/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/bitcoin-numeraire/swissknife/compare/v0.1.8...v0.2.0
 [0.1.8]: https://github.com/bitcoin-numeraire/swissknife/releases/tag/v0.1.8
 [#175]: https://github.com/bitcoin-numeraire/swissknife/pull/175
@@ -164,18 +167,8 @@ release notes when a tag is published.
 [#276]: https://github.com/bitcoin-numeraire/swissknife/pull/276
 [#282]: https://github.com/bitcoin-numeraire/swissknife/pull/282
 [#297]: https://github.com/bitcoin-numeraire/swissknife/issues/297
-[#314]: https://github.com/bitcoin-numeraire/swissknife/pull/314
-[#315]: https://github.com/bitcoin-numeraire/swissknife/pull/315
-[#317]: https://github.com/bitcoin-numeraire/swissknife/pull/317
-[#318]: https://github.com/bitcoin-numeraire/swissknife/pull/318
 [#319]: https://github.com/bitcoin-numeraire/swissknife/pull/319
-[#320]: https://github.com/bitcoin-numeraire/swissknife/pull/320
 [#321]: https://github.com/bitcoin-numeraire/swissknife/pull/321
 [#324]: https://github.com/bitcoin-numeraire/swissknife/pull/324
-[#326]: https://github.com/bitcoin-numeraire/swissknife/issues/326
-[#327]: https://github.com/bitcoin-numeraire/swissknife/issues/327
-[#328]: https://github.com/bitcoin-numeraire/swissknife/issues/328
-[#329]: https://github.com/bitcoin-numeraire/swissknife/issues/329
-[#330]: https://github.com/bitcoin-numeraire/swissknife/issues/330
 [#331]: https://github.com/bitcoin-numeraire/swissknife/pull/331
 [398e89f]: https://github.com/bitcoin-numeraire/swissknife/commit/398e89f

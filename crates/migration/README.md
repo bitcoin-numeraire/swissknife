@@ -7,8 +7,12 @@ path.
 ```bash
 make new-migration name=add-account-field
 make run-migrations
-make fresh-migrations
 ```
+
+Set `DATABASE_URL` for the migration CLI. The backend uses
+`SWISSKNIFE_DATABASE__URL` and runs pending migrations automatically on startup.
+`make fresh-migrations` drops and recreates tables; use it only on disposable
+development databases.
 
 `make new-migration` generates the timestamped file and registers the normal
 SeaORM skeleton. Implement the migration under `crates/migration/src/`, then add
@@ -24,3 +28,7 @@ DATABASE_URL=postgres://postgres:postgres@localhost:5432/numeraire make generate
 
 Review generated model changes carefully and keep both database engines covered
 by migration or persistence tests.
+
+The 0.3.0 account cutover is irreversible. See the
+[upgrade guide](../../docs/UPGRADING.md) for the supported legacy PostgreSQL
+backfill, backup requirements, API-key ownership preservation, and rollback.
