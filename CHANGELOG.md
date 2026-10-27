@@ -52,6 +52,9 @@ release notes when a tag is published.
 
 ### Fixed
 
+- Preserve a Lightning payment's original amount when a completion event reports
+  a different amount, keeping partial-payment events from settling the full payment
+  and releasing its reservation prematurely.
 - Keep LND Lightning payments pending and their funds reserved when the send
   response does not establish a final outcome. Return the stored payment instead
   of marking it failed; explicit terminal failures still release reserved funds.
@@ -82,6 +85,8 @@ release notes when a tag is published.
 
 ### Security
 
+- Switch JWT cryptography to AWS-LC, removing the vulnerable `crypto-bigint`
+  dependency (RUSTSEC-2026-0387) and the obsolete RSA audit exception.
 - Updated `bcrypt` to 0.19.2, fixing a panic in `bcrypt::verify` on non-ASCII
   hash input (RUSTSEC-2026-0199), and moved the `bitcoin` crate off the yanked
   0.32.100 release ([#324]).

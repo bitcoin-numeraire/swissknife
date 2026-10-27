@@ -84,6 +84,16 @@ impl EventUseCases for EventService {
         let payment_option = self.store.payment.find_by_payment_hash(&event.payment_hash).await?;
 
         if let Some(mut payment_retrieved) = payment_option {
+            if event.amount_msat != payment_retrieved.amount_msat {
+                debug!(
+                    id = %payment_retrieved.id,
+                    expected_amount_msat = payment_retrieved.amount_msat,
+                    reported_amount_msat = event.amount_msat,
+                    "Ignoring Lightning completion with a different principal"
+                );
+                return Ok(());
+            }
+
             if payment_retrieved.status == PaymentStatus::Settled {
                 let payment_id = payment_retrieved.id;
                 let has_unprocessed_action = payment_retrieved.lightning.as_ref().is_some_and(|lightning| {
@@ -99,7 +109,6 @@ impl EventUseCases for EventService {
 
             payment_retrieved.status = PaymentStatus::Settled;
             payment_retrieved.payment_time = Some(event.payment_time);
-            payment_retrieved.amount_msat = event.amount_msat;
             payment_retrieved.fee_msat = Some(event.fees_msat);
             Self::project_lightning_settlement(&mut payment_retrieved, &event);
 
@@ -328,6 +337,150 @@ mod tests {
             }
         }
 
+        mod when_completion_is_partial {
+            use super::*;
+
+            #[tokio::test]
+            async fn ignores_it_without_releasing_the_reservation() {
+                let mut store = MockAppStoreBuilder::new();
+                store
+                    .payment
+                    .expect_find_by_payment_hash()
+                    .withf(|hash| hash == "ph")
+                    .times(1)
+                    .returning(|_| {
+                        Ok(Some(Payment {
+                            amount_msat: 1_000,
+                            reserved_amount: 1_100,
+                            status: PaymentStatus::Pending,
+                            ..Default::default()
+                        }))
+                    });
+                store.payment_uow.expect_settle().times(0);
+                store.payment_uow.expect_fail().times(0);
+                store.payment.expect_update().times(0);
+
+                let partial = LnPaySuccessEvent {
+                    amount_msat: 333,
+                    ..event()
+                };
+
+                assert!(service(store).outgoing_payment(partial).await.is_ok());
+            }
+        }
+
+        mod when_completion_principal_differs {
+            use super::*;
+
+            #[tokio::test]
+            async fn leaves_payment_and_success_action_unchanged() {
+                for status in [PaymentStatus::Pending, PaymentStatus::Failed, PaymentStatus::Settled] {
+                    for amount_msat in [0, 333, 1_001] {
+                        let status = status.clone();
+                        let mut store = MockAppStoreBuilder::new();
+                        store
+                            .payment
+                            .expect_find_by_payment_hash()
+                            .times(1)
+                            .returning(move |_| {
+                                Ok(Some(Payment {
+                                    amount_msat: 1_000,
+                                    reserved_amount: 1_100,
+                                    status: status.clone(),
+                                    lightning: Some(LnPayment {
+                                        raw_success_action: Some(LnUrlPaySuccessAction::Message {
+                                            message: "Thanks".to_string(),
+                                        }),
+                                        ..Default::default()
+                                    }),
+                                    ..Default::default()
+                                }))
+                            });
+                        store.payment_uow.expect_settle().times(0);
+                        store.payment_uow.expect_fail().times(0);
+                        store.payment.expect_update().times(0);
+
+                        let completion = LnPaySuccessEvent { amount_msat, ..event() };
+
+                        assert!(service(store).outgoing_payment(completion).await.is_ok());
+                    }
+                }
+            }
+        }
+
+        mod when_matching_completion_follows_a_part {
+            use super::*;
+
+            #[tokio::test]
+            async fn settles_only_the_matching_principal_and_fee() {
+                let mut store = MockAppStoreBuilder::new();
+                let payment_id = Uuid::new_v4();
+                store
+                    .payment
+                    .expect_find_by_payment_hash()
+                    .times(2)
+                    .returning(move |_| {
+                        Ok(Some(Payment {
+                            id: payment_id,
+                            amount_msat: 1_000,
+                            reserved_amount: 1_100,
+                            status: PaymentStatus::Pending,
+                            ..Default::default()
+                        }))
+                    });
+                store
+                    .payment_uow
+                    .expect_settle()
+                    .withf(move |payment| {
+                        payment.id == payment_id
+                            && payment.amount_msat == 1_000
+                            && payment.fee_msat == Some(10)
+                            && payment.reserved_amount == 1_100
+                            && payment.status == PaymentStatus::Settled
+                    })
+                    .times(1)
+                    .returning(Ok);
+                store.payment_uow.expect_fail().times(0);
+                store.payment.expect_update().times(0);
+                let service = service(store);
+
+                assert!(service
+                    .outgoing_payment(LnPaySuccessEvent {
+                        amount_msat: 333,
+                        fees_msat: 3,
+                        ..event()
+                    })
+                    .await
+                    .is_ok());
+                assert!(service
+                    .outgoing_payment(LnPaySuccessEvent {
+                        fees_msat: 10,
+                        ..event()
+                    })
+                    .await
+                    .is_ok());
+            }
+        }
+
+        mod when_payment_read_fails {
+            use super::*;
+
+            #[tokio::test]
+            async fn propagates_the_error_without_mutation() {
+                let mut store = MockAppStoreBuilder::new();
+                store.payment.expect_find_by_payment_hash().times(1).returning(|_| {
+                    Err(crate::application::errors::DatabaseError::FindOne(
+                        "unavailable".to_string(),
+                    ))
+                });
+                store.payment_uow.expect_settle().times(0);
+                store.payment_uow.expect_fail().times(0);
+                store.payment.expect_update().times(0);
+
+                assert!(service(store).outgoing_payment(event()).await.is_err());
+            }
+        }
+
         mod when_payment_is_pending {
             use super::*;
 
@@ -336,6 +489,7 @@ mod tests {
                 let mut store = MockAppStoreBuilder::new();
                 store.payment.expect_find_by_payment_hash().times(1).returning(|_| {
                     Ok(Some(Payment {
+                        amount_msat: 1_000,
                         status: PaymentStatus::Pending,
                         ..Default::default()
                     }))
@@ -345,6 +499,8 @@ mod tests {
                     .expect_settle()
                     .withf(|payment| {
                         payment.status == PaymentStatus::Settled
+                            && payment.amount_msat == 1_000
+                            && payment.fee_msat == Some(1)
                             && payment
                                 .lightning
                                 .as_ref()
@@ -362,6 +518,7 @@ mod tests {
                 let mut store = MockAppStoreBuilder::new();
                 store.payment.expect_find_by_payment_hash().times(1).returning(|_| {
                     Ok(Some(Payment {
+                        amount_msat: 1_000,
                         status: PaymentStatus::Pending,
                         lightning: Some(LnPayment {
                             raw_success_action: Some(LnUrlPaySuccessAction::Message {
@@ -398,6 +555,7 @@ mod tests {
                 let mut store = MockAppStoreBuilder::new();
                 store.payment.expect_find_by_payment_hash().times(1).returning(|_| {
                     Ok(Some(Payment {
+                        amount_msat: 1_000,
                         status: PaymentStatus::Settled,
                         ..Default::default()
                     }))
@@ -412,6 +570,7 @@ mod tests {
                 let mut store = MockAppStoreBuilder::new();
                 store.payment.expect_find_by_payment_hash().times(1).returning(|_| {
                     Ok(Some(Payment {
+                        amount_msat: 1_000,
                         status: PaymentStatus::Settled,
                         lightning: Some(LnPayment {
                             raw_success_action: Some(LnUrlPaySuccessAction::Message {

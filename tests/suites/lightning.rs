@@ -120,13 +120,14 @@ mod send {
             fee as u64 <= quote.maximum_fee_msat,
             "settled fee stays within the quoted cap"
         );
-        let after = app.wallet_balance(token, wallet.id).await.available_msat;
+        let balance = app.wallet_balance(token, wallet.id).await;
+        assert_eq!(balance.reserved_msat, 0, "settlement releases the full reservation");
+        let after = balance.available_msat;
         assert_eq!(
             after,
             before - amount_msat as i64 - fee,
             "wallet should be debited by amount + fee (before={before}, fee={fee})"
         );
-        assert_eq!(app.wallet_balance(token, wallet.id).await.reserved_msat, 0);
         let persisted = app
             .api()
             .get(&format!("/v1/payments/{}", payment.id), Auth::Bearer(token))
