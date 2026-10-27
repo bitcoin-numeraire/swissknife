@@ -11,6 +11,44 @@ impl MigrationTrait for Migration {
             return Ok(());
         }
 
+        // Legacy API keys reference wallet.user_id. Backfill their account owners
+        // before dropping that foreign key and the legacy wallet owner column.
+        let db = manager.get_connection();
+        let legacy_api_keys = manager.has_column("api_key", "user_id").await?;
+        if legacy_api_keys {
+            db.execute_unprepared(
+                r#"
+                UPDATE api_key
+                SET account_id = auth_identity.account_id
+                FROM auth_identity
+                WHERE api_key.account_id IS NULL
+                  AND auth_identity.provider = 'oauth2'
+                  AND auth_identity.subject = api_key.user_id
+                "#,
+            )
+            .await?;
+        }
+
+        let missing = db
+            .query_one_raw(Statement::from_string(
+                DatabaseBackend::Postgres,
+                "SELECT COUNT(*) AS count FROM api_key WHERE account_id IS NULL".to_string(),
+            ))
+            .await?
+            .ok_or_else(|| DbErr::Migration("API-key ownership count returned no row".to_string()))?
+            .try_get::<i64>("", "count")?;
+        if missing != 0 {
+            return Err(DbErr::Migration(format!(
+                "{missing} API keys have no account owner; refusing to finalize ownership"
+            )));
+        }
+
+        db.execute_unprepared("ALTER TABLE api_key ALTER COLUMN account_id SET NOT NULL")
+            .await?;
+        if legacy_api_keys {
+            db.execute_unprepared("ALTER TABLE api_key DROP COLUMN user_id").await?;
+        }
+
         manager
             .get_connection()
             .execute_raw(Statement::from_string(

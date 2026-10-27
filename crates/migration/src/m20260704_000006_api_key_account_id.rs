@@ -17,7 +17,7 @@ impl MigrationTrait for Migration {
             .alter_table(
                 Table::alter()
                     .table(ApiKey::Table)
-                    .add_column(uuid(ApiKey::AccountId))
+                    .add_column(uuid_null(ApiKey::AccountId))
                     .to_owned(),
             )
             .await?;
