@@ -9,7 +9,7 @@ use uuid::Uuid;
 use crate::{
     application::{
         composition::{AppStore, Ledger},
-        errors::{ApplicationError, DataError, LightningError},
+        errors::{ApplicationError, BitcoinError, DataError, LightningError},
     },
     domains::{
         asset::{Protocol, NATIVE_ASSET_REF},
@@ -315,10 +315,10 @@ impl PaymentService {
                         self.store.payment.update(updated_payment).await?;
                     }
                 }
-                Err(error) => {
+                Err(error @ BitcoinError::FinalizeTransaction(_)) => {
                     if let Err(err) = self.bitcoin_wallet.release_prepared_transaction(&prepared_tx).await {
                         warn!(txid = prepared_tx.txid, %err,
-                            "Failed while signing and sending. Please release the tx manually or wait for lease expiration.");
+                            "Failed before broadcast. Please release the tx manually or wait for lease expiration.");
                     }
 
                     let mut failed_payment = pending_payment.clone();
@@ -327,6 +327,10 @@ impl PaymentService {
                     self.store.payment_uow.fail(failed_payment).await?;
 
                     return Err(error.into());
+                }
+                Err(error) => {
+                    warn!(payment_id = %pending_payment.id, txid = prepared_tx.txid, %error,
+                        "On-chain submission outcome unknown; keeping payment pending and funds reserved");
                 }
             };
 
@@ -2038,6 +2042,76 @@ mod tests {
                     .unwrap_err();
 
                 assert!(matches!(err, ApplicationError::Data(DataError::InsufficientFunds(_))));
+            }
+        }
+
+        mod when_broadcast_outcome_is_unknown {
+            use super::*;
+
+            #[tokio::test]
+            async fn returns_the_original_pending_payment_without_releasing_funds_or_inputs() {
+                let wallet_id = Uuid::new_v4();
+                let payment_id = Uuid::new_v4();
+                let mut store = MockAppStoreBuilder::new();
+                store
+                    .wallet
+                    .expect_get_balance()
+                    .withf(move |id| *id == wallet_id)
+                    .times(1)
+                    .returning(|_| {
+                        Ok(crate::domains::wallet::Balance {
+                            available_msat: 2_000_000,
+                            ..Default::default()
+                        })
+                    });
+                store
+                    .btc_address
+                    .expect_find_by_address()
+                    .times(1)
+                    .returning(|_| Ok(None));
+                store
+                    .payment_uow
+                    .expect_reserve()
+                    .withf(move |payment, reserve_amount| {
+                        payment.wallet_id == wallet_id
+                            && payment.status == PaymentStatus::Pending
+                            && *reserve_amount == payment.amount_msat + payment.fee_msat.unwrap()
+                    })
+                    .times(1)
+                    .returning(move |mut payment, reserve_amount| {
+                        payment.id = payment_id;
+                        payment.reserved_amount = reserve_amount;
+                        Ok(payment)
+                    });
+                store.payment_uow.expect_fail().never();
+                store.payment.expect_update().never();
+
+                let mut wallet = MockBitcoinWallet::new();
+                wallet
+                    .expect_prepare_transaction()
+                    .times(1)
+                    .returning(|_, _, _| Ok(prepared_tx()));
+                wallet
+                    .expect_sign_send_transaction()
+                    .withf(|prepared| prepared.txid == "txid")
+                    .times(1)
+                    .returning(|_| Err(BitcoinError::BroadcastTransaction("response lost".to_string())));
+                wallet.expect_release_prepared_transaction().never();
+                wallet.expect_get_transaction().never();
+
+                let service = service(store, MockLnClient::new(), wallet, MockEventUseCases::new());
+                let payment = service
+                    .send_bitcoin(bitcoin_data(Some(1_000)), None, None, wallet_id)
+                    .await
+                    .unwrap();
+
+                assert_eq!(payment.id, payment_id);
+                assert_eq!(payment.wallet_id, wallet_id);
+                assert_eq!(payment.status, PaymentStatus::Pending);
+                assert_eq!(payment.ledger, Ledger::Onchain);
+                assert_eq!(payment.reserved_amount, payment.amount_msat + payment.fee_msat.unwrap());
+                assert_eq!(payment.bitcoin.unwrap().txid, "txid");
+                assert!(payment.error.is_none());
             }
         }
 

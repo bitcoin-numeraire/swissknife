@@ -435,7 +435,7 @@ impl BitcoinWallet for ClnGrpcClient {
         client
             .tx_send(TxsendRequest { txid })
             .await
-            .map_err(|e| BitcoinError::FinalizeTransaction(e.message().to_string()))?
+            .map_err(|e| BitcoinError::BroadcastTransaction(e.message().to_string()))?
             .into_inner();
 
         Ok(None)
