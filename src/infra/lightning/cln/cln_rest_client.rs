@@ -244,7 +244,7 @@ impl LnClient for ClnRestClient {
                 },
             )
             .await
-            .map_err(|e| LightningError::Pay(e.to_string()))?;
+            .map_err(|e| LightningError::PaymentOutcomeUnknown(e.to_string()))?;
 
         Ok(response.into())
     }
