@@ -136,6 +136,9 @@ runs `tests/providers.rs`. This Lightning-only contract shares the account,
 auth, permissions, invoice and LNURL suites, tests sends and restart replay,
 and explicitly asserts that unsupported on-chain operations fail. The existing
 LND/CLN cells continue to run the full `tests/api.rs` suite.
+LDK also peers with CLN for gossip and waits for both directional LND/CLN
+routing policies. It has no direct CLN channel, so the fee test still routes
+through LND and verifies a real forwarding fee.
 
 `tests/itest/scripts/test-wavelength-client.sh` builds the pinned wallet-enabled
 `waved` image and runs the independent crate's authenticated RPC tests. This is
