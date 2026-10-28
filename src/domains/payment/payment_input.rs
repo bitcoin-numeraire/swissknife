@@ -48,6 +48,7 @@ pub struct ParsedBolt11Invoice {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct LnPaymentTarget {
+    pub bolt11: String,
     pub destination: Vec<u8>,
     pub amount_msat: u64,
     pub final_cltv_delta: u32,

@@ -2,6 +2,12 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum LightningError {
+    #[error("Unsupported Lightning operation: {0}")]
+    Unsupported(&'static str),
+
+    #[error("Invalid Lightning fee quote: {0}")]
+    InvalidQuote(String),
+
     #[error("Failed to parse config: {0}")]
     ParseConfig(String),
 

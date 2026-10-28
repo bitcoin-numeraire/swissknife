@@ -30,6 +30,7 @@ pub struct Model {
     pub reserved_amount: i64,
     #[sea_orm(column_type = "JsonBinary", nullable)]
     pub raw_success_action: Option<Json>,
+    pub authorized_fee_msat: Option<i64>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

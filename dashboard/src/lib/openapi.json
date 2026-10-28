@@ -9043,7 +9043,7 @@
               "null"
             ],
             "format": "int32",
-            "description": "Expiration time in seconds",
+            "description": "Optional expiration time in seconds. Omit to use the installation's\nconfigured duration or its explicitly selected provider expiry policy.",
             "minimum": 0
           },
           "wallet_id": {

@@ -9,6 +9,10 @@ binary macaroon and positive connect/request timeouts. Credential-bearing
 configuration deliberately has no Debug implementation. The client is cloneable
 and shares its HTTP/2 channel. All wallet lifecycle, receive, prepare/send,
 balance, history, inspection, stream and exit methods use upstream wire types.
+Public daemon-owned swap reads expose `QuotePay` without allocating a prepared
+intent, `GetSwap` by stable payment hash, and the server-authoritative credit
+snapshot. `ListCredits` has no cursor; an absent operation is not evidence of
+failure. These APIs use the same verified transport, authentication and deadlines.
 
 Unary calls have local deadlines. Streaming has an establishment deadline and
 continues past the unary timeout. No RPC is retried automatically. A failed

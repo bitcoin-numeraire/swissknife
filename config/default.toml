@@ -1,4 +1,5 @@
 # App
+# Use "provider" only to explicitly accept a daemon-chosen invoice expiry.
 invoice_expiry = "12h"
 domain = "numeraire.tech"
 host = "https://api.numeraire.tech"
@@ -107,3 +108,19 @@ sqlx_logging = false
 # SQLite-only: how long a writer waits for the lock before failing with SQLITE_BUSY.
 # Ignored for Postgres.
 busy_timeout = "10s"
+
+# Opt-in Wavelength wallet provider. Initialize/unlock waved separately first.
+# Select ln_provider="wavelength" and invoice_expiry="provider". LNURL receive
+# description hashes and asynchronous on-chain support remain required before
+# this provider can become the default.
+[wavelength_config]
+endpoint = "https://127.0.0.1:10029"
+cert_path = "data/wavelength/tls.cert"
+macaroon_path = "data/wavelength/admin.macaroon"
+fee_limit_msat = 25000
+allow_server_credit = false
+request_timeout = "30s"
+payment_timeout = "30s"
+poll_interval = "1s"
+activity_page_size = 100
+activity_max_pages = 1000

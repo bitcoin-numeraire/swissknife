@@ -21,6 +21,12 @@ pub mod rpc {
     tonic::include_proto!("wavewalletrpc");
 }
 
+/// Public, daemon-owned swap read APIs, pinned alongside the wallet contract.
+#[allow(clippy::all)]
+pub mod swaps {
+    tonic::include_proto!("swapclientrpc");
+}
+
 /// Configuration contains credential bytes and intentionally does not implement
 /// `Debug`. Supply the daemon CA/leaf certificate and the **binary** macaroon.
 pub struct Config {
@@ -63,6 +69,7 @@ type AuthenticatedChannel = InterceptedService<Channel, Macaroon>;
 pub struct Client {
     wallet: rpc::wallet_service_client::WalletServiceClient<AuthenticatedChannel>,
     inspection: rpc::wallet_inspection_service_client::WalletInspectionServiceClient<AuthenticatedChannel>,
+    swaps: swaps::swap_client_service_client::SwapClientServiceClient<AuthenticatedChannel>,
     request_timeout: Duration,
 }
 
@@ -112,11 +119,54 @@ impl Client {
                 Macaroon(macaroon.clone()),
             ),
             inspection: rpc::wallet_inspection_service_client::WalletInspectionServiceClient::with_interceptor(
+                channel.clone(),
+                Macaroon(macaroon.clone()),
+            ),
+            swaps: swaps::swap_client_service_client::SwapClientServiceClient::with_interceptor(
                 channel,
                 Macaroon(macaroon),
             ),
             request_timeout: config.request_timeout,
         })
+    }
+
+    /// Read-only quote: unlike PrepareSend, this allocates no intent or credit
+    /// earmark. No RPC is retried automatically.
+    pub async fn quote_pay(&self, input: swaps::QuotePayRequest) -> Result<swaps::QuotePayResponse, Error> {
+        let mut request = Request::new(input);
+        request.set_timeout(self.request_timeout);
+        Ok(
+            tokio::time::timeout(self.request_timeout, self.swaps.clone().quote_pay(request))
+                .await
+                .map_err(|_| Error::Timeout)??
+                .into_inner(),
+        )
+    }
+
+    /// Fetch one persisted swap by its stable payment hash, independent of the
+    /// inspection service's capped recent-activity window.
+    pub async fn get_swap(&self, input: swaps::GetSwapRequest) -> Result<swaps::GetSwapResponse, Error> {
+        let mut request = Request::new(input);
+        request.set_timeout(self.request_timeout);
+        Ok(
+            tokio::time::timeout(self.request_timeout, self.swaps.clone().get_swap(request))
+                .await
+                .map_err(|_| Error::Timeout)??
+                .into_inner(),
+        )
+    }
+
+    /// Read the server-authoritative credit snapshot. The public API has a
+    /// limit but no cursor: an absent operation is never proof of failure.
+    pub async fn list_credits(&self, input: swaps::ListCreditsRequest) -> Result<swaps::ListCreditsResponse, Error> {
+        let mut request = Request::new(input);
+        request.set_timeout(self.request_timeout);
+        Ok(
+            tokio::time::timeout(self.request_timeout, self.swaps.clone().list_credits(request))
+                .await
+                .map_err(|_| Error::Timeout)??
+                .into_inner(),
+        )
     }
 
     unary! {

@@ -25,7 +25,7 @@ const DEFAULT_INVOICE_DESCRIPTION: &str = "Numeraire Invoice";
 pub struct InvoiceService {
     store: AppStore,
     ln_client: Arc<dyn LnClient>,
-    invoice_expiry: u32,
+    invoice_expiry: Option<u32>,
     events: Arc<dyn EventUseCases>,
     network: BtcNetwork,
 }
@@ -34,7 +34,7 @@ impl InvoiceService {
     pub fn new(
         store: AppStore,
         ln_client: Arc<dyn LnClient>,
-        invoice_expiry: u32,
+        invoice_expiry: Option<u32>,
         events: Arc<dyn EventUseCases>,
         network: BtcNetwork,
     ) -> Self {
@@ -91,7 +91,7 @@ impl InvoiceUseCases for InvoiceService {
                 amount,
                 description.unwrap_or(DEFAULT_INVOICE_DESCRIPTION.to_string()),
                 invoice_id.to_string(),
-                expiry.unwrap_or(self.invoice_expiry),
+                expiry.or(self.invoice_expiry),
                 false,
             )
             .await?;
@@ -245,7 +245,7 @@ mod tests {
         InvoiceService::new(
             store.build(),
             Arc::new(ln_client),
-            EXPIRY,
+            Some(EXPIRY),
             Arc::new(events),
             BtcNetwork::Regtest,
         )
@@ -295,7 +295,7 @@ mod tests {
                     .withf(|amount, description, _label, expiry, deschashonly| {
                         *amount == 1_000
                             && description == DEFAULT_INVOICE_DESCRIPTION
-                            && *expiry == EXPIRY
+                            && *expiry == Some(EXPIRY)
                             && !deschashonly
                     })
                     .times(1)

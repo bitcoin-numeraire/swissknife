@@ -193,6 +193,9 @@ coverage-matrix: itest-up
 	@cargo llvm-cov clean --workspace
 	@cargo llvm-cov --no-report --workspace --features itest --bins
 	@cargo llvm-cov --no-report -p wavelength-client --test transport
+	@for db in sqlite postgres; do \
+		SWISSKNIFE_ITEST_DATABASE=$$db cargo llvm-cov --no-report --features itest --test wavelength -- --test-threads=1 || exit 1; \
+	done
 	@SWISSKNIFE_ITEST_DATABASE=postgres cargo llvm-cov --no-report --features itest --bins -- uow_tests
 	@for cell in $(COVERAGE_CELLS); do \
 		db=$${cell%%:*}; provider=$${cell##*:}; \

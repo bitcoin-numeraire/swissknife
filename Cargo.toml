@@ -67,6 +67,7 @@ rust_socketio = { version = "0.6.0", features = ["async"] }
 bcrypt = "0.19.3"
 migration = { path = "crates/migration" }
 swissknife-types = { path = "crates/swissknife-types" }
+wavelength-client = { path = "crates/wavelength-client" }
 ldk-server-macaroons = { git = "https://github.com/lightningdevkit/ldk-server", rev = "762bc473342c8f945475785ec6743a9b26f56aff" }
 utoipa = { version = "5.5.0", features = ["axum_extras", "chrono", "uuid"] }
 utoipa-scalar = { version = "0.3.0", features = ["axum"] }
@@ -93,8 +94,10 @@ strip = true
 # plain `cargo test` runs only unit tests; the itest harness needs the regtest
 # docker stack (see tests/itest/). Run with `make test-integration`.
 itest = []
+public-itest = ["itest"]
 
 [dev-dependencies]
 mockall = "0.15.0"
 dtor = "1.0"
 wiremock = "0.6"
+tokio-stream = { version = "0.1", features = ["net"] }

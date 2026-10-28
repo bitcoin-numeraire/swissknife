@@ -159,7 +159,9 @@ mod send {
         assert_eq!(payment.amount_msat, amount_msat);
 
         // The wallet is debited by the amount plus the routing fee.
-        let fee = payment.fee_msat.unwrap_or_default() as i64;
+        let fee = payment
+            .fee_msat
+            .expect("successful sends record the actual fee, including zero") as i64;
         assert!(
             fee as u64 <= quote.maximum_fee_msat,
             "settled fee stays within the quoted cap"

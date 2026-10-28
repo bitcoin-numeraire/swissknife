@@ -41,6 +41,16 @@ impl EventListener {
         services: Arc<AppServices>,
     ) -> Result<Self, ApplicationError> {
         let listener = match config.ln_provider {
+            LightningProvider::Wavelength => {
+                let provider = config
+                    .wavelength_config
+                    .clone()
+                    .ok_or_else(|| ConfigError::MissingLightningProviderConfig(config.ln_provider.to_string()))?;
+                Arc::new(PollingListener {
+                    services: services.clone(),
+                    interval: provider.poll_interval,
+                }) as Arc<dyn EventsListener>
+            }
             LightningProvider::LdkServer => {
                 let provider = config
                     .ldk_server_config

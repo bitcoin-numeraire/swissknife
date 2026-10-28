@@ -247,11 +247,9 @@ impl LndGrpcClient {
             ledger: Ledger::Lightning,
             status,
             amount_msat: payment.value_msat as u64,
-            fee_msat: if payment.fee_msat > 0 {
-                Some(payment.fee_msat as u64)
-            } else {
-                None
-            },
+            // A direct payment legitimately reports zero; it is known, not
+            // absent. Negative provider values remain invalid for settlement.
+            fee_msat: u64::try_from(payment.fee_msat).ok(),
             payment_time: Some(Utc.timestamp_nanos(payment.creation_time_ns)),
             error,
             lightning: Some(LnPayment {
@@ -304,12 +302,12 @@ impl LnClient for LndGrpcClient {
         amount_msat: u64,
         description: String,
         _label: String,
-        expiry: u32,
+        expiry: Option<u32>,
         deschashonly: bool,
     ) -> Result<Invoice, LightningError> {
         let mut request = lnrpc::Invoice {
             memo: description.clone(),
-            expiry: expiry as i64,
+            expiry: expiry.map(i64::from).unwrap_or_default(),
             value_msat: amount_msat as i64,
             ..Default::default()
         };

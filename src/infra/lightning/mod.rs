@@ -6,6 +6,7 @@ mod ln_client;
 pub mod lnd;
 mod polling_listener;
 mod unavailable_bitcoin_wallet;
+pub mod wavelength;
 pub use polling_listener::PollingListener;
 pub use unavailable_bitcoin_wallet::UnavailableBitcoinWallet;
 pub mod types;

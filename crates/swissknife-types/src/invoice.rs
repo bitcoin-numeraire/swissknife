@@ -116,7 +116,8 @@ pub struct NewInvoiceRequest {
     pub amount_msat: u64,
     /// Description of the invoice. Visible by the payer
     pub description: Option<String>,
-    /// Expiration time in seconds
+    /// Optional expiration time in seconds. Omit to use the installation's
+    /// configured duration or its explicitly selected provider expiry policy.
     pub expiry: Option<u32>,
 }
 
