@@ -9,6 +9,7 @@ repository = "https://github.com/bitcoin-numeraire/swissknife"
 
 [features]
 daemon-tests = []
+public-network-tests = []
 
 [dependencies]
 hex = "0.4.3"

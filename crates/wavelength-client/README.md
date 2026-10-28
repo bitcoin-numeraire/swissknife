@@ -25,7 +25,15 @@ Run `cargo test -p wavelength-client` for transport-contract tests. From the
 repository root, `tests/itest/scripts/test-wavelength-client.sh` builds the
 pinned wallet-enabled Docker image and checks authenticated and unauthenticated
 RPCs against a fresh, uninitialized daemon. It does **not** validate funded
-Ark/swap payment behavior. That topology is tracked in SwissKnife #389.
+Ark/swap payment behavior. Funded public-network coverage is tracked in
+SwissKnife #389.
+
+`tests/itest/scripts/test-wavelength-public.sh` is a separate, opt-in test
+against documented public signet services (`WAVELENGTH_PUBLIC_NETWORK=testnet`
+selects testnet3). It creates an ephemeral unfunded wallet and verifies boarding
+address creation, an unpaid receive invoice, restart/unlock and receive-history
+persistence. Only public `waved` runs in Docker; no private backend is needed.
+This verifies external interoperability, not funded settlement or recovery.
 
 The pinned daemon's generated TLS certificate has `CA:TRUE`, which Rustls
 rejects as an end-entity certificate. Supply a proper server certificate; the

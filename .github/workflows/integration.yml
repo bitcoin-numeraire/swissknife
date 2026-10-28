@@ -8,6 +8,13 @@ on:
     branches:
       - main
   workflow_dispatch:
+    inputs:
+      wavelength_public_network:
+        description: "Opt-in Wavelength public-network smoke test (unfunded)"
+        type: choice
+        required: true
+        default: none
+        options: [none, signet, testnet]
 
 permissions:
   contents: read
@@ -130,6 +137,23 @@ jobs:
         run: cargo test -p wavelength-client --test transport
       - name: Real daemon RPC contract (${{ matrix.provider }})
         run: tests/itest/scripts/test-wavelength-client.sh
+
+  # Shared public services are not deterministic PR infrastructure. Run this
+  # explicitly to check external interoperability without private components.
+  wavelength-public:
+    if: github.event_name == 'workflow_dispatch' && inputs.wavelength_public_network != 'none'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - name: Install protoc
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+      - uses: dtolnay/rust-toolchain@1.99.1
+      - uses: swatinem/rust-cache@v2.9.3
+      - name: Public Wavelength wallet (${{ inputs.wavelength_public_network }})
+        env:
+          WAVELENGTH_PUBLIC_NETWORK: ${{ inputs.wavelength_public_network }}
+        run: tests/itest/scripts/test-wavelength-public.sh
 
   # Full-matrix merged coverage: unit + UoW (both DBs) + the integration suite
   # across every provider x DB cell, merged into one report (printed to the job

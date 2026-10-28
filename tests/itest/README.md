@@ -153,3 +153,25 @@ The test-only certificate/key under `crates/wavelength-client/tests/fixtures`
 is public fixture data. It must never be used for an installation. An explicit
 server certificate avoids the pinned daemon's `CA:TRUE` certificate generation
 interoperability problem without disabling TLS verification.
+
+`tests/itest/scripts/test-wavelength-public.sh` runs an **unfunded**, ephemeral
+wallet against waved's documented public signet defaults. Set
+`WAVELENGTH_PUBLIC_NETWORK=testnet` for testnet3. It checks wallet creation,
+readiness, zero spendable balances, boarding-address creation, unpaid invoice
+creation, and durable receive activity and identity after restarting and
+unlocking the same daemon. Only `waved` runs
+locally; its outbound TLS connections use public defaults and system trust.
+No internal operator source, image, configuration or employee credential is
+needed. The generated mnemonic is never printed or persisted by the test;
+the container and temporary RPC credentials are removed on exit. Never import
+a funded seed into this disposable suite.
+
+The integration workflow's manual `wavelength_public_network` input selects
+this live smoke test. It is separate from required PR checks because it depends
+on shared public service availability. **It does not test funded payments.**
+Funded Lightning send/receive, exact fees, confirmed boarding, restart settlement
+and recovery still require test coins and a public payment counterparty under
+#389 before Wavelength can become the default (#390). Public-network tests
+cannot provide local block timing or deterministic fault injection; a public
+black-box development sandbox would improve that coverage without exposing
+operator internals.
