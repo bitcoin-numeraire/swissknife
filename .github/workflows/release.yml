@@ -118,7 +118,7 @@ jobs:
         uses: actions/download-artifact@v8.0.2
         with:
           path: ${{ runner.temp }}/digests
-          pattern: digests-${{ matrix.image }}-*
+          pattern: digests-${{ matrix.image }}-linux-*
           merge-multiple: true
 
       - name: Set up Docker Buildx
@@ -153,7 +153,7 @@ jobs:
         run: |
           digest=$(docker buildx imagetools inspect \
             "${{ env.REGISTRY_IMAGE_BASE }}/${{ matrix.image }}:${{ steps.meta.outputs.version }}" \
-            --format '{{json .manifest.digest}}' | tr -d '"')
+            --format '{{.Manifest.Digest}}')
           echo "digest=$digest" >> "$GITHUB_OUTPUT"
 
       - name: Generate artifact attestation
