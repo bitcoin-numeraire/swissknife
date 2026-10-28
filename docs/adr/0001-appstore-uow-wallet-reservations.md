@@ -16,6 +16,9 @@ with account-owned, asset-scoped wallets. The Unit-of-Work and atomic reservatio
 decisions in this ADR remain in force; its wallet-as-user discussion is retained
 as historical context.
 
+The `fee_buffer` discussion below is also historical. ADR 0003 replaces it with
+provider-derived fee quotes and explicit Lightning fee limits.
+
 The target architecture is:
 
 1. `AppStore` becomes a pure trait container. It contains repository ports, focused Unit-of-Work ports, and a database health probe. It does not own `DatabaseConnection`, expose `begin()`, or construct SeaORM repositories.

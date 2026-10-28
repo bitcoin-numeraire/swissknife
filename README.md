@@ -23,6 +23,8 @@ If you like what we do, consider starring, sharing and contributing!
 - Explicit accounts and authentication identities, with any number of asset-scoped wallets per account.
 - Wallet balances scoped to one asset and one settlement network.
 - Internal ledger for instant payments on the same SwissKnife instance.
+- Provider-derived payment fee estimates and hard Lightning fee limits.
+- Durable account settlement events over SSE, with live dashboard updates.
 - REST API.
 - Frequent contacts.
 - OIDC/OAuth2 authentication with automatic JWKS discovery and key refresh (tested with Auth0).
@@ -31,7 +33,7 @@ If you like what we do, consider starring, sharing and contributing!
 - Data availability through pagination and advanced search.
 - Account-scoped API key authentication
 
-Numeraire SwissKnife ships with a [Dashboard](https://github.com/bitcoin-numeraire/swissknife/dashboard).
+Numeraire SwissKnife ships with a [Dashboard](https://github.com/bitcoin-numeraire/swissknife/tree/main/dashboard).
 
 ## Lightning Providers
 
@@ -48,13 +50,16 @@ SwissKnife allows direct Lightning integration with self-hosted node implementat
 
 SwissKnife provides multiple Docker deployment options to suit different infrastructure needs:
 
+Configure the backend database, Lightning provider and credentials before starting.
+Dashboard public settings are set at build time; see [dashboard configuration](dashboard/README.md#production-configuration) for your own deployment.
+
 ### Self-Contained Installation (Recommended)
 
 The all-in-one image bundles the backend API and dashboard in a single container:
 
 ```bash
-docker pull bitcoinnumeraire/swissknife:latest
-docker run -p 3000:3000 bitcoinnumeraire/swissknife:latest
+docker pull bitcoinnumeraire/swissknife:0.3.0
+docker run -p 3000:3000 bitcoinnumeraire/swissknife:0.3.0
 ```
 
 This image includes:
@@ -68,14 +73,14 @@ For Kubernetes or microservices deployments, use the separated images:
 
 #### Backend Only
 ```bash
-docker pull bitcoinnumeraire/swissknife-server:latest
-docker run -p 3000:3000 bitcoinnumeraire/swissknife-server:latest
+docker pull bitcoinnumeraire/swissknife-server:0.3.0
+docker run -p 3000:3000 bitcoinnumeraire/swissknife-server:0.3.0
 ```
 
 #### Frontend Only (Standalone Next.js Server)
 ```bash
-docker pull bitcoinnumeraire/swissknife-dashboard:latest
-docker run -p 8080:8080 bitcoinnumeraire/swissknife-dashboard:latest
+docker pull bitcoinnumeraire/swissknife-dashboard:0.3.0
+docker run -p 8080:8080 bitcoinnumeraire/swissknife-dashboard:0.3.0
 ```
 
 When using separated deployment:

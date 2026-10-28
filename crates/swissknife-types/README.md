@@ -24,8 +24,8 @@ generated client/SDK consume the same types.
 
 ## Principles
 
-- **Pure data.** The types carry no behaviour — validation and business rules
-  live in the application's use cases, never on the types here.
+- **Pure data.** The types carry no behaviour. Handlers validate API requests;
+  application use cases enforce business rules.
 - **The wire shape lives with the type.** Each type carries its own `serde` and
   `utoipa::ToSchema` annotations, so what you read is what's serialized.
 - **Sensitive internal-only fields are `#[serde(skip)]`** so they never reach the

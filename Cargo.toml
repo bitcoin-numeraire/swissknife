@@ -7,7 +7,7 @@ rust-version = "1.99"
 
 [package]
 name = "swissknife"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 authors = ["Dario Anongba Varela <dario.varela@numeraire.tech>"]
 rust-version.workspace = true

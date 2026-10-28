@@ -1,21 +1,27 @@
 # Contributing
 
 SwissKnife is implemented in Rust with the toolchain pinned in
-`rust-toolchain.toml`. The local development infrastructure uses `Docker` and
-`Docker Compose`. To run the project locally, run:
+`rust-toolchain.toml`. Install `protoc` for the generated Lightning clients.
+Docker Compose supplies local PostgreSQL and integration-test dependencies.
+To run the backend locally against PostgreSQL:
 
 ```bash
-make install-tools
-make up
+make up-postgres
+SWISSKNIFE_DATABASE__URL=postgres://postgres:postgres@localhost:5432/numeraire cargo run
 ```
 
-Once the DB is up and migrations have executed, run the app:
+The backend applies migrations at startup. Configure the selected Lightning
+provider, its credentials, and authentication in `config/development.toml` or
+`SWISSKNIFE_` environment variables first. `config/default.toml` lists the
+available settings; nested environment keys use `__`.
 
-```
-cargo run
-```
+For a fresh local JWT installation, choose a strong `SWISSKNIFE_JWT__SECRET`.
+The initial `/v1/auth/sign-up` creates the owner login. See the
+[dashboard README](../dashboard/README.md) for the corresponding frontend setup.
 
-> If not using a Lightning provider, running dependencies locally can be done easily with [Polar](https://lightningpolar.com/).
+The backend requires a reachable Lightning provider. The
+[integration-test regtest stack](../tests/itest/README.md) supplies reproducible
+LND and CLN nodes; [Polar](https://lightningpolar.com/) is another local-node option.
 
 Before submitting backend changes, run:
 
@@ -46,3 +52,7 @@ yarn fm:check
 
 Run `make openapi` after changing backend routes or shared API types. It refreshes
 both the checked-in OpenAPI document and the generated dashboard client.
+
+Update the changelog for user-visible behavior changes. Documentation, tests,
+and internal refactors alone do not require an entry. For release preparation,
+follow [RELEASING.md](RELEASING.md).
