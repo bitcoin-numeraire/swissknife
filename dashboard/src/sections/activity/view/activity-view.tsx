@@ -337,6 +337,7 @@ function WalletActivityLedger({
     <>
       <ActivityLedger
         scope="wallet"
+        walletId={wallet?.id}
         kind={kind}
         invoices={wallet?.invoices || []}
         payments={wallet?.payments || []}
@@ -406,6 +407,7 @@ function AdminActivityLedger({
 
 function ActivityLedger({
   scope,
+  walletId,
   kind,
   invoices,
   payments,
@@ -420,6 +422,7 @@ function ActivityLedger({
   onCleanSuccess,
 }: {
   scope: ActivityScope;
+  walletId?: string;
   kind: ActivityTransactionKind;
   invoices: Invoice[];
   payments: Payment[];
@@ -670,6 +673,8 @@ function ActivityLedger({
                 >
                   <span>
                     <CleanTransactionsButton
+                      scope={scope}
+                      walletId={walletId}
                       onSuccess={onCleanSuccess}
                       transactionType={transactionTypeForKind(kind)}
                       buttonProps={{

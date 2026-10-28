@@ -805,6 +805,7 @@
     "delete_payment_success": "Paiement supprimé avec succès : {{id}}"
   },
   "clean_transactions_button": {
+    "nothing_to_clean": "Rien à nettoyer.",
     "invoices_deleted_success": "{{count}} factures supprimées avec succès",
     "payments_deleted_success": "{{count}} paiements supprimés avec succès",
     "clean_transactions": "Nettoyer les transactions"

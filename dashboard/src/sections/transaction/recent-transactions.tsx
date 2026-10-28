@@ -102,6 +102,8 @@ export function RecentTransactions({ title, tableData, isAdmin, ...other }: Prop
             <Tooltip title={t('recent_transactions.clean_failed_expired')} placement="top" arrow>
               <Box>
                 <CleanTransactionsButton
+                  scope="wallet"
+                  walletId={activeWalletId}
                   onSuccess={() => {
                     if (activeWalletId) mutate(endpointKeys.accountWallet.get(activeWalletId));
                   }}
