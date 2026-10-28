@@ -8,6 +8,11 @@ release notes when a tag is published.
 
 ## [Unreleased]
 
+### Fixed
+
+- Skip local installation onboarding for OAuth2 deployments and wait for the
+  Auth0 access token before loading authenticated pages.
+
 ## [0.3.0] - 2026-10-28
 
 ### Added

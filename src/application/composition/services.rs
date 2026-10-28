@@ -84,7 +84,7 @@ impl AppServices {
             auth_provider,
             bitcoin_wallet.network(),
         );
-        let system = Arc::new(SystemService::new(store.clone(), ln_client.clone()));
+        let system = Arc::new(SystemService::new(store.clone(), ln_client.clone(), auth_provider));
         let nostr = NostrService::new(store.clone());
         let api_key = ApiKeyService::new(store.clone());
         let bitcoin = BitcoinService::new(

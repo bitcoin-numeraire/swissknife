@@ -6,6 +6,6 @@ export function authUsesLocalTokenSession(method: AuthMethod = CONFIG.auth.metho
   return method === 'jwt' || method === 'mock-oauth2';
 }
 
-export function authRequiresLocalSignUp(method: AuthMethod = CONFIG.auth.method) {
+export function authRequiresLocalSetup(method: AuthMethod = CONFIG.auth.method) {
   return method === 'jwt';
 }

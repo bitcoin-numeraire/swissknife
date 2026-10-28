@@ -11,11 +11,26 @@ use futures_util::future::join_all;
 use reqwest::StatusCode;
 use serde_json::json;
 
-use swissknife_types::{Account, RegisterLnAddressRequest, Wallet};
+use swissknife_types::{Account, RegisterLnAddressRequest, SetupInfo, Wallet};
 
 use crate::common::fixtures::unique;
 use crate::common::oauth2::{oauth2_app, CLIENT_CONCURRENT, CLIENT_FULL, CLIENT_READONLY, CLIENT_WRONG_AUD};
 use crate::common::{assert_error, assert_status, Auth};
+
+mod setup {
+    use super::*;
+
+    #[tokio::test]
+    async fn is_complete_without_local_welcome_or_password_setup() {
+        let app = oauth2_app().await;
+        let response = app.api().get("/v1/system/setup", Auth::None).await;
+
+        assert_status(&response, StatusCode::OK);
+        let info = response.parse::<SetupInfo>();
+        assert!(info.welcome_complete);
+        assert!(info.sign_up_complete);
+    }
+}
 
 mod accepts {
     use super::*;

@@ -3,6 +3,8 @@ use serde_json::{self, from_value, to_value};
 use std::sync::Arc;
 use tracing::{debug, error, info, trace};
 
+use swissknife_types::AuthProvider;
+
 use crate::{
     application::{
         composition::AppStore,
@@ -20,11 +22,16 @@ const ONCHAIN_CURSOR_KEY: &str = "onchain_sync_cursor";
 pub struct SystemService {
     store: AppStore,
     ln_client: Arc<dyn LnClient>,
+    auth_provider: AuthProvider,
 }
 
 impl SystemService {
-    pub fn new(store: AppStore, ln_client: Arc<dyn LnClient>) -> Self {
-        SystemService { store, ln_client }
+    pub fn new(store: AppStore, ln_client: Arc<dyn LnClient>, auth_provider: AuthProvider) -> Self {
+        SystemService {
+            store,
+            ln_client,
+            auth_provider,
+        }
     }
 }
 
@@ -63,6 +70,14 @@ impl SystemUseCases for SystemService {
 
     async fn setup_check(&self) -> Result<SetupInfo, ApplicationError> {
         trace!("Checking system setup");
+
+        // External identities need neither a local owner password nor installation onboarding.
+        if self.auth_provider == AuthProvider::OAuth2 {
+            return Ok(SetupInfo {
+                welcome_complete: true,
+                sign_up_complete: true,
+            });
+        }
 
         let welcome_complete = self.store.config.find(WELCOME_COMPLETE_KEY).await?.is_some();
         let sign_up_complete: bool = self.store.config.find(PASSWORD_HASH_KEY).await?.is_some();
@@ -126,7 +141,7 @@ mod tests {
     use super::*;
 
     fn service(store: MockAppStoreBuilder, ln_client: MockLnClient) -> SystemService {
-        SystemService::new(store.build(), Arc::new(ln_client))
+        SystemService::new(store.build(), Arc::new(ln_client), AuthProvider::Jwt)
     }
 
     mod health_check {
@@ -205,6 +220,39 @@ mod tests {
 
     mod setup_check {
         use super::*;
+
+        mod when_using_oauth2 {
+            use super::*;
+
+            #[tokio::test]
+            async fn requires_no_local_setup_or_config_flags() {
+                let service = SystemService::new(
+                    MockAppStoreBuilder::new().build(),
+                    Arc::new(MockLnClient::new()),
+                    AuthProvider::OAuth2,
+                );
+
+                let info = service.setup_check().await.unwrap();
+
+                assert!(info.welcome_complete);
+                assert!(info.sign_up_complete);
+            }
+        }
+
+        mod when_local_setup_has_not_started {
+            use super::*;
+
+            #[tokio::test]
+            async fn requires_welcome_and_sign_up() {
+                let mut store = MockAppStoreBuilder::new();
+                store.config.expect_find().times(2).returning(|_| Ok(None));
+
+                let info = service(store, MockLnClient::new()).setup_check().await.unwrap();
+
+                assert!(!info.welcome_complete);
+                assert!(!info.sign_up_complete);
+            }
+        }
 
         #[tokio::test]
         async fn reports_completion_flags_from_config() {

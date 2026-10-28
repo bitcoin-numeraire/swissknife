@@ -15,7 +15,7 @@ import { ONBOARDING_COMPLETE_STORAGE_KEY } from 'src/components/settings';
 import { useAuthContext } from '../hooks';
 import { clearSession } from '../context/jwt';
 import { isSameRoutePath } from './setup-route-utils';
-import { authRequiresLocalSignUp, authUsesLocalTokenSession } from '../utils';
+import { authRequiresLocalSetup, authUsesLocalTokenSession } from '../utils';
 
 function resetSetupCache() {
   localStorage.removeItem(ONBOARDING_COMPLETE_STORAGE_KEY);
@@ -53,6 +53,11 @@ export function OnboardingGuard({ children }: { children: React.ReactNode }) {
       return undefined;
     }
 
+    if (!authRequiresLocalSetup()) {
+      replaceOnce(authenticated ? paths.wallet.root : paths.auth.login);
+      return undefined;
+    }
+
     let active = true;
     const isWelcomeRoute = isSameRoutePath(pathname, paths.onboarding.welcome);
     const isSignUpRoute = isSameRoutePath(pathname, paths.auth.signUp);
@@ -75,7 +80,7 @@ export function OnboardingGuard({ children }: { children: React.ReactNode }) {
           return;
         }
 
-        if (authRequiresLocalSignUp() && !data.sign_up_complete) {
+        if (!data.sign_up_complete) {
           resetSetupCache();
 
           if (isSignUpRoute) {
@@ -89,7 +94,7 @@ export function OnboardingGuard({ children }: { children: React.ReactNode }) {
           return;
         }
 
-        if (data.welcome_complete && (!authRequiresLocalSignUp() || data.sign_up_complete)) {
+        if (data.welcome_complete && data.sign_up_complete) {
           localStorage.setItem(ONBOARDING_COMPLETE_STORAGE_KEY, 'true');
           replaceOnce(authenticated ? paths.wallet.root : paths.auth.login);
           return;

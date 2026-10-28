@@ -13,7 +13,7 @@ import { ONBOARDING_COMPLETE_STORAGE_KEY } from 'src/components/settings';
 import { useAuthContext } from '../hooks';
 import { clearSession } from '../context/jwt';
 import { isSameRoutePath } from './setup-route-utils';
-import { authRequiresLocalSignUp, authUsesLocalTokenSession } from '../utils';
+import { authRequiresLocalSetup, authUsesLocalTokenSession } from '../utils';
 
 // ----------------------------------------------------------------------
 
@@ -62,24 +62,26 @@ export function AuthGuard({ children }: AuthGuardProps) {
       return;
     }
 
-    try {
-      const { data } = await setupCheck<true>();
+    if (authRequiresLocalSetup()) {
+      try {
+        const { data } = await setupCheck<true>();
 
-      if (!data.welcome_complete) {
-        resetSetupCache();
-        replaceOnce(paths.onboarding.welcome);
-        return;
+        if (!data.welcome_complete) {
+          resetSetupCache();
+          replaceOnce(paths.onboarding.welcome);
+          return;
+        }
+
+        if (!data.sign_up_complete) {
+          resetSetupCache();
+          replaceOnce(paths.auth.signUp);
+          return;
+        }
+
+        localStorage.setItem(ONBOARDING_COMPLETE_STORAGE_KEY, 'true');
+      } catch {
+        // Let the protected page surface API connectivity errors after the auth check.
       }
-
-      if (authRequiresLocalSignUp() && !data.sign_up_complete) {
-        resetSetupCache();
-        replaceOnce(paths.auth.signUp);
-        return;
-      }
-
-      localStorage.setItem(ONBOARDING_COMPLETE_STORAGE_KEY, 'true');
-    } catch {
-      // Let the protected page surface API connectivity errors after the auth check.
     }
 
     if (!authenticated) {

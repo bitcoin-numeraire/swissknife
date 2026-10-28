@@ -81,7 +81,7 @@ function AuthProviderContainer({ children }: Props) {
 
   const checkAuthenticated = isAuthenticated ? 'authenticated' : 'unauthenticated';
 
-  const status = isLoading ? 'loading' : checkAuthenticated;
+  const status = isLoading || (isAuthenticated && !accessToken) ? 'loading' : checkAuthenticated;
 
   const memoizedValue = useMemo(
     () => ({

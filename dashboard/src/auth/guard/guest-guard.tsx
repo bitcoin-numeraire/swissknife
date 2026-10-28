@@ -16,7 +16,7 @@ import { ONBOARDING_COMPLETE_STORAGE_KEY } from 'src/components/settings';
 import { useAuthContext } from '../hooks';
 import { clearSession } from '../context/jwt';
 import { getSafeReturnTo, isSameRoutePath } from './setup-route-utils';
-import { authRequiresLocalSignUp, authUsesLocalTokenSession } from '../utils';
+import { authRequiresLocalSetup, authUsesLocalTokenSession } from '../utils';
 
 // ----------------------------------------------------------------------
 
@@ -65,6 +65,15 @@ export function GuestGuard({ children }: GuestGuardProps) {
       return undefined;
     }
 
+    if (!authRequiresLocalSetup()) {
+      if (authenticated) {
+        replaceOnce(returnTo);
+      } else {
+        setIsChecking(false);
+      }
+      return undefined;
+    }
+
     let active = true;
 
     (async () => {
@@ -76,7 +85,7 @@ export function GuestGuard({ children }: GuestGuardProps) {
           return;
         }
 
-        if (authRequiresLocalSignUp() && !data.sign_up_complete) {
+        if (!data.sign_up_complete) {
           resetSetupCache();
           replaceOnce(paths.auth.signUp);
           return;
