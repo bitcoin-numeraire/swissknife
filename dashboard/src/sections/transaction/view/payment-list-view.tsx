@@ -129,6 +129,8 @@ export function PaymentListView() {
                 <Tooltip title={t('payment_list.clean_failed_payments')} placement="top" arrow>
                   <Box>
                     <CleanTransactionsButton
+                      scope="wallet"
+                      walletId={wallet?.id}
                       onSuccess={paymentsMutate}
                       buttonProps={{
                         color: 'error',
