@@ -28,8 +28,6 @@ release notes when a tag is published.
   upgrades preserve unknown historical limits without changing balances. Invalid
   provider payment records no longer prevent startup replay of other payments.
 
-### Fixed
-
 - Restore administrative transaction cleanup across wallets and report empty
   cleanup results and API errors in the dashboard.
 
