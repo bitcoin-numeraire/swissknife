@@ -97,7 +97,9 @@ The existing four adapters retain their complete on-chain integration suite.
 
 The Wavelength Docker test exercises a real wallet-enabled daemon with verified
 TLS and authentication. It is a transport gate, not evidence of funded Ark
-payment support. The complete operator/swap/indexer/client topology, refunds,
-restarts, offline catch-up and recovery remain #389. Only after #388/#389 and
+payment support. Public signet/testnet interoperability, funded flows, refunds, restarts,
+offline catch-up and recovery remain #389. Numeraire integrates only the public
+`waved` client and documented public network endpoints; it must not depend on
+internal operator source, internal deployment configuration or employee access. Only after #388/#389 and
 the compatibility decisions above are resolved should #390 change new-install
 defaults and deployment/documentation surfaces.

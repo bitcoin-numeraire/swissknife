@@ -140,7 +140,9 @@ LND/CLN cells continue to run the full `tests/api.rs` suite.
 `tests/itest/scripts/test-wavelength-client.sh` builds the pinned wallet-enabled
 `waved` image and runs the independent crate's authenticated RPC tests. This is
 a fresh, uninitialized-daemon transport test, **not** a funded Ark integration
-test. The full operator/swap/indexer/client topology remains #389. Both image
+test. Public signet/testnet interoperability and funded wallet coverage remain
+#389. Numeraire tests must use the public daemon and documented public services;
+internal operator source, images or employee credentials are outside scope. Both image
 builds pin source commits in `build-provider-image.sh`; state and source caches
 live under the ignored `runtime/` directory.
 
