@@ -128,3 +128,28 @@ make coverage-lcov     # merged unit + integration coverage -> lcov.info
 
 SwissKnife stdout/stderr per cell is written under `target/itest/`. On CI
 failure, dependency logs are collected via `make itest-logs`.
+## LDK Server and Wavelength
+
+`make test-integration ITEST_PROVIDER=ldk_server` builds the pinned LDK Server
+Docker image, provisions a real LND/LDK channel and on-chain anchor reserve, and
+runs `tests/providers.rs`. This Lightning-only contract shares the account,
+auth, permissions, invoice and LNURL suites, tests sends and restart replay,
+and explicitly asserts that unsupported on-chain operations fail. The existing
+LND/CLN cells continue to run the full `tests/api.rs` suite.
+LDK also peers with CLN for gossip and waits for both directional LND/CLN
+routing policies. It has no direct CLN channel, so the fee test still routes
+through LND and verifies a real forwarding fee.
+
+`tests/itest/scripts/test-wavelength-client.sh` builds the pinned wallet-enabled
+`waved` image and runs the independent crate's authenticated RPC tests. This is
+a fresh, uninitialized-daemon transport test, **not** a funded Ark integration
+test. Public signet/testnet interoperability and funded wallet coverage remain
+#389. Numeraire tests must use the public daemon and documented public services;
+internal operator source, images or employee credentials are outside scope. Both image
+builds pin source commits in `build-provider-image.sh`; state and source caches
+live under the ignored `runtime/` directory.
+
+The test-only certificate/key under `crates/wavelength-client/tests/fixtures`
+is public fixture data. It must never be used for an installation. An explicit
+server certificate avoids the pinned daemon's `CA:TRUE` certificate generation
+interoperability problem without disabling TLS verification.

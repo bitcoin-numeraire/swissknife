@@ -1,0 +1,26 @@
+[package]
+name = "wavelength-client"
+version = "0.1.0"
+edition = "2021"
+rust-version.workspace = true
+license = "MIT"
+description = "Async Rust client for the Wavelength wallet daemon"
+repository = "https://github.com/bitcoin-numeraire/swissknife"
+
+[features]
+daemon-tests = []
+
+[dependencies]
+hex = "0.4.3"
+prost = "0.14.4"
+thiserror = "2.0.21"
+tokio = { version = "1.54.1", features = ["time"] }
+tonic = { version = "0.14.6", features = ["tls-ring"] }
+tonic-prost = "0.14.6"
+
+[build-dependencies]
+tonic-prost-build = "0.14.6"
+
+[dev-dependencies]
+tokio = { version = "1.54.1", features = ["macros", "rt-multi-thread", "net"] }
+tokio-stream = { version = "0.1", features = ["net"] }

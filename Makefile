@@ -12,6 +12,7 @@ ITEST_PROJECT ?= swissknife-itest
 ITEST_COMPOSE = docker compose -p $(ITEST_PROJECT) -f tests/itest/docker-compose.yml
 ITEST_DATABASE ?= sqlite
 ITEST_PROVIDER ?= lnd_grpc
+ITEST_TARGET ?= $(if $(filter ldk_server,$(ITEST_PROVIDER)),providers,api)
 # Optional test-name filter (TEST) and post-`--` args (TESTARGS) for the test
 # targets, so a single suite or test can be run locally, e.g.:
 #   make test-integration TEST=suites::oauth2
@@ -132,7 +133,7 @@ test-unit:
 # ITEST_DATABASE / ITEST_PROVIDER (e.g. `make test-integration ITEST_PROVIDER=cln_grpc`).
 # Narrow to a suite/test with TEST=... and pass runner flags with TESTARGS=...
 test-integration: itest-up
-	@$(ITEST_ENV) cargo test --features itest --test api $(TEST) -- $(TESTARGS)
+	@$(ITEST_ENV) cargo test --features itest --test $(ITEST_TARGET) $(TEST) -- $(TESTARGS)
 
 # Recreate dependency volumes before a liquidity-sensitive integration run.
 test-integration-fresh:
@@ -149,7 +150,7 @@ test-persistence:
 
 # Bring up the regtest dependency stack (bitcoind + LND + CLN + Postgres).
 itest-up:
-	@SWISSKNIFE_ITEST_COMPOSE_PROJECT=$(ITEST_PROJECT) tests/itest/scripts/bootstrap.sh
+	@$(ITEST_ENV) tests/itest/scripts/bootstrap.sh
 
 # Stop the dependency stack, keeping volumes.
 itest-down:
@@ -179,7 +180,7 @@ coverage-html:
 coverage-lcov: itest-up
 	@cargo llvm-cov clean --workspace
 	@cargo llvm-cov --no-report --workspace --features itest --bins
-	@$(ITEST_ENV) cargo llvm-cov --no-report --features itest --test api
+	@$(ITEST_ENV) cargo llvm-cov --no-report --features itest --test $(ITEST_TARGET)
 	@cargo llvm-cov report --lcov --output-path lcov.info
 
 # Full-matrix merged coverage: unit + UoW (both DBs) + the integration API suite
@@ -187,16 +188,19 @@ coverage-lcov: itest-up
 # total — run it on Linux/CI (lnd_rest does not start under macOS native-tls).
 # Integration cells run serially (--test-threads=1) to avoid the SQLite write
 # contention in #267. Override COVERAGE_CELLS to add/drop cells.
-COVERAGE_CELLS ?= sqlite:lnd_grpc sqlite:lnd_rest sqlite:cln_grpc sqlite:cln_rest postgres:lnd_grpc
+COVERAGE_CELLS ?= sqlite:lnd_grpc sqlite:lnd_rest sqlite:cln_grpc sqlite:cln_rest postgres:lnd_grpc sqlite:ldk_server
 coverage-matrix: itest-up
 	@cargo llvm-cov clean --workspace
 	@cargo llvm-cov --no-report --workspace --features itest --bins
+	@cargo llvm-cov --no-report -p wavelength-client --test transport
 	@SWISSKNIFE_ITEST_DATABASE=postgres cargo llvm-cov --no-report --features itest --bins -- uow_tests
 	@for cell in $(COVERAGE_CELLS); do \
 		db=$${cell%%:*}; provider=$${cell##*:}; \
+		test_target=api; if [ "$$provider" = ldk_server ]; then test_target=providers; \
+			SWISSKNIFE_ITEST_COMPOSE_PROJECT=$(ITEST_PROJECT) tests/itest/scripts/bootstrap-ldk.sh || exit 1; fi; \
 		echo ">>> integration $$db/$$provider"; \
 		SWISSKNIFE_ITEST_COMPOSE_PROJECT=$(ITEST_PROJECT) SWISSKNIFE_ITEST_DATABASE=$$db SWISSKNIFE_ITEST_PROVIDER=$$provider \
-			cargo llvm-cov --no-report --features itest --test api -- --test-threads=1 || exit 1; \
+			cargo llvm-cov --no-report --features itest --test $$test_target -- --test-threads=1 || exit 1; \
 	done
 	@cargo llvm-cov report --lcov --output-path lcov.info
 	@cargo llvm-cov report

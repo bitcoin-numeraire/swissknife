@@ -8,6 +8,15 @@ release notes when a tag is published.
 
 ## [Unreleased]
 
+### Added
+
+- LDK Server Lightning provider with exact millisatoshi invoices, LNURL,
+  bounded routing fees and durable settlement replay. Route estimates and
+  SwissKnife on-chain operations are unavailable for this provider.
+- Standalone `wavelength-client` Rust crate for authenticated `waved` wallet
+  RPCs. Wavelength wallet integration and the default-provider cutover remain
+  under development.
+
 ### Fixed
 
 - Restore administrative transaction cleanup across wallets and report empty

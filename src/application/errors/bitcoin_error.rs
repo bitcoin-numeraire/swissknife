@@ -2,6 +2,9 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum BitcoinError {
+    #[error("On-chain operation unavailable: {0}")]
+    Unsupported(&'static str),
+
     #[error("Failed to get bitcoin address: {0}")]
     Address(String),
 

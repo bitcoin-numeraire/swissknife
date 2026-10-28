@@ -16,7 +16,7 @@ use crate::{
     infra::lightning::{
         cln::{ClnGrpcListener, ClnWebsocketListener},
         lnd::{LndGrpcListener, LndWebsocketListener},
-        EventsListener,
+        EventsListener, PollingListener,
     },
 };
 
@@ -41,6 +41,16 @@ impl EventListener {
         services: Arc<AppServices>,
     ) -> Result<Self, ApplicationError> {
         let listener = match config.ln_provider {
+            LightningProvider::LdkServer => {
+                let provider = config
+                    .ldk_server_config
+                    .clone()
+                    .ok_or_else(|| ConfigError::MissingLightningProviderConfig(config.ln_provider.to_string()))?;
+                Arc::new(PollingListener {
+                    services: services.clone(),
+                    interval: provider.poll_interval,
+                }) as Arc<dyn EventsListener>
+            }
             LightningProvider::ClnGrpc => {
                 let cln_config = config
                     .cln_grpc_config

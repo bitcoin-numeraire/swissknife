@@ -40,6 +40,15 @@ fee_limit_msat = 25000
 payment_timeout = "10s"
 reorg_buffer_blocks = 2
 
+[ldk_server_config]
+endpoint = "127.0.0.1:3536"
+cert_path = "tests/itest/runtime/ldk/tls.crt"
+macaroon_path = "tests/itest/runtime/ldk/admin.macaroon"
+fee_limit_msat = 25000
+request_timeout = "5s"
+payment_timeout = "10s"
+poll_interval = "500ms"
+
 [lnd_rest_config]
 host = "127.0.0.1:8080"
 macaroon_path = "tests/itest/runtime/lnd/data/chain/bitcoin/regtest/admin.macaroon"

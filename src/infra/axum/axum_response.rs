@@ -138,7 +138,7 @@ impl IntoResponse for LightningError {
 impl IntoResponse for BitcoinError {
     fn into_response(self) -> Response {
         let (error_message, status) = match self {
-            BitcoinError::AddressType(_) => {
+            BitcoinError::AddressType(_) | BitcoinError::Unsupported(_) => {
                 warn!("{}", self);
                 (self.to_string(), StatusCode::UNPROCESSABLE_ENTITY)
             }

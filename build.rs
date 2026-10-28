@@ -30,6 +30,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         std::env::var("OUT_DIR").unwrap()
     );
 
+    tonic_prost_build::configure().build_server(false).compile_protos(
+        &["src/infra/lightning/ldk/proto/api.proto"],
+        &["src/infra/lightning/ldk/proto"],
+    )?;
+
     println!("cargo:rustc-env=CARGO_PKG_VERSION={}", env!("CARGO_PKG_VERSION"));
     println!("cargo:rustc-env=BUILD_TIME={}", Utc::now().to_rfc3339());
 

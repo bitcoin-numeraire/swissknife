@@ -1,0 +1,1242 @@
+syntax = "proto3";
+package types;
+
+// Represents a payment.
+// See more: https://docs.rs/ldk-node/latest/ldk_node/payment/struct.PaymentDetails.html
+message Payment {
+  // An identifier used to uniquely identify a payment in hex-encoded form.
+  string payment_id = 1;
+
+  // The kind of the payment.
+  PaymentKind kind = 2;
+
+  // The amount transferred.
+  optional uint64 amount_msat = 3;
+
+  // The fees that were paid for this payment.
+  //
+  // For Lightning payments, this will only be updated for outbound payments once they
+  // succeeded.
+  optional uint64 fee_paid_msat = 7;
+
+  // The direction of the payment.
+  PaymentDirection direction = 4;
+
+  // The status of the payment.
+  PaymentStatus status = 5;
+
+  // The timestamp, in seconds since start of the UNIX epoch, when this entry was last updated.
+  uint64 latest_update_timestamp = 6;
+}
+
+// Options that control which BOLT 12 invoice fields a payer proof discloses.
+// See more: https://docs.rs/ldk-node/latest/ldk_node/payment/struct.PayerProofOptions.html
+message PayerProofOptions {
+  // An optional note to attach to the payer proof itself.
+  optional string note = 1;
+
+  // Whether to disclose the offer description.
+  bool include_offer_description = 2;
+
+  // Whether to disclose the offer issuer.
+  bool include_offer_issuer = 3;
+
+  // Whether to disclose the invoice amount.
+  bool include_invoice_amount = 4;
+
+  // Whether to disclose the invoice creation timestamp.
+  bool include_invoice_created_at = 5;
+
+  // Additional TLV types to disclose, for fields not covered by the flags above.
+  repeated uint64 extra_tlv_types = 6;
+}
+
+message PaymentKind {
+  oneof kind {
+    Onchain onchain = 1;
+    Bolt11 bolt11 = 2;
+    Bolt12Offer bolt12_offer = 3;
+    Bolt12Refund bolt12_refund = 4;
+    Spontaneous spontaneous = 5;
+  }
+}
+
+// Represents an on-chain payment.
+message Onchain {
+  // The transaction identifier of this payment.
+  string txid = 1;
+
+  // The confirmation status of this payment.
+  ConfirmationStatus status = 2;
+
+  // The classification of this transaction, as reported by LDK when it was broadcast.
+  //
+  // Unset for plain on-chain sends, and for payments recorded before this classification was
+  // tracked.
+  optional TransactionType tx_type = 3;
+}
+
+// A channel referenced by a TransactionType variant.
+message TransactionChannel {
+  // The `node_id` of the channel counterparty.
+  string counterparty_node_id = 1;
+
+  // The ID of the channel.
+  string channel_id = 2;
+}
+
+// The classification of an on-chain transaction, mirroring LDK Node's
+// `ldk_node::payment::TransactionType`.
+message TransactionType {
+  oneof kind {
+    Funding funding = 1;
+    CooperativeClose cooperative_close = 2;
+    UnilateralClose unilateral_close = 3;
+    AnchorBump anchor_bump = 4;
+    Claim claim = 5;
+    Sweep sweep = 6;
+    InteractiveFunding interactive_funding = 7;
+  }
+}
+
+// A funding transaction establishing one or more new channels.
+message Funding {
+  // The channels being funded.
+  repeated TransactionChannel channels = 1;
+}
+
+// A transaction cooperatively closing a channel.
+message CooperativeClose {
+  // The `node_id` of the channel counterparty.
+  string counterparty_node_id = 1;
+
+  // The ID of the channel being closed.
+  string channel_id = 2;
+}
+
+// A transaction force-closing a channel.
+message UnilateralClose {
+  // The `node_id` of the channel counterparty.
+  string counterparty_node_id = 1;
+
+  // The ID of the channel being force-closed.
+  string channel_id = 2;
+}
+
+// An anchor transaction CPFP fee-bumping a closing transaction.
+message AnchorBump {
+  // The `node_id` of the channel counterparty.
+  string counterparty_node_id = 1;
+
+  // The ID of the channel whose closing transaction is being fee-bumped.
+  string channel_id = 2;
+}
+
+// A transaction resolving an output spendable by both us and our counterparty.
+message Claim {
+  // The `node_id` of the channel counterparty.
+  string counterparty_node_id = 1;
+
+  // The ID of the channel from which outputs are being claimed.
+  string channel_id = 2;
+}
+
+// A transaction sweeping spendable outputs to the on-chain wallet.
+message Sweep {
+  // The channels from which outputs are being swept, if known.
+  repeated TransactionChannel channels = 1;
+}
+
+// An interactively-negotiated funding transaction: a splice, or (once supported) a V2
+// dual-funded channel open.
+message InteractiveFunding {
+  // The channels participating in the negotiation.
+  repeated TransactionChannel channels = 1;
+}
+
+message ConfirmationStatus {
+  oneof status {
+    Confirmed confirmed     = 1;
+    Unconfirmed unconfirmed = 2;
+  }
+}
+
+// The on-chain transaction is confirmed in the best chain.
+message Confirmed {
+  // The hex representation of hash of the block in which the transaction was confirmed.
+  string  block_hash = 1;
+
+  // The height under which the block was confirmed.
+  uint32 height = 2;
+
+  // The timestamp, in seconds since start of the UNIX epoch, when this entry was last updated.
+  uint64 timestamp = 3;
+}
+
+// The on-chain transaction is unconfirmed.
+message Unconfirmed {}
+
+// Represents a BOLT 11 payment.
+message Bolt11 {
+  // The payment hash, i.e., the hash of the preimage.
+  string hash = 1;
+
+  // The pre-image used by the payment.
+  optional string preimage = 2;
+
+  // The secret used by the payment.
+  optional bytes secret = 3;
+
+  // The value, in thousands of a satoshi, that was deducted from this payment as an extra
+  // fee taken by our channel counterparty.
+  //
+  // Will only ever be `Some` for inbound payments received via an [bLIP-52 / LSPS 2]
+  // just-in-time channel, and only after the payment is observed; `None` otherwise.
+  //
+  // [bLIP-52 / LSPS 2]: https://github.com/lightning/blips/blob/master/blip-0052.md
+  optional uint64 counterparty_skimmed_fee_msat = 4;
+}
+
+// Represents a BOLT 12 ‘offer’ payment, i.e., a payment for an Offer.
+message Bolt12Offer {
+  // The payment hash, i.e., the hash of the preimage.
+  optional string hash = 1;
+
+  // The pre-image used by the payment.
+  optional string preimage = 2;
+
+  // The secret used by the payment.
+  optional bytes secret = 3;
+
+  // The hex-encoded ID of the offer this payment is for.
+  string offer_id = 4;
+
+  // The payer's note for the payment.
+  // Truncated to [PAYER_NOTE_LIMIT](https://docs.rs/lightning/latest/lightning/offers/invoice_request/constant.PAYER_NOTE_LIMIT.html).
+  //
+  // **Caution**: The `payer_note` field may come from an untrusted source. To prevent potential misuse,
+  // all non-printable characters will be sanitized and replaced with safe characters.
+  optional string payer_note = 5;
+
+  // The quantity of an item requested in the offer.
+  optional uint64 quantity = 6;
+}
+
+// Represents a BOLT 12 ‘refund’ payment, i.e., a payment for a Refund.
+message Bolt12Refund {
+  // The payment hash, i.e., the hash of the preimage.
+  optional string hash = 1;
+
+  // The pre-image used by the payment.
+  optional string preimage = 2;
+
+  // The secret used by the payment.
+  optional bytes secret = 3;
+
+  // The payer's note for the payment.
+  // Truncated to [PAYER_NOTE_LIMIT](https://docs.rs/lightning/latest/lightning/offers/invoice_request/constant.PAYER_NOTE_LIMIT.html).
+  //
+  // **Caution**: The `payer_note` field may come from an untrusted source. To prevent potential misuse,
+  // all non-printable characters will be sanitized and replaced with safe characters.
+  optional string payer_note = 5;
+
+  // The quantity of an item requested in the offer.
+  optional uint64 quantity = 6;
+
+}
+
+// Represents a spontaneous (“keysend”) payment.
+message Spontaneous {
+  // The payment hash, i.e., the hash of the preimage.
+  string hash = 1;
+
+  // The pre-image used by the payment.
+  optional string preimage = 2;
+}
+
+// Limits applying to how much fee we allow an LSP to deduct from the payment amount.
+// See [`LdkChannelConfig::accept_underpaying_htlcs`] for more information.
+//
+// [`LdkChannelConfig::accept_underpaying_htlcs`]: lightning::util::config::ChannelConfig::accept_underpaying_htlcs
+message LSPFeeLimits {
+  // The maximal total amount we allow any configured LSP withhold from us when forwarding the
+  // payment.
+  optional uint64 max_total_opening_fee_msat = 1;
+
+  // The maximal proportional fee, in parts-per-million millisatoshi, we allow any configured
+  // LSP withhold from us when forwarding the payment.
+  optional uint64 max_proportional_opening_fee_ppm_msat = 2;
+}
+
+// Represents the direction of a payment.
+enum PaymentDirection {
+  // The payment is inbound.
+  INBOUND = 0;
+
+  // The payment is outbound.
+  OUTBOUND = 1;
+}
+
+// Represents the current status of a payment.
+enum PaymentStatus {
+  // The payment is still pending.
+  PENDING = 0;
+
+  // The payment succeeded.
+  SUCCEEDED = 1;
+
+  // The payment failed.
+  FAILED = 2;
+}
+
+// The Bitcoin network the node is running on.
+enum Network {
+  // Mainnet Bitcoin.
+  BITCOIN = 0;
+
+  // Bitcoin's testnet (testnet3) network.
+  TESTNET = 1;
+
+  // Bitcoin's testnet4 network.
+  TESTNET4 = 2;
+
+  // Bitcoin's signet network.
+  SIGNET = 3;
+
+  // Bitcoin's regtest network.
+  REGTEST = 4;
+}
+
+// Identifies the channel and counterparty that an HTLC was processed with.
+message HtlcLocator {
+  // The channel that the HTLC was sent or received on.
+  string channel_id = 1;
+
+  // The `user_channel_id` for the channel.
+  // This can be unset for older serialized events or if the payment was settled on-chain.
+  optional string user_channel_id = 2;
+
+  // The node id of the counterparty for this HTLC.
+  // This can be unset for older serialized events.
+  optional string node_id = 3;
+
+  // The amount in millisatoshis of the HTLC that was sent or received, if known.
+  // This can be unset for events serialized by LDK Node v0.7.0 and prior.
+  optional uint64 amount_msat = 4;
+}
+
+// A stored forwarding record from LDK Node's detailed history.
+// Each record describes one incoming and one outgoing HTLC.
+message ForwardedPayment {
+  // The opaque, hex-encoded identifier assigned by LDK Node.
+  string id = 1;
+
+  // The incoming channel ID.
+  string prev_channel_id = 2;
+
+  // The outgoing channel ID.
+  string next_channel_id = 3;
+
+  // The incoming user channel ID as a decimal string, if known.
+  optional string prev_user_channel_id = 4;
+
+  // The outgoing user channel ID as a decimal string, if known.
+  optional string next_user_channel_id = 5;
+
+  // The previous node's public key, if known.
+  optional string prev_node_id = 6;
+
+  // The next node's public key, if known.
+  optional string next_node_id = 7;
+
+  // The incoming amount, in millisatoshis, if known.
+  optional uint64 inbound_amount_forwarded_msat = 8;
+
+  // The total fee earned, in millisatoshis, if known.
+  optional uint64 total_fee_earned_msat = 9;
+
+  // The share of the total fee withheld in addition to the forwarding fee, if known.
+  // This is included in total_fee_earned_msat; do not add the two amounts.
+  optional uint64 skimmed_fee_msat = 10;
+
+  // Whether the next hop claimed the forwarded HTLC through an on-chain transaction.
+  bool claim_from_onchain_tx = 11;
+
+  // The outgoing amount, in millisatoshis, if known.
+  optional uint64 outbound_amount_forwarded_msat = 12;
+
+  // LDK Node's stored forwarding time, in seconds since the Unix epoch.
+  uint64 forwarded_at_timestamp = 13;
+}
+
+// Forwarding statistics reported by LDK Node.
+message ChannelForwardingStats {
+  // The channel id these stats apply to.
+  string channel_id = 1;
+
+  // The channel counterparty node id, if known.
+  optional string counterparty_node_id = 2;
+
+  // Number of forwarded payments where this was the incoming channel.
+  uint64 inbound_payments_forwarded = 3;
+
+  // Number of forwarded payments where this was the outgoing channel.
+  uint64 outbound_payments_forwarded = 4;
+
+  // Total inbound amount forwarded through this channel, in millisatoshis.
+  uint64 total_inbound_amount_msat = 5;
+
+  // Total outbound amount forwarded through this channel, in millisatoshis.
+  uint64 total_outbound_amount_msat = 6;
+
+  // Total forwarding fees earned through this channel, in millisatoshis, if known for every
+  // recorded forward.
+  //
+  // A single record covers this channel in both roles. A forward contributes its fee here when
+  // this was the incoming channel, and contributes nothing when this was the outgoing channel,
+  // because fees are attributed to the incoming side.
+  optional uint64 total_fee_earned_msat = 7;
+
+  // Total skimmed fees earned through this channel, in millisatoshis.
+  //
+  // This is the share of `total_fee_earned_msat` that was withheld in addition to the
+  // forwarding fee, not an amount earned on top of it. Adding the two would double-count.
+  uint64 total_skimmed_fee_msat = 8;
+
+  // Number of forwarded HTLCs that the next hop claimed from an on-chain transaction.
+  //
+  // A forward contributes here when this was the outgoing channel.
+  uint64 onchain_claims_count = 9;
+
+  // Timestamp of the first forward recorded for this channel, in seconds since the Unix epoch.
+  uint64 first_forwarded_at_timestamp = 10;
+
+  // Timestamp of the latest forward recorded for this channel, in seconds since the Unix epoch.
+  uint64 last_forwarded_at_timestamp = 11;
+}
+
+// Forwarding statistics reported by LDK Node.
+message ChannelPairForwardingStats {
+  // An opaque identifier for this channel-pair bucket.
+  string id = 1;
+
+  // The incoming channel id.
+  string prev_channel_id = 2;
+
+  // The outgoing channel id.
+  string next_channel_id = 3;
+
+  // Start timestamp of this aggregation bucket, in seconds since the Unix epoch.
+  uint64 bucket_start_timestamp = 4;
+
+  // Width of this aggregation bucket, in seconds.
+  uint64 bucket_size_secs = 5;
+
+  // The previous node id, if available.
+  optional string prev_node_id = 6;
+
+  // The next node id, if available.
+  optional string next_node_id = 7;
+
+  // Number of payments aggregated in this bucket.
+  uint64 payment_count = 8;
+
+  // Total inbound amount in this bucket, in millisatoshis.
+  uint64 total_inbound_amount_msat = 9;
+
+  // Total outbound amount in this bucket, in millisatoshis.
+  uint64 total_outbound_amount_msat = 10;
+
+  // Total forwarding fees earned in this bucket, in millisatoshis, if known for every payment.
+  optional uint64 total_fee_earned_msat = 11;
+
+  // Total skimmed fees in this bucket, in millisatoshis.
+  //
+  // This is the share of `total_fee_earned_msat` that was withheld in addition to the
+  // forwarding fee, not an amount earned on top of it. Adding the two would double-count.
+  uint64 total_skimmed_fee_msat = 12;
+
+  // Number of forwarded HTLCs that the next hop claimed from an on-chain transaction.
+  uint64 onchain_claims_count = 13;
+
+  // Average forwarding fee per payment, in millisatoshis, if known for every payment.
+  optional uint64 avg_fee_msat = 14;
+
+  // Average inbound amount per payment, in millisatoshis.
+  uint64 avg_inbound_amount_msat = 15;
+
+  // Timestamp of the first forward in this bucket, in seconds since the Unix epoch.
+  uint64 first_forwarded_at_timestamp = 16;
+
+  // Timestamp of the latest forward in this bucket, in seconds since the Unix epoch.
+  uint64 last_forwarded_at_timestamp = 17;
+
+  // Timestamp when this bucket was aggregated, in seconds since the Unix epoch.
+  uint64 aggregated_at_timestamp = 18;
+
+}
+
+// The forwarding history stored by LDK Node.
+enum ForwardedPaymentTrackingMode {
+  FORWARDED_PAYMENT_TRACKING_MODE_UNSPECIFIED = 0;
+  // Update per-channel totals without storing individual forwards.
+  FORWARDED_PAYMENT_TRACKING_MODE_STATS = 1;
+  // Also store individual forwards, which are later aggregated into channel-pair buckets.
+  FORWARDED_PAYMENT_TRACKING_MODE_DETAILED = 2;
+}
+
+// ChannelShutdownState mirrors LDK's `lightning::ln::channel_state::ChannelShutdownState`,
+// indicating how far along a channel is in the cooperative close process.
+enum ChannelShutdownState {
+  CHANNEL_SHUTDOWN_STATE_UNSPECIFIED = 0;
+  // Channel has not sent or received a shutdown message.
+  CHANNEL_SHUTDOWN_STATE_NOT_SHUTTING_DOWN = 1;
+  // Local node has sent a shutdown message for this channel.
+  CHANNEL_SHUTDOWN_STATE_SHUTDOWN_INITIATED = 2;
+  // Shutdown message exchanges have concluded and the channels are in the midst of
+  // resolving all existing open HTLCs before closing can continue.
+  CHANNEL_SHUTDOWN_STATE_RESOLVING_HTLCS = 3;
+  // All HTLCs have been resolved, nodes are currently negotiating channel close onchain fee
+  // rates.
+  CHANNEL_SHUTDOWN_STATE_NEGOTIATING_CLOSING_FEE = 4;
+  // We've successfully negotiated a closing_signed dance. At this point the channel is about
+  // to be dropped.
+  CHANNEL_SHUTDOWN_STATE_SHUTDOWN_COMPLETE = 5;
+}
+
+// ReserveType mirrors LDK Node's `ReserveType`, indicating the kind of on-chain reserve
+// maintained for a channel, if any has been determined yet.
+enum ReserveType {
+  RESERVE_TYPE_UNSPECIFIED = 0;
+  // An anchor outputs channel where we maintain a per-channel on-chain reserve for fee
+  // bumping force-close transactions.
+  RESERVE_TYPE_ADAPTIVE = 1;
+  // An anchor outputs channel where we do not maintain any reserve, because the counterparty
+  // is in our trusted_peers_no_reserve list.
+  RESERVE_TYPE_TRUSTED_PEERS_NO_RESERVE = 2;
+  // A legacy (pre-anchor) channel using only option_static_remotekey.
+  RESERVE_TYPE_LEGACY = 3;
+}
+
+message Channel {
+  // The channel ID (prior to funding transaction generation, this is a random 32-byte
+  // identifier, afterwards this is the transaction ID of the funding transaction XOR the
+  // funding transaction output).
+  //
+  // Note that this means this value is *not* persistent - it can change once during the
+  // lifetime of the channel.
+  string channel_id = 1;
+
+  // The node ID of our the channel's remote counterparty.
+  string counterparty_node_id = 2;
+
+  // The channel's funding transaction output, if we've negotiated the funding transaction with
+  // our counterparty already.
+  optional OutPoint funding_txo = 3;
+
+  // The hex-encoded local `user_channel_id` of this channel.
+  string user_channel_id = 4;
+
+  // The value, in satoshis, that must always be held as a reserve in the channel for us. This
+  // value ensures that if we broadcast a revoked state, our counterparty can punish us by
+  // claiming at least this value on chain.
+  //
+  // This value is not included in [`outbound_capacity_msat`] as it can never be spent.
+  //
+  // This value will be `None` for outbound channels until the counterparty accepts the channel.
+  optional uint64 unspendable_punishment_reserve = 5;
+
+  // The value, in satoshis, of this channel as it appears in the funding output.
+  uint64 channel_value_sats = 6;
+
+  // The currently negotiated fee rate denominated in satoshi per 1000 weight units,
+  // which is applied to commitment and HTLC transactions.
+  uint32 feerate_sat_per_1000_weight = 7;
+
+  // The available outbound capacity for sending HTLCs to the remote peer.
+  //
+  // The amount does not include any pending HTLCs which are not yet resolved (and, thus, whose
+  // balance is not available for inclusion in new outbound HTLCs). This further does not include
+  // any pending outgoing HTLCs which are awaiting some other resolution to be sent.
+  uint64 outbound_capacity_msat = 8;
+
+  // The available outbound capacity for sending HTLCs to the remote peer.
+  //
+  // The amount does not include any pending HTLCs which are not yet resolved
+  // (and, thus, whose balance is not available for inclusion in new inbound HTLCs). This further
+  // does not include any pending outgoing HTLCs which are awaiting some other resolution to be
+  // sent.
+  uint64 inbound_capacity_msat = 9;
+
+  // The number of required confirmations on the funding transactions before the funding is
+  // considered "locked". The amount is selected by the channel fundee.
+  //
+  // The value will be `None` for outbound channels until the counterparty accepts the channel.
+  optional uint32 confirmations_required = 10;
+
+  // The current number of confirmations on the funding transaction.
+  optional uint32 confirmations = 11;
+
+  // Is `true` if the channel was initiated (and therefore funded) by us.
+  bool is_outbound = 12;
+
+  // Is `true` if both parties have exchanged `channel_ready` messages, and the channel is
+  // not currently being shut down. Both parties exchange `channel_ready` messages upon
+  // independently verifying that the required confirmations count provided by
+  // `confirmations_required` has been reached.
+  bool is_channel_ready = 13;
+
+  // Is `true` if the channel (a) `channel_ready` messages have been exchanged, (b) the
+  // peer is connected, and (c) the channel is not currently negotiating shutdown.
+  //
+  // This is a strict superset of `is_channel_ready`.
+  bool is_usable = 14;
+
+  // Is `true` if this channel is (or will be) publicly-announced
+  bool is_announced = 15;
+
+  // Set of configurable parameters set by self that affect channel operation.
+  ChannelConfig channel_config = 16;
+
+  // The available outbound capacity for sending a single HTLC to the remote peer. This is
+  // similar to `outbound_capacity_msat` but it may be further restricted by
+  // the current state and per-HTLC limit(s). This is intended for use when routing, allowing us
+  // to use a limit as close as possible to the HTLC limit we can currently send.
+  uint64 next_outbound_htlc_limit_msat = 17;
+
+  // The minimum value for sending a single HTLC to the remote peer. This is the equivalent of
+  // `next_outbound_htlc_limit_msat` but represents a lower-bound, rather than
+  // an upper-bound. This is intended for use when routing, allowing us to ensure we pick a
+  // route which is valid.
+  uint64 next_outbound_htlc_minimum_msat = 18;
+
+  // The number of blocks (after our commitment transaction confirms) that we will need to wait
+  // until we can claim our funds after we force-close the channel. During this time our
+  // counterparty is allowed to punish us if we broadcasted a stale state. If our counterparty
+  // force-closes the channel and broadcasts a commitment transaction we do not have to wait any
+  // time to claim our non-HTLC-encumbered funds.
+  //
+  // This value will be `None` for outbound channels until the counterparty accepts the channel.
+  optional uint32 force_close_spend_delay = 19;
+
+  // The smallest value HTLC (in msat) the remote peer will accept, for this channel.
+  //
+  // This field is only `None` before we have received either the `OpenChannel` or
+  // `AcceptChannel` message from the remote peer.
+  optional uint64 counterparty_outbound_htlc_minimum_msat = 20;
+
+  // The largest value HTLC (in msat) the remote peer currently will accept, for this channel.
+  optional uint64 counterparty_outbound_htlc_maximum_msat = 21;
+
+  // The value, in satoshis, that must always be held in the channel for our counterparty. This
+  // value ensures that if our counterparty broadcasts a revoked state, we can punish them by
+  // claiming at least this value on chain.
+  //
+  // This value is not included in `inbound_capacity_msat` as it can never be spent.
+  uint64 counterparty_unspendable_punishment_reserve = 22;
+
+  // Base routing fee in millisatoshis.
+  optional uint32 counterparty_forwarding_info_fee_base_msat = 23;
+
+  // Proportional fee, in millionths of a satoshi the channel will charge per transferred satoshi.
+  optional uint32 counterparty_forwarding_info_fee_proportional_millionths = 24;
+
+  // The minimum difference in CLTV expiry between an ingoing HTLC and its outgoing counterpart,
+  // such that the outgoing HTLC is forwardable to this counterparty.
+  optional uint32 counterparty_forwarding_info_cltv_expiry_delta = 25;
+  // The channel's `short_channel_id`, if we've negotiated the funding transaction with our
+  // counterparty already and it's reached the required number of confirmations.
+  //
+  // Note that if an inbound SCID alias is set, that will be used for invoices and inbound
+  // payments instead of this value.
+  optional uint64 short_channel_id = 26;
+
+  // An optional `short_channel_id` alias for this channel, randomly generated by us and usable
+  // in place of `short_channel_id` to reference the channel in outbound routes when the channel
+  // has not yet been confirmed.
+  optional uint64 outbound_scid_alias = 27;
+
+  // An optional `short_channel_id` alias for this channel, randomly generated by our
+  // counterparty and usable in place of `short_channel_id` in invoice route hints. Our
+  // counterparty will recognize the alias provided here in place of the `short_channel_id`
+  // when they see a payment to be routed to us.
+  optional uint64 inbound_scid_alias = 28;
+
+  // The smallest value HTLC (in msat) we will accept, for this channel.
+  uint64 inbound_htlc_minimum_msat = 29;
+
+  // The largest value HTLC (in msat) we currently will accept, for this channel.
+  optional uint64 inbound_htlc_maximum_msat = 30;
+
+  // The current shutdown state of the channel, if any.
+  //
+  // Will be unset for objects serialized with LDK Node v0.1 and earlier.
+  optional ChannelShutdownState channel_shutdown_state = 31;
+
+  // The type of on-chain reserve maintained for this channel.
+  //
+  // Will be unset until channel negotiation has completed and determined whether this channel
+  // uses anchor or legacy reserve behavior.
+  optional ReserveType reserve_type = 32;
+
+  // The negotiated channel-type features, keyed by the signaled BOLT feature bit.
+  // This map is empty until channel negotiation determines the channel type.
+  map<uint32, Feature> channel_type = 33;
+
+  // The features our counterparty provided upon last connection, keyed by the signaled BOLT
+  // feature bit.
+  //
+  // Useful for routing, as it is the most up-to-date copy of the counterparty's features and
+  // many routing-relevant features are present in the init context.
+  map<uint32, Feature> counterparty_features = 34;
+}
+
+// ChannelConfig represents the configuration settings for a channel in a Lightning Network node.
+// See more: https://docs.rs/lightning/latest/lightning/util/config/struct.ChannelConfig.html
+message ChannelConfig {
+  // Amount (in millionths of a satoshi) charged per satoshi for payments forwarded outbound
+  // over the channel.
+  // See more: https://docs.rs/lightning/latest/lightning/util/config/struct.ChannelConfig.html#structfield.forwarding_fee_proportional_millionths
+  optional uint32 forwarding_fee_proportional_millionths = 1;
+
+  // Amount (in milli-satoshi) charged for payments forwarded outbound over the channel,
+  // in excess of forwarding_fee_proportional_millionths.
+  // See more: https://docs.rs/lightning/latest/lightning/util/config/struct.ChannelConfig.html#structfield.forwarding_fee_base_msat
+  optional uint32 forwarding_fee_base_msat = 2;
+
+  // The difference in the CLTV value between incoming HTLCs and an outbound HTLC forwarded
+  // over the channel this config applies to.
+  // See more: https://docs.rs/lightning/latest/lightning/util/config/struct.ChannelConfig.html#structfield.cltv_expiry_delta
+  optional uint32 cltv_expiry_delta = 3;
+
+  // The maximum additional fee we’re willing to pay to avoid waiting for the counterparty’s
+  // to_self_delay to reclaim funds.
+  // See more: https://docs.rs/lightning/latest/lightning/util/config/struct.ChannelConfig.html#structfield.force_close_avoidance_max_fee_satoshis
+  optional uint64 force_close_avoidance_max_fee_satoshis = 4;
+
+  // If set, allows this channel’s counterparty to skim an additional fee off this node’s
+  // inbound HTLCs. Useful for liquidity providers to offload on-chain channel costs to end users.
+  // See more: https://docs.rs/lightning/latest/lightning/util/config/struct.ChannelConfig.html#structfield.accept_underpaying_htlcs
+  optional bool accept_underpaying_htlcs = 5;
+
+  // Limit our total exposure to potential loss to on-chain fees on close, including
+  // in-flight HTLCs which are burned to fees as they are too small to claim on-chain
+  // and fees on commitment transaction(s) broadcasted by our counterparty in excess of
+  // our own fee estimate.
+  // See more: https://docs.rs/lightning/latest/lightning/util/config/struct.ChannelConfig.html#structfield.max_dust_htlc_exposure
+  oneof max_dust_htlc_exposure {
+
+    // This sets a fixed limit on the total dust exposure in millisatoshis.
+    // See more: https://docs.rs/lightning/latest/lightning/util/config/enum.MaxDustHTLCExposure.html#variant.FixedLimitMsat
+    uint64 fixed_limit_msat = 6;
+
+    // This sets a multiplier on the ConfirmationTarget::OnChainSweep feerate (in sats/KW) to determine the maximum allowed dust exposure.
+    // See more: https://docs.rs/lightning/latest/lightning/util/config/enum.MaxDustHTLCExposure.html#variant.FeeRateMultiplier
+    uint64 fee_rate_multiplier = 7;
+  }
+}
+
+// Represent a transaction outpoint.
+message OutPoint {
+  // The referenced transaction's txid.
+  string txid = 1;
+
+  // The index of the referenced output in its transaction's vout.
+  uint32 vout = 2;
+}
+
+message BestBlock {
+  // The block’s hash
+  string block_hash = 1;
+
+  // The height at which the block was confirmed.
+  uint32 height = 2;
+}
+
+// Details about the status of a known Lightning balance.
+message LightningBalance {
+  oneof balance_type {
+    ClaimableOnChannelClose claimable_on_channel_close = 1;
+    ClaimableAwaitingConfirmations claimable_awaiting_confirmations = 2;
+    ContentiousClaimable contentious_claimable = 3;
+    MaybeTimeoutClaimableHTLC maybe_timeout_claimable_htlc = 4;
+    MaybePreimageClaimableHTLC maybe_preimage_claimable_htlc = 5;
+    CounterpartyRevokedOutputClaimable counterparty_revoked_output_claimable = 6;
+  }
+}
+
+// The channel is not yet closed (or the commitment or closing transaction has not yet appeared in a block).
+// The given balance is claimable (less on-chain fees) if the channel is force-closed now.
+// See more: https://docs.rs/ldk-node/latest/ldk_node/enum.LightningBalance.html#variant.ClaimableOnChannelClose
+message ClaimableOnChannelClose {
+  // The identifier of the channel this balance belongs to.
+  string channel_id = 1;
+
+  // The identifier of our channel counterparty.
+  string counterparty_node_id = 2;
+
+  // The amount available to claim, in satoshis, excluding the on-chain fees which will be required to do so.
+  uint64 amount_satoshis = 3;
+
+  // The transaction fee we pay for the closing commitment transaction.
+  // This amount is not included in the `amount_satoshis` value.
+  //
+  // Note that if this channel is inbound (and thus our counterparty pays the commitment transaction fee) this value
+  // will be zero.
+  uint64 transaction_fee_satoshis = 4;
+
+  // The amount of millisatoshis which has been burned to fees from HTLCs which are outbound from us and are related to
+  // a payment which was sent by us. This is the sum of the millisatoshis part of all HTLCs which are otherwise
+  // represented by `LightningBalance::MaybeTimeoutClaimableHTLC` with their
+  // `LightningBalance::MaybeTimeoutClaimableHTLC::outbound_payment` flag set, as well as any dust HTLCs which would
+  // otherwise be represented the same.
+  //
+  // This amount (rounded up to a whole satoshi value) will not be included in `amount_satoshis`.
+  uint64 outbound_payment_htlc_rounded_msat = 5;
+
+  // The amount of millisatoshis which has been burned to fees from HTLCs which are outbound from us and are related to
+  // a forwarded HTLC. This is the sum of the millisatoshis part of all HTLCs which are otherwise represented by
+  // `LightningBalance::MaybeTimeoutClaimableHTLC` with their `LightningBalance::MaybeTimeoutClaimableHTLC::outbound_payment`
+  // flag not set, as well as any dust HTLCs which would otherwise be represented the same.
+  //
+  // This amount (rounded up to a whole satoshi value) will not be included in `amount_satoshis`.
+  uint64 outbound_forwarded_htlc_rounded_msat = 6;
+
+  // The amount of millisatoshis which has been burned to fees from HTLCs which are inbound to us and for which we know
+  // the preimage. This is the sum of the millisatoshis part of all HTLCs which would be represented by
+  // `LightningBalance::ContentiousClaimable` on channel close, but whose current value is included in `amount_satoshis`,
+  // as well as any dust HTLCs which would otherwise be represented the same.
+  //
+  // This amount (rounded up to a whole satoshi value) will not be included in `amount_satoshis`.
+  uint64 inbound_claiming_htlc_rounded_msat = 7;
+
+  // The amount of millisatoshis which has been burned to fees from HTLCs which are inbound to us and for which we do
+  // not know the preimage. This is the sum of the millisatoshis part of all HTLCs which would be represented by
+  // `LightningBalance::MaybePreimageClaimableHTLC` on channel close, as well as any dust HTLCs which would otherwise be
+  // represented the same.
+  //
+  // This amount (rounded up to a whole satoshi value) will not be included in the counterparty’s `amount_satoshis`.
+  uint64 inbound_htlc_rounded_msat = 8;
+}
+
+// The channel has been closed, and the given balance is ours but awaiting confirmations until we consider it spendable.
+// See more: https://docs.rs/ldk-node/latest/ldk_node/enum.LightningBalance.html#variant.ClaimableAwaitingConfirmations
+message ClaimableAwaitingConfirmations {
+  // The identifier of the channel this balance belongs to.
+  string channel_id = 1;
+
+  // The identifier of our channel counterparty.
+  string counterparty_node_id = 2;
+
+  // The amount available to claim, in satoshis, possibly excluding the on-chain fees which were spent in broadcasting
+  // the transaction.
+  uint64 amount_satoshis = 3;
+
+  // The height at which we start tracking it as  `SpendableOutput`.
+  uint32 confirmation_height = 4;
+
+  // Whether this balance is a result of cooperative close, a force-close, or an HTLC.
+  BalanceSource source = 5;
+}
+
+// Indicates whether the balance is derived from a cooperative close, a force-close (for holder or counterparty),
+// or whether it is for an HTLC.
+enum BalanceSource {
+  // The channel was force closed by the holder.
+  HOLDER_FORCE_CLOSED = 0;
+
+  // The channel was force closed by the counterparty.
+  COUNTERPARTY_FORCE_CLOSED = 1;
+
+  // The channel was cooperatively closed.
+  COOP_CLOSE = 2;
+
+  // This balance is the result of an HTLC.
+  HTLC = 3;
+}
+
+// The channel has been closed, and the given balance should be ours but awaiting spending transaction confirmation.
+// If the spending transaction does not confirm in time, it is possible our counterparty can take the funds by
+// broadcasting an HTLC timeout on-chain.
+//
+// Once the spending transaction confirms, before it has reached enough confirmations to be considered safe from chain
+// reorganizations, the balance will instead be provided via `LightningBalance::ClaimableAwaitingConfirmations`.
+// See more: https://docs.rs/ldk-node/latest/ldk_node/enum.LightningBalance.html#variant.ContentiousClaimable
+message ContentiousClaimable {
+  // The identifier of the channel this balance belongs to.
+  string channel_id = 1;
+
+  // The identifier of our channel counterparty.
+  string counterparty_node_id = 2;
+
+  // The amount available to claim, in satoshis, excluding the on-chain fees which were spent in broadcasting
+  // the transaction.
+  uint64 amount_satoshis = 3;
+
+  // The height at which the counterparty may be able to claim the balance if we have not done so.
+  uint32 timeout_height = 4;
+
+  // The payment hash that locks this HTLC.
+  string payment_hash = 5;
+
+  // The preimage that can be used to claim this HTLC.
+  string payment_preimage = 6;
+}
+
+// HTLCs which we sent to our counterparty which are claimable after a timeout (less on-chain fees) if the counterparty
+// does not know the preimage for the HTLCs. These are somewhat likely to be claimed by our counterparty before we do.
+// See more: https://docs.rs/ldk-node/latest/ldk_node/enum.LightningBalance.html#variant.MaybeTimeoutClaimableHTLC
+message MaybeTimeoutClaimableHTLC {
+  // The identifier of the channel this balance belongs to.
+  string channel_id = 1;
+
+  // The identifier of our channel counterparty.
+  string counterparty_node_id = 2;
+
+  // The amount available to claim, in satoshis, excluding the on-chain fees which were spent in broadcasting
+  // the transaction.
+  uint64 amount_satoshis = 3;
+
+  // The height at which we will be able to claim the balance if our counterparty has not done so.
+  uint32 claimable_height = 4;
+
+  // The payment hash whose preimage our counterparty needs to claim this HTLC.
+  string payment_hash = 5;
+
+  // Indicates whether this HTLC represents a payment which was sent outbound from us.
+  bool outbound_payment = 6;
+}
+
+// HTLCs which we received from our counterparty which are claimable with a preimage which we do not currently have.
+// This will only be claimable if we receive the preimage from the node to which we forwarded this HTLC before the
+// timeout.
+// See more: https://docs.rs/ldk-node/latest/ldk_node/enum.LightningBalance.html#variant.MaybePreimageClaimableHTLC
+message MaybePreimageClaimableHTLC {
+  // The identifier of the channel this balance belongs to.
+  string channel_id = 1;
+
+  // The identifier of our channel counterparty.
+  string counterparty_node_id = 2;
+
+  // The amount available to claim, in satoshis, excluding the on-chain fees which were spent in broadcasting
+  // the transaction.
+  uint64 amount_satoshis = 3;
+
+  // The height at which our counterparty will be able to claim the balance if we have not yet received the preimage and
+  // claimed it ourselves.
+  uint32 expiry_height = 4;
+
+  // The payment hash whose preimage we need to claim this HTLC.
+  string payment_hash = 5;
+}
+// The channel has been closed, and our counterparty broadcasted a revoked commitment transaction.
+//
+// Thus, we’re able to claim all outputs in the commitment transaction, one of which has the following amount.
+//
+// See more: https://docs.rs/ldk-node/latest/ldk_node/enum.LightningBalance.html#variant.CounterpartyRevokedOutputClaimable
+message CounterpartyRevokedOutputClaimable {
+  // The identifier of the channel this balance belongs to.
+  string channel_id = 1;
+
+  // The identifier of our channel counterparty.
+  string counterparty_node_id = 2;
+
+  // The amount, in satoshis, of the output which we can claim.
+  uint64 amount_satoshis = 3;
+}
+
+// Details about the status of a known balance currently being swept to our on-chain wallet.
+message PendingSweepBalance {
+  oneof balance_type {
+    PendingBroadcast pending_broadcast = 1;
+    BroadcastAwaitingConfirmation broadcast_awaiting_confirmation = 2;
+    AwaitingThresholdConfirmations awaiting_threshold_confirmations = 3;
+  }
+}
+
+// The spendable output is about to be swept, but a spending transaction has yet to be generated and broadcast.
+// See more: https://docs.rs/ldk-node/latest/ldk_node/enum.PendingSweepBalance.html#variant.PendingBroadcast
+message PendingBroadcast {
+  // The identifier of the channel this balance belongs to.
+  optional string channel_id = 1;
+
+  // The amount, in satoshis, of the output being swept.
+  uint64 amount_satoshis = 2;
+}
+
+// A spending transaction has been generated and broadcast and is awaiting confirmation on-chain.
+// See more: https://docs.rs/ldk-node/latest/ldk_node/enum.PendingSweepBalance.html#variant.BroadcastAwaitingConfirmation
+message BroadcastAwaitingConfirmation {
+  // The identifier of the channel this balance belongs to.
+  optional string channel_id = 1;
+
+  // The best height when we last broadcast a transaction spending the output being swept.
+  uint32 latest_broadcast_height = 2;
+
+  // The identifier of the transaction spending the swept output we last broadcast.
+  string latest_spending_txid = 3;
+
+  // The amount, in satoshis, of the output being swept.
+  uint64 amount_satoshis = 4;
+}
+
+// A spending transaction has been confirmed on-chain and is awaiting threshold confirmations.
+//
+// It will be considered irrevocably confirmed after reaching `ANTI_REORG_DELAY`.
+// See more: https://docs.rs/ldk-node/latest/ldk_node/enum.PendingSweepBalance.html#variant.AwaitingThresholdConfirmations
+message AwaitingThresholdConfirmations {
+  // The identifier of the channel this balance belongs to.
+  optional string channel_id = 1;
+
+  // The identifier of the confirmed transaction spending the swept output.
+  string latest_spending_txid = 2;
+
+  // The hash of the block in which the spending transaction was confirmed.
+  string confirmation_hash = 3;
+
+  // The height at which the spending transaction was confirmed.
+  uint32 confirmation_height = 4;
+
+  // The amount, in satoshis, of the output being swept.
+  uint64 amount_satoshis = 5;
+}
+
+message Bolt11InvoiceDescription {
+  oneof kind {
+    string direct = 1;
+    string hash = 2;
+  }
+}
+
+// Configuration options for payment routing and pathfinding.
+// See https://docs.rs/lightning/0.2.0/lightning/routing/router/struct.RouteParametersConfig.html for more details on each field.
+message RouteParametersConfig {
+  // The maximum total fees, in millisatoshi, that may accrue during route finding.
+  // Defaults to 1% of the payment amount + 50 sats
+  optional uint64 max_total_routing_fee_msat = 1;
+
+  // The maximum total CLTV delta we accept for the route.
+  // Defaults to 1008.
+  uint32 max_total_cltv_expiry_delta = 2;
+
+  // The maximum number of paths that may be used by (MPP) payments.
+  // Defaults to 10.
+  uint32 max_path_count = 3;
+
+  // Selects the maximum share of a channel's total capacity which will be
+  // sent over a channel, as a power of 1/2.
+  // Default value: 2
+  uint32 max_channel_saturation_power_of_half = 4;
+}
+
+// Routing fees for a channel as part of the network graph.
+message GraphRoutingFees {
+  // Flat routing fee in millisatoshis.
+  uint32 base_msat = 1;
+
+  // Liquidity-based routing fee in millionths of a routed amount.
+  uint32 proportional_millionths = 2;
+}
+
+// Details about one direction of a channel in the network graph,
+// as received within a `ChannelUpdate`.
+message GraphChannelUpdate {
+  // When the last update to the channel direction was issued.
+  // Value is opaque, as set in the announcement.
+  uint32 last_update = 1;
+
+  // Whether the channel can be currently used for payments (in this one direction).
+  bool enabled = 2;
+
+  // The difference in CLTV values that you must have when routing through this channel.
+  uint32 cltv_expiry_delta = 3;
+
+  // The minimum value, which must be relayed to the next hop via the channel.
+  uint64 htlc_minimum_msat = 4;
+
+  // The maximum value which may be relayed to the next hop via the channel.
+  uint64 htlc_maximum_msat = 5;
+
+  // Fees charged when the channel is used for routing.
+  GraphRoutingFees fees = 6;
+}
+
+// Details about a channel in the network graph (both directions).
+// Received within a channel announcement.
+message GraphChannel {
+  // Source node of the first direction of the channel (hex-encoded public key).
+  string node_one = 1;
+
+  // Source node of the second direction of the channel (hex-encoded public key).
+  string node_two = 2;
+
+  // The channel capacity as seen on-chain, if chain lookup is available.
+  optional uint64 capacity_sats = 3;
+
+  // Details about the first direction of a channel.
+  GraphChannelUpdate one_to_two = 4;
+
+  // Details about the second direction of a channel.
+  GraphChannelUpdate two_to_one = 5;
+}
+
+// Information received in the latest node_announcement from this node.
+message GraphNodeAnnouncement {
+  // When the last known update to the node state was issued.
+  // Value is opaque, as set in the announcement.
+  uint32 last_update = 1;
+
+  // Moniker assigned to the node.
+  // May be invalid or malicious (eg control chars), should not be exposed to the user.
+  string alias = 2;
+
+  // Color assigned to the node as a hex-encoded RGB string, e.g. "ff0000".
+  string rgb = 3;
+
+  // List of addresses on which this node is reachable.
+  repeated string addresses = 4;
+
+  // Features signaled in this node announcement, keyed by feature bit.
+  map<uint32, Feature> features = 5;
+}
+
+// Details of a known Lightning peer.
+// See more: https://docs.rs/ldk-node/latest/ldk_node/struct.Node.html#method.list_peers
+message Peer {
+  // The hex-encoded node ID of the peer.
+  string node_id = 1;
+
+  // The network address of the peer.
+  string address = 2;
+
+  // Indicates whether we'll try to reconnect to this peer after restarts.
+  bool is_persisted = 3;
+
+  // Indicates whether we currently have an active connection with the peer.
+  bool is_connected = 4;
+}
+
+// Details about a node in the network graph, known from the network announcement.
+message GraphNode {
+  // All valid channels a node has announced.
+  repeated uint64 channels = 1;
+
+  // More information about a node from node_announcement.
+  // Optional because we store a node entry after learning about it from
+  // a channel announcement, but before receiving a node announcement.
+  GraphNodeAnnouncement announcement_info = 2;
+}
+
+// Route hint for finding a path to the payee in a BOLT11 invoice.
+message Bolt11RouteHint {
+  // The hops in this route hint.
+  repeated Bolt11HopHint hop_hints = 1;
+}
+
+// A hop in a BOLT11 route hint.
+message Bolt11HopHint {
+  // The hex-encoded public key of the node at this hop.
+  string node_id = 1;
+
+  // The short channel ID.
+  uint64 short_channel_id = 2;
+
+  // The base fee in millisatoshis charged for routing through this hop.
+  uint32 fee_base_msat = 3;
+
+  // Fee proportional millionths charged for routing through this hop.
+  uint32 fee_proportional_millionths = 4;
+
+  // The CLTV expiry delta for this hop.
+  uint32 cltv_expiry_delta = 5;
+}
+
+// The amount specified in a BOLT12 offer.
+message OfferAmount {
+  oneof amount {
+    // Amount in millisatoshis for Bitcoin payments.
+    uint64 bitcoin_amount_msats = 1;
+
+    // Amount in a non-Bitcoin currency.
+    CurrencyAmount currency_amount = 2;
+  }
+}
+
+// A non-Bitcoin currency amount.
+message CurrencyAmount {
+  // ISO 4217 currency code (e.g., "USD", "EUR").
+  string iso4217_code = 1;
+
+  // The amount in the specified currency's minor unit.
+  uint64 amount = 2;
+}
+
+// The quantity of items supported by a BOLT12 offer.
+message OfferQuantity {
+  oneof quantity {
+    // Only one item may be requested.
+    bool one = 1;
+
+    // Up to this many items may be requested.
+    uint64 bounded = 2;
+
+    // Any number of items may be requested.
+    bool unbounded = 3;
+  }
+}
+
+// A blinded path to the offer recipient.
+message BlindedPath {
+  // Identifies the introduction node of the blinded path, either directly by
+  // node id or indirectly via a directed short channel ID.
+  oneof introduction_node {
+    // The hex-encoded public key of the introduction node.
+    string node_id = 1;
+
+    // The directed short channel ID identifying the introduction node.
+    DirectedShortChannelId directed_scid = 2;
+  }
+
+  // The hex-encoded blinding point.
+  string blinding_point = 3;
+
+  // The number of blinded hops in the path.
+  uint32 num_hops = 4;
+}
+
+// A short channel ID together with a direction byte identifying one of the
+// channel's two endpoints.
+message DirectedShortChannelId {
+  // The short channel ID.
+  uint64 scid = 1;
+
+  // Which endpoint of the channel is being referred to.
+  ChannelDirection direction = 2;
+}
+
+// Identifies one of the two endpoints of a channel, by lexicographic order of
+// node ids.
+enum ChannelDirection {
+  // The endpoint whose node id is lexicographically smaller.
+  NODE_ONE = 0;
+
+  // The endpoint whose node id is lexicographically greater.
+  NODE_TWO = 1;
+}
+
+// A feature advertised in a BOLT feature context.
+message Feature {
+  // Human-readable feature name.
+  string name = 1;
+
+  // Whether the signaled feature bit is required.
+  bool is_required = 2;
+}
+
+// Custom TLV record attached to a payment.
+message CustomTlvRecord {
+  // TLV type number.
+  uint64 type_num = 1;
+  // Raw TLV value.
+  bytes value = 2;
+}

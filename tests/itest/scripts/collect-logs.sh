@@ -14,7 +14,7 @@ mkdir -p "${ARTIFACT_DIR}"
 "${COMPOSE[@]}" ps >"${ARTIFACT_DIR}/docker-compose.ps.txt" 2>&1 || true
 "${COMPOSE[@]}" logs --no-color >"${ARTIFACT_DIR}/docker-compose.log" 2>&1 || true
 
-for service in postgres bitcoind lnd cln; do
+for service in postgres bitcoind lnd cln ldk; do
   "${COMPOSE[@]}" logs --no-color "${service}" >"${ARTIFACT_DIR}/${service}.log" 2>&1 || true
 done
 

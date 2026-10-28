@@ -60,6 +60,16 @@ payment_timeout = "60s"
 fee_limit_msat = 25000
 reorg_buffer_blocks = 2
 
+# LDK Server Lightning provider (initially Lightning-only)
+[ldk_server_config]
+endpoint = "localhost:3536"
+cert_path = "certs/ldk/tls.crt"
+macaroon_path = "certs/ldk/admin.macaroon"
+fee_limit_msat = 25000
+request_timeout = "10s"
+payment_timeout = "30s"
+poll_interval = "2s"
+
 # Logging
 [logging]
 format = "json"

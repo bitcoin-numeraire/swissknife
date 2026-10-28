@@ -9,6 +9,39 @@ name: swissknife-itest
 # scripts/bootstrap.sh.
 
 services:
+  waved-contract:
+    profiles: [wavelength_contract]
+    image: swissknife-itest-waved:b3ad398d
+    command:
+      - --network=regtest
+      - --datadir=/data
+      - --rpc.listenaddr=0.0.0.0:10029
+      - --rpc.tlscertpath=/test/cert.pem
+      - --rpc.tlskeypath=/test/key.pem
+      - --wallet.type=lwwallet
+      - --wallet.esploraurl=http://127.0.0.1:3000
+      - --server.host=127.0.0.1:10011
+      - --server.insecure
+      - --swap.serveraddress=127.0.0.1:11010
+      - --swap.serverinsecure
+    volumes:
+      - ../../crates/wavelength-client/tests/fixtures:/test:ro
+    ports:
+      - "127.0.0.1:${SWISSKNIFE_ITEST_WAVED_PORT:-19929}:10029"
+
+  ldk:
+    profiles: [ldk_server]
+    image: swissknife-itest-ldk:762bc473
+    depends_on:
+      bitcoind:
+        condition: service_healthy
+    command: ["/etc/ldk/config.toml"]
+    volumes:
+      - ./config/ldk/config.toml:/etc/ldk/config.toml:ro
+      - ldk-data:/data
+    ports:
+      - "127.0.0.1:${SWISSKNIFE_ITEST_LDK_GRPC_PORT:-3536}:3536"
+
   postgres:
     image: postgres:18.6@sha256:edb0c08dc33befd0262ab3b5cf1c4f3f8cfd8b09e88c05b45adee29d6761ddb6
     environment:
@@ -102,6 +135,7 @@ services:
       - "${SWISSKNIFE_ITEST_OAUTH2_PORT:-8090}:8080"
 
 volumes:
+  ldk-data:
   postgres-data:
   bitcoin-data:
   lnd-data:
