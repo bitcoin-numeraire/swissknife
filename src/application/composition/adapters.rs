@@ -14,8 +14,9 @@ use crate::{
         jwt::{local::LocalAuthenticator, oauth2::OAuth2Authenticator, JWTAuthenticator},
         lightning::{
             cln::{ClnGrpcClient, ClnRestClient},
+            ldk::LdkClient,
             lnd::{LndGrpcClient, LndRestClient},
-            LnClient,
+            LnClient, UnavailableBitcoinWallet,
         },
     },
 };
@@ -80,6 +81,21 @@ async fn get_authenticator(config: AppConfig) -> Result<Arc<dyn JWTAuthenticator
 
 async fn get_ln_client(config: AppConfig) -> Result<LightningAdapter, ApplicationError> {
     match config.ln_provider {
+        LightningProvider::LdkServer => {
+            let provider = config
+                .ldk_server_config
+                .clone()
+                .ok_or_else(|| ConfigError::MissingLightningProviderConfig(config.ln_provider.to_string()))?;
+            let ln_client = Arc::new(LdkClient::new(provider).await?);
+            let bitcoin_wallet = Arc::new(UnavailableBitcoinWallet {
+                network: ln_client.network(),
+                reason: "LDK Server does not expose PSBT preparation or output-level transaction history",
+            });
+            Ok(LightningAdapter {
+                ln_client,
+                bitcoin_wallet,
+            })
+        }
         LightningProvider::ClnGrpc => {
             let cln_config = config
                 .cln_grpc_config

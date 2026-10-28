@@ -13,6 +13,7 @@ use crate::{
         jwt::{local::JwtConfig, oauth2::OAuth2Config},
         lightning::{
             cln::{ClnClientConfig, ClnRestClientConfig},
+            ldk::LdkServerConfig,
             lnd::{LndGrpcClientConfig, LndRestClientConfig},
         },
         logging::tracing::TracingLoggerConfig,
@@ -39,6 +40,7 @@ pub struct AppConfig {
     pub cln_rest_config: Option<ClnRestClientConfig>,
     pub lnd_grpc_config: Option<LndGrpcClientConfig>,
     pub lnd_rest_config: Option<LndRestClientConfig>,
+    pub ldk_server_config: Option<LdkServerConfig>,
     pub web: AxumServerConfig,
     pub logging: TracingLoggerConfig,
 }
@@ -76,4 +78,5 @@ pub enum LightningProvider {
     ClnRest,
     LndGrpc,
     LndRest,
+    LdkServer,
 }

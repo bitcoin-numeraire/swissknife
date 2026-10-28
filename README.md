@@ -45,6 +45,16 @@ SwissKnife allows direct Lightning integration with self-hosted node implementat
 - [`Core Lightning`](https://corelightning.org/):
   - Run your own node
   - Manage your own liquidity.
+- [`LDK Server`](https://github.com/lightningdevkit/ldk-server):
+  - External node, selected with `ln_provider = "ldk_server"`.
+  - Lightning invoices, LNURL and payments; fee quotes expose the configured
+    cap without a route estimate. SwissKnife on-chain operations are currently
+    unavailable for this provider.
+
+Wavelength support starts with the independent
+[`wavelength-client`](crates/wavelength-client) Rust crate. The wallet adapter
+and default-installation cutover remain under development; see
+[provider architecture and compatibility gates](docs/adr/0005-external-wallet-providers.md).
 
 ## Installation
 

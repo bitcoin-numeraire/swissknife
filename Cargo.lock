@@ -2429,6 +2429,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "20870f649af7073d53e38067b2a84312175d56ea15217e1b15bc83506ec50afb"
 
 [[package]]
+name = "ldk-server-macaroons"
+version = "0.1.0"
+source = "git+https://github.com/lightningdevkit/ldk-server?rev=762bc473342c8f945475785ec6743a9b26f56aff#762bc473342c8f945475785ec6743a9b26f56aff"
+dependencies = [
+ "bitcoin_hashes 0.14.101",
+ "hex-conservative 0.2.3",
+]
+
+[[package]]
 name = "lexical-core"
 version = "1.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4490,6 +4499,7 @@ dependencies = [
  "http",
  "humantime",
  "jsonwebtoken",
+ "ldk-server-macaroons",
  "lightning-invoice",
  "lnurl-rs",
  "migration",
@@ -5476,6 +5486,20 @@ dependencies = [
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",
+]
+
+[[package]]
+name = "wavelength-client"
+version = "0.1.0"
+dependencies = [
+ "hex",
+ "prost",
+ "thiserror 2.0.21",
+ "tokio",
+ "tokio-stream",
+ "tonic",
+ "tonic-prost",
+ "tonic-prost-build",
 ]
 
 [[package]]

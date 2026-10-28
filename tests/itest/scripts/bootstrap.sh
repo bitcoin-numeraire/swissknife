@@ -381,4 +381,8 @@ wait_for_mock_oauth2
 ensure_lnd_synced
 wait_for_cln_synced
 
+if [[ "${SWISSKNIFE_ITEST_PROVIDER:-}" == "ldk_server" ]]; then
+  "${SCRIPT_DIR}/bootstrap-ldk.sh"
+fi
+
 echo "Swissknife integration dependencies are ready."

@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/migration", "crates/swissknife-types"]
+members = ["crates/migration", "crates/swissknife-types", "crates/wavelength-client"]
 resolver = "2"
 
 [workspace.package]
@@ -67,6 +67,7 @@ rust_socketio = { version = "0.6.0", features = ["async"] }
 bcrypt = "0.19.3"
 migration = { path = "crates/migration" }
 swissknife-types = { path = "crates/swissknife-types" }
+ldk-server-macaroons = { git = "https://github.com/lightningdevkit/ldk-server", rev = "762bc473342c8f945475785ec6743a9b26f56aff" }
 utoipa = { version = "5.5.0", features = ["axum_extras", "chrono", "uuid"] }
 utoipa-scalar = { version = "0.3.0", features = ["axum"] }
 native-tls = "0.2.18"
