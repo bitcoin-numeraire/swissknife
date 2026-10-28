@@ -21,6 +21,7 @@ release notes when a tag is published.
 
 ### Fixed
 
+- LND gRPC send/replay results preserve known zero routing fees.
 - Lightning payment replies, events and polling reconciliation retain reservations when a provider response
   changes the authorized principal, omits its fee or exceeds its recorded fee authorization.
   Fee limits are persisted separately from balance reservations for restart recovery;
