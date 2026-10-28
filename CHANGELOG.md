@@ -8,6 +8,11 @@ release notes when a tag is published.
 
 ## [Unreleased]
 
+### Fixed
+
+- Restore administrative transaction cleanup across wallets and report empty
+  cleanup results and API errors in the dashboard.
+
 ## [0.3.0] - 2026-10-28
 
 ### Added

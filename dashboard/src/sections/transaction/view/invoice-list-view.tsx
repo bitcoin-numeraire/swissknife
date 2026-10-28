@@ -126,6 +126,8 @@ export function InvoiceListView() {
                 <Tooltip title={t('invoice_list.clean_expired_invoices')} placement="top" arrow>
                   <Box>
                     <CleanTransactionsButton
+                      scope="wallet"
+                      walletId={wallet?.id}
                       onSuccess={invoicesMutate}
                       buttonProps={{
                         color: 'error',
