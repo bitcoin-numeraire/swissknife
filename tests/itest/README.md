@@ -190,3 +190,30 @@ compiled SwissKnife binary. It creates a real unpaid invoice with the public
 services, validates the actual provider expiry/network, checks unsupported
 custom expiry and verifies persistence after restarting SwissKnife. It moves
 no funds and does not satisfy the funded default-cutover gate.
+## Funded public Wavelength tests
+
+`tests/itest/scripts/test-wavelength-funded.sh` starts two fresh public `waved`
+wallets and prints a signet boarding address. Fund it with at least 100,000 test
+sats using a public faucet or another test wallet. The runner waits up to twenty
+minutes for spendable VTXOs, then receives into SwissKnife while it is offline,
+sends back to the public counterparty with a hard fee limit, and restarts both
+daemons and SwissKnife to verify exact fees, durable proofs and single ledger
+credit/debit. It never imports or prints a seed, and rejects mainnet.
+
+The wallets use the documented public network presets; no operator source,
+private images or employee credentials are used. `WAVELENGTH_PUBLIC_NETWORK=testnet`
+selects testnet3. `SWISSKNIFE_ITEST_DATABASE=postgres` runs the same API lifecycle
+against PostgreSQL; SQLite is the default. Wallet-to-wallet payments can settle
+on the same Ark operator, so this is not proof of external Lightning routing.
+The observed settlement rail and fee are printed rather than inferred.
+
+Wallet volumes and the private test state directory survive success, failure and
+interruption. The exit message prints the command to resume the same wallets.
+Resuming unlocks once, preserves identity and creates new invoices; it never
+resubmits an earlier payment. After collecting recovery evidence, remove this
+specific test project with Docker Compose `down -v` and delete its printed state
+directory. These wallets use a fixed test-only password and must never hold real
+funds. The **Integration Tests** workflow provides a `wavelength_funded` manual input
+with SQLite/PostgreSQL cells (also select a public network); fund each cell's printed address during its
+funding wait. This is a manual live-network gate, separate from deterministic PR
+checks, and is only successful after the entire payment/restart scenario passes.

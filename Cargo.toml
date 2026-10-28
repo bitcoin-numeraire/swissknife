@@ -95,6 +95,7 @@ strip = true
 # docker stack (see tests/itest/). Run with `make test-integration`.
 itest = []
 public-itest = ["itest"]
+funded-itest = ["itest"]
 
 [dev-dependencies]
 mockall = "0.15.0"

@@ -15,6 +15,11 @@ on:
         required: true
         default: none
         options: [none, signet, testnet]
+      wavelength_funded:
+        description: "Run only funded public wallet tests (fund each printed address; select signet/testnet)"
+        type: boolean
+        required: true
+        default: false
       include_coverage:
         description: "Also run the complete deterministic coverage matrix"
         type: boolean
@@ -32,6 +37,7 @@ jobs:
   # additional Postgres cell. LDK adds its Lightning-only provider contract;
   # unsupported on-chain behavior is checked explicitly in that target.
   integration:
+    if: github.event_name != 'workflow_dispatch' || !inputs.wavelength_funded
     runs-on: ubuntu-latest
     timeout-minutes: 45
 
@@ -92,6 +98,7 @@ jobs:
   # DB-backed Unit-of-Work tests: reservation/settlement balance
   # invariants and concurrency on both SQLite and Postgres.
   persistence:
+    if: github.event_name != 'workflow_dispatch' || !inputs.wavelength_funded
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -127,6 +134,7 @@ jobs:
   # This is a daemon transport contract, not a funded Ark payment gate. The
   # full Wavelength topology/default cutover remains tracked in #389/#390.
   provider-contract:
+    if: github.event_name != 'workflow_dispatch' || !inputs.wavelength_funded
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
@@ -146,6 +154,7 @@ jobs:
   # Independent public-RPC failure injection exercises SwissKnife accounting,
   # not funded Ark settlement. Real public-network tests remain separate below.
   wavelength-accounting:
+    if: github.event_name != 'workflow_dispatch' || !inputs.wavelength_funded
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
@@ -179,7 +188,7 @@ jobs:
   # Shared public services are not deterministic PR infrastructure. Run this
   # explicitly to check external interoperability without private components.
   wavelength-public:
-    if: github.event_name == 'workflow_dispatch' && inputs.wavelength_public_network != 'none'
+    if: github.event_name == 'workflow_dispatch' && inputs.wavelength_public_network != 'none' && !inputs.wavelength_funded
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -193,6 +202,36 @@ jobs:
           WAVELENGTH_PUBLIC_NETWORK: ${{ inputs.wavelength_public_network }}
         run: tests/itest/scripts/test-wavelength-public.sh
 
+  # Public client daemons only. Each cell prints an address requiring test coins;
+  # no private operator image, seed secret or employee account is needed.
+  wavelength-funded:
+    if: github.event_name == 'workflow_dispatch' && inputs.wavelength_funded
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    strategy:
+      fail-fast: false
+      matrix:
+        database: [sqlite, postgres]
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - name: Install protoc
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+      - uses: dtolnay/rust-toolchain@1.99.1
+      - uses: swatinem/rust-cache@v2.9.3
+      - name: Funded receive, send and restart (${{ matrix.database }})
+        env:
+          WAVELENGTH_PUBLIC_NETWORK: ${{ inputs.wavelength_public_network }}
+          SWISSKNIFE_ITEST_DATABASE: ${{ matrix.database }}
+        run: tests/itest/scripts/test-wavelength-funded.sh
+      - name: Upload SwissKnife diagnostic logs
+        if: failure()
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: wavelength-funded-${{ matrix.database }}
+          # Never upload wallet volumes, credentials or the state directory.
+          path: target/itest/*.log
+          retention-days: 14
+
   # Full-matrix merged coverage: unit + UoW (both DBs) + the integration suite
   # across every provider x DB cell, merged into one report (printed to the job
   # log and uploaded as lcov). This is the true total coverage.
@@ -202,7 +241,7 @@ jobs:
   # cover every cell, so coverage runs only on pushes to main (and manual
   # dispatch), not on every pull-request push.
   coverage:
-    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.include_coverage)
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.include_coverage && !inputs.wavelength_funded)
     runs-on: ubuntu-latest
     timeout-minutes: 90
 

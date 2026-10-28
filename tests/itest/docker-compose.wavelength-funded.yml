@@ -1,0 +1,31 @@
+# Public client daemons only. The separate project retains test-wallet volumes
+# after the runner exits so test coins and recovery state are not discarded.
+x-public-wallet: &public-wallet
+  image: swissknife-itest-waved:b3ad398d
+  command:
+    - --network=${WAVELENGTH_PUBLIC_NETWORK:-signet}
+    - --datadir=/data
+    - --rpc.listenaddr=0.0.0.0:10029
+    - --rpc.tlscertpath=/test/cert.pem
+    - --rpc.tlskeypath=/test/key.pem
+    - --wallet.type=lwwallet
+
+services:
+  waved-funded-payer:
+    <<: *public-wallet
+    volumes:
+      - wavelength-funded-payer:/data
+      - ../../crates/wavelength-client/tests/fixtures:/test:ro
+    ports:
+      - "127.0.0.1:${WAVELENGTH_FUNDED_PAYER_PORT:-19949}:10029"
+  waved-funded-provider:
+    <<: *public-wallet
+    volumes:
+      - wavelength-funded-provider:/data
+      - ../../crates/wavelength-client/tests/fixtures:/test:ro
+    ports:
+      - "127.0.0.1:${WAVELENGTH_FUNDED_PROVIDER_PORT:-19959}:10029"
+
+volumes:
+  wavelength-funded-payer:
+  wavelength-funded-provider:
