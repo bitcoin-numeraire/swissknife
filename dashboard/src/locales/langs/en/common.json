@@ -445,6 +445,10 @@
     "native_segwit_helper": "Most compatible modern address type. Use when Taproot support is uncertain."
   },
   "activity_view": {
+    "account": "Account",
+    "delete_selected": "Delete selected transactions",
+    "account_unavailable": "Account unavailable",
+    "ownership_unavailable": "Account and wallet details could not be loaded. Transactions remain available.",
     "all": "All",
     "in": "In",
     "out": "Out",

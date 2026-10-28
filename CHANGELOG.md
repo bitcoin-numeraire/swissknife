@@ -10,6 +10,9 @@ release notes when a tag is published.
 
 ### Fixed
 
+- Restore selected-transaction bulk deletion and show linked account and wallet
+  ownership in the administrative transaction table.
+
 - Restore administrative transaction cleanup across wallets and report empty
   cleanup results and API errors in the dashboard.
 

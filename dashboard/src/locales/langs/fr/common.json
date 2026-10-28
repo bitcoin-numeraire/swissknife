@@ -444,6 +444,10 @@
     "native_segwit_helper": "Type d'adresse moderne le plus compatible. À utiliser si le support Taproot est incertain."
   },
   "activity_view": {
+    "account": "Compte",
+    "delete_selected": "Supprimer les transactions sélectionnées",
+    "account_unavailable": "Compte indisponible",
+    "ownership_unavailable": "Impossible de charger les détails des comptes et portefeuilles. Les transactions restent disponibles.",
     "all": "Tout",
     "in": "Entrant",
     "out": "Sortant",
