@@ -9,6 +9,23 @@ name: swissknife-itest
 # scripts/bootstrap.sh.
 
 services:
+  # Only the public wallet daemon runs locally. Operator, swap and chain-data
+  # connections use waved's documented public defaults with verified TLS.
+  waved-public:
+    profiles: [wavelength_public]
+    image: swissknife-itest-waved:b3ad398d
+    command:
+      - --network=${WAVELENGTH_PUBLIC_NETWORK:-signet}
+      - --datadir=/data
+      - --rpc.listenaddr=0.0.0.0:10029
+      - --rpc.tlscertpath=/test/cert.pem
+      - --rpc.tlskeypath=/test/key.pem
+      - --wallet.type=lwwallet
+    volumes:
+      - ../../crates/wavelength-client/tests/fixtures:/test:ro
+    ports:
+      - "127.0.0.1:${WAVELENGTH_PUBLIC_PORT:-19939}:10029"
+
   waved-contract:
     profiles: [wavelength_contract]
     image: swissknife-itest-waved:b3ad398d
