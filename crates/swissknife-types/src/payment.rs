@@ -32,6 +32,11 @@ pub struct Payment {
     #[serde(skip)]
     pub reserved_amount: u64,
 
+    /// Fee limit recorded at dispatch. None means a historical authorization
+    /// was not recorded; a reservation buffer must not be treated as that limit.
+    #[serde(skip)]
+    pub authorized_fee_msat: Option<u64>,
+
     /// Ledger
     pub ledger: Ledger,
 

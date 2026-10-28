@@ -849,7 +849,8 @@ export type NewInvoiceRequest = {
    */
   description?: string | null;
   /**
-   * Expiration time in seconds
+   * Optional expiration time in seconds. Omit to use the installation's
+   * configured duration or its explicitly selected provider expiry policy.
    */
   expiry?: number | null;
   /**

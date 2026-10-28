@@ -175,3 +175,18 @@ and recovery still require test coins and a public payment counterparty under
 cannot provide local block timing or deterministic fault injection; a public
 black-box development sandbox would improve that coverage without exposing
 operator internals.
+
+`cargo test --features itest --test wavelength` tests the compiled SwissKnife
+HTTP API, real persistence and independently implemented public wallet RPCs
+over verified TLS. `SWISSKNIFE_ITEST_DATABASE=postgres` selects the second
+accounting matrix cell (start the test Postgres first). It covers receive IDs
+that differ from hashes, replay/duplicate protection, gross-outflow fee mapping,
+incomplete/invalid quotes, credit top-up rejection, lost replies, wallet-local
+timeouts, invalid settlement proofs, fee overruns and completed refunds.
+These are deterministic contract tests; they are not funded Ark tests.
+
+The public-network script also runs `tests/wavelength_public.rs` through the
+compiled SwissKnife binary. It creates a real unpaid invoice with the public
+services, validates the actual provider expiry/network, checks unsupported
+custom expiry and verifies persistence after restarting SwissKnife. It moves
+no funds and does not satisfy the funded default-cutover gate.

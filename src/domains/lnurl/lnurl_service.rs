@@ -22,7 +22,7 @@ pub struct LnUrlService {
     domain: String,
     host: String,
     store: AppStore,
-    invoice_expiry: u32,
+    invoice_expiry: Option<u32>,
     ln_client: Arc<dyn LnClient>,
 }
 
@@ -30,7 +30,7 @@ impl LnUrlService {
     pub fn new(
         store: AppStore,
         ln_client: Arc<dyn LnClient>,
-        invoice_expiry: u32,
+        invoice_expiry: Option<u32>,
         domain: String,
         host: String,
     ) -> Self {
@@ -155,7 +155,7 @@ mod tests {
         LnUrlService::new(
             store.build(),
             Arc::new(ln_client),
-            3_600,
+            Some(3_600),
             "numeraire.tech".to_string(),
             "https://numeraire.tech".to_string(),
         )

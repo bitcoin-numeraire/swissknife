@@ -167,7 +167,7 @@ impl LnClient for ClnRestClient {
         amount_msat: u64,
         description: String,
         label: String,
-        expiry: u32,
+        expiry: Option<u32>,
         deschashonly: bool,
     ) -> Result<Invoice, LightningError> {
         let response: InvoiceResponse = self
@@ -175,7 +175,7 @@ impl LnClient for ClnRestClient {
                 "invoice",
                 &InvoiceRequest {
                     description,
-                    expiry: expiry as u64,
+                    expiry: expiry.map(u64::from),
                     label,
                     amount_msat,
                     deschashonly: Some(deschashonly),

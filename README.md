@@ -37,7 +37,7 @@ Numeraire SwissKnife ships with a [Dashboard](https://github.com/bitcoin-numerai
 
 ## Lightning Providers
 
-SwissKnife allows direct Lightning integration with self-hosted node implementations:
+SwissKnife integrates with external Lightning nodes and wallet daemons:
 
 - [`LND`](https://github.com/lightningnetwork/lnd)
   - Run your own node
@@ -51,9 +51,17 @@ SwissKnife allows direct Lightning integration with self-hosted node implementat
     cap without a route estimate. SwissKnife on-chain operations are currently
     unavailable for this provider.
 
-Wavelength support starts with the independent
-[`wavelength-client`](crates/wavelength-client) Rust crate. The wallet adapter
-and default-installation cutover remain under development; see
+- [`Wavelength`](https://github.com/lightninglabs/wavelength) (opt-in):
+  - Use an initialized/unlocked external `waved`, with `ln_provider = "wavelength"`
+    and `invoice_expiry = "provider"`; no user-operated Lightning channels are needed.
+  - Whole-satoshi BOLT11 receives, fee quotes, prepared sends and durable recovery
+    use the standalone [`wavelength-client`](crates/wavelength-client) Rust crate.
+  - `allow_server_credit = true` explicitly permits credit-backed receives and
+    spending existing operator credit. Additional Ark-to-credit top-ups remain disabled.
+  - Custom invoice expiry, LNURL receives and SwissKnife on-chain operations
+    require further upstream/API work. The default cutover requires funded tests.
+
+For configuration and outstanding compatibility work, see
 [provider architecture and compatibility gates](docs/adr/0005-external-wallet-providers.md).
 
 ## Installation

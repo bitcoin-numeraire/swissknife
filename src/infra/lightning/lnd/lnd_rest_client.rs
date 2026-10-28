@@ -242,12 +242,12 @@ impl LnClient for LndRestClient {
         amount_msat: u64,
         description: String,
         _label: String,
-        expiry: u32,
+        expiry: Option<u32>,
         deschashonly: bool,
     ) -> Result<Invoice, LightningError> {
         let mut payload = InvoiceRequest {
             memo: description.clone(),
-            expiry: expiry as u64,
+            expiry: expiry.map(u64::from).unwrap_or_default(),
             value_msat: amount_msat,
             ..Default::default()
         };

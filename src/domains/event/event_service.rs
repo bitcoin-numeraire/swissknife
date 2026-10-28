@@ -15,7 +15,7 @@ use crate::{
         },
         invoice::{Invoice, InvoiceStatus},
         lnurl::process_success_action,
-        payment::{Payment, PaymentStatus},
+        payment::{validate_lightning_settlement, Payment, PaymentStatus},
     },
 };
 
@@ -94,6 +94,7 @@ impl EventUseCases for EventService {
                 return Ok(());
             }
 
+            validate_lightning_settlement(&payment_retrieved, event.amount_msat, Some(event.fees_msat))?;
             if payment_retrieved.status == PaymentStatus::Settled {
                 let payment_id = payment_retrieved.id;
                 let has_unprocessed_action = payment_retrieved.lightning.as_ref().is_some_and(|lightning| {
@@ -335,6 +336,24 @@ mod tests {
                 payment_preimage: "preimage".to_string(),
                 payment_time: Utc::now(),
             }
+        }
+
+        #[tokio::test]
+        async fn rejects_a_completion_exceeding_its_recorded_fee_limit_without_mutation() {
+            let mut store = MockAppStoreBuilder::new();
+            store.payment.expect_find_by_payment_hash().times(1).returning(|_| {
+                Ok(Some(Payment {
+                    amount_msat: 1_000,
+                    reserved_amount: 1_100,
+                    authorized_fee_msat: Some(0),
+                    status: PaymentStatus::Pending,
+                    ..Default::default()
+                }))
+            });
+            store.payment_uow.expect_settle().times(0);
+            store.payment_uow.expect_fail().times(0);
+            store.payment.expect_update().times(0);
+            assert!(service(store).outgoing_payment(event()).await.is_err());
         }
 
         mod when_completion_is_partial {

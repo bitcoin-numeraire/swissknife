@@ -1,6 +1,6 @@
 # ADR 0005: External LDK Server and Wavelength providers
 
-- Status: Proposed; LDK Lightning adapter and Wavelength RPC client implemented
+- Status: Proposed; LDK Lightning adapter and opt-in Wavelength Lightning wallet implemented
 - Date: 2026-10-28
 - Issues: #383, #384, #385, #386, #387, #388, #389, #390
 
@@ -58,9 +58,49 @@ and asynchronous wallets; existing LND/CLN behavior remains available.
 `crates/wavelength-client` is a standalone transport crate with pinned protobufs,
 TLS/macaroon authentication, unary deadlines, live streams and bounded complete
 activity pagination. SwissKnife-specific mapping stays outside the crate.
-No Wavelength provider is selectable yet, and the default remains unchanged.
+An opt-in `ln_provider = "wavelength"` adapter now maps this public contract.
+Set `invoice_expiry = "provider"` to accept daemon-chosen expiry; an explicit
+API expiry or LNURL description-hash request fails before calling `Recv`.
+Fixed expiry remains the default for existing installations. The provider
+default remains unchanged.
 
-The current daemon API requires these decisions/additions before parity:
+The adapter requires an already initialized/unlocked external daemon and
+never creates keys or handles a seed. `allow_server_credit = true` explicitly
+permits credit-backed receives and spending existing credit; Ark-to-credit
+top-ups remain disabled. It verifies the receive invoice's amount, description
+and network. Fractional sats, amountless sends and fee budgets below one satoshi
+are rejected instead of rounded or interpreted as uncapped.
+
+Sends require a complete, unexpired quote matching the signed invoice, with
+both Ark outflow and applied credit reconciled to principal plus fee. The
+fee-estimate port now carries the original invoice so the public read-only
+`SwapClientService.QuotePay` can return a complete estimate without allocating
+an intent or earmarking credit. The existing durable payment hash and reservation
+precede Send. An uncertain reply never causes resubmission; paginated history
+reconciles by structured payment hash, independent of activity ID. Completed
+sends require a matching preimage and canonical fee from public `GetSwap`,
+including credit rows whose friendly activity omits the actual fee. Wallet-local
+timeouts/intervention states retain reservations. A local credit-FSM failure
+needs positive server-debit evidence from public `ListCredits` before settlement;
+absence from its bounded, unpaginated snapshot never proves failure. Durable
+swap failure/refund releases the reservation. Synchronous replies, provider events and replay settlement verify the original
+amount and recorded fee authorization before writing ledger/events.
+
+Fee authorization is stored separately from the balance reservation. v0.2 used
+a reservation buffer, which was not an authorized maximum. The additive
+`authorized_fee_msat` migration keeps historical values NULL rather than
+inventing a limit or changing balances. New Lightning sends persist their
+maximum before dispatch; replies, events and polling replay enforce that
+recorded limit even if the installation configuration changes later. Failed
+provider lookups and inconsistent settlements retain their reservation and are
+reported individually, allowing startup and replay of other payments to continue.
+
+On-chain operations currently return an explicit capability error. Boarding,
+leave, confirmed deposit crediting and asynchronous withdrawal remain work in
+#388 and must be implemented before default cutover. The independent public-RPC
+simulator tests accounting and failure injection, not funded Ark execution.
+
+The current daemon API still requires these decisions/additions before parity:
 
 - **Receive contract:** `RecvRequest` and `StartReceiveRequest` support amount
   and memo, but not a BOLT11 description hash or caller-selected expiry. LNURL

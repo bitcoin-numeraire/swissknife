@@ -109,6 +109,7 @@ impl PaymentService {
             .ok_or_else(|| DataError::Validation("Amount is required for a zero-amount invoice".to_string()))?;
 
         Ok(LnPaymentTarget {
+            bolt11: invoice.bolt11.clone(),
             destination: invoice.destination.clone(),
             amount_msat,
             final_cltv_delta: invoice.final_cltv_delta,
@@ -125,6 +126,7 @@ impl PaymentService {
                 Some(estimated_fee_msat),
                 maximum_fee_msat,
             ),
+            Err(err @ (LightningError::Unsupported(_) | LightningError::InvalidQuote(_))) => Err(err.into()),
             Err(err) => {
                 warn!(%err, amount_msat, maximum_fee_msat, "Route fee estimate unavailable; using provider fee cap");
                 Self::fee_estimate(Ledger::Lightning, amount_msat, None, maximum_fee_msat)
@@ -465,6 +467,7 @@ impl PaymentService {
                         status: PaymentStatus::Pending,
                         ledger: Ledger::Lightning,
                         description: comment,
+                        authorized_fee_msat: Some(fee_estimate.maximum_fee_msat),
                         lightning: Some(LnPayment {
                             payment_hash: invoice.payment_hash,
                             ..Default::default()
@@ -522,6 +525,7 @@ impl PaymentService {
                     status: PaymentStatus::Pending,
                     description: comment.clone(),
                     ledger: Ledger::Lightning,
+                    authorized_fee_msat: Some(fee_estimate.maximum_fee_msat),
                     lightning: Some(LnPayment {
                         ln_address: data.ln_address.clone(),
                         payment_hash: invoice.payment_hash,
@@ -554,10 +558,16 @@ impl PaymentService {
     ) -> Result<Payment, ApplicationError> {
         match result {
             Ok(mut settled_payment) => {
+                super::validate_lightning_settlement(
+                    &pending_payment,
+                    settled_payment.amount_msat,
+                    settled_payment.fee_msat,
+                )?;
                 settled_payment.id = pending_payment.id;
                 settled_payment.wallet_id = pending_payment.wallet_id;
                 settled_payment.ledger = pending_payment.ledger.clone();
                 settled_payment.reserved_amount = pending_payment.reserved_amount;
+                settled_payment.authorized_fee_msat = pending_payment.authorized_fee_msat;
                 settled_payment.status = PaymentStatus::Settled;
 
                 let pending_raw_success_action = pending_payment
@@ -883,12 +893,25 @@ impl PaymentsUseCases for PaymentService {
             };
             let payment_hash = lightning.payment_hash.clone();
 
-            let Some(node_payment) = self.ln_client.payment_by_hash(payment_hash.clone()).await? else {
-                continue;
+            let node_payment = match self.ln_client.payment_by_hash(payment_hash.clone()).await {
+                Ok(Some(payment)) => payment,
+                Ok(None) => continue,
+                Err(error) => {
+                    warn!(payment_id = %payment.id, %error,
+                        "Provider payment lookup failed; retaining reservation and continuing replay");
+                    continue;
+                }
             };
 
             match node_payment.status {
                 PaymentStatus::Settled => {
+                    if let Err(error) =
+                        super::validate_lightning_settlement(&payment, node_payment.amount_msat, node_payment.fee_msat)
+                    {
+                        warn!(payment_id = %payment.id, %error,
+                            "Provider settlement disagrees with authorization; retaining reservation and continuing replay");
+                        continue;
+                    }
                     let payment_time = node_payment.payment_time.unwrap_or_else(Utc::now);
                     let payment_preimage = node_payment
                         .lightning
@@ -2476,7 +2499,10 @@ mod tests {
                         payment.ledger == Ledger::Lightning && *reserve_amount_msat == 6_000
                     })
                     .times(1)
-                    .returning(|payment, _| Ok(payment));
+                    .returning(|mut payment, reserve| {
+                        payment.reserved_amount = reserve;
+                        Ok(payment)
+                    });
                 store
                     .payment_uow
                     .expect_settle()
@@ -2494,6 +2520,8 @@ mod tests {
                     .returning(|_, _, _, _| {
                         Ok(Payment {
                             status: PaymentStatus::Settled,
+                            amount_msat: 1_000,
+                            fee_msat: Some(125),
                             lightning: Some(LnPayment {
                                 payment_preimage: Some("preimage".to_string()),
                                 ..Default::default()
@@ -2716,10 +2744,14 @@ mod tests {
                 let pending = Payment {
                     id: pending_id,
                     status: PaymentStatus::Pending,
+                    amount_msat: 1_000,
+                    reserved_amount: 6_000,
                     ..Default::default()
                 };
                 let settled = Payment {
                     status: PaymentStatus::Settled,
+                    amount_msat: 1_000,
+                    fee_msat: Some(125),
                     ..Default::default()
                 };
 
@@ -2756,6 +2788,8 @@ mod tests {
                 let pending = Payment {
                     id: pending_id,
                     status: PaymentStatus::Pending,
+                    amount_msat: 1_000,
+                    reserved_amount: 6_000,
                     lightning: Some(LnPayment {
                         raw_success_action: Some(LnUrlPaySuccessAction::Message {
                             message: "Thanks".to_string(),
@@ -2766,6 +2800,8 @@ mod tests {
                 };
                 let settled = Payment {
                     status: PaymentStatus::Settled,
+                    amount_msat: 1_000,
+                    fee_msat: Some(125),
                     lightning: Some(LnPayment {
                         payment_preimage: Some("preimage".to_string()),
                         ..Default::default()
@@ -2957,6 +2993,8 @@ mod tests {
             Payment {
                 id: Uuid::new_v4(),
                 status: PaymentStatus::Pending,
+                amount_msat: 1_000,
+                reserved_amount: 6_000,
                 ledger: Ledger::Lightning,
                 lightning: Some(LnPayment {
                     payment_hash: "ph".to_string(),

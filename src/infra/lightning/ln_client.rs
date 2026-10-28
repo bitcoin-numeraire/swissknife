@@ -13,12 +13,14 @@ use crate::{
 #[async_trait]
 pub trait LnClient: Sync + Send {
     async fn disconnect(&self) -> Result<(), LightningError>;
+    /// `None` explicitly accepts provider-chosen expiry. An adapter must reject
+    /// unsupported requested expiry/description hashes rather than ignore them.
     async fn invoice(
         &self,
         amount_msat: u64,
         description: String,
         label: String,
-        expiry: u32,
+        expiry: Option<u32>,
         deschashonly: bool,
     ) -> Result<Invoice, LightningError>;
     /// Return a provider-derived route fee estimate.

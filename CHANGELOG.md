@@ -13,9 +13,19 @@ release notes when a tag is published.
 - LDK Server Lightning provider with exact millisatoshi invoices, LNURL,
   bounded routing fees and durable settlement replay. Route estimates and
   SwissKnife on-chain operations are unavailable for this provider.
-- Standalone `wavelength-client` Rust crate for authenticated `waved` wallet
-  RPCs. Wavelength wallet integration and the default-provider cutover remain
-  under development.
+- Standalone `wavelength-client` Rust crate and opt-in Wavelength Lightning
+  wallet provider, with whole-satoshi BOLT11 receives, bounded prepared sends,
+  verified settlement proofs and restart reconciliation. Daemon-chosen invoice
+  expiry and operator credit require explicit configuration. LNURL receives,
+  on-chain operations and the default-provider cutover remain under development.
+
+### Fixed
+
+- Lightning payment replies, events and polling reconciliation retain reservations when a provider response
+  changes the authorized principal, omits its fee or exceeds its recorded fee authorization.
+  Fee limits are persisted separately from balance reservations for restart recovery;
+  upgrades preserve unknown historical limits without changing balances. Invalid
+  provider payment records no longer prevent startup replay of other payments.
 
 ### Fixed
 

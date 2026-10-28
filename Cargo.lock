@@ -4521,6 +4521,7 @@ dependencies = [
  "swissknife-types",
  "thiserror 2.0.21",
  "tokio",
+ "tokio-stream",
  "tokio-tungstenite 0.30.0",
  "tonic",
  "tonic-prost",
@@ -4531,6 +4532,7 @@ dependencies = [
  "utoipa",
  "utoipa-scalar",
  "uuid",
+ "wavelength-client",
  "wiremock",
 ]
 

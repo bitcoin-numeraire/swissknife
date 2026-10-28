@@ -15,6 +15,7 @@ use crate::{
             cln::{ClnClientConfig, ClnRestClientConfig},
             ldk::LdkServerConfig,
             lnd::{LndGrpcClientConfig, LndRestClientConfig},
+            wavelength::WavelengthConfig,
         },
         logging::tracing::TracingLoggerConfig,
     },
@@ -29,8 +30,9 @@ pub struct AppConfig {
     pub auth_provider: AuthProvider,
     pub oauth2: Option<OAuth2Config>,
     pub jwt: Option<JwtConfig>,
-    #[serde(deserialize_with = "deserialize_duration")]
-    pub invoice_expiry: Duration,
+    /// A fixed duration, or `provider` to use the daemon's invoice policy.
+    #[serde(deserialize_with = "deserialize_invoice_expiry")]
+    pub invoice_expiry: Option<Duration>,
     pub client_events: ClientEventConfig,
     #[serde(default)]
     pub bitcoin_address_type: BtcAddressType,
@@ -41,6 +43,7 @@ pub struct AppConfig {
     pub lnd_grpc_config: Option<LndGrpcClientConfig>,
     pub lnd_rest_config: Option<LndRestClientConfig>,
     pub ldk_server_config: Option<LdkServerConfig>,
+    pub wavelength_config: Option<WavelengthConfig>,
     pub web: AxumServerConfig,
     pub logging: TracingLoggerConfig,
 }
@@ -69,6 +72,23 @@ where
     }))
 }
 
+fn deserialize_invoice_expiry<'de, D>(deserializer: D) -> Result<Option<Duration>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let value = String::deserialize(deserializer)?;
+    if value == "provider" {
+        return Ok(None);
+    }
+    let duration = humantime::parse_duration(&value).map_err(serde::de::Error::custom)?;
+    if duration.as_secs() == 0 || duration.as_secs() > u64::from(u32::MAX) || duration.subsec_nanos() != 0 {
+        return Err(serde::de::Error::custom(
+            "invoice_expiry must be positive whole seconds within u32, or provider",
+        ));
+    }
+    Ok(Some(duration))
+}
+
 #[derive(Clone, Copy, Debug, Deserialize, EnumString, Display, PartialEq, Eq, Default)]
 #[serde(rename_all = "snake_case")]
 #[strum(serialize_all = "snake_case")]
@@ -79,4 +99,35 @@ pub enum LightningProvider {
     LndGrpc,
     LndRest,
     LdkServer,
+    Wavelength,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[derive(Deserialize)]
+    struct Expiry {
+        #[serde(deserialize_with = "deserialize_invoice_expiry")]
+        expiry: Option<Duration>,
+    }
+
+    #[test]
+    fn fixed_invoice_expiry_preserves_the_configured_duration() {
+        let config: Expiry = serde_json::from_value(serde_json::json!({"expiry":"12h"})).unwrap();
+        assert_eq!(config.expiry, Some(Duration::from_secs(43_200)));
+    }
+
+    #[test]
+    fn provider_expiry_is_explicit_and_does_not_invent_a_duration() {
+        let config: Expiry = serde_json::from_value(serde_json::json!({"expiry":"provider"})).unwrap();
+        assert_eq!(config.expiry, None);
+    }
+
+    #[test]
+    fn invoice_expiry_rejects_zero_fractional_seconds_and_overflow() {
+        for value in ["0s", "1ms", "1.5s", "4294967296s"] {
+            assert!(serde_json::from_value::<Expiry>(serde_json::json!({"expiry":value})).is_err());
+        }
+    }
 }

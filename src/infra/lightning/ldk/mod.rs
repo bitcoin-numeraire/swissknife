@@ -199,9 +199,12 @@ impl LnClient for LdkClient {
         amount_msat: u64,
         description: String,
         _label: String,
-        expiry: u32,
+        expiry: Option<u32>,
         deschashonly: bool,
     ) -> Result<Invoice, LightningError> {
+        let expiry = expiry.ok_or(LightningError::Unsupported(
+            "LDK Server requires an explicit invoice expiry",
+        ))?;
         let kind = if deschashonly {
             types::bolt11_invoice_description::Kind::Hash(sha256::Hash::hash(description.as_bytes()).to_string())
         } else {

@@ -1,5 +1,6 @@
 use migration::{Migrator, MigratorTrait};
 use sea_orm_migration::sea_orm::{ConnectionTrait, Database, DatabaseBackend, DatabaseConnection, Statement};
+use sea_orm_migration::SchemaManager;
 
 async fn sqlite() -> DatabaseConnection {
     Database::connect("sqlite::memory:")
@@ -14,6 +15,40 @@ async fn count(conn: &DatabaseConnection, sql: &str) -> i64 {
         .expect("count row")
         .try_get::<i64>("", "count")
         .expect("count value")
+}
+
+#[tokio::test]
+async fn fee_authorization_upgrade_preserves_unknown_historical_limits_and_balances() {
+    let conn = sqlite().await;
+    conn.execute_unprepared(
+        "CREATE TABLE payment (id INTEGER PRIMARY KEY, amount_msat BIGINT, reserved_amount BIGINT)",
+    )
+    .await
+    .unwrap();
+    conn.execute_unprepared("INSERT INTO payment VALUES (1, 1000, 1010)")
+        .await
+        .unwrap();
+    let migration = Migrator::migrations().pop().unwrap();
+    assert_eq!(migration.name(), "m20261028_152505_payment_fee_authorization");
+    let manager = SchemaManager::new(&conn);
+    migration.up(&manager).await.unwrap();
+    assert_eq!(count(&conn, "SELECT COUNT(*) AS count FROM payment WHERE amount_msat = 1000 AND reserved_amount = 1010 AND authorized_fee_msat IS NULL").await, 1);
+    conn.execute_unprepared("UPDATE payment SET authorized_fee_msat = 100")
+        .await
+        .unwrap();
+    assert!(conn
+        .execute_unprepared("UPDATE payment SET authorized_fee_msat = -1")
+        .await
+        .is_err());
+    migration.down(&manager).await.unwrap();
+    assert_eq!(
+        count(
+            &conn,
+            "SELECT COUNT(*) AS count FROM payment WHERE reserved_amount = 1010"
+        )
+        .await,
+        1
+    );
 }
 
 #[test]

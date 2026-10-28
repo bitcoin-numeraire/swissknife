@@ -15,6 +15,11 @@ on:
         required: true
         default: none
         options: [none, signet, testnet]
+      include_coverage:
+        description: "Also run the complete deterministic coverage matrix"
+        type: boolean
+        required: true
+        default: true
 
 permissions:
   contents: read
@@ -138,6 +143,39 @@ jobs:
       - name: Real daemon RPC contract (${{ matrix.provider }})
         run: tests/itest/scripts/test-wavelength-client.sh
 
+  # Independent public-RPC failure injection exercises SwissKnife accounting,
+  # not funded Ark settlement. Real public-network tests remain separate below.
+  wavelength-accounting:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        database: [sqlite, postgres]
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - name: Install protoc
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+      - uses: dtolnay/rust-toolchain@1.99.1
+      - uses: swatinem/rust-cache@v2.9.3
+      - name: Start Postgres
+        if: matrix.database == 'postgres'
+        run: docker compose -p wavelength-accounting -f tests/itest/docker-compose.yml up -d --wait postgres
+      - name: Wallet accounting and recovery through public RPCs
+        env:
+          SWISSKNIFE_ITEST_DATABASE: ${{ matrix.database }}
+        run: cargo test --features itest --test wavelength
+      - name: Upload API diagnostic logs
+        if: failure()
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: wavelength-accounting-${{ matrix.database }}
+          path: target/itest/*.log
+          retention-days: 14
+      - name: Stop Postgres
+        if: always() && matrix.database == 'postgres'
+        run: docker compose -p wavelength-accounting -f tests/itest/docker-compose.yml down -v
+
   # Shared public services are not deterministic PR infrastructure. Run this
   # explicitly to check external interoperability without private components.
   wavelength-public:
@@ -164,7 +202,7 @@ jobs:
   # cover every cell, so coverage runs only on pushes to main (and manual
   # dispatch), not on every pull-request push.
   coverage:
-    if: github.event_name != 'pull_request'
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.include_coverage)
     runs-on: ubuntu-latest
     timeout-minutes: 90
 

@@ -181,16 +181,22 @@ impl TestApp {
     /// from the process-wide shared app.
     pub async fn isolated(label: &str, extra_env: &[(&str, String)]) -> TestApp {
         let (database, provider) = matrix_cell();
+        Self::isolated_for(&database, &provider, label, extra_env).await
+    }
+
+    /// Explicit adapter selection for public-protocol contract tests which
+    /// provide their own TLS RPC counterparty instead of the regtest stack.
+    pub async fn isolated_for(database: &str, provider: &str, label: &str, extra_env: &[(&str, String)]) -> TestApp {
         let label = format!("{database}-{provider}-{label}");
-        let spawned = spawn_instance(&database, &provider, &label, extra_env).await;
+        let spawned = spawn_instance(database, provider, &label, extra_env).await;
         let api = ApiClient::new(spawned.base_url.clone());
         let admin_jwt = bootstrap_admin(&api).await;
 
         TestApp {
             base_url: spawned.base_url,
             database_url: spawned.database_url,
-            database,
-            provider,
+            database: database.to_owned(),
+            provider: provider.to_owned(),
             process_id: spawned.process_id,
             admin_jwt,
             stdout_path: spawned.stdout_path,
@@ -210,6 +216,29 @@ impl TestApp {
         if let Some(mut child) = child {
             child.kill().expect("stop test instance");
             child.wait().expect("reap stopped test instance");
+        }
+    }
+
+    /// Normal teardown lets instrumented binaries flush coverage. Crash/replay
+    /// scenarios deliberately keep using `stop` above.
+    pub fn shutdown(&self) {
+        let child = {
+            let mut children = SPAWNED.lock().expect("spawned registry lock");
+            children
+                .iter()
+                .position(|child| child.id() == self.process_id)
+                .map(|index| children.swap_remove(index))
+        };
+        if let Some(mut child) = child {
+            let _ = Command::new("kill").args(["-TERM", &child.id().to_string()]).status();
+            for _ in 0..50 {
+                if matches!(child.try_wait(), Ok(Some(_))) {
+                    return;
+                }
+                std::thread::sleep(Duration::from_millis(100));
+            }
+            let _ = child.kill();
+            child.wait().expect("reap test instance after shutdown");
         }
     }
 

@@ -16,6 +16,7 @@ use crate::{
             cln::{ClnGrpcClient, ClnRestClient},
             ldk::LdkClient,
             lnd::{LndGrpcClient, LndRestClient},
+            wavelength::WavelengthClient,
             LnClient, UnavailableBitcoinWallet,
         },
     },
@@ -81,6 +82,21 @@ async fn get_authenticator(config: AppConfig) -> Result<Arc<dyn JWTAuthenticator
 
 async fn get_ln_client(config: AppConfig) -> Result<LightningAdapter, ApplicationError> {
     match config.ln_provider {
+        LightningProvider::Wavelength => {
+            let provider = config
+                .wavelength_config
+                .clone()
+                .ok_or_else(|| ConfigError::MissingLightningProviderConfig(config.ln_provider.to_string()))?;
+            let ln_client = Arc::new(WavelengthClient::new(provider).await?);
+            let bitcoin_wallet = Arc::new(UnavailableBitcoinWallet {
+                network: ln_client.network(),
+                reason: "Wavelength boarding and cooperative leave require an asynchronous chain adapter, not PSBT preparation",
+            });
+            Ok(LightningAdapter {
+                ln_client,
+                bitcoin_wallet,
+            })
+        }
         LightningProvider::LdkServer => {
             let provider = config
                 .ldk_server_config

@@ -4,6 +4,8 @@ mod payment_repository;
 mod payment_service;
 mod payment_unit_of_work;
 mod payment_use_cases;
+mod settlement;
+pub(crate) use settlement::validate_lightning_settlement;
 
 pub use payment_handler::*;
 pub(crate) use payment_input::LnPaymentTarget;

@@ -304,12 +304,12 @@ impl LnClient for LndGrpcClient {
         amount_msat: u64,
         description: String,
         _label: String,
-        expiry: u32,
+        expiry: Option<u32>,
         deschashonly: bool,
     ) -> Result<Invoice, LightningError> {
         let mut request = lnrpc::Invoice {
             memo: description.clone(),
-            expiry: expiry as i64,
+            expiry: expiry.map(i64::from).unwrap_or_default(),
             value_msat: amount_msat as i64,
             ..Default::default()
         };

@@ -56,3 +56,4 @@ WAVELENGTH_TEST_PHASE=create cargo test -p wavelength-client --features public-n
 "${COMPOSE[@]}" restart waved-public
 wait_for_tls
 WAVELENGTH_TEST_PHASE=restart cargo test -p wavelength-client --features public-network-tests --test public_network
+cargo test --features public-itest --test wavelength_public
