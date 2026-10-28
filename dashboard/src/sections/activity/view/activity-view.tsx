@@ -3,7 +3,7 @@
 import type { TFunction } from 'i18next';
 import type { IFiatPrices } from 'src/types/bitcoin';
 import type { LabelColor } from 'src/components/label';
-import type { Invoice, Payment } from 'src/lib/swissknife';
+import type { Wallet, Account, Invoice, Payment } from 'src/lib/swissknife';
 import type { ITransaction, ITransactionTableFilters } from 'src/types/transaction';
 
 import { mutate } from 'swr';
@@ -13,7 +13,9 @@ import { useBoolean, usePopover, useSetState } from 'minimal-shared/hooks';
 
 import Tab from '@mui/material/Tab';
 import Card from '@mui/material/Card';
+import Link from '@mui/material/Link';
 import Tabs from '@mui/material/Tabs';
+import Alert from '@mui/material/Alert';
 import Table from '@mui/material/Table';
 import Stack from '@mui/material/Stack';
 import Button from '@mui/material/Button';
@@ -49,6 +51,7 @@ import {
 import { CONFIG } from 'src/global-config';
 import { useTranslate } from 'src/locales';
 import { endpointKeys } from 'src/actions/keys';
+import { useListAccounts } from 'src/actions/account';
 import { useListPayments } from 'src/actions/payments';
 import { useListInvoices } from 'src/actions/invoices';
 import { DashboardContent } from 'src/layouts/dashboard';
@@ -70,6 +73,7 @@ import { ConfirmDialog } from 'src/components/custom-dialog';
 import { CustomPopover } from 'src/components/custom-popover';
 import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';
 import { CleanTransactionsButton } from 'src/components/transactions';
+import { DeleteSelectedTransactionsButton } from 'src/components/transactions/delete-selected-transactions-button';
 import {
   useTable,
   emptyRows,
@@ -77,6 +81,7 @@ import {
   getComparator,
   TableEmptyRows,
   TableHeadCustom,
+  TableSelectedAction,
   TablePaginationCustom,
 } from 'src/components/table';
 
@@ -86,6 +91,8 @@ import { TransactionTableToolbar } from 'src/sections/transaction/transaction-ta
 import { TransactionTableFiltersResult } from 'src/sections/transaction/transaction-table-filters-result';
 
 import { RoleBasedGuard } from 'src/auth/guard';
+import { useAuthContext } from 'src/auth/hooks';
+import { hasAllPermissions } from 'src/auth/permissions';
 
 import { TransactionType } from 'src/types/transaction';
 
@@ -103,6 +110,9 @@ type ActivityRow = ITransaction & {
   detail_page_href: string;
   amount_total_msat: number;
   description_label: string;
+  account_label: string;
+  wallet_label: string;
+  owner?: { account: Account; wallet: Wallet };
 };
 
 const fallbackFiatPrices: IFiatPrices = { USD: 0, EUR: 0, CHF: 0 };
@@ -121,9 +131,15 @@ type ActivityTab = {
   analyticColor: string;
 };
 
-const tableHead = (t: TFunction) => [
+const tableHead = (t: TFunction, scope: ActivityScope) => [
   { id: 'direction', label: t('activity_view.direction'), width: 96 },
   { id: 'description_label', label: t('transaction_list.description') },
+  ...(scope === 'admin'
+    ? [
+        { id: 'account_label', label: t('activity_view.account') },
+        { id: 'wallet_label', label: t('wallet') },
+      ]
+    : []),
   { id: 'created_at', label: t('transaction_list.created') },
   { id: 'payment_time', label: t('transaction_list.settled') },
   { id: 'amount_total_msat', label: t('transaction_list.amount') },
@@ -193,11 +209,22 @@ function isOpenAmountRequest(tx: ITransaction) {
   );
 }
 
-function makeRow(tx: ITransaction, scope: ActivityScope): ActivityRow {
+function makeRow(
+  tx: ITransaction,
+  scope: ActivityScope,
+  owner?: ActivityRow['owner']
+): ActivityRow {
   const direction = txDirection(tx);
 
   return {
     ...tx,
+    owner,
+    account_label: owner
+      ? owner.account.display_name || owner.account.identity?.subject || owner.account.id
+      : '',
+    wallet_label: owner
+      ? owner.wallet.label || owner.wallet.asset?.name || owner.wallet.id
+      : tx.wallet_id,
     direction,
     row_key: `${tx.transaction_type}-${tx.id}`,
     detail_page_href: detailPageHrefForScope(tx, scope),
@@ -254,7 +281,12 @@ function applyFilter({
         tx.ledger.toLowerCase().includes(value) ||
         tx.status.toLowerCase().includes(value) ||
         tx.id.toLowerCase().includes(value) ||
-        tx.wallet_id.toLowerCase().includes(value)
+        tx.wallet_id.toLowerCase().includes(value) ||
+        tx.account_label.toLowerCase().includes(value) ||
+        tx.wallet_label.toLowerCase().includes(value) ||
+        !!tx.owner?.account.id.toLowerCase().includes(value) ||
+        !!tx.owner?.account.identity?.subject.toLowerCase().includes(value) ||
+        !!tx.owner?.wallet.ln_address?.username.toLowerCase().includes(value)
       );
     });
   }
@@ -380,6 +412,9 @@ function AdminActivityLedger({
   initialWalletId?: string | null;
   route?: ActivityRoute;
 }) {
+  const { user } = useAuthContext();
+  const canReadAccounts = hasAllPermissions([Permission.READ_ACCOUNT], user?.permissions);
+  const { accounts, accountsError } = useListAccounts(canReadAccounts);
   const { invoices, invoicesLoading, invoicesError } = useListInvoices();
   const { payments, paymentsLoading, paymentsError } = useListPayments();
 
@@ -387,6 +422,8 @@ function AdminActivityLedger({
     <RoleBasedGuard permissions={[Permission.READ_TRANSACTION]} hasContent>
       <ActivityLedger
         scope="admin"
+        accounts={accounts}
+        ownershipError={!!accountsError}
         kind={kind}
         invoices={invoices || []}
         payments={payments || []}
@@ -406,6 +443,8 @@ function AdminActivityLedger({
 }
 
 function ActivityLedger({
+  accounts,
+  ownershipError,
   scope,
   walletId,
   kind,
@@ -422,6 +461,8 @@ function ActivityLedger({
   onCleanSuccess,
 }: {
   scope: ActivityScope;
+  accounts?: Account[];
+  ownershipError?: boolean;
   walletId?: string;
   kind: ActivityTransactionKind;
   invoices: Invoice[];
@@ -438,6 +479,8 @@ function ActivityLedger({
 }) {
   const { t } = useTranslate();
   const theme = useTheme();
+  const { user } = useAuthContext();
+  const canWriteTransactions = hasAllPermissions([Permission.WRITE_TRANSACTION], user?.permissions);
   const router = useRouter();
   const table = useTable({
     defaultOrder: 'desc',
@@ -461,10 +504,22 @@ function ActivityLedger({
   const visibleInvoices = useMemo(() => (kind === 'payment' ? [] : invoices), [invoices, kind]);
   const visiblePayments = useMemo(() => (kind === 'invoice' ? [] : payments), [kind, payments]);
 
+  const owners = useMemo(
+    () =>
+      new Map(
+        (accounts ?? []).flatMap((account) =>
+          account.wallets.map((wallet) => [wallet.id, { account, wallet }] as const)
+        )
+      ),
+    [accounts]
+  );
+
   const rows = useMemo(
     () =>
-      mergeAndSortTransactions(visibleInvoices, visiblePayments).map((tx) => makeRow(tx, scope)),
-    [scope, visibleInvoices, visiblePayments]
+      mergeAndSortTransactions(visibleInvoices, visiblePayments).map((tx) =>
+        makeRow(tx, scope, owners.get(tx.wallet_id))
+      ),
+    [scope, visibleInvoices, visiblePayments, owners]
   );
 
   useEffect(() => {
@@ -559,12 +614,30 @@ function ActivityLedger({
   ];
   const analyticTabs = activityTabs.filter((tab) => tab.value !== 'all');
 
-  const dataFiltered = applyFilter({
-    inputData: rows,
-    comparator: getComparator(table.order, table.orderBy),
-    filters: filters.state,
-    dateError,
-  });
+  const dataFiltered = useMemo(
+    () =>
+      applyFilter({
+        inputData: rows,
+        comparator: getComparator(table.order, table.orderBy),
+        filters: filters.state,
+        dateError,
+      }),
+    [rows, table.order, table.orderBy, filters.state, dateError]
+  );
+
+  const selectedRows = dataFiltered.filter((row) => table.selected.includes(row.row_key));
+  const { setSelected, setPage } = table;
+  useEffect(() => {
+    const visible = new Set(dataFiltered.map((row) => row.row_key));
+    setSelected((selected) =>
+      selected.every((key) => visible.has(key))
+        ? selected
+        : selected.filter((key) => visible.has(key))
+    );
+    setPage((page) =>
+      Math.min(page, Math.max(0, Math.ceil(dataFiltered.length / table.rowsPerPage) - 1))
+    );
+  }, [dataFiltered, setSelected, setPage, table.rowsPerPage]);
 
   const dataInPage = dataFiltered.slice(
     table.page * table.rowsPerPage,
@@ -617,9 +690,9 @@ function ActivityLedger({
     async (row: ActivityRow) => {
       try {
         if (row.transaction_type === TransactionType.INVOICE) {
-          await deleteInvoice({ path: { id: row.id } });
+          await deleteInvoice<true>({ path: { id: row.id }, throwOnError: true });
         } else {
-          await deletePayment({ path: { id: row.id } });
+          await deletePayment<true>({ path: { id: row.id }, throwOnError: true });
         }
 
         toast.success(t('transaction_list.delete_success'));
@@ -680,7 +753,8 @@ function ActivityLedger({
                       buttonProps={{
                         color: 'error',
                         variant: 'outlined',
-                        disabled: !hasFailedOrExpired,
+                        disabled:
+                          !hasFailedOrExpired || (scope === 'admin' && !canWriteTransactions),
                         startIcon: <Iconify icon="solar:trash-bin-trash-bold" />,
                       }}
                     >
@@ -792,6 +866,11 @@ function ActivityLedger({
                 ))}
               </Tabs>
 
+              {ownershipError && (
+                <Alert severity="warning" sx={{ m: 2 }}>
+                  {t('activity_view.ownership_unavailable')}
+                </Alert>
+              )}
               <TransactionTableToolbar
                 filters={filters}
                 onResetPage={table.onResetPage}
@@ -809,14 +888,45 @@ function ActivityLedger({
               )}
 
               <TableContainer sx={{ position: 'relative', overflow: 'unset' }}>
+                {scope === 'admin' && canWriteTransactions && (
+                  <TableSelectedAction
+                    dense={table.dense}
+                    numSelected={selectedRows.length}
+                    rowCount={dataFiltered.length}
+                    onSelectAllRows={(checked) =>
+                      table.onSelectAllRows(
+                        checked,
+                        dataFiltered.map((row) => row.row_key)
+                      )
+                    }
+                    action={
+                      <DeleteSelectedTransactionsButton
+                        transactions={selectedRows}
+                        onDeleted={(completed) => {
+                          const keys = new Set(
+                            completed.map((tx) => `${tx.transaction_type}-${tx.id}`)
+                          );
+                          setSelected((selected) => selected.filter((key) => !keys.has(key)));
+                          setDetailRow((current) =>
+                            current && keys.has(current.row_key) ? null : current
+                          );
+                          onCleanSuccess();
+                        }}
+                      />
+                    }
+                  />
+                )}
                 <Scrollbar>
-                  <Table size={table.dense ? 'small' : 'medium'} sx={{ minWidth: 960 }}>
+                  <Table
+                    size={table.dense ? 'small' : 'medium'}
+                    sx={{ minWidth: scope === 'admin' ? 1200 : 960 }}
+                  >
                     <TableHeadCustom
                       order={table.order}
                       orderBy={table.orderBy}
-                      headCells={tableHead(t)}
+                      headCells={tableHead(t, scope)}
                       rowCount={dataFiltered.length}
-                      numSelected={table.selected.length}
+                      numSelected={selectedRows.length}
                       onSort={table.onSort}
                       onSelectAllRows={(checked) =>
                         table.onSelectAllRows(
@@ -835,7 +945,9 @@ function ActivityLedger({
                           selected={table.selected.includes(row.row_key)}
                           onSelectRow={() => table.onSelectRow(row.row_key)}
                           onOpenRow={() => setDetailRow(row)}
-                          canDelete={canDeleteRow(row, scope)}
+                          canDelete={
+                            canDeleteRow(row, scope) && (scope !== 'admin' || canWriteTransactions)
+                          }
                           onDeleteRow={() => handleDeleteRow(row)}
                         />
                       ))}
@@ -867,7 +979,11 @@ function ActivityLedger({
             row={detailRow}
             title={detailRow?.description_label}
             detailHref={detailRow?.detail_page_href}
-            canDelete={!!detailRow && canDeleteRow(detailRow, scope)}
+            canDelete={
+              !!detailRow &&
+              canDeleteRow(detailRow, scope) &&
+              (scope !== 'admin' || canWriteTransactions)
+            }
             onDeleteRow={detailRow ? () => handleDeleteRow(detailRow) : undefined}
             onClose={() => {
               setDetailRow(null);
@@ -940,19 +1056,69 @@ function ActivityTableRow({
         <TableCell>
           <ListItemText
             primary={row.description_label}
-            secondary={
-              scope === 'admin' ? (
-                <Tooltip title={row.wallet_id} placement="top" arrow>
-                  <span>{compactId(row.wallet_id)}</span>
-                </Tooltip>
-              ) : undefined
-            }
             slotProps={{
               primary: { noWrap: true, sx: { typography: 'body2' } },
               secondary: { sx: { typography: 'caption', color: 'text.disabled' } },
             }}
           />
         </TableCell>
+
+        {scope === 'admin' && (
+          <>
+            <TableCell>
+              {row.owner ? (
+                <ListItemText
+                  primary={
+                    <Link
+                      href={paths.admin.account(row.owner.account.id)}
+                      onClick={(event) => event.stopPropagation()}
+                      title={row.owner.account.id}
+                    >
+                      {row.account_label}
+                    </Link>
+                  }
+                  secondary={compactId(row.owner.account.id)}
+                  slotProps={{
+                    primary: { sx: { typography: 'body2', overflowWrap: 'anywhere' } },
+                    secondary: { sx: { typography: 'caption' } },
+                  }}
+                />
+              ) : (
+                <Typography variant="body2" color="text.secondary">
+                  {t('activity_view.account_unavailable')}
+                </Typography>
+              )}
+            </TableCell>
+            <TableCell>
+              <ListItemText
+                primary={
+                  <Link
+                    href={paths.admin.wallet(row.wallet_id)}
+                    onClick={(event) => event.stopPropagation()}
+                    title={row.wallet_id}
+                  >
+                    {row.wallet_label}
+                  </Link>
+                }
+                secondary={
+                  row.owner
+                    ? [
+                        row.owner.wallet.asset?.display_ticker,
+                        row.owner.wallet.asset?.network,
+                        compactId(row.wallet_id),
+                      ]
+                        .filter(Boolean)
+                        .join(' · ')
+                    : undefined
+                }
+                slotProps={{
+                  primary: { sx: { typography: 'body2', overflowWrap: 'anywhere' } },
+                  secondary: { sx: { typography: 'caption' } },
+                }}
+              />
+            </TableCell>
+          </>
+        )}
 
         <TableCell>
           <ListItemText

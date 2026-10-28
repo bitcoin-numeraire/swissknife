@@ -7,8 +7,10 @@ import { endpointKeys } from './keys';
 
 // ----------------------------------------------------------------------
 
-export function useListAccounts() {
-  const result = useSWR(endpointKeys.accounts.list, () => listAccounts<true>());
+export function useListAccounts(enabled = true) {
+  const result = useSWR(enabled ? endpointKeys.accounts.list : null, () =>
+    listAccounts<true>({ throwOnError: true })
+  );
 
   return useMemo(
     () => ({
