@@ -35,6 +35,8 @@ release notes when a tag is published.
   installations.
 - Restore administrative transaction cleanup across wallets and report empty
   cleanup results and API errors in the dashboard.
+- Restore selected-transaction bulk deletion and show linked account and wallet
+  ownership in the administrative transaction table.
 
 ## [0.3.0] - 2026-10-28
 
