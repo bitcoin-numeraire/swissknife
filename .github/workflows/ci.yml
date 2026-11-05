@@ -27,7 +27,8 @@ jobs:
         with:
           path: ./CHANGELOG.md
           version: Unreleased
-          validation_level: error
+          # Report changelog diagnostics without blocking pre-1.0 releases.
+          validation_level: warn
           validation_depth: 100
 
   fmt:
