@@ -17,7 +17,7 @@ env:
 
 jobs:
   # Run all four Lightning adapters on SQLite. On PostgreSQL, cover LND gRPC
-  # and the production CLN REST configuration, including legacy-schema replay.
+  # and the production CLN REST configuration.
   integration:
     runs-on: ubuntu-latest
     timeout-minutes: 45
