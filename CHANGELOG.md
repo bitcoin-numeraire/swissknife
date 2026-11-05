@@ -10,6 +10,10 @@ release notes when a tag is published.
 
 ### Added
 
+- Developers dashboard with personal and administrative API-key and webhook
+  management, one-time signing secrets, delivery diagnostics, signed test events,
+  and bounded manual redelivery
+  ([#359](https://github.com/bitcoin-numeraire/swissknife/issues/359)).
 - Signed wallet webhooks with personal and administrative subscription management,
   durable delivery history, bounded retries, and signing-secret rotation.
 - Replay queued Core Lightning invoice updates so settlements reach wallets and

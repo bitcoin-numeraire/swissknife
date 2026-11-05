@@ -1,13 +1,7 @@
-import { appTitle } from 'src/utils/format-string';
+import { redirect } from 'next/navigation';
 
-import { ApiKeyListView } from 'src/sections/api-key/view';
+import { paths } from 'src/routes/paths';
 
-// ----------------------------------------------------------------------
-
-export const metadata = {
-  title: appTitle('API Keys'),
-};
-
-export default function BuildApiKeysPage() {
-  return <ApiKeyListView />;
+export default function Page() {
+  redirect(paths.build.apiKeys);
 }

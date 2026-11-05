@@ -312,12 +312,20 @@ impl From<WebhookSubscriptionModel> for StoredWebhookSubscription {
     }
 }
 
-impl From<WebhookDeliveryModel> for WebhookDelivery {
-    fn from(model: WebhookDeliveryModel) -> Self {
-        Self {
+impl WebhookDeliveryModel {
+    pub fn into_delivery(self, payload: crate::domains::event::WebhookPayload) -> WebhookDelivery {
+        let model = self;
+        WebhookDelivery {
             id: model.id,
             subscription_id: model.subscription_id,
-            event_id: model.client_event_id.to_string(),
+            event_id: payload.id,
+            event_type: payload.event_type,
+            resource_id: payload.resource_id,
+            next_attempt_at: (model.status == "Pending").then_some(model.next_attempt_at.and_utc()),
+            in_flight: model
+                .locked_until
+                .is_some_and(|until| until.and_utc() > chrono::Utc::now()),
+            max_attempts: crate::domains::event::MAX_WEBHOOK_ATTEMPTS,
             status: model.status.parse::<WebhookDeliveryStatus>().expect(ASSERTION_MSG),
             attempt_count: model.attempt_count.try_into().expect(ASSERTION_MSG),
             response_status: model

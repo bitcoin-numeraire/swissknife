@@ -22,7 +22,7 @@ export const shouldFail = (
   return false;
 };
 
-function isErrorResponse(error: unknown): error is ErrorResponse {
+export function isErrorResponse(error: unknown): error is ErrorResponse {
   return typeof error === 'object' && error !== null && 'reason' in error;
 }
 

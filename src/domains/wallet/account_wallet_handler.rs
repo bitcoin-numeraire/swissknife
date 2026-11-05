@@ -21,7 +21,8 @@ use swissknife_types::{
     CreateWalletRequest, CreateWebhookSubscriptionRequest, CreatedWebhookSubscription, ErrorResponse,
     NewBtcAddressRequest, NewInvoiceRequest, PaymentFeeEstimate, RegisterLnAddressRequest, RotateWebhookSecretResponse,
     SendPaymentRequest, UpdateAccountPreferencesRequest, UpdateAccountRequest, UpdateLnAddressRequest,
-    UpdateWebhookSubscriptionRequest, WebhookDelivery, WebhookSubscription, WebhookSubscriptionFilter,
+    UpdateWebhookSubscriptionRequest, WebhookDelivery, WebhookDeliveryDetails, WebhookDeliveryFilter,
+    WebhookSubscription, WebhookSubscriptionFilter,
 };
 
 use crate::{
@@ -58,6 +59,9 @@ use super::{Balance, Contact, Wallet, WalletFilter};
         delete_webhook,
         rotate_webhook_secret,
         list_webhook_deliveries,
+        get_webhook_delivery,
+        send_webhook_test,
+        retry_webhook_delivery,
         update_current_account,
         get_account_preferences,
         update_account_preferences,
@@ -174,6 +178,15 @@ pub fn account_router() -> Router<Arc<AppServices>> {
         .route(
             "/wallets/{wallet_id}/webhooks/{id}/deliveries",
             get(list_webhook_deliveries),
+        )
+        .route(
+            "/wallets/{wallet_id}/webhooks/{id}/deliveries/{delivery_id}",
+            get(get_webhook_delivery),
+        )
+        .route("/wallets/{wallet_id}/webhooks/{id}/test", post(send_webhook_test))
+        .route(
+            "/wallets/{wallet_id}/webhooks/{id}/deliveries/{delivery_id}/retry",
+            post(retry_webhook_delivery),
         )
 }
 
@@ -1293,8 +1306,9 @@ async fn rotate_webhook_secret(
     path = "/wallets/{wallet_id}/webhooks/{id}/deliveries",
     tag = "Me",
     context_path = CONTEXT_PATH,
+    params(WebhookDeliveryFilter),
     responses(
-        (status = 200, description = "Newest 100 delivery records", body = Vec<WebhookDelivery>),
+        (status = 200, description = "Paginated delivery history (up to 100 per page)", body = Vec<WebhookDelivery>),
         (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
         (status = 404, description = "Subscription not found", body = ErrorResponse, example = json!(NOT_FOUND_EXAMPLE)),
         (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE)),
@@ -1304,12 +1318,13 @@ async fn list_webhook_deliveries(
     State(services): State<Arc<AppServices>>,
     user: User,
     Path((wallet_id, id)): Path<(Uuid, Uuid)>,
+    Query(filter): Query<WebhookDeliveryFilter>,
 ) -> Result<Json<Vec<WebhookDelivery>>, ApplicationError> {
     services
         .webhook
         .get_by_account_id(user.account_id, wallet_id, id)
         .await?;
-    Ok(Json(services.webhook.list_deliveries(id).await?))
+    Ok(Json(services.webhook.list_deliveries(id, filter).await?))
 }
 
 /// List webhooks across the authenticated account's wallets.
@@ -1359,6 +1374,89 @@ async fn get_webhook(
             .webhook
             .get_by_account_id(user.account_id, wallet_id, id)
             .await?,
+    ))
+}
+
+/// Inspect a retained webhook delivery and its exact payload.
+#[utoipa::path(
+    get,
+    path = "/wallets/{wallet_id}/webhooks/{id}/deliveries/{delivery_id}",
+    tag = "Me",
+    context_path = CONTEXT_PATH,
+    responses(
+        (status = 200, description = "Found", body = WebhookDeliveryDetails),
+        (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
+        (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
+        (status = 404, description = "Not Found", body = ErrorResponse, example = json!(NOT_FOUND_EXAMPLE)),
+        (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
+    )
+)]
+async fn get_webhook_delivery(
+    State(services): State<Arc<AppServices>>,
+    user: User,
+    Path((wallet_id, id, delivery_id)): Path<(Uuid, Uuid, Uuid)>,
+) -> Result<Json<WebhookDeliveryDetails>, ApplicationError> {
+    services
+        .webhook
+        .get_by_account_id(user.account_id, wallet_id, id)
+        .await?;
+    Ok(Json(services.webhook.get_delivery(id, delivery_id).await?))
+}
+
+/// Queue a subscription-local test event through the normal delivery worker.
+#[utoipa::path(
+    post,
+    path = "/wallets/{wallet_id}/webhooks/{id}/test",
+    tag = "Me",
+    context_path = CONTEXT_PATH,
+    responses(
+        (status = 202, description = "Queued for delivery", body = WebhookDelivery),
+        (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
+        (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
+        (status = 404, description = "Not Found", body = ErrorResponse, example = json!(NOT_FOUND_EXAMPLE)),
+        (status = 409, description = "Subscription disabled, delivery pending, limit reached, or attempt in flight", body = ErrorResponse, example = json!(CONFLICT_EXAMPLE)),
+        (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
+    )
+)]
+async fn send_webhook_test(
+    State(services): State<Arc<AppServices>>,
+    user: User,
+    Path((wallet_id, id)): Path<(Uuid, Uuid)>,
+) -> Result<(StatusCode, Json<WebhookDelivery>), ApplicationError> {
+    services
+        .webhook
+        .get_by_account_id(user.account_id, wallet_id, id)
+        .await?;
+    Ok((StatusCode::ACCEPTED, Json(services.webhook.send_test(id).await?)))
+}
+
+/// Retry a terminal delivery using its existing ID and remaining attempt budget.
+#[utoipa::path(
+    post,
+    path = "/wallets/{wallet_id}/webhooks/{id}/deliveries/{delivery_id}/retry",
+    tag = "Me",
+    context_path = CONTEXT_PATH,
+    responses(
+        (status = 202, description = "Queued for delivery", body = WebhookDelivery),
+        (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
+        (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
+        (status = 404, description = "Not Found", body = ErrorResponse, example = json!(NOT_FOUND_EXAMPLE)),
+        (status = 409, description = "Subscription disabled, delivery pending, limit reached, or attempt in flight", body = ErrorResponse, example = json!(CONFLICT_EXAMPLE)),
+        (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
+    )
+)]
+async fn retry_webhook_delivery(
+    State(services): State<Arc<AppServices>>,
+    user: User,
+    Path((wallet_id, id, delivery_id)): Path<(Uuid, Uuid, Uuid)>,
+) -> Result<(StatusCode, Json<WebhookDelivery>), ApplicationError> {
+    services
+        .webhook
+        .get_by_account_id(user.account_id, wallet_id, id)
+        .await?;
+    Ok((
+        StatusCode::ACCEPTED,
+        Json(services.webhook.retry_delivery(id, delivery_id).await?),
     ))
 }
 

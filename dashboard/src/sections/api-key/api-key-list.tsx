@@ -3,6 +3,7 @@
 import type { IApiKeyTableFilters } from 'src/types/apikey';
 import type { ApiKey, ListApiKeysResponse } from 'src/lib/swissknife';
 
+import { mutate } from 'swr';
 import { useState, useEffect, useCallback } from 'react';
 import { useBoolean, useSetState } from 'minimal-shared/hooks';
 
@@ -19,6 +20,7 @@ import { handleActionError } from 'src/utils/errors';
 import { fIsAfter, fIsBetween } from 'src/utils/format-time';
 
 import { useTranslate } from 'src/locales';
+import { endpointKeys } from 'src/actions/keys';
 import { revokeApiKey, revokeApiKeys } from 'src/lib/swissknife';
 
 import { toast } from 'src/components/snackbar';
@@ -45,11 +47,12 @@ import { ApiKeyTableFiltersResult } from './api-key-table-filters-result';
 type Props = {
   data: ListApiKeysResponse;
   tableHead: TableHeadProps[];
+  canWrite: boolean;
 };
 
 type TableHeadProps = { id: string; label?: string };
 
-export function ApiKeyList({ data: wallets, tableHead }: Props) {
+export function ApiKeyList({ data: wallets, tableHead, canWrite }: Props) {
   const { t } = useTranslate();
   const table = useTable({ defaultOrderBy: 'created_at', defaultRowsPerPage: 25 });
   const confirm = useBoolean();
@@ -67,7 +70,17 @@ export function ApiKeyList({ data: wallets, tableHead }: Props) {
 
   const dataFiltered = applyFilter({
     inputData: tableData,
-    comparator: getComparator(table.order, table.orderBy),
+    comparator: (a, b) => {
+      const value = (key: ApiKey) => {
+        const field = key[table.orderBy as keyof ApiKey];
+        return field instanceof Date
+          ? field.getTime()
+          : Array.isArray(field)
+            ? field.length
+            : (field ?? '');
+      };
+      return getComparator(table.order, 'value')({ value: value(a) }, { value: value(b) });
+    },
     filters: filters.state,
     dateError,
   });
@@ -86,6 +99,7 @@ export function ApiKeyList({ data: wallets, tableHead }: Props) {
 
   const handleDeleteRow = useCallback(
     async (id: string) => {
+      if (!canWrite) return;
       const deleteRow = tableData.filter((row) => row.id !== id);
 
       try {
@@ -93,15 +107,18 @@ export function ApiKeyList({ data: wallets, tableHead }: Props) {
 
         toast.success(t('api_key_list.delete_success'));
         setTableData(deleteRow);
+        void mutate(endpointKeys.apiKeys.list);
+        void mutate(endpointKeys.account.apiKeys.list);
         table.onUpdatePageDeleteRow(dataInPage.length);
       } catch (error) {
         handleActionError(error);
       }
     },
-    [dataInPage.length, table, tableData, t]
+    [canWrite, dataInPage.length, table, tableData, t]
   );
 
   const handleDeleteRows = useCallback(async () => {
+    if (!canWrite) return;
     const deleteRows = tableData.filter((row) => !table.selected.includes(row.id));
 
     try {
@@ -109,11 +126,13 @@ export function ApiKeyList({ data: wallets, tableHead }: Props) {
 
       toast.success(t('api_key_list.delete_multiple_success', { count: data }));
       setTableData(deleteRows);
+      void mutate(endpointKeys.apiKeys.list);
+      void mutate(endpointKeys.account.apiKeys.list);
       table.onUpdatePageDeleteRows(dataInPage.length, dataFiltered.length);
     } catch (error) {
       handleActionError(error);
     }
-  }, [dataFiltered.length, dataInPage.length, table, tableData, t]);
+  }, [canWrite, dataFiltered.length, dataInPage.length, table, tableData, t]);
 
   return (
     <>
@@ -134,38 +153,40 @@ export function ApiKeyList({ data: wallets, tableHead }: Props) {
         )}
 
         <TableContainer sx={{ position: 'relative', overflow: 'unset' }}>
-          <TableSelectedAction
-            dense={table.dense}
-            numSelected={table.selected.length}
-            rowCount={dataFiltered.length}
-            onSelectAllRows={(checked) => {
-              table.onSelectAllRows(
-                checked,
-                dataFiltered.map((row) => row.id)
-              );
-            }}
-            action={
-              <Stack direction="row">
-                <Tooltip title={t('download')}>
-                  <IconButton color="primary" onClick={() => toast.info(t('coming_soon'))}>
-                    <Iconify icon="eva:download-outline" />
-                  </IconButton>
-                </Tooltip>
+          {canWrite && (
+            <TableSelectedAction
+              dense={table.dense}
+              numSelected={table.selected.length}
+              rowCount={dataFiltered.length}
+              onSelectAllRows={(checked) => {
+                table.onSelectAllRows(
+                  checked,
+                  dataFiltered.map((row) => row.id)
+                );
+              }}
+              action={
+                <Stack direction="row">
+                  <Tooltip title={t('download')}>
+                    <IconButton color="primary" onClick={() => toast.info(t('coming_soon'))}>
+                      <Iconify icon="eva:download-outline" />
+                    </IconButton>
+                  </Tooltip>
 
-                <Tooltip title={t('print')}>
-                  <IconButton color="primary" onClick={() => toast.info(t('coming_soon'))}>
-                    <Iconify icon="solar:printer-minimalistic-bold" />
-                  </IconButton>
-                </Tooltip>
+                  <Tooltip title={t('print')}>
+                    <IconButton color="primary" onClick={() => toast.info(t('coming_soon'))}>
+                      <Iconify icon="solar:printer-minimalistic-bold" />
+                    </IconButton>
+                  </Tooltip>
 
-                <Tooltip title={t('delete')}>
-                  <IconButton color="primary" onClick={confirm.onTrue}>
-                    <Iconify icon="solar:trash-bin-trash-bold" />
-                  </IconButton>
-                </Tooltip>
-              </Stack>
-            }
-          />
+                  <Tooltip title={t('delete')}>
+                    <IconButton color="primary" onClick={confirm.onTrue}>
+                      <Iconify icon="solar:trash-bin-trash-bold" />
+                    </IconButton>
+                  </Tooltip>
+                </Stack>
+              }
+            />
+          )}
 
           <Scrollbar>
             <Table size={table.dense ? 'small' : 'medium'} sx={{ minWidth: 800 }}>
@@ -176,11 +197,14 @@ export function ApiKeyList({ data: wallets, tableHead }: Props) {
                 rowCount={dataFiltered.length}
                 numSelected={table.selected.length}
                 onSort={table.onSort}
-                onSelectAllRows={(checked) =>
-                  table.onSelectAllRows(
-                    checked,
-                    dataFiltered.map((row) => row.id)
-                  )
+                onSelectAllRows={
+                  canWrite
+                    ? (checked) =>
+                        table.onSelectAllRows(
+                          checked,
+                          dataFiltered.map((row) => row.id)
+                        )
+                    : undefined
                 }
               />
 
@@ -194,6 +218,7 @@ export function ApiKeyList({ data: wallets, tableHead }: Props) {
                     <ApiKeyTableRow
                       key={row.id}
                       row={row}
+                      canWrite={canWrite}
                       selected={table.selected.includes(row.id)}
                       onSelectRow={() => table.onSelectRow(row.id)}
                       onDeleteRow={() => handleDeleteRow(row.id)}
@@ -256,7 +281,7 @@ function applyFilter({
   dateError,
 }: {
   inputData: ApiKey[];
-  comparator: (a: any, b: any) => number;
+  comparator: (a: ApiKey, b: ApiKey) => number;
   filters: IApiKeyTableFilters;
   dateError: boolean;
 }) {

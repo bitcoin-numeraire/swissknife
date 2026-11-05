@@ -168,8 +168,8 @@ export const navData: Array<NavGroupWithPermissions> = [
     subheader: 'build',
     items: [
       {
-        title: 'api_keys',
-        path: paths.build.apiKeys,
+        title: 'developers.title',
+        path: paths.build.developers,
         icon: ICONS.apiKeys,
         modes: 'all',
       },
@@ -180,14 +180,6 @@ export const navData: Array<NavGroupWithPermissions> = [
         permissions: [Permission.READ_API_KEY, Permission.READ_WALLET],
         modes: ['server', 'agent'],
         flag: 'agents',
-      },
-      {
-        title: 'webhooks',
-        path: paths.build.apiKeys,
-        icon: ICONS.webhooks,
-        permissions: [Permission.READ_API_KEY],
-        modes: ['server', 'agent'],
-        flag: 'webhooks',
       },
     ],
   },

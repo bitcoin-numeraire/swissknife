@@ -26,12 +26,13 @@ import { CustomPopover } from 'src/components/custom-popover';
 
 type Props = {
   row: ApiKey;
+  canWrite: boolean;
   selected: boolean;
   onSelectRow: VoidFunction;
   onDeleteRow: () => Promise<void>;
 };
 
-export function ApiKeyTableRow({ row, selected, onSelectRow, onDeleteRow }: Props) {
+export function ApiKeyTableRow({ row, selected, onSelectRow, onDeleteRow, canWrite }: Props) {
   const { id, account_id, name, description, permissions, created_at, expires_at } = row;
 
   const { t } = useTranslate();
@@ -44,9 +45,11 @@ export function ApiKeyTableRow({ row, selected, onSelectRow, onDeleteRow }: Prop
   return (
     <>
       <TableRow hover selected={selected}>
-        <TableCell padding="checkbox">
-          <Checkbox checked={selected} onClick={onSelectRow} />
-        </TableCell>
+        {canWrite && (
+          <TableCell padding="checkbox">
+            <Checkbox checked={selected} onClick={onSelectRow} />
+          </TableCell>
+        )}
 
         <TableCell sx={{ display: 'flex', alignItems: 'center' }}>
           <Avatar alt={account_id} sx={{ mr: 2 }}>
@@ -90,6 +93,7 @@ export function ApiKeyTableRow({ row, selected, onSelectRow, onDeleteRow }: Prop
               size="small"
               color={collapsible.value ? 'inherit' : 'default'}
               onClick={collapsible.onToggle}
+              aria-label={t('api_key_list.scopes')}
             >
               <Iconify
                 icon={
@@ -136,14 +140,20 @@ export function ApiKeyTableRow({ row, selected, onSelectRow, onDeleteRow }: Prop
         </TableCell>
 
         <TableCell align="right" sx={{ px: 1 }}>
-          <IconButton color={popover.open ? 'inherit' : 'default'} onClick={popover.onOpen}>
-            <Iconify icon="eva:more-vertical-fill" />
-          </IconButton>
+          {canWrite && (
+            <IconButton
+              aria-label={t('developers.actions')}
+              color={popover.open ? 'inherit' : 'default'}
+              onClick={popover.onOpen}
+            >
+              <Iconify icon="eva:more-vertical-fill" />
+            </IconButton>
+          )}
         </TableCell>
       </TableRow>
 
       <TableRow>
-        <TableCell sx={{ py: 0 }} colSpan={8}>
+        <TableCell sx={{ py: 0 }} colSpan={canWrite ? 8 : 7}>
           <Collapse in={collapsible.value} timeout="auto" unmountOnExit>
             <Stack direction="row" spacing={0.5} sx={{ my: 2, flexWrap: 'wrap' }}>
               <Label color="secondary">{t('api_key_list.account_wallet_access')}</Label>

@@ -20,7 +20,7 @@ describe('dashboard permission gating', () => {
     expect(titles).toContain('activity');
     expect(titles).toContain('identity_hub');
     expect(titles).toContain('contacts');
-    expect(titles).toContain('api_keys');
+    expect(titles).toContain('developers.title');
     expect(titles).not.toContain('accounts_directory');
     expect(titles).not.toContain('admin_transactions');
   });
@@ -43,7 +43,7 @@ describe('dashboard permission gating', () => {
       filterDashboardNavData(navData, [Permission.READ_API_KEY, Permission.WRITE_API_KEY], 'server')
     );
 
-    expect(titles).toContain('api_keys');
+    expect(titles).toContain('developers.title');
     expect(titles).not.toContain('accounts_directory');
   });
 

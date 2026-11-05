@@ -197,6 +197,14 @@ impl ClientEventRepository for SeaOrmClientEventRepository<DatabaseConnection> {
             .await
             .map_err(|error| DatabaseError::FindOne(error.to_string()))?
             .ok_or_else(|| DatabaseError::FindOne("client event prune watermark is missing".to_string()))?;
+        // Test events are subscription-local and have no client-event cursor.
+        WebhookDeliveryEntity::delete_many()
+            .filter(webhook_delivery::Column::ClientEventId.is_null())
+            .filter(webhook_delivery::Column::Status.ne("Pending"))
+            .filter(webhook_delivery::Column::CreatedAt.lt(cutoff.naive_utc()))
+            .exec(&txn)
+            .await
+            .map_err(|error| DatabaseError::Delete(error.to_string()))?;
         let unconsumed = Query::select()
             .expr(Expr::value(1))
             .from(WebhookSubscriptionEntity)

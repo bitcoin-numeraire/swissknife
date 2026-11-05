@@ -34,7 +34,9 @@ import {
   getWalletInvoiceResponseTransformer,
   getWalletPaymentResponseTransformer,
   getWalletResponseTransformer,
+  getWebhookDeliveryResponseTransformer,
   getWebhookResponseTransformer,
+  getWebhookSubscriptionDeliveryResponseTransformer,
   getWebhookSubscriptionResponseTransformer,
   listAccountApiKeysResponseTransformer,
   listAccountsResponseTransformer,
@@ -63,6 +65,10 @@ import {
   registerWalletResponseTransformer,
   replaceAccountPermissionsResponseTransformer,
   resetLocalLoginResponseTransformer,
+  retryWebhookDeliveryResponseTransformer,
+  retryWebhookSubscriptionDeliveryResponseTransformer,
+  sendWebhookSubscriptionTestResponseTransformer,
+  sendWebhookTestResponseTransformer,
   streamAccountEventsResponseTransformer,
   updateAccountAddressResponseTransformer,
   updateAccountByIdResponseTransformer,
@@ -213,9 +219,15 @@ import type {
   GetWalletPaymentResponses,
   GetWalletResponses,
   GetWebhookData,
+  GetWebhookDeliveryData,
+  GetWebhookDeliveryErrors,
+  GetWebhookDeliveryResponses,
   GetWebhookErrors,
   GetWebhookResponses,
   GetWebhookSubscriptionData,
+  GetWebhookSubscriptionDeliveryData,
+  GetWebhookSubscriptionDeliveryErrors,
+  GetWebhookSubscriptionDeliveryResponses,
   GetWebhookSubscriptionErrors,
   GetWebhookSubscriptionResponses,
   HealthCheckData,
@@ -310,6 +322,12 @@ import type {
   ResetLocalPasswordData,
   ResetLocalPasswordErrors,
   ResetLocalPasswordResponses,
+  RetryWebhookDeliveryData,
+  RetryWebhookDeliveryErrors,
+  RetryWebhookDeliveryResponses,
+  RetryWebhookSubscriptionDeliveryData,
+  RetryWebhookSubscriptionDeliveryErrors,
+  RetryWebhookSubscriptionDeliveryResponses,
   RevokeAccountApiKeyData,
   RevokeAccountApiKeyErrors,
   RevokeAccountApiKeyResponses,
@@ -328,6 +346,12 @@ import type {
   RotateWebhookSubscriptionSecretData,
   RotateWebhookSubscriptionSecretErrors,
   RotateWebhookSubscriptionSecretResponses,
+  SendWebhookSubscriptionTestData,
+  SendWebhookSubscriptionTestErrors,
+  SendWebhookSubscriptionTestResponses,
+  SendWebhookTestData,
+  SendWebhookTestErrors,
+  SendWebhookTestResponses,
   SetupCheckData,
   SetupCheckErrors,
   SetupCheckResponses,
@@ -1629,6 +1653,40 @@ export const listWebhookDeliveries = <ThrowOnError extends boolean = false>(
     ...options,
   });
 
+/**
+ * Inspect a retained webhook delivery and its exact payload.
+ */
+export const getWebhookDelivery = <ThrowOnError extends boolean = false>(
+  options: Options<GetWebhookDeliveryData, ThrowOnError>
+): RequestResult<GetWebhookDeliveryResponses, GetWebhookDeliveryErrors, ThrowOnError> =>
+  (options.client ?? client).get<
+    GetWebhookDeliveryResponses,
+    GetWebhookDeliveryErrors,
+    ThrowOnError
+  >({
+    responseTransformer: getWebhookDeliveryResponseTransformer,
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/me/wallets/{wallet_id}/webhooks/{id}/deliveries/{delivery_id}',
+    ...options,
+  });
+
+/**
+ * Retry a terminal delivery using its existing ID and remaining attempt budget.
+ */
+export const retryWebhookDelivery = <ThrowOnError extends boolean = false>(
+  options: Options<RetryWebhookDeliveryData, ThrowOnError>
+): RequestResult<RetryWebhookDeliveryResponses, RetryWebhookDeliveryErrors, ThrowOnError> =>
+  (options.client ?? client).post<
+    RetryWebhookDeliveryResponses,
+    RetryWebhookDeliveryErrors,
+    ThrowOnError
+  >({
+    responseTransformer: retryWebhookDeliveryResponseTransformer,
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/me/wallets/{wallet_id}/webhooks/{id}/deliveries/{delivery_id}/retry',
+    ...options,
+  });
+
 export const rotateWebhookSecret = <ThrowOnError extends boolean = false>(
   options: Options<RotateWebhookSecretData, ThrowOnError>
 ): RequestResult<RotateWebhookSecretResponses, RotateWebhookSecretErrors, ThrowOnError> =>
@@ -1639,6 +1697,19 @@ export const rotateWebhookSecret = <ThrowOnError extends boolean = false>(
   >({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/v1/me/wallets/{wallet_id}/webhooks/{id}/rotate-secret',
+    ...options,
+  });
+
+/**
+ * Queue a subscription-local test event through the normal delivery worker.
+ */
+export const sendWebhookTest = <ThrowOnError extends boolean = false>(
+  options: Options<SendWebhookTestData, ThrowOnError>
+): RequestResult<SendWebhookTestResponses, SendWebhookTestErrors, ThrowOnError> =>
+  (options.client ?? client).post<SendWebhookTestResponses, SendWebhookTestErrors, ThrowOnError>({
+    responseTransformer: sendWebhookTestResponseTransformer,
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/me/wallets/{wallet_id}/webhooks/{id}/test',
     ...options,
   });
 
@@ -2060,6 +2131,48 @@ export const listWebhookSubscriptionDeliveries = <ThrowOnError extends boolean =
   });
 
 /**
+ * Inspect a retained webhook delivery and its exact payload.
+ */
+export const getWebhookSubscriptionDelivery = <ThrowOnError extends boolean = false>(
+  options: Options<GetWebhookSubscriptionDeliveryData, ThrowOnError>
+): RequestResult<
+  GetWebhookSubscriptionDeliveryResponses,
+  GetWebhookSubscriptionDeliveryErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    GetWebhookSubscriptionDeliveryResponses,
+    GetWebhookSubscriptionDeliveryErrors,
+    ThrowOnError
+  >({
+    responseTransformer: getWebhookSubscriptionDeliveryResponseTransformer,
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/webhooks/{id}/deliveries/{delivery_id}',
+    ...options,
+  });
+
+/**
+ * Retry a terminal delivery using its existing ID and remaining attempt budget.
+ */
+export const retryWebhookSubscriptionDelivery = <ThrowOnError extends boolean = false>(
+  options: Options<RetryWebhookSubscriptionDeliveryData, ThrowOnError>
+): RequestResult<
+  RetryWebhookSubscriptionDeliveryResponses,
+  RetryWebhookSubscriptionDeliveryErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    RetryWebhookSubscriptionDeliveryResponses,
+    RetryWebhookSubscriptionDeliveryErrors,
+    ThrowOnError
+  >({
+    responseTransformer: retryWebhookSubscriptionDeliveryResponseTransformer,
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/webhooks/{id}/deliveries/{delivery_id}/retry',
+    ...options,
+  });
+
+/**
  * Rotate a webhook signing secret.
  */
 export const rotateWebhookSubscriptionSecret = <ThrowOnError extends boolean = false>(
@@ -2076,5 +2189,26 @@ export const rotateWebhookSubscriptionSecret = <ThrowOnError extends boolean = f
   >({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/v1/webhooks/{id}/rotate-secret',
+    ...options,
+  });
+
+/**
+ * Queue a subscription-local test event through the normal delivery worker.
+ */
+export const sendWebhookSubscriptionTest = <ThrowOnError extends boolean = false>(
+  options: Options<SendWebhookSubscriptionTestData, ThrowOnError>
+): RequestResult<
+  SendWebhookSubscriptionTestResponses,
+  SendWebhookSubscriptionTestErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    SendWebhookSubscriptionTestResponses,
+    SendWebhookSubscriptionTestErrors,
+    ThrowOnError
+  >({
+    responseTransformer: sendWebhookSubscriptionTestResponseTransformer,
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/webhooks/{id}/test',
     ...options,
   });
