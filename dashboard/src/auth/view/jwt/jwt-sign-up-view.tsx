@@ -35,9 +35,11 @@ import { FormHead } from '../../components/form-head';
 
 // ----------------------------------------------------------------------
 
-const MIN_PASSWORD_LENGTH = 12;
+const MIN_PASSWORD_LENGTH = 15;
 
 export type SignUpSchemaType = {
+  username: string;
+  displayName: string;
   password: string;
   repeatPassword: string;
 };
@@ -56,9 +58,21 @@ export function JwtSignUpView() {
     () =>
       zod
         .object({
-          password: zod.string().min(MIN_PASSWORD_LENGTH, {
-            message: t('sign_up.min_password', { count: MIN_PASSWORD_LENGTH }),
-          }),
+          username: zod
+            .string()
+            .trim()
+            .regex(/^[a-z0-9._-]{3,64}$/i, {
+              message: t('local_login.username_help'),
+            }),
+          displayName: zod.string(),
+          password: zod
+            .string()
+            .refine(
+              (value) =>
+                Array.from(value).length >= MIN_PASSWORD_LENGTH &&
+                new TextEncoder().encode(value).length <= 1024,
+              { message: t('local_login.password_help') }
+            ),
           repeatPassword: zod.string().min(1, { message: t('sign_up.repeat_required') }),
         })
         .refine((data) => data.password === data.repeatPassword, {
@@ -69,6 +83,8 @@ export function JwtSignUpView() {
   );
 
   const defaultValues: SignUpSchemaType = {
+    username: 'admin',
+    displayName: '',
     password: '',
     repeatPassword: '',
   };
@@ -79,7 +95,7 @@ export function JwtSignUpView() {
   });
 
   const password = methods.watch('password');
-  const passwordProgress = Math.min((password.length / MIN_PASSWORD_LENGTH) * 100, 100);
+  const passwordProgress = Math.min((Array.from(password).length / MIN_PASSWORD_LENGTH) * 100, 100);
 
   const {
     handleSubmit,
@@ -107,7 +123,11 @@ export function JwtSignUpView() {
   const onSubmit = handleSubmit(async (body) => {
     try {
       const { data } = await signUp<true>({
-        body: { password: body.password },
+        body: {
+          username: body.username.trim(),
+          display_name: body.displayName.trim() || null,
+          password: body.password,
+        },
       });
 
       sessionStorage.setItem(JWT_STORAGE_KEY, data.token);
@@ -122,6 +142,19 @@ export function JwtSignUpView() {
 
   const renderForm = () => (
     <Box sx={{ gap: 2.5, display: 'flex', flexDirection: 'column' }}>
+      <Field.Text
+        name="username"
+        label={t('local_login.username')}
+        helperText={t('local_login.username_help')}
+        autoComplete="username"
+        slotProps={{ htmlInput: { maxLength: 64 } }}
+      />
+      <Field.Text
+        name="displayName"
+        label={t('local_login.display_name')}
+        helperText={t('local_login.display_name_help')}
+        autoComplete="nickname"
+      />
       <Field.Text
         name="password"
         label={t('sign_up.password')}

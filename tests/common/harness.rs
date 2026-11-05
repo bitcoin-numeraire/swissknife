@@ -245,14 +245,22 @@ impl TestApp {
 /// run already created it (e.g. a reused database).
 async fn bootstrap_admin(api: &ApiClient) -> String {
     let signup = api
-        .post("/v1/auth/sign-up", Auth::None, json!({ "password": ADMIN_PASSWORD }))
+        .post(
+            "/v1/auth/sign-up",
+            Auth::None,
+            json!({ "username": "admin", "password": ADMIN_PASSWORD }),
+        )
         .await;
     let body = match signup.status.as_u16() {
         200 => signup.body,
         409 => {
-            api.post("/v1/auth/sign-in", Auth::None, json!({ "password": ADMIN_PASSWORD }))
-                .await
-                .body
+            api.post(
+                "/v1/auth/sign-in",
+                Auth::None,
+                json!({ "username": "admin", "password": ADMIN_PASSWORD }),
+            )
+            .await
+            .body
         }
         other => panic!("admin bootstrap: unexpected sign-up status {other}: {}", signup.body),
     };

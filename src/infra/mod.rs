@@ -1,7 +1,9 @@
 pub mod app;
 pub mod axum;
+pub mod cli;
 pub mod config;
 pub mod database;
 pub mod jwt;
 pub mod lightning;
 pub mod logging;
+pub mod password;

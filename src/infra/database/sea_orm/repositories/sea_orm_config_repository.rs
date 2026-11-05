@@ -1,10 +1,10 @@
 use crate::{
     application::errors::DatabaseError,
     domains::system::ConfigRepository,
-    infra::database::sea_orm::models::{config, config::ActiveModel, prelude::Config},
+    infra::database::sea_orm::models::{config::ActiveModel, prelude::Config},
 };
 use async_trait::async_trait;
-use sea_orm::{sea_query::OnConflict, ActiveModelTrait, DatabaseConnection, EntityTrait, Set};
+use sea_orm::{ActiveModelTrait, DatabaseConnection, EntityTrait, Set};
 use serde_json::Value;
 
 #[derive(Clone)]
@@ -45,20 +45,6 @@ impl ConfigRepository for SeaOrmConfigRepository {
             .map_err(|e| DatabaseError::Insert(e.to_string()))?;
 
         Ok(())
-    }
-
-    async fn insert_if_absent(&self, key: &str, value: Value) -> Result<bool, DatabaseError> {
-        let model = ActiveModel {
-            key: Set(key.to_string()),
-            value: Set(Some(value)),
-        };
-        let rows_affected = Config::insert(model)
-            .on_conflict(OnConflict::column(config::Column::Key).do_nothing().to_owned())
-            .exec_without_returning(&self.db)
-            .await
-            .map_err(|e| DatabaseError::Insert(e.to_string()))?;
-
-        Ok(rows_affected == 1)
     }
 
     async fn upsert(&self, key: &str, value: Value) -> Result<(), DatabaseError> {

@@ -171,7 +171,7 @@ export const navData: Array<NavGroupWithPermissions> = [
         title: 'api_keys',
         path: paths.build.apiKeys,
         icon: ICONS.apiKeys,
-        modes: ['server', 'desktop', 'agent'],
+        modes: 'all',
       },
       {
         title: 'agents',

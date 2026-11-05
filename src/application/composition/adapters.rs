@@ -8,7 +8,7 @@ use crate::{
         composition::{AppConfig, AuthProvider, LightningProvider},
         errors::{ApplicationError, ConfigError},
     },
-    domains::bitcoin::BitcoinWallet,
+    domains::{account::PasswordHasher, bitcoin::BitcoinWallet},
     infra::{
         database::sea_orm::SeaOrmStore,
         jwt::{local::LocalAuthenticator, oauth2::OAuth2Authenticator, JWTAuthenticator},
@@ -17,6 +17,7 @@ use crate::{
             lnd::{LndGrpcClient, LndRestClient},
             LnClient,
         },
+        password::Argon2PasswordHasher,
     },
 };
 
@@ -25,6 +26,7 @@ use super::AppStore;
 #[derive(Clone)]
 pub struct AppAdapters {
     pub store: AppStore,
+    pub password_hasher: Arc<dyn PasswordHasher>,
     pub ln_client: Arc<dyn LnClient>,
     pub timeout_layer: TimeoutLayer,
     pub bitcoin_wallet: Arc<dyn BitcoinWallet>,
@@ -42,6 +44,7 @@ impl AppAdapters {
 
         Ok(AppAdapters {
             store,
+            password_hasher: Arc::new(Argon2PasswordHasher::new()),
             ln_client: lightning.ln_client,
             timeout_layer,
             bitcoin_wallet: lightning.bitcoin_wallet,

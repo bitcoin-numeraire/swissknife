@@ -8,7 +8,7 @@ use crate::{
         composition::AppStore,
         errors::{ApplicationError, DataError},
     },
-    domains::{account::PASSWORD_HASH_KEY, bitcoin::OnchainSyncCursor},
+    domains::{account::LOCAL_AUTH_INITIALIZED_KEY, bitcoin::OnchainSyncCursor},
     infra::lightning::LnClient,
 };
 
@@ -65,7 +65,7 @@ impl SystemUseCases for SystemService {
         trace!("Checking system setup");
 
         let welcome_complete = self.store.config.find(WELCOME_COMPLETE_KEY).await?.is_some();
-        let sign_up_complete: bool = self.store.config.find(PASSWORD_HASH_KEY).await?.is_some();
+        let sign_up_complete: bool = self.store.config.find(LOCAL_AUTH_INITIALIZED_KEY).await?.is_some();
 
         debug!(%welcome_complete, %sign_up_complete, "Checking system setup");
         Ok(SetupInfo {
@@ -209,7 +209,7 @@ mod tests {
         #[tokio::test]
         async fn reports_completion_flags_from_config() {
             let mut store = MockAppStoreBuilder::new();
-            // welcome_complete present, password_hash absent.
+            // welcome_complete present, local_auth_initialized absent.
             store.config.expect_find().times(2).returning(|key| {
                 if key == WELCOME_COMPLETE_KEY {
                     Ok(Some(true.into()))

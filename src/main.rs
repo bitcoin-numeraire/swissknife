@@ -4,6 +4,8 @@ mod infra;
 
 use std::{process::exit, sync::Arc};
 
+use clap::Parser;
+
 #[cfg(debug_assertions)]
 use dotenvy::dotenv;
 use tokio::signal::{
@@ -12,15 +14,17 @@ use tokio::signal::{
 };
 use tracing::{debug, error, info};
 
-use crate::application::composition::{AppAdapters, AppServices};
+use crate::application::composition::{AppAdapters, AppServices, RecoveryAdapters, RecoveryServices};
 use crate::infra::{
     app::{ClientEventRetentionWorker, EventListener, Server},
+    cli::Cli,
     config::config_rs::load_config,
     logging::tracing::setup_tracing,
 };
 
 #[tokio::main]
 async fn main() {
+    let cli = Cli::parse();
     // Load .env file in development
     #[cfg(debug_assertions)]
     dotenv().ok();
@@ -33,6 +37,19 @@ async fn main() {
             exit(1);
         }
     };
+    if let Some(command) = cli.command {
+        let result = async {
+            let adapters = RecoveryAdapters::new(&config).await?;
+            let services = RecoveryServices::new(config.auth_provider, adapters);
+            command.run(services.login.as_ref()).await
+        }
+        .await;
+        if let Err(error) = result {
+            eprintln!("Local login recovery failed: {error}");
+            exit(1);
+        }
+        return;
+    }
     setup_tracing(config.logging.clone());
 
     info!("Numeraire SwissKnife version: {}", env!("CARGO_PKG_VERSION"));

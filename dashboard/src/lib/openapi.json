@@ -821,6 +821,407 @@
         }
       }
     },
+    "/v1/accounts/{id}/login": {
+      "get": {
+        "tags": [
+          "Accounts"
+        ],
+        "summary": "Read local login state without exposing credentials.",
+        "operationId": "get_local_login",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Account ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "null"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LocalLogin"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"400 Bad Request\",\n    \"reason\": \"Missing required parameter in request\"\n}\n"
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"401 Unauthorized\",\n    \"reason\": \"Invalid credentials\"\n}\n"
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"403 Forbidden\",\n    \"reason\": \"Missing permissions\"\n}\n"
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"500 Internal Server Error\",\n    \"reason\": \"Internal server error, Please contact your administrator or try later\"\n}\n"
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Accounts"
+        ],
+        "summary": "Enable or disable local login. API keys retain their independent grants.",
+        "operationId": "update_local_login",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Account ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateLocalLoginRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Login state updated"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"400 Bad Request\",\n    \"reason\": \"Missing required parameter in request\"\n}\n"
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"401 Unauthorized\",\n    \"reason\": \"Invalid credentials\"\n}\n"
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"403 Forbidden\",\n    \"reason\": \"Missing permissions\"\n}\n"
+              }
+            }
+          },
+          "404": {
+            "description": "Login not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"404 Not Found\",\n    \"reason\": \"Resource not found\"\n}\n"
+              }
+            }
+          },
+          "409": {
+            "description": "Cannot disable your own login or concurrent credential change",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"409 Conflict\",\n    \"reason\": \"Admin account already created\"\n}\n"
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"500 Internal Server Error\",\n    \"reason\": \"Internal server error, Please contact your administrator or try later\"\n}\n"
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Accounts"
+        ],
+        "summary": "Create a local login and return a single-use activation code.",
+        "operationId": "create_local_login",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Account ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateLocalLoginRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocalLoginReset"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"400 Bad Request\",\n    \"reason\": \"Missing required parameter in request\"\n}\n"
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"401 Unauthorized\",\n    \"reason\": \"Invalid credentials\"\n}\n"
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"403 Forbidden\",\n    \"reason\": \"Missing permissions\"\n}\n"
+              }
+            }
+          },
+          "404": {
+            "description": "Account not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"404 Not Found\",\n    \"reason\": \"Resource not found\"\n}\n"
+              }
+            }
+          },
+          "409": {
+            "description": "Account already has a login or username is taken",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"409 Conflict\",\n    \"reason\": \"Admin account already created\"\n}\n"
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid username",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"422 Unprocessable Entity\",\n    \"reason\": \"Validation failed: ...\"\n}\n"
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"500 Internal Server Error\",\n    \"reason\": \"Internal server error, Please contact your administrator or try later\"\n}\n"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/accounts/{id}/login/reset": {
+      "post": {
+        "tags": [
+          "Accounts"
+        ],
+        "summary": "Revoke local sessions and issue a single-use password reset code.",
+        "operationId": "reset_local_login",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Account ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocalLoginReset"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"400 Bad Request\",\n    \"reason\": \"Missing required parameter in request\"\n}\n"
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"401 Unauthorized\",\n    \"reason\": \"Invalid credentials\"\n}\n"
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"403 Forbidden\",\n    \"reason\": \"Missing permissions\"\n}\n"
+              }
+            }
+          },
+          "404": {
+            "description": "Login not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"404 Not Found\",\n    \"reason\": \"Resource not found\"\n}\n"
+              }
+            }
+          },
+          "409": {
+            "description": "Login disabled, self-reset requested, or concurrent credential change",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"409 Conflict\",\n    \"reason\": \"Admin account already created\"\n}\n"
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"500 Internal Server Error\",\n    \"reason\": \"Internal server error, Please contact your administrator or try later\"\n}\n"
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/accounts/{id}/permissions": {
       "put": {
         "tags": [
@@ -1447,7 +1848,7 @@
           "Authentication"
         ],
         "summary": "Change Password",
-        "description": "Changes the local owner password for `JWT` auth provider deployments.",
+        "description": "Changes the authenticated account password and revokes its local sessions for `JWT` auth provider deployments.",
         "operationId": "change_password",
         "requestBody": {
           "content": {
@@ -1496,14 +1897,13 @@
               }
             }
           },
-          "405": {
-            "description": "Unsupported",
+          "409": {
+            "description": "Credentials changed concurrently",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
-                },
-                "example": "\n{\n    \"status\": \"405 Method Not Allowed\",\n    \"reason\": \"Sign in not allowed (not needed) for oauth2 provider\"\n}\n"
+                }
               }
             }
           },
@@ -1517,6 +1917,16 @@
                 "example": "\n{\n    \"status\": \"422 Unprocessable Entity\",\n    \"reason\": \"Validation failed: ...\"\n}\n"
               }
             }
+          },
+          "429": {
+            "description": "Authentication throttled; retry later",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1524,6 +1934,70 @@
             "jwt": []
           }
         ]
+      }
+    },
+    "/v1/auth/reset-password": {
+      "post": {
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "Redeem a single-use local activation or reset code. Sign in after choosing a password.",
+        "operationId": "reset_local_password",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResetLocalPasswordRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Password set; sign in to continue"
+          },
+          "401": {
+            "description": "Invalid or expired code",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Credential changed concurrently",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid password",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Try again later",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/v1/auth/sign-in": {
@@ -1577,25 +2051,23 @@
               }
             }
           },
-          "404": {
-            "description": "Not Found",
+          "409": {
+            "description": "Credentials changed concurrently; retry sign-in",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
-                },
-                "example": "\n{\n    \"status\": \"404 Not Found\",\n    \"reason\": \"Resource not found\"\n}\n"
+                }
               }
             }
           },
-          "405": {
-            "description": "Unsupported",
+          "429": {
+            "description": "Authentication throttled; retry later",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
-                },
-                "example": "\n{\n    \"status\": \"405 Method Not Allowed\",\n    \"reason\": \"Sign in not allowed (not needed) for oauth2 provider\"\n}\n"
+                }
               }
             }
           }
@@ -1653,17 +2125,6 @@
               }
             }
           },
-          "405": {
-            "description": "Unsupported",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                },
-                "example": "\n{\n    \"status\": \"405 Method Not Allowed\",\n    \"reason\": \"Sign in not allowed (not needed) for oauth2 provider\"\n}\n"
-              }
-            }
-          },
           "409": {
             "description": "Duplicate",
             "content": {
@@ -1672,6 +2133,26 @@
                   "$ref": "#/components/schemas/ErrorResponse"
                 },
                 "example": "\n{\n    \"status\": \"409 Conflict\",\n    \"reason\": \"Admin account already created\"\n}\n"
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid username or password",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Authentication throttled; retry later",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
               }
             }
           }
@@ -8276,8 +8757,8 @@
           },
           "new_password": {
             "type": "string",
-            "description": "New user password",
-            "example": "new-password"
+            "description": "New password: at least 15 Unicode characters and at most 1024 UTF-8 bytes.",
+            "example": "a different long passphrase"
           }
         }
       },
@@ -8428,6 +8909,20 @@
               "$ref": "#/components/schemas/Permission"
             },
             "description": "List of permissions for this API key"
+          }
+        }
+      },
+      "CreateLocalLoginRequest": {
+        "type": "object",
+        "description": "Add a local login to an account. The response contains a one-time activation code.",
+        "required": [
+          "username"
+        ],
+        "properties": {
+          "username": {
+            "type": "string",
+            "description": "Unique username, trimmed and lowercased before storage. Use 3 to 64 ASCII\nletters, digits, dots, underscores, or hyphens.",
+            "example": "alice"
           }
         }
       },
@@ -8992,6 +9487,57 @@
           }
         }
       },
+      "LocalLogin": {
+        "type": "object",
+        "description": "Non-secret local login information for account administrators.",
+        "required": [
+          "username",
+          "enabled",
+          "password_set"
+        ],
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "description": "Whether this login is enabled. A password must also be set to sign in."
+          },
+          "password_set": {
+            "type": "boolean",
+            "description": "Whether the account has a password; false while activation or reset is pending."
+          },
+          "reset_expires_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "Expiration of the pending activation/reset code, or null if none was issued.\nAn expiration in the past means the code can no longer be redeemed."
+          },
+          "username": {
+            "type": "string",
+            "description": "Normalized username for this account's password sign-in.",
+            "example": "alice"
+          }
+        }
+      },
+      "LocalLoginReset": {
+        "type": "object",
+        "description": "One-time activation or reset code. Shown only in this response.",
+        "required": [
+          "code",
+          "expires_at"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Secret, single-use activation/reset code to deliver to the account owner.\nRedeem it through POST /v1/auth/reset-password; never log or persist it in plaintext."
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "UTC deadline for redeeming the code, 30 minutes after it was issued."
+          }
+        }
+      },
       "NewBtcAddressRequest": {
         "type": "object",
         "description": "New Bitcoin Address Request",
@@ -9321,6 +9867,33 @@
           }
         }
       },
+      "ResetLocalPasswordRequest": {
+        "type": "object",
+        "description": "Redeem a local login activation/reset code and choose a password.",
+        "required": [
+          "code",
+          "new_password"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Unexpired, single-use code issued during activation, reset, or operator recovery."
+          },
+          "display_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Optional replacement display name. Omit or use null to keep the current\nname; send an empty string to clear it. The assigned username is unchanged.",
+            "example": "Alice"
+          },
+          "new_password": {
+            "type": "string",
+            "description": "At least 15 Unicode characters and at most 1024 UTF-8 bytes.",
+            "example": "a new personal passphrase"
+          }
+        }
+      },
       "SendPaymentRequest": {
         "type": "object",
         "description": "Send Payment Request",
@@ -9381,6 +9954,7 @@
         "type": "object",
         "description": "Sign In Request",
         "required": [
+          "username",
           "password"
         ],
         "properties": {
@@ -9388,6 +9962,10 @@
             "type": "string",
             "description": "User password",
             "example": "password"
+          },
+          "username": {
+            "type": "string",
+            "description": "Local login username."
           }
         }
       },
@@ -9409,13 +9987,27 @@
         "type": "object",
         "description": "Sign Up Request",
         "required": [
+          "username",
           "password"
         ],
         "properties": {
+          "display_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Optional name shown in the dashboard. Blank names are treated as unset.",
+            "example": "Alice"
+          },
           "password": {
             "type": "string",
-            "description": "User password",
-            "example": "password"
+            "description": "Owner password: at least 15 Unicode characters and at most 1024 UTF-8 bytes.",
+            "example": "owner-specific passphrase"
+          },
+          "username": {
+            "type": "string",
+            "description": "Owner username, normalized to lowercase. Use 3 to 64 ASCII letters,\ndigits, dots, underscores, or hyphens.",
+            "example": "admin"
           }
         }
       },
@@ -9493,6 +10085,19 @@
               "null"
             ],
             "description": "Username such as `username@domain`"
+          }
+        }
+      },
+      "UpdateLocalLoginRequest": {
+        "type": "object",
+        "description": "Enable or disable password login for this account.",
+        "required": [
+          "enabled"
+        ],
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "description": "Whether password sign-in is allowed. Changing this revokes local JWT\nsessions and pending reset codes; API keys retain their own permissions."
           }
         }
       },
