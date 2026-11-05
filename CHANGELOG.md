@@ -8,17 +8,29 @@ release notes when a tag is published.
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-11-06
+
 ### Added
 
-- Per-account local JWT credentials, username sign-in, administrator-managed
+- Per-account local JWT credentials, administrator-managed
   activation/reset codes, local login disabling, and targeted operator recovery.
-  First-owner setup supports a chosen username and display name; users can set
+  First-owner setup supports a chosen username and display name. Users can set
   their display name during activation or in Settings, and Overview greets them by name.
   Password changes and resets revoke existing local sessions
   ([#338](https://github.com/bitcoin-numeraire/swissknife/issues/338)).
 
+### Changed
+
+- Local JWT sign-in now requires a username. Installations upgrading from the
+  previous local JWT implementation must set up new credentials and sign in again
+  ([#354](https://github.com/bitcoin-numeraire/swissknife/pull/354)).
+
 ### Fixed
 
+- Restore on-chain deposit and withdrawal processing for PostgreSQL databases
+  with legacy integer columns. SwissKnife replays queued events from its saved
+  cursor after the startup migration
+  ([#400](https://github.com/bitcoin-numeraire/swissknife/pull/400)).
 - Show the API Keys navigation link in every deployment mode, including self-hosted
   installations.
 - Restore administrative transaction cleanup across wallets and report empty
@@ -154,7 +166,8 @@ release notes when a tag is published.
 
 - Removed blink on the login page ([#175]).
 
-[Unreleased]: https://github.com/bitcoin-numeraire/swissknife/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/bitcoin-numeraire/swissknife/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/bitcoin-numeraire/swissknife/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/bitcoin-numeraire/swissknife/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/bitcoin-numeraire/swissknife/compare/v0.1.8...v0.2.0
 [0.1.8]: https://github.com/bitcoin-numeraire/swissknife/releases/tag/v0.1.8
