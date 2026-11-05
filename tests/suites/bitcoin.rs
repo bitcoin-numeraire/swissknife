@@ -200,8 +200,11 @@ mod deposit {
 
     use std::{path::Path, process::Command};
 
+    use sea_orm::{ConnectionTrait, Database};
     use serde_json::{json, Value};
     use swissknife_types::{BtcOutputStatus, Invoice, InvoiceStatus, Ledger};
+
+    use crate::common::harness::matrix_cell;
 
     fn lnd_cli(args: &[&str]) -> Value {
         let project =
@@ -345,6 +348,68 @@ mod deposit {
             .get(&format!("/v1/bitcoin/addresses/{}", address.id), Auth::Bearer(token))
             .await;
         assert!(used.parse::<BtcAddress>().used);
+    }
+
+    #[tokio::test]
+    async fn cln_replays_a_native_segwit_deposit_after_upgrading_legacy_postgres() {
+        let (database, provider) = matrix_cell();
+        if database != "postgres" || provider != "cln_rest" {
+            return;
+        }
+
+        let app = TestApp::isolated("legacy-onchain", &[]).await;
+        let token = app.admin_token().await;
+        let wallet = app.create_wallet(token, "btc-legacy-upgrade").await;
+        let response = post_address(&app, token, wallet.id, Some(BtcAddressType::P2wpkh)).await;
+        assert_status(&response, StatusCode::OK);
+        let address = response.parse::<BtcAddress>();
+        assert!(!address.used);
+
+        // Fresh databases already get BIGINT from SeaQuery. Recreate the
+        // pre-SeaORM 2 schema and let the restarted binary migrate it on boot.
+        app.stop();
+        let db = Database::connect(&app.database_url)
+            .await
+            .expect("connect to test Postgres");
+        db.execute_unprepared(
+            "ALTER TABLE btc_output
+                ALTER COLUMN output_index TYPE INTEGER,
+                ALTER COLUMN block_height TYPE INTEGER;
+             ALTER TABLE payment ALTER COLUMN btc_block_height TYPE INTEGER;
+             DELETE FROM seaql_migrations WHERE version = 'm20261105_223341_widen_btc_output_indexes';",
+        )
+        .await
+        .expect("restore legacy on-chain schema");
+        db.close().await.expect("close test Postgres connection");
+
+        let sats = 50_000;
+        send_to_address(&address.address, sats).await;
+        mine(6).await;
+
+        let app = app.restart("legacy-onchain-upgraded", &[]).await;
+        let token = app.admin_token().await;
+        let expected_msat = (sats * 1000) as i64;
+        wait_until(
+            Duration::from_secs(30),
+            "replayed native SegWit deposit credited",
+            || async { app.wallet_balance(token, wallet.id).await.available_msat >= expected_msat },
+        )
+        .await;
+        assert_eq!(app.wallet_balance(token, wallet.id).await.available_msat, expected_msat);
+
+        let response = app
+            .api()
+            .get(&format!("/v1/invoices?wallet_id={}", wallet.id), Auth::Bearer(token))
+            .await;
+        assert_status(&response, StatusCode::OK);
+        let invoices = response.parse::<Vec<Invoice>>();
+        assert_eq!(invoices.len(), 1);
+        assert_eq!(invoices[0].status, InvoiceStatus::Settled);
+        let output = invoices[0].bitcoin_output.as_ref().expect("deposit output");
+        assert_eq!(output.address, address.address);
+        assert_eq!(output.amount_sat, sats);
+        assert_eq!(output.status, BtcOutputStatus::Confirmed);
+        assert!(output.block_height.is_some());
     }
 
     #[tokio::test]

@@ -19,6 +19,8 @@ release notes when a tag is published.
 
 ### Fixed
 
+- Resume on-chain deposit and withdrawal processing on PostgreSQL databases
+  created before the SeaORM 2 upgrade.
 - Show the API Keys navigation link in every deployment mode, including self-hosted
   installations.
 - Restore administrative transaction cleanup across wallets and report empty

@@ -94,6 +94,8 @@ All images support both `linux/amd64` and `linux/arm64` architectures.
 
 Extended documentation is available [here](https://docs.numeraire.tech/swissknife)
 
+- [On-chain listener recovery and alerting](docs/ONCHAIN_RECOVERY.md)
+
 Developer documentation:
 
 - [Contributing](docs/CONTRIBUTING.md)
