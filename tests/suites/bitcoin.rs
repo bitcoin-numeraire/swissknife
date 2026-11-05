@@ -410,6 +410,7 @@ mod deposit {
         assert_eq!(output.amount_sat, sats);
         assert_eq!(output.status, BtcOutputStatus::Confirmed);
         assert!(output.block_height.is_some());
+        app.stop();
     }
 
     #[tokio::test]
