@@ -10,6 +10,10 @@ release notes when a tag is published.
 
 ### Added
 
+- Signed wallet webhooks with personal and administrative subscription management,
+  durable delivery history, bounded retries, and signing-secret rotation.
+- Replay queued Core Lightning invoice updates so settlements reach wallets and
+  integrations after a listener interruption.
 - Per-account local JWT credentials, username sign-in, administrator-managed
   activation/reset codes, local login disabling, and targeted operator recovery.
   First-owner setup supports a chosen username and display name; users can set

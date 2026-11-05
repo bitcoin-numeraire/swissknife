@@ -20,6 +20,9 @@ pub enum DatabaseError {
     #[error("Failed to save resource: {0}")]
     Insert(String),
 
+    #[error("Database write conflict: {0}")]
+    Conflict(String),
+
     #[error("Failed to update resource: {0}")]
     Update(String),
 

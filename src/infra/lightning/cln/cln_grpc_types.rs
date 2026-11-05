@@ -14,9 +14,7 @@ use crate::{
     infra::lightning::cln::cln::listfunds_outputs::ListfundsOutputsStatus,
 };
 
-use super::cln::{
-    listinvoices_invoices::ListinvoicesInvoicesStatus, ListinvoicesInvoices, WaitinvoiceResponse, XpayResponse,
-};
+use super::cln::{listinvoices_invoices::ListinvoicesInvoicesStatus, ListinvoicesInvoices, XpayResponse};
 
 impl From<XpayResponse> for Payment {
     fn from(val: XpayResponse) -> Self {
@@ -67,8 +65,8 @@ impl From<ListinvoicesInvoices> for Invoice {
     }
 }
 
-impl From<WaitinvoiceResponse> for LnInvoicePaidEvent {
-    fn from(val: WaitinvoiceResponse) -> Self {
+impl From<ListinvoicesInvoices> for LnInvoicePaidEvent {
+    fn from(val: ListinvoicesInvoices) -> Self {
         LnInvoicePaidEvent {
             payment_hash: hex::encode(&val.payment_hash),
             amount_received_msat: val.amount_received_msat.as_ref().unwrap().msat,

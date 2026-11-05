@@ -58,9 +58,31 @@ Retain events for a configurable minimum window (`client_events.retention`, 30 d
 
 When `Last-Event-ID` or `after` is before that watermark, the server returns `409 Conflict` before opening the stream. The client must then refresh authoritative REST state and reconnect without a cursor. A fresh stream starts no earlier than the watermark, including for a new account with no retained events. The server checks the watermark both before and after each replay query so pruning cannot silently create a partial replay batch.
 
-### Reuse the log for webhooks
+### Reuse the log for signed webhooks
 
-Webhook delivery will consume this same durable event log rather than creating a second set of settlement hooks. Subscription and delivery-attempt state belong in separate tables; delivery must not hold or retry the wallet settlement transaction. The webhook implementation must materialize delivery rows before advancing its durable cursor and must participate in retention safety before it is merged; the event-log foundation does not treat an in-memory worker position as durable consumption.
+Webhook delivery consumes this same durable event log rather than creating a second set of settlement hooks. Account-scoped CRUD endpoints under `/v1/me/wallets/{wallet_id}/webhooks` manage an HTTPS endpoint and a non-empty event filter. A new subscription starts at the current event cursor; it does not unexpectedly replay historical payments. Disabling a subscription exhausts pending attempts and advances its cursor, so re-enabling it resumes with new events rather than producing a backlog. An attempt already claimed before the disable may still complete.
+
+Subscriptions and delivery-attempt state live in separate tables. A background worker first fans matching outbox rows into unique `(subscription_id, client_event_id)` delivery rows, then claims due work with a 60-second database lease. Attempt outcomes are applied only while that exact lease is still current, so a late worker cannot overwrite the result of a newer claim. This supports multiple application replicas and keeps all external I/O outside wallet settlement transactions. Delivery is at least once: an endpoint must deduplicate using `X-SwissKnife-Delivery`, and event order is not guaranteed across concurrent attempts.
+
+The JSON body contains the stable event ID and type, wallet and resource IDs, timestamp, and committed public snapshot. Requests include:
+
+- `X-SwissKnife-Event`
+- `X-SwissKnife-Delivery`
+- `X-SwissKnife-Timestamp`
+- `X-SwissKnife-Signature: v1=<hex HMAC-SHA256>`
+
+The signed message is `<timestamp>.<raw request body>`. A random 256-bit base64url secret is returned only on subscription creation or explicit rotation. Consumers should reject old timestamps and compare signatures in constant time. A rotation affects subsequent attempts; an attempt already claimed by a worker may still carry the previous signature.
+
+The `/me/wallets/{wallet_id}/webhooks` endpoints authenticate the account and verify wallet ownership, like the other account wallet operations. Ordinary accounts can manage their subscriptions without administrative permissions. `GET /me/webhooks` lists subscriptions across the authenticated account's wallets. Account-scoped list filters cannot override the authenticated account or the wallet in the path, even when the caller also holds administrative permissions.
+
+Administrative endpoints under `/v1/webhooks` follow the API-key handler's permission model. `read:webhook` permits listing subscriptions across accounts, fetching one subscription, and viewing its delivery history. `write:webhook` permits creation, updates, enable/disable, deletion, and secret rotation. Read and write permissions are independent. Creation requires an explicit `wallet_id` and derives the subscription's owner from that wallet; subsequent edits cannot transfer ownership. Both route families use the same services, validation, and delivery worker. List filters support account, wallet, IDs, enabled state, ordering, limit, and offset.
+
+New local bootstrap administrators receive both webhook permissions through `Permission::all_permissions()`. Existing local administrators can be granted the new permissions through account-permission management; OAuth2 deployments must grant the corresponding scopes in their identity provider. Existing API keys retain their explicitly granted scopes.
+
+Only public HTTPS destinations are delivered. The worker rejects credentials and fragments, resolves DNS itself, rejects any private, loopback, link-local, multicast, or reserved result, pins the verified address for the request, disables redirects and environment proxies, and bounds DNS resolution and the complete request by ten seconds. Network failures, HTTP 408/409/425/429, and 5xx responses retry exponentially from one minute up to one hour. Other non-2xx responses are permanent failures. Delivery exhausts after eight attempts and remains visible through the delivery-history endpoint.
+
+
+Retention takes the same event-log lock as fan-out and subscription changes. It preserves events not yet consumed by an active subscription and events referenced by pending deliveries. Terminal delivery records are removed with their expired events; otherwise their foreign keys would prevent cleanup. Subscription updates modify only requested fields and cannot roll back a worker cursor or a rotated secret.
 
 ## Consequences
 
@@ -68,5 +90,6 @@ Webhook delivery will consume this same durable event log rather than creating a
 - Listener replay, synchronous/listener races, process restarts, and multiple application replicas preserve one committed event per transition.
 - Event history begins when this migration is deployed; existing terminal payments and invoices are not backfilled.
 - Event replay is bounded. A client offline longer than the configured window receives an explicit reset signal and must rebuild state from REST.
-- The dependent webhook branch must be adapted to the retention contract before merge; pruning events still referenced by durable delivery rows must remain prohibited.
+- Webhook signing secrets are stored in the application database because SwissKnife has no deployment-wide envelope-encryption facility today. Database access must therefore be treated as secret access; a future key-management integration can encrypt the column without changing the wire contract.
+
 - WebSocket support is deferred. It should be added only if a real bidirectional protocol appears; deployment in separate pods alone is not a reason to maintain two transports.

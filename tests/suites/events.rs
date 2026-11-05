@@ -3,7 +3,7 @@
 //! through the matrix counterparty, so the same public behavior is exercised
 //! against every configured LND and CLN transport.
 
-use std::time::Duration;
+use std::{collections::HashSet, time::Duration};
 
 use reqwest::{header, Response, StatusCode};
 use sea_orm::{
@@ -362,6 +362,55 @@ mod stream {
             second.id.parse::<i32>().expect("numeric second cursor")
                 > first.id.parse::<i32>().expect("numeric first cursor")
         );
+    }
+
+    #[tokio::test]
+    async fn replays_every_invoice_settled_while_the_listener_is_paused() {
+        let app = TestApp::isolated(&unique("event-backlog"), &[]).await;
+        let account = ordinary_account(&app, "event-backlog").await;
+        let counterparty = Counterparty::for_provider(&app.provider);
+        let path = "/v1/me/events";
+
+        // Observe a live settlement before accumulating the backlog.
+        let first_invoice = invoice(&app, &account.key, account.wallet.id, 1_000_000).await;
+        let mut stream = app.api().event_stream(path, Auth::ApiKey(&account.key), None).await;
+        counterparty.pay(&first_invoice.ln_invoice.as_ref().expect("Lightning invoice").bolt11);
+        let first = next_event(&mut stream).await;
+        assert_eq!(first.payload.resource_id, first_invoice.id);
+        drop(stream);
+
+        let mut invoices = Vec::new();
+        for _ in 0..4 {
+            invoices.push(invoice(&app, &account.key, account.wallet.id, 1_000_000).await);
+        }
+
+        // CLN's outstanding wait can describe the first update, but the next
+        // wait must catch up across several indexes without invoice details.
+        let paused = app.pause();
+        for invoice in &invoices {
+            counterparty.pay(&invoice.ln_invoice.as_ref().expect("Lightning invoice").bolt11);
+        }
+        drop(paused);
+
+        let mut remaining: HashSet<_> = invoices.iter().map(|invoice| invoice.id).collect();
+        let mut cursor = first.id;
+        while !remaining.is_empty() {
+            let mut stream = app
+                .api()
+                .event_stream(path, Auth::ApiKey(&account.key), Some(&cursor))
+                .await;
+            let event = next_event(&mut stream).await;
+            assert_eq!(event.payload.event_type, ClientEventType::InvoicePaid);
+            assert_eq!(event.payload.wallet_id, account.wallet.id);
+            assert!(
+                remaining.remove(&event.payload.resource_id),
+                "unexpected or duplicate settlement"
+            );
+            let paid = serde_json::from_value::<Invoice>(event.payload.data).expect("paid invoice snapshot");
+            assert_eq!(paid.status, InvoiceStatus::Settled);
+            assert_eq!(paid.amount_received_msat, Some(1_000_000));
+            cursor = event.id;
+        }
     }
 
     #[tokio::test]
