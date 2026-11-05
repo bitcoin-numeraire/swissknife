@@ -16,14 +16,8 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  # The full suite runs across a matrix that covers each dependency dimension
-  # without the redundant cross-product: all four Lightning adapters on sqlite,
-  # plus one postgres cell. Storage behaviour is independent of the Lightning
-  # provider (and vice-versa), so every test gets both-DB and all-adapter
-  # coverage from these cells while the omitted cross cells (e.g. postgres x
-  # cln_rest) would add no surface. We deliberately do not tier tests by
-  # dependency — that classification is leaky, since one test can touch both
-  # storage and the provider at once.
+  # Run all four Lightning adapters on SQLite. On PostgreSQL, cover LND gRPC
+  # and the production CLN REST configuration.
   integration:
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -35,6 +29,8 @@ jobs:
         database: [sqlite]
         include:
           - provider: lnd_grpc
+            database: postgres
+          - provider: cln_rest
             database: postgres
 
     steps:
@@ -118,9 +114,8 @@ jobs:
   # log and uploaded as lcov). This is the true total coverage.
   #
   # It re-runs the whole suite under instrumentation, which duplicates the
-  # integration + persistence jobs above. Those are the PR gates and already
-  # cover every cell, so coverage runs only on pushes to main (and manual
-  # dispatch), not on every pull-request push.
+  # integration + persistence jobs above, so coverage runs only on pushes to
+  # main (and manual dispatch), not on every pull-request push.
   coverage:
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
