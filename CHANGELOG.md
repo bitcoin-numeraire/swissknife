@@ -8,10 +8,17 @@ release notes when a tag is published.
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-11-06
+
 ### Fixed
 
+- Restore on-chain deposit and withdrawal processing for PostgreSQL databases
+  with legacy integer columns. SwissKnife replays queued events from its saved
+  cursor after the startup migration
+  ([#400](https://github.com/bitcoin-numeraire/swissknife/pull/400)).
 - Restore administrative transaction cleanup across wallets and report empty
-  cleanup results and API errors in the dashboard.
+  cleanup results and API errors in the dashboard
+  ([#396](https://github.com/bitcoin-numeraire/swissknife/pull/396)).
 
 ## [0.3.0] - 2026-10-28
 
@@ -141,7 +148,8 @@ release notes when a tag is published.
 
 - Removed blink on the login page ([#175]).
 
-[Unreleased]: https://github.com/bitcoin-numeraire/swissknife/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/bitcoin-numeraire/swissknife/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/bitcoin-numeraire/swissknife/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/bitcoin-numeraire/swissknife/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/bitcoin-numeraire/swissknife/compare/v0.1.8...v0.2.0
 [0.1.8]: https://github.com/bitcoin-numeraire/swissknife/releases/tag/v0.1.8
