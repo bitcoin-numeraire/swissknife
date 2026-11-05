@@ -10,7 +10,8 @@ use utoipa::OpenApi;
 use uuid::Uuid;
 
 use swissknife_types::{
-    Account, AccountFilter, CreateAccountRequest, ErrorResponse, UpdateAccountPermissionsRequest, UpdateAccountRequest,
+    Account, AccountFilter, CreateAccountRequest, CreateLocalLoginRequest, ErrorResponse, LocalLogin, LocalLoginReset,
+    UpdateAccountPermissionsRequest, UpdateAccountRequest, UpdateLocalLoginRequest,
 };
 
 use crate::{
@@ -18,7 +19,7 @@ use crate::{
         composition::AppServices,
         docs::{
             BAD_REQUEST_EXAMPLE, CONFLICT_EXAMPLE, FORBIDDEN_EXAMPLE, INTERNAL_EXAMPLE, NOT_FOUND_EXAMPLE,
-            UNAUTHORIZED_EXAMPLE,
+            UNAUTHORIZED_EXAMPLE, UNPROCESSABLE_EXAMPLE,
         },
         errors::{ApplicationError, DataError},
     },
@@ -31,6 +32,10 @@ use super::{Permission, User};
 #[openapi(
     paths(
         create_account,
+        get_local_login,
+        create_local_login,
+        update_local_login,
+        reset_local_login,
         list_accounts,
         get_account_by_id,
         update_account_by_id,
@@ -54,6 +59,11 @@ pub fn router() -> Router<Arc<AppServices>> {
         .route("/{id}", get(get_account_by_id))
         .route("/{id}", put(update_account_by_id))
         .route("/{id}/permissions", put(replace_account_permissions))
+        .route(
+            "/{id}/login",
+            get(get_local_login).post(create_local_login).put(update_local_login),
+        )
+        .route("/{id}/login/reset", post(reset_local_login))
         .route("/{id}", delete(delete_account_by_id))
 }
 
@@ -243,6 +253,112 @@ async fn delete_accounts(
     }
 
     Ok(services.account.delete_many(filter).await?.into())
+}
+
+/// Read local login state without exposing credentials.
+#[utoipa::path(
+    get,
+    path = "/{id}/login",
+    tag = "Accounts",
+    context_path = CONTEXT_PATH,
+    params(("id" = Uuid, Path, description = "Account ID")),
+    responses(
+        (status = 200, description = "Success", body = Option<LocalLogin>),
+        (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
+        (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
+        (status = 403, description = "Forbidden", body = ErrorResponse, example = json!(FORBIDDEN_EXAMPLE)),
+        (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
+    )
+)]
+async fn get_local_login(
+    State(services): State<Arc<AppServices>>,
+    user: User,
+    Path(id): Path<Uuid>,
+) -> Result<Json<Option<LocalLogin>>, ApplicationError> {
+    user.check_permission(Permission::ReadAccount)?;
+    Ok(Json(services.auth.get_local_login(id).await?))
+}
+
+/// Create a local login and return a single-use activation code.
+#[utoipa::path(
+    post,
+    path = "/{id}/login",
+    tag = "Accounts",
+    context_path = CONTEXT_PATH,
+    params(("id" = Uuid, Path, description = "Account ID")),
+    request_body = CreateLocalLoginRequest,
+    responses(
+        (status = 200, description = "Success", body = LocalLoginReset),
+        (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
+        (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
+        (status = 403, description = "Forbidden", body = ErrorResponse, example = json!(FORBIDDEN_EXAMPLE)),
+        (status = 404, description = "Account not found", body = ErrorResponse, example = json!(NOT_FOUND_EXAMPLE)),
+        (status = 409, description = "Account already has a login or username is taken", body = ErrorResponse, example = json!(CONFLICT_EXAMPLE)),
+        (status = 422, description = "Invalid username", body = ErrorResponse, example = json!(UNPROCESSABLE_EXAMPLE)),
+        (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
+    )
+)]
+async fn create_local_login(
+    State(services): State<Arc<AppServices>>,
+    user: User,
+    Path(id): Path<Uuid>,
+    Json(payload): Json<CreateLocalLoginRequest>,
+) -> Result<Json<LocalLoginReset>, ApplicationError> {
+    user.check_permission(Permission::WriteAccount)?;
+    Ok(Json(services.auth.create_local_login(id, payload.username).await?))
+}
+
+/// Enable or disable local login. API keys retain their independent grants.
+#[utoipa::path(
+    put,
+    path = "/{id}/login",
+    tag = "Accounts",
+    context_path = CONTEXT_PATH,
+    params(("id" = Uuid, Path, description = "Account ID")),
+    request_body = UpdateLocalLoginRequest,
+    responses(
+        (status = 204, description = "Login state updated"),
+        (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
+        (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
+        (status = 403, description = "Forbidden", body = ErrorResponse, example = json!(FORBIDDEN_EXAMPLE)),
+        (status = 404, description = "Login not found", body = ErrorResponse, example = json!(NOT_FOUND_EXAMPLE)),
+        (status = 409, description = "Cannot disable your own login or concurrent credential change", body = ErrorResponse, example = json!(CONFLICT_EXAMPLE)),
+        (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
+    )
+)]
+async fn update_local_login(
+    State(services): State<Arc<AppServices>>,
+    user: User,
+    Path(id): Path<Uuid>,
+    Json(payload): Json<UpdateLocalLoginRequest>,
+) -> Result<axum::http::StatusCode, ApplicationError> {
+    services.auth.update_local_login(user, id, payload.enabled).await?;
+    Ok(axum::http::StatusCode::NO_CONTENT)
+}
+
+/// Revoke local sessions and issue a single-use password reset code.
+#[utoipa::path(
+    post,
+    path = "/{id}/login/reset",
+    tag = "Accounts",
+    context_path = CONTEXT_PATH,
+    params(("id" = Uuid, Path, description = "Account ID")),
+    responses(
+        (status = 200, description = "Success", body = LocalLoginReset),
+        (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
+        (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
+        (status = 403, description = "Forbidden", body = ErrorResponse, example = json!(FORBIDDEN_EXAMPLE)),
+        (status = 404, description = "Login not found", body = ErrorResponse, example = json!(NOT_FOUND_EXAMPLE)),
+        (status = 409, description = "Login disabled, self-reset requested, or concurrent credential change", body = ErrorResponse, example = json!(CONFLICT_EXAMPLE)),
+        (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
+    )
+)]
+async fn reset_local_login(
+    State(services): State<Arc<AppServices>>,
+    user: User,
+    Path(id): Path<Uuid>,
+) -> Result<Json<LocalLoginReset>, ApplicationError> {
+    Ok(Json(services.auth.reset_local_login(user, id).await?))
 }
 
 #[cfg(test)]

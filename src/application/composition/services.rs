@@ -49,6 +49,7 @@ impl AppServices {
             ln_client,
             bitcoin_wallet,
             jwt_authenticator,
+            password_hasher,
             ..
         } = adapters;
 
@@ -80,6 +81,7 @@ impl AppServices {
         let wallet = WalletService::new(store.clone());
         let auth = AuthService::new(
             jwt_authenticator,
+            password_hasher,
             store.clone(),
             auth_provider,
             bitcoin_wallet.network(),

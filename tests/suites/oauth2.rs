@@ -174,7 +174,11 @@ mod local_auth_is_disabled {
         let app = oauth2_app().await;
         let res = app
             .api()
-            .post("/v1/auth/sign-up", Auth::None, json!({ "password": "irrelevant" }))
+            .post(
+                "/v1/auth/sign-up",
+                Auth::None,
+                json!({ "username": "admin", "password": "irrelevant" }),
+            )
             .await;
         assert_error(&res, StatusCode::UNAUTHORIZED);
     }
@@ -184,7 +188,11 @@ mod local_auth_is_disabled {
         let app = oauth2_app().await;
         let res = app
             .api()
-            .post("/v1/auth/sign-in", Auth::None, json!({ "password": "irrelevant" }))
+            .post(
+                "/v1/auth/sign-in",
+                Auth::None,
+                json!({ "username": "admin", "password": "irrelevant" }),
+            )
             .await;
         assert_error(&res, StatusCode::UNAUTHORIZED);
     }

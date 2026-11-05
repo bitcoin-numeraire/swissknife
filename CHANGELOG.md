@@ -8,8 +8,19 @@ release notes when a tag is published.
 
 ## [Unreleased]
 
+### Added
+
+- Per-account local JWT credentials, username sign-in, administrator-managed
+  activation/reset codes, local login disabling, and targeted operator recovery.
+  First-owner setup supports a chosen username and display name; users can set
+  their display name during activation or in Settings, and Overview greets them by name.
+  Password changes and resets revoke existing local sessions
+  ([#338](https://github.com/bitcoin-numeraire/swissknife/issues/338)).
+
 ### Fixed
 
+- Show the API Keys navigation link in every deployment mode, including self-hosted
+  installations.
 - Restore administrative transaction cleanup across wallets and report empty
   cleanup results and API errors in the dashboard.
 

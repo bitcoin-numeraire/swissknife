@@ -17,6 +17,7 @@ import IconButton from '@mui/material/IconButton';
 import { RouterLink } from 'src/routes/components';
 
 import { CONFIG } from 'src/global-config';
+import { useAccountContext } from 'src/contexts/account';
 
 import { Label } from 'src/components/label';
 import { Iconify } from 'src/components/iconify';
@@ -42,6 +43,8 @@ export type AccountDrawerProps = IconButtonProps & {
 
 export function AccountDrawer({ data = [], sx, ...other }: AccountDrawerProps) {
   const { user } = useAuthContext();
+  const { account } = useAccountContext();
+  const displayName = account?.display_name || user?.displayName;
 
   const { value: open, onFalse: onClose, onTrue: onOpen } = useBoolean();
 
@@ -52,8 +55,8 @@ export function AccountDrawer({ data = [], sx, ...other }: AccountDrawerProps) {
         primaryBorder: { size: 120, sx: { color: 'primary.main' } },
       }}
     >
-      <Avatar src={user?.photoURL} alt={user?.displayName} sx={{ width: 1, height: 1 }}>
-        {user?.displayName?.charAt(0).toUpperCase()}
+      <Avatar src={user?.photoURL} alt={displayName} sx={{ width: 1, height: 1 }}>
+        {displayName?.charAt(0).toUpperCase()}
       </Avatar>
     </AnimateBorder>
   );
@@ -113,7 +116,7 @@ export function AccountDrawer({ data = [], sx, ...other }: AccountDrawerProps) {
       <AccountButton
         onClick={onOpen}
         photoURL={user?.photoURL}
-        displayName={user?.displayName}
+        displayName={displayName}
         sx={sx}
         {...other}
       />
@@ -152,7 +155,7 @@ export function AccountDrawer({ data = [], sx, ...other }: AccountDrawerProps) {
             {renderAvatar()}
 
             <Typography variant="subtitle1" noWrap sx={{ mt: 2 }}>
-              {user?.displayName}
+              {displayName}
             </Typography>
 
             <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }} noWrap>

@@ -35,6 +35,7 @@ import { mergeAndSortTransactions } from 'src/utils/transactions';
 import { useTranslate } from 'src/locales';
 import { endpointKeys } from 'src/actions/keys';
 import { DashboardContent } from 'src/layouts/dashboard';
+import { useAccountContext } from 'src/contexts/account';
 import { useActiveWallet } from 'src/actions/account-wallet';
 import { useFetchFiatPrices } from 'src/actions/mempool-space';
 
@@ -124,6 +125,7 @@ export function WalletView() {
   const [isRefreshingWallet, setIsRefreshingWallet] = useState(false);
 
   const { wallet, walletLoading, walletError } = useActiveWallet();
+  const { account } = useAccountContext();
   const { fiatPrices, fiatPricesError } = useFetchFiatPrices();
 
   const prices = fiatPrices ?? fallbackFiatPrices;
@@ -229,7 +231,14 @@ export function WalletView() {
             sx={{ alignItems: { md: 'flex-end' }, justifyContent: 'space-between', mb: 3 }}
           >
             <Stack spacing={1}>
-              <Typography variant="h3">{t('wallet_view.title')}</Typography>
+              <Typography variant="h3" sx={{ overflowWrap: 'anywhere' }}>
+                {account?.display_name
+                  ? t('wallet_view.welcome_name', {
+                      name: account.display_name,
+                      interpolation: { escapeValue: false },
+                    })
+                  : t('wallet_view.welcome')}
+              </Typography>
               {!wallet?.ln_address && (
                 <Typography variant="body2" color="text.secondary">
                   {t('wallet_view.identity_missing')}

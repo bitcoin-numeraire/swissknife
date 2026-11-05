@@ -63,6 +63,7 @@ import {
 
 import { RoleBasedGuard } from 'src/auth/guard';
 
+import { LocalLoginCard } from './local-login-card';
 import { AccountDirectory } from './account-directory';
 
 // ----------------------------------------------------------------------
@@ -481,6 +482,11 @@ function AccountDetailsView({ id }: { id: string }) {
                   </DetailCard>
                 </Grid>
               </Grid>
+
+              {CONFIG.auth.method === 'jwt' &&
+                account!.identity?.provider !== AuthProvider.OAUTH2 && (
+                  <LocalLoginCard key={account!.id} account={account!} />
+                )}
 
               <Box>
                 <Stack
