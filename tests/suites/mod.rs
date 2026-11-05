@@ -17,4 +17,5 @@ mod oauth2;
 mod payments;
 mod system;
 mod wallets;
+mod webhooks;
 mod well_known;

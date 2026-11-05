@@ -8,7 +8,7 @@ use crate::{
         account::{Account, AccountPreferences, ApiKey, AuthIdentity},
         asset::Asset,
         bitcoin::{BtcAddress, BtcOutput},
-        event::ClientEvent,
+        event::{ClientEvent, StoredWebhookSubscription, WebhookDelivery, WebhookDeliveryStatus},
         invoice::{Invoice, InvoiceStatus, LnInvoice},
         ln_address::LnAddress,
         payment::{BtcPayment, InternalPayment, LnPayment, Payment},
@@ -24,7 +24,8 @@ use super::models::{
     asset::Model as AssetModel, auth_identity::Model as AuthIdentityModel, btc_address::Model as BitcoinAddressModel,
     btc_output::Model as BitcoinOutputModel, client_event::Model as ClientEventModel, contact::ContactModel,
     invoice::Model as InvoiceModel, ln_address::Model as LnAddressModel, payment::Model as PaymentModel,
-    wallet::Model as WalletModel,
+    wallet::Model as WalletModel, webhook_delivery::Model as WebhookDeliveryModel,
+    webhook_subscription::Model as WebhookSubscriptionModel,
 };
 
 const ASSERTION_MSG: &str = "should parse successfully by assertion";
@@ -290,6 +291,42 @@ impl From<ClientEventModel> for ClientEvent {
             resource_id: model.resource_id,
             data: model.payload,
             created_at: model.created_at.and_utc(),
+        }
+    }
+}
+
+impl From<WebhookSubscriptionModel> for StoredWebhookSubscription {
+    fn from(model: WebhookSubscriptionModel) -> Self {
+        Self {
+            id: model.id,
+            account_id: model.account_id,
+            wallet_id: model.wallet_id,
+            url: model.url,
+            event_types: serde_json::from_value(model.event_types).expect(ASSERTION_MSG),
+            signing_secret: model.signing_secret,
+            active: model.active,
+            last_event_id: model.last_event_id,
+            created_at: model.created_at.and_utc(),
+            updated_at: model.updated_at.map(|value| value.and_utc()),
+        }
+    }
+}
+
+impl From<WebhookDeliveryModel> for WebhookDelivery {
+    fn from(model: WebhookDeliveryModel) -> Self {
+        Self {
+            id: model.id,
+            subscription_id: model.subscription_id,
+            event_id: model.client_event_id.to_string(),
+            status: model.status.parse::<WebhookDeliveryStatus>().expect(ASSERTION_MSG),
+            attempt_count: model.attempt_count.try_into().expect(ASSERTION_MSG),
+            response_status: model
+                .response_status
+                .map(|value| value.try_into().expect(ASSERTION_MSG)),
+            last_error: model.last_error,
+            delivered_at: model.delivered_at.map(|value| value.and_utc()),
+            created_at: model.created_at.and_utc(),
+            updated_at: model.updated_at.map(|value| value.and_utc()),
         }
     }
 }

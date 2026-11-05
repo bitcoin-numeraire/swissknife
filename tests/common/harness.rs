@@ -91,6 +91,20 @@ pub struct Spawned {
     process_id: u32,
 }
 
+/// Resume an isolated instance even if a test panics while it is paused.
+pub struct PausedInstance {
+    process_id: u32,
+}
+
+impl Drop for PausedInstance {
+    fn drop(&mut self) {
+        let _ = Command::new("kill")
+            .arg("-CONT")
+            .arg(self.process_id.to_string())
+            .status();
+    }
+}
+
 /// Spawn a SwissKnife instance against the regtest stack with `extra_env`
 /// layered on top of the per-instance dynamics, returning once it reports ready.
 ///
@@ -233,6 +247,20 @@ impl TestApp {
     /// A fresh HTTP client bound to this instance.
     pub fn api(&self) -> ApiClient {
         ApiClient::new(self.base_url.clone())
+    }
+
+    /// Pause an isolated process to accumulate provider updates without
+    /// disconnecting its listener. Dropping the guard resumes the process.
+    pub fn pause(&self) -> PausedInstance {
+        let status = Command::new("kill")
+            .arg("-STOP")
+            .arg(self.process_id.to_string())
+            .status()
+            .expect("pause isolated SwissKnife process");
+        assert!(status.success(), "pause isolated SwissKnife process");
+        PausedInstance {
+            process_id: self.process_id,
+        }
     }
 
     /// JWT for the bootstrap admin (all permissions), created during startup.

@@ -28,6 +28,10 @@ pub enum Permission {
     ReadApiKey,
     #[serde(rename = "write:api_key")]
     WriteApiKey,
+    #[serde(rename = "read:webhook")]
+    ReadWebhook,
+    #[serde(rename = "write:webhook")]
+    WriteWebhook,
     #[serde(rename = "read:btc_address")]
     ReadBtcAddress,
     #[serde(rename = "write:btc_address")]
@@ -49,6 +53,8 @@ impl Permission {
             Permission::WriteLnNode,
             Permission::ReadApiKey,
             Permission::WriteApiKey,
+            Permission::ReadWebhook,
+            Permission::WriteWebhook,
             Permission::ReadBtcAddress,
             Permission::WriteBtcAddress,
         ]

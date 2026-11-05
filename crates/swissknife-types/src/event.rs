@@ -1,8 +1,11 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use serde_with::{serde_as, DisplayFromStr};
 use strum_macros::{Display, EnumString};
 use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
+
+use crate::OrderDirection;
 
 /// A durable event emitted after an invoice or payment changes state.
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
@@ -44,4 +47,101 @@ pub enum ClientEventType {
 pub struct ClientEventStreamQuery {
     /// Replay events strictly after this event ID. `Last-Event-ID` takes precedence.
     pub after: Option<i32>,
+}
+
+/// Create a server-to-server webhook for one account-owned wallet.
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct CreateWebhookSubscriptionRequest {
+    /// Target wallet. Required by administrative endpoints; account-scoped
+    /// endpoints use the wallet in the path instead.
+    pub wallet_id: Option<Uuid>,
+    /// Public HTTPS endpoint that receives signed POST requests.
+    pub url: String,
+    /// Non-empty event filter.
+    pub event_types: Vec<ClientEventType>,
+}
+
+/// Webhook subscription query filter.
+#[serde_as]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, IntoParams)]
+pub struct WebhookSubscriptionFilter {
+    /// Total amount of results to return.
+    #[serde_as(as = "Option<DisplayFromStr>")]
+    pub limit: Option<u64>,
+    /// Offset where to start returning results.
+    #[serde_as(as = "Option<DisplayFromStr>")]
+    pub offset: Option<u64>,
+    pub ids: Option<Vec<Uuid>>,
+    /// Account-scoped endpoints populate this from the authenticated account.
+    pub account_id: Option<Uuid>,
+    /// Wallet-scoped endpoints populate this from the path.
+    pub wallet_id: Option<Uuid>,
+    #[serde_as(as = "Option<DisplayFromStr>")]
+    pub active: Option<bool>,
+    #[serde(default)]
+    pub order_direction: OrderDirection,
+}
+
+/// Update a webhook endpoint, event filter, or enabled state.
+#[derive(Clone, Debug, Default, Deserialize, Serialize, ToSchema)]
+pub struct UpdateWebhookSubscriptionRequest {
+    pub url: Option<String>,
+    pub event_types: Option<Vec<ClientEventType>>,
+    pub active: Option<bool>,
+}
+
+/// Webhook configuration. The signing secret is never returned after creation or rotation.
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct WebhookSubscription {
+    pub id: Uuid,
+    pub account_id: Uuid,
+    pub wallet_id: Uuid,
+    pub url: String,
+    pub event_types: Vec<ClientEventType>,
+    pub active: bool,
+    pub created_at: DateTime<Utc>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub updated_at: Option<DateTime<Utc>>,
+}
+
+/// Creation response containing the secret exactly once.
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct CreatedWebhookSubscription {
+    #[serde(flatten)]
+    pub subscription: WebhookSubscription,
+    /// Base64url secret used to verify `X-SwissKnife-Signature`.
+    pub signing_secret: String,
+}
+
+/// Secret rotation response. Subsequent attempts use the new secret; an attempt
+/// already claimed by a worker may still carry the previous signature.
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct RotateWebhookSecretResponse {
+    pub signing_secret: String,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Display, EnumString, Eq, PartialEq, Serialize, ToSchema)]
+pub enum WebhookDeliveryStatus {
+    Pending,
+    Delivered,
+    Exhausted,
+}
+
+/// Delivery state for webhook observability.
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct WebhookDelivery {
+    pub id: Uuid,
+    pub subscription_id: Uuid,
+    pub event_id: String,
+    pub status: WebhookDeliveryStatus,
+    pub attempt_count: u32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub response_status: Option<u16>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_error: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub delivered_at: Option<DateTime<Utc>>,
+    pub created_at: DateTime<Utc>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub updated_at: Option<DateTime<Utc>>,
 }

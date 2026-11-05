@@ -17,3 +17,5 @@ pub mod ln_address;
 pub mod local_credential;
 pub mod payment;
 pub mod wallet;
+pub mod webhook_delivery;
+pub mod webhook_subscription;

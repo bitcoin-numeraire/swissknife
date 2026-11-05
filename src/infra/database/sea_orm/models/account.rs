@@ -28,6 +28,8 @@ pub enum Relation {
     LocalCredential,
     #[sea_orm(has_many = "super::wallet::Entity")]
     Wallet,
+    #[sea_orm(has_many = "super::webhook_subscription::Entity")]
+    WebhookSubscription,
 }
 
 impl Related<super::account_preference::Entity> for Entity {
@@ -63,6 +65,12 @@ impl Related<super::local_credential::Entity> for Entity {
 impl Related<super::wallet::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::Wallet.def()
+    }
+}
+
+impl Related<super::webhook_subscription::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::WebhookSubscription.def()
     }
 }
 

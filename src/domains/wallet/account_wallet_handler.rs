@@ -2,7 +2,7 @@ use std::{collections::VecDeque, convert::Infallible, sync::Arc, time::Duration}
 
 use axum::{
     extract::State,
-    http::{header::CACHE_CONTROL, HeaderMap, HeaderName, HeaderValue},
+    http::{header::CACHE_CONTROL, HeaderMap, HeaderName, HeaderValue, StatusCode},
     response::{
         sse::{Event, KeepAlive},
         IntoResponse, Sse,
@@ -18,9 +18,10 @@ use uuid::Uuid;
 
 use swissknife_types::{
     Account, AccountPreferences, ClientEvent, ClientEventStreamQuery, ClientEventType, CreateApiKeyRequest,
-    CreateWalletRequest, ErrorResponse, NewBtcAddressRequest, NewInvoiceRequest, PaymentFeeEstimate,
-    RegisterLnAddressRequest, SendPaymentRequest, UpdateAccountPreferencesRequest, UpdateAccountRequest,
-    UpdateLnAddressRequest,
+    CreateWalletRequest, CreateWebhookSubscriptionRequest, CreatedWebhookSubscription, ErrorResponse,
+    NewBtcAddressRequest, NewInvoiceRequest, PaymentFeeEstimate, RegisterLnAddressRequest, RotateWebhookSecretResponse,
+    SendPaymentRequest, UpdateAccountPreferencesRequest, UpdateAccountRequest, UpdateLnAddressRequest,
+    UpdateWebhookSubscriptionRequest, WebhookDelivery, WebhookSubscription, WebhookSubscriptionFilter,
 };
 
 use crate::{
@@ -49,6 +50,14 @@ use super::{Balance, Contact, Wallet, WalletFilter};
     paths(
         get_account,
         stream_account_events,
+        create_webhook,
+        list_webhooks,
+        list_account_webhooks,
+        get_webhook,
+        update_webhook,
+        delete_webhook,
+        rotate_webhook_secret,
+        list_webhook_deliveries,
         update_current_account,
         get_account_preferences,
         update_account_preferences,
@@ -84,6 +93,12 @@ use super::{Balance, Contact, Wallet, WalletFilter};
         ClientEvent,
         ClientEventType,
         ClientEventStreamQuery,
+        CreateWebhookSubscriptionRequest,
+        CreatedWebhookSubscription,
+        RotateWebhookSecretResponse,
+        UpdateWebhookSubscriptionRequest,
+        WebhookDelivery,
+        WebhookSubscription,
         UpdateAccountRequest,
         UpdateAccountPreferencesRequest,
         CreateWalletRequest,
@@ -146,6 +161,20 @@ pub fn account_router() -> Router<Arc<AppServices>> {
         .route("/wallets/{wallet_id}/payments/{id}", get(get_wallet_payment))
         .route("/wallets/{wallet_id}/payments", delete(delete_failed_payments))
         .route("/wallets/{wallet_id}/contacts", get(list_contacts))
+        .route("/webhooks", get(list_account_webhooks))
+        .route("/wallets/{wallet_id}/webhooks", post(create_webhook).get(list_webhooks))
+        .route(
+            "/wallets/{wallet_id}/webhooks/{id}",
+            get(get_webhook).put(update_webhook).delete(delete_webhook),
+        )
+        .route(
+            "/wallets/{wallet_id}/webhooks/{id}/rotate-secret",
+            post(rotate_webhook_secret),
+        )
+        .route(
+            "/wallets/{wallet_id}/webhooks/{id}/deliveries",
+            get(list_webhook_deliveries),
+        )
 }
 
 /// Stream durable events for every wallet owned by the authenticated account.
@@ -1125,6 +1154,212 @@ async fn revoke_account_api_keys(
     filter.account_id = Some(user.account_id);
     let n_revoked = services.api_key.revoke_many(filter).await?;
     Ok(n_revoked.into())
+}
+
+#[utoipa::path(
+    post,
+    path = "/wallets/{wallet_id}/webhooks",
+    tag = "Me",
+    context_path = CONTEXT_PATH,
+    request_body = CreateWebhookSubscriptionRequest,
+    responses(
+        (status = 201, description = "Created; save the signing secret because it is returned only once", body = CreatedWebhookSubscription),
+        (status = 400, description = "Malformed request body", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
+        (status = 409, description = "A subscription already exists for this wallet and URL", body = ErrorResponse, example = json!(CONFLICT_EXAMPLE)),
+        (status = 422, description = "Invalid URL or empty event filter", body = ErrorResponse, example = json!(UNPROCESSABLE_EXAMPLE)),
+        (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
+        (status = 404, description = "Wallet not found", body = ErrorResponse, example = json!(NOT_FOUND_EXAMPLE)),
+        (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE)),
+    )
+)]
+async fn create_webhook(
+    State(services): State<Arc<AppServices>>,
+    user: User,
+    Path(wallet_id): Path<Uuid>,
+    Json(request): Json<CreateWebhookSubscriptionRequest>,
+) -> Result<(StatusCode, Json<CreatedWebhookSubscription>), ApplicationError> {
+    services.wallet.verify_ownership(user.account_id, wallet_id).await?;
+    Ok((
+        StatusCode::CREATED,
+        Json(services.webhook.create(wallet_id, request).await?),
+    ))
+}
+
+#[utoipa::path(
+    get,
+    path = "/wallets/{wallet_id}/webhooks",
+    tag = "Me",
+    context_path = CONTEXT_PATH,
+    params(WebhookSubscriptionFilter),
+    responses(
+        (status = 200, description = "Subscriptions", body = Vec<WebhookSubscription>),
+        (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
+        (status = 404, description = "Wallet not found", body = ErrorResponse, example = json!(NOT_FOUND_EXAMPLE)),
+        (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE)),
+    )
+)]
+async fn list_webhooks(
+    State(services): State<Arc<AppServices>>,
+    user: User,
+    Path(wallet_id): Path<Uuid>,
+    Query(mut filter): Query<WebhookSubscriptionFilter>,
+) -> Result<Json<Vec<WebhookSubscription>>, ApplicationError> {
+    services.wallet.verify_ownership(user.account_id, wallet_id).await?;
+    filter.account_id = Some(user.account_id);
+    filter.wallet_id = Some(wallet_id);
+    Ok(Json(services.webhook.list(filter).await?))
+}
+
+#[utoipa::path(
+    put,
+    path = "/wallets/{wallet_id}/webhooks/{id}",
+    tag = "Me",
+    context_path = CONTEXT_PATH,
+    request_body = UpdateWebhookSubscriptionRequest,
+    responses(
+        (status = 200, description = "Updated", body = WebhookSubscription),
+        (status = 400, description = "Malformed request body", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
+        (status = 409, description = "A subscription already exists for this wallet and URL", body = ErrorResponse, example = json!(CONFLICT_EXAMPLE)),
+        (status = 422, description = "Invalid URL or empty event filter", body = ErrorResponse, example = json!(UNPROCESSABLE_EXAMPLE)),
+        (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
+        (status = 404, description = "Subscription not found", body = ErrorResponse, example = json!(NOT_FOUND_EXAMPLE)),
+        (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE)),
+    )
+)]
+async fn update_webhook(
+    State(services): State<Arc<AppServices>>,
+    user: User,
+    Path((wallet_id, id)): Path<(Uuid, Uuid)>,
+    Json(request): Json<UpdateWebhookSubscriptionRequest>,
+) -> Result<Json<WebhookSubscription>, ApplicationError> {
+    services
+        .webhook
+        .get_by_account_id(user.account_id, wallet_id, id)
+        .await?;
+    Ok(Json(services.webhook.update(id, request).await?))
+}
+
+#[utoipa::path(
+    delete,
+    path = "/wallets/{wallet_id}/webhooks/{id}",
+    tag = "Me",
+    context_path = CONTEXT_PATH,
+    responses(
+        (status = 204, description = "Deleted"),
+        (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
+        (status = 404, description = "Subscription not found", body = ErrorResponse, example = json!(NOT_FOUND_EXAMPLE)),
+        (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE)),
+    )
+)]
+async fn delete_webhook(
+    State(services): State<Arc<AppServices>>,
+    user: User,
+    Path((wallet_id, id)): Path<(Uuid, Uuid)>,
+) -> Result<StatusCode, ApplicationError> {
+    services
+        .webhook
+        .get_by_account_id(user.account_id, wallet_id, id)
+        .await?;
+    services.webhook.delete(id).await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+#[utoipa::path(
+    post,
+    path = "/wallets/{wallet_id}/webhooks/{id}/rotate-secret",
+    tag = "Me",
+    context_path = CONTEXT_PATH,
+    responses(
+        (status = 200, description = "Rotated; save the new secret because it is returned only once", body = RotateWebhookSecretResponse),
+        (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
+        (status = 404, description = "Subscription not found", body = ErrorResponse, example = json!(NOT_FOUND_EXAMPLE)),
+        (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE)),
+    )
+)]
+async fn rotate_webhook_secret(
+    State(services): State<Arc<AppServices>>,
+    user: User,
+    Path((wallet_id, id)): Path<(Uuid, Uuid)>,
+) -> Result<Json<RotateWebhookSecretResponse>, ApplicationError> {
+    services
+        .webhook
+        .get_by_account_id(user.account_id, wallet_id, id)
+        .await?;
+    Ok(Json(services.webhook.rotate_secret(id).await?))
+}
+
+#[utoipa::path(
+    get,
+    path = "/wallets/{wallet_id}/webhooks/{id}/deliveries",
+    tag = "Me",
+    context_path = CONTEXT_PATH,
+    responses(
+        (status = 200, description = "Newest 100 delivery records", body = Vec<WebhookDelivery>),
+        (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
+        (status = 404, description = "Subscription not found", body = ErrorResponse, example = json!(NOT_FOUND_EXAMPLE)),
+        (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE)),
+    )
+)]
+async fn list_webhook_deliveries(
+    State(services): State<Arc<AppServices>>,
+    user: User,
+    Path((wallet_id, id)): Path<(Uuid, Uuid)>,
+) -> Result<Json<Vec<WebhookDelivery>>, ApplicationError> {
+    services
+        .webhook
+        .get_by_account_id(user.account_id, wallet_id, id)
+        .await?;
+    Ok(Json(services.webhook.list_deliveries(id).await?))
+}
+
+/// List webhooks across the authenticated account's wallets.
+#[utoipa::path(
+    get,
+    path = "/webhooks",
+    tag = "Me",
+    context_path = CONTEXT_PATH,
+    params(WebhookSubscriptionFilter),
+    responses(
+        (status = 200, description = "Subscriptions", body = Vec<WebhookSubscription>),
+        (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
+        (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
+        (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
+    )
+)]
+async fn list_account_webhooks(
+    State(services): State<Arc<AppServices>>,
+    user: User,
+    Query(mut filter): Query<WebhookSubscriptionFilter>,
+) -> Result<Json<Vec<WebhookSubscription>>, ApplicationError> {
+    filter.account_id = Some(user.account_id);
+    Ok(Json(services.webhook.list(filter).await?))
+}
+
+/// Get a webhook for an account-owned wallet.
+#[utoipa::path(
+    get,
+    path = "/wallets/{wallet_id}/webhooks/{id}",
+    tag = "Me",
+    context_path = CONTEXT_PATH,
+    responses(
+        (status = 200, description = "Found", body = WebhookSubscription),
+        (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
+        (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
+        (status = 404, description = "Subscription not found", body = ErrorResponse, example = json!(NOT_FOUND_EXAMPLE)),
+        (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
+    )
+)]
+async fn get_webhook(
+    State(services): State<Arc<AppServices>>,
+    user: User,
+    Path((wallet_id, id)): Path<(Uuid, Uuid)>,
+) -> Result<Json<WebhookSubscription>, ApplicationError> {
+    Ok(Json(
+        services
+            .webhook
+            .get_by_account_id(user.account_id, wallet_id, id)
+            .await?,
+    ))
 }
 
 #[cfg(test)]

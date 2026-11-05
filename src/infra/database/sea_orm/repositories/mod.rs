@@ -10,6 +10,7 @@ mod sea_orm_invoice_repository;
 mod sea_orm_ln_address_repository;
 mod sea_orm_payment_repository;
 mod sea_orm_wallet_repository;
+mod sea_orm_webhook_repository;
 
 pub(crate) use connection::SeaOrmConnection;
 pub use sea_orm_account_repository::*;
@@ -25,3 +26,4 @@ pub use sea_orm_payment_repository::*;
 pub use sea_orm_wallet_repository::*;
 mod sea_orm_local_credential_repository;
 pub use sea_orm_local_credential_repository::*;
+pub use sea_orm_webhook_repository::*;
