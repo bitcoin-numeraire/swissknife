@@ -122,11 +122,11 @@ pub struct ListPaysResponse {
 pub struct ListPaysPayment {
     pub status: String,
     pub payment_hash: String,
-    pub preimage: Option<String>,
-    pub amount_msat: Option<u64>,
-    pub amount_sent_msat: Option<u64>,
-    pub created_at: Option<u64>,
-    pub completed_at: Option<u64>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ListSendPaysResponse {
+    pub payments: Vec<super::cln_payment::ClnPaymentPart>,
 }
 
 #[derive(Debug, Serialize, Default)]
@@ -166,6 +166,8 @@ pub struct GetRoutesRequest {
     pub layers: Vec<String>,
     pub maxfee_msat: u64,
     pub final_cltv: u32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub maxparts: Option<u32>,
 }
 
 #[derive(Debug, Deserialize)]

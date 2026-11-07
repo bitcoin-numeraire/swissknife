@@ -127,6 +127,21 @@ impl EventListener {
         yield_now().await;
         Self::sync_offchain_state(&self.services).await?;
 
+        // Notifications can be lost, concern just one attempt, or precede the
+        // final xpay state. Also recover sends whose HTTP caller disconnected.
+        let services = self.services.clone();
+        tokio::spawn(async move {
+            let mut interval = tokio::time::interval(Duration::from_secs(5));
+            interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+            interval.tick().await;
+            loop {
+                interval.tick().await;
+                if let Err(err) = services.payment.sync().await {
+                    warn!(%err, "Pending Lightning payment reconciliation failed; will retry");
+                }
+            }
+        });
+
         Ok(())
     }
 

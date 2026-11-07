@@ -58,6 +58,7 @@ pub struct LndRestClient {
     fee_limit_msat: u64,
     retry_for: u32,
     network: BtcNetwork,
+    node_id: Vec<u8>,
     reorg_buffer_blocks: u32,
 }
 
@@ -102,10 +103,11 @@ impl LndRestClient {
             fee_limit_msat: config.fee_limit_msat,
             retry_for: config.payment_timeout.as_secs() as u32,
             network: BtcNetwork::default(),
+            node_id: Vec::new(),
             reorg_buffer_blocks: config.reorg_buffer_blocks,
         };
 
-        let network = lnd_client.network().await?;
+        let network = lnd_client.load_network().await?;
         lnd_client.network = network;
 
         Ok(lnd_client)
@@ -193,11 +195,48 @@ impl LndRestClient {
         Ok(result)
     }
 
-    async fn network(&self) -> Result<BtcNetwork, LightningError> {
+    /// TrackPaymentV2 is a GET stream with base64 bytes in the path. Consume
+    /// its first current-state update, then disconnect; buffering until EOF
+    /// would block reconciliation on every payment that is still in flight.
+    async fn payment_update(&self, endpoint: &str) -> anyhow::Result<Option<TrackPaymentResponse>> {
+        let response = self
+            .client
+            .get(format!("https://{}/{}", self.base_url, endpoint))
+            .send()
+            .await?;
+        if response.status() == reqwest::StatusCode::NOT_FOUND {
+            return Ok(None);
+        }
+        let mut response = Self::check_response_status(response).await?;
+        let mut line = Vec::new();
+        while let Some(chunk) = response.chunk().await? {
+            let end = chunk.iter().position(|byte| *byte == b'\n');
+            let bytes = &chunk[..end.unwrap_or(chunk.len())];
+            if line.len() + bytes.len() > 4 * 1024 * 1024 {
+                return Err(anyhow!("Payment update exceeds maximum response size"));
+            }
+            line.extend_from_slice(bytes);
+            if end.is_some() {
+                break;
+            }
+        }
+        let update: StreamTrackPaymentResponse = serde_json::from_slice(&line)?;
+        update.result.map(Some).ok_or_else(|| {
+            anyhow!(update
+                .error
+                .map(|error| error.message)
+                .unwrap_or_else(|| "Missing payment update".to_string()))
+        })
+    }
+
+    async fn load_network(&mut self) -> Result<BtcNetwork, LightningError> {
         let response: GetinfoResponse = self
             .get_request("v1/getinfo")
             .await
-            .map_err(|e| LightningError::NodeInfo(e.to_string()))?;
+            .map_err(|e| LightningError::NodeInfo(format!("{e:#}")))?;
+
+        self.node_id =
+            hex::decode(&response.identity_pubkey).map_err(|err| LightningError::NodeInfo(err.to_string()))?;
 
         if let Some(chain) = response
             .chains
@@ -267,18 +306,15 @@ impl LnClient for LndRestClient {
     }
 
     async fn estimate_fee(&self, target: LnPaymentTarget) -> Result<u64, LightningError> {
-        let response: RouteFeeResponse = self
-            .post_request(
-                "v2/router/route/estimatefee",
-                &RouteFeeRequest {
-                    dest: STANDARD.encode(target.destination),
-                    amt_sat: target.amount_msat.div_ceil(1000).to_string(),
-                },
-            )
-            .await
-            .map_err(|err| LightningError::EstimateFee(err.to_string()))?;
-
-        Ok(response.routing_fee_msat)
+        crate::infra::lightning::fee_estimation::estimate_with_hints(target, &self.node_id, self.fee_limit_msat,
+            |target, fee_limit_msat, _single_path| async move {
+                let response: QueryRoutesResponse = self.get_request(&format!(
+                    "v1/graph/routes/{}/0?amt_msat={}&final_cltv_delta={}&fee_limit.fixed_msat={}&use_mission_control=true",
+                    hex::encode(target.destination), target.amount_msat, target.final_cltv_delta, fee_limit_msat
+                )).await.map_err(|err| LightningError::EstimateFee(err.to_string()))?;
+                response.routes.into_iter().map(|route| route.total_fees_msat).min()
+                    .ok_or_else(|| LightningError::EstimateFee("No route available".to_string()))
+            }).await
     }
 
     fn fee_limit_msat(&self, _amount_msat: u64) -> u64 {
@@ -342,28 +378,22 @@ impl LnClient for LndRestClient {
     }
 
     async fn payment_by_hash(&self, payment_hash: String) -> Result<Option<Payment>, LightningError> {
-        let endpoint = format!("v2/router/track/{}", payment_hash);
-        let result = self
-            .post_request_buffered::<TrackPaymentResponse>(
-                &endpoint,
-                &TrackPaymentRequest {
-                    no_inflight_updates: true,
-                },
-            )
-            .await;
+        let hash_bytes = hex::decode(&payment_hash).map_err(|err| LightningError::PaymentByHash(err.to_string()))?;
+        let endpoint = format!(
+            "v2/router/track/{}?no_inflight_updates=false",
+            base64::engine::general_purpose::URL_SAFE.encode(hash_bytes)
+        );
+        let result = self.payment_update(&endpoint).await;
 
         let status = match result {
-            Ok(response) => response,
-            Err(err) => {
-                let err_msg = err.to_string();
-                if err_msg.contains("unable to find payment") || err_msg.contains("unknown payment") {
-                    return Ok(None);
-                } else {
-                    return Err(LightningError::PaymentByHash(err.to_string()));
-                }
-            }
+            Ok(Some(response)) => response,
+            Ok(None) => return Ok(None),
+            Err(err) => return Err(LightningError::PaymentByHash(err.to_string())),
         };
 
+        if status.payment_hash != payment_hash {
+            return Err(LightningError::PaymentByHash("Mismatched payment hash".to_string()));
+        }
         match status.status.as_str() {
             "SUCCEEDED" => {
                 let payment_time_ns = status.payment_time_ns.or(status.creation_time_ns).unwrap_or_default();

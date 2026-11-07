@@ -129,6 +129,43 @@ impl Counterparty {
         }
     }
 
+    /// Ensure the real LND record is settled while SwissKnife is stopped. A
+    /// zero-duration client timeout may still have submitted the original RPC;
+    /// wait for that attempt before deciding whether the test needs to send it.
+    pub fn complete_uncertain_lnd_send(&self, bolt11: &str) {
+        assert!(matches!(self.kind, Kind::Lnd));
+        let hash = bolt11
+            .parse::<lightning_invoice::Bolt11Invoice>()
+            .unwrap()
+            .payment_hash()
+            .to_string();
+        let started = std::time::Instant::now();
+        loop {
+            let payments = self.run_json(&["lncli", "--network=regtest", "listpayments", "--include_incomplete"]);
+            let status = payments["payments"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|payment| payment["payment_hash"] == hash)
+                .and_then(|payment| payment["status"].as_str());
+            match status {
+                Some("SUCCEEDED") => return,
+                Some("IN_FLIGHT" | "INITIATED") => {
+                    assert!(
+                        started.elapsed() < std::time::Duration::from_secs(30),
+                        "LND attempt did not finish"
+                    );
+                    std::thread::sleep(std::time::Duration::from_millis(100));
+                }
+                None | Some("FAILED") => {
+                    self.pay(bolt11);
+                    return;
+                }
+                other => panic!("Unexpected LND payment status {other:?}"),
+            }
+        }
+    }
+
     /// Pay a bolt11 from the counterparty (so the SUT receives).
     pub fn pay(&self, bolt11: &str) {
         match self.kind {

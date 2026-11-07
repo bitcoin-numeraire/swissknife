@@ -23,7 +23,7 @@ use crate::{
     infra::lightning::EventsListener,
 };
 
-use super::cln_websocket_types::{InvoicePayment, SendPayFailure, SendPaySuccess};
+use super::cln_websocket_types::InvoicePayment;
 use super::ClnRestClientConfig;
 
 pub struct ClnWebsocketListener {
@@ -102,6 +102,15 @@ impl ClnWebsocketListener {
         Ok(client_builder)
     }
 
+    fn payment_hint(value: &serde_json::Value) -> Option<String> {
+        value
+            .get("sendpay_success")
+            .or_else(|| value.get("sendpay_failure").and_then(|event| event.get("data")))
+            .and_then(|event| event.get("payment_hash"))
+            .and_then(serde_json::Value::as_str)
+            .map(str::to_owned)
+    }
+
     fn on_message(
         services: Arc<AppServices>,
         wallet: Arc<dyn BitcoinWallet>,
@@ -137,57 +146,14 @@ impl ClnWebsocketListener {
                             }
                         }
 
-                        if let Some(event) = value.get("sendpay_success") {
-                            match serde_json::from_value::<SendPaySuccess>(event.clone()) {
-                                Ok(sendpay_success) => {
-                                    if sendpay_success.status != "complete" {
-                                        warn!(
-                                            payment_hash = sendpay_success.payment_hash,
-                                            status = sendpay_success.status,
-                                            "Invalid payment status. Expected Complete."
-                                        );
-                                        return;
-                                    }
-
-                                    if let Err(err) = services.event.outgoing_payment(sendpay_success.into()).await {
-                                        Self::stop_after_projection_error(
-                                            &failure_tx,
-                                            &client,
-                                            "outgoing_payment",
-                                            err,
-                                        )
-                                        .await;
-                                        return;
-                                    }
-                                }
-                                Err(err) => {
-                                    error!(?err, "Failed to parse sendpay_success event");
-                                }
-                            }
-                        }
-
-                        if let Some(event) = value.get("sendpay_failure") {
-                            match serde_json::from_value::<SendPayFailure>(event.clone()) {
-                                Ok(sendpay_failure) => {
-                                    if sendpay_failure.data.status != "failed" {
-                                        warn!(
-                                            payment_hash = sendpay_failure.data.payment_hash,
-                                            status = sendpay_failure.data.status,
-                                            "Invalid payment status. Expected Failed."
-                                        );
-                                        // We must accept the payment as failed until this is fixed: https://github.com/ElementsProject/lightning/issues/7561
-                                        // return;
-                                    }
-
-                                    if let Err(err) = services.event.failed_payment(sendpay_failure.into()).await {
-                                        Self::stop_after_projection_error(&failure_tx, &client, "failed_payment", err)
-                                            .await;
-                                        return;
-                                    }
-                                }
-                                Err(err) => {
-                                    error!(?err, "Failed to parse sendpay_failure event");
-                                }
+                        // sendpay_* and xpay_pay_part_* are part/attempt events,
+                        // including successes in an MPP payment. Query whole-payment
+                        // state; never project their amounts or release funds directly.
+                        if let Some(payment_hash) = Self::payment_hint(&value) {
+                            if let Err(err) = services.payment.sync_payment(payment_hash).await {
+                                Self::stop_after_projection_error(&failure_tx, &client, "payment_reconciliation", err)
+                                    .await;
+                                return;
                             }
                         }
 

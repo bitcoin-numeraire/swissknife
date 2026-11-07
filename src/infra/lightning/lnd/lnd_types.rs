@@ -55,22 +55,22 @@ pub struct PayRequest {
     pub no_inflight_updates: bool,
 }
 
-#[derive(Debug, Serialize)]
-pub struct RouteFeeRequest {
-    pub dest: String,
-    pub amt_sat: String,
+#[derive(Debug, Deserialize)]
+pub struct QueryRoutesResponse {
+    pub routes: Vec<QueryRoute>,
 }
 
 #[serde_as]
 #[derive(Debug, Deserialize)]
-pub struct RouteFeeResponse {
+pub struct QueryRoute {
     #[serde_as(as = "DisplayFromStr")]
-    pub routing_fee_msat: u64,
+    pub total_fees_msat: u64,
 }
 
-#[derive(Debug, Serialize)]
-pub struct TrackPaymentRequest {
-    pub no_inflight_updates: bool,
+#[derive(Debug, Deserialize)]
+pub struct StreamTrackPaymentResponse {
+    pub result: Option<TrackPaymentResponse>,
+    pub error: Option<ErrorResponse>,
 }
 
 #[derive(Debug, Serialize)]
@@ -125,6 +125,7 @@ pub struct DeleteCanceledInvoiceResponse {}
 
 #[derive(Debug, Deserialize)]
 pub struct GetinfoResponse {
+    pub identity_pubkey: String,
     pub chains: Option<Vec<Chain>>,
 }
 

@@ -7,6 +7,7 @@
 pub mod assertions;
 pub mod chain;
 pub mod client;
+pub mod cln_scenario;
 pub mod counterparty;
 pub mod db;
 pub mod fixtures;

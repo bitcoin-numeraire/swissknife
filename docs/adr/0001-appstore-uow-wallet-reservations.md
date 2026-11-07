@@ -303,11 +303,50 @@ Every reservation, debit, credit, payment, invoice, and reconciliation query mus
 #### Outgoing payment lifecycle
 
 1. Before the external Lightning/Bitcoin call, reserve funds and insert a pending payment in one DB transaction.
-2. If the external call fails, release the reservation and mark the payment failed in one DB transaction.
+2. On a definitive whole-payment failure, release the reservation and mark the payment failed in one DB transaction. Transport errors, timeouts, missing provider records, and individual attempt failures leave the payment pending with its reservation intact.
 3. If the external call succeeds, settle the payment and adjust the reservation to the actual debit in one DB transaction:
    - release any unused reserve back to `available_amount`;
    - if actual fee exceeds reserve, attempt an additional conditional debit or fail according to the provider/payment policy;
    - set the real `fee_msat` on the payment.
+
+#### Lightning reconciliation (2026-11)
+
+CLN `sendpay_failure` and `sendpay_success` are per-attempt/per-part notifications.
+REST websocket notifications and gRPC `wait(sendpays, updated)` only trigger a
+lookup by payment hash. Neither directly releases or settles a reservation.
+`xpay_pay_part_start`/`xpay_pay_part_end` have the same part-level limitation and
+are useful diagnostics, not a terminal payment authority. `coin_movement`
+represents accounting movements; it does not cover all terminal payment failures.
+
+For CLN, `listpays` supplies whole-payment status, including active xpay retries
+between parts. Its `complete` status takes precedence over pending parts, and its
+amounts can include those pending parts. Therefore success additionally requires
+`listsendpays` to have no pending parts. SwissKnife totals only successful parts,
+checks their preimage against the payment hash, requires successful parts to
+cover the requested amount, and settles their actual amount
+and fees. The synchronous xpay response uses the same check. Definitive aggregate
+failure releases the reservation; absent, malformed, or unavailable responses do
+not. Keep the xpay plugin enabled: its `listpays` implementation is required.
+
+Pending payments are reconciled on startup/reconnect and periodically (five
+seconds between scheduled passes; slow provider requests can extend a pass).
+Reconciliation never resends a payment. It applies existing idempotent financial
+projections, which also write the account's durable final-status event. LND uses
+its whole-payment status rather than individual HTLC attempts and shares the
+periodic recovery path. LND lookups consume the first current-state update from
+`TrackPaymentV2`, including an in-flight state, rather than waiting for the stream
+to close. REST uses GET, a URL-safe base64 payment hash, and the streamed `result`
+envelope.
+
+A missing record after a disconnected RPC cannot prove the send was rejected.
+Such payments retain their reservation until an authoritative result is available;
+there is no automatic timeout-based release. For upgrades, operators should audit
+historical CLN payments already marked failed against the provider: the periodic
+scan processes pending rows and cannot retroactively prevent a past release.
+
+References: [CLN notifications](https://docs.corelightning.org/reference/notification-sendpay_failure),
+[`listpays`](https://docs.corelightning.org/reference/listpays),
+[`coin_movement`](https://docs.corelightning.org/reference/notification-coin_movement).
 
 #### Internal payment lifecycle
 
