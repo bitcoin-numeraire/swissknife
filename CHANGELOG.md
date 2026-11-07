@@ -13,9 +13,6 @@ release notes when a tag is published.
 - Check the whole CLN payment status before processing a sendpay notification,
   over REST and gRPC. Failed attempts no longer release funds while the payment
   is still pending.
-- Complete payment processing after an HTTP timeout or disconnect, and check
-  current node state once on ambiguous send errors. Correct LND REST/gRPC
-  current-state lookups used by this path and restart recovery.
 
 ## [0.3.1] - 2026-11-06
 

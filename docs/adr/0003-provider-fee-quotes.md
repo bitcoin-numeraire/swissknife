@@ -32,12 +32,6 @@ If route estimation fails, fee quoting and payment admission fall back to the pr
 
 If a provider estimate is already above the hard maximum, SwissKnife rejects the quote and payment before reserving funds. Such an estimate cannot succeed under the configured execution policy.
 
-CLN `getroutes` accepts a destination and amount, not a BOLT11 invoice or its
-private route hints. LND's destination/amount `EstimateRouteFee` mode is a graph
-query; its separate invoice mode sends probes. SwissKnife keeps the existing
-native graph estimators and the unavailable-estimate fallback. It does not build
-routes, create Askrene layers, or send probe payments to manufacture a quote.
-
 ### On-chain and internal payments
 
 For on-chain payments, the quote endpoint prepares a transaction with the configured wallet, reports its fee, then immediately releases the temporary input lease. The send path prepares the transaction again and reserves its then-current exact fee. The quote is therefore presented as an estimate, not a guarantee across time.

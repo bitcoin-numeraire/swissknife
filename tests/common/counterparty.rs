@@ -6,7 +6,6 @@ use std::{
 };
 
 use bitcoin::hashes::{sha256, Hash};
-use lightning_invoice::Bolt11Invoice;
 use serde_json::{json, Value};
 use uuid::Uuid;
 
@@ -222,44 +221,6 @@ impl Counterparty {
         }
     }
 
-    pub fn lnd_payment_status(&self, hash: &str) -> Option<String> {
-        assert!(matches!(self.kind, Kind::Lnd));
-        self.run_json(&["lncli", "--network=regtest", "listpayments", "--include_incomplete"])["payments"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .find(|payment| payment["payment_hash"] == hash)
-            .and_then(|payment| payment["status"].as_str())
-            .map(str::to_owned)
-    }
-
-    /// Ensure the real LND record is settled while SwissKnife is stopped. A
-    /// zero-duration client timeout may still have submitted the original RPC;
-    /// wait for that attempt before deciding whether the test needs to send it.
-    pub fn complete_uncertain_lnd_send(&self, bolt11: &str) {
-        assert!(matches!(self.kind, Kind::Lnd));
-        let hash = bolt11.parse::<Bolt11Invoice>().unwrap().payment_hash().to_string();
-        let started = Instant::now();
-        loop {
-            let status = self.lnd_payment_status(&hash);
-            match status.as_deref() {
-                Some("SUCCEEDED") => return,
-                Some("IN_FLIGHT" | "INITIATED") => {
-                    assert!(
-                        started.elapsed() < Duration::from_secs(30),
-                        "LND attempt did not finish"
-                    );
-                    sleep(Duration::from_millis(100));
-                }
-                None | Some("FAILED") => {
-                    self.pay(bolt11);
-                    return;
-                }
-                other => panic!("Unexpected LND payment status {other:?}"),
-            }
-        }
-    }
-
     /// Pay a bolt11 from the counterparty (so the SUT receives).
     pub fn pay(&self, bolt11: &str) {
         match self.kind {
@@ -295,18 +256,13 @@ impl HeldInvoice {
             .run(&["lncli", "--network=regtest", "settleinvoice", &self.preimage]);
         self.resolved = true;
     }
-
-    pub fn cancel(&mut self) {
-        self.node
-            .run(&["lncli", "--network=regtest", "cancelinvoice", &self.hash]);
-        self.resolved = true;
-    }
 }
 
 impl Drop for HeldInvoice {
     fn drop(&mut self) {
         if !self.resolved {
-            self.cancel();
+            self.node
+                .run(&["lncli", "--network=regtest", "cancelinvoice", &self.hash]);
         }
     }
 }

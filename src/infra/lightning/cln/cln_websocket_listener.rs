@@ -103,15 +103,6 @@ impl ClnWebsocketListener {
         Ok(client_builder)
     }
 
-    fn payment_hint(value: &Value) -> Option<String> {
-        value
-            .get("sendpay_success")
-            .or_else(|| value.get("sendpay_failure").and_then(|event| event.get("data")))
-            .and_then(|event| event.get("payment_hash"))
-            .and_then(Value::as_str)
-            .map(str::to_owned)
-    }
-
     fn on_message(
         services: Arc<AppServices>,
         wallet: Arc<dyn BitcoinWallet>,
@@ -149,7 +140,13 @@ impl ClnWebsocketListener {
 
                         // A sendpay notification describes one attempt. Read the aggregate
                         // payment status before settling or releasing its reservation.
-                        if let Some(payment_hash) = Self::payment_hint(&value) {
+                        let payment_hash = value
+                            .get("sendpay_success")
+                            .or_else(|| value.get("sendpay_failure").and_then(|event| event.get("data")))
+                            .and_then(|event| event.get("payment_hash"))
+                            .and_then(Value::as_str)
+                            .map(str::to_owned);
+                        if let Some(payment_hash) = payment_hash {
                             if let Err(err) = services.payment.sync_one(payment_hash).await {
                                 Self::stop_after_projection_error(&failure_tx, &client, "payment_reconciliation", err)
                                     .await;

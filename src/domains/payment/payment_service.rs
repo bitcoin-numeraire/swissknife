@@ -3,7 +3,6 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use chrono::Utc;
 use lightning_invoice::Bolt11Invoice;
-use tokio::spawn;
 use tracing::{debug, info, trace, warn};
 use uuid::Uuid;
 
@@ -33,7 +32,6 @@ use super::{
 const DEFAULT_INTERNAL_INVOICE_DESCRIPTION: &str = "Numeraire Invoice";
 const DEFAULT_INTERNAL_PAYMENT_DESCRIPTION: &str = "Payment to Numeraire";
 
-#[derive(Clone)]
 pub struct PaymentService {
     domain: String,
     store: AppStore,
@@ -549,42 +547,6 @@ impl PaymentService {
         self.handle_processed_payment(pending_payment, result).await
     }
 
-    async fn process_payment(
-        &self,
-        input: String,
-        amount_msat: Option<u64>,
-        comment: Option<String>,
-        wallet_id: Uuid,
-    ) -> Result<Payment, ApplicationError> {
-        debug!(%input, %wallet_id, "Received pay request");
-
-        let payment = if self.is_internal_payment(&input) {
-            self.ensure_wallet_network(wallet_id, self.bitcoin_wallet.network())
-                .await?;
-            self.send_internal(input, amount_msat, comment, wallet_id).await
-        } else {
-            let input_type = parse_payment_input(&input).await.map_err(DataError::Validation)?;
-            let expected_network = match &input_type {
-                PaymentInput::BitcoinAddress(address) => address.network,
-                PaymentInput::Bolt11(invoice) => self.bolt11_network(invoice),
-                PaymentInput::LnUrlPay(_) => self.bitcoin_wallet.network(),
-            };
-            self.ensure_wallet_network(wallet_id, expected_network).await?;
-
-            match input_type {
-                PaymentInput::BitcoinAddress(address) => {
-                    let amount_sat = amount_msat.map(|amount| amount / 1000);
-                    self.send_bitcoin(address, amount_sat, comment, wallet_id).await
-                }
-                PaymentInput::Bolt11(invoice) => self.send_bolt11(invoice, amount_msat, comment, wallet_id).await,
-                PaymentInput::LnUrlPay(data) => self.send_lnurl_pay(data, amount_msat, comment, wallet_id).await,
-            }
-        }?;
-
-        info!(id = %payment.id, "Payment processed successfully");
-        Ok(payment)
-    }
-
     async fn handle_processed_payment(
         &self,
         mut pending_payment: Payment,
@@ -637,18 +599,8 @@ impl PaymentService {
             }
             Err(LightningError::PaymentOutcomeUnknown(reason)) => {
                 warn!(payment_id = %pending_payment.id, %reason, "Payment outcome unknown; preserving reservation");
-                // First respect a result already committed by the listener. An
-                // ambiguous RPC error warrants one current-state lookup, never a resend.
-                let current = self.get(pending_payment.id).await?;
-                if current.status == PaymentStatus::Pending {
-                    if let Some(lightning) = &current.lightning {
-                        if let Err(error) = self.sync_lightning_payment(lightning.payment_hash.clone()).await {
-                            warn!(payment_id = %current.id, %error, "Payment status lookup failed; preserving reservation");
-                        }
-                        return self.get(current.id).await;
-                    }
-                }
-                Ok(current)
+                // A listener may have committed a terminal result while the send response was lost.
+                self.get(pending_payment.id).await
             }
             Err(error) => {
                 pending_payment.status = PaymentStatus::Failed;
@@ -880,18 +832,33 @@ impl PaymentsUseCases for PaymentService {
         comment: Option<String>,
         wallet_id: Uuid,
     ) -> Result<Payment, ApplicationError> {
-        // Once accepted, payment processing must survive an HTTP timeout or
-        // disconnect. The caller still awaits the result when it stays connected.
-        let service = self.clone();
-        spawn(async move {
-            let result = service.process_payment(input, amount_msat, comment, wallet_id).await;
-            if let Err(error) = &result {
-                warn!(%wallet_id, %error, "Payment processing failed");
+        debug!(%input, %wallet_id, "Received pay request");
+
+        let payment = if self.is_internal_payment(&input) {
+            self.ensure_wallet_network(wallet_id, self.bitcoin_wallet.network())
+                .await?;
+            self.send_internal(input, amount_msat, comment, wallet_id).await
+        } else {
+            let input_type = parse_payment_input(&input).await.map_err(DataError::Validation)?;
+            let expected_network = match &input_type {
+                PaymentInput::BitcoinAddress(address) => address.network,
+                PaymentInput::Bolt11(invoice) => self.bolt11_network(invoice),
+                PaymentInput::LnUrlPay(_) => self.bitcoin_wallet.network(),
+            };
+            self.ensure_wallet_network(wallet_id, expected_network).await?;
+
+            match input_type {
+                PaymentInput::BitcoinAddress(address) => {
+                    let amount_sat = amount_msat.map(|amount| amount / 1000);
+                    self.send_bitcoin(address, amount_sat, comment, wallet_id).await
+                }
+                PaymentInput::Bolt11(invoice) => self.send_bolt11(invoice, amount_msat, comment, wallet_id).await,
+                PaymentInput::LnUrlPay(data) => self.send_lnurl_pay(data, amount_msat, comment, wallet_id).await,
             }
-            result
-        })
-        .await
-        .map_err(|error| DataError::Inconsistency(format!("Payment task stopped: {error}")))?
+        }?;
+
+        info!(id = %payment.id, "Payment processed successfully");
+        Ok(payment)
     }
 
     async fn delete(&self, id: Uuid) -> Result<(), ApplicationError> {
@@ -2639,20 +2606,11 @@ mod tests {
                     .payment
                     .expect_find()
                     .withf(move |id| *id == pending_id)
-                    .times(2)
-                    .returning(move |_| Ok(Some(durable.clone())));
+                    .times(1)
+                    .return_once(move |_| Ok(Some(durable)));
                 let mut ln_client = MockLnClient::new();
                 ln_client.expect_pay().never();
-                ln_client
-                    .expect_payment_by_hash()
-                    .withf(|hash| hash == "ph")
-                    .times(1)
-                    .returning(|_| {
-                        Ok(Some(Payment {
-                            status: PaymentStatus::Pending,
-                            ..Default::default()
-                        }))
-                    });
+                ln_client.expect_payment_by_hash().never();
                 let service = service(store, ln_client, MockBitcoinWallet::new(), MockEventUseCases::new());
 
                 let payment = service

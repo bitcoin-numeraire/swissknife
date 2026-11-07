@@ -12,7 +12,6 @@ use swissknife_types::{
 
 use crate::common::counterparty::Counterparty;
 use crate::common::fixtures::unique;
-use crate::common::harness::matrix_cell;
 use crate::common::wait::wait_until;
 use crate::common::{app, assert_error, assert_status, Auth, TestApp};
 
@@ -191,7 +190,7 @@ mod failure {
     use super::*;
 
     #[tokio::test]
-    async fn a_local_lnd_send_timeout_releases_funds_only_for_a_confirmed_failure() {
+    async fn a_local_lnd_send_timeout_keeps_the_payment_and_reservation_pending() {
         if crate::common::harness::matrix_cell().1 != "lnd_grpc" {
             return;
         }
@@ -223,9 +222,13 @@ mod failure {
         let response = app.api().post("/v1/payments", Auth::Bearer(token), request).await;
         assert_status(&response, StatusCode::OK);
         let payment = response.parse::<Payment>();
-        assert!(matches!(payment.status, PaymentStatus::Pending | PaymentStatus::Failed));
+        assert_eq!(payment.status, PaymentStatus::Pending);
         assert_eq!(payment.wallet_id, wallet.id);
         assert_eq!(payment.amount_msat, amount_msat);
+        assert!(payment.error.is_none());
+        let balance = app.wallet_balance(token, wallet.id).await;
+        assert_eq!(balance.reserved_msat, quote.maximum_total_msat);
+        assert_eq!(balance.available_msat, before - quote.maximum_total_msat as i64);
         let persisted = app
             .api()
             .get(&format!("/v1/payments/{}", payment.id), Auth::Bearer(token))
@@ -233,30 +236,12 @@ mod failure {
         assert_status(&persisted, StatusCode::OK);
         let persisted = persisted.parse::<Payment>();
         assert_eq!(persisted.id, payment.id);
-        assert!(matches!(
-            persisted.status,
-            PaymentStatus::Pending | PaymentStatus::Failed
-        ));
+        assert_eq!(persisted.status, PaymentStatus::Pending);
         assert_eq!(persisted.amount_msat, amount_msat);
         assert_eq!(
             persisted.lightning.as_ref().unwrap().payment_hash,
             payment.lightning.as_ref().unwrap().payment_hash
         );
-
-        // The send may reach LND despite the local timeout. The follow-up lookup
-        // or listener can then legitimately observe its terminal route failure.
-        let balance = app.wallet_balance(token, wallet.id).await;
-        if balance.reserved_msat == 0 {
-            let hash = &persisted.lightning.as_ref().unwrap().payment_hash;
-            let node = Counterparty::for_provider("cln_grpc");
-            assert_eq!(node.lnd_payment_status(hash).as_deref(), Some("FAILED"));
-            assert_eq!(balance.available_msat, before);
-        } else {
-            assert_eq!(persisted.status, PaymentStatus::Pending);
-            assert!(persisted.error.is_none());
-            assert_eq!(balance.reserved_msat, quote.maximum_total_msat);
-            assert_eq!(balance.available_msat, before - quote.maximum_total_msat as i64);
-        }
     }
 
     /// Exceeding the only channel's capacity makes routing fail independently
@@ -334,69 +319,6 @@ mod failure {
                 .iter()
                 .any(|p| p.status == PaymentStatus::Failed && p.error.is_some()),
             "the unroutable attempt is recorded as failed"
-        );
-    }
-}
-
-mod recovery {
-    use super::*;
-
-    #[tokio::test]
-    async fn reconciles_an_uncertain_send_on_restart_from_the_real_lnd_record() {
-        let (_, provider) = matrix_cell();
-        if !provider.starts_with("lnd_") {
-            return;
-        }
-        // A local establishment timeout leaves a genuine durable reservation.
-        // Complete the same payment on the test node while SwissKnife is stopped
-        // to model a provider outcome whose RPC response the caller never saw.
-        let app = TestApp::isolated(
-            "ln-outgoing-recovery",
-            &[
-                ("SWISSKNIFE_LN_PROVIDER", "lnd_grpc".to_string()),
-                ("SWISSKNIFE_LND_GRPC_CONFIG__PAYMENT_TIMEOUT", "0s".to_string()),
-            ],
-        )
-        .await;
-        let token = app.admin_token().await;
-        let wallet = app.create_wallet(token, "ln-outgoing-recovery").await;
-        app.fund_onchain(token, wallet.id, 100_000).await;
-        let amount_msat = 1_000_000;
-        let bolt11 = Counterparty::for_provider(&provider).invoice(amount_msat, &unique("recovery-invoice"));
-        let res = app
-            .api()
-            .post(
-                "/v1/payments",
-                Auth::Bearer(token),
-                SendPaymentRequest {
-                    wallet_id: Some(wallet.id),
-                    input: bolt11.clone(),
-                    amount_msat: None,
-                    comment: None,
-                },
-            )
-            .await;
-        assert_status(&res, StatusCode::OK);
-        let pending = res.parse::<Payment>();
-        assert_eq!(pending.status, PaymentStatus::Pending);
-        assert!(app.wallet_balance(token, wallet.id).await.reserved_msat > 0);
-        app.stop();
-        // This selects LND itself as the test actor, not the recipient CLN.
-        Counterparty::for_provider("cln_grpc").complete_uncertain_lnd_send(&bolt11);
-        let restarted = app.restart("ln-outgoing-recovered", &[]).await;
-        let response = restarted
-            .api()
-            .get(&format!("/v1/payments/{}", pending.id), Auth::Bearer(token))
-            .await;
-        assert_status(&response, StatusCode::OK);
-        let settled = response.parse::<Payment>();
-        assert_eq!(settled.status, PaymentStatus::Settled);
-        assert_eq!(settled.amount_msat, amount_msat);
-        let balance = restarted.wallet_balance(token, wallet.id).await;
-        assert_eq!(balance.reserved_msat, 0);
-        assert_eq!(
-            balance.available_msat,
-            (100_000_000 - amount_msat - settled.fee_msat.unwrap()) as i64
         );
     }
 }

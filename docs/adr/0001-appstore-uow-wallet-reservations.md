@@ -309,32 +309,10 @@ Every reservation, debit, credit, payment, invoice, and reconciliation query mus
    - if actual fee exceeds reserve, attempt an additional conditional debit or fail according to the provider/payment policy;
    - set the real `fee_msat` on the payment.
 
-#### Lightning payment completion
-
-Payment execution survives an HTTP timeout or disconnect. A successful send RPC
-settles through the existing payment unit of work. An ambiguous RPC error causes
-one status lookup; pending, missing, or unavailable state keeps the reservation.
-Startup and listener reconnection retain their existing pending-payment sync.
-There is no periodic payment scan and no automatic resend.
-
 CLN `sendpay_success` / `sendpay_failure` and gRPC `wait(sendpays)` describe
-attempts. They trigger `sync_one`, which uses `listpays` for the whole payment.
-An attempt failure must never directly release funds. `pay_part_end` is also
-per-part; `coin_movement` describes accounting movements and does not report
-failed payments. In CLN 26.06.9, a final part update can precede xpay's terminal
-result, so event handling does not replace processing the original send RPC.
-
-CLN REST keeps `xpay` open beyond the ordinary RPC timeout: `retry_for` limits
-route retries, not the lifetime of an accepted HTLC. LND status lookups read the
-first current-state `TrackPaymentV2` update, including an in-flight state.
-
-CLN 26.06.9 has a separate status-publication race: after xpay returns a final
-failure, `listpays` can still report pending until asynchronous layer cleanup
-finishes. A deterministic CLN regression reproduces this with cleanup paused;
-requiring `payment->cmd` in xpay's `attempt_ongoing` fixes it. Until that node fix
-is deployed, the one-shot lookup can leave a failed payment reserved until the
-existing startup/reconnect sync runs. This is a completion limitation, not a
-reason to infer failure from an attempt or release funds on a timer.
+individual attempts. They trigger `sync_one`, which reads the whole payment
+through `listpays` before applying the existing settlement or failure transaction.
+Pending, missing, or unavailable state preserves the reservation.
 
 #### Internal payment lifecycle
 

@@ -4,7 +4,7 @@ use anyhow::anyhow;
 use chrono::{TimeZone, Utc};
 use reqwest::{
     header::{HeaderMap, HeaderValue},
-    Certificate, Client, Response, StatusCode,
+    Certificate, Client, Response,
 };
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_bolt::bitcoin::hashes::{sha256, Hash};
@@ -30,10 +30,7 @@ use crate::{
     },
 };
 use async_trait::async_trait;
-use base64::{
-    engine::general_purpose::{STANDARD, URL_SAFE},
-    Engine,
-};
+use base64::{engine::general_purpose::STANDARD, Engine};
 
 use super::lnd_types::*;
 
@@ -196,40 +193,6 @@ impl LndRestClient {
         Ok(result)
     }
 
-    /// TrackPaymentV2 is a GET stream with base64 bytes in the path. Consume
-    /// its first current-state update, then disconnect; buffering until EOF
-    /// would block reconciliation on every payment that is still in flight.
-    async fn payment_update(&self, endpoint: &str) -> anyhow::Result<Option<TrackPaymentResponse>> {
-        let response = self
-            .client
-            .get(format!("https://{}/{}", self.base_url, endpoint))
-            .send()
-            .await?;
-        if response.status() == StatusCode::NOT_FOUND {
-            return Ok(None);
-        }
-        let mut response = Self::check_response_status(response).await?;
-        let mut line = Vec::new();
-        while let Some(chunk) = response.chunk().await? {
-            let end = chunk.iter().position(|byte| *byte == b'\n');
-            let bytes = &chunk[..end.unwrap_or(chunk.len())];
-            if line.len() + bytes.len() > 4 * 1024 * 1024 {
-                return Err(anyhow!("Payment update exceeds maximum response size"));
-            }
-            line.extend_from_slice(bytes);
-            if end.is_some() {
-                break;
-            }
-        }
-        let update: StreamTrackPaymentResponse = serde_json::from_slice(&line)?;
-        update.result.map(Some).ok_or_else(|| {
-            anyhow!(update
-                .error
-                .map(|error| error.message)
-                .unwrap_or_else(|| "Missing payment update".to_string()))
-        })
-    }
-
     async fn network(&self) -> Result<BtcNetwork, LightningError> {
         let response: GetinfoResponse = self
             .get_request("v1/getinfo")
@@ -379,22 +342,28 @@ impl LnClient for LndRestClient {
     }
 
     async fn payment_by_hash(&self, payment_hash: String) -> Result<Option<Payment>, LightningError> {
-        let hash_bytes = hex::decode(&payment_hash).map_err(|err| LightningError::PaymentByHash(err.to_string()))?;
-        let endpoint = format!(
-            "v2/router/track/{}?no_inflight_updates=false",
-            URL_SAFE.encode(hash_bytes)
-        );
-        let result = self.payment_update(&endpoint).await;
+        let endpoint = format!("v2/router/track/{}", payment_hash);
+        let result = self
+            .post_request_buffered::<TrackPaymentResponse>(
+                &endpoint,
+                &TrackPaymentRequest {
+                    no_inflight_updates: true,
+                },
+            )
+            .await;
 
         let status = match result {
-            Ok(Some(response)) => response,
-            Ok(None) => return Ok(None),
-            Err(err) => return Err(LightningError::PaymentByHash(err.to_string())),
+            Ok(response) => response,
+            Err(err) => {
+                let err_msg = err.to_string();
+                if err_msg.contains("unable to find payment") || err_msg.contains("unknown payment") {
+                    return Ok(None);
+                } else {
+                    return Err(LightningError::PaymentByHash(err.to_string()));
+                }
+            }
         };
 
-        if status.payment_hash != payment_hash {
-            return Err(LightningError::PaymentByHash("Mismatched payment hash".to_string()));
-        }
         match status.status.as_str() {
             "SUCCEEDED" => {
                 let payment_time_ns = status.payment_time_ns.or(status.creation_time_ns).unwrap_or_default();

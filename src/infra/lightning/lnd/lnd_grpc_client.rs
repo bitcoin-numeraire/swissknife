@@ -418,7 +418,7 @@ impl LnClient for LndGrpcClient {
         let result = router
             .track_payment_v2(routerrpc::TrackPaymentRequest {
                 payment_hash: hash_bytes,
-                no_inflight_updates: false,
+                no_inflight_updates: true,
             })
             .await;
 

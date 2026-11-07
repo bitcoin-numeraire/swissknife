@@ -68,10 +68,9 @@ pub struct RouteFeeResponse {
     pub routing_fee_msat: u64,
 }
 
-#[derive(Debug, Deserialize)]
-pub struct StreamTrackPaymentResponse {
-    pub result: Option<TrackPaymentResponse>,
-    pub error: Option<ErrorResponse>,
+#[derive(Debug, Serialize)]
+pub struct TrackPaymentRequest {
+    pub no_inflight_updates: bool,
 }
 
 #[derive(Debug, Serialize)]

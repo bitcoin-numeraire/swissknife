@@ -6,7 +6,7 @@ use chrono::{TimeZone, Utc};
 use lightning_invoice::Bolt11Invoice;
 use reqwest::{
     header::{HeaderMap, HeaderValue},
-    Certificate, Client, RequestBuilder,
+    Certificate, Client,
 };
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use tokio::fs;
@@ -67,7 +67,6 @@ pub struct ClnRestClientConfig {
 pub struct ClnRestClient {
     client: Client,
     base_url: String,
-    timeout: Duration,
     node_id: String,
     maxfee: Option<u64>,
     retry_for: Option<u32>,
@@ -87,6 +86,7 @@ impl ClnRestClient {
         let mut client_builder = Client::builder()
             .user_agent(USER_AGENT)
             .connect_timeout(config.connect_timeout)
+            .timeout(config.timeout)
             .connection_verbose(config.connection_verbose)
             .default_headers(headers)
             .danger_accept_invalid_certs(config.accept_invalid_certs);
@@ -107,7 +107,6 @@ impl ClnRestClient {
         let mut cln_client = Self {
             client,
             base_url: config.endpoint.clone(),
-            timeout: config.timeout,
             node_id: String::new(),
             maxfee: config.maxfee,
             retry_for: Some(config.payment_timeout.as_secs() as u32),
@@ -129,23 +128,12 @@ impl ClnRestClient {
     }
 
     async fn post_request<T: DeserializeOwned>(&self, endpoint: &str, payload: &impl Serialize) -> anyhow::Result<T> {
-        let request = self
+        let response = self
             .client
             .post(format!("{}/v1/{}", self.base_url, endpoint))
             .json(payload)
-            .timeout(self.timeout);
-        self.send_request(request).await
-    }
-
-    async fn xpay(&self, payload: &XpayRequest) -> anyhow::Result<XpayResponse> {
-        // retry_for bounds route retries, not the lifetime of an accepted HTLC.
-        // Keep this RPC open so its final result can complete the payment.
-        let request = self.client.post(format!("{}/v1/xpay", self.base_url)).json(payload);
-        self.send_request(request).await
-    }
-
-    async fn send_request<T: DeserializeOwned>(&self, request: RequestBuilder) -> anyhow::Result<T> {
-        let response = request.send().await?;
+            .send()
+            .await?;
 
         let status = response.status();
         if status.is_client_error() || status.is_server_error() {
@@ -244,14 +232,17 @@ impl LnClient for ClnRestClient {
         fee_limit_msat: u64,
         label: String,
     ) -> Result<Payment, LightningError> {
-        let response = self
-            .xpay(&XpayRequest {
-                invstring: bolt11,
-                amount_msat,
-                maxfee: Some(fee_limit_msat),
-                retry_for: self.retry_for,
-                label: Some(label),
-            })
+        let response: XpayResponse = self
+            .post_request(
+                "xpay",
+                &XpayRequest {
+                    invstring: bolt11,
+                    amount_msat,
+                    maxfee: Some(fee_limit_msat),
+                    retry_for: self.retry_for,
+                    label: Some(label),
+                },
+            )
             .await
             .map_err(|e| LightningError::PaymentOutcomeUnknown(e.to_string()))?;
 
