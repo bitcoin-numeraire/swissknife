@@ -3,7 +3,8 @@ use chrono::Utc;
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     tonic_prost_build::configure()
         .protoc_arg("--experimental_allow_proto3_optional")
-        .build_server(false)
+        .build_server(std::env::var_os("CARGO_FEATURE_ITEST").is_some())
+        .generate_default_stubs(true)
         .compile_protos(
             &["src/infra/lightning/cln/proto/node.proto"],
             &["src/infra/lightning/cln/proto"],

@@ -11,3 +11,4 @@ pub use cln_grpc_listener::ClnGrpcListener;
 pub use cln_rest_client::*;
 pub use cln_rest_types::*;
 pub use cln_websocket_listener::ClnWebsocketListener;
+mod cln_payment;

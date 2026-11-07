@@ -112,6 +112,7 @@ impl PaymentService {
             destination: invoice.destination.clone(),
             amount_msat,
             final_cltv_delta: invoice.final_cltv_delta,
+            route_hints: invoice.route_hints.clone(),
         })
     }
 
@@ -612,6 +613,68 @@ impl PaymentService {
         }
     }
 
+    async fn reconcile_lightning_payment(
+        &self,
+        payment_hash: String,
+        expected_amount_msat: u64,
+    ) -> Result<bool, ApplicationError> {
+        let Some(node_payment) = tokio::time::timeout(
+            std::time::Duration::from_secs(30),
+            self.ln_client.payment_by_hash(payment_hash.clone()),
+        )
+        .await
+        .map_err(|_| LightningError::PaymentByHash("Provider lookup timed out".to_string()))??
+        else {
+            return Ok(false);
+        };
+
+        match node_payment.status {
+            PaymentStatus::Settled => {
+                // A recipient can disclose a preimage before all MPP value is
+                // delivered. A completed part is not enough even if a retry has
+                // not created its next HTLC yet. Keep the full reservation.
+                if node_payment.amount_msat < expected_amount_msat {
+                    return Err(LightningError::PaymentByHash(
+                        "Successful parts do not cover the payment amount".to_string(),
+                    )
+                    .into());
+                }
+                let payment_time = node_payment.payment_time.unwrap_or_else(Utc::now);
+                let payment_preimage = node_payment
+                    .lightning
+                    .as_ref()
+                    .and_then(|lightning| lightning.payment_preimage.clone())
+                    .unwrap_or_default();
+
+                let event = LnPaySuccessEvent {
+                    amount_msat: node_payment.amount_msat,
+                    fees_msat: node_payment.fee_msat.unwrap_or_default(),
+                    payment_hash: payment_hash.clone(),
+                    payment_preimage,
+                    payment_time,
+                };
+
+                self.events.outgoing_payment(event).await?;
+                Ok(true)
+            }
+            PaymentStatus::Failed => {
+                let reason = node_payment
+                    .error
+                    .clone()
+                    .unwrap_or_else(|| "Payment failed".to_string());
+                self.events
+                    .failed_payment(LnPayFailureEvent { payment_hash, reason })
+                    .await?;
+
+                Ok(true)
+            }
+            PaymentStatus::Pending => {
+                debug!(payment_hash = %payment_hash, "Payment still pending; skipping sync");
+                Ok(false)
+            }
+        }
+    }
+
     fn is_internal_payment(&self, input: &str) -> bool {
         if let Some((_, input_domain)) = input.split_once('@') {
             return input_domain == self.domain;
@@ -858,6 +921,18 @@ impl PaymentsUseCases for PaymentService {
         Ok(n_deleted)
     }
 
+    async fn sync_payment(&self, payment_hash: String) -> Result<(), ApplicationError> {
+        let Some(payment) = self.store.payment.find_by_payment_hash(&payment_hash).await? else {
+            return Ok(());
+        };
+        if payment.ledger != Ledger::Lightning || payment.status == PaymentStatus::Settled {
+            return Ok(());
+        }
+        self.reconcile_lightning_payment(payment_hash, payment.amount_msat)
+            .await?;
+        Ok(())
+    }
+
     async fn sync(&self) -> Result<u32, ApplicationError> {
         trace!("Synchronizing pending payments...");
 
@@ -872,6 +947,7 @@ impl PaymentsUseCases for PaymentService {
             .await?;
 
         let mut synced = 0;
+        let mut first_error = None;
 
         for payment in pending_payments {
             let Some(lightning) = payment.lightning.as_ref() else {
@@ -883,46 +959,22 @@ impl PaymentsUseCases for PaymentService {
             };
             let payment_hash = lightning.payment_hash.clone();
 
-            let Some(node_payment) = self.ln_client.payment_by_hash(payment_hash.clone()).await? else {
-                continue;
-            };
-
-            match node_payment.status {
-                PaymentStatus::Settled => {
-                    let payment_time = node_payment.payment_time.unwrap_or_else(Utc::now);
-                    let payment_preimage = node_payment
-                        .lightning
-                        .as_ref()
-                        .and_then(|lightning| lightning.payment_preimage.clone())
-                        .unwrap_or_default();
-
-                    let event = LnPaySuccessEvent {
-                        amount_msat: node_payment.amount_msat,
-                        fees_msat: node_payment.fee_msat.unwrap_or_default(),
-                        payment_hash: payment_hash.clone(),
-                        payment_preimage,
-                        payment_time,
-                    };
-
-                    self.events.outgoing_payment(event).await?;
-                    synced += 1;
-                }
-                PaymentStatus::Failed => {
-                    let reason = node_payment
-                        .error
-                        .clone()
-                        .unwrap_or_else(|| "Payment failed".to_string());
-                    self.events
-                        .failed_payment(LnPayFailureEvent { payment_hash, reason })
-                        .await?;
-
-                    synced += 1;
-                }
-                PaymentStatus::Pending => {
-                    debug!(payment_id = %payment.id, "Payment still pending; skipping sync");
-                    continue;
+            match self
+                .reconcile_lightning_payment(payment_hash, payment.amount_msat)
+                .await
+            {
+                Ok(true) => synced += 1,
+                Ok(false) => {}
+                Err(err) => {
+                    warn!(payment_id = %payment.id, %err, "Payment reconciliation failed; preserving reservation");
+                    if first_error.is_none() {
+                        first_error = Some(err);
+                    }
                 }
             }
+        }
+        if let Some(err) = first_error {
+            return Err(err);
         }
 
         debug!(synced, "Pending payments synchronized successfully");
@@ -1043,6 +1095,7 @@ mod tests {
 
     fn bolt11(amount_msat: Option<u64>) -> ParsedBolt11Invoice {
         ParsedBolt11Invoice {
+            route_hints: vec![],
             bolt11: "lnbc1example".to_string(),
             amount_msat,
             payment_hash: "ph".to_string(),
@@ -2950,6 +3003,71 @@ mod tests {
         }
     }
 
+    mod sync_payment {
+        use super::*;
+
+        #[tokio::test]
+        async fn ignores_unknown_hashes_without_calling_the_provider() {
+            let mut store = MockAppStoreBuilder::new();
+            store
+                .payment
+                .expect_find_by_payment_hash()
+                .times(1)
+                .returning(|_| Ok(None));
+            let service = service(
+                store,
+                MockLnClient::new(),
+                MockBitcoinWallet::new(),
+                MockEventUseCases::new(),
+            );
+            service.sync_payment("external".to_string()).await.unwrap();
+        }
+
+        #[tokio::test]
+        async fn ignores_replayed_events_after_settlement() {
+            let mut store = MockAppStoreBuilder::new();
+            store.payment.expect_find_by_payment_hash().times(1).returning(|_| {
+                Ok(Some(Payment {
+                    ledger: Ledger::Lightning,
+                    status: PaymentStatus::Settled,
+                    ..Default::default()
+                }))
+            });
+            let service = service(
+                store,
+                MockLnClient::new(),
+                MockBitcoinWallet::new(),
+                MockEventUseCases::new(),
+            );
+            service.sync_payment("settled".to_string()).await.unwrap();
+        }
+
+        #[tokio::test]
+        async fn preserves_reservations_when_the_provider_is_pending_or_has_no_record() {
+            for outcome in [
+                None,
+                Some(Payment {
+                    status: PaymentStatus::Pending,
+                    ..Default::default()
+                }),
+            ] {
+                let mut store = MockAppStoreBuilder::new();
+                store.payment.expect_find_by_payment_hash().times(1).returning(|_| {
+                    Ok(Some(Payment {
+                        ledger: Ledger::Lightning,
+                        status: PaymentStatus::Pending,
+                        ..Default::default()
+                    }))
+                });
+                let mut ln = MockLnClient::new();
+                ln.expect_payment_by_hash().times(1).return_once(|_| Ok(outcome));
+                // No financial event or UOW mutation is allowed for uncertainty.
+                let service = service(store, ln, MockBitcoinWallet::new(), MockEventUseCases::new());
+                service.sync_payment("pending".to_string()).await.unwrap();
+            }
+        }
+    }
+
     mod sync {
         use super::*;
 
@@ -2964,6 +3082,35 @@ mod tests {
                 }),
                 ..Default::default()
             }
+        }
+
+        #[tokio::test]
+        async fn continues_other_payments_after_a_lookup_failure() {
+            let mut store = MockAppStoreBuilder::new();
+            store
+                .payment
+                .expect_find_many()
+                .times(1)
+                .returning(|_| Ok(vec![pending_lightning_payment(), pending_lightning_payment()]));
+            let mut ln = MockLnClient::new();
+            let mut sequence = mockall::Sequence::new();
+            ln.expect_payment_by_hash()
+                .times(1)
+                .in_sequence(&mut sequence)
+                .return_once(|_| Err(LightningError::PaymentByHash("unavailable".to_string())));
+            ln.expect_payment_by_hash()
+                .times(1)
+                .in_sequence(&mut sequence)
+                .return_once(|_| {
+                    Ok(Some(Payment {
+                        status: PaymentStatus::Failed,
+                        ..Default::default()
+                    }))
+                });
+            let mut events = MockEventUseCases::new();
+            events.expect_failed_payment().times(1).returning(|_| Ok(()));
+            let service = service(store, ln, MockBitcoinWallet::new(), events);
+            assert!(service.sync().await.is_err());
         }
 
         mod when_node_reports_settled {

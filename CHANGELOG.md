@@ -8,6 +8,17 @@ release notes when a tag is published.
 
 ## [Unreleased]
 
+### Fixed
+
+- Keep Lightning payment funds reserved while Core Lightning retries failed
+  attempts or still has multipart HTLCs in flight, for both REST and gRPC.
+  Reconcile final payment status and actual fees after missed notifications,
+  interrupted requests, and restarts without resending payments.
+- Recover uncertain LND REST payments using the correct streaming payment-status
+  lookup, including after restart.
+- Include private BOLT11 route hints, forwarding fees, and CLTV requirements in
+  Lightning fee estimates for Core Lightning and LND, over REST and gRPC.
+
 ## [0.3.1] - 2026-11-06
 
 ### Added
