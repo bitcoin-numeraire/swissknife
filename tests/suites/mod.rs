@@ -6,7 +6,7 @@ mod asset_scoping;
 mod auth;
 mod bitcoin;
 mod cli;
-mod cln_reconciliation;
+mod cln_payments;
 mod events;
 mod guards;
 mod invoices;
