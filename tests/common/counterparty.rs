@@ -165,6 +165,19 @@ impl Counterparty {
         );
     }
 
+    /// Explicit self-payment for the LND lookup regression.
+    pub fn pay_self(&self, bolt11: &str) {
+        assert!(matches!(self.kind, Kind::Lnd));
+        self.run(&[
+            "lncli",
+            "--network=regtest",
+            "payinvoice",
+            "--force",
+            "--allow_self_payment",
+            bolt11,
+        ]);
+    }
+
     /// Create an invoice on the counterparty and return its bolt11 (for the SUT to pay).
     pub fn invoice(&self, amount_msat: u64, label: &str) -> String {
         match self.kind {
