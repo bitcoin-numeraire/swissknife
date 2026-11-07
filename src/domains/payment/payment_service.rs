@@ -634,10 +634,13 @@ impl PaymentService {
                 // delivered. A completed part is not enough even if a retry has
                 // not created its next HTLC yet. Keep the full reservation.
                 if node_payment.amount_msat < expected_amount_msat {
-                    return Err(LightningError::PaymentByHash(
-                        "Successful parts do not cover the payment amount".to_string(),
-                    )
-                    .into());
+                    debug!(
+                        %payment_hash,
+                        delivered_msat = node_payment.amount_msat,
+                        expected_amount_msat,
+                        "Successful parts do not yet cover the payment amount; preserving reservation"
+                    );
+                    return Ok(false);
                 }
                 let payment_time = node_payment.payment_time.unwrap_or_else(Utc::now);
                 let payment_preimage = node_payment
@@ -3111,6 +3114,36 @@ mod tests {
             events.expect_failed_payment().times(1).returning(|_| Ok(()));
             let service = service(store, ln, MockBitcoinWallet::new(), events);
             assert!(service.sync().await.is_err());
+        }
+
+        mod when_successful_parts_do_not_cover_the_requested_amount {
+            use super::*;
+
+            #[tokio::test]
+            async fn keeps_the_payment_pending_without_failing_replay() {
+                let mut store = MockAppStoreBuilder::new();
+                store.payment.expect_find_many().times(1).returning(|_| {
+                    Ok(vec![Payment {
+                        amount_msat: 1_000,
+                        ..pending_lightning_payment()
+                    }])
+                });
+                let mut ln_client = MockLnClient::new();
+                ln_client
+                    .expect_payment_by_hash()
+                    .withf(|hash| hash == "ph")
+                    .times(1)
+                    .returning(|_| {
+                        Ok(Some(Payment {
+                            status: PaymentStatus::Settled,
+                            amount_msat: 600,
+                            ..Default::default()
+                        }))
+                    });
+                // No success/failure projection or balance mutation is permitted.
+                let service = service(store, ln_client, MockBitcoinWallet::new(), MockEventUseCases::new());
+                assert_eq!(service.sync().await.unwrap(), 0);
+            }
         }
 
         mod when_node_reports_settled {

@@ -66,10 +66,10 @@ async fn start_send(app: &TestApp, peer: &Peer, wallet: Uuid) {
 }
 
 async fn assert_held(app: &TestApp, wallet: Uuid) {
-    assert_eq!(payment(app, wallet).await.status, PaymentStatus::Pending);
     let balance = app.wallet_balance(app.admin_token().await, wallet).await;
     assert_eq!(balance.available_msat, 0, "an unresolved send cannot be spent again");
     assert_eq!(balance.reserved_msat, RESERVED);
+    assert_eq!(payment(app, wallet).await.status, PaymentStatus::Pending);
 }
 
 async fn reconcile_event(peer: &Peer, status: &str) {
@@ -230,4 +230,21 @@ async fn an_early_xpay_success_response_cannot_release_pending_mpp_fees() {
         assert_settled(&app, wallet).await;
         app.stop();
     }
+}
+
+#[tokio::test]
+async fn restarts_with_incomplete_delivered_value_and_later_settles() {
+    let Some((app, peer, wallet)) = setup("cln-incomplete-restart").await else {
+        return;
+    };
+    start_send(&app, &peer, wallet).await;
+    peer.scenario.set(Outcome::Incomplete);
+    let restarted = app.restart("cln-incomplete-restarted", &peer.env).await;
+    assert_held(&restarted, wallet).await;
+    // Startup must bring up both the API and the periodic reconciler while
+    // preserving the original reservation. No resend or final event is needed.
+    assert_eq!(peer.scenario.sends.load(Ordering::SeqCst), 1);
+    peer.scenario.set(Outcome::Complete);
+    assert_settled(&restarted, wallet).await;
+    restarted.stop();
 }
