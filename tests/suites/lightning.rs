@@ -191,7 +191,7 @@ mod failure {
     use super::*;
 
     #[tokio::test]
-    async fn a_local_lnd_send_timeout_keeps_the_payment_and_reservation_pending() {
+    async fn a_local_lnd_send_timeout_releases_funds_only_for_a_confirmed_failure() {
         if crate::common::harness::matrix_cell().1 != "lnd_grpc" {
             return;
         }
@@ -223,13 +223,9 @@ mod failure {
         let response = app.api().post("/v1/payments", Auth::Bearer(token), request).await;
         assert_status(&response, StatusCode::OK);
         let payment = response.parse::<Payment>();
-        assert_eq!(payment.status, PaymentStatus::Pending);
+        assert!(matches!(payment.status, PaymentStatus::Pending | PaymentStatus::Failed));
         assert_eq!(payment.wallet_id, wallet.id);
         assert_eq!(payment.amount_msat, amount_msat);
-        assert!(payment.error.is_none());
-        let balance = app.wallet_balance(token, wallet.id).await;
-        assert_eq!(balance.reserved_msat, quote.maximum_total_msat);
-        assert_eq!(balance.available_msat, before - quote.maximum_total_msat as i64);
         let persisted = app
             .api()
             .get(&format!("/v1/payments/{}", payment.id), Auth::Bearer(token))
@@ -237,12 +233,30 @@ mod failure {
         assert_status(&persisted, StatusCode::OK);
         let persisted = persisted.parse::<Payment>();
         assert_eq!(persisted.id, payment.id);
-        assert_eq!(persisted.status, PaymentStatus::Pending);
+        assert!(matches!(
+            persisted.status,
+            PaymentStatus::Pending | PaymentStatus::Failed
+        ));
         assert_eq!(persisted.amount_msat, amount_msat);
         assert_eq!(
             persisted.lightning.as_ref().unwrap().payment_hash,
             payment.lightning.as_ref().unwrap().payment_hash
         );
+
+        // The send may reach LND despite the local timeout. The follow-up lookup
+        // or listener can then legitimately observe its terminal route failure.
+        let balance = app.wallet_balance(token, wallet.id).await;
+        if balance.reserved_msat == 0 {
+            let hash = &persisted.lightning.as_ref().unwrap().payment_hash;
+            let node = Counterparty::for_provider("cln_grpc");
+            assert_eq!(node.lnd_payment_status(hash).as_deref(), Some("FAILED"));
+            assert_eq!(balance.available_msat, before);
+        } else {
+            assert_eq!(persisted.status, PaymentStatus::Pending);
+            assert!(persisted.error.is_none());
+            assert_eq!(balance.reserved_msat, quote.maximum_total_msat);
+            assert_eq!(balance.available_msat, before - quote.maximum_total_msat as i64);
+        }
     }
 
     /// Exceeding the only channel's capacity makes routing fail independently

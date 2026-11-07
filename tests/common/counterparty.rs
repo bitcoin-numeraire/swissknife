@@ -222,6 +222,17 @@ impl Counterparty {
         }
     }
 
+    pub fn lnd_payment_status(&self, hash: &str) -> Option<String> {
+        assert!(matches!(self.kind, Kind::Lnd));
+        self.run_json(&["lncli", "--network=regtest", "listpayments", "--include_incomplete"])["payments"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|payment| payment["payment_hash"] == hash)
+            .and_then(|payment| payment["status"].as_str())
+            .map(str::to_owned)
+    }
+
     /// Ensure the real LND record is settled while SwissKnife is stopped. A
     /// zero-duration client timeout may still have submitted the original RPC;
     /// wait for that attempt before deciding whether the test needs to send it.
@@ -230,14 +241,8 @@ impl Counterparty {
         let hash = bolt11.parse::<Bolt11Invoice>().unwrap().payment_hash().to_string();
         let started = Instant::now();
         loop {
-            let payments = self.run_json(&["lncli", "--network=regtest", "listpayments", "--include_incomplete"]);
-            let status = payments["payments"]
-                .as_array()
-                .unwrap()
-                .iter()
-                .find(|payment| payment["payment_hash"] == hash)
-                .and_then(|payment| payment["status"].as_str());
-            match status {
+            let status = self.lnd_payment_status(&hash);
+            match status.as_deref() {
                 Some("SUCCEEDED") => return,
                 Some("IN_FLIGHT" | "INITIATED") => {
                     assert!(
