@@ -8,6 +8,12 @@ release notes when a tag is published.
 
 ## [Unreleased]
 
+### Fixed
+
+- Check the whole CLN payment status before processing a sendpay notification,
+  over REST and gRPC. Failed attempts no longer release funds while the payment
+  is still pending.
+
 ## [0.3.1] - 2026-11-06
 
 ### Added

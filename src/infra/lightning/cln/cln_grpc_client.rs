@@ -290,7 +290,7 @@ impl LnClient for ClnGrpcClient {
         let entry = response
             .pays
             .into_iter()
-            .find(|pay| matches!(pay.status(), ListpaysPaysStatus::Complete | ListpaysPaysStatus::Failed));
+            .rfind(|pay| hex::encode(&pay.payment_hash) == payment_hash);
 
         let Some(entry) = entry else {
             return Ok(None);

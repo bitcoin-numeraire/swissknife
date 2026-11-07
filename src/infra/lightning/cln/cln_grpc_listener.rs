@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use chrono::{TimeZone, Utc};
 use tonic::transport::Channel;
 use tracing::{trace, warn};
 
@@ -12,9 +11,8 @@ use super::{
         node_client::NodeClient,
         wait_invoices::WaitInvoicesStatus,
         wait_request::{WaitIndexname, WaitSubsystem},
-        wait_sendpays::WaitSendpaysStatus,
         waitinvoice_response::WaitinvoiceStatus,
-        ListchainmovesRequest, WaitRequest, WaitinvoiceRequest, WaitsendpayRequest,
+        ListchainmovesRequest, WaitRequest, WaitinvoiceRequest,
     },
     cln_grpc_client::{ClnClientConfig, ClnGrpcClient},
 };
@@ -22,7 +20,7 @@ use crate::{
     application::{composition::AppServices, errors::LightningError},
     domains::{
         bitcoin::{BitcoinWallet, OnchainSyncCursor},
-        event::{LnPayFailureEvent, LnPaySuccessEvent, OnchainWithdrawalEvent},
+        event::OnchainWithdrawalEvent,
     },
     infra::lightning::EventsListener,
 };
@@ -133,22 +131,13 @@ impl ClnGrpcListener {
                 };
 
                 let payment_hash = hex::encode(&payment_hash_bytes);
-                match sendpays.status() {
-                    WaitSendpaysStatus::Complete => {
-                        self.handle_sendpay_complete(payment_hash_bytes, sendpays.partid, sendpays.groupid)
-                            .await?;
-                    }
-                    WaitSendpaysStatus::Failed => {
-                        let failure_event = LnPayFailureEvent {
-                            reason: "Payment failed".to_string(),
-                            payment_hash,
-                        };
-                        if let Err(err) = self.services.event.failed_payment(failure_event).await {
-                            return Err(LightningError::EventProcessing(err.to_string()));
-                        }
-                    }
-                    WaitSendpaysStatus::Pending => {}
-                }
+                // A sendpay update describes one attempt. Read the aggregate
+                // payment status before settling or releasing its reservation.
+                self.services
+                    .payment
+                    .sync_one(payment_hash)
+                    .await
+                    .map_err(|err| LightningError::EventProcessing(err.to_string()))?;
             }
 
             if let Some(index) = response.updated {
@@ -200,67 +189,6 @@ impl ClnGrpcListener {
                 .await
                 .map_err(|e| LightningError::Listener(e.to_string()))?;
         }
-    }
-
-    async fn handle_sendpay_complete(
-        &self,
-        payment_hash: Vec<u8>,
-        partid: Option<u64>,
-        groupid: Option<u64>,
-    ) -> Result<(), LightningError> {
-        let result = {
-            let mut client = self.client.clone();
-            client
-                .wait_send_pay(WaitsendpayRequest {
-                    payment_hash,
-                    partid,
-                    groupid,
-                    timeout: None,
-                })
-                .await
-        };
-
-        let response = result
-            .map_err(|e| LightningError::Listener(e.message().to_string()))?
-            .into_inner();
-
-        let payment_hash = hex::encode(response.payment_hash);
-        let amount_sent_msat = response
-            .amount_sent_msat
-            .as_ref()
-            .map(|amount| amount.msat)
-            .unwrap_or_default();
-        let amount_msat = response
-            .amount_msat
-            .as_ref()
-            .map(|amount| amount.msat)
-            .unwrap_or(amount_sent_msat);
-        let fees_msat = amount_sent_msat.saturating_sub(amount_msat);
-        let payment_preimage = response.payment_preimage.as_ref().map(hex::encode).unwrap_or_default();
-
-        let payment_time = response
-            .completed_at
-            .and_then(|completed_at| {
-                let secs = completed_at as i64;
-                let nanos = ((completed_at - secs as f64) * 1e9) as u32;
-                Utc.timestamp_opt(secs, nanos).single()
-            })
-            .or_else(|| Utc.timestamp_opt(response.created_at as i64, 0).single())
-            .unwrap_or_else(Utc::now);
-
-        let success_event = LnPaySuccessEvent {
-            amount_msat,
-            fees_msat,
-            payment_hash,
-            payment_preimage,
-            payment_time,
-        };
-
-        self.services
-            .event
-            .outgoing_payment(success_event)
-            .await
-            .map_err(|err| LightningError::EventProcessing(err.to_string()))
     }
 
     async fn handle_chainmoves(&self, start_index: u64) -> Result<u64, LightningError> {

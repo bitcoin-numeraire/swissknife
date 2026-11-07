@@ -27,4 +27,6 @@ pub trait PaymentsUseCases: Send + Sync {
     async fn delete(&self, id: Uuid) -> Result<(), ApplicationError>;
     async fn delete_many(&self, filter: PaymentFilter) -> Result<u64, ApplicationError>;
     async fn sync(&self) -> Result<u32, ApplicationError>;
+    /// Synchronize one known payment by its payment hash.
+    async fn sync_one(&self, payment_hash: String) -> Result<(), ApplicationError>;
 }

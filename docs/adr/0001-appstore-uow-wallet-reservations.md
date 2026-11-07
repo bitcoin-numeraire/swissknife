@@ -303,11 +303,16 @@ Every reservation, debit, credit, payment, invoice, and reconciliation query mus
 #### Outgoing payment lifecycle
 
 1. Before the external Lightning/Bitcoin call, reserve funds and insert a pending payment in one DB transaction.
-2. If the external call fails, release the reservation and mark the payment failed in one DB transaction.
+2. On a definitive whole-payment failure, release the reservation and mark the payment failed in one DB transaction. Timeouts and individual attempt failures do not establish that outcome.
 3. If the external call succeeds, settle the payment and adjust the reservation to the actual debit in one DB transaction:
    - release any unused reserve back to `available_amount`;
    - if actual fee exceeds reserve, attempt an additional conditional debit or fail according to the provider/payment policy;
    - set the real `fee_msat` on the payment.
+
+CLN `sendpay_success` / `sendpay_failure` and gRPC `wait(sendpays)` describe
+individual attempts. They trigger `sync_one`, which reads the whole payment
+through `listpays` before applying the existing settlement or failure transaction.
+Pending, missing, or unavailable state preserves the reservation.
 
 #### Internal payment lifecycle
 

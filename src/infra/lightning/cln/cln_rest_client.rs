@@ -277,10 +277,7 @@ impl LnClient for ClnRestClient {
             .await
             .map_err(|e| LightningError::PaymentByHash(e.to_string()))?;
 
-        let payment = response
-            .pays
-            .into_iter()
-            .find(|pay| matches!(pay.status.as_str(), "complete" | "failed") && pay.payment_hash == payment_hash);
+        let payment = response.pays.into_iter().rfind(|pay| pay.payment_hash == payment_hash);
 
         let Some(payment) = payment else {
             return Ok(None);
@@ -293,10 +290,15 @@ impl LnClient for ClnRestClient {
             .or(payment.created_at)
             .and_then(|timestamp| Utc.timestamp_opt(timestamp as i64, 0).single());
 
-        let status = if payment.status == "complete" {
-            PaymentStatus::Settled
-        } else {
-            PaymentStatus::Failed
+        let status = match payment.status.as_str() {
+            "complete" => PaymentStatus::Settled,
+            "failed" => PaymentStatus::Failed,
+            "pending" => PaymentStatus::Pending,
+            status => {
+                return Err(LightningError::PaymentByHash(format!(
+                    "Unknown payment status: {status}"
+                )))
+            }
         };
 
         Ok(Some(Payment {
