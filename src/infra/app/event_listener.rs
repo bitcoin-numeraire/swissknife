@@ -1,11 +1,10 @@
 use std::{sync::Arc, time::Duration};
 
 use tokio::{
-    spawn,
     task::yield_now,
-    time::{interval, sleep, Instant, MissedTickBehavior},
+    time::{sleep, Instant},
 };
-use tracing::{debug, error, warn};
+use tracing::{error, warn};
 
 use crate::{
     application::{
@@ -90,7 +89,7 @@ impl EventListener {
     pub async fn start(&self) -> Result<(), ApplicationError> {
         let listener = self.listener.clone();
         let services = self.services.clone();
-        spawn(async move {
+        tokio::spawn(async move {
             let mut backoff = LISTENER_MIN_RECONNECT_DELAY;
             let mut replay_before_listen = false;
 
@@ -128,31 +127,13 @@ impl EventListener {
         yield_now().await;
         Self::sync_offchain_state(&self.services).await?;
 
-        // CLN can notify the last failed part while xpay's aggregate state is
-        // still pending during cleanup. Removing that active xpay changes
-        // listpays to failed without another sendpay notification. Recheck only
-        // pending payments even when the listener connection stays healthy.
-        // Also recover sends whose HTTP caller disconnected; never resend.
-        let services = self.services.clone();
-        spawn(async move {
-            let mut interval = interval(Duration::from_secs(5));
-            interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
-            interval.tick().await;
-            loop {
-                interval.tick().await;
-                if let Err(err) = services.payment.sync().await {
-                    warn!(%err, "Pending Lightning payment reconciliation failed; will retry");
-                }
-            }
-        });
-
         Ok(())
     }
 
     async fn sync_offchain_state(services: &AppServices) -> Result<(), ApplicationError> {
         let (synced_invoices, synced_payments) = tokio::try_join!(services.invoice.sync(), services.payment.sync())?;
 
-        debug!(synced_invoices, synced_payments, "Lightning off-chain state replayed");
+        tracing::debug!(synced_invoices, synced_payments, "Lightning off-chain state replayed");
 
         Ok(())
     }

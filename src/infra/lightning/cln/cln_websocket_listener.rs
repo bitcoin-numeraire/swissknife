@@ -147,9 +147,8 @@ impl ClnWebsocketListener {
                             }
                         }
 
-                        // sendpay_* and xpay_pay_part_* are part/attempt events,
-                        // including successes in an MPP payment. Query whole-payment
-                        // state; never project their amounts or release funds directly.
+                        // A sendpay notification describes one attempt. Read the aggregate
+                        // payment status before settling or releasing its reservation.
                         if let Some(payment_hash) = Self::payment_hint(&value) {
                             if let Err(err) = services.payment.sync_one(payment_hash).await {
                                 Self::stop_after_projection_error(&failure_tx, &client, "payment_reconciliation", err)

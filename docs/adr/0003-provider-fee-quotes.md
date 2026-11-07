@@ -21,8 +21,8 @@ Lightning graph estimates cannot be guaranteed. Channel balances are private, ro
 
 `LnClient` exposes a provider-specific graph estimate and an amount-aware hard fee policy. Payment execution receives that hard limit explicitly.
 
-- LND uses read-only `QueryRoutes` with the exact millisatoshi amount, final CLTV, mission control, and an absolute fee limit.
-- Core Lightning uses `getroutes` with `auto.localchans`, `auto.sourcefree`, and the configured fee budget. Public routes keep the provider's default multipart behavior and sum the fee across every returned route part.
+- LND uses `EstimateRouteFee` with destination plus amount, which selects its fast graph-based mode.
+- Core Lightning uses `getroutes` with `auto.localchans`, `auto.sourcefree`, and the configured fee budget. It keeps the provider's default multipart behavior and sums the fee across every returned route part.
 - LND keeps its configured absolute `fee_limit_msat`.
 - Core Lightning keeps its configured `maxfee`; when omitted, SwissKnife mirrors `xpay`'s `max(1%, 5000 msat)` default.
 
@@ -30,22 +30,13 @@ The payment service reserves `amount + maximum_fee`, not merely `amount + estima
 
 If route estimation fails, fee quoting and payment admission fall back to the provider's hard maximum. The API returns no expected fee in that case, while still returning the guaranteed cap. An unavailable graph route does not prevent the provider from attempting private hints, retries, or a route that appears later.
 
-Route candidates above the hard maximum are excluded. If no candidate fits, the API omits the expected fee and retains the execution cap; the provider must still enforce that cap.
+If a provider estimate is already above the hard maximum, SwissKnife rejects the quote and payment before reserving funds. Such an estimate cannot succeed under the configured execution policy.
 
-### Private BOLT11 route hints
-
-Invoice parsing retains all route hints. Each estimator considers the direct
-public route and each hinted suffix, computing the suffix's base and proportional
-fees backwards from the recipient. It quotes the public prefix to that hint's
-entry node for the resulting amount and CLTV, with the suffix fee deducted from
-the total fee cap. If the payer is itself a hinted node, its own forwarding fee
-and CLTV are omitted. The cheapest available candidate is returned.
-
-Hinted prefixes use a single route (`maxparts=1` on CLN; LND `QueryRoutes` returns
-individual routes). Splitting the public prefix would otherwise undercount
-per-HTLC base fees on the private suffix. No probe payment or shared Askrene layer
-is created. Private-channel liquidity is not verifiable from the hint: invoices
-that need MPP across multiple hints can still fall back to the execution cap.
+CLN `getroutes` accepts a destination and amount, not a BOLT11 invoice or its
+private route hints. LND's destination/amount `EstimateRouteFee` mode is a graph
+query; its separate invoice mode sends probes. SwissKnife keeps the existing
+native graph estimators and the unavailable-estimate fallback. It does not build
+routes, create Askrene layers, or send probe payments to manufacture a quote.
 
 ### On-chain and internal payments
 
@@ -75,7 +66,7 @@ The quote is informational. The execution-time maximum is guaranteed for Lightni
 
 ## References
 
-- [LND `QueryRoutes`](https://lightning.engineering/api-docs/api/lnd/lightning/query-routes/)
+- [LND `EstimateRouteFee`](https://api.lightning.community/api/lnd/router/estimate-route-fee/index.html)
 - [LND payment fee limits](https://docs.lightning.engineering/lightning-network-tools/lnd/payments)
 - [Core Lightning `getroutes`](https://docs.corelightning.org/reference/getroutes)
 - [Core Lightning `xpay`](https://docs.corelightning.org/reference/xpay)

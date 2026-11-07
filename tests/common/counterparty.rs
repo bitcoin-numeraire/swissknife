@@ -5,9 +5,10 @@ use std::{
     time::{Duration, Instant},
 };
 
+use bitcoin::hashes::{sha256, Hash};
 use lightning_invoice::Bolt11Invoice;
-
-use serde_json::Value;
+use serde_json::{json, Value};
+use uuid::Uuid;
 
 /// The Lightning node NOT under test, driven via its CLI through docker so that
 /// real payments flow over the LND<->CLN channel. When SwissKnife runs on LND
@@ -77,6 +78,92 @@ impl Counterparty {
                 String::from_utf8_lossy(&output.stdout)
             )
         })
+    }
+
+    pub fn hold_invoice(self, amount_msat: u64) -> HeldInvoice {
+        assert!(matches!(self.kind, Kind::Lnd));
+        let preimage = sha256::Hash::hash(Uuid::new_v4().as_bytes()).to_byte_array();
+        let hash = sha256::Hash::hash(&preimage).to_string();
+        let invoice = self.run_json(&[
+            "lncli",
+            "--network=regtest",
+            "addholdinvoice",
+            &format!("--amt_msat={amount_msat}"),
+            &hash,
+        ]);
+        HeldInvoice {
+            bolt11: invoice["payment_request"].as_str().unwrap().to_string(),
+            hash,
+            preimage: hex::encode(preimage),
+            node: self,
+            resolved: false,
+        }
+    }
+
+    fn cln_rpc(&self, method: &str, params: Value) -> Value {
+        assert!(matches!(self.kind, Kind::Cln));
+        let params: Vec<String> = params
+            .as_object()
+            .unwrap()
+            .iter()
+            .map(|(key, value)| {
+                format!(
+                    "{key}={}",
+                    value.as_str().map(str::to_owned).unwrap_or_else(|| value.to_string())
+                )
+            })
+            .collect();
+        let mut args = vec!["lightning-cli", "--network=regtest", "-k", method];
+        args.extend(params.iter().map(String::as_str));
+        self.run_json(&args)
+    }
+
+    /// Send a malformed onion in the held payment's group. The real receiving
+    /// node rejects this part while the original xpay remains in flight.
+    pub fn fail_payment_part(&self, hash: &str) {
+        let payments = self.cln_rpc("listsendpays", json!({"payment_hash": hash}));
+        let part = payments["payments"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|part| part["status"] == "pending")
+            .expect("original payment is held");
+        let onion = self.cln_rpc(
+            "createonion",
+            json!({
+                "hops": [{"pubkey": part["destination"], "payload": "00"}], "assocdata": hash,
+            }),
+        );
+        self.cln_rpc(
+            "sendonion",
+            json!({
+                "onion": onion["onion"],
+                "first_hop": {"id": part["destination"], "amount_msat": part["amount_sent_msat"], "delay": 100},
+                "payment_hash": hash, "partid": 999, "groupid": part["groupid"],
+            }),
+        );
+        let started = Instant::now();
+        loop {
+            let payments = self.cln_rpc("listsendpays", json!({"payment_hash": hash}));
+            if payments["payments"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|part| part["partid"] == 999 && part["status"] == "failed")
+            {
+                break;
+            }
+            assert!(
+                started.elapsed() < Duration::from_secs(10),
+                "injected part did not fail"
+            );
+            sleep(Duration::from_millis(100));
+        }
+        let payment = self.cln_rpc("listpays", json!({"payment_hash": hash}));
+        assert_eq!(
+            payment["pays"][0]["status"], "pending",
+            "the payment itself has not failed"
+        );
     }
 
     /// Create an invoice on the counterparty and return its bolt11 (for the SUT to pay).
@@ -177,6 +264,44 @@ impl Counterparty {
             Kind::Cln => {
                 self.run(&["lightning-cli", "--network=regtest", "pay", bolt11]);
             }
+        }
+    }
+}
+
+/// Cancel an unresolved hold even if a test panics, so it does not strand
+/// channel liquidity for the remaining integration tests.
+pub struct HeldInvoice {
+    pub bolt11: String,
+    pub hash: String,
+    preimage: String,
+    node: Counterparty,
+    resolved: bool,
+}
+
+impl HeldInvoice {
+    pub fn accepted(&self) -> bool {
+        self.node
+            .run_json(&["lncli", "--network=regtest", "lookupinvoice", &self.hash])["state"]
+            == "ACCEPTED"
+    }
+
+    pub fn settle(&mut self) {
+        self.node
+            .run(&["lncli", "--network=regtest", "settleinvoice", &self.preimage]);
+        self.resolved = true;
+    }
+
+    pub fn cancel(&mut self) {
+        self.node
+            .run(&["lncli", "--network=regtest", "cancelinvoice", &self.hash]);
+        self.resolved = true;
+    }
+}
+
+impl Drop for HeldInvoice {
+    fn drop(&mut self) {
+        if !self.resolved {
+            self.cancel();
         }
     }
 }

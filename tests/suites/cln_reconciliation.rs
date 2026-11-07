@@ -1,293 +1,197 @@
-//! Exercise production adapters/listeners and durable accounting through HTTP.
-//! A wire-level CLN peer makes xpay retry and MPP timing deterministic.
-use std::{sync::atomic::Ordering, time::Duration};
+//! Real CLN attempt notifications must not release an in-flight payment's funds.
+use std::time::Duration;
 
 use reqwest::StatusCode;
-use swissknife_types::{Payment, PaymentFeeEstimate, PaymentStatus, SendPaymentRequest};
+use swissknife_types::{ClientEventType, Payment, PaymentStatus, SendPaymentRequest};
 use tokio::time::sleep;
 use uuid::Uuid;
 
+use super::events::next_event;
 use crate::common::{
-    assert_error, assert_status,
-    cln_scenario::{invoice, Outcome, Peer, AMOUNT, FINAL_FEE, RESERVED},
-    harness::matrix_cell,
-    wait::wait_until,
-    Auth, TestApp,
+    assert_error, assert_status, counterparty::Counterparty, harness::matrix_cell, wait::wait_until, Auth, TestApp,
 };
 
-fn request(wallet: Uuid, seed: u8) -> SendPaymentRequest {
+const AMOUNT: u64 = 1_000_000;
+const RESERVED: u64 = AMOUNT + 10_000;
+
+fn request(wallet: Uuid, invoice: &str) -> SendPaymentRequest {
     SendPaymentRequest {
         wallet_id: Some(wallet),
-        input: invoice(seed, true),
+        input: invoice.to_string(),
         amount_msat: None,
         comment: None,
     }
 }
 
-async fn setup(label: &str) -> Option<(TestApp, Peer, Uuid)> {
-    let (_, provider) = matrix_cell();
-    if !provider.starts_with("cln_") {
+async fn setup(label: &str, timeout: &str) -> Option<(TestApp, Uuid, String)> {
+    if !matrix_cell().1.starts_with("cln_") {
         return None;
     }
-    let funded = TestApp::isolated(label, &[]).await;
-    let token = funded.admin_token().await;
-    let wallet = funded.create_wallet(token, label).await;
-    funded.fund_onchain(token, wallet.id, RESERVED / 1000).await;
-    let peer = Peer::start(&provider).await;
-    let app = funded.restart(&format!("{label}-peer"), &peer.env).await;
-    Some((app, peer, wallet.id))
+    let app = TestApp::isolated(
+        label,
+        &[
+            ("SWISSKNIFE_WEB__REQUEST_TIMEOUT", timeout.to_string()),
+            ("SWISSKNIFE_CLN_REST_CONFIG__TIMEOUT", "3s".to_string()),
+        ],
+    )
+    .await;
+    let token = app.admin_token().await;
+    let wallet = app.create_wallet(token, label).await;
+    app.fund_onchain(token, wallet.id, RESERVED / 1000).await;
+    let key = app.account_api_key(token, wallet.account_id, vec![]).await;
+    Some((app, wallet.id, key))
 }
 
 async fn payment(app: &TestApp, wallet: Uuid) -> Payment {
-    let res = app
+    let response = app
         .api()
         .get(
             &format!("/v1/payments?wallet_id={wallet}"),
             Auth::Bearer(app.admin_token().await),
         )
         .await;
-    assert_status(&res, StatusCode::OK);
-    let payments = res.parse::<Vec<Payment>>();
-    assert_eq!(payments.len(), 1, "one durable send, including after retries/restart");
-    payments.into_iter().next().unwrap()
+    assert_status(&response, StatusCode::OK);
+    let mut payments = response.parse::<Vec<Payment>>();
+    assert_eq!(payments.len(), 1, "one original payment, no resend");
+    payments.remove(0)
 }
 
-async fn start_send(app: &TestApp, peer: &Peer, wallet: Uuid) {
-    let res = app
+async fn assert_reserved(app: &TestApp, wallet: Uuid) {
+    assert_eq!(payment(app, wallet).await.status, PaymentStatus::Pending);
+    let balance = app.wallet_balance(app.admin_token().await, wallet).await;
+    assert_eq!(balance.available_msat, 0);
+    assert_eq!(balance.reserved_msat, RESERVED);
+}
+
+#[tokio::test]
+async fn failed_part_cannot_release_funds_for_a_second_spend() {
+    let Some((app, wallet, key)) = setup("cln-failed-part", "30s").await else {
+        return;
+    };
+    let mut held = Counterparty::for_provider(&app.provider).hold_invoice(AMOUNT);
+    let api = app.api();
+    let token = app.admin_token().await.to_string();
+    let send = request(wallet, &held.bolt11);
+    let sending = tokio::spawn(async move { api.post("/v1/payments", Auth::Bearer(&token), send).await });
+    wait_until(
+        Duration::from_secs(10),
+        "receiver accepted the original payment",
+        || async { held.accepted() },
+    )
+    .await;
+    let mut events = app.api().event_stream("/v1/me/events", Auth::ApiKey(&key), None).await;
+
+    // This emits an actual sendpay_failure / wait(sendpays) update. It does not
+    // fake CLN responses: listpays still reports the held payment as pending.
+    Counterparty::for_provider("lnd_grpc").fail_payment_part(&held.hash);
+    sleep(Duration::from_secs(1)).await;
+    assert_reserved(&app, wallet).await;
+    let second_invoice = Counterparty::for_provider(&app.provider).invoice(AMOUNT, "second-spend");
+    let second = app
         .api()
         .post(
             "/v1/payments",
             Auth::Bearer(app.admin_token().await),
-            request(wallet, 21),
+            request(wallet, &second_invoice),
         )
         .await;
-    assert_status(&res, StatusCode::REQUEST_TIMEOUT);
-    assert_eq!(peer.scenario.sends.load(Ordering::SeqCst), 1);
-    assert_held(app, wallet).await;
-}
+    assert_error(&second, StatusCode::UNPROCESSABLE_ENTITY);
+    assert!(second.body["reason"].as_str().unwrap().contains("Insufficient funds"));
 
-async fn assert_held(app: &TestApp, wallet: Uuid) {
-    let balance = app.wallet_balance(app.admin_token().await, wallet).await;
-    assert_eq!(balance.available_msat, 0, "an unresolved send cannot be spent again");
-    assert_eq!(balance.reserved_msat, RESERVED);
-    assert_eq!(payment(app, wallet).await.status, PaymentStatus::Pending);
-}
-
-async fn reconcile_event(peer: &Peer, status: &str) {
-    let before = peer.scenario.lookups.load(Ordering::SeqCst);
-    peer.scenario.notify(status);
-    wait_until(
-        Duration::from_secs(10),
-        "event or periodic aggregate lookup",
-        || async { peer.scenario.lookups.load(Ordering::SeqCst) > before },
-    )
-    .await;
-    // Allow the lookup's projection to commit before asserting its effect.
-    sleep(Duration::from_millis(200)).await;
-}
-
-async fn assert_settled(app: &TestApp, wallet: Uuid) {
-    wait_until(Duration::from_secs(15), "whole payment settled", || async {
-        payment(app, wallet).await.status == PaymentStatus::Settled
-    })
-    .await;
-    let pay = payment(app, wallet).await;
-    assert_eq!(pay.amount_msat, AMOUNT);
-    assert_eq!(pay.fee_msat, Some(FINAL_FEE));
-    let balance = app.wallet_balance(app.admin_token().await, wallet).await;
-    assert_eq!(balance.reserved_msat, 0);
-    assert_eq!(balance.available_msat, (RESERVED - AMOUNT - FINAL_FEE) as i64);
-}
-
-#[tokio::test]
-async fn failed_attempt_cannot_release_funds_for_a_second_spend() {
-    let Some((app, peer, wallet)) = setup("cln-retry-hold").await else {
-        return;
-    };
-    start_send(&app, &peer, wallet).await;
-    // Real CLN versions can report either stale `pending` or `failed` in this
-    // per-attempt notification. Neither is a whole-xpay terminal outcome.
-    for status in ["pending", "failed"] {
-        reconcile_event(&peer, status).await;
-        assert_held(&app, wallet).await;
-        let res = app
-            .api()
-            .post(
-                "/v1/payments",
-                Auth::Bearer(app.admin_token().await),
-                request(wallet, 22),
-            )
-            .await;
-        assert_error(&res, StatusCode::UNPROCESSABLE_ENTITY);
-        assert!(res.body["reason"].as_str().unwrap().contains("Insufficient funds"));
-        assert_eq!(peer.scenario.sends.load(Ordering::SeqCst), 1);
-    }
-    peer.scenario.set(Outcome::Complete);
-    reconcile_event(&peer, "complete").await;
-    assert_settled(&app, wallet).await;
-    // Replayed success/failure cannot debit twice or downgrade a settlement.
-    peer.scenario.notify("failed");
-    peer.scenario.notify("complete");
-    sleep(Duration::from_millis(500)).await;
-    assert_settled(&app, wallet).await;
-}
-
-#[tokio::test]
-async fn partial_success_keeps_the_reservation_until_all_parts_resolve() {
-    let Some((app, peer, wallet)) = setup("cln-mpp-hold").await else {
-        return;
-    };
-    start_send(&app, &peer, wallet).await;
-    for outcome in [Outcome::Partial, Outcome::Incomplete] {
-        peer.scenario.set(outcome);
-        reconcile_event(&peer, "complete").await;
-        assert_held(&app, wallet).await;
-    }
-    // Deliberately no final notification: periodic reconciliation must finish.
-    peer.scenario.set(Outcome::Complete);
-    assert_settled(&app, wallet).await;
-}
-
-#[tokio::test]
-async fn restart_and_lookup_uncertainty_preserve_the_hold_until_terminal_failure() {
-    let Some((app, peer, wallet)) = setup("cln-recovery-hold").await else {
-        return;
-    };
-    start_send(&app, &peer, wallet).await;
-    peer.scenario.set(Outcome::LookupError);
-    reconcile_event(&peer, "failed").await;
-    assert_held(&app, wallet).await;
-    peer.scenario.set(Outcome::Missing);
-    let restarted = app.restart("cln-recovery-restarted", &peer.env).await;
-    assert_held(&restarted, wallet).await;
+    held.settle();
+    let response = sending.await.unwrap();
+    assert_status(&response, StatusCode::OK);
+    assert_eq!(response.parse::<Payment>().status, PaymentStatus::Settled);
+    let event = next_event(&mut events).await;
     assert_eq!(
-        peer.scenario.sends.load(Ordering::SeqCst),
-        1,
-        "recovery must never resend"
+        event.payload.event_type,
+        ClientEventType::PaymentSettled,
+        "no false PaymentFailed event"
     );
-    peer.scenario.set(Outcome::Failed);
-    wait_until(
-        Duration::from_secs(15),
-        "terminal failure reconciled without notification",
-        || async { payment(&restarted, wallet).await.status == PaymentStatus::Failed },
-    )
-    .await;
-    let balance = restarted.wallet_balance(restarted.admin_token().await, wallet).await;
+    assert_eq!(event.payload.resource_id, payment(&app, wallet).await.id);
+    let balance = app.wallet_balance(app.admin_token().await, wallet).await;
     assert_eq!(balance.reserved_msat, 0);
-    assert_eq!(balance.available_msat, RESERVED as i64);
+    assert_eq!(
+        balance.available_msat, 10_000,
+        "one debit, with zero fees on the direct channel"
+    );
 }
 
 #[tokio::test]
-async fn private_hint_estimate_includes_suffix_fees_and_cltv_without_sending() {
-    let Some((app, peer, wallet)) = setup("cln-private-quote").await else {
-        return;
-    };
-    let res = app
-        .api()
-        .post(
-            "/v1/payments/fee-estimate",
-            Auth::Bearer(app.admin_token().await),
-            request(wallet, 21),
-        )
-        .await;
-    assert_status(&res, StatusCode::OK);
-    let estimate = res.parse::<PaymentFeeEstimate>();
-    assert_eq!(estimate.estimated_fee_msat, Some(4_734));
-    assert_eq!(estimate.maximum_fee_msat, 10_000);
-    assert_eq!(peer.scenario.sends.load(Ordering::SeqCst), 0);
-    let quotes = peer.scenario.quotes.lock().unwrap();
-    let hinted = quotes
-        .iter()
-        .find(|quote| quote["amount_msat"] == 1_003_500)
-        .expect("quote the public entry to the private route");
-    assert_eq!(hinted["final_cltv"], 184);
-    assert_eq!(hinted["maxfee_msat"], 6_500);
-    assert_eq!(hinted["maxparts"], 1);
-}
-
-#[tokio::test]
-async fn an_early_xpay_success_response_cannot_release_pending_mpp_fees() {
-    for (label, outcome) in [
-        ("cln-rpc-mpp-hold", Outcome::Partial),
-        ("cln-rpc-partial-value", Outcome::Incomplete),
-    ] {
-        let Some((app, peer, wallet)) = setup(label).await else {
+async fn completes_a_payment_after_the_http_request_times_out() {
+    for settle in [true, false] {
+        let label = if settle { "cln-late-success" } else { "cln-late-failure" };
+        let Some((app, wallet, key)) = setup(label, "2s").await else {
             return;
         };
-        peer.scenario.set(outcome);
-        peer.scenario.rpc_success.store(true, Ordering::SeqCst);
-        let res = app
+        let mut held = Counterparty::for_provider(&app.provider).hold_invoice(AMOUNT);
+        let response = app
             .api()
             .post(
                 "/v1/payments",
                 Auth::Bearer(app.admin_token().await),
-                request(wallet, 21),
+                request(wallet, &held.bolt11),
             )
             .await;
-        assert_status(&res, StatusCode::OK);
-        assert_eq!(res.parse::<Payment>().status, PaymentStatus::Pending);
-        assert_held(&app, wallet).await;
-        peer.scenario.set(Outcome::Complete);
-        assert_settled(&app, wallet).await;
+        assert_status(&response, StatusCode::REQUEST_TIMEOUT);
+        assert!(held.accepted());
+        assert_reserved(&app, wallet).await;
+        // Also exceed the ordinary REST RPC deadline: an accepted HTLC can
+        // outlive both that deadline and the caller's HTTP request.
+        sleep(Duration::from_secs(2)).await;
+        let mut events = app.api().event_stream("/v1/me/events", Auth::ApiKey(&key), None).await;
+        if settle {
+            held.settle();
+        } else {
+            held.cancel();
+        }
+        let expected = if settle {
+            PaymentStatus::Settled
+        } else {
+            PaymentStatus::Failed
+        };
+        wait_until(Duration::from_secs(10), "final notification committed", || async {
+            payment(&app, wallet).await.status == expected
+        })
+        .await;
+        let event = next_event(&mut events).await;
+        assert_eq!(
+            event.payload.event_type,
+            if settle {
+                ClientEventType::PaymentSettled
+            } else {
+                ClientEventType::PaymentFailed
+            }
+        );
+        let balance = app.wallet_balance(app.admin_token().await, wallet).await;
+        assert_eq!(balance.reserved_msat, 0);
+        assert_eq!(balance.available_msat, if settle { 10_000 } else { RESERVED as i64 });
         app.stop();
     }
 }
 
 #[tokio::test]
-async fn restarts_with_incomplete_delivered_value_and_later_settles() {
-    let Some((app, peer, wallet)) = setup("cln-incomplete-restart").await else {
+async fn startup_recovers_a_payment_settled_while_swissknife_was_stopped() {
+    let Some((app, wallet, _key)) = setup("cln-restart", "2s").await else {
         return;
     };
-    start_send(&app, &peer, wallet).await;
-    peer.scenario.set(Outcome::Incomplete);
-    let restarted = app.restart("cln-incomplete-restarted", &peer.env).await;
-    assert_held(&restarted, wallet).await;
-    // Startup must bring up both the API and the periodic reconciler while
-    // preserving the original reservation. No resend or final event is needed.
-    assert_eq!(peer.scenario.sends.load(Ordering::SeqCst), 1);
-    peer.scenario.set(Outcome::Complete);
-    assert_settled(&restarted, wallet).await;
-    restarted.stop();
-}
-
-#[tokio::test]
-async fn a_lookup_timeout_during_restart_keeps_funds_reserved_and_retries_later() {
-    let Some((app, peer, wallet)) = setup("cln-timeout-restart").await else {
-        return;
-    };
-    start_send(&app, &peer, wallet).await;
-    peer.scenario.set(Outcome::LookupTimeout);
-    // Let the service's 30-second reconciliation deadline expire first, rather
-    // than the REST transport's own deadline. A timeout is not a final outcome.
-    let mut env = peer.env.clone();
-    env.push(("SWISSKNIFE_CLN_REST_CONFIG__TIMEOUT", "60s".to_string()));
-    let restarted = app.restart("cln-timeout-restarted", &env).await;
-    assert_held(&restarted, wallet).await;
-    assert_eq!(peer.scenario.sends.load(Ordering::SeqCst), 1);
-    peer.scenario.set(Outcome::Complete);
-    assert_settled(&restarted, wallet).await;
-    restarted.stop();
-}
-
-#[tokio::test]
-async fn final_xpay_failure_is_reconciled_after_the_last_part_notification() {
-    let Some((app, peer, wallet)) = setup("cln-final-failure-gap").await else {
-        return;
-    };
-    start_send(&app, &peer, wallet).await;
-    // The final part has failed, but xpay has not finished cleanup yet. Both
-    // applications and the notification connection remain running throughout.
-    reconcile_event(&peer, "failed").await;
-    assert_held(&app, wallet).await;
-    // xpay finishes without another part notification or a SwissKnife restart.
-    peer.scenario.set(Outcome::Failed);
-    wait_until(Duration::from_secs(15), "xpay cleanup reconciled", || async {
-        payment(&app, wallet).await.status == PaymentStatus::Failed
-    })
-    .await;
-    let balance = app.wallet_balance(app.admin_token().await, wallet).await;
-    assert_eq!(balance.reserved_msat, 0);
-    assert_eq!(balance.available_msat, RESERVED as i64);
-    assert_eq!(peer.scenario.sends.load(Ordering::SeqCst), 1);
+    let mut held = Counterparty::for_provider(&app.provider).hold_invoice(AMOUNT);
+    let response = app
+        .api()
+        .post(
+            "/v1/payments",
+            Auth::Bearer(app.admin_token().await),
+            request(wallet, &held.bolt11),
+        )
+        .await;
+    assert_status(&response, StatusCode::REQUEST_TIMEOUT);
+    assert!(held.accepted());
+    assert_reserved(&app, wallet).await;
     app.stop();
+    held.settle();
+    let restarted = app.restart("cln-recovered", &[]).await;
+    assert_eq!(payment(&restarted, wallet).await.status, PaymentStatus::Settled);
+    let balance = restarted.wallet_balance(restarted.admin_token().await, wallet).await;
+    assert_eq!(balance.reserved_msat, 0);
+    assert_eq!(balance.available_msat, 10_000);
 }

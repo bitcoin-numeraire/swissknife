@@ -95,7 +95,6 @@ strip = true
 itest = []
 
 [dev-dependencies]
-axum = { version = "0.8.9", features = ["ws"] }
 tempfile = "3"
 mockall = "0.15.0"
 dtor = "1.0"

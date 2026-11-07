@@ -10,16 +10,12 @@ release notes when a tag is published.
 
 ### Fixed
 
-- Keep Lightning payment funds reserved while Core Lightning retries failed
-  attempts or still has multipart HTLCs in flight, for both REST and gRPC.
-  Reconcile final payment status and actual fees after missed notifications,
-  interrupted requests, and restarts without resending payments.
-  Preserve pending reservations through incomplete delivery and lookup deadlines
-  without blocking startup or reconnection.
-- Recover uncertain LND REST payments using the correct streaming payment-status
-  lookup, including after restart.
-- Include private BOLT11 route hints, forwarding fees, and CLTV requirements in
-  Lightning fee estimates for Core Lightning and LND, over REST and gRPC.
+- Check the whole CLN payment status before processing a sendpay notification,
+  over REST and gRPC. Failed attempts no longer release funds while the payment
+  is still pending.
+- Complete payment processing after an HTTP timeout or disconnect, and check
+  current node state once on ambiguous send errors. Correct LND REST/gRPC
+  current-state lookups used by this path and restart recovery.
 
 ## [0.3.1] - 2026-11-06
 

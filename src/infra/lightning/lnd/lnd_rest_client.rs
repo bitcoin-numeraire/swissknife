@@ -26,7 +26,7 @@ use crate::{
     },
     infra::{
         config::config_rs::deserialize_duration,
-        lightning::{bitcoin_utils::parse_psbt, fee_estimation::estimate_with_hints, types::parse_network, LnClient},
+        lightning::{bitcoin_utils::parse_psbt, types::parse_network, LnClient},
     },
 };
 use async_trait::async_trait;
@@ -61,7 +61,6 @@ pub struct LndRestClient {
     fee_limit_msat: u64,
     retry_for: u32,
     network: BtcNetwork,
-    node_id: Vec<u8>,
     reorg_buffer_blocks: u32,
 }
 
@@ -106,11 +105,10 @@ impl LndRestClient {
             fee_limit_msat: config.fee_limit_msat,
             retry_for: config.payment_timeout.as_secs() as u32,
             network: BtcNetwork::default(),
-            node_id: Vec::new(),
             reorg_buffer_blocks: config.reorg_buffer_blocks,
         };
 
-        let network = lnd_client.load_network().await?;
+        let network = lnd_client.network().await?;
         lnd_client.network = network;
 
         Ok(lnd_client)
@@ -232,14 +230,11 @@ impl LndRestClient {
         })
     }
 
-    async fn load_network(&mut self) -> Result<BtcNetwork, LightningError> {
+    async fn network(&self) -> Result<BtcNetwork, LightningError> {
         let response: GetinfoResponse = self
             .get_request("v1/getinfo")
             .await
-            .map_err(|e| LightningError::NodeInfo(format!("{e:#}")))?;
-
-        self.node_id =
-            hex::decode(&response.identity_pubkey).map_err(|err| LightningError::NodeInfo(err.to_string()))?;
+            .map_err(|e| LightningError::NodeInfo(e.to_string()))?;
 
         if let Some(chain) = response
             .chains
@@ -309,15 +304,18 @@ impl LnClient for LndRestClient {
     }
 
     async fn estimate_fee(&self, target: LnPaymentTarget) -> Result<u64, LightningError> {
-        estimate_with_hints(target, &self.node_id, self.fee_limit_msat,
-            |target, fee_limit_msat, _single_path| async move {
-                let response: QueryRoutesResponse = self.get_request(&format!(
-                    "v1/graph/routes/{}/0?amt_msat={}&final_cltv_delta={}&fee_limit.fixed_msat={}&use_mission_control=true",
-                    hex::encode(target.destination), target.amount_msat, target.final_cltv_delta, fee_limit_msat
-                )).await.map_err(|err| LightningError::EstimateFee(err.to_string()))?;
-                response.routes.into_iter().map(|route| route.total_fees_msat).min()
-                    .ok_or_else(|| LightningError::EstimateFee("No route available".to_string()))
-            }).await
+        let response: RouteFeeResponse = self
+            .post_request(
+                "v2/router/route/estimatefee",
+                &RouteFeeRequest {
+                    dest: STANDARD.encode(target.destination),
+                    amt_sat: target.amount_msat.div_ceil(1000).to_string(),
+                },
+            )
+            .await
+            .map_err(|err| LightningError::EstimateFee(err.to_string()))?;
+
+        Ok(response.routing_fee_msat)
     }
 
     fn fee_limit_msat(&self, _amount_msat: u64) -> u64 {

@@ -26,10 +26,10 @@ use crate::common::{app, assert_error, assert_status, Auth, TestApp};
 
 const EVENT_TIMEOUT: Duration = Duration::from_secs(60);
 
-struct SseMessage {
+pub(super) struct SseMessage {
     id: String,
     event_type: String,
-    payload: ClientEvent,
+    pub(super) payload: ClientEvent,
 }
 
 async fn ordinary_account(app: &TestApp, label: &str) -> TestAccount {
@@ -115,7 +115,7 @@ fn assert_stream_headers(response: &Response) {
     );
 }
 
-async fn next_event(response: &mut Response) -> SseMessage {
+pub(super) async fn next_event(response: &mut Response) -> SseMessage {
     tokio::time::timeout(EVENT_TIMEOUT, async {
         let mut buffered = String::new();
 

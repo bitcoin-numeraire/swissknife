@@ -131,8 +131,8 @@ impl ClnGrpcListener {
                 };
 
                 let payment_hash = hex::encode(&payment_hash_bytes);
-                // The sendpays subsystem reports attempts, not a terminal xpay
-                // outcome. Reconcile successes too, to account for all MPP parts.
+                // A sendpay update describes one attempt. Read the aggregate
+                // payment status before settling or releasing its reservation.
                 self.services
                     .payment
                     .sync_one(payment_hash)

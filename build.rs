@@ -1,19 +1,16 @@
-use std::env::{var, var_os};
-
 use chrono::Utc;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     tonic_prost_build::configure()
         .protoc_arg("--experimental_allow_proto3_optional")
-        .build_server(var_os("CARGO_FEATURE_ITEST").is_some())
-        .generate_default_stubs(true)
+        .build_server(false)
         .compile_protos(
             &["src/infra/lightning/cln/proto/node.proto"],
             &["src/infra/lightning/cln/proto"],
         )?;
     println!(
         "cargo:info=Generated CLN files from proto at {:?}",
-        var("OUT_DIR").unwrap()
+        std::env::var("OUT_DIR").unwrap()
     );
 
     tonic_prost_build::configure()
@@ -30,7 +27,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         )?;
     println!(
         "cargo:info=Generated LND files from proto at {:?}",
-        var("OUT_DIR").unwrap()
+        std::env::var("OUT_DIR").unwrap()
     );
 
     println!("cargo:rustc-env=CARGO_PKG_VERSION={}", env!("CARGO_PKG_VERSION"));

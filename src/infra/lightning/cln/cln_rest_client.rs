@@ -2,16 +2,20 @@ use std::{collections::HashMap, path::PathBuf, str::FromStr, time::Duration};
 
 use async_trait::async_trait;
 use bitcoin::{Address, Network, OutPoint, ScriptBuf};
+use chrono::{TimeZone, Utc};
 use lightning_invoice::Bolt11Invoice;
 use reqwest::{
     header::{HeaderMap, HeaderValue},
-    Certificate, Client,
+    Certificate, Client, RequestBuilder,
 };
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use tokio::fs;
 
 use crate::{
-    application::errors::{BitcoinError, LightningError},
+    application::{
+        composition::Ledger,
+        errors::{BitcoinError, LightningError},
+    },
     domains::{
         bitcoin::{
             BitcoinWallet, BtcAddressType, BtcNetwork, BtcOutput, BtcOutputStatus, BtcPreparedTransaction,
@@ -19,26 +23,22 @@ use crate::{
         },
         event::OnchainWithdrawalEvent,
         invoice::Invoice,
-        payment::{LnPaymentTarget, Payment, PaymentStatus},
+        payment::{LnPayment, LnPaymentTarget, Payment, PaymentStatus},
         system::HealthStatus,
     },
     infra::{
         config::config_rs::deserialize_duration,
-        lightning::{
-            bitcoin_utils::parse_psbt, cln::ListFundsResponse, fee_estimation::estimate_with_hints,
-            types::parse_network, LnClient,
-        },
+        lightning::{bitcoin_utils::parse_psbt, cln::ListFundsResponse, types::parse_network, LnClient},
     },
 };
 
-use super::cln_payment::{completed_payment, payment_state};
 use super::{
     DelInvoiceRequest, DelInvoiceResponse, ErrorResponse, GetRoutesRequest, GetRoutesResponse, GetinfoRequest,
     GetinfoResponse, InvoiceRequest, InvoiceResponse, ListChainMovesRequest, ListChainMovesResponse, ListFundsRequest,
-    ListInvoicesRequest, ListInvoicesResponse, ListPaysRequest, ListPaysResponse, ListSendPaysResponse,
-    ListTransactionsRequest, ListTransactionsResponse, NewAddrRequest, NewAddrResponse, SetPsbtVersionRequest,
-    SetPsbtVersionResponse, TxDiscardRequest, TxDiscardResponse, TxPrepareOutput, TxPrepareRequest, TxPrepareResponse,
-    TxSendRequest, TxSendResponse, XpayRequest, XpayResponse,
+    ListInvoicesRequest, ListInvoicesResponse, ListPaysRequest, ListPaysResponse, ListTransactionsRequest,
+    ListTransactionsResponse, NewAddrRequest, NewAddrResponse, SetPsbtVersionRequest, SetPsbtVersionResponse,
+    TxDiscardRequest, TxDiscardResponse, TxPrepareOutput, TxPrepareRequest, TxPrepareResponse, TxSendRequest,
+    TxSendResponse, XpayRequest, XpayResponse,
 };
 
 #[derive(Clone, Debug, Deserialize)]
@@ -67,6 +67,7 @@ pub struct ClnRestClientConfig {
 pub struct ClnRestClient {
     client: Client,
     base_url: String,
+    timeout: Duration,
     node_id: String,
     maxfee: Option<u64>,
     retry_for: Option<u32>,
@@ -86,7 +87,6 @@ impl ClnRestClient {
         let mut client_builder = Client::builder()
             .user_agent(USER_AGENT)
             .connect_timeout(config.connect_timeout)
-            .timeout(config.timeout)
             .connection_verbose(config.connection_verbose)
             .default_headers(headers)
             .danger_accept_invalid_certs(config.accept_invalid_certs);
@@ -107,6 +107,7 @@ impl ClnRestClient {
         let mut cln_client = Self {
             client,
             base_url: config.endpoint.clone(),
+            timeout: config.timeout,
             node_id: String::new(),
             maxfee: config.maxfee,
             retry_for: Some(config.payment_timeout.as_secs() as u32),
@@ -128,12 +129,23 @@ impl ClnRestClient {
     }
 
     async fn post_request<T: DeserializeOwned>(&self, endpoint: &str, payload: &impl Serialize) -> anyhow::Result<T> {
-        let response = self
+        let request = self
             .client
             .post(format!("{}/v1/{}", self.base_url, endpoint))
             .json(payload)
-            .send()
-            .await?;
+            .timeout(self.timeout);
+        self.send_request(request).await
+    }
+
+    async fn xpay(&self, payload: &XpayRequest) -> anyhow::Result<XpayResponse> {
+        // retry_for bounds route retries, not the lifetime of an accepted HTLC.
+        // Keep this RPC open so its final result can complete the payment.
+        let request = self.client.post(format!("{}/v1/xpay", self.base_url)).json(payload);
+        self.send_request(request).await
+    }
+
+    async fn send_request<T: DeserializeOwned>(&self, request: RequestBuilder) -> anyhow::Result<T> {
+        let response = request.send().await?;
 
         let status = response.status();
         if status.is_client_error() || status.is_server_error() {
@@ -190,44 +202,35 @@ impl LnClient for ClnRestClient {
     }
 
     async fn estimate_fee(&self, target: LnPaymentTarget) -> Result<u64, LightningError> {
-        let maximum_fee_msat = self.fee_limit_msat(target.amount_msat);
-        let source = hex::decode(&self.node_id).map_err(|err| LightningError::EstimateFee(err.to_string()))?;
-        estimate_with_hints(
-            target,
-            &source,
-            maximum_fee_msat,
-            |target, fee_limit_msat, single_path| async move {
-                let response: GetRoutesResponse = self
-                    .post_request(
-                        "getroutes",
-                        &GetRoutesRequest {
-                            source: self.node_id.clone(),
-                            destination: hex::encode(target.destination),
-                            amount_msat: target.amount_msat,
-                            layers: vec!["auto.localchans".to_string(), "auto.sourcefree".to_string()],
-                            maxfee_msat: fee_limit_msat,
-                            final_cltv: target.final_cltv_delta,
-                            maxparts: single_path.then_some(1),
-                        },
-                    )
-                    .await
-                    .map_err(|err| LightningError::EstimateFee(err.to_string()))?;
-                if response.routes.is_empty() {
-                    return Err(LightningError::EstimateFee("No route available".to_string()));
-                }
+        let fee_limit_msat = self.fee_limit_msat(target.amount_msat);
+        let response: GetRoutesResponse = self
+            .post_request(
+                "getroutes",
+                &GetRoutesRequest {
+                    source: self.node_id.clone(),
+                    destination: hex::encode(target.destination),
+                    amount_msat: target.amount_msat,
+                    layers: vec!["auto.localchans".to_string(), "auto.sourcefree".to_string()],
+                    maxfee_msat: fee_limit_msat,
+                    final_cltv: target.final_cltv_delta,
+                },
+            )
+            .await
+            .map_err(|err| LightningError::EstimateFee(err.to_string()))?;
+        if response.routes.is_empty() {
+            return Err(LightningError::EstimateFee("No route available".to_string()));
+        }
 
-                let estimated_fee_msat = response.routes.iter().try_fold(0_u64, |total, route| {
-                    let sent = route.path.first().and_then(|hop| hop.amount_in_msat).ok_or_else(|| {
-                        LightningError::EstimateFee("Estimated route has no first hop amount".to_string())
-                    })?;
-
-                    Ok(total.saturating_add(sent.saturating_sub(route.amount_msat)))
+        let estimated_fee_msat = response.routes.iter().try_fold(0_u64, |total, route| {
+            let sent =
+                route.path.first().and_then(|hop| hop.amount_in_msat).ok_or_else(|| {
+                    LightningError::EstimateFee("Estimated route has no first hop amount".to_string())
                 })?;
 
-                Ok(estimated_fee_msat)
-            },
-        )
-        .await
+            Ok(total.saturating_add(sent.saturating_sub(route.amount_msat)))
+        })?;
+
+        Ok(estimated_fee_msat.min(fee_limit_msat))
     }
 
     fn fee_limit_msat(&self, amount_msat: u64) -> u64 {
@@ -241,32 +244,18 @@ impl LnClient for ClnRestClient {
         fee_limit_msat: u64,
         label: String,
     ) -> Result<Payment, LightningError> {
-        // Decode the already-validated invoice only to obtain the lookup key.
-        let invoice = Bolt11Invoice::from_str(&bolt11).map_err(|err| LightningError::Pay(err.to_string()))?;
-        let payment_hash = invoice.payment_hash().to_string();
-        let _response: XpayResponse = self
-            .post_request(
-                "xpay",
-                &XpayRequest {
-                    invstring: bolt11,
-                    amount_msat,
-                    maxfee: Some(fee_limit_msat),
-                    retry_for: self.retry_for,
-                    label: Some(label),
-                },
-            )
+        let response = self
+            .xpay(&XpayRequest {
+                invstring: bolt11,
+                amount_msat,
+                maxfee: Some(fee_limit_msat),
+                retry_for: self.retry_for,
+                label: Some(label),
+            })
             .await
             .map_err(|e| LightningError::PaymentOutcomeUnknown(e.to_string()))?;
 
-        // xpay's default fast mode returns the first preimage and anticipated
-        // MPP fees while other parts can still be in flight. Return the final
-        // provider amounts; the business service checks the requested value.
-        match self.payment_by_hash(payment_hash).await {
-            Ok(Some(payment)) if payment.status == PaymentStatus::Settled => Ok(payment),
-            _ => Err(LightningError::PaymentOutcomeUnknown(
-                "Awaiting complete payment reconciliation".to_string(),
-            )),
-        }
+        Ok(response.into())
     }
 
     async fn invoice_by_hash(&self, payment_hash: String) -> Result<Option<Invoice>, LightningError> {
@@ -297,26 +286,48 @@ impl LnClient for ClnRestClient {
             .await
             .map_err(|e| LightningError::PaymentByHash(e.to_string()))?;
 
-        let mut matching = response.pays.into_iter().filter(|pay| pay.payment_hash == payment_hash);
-        let Some(summary) = matching.next() else {
+        let payment = response.pays.into_iter().rfind(|pay| pay.payment_hash == payment_hash);
+
+        let Some(payment) = payment else {
             return Ok(None);
         };
-        if matching.next().is_some() {
-            return Err(LightningError::PaymentByHash("Ambiguous payment summary".to_string()));
-        }
-        if summary.status != "complete" {
-            return payment_state(payment_hash, &summary.status).map(Some);
-        }
-        let parts: ListSendPaysResponse = self
-            .post_request(
-                "listsendpays",
-                &ListPaysRequest {
-                    payment_hash: Some(payment_hash.clone()),
-                },
-            )
-            .await
-            .map_err(|err| LightningError::PaymentByHash(err.to_string()))?;
-        completed_payment(payment_hash, parts.payments).map(Some)
+
+        let amount_msat = payment.amount_msat.unwrap_or_default();
+        let amount_sent_msat = payment.amount_sent_msat.unwrap_or(amount_msat);
+        let payment_time = payment
+            .completed_at
+            .or(payment.created_at)
+            .and_then(|timestamp| Utc.timestamp_opt(timestamp as i64, 0).single());
+
+        let status = match payment.status.as_str() {
+            "complete" => PaymentStatus::Settled,
+            "failed" => PaymentStatus::Failed,
+            "pending" => PaymentStatus::Pending,
+            status => {
+                return Err(LightningError::PaymentByHash(format!(
+                    "Unknown payment status: {status}"
+                )))
+            }
+        };
+
+        Ok(Some(Payment {
+            ledger: Ledger::Lightning,
+            status,
+            amount_msat,
+            fee_msat: Some(amount_sent_msat.saturating_sub(amount_msat)),
+            payment_time,
+            error: if payment.status == "failed" {
+                Some("Payment failed".to_string())
+            } else {
+                None
+            },
+            lightning: Some(LnPayment {
+                payment_hash,
+                payment_preimage: payment.preimage,
+                ..Default::default()
+            }),
+            ..Default::default()
+        }))
     }
 
     async fn cancel_invoice(&self, _payment_hash: String, label: String) -> Result<(), LightningError> {

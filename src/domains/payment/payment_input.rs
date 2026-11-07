@@ -8,9 +8,7 @@ use bip21::{
     Param, Uri,
 };
 use bitcoin::{address::NetworkUnchecked, Address, Network as BitcoinNetwork};
-use lightning_invoice::{
-    Bolt11Invoice, Bolt11InvoiceDescriptionRef, Currency as Bolt11Currency, ParseOrSemanticError, RouteHint,
-};
+use lightning_invoice::{Bolt11Invoice, Bolt11InvoiceDescriptionRef, Currency as Bolt11Currency, ParseOrSemanticError};
 use reqwest::Url;
 use thiserror::Error;
 
@@ -46,7 +44,6 @@ pub struct ParsedBolt11Invoice {
     pub currency: Currency,
     pub destination: Vec<u8>,
     pub final_cltv_delta: u32,
-    pub route_hints: Vec<RouteHint>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -54,7 +51,6 @@ pub struct LnPaymentTarget {
     pub destination: Vec<u8>,
     pub amount_msat: u64,
     pub final_cltv_delta: u32,
-    pub route_hints: Vec<RouteHint>,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -158,7 +154,6 @@ fn parsed_bolt11_from_invoice(bolt11: String, invoice: Bolt11Invoice) -> Result<
             .to_vec(),
         final_cltv_delta: u32::try_from(invoice.min_final_cltv_expiry_delta())
             .map_err(|_| "Invoice final CLTV delta is too large".to_string())?,
-        route_hints: invoice.route_hints(),
     })
 }
 

@@ -37,7 +37,6 @@ use crate::{
         config::config_rs::deserialize_duration,
         lightning::{
             bitcoin_utils::parse_psbt,
-            fee_estimation::estimate_with_hints,
             lnd::{
                 lnrpc::{
                     invoice::InvoiceState, AddressType, GetTransactionsRequest, NewAddressRequest, PaymentFailureReason,
@@ -114,7 +113,6 @@ pub struct LndGrpcClient {
     payment_timeout: Duration,
     reorg_buffer_blocks: u32,
     network: BtcNetwork,
-    node_id: Vec<u8>,
 }
 
 impl LndGrpcClient {
@@ -130,10 +128,9 @@ impl LndGrpcClient {
             payment_timeout: config.payment_timeout,
             reorg_buffer_blocks: config.reorg_buffer_blocks,
             network: BtcNetwork::default(),
-            node_id: Vec::new(),
         };
 
-        let network = lnd_client.load_network().await?;
+        let network = lnd_client.network().await?;
         lnd_client.network = network;
 
         Ok(lnd_client)
@@ -192,7 +189,7 @@ impl LndGrpcClient {
         message
     }
 
-    async fn load_network(&mut self) -> Result<BtcNetwork, LightningError> {
+    async fn network(&self) -> Result<BtcNetwork, LightningError> {
         let mut client = self.client.clone();
 
         let response = client
@@ -200,9 +197,6 @@ impl LndGrpcClient {
             .await
             .map_err(|e| LightningError::NodeInfo(e.message().to_string()))?
             .into_inner();
-
-        self.node_id =
-            hex::decode(&response.identity_pubkey).map_err(|err| LightningError::NodeInfo(err.to_string()))?;
 
         if let Some(chain) = response.chains.first() {
             return Ok(parse_network(&chain.network));
@@ -338,41 +332,19 @@ impl LnClient for LndGrpcClient {
     }
 
     async fn estimate_fee(&self, target: LnPaymentTarget) -> Result<u64, LightningError> {
-        estimate_with_hints(
-            target,
-            &self.node_id,
-            self.fee_limit_msat,
-            |target, fee_limit_msat, _single_path| async move {
-                let mut client = self.client.clone();
-                let response = client
-                    .query_routes(lnrpc::QueryRoutesRequest {
-                        pub_key: hex::encode(target.destination),
-                        amt_msat: i64::try_from(target.amount_msat)
-                            .map_err(|_| LightningError::EstimateFee("Amount too large".to_string()))?,
-                        final_cltv_delta: i32::try_from(target.final_cltv_delta)
-                            .map_err(|_| LightningError::EstimateFee("CLTV too large".to_string()))?,
-                        fee_limit: Some(lnrpc::FeeLimit {
-                            limit: Some(lnrpc::fee_limit::Limit::FixedMsat(
-                                i64::try_from(fee_limit_msat)
-                                    .map_err(|_| LightningError::EstimateFee("Fee limit too large".to_string()))?,
-                            )),
-                        }),
-                        use_mission_control: true,
-                        ..Default::default()
-                    })
-                    .await
-                    .map_err(|err| LightningError::EstimateFee(err.message().to_string()))?
-                    .into_inner();
-                let fee = response
-                    .routes
-                    .into_iter()
-                    .map(|route| route.total_fees_msat)
-                    .min()
-                    .ok_or_else(|| LightningError::EstimateFee("No route available".to_string()))?;
-                u64::try_from(fee).map_err(|_| LightningError::EstimateFee("Negative route fee".to_string()))
-            },
-        )
-        .await
+        let mut router = self.router.clone();
+        let response = router
+            .estimate_route_fee(routerrpc::RouteFeeRequest {
+                dest: target.destination,
+                amt_sat: target.amount_msat.div_ceil(1000) as i64,
+                ..Default::default()
+            })
+            .await
+            .map_err(|err| LightningError::EstimateFee(err.message().to_string()))?
+            .into_inner();
+
+        u64::try_from(response.routing_fee_msat)
+            .map_err(|_| LightningError::EstimateFee("LND returned a negative route fee".to_string()))
     }
 
     fn fee_limit_msat(&self, _amount_msat: u64) -> u64 {

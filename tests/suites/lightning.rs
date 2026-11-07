@@ -192,7 +192,7 @@ mod failure {
 
     #[tokio::test]
     async fn a_local_lnd_send_timeout_keeps_the_payment_and_reservation_pending() {
-        if matrix_cell().1 != "lnd_grpc" {
+        if crate::common::harness::matrix_cell().1 != "lnd_grpc" {
             return;
         }
         let app = TestApp::isolated(

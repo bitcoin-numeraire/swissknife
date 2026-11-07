@@ -1,6 +1,5 @@
 pub mod bitcoin_utils;
 pub mod cln;
-mod fee_estimation;
 mod listener;
 mod ln_client;
 pub mod lnd;

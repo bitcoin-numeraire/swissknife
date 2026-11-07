@@ -303,63 +303,38 @@ Every reservation, debit, credit, payment, invoice, and reconciliation query mus
 #### Outgoing payment lifecycle
 
 1. Before the external Lightning/Bitcoin call, reserve funds and insert a pending payment in one DB transaction.
-2. On a definitive whole-payment failure, release the reservation and mark the payment failed in one DB transaction. Transport errors, timeouts, missing provider records, and individual attempt failures leave the payment pending with its reservation intact.
+2. On a definitive whole-payment failure, release the reservation and mark the payment failed in one DB transaction. Timeouts and individual attempt failures do not establish that outcome.
 3. If the external call succeeds, settle the payment and adjust the reservation to the actual debit in one DB transaction:
    - release any unused reserve back to `available_amount`;
    - if actual fee exceeds reserve, attempt an additional conditional debit or fail according to the provider/payment policy;
    - set the real `fee_msat` on the payment.
 
-#### Lightning reconciliation (2026-11)
+#### Lightning payment completion
 
-CLN `sendpay_failure` and `sendpay_success` are per-attempt/per-part notifications.
-REST websocket notifications and gRPC `wait(sendpays, updated)` only trigger a
-lookup by payment hash. Neither directly releases or settles a reservation.
-`xpay_pay_part_start`/`xpay_pay_part_end` have the same part-level limitation and
-are useful diagnostics, not a terminal payment authority. `coin_movement`
-represents accounting movements; it does not cover all terminal payment failures.
+Payment execution survives an HTTP timeout or disconnect. A successful send RPC
+settles through the existing payment unit of work. An ambiguous RPC error causes
+one status lookup; pending, missing, or unavailable state keeps the reservation.
+Startup and listener reconnection retain their existing pending-payment sync.
+There is no periodic payment scan and no automatic resend.
 
-For CLN, `listpays` supplies whole-payment status, including active xpay retries
-between parts. Its `complete` status takes precedence over pending parts, and its
-amounts can include those pending parts. Therefore success additionally requires
-`listsendpays` to have no pending parts. SwissKnife totals only successful parts,
-checks their preimage against the payment hash, requires successful parts to
-cover the requested amount, and settles their actual amount
-and fees. The synchronous xpay response uses the same check: CLN's default fast
-mode can return the first preimage while other parts remain in flight, and
-[`total_sent` includes their anticipated amounts](https://github.com/ElementsProject/lightning/blob/v26.06.10/plugins/xpay/xpay.c#L400-L442).
-A successful response therefore does not establish the final debit or fee refund.
-Definitive aggregate
-failure releases the reservation; absent, malformed, or unavailable responses do
-not. Keep the xpay plugin enabled: its `listpays` implementation is required.
+CLN `sendpay_success` / `sendpay_failure` and gRPC `wait(sendpays)` describe
+attempts. They trigger `sync_one`, which uses `listpays` for the whole payment.
+An attempt failure must never directly release funds. `pay_part_end` is also
+per-part; `coin_movement` describes accounting movements and does not report
+failed payments. In CLN 26.06.9, a final part update can precede xpay's terminal
+result, so event handling does not replace processing the original send RPC.
 
-Pending payments are reconciled on startup/reconnect and periodically (five
-seconds between scheduled passes; slow provider requests can extend a pass).
-This is necessary even with a healthy notification connection: the last failed
-part can notify while xpay remains active, so `listpays` still reports pending.
-After xpay cleans up its active payment, the same lookup reports failed without
-another sendpay update. This follows from CLN's
-[`attempt_ongoing` status check](https://github.com/ElementsProject/lightning/blob/v26.06.10/plugins/xpay/listpays.c#L149-L154)
-and [asynchronous cleanup](https://github.com/ElementsProject/lightning/blob/v26.06.10/plugins/xpay/xpay.c#L310-L341).
-The worker queries the provider only for pending rows; an empty scan performs no
-provider calls. Incomplete delivered value and lookup deadlines leave the row
-pending without preventing startup or reconnect.
-Reconciliation never resends a payment. It applies existing idempotent financial
-projections, which also write the account's durable final-status event. LND uses
-its whole-payment status rather than individual HTLC attempts and shares the
-periodic recovery path. LND lookups consume the first current-state update from
-`TrackPaymentV2`, including an in-flight state, rather than waiting for the stream
-to close. REST uses GET, a URL-safe base64 payment hash, and the streamed `result`
-envelope.
+CLN REST keeps `xpay` open beyond the ordinary RPC timeout: `retry_for` limits
+route retries, not the lifetime of an accepted HTLC. LND status lookups read the
+first current-state `TrackPaymentV2` update, including an in-flight state.
 
-A missing record after a disconnected RPC cannot prove the send was rejected.
-Such payments retain their reservation until an authoritative result is available;
-there is no automatic timeout-based release. For upgrades, operators should audit
-historical CLN payments already marked failed against the provider: the periodic
-scan processes pending rows and cannot retroactively prevent a past release.
-
-References: [CLN notifications](https://docs.corelightning.org/reference/notification-sendpay_failure),
-[`listpays`](https://docs.corelightning.org/reference/listpays),
-[`coin_movement`](https://docs.corelightning.org/reference/notification-coin_movement).
+CLN 26.06.9 has a separate status-publication race: after xpay returns a final
+failure, `listpays` can still report pending until asynchronous layer cleanup
+finishes. A deterministic CLN regression reproduces this with cleanup paused;
+requiring `payment->cmd` in xpay's `attempt_ongoing` fixes it. Until that node fix
+is deployed, the one-shot lookup can leave a failed payment reserved until the
+existing startup/reconnect sync runs. This is a completion limitation, not a
+reason to infer failure from an attempt or release funds on a timer.
 
 #### Internal payment lifecycle
 
