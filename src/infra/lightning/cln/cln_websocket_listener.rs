@@ -7,6 +7,7 @@ use rust_socketio::{
     asynchronous::{Client, ClientBuilder, ReconnectSettings},
     Payload, TransportType,
 };
+use serde_json::Value;
 use tokio::{
     fs,
     sync::{self, mpsc},
@@ -102,12 +103,12 @@ impl ClnWebsocketListener {
         Ok(client_builder)
     }
 
-    fn payment_hint(value: &serde_json::Value) -> Option<String> {
+    fn payment_hint(value: &Value) -> Option<String> {
         value
             .get("sendpay_success")
             .or_else(|| value.get("sendpay_failure").and_then(|event| event.get("data")))
             .and_then(|event| event.get("payment_hash"))
-            .and_then(serde_json::Value::as_str)
+            .and_then(Value::as_str)
             .map(str::to_owned)
     }
 
@@ -150,7 +151,7 @@ impl ClnWebsocketListener {
                         // including successes in an MPP payment. Query whole-payment
                         // state; never project their amounts or release funds directly.
                         if let Some(payment_hash) = Self::payment_hint(&value) {
-                            if let Err(err) = services.payment.sync_payment(payment_hash).await {
+                            if let Err(err) = services.payment.sync_one(payment_hash).await {
                                 Self::stop_after_projection_error(&failure_tx, &client, "payment_reconciliation", err)
                                     .await;
                                 return;

@@ -37,6 +37,7 @@ use crate::{
         config::config_rs::deserialize_duration,
         lightning::{
             bitcoin_utils::parse_psbt,
+            fee_estimation::estimate_with_hints,
             lnd::{
                 lnrpc::{
                     invoice::InvoiceState, AddressType, GetTransactionsRequest, NewAddressRequest, PaymentFailureReason,
@@ -337,7 +338,7 @@ impl LnClient for LndGrpcClient {
     }
 
     async fn estimate_fee(&self, target: LnPaymentTarget) -> Result<u64, LightningError> {
-        crate::infra::lightning::fee_estimation::estimate_with_hints(
+        estimate_with_hints(
             target,
             &self.node_id,
             self.fee_limit_msat,

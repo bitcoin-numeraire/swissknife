@@ -135,7 +135,7 @@ impl ClnGrpcListener {
                 // outcome. Reconcile successes too, to account for all MPP parts.
                 self.services
                     .payment
-                    .sync_payment(payment_hash)
+                    .sync_one(payment_hash)
                     .await
                     .map_err(|err| LightningError::EventProcessing(err.to_string()))?;
             }

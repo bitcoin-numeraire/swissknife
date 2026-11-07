@@ -8,7 +8,9 @@ use bip21::{
     Param, Uri,
 };
 use bitcoin::{address::NetworkUnchecked, Address, Network as BitcoinNetwork};
-use lightning_invoice::{Bolt11Invoice, Bolt11InvoiceDescriptionRef, Currency as Bolt11Currency, ParseOrSemanticError};
+use lightning_invoice::{
+    Bolt11Invoice, Bolt11InvoiceDescriptionRef, Currency as Bolt11Currency, ParseOrSemanticError, RouteHint,
+};
 use reqwest::Url;
 use thiserror::Error;
 
@@ -44,7 +46,7 @@ pub struct ParsedBolt11Invoice {
     pub currency: Currency,
     pub destination: Vec<u8>,
     pub final_cltv_delta: u32,
-    pub route_hints: Vec<lightning_invoice::RouteHint>,
+    pub route_hints: Vec<RouteHint>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -52,7 +54,7 @@ pub struct LnPaymentTarget {
     pub destination: Vec<u8>,
     pub amount_msat: u64,
     pub final_cltv_delta: u32,
-    pub route_hints: Vec<lightning_invoice::RouteHint>,
+    pub route_hints: Vec<RouteHint>,
 }
 
 #[derive(Clone, Debug, Default)]

@@ -1,8 +1,9 @@
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 use async_trait::async_trait;
 use chrono::Utc;
 use lightning_invoice::Bolt11Invoice;
+use tokio::time::timeout;
 use tracing::{debug, info, trace, warn};
 use uuid::Uuid;
 
@@ -555,6 +556,16 @@ impl PaymentService {
     ) -> Result<Payment, ApplicationError> {
         match result {
             Ok(mut settled_payment) => {
+                // Provider success can describe completed parts with less than
+                // the requested value. The service owns this settlement rule,
+                // for synchronous replies as well as later reconciliation.
+                if settled_payment.amount_msat < pending_payment.amount_msat {
+                    debug!(payment_id = %pending_payment.id,
+                        delivered_msat = settled_payment.amount_msat,
+                        expected_amount_msat = pending_payment.amount_msat,
+                        "Delivered value is incomplete; preserving reservation");
+                    return self.get(pending_payment.id).await;
+                }
                 settled_payment.id = pending_payment.id;
                 settled_payment.wallet_id = pending_payment.wallet_id;
                 settled_payment.ledger = pending_payment.ledger.clone();
@@ -618,13 +629,19 @@ impl PaymentService {
         payment_hash: String,
         expected_amount_msat: u64,
     ) -> Result<bool, ApplicationError> {
-        let Some(node_payment) = tokio::time::timeout(
-            std::time::Duration::from_secs(30),
+        let lookup = timeout(
+            Duration::from_secs(30),
             self.ln_client.payment_by_hash(payment_hash.clone()),
         )
-        .await
-        .map_err(|_| LightningError::PaymentByHash("Provider lookup timed out".to_string()))??
-        else {
+        .await;
+        let node_payment = match lookup {
+            Ok(payment) => payment?,
+            Err(_) => {
+                warn!(%payment_hash, "Payment lookup timed out; preserving reservation for later reconciliation");
+                return Ok(false);
+            }
+        };
+        let Some(node_payment) = node_payment else {
             return Ok(false);
         };
 
@@ -924,7 +941,7 @@ impl PaymentsUseCases for PaymentService {
         Ok(n_deleted)
     }
 
-    async fn sync_payment(&self, payment_hash: String) -> Result<(), ApplicationError> {
+    async fn sync_one(&self, payment_hash: String) -> Result<(), ApplicationError> {
         let Some(payment) = self.store.payment.find_by_payment_hash(&payment_hash).await? else {
             return Ok(());
         };
@@ -987,6 +1004,8 @@ impl PaymentsUseCases for PaymentService {
 
 #[cfg(test)]
 mod tests {
+    use mockall::Sequence;
+
     use crate::{
         application::{
             composition::{Currency, MockAppStoreBuilder},
@@ -2243,7 +2262,7 @@ mod tests {
             .description("Internal payment test".to_string())
             .payment_hash(bitcoin::hashes::sha256::Hash::from_byte_array([42; 32]))
             .payment_secret(PaymentSecret([43; 32]))
-            .duration_since_epoch(std::time::Duration::from_secs(1_791_000_000))
+            .duration_since_epoch(Duration::from_secs(1_791_000_000))
             .min_final_cltv_expiry_delta(18);
         let builder = match amount_msat {
             Some(amount) => builder.amount_milli_satoshis(amount),
@@ -2550,6 +2569,7 @@ mod tests {
                     .returning(|_, _, _, _| {
                         Ok(Payment {
                             status: PaymentStatus::Settled,
+                            amount_msat: 1_000,
                             lightning: Some(LnPayment {
                                 payment_preimage: Some("preimage".to_string()),
                                 ..Default::default()
@@ -2614,6 +2634,53 @@ mod tests {
 
     mod handle_processed_payment {
         use super::*;
+
+        mod when_the_provider_delivers_less_than_the_reserved_principal {
+            use super::*;
+
+            #[tokio::test]
+            async fn preserves_the_reservation_instead_of_settling_partial_value() {
+                let pending = Payment {
+                    id: Uuid::new_v4(),
+                    status: PaymentStatus::Pending,
+                    ledger: Ledger::Lightning,
+                    amount_msat: 1_000,
+                    reserved_amount: 1_010,
+                    ..Default::default()
+                };
+                let pending_id = pending.id;
+                let durable = pending.clone();
+                let mut store = MockAppStoreBuilder::new();
+                store.payment_uow.expect_settle().never();
+                store.payment_uow.expect_fail().never();
+                store
+                    .payment
+                    .expect_find()
+                    .withf(move |id| *id == pending_id)
+                    .times(1)
+                    .return_once(move |_| Ok(Some(durable)));
+                let service = service(
+                    store,
+                    MockLnClient::new(),
+                    MockBitcoinWallet::new(),
+                    MockEventUseCases::new(),
+                );
+                let result = service
+                    .handle_processed_payment(
+                        pending,
+                        Ok(Payment {
+                            status: PaymentStatus::Settled,
+                            amount_msat: 600,
+                            ..Default::default()
+                        }),
+                    )
+                    .await
+                    .unwrap();
+                assert_eq!(result.status, PaymentStatus::Pending);
+                assert_eq!(result.amount_msat, 1_000);
+                assert_eq!(result.reserved_amount, 1_010);
+            }
+        }
 
         mod when_payment_outcome_is_unknown {
             use super::*;
@@ -3006,7 +3073,7 @@ mod tests {
         }
     }
 
-    mod sync_payment {
+    mod sync_one {
         use super::*;
 
         #[tokio::test]
@@ -3023,7 +3090,7 @@ mod tests {
                 MockBitcoinWallet::new(),
                 MockEventUseCases::new(),
             );
-            service.sync_payment("external".to_string()).await.unwrap();
+            service.sync_one("external".to_string()).await.unwrap();
         }
 
         #[tokio::test]
@@ -3042,7 +3109,7 @@ mod tests {
                 MockBitcoinWallet::new(),
                 MockEventUseCases::new(),
             );
-            service.sync_payment("settled".to_string()).await.unwrap();
+            service.sync_one("settled".to_string()).await.unwrap();
         }
 
         #[tokio::test]
@@ -3066,7 +3133,7 @@ mod tests {
                 ln.expect_payment_by_hash().times(1).return_once(|_| Ok(outcome));
                 // No financial event or UOW mutation is allowed for uncertainty.
                 let service = service(store, ln, MockBitcoinWallet::new(), MockEventUseCases::new());
-                service.sync_payment("pending".to_string()).await.unwrap();
+                service.sync_one("pending".to_string()).await.unwrap();
             }
         }
     }
@@ -3096,7 +3163,7 @@ mod tests {
                 .times(1)
                 .returning(|_| Ok(vec![pending_lightning_payment(), pending_lightning_payment()]));
             let mut ln = MockLnClient::new();
-            let mut sequence = mockall::Sequence::new();
+            let mut sequence = Sequence::new();
             ln.expect_payment_by_hash()
                 .times(1)
                 .in_sequence(&mut sequence)

@@ -1,10 +1,11 @@
 use std::{sync::Arc, time::Duration};
 
 use tokio::{
+    spawn,
     task::yield_now,
-    time::{sleep, Instant},
+    time::{interval, sleep, Instant, MissedTickBehavior},
 };
-use tracing::{error, warn};
+use tracing::{debug, error, warn};
 
 use crate::{
     application::{
@@ -89,7 +90,7 @@ impl EventListener {
     pub async fn start(&self) -> Result<(), ApplicationError> {
         let listener = self.listener.clone();
         let services = self.services.clone();
-        tokio::spawn(async move {
+        spawn(async move {
             let mut backoff = LISTENER_MIN_RECONNECT_DELAY;
             let mut replay_before_listen = false;
 
@@ -127,12 +128,15 @@ impl EventListener {
         yield_now().await;
         Self::sync_offchain_state(&self.services).await?;
 
-        // Notifications can be lost, concern just one attempt, or precede the
-        // final xpay state. Also recover sends whose HTTP caller disconnected.
+        // CLN can notify the last failed part while xpay's aggregate state is
+        // still pending during cleanup. Removing that active xpay changes
+        // listpays to failed without another sendpay notification. Recheck only
+        // pending payments even when the listener connection stays healthy.
+        // Also recover sends whose HTTP caller disconnected; never resend.
         let services = self.services.clone();
-        tokio::spawn(async move {
-            let mut interval = tokio::time::interval(Duration::from_secs(5));
-            interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+        spawn(async move {
+            let mut interval = interval(Duration::from_secs(5));
+            interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
             interval.tick().await;
             loop {
                 interval.tick().await;
@@ -148,7 +152,7 @@ impl EventListener {
     async fn sync_offchain_state(services: &AppServices) -> Result<(), ApplicationError> {
         let (synced_invoices, synced_payments) = tokio::try_join!(services.invoice.sync(), services.payment.sync())?;
 
-        tracing::debug!(synced_invoices, synced_payments, "Lightning off-chain state replayed");
+        debug!(synced_invoices, synced_payments, "Lightning off-chain state replayed");
 
         Ok(())
     }

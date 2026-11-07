@@ -35,6 +35,7 @@ use crate::{
                 listsendpays_payments::ListsendpaysPaymentsStatus, newaddr_request::NewaddrAddresstype,
                 DelinvoiceRequest, ListchainmovesRequest, ListpaysRequest, ListsendpaysRequest,
             },
+            fee_estimation::estimate_with_hints,
             types::parse_network,
             LnClient,
         },
@@ -42,6 +43,7 @@ use crate::{
 };
 
 use self::cln::InvoiceRequest;
+use super::cln_payment::{completed_payment, payment_state, ClnPaymentPart};
 
 #[allow(dead_code, clippy::all)]
 pub mod cln {
@@ -188,7 +190,7 @@ impl LnClient for ClnGrpcClient {
     async fn estimate_fee(&self, target: LnPaymentTarget) -> Result<u64, LightningError> {
         let maximum_fee_msat = self.fee_limit_msat(target.amount_msat);
         let source = self.node_id.clone();
-        crate::infra::lightning::fee_estimation::estimate_with_hints(
+        estimate_with_hints(
             target,
             &source,
             maximum_fee_msat,
@@ -249,12 +251,9 @@ impl LnClient for ClnGrpcClient {
     ) -> Result<Payment, LightningError> {
         let mut client = self.client.clone();
 
+        // Decode the already-validated invoice only to obtain the lookup key.
         let invoice = Bolt11Invoice::from_str(&bolt11).map_err(|err| LightningError::Pay(err.to_string()))?;
         let payment_hash = invoice.payment_hash().to_string();
-        let expected_amount_msat = invoice
-            .amount_milli_satoshis()
-            .or(amount_msat)
-            .ok_or_else(|| LightningError::Pay("Missing payment amount".to_string()))?;
         let _response = client
             .xpay(XpayRequest {
                 invstring: bolt11,
@@ -268,12 +267,11 @@ impl LnClient for ClnGrpcClient {
             .map_err(|e| LightningError::PaymentOutcomeUnknown(e.message().to_string()))?
             .into_inner();
 
+        // xpay's default fast mode returns the first preimage and anticipated
+        // MPP fees while other parts can still be in flight. Return the final
+        // provider amounts; the business service checks the requested value.
         match self.payment_by_hash(payment_hash).await {
-            Ok(Some(payment))
-                if payment.status == PaymentStatus::Settled && payment.amount_msat >= expected_amount_msat =>
-            {
-                Ok(payment)
-            }
+            Ok(Some(payment)) if payment.status == PaymentStatus::Settled => Ok(payment),
             _ => Err(LightningError::PaymentOutcomeUnknown(
                 "Awaiting complete payment reconciliation".to_string(),
             )),
@@ -303,6 +301,7 @@ impl LnClient for ClnGrpcClient {
 
         let response = client
             .list_pays(ListpaysRequest {
+                // A conversion error must not silently omit the required filter.
                 payment_hash: Some(
                     decode(&payment_hash).map_err(|err| LightningError::PaymentByHash(err.to_string()))?,
                 ),
@@ -329,12 +328,12 @@ impl LnClient for ClnGrpcClient {
             Err(_) => return Err(LightningError::PaymentByHash("Unknown payment status".to_string())),
         };
         if status != "complete" {
-            return super::cln_payment::payment_state(payment_hash, status).map(Some);
+            return payment_state(payment_hash, status).map(Some);
         }
         let parts = client
             .list_send_pays(ListsendpaysRequest {
                 payment_hash: Some(
-                    hex::decode(&payment_hash).map_err(|err| LightningError::PaymentByHash(err.to_string()))?,
+                    decode(&payment_hash).map_err(|err| LightningError::PaymentByHash(err.to_string()))?,
                 ),
                 ..Default::default()
             })
@@ -352,7 +351,7 @@ impl LnClient for ClnGrpcClient {
                     Err(_) => "unknown",
                 }
                 .to_string();
-                super::cln_payment::ClnPaymentPart {
+                ClnPaymentPart {
                     payment_hash: hex::encode(part.payment_hash),
                     status,
                     amount_msat: part.amount_msat.map(|amount| amount.msat),
@@ -362,7 +361,7 @@ impl LnClient for ClnGrpcClient {
                 }
             })
             .collect();
-        super::cln_payment::completed_payment(payment_hash, parts).map(Some)
+        completed_payment(payment_hash, parts).map(Some)
     }
 
     async fn cancel_invoice(&self, _payment_hash: String, label: String) -> Result<(), LightningError> {

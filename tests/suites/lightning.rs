@@ -12,6 +12,7 @@ use swissknife_types::{
 
 use crate::common::counterparty::Counterparty;
 use crate::common::fixtures::unique;
+use crate::common::harness::matrix_cell;
 use crate::common::wait::wait_until;
 use crate::common::{app, assert_error, assert_status, Auth, TestApp};
 
@@ -191,7 +192,7 @@ mod failure {
 
     #[tokio::test]
     async fn a_local_lnd_send_timeout_keeps_the_payment_and_reservation_pending() {
-        if crate::common::harness::matrix_cell().1 != "lnd_grpc" {
+        if matrix_cell().1 != "lnd_grpc" {
             return;
         }
         let app = TestApp::isolated(
@@ -328,7 +329,7 @@ mod recovery {
 
     #[tokio::test]
     async fn reconciles_an_uncertain_send_on_restart_from_the_real_lnd_record() {
-        let (_, provider) = crate::common::harness::matrix_cell();
+        let (_, provider) = matrix_cell();
         if !provider.starts_with("lnd_") {
             return;
         }

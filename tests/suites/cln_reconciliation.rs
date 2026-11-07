@@ -4,6 +4,7 @@ use std::{sync::atomic::Ordering, time::Duration};
 
 use reqwest::StatusCode;
 use swissknife_types::{Payment, PaymentFeeEstimate, PaymentStatus, SendPaymentRequest};
+use tokio::time::sleep;
 use uuid::Uuid;
 
 use crate::common::{
@@ -82,7 +83,7 @@ async fn reconcile_event(peer: &Peer, status: &str) {
     )
     .await;
     // Allow the lookup's projection to commit before asserting its effect.
-    tokio::time::sleep(Duration::from_millis(200)).await;
+    sleep(Duration::from_millis(200)).await;
 }
 
 async fn assert_settled(app: &TestApp, wallet: Uuid) {
@@ -127,7 +128,7 @@ async fn failed_attempt_cannot_release_funds_for_a_second_spend() {
     // Replayed success/failure cannot debit twice or downgrade a settlement.
     peer.scenario.notify("failed");
     peer.scenario.notify("complete");
-    tokio::time::sleep(Duration::from_millis(500)).await;
+    sleep(Duration::from_millis(500)).await;
     assert_settled(&app, wallet).await;
 }
 
@@ -247,4 +248,46 @@ async fn restarts_with_incomplete_delivered_value_and_later_settles() {
     peer.scenario.set(Outcome::Complete);
     assert_settled(&restarted, wallet).await;
     restarted.stop();
+}
+
+#[tokio::test]
+async fn a_lookup_timeout_during_restart_keeps_funds_reserved_and_retries_later() {
+    let Some((app, peer, wallet)) = setup("cln-timeout-restart").await else {
+        return;
+    };
+    start_send(&app, &peer, wallet).await;
+    peer.scenario.set(Outcome::LookupTimeout);
+    // Let the service's 30-second reconciliation deadline expire first, rather
+    // than the REST transport's own deadline. A timeout is not a final outcome.
+    let mut env = peer.env.clone();
+    env.push(("SWISSKNIFE_CLN_REST_CONFIG__TIMEOUT", "60s".to_string()));
+    let restarted = app.restart("cln-timeout-restarted", &env).await;
+    assert_held(&restarted, wallet).await;
+    assert_eq!(peer.scenario.sends.load(Ordering::SeqCst), 1);
+    peer.scenario.set(Outcome::Complete);
+    assert_settled(&restarted, wallet).await;
+    restarted.stop();
+}
+
+#[tokio::test]
+async fn final_xpay_failure_is_reconciled_after_the_last_part_notification() {
+    let Some((app, peer, wallet)) = setup("cln-final-failure-gap").await else {
+        return;
+    };
+    start_send(&app, &peer, wallet).await;
+    // The final part has failed, but xpay has not finished cleanup yet. Both
+    // applications and the notification connection remain running throughout.
+    reconcile_event(&peer, "failed").await;
+    assert_held(&app, wallet).await;
+    // xpay finishes without another part notification or a SwissKnife restart.
+    peer.scenario.set(Outcome::Failed);
+    wait_until(Duration::from_secs(15), "xpay cleanup reconciled", || async {
+        payment(&app, wallet).await.status == PaymentStatus::Failed
+    })
+    .await;
+    let balance = app.wallet_balance(app.admin_token().await, wallet).await;
+    assert_eq!(balance.reserved_msat, 0);
+    assert_eq!(balance.available_msat, RESERVED as i64);
+    assert_eq!(peer.scenario.sends.load(Ordering::SeqCst), 1);
+    app.stop();
 }

@@ -1,5 +1,11 @@
-use std::path::PathBuf;
-use std::process::{Command, Output};
+use std::{
+    path::PathBuf,
+    process::{Command, Output},
+    thread::sleep,
+    time::{Duration, Instant},
+};
+
+use lightning_invoice::Bolt11Invoice;
 
 use serde_json::Value;
 
@@ -134,12 +140,8 @@ impl Counterparty {
     /// wait for that attempt before deciding whether the test needs to send it.
     pub fn complete_uncertain_lnd_send(&self, bolt11: &str) {
         assert!(matches!(self.kind, Kind::Lnd));
-        let hash = bolt11
-            .parse::<lightning_invoice::Bolt11Invoice>()
-            .unwrap()
-            .payment_hash()
-            .to_string();
-        let started = std::time::Instant::now();
+        let hash = bolt11.parse::<Bolt11Invoice>().unwrap().payment_hash().to_string();
+        let started = Instant::now();
         loop {
             let payments = self.run_json(&["lncli", "--network=regtest", "listpayments", "--include_incomplete"]);
             let status = payments["payments"]
@@ -152,10 +154,10 @@ impl Counterparty {
                 Some("SUCCEEDED") => return,
                 Some("IN_FLIGHT" | "INITIATED") => {
                     assert!(
-                        started.elapsed() < std::time::Duration::from_secs(30),
+                        started.elapsed() < Duration::from_secs(30),
                         "LND attempt did not finish"
                     );
-                    std::thread::sleep(std::time::Duration::from_millis(100));
+                    sleep(Duration::from_millis(100));
                 }
                 None | Some("FAILED") => {
                     self.pay(bolt11);

@@ -6,28 +6,34 @@ use axum::{
         ws::{Message, WebSocket},
         Path, State, WebSocketUpgrade,
     },
+    http::StatusCode,
     response::IntoResponse,
     routing::{get, post},
-    Json, Router,
+    serve, Json, Router,
 };
 use bitcoin::{
     hashes::{sha256, Hash},
     secp256k1::{PublicKey, Secp256k1, SecretKey},
 };
+use futures_util::stream::unfold;
 use lightning_invoice::{Currency, InvoiceBuilder, PaymentSecret, RouteHint, RouteHintHop, RoutingFees};
 use serde_json::{json, Value};
 use std::{
+    fs::read,
     future::pending,
+    path::Path as FsPath,
     sync::{
         atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering},
         Arc, Mutex,
     },
-    time::Duration,
+    time::{Duration, SystemTime, UNIX_EPOCH},
 };
 use tokio::{
     net::TcpListener,
+    spawn,
     sync::{broadcast, watch},
     task::JoinHandle,
+    time::interval,
 };
 use tonic::{
     transport::{Identity, Server, ServerTlsConfig},
@@ -53,6 +59,7 @@ pub enum Outcome {
     Failed = 4,
     Missing = 5,
     Incomplete = 6,
+    LookupTimeout = 7,
 }
 
 pub struct Scenario {
@@ -89,11 +96,7 @@ pub fn invoice(seed: u8, private: bool) -> String {
         .description("CLN reconciliation regression".to_string())
         .payment_hash(sha256::Hash::hash(&[seed; 32]))
         .payment_secret(PaymentSecret([31; 32]))
-        .duration_since_epoch(
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap(),
-        )
+        .duration_since_epoch(SystemTime::now().duration_since(UNIX_EPOCH).unwrap())
         .min_final_cltv_expiry_delta(40);
     if private {
         builder = builder.private_route(RouteHint(vec![RouteHintHop {
@@ -129,7 +132,7 @@ impl Scenario {
         };
         let _ = self.events.send(event);
     }
-    fn summary(&self) -> Result<Option<&'static str>, Status> {
+    async fn summary(&self) -> Result<Option<&'static str>, Status> {
         self.lookups.fetch_add(1, Ordering::SeqCst);
         if self.sends.load(Ordering::SeqCst) == 0 {
             return Ok(None);
@@ -140,6 +143,7 @@ impl Scenario {
             2 | 3 | 6 => Ok(Some("complete")),
             4 => Ok(Some("failed")),
             5 => Ok(None),
+            7 => pending().await,
             _ => unreachable!(),
         }
     }
@@ -215,22 +219,22 @@ impl Peer {
                 .route("/v1/{method}", post(rest))
                 .route("/socket.io/", get(socket))
                 .with_state(scenario.clone());
-            tokio::spawn(async move {
-                axum::serve(listener, app).await.unwrap();
+            spawn(async move {
+                serve(listener, app).await.unwrap();
             })
         } else {
             env.push((
                 "SWISSKNIFE_CLN_GRPC_CONFIG__ENDPOINT",
                 format!("https://localhost:{port}"),
             ));
-            let certs = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/itest/runtime/cln/regtest");
+            let certs = FsPath::new(env!("CARGO_MANIFEST_DIR")).join("tests/itest/runtime/cln/regtest");
             let identity = Identity::from_pem(
-                std::fs::read(certs.join("server.pem")).unwrap(),
-                std::fs::read(certs.join("server-key.pem")).unwrap(),
+                read(certs.join("server.pem")).unwrap(),
+                read(certs.join("server-key.pem")).unwrap(),
             );
             let service = pb::node_server::NodeServer::new(Grpc(scenario.clone()));
-            tokio::spawn(async move {
-                let incoming = futures_util::stream::unfold(listener, |listener| async move {
+            spawn(async move {
+                let incoming = unfold(listener, |listener| async move {
                     Some((listener.accept().await.map(|(stream, _)| stream), listener))
                 });
                 Server::builder()
@@ -260,7 +264,7 @@ async fn socket_loop(s: Arc<Scenario>, mut ws: WebSocket) {
     {
         return;
     }
-    let mut ping = tokio::time::interval(Duration::from_secs(10));
+    let mut ping = interval(Duration::from_secs(10));
     ping.tick().await;
     loop {
         tokio::select! {
@@ -278,13 +282,12 @@ async fn rest(
     State(s): State<Arc<Scenario>>,
     Path(method): Path<String>,
     Json(p): Json<Value>,
-) -> (axum::http::StatusCode, Json<Value>) {
-    use axum::http::StatusCode;
+) -> (StatusCode, Json<Value>) {
     let value = match method.as_str() {
         "getinfo" => json!({"id":key(1).to_string(),"network":"regtest"}),
         "listchainmoves" => json!({"chainmoves":[]}),
         "listinvoices" => json!({"invoices":[]}),
-        "listpays" => match s.summary() {
+        "listpays" => match s.summary().await {
             Ok(Some(status)) => json!({"pays":[{"payment_hash":s.hash,"status":status}]}),
             Ok(None) => json!({"pays":[]}),
             Err(_) => {
@@ -355,7 +358,8 @@ impl pb::node_server::Node for Grpc {
     async fn list_pays(&self, _: Request<pb::ListpaysRequest>) -> Result<Response<pb::ListpaysResponse>, Status> {
         let pays = self
             .0
-            .summary()?
+            .summary()
+            .await?
             .map(|status| pb::ListpaysPays {
                 payment_hash: hex::decode(&self.0.hash).unwrap(),
                 status: match status {

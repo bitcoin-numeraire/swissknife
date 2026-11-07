@@ -4,6 +4,8 @@ use serde::{Deserialize, Serialize};
 use serde_bolt::bitcoin::hashes::{sha256, Hash};
 use std::str::FromStr;
 
+use super::cln_payment::ClnPaymentPart;
+
 use crate::{
     application::composition::Ledger,
     domains::{
@@ -126,7 +128,7 @@ pub struct ListPaysPayment {
 
 #[derive(Debug, Deserialize)]
 pub struct ListSendPaysResponse {
-    pub payments: Vec<super::cln_payment::ClnPaymentPart>,
+    pub payments: Vec<ClnPaymentPart>,
 }
 
 #[derive(Debug, Serialize, Default)]

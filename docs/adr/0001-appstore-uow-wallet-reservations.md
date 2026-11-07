@@ -324,12 +324,25 @@ amounts can include those pending parts. Therefore success additionally requires
 `listsendpays` to have no pending parts. SwissKnife totals only successful parts,
 checks their preimage against the payment hash, requires successful parts to
 cover the requested amount, and settles their actual amount
-and fees. The synchronous xpay response uses the same check. Definitive aggregate
+and fees. The synchronous xpay response uses the same check: CLN's default fast
+mode can return the first preimage while other parts remain in flight, and
+[`total_sent` includes their anticipated amounts](https://github.com/ElementsProject/lightning/blob/v26.06.10/plugins/xpay/xpay.c#L400-L442).
+A successful response therefore does not establish the final debit or fee refund.
+Definitive aggregate
 failure releases the reservation; absent, malformed, or unavailable responses do
 not. Keep the xpay plugin enabled: its `listpays` implementation is required.
 
 Pending payments are reconciled on startup/reconnect and periodically (five
 seconds between scheduled passes; slow provider requests can extend a pass).
+This is necessary even with a healthy notification connection: the last failed
+part can notify while xpay remains active, so `listpays` still reports pending.
+After xpay cleans up its active payment, the same lookup reports failed without
+another sendpay update. This follows from CLN's
+[`attempt_ongoing` status check](https://github.com/ElementsProject/lightning/blob/v26.06.10/plugins/xpay/listpays.c#L149-L154)
+and [asynchronous cleanup](https://github.com/ElementsProject/lightning/blob/v26.06.10/plugins/xpay/xpay.c#L310-L341).
+The worker queries the provider only for pending rows; an empty scan performs no
+provider calls. Incomplete delivered value and lookup deadlines leave the row
+pending without preventing startup or reconnect.
 Reconciliation never resends a payment. It applies existing idempotent financial
 projections, which also write the account's durable final-status event. LND uses
 its whole-payment status rather than individual HTLC attempts and shares the

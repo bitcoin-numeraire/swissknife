@@ -4,7 +4,7 @@ use anyhow::anyhow;
 use chrono::{TimeZone, Utc};
 use reqwest::{
     header::{HeaderMap, HeaderValue},
-    Certificate, Client, Response,
+    Certificate, Client, Response, StatusCode,
 };
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_bolt::bitcoin::hashes::{sha256, Hash};
@@ -26,11 +26,14 @@ use crate::{
     },
     infra::{
         config::config_rs::deserialize_duration,
-        lightning::{bitcoin_utils::parse_psbt, types::parse_network, LnClient},
+        lightning::{bitcoin_utils::parse_psbt, fee_estimation::estimate_with_hints, types::parse_network, LnClient},
     },
 };
 use async_trait::async_trait;
-use base64::{engine::general_purpose::STANDARD, Engine};
+use base64::{
+    engine::general_purpose::{STANDARD, URL_SAFE},
+    Engine,
+};
 
 use super::lnd_types::*;
 
@@ -204,7 +207,7 @@ impl LndRestClient {
             .get(format!("https://{}/{}", self.base_url, endpoint))
             .send()
             .await?;
-        if response.status() == reqwest::StatusCode::NOT_FOUND {
+        if response.status() == StatusCode::NOT_FOUND {
             return Ok(None);
         }
         let mut response = Self::check_response_status(response).await?;
@@ -306,7 +309,7 @@ impl LnClient for LndRestClient {
     }
 
     async fn estimate_fee(&self, target: LnPaymentTarget) -> Result<u64, LightningError> {
-        crate::infra::lightning::fee_estimation::estimate_with_hints(target, &self.node_id, self.fee_limit_msat,
+        estimate_with_hints(target, &self.node_id, self.fee_limit_msat,
             |target, fee_limit_msat, _single_path| async move {
                 let response: QueryRoutesResponse = self.get_request(&format!(
                     "v1/graph/routes/{}/0?amt_msat={}&final_cltv_delta={}&fee_limit.fixed_msat={}&use_mission_control=true",
@@ -381,7 +384,7 @@ impl LnClient for LndRestClient {
         let hash_bytes = hex::decode(&payment_hash).map_err(|err| LightningError::PaymentByHash(err.to_string()))?;
         let endpoint = format!(
             "v2/router/track/{}?no_inflight_updates=false",
-            base64::engine::general_purpose::URL_SAFE.encode(hash_bytes)
+            URL_SAFE.encode(hash_bytes)
         );
         let result = self.payment_update(&endpoint).await;
 

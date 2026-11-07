@@ -1,5 +1,7 @@
 use std::future::Future;
 
+use lightning_invoice::RouteHint;
+
 use crate::{application::errors::LightningError, domains::payment::LnPaymentTarget};
 
 /// Price the public prefix plus a complete hinted suffix. Each hinted quote is
@@ -52,11 +54,7 @@ where
     best.ok_or(last_error)
 }
 
-fn hinted_prefix(
-    target: &LnPaymentTarget,
-    hint: &lightning_invoice::RouteHint,
-    source: &[u8],
-) -> Option<(LnPaymentTarget, u64)> {
+fn hinted_prefix(target: &LnPaymentTarget, hint: &RouteHint, source: &[u8]) -> Option<(LnPaymentTarget, u64)> {
     // If the payer is itself a hinted hop, only the suffix from there is needed.
     let start = hint
         .0
@@ -98,7 +96,7 @@ fn hinted_prefix(
 mod tests {
     use super::*;
     use bitcoin::secp256k1::{PublicKey, Secp256k1, SecretKey};
-    use lightning_invoice::{RouteHint, RouteHintHop, RoutingFees};
+    use lightning_invoice::{RouteHintHop, RoutingFees};
 
     fn key(n: u8) -> PublicKey {
         PublicKey::from_secret_key(&Secp256k1::new(), &SecretKey::from_slice(&[n; 32]).unwrap())
