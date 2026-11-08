@@ -13,9 +13,10 @@ afterEach(() => {
 
 it.each([
   { configured: 'Numeraire', expected: 'Numeraire' },
+  { configured: 'SwissKnife', expected: 'SwissKnife' },
   { configured: 'Acme & Co', expected: 'Acme & Co' },
-  { configured: undefined, expected: 'SwissKnife' },
-  { configured: '  ', expected: 'SwissKnife' },
+  { configured: undefined, expected: 'Numeraire SwissKnife' },
+  { configured: '  ', expected: 'Numeraire SwissKnife' },
 ])(
   'uses the deployment name $expected throughout the interface',
   async ({ configured, expected }) => {

@@ -31,7 +31,7 @@ public values for your own deployment before building a production image:
 | -------------------------------- | -------------------------------------------------------------------- |
 | `NEXT_PUBLIC_SERVER_URL`         | Public API origin; empty for the bundled, same-origin backend        |
 | `NEXT_PUBLIC_AUTH_METHOD`        | `jwt` for the local owner login, or `auth0` for the hosted OIDC flow |
-| `NEXT_PUBLIC_APPNAME`            | Brand name throughout the dashboard (default: `SwissKnife`)           |
+| `NEXT_PUBLIC_APPNAME`            | Display name                                                         |
 | `NEXT_PUBLIC_AUTH0_DOMAIN`       | Auth0 tenant/custom domain                                           |
 | `NEXT_PUBLIC_AUTH0_CLIENT_ID`    | Public SPA client ID                                                 |
 | `NEXT_PUBLIC_AUTH0_CALLBACK_URL` | Registered dashboard callback URL                                    |
@@ -42,11 +42,6 @@ do not put credentials or private provider secrets there. Setting these variable
 only on a running container does not reconfigure the browser bundle. The Docker
 builds copy `.env.production`; local override files are excluded from the Docker
 context.
-
-Set `NEXT_PUBLIC_APPNAME=Numeraire` in `.env.production` for the hosted service,
-or `NEXT_PUBLIC_APPNAME=SwissKnife` for a desktop or self-hosted installation.
-This name is used in page titles, translated interface text, and the installable
-app manifest. Rebuild the dashboard after changing it.
 
 There are two build modes:
 
