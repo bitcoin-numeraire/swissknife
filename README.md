@@ -58,8 +58,8 @@ Dashboard public settings are set at build time; see [dashboard configuration](d
 The all-in-one image bundles the backend API and dashboard in a single container:
 
 ```bash
-docker pull bitcoinnumeraire/swissknife:0.3.1
-docker run -p 3000:3000 bitcoinnumeraire/swissknife:0.3.1
+docker pull bitcoinnumeraire/swissknife:0.3.2
+docker run -p 3000:3000 bitcoinnumeraire/swissknife:0.3.2
 ```
 
 This image includes:
@@ -73,14 +73,14 @@ For Kubernetes or microservices deployments, use the separated images:
 
 #### Backend Only
 ```bash
-docker pull bitcoinnumeraire/swissknife-server:0.3.1
-docker run -p 3000:3000 bitcoinnumeraire/swissknife-server:0.3.1
+docker pull bitcoinnumeraire/swissknife-server:0.3.2
+docker run -p 3000:3000 bitcoinnumeraire/swissknife-server:0.3.2
 ```
 
 #### Frontend Only (Standalone Next.js Server)
 ```bash
-docker pull bitcoinnumeraire/swissknife-dashboard:0.3.1
-docker run -p 8080:8080 bitcoinnumeraire/swissknife-dashboard:0.3.1
+docker pull bitcoinnumeraire/swissknife-dashboard:0.3.2
+docker run -p 8080:8080 bitcoinnumeraire/swissknife-dashboard:0.3.2
 ```
 
 When using separated deployment:

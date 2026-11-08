@@ -8,6 +8,8 @@ release notes when a tag is published.
 
 ## [Unreleased]
 
+## [0.3.2] - 2026-11-08
+
 ### Fixed
 
 - Correct LND payment lookup over REST and gRPC so startup reconciliation can
@@ -174,7 +176,8 @@ release notes when a tag is published.
 
 - Removed blink on the login page ([#175]).
 
-[Unreleased]: https://github.com/bitcoin-numeraire/swissknife/compare/v0.3.1...HEAD
+[Unreleased]: https://github.com/bitcoin-numeraire/swissknife/compare/v0.3.2...HEAD
+[0.3.2]: https://github.com/bitcoin-numeraire/swissknife/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/bitcoin-numeraire/swissknife/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/bitcoin-numeraire/swissknife/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/bitcoin-numeraire/swissknife/compare/v0.1.8...v0.2.0
