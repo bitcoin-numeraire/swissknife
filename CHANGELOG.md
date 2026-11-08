@@ -10,6 +10,8 @@ release notes when a tag is published.
 
 ### Fixed
 
+- Correct LND payment lookup over REST and gRPC so startup reconciliation can
+  read pending payments without waiting for settlement and recover completed payments.
 - Check the whole CLN payment status before processing a sendpay notification,
   over REST and gRPC. Failed attempts no longer release funds while the payment
   is still pending.

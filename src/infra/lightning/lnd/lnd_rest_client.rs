@@ -4,7 +4,7 @@ use anyhow::anyhow;
 use chrono::{TimeZone, Utc};
 use reqwest::{
     header::{HeaderMap, HeaderValue},
-    Certificate, Client, Response,
+    Certificate, Client, Response, StatusCode,
 };
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_bolt::bitcoin::hashes::{sha256, Hash};
@@ -30,7 +30,10 @@ use crate::{
     },
 };
 use async_trait::async_trait;
-use base64::{engine::general_purpose::STANDARD, Engine};
+use base64::{
+    engine::general_purpose::{STANDARD, URL_SAFE},
+    Engine,
+};
 
 use super::lnd_types::*;
 
@@ -342,27 +345,49 @@ impl LnClient for LndRestClient {
     }
 
     async fn payment_by_hash(&self, payment_hash: String) -> Result<Option<Payment>, LightningError> {
-        let endpoint = format!("v2/router/track/{}", payment_hash);
-        let result = self
-            .post_request_buffered::<TrackPaymentResponse>(
-                &endpoint,
-                &TrackPaymentRequest {
-                    no_inflight_updates: true,
-                },
-            )
-            .await;
+        let hash_bytes = hex::decode(&payment_hash).map_err(|e| LightningError::PaymentByHash(e.to_string()))?;
+        let url = format!(
+            "https://{}/v2/router/track/{}?no_inflight_updates=false",
+            self.base_url,
+            URL_SAFE.encode(hash_bytes)
+        );
+        let response = self
+            .client
+            .get(url)
+            .send()
+            .await
+            .map_err(|e| LightningError::PaymentByHash(e.to_string()))?;
+        if response.status() == StatusCode::NOT_FOUND {
+            return Ok(None);
+        }
+        let mut response = Self::check_response_status(response)
+            .await
+            .map_err(|e| LightningError::PaymentByHash(e.to_string()))?;
 
-        let status = match result {
-            Ok(response) => response,
-            Err(err) => {
-                let err_msg = err.to_string();
-                if err_msg.contains("unable to find payment") || err_msg.contains("unknown payment") {
-                    return Ok(None);
-                } else {
-                    return Err(LightningError::PaymentByHash(err.to_string()));
-                }
+        // TrackPaymentV2 streams newline-delimited JSON. Read the first current
+        // state; waiting for EOF would block while the payment is in flight.
+        let mut line = Vec::new();
+        while let Some(chunk) = response
+            .chunk()
+            .await
+            .map_err(|e| LightningError::PaymentByHash(e.to_string()))?
+        {
+            let end = chunk.iter().position(|byte| *byte == b'\n');
+            line.extend_from_slice(&chunk[..end.unwrap_or(chunk.len())]);
+            if end.is_some() {
+                break;
             }
-        };
+        }
+        let update: StreamTrackPaymentResponse =
+            serde_json::from_slice(&line).map_err(|e| LightningError::PaymentByHash(e.to_string()))?;
+        let status = update.result.ok_or_else(|| {
+            LightningError::PaymentByHash(
+                update
+                    .error
+                    .map(|error| error.message)
+                    .unwrap_or_else(|| "Missing payment update".to_string()),
+            )
+        })?;
 
         match status.status.as_str() {
             "SUCCEEDED" => {
@@ -393,7 +418,20 @@ impl LnClient for LndRestClient {
                 }),
                 ..Default::default()
             })),
-            _ => Ok(None),
+            "INITIATED" | "IN_FLIGHT" => Ok(Some(Payment {
+                ledger: Ledger::Lightning,
+                status: PaymentStatus::Pending,
+                amount_msat: status.value_msat.unwrap_or_default(),
+                lightning: Some(LnPayment {
+                    payment_hash: status.payment_hash,
+                    ..Default::default()
+                }),
+                ..Default::default()
+            })),
+            _ => Err(LightningError::PaymentByHash(format!(
+                "Unknown payment status: {}",
+                status.status
+            ))),
         }
     }
 

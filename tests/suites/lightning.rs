@@ -5,6 +5,7 @@
 use std::time::Duration;
 
 use reqwest::StatusCode;
+use tokio::time::timeout;
 
 use swissknife_types::{
     Invoice, InvoiceStatus, Ledger, NewInvoiceRequest, Payment, PaymentFeeEstimate, PaymentStatus, SendPaymentRequest,
@@ -12,6 +13,7 @@ use swissknife_types::{
 
 use crate::common::counterparty::Counterparty;
 use crate::common::fixtures::unique;
+use crate::common::harness::matrix_cell;
 use crate::common::wait::wait_until;
 use crate::common::{app, assert_error, assert_status, Auth, TestApp};
 
@@ -319,6 +321,91 @@ mod failure {
                 .iter()
                 .any(|p| p.status == PaymentStatus::Failed && p.error.is_some()),
             "the unroutable attempt is recorded as failed"
+        );
+    }
+}
+
+mod recovery {
+    use super::*;
+
+    #[tokio::test]
+    async fn starts_with_an_inflight_lnd_payment_and_recovers_its_settlement() {
+        let (_, provider) = matrix_cell();
+        if !provider.starts_with("lnd_") {
+            return;
+        }
+        let app = TestApp::isolated(
+            "lnd-lookup",
+            &[
+                ("SWISSKNIFE_LN_PROVIDER", "lnd_grpc".to_string()),
+                ("SWISSKNIFE_LND_GRPC_CONFIG__PAYMENT_TIMEOUT", "0s".to_string()),
+            ],
+        )
+        .await;
+        let token = app.admin_token().await;
+        let wallet = app.create_wallet(token, "lnd-lookup").await;
+        app.fund_onchain(token, wallet.id, 100_000).await;
+        let mut held = Counterparty::for_provider("cln_grpc").hold_invoice(1_000_000);
+        // The local establishment timeout creates an uncertain payment through
+        // the public API; then the node progresses while SwissKnife is stopped.
+        let response = app
+            .api()
+            .post(
+                "/v1/payments",
+                Auth::Bearer(token),
+                SendPaymentRequest {
+                    wallet_id: Some(wallet.id),
+                    input: held.bolt11.clone(),
+                    amount_msat: None,
+                    comment: None,
+                },
+            )
+            .await;
+        assert_status(&response, StatusCode::OK);
+        let pending = response.parse::<Payment>();
+        assert_eq!(pending.status, PaymentStatus::Pending);
+        let reserved = app.wallet_balance(token, wallet.id).await;
+        assert!(reserved.reserved_msat > 0);
+        app.stop();
+
+        let invoice = held.bolt11.clone();
+        let sending = tokio::task::spawn_blocking(move || {
+            Counterparty::for_provider("cln_grpc").pay_self(&invoice);
+        });
+        wait_until(Duration::from_secs(10), "LND payment is in flight", || async {
+            held.accepted()
+        })
+        .await;
+
+        let restarted = timeout(Duration::from_secs(10), app.restart("lnd-lookup-pending", &[]))
+            .await
+            .expect("startup must not wait for an in-flight payment to settle");
+        let response = restarted
+            .api()
+            .get(&format!("/v1/payments/{}", pending.id), Auth::Bearer(token))
+            .await;
+        assert_status(&response, StatusCode::OK);
+        assert_eq!(response.parse::<Payment>().status, PaymentStatus::Pending);
+        let balance = restarted.wallet_balance(token, wallet.id).await;
+        assert_eq!(balance.reserved_msat, reserved.reserved_msat);
+        assert_eq!(balance.available_msat, reserved.available_msat);
+        restarted.stop();
+
+        held.settle();
+        sending.await.unwrap();
+        let recovered = restarted.restart("lnd-lookup-settled", &[]).await;
+        let response = recovered
+            .api()
+            .get(&format!("/v1/payments/{}", pending.id), Auth::Bearer(token))
+            .await;
+        assert_status(&response, StatusCode::OK);
+        let settled = response.parse::<Payment>();
+        assert_eq!(settled.status, PaymentStatus::Settled);
+        let balance = recovered.wallet_balance(token, wallet.id).await;
+        assert_eq!(balance.reserved_msat, 0);
+        assert_eq!(
+            balance.available_msat,
+            (100_000_000 - settled.amount_msat - settled.fee_msat.unwrap()) as i64
         );
     }
 }
