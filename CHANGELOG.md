@@ -8,8 +8,16 @@ release notes when a tag is published.
 
 ## [Unreleased]
 
+### Changed
+
+- Use `NEXT_PUBLIC_APPNAME` throughout the dashboard, including translated copy
+  and the installable app name. The hosted profile uses Numeraire; other
+  installations can choose their own name, with SwissKnife as the fallback.
+
 ### Fixed
 
+- Keep long transaction descriptions and account labels compact in the dashboard
+  and display account and wallet links in the normal text color.
 - Correct LND payment lookup over REST and gRPC so startup reconciliation can
   read pending payments without waiting for settlement and recover completed payments.
 - Check the whole CLN payment status before processing a sendpay notification,

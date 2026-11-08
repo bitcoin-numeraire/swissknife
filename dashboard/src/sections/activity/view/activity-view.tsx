@@ -1056,8 +1056,13 @@ function ActivityTableRow({
         <TableCell>
           <ListItemText
             primary={row.description_label}
+            sx={{ maxWidth: 240 }}
             slotProps={{
-              primary: { noWrap: true, sx: { typography: 'body2' } },
+              primary: {
+                noWrap: true,
+                title: row.description_label,
+                sx: { typography: 'body2' },
+              },
               secondary: { sx: { typography: 'caption', color: 'text.disabled' } },
             }}
           />
@@ -1068,18 +1073,20 @@ function ActivityTableRow({
             <TableCell>
               {row.owner ? (
                 <ListItemText
+                  sx={{ maxWidth: 180 }}
                   primary={
                     <Link
+                      color="inherit"
                       href={paths.admin.account(row.owner.account.id)}
                       onClick={(event) => event.stopPropagation()}
-                      title={row.owner.account.id}
+                      title={`${row.account_label} (${row.owner.account.id})`}
                     >
                       {row.account_label}
                     </Link>
                   }
                   secondary={compactId(row.owner.account.id)}
                   slotProps={{
-                    primary: { sx: { typography: 'body2', overflowWrap: 'anywhere' } },
+                    primary: { noWrap: true, sx: { typography: 'body2' } },
                     secondary: { sx: { typography: 'caption' } },
                   }}
                 />
@@ -1091,11 +1098,13 @@ function ActivityTableRow({
             </TableCell>
             <TableCell>
               <ListItemText
+                sx={{ maxWidth: 180 }}
                 primary={
                   <Link
+                    color="inherit"
                     href={paths.admin.wallet(row.wallet_id)}
                     onClick={(event) => event.stopPropagation()}
-                    title={row.wallet_id}
+                    title={`${row.wallet_label} (${row.wallet_id})`}
                   >
                     {row.wallet_label}
                   </Link>
@@ -1112,7 +1121,7 @@ function ActivityTableRow({
                     : undefined
                 }
                 slotProps={{
-                  primary: { sx: { typography: 'body2', overflowWrap: 'anywhere' } },
+                  primary: { noWrap: true, sx: { typography: 'body2' } },
                   secondary: { sx: { typography: 'caption' } },
                 }}
               />

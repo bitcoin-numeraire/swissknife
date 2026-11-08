@@ -1,3 +1,5 @@
+import { CONFIG } from 'src/global-config';
+
 // ----------------------------------------------------------------------
 
 export const fallbackLng = 'en';
@@ -18,5 +20,9 @@ export function i18nOptions(lng = fallbackLng, ns = defaultNS) {
     defaultNS,
     fallbackNS: defaultNS,
     supportedLngs: languages,
+    interpolation: {
+      escapeValue: false,
+      defaultVariables: { appName: CONFIG.appName },
+    },
   };
 }
