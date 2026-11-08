@@ -1400,7 +1400,7 @@ function ReceivePaymentSuccessPanel({
           <Box
             component="img"
             src={`${CONFIG.assetsDir}/logo/logo_single.svg`}
-            alt="SwissKnife"
+            alt={CONFIG.appName}
             sx={{
               width: 42,
               height: 66,

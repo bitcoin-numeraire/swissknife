@@ -1,6 +1,6 @@
 {
   "preview": {
-    "eyebrow": "SwissKnife setup",
+    "eyebrow": "{{appName}} setup",
     "title": "Set up your Bitcoin wallet",
     "content": "This wallet runs from your server. You control the funds, so setup starts with access, backups and a few checks before money moves.",
     "wallet_title": "Wallet setup",
@@ -18,14 +18,14 @@
   },
   "welcome": {
     "title": "Your wallet for everyday Bitcoin",
-    "content": "SwissKnife brings Lightning payments, Bitcoin addresses and a reusable Lightning Address into one place, so you can receive, pay and see what needs attention.",
+    "content": "{{appName}} brings Lightning payments, Bitcoin addresses and a reusable Lightning Address into one place, so you can receive, pay and see what needs attention.",
     "point_one": "Receive payments with invoices, addresses or your Lightning Address.",
     "point_two": "Pay from the same wallet when a payment request arrives.",
     "point_three": "See amounts, status and next actions without switching tools."
   },
   "custody": {
     "title": "You hold the keys",
-    "content": "SwissKnife does not custody your bitcoin or keep a spare copy of your secrets. Before you fund the wallet, make sure your backups are real and reachable.",
+    "content": "{{appName}} does not custody your bitcoin or keep a spare copy of your secrets. Before you fund the wallet, make sure your backups are real and reachable.",
     "point_one": "Choose a strong owner password for this dashboard.",
     "point_two": "Keep recovery material somewhere offline that you can find later.",
     "point_three": "Test the wallet with a small amount before you add more."

@@ -30,7 +30,7 @@ export type DeploymentMode = 'server' | 'self-hosted' | 'merchant' | 'desktop' |
 // ----------------------------------------------------------------------
 
 export const CONFIG: ConfigValue = {
-  appName: process.env.NEXT_PUBLIC_APPNAME ?? 'Numeraire SwissKnife',
+  appName: process.env.NEXT_PUBLIC_APPNAME?.trim() || 'Numeraire SwissKnife',
   appVersion: packageJson.version,
   serverUrl: process.env.NEXT_PUBLIC_SERVER_URL ?? '',
   assetsDir: process.env.NEXT_PUBLIC_ASSETS_DIR ?? '',

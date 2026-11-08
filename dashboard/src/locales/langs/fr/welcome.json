@@ -1,6 +1,6 @@
 {
   "preview": {
-    "eyebrow": "Configuration SwissKnife",
+    "eyebrow": "Configuration {{appName}}",
     "title": "Configure ton wallet Bitcoin",
     "content": "Ce wallet tourne depuis ton serveur. Tu contrôles les fonds, donc la configuration commence par l'accès, les sauvegardes et quelques vérifications avant de déplacer de l'argent.",
     "wallet_title": "Configuration du wallet",
@@ -18,14 +18,14 @@
   },
   "welcome": {
     "title": "Ton wallet pour le Bitcoin du quotidien",
-    "content": "SwissKnife réunit les paiements Lightning, les adresses Bitcoin et une adresse Lightning réutilisable au même endroit pour recevoir, payer et voir ce qui demande ton attention.",
+    "content": "{{appName}} réunit les paiements Lightning, les adresses Bitcoin et une adresse Lightning réutilisable au même endroit pour recevoir, payer et voir ce qui demande ton attention.",
     "point_one": "Reçois avec des factures, des adresses ou ton adresse Lightning.",
     "point_two": "Paie depuis le même wallet quand une demande de paiement arrive.",
     "point_three": "Vois les montants, les statuts et les prochaines actions sans changer d'outil."
   },
   "custody": {
     "title": "Tu tiens les clés",
-    "content": "SwissKnife ne garde pas tes bitcoins et ne conserve pas de copie de tes secrets. Avant de financer le wallet, assure-toi que tes sauvegardes existent et sont accessibles.",
+    "content": "{{appName}} ne garde pas tes bitcoins et ne conserve pas de copie de tes secrets. Avant de financer le wallet, assure-toi que tes sauvegardes existent et sont accessibles.",
     "point_one": "Choisis un mot de passe propriétaire fort pour ce dashboard.",
     "point_two": "Garde le matériel de récupération hors ligne, dans un endroit que tu retrouveras.",
     "point_three": "Teste le wallet avec un petit montant avant d'en ajouter plus."
