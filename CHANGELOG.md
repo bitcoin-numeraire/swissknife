@@ -8,6 +8,10 @@ release notes when a tag is published.
 
 ## [Unreleased]
 
+### Fixed
+
+- Wait for an Auth0 API access token before loading the dashboard after sign-in.
+
 ## [0.3.2] - 2026-11-08
 
 ### Fixed
