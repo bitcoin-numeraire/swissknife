@@ -8,6 +8,11 @@ release notes when a tag is published.
 
 ## [Unreleased]
 
+### Added
+
+- Show pending on-chain deposits with Core Lightning when a Bitcoin Core mempool
+  RPC source is configured. The deposit credits the wallet on confirmation.
+
 ### Fixed
 
 - Wait for an Auth0 API access token before loading the dashboard after sign-in.

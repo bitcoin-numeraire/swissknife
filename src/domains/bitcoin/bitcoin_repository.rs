@@ -30,6 +30,7 @@ pub trait BtcAddressRepository: Send + Sync {
 #[async_trait]
 pub trait BtcOutputRepository: Send + Sync {
     async fn find_by_outpoint(&self, outpoint: &str) -> Result<Option<BtcOutput>, DatabaseError>;
-    async fn upsert(&self, output: BtcOutput) -> Result<BtcOutput, DatabaseError>;
+    /// Returns None when an unconfirmed observation follows a confirmation.
+    async fn upsert(&self, output: BtcOutput) -> Result<Option<BtcOutput>, DatabaseError>;
     async fn max_block_height(&self) -> Result<Option<u32>, DatabaseError>;
 }

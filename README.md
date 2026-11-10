@@ -90,6 +90,24 @@ When using separated deployment:
 
 All images support both `linux/amd64` and `linux/arm64` architectures.
 
+### Pending on-chain deposits with Core Lightning
+
+For `cln_grpc` or `cln_rest`, configure the following backend environment variables
+to show incoming deposits as pending before the first confirmation.
+
+| Variable | Value |
+| --- | --- |
+| `SWISSKNIFE_CLN_MEMPOOL__RPC_URL` | Private Bitcoin Core RPC URL on the same network as CLN |
+| `SWISSKNIFE_CLN_MEMPOOL__RPC_USER` | Bitcoin Core RPC username |
+| `SWISSKNIFE_CLN_MEMPOOL__RPC_PASSWORD` | Bitcoin Core RPC password |
+
+Use a dedicated RPC user restricted to `getblockchaininfo`, `getrawmempool`, and
+`getrawtransaction`. SwissKnife checks the mempool every five seconds and looks
+up newly seen transactions in batches. The first scan checks the current
+mempool. CLN supplies confirmations and the balance is credited on confirmation.
+Pending deposits record that a transaction was seen. A transaction evicted from
+the mempool or replaced by fee can leave a pending entry behind.
+
 ## Documentation
 
 Extended documentation is available [here](https://docs.numeraire.tech/swissknife)

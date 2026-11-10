@@ -1,8 +1,8 @@
 use async_trait::async_trait;
 use chrono::Utc;
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, FromQueryResult, QueryFilter, QuerySelect, Set,
-    Unchanged,
+    sea_query::{Expr, OnConflict},
+    ColumnTrait, DatabaseConnection, EntityTrait, ExprTrait, FromQueryResult, QueryFilter, QuerySelect, Set,
 };
 use uuid::Uuid;
 
@@ -10,7 +10,7 @@ use super::SeaOrmConnection;
 
 use crate::{
     application::errors::DatabaseError,
-    domains::bitcoin::{BtcOutput, BtcOutputRepository},
+    domains::bitcoin::{BtcOutput, BtcOutputRepository, BtcOutputStatus},
     infra::database::sea_orm::models::{
         btc_output::{ActiveModel, Column},
         prelude::BtcOutput as BtcOutputEntity,
@@ -43,46 +43,42 @@ where
         Ok(model.map(Into::into))
     }
 
-    async fn upsert(&self, output: BtcOutput) -> Result<BtcOutput, DatabaseError> {
-        if let Some(existing) = self.find_by_outpoint(&output.outpoint).await? {
-            let active_model = ActiveModel {
-                id: Unchanged(existing.id),
-                txid: Set(output.txid.clone()),
-                output_index: Set(i64::from(output.output_index)),
-                address: Set(output.address.clone()),
-                amount_sat: Set(output.amount_sat as i64),
-                status: Set(output.status.to_string()),
-                block_height: Set(output.block_height.map(i64::from)),
-                updated_at: Set(Some(Utc::now().naive_utc())),
-                ..Default::default()
-            };
-
-            let model = active_model
-                .update(self.db.connection())
-                .await
-                .map_err(|e| DatabaseError::Update(e.to_string()))?;
-
-            return Ok(model.into());
+    async fn upsert(&self, output: BtcOutput) -> Result<Option<BtcOutput>, DatabaseError> {
+        let mut conflict = OnConflict::column(Column::Outpoint);
+        conflict
+            .update_columns([Column::Address, Column::AmountSat, Column::Status, Column::BlockHeight])
+            .value(Column::UpdatedAt, Expr::value(Utc::now().naive_utc()));
+        if output.status == BtcOutputStatus::Unconfirmed {
+            // A mempool observation can reach this transaction after CLN
+            // already processed the block containing the same outpoint.
+            let height = Expr::col((BtcOutputEntity, Column::BlockHeight));
+            conflict.action_and_where(height.clone().is_null().or(height.eq(0)));
         }
 
-        let model = ActiveModel {
+        let affected = BtcOutputEntity::insert(ActiveModel {
             id: Set(Uuid::new_v4()),
             outpoint: Set(output.outpoint.clone()),
-            txid: Set(output.txid.clone()),
+            txid: Set(output.txid),
             output_index: Set(i64::from(output.output_index)),
-            address: Set(output.address.clone()),
+            address: Set(output.address),
             amount_sat: Set(output.amount_sat as i64),
             status: Set(output.status.to_string()),
             block_height: Set(output.block_height.map(i64::from)),
             ..Default::default()
-        };
+        })
+        .on_conflict(conflict.to_owned())
+        .exec_without_returning(self.db.connection())
+        .await
+        .map_err(|e| DatabaseError::Insert(e.to_string()))?;
 
-        let model = model
-            .insert(self.db.connection())
-            .await
-            .map_err(|e| DatabaseError::Insert(e.to_string()))?;
-
-        Ok(model.into())
+        if affected == 0 {
+            return Ok(None);
+        }
+        let output = self
+            .find_by_outpoint(&output.outpoint)
+            .await?
+            .ok_or_else(|| DatabaseError::FindOne("Bitcoin output missing after upsert".into()))?;
+        Ok(Some(output))
     }
 
     async fn max_block_height(&self) -> Result<Option<u32>, DatabaseError> {

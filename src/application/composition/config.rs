@@ -7,6 +7,7 @@ pub use swissknife_types::AuthProvider;
 use crate::{
     domains::bitcoin::BtcAddressType,
     infra::{
+        app::ClnMempoolConfig,
         axum::AxumServerConfig,
         config::config_rs::deserialize_duration,
         database::sea_orm::SeaOrmConfig,
@@ -35,6 +36,7 @@ pub struct AppConfig {
     pub bitcoin_address_type: BtcAddressType,
     pub ln_provider: LightningProvider,
     pub database: SeaOrmConfig,
+    pub cln_mempool: Option<ClnMempoolConfig>,
     pub cln_grpc_config: Option<ClnClientConfig>,
     pub cln_rest_config: Option<ClnRestClientConfig>,
     pub lnd_grpc_config: Option<LndGrpcClientConfig>,

@@ -968,7 +968,8 @@ async fn onchain_deposit_emits_pending_then_paid_once() {
     let stored = projection
         .project_onchain_deposit(unconfirmed_output.clone(), address.clone(), pending.clone())
         .await
-        .expect("project pending deposit");
+        .expect("project pending deposit")
+        .expect("new pending deposit");
     assert_eq!(stored.status, crate::domains::invoice::InvoiceStatus::Pending);
     assert_eq!(balance(&conn, receiver).await, (0, 0));
 
@@ -979,18 +980,33 @@ async fn onchain_deposit_emits_pending_then_paid_once() {
         .await
         .expect("replay pending deposit");
 
-    let mut confirmed_output = unconfirmed_output;
+    let mut confirmed_output = unconfirmed_output.clone();
     confirmed_output.status = BtcOutputStatus::Confirmed;
     confirmed_output.block_height = Some(42);
-    let mut confirmed = pending;
+    let mut confirmed = pending.clone();
     confirmed.amount_received_msat = Some(30_000);
     confirmed.payment_time = Some(Utc::now());
     let settled = projection
         .project_onchain_deposit(confirmed_output.clone(), address.clone(), confirmed.clone())
         .await
-        .expect("confirm deposit");
+        .expect("confirm deposit")
+        .expect("confirmed deposit");
     assert_eq!(settled.status, crate::domains::invoice::InvoiceStatus::Settled);
     assert_eq!(balance(&conn, receiver).await, (30_000, 0));
+
+    // A mempool snapshot processed after confirmation must preserve the settlement.
+    assert!(projection
+        .project_onchain_deposit(unconfirmed_output, address.clone(), pending)
+        .await
+        .expect("replay late pending deposit")
+        .is_none());
+    let invoice = SeaOrmInvoiceRepository::new(conn.clone())
+        .find(stored.id)
+        .await
+        .expect("read settled invoice")
+        .expect("settled invoice");
+    assert_eq!(invoice.status, crate::domains::invoice::InvoiceStatus::Settled);
+    assert_eq!(invoice.bitcoin_output.expect("stored output").block_height, Some(42));
 
     // A confirmed replay neither credits nor emits twice.
     projection

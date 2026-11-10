@@ -291,7 +291,7 @@ impl EventProjectionUnitOfWork for SeaOrmEventProjectionUnitOfWork {
         output: BtcOutput,
         address: BtcAddress,
         mut deposit_invoice: Invoice,
-    ) -> Result<Invoice, ApplicationError> {
+    ) -> Result<Option<Invoice>, ApplicationError> {
         let txn = self
             .db
             .begin()
@@ -303,7 +303,9 @@ impl EventProjectionUnitOfWork for SeaOrmEventProjectionUnitOfWork {
         let invoice_repo = SeaOrmInvoiceRepository::new(&txn);
         let wallet_repo = SeaOrmWalletRepository::new(&txn);
 
-        let stored_output = output_repo.upsert(output).await?;
+        let Some(stored_output) = output_repo.upsert(output).await? else {
+            return Ok(None);
+        };
 
         if !address.used {
             address_repo.mark_used(address.id).await?;
@@ -371,6 +373,6 @@ impl EventProjectionUnitOfWork for SeaOrmEventProjectionUnitOfWork {
             .await
             .map_err(|e| DatabaseError::Transaction(e.to_string()))?;
 
-        Ok(invoice)
+        Ok(Some(invoice))
     }
 }

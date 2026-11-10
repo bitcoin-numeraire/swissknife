@@ -14,9 +14,11 @@ use tokio::signal::{
 };
 use tracing::{debug, error, info};
 
-use crate::application::composition::{AppAdapters, AppServices, RecoveryAdapters, RecoveryServices};
+use crate::application::composition::{
+    AppAdapters, AppServices, LightningProvider, RecoveryAdapters, RecoveryServices,
+};
 use crate::infra::{
-    app::{ClientEventRetentionWorker, EventListener, Server},
+    app::{ClientEventRetentionWorker, ClnMempool, EventListener, Server},
     cli::Cli,
     config::config_rs::load_config,
     logging::tracing::setup_tracing,
@@ -79,6 +81,21 @@ async fn main() {
     if let Err(err) = event_listener.start().await {
         error!(%err, "failed to start event listener");
         exit(1);
+    }
+
+    if matches!(
+        config.ln_provider,
+        LightningProvider::ClnGrpc | LightningProvider::ClnRest
+    ) {
+        if let Some(mempool_config) = config.cln_mempool.clone() {
+            match ClnMempool::new(mempool_config, adapters.bitcoin_wallet.network(), services.clone()) {
+                Ok(mempool) => mempool.start(),
+                Err(err) => {
+                    error!(%err, "Failed to configure CLN mempool monitoring");
+                    exit(1);
+                }
+            }
+        }
     }
 
     // We start accepting external requests only when everything is synced and ready

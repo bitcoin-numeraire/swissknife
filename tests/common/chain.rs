@@ -2,16 +2,24 @@
 //! miner wallet over JSON-RPC; endpoint/credentials are overridable via env.
 
 use serde_json::{json, Value};
+use tokio::sync::{Mutex, MutexGuard};
 
-fn rpc_url() -> String {
+static MINING: Mutex<()> = Mutex::const_new(());
+
+pub fn rpc_url() -> String {
     std::env::var("SWISSKNIFE_ITEST_BITCOIN_RPC_URL")
         .unwrap_or_else(|_| "http://127.0.0.1:18443/wallet/miner".to_string())
 }
 
-pub async fn bitcoin_rpc(method: &str, params: Value) -> Value {
+pub fn rpc_credentials() -> (String, String) {
     let user = std::env::var("SWISSKNIFE_ITEST_BITCOIN_RPC_USER").unwrap_or_else(|_| "regtest".to_string());
     let password = std::env::var("SWISSKNIFE_ITEST_BITCOIN_RPC_PASSWORD").unwrap_or_else(|_| "regtest".to_string());
 
+    (user, password)
+}
+
+pub async fn bitcoin_rpc(method: &str, params: Value) -> Value {
+    let (user, password) = rpc_credentials();
     let response = reqwest::Client::new()
         .post(rpc_url())
         .basic_auth(user, Some(password))
@@ -35,8 +43,15 @@ pub async fn send_to_address(address: &str, sats: u64) {
     bitcoin_rpc("sendtoaddress", json!([address, btc])).await;
 }
 
+/// Keep parallel tests from confirming a transaction while it is being checked
+/// in the mempool.
+pub async fn pause_mining() -> MutexGuard<'static, ()> {
+    MINING.lock().await
+}
+
 /// Mine `blocks` to the miner wallet, confirming pending transactions.
 pub async fn mine(blocks: u64) {
+    let _mining = MINING.lock().await;
     let address = bitcoin_rpc("getnewaddress", json!(["itest", "bech32"])).await;
     let address = address.as_str().expect("miner address");
     bitcoin_rpc("generatetoaddress", json!([blocks, address])).await;

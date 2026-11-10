@@ -194,11 +194,14 @@ impl EventUseCases for EventService {
 
         // Output upsert, address mark-used, and invoice settle/insert (+ balance credit when
         // confirmed) are applied atomically; idempotent if the event is replayed.
-        let invoice = self
+        let Some(invoice) = self
             .store
             .event_uow
             .project_onchain_deposit(output, btc_address, deposit_invoice)
-            .await?;
+            .await?
+        else {
+            return Ok(false);
+        };
 
         info!(invoice_id = %invoice.id, %outpoint, %address, "Onchain deposit processed");
         Ok(true)
@@ -730,7 +733,7 @@ mod tests {
                             && invoice.payment_time.is_some()
                     })
                     .times(1)
-                    .returning(|_, _, invoice| Ok(invoice));
+                    .returning(|_, _, invoice| Ok(Some(invoice)));
 
                 let event = OnchainDepositEvent {
                     txid: "txid".to_string(),
@@ -766,7 +769,7 @@ mod tests {
                             && invoice.payment_time.is_none()
                     })
                     .times(1)
-                    .returning(|_, _, invoice| Ok(invoice));
+                    .returning(|_, _, invoice| Ok(Some(invoice)));
 
                 let event = OnchainDepositEvent {
                     txid: "txid".to_string(),

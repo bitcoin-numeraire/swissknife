@@ -18,11 +18,12 @@ pub trait EventProjectionUnitOfWork: Send + Sync {
     /// Project an on-chain deposit in one transaction: upsert the output, mark the receiving
     /// address used, and settle-or-insert the linked invoice (crediting the receiver when
     /// confirmed). `deposit_invoice` is the desired invoice for a first sighting; when an invoice
-    /// already exists for the output it is settled idempotently instead.
+    /// already exists for the output it is settled idempotently instead. Returns None when a
+    /// late unconfirmed observation is ignored.
     async fn project_onchain_deposit(
         &self,
         output: BtcOutput,
         address: BtcAddress,
         deposit_invoice: Invoice,
-    ) -> Result<Invoice, ApplicationError>;
+    ) -> Result<Option<Invoice>, ApplicationError>;
 }
