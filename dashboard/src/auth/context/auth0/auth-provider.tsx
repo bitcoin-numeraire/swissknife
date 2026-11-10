@@ -44,62 +44,95 @@ export function AuthProvider({ children }: Props) {
 
 // ----------------------------------------------------------------------
 
+type ApiSession = {
+  subject: string;
+  accessToken: string | null;
+  permissions: DecodedToken['permissions'];
+};
+
 function AuthProviderContainer({ children }: Props) {
   const { user, isLoading, isAuthenticated, getAccessTokenSilently, loginWithRedirect } =
     useAuth0();
-
-  const [accessToken, setAccessToken] = useState<string | null>(null);
-  const [permissions, setPermissions] = useState<string[]>([]);
-
-  const getAccessToken = useCallback(async () => {
-    try {
-      const token = await getAccessTokenSilently();
-      setAccessToken(token);
-      setPermissions(jwtDecode<DecodedToken>(token).permissions || []);
-
-      client.interceptors.request.use(async (request) => {
-        try {
-          const t = await getAccessTokenSilently();
-          request.headers.set('Authorization', `Bearer ${t}`);
-        } catch (err: unknown) {
-          console.error('Token expired or missing, redirecting to login', err);
-          loginWithRedirect();
-        }
-        return request;
-      });
-    } catch (err) {
-      console.debug('Error getting access token', err);
-      loginWithRedirect();
-    }
-  }, [getAccessTokenSilently, loginWithRedirect]);
+  const subject = user?.sub;
+  const [session, setSession] = useState<ApiSession | null>(null);
 
   useEffect(() => {
-    getAccessToken();
-  }, [getAccessToken]);
+    if (isLoading || !isAuthenticated || !subject) return undefined;
 
-  // ----------------------------------------------------------------------
+    let active = true;
+    let interceptorId: number | undefined;
+    let redirecting = false;
 
-  const checkAuthenticated = isAuthenticated ? 'authenticated' : 'unauthenticated';
+    const getAccessToken = async () => {
+      const token = await getAccessTokenSilently();
+      if (!token) throw new Error('Auth0 did not return an API access token');
+      return token;
+    };
 
-  const status = isLoading ? 'loading' : checkAuthenticated;
+    const authorizeRequest = async (request: Request) => {
+      try {
+        const token = await getAccessToken();
+        if (!active) throw new DOMException('Auth0 session ended', 'AbortError');
+        request.headers.set('Authorization', `Bearer ${token}`);
+        return request;
+      } catch (error) {
+        if (active && !redirecting) {
+          redirecting = true;
+          void loginWithRedirect({ appState: { returnTo: window.location.href } }).catch(() => {
+            redirecting = false;
+            console.error('Could not redirect to Auth0 for sign-in');
+          });
+        }
+        throw error;
+      }
+    };
+
+    const startSession = async () => {
+      try {
+        const accessToken = await getAccessToken();
+        if (!active) return;
+
+        const { permissions = [] } = jwtDecode<DecodedToken>(accessToken);
+        interceptorId = client.interceptors.request.use(authorizeRequest);
+
+        // The guards may start API requests as soon as this session is published.
+        setSession({ subject, accessToken, permissions });
+      } catch {
+        if (active) setSession({ subject, accessToken: null, permissions: [] });
+      }
+    };
+
+    void startSession();
+
+    return () => {
+      active = false;
+      if (interceptorId !== undefined) client.interceptors.request.eject(interceptorId);
+      setSession(null);
+    };
+  }, [isLoading, isAuthenticated, subject, getAccessTokenSilently, loginWithRedirect]);
+
+  const currentSession = session?.subject === subject ? session : null;
+  const loading = isLoading || Boolean(isAuthenticated && subject && !currentSession);
+  const authenticated = !loading && isAuthenticated && Boolean(currentSession?.accessToken);
 
   const memoizedValue = useMemo(
     () => ({
-      user: user
-        ? {
-            ...user,
-            id: user?.sub,
-            accessToken,
-            displayName: user?.name,
-            photoURL: user?.picture,
-            permissions,
-          }
-        : null,
-      loading: status === 'loading',
-      authenticated: status === 'authenticated',
-      unauthenticated: status === 'unauthenticated',
+      user:
+        authenticated && user && currentSession
+          ? {
+              ...user,
+              id: user.sub,
+              accessToken: currentSession.accessToken,
+              displayName: user.name,
+              photoURL: user.picture,
+              permissions: currentSession.permissions,
+            }
+          : null,
+      loading,
+      authenticated,
+      unauthenticated: !loading && !authenticated,
     }),
-    [accessToken, status, user, permissions]
+    [authenticated, currentSession, loading, user]
   );
 
   return <AuthContext.Provider value={memoizedValue}>{children}</AuthContext.Provider>;
