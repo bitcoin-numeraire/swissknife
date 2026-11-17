@@ -1,4 +1,5 @@
 use chrono::{DateTime, Utc};
+use uuid::Uuid;
 
 #[derive(Debug, Clone)]
 pub struct LnInvoicePaidEvent {
@@ -10,6 +11,7 @@ pub struct LnInvoicePaidEvent {
 
 #[derive(Debug, Clone)]
 pub struct LnPaySuccessEvent {
+    pub attempt_id: Option<Uuid>,
     pub amount_msat: u64,
     pub fees_msat: u64,
     pub payment_hash: String,
@@ -19,6 +21,7 @@ pub struct LnPaySuccessEvent {
 
 #[derive(Debug, Clone)]
 pub struct LnPayFailureEvent {
+    pub attempt_id: Option<Uuid>,
     pub reason: String,
     pub payment_hash: String,
 }

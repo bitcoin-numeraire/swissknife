@@ -738,6 +738,10 @@ export type LnInvoice = {
  */
 export type LnPayment = {
   /**
+   * Original BOLT11 supplied for this outgoing payment.
+   */
+  bolt11?: string | null;
+  /**
    * Lightning Address. Populated when sending to a LN Address
    */
   ln_address?: string | null;
@@ -753,6 +757,10 @@ export type LnPayment = {
    * Payment Preimage
    */
   payment_preimage?: string | null;
+  /**
+   * Whether a failed payment can be retried from its details.
+   */
+  retryable?: boolean | null;
   success_action?: null | LnUrlSuccessAction;
 };
 
@@ -4478,6 +4486,10 @@ export type WalletPayErrors = {
    */
   404: ErrorResponse;
   /**
+   * An existing payment blocks this send or retry
+   */
+  409: ErrorResponse;
+  /**
    * Unprocessable Entity
    */
   422: ErrorResponse;
@@ -4756,6 +4768,10 @@ export type PayErrors = {
    */
   403: ErrorResponse;
   /**
+   * An existing payment blocks this send or retry
+   */
+  409: ErrorResponse;
+  /**
    * Unprocessable Entity
    */
   422: ErrorResponse;
@@ -4844,6 +4860,10 @@ export type DeletePaymentErrors = {
    * Not Found
    */
   404: ErrorResponse;
+  /**
+   * The payment changed before deletion
+   */
+  409: ErrorResponse;
   /**
    * Internal Server Error
    */

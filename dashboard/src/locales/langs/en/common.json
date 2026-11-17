@@ -756,6 +756,7 @@
     "invoice_from": "Invoice From"
   },
   "payment_details": {
+    "retry": "Retry payment",
     "detail_heading": "Payment details",
     "amount_sent": "Amount sent",
     "fees": "Fees",

@@ -334,10 +334,12 @@ export const zLnUrlSuccessAction = z.object({
  * Lightning-specific details of a payment.
  */
 export const zLnPayment = z.object({
+  bolt11: z.string().nullish(),
   ln_address: z.string().nullish(),
   metadata: z.string().nullish(),
   payment_hash: z.string(),
   payment_preimage: z.string().nullish(),
+  retryable: z.boolean().nullish(),
   success_action: zLnUrlSuccessAction.nullish(),
 });
 

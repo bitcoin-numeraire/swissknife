@@ -47,7 +47,7 @@ use crate::{
                 },
             },
             types::parse_network,
-            LnClient,
+            LnClient, PaymentLookup,
         },
     },
 };
@@ -256,6 +256,7 @@ impl LndGrpcClient {
             error,
             lightning: Some(LnPayment {
                 payment_hash: payment.payment_hash,
+                bolt11: (!payment.payment_request.is_empty()).then_some(payment.payment_request),
                 payment_preimage: if payment.payment_preimage.is_empty() {
                     None
                 } else {
@@ -411,7 +412,11 @@ impl LnClient for LndGrpcClient {
         }
     }
 
-    async fn payment_by_hash(&self, payment_hash: String) -> Result<Option<Payment>, LightningError> {
+    async fn payment_by_hash(
+        &self,
+        payment_hash: String,
+        _lookup: PaymentLookup,
+    ) -> Result<Option<Payment>, LightningError> {
         let hash_bytes = hex::decode(&payment_hash).map_err(|e| LightningError::PaymentByHash(e.to_string()))?;
 
         let mut router = self.router.clone();

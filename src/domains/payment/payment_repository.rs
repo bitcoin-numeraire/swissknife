@@ -18,7 +18,13 @@ pub trait PaymentRepository: Send + Sync {
     /// single-winner when the synchronous result and the success/failure event
     /// race; settling accepts `Failed` as a source too, so a later success can
     /// correct a payment that a premature error marked failed.
-    async fn try_transition(&self, id: Uuid, from: &[PaymentStatus], to: PaymentStatus) -> Result<bool, DatabaseError>;
+    async fn try_transition(
+        &self,
+        id: Uuid,
+        attempt_id: Option<Uuid>,
+        from: &[PaymentStatus],
+        to: PaymentStatus,
+    ) -> Result<bool, DatabaseError>;
     async fn delete_many(&self, filter: PaymentFilter) -> Result<u64, DatabaseError>;
     async fn max_btc_block_height(&self) -> Result<Option<u32>, DatabaseError>;
 }

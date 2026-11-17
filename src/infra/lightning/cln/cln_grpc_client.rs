@@ -39,7 +39,7 @@ use crate::{
                 newaddr_request::NewaddrAddresstype, DelinvoiceRequest, ListchainmovesRequest, ListpaysRequest,
             },
             types::parse_network,
-            LnClient,
+            LnClient, PaymentLookup,
         },
     },
 };
@@ -275,7 +275,11 @@ impl LnClient for ClnGrpcClient {
         }
     }
 
-    async fn payment_by_hash(&self, payment_hash: String) -> Result<Option<Payment>, LightningError> {
+    async fn payment_by_hash(
+        &self,
+        payment_hash: String,
+        lookup: PaymentLookup,
+    ) -> Result<Option<Payment>, LightningError> {
         let mut client = self.client.clone();
 
         let response = client
@@ -287,10 +291,17 @@ impl LnClient for ClnGrpcClient {
             .map_err(|e| LightningError::PaymentByHash(e.message().to_string()))?
             .into_inner();
 
+        if matches!(lookup, PaymentLookup::RetryCandidate(_))
+            && response.pays.iter().any(|pay| {
+                hex::encode(&pay.payment_hash) == payment_hash && pay.status != ListpaysPaysStatus::Failed as i32
+            })
+        {
+            return Ok(None);
+        }
         let entry = response
             .pays
             .into_iter()
-            .rfind(|pay| hex::encode(&pay.payment_hash) == payment_hash);
+            .rfind(|pay| hex::encode(&pay.payment_hash) == payment_hash && lookup.matches_label(pay.label.as_deref()));
 
         let Some(entry) = entry else {
             return Ok(None);
@@ -323,6 +334,7 @@ impl LnClient for ClnGrpcClient {
             lightning: Some(LnPayment {
                 payment_hash,
                 payment_preimage: entry.preimage.as_ref().map(hex::encode),
+                bolt11: entry.bolt11,
                 ..Default::default()
             }),
             ..Default::default()

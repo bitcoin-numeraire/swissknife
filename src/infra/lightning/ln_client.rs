@@ -9,6 +9,22 @@ use crate::{
     },
 };
 
+pub enum PaymentLookup {
+    Latest,
+    Attempt(String),
+    /// Only return this attempt when every group for the hash has failed.
+    RetryCandidate(String),
+}
+
+impl PaymentLookup {
+    pub fn matches_label(&self, label: Option<&str>) -> bool {
+        match self {
+            Self::Latest => true,
+            Self::Attempt(expected) | Self::RetryCandidate(expected) => label == Some(expected),
+        }
+    }
+}
+
 #[cfg_attr(test, mockall::automock)]
 #[async_trait]
 pub trait LnClient: Sync + Send {
@@ -32,7 +48,11 @@ pub trait LnClient: Sync + Send {
         label: String,
     ) -> Result<Payment, LightningError>;
     async fn invoice_by_hash(&self, payment_hash: String) -> Result<Option<Invoice>, LightningError>;
-    async fn payment_by_hash(&self, payment_hash: String) -> Result<Option<Payment>, LightningError>;
+    async fn payment_by_hash(
+        &self,
+        payment_hash: String,
+        lookup: PaymentLookup,
+    ) -> Result<Option<Payment>, LightningError>;
     async fn cancel_invoice(&self, payment_hash: String, label: String) -> Result<(), LightningError>;
     async fn health(&self) -> Result<HealthStatus, LightningError>;
 }
