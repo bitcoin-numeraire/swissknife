@@ -11,6 +11,7 @@ release notes when a tag is published.
 ### Fixed
 
 - Wait for an Auth0 API access token before loading the dashboard after sign-in.
+- Reconcile pending Core Lightning payments while the server is running, and report the recorded payment status in the payment request log.
 
 ## [0.3.2] - 2026-11-08
 

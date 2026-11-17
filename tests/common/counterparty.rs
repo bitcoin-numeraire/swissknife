@@ -43,7 +43,7 @@ impl Counterparty {
         }
     }
 
-    fn run(&self, args: &[&str]) -> Output {
+    fn command(&self, args: &[&str]) -> Command {
         let service = match self.kind {
             Kind::Lnd => "lnd",
             Kind::Cln => "cln",
@@ -57,10 +57,15 @@ impl Counterparty {
             .arg("exec")
             .arg("-T")
             .arg(service);
-        for arg in args {
-            cmd.arg(arg);
-        }
-        let output = cmd.output().expect("run counterparty CLI via docker compose exec");
+        cmd.args(args);
+        cmd
+    }
+
+    fn run(&self, args: &[&str]) -> Output {
+        let output = self
+            .command(args)
+            .output()
+            .expect("run counterparty CLI via docker compose exec");
         assert!(
             output.status.success(),
             "counterparty command {args:?} failed:\n{}",
@@ -163,6 +168,42 @@ impl Counterparty {
             payment["pays"][0]["status"], "pending",
             "the payment itself has not failed"
         );
+    }
+
+    /// Record a terminal failed xpay for a canceled regtest invoice.
+    pub fn pay_cancelled_invoice(&self, bolt11: &str, hash: &str, label: Uuid) {
+        assert!(matches!(self.kind, Kind::Cln));
+        let result = self
+            .command(&[
+                "lightning-cli",
+                "--network=regtest",
+                "-k",
+                "xpay",
+                &format!("invstring={bolt11}"),
+                &format!("label={label}"),
+            ])
+            .output()
+            .expect("call xpay for canceled invoice");
+        assert!(!result.status.success(), "xpay succeeded on a canceled invoice");
+
+        let label = label.to_string();
+        let started = Instant::now();
+        loop {
+            let pays = self.cln_rpc("listpays", json!({"payment_hash": hash}));
+            if pays["pays"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|pay| pay["label"] == label && pay["status"] == "failed")
+            {
+                return;
+            }
+            assert!(
+                started.elapsed() < Duration::from_secs(10),
+                "xpay left no terminal failure with the expected label: {pays}"
+            );
+            sleep(Duration::from_millis(100));
+        }
     }
 
     /// Explicit self-payment for the LND lookup regression.

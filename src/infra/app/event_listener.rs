@@ -29,9 +29,13 @@ const LISTENER_MAX_RECONNECT_DELAY: Duration = Duration::from_secs(60);
 /// next failure restarts from the minimum delay instead of the grown backoff.
 const LISTENER_STABLE_THRESHOLD: Duration = Duration::from_secs(60);
 
+/// CLN notifications report attempts and may arrive before listpays reflects the final result.
+const CLN_PAYMENT_SYNC_INTERVAL: Duration = Duration::from_secs(10);
+
 pub struct EventListener {
     listener: Arc<dyn EventsListener>,
     services: Arc<AppServices>,
+    sync_cln_payments: bool,
 }
 
 impl EventListener {
@@ -83,7 +87,15 @@ impl EventListener {
             }
         };
 
-        Ok(Self { listener, services })
+        let sync_cln_payments = matches!(
+            config.ln_provider,
+            LightningProvider::ClnRest | LightningProvider::ClnGrpc
+        );
+        Ok(Self {
+            listener,
+            services,
+            sync_cln_payments,
+        })
     }
 
     pub async fn start(&self) -> Result<(), ApplicationError> {
@@ -127,7 +139,20 @@ impl EventListener {
         yield_now().await;
         Self::sync_offchain_state(&self.services).await?;
 
+        if self.sync_cln_payments {
+            tokio::spawn(Self::sync_pending_cln_payments(self.services.clone()));
+        }
+
         Ok(())
+    }
+
+    async fn sync_pending_cln_payments(services: Arc<AppServices>) {
+        loop {
+            sleep(CLN_PAYMENT_SYNC_INTERVAL).await;
+            if let Err(err) = services.payment.sync().await {
+                warn!(%err, "Unable to reconcile pending CLN payments");
+            }
+        }
     }
 
     async fn sync_offchain_state(services: &AppServices) -> Result<(), ApplicationError> {
@@ -185,6 +210,7 @@ mod tests {
         let event_listener = EventListener {
             listener: Arc::new(listener),
             services,
+            sync_cln_payments: false,
         };
 
         event_listener.start().await.unwrap();

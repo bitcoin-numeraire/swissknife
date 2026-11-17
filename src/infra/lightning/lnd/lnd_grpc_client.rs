@@ -411,7 +411,7 @@ impl LnClient for LndGrpcClient {
         }
     }
 
-    async fn payment_by_hash(&self, payment_hash: String) -> Result<Option<Payment>, LightningError> {
+    async fn payment_by_hash(&self, payment_hash: String, _label: &str) -> Result<Option<Payment>, LightningError> {
         let hash_bytes = hex::decode(&payment_hash).map_err(|e| LightningError::PaymentByHash(e.to_string()))?;
 
         let mut router = self.router.clone();

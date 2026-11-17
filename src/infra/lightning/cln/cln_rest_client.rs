@@ -266,7 +266,7 @@ impl LnClient for ClnRestClient {
         }
     }
 
-    async fn payment_by_hash(&self, payment_hash: String) -> Result<Option<Payment>, LightningError> {
+    async fn payment_by_hash(&self, payment_hash: String, label: &str) -> Result<Option<Payment>, LightningError> {
         let response = self
             .post_request::<ListPaysResponse>(
                 "listpays",
@@ -277,7 +277,10 @@ impl LnClient for ClnRestClient {
             .await
             .map_err(|e| LightningError::PaymentByHash(e.to_string()))?;
 
-        let payment = response.pays.into_iter().rfind(|pay| pay.payment_hash == payment_hash);
+        let payment = response
+            .pays
+            .into_iter()
+            .rfind(|pay| pay.payment_hash == payment_hash && pay.label.as_deref() == Some(label));
 
         let Some(payment) = payment else {
             return Ok(None);

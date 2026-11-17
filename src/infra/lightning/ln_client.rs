@@ -32,7 +32,8 @@ pub trait LnClient: Sync + Send {
         label: String,
     ) -> Result<Payment, LightningError>;
     async fn invoice_by_hash(&self, payment_hash: String) -> Result<Option<Invoice>, LightningError>;
-    async fn payment_by_hash(&self, payment_hash: String) -> Result<Option<Payment>, LightningError>;
+    /// Look up a submitted payment. CLN uses the send label to select the current attempt.
+    async fn payment_by_hash(&self, payment_hash: String, label: &str) -> Result<Option<Payment>, LightningError>;
     async fn cancel_invoice(&self, payment_hash: String, label: String) -> Result<(), LightningError>;
     async fn health(&self) -> Result<HealthStatus, LightningError>;
 }

@@ -275,7 +275,7 @@ impl LnClient for ClnGrpcClient {
         }
     }
 
-    async fn payment_by_hash(&self, payment_hash: String) -> Result<Option<Payment>, LightningError> {
+    async fn payment_by_hash(&self, payment_hash: String, label: &str) -> Result<Option<Payment>, LightningError> {
         let mut client = self.client.clone();
 
         let response = client
@@ -290,7 +290,7 @@ impl LnClient for ClnGrpcClient {
         let entry = response
             .pays
             .into_iter()
-            .rfind(|pay| hex::encode(&pay.payment_hash) == payment_hash);
+            .rfind(|pay| hex::encode(&pay.payment_hash) == payment_hash && pay.label.as_deref() == Some(label));
 
         let Some(entry) = entry else {
             return Ok(None);

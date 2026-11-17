@@ -81,7 +81,7 @@ impl EventUseCases for EventService {
     async fn outgoing_payment(&self, event: LnPaySuccessEvent) -> Result<(), ApplicationError> {
         debug!(?event, "Processing outgoing Lightning payment...");
 
-        let payment_option = self.store.payment.find_by_payment_hash(&event.payment_hash).await?;
+        let payment_option = self.store.payment.find(event.payment_id).await?;
 
         if let Some(mut payment_retrieved) = payment_option {
             if event.amount_msat != payment_retrieved.amount_msat {
@@ -115,7 +115,7 @@ impl EventUseCases for EventService {
             let payment = self.store.payment_uow.settle(payment_retrieved).await?;
 
             info!(id = %payment.id, payment_status = %payment.status,
-                "Outgoing Lightning payment processed successfully");
+                "Outgoing Lightning payment reconciled");
 
             return Ok(());
         }
@@ -130,7 +130,7 @@ impl EventUseCases for EventService {
     async fn failed_payment(&self, event: LnPayFailureEvent) -> Result<(), ApplicationError> {
         debug!(?event, "Processing failed outgoing Lightning payment");
 
-        let payment_option = self.store.payment.find_by_payment_hash(&event.payment_hash).await?;
+        let payment_option = self.store.payment.find(event.payment_id).await?;
 
         if let Some(mut payment_retrieved) = payment_option {
             if payment_retrieved.status == PaymentStatus::Failed {
@@ -144,7 +144,7 @@ impl EventUseCases for EventService {
             let payment = self.store.payment_uow.fail(payment_retrieved).await?;
 
             info!(id = %payment.id,payment_status = %payment.status,
-                "Outgoing Lightning payment processed successfully");
+                "Outgoing Lightning payment reconciled");
 
             return Ok(());
         }
@@ -329,6 +329,7 @@ mod tests {
 
         fn event() -> LnPaySuccessEvent {
             LnPaySuccessEvent {
+                payment_id: Uuid::nil(),
                 amount_msat: 1_000,
                 fees_msat: 1,
                 payment_hash: "ph".to_string(),
@@ -343,19 +344,14 @@ mod tests {
             #[tokio::test]
             async fn ignores_it_without_releasing_the_reservation() {
                 let mut store = MockAppStoreBuilder::new();
-                store
-                    .payment
-                    .expect_find_by_payment_hash()
-                    .withf(|hash| hash == "ph")
-                    .times(1)
-                    .returning(|_| {
-                        Ok(Some(Payment {
-                            amount_msat: 1_000,
-                            reserved_amount: 1_100,
-                            status: PaymentStatus::Pending,
-                            ..Default::default()
-                        }))
-                    });
+                store.payment.expect_find().withf(Uuid::is_nil).times(1).returning(|_| {
+                    Ok(Some(Payment {
+                        amount_msat: 1_000,
+                        reserved_amount: 1_100,
+                        status: PaymentStatus::Pending,
+                        ..Default::default()
+                    }))
+                });
                 store.payment_uow.expect_settle().times(0);
                 store.payment_uow.expect_fail().times(0);
                 store.payment.expect_update().times(0);
@@ -378,24 +374,20 @@ mod tests {
                     for amount_msat in [0, 333, 1_001] {
                         let status = status.clone();
                         let mut store = MockAppStoreBuilder::new();
-                        store
-                            .payment
-                            .expect_find_by_payment_hash()
-                            .times(1)
-                            .returning(move |_| {
-                                Ok(Some(Payment {
-                                    amount_msat: 1_000,
-                                    reserved_amount: 1_100,
-                                    status: status.clone(),
-                                    lightning: Some(LnPayment {
-                                        raw_success_action: Some(LnUrlPaySuccessAction::Message {
-                                            message: "Thanks".to_string(),
-                                        }),
-                                        ..Default::default()
+                        store.payment.expect_find().times(1).returning(move |_| {
+                            Ok(Some(Payment {
+                                amount_msat: 1_000,
+                                reserved_amount: 1_100,
+                                status: status.clone(),
+                                lightning: Some(LnPayment {
+                                    raw_success_action: Some(LnUrlPaySuccessAction::Message {
+                                        message: "Thanks".to_string(),
                                     }),
                                     ..Default::default()
-                                }))
-                            });
+                                }),
+                                ..Default::default()
+                            }))
+                        });
                         store.payment_uow.expect_settle().times(0);
                         store.payment_uow.expect_fail().times(0);
                         store.payment.expect_update().times(0);
@@ -415,19 +407,15 @@ mod tests {
             async fn settles_only_the_matching_principal_and_fee() {
                 let mut store = MockAppStoreBuilder::new();
                 let payment_id = Uuid::new_v4();
-                store
-                    .payment
-                    .expect_find_by_payment_hash()
-                    .times(2)
-                    .returning(move |_| {
-                        Ok(Some(Payment {
-                            id: payment_id,
-                            amount_msat: 1_000,
-                            reserved_amount: 1_100,
-                            status: PaymentStatus::Pending,
-                            ..Default::default()
-                        }))
-                    });
+                store.payment.expect_find().times(2).returning(move |_| {
+                    Ok(Some(Payment {
+                        id: payment_id,
+                        amount_msat: 1_000,
+                        reserved_amount: 1_100,
+                        status: PaymentStatus::Pending,
+                        ..Default::default()
+                    }))
+                });
                 store
                     .payment_uow
                     .expect_settle()
@@ -468,7 +456,7 @@ mod tests {
             #[tokio::test]
             async fn propagates_the_error_without_mutation() {
                 let mut store = MockAppStoreBuilder::new();
-                store.payment.expect_find_by_payment_hash().times(1).returning(|_| {
+                store.payment.expect_find().times(1).returning(|_| {
                     Err(crate::application::errors::DatabaseError::FindOne(
                         "unavailable".to_string(),
                     ))
@@ -487,7 +475,7 @@ mod tests {
             #[tokio::test]
             async fn settles_it_with_preimage() {
                 let mut store = MockAppStoreBuilder::new();
-                store.payment.expect_find_by_payment_hash().times(1).returning(|_| {
+                store.payment.expect_find().times(1).returning(|_| {
                     Ok(Some(Payment {
                         amount_msat: 1_000,
                         status: PaymentStatus::Pending,
@@ -516,7 +504,7 @@ mod tests {
             #[tokio::test]
             async fn projects_the_persisted_lnurl_success_action() {
                 let mut store = MockAppStoreBuilder::new();
-                store.payment.expect_find_by_payment_hash().times(1).returning(|_| {
+                store.payment.expect_find().times(1).returning(|_| {
                     Ok(Some(Payment {
                         amount_msat: 1_000,
                         status: PaymentStatus::Pending,
@@ -553,7 +541,7 @@ mod tests {
             #[tokio::test]
             async fn is_idempotent_and_does_not_update() {
                 let mut store = MockAppStoreBuilder::new();
-                store.payment.expect_find_by_payment_hash().times(1).returning(|_| {
+                store.payment.expect_find().times(1).returning(|_| {
                     Ok(Some(Payment {
                         amount_msat: 1_000,
                         status: PaymentStatus::Settled,
@@ -568,7 +556,7 @@ mod tests {
             #[tokio::test]
             async fn repairs_an_unprocessed_lnurl_success_action() {
                 let mut store = MockAppStoreBuilder::new();
-                store.payment.expect_find_by_payment_hash().times(1).returning(|_| {
+                store.payment.expect_find().times(1).returning(|_| {
                     Ok(Some(Payment {
                         amount_msat: 1_000,
                         status: PaymentStatus::Settled,
@@ -606,11 +594,7 @@ mod tests {
             #[tokio::test]
             async fn ignores_the_event() {
                 let mut store = MockAppStoreBuilder::new();
-                store
-                    .payment
-                    .expect_find_by_payment_hash()
-                    .times(1)
-                    .returning(|_| Ok(None));
+                store.payment.expect_find().times(1).returning(|_| Ok(None));
 
                 assert!(service(store).outgoing_payment(event()).await.is_ok());
             }
@@ -622,6 +606,7 @@ mod tests {
 
         fn event() -> LnPayFailureEvent {
             LnPayFailureEvent {
+                payment_id: Uuid::nil(),
                 reason: "no route".to_string(),
                 payment_hash: "ph".to_string(),
             }
@@ -633,7 +618,7 @@ mod tests {
             #[tokio::test]
             async fn marks_it_failed_with_reason() {
                 let mut store = MockAppStoreBuilder::new();
-                store.payment.expect_find_by_payment_hash().times(1).returning(|_| {
+                store.payment.expect_find().times(1).returning(|_| {
                     Ok(Some(Payment {
                         status: PaymentStatus::Pending,
                         ..Default::default()
@@ -658,7 +643,7 @@ mod tests {
             #[tokio::test]
             async fn is_idempotent_and_does_not_update() {
                 let mut store = MockAppStoreBuilder::new();
-                store.payment.expect_find_by_payment_hash().times(1).returning(|_| {
+                store.payment.expect_find().times(1).returning(|_| {
                     Ok(Some(Payment {
                         status: PaymentStatus::Failed,
                         ..Default::default()
@@ -675,11 +660,7 @@ mod tests {
             #[tokio::test]
             async fn ignores_the_event() {
                 let mut store = MockAppStoreBuilder::new();
-                store
-                    .payment
-                    .expect_find_by_payment_hash()
-                    .times(1)
-                    .returning(|_| Ok(None));
+                store.payment.expect_find().times(1).returning(|_| Ok(None));
 
                 assert!(service(store).failed_payment(event()).await.is_ok());
             }
