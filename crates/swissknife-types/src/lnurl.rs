@@ -16,6 +16,26 @@ pub struct LnUrlCallback {
     pub disposable: Option<bool>,
     /// array with payment routes, should be left empty if no routes are to be provided
     pub routes: Vec<String>,
+    /// Optional LUD-21 URL to check whether this invoice has been settled.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub verify: Option<String>,
+}
+
+/// LUD-21 invoice verification response.
+#[derive(Debug, Deserialize, Serialize, ToSchema)]
+#[serde(tag = "status")]
+pub enum LnUrlVerifyResponse {
+    #[serde(rename = "OK")]
+    Ok {
+        settled: bool,
+        /// Hex-encoded payment preimage, or null before settlement.
+        #[schema(required = true)]
+        preimage: Option<String>,
+        /// Original BOLT11 invoice.
+        pr: String,
+    },
+    #[serde(rename = "ERROR")]
+    Error { reason: String },
 }
 
 /// LNURL success action shown to the payer after a successful payment (LUD-09).

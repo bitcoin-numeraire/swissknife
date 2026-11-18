@@ -26,7 +26,7 @@ use crate::{
     },
     infra::{
         config::config_rs::deserialize_duration,
-        lightning::{bitcoin_utils::parse_psbt, types::parse_network, LnClient},
+        lightning::{bitcoin_utils::parse_psbt, types::parse_network, LnClient, LnInvoiceOptions},
     },
 };
 use async_trait::async_trait;
@@ -246,16 +246,17 @@ impl LnClient for LndRestClient {
         description: String,
         _label: String,
         expiry: u32,
-        deschashonly: bool,
+        options: LnInvoiceOptions,
     ) -> Result<Invoice, LightningError> {
         let mut payload = InvoiceRequest {
             memo: description.clone(),
             expiry: expiry as u64,
             value_msat: amount_msat,
+            r_preimage: options.preimage.map(|preimage| STANDARD.encode(preimage)),
             ..Default::default()
         };
 
-        if deschashonly {
+        if options.description_hash_only {
             // LND REST takes byte fields as base64 in JSON; a hex string would be
             // base64-decoded into 48 bytes and rejected ("must be 32").
             payload.description_hash = STANDARD.encode(sha256::Hash::hash(description.as_bytes()).to_byte_array());

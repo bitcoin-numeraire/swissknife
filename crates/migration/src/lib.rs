@@ -33,6 +33,7 @@ mod m20260717_170449_add_client_event_log;
 mod m20260814_151430_promote_wallet_account_unique_constraint;
 mod m20260904_192903_local_jwt_credentials;
 mod m20261105_223341_widen_btc_output_indexes;
+mod m20261118_154958_add_lnurl_invoice_verification;
 
 pub struct Migrator;
 
@@ -73,6 +74,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260814_151430_promote_wallet_account_unique_constraint::Migration),
             Box::new(m20260904_192903_local_jwt_credentials::Migration),
             Box::new(m20261105_223341_widen_btc_output_indexes::Migration),
+            Box::new(m20261118_154958_add_lnurl_invoice_verification::Migration),
         ]
     }
 }

@@ -812,6 +812,10 @@ export type LnUrlCallback = {
    */
   routes: Array<string>;
   successAction?: null | LnUrlSuccessAction;
+  /**
+   * Optional LUD-21 URL to check whether this invoice has been settled.
+   */
+  verify?: string | null;
 };
 
 /**
@@ -835,6 +839,27 @@ export type LnUrlSuccessAction = {
    */
   url?: string | null;
 };
+
+/**
+ * LUD-21 invoice verification response.
+ */
+export type LnUrlVerifyResponse =
+  | {
+      /**
+       * Original BOLT11 invoice.
+       */
+      pr: string;
+      /**
+       * Hex-encoded payment preimage, or null before settlement.
+       */
+      preimage: string | null;
+      settled: boolean;
+      status: 'OK';
+    }
+  | {
+      reason: string;
+      status: 'ERROR';
+    };
 
 /**
  * Non-secret local login information for account administrators.
@@ -1427,6 +1452,37 @@ export type WellKnownNostrResponses = {
 };
 
 export type WellKnownNostrResponse = WellKnownNostrResponses[keyof WellKnownNostrResponses];
+
+export type VerifyLnurlInvoiceData = {
+  body?: never;
+  path: {
+    /**
+     * Invoice verification token from the LNURL-pay callback
+     */
+    token: string;
+  };
+  query?: never;
+  url: '/lnurlp/{token}/verify';
+};
+
+export type VerifyLnurlInvoiceErrors = {
+  /**
+   * Verification unavailable
+   */
+  500: LnUrlVerifyResponse;
+};
+
+export type VerifyLnurlInvoiceError = VerifyLnurlInvoiceErrors[keyof VerifyLnurlInvoiceErrors];
+
+export type VerifyLnurlInvoiceResponses = {
+  /**
+   * Invoice verification result, or Not found for an invalid or unknown token
+   */
+  200: LnUrlVerifyResponse;
+};
+
+export type VerifyLnurlInvoiceResponse =
+  VerifyLnurlInvoiceResponses[keyof VerifyLnurlInvoiceResponses];
 
 export type CallbackData = {
   body?: never;

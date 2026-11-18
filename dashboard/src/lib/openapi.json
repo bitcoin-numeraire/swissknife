@@ -123,13 +123,58 @@
         }
       }
     },
+    "/lnurlp/{token}/verify": {
+      "get": {
+        "tags": [
+          "LNURL"
+        ],
+        "summary": "Verify an LNURL-pay invoice",
+        "description": "Check settlement using the URL from the callback response. The preimage\nis returned only after settlement. See [LUD-21](https://github.com/lnurl/luds/blob/luds/21.md).",
+        "operationId": "verify_lnurl_invoice",
+        "parameters": [
+          {
+            "name": "token",
+            "in": "path",
+            "description": "Invoice verification token from the LNURL-pay callback",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Invoice verification result, or Not found for an invalid or unknown token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LnUrlVerifyResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Verification unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LnUrlVerifyResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
     "/lnurlp/{username}/callback": {
       "get": {
         "tags": [
           "LNURL"
         ],
         "summary": "LNURL callback endpoint",
-        "description": "Returns the callback response for this LN Address (username). Containing an invoice and information on how to behave upon success. See [LUDS-06](https://github.com/lnurl/luds/blob/luds/06.md)",
+        "description": "Returns an invoice, a success action, and a URL to verify settlement.\nSee [LUD-06](https://github.com/lnurl/luds/blob/luds/06.md) and [LUD-21](https://github.com/lnurl/luds/blob/luds/21.md).",
         "operationId": "callback",
         "parameters": [
           {
@@ -9450,6 +9495,13 @@
                 "description": "An optional action to be executed after successfully paying an invoice"
               }
             ]
+          },
+          "verify": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Optional LUD-21 URL to check whether this invoice has been settled."
           }
         }
       },
@@ -9486,6 +9538,60 @@
             "description": "URL for the user to open on success"
           }
         }
+      },
+      "LnUrlVerifyResponse": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "settled",
+              "preimage",
+              "pr",
+              "status"
+            ],
+            "properties": {
+              "pr": {
+                "type": "string",
+                "description": "Original BOLT11 invoice."
+              },
+              "preimage": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "Hex-encoded payment preimage, or null before settlement."
+              },
+              "settled": {
+                "type": "boolean"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "OK"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "reason",
+              "status"
+            ],
+            "properties": {
+              "reason": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "ERROR"
+                ]
+              }
+            }
+          }
+        ],
+        "description": "LUD-21 invoice verification response."
       },
       "LocalLogin": {
         "type": "object",

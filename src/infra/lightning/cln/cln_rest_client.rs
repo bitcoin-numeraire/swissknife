@@ -28,7 +28,9 @@ use crate::{
     },
     infra::{
         config::config_rs::deserialize_duration,
-        lightning::{bitcoin_utils::parse_psbt, cln::ListFundsResponse, types::parse_network, LnClient},
+        lightning::{
+            bitcoin_utils::parse_psbt, cln::ListFundsResponse, types::parse_network, LnClient, LnInvoiceOptions,
+        },
     },
 };
 
@@ -168,7 +170,7 @@ impl LnClient for ClnRestClient {
         description: String,
         label: String,
         expiry: u32,
-        deschashonly: bool,
+        options: LnInvoiceOptions,
     ) -> Result<Invoice, LightningError> {
         let response: InvoiceResponse = self
             .post_request(
@@ -178,7 +180,8 @@ impl LnClient for ClnRestClient {
                     expiry: expiry as u64,
                     label,
                     amount_msat,
-                    deschashonly: Some(deschashonly),
+                    deschashonly: Some(options.description_hash_only),
+                    preimage: options.preimage.map(hex::encode),
                 },
             )
             .await

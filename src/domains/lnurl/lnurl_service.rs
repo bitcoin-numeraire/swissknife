@@ -1,15 +1,17 @@
 use std::{sync::Arc, vec};
 
 use async_trait::async_trait;
+use bitcoin::hashes::{sha256, Hash};
 use tracing::{debug, info};
 use uuid::Uuid;
 
 use crate::{
     application::{
         composition::AppStore,
-        errors::{ApplicationError, DataError},
+        errors::{ApplicationError, DataError, LightningError},
     },
-    infra::lightning::LnClient,
+    domains::invoice::LnUrlInvoiceVerification,
+    infra::lightning::{LnClient, LnInvoiceOptions},
 };
 
 use super::{LnURLPayRequest, LnUrlCallback, LnUrlSuccessAction, LnUrlUseCases};
@@ -103,6 +105,10 @@ impl LnUrlUseCases for LnUrlService {
         }
 
         let invoice_id = Uuid::new_v4();
+        let verify_token = Uuid::new_v4();
+        // SwissKnife must know the preimage even if the invoice is paid internally
+        // and the provider's copy is canceled.
+        let preimage: [u8; 32] = rand::random();
         let mut invoice = self
             .ln_client
             .invoice(
@@ -110,18 +116,29 @@ impl LnUrlUseCases for LnUrlService {
                 self.metadata(&username),
                 invoice_id.to_string(),
                 self.invoice_expiry,
-                true,
+                LnInvoiceOptions {
+                    description_hash_only: true,
+                    preimage: Some(preimage),
+                },
             )
             .await?;
+        let ln_invoice = invoice
+            .ln_invoice
+            .as_ref()
+            .ok_or_else(|| LightningError::Invoice("Provider returned no Lightning invoice".to_string()))?;
+        if ln_invoice.payment_hash != sha256::Hash::hash(&preimage).to_string() {
+            return Err(LightningError::Invoice("Provider returned an unexpected invoice payment hash".into()).into());
+        }
+        let bolt11 = ln_invoice.bolt11.clone();
         invoice.id = invoice_id;
         invoice.wallet_id.clone_from(&ln_address.wallet_id);
         invoice.ln_address_id = Some(ln_address.id);
         invoice.description = Some(comment.unwrap_or(format!("Payment to {}@{}", username, self.domain)));
 
         // TODO: Get or add more information to make this a LNURLp invoice (like fetching a success action specific to the user)
-        let invoice = self.store.invoice.insert(invoice).await?;
+        self.store.invoice.insert_lnurl(invoice, verify_token, preimage).await?;
         let lnurlp_invoice = LnUrlCallback {
-            pr: invoice.ln_invoice.expect("should exist for ledger Lightning").bolt11,
+            pr: bolt11,
             success_action: Some(LnUrlSuccessAction {
                 tag: "message".to_string(),
                 message: Some("Thanks for the sats!".to_string()),
@@ -129,10 +146,18 @@ impl LnUrlUseCases for LnUrlService {
             }),
             disposable: None,
             routes: vec![],
+            verify: Some(format!(
+                "{}/lnurlp/{verify_token}/verify",
+                self.host.trim_end_matches('/')
+            )),
         };
 
         info!(username, "Lightning invoice generated successfully");
         Ok(lnurlp_invoice)
+    }
+
+    async fn verify(&self, token: Uuid) -> Result<Option<LnUrlInvoiceVerification>, ApplicationError> {
+        Ok(self.store.invoice.find_lnurl_verification(token).await?)
     }
 }
 
@@ -260,17 +285,18 @@ mod tests {
                     .expect_find_by_username()
                     .times(1)
                     .returning(|_| Ok(Some(ln_address(true))));
-                store.invoice.expect_insert().times(1).returning(Ok);
+                store.invoice.expect_insert_lnurl().times(1).returning(|_, _, _| Ok(()));
 
                 let mut ln_client = MockLnClient::new();
                 ln_client
                     .expect_invoice()
-                    .withf(|_, _, _, _, deschashonly| *deschashonly)
+                    .withf(|_, _, _, _, options| options.description_hash_only && options.preimage.is_some())
                     .times(1)
-                    .returning(|_, _, _, _, _| {
+                    .returning(|_, _, _, _, options| {
                         Ok(Invoice {
                             ln_invoice: Some(LnInvoice {
                                 bolt11: "lnbc1example".to_string(),
+                                payment_hash: sha256::Hash::hash(&options.preimage.unwrap()).to_string(),
                                 ..Default::default()
                             }),
                             ..Default::default()

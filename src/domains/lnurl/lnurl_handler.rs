@@ -1,9 +1,16 @@
 use std::sync::Arc;
 
-use axum::{extract::State, routing::get, Router};
+use axum::{
+    extract::{rejection::PathRejection, Path as AxumPath, State},
+    http::{header::CACHE_CONTROL, StatusCode},
+    response::IntoResponse,
+    routing::get,
+    Router,
+};
 use utoipa::OpenApi;
+use uuid::Uuid;
 
-use swissknife_types::{ErrorResponse, LNUrlpInvoiceQueryParams};
+use swissknife_types::{ErrorResponse, LNUrlpInvoiceQueryParams, LnUrlVerifyResponse};
 
 use crate::{
     application::{
@@ -18,8 +25,8 @@ use super::{LnURLPayRequest, LnUrlCallback};
 
 #[derive(OpenApi)]
 #[openapi(
-    paths(well_known, callback),
-    components(schemas(LnURLPayRequest, LnUrlCallback)),
+    paths(well_known, callback, verify),
+    components(schemas(LnURLPayRequest, LnUrlCallback, LnUrlVerifyResponse)),
     tags(
         (name = "LNURL", description = "Public LNURL endpoints as defined in the [protocol specification](https://github.com/lnurl/luds). Allows any active Lightning Address to receive payments")
     ),
@@ -27,7 +34,9 @@ use super::{LnURLPayRequest, LnUrlCallback};
 pub struct LnURLHandler;
 
 pub fn router() -> Router<Arc<AppServices>> {
-    Router::new().route("/{username}/callback", get(callback))
+    Router::new()
+        .route("/{username}/callback", get(callback))
+        .route("/{token}/verify", get(verify))
 }
 
 /// Well-known endpoint
@@ -54,7 +63,8 @@ pub async fn well_known(
 
 /// LNURL callback endpoint
 ///
-/// Returns the callback response for this LN Address (username). Containing an invoice and information on how to behave upon success. See [LUDS-06](https://github.com/lnurl/luds/blob/luds/06.md)
+/// Returns an invoice, a success action, and a URL to verify settlement.
+/// See [LUD-06](https://github.com/lnurl/luds/blob/luds/06.md) and [LUD-21](https://github.com/lnurl/luds/blob/luds/21.md).
 #[utoipa::path(
     get,
     path = "/{username}/callback",
@@ -73,12 +83,65 @@ async fn callback(
     Path(username): Path<String>,
     Query(query_params): Query<LNUrlpInvoiceQueryParams>,
     State(services): State<Arc<AppServices>>,
-) -> Result<Json<LnUrlCallback>, ApplicationError> {
+) -> Result<impl IntoResponse, ApplicationError> {
     let callback = services
         .lnurl
         .lnurlp_callback(username, query_params.amount, query_params.comment)
         .await?;
-    Ok(Json(callback))
+    Ok(([(CACHE_CONTROL, "no-store")], Json(callback)))
+}
+
+/// Verify an LNURL-pay invoice
+///
+/// Check settlement using the URL from the callback response. The preimage
+/// is returned only after settlement. See [LUD-21](https://github.com/lnurl/luds/blob/luds/21.md).
+#[utoipa::path(
+    get,
+    path = "/{token}/verify",
+    operation_id = "verify_lnurl_invoice",
+    context_path = "/lnurlp",
+    tag = "LNURL",
+    security(),
+    params(("token" = Uuid, Path, description = "Invoice verification token from the LNURL-pay callback")),
+    responses(
+        (status = 200, description = "Invoice verification result, or Not found for an invalid or unknown token", body = LnUrlVerifyResponse),
+        (status = 500, description = "Verification unavailable", body = LnUrlVerifyResponse)
+    )
+)]
+async fn verify(
+    token: Result<AxumPath<Uuid>, PathRejection>,
+    State(services): State<Arc<AppServices>>,
+) -> impl IntoResponse {
+    let verification = match token {
+        Ok(AxumPath(token)) => services.lnurl.verify(token).await,
+        Err(_) => Ok(None),
+    };
+    let (status, response) = match verification {
+        Ok(Some(invoice)) => (
+            StatusCode::OK,
+            LnUrlVerifyResponse::Ok {
+                settled: invoice.settled_preimage.is_some(),
+                preimage: invoice.settled_preimage,
+                pr: invoice.bolt11,
+            },
+        ),
+        Ok(None) => (
+            StatusCode::OK,
+            LnUrlVerifyResponse::Error {
+                reason: "Not found".into(),
+            },
+        ),
+        Err(error) => {
+            tracing::error!(%error, "Invoice verification failed");
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                LnUrlVerifyResponse::Error {
+                    reason: "Verification unavailable".into(),
+                },
+            )
+        }
+    };
+    (status, [(CACHE_CONTROL, "no-store")], Json(response))
 }
 
 #[cfg(test)]

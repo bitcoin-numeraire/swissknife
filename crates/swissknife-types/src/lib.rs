@@ -38,7 +38,10 @@ pub use error::ErrorResponse;
 pub use event::{ClientEvent, ClientEventStreamQuery, ClientEventType};
 pub use invoice::{Invoice, InvoiceFilter, InvoiceOrderBy, InvoiceStatus, LnInvoice, NewInvoiceRequest};
 pub use ln_address::{LnAddress, LnAddressFilter, RegisterLnAddressRequest, UpdateLnAddressRequest};
-pub use lnurl::{LNUrlpInvoiceQueryParams, LnURLPayRequest, LnUrlCallback, LnUrlPaySuccessAction, LnUrlSuccessAction};
+pub use lnurl::{
+    LNUrlpInvoiceQueryParams, LnURLPayRequest, LnUrlCallback, LnUrlPaySuccessAction, LnUrlSuccessAction,
+    LnUrlVerifyResponse,
+};
 pub use network::BtcNetwork;
 pub use nostr::{NostrNIP05QueryParams, NostrNIP05Response};
 pub use payment::{

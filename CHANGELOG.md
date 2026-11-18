@@ -8,6 +8,12 @@ release notes when a tag is published.
 
 ## [Unreleased]
 
+### Added
+
+- LNURL-pay callbacks now include a [LUD-21](https://github.com/lnurl/luds/blob/luds/21.md)
+  verification URL for checking invoice settlement and retrieving the preimage after payment
+  ([#412](https://github.com/bitcoin-numeraire/swissknife/issues/412)).
+
 ### Fixed
 
 - Wait for an Auth0 API access token before loading the dashboard after sign-in.

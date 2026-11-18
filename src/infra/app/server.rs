@@ -8,13 +8,13 @@ use crate::{
     },
     domains::{account, bitcoin, invoice, ln_address, lnurl, nostr, payment, system, wallet},
 };
-use axum::{routing::get, Router};
+use axum::{extract::MatchedPath, http::Request, routing::get, Router};
 use std::future::Future;
 use tokio::net::TcpListener;
 use tower_http::{
     cors::CorsLayer,
     services::{ServeDir, ServeFile},
-    trace::TraceLayer,
+    trace::{DefaultMakeSpan, MakeSpan, TraceLayer},
 };
 use tracing::info;
 use utoipa_scalar::{Scalar, Servable as ScalarServable};
@@ -47,7 +47,18 @@ impl Server {
         };
 
         let router = router
-            .layer(TraceLayer::new_for_http())
+            .layer(TraceLayer::new_for_http().make_span_with(|request: &Request<_>| {
+                // The verification URL grants access to the preimage after settlement.
+                if let Some(path) = request
+                    .extensions()
+                    .get::<MatchedPath>()
+                    .filter(|path| path.as_str() == "/lnurlp/{token}/verify")
+                {
+                    tracing::debug_span!("request", method = %request.method(), uri = path.as_str(), version = ?request.version())
+                } else {
+                    DefaultMakeSpan::new().make_span(request)
+                }
+            }))
             .layer(adapters.timeout_layer)
             .layer(CorsLayer::permissive())
             .with_state(services);

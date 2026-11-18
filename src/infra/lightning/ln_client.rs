@@ -9,6 +9,13 @@ use crate::{
     },
 };
 
+#[derive(Default)]
+pub struct LnInvoiceOptions {
+    pub description_hash_only: bool,
+    /// Set when SwissKnife needs to prove settlement even for an internal transfer.
+    pub preimage: Option<[u8; 32]>,
+}
+
 #[cfg_attr(test, mockall::automock)]
 #[async_trait]
 pub trait LnClient: Sync + Send {
@@ -19,7 +26,7 @@ pub trait LnClient: Sync + Send {
         description: String,
         label: String,
         expiry: u32,
-        deschashonly: bool,
+        options: LnInvoiceOptions,
     ) -> Result<Invoice, LightningError>;
     /// Return a provider-derived route fee estimate.
     async fn estimate_fee(&self, target: LnPaymentTarget) -> Result<u64, LightningError>;

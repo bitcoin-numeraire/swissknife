@@ -47,7 +47,7 @@ use crate::{
                 },
             },
             types::parse_network,
-            LnClient,
+            LnClient, LnInvoiceOptions,
         },
     },
 };
@@ -305,16 +305,17 @@ impl LnClient for LndGrpcClient {
         description: String,
         _label: String,
         expiry: u32,
-        deschashonly: bool,
+        options: LnInvoiceOptions,
     ) -> Result<Invoice, LightningError> {
         let mut request = lnrpc::Invoice {
             memo: description.clone(),
             expiry: expiry as i64,
             value_msat: amount_msat as i64,
+            r_preimage: options.preimage.map_or_else(Vec::new, |preimage| preimage.to_vec()),
             ..Default::default()
         };
 
-        if deschashonly {
+        if options.description_hash_only {
             let hash = sha256::Hash::hash(description.as_bytes()).to_byte_array().to_vec();
             request.description_hash = hash;
         }

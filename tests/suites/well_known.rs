@@ -1,14 +1,20 @@
 //! Public, unauthenticated endpoints an external wallet hits to reach a
-//! SwissKnife user: LNURL-pay (LUD-06) and Nostr NIP-05. These serve OUR
+//! SwissKnife user: LNURL-pay (LUD-06/LUD-21) and Nostr NIP-05. These serve OUR
 //! endpoints — no outbound calls — so no mock server is needed, and the LNURL
 //! pay flow settles over the real LND<->CLN channel. Paying *out* to someone
 //! else's address/Nostr (which needs a mock server) is covered separately.
 
 use std::time::Duration;
 
-use reqwest::StatusCode;
+use bitcoin::hashes::{sha256, Hash};
+use lightning_invoice::Bolt11Invoice;
+use reqwest::{header::CACHE_CONTROL, StatusCode};
+use serde_json::{json, Value};
 
-use swissknife_types::{LnAddress, LnURLPayRequest, LnUrlCallback, NostrNIP05Response, UpdateLnAddressRequest, Wallet};
+use swissknife_types::{
+    Invoice, Ledger, LnAddress, LnURLPayRequest, LnUrlCallback, NewInvoiceRequest, NostrNIP05Response, Payment,
+    SendPaymentRequest, UpdateLnAddressRequest, Wallet,
+};
 
 use crate::common::counterparty::Counterparty;
 use crate::common::fixtures::unique;
@@ -48,9 +54,28 @@ mod lnurl {
             200,
             "advertised callback was not reachable / failed"
         );
+        assert_eq!(res.headers().get(CACHE_CONTROL).unwrap(), "no-store");
         res.json::<LnUrlCallback>()
             .await
             .expect("callback returns an LnUrlCallback")
+    }
+
+    async fn verify(url: &str) -> Value {
+        let response = reqwest::get(url).await.expect("reach the LNURL verification endpoint");
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(response.headers().get(CACHE_CONTROL).unwrap(), "no-store");
+        response.json().await.expect("verification returns JSON")
+    }
+
+    fn assert_payment_proof(response: &Value, pr: &str) {
+        let preimage = hex::decode(response["preimage"].as_str().expect("settled invoice has proof")).unwrap();
+        assert_eq!(preimage.len(), 32);
+        let invoice: Bolt11Invoice = pr.parse().unwrap();
+        assert_eq!(&sha256::Hash::hash(&preimage), invoice.payment_hash());
+        assert_eq!(
+            response,
+            &json!({"status": "OK", "settled": true, "pr": pr, "preimage": hex::encode(preimage)})
+        );
     }
 
     #[tokio::test]
@@ -105,6 +130,7 @@ mod lnurl {
             "a regtest bolt11 invoice was issued: {}",
             cb.pr
         );
+        assert!(cb.success_action.is_some());
     }
 
     #[tokio::test]
@@ -121,6 +147,14 @@ mod lnurl {
             .parse::<LnURLPayRequest>();
         // Resolve and pay strictly through the advertised callback.
         let cb = follow_callback(&pay.callback, amount_msat).await;
+        let verify_url = cb.verify.as_deref().expect("callback advertises LUD-21");
+        let another = follow_callback(&pay.callback, amount_msat).await;
+        let another_url = another.verify.as_deref().expect("each invoice has a verification URL");
+        assert_ne!(verify_url, another_url);
+        assert_eq!(
+            verify(verify_url).await,
+            json!({"status": "OK", "settled": false, "pr": cb.pr, "preimage": null})
+        );
         Counterparty::for_provider(&app.provider).pay(&cb.pr);
 
         wait_until(
@@ -129,6 +163,79 @@ mod lnurl {
             || async { app.wallet_balance(token, wallet.id).await.available_msat >= amount_msat as i64 },
         )
         .await;
+
+        assert_payment_proof(&verify(verify_url).await, &cb.pr);
+        assert_eq!(
+            verify(another_url).await,
+            json!({"status": "OK", "settled": false, "pr": another.pr, "preimage": null})
+        );
+    }
+
+    #[tokio::test]
+    async fn verifies_an_internal_payment_after_restart() {
+        let app = TestApp::isolated("lnurl-verify-internal", &[]).await;
+        let token = app.admin_token().await;
+        let payer = app.create_wallet(token, "lnurl-verify-payer").await;
+        app.fund_onchain(token, payer.id, 100_000).await;
+        let (_wallet, addr) = register_address(&app, token, "lnurl-verify-payee", None).await;
+        let pay = app
+            .api()
+            .get(&format!("/.well-known/lnurlp/{}", addr.username), Auth::None)
+            .await
+            .parse::<LnURLPayRequest>();
+        let cb = follow_callback(&pay.callback, 10_000_000).await;
+        let verify_url = reqwest::Url::parse(cb.verify.as_deref().unwrap()).unwrap();
+        let result = app
+            .api()
+            .post(
+                "/v1/payments",
+                Auth::Bearer(token),
+                SendPaymentRequest {
+                    wallet_id: Some(payer.id),
+                    input: cb.pr.clone(),
+                    amount_msat: None,
+                    comment: None,
+                },
+            )
+            .await;
+        assert_status(&result, StatusCode::OK);
+        assert_eq!(result.parse::<Payment>().ledger, Ledger::Internal);
+        assert_payment_proof(&verify(verify_url.as_str()).await, &cb.pr);
+
+        let restarted = app.restart("lnurl-verify-restarted", &[]).await;
+        let url = format!("{}{}", restarted.base_url, verify_url.path());
+        assert_payment_proof(&verify(&url).await, &cb.pr);
+    }
+
+    #[tokio::test]
+    async fn verification_rejects_invalid_tokens_and_ordinary_invoice_ids() {
+        let app = app().await;
+        let token = app.admin_token().await;
+        let wallet = app.create_wallet(token, "lnurl-verify-private").await;
+        let result = app
+            .api()
+            .post(
+                "/v1/invoices",
+                Auth::Bearer(token),
+                NewInvoiceRequest {
+                    wallet_id: Some(wallet.id),
+                    amount_msat: 10_000,
+                    description: None,
+                    expiry: None,
+                },
+            )
+            .await;
+        assert_status(&result, StatusCode::OK);
+        let id = result.parse::<Invoice>().id;
+
+        for token in [
+            "not-a-uuid".to_string(),
+            uuid::Uuid::new_v4().to_string(),
+            id.to_string(),
+        ] {
+            let url = format!("{}/lnurlp/{token}/verify", app.base_url);
+            assert_eq!(verify(&url).await, json!({"status": "ERROR", "reason": "Not found"}));
+        }
     }
 
     #[tokio::test]
