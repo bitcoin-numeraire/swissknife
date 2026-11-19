@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use crate::{
-    application::composition::{AppAdapters, AppConfig, LightningProvider},
+    application::composition::{AppAdapters, AppConfig},
     domains::{
         account::{AccountService, AccountUseCases, ApiKeyService, ApiKeyUseCases, AuthService, AuthUseCases},
         bitcoin::{BitcoinService, BitcoinUseCases},
@@ -41,7 +41,6 @@ impl AppServices {
             client_events,
             auth_provider,
             bitcoin_address_type,
-            ln_provider,
             ..
         } = config;
 
@@ -62,7 +61,6 @@ impl AppServices {
             bitcoin_wallet.clone(),
             domain.clone(),
             event.clone(),
-            matches!(ln_provider, LightningProvider::ClnGrpc | LightningProvider::ClnRest),
         );
         let invoices = InvoiceService::new(
             store.clone(),

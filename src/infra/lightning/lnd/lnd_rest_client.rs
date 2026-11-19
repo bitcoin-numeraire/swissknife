@@ -26,7 +26,7 @@ use crate::{
     },
     infra::{
         config::config_rs::deserialize_duration,
-        lightning::{bitcoin_utils::parse_psbt, types::parse_network, LnClient, PaymentLookup},
+        lightning::{bitcoin_utils::parse_psbt, types::parse_network, LnClient},
     },
 };
 use async_trait::async_trait;
@@ -344,11 +344,7 @@ impl LnClient for LndRestClient {
         }
     }
 
-    async fn payment_by_hash(
-        &self,
-        payment_hash: String,
-        _lookup: PaymentLookup,
-    ) -> Result<Option<Payment>, LightningError> {
+    async fn payment_by_hash(&self, payment_hash: String) -> Result<Option<Payment>, LightningError> {
         let hash_bytes = hex::decode(&payment_hash).map_err(|e| LightningError::PaymentByHash(e.to_string()))?;
         let url = format!(
             "https://{}/v2/router/track/{}?no_inflight_updates=false",
@@ -404,7 +400,6 @@ impl LnClient for LndRestClient {
                     payment_time: Some(Utc.timestamp_nanos(payment_time_ns)),
                     lightning: Some(LnPayment {
                         payment_hash: status.payment_hash,
-                        bolt11: status.payment_request.filter(|request| !request.is_empty()),
                         payment_preimage: Some(status.payment_preimage),
                         ..Default::default()
                     }),
@@ -419,7 +414,6 @@ impl LnClient for LndRestClient {
                 fee_msat: status.fee_msat,
                 lightning: Some(LnPayment {
                     payment_hash: status.payment_hash,
-                    bolt11: status.payment_request.filter(|request| !request.is_empty()),
                     ..Default::default()
                 }),
                 ..Default::default()
@@ -430,7 +424,6 @@ impl LnClient for LndRestClient {
                 amount_msat: status.value_msat.unwrap_or_default(),
                 lightning: Some(LnPayment {
                     payment_hash: status.payment_hash,
-                    bolt11: status.payment_request.filter(|request| !request.is_empty()),
                     ..Default::default()
                 }),
                 ..Default::default()

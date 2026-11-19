@@ -122,8 +122,6 @@ pub struct ListPaysResponse {
 pub struct ListPaysPayment {
     pub status: String,
     pub payment_hash: String,
-    pub bolt11: Option<String>,
-    pub label: Option<String>,
     pub preimage: Option<String>,
     pub amount_msat: Option<u64>,
     pub amount_sent_msat: Option<u64>,

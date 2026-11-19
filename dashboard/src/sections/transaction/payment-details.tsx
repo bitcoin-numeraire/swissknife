@@ -1,13 +1,10 @@
 import type { Payment } from 'src/lib/swissknife';
 
-import { useState } from 'react';
-
 import Link from '@mui/material/Link';
 import Card from '@mui/material/Card';
 import Grid from '@mui/material/Grid';
 import Stack from '@mui/material/Stack';
 import Alert from '@mui/material/Alert';
-import Button from '@mui/material/Button';
 import Typography from '@mui/material/Typography';
 
 import { paths } from 'src/routes/paths';
@@ -21,15 +18,9 @@ import {
 } from 'src/utils/bitcoin-explorer';
 
 import { useTranslate } from 'src/locales';
-import { Permission } from 'src/lib/swissknife';
-import { useFetchFiatPrices } from 'src/actions/mempool-space';
 
 import { CopyButton } from 'src/components/copy';
 import { SatsWithIcon } from 'src/components/bitcoin';
-
-import { SendMoneyDrawer } from 'src/sections/wallet/money-drawers';
-
-import { RoleBasedGuard } from 'src/auth/guard';
 
 import { TransactionType } from 'src/types/transaction';
 
@@ -49,7 +40,6 @@ import {
 type Props = {
   payment: Payment;
   isAdmin?: boolean;
-  onPaymentChange?: VoidFunction;
 };
 
 function compactHash(value?: string | null) {
@@ -58,35 +48,9 @@ function compactHash(value?: string | null) {
   return `${value.slice(0, 8)}...${value.slice(-8)}`;
 }
 
-function RetryPaymentDrawer({
-  payment,
-  invoice,
-  isAdmin,
-  onClose,
-  onPaymentChange,
-}: Props & { invoice: string; onClose: VoidFunction }) {
-  const { fiatPrices } = useFetchFiatPrices();
-
-  return (
-    <SendMoneyDrawer
-      open
-      walletId={payment.wallet_id}
-      isAdmin={isAdmin}
-      contacts={[]}
-      fiatPrices={fiatPrices ?? {}}
-      initialInput={invoice}
-      initialAmountMSats={payment.amount_msat}
-      onClose={onClose}
-      onSuccess={onPaymentChange}
-    />
-  );
-}
-
-export function PaymentDetails({ payment, isAdmin, onPaymentChange }: Props) {
+export function PaymentDetails({ payment, isAdmin }: Props) {
   const { t } = useTranslate();
-  const [retryOpen, setRetryOpen] = useState(false);
-  const { ln_address, success_action, payment_hash, payment_preimage, bolt11, retryable } =
-    payment.lightning ?? {};
+  const { ln_address, success_action, payment_hash, payment_preimage } = payment.lightning ?? {};
   const amountSent = payment.amount_msat || 0;
   const feeAmount = payment.fee_msat || 0;
   const totalAmount = amountSent + feeAmount;
@@ -242,21 +206,6 @@ export function PaymentDetails({ payment, isAdmin, onPaymentChange }: Props) {
                     </Alert>
                   )}
 
-                  {payment.status === 'Failed' && retryable && bolt11 && (
-                    <RoleBasedGuard
-                      permissions={isAdmin ? [Permission.WRITE_TRANSACTION] : undefined}
-                    >
-                      <Button
-                        size="small"
-                        variant="outlined"
-                        sx={{ alignSelf: 'flex-start' }}
-                        onClick={() => setRetryOpen(true)}
-                      >
-                        {t('payment_details.retry')}
-                      </Button>
-                    </RoleBasedGuard>
-                  )}
-
                   {success_action && (
                     <Alert severity="success" variant="outlined">
                       <Stack spacing={0.5}>
@@ -316,14 +265,6 @@ export function PaymentDetails({ payment, isAdmin, onPaymentChange }: Props) {
               <DetailRow label={t('transaction_details.description')} value={payment.description} />
               {isLightning && (
                 <DetailRow label={t('payment_details.lightning_address')} value={ln_address} />
-              )}
-              {payment.status === 'Failed' && bolt11 && (
-                <DetailRow
-                  label={t('invoice_details.bolt11')}
-                  value={bolt11}
-                  copyValue={bolt11}
-                  mono
-                />
               )}
               {bitcoinAddress && (
                 <DetailRow
@@ -420,16 +361,6 @@ export function PaymentDetails({ payment, isAdmin, onPaymentChange }: Props) {
           </Grid>
         </Grid>
       </Stack>
-
-      {retryOpen && bolt11 && (
-        <RetryPaymentDrawer
-          payment={payment}
-          invoice={bolt11}
-          isAdmin={isAdmin}
-          onClose={() => setRetryOpen(false)}
-          onPaymentChange={onPaymentChange}
-        />
-      )}
     </>
   );
 }

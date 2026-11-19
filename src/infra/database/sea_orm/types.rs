@@ -146,9 +146,6 @@ impl From<PaymentModel> for Payment {
                 .payment_hash
                 .clone()
                 .expect("payment_hash should exist for Lightning payment"),
-            bolt11: model.bolt11.clone(),
-            retryable: None,
-            attempt_id: model.attempt_id,
             payment_preimage: model.payment_preimage.clone(),
             metadata: model.metadata.clone(),
             success_action: serde_json::from_value(model.success_action.clone().unwrap_or_default()).ok(),

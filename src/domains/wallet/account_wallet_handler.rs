@@ -530,7 +530,6 @@ async fn list_wallet_btc_addresses(
         (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
         (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
         (status = 404, description = "Not Found", body = ErrorResponse, example = json!(NOT_FOUND_EXAMPLE)),
-        (status = 409, description = "An existing payment blocks this send or retry", body = ErrorResponse),
         (status = 422, description = "Unprocessable Entity", body = ErrorResponse, example = json!(UNPROCESSABLE_EXAMPLE)),
         (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
     )
@@ -826,7 +825,7 @@ async fn get_wallet_payment(
         .cloned()
         .ok_or_else(|| DataError::NotFound("Payment not found.".to_string()))?;
 
-    Ok(Json(services.payment.payment_details(payment).await))
+    Ok(Json(payment))
 }
 
 /// List invoices for a wallet.

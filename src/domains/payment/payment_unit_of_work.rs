@@ -10,14 +10,6 @@ pub trait PaymentUnitOfWork: Send + Sync {
     /// Reserve `reserve_amount_msat` and insert a pending outgoing payment, atomically.
     async fn reserve(&self, payment: Payment, reserve_amount_msat: u64) -> Result<Payment, ApplicationError>;
 
-    /// Re-reserve a failed Lightning payment with a fresh provider attempt ID.
-    async fn retry(
-        &self,
-        payment: Payment,
-        bolt11: String,
-        reserve_amount_msat: u64,
-    ) -> Result<Payment, ApplicationError>;
-
     /// Settle a reserved payment: release the reservation and debit the actual spend, atomically.
     async fn settle(&self, payment: Payment) -> Result<Payment, ApplicationError>;
 

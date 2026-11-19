@@ -25,7 +25,7 @@ type Props = {
 export function AdminPaymentDetailsView({ id }: Props) {
   const { t } = useTranslate();
 
-  const { payment, paymentLoading, paymentError, paymentMutate } = useGetPayment(id);
+  const { payment, paymentLoading, paymentError } = useGetPayment(id);
 
   const errors = [paymentError];
   const data = [payment];
@@ -55,13 +55,7 @@ export function AdminPaymentDetailsView({ id }: Props) {
               sx={{ mb: { xs: 3, md: 5 } }}
             />
 
-            <PaymentDetails
-              payment={payment!}
-              isAdmin
-              onPaymentChange={() => {
-                void paymentMutate();
-              }}
-            />
+            <PaymentDetails payment={payment!} isAdmin />
           </>
         )}
       </RoleBasedGuard>

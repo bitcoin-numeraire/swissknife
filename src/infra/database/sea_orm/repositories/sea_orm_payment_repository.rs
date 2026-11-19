@@ -121,11 +121,6 @@ where
             })
             .unwrap_or((None, None, None));
 
-        let bolt11 = payment
-            .lightning
-            .as_ref()
-            .and_then(|lightning| lightning.bolt11.clone());
-        let attempt_id = payment.lightning.as_ref().and_then(|lightning| lightning.attempt_id);
         let model = ActiveModel {
             id: Set(Uuid::new_v4()),
             wallet_id: Set(payment.wallet_id),
@@ -143,8 +138,6 @@ where
             success_action: Set(success_action),
             raw_success_action: Set(raw_success_action),
             payment_preimage: Set(payment_preimage),
-            bolt11: Set(bolt11),
-            attempt_id: Set(attempt_id),
             btc_block_height: Set(block_height.map(i64::from)),
             ..Default::default()
         }
@@ -211,11 +204,6 @@ where
             None => ActiveValue::NotSet,
         };
 
-        let bolt11 = payment
-            .lightning
-            .as_ref()
-            .and_then(|lightning| lightning.bolt11.clone());
-        let attempt_id = payment.lightning.as_ref().and_then(|lightning| lightning.attempt_id);
         let model = ActiveModel {
             id: Unchanged(payment.id),
             status: Set(payment.status.to_string()),
@@ -224,8 +212,6 @@ where
             payment_time: Set(payment.payment_time.map(|t| t.naive_utc())),
             payment_hash: Set(payment_hash.or(btc_txid).or(internal_payment_hash)),
             payment_preimage: Set(payment_preimage),
-            bolt11: Set(bolt11),
-            attempt_id: Set(attempt_id),
             error: Set(payment.error),
             amount_msat: Set(payment.amount_msat as i64),
             metadata: Set(metadata),
@@ -246,21 +232,11 @@ where
         Ok(model.into())
     }
 
-    async fn try_transition(
-        &self,
-        id: Uuid,
-        attempt_id: Option<Uuid>,
-        from: &[PaymentStatus],
-        to: PaymentStatus,
-    ) -> Result<bool, DatabaseError> {
+    async fn try_transition(&self, id: Uuid, from: &[PaymentStatus], to: PaymentStatus) -> Result<bool, DatabaseError> {
         let result = PaymentEntity::update_many()
             .col_expr(Column::Status, Expr::value(to.to_string()))
             .filter(Column::Id.eq(id))
             .filter(Column::Status.is_in(from.iter().map(|status| status.to_string())))
-            .filter(match attempt_id {
-                Some(attempt_id) => Column::AttemptId.eq(attempt_id),
-                None => Column::AttemptId.is_null(),
-            })
             .exec(self.db.connection())
             .await
             .map_err(|e| DatabaseError::Update(e.to_string()))?;
@@ -270,7 +246,6 @@ where
 
     async fn delete_many(&self, filter: PaymentFilter) -> Result<u64, DatabaseError> {
         let result = PaymentEntity::delete_many()
-            .filter(Column::Status.ne(PaymentStatus::Pending.to_string()))
             .apply_if(filter.wallet_id, |q, wallet| q.filter(Column::WalletId.eq(wallet)))
             .apply_if(filter.ids, |q, ids| q.filter(Column::Id.is_in(ids)))
             .apply_if(filter.status, |q, s| q.filter(Column::Status.eq(s.to_string())))

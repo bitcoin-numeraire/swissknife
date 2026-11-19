@@ -6560,16 +6560,6 @@
               }
             }
           },
-          "409": {
-            "description": "An existing payment blocks this send or retry",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
           "422": {
             "description": "Unprocessable Entity",
             "content": {
@@ -7101,16 +7091,6 @@
               }
             }
           },
-          "409": {
-            "description": "An existing payment blocks this send or retry",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
           "422": {
             "description": "Unprocessable Entity",
             "content": {
@@ -7579,16 +7559,6 @@
                   "$ref": "#/components/schemas/ErrorResponse"
                 },
                 "example": "\n{\n    \"status\": \"404 Not Found\",\n    \"reason\": \"Resource not found\"\n}\n"
-              }
-            }
-          },
-          "409": {
-            "description": "The payment changed before deletion",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
               }
             }
           },
@@ -9340,13 +9310,6 @@
           "payment_hash"
         ],
         "properties": {
-          "bolt11": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "Original BOLT11 supplied for this outgoing payment."
-          },
           "ln_address": {
             "type": [
               "string",
@@ -9373,13 +9336,6 @@
               "null"
             ],
             "description": "Payment Preimage"
-          },
-          "retryable": {
-            "type": [
-              "boolean",
-              "null"
-            ],
-            "description": "Whether a failed payment can be retried from its details."
           },
           "success_action": {
             "oneOf": [

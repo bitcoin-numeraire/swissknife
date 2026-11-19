@@ -78,18 +78,6 @@ pub struct LnPayment {
     #[schema(example = "b587c7f76339e3fb87ad2b...")]
     pub payment_hash: String,
 
-    /// Original BOLT11 supplied for this outgoing payment.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub bolt11: Option<String>,
-
-    /// Whether a failed payment can be retried from its details.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub retryable: Option<bool>,
-
-    /// Provider label for a retry. First attempts use the payment ID.
-    #[serde(skip)]
-    pub attempt_id: Option<Uuid>,
-
     /// Payment Preimage
     #[serde(skip_serializing_if = "Option::is_none")]
     pub payment_preimage: Option<String>,

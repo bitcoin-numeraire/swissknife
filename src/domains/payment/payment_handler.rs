@@ -108,7 +108,6 @@ async fn estimate_payment_fee(
         (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
         (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
         (status = 403, description = "Forbidden", body = ErrorResponse, example = json!(FORBIDDEN_EXAMPLE)),
-        (status = 409, description = "An existing payment blocks this send or retry", body = ErrorResponse),
         (status = 422, description = "Unprocessable Entity", body = ErrorResponse, example = json!(UNPROCESSABLE_EXAMPLE)),
         (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
     )
@@ -156,7 +155,7 @@ async fn get_payment(
     user.check_permission(Permission::ReadTransaction)?;
 
     let payment = services.payment.get(id).await?;
-    Ok(Json(services.payment.payment_details(payment).await))
+    Ok(Json(payment))
 }
 
 /// List payments
@@ -202,7 +201,6 @@ async fn list_payments(
         (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
         (status = 403, description = "Forbidden", body = ErrorResponse, example = json!(FORBIDDEN_EXAMPLE)),
         (status = 404, description = "Not Found", body = ErrorResponse, example = json!(NOT_FOUND_EXAMPLE)),
-        (status = 409, description = "The payment changed before deletion", body = ErrorResponse),
         (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
     )
 )]
@@ -412,11 +410,6 @@ mod tests {
                     .withf(move |queried| *queried == id)
                     .times(1)
                     .returning(|_| Ok(Payment::default()));
-                builder
-                    .payment
-                    .expect_payment_details()
-                    .times(1)
-                    .returning(|payment| payment);
 
                 let result = get_payment(
                     State(Arc::new(builder.build())),
