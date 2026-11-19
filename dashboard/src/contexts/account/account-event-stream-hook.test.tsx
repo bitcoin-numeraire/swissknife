@@ -14,7 +14,7 @@ afterEach(() => {
 describe('account event authentication', () => {
   it('connects once an account is authenticated and closes on sign-out', async () => {
     vi.mocked(streamAccountEvents).mockImplementation(async (options) => ({
-      stream: (async function* () {
+      stream: (async function* waitForAbort() {
         await new Promise<void>((resolve) => {
           options?.signal?.addEventListener('abort', () => resolve(), { once: true });
         });

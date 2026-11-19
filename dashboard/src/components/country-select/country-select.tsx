@@ -31,6 +31,7 @@ type DisableClearable = boolean | undefined;
 type FreeSolo = boolean | undefined;
 
 type ExcludedProps = 'options' | 'renderOption' | 'renderInput' | 'renderValue' | 'getOptionLabel';
+type TextFieldSlotProps = NonNullable<TextFieldProps['slotProps']>;
 
 export type AutocompleteBaseProps = Omit<
   AutocompleteProps<any, Multiple, DisableClearable, FreeSolo>,
@@ -137,8 +138,8 @@ export function CountrySelect({
         },
       };
 
-      const mergedSlotProps: TextFieldProps['slotProps'] = merge(
-        systemSlotProps,
+      const mergedSlotProps = merge<TextFieldSlotProps, TextFieldSlotProps>(
+        systemSlotProps ?? {},
         externalTextFieldSlotProps ?? {}
       );
 

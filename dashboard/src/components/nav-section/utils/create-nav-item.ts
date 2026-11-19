@@ -40,18 +40,13 @@ export function createNavItem({
   /**
    * Render @icon
    */
-  let renderIcon = null;
-
-  if (icon && render?.navIcon && typeof icon === 'string') {
-    renderIcon = render?.navIcon[icon];
-  } else {
-    renderIcon = icon;
-  }
+  const renderIcon =
+    icon && render?.navIcon && typeof icon === 'string' ? render.navIcon[icon] : icon;
 
   /**
    * Render @info
    */
-  let renderInfo = null;
+  let renderInfo: React.ReactNode;
 
   if (info && render?.navInfo && Array.isArray(info)) {
     const [key, value] = info;

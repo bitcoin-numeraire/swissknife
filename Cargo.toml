@@ -3,7 +3,7 @@ members = ["crates/migration", "crates/swissknife-types"]
 resolver = "2"
 
 [workspace.package]
-rust-version = "1.99"
+rust-version = "1.100"
 
 [package]
 name = "swissknife"
@@ -24,17 +24,17 @@ axum-extra = { version = "0.12.6", features = ["typed-header", "query"] }
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.154"
 serde_bolt = "0.5.2"
-serde_with = "3.24.0"
+serde_with = "3.25.0"
 tokio = { version = "1.54.1", features = ["macros", "rt-multi-thread", "signal", "net", "sync", "time", "fs", "io-util"] }
 bip21 = { version = "0.5.0", features = ["std"] }
-lnurl = { package = "lnurl-rs", version = "0.10.0", default-features = false, features = ["async"] }
+lnurl = { package = "lnurl-rs", version = "0.11.0", default-features = false, features = ["async"] }
 config = { version = "0.15.27", features = ["yaml", "json", "toml"] }
 dotenvy = "0.15.7"
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["json", "env-filter"] }
-jsonwebtoken = { version = "11.1.0", features = ["aws_lc_rs"] }
-reqwest = { version = "0.12.28", features = ["json"] }
-uuid = { version = "1.29.0", features = ["v4", "serde"] }
+jsonwebtoken = { version = "12.0.0", features = ["aws_lc_rs"] }
+reqwest = { version = "0.13.5", features = ["json", "form"] }
+uuid = { version = "1.29.3", features = ["v4", "serde"] }
 chrono = "0.4.45"
 thiserror = "2.0.21"
 tower-http = { version = "0.7.1", features = [
@@ -55,10 +55,10 @@ sea-orm = { version = "2.0.4", features = [
 ] }
 strum = "0.28"
 strum_macros = "0.28"
-tonic = { version = "0.14.6", features = ["tls-ring"] }
-tonic-prost = "0.14.6"
-prost = "0.14.4"
-lightning-invoice = "0.34.1"
+tonic = { version = "0.14.9", features = ["tls-ring"] }
+tonic-prost = "0.14.9"
+prost = "0.14.6"
+lightning-invoice = "0.34.2"
 hex = "0.4.3"
 anyhow = "1.0.104"
 futures-util = "0.3.34"
@@ -66,21 +66,21 @@ humantime = "2.4.0"
 rust_socketio = { version = "0.6.0", features = ["async"] }
 migration = { path = "crates/migration" }
 swissknife-types = { path = "crates/swissknife-types" }
-utoipa = { version = "5.5.0", features = ["axum_extras", "chrono", "uuid"] }
-utoipa-scalar = { version = "0.3.0", features = ["axum"] }
+utoipa = { version = "6.0.0", features = ["axum_extras", "chrono", "uuid"] }
+utoipa-scalar = { version = "0.4.0", features = ["axum"] }
 native-tls = "0.2.18"
-nostr-sdk = "0.45.4"
-rand = "0.10.3"
+nostr-sdk = "0.45.6"
+rand = "0.10.4"
 base64 = "0.23.1"
 tokio-tungstenite = { version = "0.30.0", features = ["native-tls"] }
 http = "1.5.0"
-bytes = "1.12.1"
+bytes = "1.12.2"
 bitcoin = "=0.32.102"
-argon2 = "0.5.3"
-clap = { version = "4.6.7", features = ["derive"] }
+argon2 = "0.6.0"
+clap = { version = "4.6.8", features = ["derive"] }
 
 [build-dependencies]
-tonic-prost-build = "0.14.6"
+tonic-prost-build = "0.14.9"
 chrono = "0.4.45"
 
 [profile.release]

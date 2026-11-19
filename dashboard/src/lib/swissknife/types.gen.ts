@@ -21,12 +21,12 @@ export type Account = {
    * Stable internal account ID.
    */
   id: string;
-  identity?: null | AuthIdentity;
+  identity?: AuthIdentity | null;
   /**
    * Permissions stored for this account.
    */
   permissions?: Array<Permission> | null;
-  preferences?: null | AccountPreferences;
+  preferences?: AccountPreferences | null;
   /**
    * Date of update in database.
    */
@@ -563,7 +563,7 @@ export type Invoice = {
    * Amount received in millisatoshis.
    */
   amount_received_msat?: number | null;
-  bitcoin_output?: null | BtcOutput;
+  bitcoin_output?: BtcOutput | null;
   /**
    * Date of creation in database
    */
@@ -588,7 +588,7 @@ export type Invoice = {
    * Lightning Address. Populated when invoice is generated as part of the LNURL protocol
    */
   ln_address_id?: string | null;
-  ln_invoice?: null | LnInvoice;
+  ln_invoice?: LnInvoice | null;
   /**
    * Payment time
    */
@@ -753,7 +753,7 @@ export type LnPayment = {
    * Payment Preimage
    */
   payment_preimage?: string | null;
-  success_action?: null | LnUrlSuccessAction;
+  success_action?: LnUrlSuccessAction | null;
 };
 
 /**
@@ -811,7 +811,7 @@ export type LnUrlCallback = {
    * array with payment routes, should be left empty if no routes are to be provided
    */
   routes: Array<string>;
-  successAction?: null | LnUrlSuccessAction;
+  successAction?: LnUrlSuccessAction | null;
   /**
    * Optional LUD-21 URL to check whether this invoice has been settled.
    */
@@ -903,7 +903,7 @@ export type LocalLoginReset = {
  * New Bitcoin Address Request
  */
 export type NewBtcAddressRequest = {
-  type?: null | BtcAddressType;
+  type?: BtcAddressType | null;
   /**
    * Wallet ID to receive into. Required by admin endpoints; derived from the path on wallet-scoped endpoints.
    */
@@ -962,7 +962,7 @@ export type Payment = {
    * Amount in millisatoshis.
    */
   amount_msat: number;
-  bitcoin?: null | BtcPayment;
+  bitcoin?: BtcPayment | null;
   /**
    * Date of creation in database
    */
@@ -983,12 +983,12 @@ export type Payment = {
    * Internal ID
    */
   id: string;
-  internal?: null | InternalPayment;
+  internal?: InternalPayment | null;
   /**
    * Ledger
    */
   ledger: Ledger;
-  lightning?: null | LnPayment;
+  lightning?: LnPayment | null;
   /**
    * Payment time
    */
@@ -1296,7 +1296,7 @@ export type Wallet = {
    * Owning account ID
    */
   account_id: string;
-  asset?: null | Asset;
+  asset?: Asset | null;
   /**
    * Spendable asset held by this wallet
    */
@@ -1329,7 +1329,7 @@ export type Wallet = {
    * Optional account-specific display label.
    */
   label?: string | null;
-  ln_address?: null | LnAddress;
+  ln_address?: LnAddress | null;
   /**
    * List of payments
    */
@@ -1348,7 +1348,7 @@ export type WalletOverview = {
    * Owning account ID
    */
   account_id: string;
-  asset?: null | Asset;
+  asset?: Asset | null;
   /**
    * Spendable asset held by this wallet
    */
@@ -1369,7 +1369,7 @@ export type WalletOverview = {
    * Optional account-specific display label.
    */
   label?: string | null;
-  ln_address?: null | LnAddress;
+  ln_address?: LnAddress | null;
   /**
    * Number of contacts
    */
@@ -1850,7 +1850,7 @@ export type GetLocalLoginResponses = {
   /**
    * Success
    */
-  200: null | LocalLogin;
+  200: LocalLogin | null;
 };
 
 export type GetLocalLoginResponse = GetLocalLoginResponses[keyof GetLocalLoginResponses];
@@ -2487,7 +2487,7 @@ export type DeleteBtcAddressesData = {
     /**
      * Status
      */
-    address_type?: null | BtcAddressType;
+    address_type?: BtcAddressType | null;
     /**
      * Whether the address has been used
      */
@@ -2558,7 +2558,7 @@ export type ListBtcAddressesData = {
     /**
      * Status
      */
-    address_type?: null | BtcAddressType;
+    address_type?: BtcAddressType | null;
     /**
      * Whether the address has been used
      */
@@ -2750,11 +2750,11 @@ export type DeleteInvoicesData = {
     /**
      * Status
      */
-    status?: null | InvoiceStatus;
+    status?: InvoiceStatus | null;
     /**
      * Ledger
      */
-    ledger?: null | Ledger;
+    ledger?: Ledger | null;
     /**
      * Order by
      */
@@ -2820,11 +2820,11 @@ export type ListInvoicesData = {
     /**
      * Status
      */
-    status?: null | InvoiceStatus;
+    status?: InvoiceStatus | null;
     /**
      * Ledger
      */
-    ledger?: null | Ledger;
+    ledger?: Ledger | null;
     /**
      * Order by
      */
@@ -3716,7 +3716,7 @@ export type GetAccountAddressResponses = {
   /**
    * Found
    */
-  200: null | LnAddress;
+  200: LnAddress | null;
 };
 
 export type GetAccountAddressResponse =
@@ -4076,7 +4076,7 @@ export type ListWalletBtcAddressesData = {
     /**
      * Status
      */
-    address_type?: null | BtcAddressType;
+    address_type?: BtcAddressType | null;
     /**
      * Whether the address has been used
      */
@@ -4266,11 +4266,11 @@ export type ListWalletInvoicesData = {
     /**
      * Status
      */
-    status?: null | InvoiceStatus;
+    status?: InvoiceStatus | null;
     /**
      * Ledger
      */
-    ledger?: null | Ledger;
+    ledger?: Ledger | null;
     /**
      * Order by
      */
@@ -4459,11 +4459,11 @@ export type ListWalletPaymentsData = {
     /**
      * Status
      */
-    status?: null | PaymentStatus;
+    status?: PaymentStatus | null;
     /**
      * Ledger
      */
-    ledger?: null | Ledger;
+    ledger?: Ledger | null;
     /**
      * Lightning addresses
      */
@@ -4662,11 +4662,11 @@ export type DeletePaymentsData = {
     /**
      * Status
      */
-    status?: null | PaymentStatus;
+    status?: PaymentStatus | null;
     /**
      * Ledger
      */
-    ledger?: null | Ledger;
+    ledger?: Ledger | null;
     /**
      * Lightning addresses
      */
@@ -4740,11 +4740,11 @@ export type ListPaymentsData = {
     /**
      * Status
      */
-    status?: null | PaymentStatus;
+    status?: PaymentStatus | null;
     /**
      * Ledger
      */
-    ledger?: null | Ledger;
+    ledger?: Ledger | null;
     /**
      * Lightning addresses
      */
