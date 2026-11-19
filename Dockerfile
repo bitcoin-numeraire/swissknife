@@ -1,4 +1,4 @@
-FROM rust:1.99.1-trixie@sha256:931c2c0531a8b143e044f0f3914dfe802f15bb3d1955f0b657e9359327ac2ffc AS chef
+FROM rust:1.100.0-trixie@sha256:223cc32ddca8f3ee90c436dbc94b6b5f052ea7f9653c5201e9612f08ad7d21b8 AS chef
 # The published cargo-chef lockfile pins vulnerable crossbeam-epoch.
 # Keep the tool version fixed while resolving compatible security fixes.
 RUN apt-get update && \
@@ -36,7 +36,7 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
     cp /app/target/release/swissknife /tmp/swissknife
 
 # Node.js stage for building the dashboard
-FROM node:24.22.1-alpine3.24@sha256:06d7adf3e0ef61a13f1d28682726366f97a15aa1888c934d3ecec86c33918b53 AS dashboard-builder
+FROM node:24.22.3-alpine3.24@sha256:116b800c3754b440ee0aa3ed2f20f5bf3d99a554bfd9adeea09ea8017f6e85f5 AS dashboard-builder
 WORKDIR /app/dashboard
 
 # Copy package files first for better caching
@@ -66,7 +66,7 @@ RUN --mount=type=cache,target=/app/dashboard/.next/cache \
 # Use debian:trixie-slim as minimal runtime base
 # Trixie = Debian 13
 # Match the builder's Debian release for GLIBC and OpenSSL compatibility.
-FROM debian:trixie-slim@sha256:62bd423aeee912639ca8ee681c2b762cb3e25137e0a92b20be455898a9f034ad AS runtime-base
+FROM debian:trixie-slim@sha256:a72b4433de1cf7d6bae0c4cee74d0547f58601a643b3375f070c51600d63b6b2 AS runtime-base
 
 # Install minimal runtime dependencies
 # ca-certificates: Required for HTTPS connections

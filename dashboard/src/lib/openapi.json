@@ -893,10 +893,10 @@
                 "schema": {
                   "oneOf": [
                     {
-                      "type": "null"
+                      "$ref": "#/components/schemas/LocalLogin"
                     },
                     {
-                      "$ref": "#/components/schemas/LocalLogin"
+                      "type": "null"
                     }
                   ]
                 }
@@ -2290,10 +2290,10 @@
             "schema": {
               "oneOf": [
                 {
-                  "type": "null"
+                  "$ref": "#/components/schemas/BtcAddressType"
                 },
                 {
-                  "$ref": "#/components/schemas/BtcAddressType"
+                  "type": "null"
                 }
               ]
             }
@@ -2550,10 +2550,10 @@
             "schema": {
               "oneOf": [
                 {
-                  "type": "null"
+                  "$ref": "#/components/schemas/BtcAddressType"
                 },
                 {
-                  "$ref": "#/components/schemas/BtcAddressType"
+                  "type": "null"
                 }
               ]
             }
@@ -2881,10 +2881,10 @@
             "schema": {
               "oneOf": [
                 {
-                  "type": "null"
+                  "$ref": "#/components/schemas/InvoiceStatus"
                 },
                 {
-                  "$ref": "#/components/schemas/InvoiceStatus"
+                  "type": "null"
                 }
               ]
             }
@@ -2897,10 +2897,10 @@
             "schema": {
               "oneOf": [
                 {
-                  "type": "null"
+                  "$ref": "#/components/schemas/Ledger"
                 },
                 {
-                  "$ref": "#/components/schemas/Ledger"
+                  "type": "null"
                 }
               ]
             }
@@ -3142,10 +3142,10 @@
             "schema": {
               "oneOf": [
                 {
-                  "type": "null"
+                  "$ref": "#/components/schemas/InvoiceStatus"
                 },
                 {
-                  "$ref": "#/components/schemas/InvoiceStatus"
+                  "type": "null"
                 }
               ]
             }
@@ -3158,10 +3158,10 @@
             "schema": {
               "oneOf": [
                 {
-                  "type": "null"
+                  "$ref": "#/components/schemas/Ledger"
                 },
                 {
-                  "$ref": "#/components/schemas/Ledger"
+                  "type": "null"
                 }
               ]
             }
@@ -4811,10 +4811,10 @@
                 "schema": {
                   "oneOf": [
                     {
-                      "type": "null"
+                      "$ref": "#/components/schemas/LnAddress"
                     },
                     {
-                      "$ref": "#/components/schemas/LnAddress"
+                      "type": "null"
                     }
                   ]
                 }
@@ -5623,10 +5623,10 @@
             "schema": {
               "oneOf": [
                 {
-                  "type": "null"
+                  "$ref": "#/components/schemas/BtcAddressType"
                 },
                 {
-                  "$ref": "#/components/schemas/BtcAddressType"
+                  "type": "null"
                 }
               ]
             }
@@ -5970,10 +5970,10 @@
             "schema": {
               "oneOf": [
                 {
-                  "type": "null"
+                  "$ref": "#/components/schemas/InvoiceStatus"
                 },
                 {
-                  "$ref": "#/components/schemas/InvoiceStatus"
+                  "type": "null"
                 }
               ]
             }
@@ -5986,10 +5986,10 @@
             "schema": {
               "oneOf": [
                 {
-                  "type": "null"
+                  "$ref": "#/components/schemas/Ledger"
                 },
                 {
-                  "$ref": "#/components/schemas/Ledger"
+                  "type": "null"
                 }
               ]
             }
@@ -6401,10 +6401,10 @@
             "schema": {
               "oneOf": [
                 {
-                  "type": "null"
+                  "$ref": "#/components/schemas/PaymentStatus"
                 },
                 {
-                  "$ref": "#/components/schemas/PaymentStatus"
+                  "type": "null"
                 }
               ]
             }
@@ -6417,10 +6417,10 @@
             "schema": {
               "oneOf": [
                 {
-                  "type": "null"
+                  "$ref": "#/components/schemas/Ledger"
                 },
                 {
-                  "$ref": "#/components/schemas/Ledger"
+                  "type": "null"
                 }
               ]
             }
@@ -6951,10 +6951,10 @@
             "schema": {
               "oneOf": [
                 {
-                  "type": "null"
+                  "$ref": "#/components/schemas/PaymentStatus"
                 },
                 {
-                  "$ref": "#/components/schemas/PaymentStatus"
+                  "type": "null"
                 }
               ]
             }
@@ -6967,10 +6967,10 @@
             "schema": {
               "oneOf": [
                 {
-                  "type": "null"
+                  "$ref": "#/components/schemas/Ledger"
                 },
                 {
-                  "$ref": "#/components/schemas/Ledger"
+                  "type": "null"
                 }
               ]
             }
@@ -7233,10 +7233,10 @@
             "schema": {
               "oneOf": [
                 {
-                  "type": "null"
+                  "$ref": "#/components/schemas/PaymentStatus"
                 },
                 {
-                  "$ref": "#/components/schemas/PaymentStatus"
+                  "type": "null"
                 }
               ]
             }
@@ -7249,10 +7249,10 @@
             "schema": {
               "oneOf": [
                 {
-                  "type": "null"
+                  "$ref": "#/components/schemas/Ledger"
                 },
                 {
-                  "$ref": "#/components/schemas/Ledger"
+                  "type": "null"
                 }
               ]
             }
@@ -8330,11 +8330,11 @@
           "identity": {
             "oneOf": [
               {
-                "type": "null"
-              },
-              {
                 "$ref": "#/components/schemas/AuthIdentity",
                 "description": "Login identity currently linked to this account, when one exists."
+              },
+              {
+                "type": "null"
               }
             ]
           },
@@ -8351,11 +8351,11 @@
           "preferences": {
             "oneOf": [
               {
-                "type": "null"
-              },
-              {
                 "$ref": "#/components/schemas/AccountPreferences",
                 "description": "Account-scoped dashboard and UI preferences."
+              },
+              {
+                "type": "null"
               }
             ]
           },
@@ -9108,11 +9108,11 @@
           "bitcoin_output": {
             "oneOf": [
               {
-                "type": "null"
-              },
-              {
                 "$ref": "#/components/schemas/BtcOutput",
                 "description": "Bitcoin output details of the invoice"
+              },
+              {
+                "type": "null"
               }
             ]
           },
@@ -9157,11 +9157,11 @@
           "ln_invoice": {
             "oneOf": [
               {
-                "type": "null"
-              },
-              {
                 "$ref": "#/components/schemas/LnInvoice",
                 "description": "Lightning details of the invoice"
+              },
+              {
+                "type": "null"
               }
             ]
           },
@@ -9385,11 +9385,11 @@
           "success_action": {
             "oneOf": [
               {
-                "type": "null"
-              },
-              {
                 "$ref": "#/components/schemas/LnUrlSuccessAction",
                 "description": "Success Action. Populated when sending to a LNURL or LN Address"
+              },
+              {
+                "type": "null"
               }
             ]
           }
@@ -9488,11 +9488,11 @@
           "successAction": {
             "oneOf": [
               {
-                "type": "null"
-              },
-              {
                 "$ref": "#/components/schemas/LnUrlSuccessAction",
                 "description": "An optional action to be executed after successfully paying an invoice"
+              },
+              {
+                "type": "null"
               }
             ]
           },
@@ -9651,11 +9651,11 @@
           "type": {
             "oneOf": [
               {
-                "type": "null"
-              },
-              {
                 "$ref": "#/components/schemas/BtcAddressType",
                 "description": "Address type"
+              },
+              {
+                "type": "null"
               }
             ]
           },
@@ -9756,11 +9756,11 @@
           "bitcoin": {
             "oneOf": [
               {
-                "type": "null"
-              },
-              {
                 "$ref": "#/components/schemas/BtcPayment",
                 "description": "Bitcoin on-chain payment details"
+              },
+              {
+                "type": "null"
               }
             ]
           },
@@ -9801,11 +9801,11 @@
           "internal": {
             "oneOf": [
               {
-                "type": "null"
-              },
-              {
                 "$ref": "#/components/schemas/InternalPayment",
                 "description": "Internal payment details"
+              },
+              {
+                "type": "null"
               }
             ]
           },
@@ -9816,11 +9816,11 @@
           "lightning": {
             "oneOf": [
               {
-                "type": "null"
-              },
-              {
                 "$ref": "#/components/schemas/LnPayment",
                 "description": "Lightning payment details"
+              },
+              {
+                "type": "null"
               }
             ]
           },
@@ -10250,11 +10250,11 @@
           "asset": {
             "oneOf": [
               {
-                "type": "null"
-              },
-              {
                 "$ref": "#/components/schemas/Asset",
                 "description": "Asset metadata for this wallet, when included in the response."
+              },
+              {
+                "type": "null"
               }
             ]
           },
@@ -10308,11 +10308,11 @@
           "ln_address": {
             "oneOf": [
               {
-                "type": "null"
-              },
-              {
                 "$ref": "#/components/schemas/LnAddress",
                 "description": "Lightning Address"
+              },
+              {
+                "type": "null"
               }
             ]
           },
@@ -10355,11 +10355,11 @@
           "asset": {
             "oneOf": [
               {
-                "type": "null"
-              },
-              {
                 "$ref": "#/components/schemas/Asset",
                 "description": "Asset metadata for this wallet, when included in the response."
+              },
+              {
+                "type": "null"
               }
             ]
           },
@@ -10392,11 +10392,11 @@
           "ln_address": {
             "oneOf": [
               {
-                "type": "null"
-              },
-              {
                 "$ref": "#/components/schemas/LnAddress",
                 "description": "Lightning Address"
+              },
+              {
+                "type": "null"
               }
             ]
           },

@@ -10,7 +10,7 @@ name: swissknife-itest
 
 services:
   postgres:
-    image: postgres:18.6@sha256:edb0c08dc33befd0262ab3b5cf1c4f3f8cfd8b09e88c05b45adee29d6761ddb6
+    image: postgres:18.7@sha256:e754b839f447639b7004895f4d8a4bfcb4e9dbe3a1bc035f27f646562a16fd61
     # A parallel suite runs several SwissKnife instances, each with its own pool.
     command: ["postgres", "-c", "max_connections=200"]
     environment:
@@ -28,7 +28,7 @@ services:
       retries: 30
 
   bitcoind:
-    image: bitcoin/bitcoin:31.1@sha256:da25cedc66b1daefff9f412ee196c901a899c3fa68a33b20849c3e08b5c40d63
+    image: bitcoin/bitcoin:32.1@sha256:d2454aaf2ff4ce1ebbc49f4aa05ed044c907b849a80a3f4c0ad23e488e50bbe0
     command: ["-conf=/etc/bitcoin/bitcoin.conf"]
     volumes:
       - ./config/bitcoin/bitcoin.conf:/etc/bitcoin/bitcoin.conf:ro
@@ -49,7 +49,7 @@ services:
       retries: 30
 
   lnd:
-    image: lightninglabs/lnd:v0.21.4-beta@sha256:04d06edcc0f6e99a5e797ea34959f330add222226f840cd86afbc31f8f29627d
+    image: lightninglabs/lnd:v0.21.8-beta@sha256:f17b2944b1b76396cccbe58feac469b6cefb5f407557ac77f0880f136fb935f9
     depends_on:
       bitcoind:
         condition: service_healthy
@@ -67,7 +67,7 @@ services:
       - "${SWISSKNIFE_ITEST_LND_P2P_PORT:-9735}:9735"
 
   cln:
-    image: elementsproject/lightningd:v26.06.9@sha256:de74289ddcccb68cd60543b08b2b8594002d819125d200492e17a95166d56577
+    image: elementsproject/lightningd:v26.06.10@sha256:59f10c4c7429bb80791481c906859f6de1aa58ef224758aa25d50b7d47fc0c04
     depends_on:
       bitcoind:
         condition: service_healthy
@@ -95,7 +95,7 @@ services:
   # agree. Container port 8080 is published on 8090 by default to avoid clashing
   # with LND's REST port (8080).
   mock-oauth2-server:
-    image: ghcr.io/navikt/mock-oauth2-server:6.1.2@sha256:94d4ebf0fe793a727b3468b846e92ccbcd513f3b359a095802d817934d762e01
+    image: ghcr.io/navikt/mock-oauth2-server:7.0.1@sha256:eb07a0a65007c34c40c7b849592a47e6299128a514a5c6c582a53451cc6e3390
     environment:
       JSON_CONFIG_PATH: /tmp/mock-oauth2-config.json
     volumes:

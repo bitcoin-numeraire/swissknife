@@ -144,7 +144,7 @@ Configured via `ln_provider` in config:
 
 ## Key Dependencies
 
-- **Rust 1.99.1** (see rust-toolchain.toml)
+- **Rust 1.100.0** (see rust-toolchain.toml)
 - **Axum** - Web framework
 - **Sea-ORM** - Database ORM (SQLite/PostgreSQL)
 - **tokio** - Async runtime

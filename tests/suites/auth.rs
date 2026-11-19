@@ -869,7 +869,7 @@ async fn rejects_local_tokens_without_credential_binding() {
     app.admin_token().await;
     let token = encode(&Header::default(), &json!({
         "sub":"admin", "iat":chrono::Utc::now().timestamp(), "exp":chrono::Utc::now().timestamp() + 3600, "permissions":[]
-    }), &EncodingKey::from_secret(b"integration-test-secret")).unwrap();
+    }), &EncodingKey::from_secret(b"integration-test-secret").unwrap()).unwrap();
     assert_error(
         &app.api().get("/v1/me", Auth::Bearer(&token)).await,
         StatusCode::UNAUTHORIZED,

@@ -12,6 +12,10 @@ ID used by balance, payment, invoice, contact, and Bitcoin-address requests.
 
 Use Node 24 and the Yarn 4 version pinned in `package.json` (via Corepack).
 
+Type checking uses TypeScript 7. The `typescript` dependency aliases the official
+TypeScript 6 compatibility package for tools that still need its JavaScript API,
+including ESLint and the OpenAPI client generator.
+
 ```bash
 corepack enable
 yarn install --immutable

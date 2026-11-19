@@ -28,8 +28,10 @@ impl LocalAuthenticator {
     pub async fn new(config: JwtConfig) -> Result<Self, AuthenticationError> {
         Ok(Self {
             token_expiry: config.token_expiry,
-            encoding_key: EncodingKey::from_secret(config.secret.as_ref()),
-            decoding_key: DecodingKey::from_secret(config.secret.as_ref()),
+            encoding_key: EncodingKey::from_secret(config.secret.as_ref())
+                .map_err(|e| AuthenticationError::EncodeJWT(e.to_string()))?,
+            decoding_key: DecodingKey::from_secret(config.secret.as_ref())
+                .map_err(|e| AuthenticationError::DecodeJWTKey(e.to_string()))?,
         })
     }
 }

@@ -1,4 +1,5 @@
 import globals from 'globals';
+import { fixupConfigRules } from '@eslint/compat';
 import eslintJs from '@eslint/js';
 import eslintTs from 'typescript-eslint';
 import pluginReact from 'eslint-plugin-react';
@@ -269,4 +270,4 @@ const eslintConfig = [
   perfectionistConfig,
 ];
 
-export default eslintConfig;
+export default fixupConfigRules(eslintConfig);

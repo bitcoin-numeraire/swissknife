@@ -1,9 +1,6 @@
 use std::sync::Arc;
 
-use argon2::{
-    password_hash::{rand_core::OsRng, PasswordHash, SaltString},
-    Argon2, PasswordHasher as _, PasswordVerifier,
-};
+use argon2::{password_hash::phc::PasswordHash, Argon2, PasswordHasher as _, PasswordVerifier};
 use async_trait::async_trait;
 use tokio::sync::{OnceCell, Semaphore};
 
@@ -46,7 +43,7 @@ impl PasswordHasher for Argon2PasswordHasher {
             let _permit = permit;
             let _admitted = admitted;
             Argon2::default()
-                .hash_password(password.as_bytes(), &SaltString::generate(&mut OsRng))
+                .hash_password(password.as_bytes())
                 .map(|hash| hash.to_string())
                 .map_err(|_| AuthenticationError::Hash("Password hashing failed".into()))
         })
@@ -88,5 +85,29 @@ impl PasswordHasher for Argon2PasswordHasher {
         .await
         .map_err(|_| AuthenticationError::Hash("Password worker failed".into()))?;
         Ok(real && valid)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    mod verify {
+        use super::*;
+
+        mod when_hash_was_created_before_the_dependency_upgrade {
+            use super::*;
+
+            #[tokio::test]
+            async fn accepts_the_existing_password_hash() {
+                // Generated with Argon2 0.5.3 and the previous default parameters.
+                let stored =
+                    "$argon2id$v=19$m=19456,t=2,p=1$bGVnYWN5LXBhc3N3b3JkIQ$vlONHXOLvpQ0hTR8iUukzFZJLb9gOcf0pfbjetUika4";
+                assert!(Argon2PasswordHasher::new()
+                    .verify("prior-version-password".into(), Some(stored.into()))
+                    .await
+                    .unwrap());
+            }
+        }
     }
 }

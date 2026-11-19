@@ -16,6 +16,7 @@ type DisableClearable = boolean | undefined;
 type FreeSolo = boolean | undefined;
 
 type ExcludedProps = 'renderInput';
+type TextFieldSlotProps = NonNullable<TextFieldProps['slotProps']>;
 
 export type AutocompleteBaseProps = Omit<
   AutocompleteProps<any, Multiple, DisableClearable, FreeSolo>,
@@ -49,8 +50,8 @@ export function RHFAutocomplete({
       const { slotProps: systemSlotProps, ...otherSystemProps } = params;
       const { slotProps: externalTextFieldSlotProps, ...otherTextFieldProps } = textField || {};
 
-      const mergedSlotProps: TextFieldProps['slotProps'] = merge(
-        systemSlotProps,
+      const mergedSlotProps = merge<TextFieldSlotProps, TextFieldSlotProps>(
+        systemSlotProps ?? {},
         externalTextFieldSlotProps ?? {}
       );
 
