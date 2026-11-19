@@ -59,6 +59,23 @@ pub struct Invoice {
     /// Bitcoin output details of the invoice
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bitcoin_output: Option<BtcOutput>,
+
+    /// Private LNURL verification data. Never part of the invoice API response.
+    #[serde(skip)]
+    pub lnurl: Option<LnUrlInvoiceData>,
+}
+
+/// Private data retained for LUD-21 verification, including after internal settlement.
+#[derive(Clone)]
+pub struct LnUrlInvoiceData {
+    pub verify_token: Uuid,
+    pub preimage: String,
+}
+
+impl std::fmt::Debug for LnUrlInvoiceData {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("LnUrlInvoiceData([REDACTED])")
+    }
 }
 
 /// Lightning-specific details of an invoice.
@@ -122,7 +139,7 @@ pub struct NewInvoiceRequest {
 
 /// Invoice query filter.
 #[serde_as]
-#[derive(Clone, Debug, Deserialize, Serialize, Default, IntoParams, ToSchema)]
+#[derive(Clone, Deserialize, Serialize, Default, IntoParams, ToSchema)]
 pub struct InvoiceFilter {
     /// Total amount of results to return
     #[serde_as(as = "Option<DisplayFromStr>")]
@@ -144,6 +161,26 @@ pub struct InvoiceFilter {
     /// Direction of the ordering of results
     #[serde(default)]
     pub order_direction: OrderDirection,
+
+    /// Internal lookup token. Never accepted as a public invoice filter.
+    #[serde(skip)]
+    pub lnurl_verify_token: Option<Uuid>,
+}
+
+impl std::fmt::Debug for InvoiceFilter {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("InvoiceFilter")
+            .field("limit", &self.limit)
+            .field("offset", &self.offset)
+            .field("ids", &self.ids)
+            .field("wallet_id", &self.wallet_id)
+            .field("status", &self.status)
+            .field("ledger", &self.ledger)
+            .field("order_by", &self.order_by)
+            .field("order_direction", &self.order_direction)
+            .field("lnurl_verify_token", &self.lnurl_verify_token.map(|_| "[REDACTED]"))
+            .finish()
+    }
 }
 
 /// Field to order invoices by.
@@ -153,4 +190,46 @@ pub enum InvoiceOrderBy {
     CreatedAt,
     PaymentTime,
     UpdatedAt,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    mod verification_secrets {
+        use super::*;
+
+        #[test]
+        fn invoice_json_and_debug_output_hide_the_token_and_preimage() {
+            let token = Uuid::new_v4();
+            let preimage = "12".repeat(32);
+            let invoice = Invoice {
+                lnurl: Some(LnUrlInvoiceData {
+                    verify_token: token,
+                    preimage: preimage.clone(),
+                }),
+                ..Default::default()
+            };
+            let json = serde_json::to_string(&invoice).unwrap();
+            let debug = format!("{invoice:?}");
+            for text in [json, debug] {
+                assert!(!text.contains(&token.to_string()));
+                assert!(!text.contains(&preimage));
+            }
+        }
+
+        #[test]
+        fn the_filter_token_is_hidden_and_cannot_be_supplied_through_json() {
+            let token = Uuid::new_v4();
+            let filter = InvoiceFilter {
+                lnurl_verify_token: Some(token),
+                ..Default::default()
+            };
+            assert!(!format!("{filter:?}").contains(&token.to_string()));
+            assert!(!serde_json::to_string(&filter).unwrap().contains(&token.to_string()));
+            let parsed: InvoiceFilter =
+                serde_json::from_value(serde_json::json!({"lnurl_verify_token": token})).unwrap();
+            assert!(parsed.lnurl_verify_token.is_none());
+        }
+    }
 }

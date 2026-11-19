@@ -22,15 +22,13 @@ use crate::{
             BtcTransaction, BtcTransactionOutput, OnchainSyncBatch, OnchainSyncCursor, OnchainTransaction,
         },
         event::OnchainWithdrawalEvent,
-        invoice::Invoice,
+        invoice::{Invoice, LnInvoiceOptions},
         payment::{LnPayment, LnPaymentTarget, Payment, PaymentStatus},
         system::HealthStatus,
     },
     infra::{
         config::config_rs::deserialize_duration,
-        lightning::{
-            bitcoin_utils::parse_psbt, cln::ListFundsResponse, types::parse_network, LnClient, LnInvoiceOptions,
-        },
+        lightning::{bitcoin_utils::parse_psbt, cln::ListFundsResponse, types::parse_network, LnClient},
     },
 };
 

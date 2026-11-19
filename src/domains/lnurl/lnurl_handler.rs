@@ -114,23 +114,12 @@ async fn verify(
 ) -> impl IntoResponse {
     let verification = match token {
         Ok(AxumPath(token)) => services.lnurl.verify(token).await,
-        Err(_) => Ok(None),
+        Err(_) => Ok(LnUrlVerifyResponse::Error {
+            reason: "Not found".into(),
+        }),
     };
     let (status, response) = match verification {
-        Ok(Some(invoice)) => (
-            StatusCode::OK,
-            LnUrlVerifyResponse::Ok {
-                settled: invoice.settled_preimage.is_some(),
-                preimage: invoice.settled_preimage,
-                pr: invoice.bolt11,
-            },
-        ),
-        Ok(None) => (
-            StatusCode::OK,
-            LnUrlVerifyResponse::Error {
-                reason: "Not found".into(),
-            },
-        ),
+        Ok(response) => (StatusCode::OK, response),
         Err(error) => {
             tracing::error!(%error, "Invoice verification failed");
             (

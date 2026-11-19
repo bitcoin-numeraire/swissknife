@@ -1,7 +1,8 @@
 use async_trait::async_trait;
 use uuid::Uuid;
 
-use crate::{application::errors::ApplicationError, domains::invoice::LnUrlInvoiceVerification};
+use crate::application::errors::ApplicationError;
+use swissknife_types::LnUrlVerifyResponse;
 
 use super::{LnURLPayRequest, LnUrlCallback};
 
@@ -15,5 +16,5 @@ pub trait LnUrlUseCases: Send + Sync {
         amount: u64,
         comment: Option<String>,
     ) -> Result<LnUrlCallback, ApplicationError>;
-    async fn verify(&self, token: Uuid) -> Result<Option<LnUrlInvoiceVerification>, ApplicationError>;
+    async fn verify(&self, token: Uuid) -> Result<LnUrlVerifyResponse, ApplicationError>;
 }

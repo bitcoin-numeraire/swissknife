@@ -29,7 +29,7 @@ use crate::{
             BtcPreparedTransaction, BtcTransaction, BtcTransactionOutput, OnchainSyncBatch, OnchainSyncCursor,
             OnchainTransaction,
         },
-        invoice::{Invoice, InvoiceStatus},
+        invoice::{Invoice, InvoiceStatus, LnInvoiceOptions},
         payment::{LnPayment, LnPaymentTarget, Payment, PaymentStatus},
         system::HealthStatus,
     },
@@ -47,7 +47,7 @@ use crate::{
                 },
             },
             types::parse_network,
-            LnClient, LnInvoiceOptions,
+            LnClient,
         },
     },
 };

@@ -155,6 +155,17 @@ mod lnurl {
             verify(verify_url).await,
             json!({"status": "OK", "settled": false, "pr": cb.pr, "preimage": null})
         );
+        let invoices = app
+            .api()
+            .get(&format!("/v1/invoices?wallet_id={}", wallet.id), Auth::Bearer(token))
+            .await;
+        assert_status(&invoices, StatusCode::OK);
+        for invoice in invoices.body.as_array().unwrap() {
+            assert!(
+                invoice.get("lnurl").is_none(),
+                "private verification data is omitted from invoice JSON"
+            );
+        }
         Counterparty::for_provider(&app.provider).pay(&cb.pr);
 
         wait_until(
@@ -205,6 +216,45 @@ mod lnurl {
         let restarted = app.restart("lnurl-verify-restarted", &[]).await;
         let url = format!("{}{}", restarted.base_url, verify_url.path());
         assert_payment_proof(&verify(&url).await, &cb.pr);
+    }
+
+    #[tokio::test]
+    async fn verification_tokens_are_redacted_from_debug_request_logs() {
+        let app = TestApp::isolated(
+            "lnurl-verify-logs",
+            &[(
+                "SWISSKNIFE_LOGGING__FILTER",
+                "warn,swissknife=debug,tower_http::trace=debug".into(),
+            )],
+        )
+        .await;
+        let token = app.admin_token().await;
+        let (_wallet, addr) = register_address(&app, token, "lnurl-log", None).await;
+        let pay = app
+            .api()
+            .get(&format!("/.well-known/lnurlp/{}", addr.username), Auth::None)
+            .await
+            .parse::<LnURLPayRequest>();
+        let callback = follow_callback(&pay.callback, 10_000).await;
+        let url = callback.verify.as_deref().unwrap();
+        verify(url).await;
+        let secret = reqwest::Url::parse(url)
+            .unwrap()
+            .path_segments()
+            .unwrap()
+            .nth(1)
+            .unwrap()
+            .to_string();
+        app.stop();
+        let logs = app.stdout_log();
+        assert!(
+            logs.contains("/lnurlp/{token}/verify"),
+            "the verification request is traced"
+        );
+        assert!(
+            !logs.contains(&secret),
+            "the verification token must not appear in debug logs"
+        );
     }
 
     #[tokio::test]

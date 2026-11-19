@@ -1,8 +1,6 @@
 use crate::{
     application::{composition::Ledger, errors::DatabaseError},
-    domains::invoice::{
-        Invoice, InvoiceFilter, InvoiceOrderBy, InvoiceRepository, InvoiceStatus, LnUrlInvoiceVerification,
-    },
+    domains::invoice::{Invoice, InvoiceFilter, InvoiceOrderBy, InvoiceRepository, InvoiceStatus},
     infra::database::sea_orm::models::{
         btc_output::Model as BtcOutputModel,
         invoice::{ActiveModel, Column, Model as InvoiceModel},
@@ -39,58 +37,6 @@ impl<C> SeaOrmInvoiceRepository<C> {
 
     pub fn new(db: C) -> Self {
         Self { db }
-    }
-}
-
-impl<C: SeaOrmConnection> SeaOrmInvoiceRepository<C> {
-    async fn insert_with_verification(
-        &self,
-        invoice: Invoice,
-        verification: Option<(Uuid, [u8; 32])>,
-    ) -> Result<Invoice, DatabaseError> {
-        let id = if invoice.id.is_nil() {
-            Uuid::new_v4()
-        } else {
-            invoice.id
-        };
-
-        let mut model = ActiveModel {
-            id: Set(id),
-            wallet_id: Set(invoice.wallet_id),
-            ln_address_id: Set(invoice.ln_address_id),
-            description: Set(invoice.description),
-            amount_msat: Set(invoice.amount_msat.map(|v| v as i64)),
-            amount_received_msat: Set(invoice.amount_received_msat.map(|v| v as i64)),
-            timestamp: Set(invoice.timestamp.naive_utc()),
-            payment_time: Set(invoice.payment_time.map(|t| t.naive_utc())),
-            ledger: Set(invoice.ledger.to_string()),
-            btc_output_id: Set(invoice.btc_output_id),
-            ..Default::default()
-        };
-
-        if invoice.ledger == Ledger::Lightning {
-            let ln_invoice = invoice.ln_invoice.expect("should exist for ledger Lightning");
-            model.bolt11 = Set(ln_invoice.bolt11.into());
-            model.payee_pubkey = Set(ln_invoice.payee_pubkey.into());
-            model.payment_hash = Set(ln_invoice.payment_hash.into());
-            model.description_hash = Set(ln_invoice.description_hash);
-            model.payment_secret = Set(ln_invoice.payment_secret.into());
-            model.min_final_cltv_expiry_delta = Set((ln_invoice.min_final_cltv_expiry_delta as i64).into());
-            model.expiry = Set((ln_invoice.expiry.as_secs() as i64).into());
-            model.expires_at = Set(Some(ln_invoice.expires_at.naive_utc()));
-        }
-
-        if let Some((token, preimage)) = verification {
-            model.lnurl_verify_token = Set(Some(token));
-            model.lnurl_preimage = Set(Some(hex::encode(preimage)));
-        }
-
-        let result = model
-            .insert(self.db.connection())
-            .await
-            .map_err(|e| DatabaseError::Insert(e.to_string()))?;
-
-        Ok(result.into())
     }
 }
 
@@ -142,6 +88,9 @@ where
         let models = InvoiceEntity::find()
             .apply_if(filter.wallet_id, |q, wallet| q.filter(Column::WalletId.eq(wallet)))
             .apply_if(filter.ids, |q, ids| q.filter(Column::Id.is_in(ids)))
+            .apply_if(filter.lnurl_verify_token, |q, token| {
+                q.filter(Column::LnurlVerifyToken.eq(token))
+            })
             .apply_if(filter.status, |q, s| match s {
                 InvoiceStatus::Pending => q.filter(
                     Condition::all()
@@ -175,41 +124,49 @@ where
     }
 
     async fn insert(&self, invoice: Invoice) -> Result<Invoice, DatabaseError> {
-        self.insert_with_verification(invoice, None).await
-    }
+        let id = if invoice.id.is_nil() {
+            Uuid::new_v4()
+        } else {
+            invoice.id
+        };
 
-    async fn insert_lnurl(
-        &self,
-        invoice: Invoice,
-        verify_token: Uuid,
-        preimage: [u8; 32],
-    ) -> Result<(), DatabaseError> {
-        self.insert_with_verification(invoice, Some((verify_token, preimage)))
-            .await?;
-        Ok(())
-    }
+        let mut model = ActiveModel {
+            id: Set(id),
+            wallet_id: Set(invoice.wallet_id),
+            ln_address_id: Set(invoice.ln_address_id),
+            description: Set(invoice.description),
+            amount_msat: Set(invoice.amount_msat.map(|v| v as i64)),
+            amount_received_msat: Set(invoice.amount_received_msat.map(|v| v as i64)),
+            timestamp: Set(invoice.timestamp.naive_utc()),
+            payment_time: Set(invoice.payment_time.map(|t| t.naive_utc())),
+            ledger: Set(invoice.ledger.to_string()),
+            btc_output_id: Set(invoice.btc_output_id),
+            ..Default::default()
+        };
 
-    async fn find_lnurl_verification(
-        &self,
-        verify_token: Uuid,
-    ) -> Result<Option<LnUrlInvoiceVerification>, DatabaseError> {
-        let row = InvoiceEntity::find()
-            .filter(Column::LnurlVerifyToken.eq(verify_token))
-            .select_only()
-            .column(Column::Bolt11)
-            .expr_as(
-                Expr::case(Column::PaymentTime.is_not_null(), Expr::col(Column::LnurlPreimage)),
-                "settled_preimage",
-            )
-            .into_tuple::<(String, Option<String>)>()
-            .one(self.db.connection())
+        if invoice.ledger == Ledger::Lightning {
+            let ln_invoice = invoice.ln_invoice.expect("should exist for ledger Lightning");
+            model.bolt11 = Set(ln_invoice.bolt11.into());
+            model.payee_pubkey = Set(ln_invoice.payee_pubkey.into());
+            model.payment_hash = Set(ln_invoice.payment_hash.into());
+            model.description_hash = Set(ln_invoice.description_hash);
+            model.payment_secret = Set(ln_invoice.payment_secret.into());
+            model.min_final_cltv_expiry_delta = Set((ln_invoice.min_final_cltv_expiry_delta as i64).into());
+            model.expiry = Set((ln_invoice.expiry.as_secs() as i64).into());
+            model.expires_at = Set(Some(ln_invoice.expires_at.naive_utc()));
+        }
+
+        if let Some(lnurl) = invoice.lnurl {
+            model.lnurl_verify_token = Set(Some(lnurl.verify_token));
+            model.lnurl_preimage = Set(Some(lnurl.preimage));
+        }
+
+        let result = model
+            .insert(self.db.connection())
             .await
-            .map_err(|err| DatabaseError::FindOne(err.to_string()))?;
+            .map_err(|e| DatabaseError::Insert(e.to_string()))?;
 
-        Ok(row.map(|(bolt11, settled_preimage)| LnUrlInvoiceVerification {
-            bolt11,
-            settled_preimage,
-        }))
+        Ok(result.into())
     }
 
     async fn update(&self, invoice: Invoice) -> Result<Invoice, DatabaseError> {
@@ -260,6 +217,9 @@ where
         let result = InvoiceEntity::delete_many()
             .apply_if(filter.wallet_id, |q, wallet| q.filter(Column::WalletId.eq(wallet)))
             .apply_if(filter.ids, |q, ids| q.filter(Column::Id.is_in(ids)))
+            .apply_if(filter.lnurl_verify_token, |q, token| {
+                q.filter(Column::LnurlVerifyToken.eq(token))
+            })
             .apply_if(filter.status, |q, status| match status {
                 InvoiceStatus::Pending => q.filter(
                     Condition::all()

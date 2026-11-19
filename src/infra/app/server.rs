@@ -48,7 +48,8 @@ impl Server {
 
         let router = router
             .layer(TraceLayer::new_for_http().make_span_with(|request: &Request<_>| {
-                // The verification URL grants access to the preimage after settlement.
+                // DefaultMakeSpan logs the full URI. A verification URL grants
+                // access to the settled preimage, so log its route without the token.
                 if let Some(path) = request
                     .extensions()
                     .get::<MatchedPath>()

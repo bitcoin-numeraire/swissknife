@@ -20,13 +20,13 @@ use crate::{
             BitcoinWallet, BtcAddressType, BtcLockedUtxo, BtcNetwork, BtcOutput, BtcOutputStatus,
             BtcPreparedTransaction, BtcTransaction, OnchainSyncBatch, OnchainSyncCursor, OnchainTransaction,
         },
-        invoice::Invoice,
+        invoice::{Invoice, LnInvoiceOptions},
         payment::{LnPayment, LnPaymentTarget, Payment, PaymentStatus},
         system::HealthStatus,
     },
     infra::{
         config::config_rs::deserialize_duration,
-        lightning::{bitcoin_utils::parse_psbt, types::parse_network, LnClient, LnInvoiceOptions},
+        lightning::{bitcoin_utils::parse_psbt, types::parse_network, LnClient},
     },
 };
 use async_trait::async_trait;

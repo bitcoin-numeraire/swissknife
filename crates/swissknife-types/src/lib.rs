@@ -36,7 +36,9 @@ pub use auth::{
 pub use bitcoin::{BtcAddress, BtcAddressFilter, BtcAddressType, BtcOutput, BtcOutputStatus, NewBtcAddressRequest};
 pub use error::ErrorResponse;
 pub use event::{ClientEvent, ClientEventStreamQuery, ClientEventType};
-pub use invoice::{Invoice, InvoiceFilter, InvoiceOrderBy, InvoiceStatus, LnInvoice, NewInvoiceRequest};
+pub use invoice::{
+    Invoice, InvoiceFilter, InvoiceOrderBy, InvoiceStatus, LnInvoice, LnUrlInvoiceData, NewInvoiceRequest,
+};
 pub use ln_address::{LnAddress, LnAddressFilter, RegisterLnAddressRequest, UpdateLnAddressRequest};
 pub use lnurl::{
     LNUrlpInvoiceQueryParams, LnURLPayRequest, LnUrlCallback, LnUrlPaySuccessAction, LnUrlSuccessAction,

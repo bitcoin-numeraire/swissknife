@@ -24,7 +24,7 @@ use crate::{
             BtcTransactionOutput, OnchainSyncBatch, OnchainSyncCursor, OnchainTransaction,
         },
         event::OnchainWithdrawalEvent,
-        invoice::Invoice,
+        invoice::{Invoice, LnInvoiceOptions},
         payment::{LnPayment, LnPaymentTarget, Payment, PaymentStatus},
         system::HealthStatus,
     },
@@ -39,7 +39,7 @@ use crate::{
                 newaddr_request::NewaddrAddresstype, DelinvoiceRequest, ListchainmovesRequest, ListpaysRequest,
             },
             types::parse_network,
-            LnClient, LnInvoiceOptions,
+            LnClient,
         },
     },
 };
