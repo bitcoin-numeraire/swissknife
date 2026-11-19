@@ -83,9 +83,7 @@ impl EventUseCases for EventService {
 
         let payment_option = self.store.payment.find_by_payment_hash(&event.payment_hash).await?;
 
-        if let Some(mut payment_retrieved) = payment_option
-            .filter(|payment| payment.lightning.as_ref().and_then(|lightning| lightning.attempt_id) == event.attempt_id)
-        {
+        if let Some(mut payment_retrieved) = payment_option {
             if event.amount_msat != payment_retrieved.amount_msat {
                 debug!(
                     id = %payment_retrieved.id,
@@ -134,9 +132,7 @@ impl EventUseCases for EventService {
 
         let payment_option = self.store.payment.find_by_payment_hash(&event.payment_hash).await?;
 
-        if let Some(mut payment_retrieved) = payment_option
-            .filter(|payment| payment.lightning.as_ref().and_then(|lightning| lightning.attempt_id) == event.attempt_id)
-        {
+        if let Some(mut payment_retrieved) = payment_option {
             if payment_retrieved.status == PaymentStatus::Failed {
                 debug!(id = %payment_retrieved.id, "Lightning payment already failed");
                 return Ok(());
@@ -333,7 +329,6 @@ mod tests {
 
         fn event() -> LnPaySuccessEvent {
             LnPaySuccessEvent {
-                attempt_id: None,
                 amount_msat: 1_000,
                 fees_msat: 1,
                 payment_hash: "ph".to_string(),
@@ -627,7 +622,6 @@ mod tests {
 
         fn event() -> LnPayFailureEvent {
             LnPayFailureEvent {
-                attempt_id: None,
                 reason: "no route".to_string(),
                 payment_hash: "ph".to_string(),
             }

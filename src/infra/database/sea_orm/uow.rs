@@ -1,6 +1,5 @@
 use async_trait::async_trait;
 use sea_orm::{DatabaseConnection, TransactionTrait};
-use uuid::Uuid;
 
 use crate::{
     application::errors::{ApplicationError, DataError, DatabaseError},
@@ -53,54 +52,6 @@ impl PaymentUnitOfWork for SeaOrmPaymentUnitOfWork {
         Ok(payment)
     }
 
-    async fn retry(
-        &self,
-        mut payment: Payment,
-        bolt11: String,
-        reserve_amount_msat: u64,
-    ) -> Result<Payment, ApplicationError> {
-        let lightning = payment
-            .lightning
-            .as_mut()
-            .ok_or_else(|| DataError::Inconsistency("Missing Lightning details on retry".to_string()))?;
-        let txn = self
-            .db
-            .begin()
-            .await
-            .map_err(|e| DatabaseError::Transaction(e.to_string()))?;
-        let payment_repo = SeaOrmPaymentRepository::new(&txn);
-        if !payment_repo
-            .try_transition(
-                payment.id,
-                lightning.attempt_id,
-                &[PaymentStatus::Failed],
-                PaymentStatus::Pending,
-            )
-            .await?
-        {
-            return Err(DataError::Conflict("The payment is no longer eligible to retry.".to_string()).into());
-        }
-
-        let wallet_repo = SeaOrmWalletRepository::new(&txn);
-        if !wallet_repo.reserve(payment.wallet_id, reserve_amount_msat).await? {
-            return Err(DataError::InsufficientFunds(reserve_amount_msat as f64).into());
-        }
-        payment.status = PaymentStatus::Pending;
-        payment.error = None;
-        payment.fee_msat = None;
-        payment.payment_time = None;
-        payment.reserved_amount = reserve_amount_msat;
-        lightning.payment_preimage = None;
-        lightning.attempt_id = Some(Uuid::new_v4());
-        lightning.bolt11 = Some(bolt11);
-        let payment = payment_repo.update(payment).await?;
-
-        txn.commit()
-            .await
-            .map_err(|e| DatabaseError::Transaction(e.to_string()))?;
-        Ok(payment)
-    }
-
     async fn settle(&self, mut payment: Payment) -> Result<Payment, ApplicationError> {
         let txn = self
             .db
@@ -119,7 +70,6 @@ impl PaymentUnitOfWork for SeaOrmPaymentUnitOfWork {
         if !payment_repo
             .try_transition(
                 payment.id,
-                payment.lightning.as_ref().and_then(|lightning| lightning.attempt_id),
                 &[PaymentStatus::Pending, PaymentStatus::Failed],
                 PaymentStatus::Settled,
             )
@@ -191,12 +141,7 @@ impl PaymentUnitOfWork for SeaOrmPaymentUnitOfWork {
         // + failure event) returns the already-failed payment, and a payment that
         // already settled is never moved back to Failed.
         if !payment_repo
-            .try_transition(
-                payment.id,
-                payment.lightning.as_ref().and_then(|lightning| lightning.attempt_id),
-                &[PaymentStatus::Pending],
-                PaymentStatus::Failed,
-            )
+            .try_transition(payment.id, &[PaymentStatus::Pending], PaymentStatus::Failed)
             .await?
         {
             let failed = payment_repo

@@ -1,12 +1,8 @@
-use std::{
-    sync::Arc,
-    time::{Duration, SystemTime},
-};
+use std::sync::Arc;
 
 use async_trait::async_trait;
 use chrono::Utc;
 use lightning_invoice::Bolt11Invoice;
-use tokio::time::timeout;
 use tracing::{debug, info, trace, warn};
 use uuid::Uuid;
 
@@ -22,7 +18,7 @@ use crate::{
         invoice::{Invoice, InvoiceStatus},
         lnurl::{process_success_action, validate_lnurl_pay, LnUrlPayRequestData},
     },
-    infra::lightning::{LnClient, PaymentLookup},
+    infra::lightning::LnClient,
 };
 
 use super::{
@@ -42,7 +38,6 @@ pub struct PaymentService {
     ln_client: Arc<dyn LnClient>,
     bitcoin_wallet: Arc<dyn BitcoinWallet>,
     events: Arc<dyn EventUseCases>,
-    cln_retries: bool,
 }
 
 impl PaymentService {
@@ -52,7 +47,6 @@ impl PaymentService {
         bitcoin_wallet: Arc<dyn BitcoinWallet>,
         domain: String,
         events: Arc<dyn EventUseCases>,
-        cln_retries: bool,
     ) -> Self {
         PaymentService {
             store,
@@ -60,7 +54,6 @@ impl PaymentService {
             bitcoin_wallet,
             domain,
             events,
-            cln_retries,
         }
     }
 }
@@ -462,33 +455,25 @@ impl PaymentService {
             let target = Self::ln_payment_target(&invoice, variable_amount)?;
             let fee_estimate = self.lightning_fee_estimate(target).await?;
 
-            let pending_payment = match self.store.payment.find_by_payment_hash(&invoice.payment_hash).await? {
-                Some(previous) => {
-                    self.retry_bolt11(previous, &invoice, wallet_id, amount, fee_estimate.maximum_total_msat)
-                        .await?
-                }
-                None => {
-                    self.store
-                        .payment_uow
-                        .reserve(
-                            Payment {
-                                wallet_id,
-                                amount_msat: amount,
-                                status: PaymentStatus::Pending,
-                                ledger: Ledger::Lightning,
-                                description: comment,
-                                lightning: Some(LnPayment {
-                                    payment_hash: invoice.payment_hash,
-                                    bolt11: Some(invoice.bolt11.clone()),
-                                    ..Default::default()
-                                }),
-                                ..Default::default()
-                            },
-                            fee_estimate.maximum_total_msat,
-                        )
-                        .await?
-                }
-            };
+            let pending_payment = self
+                .store
+                .payment_uow
+                .reserve(
+                    Payment {
+                        wallet_id,
+                        amount_msat: amount,
+                        status: PaymentStatus::Pending,
+                        ledger: Ledger::Lightning,
+                        description: comment,
+                        lightning: Some(LnPayment {
+                            payment_hash: invoice.payment_hash,
+                            ..Default::default()
+                        }),
+                        ..Default::default()
+                    },
+                    fee_estimate.maximum_total_msat,
+                )
+                .await?;
 
             let result = self
                 .ln_client
@@ -500,7 +485,7 @@ impl PaymentService {
                         Some(amount)
                     },
                     fee_estimate.maximum_fee_msat,
-                    Self::payment_label(&pending_payment),
+                    pending_payment.id.to_string(),
                 )
                 .await;
 
@@ -508,82 +493,6 @@ impl PaymentService {
         } else {
             Err(DataError::Validation("Amount must be defined for zero-amount invoices.".to_string()).into())
         }
-    }
-
-    fn invoice_is_unexpired(invoice: &Bolt11Invoice) -> bool {
-        SystemTime::UNIX_EPOCH
-            .elapsed()
-            .is_ok_and(|now| invoice.expires_at().is_some_and(|expiry| expiry > now))
-    }
-
-    fn payment_label(payment: &Payment) -> String {
-        payment
-            .lightning
-            .as_ref()
-            .and_then(|lightning| lightning.attempt_id)
-            .unwrap_or(payment.id)
-            .to_string()
-    }
-
-    async fn retry_bolt11(
-        &self,
-        previous: Payment,
-        invoice: &ParsedBolt11Invoice,
-        wallet_id: Uuid,
-        amount_msat: u64,
-        reserve_amount_msat: u64,
-    ) -> Result<Payment, ApplicationError> {
-        if previous.wallet_id != wallet_id
-            || previous.status != PaymentStatus::Failed
-            || previous.ledger != Ledger::Lightning
-        {
-            return Err(DataError::Conflict("A payment already exists for this invoice.".to_string()).into());
-        }
-        if !self.cln_retries {
-            return Err(DataError::Conflict(
-                "The current Lightning provider does not support retrying in SwissKnife.".to_string(),
-            )
-            .into());
-        }
-        let signed = invoice
-            .bolt11
-            .parse::<Bolt11Invoice>()
-            .map_err(|err| DataError::Validation(err.to_string()))?;
-        if !Self::invoice_is_unexpired(&signed) {
-            return Err(DataError::Validation("The Lightning invoice has expired.".to_string()).into());
-        }
-        if amount_msat != previous.amount_msat {
-            return Err(DataError::Validation("A retry must use the original payment amount.".to_string()).into());
-        }
-
-        let label = Self::payment_label(&previous);
-        let node_payment = self
-            .ln_client
-            .payment_by_hash(invoice.payment_hash.clone(), PaymentLookup::RetryCandidate(label))
-            .await?;
-        let Some(node_payment) = node_payment.filter(|payment| payment.status == PaymentStatus::Failed) else {
-            return Err(DataError::Conflict(
-                "Core Lightning could not confirm this invoice is eligible for another attempt.".to_string(),
-            )
-            .into());
-        };
-        let original = previous
-            .lightning
-            .as_ref()
-            .and_then(|lightning| lightning.bolt11.as_deref())
-            .or_else(|| {
-                node_payment
-                    .lightning
-                    .as_ref()
-                    .and_then(|lightning| lightning.bolt11.as_deref())
-            });
-        if !original.is_some_and(|bolt11| bolt11.eq_ignore_ascii_case(&invoice.bolt11)) {
-            return Err(DataError::Validation("A retry must use the original Lightning invoice.".to_string()).into());
-        }
-        self.store
-            .payment_uow
-            .retry(previous, invoice.bolt11.clone(), reserve_amount_msat)
-            .await
     }
 
     async fn send_lnurl_pay(
@@ -616,7 +525,6 @@ impl PaymentService {
                     lightning: Some(LnPayment {
                         ln_address: data.ln_address.clone(),
                         payment_hash: invoice.payment_hash,
-                        bolt11: Some(cb.pr.clone()),
                         raw_success_action: cb.success_action.clone(),
                         ..Default::default()
                     }),
@@ -652,17 +560,14 @@ impl PaymentService {
                 settled_payment.reserved_amount = pending_payment.reserved_amount;
                 settled_payment.status = PaymentStatus::Settled;
 
+                let pending_raw_success_action = pending_payment
+                    .lightning
+                    .as_ref()
+                    .and_then(|lightning| lightning.raw_success_action.clone());
                 let lightning = settled_payment.lightning.get_or_insert_with(Default::default);
-                if let Some(pending) = pending_payment.lightning {
-                    lightning.attempt_id = pending.attempt_id;
-                    if pending.bolt11.is_some() {
-                        lightning.bolt11 = pending.bolt11;
-                    }
-                    if lightning.raw_success_action.is_none() {
-                        lightning.raw_success_action = pending.raw_success_action;
-                    }
+                if lightning.raw_success_action.is_none() {
+                    lightning.raw_success_action = pending_raw_success_action;
                 }
-                let attempt_id = lightning.attempt_id;
                 let success_action = match (
                     lightning.raw_success_action.clone(),
                     lightning.payment_preimage.as_deref(),
@@ -682,12 +587,8 @@ impl PaymentService {
                 // win the Settled transition and persist the row without it, so attach it and
                 // persist when the stored row is missing it — this path is its only source.
                 if let Some(success_action) = success_action {
-                    let current = payment.lightning.as_mut().filter(|lightning| {
-                        payment.status == PaymentStatus::Settled
-                            && lightning.attempt_id == attempt_id
-                            && lightning.success_action.is_none()
-                    });
-                    if let Some(lightning) = current {
+                    let lightning = payment.lightning.get_or_insert_with(Default::default);
+                    if lightning.success_action.is_none() {
                         lightning.success_action = Some(success_action);
                         lightning.raw_success_action = None;
                         payment = self.store.payment.update(payment).await?;
@@ -711,14 +612,8 @@ impl PaymentService {
         }
     }
 
-    async fn sync_lightning_payment(&self, payment: Payment, payment_hash: String) -> Result<bool, ApplicationError> {
-        let attempt_id = payment.lightning.as_ref().and_then(|lightning| lightning.attempt_id);
-        // Only CLN can identify a retry independently of earlier sends of the same invoice.
-        if attempt_id.is_some() && !self.cln_retries {
-            return Ok(false);
-        }
-        let lookup = attempt_id.map_or(PaymentLookup::Latest, |id| PaymentLookup::Attempt(id.to_string()));
-        let Some(node_payment) = self.ln_client.payment_by_hash(payment_hash.clone(), lookup).await? else {
+    async fn sync_lightning_payment(&self, payment_hash: String) -> Result<bool, ApplicationError> {
+        let Some(node_payment) = self.ln_client.payment_by_hash(payment_hash.clone()).await? else {
             return Ok(false);
         };
 
@@ -732,7 +627,6 @@ impl PaymentService {
                     .unwrap_or_default();
 
                 let event = LnPaySuccessEvent {
-                    attempt_id,
                     amount_msat: node_payment.amount_msat,
                     fees_msat: node_payment.fee_msat.unwrap_or_default(),
                     payment_hash: payment_hash.clone(),
@@ -749,11 +643,7 @@ impl PaymentService {
                     .clone()
                     .unwrap_or_else(|| "Payment failed".to_string());
                 self.events
-                    .failed_payment(LnPayFailureEvent {
-                        attempt_id,
-                        payment_hash,
-                        reason,
-                    })
+                    .failed_payment(LnPayFailureEvent { payment_hash, reason })
                     .await?;
 
                 Ok(true)
@@ -926,63 +816,6 @@ impl PaymentsUseCases for PaymentService {
         Ok(payment)
     }
 
-    async fn payment_details(&self, mut payment: Payment) -> Payment {
-        let label = Self::payment_label(&payment);
-        if payment.status != PaymentStatus::Failed {
-            return payment;
-        }
-        let Some(lightning) = payment.lightning.as_mut() else {
-            return payment;
-        };
-        // Older rows did not have the invoice. Recover it even when it is
-        // too late to retry or the original attempt has no provider label.
-        let details = async {
-            let candidate = if self.cln_retries {
-                self.ln_client
-                    .payment_by_hash(lightning.payment_hash.clone(), PaymentLookup::RetryCandidate(label))
-                    .await
-                    .ok()
-                    .flatten()
-            } else {
-                None
-            };
-            let can_retry = candidate
-                .as_ref()
-                .is_some_and(|payment| payment.status == PaymentStatus::Failed);
-            let mut bolt11 = lightning.bolt11.clone();
-            if bolt11.is_none() {
-                let node_payment = match candidate {
-                    Some(payment) => Some(payment),
-                    None => self
-                        .ln_client
-                        .payment_by_hash(lightning.payment_hash.clone(), PaymentLookup::Latest)
-                        .await
-                        .ok()
-                        .flatten(),
-                };
-                bolt11 = node_payment.and_then(|payment| payment.lightning).and_then(|node| {
-                    node.bolt11.filter(|bolt11| {
-                        parse_bolt11(bolt11).is_ok_and(|invoice| invoice.payment_hash == lightning.payment_hash)
-                    })
-                });
-            }
-            (bolt11, can_retry)
-        };
-
-        if let Ok((bolt11, can_retry)) = timeout(Duration::from_secs(2), details).await {
-            if can_retry
-                && bolt11
-                    .as_deref()
-                    .and_then(|bolt11| bolt11.parse::<Bolt11Invoice>().ok())
-                    .is_some_and(|invoice| Self::invoice_is_unexpired(&invoice))
-            {
-                lightning.retryable = Some(true);
-            }
-            lightning.bolt11 = bolt11;
-        }
-        payment
-    }
-
     async fn list(&self, filter: PaymentFilter) -> Result<Vec<Payment>, ApplicationError> {
         trace!(?filter, "Listing payments");
 
@@ -1042,17 +875,13 @@ impl PaymentsUseCases for PaymentService {
             return Err(DataError::Validation("Cannot delete a pending payment.".to_string()).into());
         }
 
-        let n_deleted = self
-            .store
+        self.store
             .payment
             .delete_many(PaymentFilter {
                 ids: Some(vec![id]),
                 ..Default::default()
             })
             .await?;
-        if n_deleted == 0 {
-            return Err(DataError::Conflict("The payment changed before it could be deleted.".to_string()).into());
-        }
 
         info!(%id, "Payment deleted successfully");
         Ok(())
@@ -1077,7 +906,7 @@ impl PaymentsUseCases for PaymentService {
             return Ok(());
         };
         if payment.ledger == Ledger::Lightning && payment.status != PaymentStatus::Settled {
-            self.sync_lightning_payment(payment, payment_hash).await?;
+            self.sync_lightning_payment(payment_hash).await?;
         }
         Ok(())
     }
@@ -1107,7 +936,7 @@ impl PaymentsUseCases for PaymentService {
             };
             let payment_hash = lightning.payment_hash.clone();
 
-            if self.sync_lightning_payment(payment, payment_hash).await? {
+            if self.sync_lightning_payment(payment_hash).await? {
                 synced += 1;
             }
         }
@@ -1150,7 +979,6 @@ mod tests {
             Arc::new(bitcoin_wallet),
             DOMAIN.to_string(),
             Arc::new(events),
-            false,
         )
     }
 
@@ -2658,11 +2486,6 @@ mod tests {
                     .times(1)
                     .returning(|_| Ok(None));
                 store
-                    .payment
-                    .expect_find_by_payment_hash()
-                    .times(1)
-                    .returning(|_| Ok(None));
-                store
                     .payment_uow
                     .expect_reserve()
                     .withf(|payment, reserve_amount_msat| {
@@ -2714,11 +2537,6 @@ mod tests {
                 let mut store = MockAppStoreBuilder::new();
                 store
                     .invoice
-                    .expect_find_by_payment_hash()
-                    .times(1)
-                    .returning(|_| Ok(None));
-                store
-                    .payment
                     .expect_find_by_payment_hash()
                     .times(1)
                     .returning(|_| Ok(None));
@@ -3215,9 +3033,9 @@ mod tests {
                         });
                     let mut node = MockLnClient::new();
                     node.expect_payment_by_hash()
-                        .withf(|hash, label| hash == "ph" && matches!(label, PaymentLookup::Latest))
+                        .withf(|hash| hash == "ph")
                         .times(1)
-                        .return_once(move |_, _| result);
+                        .return_once(move |_| result);
                     let service = service(store, node, MockBitcoinWallet::new(), MockEventUseCases::new());
                     assert_eq!(service.sync_one("ph".to_string()).await.is_err(), should_error);
                 }
@@ -3244,9 +3062,9 @@ mod tests {
                     });
                 let mut node = MockLnClient::new();
                 node.expect_payment_by_hash()
-                    .withf(|hash, label| hash == "ph" && matches!(label, PaymentLookup::Latest))
+                    .withf(|hash| hash == "ph")
                     .times(1)
-                    .returning(|_, _| {
+                    .returning(|_| {
                         Ok(Some(Payment {
                             status: PaymentStatus::Failed,
                             error: Some("cancelled".to_string()),
@@ -3294,7 +3112,7 @@ mod tests {
                     .returning(|_| Ok(vec![pending_lightning_payment()]));
 
                 let mut ln_client = MockLnClient::new();
-                ln_client.expect_payment_by_hash().times(1).returning(|_, _| {
+                ln_client.expect_payment_by_hash().times(1).returning(|_| {
                     Ok(Some(Payment {
                         status: PaymentStatus::Settled,
                         amount_msat: 1_000,

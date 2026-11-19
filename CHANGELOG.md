@@ -8,10 +8,6 @@ release notes when a tag is published.
 
 ## [Unreleased]
 
-### Added
-
-- Show the original BOLT11 on failed outgoing Lightning payments and allow confirmed Core Lightning failures to be retried from the original wallet.
-
 ### Fixed
 
 - Wait for an Auth0 API access token before loading the dashboard after sign-in.

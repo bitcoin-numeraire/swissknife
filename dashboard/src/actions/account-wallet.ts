@@ -149,7 +149,6 @@ export function useGetWalletPayment(id: string, walletId?: string) {
 
   return {
     payment: result.data?.data,
-    paymentMutate: result.mutate,
     paymentLoading: walletsLoading || result.isLoading,
     paymentError: walletsError || result.error,
     paymentValidating: result.isValidating,

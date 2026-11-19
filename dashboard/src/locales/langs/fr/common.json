@@ -755,7 +755,6 @@
     "invoice_from": "Facture de"
   },
   "payment_details": {
-    "retry": "Réessayer le paiement",
     "detail_heading": "Détails du paiement",
     "amount_sent": "Montant envoyé",
     "fees": "Frais",

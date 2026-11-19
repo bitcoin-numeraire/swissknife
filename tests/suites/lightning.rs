@@ -145,7 +145,7 @@ mod send {
                 Auth::Bearer(token),
                 SendPaymentRequest {
                     wallet_id: Some(wallet.id),
-                    input: bolt11.clone(),
+                    input: bolt11,
                     amount_msat: None,
                     comment: None,
                 },
@@ -185,7 +185,6 @@ mod send {
         assert_eq!(persisted.status, PaymentStatus::Settled);
         assert_eq!(persisted.amount_msat, amount_msat);
         assert_eq!(persisted.fee_msat, payment.fee_msat);
-        assert_eq!(persisted.lightning.unwrap().bolt11.as_deref(), Some(bolt11.as_str()));
     }
 }
 

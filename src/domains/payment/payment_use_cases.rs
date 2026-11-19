@@ -23,8 +23,6 @@ pub trait PaymentsUseCases: Send + Sync {
         wallet_id: Uuid,
     ) -> Result<Payment, ApplicationError>;
     async fn get(&self, id: Uuid) -> Result<Payment, ApplicationError>;
-    /// Add invoice and retry information to a payment already authorized for detail access.
-    async fn payment_details(&self, payment: Payment) -> Payment;
     async fn list(&self, filter: PaymentFilter) -> Result<Vec<Payment>, ApplicationError>;
     async fn delete(&self, id: Uuid) -> Result<(), ApplicationError>;
     async fn delete_many(&self, filter: PaymentFilter) -> Result<u64, ApplicationError>;
