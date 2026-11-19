@@ -92,7 +92,7 @@ impl InvoiceUseCases for InvoiceService {
                 description.unwrap_or(DEFAULT_INVOICE_DESCRIPTION.to_string()),
                 invoice_id.to_string(),
                 expiry.unwrap_or(self.invoice_expiry),
-                false,
+                Default::default(),
             )
             .await?;
         invoice.id = invoice_id;
@@ -292,11 +292,12 @@ mod tests {
                 let mut ln_client = MockLnClient::new();
                 ln_client
                     .expect_invoice()
-                    .withf(|amount, description, _label, expiry, deschashonly| {
+                    .withf(|amount, description, _label, expiry, options| {
                         *amount == 1_000
                             && description == DEFAULT_INVOICE_DESCRIPTION
                             && *expiry == EXPIRY
-                            && !deschashonly
+                            && !options.description_hash_only
+                            && options.preimage.is_none()
                     })
                     .times(1)
                     .returning(|amount, _, _, _, _| {

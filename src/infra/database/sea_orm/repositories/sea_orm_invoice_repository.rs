@@ -88,6 +88,9 @@ where
         let models = InvoiceEntity::find()
             .apply_if(filter.wallet_id, |q, wallet| q.filter(Column::WalletId.eq(wallet)))
             .apply_if(filter.ids, |q, ids| q.filter(Column::Id.is_in(ids)))
+            .apply_if(filter.lnurl_verify_token, |q, token| {
+                q.filter(Column::LnurlVerifyToken.eq(token))
+            })
             .apply_if(filter.status, |q, s| match s {
                 InvoiceStatus::Pending => q.filter(
                     Condition::all()
@@ -153,6 +156,11 @@ where
             model.expires_at = Set(Some(ln_invoice.expires_at.naive_utc()));
         }
 
+        if let Some(lnurl) = invoice.lnurl {
+            model.lnurl_verify_token = Set(Some(lnurl.verify_token));
+            model.lnurl_preimage = Set(Some(lnurl.preimage));
+        }
+
         let result = model
             .insert(self.db.connection())
             .await
@@ -209,6 +217,9 @@ where
         let result = InvoiceEntity::delete_many()
             .apply_if(filter.wallet_id, |q, wallet| q.filter(Column::WalletId.eq(wallet)))
             .apply_if(filter.ids, |q, ids| q.filter(Column::Id.is_in(ids)))
+            .apply_if(filter.lnurl_verify_token, |q, token| {
+                q.filter(Column::LnurlVerifyToken.eq(token))
+            })
             .apply_if(filter.status, |q, status| match status {
                 InvoiceStatus::Pending => q.filter(
                     Condition::all()

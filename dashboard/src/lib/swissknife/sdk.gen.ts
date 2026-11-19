@@ -309,6 +309,9 @@ import type {
   UpdateLocalLoginData,
   UpdateLocalLoginErrors,
   UpdateLocalLoginResponses,
+  VerifyLnurlInvoiceData,
+  VerifyLnurlInvoiceErrors,
+  VerifyLnurlInvoiceResponses,
   VersionCheckData,
   VersionCheckResponses,
   WalletPayData,
@@ -369,9 +372,25 @@ export const wellKnownNostr = <ThrowOnError extends boolean = false>(
   });
 
 /**
+ * Verify an LNURL-pay invoice
+ *
+ * Check settlement using the URL from the callback response. The preimage
+ * is returned only after settlement. See [LUD-21](https://github.com/lnurl/luds/blob/luds/21.md).
+ */
+export const verifyLnurlInvoice = <ThrowOnError extends boolean = false>(
+  options: Options<VerifyLnurlInvoiceData, ThrowOnError>
+): RequestResult<VerifyLnurlInvoiceResponses, VerifyLnurlInvoiceErrors, ThrowOnError> =>
+  (options.client ?? client).get<
+    VerifyLnurlInvoiceResponses,
+    VerifyLnurlInvoiceErrors,
+    ThrowOnError
+  >({ url: '/lnurlp/{token}/verify', ...options });
+
+/**
  * LNURL callback endpoint
  *
- * Returns the callback response for this LN Address (username). Containing an invoice and information on how to behave upon success. See [LUDS-06](https://github.com/lnurl/luds/blob/luds/06.md)
+ * Returns an invoice, a success action, and a URL to verify settlement.
+ * See [LUD-06](https://github.com/lnurl/luds/blob/luds/06.md) and [LUD-21](https://github.com/lnurl/luds/blob/luds/21.md).
  */
 export const callback = <ThrowOnError extends boolean = false>(
   options: Options<CallbackData, ThrowOnError>

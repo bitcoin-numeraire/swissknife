@@ -1,16 +1,19 @@
 use std::{sync::Arc, vec};
 
 use async_trait::async_trait;
+use bitcoin::hashes::{sha256, Hash};
 use tracing::{debug, info};
 use uuid::Uuid;
 
 use crate::{
     application::{
         composition::AppStore,
-        errors::{ApplicationError, DataError},
+        errors::{ApplicationError, DataError, LightningError},
     },
+    domains::invoice::{InvoiceFilter, InvoiceStatus, LnInvoiceOptions, LnUrlInvoiceData},
     infra::lightning::LnClient,
 };
+use swissknife_types::LnUrlVerifyResponse;
 
 use super::{LnURLPayRequest, LnUrlCallback, LnUrlSuccessAction, LnUrlUseCases};
 
@@ -103,6 +106,10 @@ impl LnUrlUseCases for LnUrlService {
         }
 
         let invoice_id = Uuid::new_v4();
+        let verify_token = Uuid::new_v4();
+        // SwissKnife must know the preimage even if the invoice is paid internally
+        // and the provider's copy is canceled.
+        let preimage: [u8; 32] = rand::random();
         let mut invoice = self
             .ln_client
             .invoice(
@@ -110,18 +117,33 @@ impl LnUrlUseCases for LnUrlService {
                 self.metadata(&username),
                 invoice_id.to_string(),
                 self.invoice_expiry,
-                true,
+                LnInvoiceOptions {
+                    description_hash_only: true,
+                    preimage: Some(preimage),
+                },
             )
             .await?;
+        let ln_invoice = invoice
+            .ln_invoice
+            .as_ref()
+            .ok_or_else(|| LightningError::Invoice("Provider returned no Lightning invoice".to_string()))?;
+        if ln_invoice.payment_hash != sha256::Hash::hash(&preimage).to_string() {
+            return Err(LightningError::Invoice("Provider returned an unexpected invoice payment hash".into()).into());
+        }
+        let bolt11 = ln_invoice.bolt11.clone();
         invoice.id = invoice_id;
         invoice.wallet_id.clone_from(&ln_address.wallet_id);
         invoice.ln_address_id = Some(ln_address.id);
         invoice.description = Some(comment.unwrap_or(format!("Payment to {}@{}", username, self.domain)));
+        invoice.lnurl = Some(LnUrlInvoiceData {
+            verify_token,
+            preimage: hex::encode(preimage),
+        });
 
         // TODO: Get or add more information to make this a LNURLp invoice (like fetching a success action specific to the user)
-        let invoice = self.store.invoice.insert(invoice).await?;
+        self.store.invoice.insert(invoice).await?;
         let lnurlp_invoice = LnUrlCallback {
-            pr: invoice.ln_invoice.expect("should exist for ledger Lightning").bolt11,
+            pr: bolt11,
             success_action: Some(LnUrlSuccessAction {
                 tag: "message".to_string(),
                 message: Some("Thanks for the sats!".to_string()),
@@ -129,10 +151,45 @@ impl LnUrlUseCases for LnUrlService {
             }),
             disposable: None,
             routes: vec![],
+            verify: Some(format!(
+                "{}/lnurlp/{verify_token}/verify",
+                self.host.trim_end_matches('/')
+            )),
         };
 
         info!(username, "Lightning invoice generated successfully");
         Ok(lnurlp_invoice)
+    }
+
+    async fn verify(&self, token: Uuid) -> Result<LnUrlVerifyResponse, ApplicationError> {
+        let invoice = self
+            .store
+            .invoice
+            .find_many(InvoiceFilter {
+                lnurl_verify_token: Some(token),
+                limit: Some(1),
+                ..Default::default()
+            })
+            .await?
+            .into_iter()
+            .next();
+        let Some(invoice) = invoice else {
+            return Ok(LnUrlVerifyResponse::Error {
+                reason: "Not found".into(),
+            });
+        };
+        let lnurl = invoice
+            .lnurl
+            .ok_or_else(|| DataError::Inconsistency("Missing LNURL verification data".into()))?;
+        let ln_invoice = invoice
+            .ln_invoice
+            .ok_or_else(|| DataError::Inconsistency("Missing Lightning invoice details".into()))?;
+        let settled = invoice.status == InvoiceStatus::Settled;
+        Ok(LnUrlVerifyResponse::Ok {
+            settled,
+            preimage: settled.then_some(lnurl.preimage),
+            pr: ln_invoice.bolt11,
+        })
     }
 }
 
@@ -172,6 +229,106 @@ mod tests {
             nostr_pubkey: None,
             created_at: Utc::now(),
             updated_at: None,
+        }
+    }
+
+    mod verify {
+        use crate::application::errors::DatabaseError;
+
+        use super::*;
+
+        fn verification_invoice(status: InvoiceStatus) -> Invoice {
+            Invoice {
+                status,
+                ln_invoice: Some(LnInvoice {
+                    bolt11: "original-bolt11".into(),
+                    ..Default::default()
+                }),
+                lnurl: Some(LnUrlInvoiceData {
+                    verify_token: Uuid::new_v4(),
+                    preimage: "11".repeat(32),
+                }),
+                ..Default::default()
+            }
+        }
+
+        fn with_invoice(mut invoice: Invoice) -> (LnUrlService, Uuid) {
+            let token = Uuid::new_v4();
+            invoice.lnurl.as_mut().unwrap().verify_token = token;
+            let mut store = MockAppStoreBuilder::new();
+            store
+                .invoice
+                .expect_find_many()
+                .withf(move |filter| filter.lnurl_verify_token == Some(token) && filter.limit == Some(1))
+                .times(1)
+                .return_once(move |_| Ok(vec![invoice]));
+            (service(store, MockLnClient::new()), token)
+        }
+
+        mod when_unsettled {
+            use super::*;
+
+            #[tokio::test]
+            async fn withholds_the_preimage_for_pending_and_expired_invoices() {
+                for status in [InvoiceStatus::Pending, InvoiceStatus::Expired] {
+                    let (service, token) = with_invoice(verification_invoice(status));
+                    assert!(matches!(
+                        service.verify(token).await.unwrap(),
+                        LnUrlVerifyResponse::Ok { settled: false, preimage: None, pr } if pr == "original-bolt11"
+                    ));
+                }
+            }
+        }
+
+        mod when_settled {
+            use super::*;
+            use crate::application::composition::Ledger;
+
+            #[tokio::test]
+            async fn returns_the_preimage_for_lightning_and_internal_settlement() {
+                for ledger in [Ledger::Lightning, Ledger::Internal] {
+                    let mut invoice = verification_invoice(InvoiceStatus::Settled);
+                    invoice.ledger = ledger;
+                    let (service, token) = with_invoice(invoice);
+                    assert!(matches!(
+                        service.verify(token).await.unwrap(),
+                        LnUrlVerifyResponse::Ok { settled: true, preimage: Some(preimage), pr }
+                            if preimage == "11".repeat(32) && pr == "original-bolt11"
+                    ));
+                }
+            }
+        }
+
+        mod when_missing {
+            use super::*;
+
+            #[tokio::test]
+            async fn returns_an_lnurl_error() {
+                let mut store = MockAppStoreBuilder::new();
+                store.invoice.expect_find_many().times(1).returning(|_| Ok(vec![]));
+                assert!(matches!(
+                    service(store, MockLnClient::new()).verify(Uuid::new_v4()).await.unwrap(),
+                    LnUrlVerifyResponse::Error { reason } if reason == "Not found"
+                ));
+            }
+        }
+
+        mod when_lookup_fails {
+            use super::*;
+
+            #[tokio::test]
+            async fn propagates_the_database_error() {
+                let mut store = MockAppStoreBuilder::new();
+                store
+                    .invoice
+                    .expect_find_many()
+                    .times(1)
+                    .returning(|_| Err(DatabaseError::FindMany("unavailable".into())));
+                assert!(matches!(
+                    service(store, MockLnClient::new()).verify(Uuid::new_v4()).await,
+                    Err(ApplicationError::Database(DatabaseError::FindMany(_)))
+                ));
+            }
         }
     }
 
@@ -260,17 +417,29 @@ mod tests {
                     .expect_find_by_username()
                     .times(1)
                     .returning(|_| Ok(Some(ln_address(true))));
-                store.invoice.expect_insert().times(1).returning(Ok);
+                store
+                    .invoice
+                    .expect_insert()
+                    .withf(|invoice| {
+                        let lnurl = invoice.lnurl.as_ref().unwrap();
+                        let preimage = hex::decode(&lnurl.preimage).unwrap();
+                        lnurl.verify_token != invoice.id
+                            && invoice.ln_invoice.as_ref().unwrap().payment_hash
+                                == sha256::Hash::hash(&preimage).to_string()
+                    })
+                    .times(1)
+                    .returning(Ok);
 
                 let mut ln_client = MockLnClient::new();
                 ln_client
                     .expect_invoice()
-                    .withf(|_, _, _, _, deschashonly| *deschashonly)
+                    .withf(|_, _, _, _, options| options.description_hash_only && options.preimage.is_some())
                     .times(1)
-                    .returning(|_, _, _, _, _| {
+                    .returning(|_, _, _, _, options| {
                         Ok(Invoice {
                             ln_invoice: Some(LnInvoice {
                                 bolt11: "lnbc1example".to_string(),
+                                payment_hash: sha256::Hash::hash(&options.preimage.unwrap()).to_string(),
                                 ..Default::default()
                             }),
                             ..Default::default()

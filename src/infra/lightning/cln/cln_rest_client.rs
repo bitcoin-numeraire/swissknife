@@ -22,7 +22,7 @@ use crate::{
             BtcTransaction, BtcTransactionOutput, OnchainSyncBatch, OnchainSyncCursor, OnchainTransaction,
         },
         event::OnchainWithdrawalEvent,
-        invoice::Invoice,
+        invoice::{Invoice, LnInvoiceOptions},
         payment::{LnPayment, LnPaymentTarget, Payment, PaymentStatus},
         system::HealthStatus,
     },
@@ -168,7 +168,7 @@ impl LnClient for ClnRestClient {
         description: String,
         label: String,
         expiry: u32,
-        deschashonly: bool,
+        options: LnInvoiceOptions,
     ) -> Result<Invoice, LightningError> {
         let response: InvoiceResponse = self
             .post_request(
@@ -178,7 +178,8 @@ impl LnClient for ClnRestClient {
                     expiry: expiry as u64,
                     label,
                     amount_msat,
-                    deschashonly: Some(deschashonly),
+                    deschashonly: Some(options.description_hash_only),
+                    preimage: options.preimage.map(hex::encode),
                 },
             )
             .await

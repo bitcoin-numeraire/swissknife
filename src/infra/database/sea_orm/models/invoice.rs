@@ -30,6 +30,9 @@ pub struct Model {
     pub expires_at: Option<DateTime>,
     #[sea_orm(unique)]
     pub btc_output_id: Option<Uuid>,
+    #[sea_orm(unique)]
+    pub lnurl_verify_token: Option<Uuid>,
+    pub lnurl_preimage: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

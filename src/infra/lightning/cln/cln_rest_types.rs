@@ -19,6 +19,8 @@ pub struct InvoiceRequest {
     pub expiry: u64,
     pub amount_msat: u64,
     pub deschashonly: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub preimage: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]

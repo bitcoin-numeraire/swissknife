@@ -3,7 +3,7 @@ use async_trait::async_trait;
 use crate::{
     application::errors::LightningError,
     domains::{
-        invoice::Invoice,
+        invoice::{Invoice, LnInvoiceOptions},
         payment::{LnPaymentTarget, Payment},
         system::HealthStatus,
     },
@@ -19,7 +19,7 @@ pub trait LnClient: Sync + Send {
         description: String,
         label: String,
         expiry: u32,
-        deschashonly: bool,
+        options: LnInvoiceOptions,
     ) -> Result<Invoice, LightningError>;
     /// Return a provider-derived route fee estimate.
     async fn estimate_fee(&self, target: LnPaymentTarget) -> Result<u64, LightningError>;

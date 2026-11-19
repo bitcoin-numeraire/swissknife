@@ -101,10 +101,12 @@ impl From<InvoiceModel> for Invoice {
             },
         };
 
-        let ln_invoice = match model.ledger.as_str() {
-            "Lightning" => Some(LnInvoice {
+        // Internal settlement changes the ledger, but the original BOLT11 remains
+        // part of the invoice and is needed for LNURL verification.
+        let ln_invoice = match model.bolt11 {
+            Some(bolt11) => Some(LnInvoice {
                 payment_hash: model.payment_hash.expect(ASSERTION_MSG),
-                bolt11: model.bolt11.expect(ASSERTION_MSG),
+                bolt11,
                 description_hash: model.description_hash,
                 payee_pubkey: model.payee_pubkey.expect(ASSERTION_MSG),
                 min_final_cltv_expiry_delta: model.min_final_cltv_expiry_delta.expect(ASSERTION_MSG) as u64,
@@ -112,7 +114,7 @@ impl From<InvoiceModel> for Invoice {
                 expiry: Duration::from_secs(model.expiry.expect(ASSERTION_MSG) as u64),
                 expires_at: model.expires_at.expect(ASSERTION_MSG).and_utc(),
             }),
-            _ => None,
+            None => None,
         };
 
         Invoice {
@@ -132,6 +134,10 @@ impl From<InvoiceModel> for Invoice {
             ln_invoice,
             btc_output_id: model.btc_output_id,
             bitcoin_output: None,
+            lnurl: model
+                .lnurl_verify_token
+                .zip(model.lnurl_preimage)
+                .map(|(verify_token, preimage)| crate::domains::invoice::LnUrlInvoiceData { verify_token, preimage }),
         }
     }
 }

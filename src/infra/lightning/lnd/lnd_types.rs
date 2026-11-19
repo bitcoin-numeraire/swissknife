@@ -26,6 +26,8 @@ pub struct InvoiceRequest {
     pub expiry: u64,
     pub value_msat: u64,
     pub description_hash: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub r_preimage: Option<String>,
 }
 
 #[serde_as]

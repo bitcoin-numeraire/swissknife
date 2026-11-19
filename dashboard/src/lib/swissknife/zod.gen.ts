@@ -350,7 +350,24 @@ export const zLnUrlCallback = z.object({
   pr: z.string(),
   routes: z.array(z.string()),
   successAction: zLnUrlSuccessAction.nullish(),
+  verify: z.string().nullish(),
 });
+
+/**
+ * LUD-21 invoice verification response.
+ */
+export const zLnUrlVerifyResponse = z.union([
+  z.object({
+    pr: z.string(),
+    preimage: z.string().nullable(),
+    settled: z.boolean(),
+    status: z.enum(['OK']),
+  }),
+  z.object({
+    reason: z.string(),
+    status: z.enum(['ERROR']),
+  }),
+]);
 
 /**
  * Non-secret local login information for account administrators.
@@ -746,6 +763,15 @@ export const zWellKnownNostrQuery = z.object({
  * Found
  */
 export const zWellKnownNostrResponse = zNostrNip05Response;
+
+export const zVerifyLnurlInvoicePath = z.object({
+  token: z.uuid(),
+});
+
+/**
+ * Invoice verification result, or Not found for an invalid or unknown token
+ */
+export const zVerifyLnurlInvoiceResponse = zLnUrlVerifyResponse;
 
 export const zCallbackPath = z.object({
   username: z.string(),
