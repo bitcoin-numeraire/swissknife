@@ -117,6 +117,49 @@ impl Counterparty {
         self.run_json(&args)
     }
 
+    /// Record a failed attempt while leaving the original invoice payable.
+    pub fn record_rejected_payment(&self, bolt11: &str, label: Uuid) -> String {
+        let decoded = self.cln_rpc("decode", json!({ "string": bolt11 }));
+        let hash = decoded["payment_hash"].as_str().unwrap();
+        let peer = &decoded["payee"];
+        let channels = self.cln_rpc("listpeerchannels", json!({ "id": peer }));
+        let channel = channels["channels"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|channel| channel["state"] == "CHANNELD_NORMAL")
+            .expect("direct regtest channel to invoice recipient");
+        let route = json!([{
+            "id": peer,
+            "channel": channel["short_channel_id"],
+            "amount_msat": decoded["amount_msat"],
+            "delay": decoded["min_final_cltv_expiry"],
+        }]);
+        self.cln_rpc(
+            "sendpay",
+            json!({
+                "route": route,
+                "payment_hash": hash,
+                "label": label,
+                "bolt11": bolt11,
+                "payment_secret": hex::encode([0u8; 32]),
+            }),
+        );
+        let started = Instant::now();
+        loop {
+            let history = self.cln_rpc("listpays", json!({ "payment_hash": hash }));
+            if history["pays"][0]["status"] == "failed" {
+                assert_eq!(history["pays"][0]["label"], label.to_string());
+                return hash.to_string();
+            }
+            assert!(
+                started.elapsed() < Duration::from_secs(10),
+                "the test attempt did not fail"
+            );
+            sleep(Duration::from_millis(100));
+        }
+    }
+
     /// Send a malformed onion in the held payment's group. The real receiving
     /// node rejects this part while the original xpay remains in flight.
     pub fn fail_payment_part(&self, hash: &str) {

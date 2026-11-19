@@ -101,6 +101,7 @@ type SendMoneyDrawerProps = {
   isAdmin?: boolean;
   walletId?: string;
   initialInput?: string;
+  initialAmountMSats?: number;
 };
 
 type ReceiveMoneyDrawerProps = {
@@ -668,6 +669,7 @@ export function SendMoneyDrawer({
   isAdmin = false,
   walletId,
   initialInput,
+  initialAmountMSats,
 }: SendMoneyDrawerProps) {
   const { t } = useTranslate();
   const { state } = useSettingsContext();
@@ -712,9 +714,10 @@ export function SendMoneyDrawer({
     () => amountValueToSats(amountValue, amountUnit, fiatPrices, state.currency),
     [amountUnit, amountValue, fiatPrices, state.currency]
   );
-  const embeddedAmountSats = bolt11Amount || bitcoinRequest.amountSats || 0;
+  const initialAmountSats = input === initialInput ? (initialAmountMSats ?? 0) / 1000 : 0;
+  const embeddedAmountSats = bolt11Amount || bitcoinRequest.amountSats || initialAmountSats;
   const amountSats = embeddedAmountSats || manualAmountSats;
-  const amountMSats = amountSats * 1000;
+  const amountMSats = Math.round(amountSats * 1000);
   const amountExceedsAvailable =
     balance != null && amountSats > 0 && amountMSats > Math.max(balance, 0);
   const activeWalletId = walletId || selectedWalletId || (!isAdmin ? wallet?.id : '');

@@ -125,6 +125,43 @@ describe('SendMoneyDrawer', () => {
     });
   });
 
+  it('prefills a retry at the original millisatoshi amount and waits for Send', async () => {
+    // Amountless BOLT11 signed by the local regtest LND fixture.
+    const amountlessInvoice =
+      'lnbcrt1p40ehpxpp52xmp28suz9jqusez9xv3el2jqm89q6v5zmlger2mld5kn3ax994qdqqcqzzsxqyz5vqsp5g27pdqh9q2clvs9fnnhj424v7qvwfxz9s96zqhumlu39nm8f27gs9qxpqysgqd7dypkcqd9pzz80smakm2a4pckkmsheq6rtfaapsh5e7zhr2ln3kux3tcdq3c8lmalj9k9wh2e7s5n9tfahrj0ayyx4wpp6s3xc8j0sqn3euhh';
+    const { sections } = decode(amountlessInvoice) as typeof invoiceDetails;
+    const timestamp = Number(sections.find((section) => section.name === 'timestamp')?.value);
+    vi.setSystemTime(new Date((timestamp + 1) * 1000));
+
+    render(
+      <ThemeProvider theme={createTheme()}>
+        <SendMoneyDrawer
+          open
+          walletId="original-wallet"
+          contacts={[]}
+          fiatPrices={{ USD: 100_000 }}
+          initialInput={amountlessInvoice}
+          initialAmountMSats={28_784_875}
+          onClose={vi.fn()}
+        />
+      </ThemeProvider>
+    );
+
+    expect(screen.getByPlaceholderText('send_money.recipient_placeholder')).toHaveValue(
+      amountlessInvoice
+    );
+    expect(walletPay).not.toHaveBeenCalled();
+    const send = screen.getByRole('button', { name: 'send_money.send' });
+    expect(send).toBeEnabled();
+    fireEvent.click(send);
+
+    await waitFor(() => expect(walletPay).toHaveBeenCalledOnce());
+    expect(walletPay).toHaveBeenCalledWith({
+      path: { wallet_id: 'original-wallet' },
+      body: { input: amountlessInvoice, amount_msat: 28_784_875, comment: null },
+    });
+  });
+
   it('blocks quote and send until the payer explicitly selects an on-chain request', () => {
     renderSendDrawer();
 

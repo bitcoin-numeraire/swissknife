@@ -42,10 +42,14 @@ export function useGetPayment(id: string) {
     return data;
   };
 
-  const { data, error, isLoading, isValidating } = useSWR(endpointKeys.payments.get, fetcher);
+  const { data, error, isLoading, isValidating, mutate } = useSWR(
+    [endpointKeys.payments.get, id],
+    fetcher
+  );
 
   return {
     payment: data,
+    paymentMutate: mutate,
     paymentLoading: isLoading,
     paymentError: error,
     paymentValidating: isValidating,

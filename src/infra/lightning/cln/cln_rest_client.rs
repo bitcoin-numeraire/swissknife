@@ -28,7 +28,7 @@ use crate::{
     },
     infra::{
         config::config_rs::deserialize_duration,
-        lightning::{bitcoin_utils::parse_psbt, cln::ListFundsResponse, types::parse_network, LnClient},
+        lightning::{bitcoin_utils::parse_psbt, cln::ListFundsResponse, types::parse_network, LnClient, PaymentLookup},
     },
 };
 
@@ -266,7 +266,11 @@ impl LnClient for ClnRestClient {
         }
     }
 
-    async fn payment_by_hash(&self, payment_hash: String) -> Result<Option<Payment>, LightningError> {
+    async fn payment_by_hash(
+        &self,
+        payment_hash: String,
+        lookup: PaymentLookup,
+    ) -> Result<Option<Payment>, LightningError> {
         let response = self
             .post_request::<ListPaysResponse>(
                 "listpays",
@@ -277,7 +281,18 @@ impl LnClient for ClnRestClient {
             .await
             .map_err(|e| LightningError::PaymentByHash(e.to_string()))?;
 
-        let payment = response.pays.into_iter().rfind(|pay| pay.payment_hash == payment_hash);
+        if matches!(lookup, PaymentLookup::RetryCandidate(_))
+            && response
+                .pays
+                .iter()
+                .any(|pay| pay.payment_hash == payment_hash && pay.status != "failed")
+        {
+            return Ok(None);
+        }
+        let payment = response
+            .pays
+            .into_iter()
+            .rfind(|pay| pay.payment_hash == payment_hash && lookup.matches_label(pay.label.as_deref()));
 
         let Some(payment) = payment else {
             return Ok(None);
@@ -315,6 +330,7 @@ impl LnClient for ClnRestClient {
             lightning: Some(LnPayment {
                 payment_hash,
                 payment_preimage: payment.preimage,
+                bolt11: payment.bolt11,
                 ..Default::default()
             }),
             ..Default::default()

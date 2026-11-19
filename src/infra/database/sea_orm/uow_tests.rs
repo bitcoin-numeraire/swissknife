@@ -21,7 +21,7 @@ use crate::domains::account::{AccountFilter, AccountRepository, ApiKey, ApiKeyRe
 use crate::domains::event::{ClientEventRepository, ClientEventType, EventProjectionUnitOfWork};
 use crate::domains::invoice::{Invoice, InvoiceRepository};
 use crate::domains::ln_address::LnAddressRepository;
-use crate::domains::payment::{LnPayment, Payment, PaymentRepository, PaymentStatus, PaymentUnitOfWork};
+use crate::domains::payment::{LnPayment, Payment, PaymentFilter, PaymentRepository, PaymentStatus, PaymentUnitOfWork};
 use crate::domains::{
     asset::AssetRepository,
     bitcoin::{BtcAddressRepository, BtcAddressType, BtcNetwork, BtcOutput, BtcOutputStatus},
@@ -808,6 +808,54 @@ async fn fail_then_settle_corrects_without_double_release() {
 
     assert_eq!(settled.status, PaymentStatus::Settled);
     assert!(settled.error.is_none(), "a settled payment carries no failure reason");
+    assert_eq!(balance(&conn, wallet).await, (99_000, 0));
+}
+
+#[tokio::test]
+async fn old_attempt_cannot_change_the_status_or_balance_of_a_retry() {
+    let conn = connect().await;
+    let wallet = seed_wallet(&conn, 200_000).await;
+    let mut first = uow(&conn)
+        .reserve(pending_payment(wallet, 100_000, 1_000), 110_000)
+        .await
+        .unwrap();
+    first.status = PaymentStatus::Failed;
+    let failed = uow(&conn).fail(first.clone()).await.unwrap();
+    let retry = uow(&conn)
+        .retry(failed.clone(), "invoice".to_string(), 110_000)
+        .await
+        .unwrap();
+    assert_eq!(retry.status, PaymentStatus::Pending);
+    assert!(retry.lightning.as_ref().unwrap().attempt_id.is_some());
+    assert_eq!(balance(&conn, wallet).await, (90_000, 110_000));
+
+    let deleted = SeaOrmPaymentRepository::new(conn.clone())
+        .delete_many(PaymentFilter {
+            ids: Some(vec![retry.id]),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    assert_eq!(deleted, 0, "a payment cannot be deleted after a retry reserves funds");
+
+    assert!(matches!(
+        uow(&conn)
+            .retry(failed, "invoice".to_string(), 110_000)
+            .await
+            .unwrap_err(),
+        ApplicationError::Data(DataError::Conflict(_))
+    ));
+    assert_eq!(
+        uow(&conn).fail(first.clone()).await.unwrap().status,
+        PaymentStatus::Pending
+    );
+    assert_eq!(uow(&conn).settle(first).await.unwrap().status, PaymentStatus::Pending);
+    assert_eq!(balance(&conn, wallet).await, (90_000, 110_000));
+
+    let mut retry = retry;
+    retry.status = PaymentStatus::Settled;
+    retry.fee_msat = Some(1_000);
+    assert_eq!(uow(&conn).settle(retry).await.unwrap().status, PaymentStatus::Settled);
     assert_eq!(balance(&conn, wallet).await, (99_000, 0));
 }
 

@@ -86,6 +86,7 @@ pub struct CancelInvoiceResponse {}
 #[derive(Debug, Deserialize)]
 pub struct TrackPaymentResponse {
     pub payment_hash: String,
+    pub payment_request: Option<String>,
     pub payment_preimage: String,
     #[serde_as(as = "Option<DisplayFromStr>")]
     pub value_msat: Option<u64>,

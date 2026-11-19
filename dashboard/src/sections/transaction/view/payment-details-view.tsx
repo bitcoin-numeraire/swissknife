@@ -22,7 +22,7 @@ type Props = {
 export function PaymentDetailsView({ id }: Props) {
   const { t } = useTranslate();
 
-  const { payment, paymentLoading, paymentError } = useGetWalletPayment(id);
+  const { payment, paymentLoading, paymentError, paymentMutate } = useGetWalletPayment(id);
 
   const errors = [paymentError];
   const data = [payment];
@@ -52,7 +52,12 @@ export function PaymentDetailsView({ id }: Props) {
             sx={{ mb: { xs: 3, md: 5 } }}
           />
 
-          <PaymentDetails payment={payment!} />
+          <PaymentDetails
+            payment={payment!}
+            onPaymentChange={() => {
+              void paymentMutate();
+            }}
+          />
         </>
       )}
     </DashboardContent>
