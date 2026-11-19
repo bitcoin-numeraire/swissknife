@@ -235,11 +235,6 @@ impl TestApp {
         ApiClient::new(self.base_url.clone())
     }
 
-    /// Read the binary's captured stdout for logging assertions.
-    pub fn stdout_log(&self) -> String {
-        fs::read_to_string(&self.stdout_path).expect("read SwissKnife stdout log")
-    }
-
     /// JWT for the bootstrap admin (all permissions), created during startup.
     pub async fn admin_token(&self) -> &str {
         &self.admin_jwt

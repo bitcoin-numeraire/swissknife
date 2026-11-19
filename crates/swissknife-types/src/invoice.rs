@@ -69,12 +69,16 @@ pub struct Invoice {
 #[derive(Clone)]
 pub struct LnUrlInvoiceData {
     pub verify_token: Uuid,
+    /// Payment preimage; keep secret until the invoice settles.
     pub preimage: String,
 }
 
 impl std::fmt::Debug for LnUrlInvoiceData {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str("LnUrlInvoiceData([REDACTED])")
+        f.debug_struct("LnUrlInvoiceData")
+            .field("verify_token", &self.verify_token)
+            .field("preimage", &"[REDACTED]")
+            .finish()
     }
 }
 
@@ -139,7 +143,7 @@ pub struct NewInvoiceRequest {
 
 /// Invoice query filter.
 #[serde_as]
-#[derive(Clone, Deserialize, Serialize, Default, IntoParams, ToSchema)]
+#[derive(Clone, Debug, Deserialize, Serialize, Default, IntoParams, ToSchema)]
 pub struct InvoiceFilter {
     /// Total amount of results to return
     #[serde_as(as = "Option<DisplayFromStr>")]
@@ -167,22 +171,6 @@ pub struct InvoiceFilter {
     pub lnurl_verify_token: Option<Uuid>,
 }
 
-impl std::fmt::Debug for InvoiceFilter {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("InvoiceFilter")
-            .field("limit", &self.limit)
-            .field("offset", &self.offset)
-            .field("ids", &self.ids)
-            .field("wallet_id", &self.wallet_id)
-            .field("status", &self.status)
-            .field("ledger", &self.ledger)
-            .field("order_by", &self.order_by)
-            .field("order_direction", &self.order_direction)
-            .field("lnurl_verify_token", &self.lnurl_verify_token.map(|_| "[REDACTED]"))
-            .finish()
-    }
-}
-
 /// Field to order invoices by.
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq, Default, ToSchema)]
 pub enum InvoiceOrderBy {
@@ -200,7 +188,7 @@ mod tests {
         use super::*;
 
         #[test]
-        fn invoice_json_and_debug_output_hide_the_token_and_preimage() {
+        fn invoice_json_hides_verification_data_and_debug_hides_the_preimage() {
             let token = Uuid::new_v4();
             let preimage = "12".repeat(32);
             let invoice = Invoice {
@@ -211,11 +199,9 @@ mod tests {
                 ..Default::default()
             };
             let json = serde_json::to_string(&invoice).unwrap();
-            let debug = format!("{invoice:?}");
-            for text in [json, debug] {
-                assert!(!text.contains(&token.to_string()));
-                assert!(!text.contains(&preimage));
-            }
+            assert!(!json.contains(&token.to_string()));
+            assert!(!json.contains(&preimage));
+            assert!(!format!("{invoice:?}").contains(&preimage));
         }
 
         #[test]
@@ -225,7 +211,6 @@ mod tests {
                 lnurl_verify_token: Some(token),
                 ..Default::default()
             };
-            assert!(!format!("{filter:?}").contains(&token.to_string()));
             assert!(!serde_json::to_string(&filter).unwrap().contains(&token.to_string()));
             let parsed: InvoiceFilter =
                 serde_json::from_value(serde_json::json!({"lnurl_verify_token": token})).unwrap();

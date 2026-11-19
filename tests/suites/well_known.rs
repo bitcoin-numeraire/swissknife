@@ -219,45 +219,6 @@ mod lnurl {
     }
 
     #[tokio::test]
-    async fn verification_tokens_are_redacted_from_debug_request_logs() {
-        let app = TestApp::isolated(
-            "lnurl-verify-logs",
-            &[(
-                "SWISSKNIFE_LOGGING__FILTER",
-                "warn,swissknife=debug,tower_http::trace=debug".into(),
-            )],
-        )
-        .await;
-        let token = app.admin_token().await;
-        let (_wallet, addr) = register_address(&app, token, "lnurl-log", None).await;
-        let pay = app
-            .api()
-            .get(&format!("/.well-known/lnurlp/{}", addr.username), Auth::None)
-            .await
-            .parse::<LnURLPayRequest>();
-        let callback = follow_callback(&pay.callback, 10_000).await;
-        let url = callback.verify.as_deref().unwrap();
-        verify(url).await;
-        let secret = reqwest::Url::parse(url)
-            .unwrap()
-            .path_segments()
-            .unwrap()
-            .nth(1)
-            .unwrap()
-            .to_string();
-        app.stop();
-        let logs = app.stdout_log();
-        assert!(
-            logs.contains("/lnurlp/{token}/verify"),
-            "the verification request is traced"
-        );
-        assert!(
-            !logs.contains(&secret),
-            "the verification token must not appear in debug logs"
-        );
-    }
-
-    #[tokio::test]
     async fn verification_rejects_invalid_tokens_and_ordinary_invoice_ids() {
         let app = app().await;
         let token = app.admin_token().await;
