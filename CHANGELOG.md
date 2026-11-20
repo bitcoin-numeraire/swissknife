@@ -8,6 +8,11 @@ release notes when a tag is published.
 
 ## [Unreleased]
 
+### Fixed
+
+- Restore startup with custom CA certificates for CLN and LND REST connections
+  when hostname verification is disabled.
+
 ## [0.3.3] - 2026-11-19
 
 ### Added

@@ -95,14 +95,18 @@ impl ClnRestClient {
             let ca_certificate = Self::read_ca(ca_cert_path)
                 .await
                 .map_err(|e| LightningError::ReadCertificates(e.to_string()))?;
-            client_builder = client_builder
-                .add_root_certificate(ca_certificate)
-                .danger_accept_invalid_hostnames(config.accept_invalid_hostnames);
+            // Rustls requires an explicit trust store when hostname verification is disabled.
+            client_builder = if config.accept_invalid_hostnames {
+                client_builder.tls_certs_only([ca_certificate])
+            } else {
+                client_builder.tls_certs_merge([ca_certificate])
+            };
+            client_builder = client_builder.tls_danger_accept_invalid_hostnames(config.accept_invalid_hostnames);
         }
 
         let client = client_builder
             .build()
-            .map_err(|e| LightningError::ParseConfig(e.to_string()))?;
+            .map_err(|e| LightningError::ParseConfig(format!("{e:?}")))?;
 
         let mut cln_client = Self {
             client,
