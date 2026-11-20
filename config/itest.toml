@@ -47,7 +47,7 @@ ca_cert_path = "tests/itest/runtime/lnd/ca.cert"
 connect_timeout = "5s"
 timeout = "30s"
 connection_verbose = false
-accept_invalid_certs = true
+accept_invalid_certs = false
 accept_invalid_hostnames = true
 fee_limit_msat = 25000
 payment_timeout = "10s"
@@ -60,11 +60,12 @@ payment_timeout = "10s"
 
 [cln_rest_config]
 endpoint = "https://127.0.0.1:3010"
+ca_cert_path = "tests/itest/runtime/cln/regtest/ca.pem"
 rune = "INJECTED_VIA_ENV"
 connect_timeout = "5s"
 timeout = "30s"
 connection_verbose = false
-accept_invalid_certs = true
+accept_invalid_certs = false
 accept_invalid_hostnames = true
 payment_timeout = "10s"
 ws_min_reconnect_delay = "1s"
