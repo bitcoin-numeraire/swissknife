@@ -64,6 +64,9 @@ impl PaymentService {
         if amount == 0 {
             return Err(DataError::Validation("Amount must be greater than zero".to_string()).into());
         }
+        if amount > i64::MAX as u64 {
+            return Err(DataError::Validation("Amount exceeds the supported storage range".to_string()).into());
+        }
 
         Ok(amount)
     }
@@ -71,7 +74,10 @@ impl PaymentService {
     fn reserve_amount_msat(amount_msat: u64, fee_msat: u64) -> Result<u64, ApplicationError> {
         amount_msat
             .checked_add(fee_msat)
-            .ok_or_else(|| DataError::Validation("Payment amount plus fee overflows".to_string()).into())
+            .filter(|total| *total <= i64::MAX as u64)
+            .ok_or_else(|| {
+                DataError::Validation("Payment amount plus fee exceeds the supported storage range".to_string()).into()
+            })
     }
 
     fn fee_estimate(
@@ -102,11 +108,7 @@ impl PaymentService {
         invoice: &ParsedBolt11Invoice,
         amount_msat: Option<u64>,
     ) -> Result<LnPaymentTarget, ApplicationError> {
-        let amount_msat = invoice
-            .amount_msat
-            .or(amount_msat)
-            .filter(|amount| *amount > 0)
-            .ok_or_else(|| DataError::Validation("Amount is required for a zero-amount invoice".to_string()))?;
+        let amount_msat = Self::validate_amount(invoice.amount_msat.or(amount_msat))?;
 
         Ok(LnPaymentTarget {
             destination: invoice.destination.clone(),
@@ -217,7 +219,7 @@ impl PaymentService {
         }
 
         if let Some(amount) = specified_amount {
-            let amount_msat = amount.saturating_mul(1000);
+            let amount_msat = Self::validate_amount(amount.checked_mul(1000))?;
             let description: Option<String> = comment.or(data.message);
 
             if let Some(recipient_address) = self.store.btc_address.find_by_address(&data.address).await? {
@@ -377,6 +379,9 @@ impl PaymentService {
         let specified_amount = invoice.amount_msat.or(amount_msat);
         if specified_amount == Some(0) {
             return Err(DataError::Validation("Amount must be greater than zero.".to_string()).into());
+        }
+        if let Some(amount) = specified_amount {
+            Self::validate_amount(Some(amount))?;
         }
 
         if let Some(amount) = specified_amount {
@@ -747,6 +752,7 @@ impl PaymentsUseCases for PaymentService {
                 let amount_msat = amount_sat
                     .checked_mul(1000)
                     .ok_or_else(|| DataError::Validation("Payment amount overflows".to_string()))?;
+                Self::validate_amount(Some(amount_msat))?;
 
                 if let Some(recipient_address) = self.store.btc_address.find_by_address(&data.address).await? {
                     if recipient_address.wallet_id == wallet_id {
@@ -778,6 +784,7 @@ impl PaymentsUseCases for PaymentService {
                     .ok_or_else(|| {
                         DataError::Validation("Amount must be defined for zero-amount invoices.".to_string())
                     })?;
+                Self::validate_amount(Some(amount))?;
                 if let Some(stored_invoice) = self.store.invoice.find_by_payment_hash(&invoice.payment_hash).await? {
                     if stored_invoice.wallet_id == wallet_id {
                         return Err(DataError::Validation("Cannot pay for own invoice.".to_string()).into());

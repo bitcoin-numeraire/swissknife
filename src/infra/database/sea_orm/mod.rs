@@ -13,4 +13,4 @@ pub use repositories::*;
 pub use store::*;
 pub use uow::*;
 
-pub(crate) use types::sea_order;
+pub(crate) use types::{amount_to_db, sea_order};

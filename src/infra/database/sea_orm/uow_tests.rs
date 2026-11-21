@@ -812,6 +812,77 @@ async fn fail_then_settle_corrects_without_double_release() {
 }
 
 #[tokio::test]
+async fn wallet_operations_reject_unsigned_amounts_outside_storage_range() {
+    let conn = connect().await;
+    let wallet = seed_wallet(&conn, 1_000).await;
+    let repo = SeaOrmWalletRepository::new(conn.clone());
+
+    for amount in [i64::MAX as u64 + 1, u64::MAX - 999, u64::MAX] {
+        assert!(repo.credit(wallet, amount).await.is_err());
+        assert!(repo.debit(wallet, amount).await.is_err());
+        assert!(repo.debit_confirmed(wallet, amount).await.is_err());
+        assert!(repo.reserve(wallet, amount).await.is_err());
+        assert!(repo.release(wallet, amount).await.is_err());
+        assert_eq!(balance(&conn, wallet).await, (1_000, 0));
+    }
+}
+
+#[tokio::test]
+async fn wallet_operations_preserve_the_largest_supported_amount() {
+    let conn = connect().await;
+    let maximum = i64::MAX as u64;
+    let wallet = seed_wallet(&conn, maximum).await;
+    let repo = SeaOrmWalletRepository::new(conn.clone());
+
+    assert!(repo.credit(wallet, 1).await.is_err());
+    assert_eq!(balance(&conn, wallet).await, (i64::MAX, 0));
+    assert!(repo.reserve(wallet, maximum).await.unwrap());
+    assert_eq!(balance(&conn, wallet).await, (0, i64::MAX));
+    assert!(repo.release(wallet, maximum).await.unwrap());
+    assert_eq!(balance(&conn, wallet).await, (i64::MAX, 0));
+    assert!(repo.debit(wallet, maximum).await.unwrap());
+    assert_eq!(balance(&conn, wallet).await, (0, 0));
+}
+
+#[tokio::test]
+async fn confirmed_debits_can_go_negative_without_underflowing() {
+    let conn = connect().await;
+    let wallet = seed_wallet(&conn, 0).await;
+    let repo = SeaOrmWalletRepository::new(conn.clone());
+
+    assert!(repo.debit_confirmed(wallet, i64::MAX as u64).await.unwrap());
+    assert!(repo.debit_confirmed(wallet, 1).await.unwrap());
+    assert_eq!(balance(&conn, wallet).await, (i64::MIN, 0));
+    assert!(!repo.debit_confirmed(wallet, 1).await.unwrap());
+    assert_eq!(balance(&conn, wallet).await, (i64::MIN, 0));
+}
+
+#[tokio::test]
+async fn oversized_internal_amount_cannot_create_spendable_balance() {
+    let conn = connect().await;
+    let payer = seed_wallet(&conn, 0).await;
+    let payee = seed_wallet(&conn, 0).await;
+    // This unsigned amount would become -1,000 in signed database storage.
+    let amount = u64::MAX - 999;
+    let mut payment = pending_payment(payer, amount, 0);
+    payment.ledger = Ledger::Internal;
+    payment.status = PaymentStatus::Settled;
+    let mut invoice = pending_invoice(payee, amount);
+    invoice.payment_time = Some(Utc::now());
+
+    let result = uow(&conn).settle_internal(payment, invoice).await;
+
+    assert!(result.is_err(), "an unrepresentable internal transfer must be rejected");
+    assert_eq!(balance(&conn, payer).await, (0, 0));
+    assert_eq!(balance(&conn, payee).await, (0, 0));
+    let events = SeaOrmClientEventRepository::new(conn.clone())
+        .find_after(account_id(&conn, payer).await, 0, 10)
+        .await
+        .expect("read payer events");
+    assert!(events.is_empty(), "a rejected transfer emits no settlement event");
+}
+
+#[tokio::test]
 async fn settle_internal_is_atomic() {
     let conn = connect().await;
     let payer = seed_wallet(&conn, 200_000).await;

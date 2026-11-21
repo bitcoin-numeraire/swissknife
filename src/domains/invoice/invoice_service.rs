@@ -80,6 +80,9 @@ impl InvoiceUseCases for InvoiceService {
         description: Option<String>,
         expiry: Option<u32>,
     ) -> Result<Invoice, ApplicationError> {
+        if amount > i64::MAX as u64 {
+            return Err(DataError::Validation("Amount exceeds the supported storage range".to_string()).into());
+        }
         debug!(%wallet_id, "Generating invoice");
 
         self.ensure_wallet_network(wallet_id).await?;

@@ -8,7 +8,7 @@ use sea_orm::{
 use uuid::Uuid;
 
 use super::SeaOrmConnection;
-use crate::infra::database::sea_orm::sea_order;
+use crate::infra::database::sea_orm::{amount_to_db, sea_order};
 
 use crate::{
     application::errors::DatabaseError,
@@ -334,11 +334,12 @@ where
     }
 
     async fn credit(&self, id: Uuid, amount_msat: u64) -> Result<(), DatabaseError> {
-        let amount = amount_msat as i64;
+        let amount = amount_to_db(amount_msat)?;
         let result = WalletEntity::update_many()
             .col_expr(Column::AvailableAmount, Expr::col(Column::AvailableAmount).add(amount))
             .col_expr(Column::UpdatedAt, Expr::value(Utc::now().naive_utc()))
             .filter(Column::Id.eq(id))
+            .filter(Column::AvailableAmount.lte(i64::MAX - amount))
             .exec(self.db.connection())
             .await
             .map_err(|e| DatabaseError::Update(e.to_string()))?;
@@ -347,19 +348,20 @@ where
             Ok(())
         } else {
             Err(DatabaseError::Update(
-                "wallet balance credit target was missing".to_string(),
+                "wallet balance credit target was missing or exceeded the storage range".to_string(),
             ))
         }
     }
 
     async fn reserve(&self, id: Uuid, amount_msat: u64) -> Result<bool, DatabaseError> {
-        let amount = amount_msat as i64;
+        let amount = amount_to_db(amount_msat)?;
         let result = WalletEntity::update_many()
             .col_expr(Column::AvailableAmount, Expr::col(Column::AvailableAmount).sub(amount))
             .col_expr(Column::ReservedAmount, Expr::col(Column::ReservedAmount).add(amount))
             .col_expr(Column::UpdatedAt, Expr::value(Utc::now().naive_utc()))
             .filter(Column::Id.eq(id))
             .filter(Column::AvailableAmount.gte(amount))
+            .filter(Column::ReservedAmount.lte(i64::MAX - amount))
             .exec(self.db.connection())
             .await
             .map_err(|e| DatabaseError::Update(e.to_string()))?;
@@ -368,7 +370,7 @@ where
     }
 
     async fn debit(&self, id: Uuid, amount_msat: u64) -> Result<bool, DatabaseError> {
-        let amount = amount_msat as i64;
+        let amount = amount_to_db(amount_msat)?;
         let result = WalletEntity::update_many()
             .col_expr(Column::AvailableAmount, Expr::col(Column::AvailableAmount).sub(amount))
             .col_expr(Column::UpdatedAt, Expr::value(Utc::now().naive_utc()))
@@ -382,11 +384,12 @@ where
     }
 
     async fn debit_confirmed(&self, id: Uuid, amount_msat: u64) -> Result<bool, DatabaseError> {
-        let amount = amount_msat as i64;
+        let amount = amount_to_db(amount_msat)?;
         let result = WalletEntity::update_many()
             .col_expr(Column::AvailableAmount, Expr::col(Column::AvailableAmount).sub(amount))
             .col_expr(Column::UpdatedAt, Expr::value(Utc::now().naive_utc()))
             .filter(Column::Id.eq(id))
+            .filter(Column::AvailableAmount.gte(i64::MIN + amount))
             .exec(self.db.connection())
             .await
             .map_err(|e| DatabaseError::Update(e.to_string()))?;
@@ -395,13 +398,14 @@ where
     }
 
     async fn release(&self, id: Uuid, amount_msat: u64) -> Result<bool, DatabaseError> {
-        let amount = amount_msat as i64;
+        let amount = amount_to_db(amount_msat)?;
         let result = WalletEntity::update_many()
             .col_expr(Column::AvailableAmount, Expr::col(Column::AvailableAmount).add(amount))
             .col_expr(Column::ReservedAmount, Expr::col(Column::ReservedAmount).sub(amount))
             .col_expr(Column::UpdatedAt, Expr::value(Utc::now().naive_utc()))
             .filter(Column::Id.eq(id))
             .filter(Column::ReservedAmount.gte(amount))
+            .filter(Column::AvailableAmount.lte(i64::MAX - amount))
             .exec(self.db.connection())
             .await
             .map_err(|e| DatabaseError::Update(e.to_string()))?;

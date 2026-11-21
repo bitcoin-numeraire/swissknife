@@ -3,7 +3,7 @@ use std::time::Duration;
 use chrono::Utc;
 
 use crate::{
-    application::composition::Ledger,
+    application::{composition::Ledger, errors::DatabaseError},
     domains::{
         account::{Account, AccountPreferences, ApiKey, AuthIdentity},
         asset::Asset,
@@ -28,6 +28,11 @@ use super::models::{
 };
 
 const ASSERTION_MSG: &str = "should parse successfully by assertion";
+
+/// Monetary database columns are signed, even when the domain amount is unsigned.
+pub(crate) fn amount_to_db(amount: u64) -> Result<i64, DatabaseError> {
+    i64::try_from(amount).map_err(|_| DatabaseError::AmountOutOfRange)
+}
 
 impl From<AssetModel> for Asset {
     fn from(model: AssetModel) -> Self {

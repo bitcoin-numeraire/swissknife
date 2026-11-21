@@ -7,6 +7,7 @@ use sea_orm::{
 use uuid::Uuid;
 
 use super::SeaOrmConnection;
+use crate::infra::database::sea_orm::amount_to_db;
 
 use crate::{
     application::errors::DatabaseError,
@@ -50,7 +51,7 @@ where
                 txid: Set(output.txid.clone()),
                 output_index: Set(i64::from(output.output_index)),
                 address: Set(output.address.clone()),
-                amount_sat: Set(output.amount_sat as i64),
+                amount_sat: Set(amount_to_db(output.amount_sat)?),
                 status: Set(output.status.to_string()),
                 block_height: Set(output.block_height.map(i64::from)),
                 updated_at: Set(Some(Utc::now().naive_utc())),
@@ -71,7 +72,7 @@ where
             txid: Set(output.txid.clone()),
             output_index: Set(i64::from(output.output_index)),
             address: Set(output.address.clone()),
-            amount_sat: Set(output.amount_sat as i64),
+            amount_sat: Set(amount_to_db(output.amount_sat)?),
             status: Set(output.status.to_string()),
             block_height: Set(output.block_height.map(i64::from)),
             ..Default::default()
