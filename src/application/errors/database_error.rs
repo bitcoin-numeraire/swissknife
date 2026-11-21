@@ -2,6 +2,9 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum DatabaseError {
+    #[error("Monetary amount exceeds the supported storage range")]
+    AmountOutOfRange,
+
     #[error("Failed to connect to database: {0}")]
     Connect(String),
 

@@ -16,7 +16,7 @@ use sea_orm::{
 use uuid::Uuid;
 
 use super::SeaOrmConnection;
-use crate::infra::database::sea_orm::sea_order;
+use crate::infra::database::sea_orm::{amount_to_db, sea_order};
 
 #[derive(Clone)]
 pub struct SeaOrmInvoiceRepository<C = DatabaseConnection> {
@@ -135,8 +135,8 @@ where
             wallet_id: Set(invoice.wallet_id),
             ln_address_id: Set(invoice.ln_address_id),
             description: Set(invoice.description),
-            amount_msat: Set(invoice.amount_msat.map(|v| v as i64)),
-            amount_received_msat: Set(invoice.amount_received_msat.map(|v| v as i64)),
+            amount_msat: Set(invoice.amount_msat.map(amount_to_db).transpose()?),
+            amount_received_msat: Set(invoice.amount_received_msat.map(amount_to_db).transpose()?),
             timestamp: Set(invoice.timestamp.naive_utc()),
             payment_time: Set(invoice.payment_time.map(|t| t.naive_utc())),
             ledger: Set(invoice.ledger.to_string()),
@@ -172,10 +172,10 @@ where
     async fn update(&self, invoice: Invoice) -> Result<Invoice, DatabaseError> {
         let model = ActiveModel {
             id: Unchanged(invoice.id),
-            fee_msat: Set(invoice.fee_msat.map(|v| v as i64)),
+            fee_msat: Set(invoice.fee_msat.map(amount_to_db).transpose()?),
             payment_time: Set(invoice.payment_time.map(|t| t.naive_utc())),
             description: Set(invoice.description),
-            amount_received_msat: Set(invoice.amount_received_msat.map(|v| v as i64)),
+            amount_received_msat: Set(invoice.amount_received_msat.map(amount_to_db).transpose()?),
             ledger: Set(invoice.ledger.to_string()),
             btc_output_id: Set(invoice.btc_output_id),
             updated_at: Set(Some(Utc::now().naive_utc())),
@@ -196,10 +196,13 @@ where
                 Column::PaymentTime,
                 Expr::value(invoice.payment_time.map(|t| t.naive_utc())),
             )
-            .col_expr(Column::FeeMsat, Expr::value(invoice.fee_msat.map(|v| v as i64)))
+            .col_expr(
+                Column::FeeMsat,
+                Expr::value(invoice.fee_msat.map(amount_to_db).transpose()?),
+            )
             .col_expr(
                 Column::AmountReceivedMsat,
-                Expr::value(invoice.amount_received_msat.map(|v| v as i64)),
+                Expr::value(invoice.amount_received_msat.map(amount_to_db).transpose()?),
             )
             .col_expr(Column::Ledger, Expr::value(invoice.ledger.to_string()))
             .col_expr(Column::UpdatedAt, Expr::value(Some(Utc::now().naive_utc())))

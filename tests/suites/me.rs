@@ -313,6 +313,73 @@ mod payments {
     use super::*;
 
     #[tokio::test]
+    async fn oversized_internal_payments_cannot_create_balance_or_history() {
+        let app = app().await;
+        let token = app.admin_token().await;
+        let payer = app.create_account_with_wallet(token, "amount-range-payer").await;
+        let payee = app.create_account_with_wallet(token, "amount-range-payee").await;
+        let username = unique("amount-range");
+        let address = app
+            .api()
+            .post(
+                "/v1/me/lightning-address",
+                Auth::ApiKey(&payee.key),
+                RegisterLnAddressRequest {
+                    account_id: None,
+                    username: username.clone(),
+                    allows_nostr: false,
+                    nostr_pubkey: None,
+                },
+            )
+            .await;
+        assert_status(&address, StatusCode::OK);
+
+        for amount in [i64::MAX as u64 + 1, u64::MAX - 999] {
+            for suffix in ["payments", "payments/fee-estimate"] {
+                let response = app
+                    .api()
+                    .post(
+                        &format!("/v1/me/wallets/{}/{suffix}", payer.wallet.id),
+                        Auth::ApiKey(&payer.key),
+                        SendPaymentRequest {
+                            wallet_id: None,
+                            input: format!("{username}@localhost"),
+                            amount_msat: Some(amount),
+                            comment: None,
+                        },
+                    )
+                    .await;
+                assert_error(&response, StatusCode::UNPROCESSABLE_ENTITY);
+            }
+        }
+
+        for account in [&payer, &payee] {
+            let balance = app
+                .api()
+                .get(
+                    &format!("/v1/me/wallets/{}/balance", account.wallet.id),
+                    Auth::ApiKey(&account.key),
+                )
+                .await;
+            assert_status(&balance, StatusCode::OK);
+            let balance = balance.parse::<Balance>();
+            assert_eq!(balance.available_msat, 0);
+            assert_eq!(balance.reserved_msat, 0);
+            for resource in ["payments", "invoices"] {
+                let history = app
+                    .api()
+                    .get(
+                        &format!("/v1/me/wallets/{}/{resource}", account.wallet.id),
+                        Auth::ApiKey(&account.key),
+                    )
+                    .await;
+                assert_status(&history, StatusCode::OK);
+                assert_eq!(history.body, json!([]));
+            }
+        }
+    }
+
+    #[tokio::test]
     async fn fee_estimate_requires_authentication() {
         let app = app().await;
         let res = app

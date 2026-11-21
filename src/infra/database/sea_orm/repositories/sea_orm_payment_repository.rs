@@ -7,7 +7,7 @@ use sea_orm::{
 use uuid::Uuid;
 
 use super::SeaOrmConnection;
-use crate::infra::database::sea_orm::sea_order;
+use crate::infra::database::sea_orm::{amount_to_db, sea_order};
 
 use crate::{
     application::errors::DatabaseError,
@@ -126,11 +126,11 @@ where
             wallet_id: Set(payment.wallet_id),
             ln_address: Set(ln_address.or(internal_ln_address)),
             btc_address: Set(btc_address.or(internal_btc_address)),
-            amount_msat: Set(payment.amount_msat as i64),
+            amount_msat: Set(amount_to_db(payment.amount_msat)?),
             status: Set(payment.status.to_string()),
             ledger: Set(payment.ledger.to_string()),
-            fee_msat: Set(payment.fee_msat.map(|v| v as i64)),
-            reserved_amount: Set(payment.reserved_amount as i64),
+            fee_msat: Set(payment.fee_msat.map(amount_to_db).transpose()?),
+            reserved_amount: Set(amount_to_db(payment.reserved_amount)?),
             payment_time: Set(payment.payment_time.map(|t| t.naive_utc())),
             payment_hash: Set(payment_hash.or(btc_txid).or(internal_payment_hash)),
             description: Set(payment.description),
@@ -207,13 +207,13 @@ where
         let model = ActiveModel {
             id: Unchanged(payment.id),
             status: Set(payment.status.to_string()),
-            fee_msat: Set(payment.fee_msat.map(|v| v as i64)),
-            reserved_amount: Set(payment.reserved_amount as i64),
+            fee_msat: Set(payment.fee_msat.map(amount_to_db).transpose()?),
+            reserved_amount: Set(amount_to_db(payment.reserved_amount)?),
             payment_time: Set(payment.payment_time.map(|t| t.naive_utc())),
             payment_hash: Set(payment_hash.or(btc_txid).or(internal_payment_hash)),
             payment_preimage: Set(payment_preimage),
             error: Set(payment.error),
-            amount_msat: Set(payment.amount_msat as i64),
+            amount_msat: Set(amount_to_db(payment.amount_msat)?),
             metadata: Set(metadata),
             ln_address,
             btc_address,
