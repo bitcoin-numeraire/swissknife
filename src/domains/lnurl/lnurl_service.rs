@@ -92,6 +92,13 @@ impl LnUrlUseCases for LnUrlService {
         amount: u64,
         comment: Option<String>,
     ) -> Result<LnUrlCallback, ApplicationError> {
+        if !(MIN_SENDABLE..=MAX_SENDABLE).contains(&amount) {
+            return Err(DataError::Validation(format!(
+                "Amount must be between {MIN_SENDABLE} and {MAX_SENDABLE} millisatoshis"
+            ))
+            .into());
+        }
+
         debug!(username, amount, comment, "Generating LNURLp invoice");
 
         let ln_address = self
@@ -405,6 +412,22 @@ mod tests {
 
     mod lnurlp_callback {
         use super::*;
+
+        mod when_amount_is_outside_the_advertised_range {
+            use super::*;
+
+            #[tokio::test]
+            async fn rejects_the_request_without_calling_the_node() {
+                for amount in [0, MIN_SENDABLE - 1, MAX_SENDABLE + 1, i64::MAX as u64 + 1, u64::MAX] {
+                    let err = service(MockAppStoreBuilder::new(), MockLnClient::new())
+                        .lnurlp_callback("alice".to_string(), amount, None)
+                        .await
+                        .unwrap_err();
+
+                    assert!(matches!(err, ApplicationError::Data(DataError::Validation(_))));
+                }
+            }
+        }
 
         mod when_address_is_active {
             use super::*;

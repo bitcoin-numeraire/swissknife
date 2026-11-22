@@ -134,6 +134,76 @@ mod lnurl {
     }
 
     #[tokio::test]
+    async fn callback_rejects_amounts_outside_the_advertised_range() {
+        let app = app().await;
+        let token = app.admin_token().await;
+        let (wallet, addr) = register_address(app, token, "lnurl-range-reject", None).await;
+        let pay = app
+            .api()
+            .get(&format!("/.well-known/lnurlp/{}", addr.username), Auth::None)
+            .await
+            .parse::<LnURLPayRequest>();
+        let balance_before = app.wallet_balance(token, wallet.id).await;
+
+        for amount in [
+            0,
+            pay.min_sendable - 1,
+            pay.max_sendable + 1,
+            i64::MAX as u64 + 1,
+            u64::MAX,
+        ] {
+            let response = reqwest::get(format!("{}?amount={amount}", pay.callback))
+                .await
+                .expect("reach the LNURL callback");
+            assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
+            let body: Value = response.json().await.expect("validation error response");
+            assert!(body["reason"].is_string());
+        }
+
+        let invoices = app
+            .api()
+            .get(&format!("/v1/invoices?wallet_id={}", wallet.id), Auth::Bearer(token))
+            .await;
+        assert_status(&invoices, StatusCode::OK);
+        assert!(invoices.parse::<Vec<Invoice>>().is_empty());
+        let balance_after = app.wallet_balance(token, wallet.id).await;
+        assert_eq!(balance_before.available_msat, balance_after.available_msat);
+        assert_eq!(balance_before.reserved_msat, balance_after.reserved_msat);
+    }
+
+    #[tokio::test]
+    async fn callback_accepts_both_advertised_amount_boundaries() {
+        let app = app().await;
+        let token = app.admin_token().await;
+        let (wallet, addr) = register_address(app, token, "lnurl-range-accept", None).await;
+        let pay = app
+            .api()
+            .get(&format!("/.well-known/lnurlp/{}", addr.username), Auth::None)
+            .await
+            .parse::<LnURLPayRequest>();
+
+        for amount in [pay.min_sendable, pay.max_sendable] {
+            let callback = follow_callback(&pay.callback, amount).await;
+            let invoice: Bolt11Invoice = callback.pr.parse().expect("valid BOLT11 invoice");
+            assert_eq!(invoice.amount_milli_satoshis(), Some(amount));
+        }
+
+        let invoices = app
+            .api()
+            .get(&format!("/v1/invoices?wallet_id={}", wallet.id), Auth::Bearer(token))
+            .await;
+        assert_status(&invoices, StatusCode::OK);
+        let invoices = invoices.parse::<Vec<Invoice>>();
+        assert_eq!(invoices.len(), 2);
+        assert!(invoices
+            .iter()
+            .any(|invoice| invoice.amount_msat == Some(pay.min_sendable)));
+        assert!(invoices
+            .iter()
+            .any(|invoice| invoice.amount_msat == Some(pay.max_sendable)));
+    }
+
+    #[tokio::test]
     async fn an_external_payer_settles_via_the_address() {
         let app = app().await;
         let token = app.admin_token().await;
