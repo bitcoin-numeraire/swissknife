@@ -92,6 +92,13 @@ impl LnUrlUseCases for LnUrlService {
         amount: u64,
         comment: Option<String>,
     ) -> Result<LnUrlCallback, ApplicationError> {
+        if !(MIN_SENDABLE..=MAX_SENDABLE).contains(&amount) {
+            return Err(DataError::Validation(format!(
+                "Amount must be between {MIN_SENDABLE} and {MAX_SENDABLE} millisatoshis"
+            ))
+            .into());
+        }
+
         debug!(username, amount, comment, "Generating LNURLp invoice");
 
         let ln_address = self
@@ -127,6 +134,9 @@ impl LnUrlUseCases for LnUrlService {
             .ln_invoice
             .as_ref()
             .ok_or_else(|| LightningError::Invoice("Provider returned no Lightning invoice".to_string()))?;
+        if invoice.amount_msat != Some(amount) {
+            return Err(LightningError::Invoice("Provider returned an unexpected invoice amount".into()).into());
+        }
         if ln_invoice.payment_hash != sha256::Hash::hash(&preimage).to_string() {
             return Err(LightningError::Invoice("Provider returned an unexpected invoice payment hash".into()).into());
         }
@@ -406,6 +416,61 @@ mod tests {
     mod lnurlp_callback {
         use super::*;
 
+        mod when_amount_is_outside_the_advertised_range {
+            use super::*;
+
+            #[tokio::test]
+            async fn rejects_the_request_without_calling_the_node() {
+                for amount in [0, MIN_SENDABLE - 1, MAX_SENDABLE + 1, i64::MAX as u64 + 1, u64::MAX] {
+                    let err = service(MockAppStoreBuilder::new(), MockLnClient::new())
+                        .lnurlp_callback("alice".to_string(), amount, None)
+                        .await
+                        .unwrap_err();
+
+                    assert!(matches!(err, ApplicationError::Data(DataError::Validation(_))));
+                }
+            }
+        }
+
+        mod when_the_provider_returns_a_different_amount {
+            use super::*;
+
+            #[tokio::test]
+            async fn rejects_the_invoice_without_persisting_it() {
+                for returned_amount in [None, Some(0), Some(1_999), Some(2_001)] {
+                    let mut store = MockAppStoreBuilder::new();
+                    store
+                        .ln_address
+                        .expect_find_by_username()
+                        .times(1)
+                        .returning(|_| Ok(Some(ln_address(true))));
+                    store.invoice.expect_insert().never();
+                    let mut ln_client = MockLnClient::new();
+                    ln_client
+                        .expect_invoice()
+                        .withf(|amount, _, _, _, _| *amount == 2_000)
+                        .times(1)
+                        .returning(move |_, _, _, _, options| {
+                            Ok(Invoice {
+                                amount_msat: returned_amount,
+                                ln_invoice: Some(LnInvoice {
+                                    payment_hash: sha256::Hash::hash(&options.preimage.unwrap()).to_string(),
+                                    ..Default::default()
+                                }),
+                                ..Default::default()
+                            })
+                        });
+
+                    let err = service(store, ln_client)
+                        .lnurlp_callback("alice".to_string(), 2_000, None)
+                        .await
+                        .unwrap_err();
+
+                    assert!(matches!(err, ApplicationError::Lightning(LightningError::Invoice(_))));
+                }
+            }
+        }
+
         mod when_address_is_active {
             use super::*;
 
@@ -433,10 +498,13 @@ mod tests {
                 let mut ln_client = MockLnClient::new();
                 ln_client
                     .expect_invoice()
-                    .withf(|_, _, _, _, options| options.description_hash_only && options.preimage.is_some())
+                    .withf(|amount, _, _, _, options| {
+                        *amount == 2_000 && options.description_hash_only && options.preimage.is_some()
+                    })
                     .times(1)
-                    .returning(|_, _, _, _, options| {
+                    .returning(|amount, _, _, _, options| {
                         Ok(Invoice {
+                            amount_msat: Some(amount),
                             ln_invoice: Some(LnInvoice {
                                 bolt11: "lnbc1example".to_string(),
                                 payment_hash: sha256::Hash::hash(&options.preimage.unwrap()).to_string(),
