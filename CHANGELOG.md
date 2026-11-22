@@ -8,11 +8,6 @@ release notes when a tag is published.
 
 ## [Unreleased]
 
-### Fixed
-
-- Enforce the advertised LNURL-pay amount range and reject provider invoices
-  whose amount does not match the callback request.
-
 ## [0.3.5] - 2026-11-21
 
 ### Fixed
