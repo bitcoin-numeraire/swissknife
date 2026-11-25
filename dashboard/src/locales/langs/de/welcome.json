@@ -1,0 +1,51 @@
+{
+  "preview": {
+    "eyebrow": "{{appName}}-Einrichtung",
+    "title": "Stellen Sie Ihre Bitcoin-Wallet ein",
+    "content": "Diese Wallet läuft von Ihrem Server. Sie kontrollieren das Geld, also beginnt die Einrichtung mit Zugriff, Sicherungen und ein paar Prüfungen, bevor Geld bewegt wird.",
+    "wallet_title": "Wallet-Einrichtung",
+    "wallet_caption": "Leer, bis Sie es mit Satoshis füllen",
+    "setup_label": "Vor dem Hinzufügen von Satoshis",
+    "setup_title": "Sicherungen zuerst",
+    "setup_content": "Speichern Sie Ihre Knoten- und Wallet-Wiederherstellungsmaterial, dann testen Sie mit einer kleinen Zahlung, bevor Sie sich auf diese Wallet verlassen.",
+    "backup_check": "Sicherung gespeichert",
+    "access_check": "Zugriff geschützt",
+    "test_check": "Zuerst ein kleiner Test",
+    "lightning": "Lightning-Zahlungen",
+    "onchain": "Bitcoin-Adressen",
+    "identity": "Lightning-Adresse",
+    "node": "Serverbereitschaft"
+  },
+  "welcome": {
+    "title": "Ihre Wallet für Alltag Bitcoin",
+    "content": "{{appName}} bringt Lightning-Zahlungen, Bitcoin-Adressen und eine wiederverwendbare Lightning-Adresse an einen Ort, damit Sie Zahlungen empfangen, bezahlen und sehen, was Aufmerksamkeit benötigt.",
+    "point_one": "Empfangen Sie Zahlungen mit Rechnungen, Adressen oder Ihrer Lightning-Adresse.",
+    "point_two": "Bezahlen Sie aus derselben Wallet, wenn eine Zahlungsaufforderung kommt.",
+    "point_three": "Sehen Sie Beträge, Status und nächste Schritte, ohne Tools zu wechseln."
+  },
+  "custody": {
+    "title": "Du verwaltest deine Schlüssel",
+    "content": "{{appName}} verwaltet nicht Ihre Bitcoin oder hält eine Sicherungskopie Ihrer Geheimnisse. Vor dem Füllen der Wallet stellen Sie sicher, dass Ihre Sicherungen echt und erreichbar sind.",
+    "point_one": "Wählen Sie ein starkes Passwort für dieses Dashboard aus.",
+    "point_two": "Bewahren Sie das Wiederherstellungsmaterial an einem Offline-Ort auf, an dem Sie es später finden können.",
+    "point_three": "Testen Sie die Wallet mit einer kleinen Summe, bevor Sie mehr hinzufügen."
+  },
+  "accessibility": {
+    "title": "Halten Sie Ihren Server bereit",
+    "content": "Lightning funktioniert am besten, wenn Ihr Wallet-Server online und erreichbar ist. Eine stabile Einrichtung sorgt dafür, dass Rechnungen, Zahlungen und verbundene Apps genau dann funktionieren, wenn Sie sie benötigen.",
+    "point_one": "Bestätigen Sie, dass der Server erreichbar ist, bevor Sie echte Zahlungen empfangen.",
+    "point_two": "Stellen Sie sicher, dass der Server von den Apps, die ihn verwenden, erreichbar bleibt.",
+    "point_three": "Verwenden Sie Testgelder zuerst, nachdem Sie die Hosting- oder Knoteneinstellungen geändert haben."
+  },
+  "multi_user": {
+    "title": "Entscheiden Sie, wer ihn verwenden darf",
+    "content": "Beginnen Sie mit dem Besitzerkonto, dann verbinden Sie nur die Personen, Apps und Dienste, die Zahlungen oder Empfangsaktionen für diese Wallet durchführen sollen.",
+    "point_one": "Geben Sie jedem verbundenen App nur den Zugriff zu, den sie benötigen.",
+    "point_two": "Überprüfen Sie den Zugriff regelmäßig, insbesondere bei gemeinsam genutzten Servern.",
+    "point_three": "Fügen Sie weitere Konten hinzu, wenn Ihre Bereitstellung dies unterstützt."
+  },
+  "step": "Schritt {{current}} von {{total}}",
+  "back": "Zurück",
+  "continue": "Weiter",
+  "get_started": "Passwort wählen"
+}

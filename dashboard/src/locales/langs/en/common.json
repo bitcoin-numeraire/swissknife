@@ -1,4 +1,5 @@
 {
+  "select_language": "Choose language",
   "wallet_credit": {
     "asset_units": "asset units",
     "opening": "Opening credit",

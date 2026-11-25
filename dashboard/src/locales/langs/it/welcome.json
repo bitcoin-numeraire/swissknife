@@ -1,0 +1,51 @@
+{
+  "preview": {
+    "eyebrow": "{{appName}} setup",
+    "title": "Configura il tuo portafoglio Bitcoin",
+    "content": "Questo portafoglio funziona dal tuo server. Tu controlli i fondi, quindi l'installazione inizia con l'accesso, i backup e alcuni controlli prima che i fondi vengano spostati.",
+    "wallet_title": "Configurazione del portafoglio",
+    "wallet_caption": "Vuoto finché non lo finanzierai",
+    "setup_label": "Prima di aggiungere sats",
+    "setup_title": "Backup prima",
+    "setup_content": "Salva il materiale di recupero del tuo nodo e del portafoglio, quindi testa con un piccolo pagamento prima di affidarti a questo portafoglio.",
+    "backup_check": "Backup salvato",
+    "access_check": "Accesso protetto",
+    "test_check": "Test piccolo prima",
+    "lightning": "Pagamenti Lightning",
+    "onchain": "Indirizzi Bitcoin",
+    "identity": "Indirizzo Lightning",
+    "node": "Prontezza del server"
+  },
+  "welcome": {
+    "title": "Il tuo portafoglio per il Bitcoin quotidiano",
+    "content": "{{appName}} unisce i pagamenti Lightning, gli indirizzi Bitcoin e un indirizzo Lightning riutilizzabile in un unico posto, così puoi ricevere, pagare e vedere cosa richiede attenzione.",
+    "point_one": "Ricevi pagamenti con fatture, indirizzi o il tuo indirizzo Lightning.",
+    "point_two": "Paga dallo stesso portafoglio quando arriva una richiesta di pagamento.",
+    "point_three": "Vedi importi, stato e azioni successive senza passare a strumenti diversi."
+  },
+  "custody": {
+    "title": "Le chiavi sono nelle tue mani",
+    "content": "{{appName}} non custodisce i tuoi bitcoin né conserva una copia di riserva dei tuoi segreti. Prima di finanziare il portafoglio, assicurati che i tuoi backup siano reali e accessibili.",
+    "point_one": "Scegli una password forte per questo dashboard.",
+    "point_two": "Mantieni il materiale di recupero in un posto offline che puoi trovare in seguito.",
+    "point_three": "Prova il portafoglio con un importo piccolo prima di aggiungere di più."
+  },
+  "accessibility": {
+    "title": "Mantieni il server pronto",
+    "content": "Lightning funziona meglio quando il server del portafoglio è online e raggiungibile. Un setup stabile aiuta fatture, pagamenti e app connesse a funzionare quando ne hai bisogno.",
+    "point_one": "Conferma che il server è raggiungibile prima di ricevere pagamenti reali.",
+    "point_two": "Mantieni il server raggiungibile dalle app che lo utilizzano.",
+    "point_three": "Usa fondi di test prima di modificare l'hosting o le impostazioni del nodo."
+  },
+  "multi_user": {
+    "title": "Decidi chi può usarlo",
+    "content": "Inizia con l'account proprietario, poi connetti solo le persone, le app e i servizi che dovrebbero poter pagare o ricevere da questo portafoglio.",
+    "point_one": "Dai a ogni app connessa solo l'accesso necessario.",
+    "point_two": "Rivedi regolarmente gli accessi, soprattutto sui server condivisi.",
+    "point_three": "Aggiungi più account quando il tuo deployment lo supporta."
+  },
+  "step": "Passo {{current}} di {{total}}",
+  "back": "Indietro",
+  "continue": "Continua",
+  "get_started": "Scegli la password"
+}

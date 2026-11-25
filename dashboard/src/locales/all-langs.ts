@@ -1,11 +1,31 @@
 'use client';
 
 // core (MUI)
-import { frFR as frFRCore } from '@mui/material/locale';
+import {
+  frFR as frFRCore,
+  deDE as deDECore,
+  esES as esESCore,
+  itIT as itITCore,
+  ptPT as ptPTCore,
+} from '@mui/material/locale';
 // date pickers (MUI)
-import { enUS as enUSDate, frFR as frFRDate } from '@mui/x-date-pickers/locales';
+import {
+  enUS as enUSDate,
+  frFR as frFRDate,
+  deDE as deDEDate,
+  esES as esESDate,
+  itIT as itITDate,
+  ptPT as ptPTDate,
+} from '@mui/x-date-pickers/locales';
 // data grid (MUI)
-import { enUS as enUSDataGrid, frFR as frFRDataGrid } from '@mui/x-data-grid/locales';
+import {
+  enUS as enUSDataGrid,
+  frFR as frFRDataGrid,
+  deDE as deDEDataGrid,
+  esES as esESDataGrid,
+  itIT as itITDataGrid,
+  ptPT as ptPTDataGrid,
+} from '@mui/x-data-grid/locales';
 
 // ----------------------------------------------------------------------
 
@@ -25,9 +45,49 @@ export const allLangs = [
     label: 'Français',
     countryCode: 'FR',
     adapterLocale: 'fr',
-    numberFormat: { code: 'fr-Fr' },
+    numberFormat: { code: 'fr-FR' },
     systemValue: {
       components: { ...frFRCore.components, ...frFRDate.components, ...frFRDataGrid.components },
+    },
+  },
+  {
+    value: 'de',
+    label: 'Deutsch',
+    countryCode: 'DE',
+    adapterLocale: 'de',
+    numberFormat: { code: 'de-DE' },
+    systemValue: {
+      components: { ...deDECore.components, ...deDEDate.components, ...deDEDataGrid.components },
+    },
+  },
+  {
+    value: 'es',
+    label: 'Español',
+    countryCode: 'ES',
+    adapterLocale: 'es',
+    numberFormat: { code: 'es-ES' },
+    systemValue: {
+      components: { ...esESCore.components, ...esESDate.components, ...esESDataGrid.components },
+    },
+  },
+  {
+    value: 'it',
+    label: 'Italiano',
+    countryCode: 'IT',
+    adapterLocale: 'it',
+    numberFormat: { code: 'it-IT' },
+    systemValue: {
+      components: { ...itITCore.components, ...itITDate.components, ...itITDataGrid.components },
+    },
+  },
+  {
+    value: 'pt',
+    label: 'Português',
+    countryCode: 'PT',
+    adapterLocale: 'pt',
+    numberFormat: { code: 'pt-PT' },
+    systemValue: {
+      components: { ...ptPTCore.components, ...ptPTDate.components, ...ptPTDataGrid.components },
     },
   },
 ];
