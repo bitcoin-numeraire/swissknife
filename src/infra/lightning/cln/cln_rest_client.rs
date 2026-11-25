@@ -163,6 +163,49 @@ impl ClnRestClient {
 
 #[async_trait]
 impl LnClient for ClnRestClient {
+    fn offer_backend(&self) -> Option<String> {
+        Some(self.withdrawal_backend())
+    }
+    async fn issue_offer(
+        &self,
+        offer: &swissknife_types::WalletOffer,
+    ) -> Result<crate::domains::offer::NodeOffer, LightningError> {
+        let label = offer.id.to_string();
+        let request = serde_json::json!({"amount":offer.amount_msat.map_or_else(||"any".into(),|a|format!("{a}msat")),"description":offer.description,"label":label,"issuer":format!("SwissKnife {label}"),"single_use":offer.single_use});
+        self.post_request("offer", &request)
+            .await
+            .map_err(|e| LightningError::Invoice(e.to_string()))
+    }
+    async fn local_offers(&self, id: Option<String>) -> Result<Vec<crate::domains::offer::NodeOffer>, LightningError> {
+        #[derive(serde::Deserialize)]
+        struct Offers {
+            offers: Vec<crate::domains::offer::NodeOffer>,
+        }
+        let request = id.map_or_else(|| serde_json::json!({}), |id| serde_json::json!({"offer_id":id}));
+        self.post_request::<Offers>("listoffers", &request)
+            .await
+            .map(|r| r.offers)
+            .map_err(|e| LightningError::Invoice(e.to_string()))
+    }
+    async fn disable_offer(&self, id: &str) -> Result<(), LightningError> {
+        self.post_request::<crate::domains::offer::NodeOffer>("disableoffer", &serde_json::json!({"offer_id":id}))
+            .await
+            .map(|_| ())
+            .map_err(|e| LightningError::Invoice(e.to_string()))
+    }
+    async fn offer_updates(&self, start: u64) -> Result<Vec<crate::domains::offer::OfferUpdate>, LightningError> {
+        #[derive(serde::Deserialize)]
+        struct Updates {
+            invoices: Vec<crate::domains::offer::OfferUpdate>,
+        }
+        self.post_request::<Updates>(
+            "listinvoices",
+            &serde_json::json!({"index":"updated","start":start,"limit":100}),
+        )
+        .await
+        .map(|r| r.invoices)
+        .map_err(|e| LightningError::Invoice(e.to_string()))
+    }
     async fn decode_bolt12(&self, input: &str) -> Result<crate::domains::payment::DecodedBolt12, LightningError> {
         self.post_request("decode", &serde_json::json!({"string":input}))
             .await
@@ -293,7 +336,7 @@ impl LnClient for ClnRestClient {
             .map_err(|e| LightningError::InvoiceByHash(e.to_string()))?;
 
         match response.invoices.into_iter().next() {
-            Some(invoice) => Ok(Some(invoice.into())),
+            Some(invoice) => invoice.bolt11_invoice(),
             None => Ok(None),
         }
     }

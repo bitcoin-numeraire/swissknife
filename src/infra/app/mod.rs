@@ -7,3 +7,6 @@ pub use client_event_retention::ClientEventRetentionWorker;
 pub use event_listener::EventListener;
 pub use payment_worker::{start_legacy_withdrawal_reconciliation, start_payment_workers};
 pub use server::Server;
+
+mod offer_worker;
+pub use offer_worker::start_offer_worker;

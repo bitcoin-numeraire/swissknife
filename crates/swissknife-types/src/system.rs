@@ -35,6 +35,9 @@ impl HealthCheck {
 /// App setup info.
 #[derive(Debug, Deserialize, Serialize, ToSchema)]
 pub struct SetupInfo {
+    /// The configured node can issue and accept BOLT12 offers.
+    #[serde(default)]
+    pub bolt12_offers: bool,
     /// Whether the welcome flow has been completed
     pub welcome_complete: bool,
     /// Whether the admin account has been created

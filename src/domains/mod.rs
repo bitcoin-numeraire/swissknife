@@ -10,3 +10,5 @@ pub mod notification;
 pub mod payment;
 pub mod system;
 pub mod wallet;
+
+pub mod offer;

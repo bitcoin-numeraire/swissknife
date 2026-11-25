@@ -90,6 +90,7 @@ async fn main() {
         crate::infra::app::start_legacy_withdrawal_reconciliation(services.clone());
     }
 
+    crate::infra::app::start_offer_worker(services.clone());
     crate::infra::app::start_payment_workers(services.clone());
 
     // We start accepting external requests only when everything is synced and ready

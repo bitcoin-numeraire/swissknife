@@ -765,7 +765,7 @@ impl PaymentsUseCases for PaymentService {
                 self.ensure_wallet_network(wallet_id, self.bitcoin_wallet.network())
                     .await?;
                 let resolved = self
-                    .resolve_bolt12(input, request.amount_msat, request.comment.as_deref())
+                    .resolve_bolt12(wallet_id, input, request.amount_msat, request.comment.as_deref())
                     .await?;
                 let payment = resolved.payment(wallet_id, request.comment);
                 return self
@@ -926,7 +926,7 @@ impl PaymentsUseCases for PaymentService {
 
         match input_type {
             PaymentInput::Bolt12(value) => {
-                let (_, amount) = self.inspect_bolt12(&value, amount_msat).await?;
+                let (_, amount) = self.inspect_bolt12(wallet_id, &value, amount_msat).await?;
                 Self::fee_estimate(Ledger::Lightning, amount, None, self.ln_client.fee_limit_msat(amount))
             }
 
@@ -1045,7 +1045,9 @@ impl PaymentsUseCases for PaymentService {
 
             match input_type {
                 PaymentInput::Bolt12(value) => {
-                    let resolved = self.resolve_bolt12(value, amount_msat, comment.as_deref()).await?;
+                    let resolved = self
+                        .resolve_bolt12(wallet_id, value, amount_msat, comment.as_deref())
+                        .await?;
                     let cap = self.ln_client.fee_limit_msat(resolved.amount_msat);
                     let payment = resolved.payment(wallet_id, comment);
                     self.send_external_invoice(payment, resolved.invoice, None, cap).await

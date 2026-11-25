@@ -75,7 +75,7 @@ services:
       LIGHTNINGD_NETWORK: regtest
     command: ["--conf=/etc/cln/config"]
     volumes:
-      - ./config/cln/config:/etc/cln/config:ro
+      - ./runtime/cln/node.conf:/etc/cln/config:ro
       - cln-data:/root/.lightning
       - ./runtime/cln/regtest/ca.pem:/root/.lightning/regtest/ca.pem
       - ./runtime/cln/regtest/ca-key.pem:/root/.lightning/regtest/ca-key.pem

@@ -10,6 +10,8 @@ release notes when a tag is published.
 
 ### Added
 
+- Wallets on Core Lightning can issue, list and disable reusable or single-use BOLT12 offers. Paid offer invoices credit their owning wallet and appear in wallet history.
+
 - Core Lightning wallets can pay reusable BOLT12 offers and negotiated invoices, including amountless offers and optional payer notes.
 
 - The send drawer tracks background Lightning payments and recovers the original request after a lost response.

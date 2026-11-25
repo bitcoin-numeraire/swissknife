@@ -1,5 +1,6 @@
 mod config;
 mod models;
+mod offer_repository;
 mod payment_command;
 mod repositories;
 mod store;

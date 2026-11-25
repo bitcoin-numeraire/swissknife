@@ -297,28 +297,33 @@ impl From<XpayResponse> for Payment {
     }
 }
 
-impl From<ListInvoicesInvoice> for Invoice {
-    fn from(val: ListInvoicesInvoice) -> Self {
-        let bolt11_str = val.bolt11.clone().unwrap();
-        let bolt11 = Bolt11Invoice::from_str(&bolt11_str).unwrap();
-        let mut invoice: Invoice = crate::infra::lightning::types::invoice_from_bolt11(bolt11);
-
-        match val.status.as_str() {
-            "paid" => {
-                invoice.status = InvoiceStatus::Settled;
-                invoice.payment_time = Some(Utc.timestamp_opt(val.paid_at.unwrap() as i64, 0).unwrap());
-                invoice.amount_received_msat = val.amount_received_msat;
-            }
-            "unpaid" => {
-                invoice.status = InvoiceStatus::Pending;
-            }
-            "expired" => {
-                invoice.status = InvoiceStatus::Expired;
-            }
-            _ => {}
+impl ListInvoicesInvoice {
+    /// The invoice lookup serves tracked BOLT11 invoices. BOLT12 settlements are reconciled by offer ID.
+    pub(super) fn bolt11_invoice(self) -> Result<Option<Invoice>, crate::application::errors::LightningError> {
+        let val = self;
+        let Some(encoded) = val.bolt11.as_deref() else {
+            return Ok(None);
         };
-
-        invoice
+        let invalid = |reason: &str| crate::application::errors::LightningError::InvoiceByHash(reason.into());
+        let bolt11 = Bolt11Invoice::from_str(encoded).map_err(|_| invalid("Invalid BOLT11 invoice from node"))?;
+        let mut invoice = crate::infra::lightning::types::invoice_from_bolt11(bolt11);
+        let paid = val.status == "paid";
+        if paid {
+            invoice.status = InvoiceStatus::Settled;
+            invoice.payment_time = Some(
+                val.paid_at
+                    .and_then(|t| i64::try_from(t).ok())
+                    .and_then(|t| Utc.timestamp_opt(t, 0).single())
+                    .ok_or_else(|| invalid("Missing invoice settlement time"))?,
+            );
+            invoice.amount_received_msat = Some(
+                val.amount_received_msat
+                    .ok_or_else(|| invalid("Missing amount received"))?,
+            );
+        } else if val.status == "expired" {
+            invoice.status = InvoiceStatus::Expired;
+        }
+        Ok(Some(invoice))
     }
 }
 

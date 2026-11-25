@@ -154,6 +154,103 @@ impl ClnGrpcClient {
 
 #[async_trait]
 impl LnClient for ClnGrpcClient {
+    fn offer_backend(&self) -> Option<String> {
+        Some(self.withdrawal_backend())
+    }
+    async fn issue_offer(
+        &self,
+        offer: &swissknife_types::WalletOffer,
+    ) -> Result<crate::domains::offer::NodeOffer, LightningError> {
+        let label = offer.id.to_string();
+        let r = self
+            .client
+            .clone()
+            .offer(cln::OfferRequest {
+                amount: offer.amount_msat.map_or_else(|| "any".into(), |a| format!("{a}msat")),
+                description: Some(offer.description.clone()),
+                label: Some(label.clone()),
+                issuer: Some(format!("SwissKnife {label}")),
+                single_use: Some(offer.single_use),
+                ..Default::default()
+            })
+            .await
+            .map_err(|e| LightningError::Invoice(e.message().into()))?
+            .into_inner();
+        Ok(crate::domains::offer::NodeOffer {
+            offer_id: hex::encode(r.offer_id),
+            bolt12: r.bolt12,
+            active: r.active,
+            label: r.label,
+        })
+    }
+    async fn local_offers(&self, id: Option<String>) -> Result<Vec<crate::domains::offer::NodeOffer>, LightningError> {
+        let offer_id = id
+            .map(hex::decode)
+            .transpose()
+            .map_err(|e| LightningError::Invoice(e.to_string()))?;
+        let r = self
+            .client
+            .clone()
+            .list_offers(cln::ListoffersRequest {
+                offer_id,
+                active_only: None,
+            })
+            .await
+            .map_err(|e| LightningError::Invoice(e.message().into()))?
+            .into_inner();
+        Ok(r.offers
+            .into_iter()
+            .map(|o| crate::domains::offer::NodeOffer {
+                offer_id: hex::encode(o.offer_id),
+                bolt12: o.bolt12,
+                active: o.active,
+                label: o.label,
+            })
+            .collect())
+    }
+    async fn disable_offer(&self, id: &str) -> Result<(), LightningError> {
+        self.client
+            .clone()
+            .disable_offer(cln::DisableofferRequest {
+                offer_id: hex::decode(id).map_err(|e| LightningError::Invoice(e.to_string()))?,
+            })
+            .await
+            .map_err(|e| LightningError::Invoice(e.message().into()))?;
+        Ok(())
+    }
+    async fn offer_updates(&self, start: u64) -> Result<Vec<crate::domains::offer::OfferUpdate>, LightningError> {
+        let r = self
+            .client
+            .clone()
+            .list_invoices(cln::ListinvoicesRequest {
+                index: Some(cln::listinvoices_request::ListinvoicesIndex::Updated as i32),
+                start: Some(start),
+                limit: Some(100),
+                ..Default::default()
+            })
+            .await
+            .map_err(|e| LightningError::Invoice(e.message().into()))?
+            .into_inner();
+        r.invoices
+            .into_iter()
+            .map(|i| {
+                Ok(crate::domains::offer::OfferUpdate {
+                    status: i.status().as_str_name().to_ascii_lowercase(),
+                    updated_index: i
+                        .updated_index
+                        .ok_or_else(|| LightningError::Invoice("Missing invoice update index".into()))?,
+                    local_offer_id: i.local_offer_id.map(hex::encode),
+                    payment_hash: hex::encode(i.payment_hash),
+                    bolt12: i.bolt12,
+                    amount_msat: i.amount_msat.map(|v| v.msat),
+                    amount_received_msat: i.amount_received_msat.map(|v| v.msat),
+                    paid_at: i.paid_at,
+                    invoice_created_at: None,
+                    invreq_payer_note: i.invreq_payer_note,
+                })
+            })
+            .collect()
+    }
     async fn decode_bolt12(&self, input: &str) -> Result<crate::domains::payment::DecodedBolt12, LightningError> {
         let response = self
             .client
@@ -326,7 +423,7 @@ impl LnClient for ClnGrpcClient {
             .into_inner();
 
         match response.invoices.into_iter().next() {
-            Some(invoice) => Ok(Some(invoice.into())),
+            Some(invoice) => invoice.bolt11_invoice(),
             None => Ok(None),
         }
     }

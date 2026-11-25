@@ -179,6 +179,20 @@ export const zCreateLocalLoginRequest = z.object({
   username: z.string(),
 });
 
+export const zCreateOfferRequest = z.object({
+  amount_msat: z.coerce
+    .bigint()
+    .gte(BigInt(0))
+    .max(BigInt('9223372036854775807'), {
+      error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
+    })
+    .nullish(),
+  description: z.string(),
+  idempotency_key: z.uuid(),
+  single_use: z.boolean().optional(),
+  wallet_id: z.uuid().nullish(),
+});
+
 /**
  * Create Wallet Request
  */
@@ -286,45 +300,6 @@ export const zLnInvoice = z.object({
   payee_pubkey: z.string(),
   payment_hash: z.string(),
   payment_secret: z.string(),
-});
-
-/**
- * An incoming payment request, over Lightning and/or on-chain.
- */
-export const zInvoice = z.object({
-  amount_msat: z.coerce
-    .bigint()
-    .gte(BigInt(0))
-    .max(BigInt('9223372036854775807'), {
-      error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
-    })
-    .nullish(),
-  amount_received_msat: z.coerce
-    .bigint()
-    .gte(BigInt(0))
-    .max(BigInt('9223372036854775807'), {
-      error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
-    })
-    .nullish(),
-  bitcoin_output: zBtcOutput.nullish(),
-  created_at: z.iso.datetime(),
-  description: z.string().nullish(),
-  fee_msat: z.coerce
-    .bigint()
-    .gte(BigInt(0))
-    .max(BigInt('9223372036854775807'), {
-      error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
-    })
-    .nullish(),
-  id: z.uuid(),
-  ledger: zLedger,
-  ln_address_id: z.uuid().nullish(),
-  ln_invoice: zLnInvoice.nullish(),
-  payment_time: z.iso.datetime().nullish(),
-  status: zInvoiceStatus,
-  timestamp: z.iso.datetime(),
-  updated_at: z.iso.datetime().nullish(),
-  wallet_id: z.uuid(),
 });
 
 /**
@@ -473,6 +448,55 @@ export const zNotificationQuery = z.object({
     .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
     .nullish(),
 });
+
+export const zOfferInvoice = z.object({
+  bolt12: z.string(),
+  offer_id: z.uuid(),
+  payer_note: z.string().nullish(),
+  payment_hash: z.string(),
+});
+
+/**
+ * An incoming payment request, over Lightning and/or on-chain.
+ */
+export const zInvoice = z.object({
+  amount_msat: z.coerce
+    .bigint()
+    .gte(BigInt(0))
+    .max(BigInt('9223372036854775807'), {
+      error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
+    })
+    .nullish(),
+  amount_received_msat: z.coerce
+    .bigint()
+    .gte(BigInt(0))
+    .max(BigInt('9223372036854775807'), {
+      error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
+    })
+    .nullish(),
+  bitcoin_output: zBtcOutput.nullish(),
+  created_at: z.iso.datetime(),
+  description: z.string().nullish(),
+  fee_msat: z.coerce
+    .bigint()
+    .gte(BigInt(0))
+    .max(BigInt('9223372036854775807'), {
+      error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
+    })
+    .nullish(),
+  id: z.uuid(),
+  ledger: zLedger,
+  ln_address_id: z.uuid().nullish(),
+  ln_invoice: zLnInvoice.nullish(),
+  offer_invoice: zOfferInvoice.nullish(),
+  payment_time: z.iso.datetime().nullish(),
+  status: zInvoiceStatus,
+  timestamp: z.iso.datetime(),
+  updated_at: z.iso.datetime().nullish(),
+  wallet_id: z.uuid(),
+});
+
+export const zOfferState = z.enum(['creating', 'active', 'disabling', 'disabled']);
 
 /**
  * Direction of result ordering for list endpoints.
@@ -693,6 +717,7 @@ export const zSendPaymentRequest = z.object({
  * App setup info.
  */
 export const zSetupInfo = z.object({
+  bolt12_offers: z.boolean().optional(),
   sign_up_complete: z.boolean(),
   welcome_complete: z.boolean(),
 });
@@ -827,6 +852,24 @@ export const zAccount = z.object({
   preferences: zAccountPreferences.nullish(),
   updated_at: z.iso.datetime().nullish(),
   wallets: z.array(zWallet),
+});
+
+export const zWalletOffer = z.object({
+  amount_msat: z.coerce
+    .bigint()
+    .gte(BigInt(0))
+    .max(BigInt('9223372036854775807'), {
+      error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
+    })
+    .nullish(),
+  bolt12: z.string().nullish(),
+  created_at: z.iso.datetime(),
+  description: z.string(),
+  id: z.uuid(),
+  provider_id: z.string().nullish(),
+  single_use: z.boolean(),
+  state: zOfferState,
+  wallet_id: z.uuid(),
 });
 
 /**
@@ -1758,6 +1801,54 @@ export const zGetWalletInvoicePath = z.object({
  */
 export const zGetWalletInvoiceResponse = zInvoice;
 
+export const zListWalletOffersPath = z.object({
+  wallet_id: z.uuid(),
+});
+
+export const zListWalletOffersQuery = z.object({
+  wallet_id: z.uuid().nullish(),
+  offset: z.coerce
+    .bigint()
+    .gte(BigInt(0))
+    .max(BigInt('9223372036854775807'), {
+      error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
+    })
+    .nullish(),
+  limit: z.coerce
+    .bigint()
+    .gte(BigInt(0))
+    .max(BigInt('9223372036854775807'), {
+      error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
+    })
+    .nullish(),
+});
+
+/**
+ * Success
+ */
+export const zListWalletOffersResponse = z.array(zWalletOffer);
+
+export const zCreateWalletOfferBody = zCreateOfferRequest;
+
+export const zCreateWalletOfferPath = z.object({
+  wallet_id: z.uuid(),
+});
+
+/**
+ * Success
+ */
+export const zCreateWalletOfferResponse = zWalletOffer;
+
+export const zDisableWalletOfferPath = z.object({
+  wallet_id: z.uuid(),
+  id: z.uuid(),
+});
+
+/**
+ * Success
+ */
+export const zDisableWalletOfferResponse = zWalletOffer;
+
 export const zDeleteFailedPaymentsPath = z.object({
   wallet_id: z.uuid(),
 });
@@ -1858,6 +1949,45 @@ export const zGetWalletPaymentPath = z.object({
  * Found
  */
 export const zGetWalletPaymentResponse = zPayment;
+
+export const zListOffersQuery = z.object({
+  wallet_id: z.uuid().nullish(),
+  offset: z.coerce
+    .bigint()
+    .gte(BigInt(0))
+    .max(BigInt('9223372036854775807'), {
+      error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
+    })
+    .nullish(),
+  limit: z.coerce
+    .bigint()
+    .gte(BigInt(0))
+    .max(BigInt('9223372036854775807'), {
+      error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
+    })
+    .nullish(),
+});
+
+/**
+ * Success
+ */
+export const zListOffersResponse = z.array(zWalletOffer);
+
+export const zCreateOfferBody = zCreateOfferRequest;
+
+/**
+ * Success
+ */
+export const zCreateOfferResponse = zWalletOffer;
+
+export const zDisableOfferPath = z.object({
+  id: z.uuid(),
+});
+
+/**
+ * Success
+ */
+export const zDisableOfferResponse = zWalletOffer;
 
 export const zDeletePaymentsQuery = z.object({
   limit: z.coerce

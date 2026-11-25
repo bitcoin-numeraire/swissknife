@@ -97,6 +97,8 @@ ensure_cln_grpc_certs() {
 
 ensure_lnd_tls_cert
 ensure_cln_grpc_certs
+# Preserve the optional onion-message peer selected by the BOLT12 fixture.
+"${SCRIPT_DIR}/configure-cln.sh"
 
 "${COMPOSE[@]}" up -d postgres bitcoind lnd cln mock-oauth2-server
 

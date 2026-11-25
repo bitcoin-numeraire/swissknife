@@ -37,6 +37,7 @@ impl SeaOrmStore {
             Arc::new(SeaOrmLnAddressRepository::new(db_conn.clone())),
             Arc::new(SeaOrmPaymentRepository::new(db_conn.clone())),
             Arc::new(SeaOrmInvoiceRepository::new(db_conn.clone())),
+            Arc::new(super::offer_repository::SeaOrmOfferRepository(db_conn.clone())),
             Arc::new(SeaOrmWalletRepository::new(db_conn.clone())),
             Arc::new(SeaOrmAccountRepository::new(db_conn.clone())),
             Arc::new(SeaOrmLocalCredentialRepository::new(db_conn.clone())),

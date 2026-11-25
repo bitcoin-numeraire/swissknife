@@ -45,6 +45,7 @@ pub fn merged_openapi() -> OpenApi {
     openapi.merge(InvoiceHandler::openapi());
     openapi.merge(PaymentHandler::openapi());
     openapi.merge(LnAddressHandler::openapi());
+    openapi.merge(crate::domains::offer::OfferHandler::openapi());
     openapi.merge(LnURLHandler::openapi());
     openapi.merge(NostrHandler::openapi());
     openapi.merge(SystemHandler::openapi());

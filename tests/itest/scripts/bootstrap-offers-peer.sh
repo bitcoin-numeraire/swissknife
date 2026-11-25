@@ -16,6 +16,19 @@ until peer getinfo 2>/dev/null | python3 -c 'import json,sys; sys.exit(json.load
   bitcoin generatetoaddress 1 "${miner}" >/dev/null
   sleep 2
 done
+peer_id=$(peer getinfo | python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])')
+# The LND fixture cannot relay onion messages. Select the independent CLN as the
+# introduction point for offers issued by the main node, using CLN's native policy.
+if [[ $(cat "${root}/runtime/cln/fronting-node" 2>/dev/null || true) != "${peer_id}" ]]; then
+  printf '%s\n' "${peer_id}" > "${root}/runtime/cln/fronting-node"
+  "${root}/scripts/configure-cln.sh"
+  "${compose[@]}" restart cln >/dev/null
+  deadline=$((SECONDS + 90))
+  until node getinfo >/dev/null 2>&1; do
+    if (( SECONDS >= deadline )); then echo "Core Lightning did not restart" >&2; exit 1; fi
+    sleep 1
+  done
+fi
 id=$(node getinfo | python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])')
 peer connect "${id}@cln:9736" >/dev/null
 if ! peer listpeerchannels "${id}" | python3 -c 'import json,sys; sys.exit(not any(c["state"] in ("CHANNELD_NORMAL","CHANNELD_AWAITING_LOCKIN","DUALOPEND_AWAITING_LOCKIN") for c in json.load(sys.stdin)["channels"]))'; then
