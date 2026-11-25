@@ -43,7 +43,8 @@ pub use bitcoin::{BtcAddress, BtcAddressFilter, BtcAddressType, BtcOutput, BtcOu
 pub use error::{ErrorCode, ErrorResponse};
 pub use event::{ClientEvent, ClientEventStreamQuery, ClientEventType};
 pub use invoice::{
-    Invoice, InvoiceFilter, InvoiceOrderBy, InvoiceStatus, LnInvoice, LnUrlInvoiceData, NewInvoiceRequest,
+    Invoice, InvoiceFilter, InvoiceOrderBy, InvoiceStatus, LnInvoice, LnUrlInvoiceData, MerchantRevenue,
+    MerchantRevenueQuery, NewInvoiceRequest,
 };
 pub use ln_address::{LnAddress, LnAddressFilter, RegisterLnAddressRequest, UpdateLnAddressRequest};
 pub use lnurl::{

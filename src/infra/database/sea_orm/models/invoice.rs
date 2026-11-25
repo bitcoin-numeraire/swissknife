@@ -38,6 +38,7 @@ pub struct Model {
     pub bolt12: Option<String>,
     #[sea_orm(column_type = "Text", nullable)]
     pub payer_note: Option<String>,
+    pub merchant_route: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

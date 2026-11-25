@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use swissknife_types::MerchantRevenue;
 use uuid::Uuid;
 
 use crate::application::errors::DatabaseError;
@@ -13,6 +14,12 @@ pub trait InvoiceRepository: Send + Sync {
     async fn find_by_btc_output_id(&self, btc_output_id: Uuid) -> Result<Option<Invoice>, DatabaseError>;
     async fn find_many(&self, filter: InvoiceFilter) -> Result<Vec<Invoice>, DatabaseError>;
     async fn insert(&self, invoice: Invoice) -> Result<Invoice, DatabaseError>;
+    async fn merchant_revenue(
+        &self,
+        wallet_id: Uuid,
+        start: chrono::NaiveDateTime,
+        end: chrono::NaiveDateTime,
+    ) -> Result<Vec<MerchantRevenue>, DatabaseError>;
     async fn update(&self, invoice: Invoice) -> Result<Invoice, DatabaseError>;
     /// Conditionally settle a still-pending invoice (sets payment_time/fee/received once).
     /// Returns `false` if the invoice was already settled, so callers stay idempotent.

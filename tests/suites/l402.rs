@@ -372,3 +372,97 @@ async fn merchant_quotes_set_exact_invoice_amounts_and_paid_passes_survive_repri
     assert_eq!(upstream.received_requests().await.unwrap().len(), 1);
     app.stop();
 }
+
+#[tokio::test]
+async fn merchant_revenue_counts_only_settled_attributed_invoices_for_the_owned_wallet() {
+    use crate::common::Auth;
+    use serde_json::json;
+    let setup = TestApp::isolated("merchant-revenue", &[]).await;
+    let admin = setup.admin_token().await;
+    let owner = setup.create_account_with_wallet(admin, "income").await;
+    let other = setup.create_account_with_wallet(admin, "other-income").await;
+    let env = [
+        ("SWISSKNIFE_L402__ROOT_KEY", hex::encode([20u8; 32])),
+        ("SWISSKNIFE_L402__ROUTES__DATA__WALLET_ID", owner.wallet.id.to_string()),
+        (
+            "SWISSKNIFE_L402__ROUTES__DATA__TARGET",
+            "http://127.0.0.1:1/read".into(),
+        ),
+        ("SWISSKNIFE_L402__ROUTES__DATA__PRICE_SATS", "7".into()),
+        ("SWISSKNIFE_L402__ROUTES__DATA__ACCESS_SECONDS", "600".into()),
+    ];
+    let app = setup.restart("revenue", &env).await;
+    let api = app.api();
+    let path = format!("/v1/me/wallets/{}/l402/revenue", owner.wallet.id);
+    let own = Auth::ApiKey(&owner.key);
+    assert_eq!(api.get(&path, Auth::None).await.status, StatusCode::UNAUTHORIZED);
+    assert_eq!(
+        api.get(&path, Auth::ApiKey(&other.key)).await.status,
+        StatusCode::NOT_FOUND
+    );
+    assert_eq!(
+        api.get(&format!("{path}?from=2000-01-01&through=2001-01-01"), own)
+            .await
+            .status,
+        StatusCode::UNPROCESSABLE_ENTITY
+    );
+    let payer = Counterparty::for_provider(&app.provider);
+    let http = Client::new();
+    for index in 0..3 {
+        let response = http.get(format!("{}/l402/data", app.base_url)).send().await.unwrap();
+        assert_eq!(response.status(), StatusCode::PAYMENT_REQUIRED);
+        let (_, invoice) = response.headers()[header::WWW_AUTHENTICATE]
+            .to_str()
+            .unwrap()
+            .strip_prefix("L402 macaroon=\"")
+            .unwrap()
+            .strip_suffix('"')
+            .unwrap()
+            .split_once("\", invoice=\"")
+            .unwrap();
+        if index < 2 {
+            payer.pay_for_preimage(invoice);
+        }
+    }
+    // An ordinary buyer-controlled invoice description cannot impersonate a merchant sale.
+    let normal = api
+        .post(
+            &format!("/v1/me/wallets/{}/invoices", owner.wallet.id),
+            own,
+            json!({"amount_msat":3000,"description":"L402 access to data","merchant_route":"data"}),
+        )
+        .await;
+    assert_eq!(normal.status, StatusCode::OK, "{}", normal.body);
+    assert!(normal.body.get("merchant_route").is_none());
+    payer.pay_for_preimage(normal.body["ln_invoice"]["bolt11"].as_str().unwrap());
+    wait_until(
+        Duration::from_secs(40),
+        "merchant and regular invoices settled",
+        || async {
+            app.wallet_balance(app.admin_token().await, owner.wallet.id)
+                .await
+                .available_msat
+                == 17_000
+        },
+    )
+    .await;
+    let expected = json!([{"route":"data","settled_invoices":2,"received_msat":"14000","fee_msat":"0"}]);
+    let response = api.get(&path, own).await;
+    assert_eq!(response.status, StatusCode::OK, "{}", response.body);
+    assert_eq!(response.body, expected);
+    let empty = api
+        .get(&format!("{path}?from=2000-01-01&through=2000-01-01"), own)
+        .await;
+    assert_eq!(empty.body, json!([]));
+    let app = app.restart("revenue-offline", &[]).await;
+    assert_eq!(app.api().get(&path, own).await.body, expected);
+    let empty = app
+        .api()
+        .get(
+            &format!("/v1/me/wallets/{}/l402/revenue", other.wallet.id),
+            Auth::ApiKey(&other.key),
+        )
+        .await;
+    assert_eq!(empty.body, json!([]));
+    app.stop();
+}

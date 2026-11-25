@@ -390,6 +390,15 @@ export const zLocalLoginReset = z.object({
   expires_at: z.iso.datetime(),
 });
 
+export const zMerchantRevenue = z.object({
+  fee_msat: z.string(),
+  received_msat: z.string(),
+  route: z.string(),
+  settled_invoices: z.coerce.bigint().gte(BigInt(0)).max(BigInt('9223372036854775807'), {
+    error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
+  }),
+});
+
 /**
  * New Bitcoin Address Request
  */
@@ -488,6 +497,7 @@ export const zInvoice = z.object({
   ledger: zLedger,
   ln_address_id: z.uuid().nullish(),
   ln_invoice: zLnInvoice.nullish(),
+  merchant_route: z.string().nullish(),
   offer_invoice: zOfferInvoice.nullish(),
   payment_time: z.iso.datetime().nullish(),
   status: zInvoiceStatus,
@@ -1909,6 +1919,17 @@ export const zGetWalletInvoicePath = z.object({
  * Found
  */
 export const zGetWalletInvoiceResponse = zInvoice;
+
+export const zGetMerchantRevenuePath = z.object({
+  wallet_id: z.uuid(),
+});
+
+export const zGetMerchantRevenueQuery = z.object({
+  from: z.string().nullish(),
+  through: z.string().nullish(),
+});
+
+export const zGetMerchantRevenueResponse = z.array(zMerchantRevenue);
 
 export const zListWalletOffersPath = z.object({
   wallet_id: z.uuid(),

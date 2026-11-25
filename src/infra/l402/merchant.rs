@@ -61,11 +61,12 @@ impl InvoiceGate for Merchant {
         let invoice = self
             .services
             .invoice
-            .invoice(
+            .merchant_invoice(
                 self.wallet_id,
                 price_msat,
-                Some(description),
-                Some(self.invoice_seconds),
+                description,
+                self.invoice_seconds,
+                &self.name,
             )
             .await
             .map_err(|_| GateError::Unavailable)?;

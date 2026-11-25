@@ -657,6 +657,10 @@ export type Invoice = {
    */
   ln_address_id?: string | null;
   ln_invoice?: LnInvoice | null;
+  /**
+   * Merchant route which issued this invoice, when attribution is available.
+   */
+  merchant_route?: string | null;
   offer_invoice?: OfferInvoice | null;
   /**
    * Payment time
@@ -973,6 +977,19 @@ export type LocalLoginReset = {
    * UTC deadline for redeeming the code, 30 minutes after it was issued.
    */
   expires_at: Date;
+};
+
+export type MerchantRevenue = {
+  /**
+   * Fees recorded on these incoming invoices, in exact decimal millisatoshis.
+   */
+  fee_msat: string;
+  /**
+   * Total amount received, in exact decimal millisatoshis.
+   */
+  received_msat: string;
+  route: string;
+  settled_invoices: number;
 };
 
 /**
@@ -4953,6 +4970,38 @@ export type GetWalletInvoiceResponses = {
 };
 
 export type GetWalletInvoiceResponse = GetWalletInvoiceResponses[keyof GetWalletInvoiceResponses];
+
+export type GetMerchantRevenueData = {
+  body?: never;
+  path: {
+    wallet_id: string;
+  };
+  query?: {
+    /**
+     * First day, inclusive. Defaults to 29 days before the last day.
+     */
+    from?: string | null;
+    /**
+     * Last day, inclusive. Defaults to today.
+     */
+    through?: string | null;
+  };
+  url: '/v1/me/wallets/{wallet_id}/l402/revenue';
+};
+
+export type GetMerchantRevenueErrors = {
+  401: unknown;
+  403: unknown;
+  404: unknown;
+  422: unknown;
+};
+
+export type GetMerchantRevenueResponses = {
+  200: Array<MerchantRevenue>;
+};
+
+export type GetMerchantRevenueResponse =
+  GetMerchantRevenueResponses[keyof GetMerchantRevenueResponses];
 
 export type ListWalletOffersData = {
   body?: never;
