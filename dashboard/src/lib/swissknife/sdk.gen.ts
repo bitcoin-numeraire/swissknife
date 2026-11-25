@@ -297,6 +297,9 @@ import type {
   ListWalletInvoicesData,
   ListWalletInvoicesErrors,
   ListWalletInvoicesResponses,
+  ListWalletMerchantRoutesData,
+  ListWalletMerchantRoutesErrors,
+  ListWalletMerchantRoutesResponses,
   ListWalletOffersData,
   ListWalletOffersErrors,
   ListWalletOffersResponses,
@@ -321,6 +324,9 @@ import type {
   NewWalletInvoiceData,
   NewWalletInvoiceErrors,
   NewWalletInvoiceResponses,
+  PaidWalletRouteData,
+  PaidWalletRouteErrors,
+  PaidWalletRouteResponses,
   PatchAccountPreferencesData,
   PatchAccountPreferencesErrors,
   PatchAccountPreferencesResponses,
@@ -368,6 +374,9 @@ import type {
   SetupCheckData,
   SetupCheckErrors,
   SetupCheckResponses,
+  SetWalletMerchantRouteData,
+  SetWalletMerchantRouteErrors,
+  SetWalletMerchantRouteResponses,
   SignInData,
   SignInErrors,
   SignInResponses,
@@ -464,6 +473,18 @@ export const wellKnownNostr = <ThrowOnError extends boolean = false>(
   (options?.client ?? client).get<WellKnownNostrResponses, WellKnownNostrErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/.well-known/nostr.json',
+    ...options,
+  });
+
+/**
+ * Download a paid resource published by the selected wallet.
+ */
+export const paidWalletRoute = <ThrowOnError extends boolean = false>(
+  options: Options<PaidWalletRouteData, ThrowOnError>
+): RequestResult<PaidWalletRouteResponses, PaidWalletRouteErrors, ThrowOnError> =>
+  (options.client ?? client).get<PaidWalletRouteResponses, PaidWalletRouteErrors, ThrowOnError>({
+    security: [{ name: 'Authorization', type: 'apiKey' }],
+    url: '/l402/w/{wallet_id}/{name}',
     ...options,
   });
 
@@ -1779,6 +1800,48 @@ export const getMerchantRevenue = <ThrowOnError extends boolean = false>(
     ],
     url: '/v1/me/wallets/{wallet_id}/l402/revenue',
     ...options,
+  });
+
+/**
+ * List this wallet’s approved origins and its configured sales.
+ */
+export const listWalletMerchantRoutes = <ThrowOnError extends boolean = false>(
+  options: Options<ListWalletMerchantRoutesData, ThrowOnError>
+): RequestResult<ListWalletMerchantRoutesResponses, ListWalletMerchantRoutesErrors, ThrowOnError> =>
+  (options.client ?? client).get<
+    ListWalletMerchantRoutesResponses,
+    ListWalletMerchantRoutesErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: 'bearer', type: 'http' },
+      { name: 'Api-Key', type: 'apiKey' },
+    ],
+    url: '/v1/me/wallets/{wallet_id}/l402/routes',
+    ...options,
+  });
+
+/**
+ * Publish, reprice or pause a wallet route for an operator-approved origin.
+ */
+export const setWalletMerchantRoute = <ThrowOnError extends boolean = false>(
+  options: Options<SetWalletMerchantRouteData, ThrowOnError>
+): RequestResult<SetWalletMerchantRouteResponses, SetWalletMerchantRouteErrors, ThrowOnError> =>
+  (options.client ?? client).put<
+    SetWalletMerchantRouteResponses,
+    SetWalletMerchantRouteErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: 'bearer', type: 'http' },
+      { name: 'Api-Key', type: 'apiKey' },
+    ],
+    url: '/v1/me/wallets/{wallet_id}/l402/routes/{name}',
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
   });
 
 /**

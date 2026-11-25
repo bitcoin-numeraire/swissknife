@@ -1,3 +1,6 @@
+mod merchant_catalog;
+pub mod merchant_handler;
+pub use merchant_catalog::*;
 use std::num::NonZeroU32;
 
 use async_trait::async_trait;

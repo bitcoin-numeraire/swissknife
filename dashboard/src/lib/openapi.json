@@ -123,6 +123,76 @@
         }
       }
     },
+    "/l402/w/{wallet_id}/{name}": {
+      "get": {
+        "tags": [
+          "L402"
+        ],
+        "summary": "Download a paid resource published by the selected wallet.",
+        "operationId": "paid_wallet_route",
+        "parameters": [
+          {
+            "name": "wallet_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "format": "int32",
+                    "minimum": 0
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid payment proof"
+          },
+          "402": {
+            "description": "A new Lightning invoice is required",
+            "headers": {
+              "WWW-Authenticate": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "L402 challenge"
+              }
+            }
+          },
+          "404": {
+            "description": "Unknown resource or new sales are paused"
+          },
+          "429": {},
+          "502": {},
+          "503": {}
+        },
+        "security": [
+          {},
+          {
+            "l402": []
+          }
+        ]
+      }
+    },
     "/l402/{name}": {
       "get": {
         "tags": [
@@ -7009,6 +7079,100 @@
         ]
       }
     },
+    "/v1/me/wallets/{wallet_id}/l402/routes": {
+      "get": {
+        "tags": [
+          "L402"
+        ],
+        "summary": "List this wallet’s approved origins and its configured sales.",
+        "operationId": "list_wallet_merchant_routes",
+        "parameters": [
+          {
+            "name": "wallet_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WalletMerchantCatalog"
+                }
+              }
+            }
+          },
+          "401": {},
+          "404": {}
+        },
+        "security": [
+          {
+            "jwt": []
+          },
+          {
+            "api_key": []
+          }
+        ]
+      }
+    },
+    "/v1/me/wallets/{wallet_id}/l402/routes/{name}": {
+      "put": {
+        "tags": [
+          "L402"
+        ],
+        "summary": "Publish, reprice or pause a wallet route for an operator-approved origin.",
+        "operationId": "set_wallet_merchant_route",
+        "parameters": [
+          {
+            "name": "wallet_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MerchantSaleTerms"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {},
+          "401": {},
+          "404": {},
+          "409": {},
+          "422": {}
+        },
+        "security": [
+          {
+            "jwt": []
+          },
+          {
+            "api_key": []
+          }
+        ]
+      }
+    },
     "/v1/me/wallets/{wallet_id}/offers": {
       "get": {
         "tags": [
@@ -11654,6 +11818,41 @@
           }
         }
       },
+      "MerchantOrigin": {
+        "type": "object",
+        "description": "An operator-approved resource that this wallet may sell.",
+        "required": [
+          "name",
+          "maximum_price_msat",
+          "uses_quote",
+          "access_seconds"
+        ],
+        "properties": {
+          "access_seconds": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "maximum_price_msat": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "requests_per_payment": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "minimum": 0
+          },
+          "uses_quote": {
+            "type": "boolean",
+            "description": "The wallet price caps per-invoice quotes when enabled."
+          }
+        }
+      },
       "MerchantRevenue": {
         "type": "object",
         "required": [
@@ -11680,6 +11879,28 @@
             "minimum": 0
           }
         }
+      },
+      "MerchantSaleTerms": {
+        "type": "object",
+        "required": [
+          "origin",
+          "price_msat",
+          "enabled"
+        ],
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "description": "Pausing new invoices preserves previously issued payment terms."
+          },
+          "origin": {
+            "type": "string"
+          },
+          "price_msat": {
+            "type": "string",
+            "description": "Fixed invoice price, or the ceiling for an origin with a quote callback."
+          }
+        },
+        "additionalProperties": false
       },
       "NewBtcAddressRequest": {
         "type": "object",
@@ -12700,6 +12921,42 @@
           }
         },
         "additionalProperties": false
+      },
+      "WalletMerchantCatalog": {
+        "type": "object",
+        "required": [
+          "origins",
+          "routes"
+        ],
+        "properties": {
+          "origins": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MerchantOrigin"
+            }
+          },
+          "routes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WalletMerchantRoute"
+            }
+          }
+        }
+      },
+      "WalletMerchantRoute": {
+        "type": "object",
+        "required": [
+          "name",
+          "terms"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "terms": {
+            "$ref": "#/components/schemas/MerchantSaleTerms"
+          }
+        }
       },
       "WalletOffer": {
         "type": "object",

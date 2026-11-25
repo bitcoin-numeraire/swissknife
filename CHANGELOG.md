@@ -10,6 +10,8 @@ release notes when a tag is published.
 
 ### Added
 
+- Wallet owners can publish paid routes for assigned merchant resources, set an invoice price, and pause new sales while honoring existing passes.
+
 - The wallet invoice screen shows settled merchant revenue and recorded fees by route for a selected date range.
 
 - Wallet owners can report settled L402 invoice counts, amounts received and incoming fees by merchant route for a UTC date range.

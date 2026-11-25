@@ -9,13 +9,17 @@ use uuid::Uuid;
 pub struct MerchantConfig {
     #[serde(deserialize_with = "read_root_key")]
     pub root_key: [u8; 32],
+    #[serde(default)]
     pub routes: BTreeMap<String, MerchantRoute>,
+    #[serde(default)]
+    pub origins: BTreeMap<String, MerchantRoute>,
 }
 
 impl fmt::Debug for MerchantConfig {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("MerchantConfig")
             .field("routes", &self.routes.keys())
+            .field("origins", &self.origins.keys())
             .finish_non_exhaustive()
     }
 }
@@ -59,12 +63,7 @@ fn merchant_url(value: &str) -> Result<Url, &'static str> {
 
 impl MerchantRoute {
     pub fn validate(&self, name: &str) -> Result<(Url, u64, Option<Url>), &'static str> {
-        if name.is_empty()
-            || name.len() > 64
-            || !name
-                .bytes()
-                .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
-        {
+        if !crate::domains::l402::valid_name(name, 64) {
             return Err("L402 route names must contain 1–64 lowercase letters, digits or hyphens");
         }
         let url = merchant_url(&self.target)?;

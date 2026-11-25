@@ -15,10 +15,11 @@ pub(super) struct Merchant {
     pub services: Arc<AppServices>,
     pub name: String,
     pub wallet_id: Uuid,
+    pub enabled: bool,
     pub price: Price,
     pub requests_per_payment: Option<NonZeroU32>,
     pub invoice_seconds: u32,
-    pub challenges: ChallengeLimit,
+    pub challenges: Arc<ChallengeLimit>,
 }
 
 // Shared by every request for one route on this replica. Only new invoices
@@ -52,6 +53,9 @@ impl ChallengeLimit {
 #[async_trait]
 impl InvoiceGate for Merchant {
     async fn invoice(&self) -> Result<ChallengeInvoice, GateError> {
+        if !self.enabled {
+            return Err(GateError::Closed);
+        }
         self.challenges.take()?;
         let price_msat = self.price.quote().await?;
         let description = match self.requests_per_payment {

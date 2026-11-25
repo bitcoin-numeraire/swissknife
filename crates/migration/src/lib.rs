@@ -44,6 +44,7 @@ mod m20261125_191409_wallet_agent_keys;
 mod m20261125_193225_account_spending_policy;
 mod m20261125_202712_meter_paid_resource_requests;
 mod m20261125_211611_attribute_merchant_invoice_revenue;
+mod m20261125_213201_wallet_merchant_routes;
 
 pub struct Migrator;
 
@@ -95,6 +96,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20261125_193225_account_spending_policy::Migration),
             Box::new(m20261125_202712_meter_paid_resource_requests::Migration),
             Box::new(m20261125_211611_attribute_merchant_invoice_revenue::Migration),
+            Box::new(m20261125_213201_wallet_merchant_routes::Migration),
         ]
     }
 }

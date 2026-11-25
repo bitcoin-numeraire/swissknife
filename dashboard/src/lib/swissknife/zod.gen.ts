@@ -390,6 +390,24 @@ export const zLocalLoginReset = z.object({
   expires_at: z.iso.datetime(),
 });
 
+/**
+ * An operator-approved resource that this wallet may sell.
+ */
+export const zMerchantOrigin = z.object({
+  access_seconds: z
+    .int()
+    .gte(0)
+    .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
+  maximum_price_msat: z.string(),
+  name: z.string(),
+  requests_per_payment: z
+    .int()
+    .gte(0)
+    .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
+    .nullish(),
+  uses_quote: z.boolean(),
+});
+
 export const zMerchantRevenue = z.object({
   fee_msat: z.string(),
   received_msat: z.string(),
@@ -397,6 +415,12 @@ export const zMerchantRevenue = z.object({
   settled_invoices: z.coerce.bigint().gte(BigInt(0)).max(BigInt('9223372036854775807'), {
     error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
   }),
+});
+
+export const zMerchantSaleTerms = z.object({
+  enabled: z.boolean(),
+  origin: z.string(),
+  price_msat: z.string(),
 });
 
 /**
@@ -921,6 +945,16 @@ export const zIssuedAgentKey = zAgentKey.and(
   })
 );
 
+export const zWalletMerchantRoute = z.object({
+  name: z.string(),
+  terms: zMerchantSaleTerms,
+});
+
+export const zWalletMerchantCatalog = z.object({
+  origins: z.array(zMerchantOrigin),
+  routes: z.array(zWalletMerchantRoute),
+});
+
 export const zWalletOffer = z.object({
   amount_msat: z.coerce
     .bigint()
@@ -1002,6 +1036,15 @@ export const zWellKnownNostrQuery = z.object({
  * Found
  */
 export const zWellKnownNostrResponse = zNostrNip05Response;
+
+export const zPaidWalletRoutePath = z.object({
+  wallet_id: z.uuid(),
+  name: z.string(),
+});
+
+export const zPaidWalletRouteResponse = z.array(
+  z.int().gte(0).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
+);
 
 export const zGetPaidResourcePath = z.object({
   name: z.string(),
@@ -1930,6 +1973,21 @@ export const zGetMerchantRevenueQuery = z.object({
 });
 
 export const zGetMerchantRevenueResponse = z.array(zMerchantRevenue);
+
+export const zListWalletMerchantRoutesPath = z.object({
+  wallet_id: z.uuid(),
+});
+
+export const zListWalletMerchantRoutesResponse = zWalletMerchantCatalog;
+
+export const zSetWalletMerchantRouteBody = zMerchantSaleTerms;
+
+export const zSetWalletMerchantRoutePath = z.object({
+  wallet_id: z.uuid(),
+  name: z.string(),
+});
+
+export const zSetWalletMerchantRouteResponse = z.void();
 
 export const zListWalletOffersPath = z.object({
   wallet_id: z.uuid(),

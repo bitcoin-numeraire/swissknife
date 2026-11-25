@@ -979,6 +979,20 @@ export type LocalLoginReset = {
   expires_at: Date;
 };
 
+/**
+ * An operator-approved resource that this wallet may sell.
+ */
+export type MerchantOrigin = {
+  access_seconds: number;
+  maximum_price_msat: string;
+  name: string;
+  requests_per_payment?: number | null;
+  /**
+   * The wallet price caps per-invoice quotes when enabled.
+   */
+  uses_quote: boolean;
+};
+
 export type MerchantRevenue = {
   /**
    * Fees recorded on these incoming invoices, in exact decimal millisatoshis.
@@ -990,6 +1004,18 @@ export type MerchantRevenue = {
   received_msat: string;
   route: string;
   settled_invoices: number;
+};
+
+export type MerchantSaleTerms = {
+  /**
+   * Pausing new invoices preserves previously issued payment terms.
+   */
+  enabled: boolean;
+  origin: string;
+  /**
+   * Fixed invoice price, or the ceiling for an origin with a quote callback.
+   */
+  price_msat: string;
 };
 
 /**
@@ -1583,6 +1609,16 @@ export type WalletCapabilities = {
   spend?: boolean;
 };
 
+export type WalletMerchantCatalog = {
+  origins: Array<MerchantOrigin>;
+  routes: Array<WalletMerchantRoute>;
+};
+
+export type WalletMerchantRoute = {
+  name: string;
+  terms: MerchantSaleTerms;
+};
+
 export type WalletOffer = {
   amount_msat?: number | null;
   /**
@@ -1723,6 +1759,40 @@ export type WellKnownNostrResponses = {
 };
 
 export type WellKnownNostrResponse = WellKnownNostrResponses[keyof WellKnownNostrResponses];
+
+export type PaidWalletRouteData = {
+  body?: never;
+  path: {
+    wallet_id: string;
+    name: string;
+  };
+  query?: never;
+  url: '/l402/w/{wallet_id}/{name}';
+};
+
+export type PaidWalletRouteErrors = {
+  /**
+   * Invalid payment proof
+   */
+  401: unknown;
+  /**
+   * A new Lightning invoice is required
+   */
+  402: unknown;
+  /**
+   * Unknown resource or new sales are paused
+   */
+  404: unknown;
+  429: unknown;
+  502: unknown;
+  503: unknown;
+};
+
+export type PaidWalletRouteResponses = {
+  200: Array<number>;
+};
+
+export type PaidWalletRouteResponse = PaidWalletRouteResponses[keyof PaidWalletRouteResponses];
 
 export type GetPaidResourceData = {
   body?: never;
@@ -5006,6 +5076,51 @@ export type GetMerchantRevenueResponses = {
 
 export type GetMerchantRevenueResponse =
   GetMerchantRevenueResponses[keyof GetMerchantRevenueResponses];
+
+export type ListWalletMerchantRoutesData = {
+  body?: never;
+  path: {
+    wallet_id: string;
+  };
+  query?: never;
+  url: '/v1/me/wallets/{wallet_id}/l402/routes';
+};
+
+export type ListWalletMerchantRoutesErrors = {
+  401: unknown;
+  404: unknown;
+};
+
+export type ListWalletMerchantRoutesResponses = {
+  200: WalletMerchantCatalog;
+};
+
+export type ListWalletMerchantRoutesResponse =
+  ListWalletMerchantRoutesResponses[keyof ListWalletMerchantRoutesResponses];
+
+export type SetWalletMerchantRouteData = {
+  body: MerchantSaleTerms;
+  path: {
+    wallet_id: string;
+    name: string;
+  };
+  query?: never;
+  url: '/v1/me/wallets/{wallet_id}/l402/routes/{name}';
+};
+
+export type SetWalletMerchantRouteErrors = {
+  401: unknown;
+  404: unknown;
+  409: unknown;
+  422: unknown;
+};
+
+export type SetWalletMerchantRouteResponses = {
+  204: void;
+};
+
+export type SetWalletMerchantRouteResponse =
+  SetWalletMerchantRouteResponses[keyof SetWalletMerchantRouteResponses];
 
 export type ListWalletOffersData = {
   body?: never;

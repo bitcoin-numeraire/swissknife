@@ -1,6 +1,7 @@
 mod config;
 mod merchant;
 mod pricing;
+mod wallet_routes;
 
 pub use config::MerchantConfig;
 use merchant::{ChallengeLimit, Merchant};
@@ -37,7 +38,14 @@ pub fn router(
     services: Arc<AppServices>,
 ) -> Result<Router<Arc<AppServices>>, WebServerError> {
     let mut router = Router::new();
-    let Some(config) = config else { return Ok(router) };
+    let Some(config) = config else {
+        return Ok(crate::domains::l402::merchant_handler::router(Arc::new(
+            crate::domains::l402::MerchantCatalog {
+                origins: Default::default(),
+                routes: services.merchant_routes.clone(),
+            },
+        )));
+    };
     let bakery = Bakery::new(&config.root_key);
     let client = Client::builder()
         .redirect(Policy::none())
@@ -45,6 +53,12 @@ pub fn router(
         .build()
         .map_err(|_| WebServerError::Merchant("could not create upstream client"))?;
 
+    router = router.merge(wallet_routes::router(
+        config,
+        &client,
+        services.clone(),
+        bakery.clone(),
+    )?);
     for (name, route) in &config.routes {
         let (url, price_msat, quote_url) = route.validate(name).map_err(WebServerError::Merchant)?;
         let terms = (name, route.wallet_id, url.as_str(), price_msat, route.access_seconds);
@@ -63,10 +77,11 @@ pub fn router(
                 services: services.clone(),
                 name: name.clone(),
                 wallet_id: route.wallet_id,
+                enabled: true,
                 price: Price::new(price_msat, quote_url, &client),
                 requests_per_payment: route.requests_per_payment,
                 invoice_seconds: (route.access_seconds / 2).min(120),
-                challenges: ChallengeLimit::new(route.challenges_per_minute),
+                challenges: Arc::new(ChallengeLimit::new(route.challenges_per_minute)),
             }),
         });
         let handler = get(get_paid_resource)
@@ -82,7 +97,7 @@ pub fn router(
 }
 
 #[derive(OpenApi)]
-#[openapi(paths(get_paid_resource), tags((name = "L402", description = "Wallet-backed paid resources")))]
+#[openapi(paths(get_paid_resource,wallet_routes::paid_wallet_route), tags((name = "L402", description = "Wallet-backed paid resources")))]
 pub struct MerchantHandler;
 
 /// Fetch a fixed merchant resource with an L402 access pass. Each configured
