@@ -17,6 +17,7 @@ use crate::{
 };
 
 pub struct AppServices {
+    pub notification: Box<dyn crate::domains::notification::NotificationUseCases>,
     pub invoice: Box<dyn InvoiceUseCases>,
     pub payment: Box<dyn PaymentsUseCases>,
     pub wallet: Box<dyn WalletUseCases>,
@@ -54,6 +55,7 @@ impl AppServices {
         } = adapters;
 
         let event = Arc::new(EventService::new(store.clone()));
+        let notification = crate::domains::notification::NotificationService::new(store.notification.clone());
         let client_event = ClientEventService::new(store.clone(), client_events.retention);
         let payments = PaymentService::new(
             store.clone(),
@@ -111,6 +113,7 @@ impl AppServices {
             bitcoin: Box::new(bitcoin),
             event,
             client_event: Box::new(client_event),
+            notification: Box::new(notification),
         }
     }
 }
@@ -121,6 +124,7 @@ impl AppServices {
 /// `AppServices` suitable for handler unit tests.
 #[cfg(test)]
 pub struct MockAppServicesBuilder {
+    pub notification: crate::domains::notification::MockNotificationUseCases,
     pub invoice: crate::domains::invoice::MockInvoiceUseCases,
     pub payment: crate::domains::payment::MockPaymentsUseCases,
     pub wallet: crate::domains::wallet::MockWalletUseCases,
@@ -153,6 +157,7 @@ impl MockAppServicesBuilder {
             bitcoin: crate::domains::bitcoin::MockBitcoinUseCases::new(),
             event: crate::domains::event::MockEventUseCases::new(),
             client_event: crate::domains::event::MockClientEventUseCases::new(),
+            notification: crate::domains::notification::MockNotificationUseCases::new(),
         }
     }
 
@@ -171,6 +176,7 @@ impl MockAppServicesBuilder {
             bitcoin: Box::new(self.bitcoin),
             event: Arc::new(self.event),
             client_event: Box::new(self.client_event),
+            notification: Box::new(self.notification),
         }
     }
 }

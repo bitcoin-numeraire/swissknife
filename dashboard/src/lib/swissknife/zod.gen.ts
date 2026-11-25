@@ -228,6 +228,25 @@ export const zInvoiceStatus = z.enum(['Pending', 'Settled', 'Expired']);
 export const zLedger = z.enum(['Lightning', 'Internal', 'Onchain']);
 
 /**
+ * Presentation state for one terminal payment or receipt belonging to the signed-in account.
+ */
+export const zAccountNotification = z.object({
+  amount_msat: z.string().nullish(),
+  archived: z.boolean(),
+  created_at: z.iso.datetime(),
+  description: z.string().nullish(),
+  event_type: zClientEventType,
+  is_read: z.boolean(),
+  ledger: zLedger.nullish(),
+  resource_id: z.uuid(),
+  source_event_id: z
+    .int()
+    .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
+    .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
+  wallet_id: z.uuid(),
+});
+
+/**
  * Lightning Address
  */
 export const zLnAddress = z.object({
@@ -418,6 +437,34 @@ export const zNostrNip05Response = z.object({
   names: z.record(z.string(), z.string()),
 });
 
+export const zNotificationAction = z.enum(['read', 'archive']);
+
+export const zNotificationPage = z.object({
+  items: z.array(zAccountNotification),
+  next_before: z
+    .int()
+    .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
+    .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
+    .nullish(),
+  unread_count: z.coerce.bigint().gte(BigInt(0)).max(BigInt('9223372036854775807'), {
+    error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
+  }),
+});
+
+export const zNotificationQuery = z.object({
+  archived: z.boolean().optional(),
+  before: z
+    .int()
+    .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
+    .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
+    .nullish(),
+  limit: z
+    .int()
+    .gte(0)
+    .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
+    .nullish(),
+});
+
 /**
  * Direction of result ordering for list endpoints.
  */
@@ -579,6 +626,13 @@ export const zAsset = z.object({
   updated_at: z.iso.datetime().nullish(),
 });
 
+export const zReadNotificationsRequest = z.object({
+  through: z
+    .int()
+    .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
+    .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
+});
+
 /**
  * Register Lightning Address Request
  */
@@ -682,6 +736,10 @@ export const zUpdateLnAddressRequest = z.object({
  */
 export const zUpdateLocalLoginRequest = z.object({
   enabled: z.boolean(),
+});
+
+export const zUpdateNotificationRequest = z.object({
+  action: zNotificationAction,
 });
 
 /**
@@ -1406,6 +1464,46 @@ export const zUpdateAccountAddressBody = zUpdateLnAddressRequest;
  * LN Address Updated
  */
 export const zUpdateAccountAddressResponse = zLnAddress;
+
+export const zListAccountNotificationsQuery = z.object({
+  before: z
+    .int()
+    .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
+    .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
+    .optional(),
+  limit: z
+    .int()
+    .gte(0)
+    .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
+    .optional(),
+  archived: z.boolean().optional(),
+});
+
+/**
+ * Newest account notifications and total unread count
+ */
+export const zListAccountNotificationsResponse = zNotificationPage;
+
+export const zMarkAccountNotificationsReadBody = zReadNotificationsRequest;
+
+/**
+ * Account notifications marked read through the supplied ID
+ */
+export const zMarkAccountNotificationsReadResponse = z.void();
+
+export const zUpdateAccountNotificationBody = zUpdateNotificationRequest;
+
+export const zUpdateAccountNotificationPath = z.object({
+  id: z
+    .int()
+    .min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' })
+    .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
+});
+
+/**
+ * Notification updated
+ */
+export const zUpdateAccountNotificationResponse = z.void();
 
 /**
  * Found

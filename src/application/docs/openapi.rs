@@ -40,6 +40,7 @@ pub fn merged_openapi() -> OpenApi {
     openapi.merge(AuthHandler::openapi());
     openapi.merge(AccountHandler::openapi());
     openapi.merge(AccountWalletHandler::openapi());
+    openapi.merge(crate::domains::notification::NotificationHandler::openapi());
     openapi.merge(WalletHandler::openapi());
     openapi.merge(InvoiceHandler::openapi());
     openapi.merge(PaymentHandler::openapi());

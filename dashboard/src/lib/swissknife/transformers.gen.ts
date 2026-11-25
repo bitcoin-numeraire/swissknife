@@ -24,6 +24,7 @@ import type {
   GetWalletPaymentResponse,
   GetWalletResponse,
   ListAccountApiKeysResponse,
+  ListAccountNotificationsResponse,
   ListAccountsResponse,
   ListAccountWalletsResponse,
   ListAddressesResponse,
@@ -394,6 +395,23 @@ export const updateAccountAddressResponseTransformer = async (
   data: any
 ): Promise<UpdateAccountAddressResponse> => {
   data = lnAddressSchemaResponseTransformer(data);
+  return data;
+};
+
+const accountNotificationSchemaResponseTransformer = (data: any) => {
+  data.created_at = new Date(data.created_at);
+  return data;
+};
+
+const notificationPageSchemaResponseTransformer = (data: any) => {
+  data.items = data.items.map((item: any) => accountNotificationSchemaResponseTransformer(item));
+  return data;
+};
+
+export const listAccountNotificationsResponseTransformer = async (
+  data: any
+): Promise<ListAccountNotificationsResponse> => {
+  data = notificationPageSchemaResponseTransformer(data);
   return data;
 };
 

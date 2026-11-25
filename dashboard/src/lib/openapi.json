@@ -5070,6 +5070,173 @@
         }
       }
     },
+    "/v1/me/notifications": {
+      "get": {
+        "tags": [
+          "Account"
+        ],
+        "operationId": "list_account_notifications",
+        "parameters": [
+          {
+            "name": "before",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "archived",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Newest account notifications and total unread count",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationPage"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid page or cursor",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/me/notifications/read": {
+      "post": {
+        "tags": [
+          "Account"
+        ],
+        "operationId": "mark_account_notifications_read",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReadNotificationsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Account notifications marked read through the supplied ID"
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid cursor",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/me/notifications/{id}": {
+      "patch": {
+        "tags": [
+          "Account"
+        ],
+        "operationId": "update_account_notification",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Source event ID",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateNotificationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Notification updated"
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Notification not found in this account",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/me/preferences": {
       "get": {
         "tags": [
@@ -8439,6 +8606,69 @@
           }
         }
       },
+      "AccountNotification": {
+        "type": "object",
+        "description": "Presentation state for one terminal payment or receipt belonging to the signed-in account.",
+        "required": [
+          "source_event_id",
+          "event_type",
+          "wallet_id",
+          "resource_id",
+          "created_at",
+          "is_read",
+          "archived"
+        ],
+        "properties": {
+          "amount_msat": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Decimal integer string so JavaScript clients can represent the full amount."
+          },
+          "archived": {
+            "type": "boolean"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "event_type": {
+            "$ref": "#/components/schemas/ClientEventType"
+          },
+          "is_read": {
+            "type": "boolean"
+          },
+          "ledger": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Ledger"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "resource_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "source_event_id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "wallet_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
       "AccountPreferences": {
         "type": "object",
         "description": "Account-scoped dashboard and UI preferences.",
@@ -9790,6 +10020,65 @@
           }
         }
       },
+      "NotificationAction": {
+        "type": "string",
+        "enum": [
+          "read",
+          "archive"
+        ]
+      },
+      "NotificationPage": {
+        "type": "object",
+        "required": [
+          "items",
+          "unread_count"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AccountNotification"
+            }
+          },
+          "next_before": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "Exclusive cursor for the next page, ordered newest first."
+          },
+          "unread_count": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Number of unread items in the active inbox, across all pages.",
+            "minimum": 0
+          }
+        }
+      },
+      "NotificationQuery": {
+        "type": "object",
+        "properties": {
+          "archived": {
+            "type": "boolean"
+          },
+          "before": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "limit": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "minimum": 0
+          }
+        }
+      },
       "OrderDirection": {
         "type": "string",
         "description": "Direction of result ordering for list endpoints.",
@@ -10022,6 +10311,19 @@
           "bitcoin",
           "taproot_assets"
         ]
+      },
+      "ReadNotificationsRequest": {
+        "type": "object",
+        "required": [
+          "through"
+        ],
+        "properties": {
+          "through": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Mark notifications through the newest ID observed by the caller."
+          }
+        }
       },
       "RegisterLnAddressRequest": {
         "type": "object",
@@ -10287,6 +10589,17 @@
           "enabled": {
             "type": "boolean",
             "description": "Whether password sign-in is allowed. Changing this revokes local JWT\nsessions and pending reset codes; API keys retain their own permissions."
+          }
+        }
+      },
+      "UpdateNotificationRequest": {
+        "type": "object",
+        "required": [
+          "action"
+        ],
+        "properties": {
+          "action": {
+            "$ref": "#/components/schemas/NotificationAction"
           }
         }
       },

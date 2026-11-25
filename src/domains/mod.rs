@@ -6,6 +6,7 @@ pub mod invoice;
 pub mod ln_address;
 pub mod lnurl;
 pub mod nostr;
+pub mod notification;
 pub mod payment;
 pub mod system;
 pub mod wallet;

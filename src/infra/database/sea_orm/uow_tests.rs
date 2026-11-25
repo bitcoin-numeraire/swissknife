@@ -613,6 +613,11 @@ async fn client_events_are_account_scoped_and_pruned_with_a_durable_watermark() 
     assert_eq!(third_events.len(), 1);
     assert_eq!(third_events[0].wallet_id, third_wallet);
 
+    let notifications = super::SeaOrmNotificationRepository::new(conn.clone());
+    use crate::domains::notification::NotificationRepository;
+    assert_eq!(notifications.unread_count(first_account).await.unwrap(), 1);
+    assert_eq!(notifications.unread_count(third_account).await.unwrap(), 1);
+
     let first_id = first_events[0].id.parse::<i32>().expect("numeric event ID");
     let second_id = second_events[0].id.parse::<i32>().expect("numeric event ID");
     for (event_id, age) in [(first_id, 3), (second_id, 2)] {
@@ -636,6 +641,9 @@ async fn client_events_are_account_scoped_and_pruned_with_a_durable_watermark() 
         older_count.expect("prune oldest events") + all_count.expect("prune all expired events"),
         2
     );
+    assert_eq!(notifications.unread_count(first_account).await.unwrap(), 0);
+    assert_eq!(notifications.unread_count(second_account).await.unwrap(), 0);
+    assert_eq!(notifications.unread_count(third_account).await.unwrap(), 1);
     assert_eq!(repo.pruned_through().await.expect("read prune watermark"), second_id);
     assert!(repo
         .find_after(first_account, 0, 10)
@@ -655,6 +663,48 @@ async fn client_events_are_account_scoped_and_pruned_with_a_durable_watermark() 
         1,
         "retention must leave newer events intact"
     );
+}
+
+#[tokio::test]
+async fn notification_migration_projects_existing_terminal_events() {
+    use crate::domains::notification::NotificationRepository;
+
+    let conn = connect().await;
+    let owner_wallet = seed_wallet(&conn, 0).await;
+    let unpaid = SeaOrmInvoiceRepository::new(conn.clone())
+        .insert(pending_invoice(owner_wallet, 42_000))
+        .await
+        .unwrap();
+    let txn = conn.begin().await.unwrap();
+    SeaOrmClientEventRepository::new(&txn)
+        .append_event(NewClientEvent::invoice_pending(&unpaid))
+        .await
+        .unwrap();
+    let mut paid = unpaid;
+    paid.payment_time = Some(Utc::now());
+    paid.amount_received_msat = Some(42_000);
+    SeaOrmClientEventRepository::new(&txn)
+        .append_event(NewClientEvent::invoice_paid(&paid))
+        .await
+        .unwrap();
+    txn.commit().await.unwrap();
+
+    let migration = Migrator::migrations()
+        .into_iter()
+        .find(|m| m.name().ends_with("_account_notification"))
+        .unwrap();
+    let manager = migration::SchemaManager::new(&conn);
+    migration.down(&manager).await.unwrap();
+    migration.up(&manager).await.unwrap();
+    let repo = super::SeaOrmNotificationRepository::new(conn.clone());
+    let items = repo
+        .list(account_id(&conn, owner_wallet).await, None, 10, false)
+        .await
+        .unwrap();
+    assert_eq!(items.len(), 1);
+    assert_eq!(items[0].resource_id, paid.id);
+    assert_eq!(items[0].event_type, ClientEventType::InvoicePaid);
+    assert_eq!(items[0].amount_msat.as_deref(), Some("42000"));
 }
 
 #[tokio::test]
@@ -986,10 +1036,12 @@ async fn settle_incoming_invoice_credits_once_under_replay() {
     invoice.payment_time = Some(Utc::now());
 
     let projection = SeaOrmEventProjectionUnitOfWork::new(conn.clone());
-    projection
-        .settle_incoming_invoice(invoice.clone())
-        .await
-        .expect("settle");
+    let (first, duplicate) = tokio::join!(
+        projection.settle_incoming_invoice(invoice.clone()),
+        projection.settle_incoming_invoice(invoice.clone())
+    );
+    first.expect("first settlement");
+    duplicate.expect("concurrent replay");
     assert_eq!(balance(&conn, receiver).await, (30_000, 0), "credited on settlement");
 
     // A duplicate success event must not credit twice.
@@ -1003,6 +1055,13 @@ async fn settle_incoming_invoice_credits_once_under_replay() {
         "no double credit on replay"
     );
 
+    use crate::domains::notification::NotificationRepository;
+    let notices = super::SeaOrmNotificationRepository::new(conn.clone());
+    let notices = notices
+        .list(account_id(&conn, receiver).await, None, 10, false)
+        .await
+        .unwrap();
+    assert_eq!(notices.len(), 1, "event replay must preserve one inbox item");
     let events = SeaOrmClientEventRepository::new(conn.clone())
         .find_after(account_id(&conn, receiver).await, 0, 10)
         .await

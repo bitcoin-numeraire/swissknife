@@ -17,6 +17,7 @@ mod ln_address;
 mod lnurl;
 mod network;
 mod nostr;
+mod notification;
 mod payment;
 mod permission;
 mod query;
@@ -46,6 +47,7 @@ pub use lnurl::{
 };
 pub use network::BtcNetwork;
 pub use nostr::{NostrNIP05QueryParams, NostrNIP05Response};
+pub use notification::*;
 pub use payment::{
     BtcPayment, InternalPayment, LnPayment, Payment, PaymentFeeEstimate, PaymentFilter, PaymentStatus,
     SendPaymentRequest,

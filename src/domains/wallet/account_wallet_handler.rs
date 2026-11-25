@@ -117,6 +117,7 @@ pub fn account_router() -> Router<Arc<AppServices>> {
     Router::new()
         .route("/", get(get_account))
         .route("/events", get(stream_account_events))
+        .nest("/notifications", crate::domains::notification::router())
         .route("/", put(update_current_account))
         .route("/preferences", get(get_account_preferences))
         .route(
