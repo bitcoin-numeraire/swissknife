@@ -1486,3 +1486,90 @@ async fn withdrawal_reconciliation_keeps_the_signed_payload_and_full_cap_until_c
     );
     assert!(uow.claim_withdrawal("node").await.unwrap().is_none());
 }
+
+#[tokio::test]
+async fn offer_receipt_cursor_credit_history_and_event_commit_once_across_workers() {
+    use super::offer_repository::SeaOrmOfferRepository;
+    use crate::domains::offer::{CreateOfferRequest, NodeOffer, OfferRepository, OfferUpdate};
+    let db = connect().await;
+    let owner = seed_wallet(&db, 0).await;
+    let repo = SeaOrmOfferRepository(db.clone());
+    let (stored, _) = repo
+        .register(
+            owner,
+            "cln:test",
+            &CreateOfferRequest {
+                wallet_id: None,
+                idempotency_key: Uuid::new_v4(),
+                amount_msat: None,
+                description: "orders".into(),
+                single_use: false,
+            },
+        )
+        .await
+        .unwrap();
+    repo.activate(
+        stored.offer.id,
+        &NodeOffer {
+            offer_id: "local".into(),
+            bolt12: "lno1…".into(),
+            active: true,
+            label: None,
+        },
+    )
+    .await
+    .unwrap();
+    let receipt = |index: u64, hash: &str, received: Option<u64>| OfferUpdate {
+        updated_index: index,
+        status: "paid".into(),
+        local_offer_id: Some("local".into()),
+        payment_hash: hash.into(),
+        bolt12: Some("lni1…".into()),
+        amount_msat: received,
+        amount_received_msat: received,
+        paid_at: Some(1795630000),
+        invoice_created_at: Some(1795629999),
+        invreq_payer_note: None,
+    };
+    // Failure on the second item rolls back the first credit, receipt and cursor.
+    assert!(repo
+        .project(
+            "cln:test",
+            0,
+            vec![receipt(1, "hash-a", Some(123)), receipt(2, "hash-b", None)]
+        )
+        .await
+        .is_err());
+    assert_eq!(repo.cursor("cln:test").await.unwrap(), Some(0));
+    assert_eq!(balance(&db, owner).await, (0, 0));
+    let (a, b) = tokio::join!(
+        repo.project("cln:test", 0, vec![receipt(1, "hash-a", Some(123))]),
+        repo.project("cln:test", 0, vec![receipt(1, "hash-a", Some(123))])
+    );
+    a.unwrap();
+    b.unwrap();
+    assert_eq!(balance(&db, owner).await, (123, 0));
+    assert_eq!(
+        ClientEventEntity::find()
+            .filter(client_event::Column::WalletId.eq(owner))
+            .all(&db)
+            .await
+            .unwrap()
+            .len(),
+        1
+    );
+    let invoices = SeaOrmInvoiceRepository::new(db.clone());
+    let invoice = invoices.find_by_payment_hash("hash-a").await.unwrap().unwrap();
+    invoices
+        .delete_many(crate::domains::invoice::InvoiceFilter {
+            ids: Some(vec![invoice.id]),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    repo.project("cln:test", 1, vec![receipt(2, "hash-a", Some(123))])
+        .await
+        .unwrap();
+    assert_eq!(balance(&db, owner).await, (123, 0));
+    assert_eq!(repo.cursor("cln:test").await.unwrap(), Some(2));
+}

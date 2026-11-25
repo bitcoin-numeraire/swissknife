@@ -43,27 +43,34 @@ impl From<XpayResponse> for Payment {
     }
 }
 
-impl From<ListinvoicesInvoices> for Invoice {
-    fn from(val: ListinvoicesInvoices) -> Self {
-        let bolt11_str = val.bolt11.clone().unwrap();
-        let bolt11 = Bolt11Invoice::from_str(&bolt11_str).unwrap();
-        let mut invoice: Invoice = crate::infra::lightning::types::invoice_from_bolt11(bolt11);
-
-        match val.status() {
-            ListinvoicesInvoicesStatus::Paid => {
-                invoice.status = InvoiceStatus::Settled;
-                invoice.payment_time = Some(Utc.timestamp_opt(val.paid_at() as i64, 0).unwrap());
-                invoice.amount_received_msat = Some(val.amount_received_msat.unwrap().msat);
-            }
-            ListinvoicesInvoicesStatus::Unpaid => {
-                invoice.status = InvoiceStatus::Pending;
-            }
-            ListinvoicesInvoicesStatus::Expired => {
-                invoice.status = InvoiceStatus::Expired;
-            }
+impl ListinvoicesInvoices {
+    /// The invoice lookup serves tracked BOLT11 invoices. BOLT12 settlements are reconciled by offer ID.
+    pub(super) fn bolt11_invoice(self) -> Result<Option<Invoice>, crate::application::errors::LightningError> {
+        let val = self;
+        let Some(encoded) = val.bolt11.as_deref() else {
+            return Ok(None);
         };
-
-        invoice
+        let invalid = |reason: &str| crate::application::errors::LightningError::InvoiceByHash(reason.into());
+        let bolt11 = Bolt11Invoice::from_str(encoded).map_err(|_| invalid("Invalid BOLT11 invoice from node"))?;
+        let mut invoice = crate::infra::lightning::types::invoice_from_bolt11(bolt11);
+        let paid = val.status() == ListinvoicesInvoicesStatus::Paid;
+        if paid {
+            invoice.status = InvoiceStatus::Settled;
+            invoice.payment_time = Some(
+                val.paid_at
+                    .and_then(|t| i64::try_from(t).ok())
+                    .and_then(|t| Utc.timestamp_opt(t, 0).single())
+                    .ok_or_else(|| invalid("Missing invoice settlement time"))?,
+            );
+            invoice.amount_received_msat = Some(
+                val.amount_received_msat
+                    .map(|a| a.msat)
+                    .ok_or_else(|| invalid("Missing amount received"))?,
+            );
+        } else if val.status() == ListinvoicesInvoicesStatus::Expired {
+            invoice.status = InvoiceStatus::Expired;
+        }
+        Ok(Some(invoice))
     }
 }
 
@@ -120,7 +127,7 @@ mod tests {
             ..Default::default()
         };
 
-        let invoice: Invoice = response.into();
+        let invoice = response.bolt11_invoice().unwrap().unwrap();
 
         assert_eq!(invoice.status, InvoiceStatus::Settled);
         assert_eq!(invoice.amount_msat, Some(1_000));

@@ -12,6 +12,24 @@ use crate::{
 #[cfg_attr(test, mockall::automock)]
 #[async_trait]
 pub trait LnClient: Sync + Send {
+    fn offer_backend(&self) -> Option<String> {
+        None
+    }
+    async fn issue_offer(
+        &self,
+        _offer: &swissknife_types::WalletOffer,
+    ) -> Result<crate::domains::offer::NodeOffer, LightningError> {
+        Err(LightningError::InvalidPaymentTarget("BOLT12 offers unavailable".into()))
+    }
+    async fn local_offers(&self, _id: Option<String>) -> Result<Vec<crate::domains::offer::NodeOffer>, LightningError> {
+        Err(LightningError::InvalidPaymentTarget("BOLT12 offers unavailable".into()))
+    }
+    async fn disable_offer(&self, _id: &str) -> Result<(), LightningError> {
+        Err(LightningError::InvalidPaymentTarget("BOLT12 offers unavailable".into()))
+    }
+    async fn offer_updates(&self, _start: u64) -> Result<Vec<crate::domains::offer::OfferUpdate>, LightningError> {
+        Err(LightningError::InvalidPaymentTarget("BOLT12 offers unavailable".into()))
+    }
     async fn decode_bolt12(&self, _input: &str) -> Result<crate::domains::payment::DecodedBolt12, LightningError> {
         Err(LightningError::InvalidPaymentTarget(
             "This Lightning provider does not support BOLT12".into(),

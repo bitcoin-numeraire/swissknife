@@ -144,8 +144,16 @@ where
             ..Default::default()
         };
 
-        if invoice.ledger == Ledger::Lightning {
-            let ln_invoice = invoice.ln_invoice.expect("should exist for ledger Lightning");
+        if let Some(offer) = invoice.offer_invoice {
+            model.offer_id = Set(Some(offer.offer_id));
+            model.bolt12 = Set(Some(offer.bolt12));
+            model.payment_hash = Set(Some(offer.payment_hash));
+            model.payer_note = Set(offer.payer_note);
+            model.fee_msat = Set(invoice.fee_msat.map(amount_to_db).transpose()?);
+        } else if invoice.ledger == Ledger::Lightning {
+            let ln_invoice = invoice
+                .ln_invoice
+                .ok_or_else(|| DatabaseError::Insert("Missing Lightning invoice".into()))?;
             model.bolt11 = Set(ln_invoice.bolt11.into());
             model.payee_pubkey = Set(ln_invoice.payee_pubkey.into());
             model.payment_hash = Set(ln_invoice.payment_hash.into());

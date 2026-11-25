@@ -69,6 +69,7 @@ impl SystemUseCases for SystemService {
 
         debug!(%welcome_complete, %sign_up_complete, "Checking system setup");
         Ok(SetupInfo {
+            bolt12_offers: self.ln_client.offer_backend().is_some(),
             welcome_complete,
             sign_up_complete,
         })
@@ -218,10 +219,13 @@ mod tests {
                 }
             });
 
-            let service = service(store, MockLnClient::new());
+            let mut client = MockLnClient::new();
+            client.expect_offer_backend().return_const(Some("node".into()));
+            let service = service(store, client);
 
             let info = service.setup_check().await.unwrap();
 
+            assert!(info.bolt12_offers);
             assert!(info.welcome_complete);
             assert!(!info.sign_up_complete);
         }

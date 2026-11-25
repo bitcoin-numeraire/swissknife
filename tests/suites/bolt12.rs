@@ -96,3 +96,117 @@ async fn sends_fixed_and_amountless_bolt12_requests_and_enforces_the_payer_amoun
     assert_eq!(paid.parse::<Payment>().amount_msat, 42000);
     assert_eq!(app.wallet_balance(admin, account.wallet.id).await.reserved_msat, 0);
 }
+
+#[tokio::test]
+async fn receives_reusable_offers_once_per_paid_invoice_after_restart() {
+    use swissknife_types::{Invoice, OfferState, WalletOffer};
+    let app = TestApp::isolated("bolt12-receive", &[]).await;
+    let admin = app.admin_token().await.to_owned();
+    let a = app.create_account_with_wallet(&admin, "offer-shop").await;
+    let b = app.create_account_with_wallet(&admin, "offer-other").await;
+    let path = format!("/v1/me/wallets/{}/offers", a.wallet.id);
+    let other = format!("/v1/me/wallets/{}/offers", b.wallet.id);
+    let auth = Auth::ApiKey(&a.key);
+    let api = app.api();
+    let body = json!({"idempotency_key":Uuid::new_v4(),"description":"Two shops, same label"});
+    assert_error(&api.get(&path, Auth::None).await, StatusCode::UNAUTHORIZED);
+    assert_error(&api.get(&path, Auth::ApiKey(&b.key)).await, StatusCode::NOT_FOUND);
+    let result = api.post(&path, auth, &body).await;
+    if app.provider.starts_with("lnd") {
+        assert_error(&result, StatusCode::UNPROCESSABLE_ENTITY);
+        return;
+    }
+    assert_status(&result, StatusCode::OK);
+    let first: WalletOffer = result.parse();
+    assert_eq!(first.state, OfferState::Active);
+    let replay: WalletOffer = api.post(&path, auth, &body).await.parse();
+    assert_eq!(replay.bolt12, first.bolt12);
+    let mut conflict = body.clone();
+    conflict["amount_msat"] = json!(1000);
+    assert_error(&api.post(&path, auth, conflict).await, StatusCode::CONFLICT);
+    let mut second = body;
+    second["single_use"] = json!(true);
+    let second: WalletOffer = api.post(&other, Auth::ApiKey(&b.key), second).await.parse();
+    assert_ne!(first.provider_id, second.provider_id);
+    let admin_list = api
+        .get(&format!("/v1/offers?wallet_id={}", a.wallet.id), Auth::Bearer(&admin))
+        .await;
+    assert_eq!(admin_list.parse::<Vec<WalletOffer>>().len(), 1);
+    assert_error(
+        &api.delete(&format!("{other}/{}", first.id), Auth::ApiKey(&b.key)).await,
+        StatusCode::NOT_FOUND,
+    );
+    let peer = Counterparty::offers_peer();
+    let pay = |offer: &str, amount: u64, note: &str| {
+        let invoice = peer.cln_rpc(
+            "fetchinvoice",
+            json!({"offer":offer,"amount_msat":amount,"payer_note":note,"timeout":15}),
+        );
+        peer.cln_rpc("xpay", json!({"invstring":invoice["invoice"]}));
+    };
+    let remote = Counterparty::for_provider("lnd_grpc");
+    let foreign = remote.cln_rpc("offer", json!({"amount":"any","description":unique("operator offer")}));
+    app.stop();
+    pay(first.bolt12.as_ref().unwrap(), 12017, "order A");
+    pay(first.bolt12.as_ref().unwrap(), 19231, "order B");
+    pay(second.bolt12.as_ref().unwrap(), 33107, "single");
+    pay(foreign["bolt12"].as_str().unwrap(), 1013, "unregistered");
+    let app = app.restart("offer-replay", &[]).await;
+    let api = app.api();
+    wait_until(Duration::from_secs(35), "catch up paid BOLT12 offers", || async {
+        app.wallet_balance(&admin, a.wallet.id).await.available_msat == 31248
+            && app.wallet_balance(&admin, b.wallet.id).await.available_msat == 33107
+    })
+    .await;
+    let history = format!("/v1/me/wallets/{}/invoices", a.wallet.id);
+    let invoices: Vec<Invoice> = api.get(&history, auth).await.parse();
+    assert_eq!(invoices.len(), 2);
+    let mut seen: Vec<_> = invoices
+        .iter()
+        .map(|inv| {
+            assert!(inv.ln_invoice.is_none());
+            let paid = inv.offer_invoice.as_ref().unwrap();
+            assert_eq!(paid.offer_id, first.id);
+            assert!(paid.bolt12.starts_with("lni1"));
+            (inv.amount_received_msat.unwrap(), paid.payer_note.clone().unwrap())
+        })
+        .collect();
+    seen.sort();
+    assert_eq!(seen, vec![(12017, "order A".into()), (19231, "order B".into())]);
+    let status: Vec<WalletOffer> = api.get(&other, Auth::ApiKey(&b.key)).await.parse();
+    assert_eq!(status[0].state, OfferState::Disabled);
+    let wallet_payments = format!("/v1/me/wallets/{}/payments", a.wallet.id);
+    assert_error(
+        &api.post(&wallet_payments, auth, json!({"input":first.bolt12,"amount_msat":1005}))
+            .await,
+        StatusCode::UNPROCESSABLE_ENTITY,
+    );
+    let cross = api
+        .post(
+            &format!("/v1/me/wallets/{}/payments", b.wallet.id),
+            Auth::ApiKey(&b.key),
+            json!({"input":first.bolt12,"amount_msat":1005}),
+        )
+        .await;
+    assert_status(&cross, StatusCode::OK);
+    let fee = cross.parse::<Payment>().fee_msat.unwrap();
+    wait_until(Duration::from_secs(15), "different wallet on the same node", || async {
+        app.wallet_balance(&admin, a.wallet.id).await.available_msat == 32253
+            && app.wallet_balance(&admin, b.wallet.id).await.available_msat == 33107 - 1005 - fee as i64
+    })
+    .await;
+    let disable = format!("{path}/{}", first.id);
+    for _ in 0..2 {
+        assert_eq!(
+            api.delete(&disable, auth).await.parse::<WalletOffer>().state,
+            OfferState::Disabled
+        );
+    }
+    let registered = remote.cln_rpc("listoffers", json!({"offer_id":first.provider_id}));
+    assert_eq!(registered["offers"][0]["active"], false);
+    let restarted = app.restart("offers-up-to-date", &[]).await;
+    assert_eq!(
+        restarted.wallet_balance(&admin, a.wallet.id).await.available_msat,
+        32253
+    );
+}

@@ -33,6 +33,11 @@ pub struct Model {
     #[sea_orm(unique)]
     pub lnurl_verify_token: Option<Uuid>,
     pub lnurl_preimage: Option<String>,
+    pub offer_id: Option<Uuid>,
+    #[sea_orm(column_type = "Text", nullable)]
+    pub bolt12: Option<String>,
+    #[sea_orm(column_type = "Text", nullable)]
+    pub payer_note: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
@@ -61,6 +66,14 @@ pub enum Relation {
         on_delete = "Cascade"
     )]
     Wallet,
+    #[sea_orm(
+        belongs_to = "super::wallet_offer::Entity",
+        from = "Column::OfferId",
+        to = "super::wallet_offer::Column::Id",
+        on_update = "NoAction",
+        on_delete = "NoAction"
+    )]
+    WalletOffer,
 }
 
 impl Related<super::btc_output::Entity> for Entity {
@@ -78,6 +91,12 @@ impl Related<super::ln_address::Entity> for Entity {
 impl Related<super::wallet::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::Wallet.def()
+    }
+}
+
+impl Related<super::wallet_offer::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::WalletOffer.def()
     }
 }
 

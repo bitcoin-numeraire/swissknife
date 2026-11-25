@@ -20,6 +20,7 @@ pub struct AppServices {
     pub payment_command_available: tokio::sync::Notify,
     pub notification: Box<dyn crate::domains::notification::NotificationUseCases>,
     pub invoice: Box<dyn InvoiceUseCases>,
+    pub offer: Box<dyn crate::domains::offer::OfferUseCases>,
     pub payment: Box<dyn PaymentsUseCases>,
     pub wallet: Box<dyn WalletUseCases>,
     pub lnurl: Box<dyn LnUrlUseCases>,
@@ -55,6 +56,8 @@ impl AppServices {
             ..
         } = adapters;
 
+        let offer =
+            crate::domains::offer::OfferService::new(store.clone(), ln_client.clone(), bitcoin_wallet.network());
         let event = Arc::new(EventService::new(store.clone()));
         let notification = crate::domains::notification::NotificationService::new(store.notification.clone());
         let client_event = ClientEventService::new(store.clone(), client_events.retention);
@@ -103,6 +106,7 @@ impl AppServices {
         AppServices {
             payment_command_available: tokio::sync::Notify::new(),
             invoice: Box::new(invoices),
+            offer: Box::new(offer),
             payment: Box::new(payments),
             wallet: Box::new(wallet),
             lnurl: Box::new(lnurl),
@@ -128,6 +132,7 @@ impl AppServices {
 pub struct MockAppServicesBuilder {
     pub notification: crate::domains::notification::MockNotificationUseCases,
     pub invoice: crate::domains::invoice::MockInvoiceUseCases,
+    pub offer: crate::domains::offer::MockOfferUseCases,
     pub payment: crate::domains::payment::MockPaymentsUseCases,
     pub wallet: crate::domains::wallet::MockWalletUseCases,
     pub lnurl: crate::domains::lnurl::MockLnUrlUseCases,
@@ -147,6 +152,7 @@ impl MockAppServicesBuilder {
     pub fn new() -> Self {
         Self {
             invoice: crate::domains::invoice::MockInvoiceUseCases::new(),
+            offer: crate::domains::offer::MockOfferUseCases::new(),
             payment: crate::domains::payment::MockPaymentsUseCases::new(),
             wallet: crate::domains::wallet::MockWalletUseCases::new(),
             lnurl: crate::domains::lnurl::MockLnUrlUseCases::new(),
@@ -167,6 +173,7 @@ impl MockAppServicesBuilder {
         AppServices {
             payment_command_available: tokio::sync::Notify::new(),
             invoice: Box::new(self.invoice),
+            offer: Box::new(self.offer),
             payment: Box::new(self.payment),
             wallet: Box::new(self.wallet),
             lnurl: Box::new(self.lnurl),

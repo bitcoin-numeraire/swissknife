@@ -123,6 +123,7 @@ impl PaymentService {
     /// Inspecting an offer for a fee preview does not contact its issuer or create an invoice.
     pub(super) async fn inspect_bolt12(
         &self,
+        wallet: uuid::Uuid,
         input: &str,
         requested: Option<u64>,
     ) -> Result<(DecodedBolt12, u64), ApplicationError> {
@@ -139,17 +140,23 @@ impl PaymentService {
         {
             return Err(DataError::Validation("BOLT12 offer is expired".into()).into());
         }
+        if let Some(id) = decoded.offer_id.as_deref() {
+            if self.store.offer.owner(id).await? == Some(wallet) {
+                return Err(DataError::Validation("Cannot pay your own wallet offer".into()).into());
+            }
+        }
         let amount = decoded.fixed_amount(requested)?;
         Ok((decoded, amount))
     }
 
     pub(super) async fn resolve_bolt12(
         &self,
+        wallet: uuid::Uuid,
         input: String,
         amount: Option<u64>,
         note: Option<&str>,
     ) -> Result<ResolvedBolt12, ApplicationError> {
-        let (decoded, approved) = self.inspect_bolt12(&input, amount).await?;
+        let (decoded, approved) = self.inspect_bolt12(wallet, &input, amount).await?;
         let (invoice, decoded) = if decoded.kind == "bolt12 offer" {
             let id = decoded
                 .offer_id

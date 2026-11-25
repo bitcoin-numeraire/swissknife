@@ -17,6 +17,10 @@ import {
   createAccountWalletResponseTransformer,
   createApiKeyResponseTransformer,
   createLocalLoginResponseTransformer,
+  createOfferResponseTransformer,
+  createWalletOfferResponseTransformer,
+  disableOfferResponseTransformer,
+  disableWalletOfferResponseTransformer,
   generateBtcAddressResponseTransformer,
   generateInvoiceResponseTransformer,
   getAccountAddressResponseTransformer,
@@ -45,9 +49,11 @@ import {
   listBtcAddressesResponseTransformer,
   listContactsResponseTransformer,
   listInvoicesResponseTransformer,
+  listOffersResponseTransformer,
   listPaymentsResponseTransformer,
   listWalletBtcAddressesResponseTransformer,
   listWalletInvoicesResponseTransformer,
+  listWalletOffersResponseTransformer,
   listWalletOverviewsResponseTransformer,
   listWalletPaymentsResponseTransformer,
   listWalletsResponseTransformer,
@@ -98,6 +104,12 @@ import type {
   CreateLocalLoginData,
   CreateLocalLoginErrors,
   CreateLocalLoginResponses,
+  CreateOfferData,
+  CreateOfferErrors,
+  CreateOfferResponses,
+  CreateWalletOfferData,
+  CreateWalletOfferErrors,
+  CreateWalletOfferResponses,
   DeleteAccountAddressData,
   DeleteAccountAddressErrors,
   DeleteAccountAddressResponses,
@@ -143,6 +155,12 @@ import type {
   DeleteWalletsData,
   DeleteWalletsErrors,
   DeleteWalletsResponses,
+  DisableOfferData,
+  DisableOfferErrors,
+  DisableOfferResponses,
+  DisableWalletOfferData,
+  DisableWalletOfferErrors,
+  DisableWalletOfferResponses,
   EstimatePaymentFeeData,
   EstimatePaymentFeeErrors,
   EstimatePaymentFeeResponses,
@@ -239,6 +257,9 @@ import type {
   ListInvoicesData,
   ListInvoicesErrors,
   ListInvoicesResponses,
+  ListOffersData,
+  ListOffersErrors,
+  ListOffersResponses,
   ListPaymentsData,
   ListPaymentsErrors,
   ListPaymentsResponses,
@@ -248,6 +269,9 @@ import type {
   ListWalletInvoicesData,
   ListWalletInvoicesErrors,
   ListWalletInvoicesResponses,
+  ListWalletOffersData,
+  ListWalletOffersErrors,
+  ListWalletOffersResponses,
   ListWalletOverviewsData,
   ListWalletOverviewsErrors,
   ListWalletOverviewsResponses,
@@ -1555,6 +1579,57 @@ export const getWalletInvoice = <ThrowOnError extends boolean = false>(
   });
 
 /**
+ * List wallet-owned BOLT12 offers.
+ */
+export const listWalletOffers = <ThrowOnError extends boolean = false>(
+  options: Options<ListWalletOffersData, ThrowOnError>
+): RequestResult<ListWalletOffersResponses, ListWalletOffersErrors, ThrowOnError> =>
+  (options.client ?? client).get<ListWalletOffersResponses, ListWalletOffersErrors, ThrowOnError>({
+    responseTransformer: listWalletOffersResponseTransformer,
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/me/wallets/{wallet_id}/offers',
+    ...options,
+  });
+
+/**
+ * Create wallet-owned BOLT12 offer.
+ */
+export const createWalletOffer = <ThrowOnError extends boolean = false>(
+  options: Options<CreateWalletOfferData, ThrowOnError>
+): RequestResult<CreateWalletOfferResponses, CreateWalletOfferErrors, ThrowOnError> =>
+  (options.client ?? client).post<
+    CreateWalletOfferResponses,
+    CreateWalletOfferErrors,
+    ThrowOnError
+  >({
+    responseTransformer: createWalletOfferResponseTransformer,
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/me/wallets/{wallet_id}/offers',
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
+
+/**
+ * Disable wallet-owned BOLT12 offer.
+ */
+export const disableWalletOffer = <ThrowOnError extends boolean = false>(
+  options: Options<DisableWalletOfferData, ThrowOnError>
+): RequestResult<DisableWalletOfferResponses, DisableWalletOfferErrors, ThrowOnError> =>
+  (options.client ?? client).delete<
+    DisableWalletOfferResponses,
+    DisableWalletOfferErrors,
+    ThrowOnError
+  >({
+    responseTransformer: disableWalletOfferResponseTransformer,
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/me/wallets/{wallet_id}/offers/{id}',
+    ...options,
+  });
+
+/**
  * Delete failed payments for a wallet.
  */
 export const deleteFailedPayments = <ThrowOnError extends boolean = false>(
@@ -1693,6 +1768,49 @@ export const getWalletPayment = <ThrowOnError extends boolean = false>(
     responseTransformer: getWalletPaymentResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/v1/me/wallets/{wallet_id}/payments/{id}',
+    ...options,
+  });
+
+/**
+ * List BOLT12 offers.
+ */
+export const listOffers = <ThrowOnError extends boolean = false>(
+  options?: Options<ListOffersData, ThrowOnError>
+): RequestResult<ListOffersResponses, ListOffersErrors, ThrowOnError> =>
+  (options?.client ?? client).get<ListOffersResponses, ListOffersErrors, ThrowOnError>({
+    responseTransformer: listOffersResponseTransformer,
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/offers',
+    ...options,
+  });
+
+/**
+ * Create BOLT12 offer.
+ */
+export const createOffer = <ThrowOnError extends boolean = false>(
+  options: Options<CreateOfferData, ThrowOnError>
+): RequestResult<CreateOfferResponses, CreateOfferErrors, ThrowOnError> =>
+  (options.client ?? client).post<CreateOfferResponses, CreateOfferErrors, ThrowOnError>({
+    responseTransformer: createOfferResponseTransformer,
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/offers',
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
+
+/**
+ * Disable BOLT12 offer.
+ */
+export const disableOffer = <ThrowOnError extends boolean = false>(
+  options: Options<DisableOfferData, ThrowOnError>
+): RequestResult<DisableOfferResponses, DisableOfferErrors, ThrowOnError> =>
+  (options.client ?? client).delete<DisableOfferResponses, DisableOfferErrors, ThrowOnError>({
+    responseTransformer: disableOfferResponseTransformer,
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/offers/{id}',
     ...options,
   });
 

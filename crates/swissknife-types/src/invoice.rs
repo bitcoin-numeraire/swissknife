@@ -52,6 +52,10 @@ pub struct Invoice {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ln_invoice: Option<LnInvoice>,
 
+    /// Signed BOLT12 invoice and the local offer that received this payment.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub offer_invoice: Option<crate::OfferInvoice>,
+
     /// Internal reference to the on-chain output backing this invoice.
     #[serde(skip)]
     pub btc_output_id: Option<Uuid>,

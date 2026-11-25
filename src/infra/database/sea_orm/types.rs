@@ -110,7 +110,7 @@ impl From<InvoiceModel> for Invoice {
         // part of the invoice and is needed for LNURL verification.
         let ln_invoice = match model.bolt11 {
             Some(bolt11) => Some(LnInvoice {
-                payment_hash: model.payment_hash.expect(ASSERTION_MSG),
+                payment_hash: model.payment_hash.clone().expect(ASSERTION_MSG),
                 bolt11,
                 description_hash: model.description_hash,
                 payee_pubkey: model.payee_pubkey.expect(ASSERTION_MSG),
@@ -137,6 +137,14 @@ impl From<InvoiceModel> for Invoice {
             created_at: model.created_at.and_utc(),
             updated_at: model.updated_at.map(|t| t.and_utc()),
             ln_invoice,
+            offer_invoice: model.offer_id.zip(model.bolt12).zip(model.payment_hash).map(
+                |((offer_id, bolt12), payment_hash)| swissknife_types::OfferInvoice {
+                    offer_id,
+                    bolt12,
+                    payment_hash,
+                    payer_note: model.payer_note,
+                },
+            ),
             btc_output_id: model.btc_output_id,
             bitcoin_output: None,
             lnurl: model

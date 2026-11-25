@@ -122,7 +122,13 @@ impl Counterparty {
                 )
             })
             .collect();
-        let mut args = vec!["lightning-cli", "--network=regtest", "-k", method];
+        let mut args = vec![
+            "lightning-cli",
+            "--network=regtest",
+            "--notifications=none",
+            "-k",
+            method,
+        ];
         args.extend(params.iter().map(String::as_str));
         self.run_json(&args)
     }

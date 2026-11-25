@@ -498,6 +498,23 @@ export type CreateLocalLoginRequest = {
   username: string;
 };
 
+export type CreateOfferRequest = {
+  /**
+   * Omit to let each payer choose the amount.
+   */
+  amount_msat?: number | null;
+  description: string;
+  /**
+   * Reuse when retrying a single creation.
+   */
+  idempotency_key: string;
+  single_use?: boolean;
+  /**
+   * Required for administration. Account endpoints use the wallet in the path.
+   */
+  wallet_id?: string | null;
+};
+
 /**
  * Create Wallet Request
  */
@@ -619,6 +636,7 @@ export type Invoice = {
    */
   ln_address_id?: string | null;
   ln_invoice?: LnInvoice | null;
+  offer_invoice?: OfferInvoice | null;
   /**
    * Payment time
    */
@@ -996,6 +1014,22 @@ export type NotificationQuery = {
   limit?: number | null;
 };
 
+export type OfferInvoice = {
+  bolt12: string;
+  offer_id: string;
+  payer_note?: string | null;
+  payment_hash: string;
+};
+
+export const OfferState = {
+  CREATING: 'creating',
+  ACTIVE: 'active',
+  DISABLING: 'disabling',
+  DISABLED: 'disabled',
+} as const;
+
+export type OfferState = (typeof OfferState)[keyof typeof OfferState];
+
 /**
  * Direction of result ordering for list endpoints.
  */
@@ -1255,6 +1289,10 @@ export type SendPaymentRequest = {
  */
 export type SetupInfo = {
   /**
+   * The configured node can issue and accept BOLT12 offers.
+   */
+  bolt12_offers?: boolean;
+  /**
    * Whether the admin account has been created
    */
   sign_up_complete: boolean;
@@ -1456,6 +1494,21 @@ export type Wallet = {
    * Date of update in database
    */
   updated_at?: Date | null;
+};
+
+export type WalletOffer = {
+  amount_msat?: number | null;
+  /**
+   * Available once the original node has registered this offer.
+   */
+  bolt12?: string | null;
+  created_at: Date;
+  description: string;
+  id: string;
+  provider_id?: string | null;
+  single_use: boolean;
+  state: OfferState;
+  wallet_id: string;
 };
 
 /**
@@ -4665,6 +4718,142 @@ export type GetWalletInvoiceResponses = {
 
 export type GetWalletInvoiceResponse = GetWalletInvoiceResponses[keyof GetWalletInvoiceResponses];
 
+export type ListWalletOffersData = {
+  body?: never;
+  path: {
+    wallet_id: string;
+  };
+  query?: {
+    wallet_id?: string | null;
+    offset?: number | null;
+    limit?: number | null;
+  };
+  url: '/v1/me/wallets/{wallet_id}/offers';
+};
+
+export type ListWalletOffersErrors = {
+  /**
+   * Authentication required
+   */
+  401: ErrorResponse;
+  /**
+   * Insufficient permission
+   */
+  403: ErrorResponse;
+  /**
+   * Wallet or offer not found
+   */
+  404: ErrorResponse;
+  /**
+   * Conflicting request
+   */
+  409: ErrorResponse;
+  /**
+   * Unsupported offer request
+   */
+  422: ErrorResponse;
+};
+
+export type ListWalletOffersError = ListWalletOffersErrors[keyof ListWalletOffersErrors];
+
+export type ListWalletOffersResponses = {
+  /**
+   * Success
+   */
+  200: Array<WalletOffer>;
+};
+
+export type ListWalletOffersResponse = ListWalletOffersResponses[keyof ListWalletOffersResponses];
+
+export type CreateWalletOfferData = {
+  body: CreateOfferRequest;
+  path: {
+    wallet_id: string;
+  };
+  query?: never;
+  url: '/v1/me/wallets/{wallet_id}/offers';
+};
+
+export type CreateWalletOfferErrors = {
+  /**
+   * Authentication required
+   */
+  401: ErrorResponse;
+  /**
+   * Insufficient permission
+   */
+  403: ErrorResponse;
+  /**
+   * Wallet or offer not found
+   */
+  404: ErrorResponse;
+  /**
+   * Conflicting request
+   */
+  409: ErrorResponse;
+  /**
+   * Unsupported offer request
+   */
+  422: ErrorResponse;
+};
+
+export type CreateWalletOfferError = CreateWalletOfferErrors[keyof CreateWalletOfferErrors];
+
+export type CreateWalletOfferResponses = {
+  /**
+   * Success
+   */
+  200: WalletOffer;
+};
+
+export type CreateWalletOfferResponse =
+  CreateWalletOfferResponses[keyof CreateWalletOfferResponses];
+
+export type DisableWalletOfferData = {
+  body?: never;
+  path: {
+    wallet_id: string;
+    id: string;
+  };
+  query?: never;
+  url: '/v1/me/wallets/{wallet_id}/offers/{id}';
+};
+
+export type DisableWalletOfferErrors = {
+  /**
+   * Authentication required
+   */
+  401: ErrorResponse;
+  /**
+   * Insufficient permission
+   */
+  403: ErrorResponse;
+  /**
+   * Wallet or offer not found
+   */
+  404: ErrorResponse;
+  /**
+   * Conflicting request
+   */
+  409: ErrorResponse;
+  /**
+   * Unsupported offer request
+   */
+  422: ErrorResponse;
+};
+
+export type DisableWalletOfferError = DisableWalletOfferErrors[keyof DisableWalletOfferErrors];
+
+export type DisableWalletOfferResponses = {
+  /**
+   * Success
+   */
+  200: WalletOffer;
+};
+
+export type DisableWalletOfferResponse =
+  DisableWalletOfferResponses[keyof DisableWalletOfferResponses];
+
 export type DeleteFailedPaymentsData = {
   body?: never;
   path: {
@@ -4994,6 +5183,135 @@ export type GetWalletPaymentResponses = {
 };
 
 export type GetWalletPaymentResponse = GetWalletPaymentResponses[keyof GetWalletPaymentResponses];
+
+export type ListOffersData = {
+  body?: never;
+  path?: never;
+  query?: {
+    wallet_id?: string | null;
+    offset?: number | null;
+    limit?: number | null;
+  };
+  url: '/v1/offers';
+};
+
+export type ListOffersErrors = {
+  /**
+   * Authentication required
+   */
+  401: ErrorResponse;
+  /**
+   * Insufficient permission
+   */
+  403: ErrorResponse;
+  /**
+   * Wallet or offer not found
+   */
+  404: ErrorResponse;
+  /**
+   * Conflicting request
+   */
+  409: ErrorResponse;
+  /**
+   * Unsupported offer request
+   */
+  422: ErrorResponse;
+};
+
+export type ListOffersError = ListOffersErrors[keyof ListOffersErrors];
+
+export type ListOffersResponses = {
+  /**
+   * Success
+   */
+  200: Array<WalletOffer>;
+};
+
+export type ListOffersResponse = ListOffersResponses[keyof ListOffersResponses];
+
+export type CreateOfferData = {
+  body: CreateOfferRequest;
+  path?: never;
+  query?: never;
+  url: '/v1/offers';
+};
+
+export type CreateOfferErrors = {
+  /**
+   * Authentication required
+   */
+  401: ErrorResponse;
+  /**
+   * Insufficient permission
+   */
+  403: ErrorResponse;
+  /**
+   * Wallet or offer not found
+   */
+  404: ErrorResponse;
+  /**
+   * Conflicting request
+   */
+  409: ErrorResponse;
+  /**
+   * Unsupported offer request
+   */
+  422: ErrorResponse;
+};
+
+export type CreateOfferError = CreateOfferErrors[keyof CreateOfferErrors];
+
+export type CreateOfferResponses = {
+  /**
+   * Success
+   */
+  200: WalletOffer;
+};
+
+export type CreateOfferResponse = CreateOfferResponses[keyof CreateOfferResponses];
+
+export type DisableOfferData = {
+  body?: never;
+  path: {
+    id: string;
+  };
+  query?: never;
+  url: '/v1/offers/{id}';
+};
+
+export type DisableOfferErrors = {
+  /**
+   * Authentication required
+   */
+  401: ErrorResponse;
+  /**
+   * Insufficient permission
+   */
+  403: ErrorResponse;
+  /**
+   * Wallet or offer not found
+   */
+  404: ErrorResponse;
+  /**
+   * Conflicting request
+   */
+  409: ErrorResponse;
+  /**
+   * Unsupported offer request
+   */
+  422: ErrorResponse;
+};
+
+export type DisableOfferError = DisableOfferErrors[keyof DisableOfferErrors];
+
+export type DisableOfferResponses = {
+  /**
+   * Success
+   */
+  200: WalletOffer;
+};
+
+export type DisableOfferResponse = DisableOfferResponses[keyof DisableOfferResponses];
 
 export type DeletePaymentsData = {
   body?: never;

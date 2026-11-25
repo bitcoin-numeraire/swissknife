@@ -8,6 +8,10 @@ import type {
   CreateAccountWalletResponse,
   CreateApiKeyResponse,
   CreateLocalLoginResponse,
+  CreateOfferResponse,
+  CreateWalletOfferResponse,
+  DisableOfferResponse,
+  DisableWalletOfferResponse,
   GenerateBtcAddressResponse,
   GenerateInvoiceResponse,
   GetAccountAddressResponse,
@@ -36,9 +40,11 @@ import type {
   ListBtcAddressesResponse,
   ListContactsResponse,
   ListInvoicesResponse,
+  ListOffersResponse,
   ListPaymentsResponse,
   ListWalletBtcAddressesResponse,
   ListWalletInvoicesResponse,
+  ListWalletOffersResponse,
   ListWalletOverviewsResponse,
   ListWalletPaymentsResponse,
   ListWalletsResponse,
@@ -503,6 +509,32 @@ export const getWalletInvoiceResponseTransformer = async (
   return data;
 };
 
+const walletOfferSchemaResponseTransformer = (data: any) => {
+  data.created_at = new Date(data.created_at);
+  return data;
+};
+
+export const listWalletOffersResponseTransformer = async (
+  data: any
+): Promise<ListWalletOffersResponse> => {
+  data = data.map((item: any) => walletOfferSchemaResponseTransformer(item));
+  return data;
+};
+
+export const createWalletOfferResponseTransformer = async (
+  data: any
+): Promise<CreateWalletOfferResponse> => {
+  data = walletOfferSchemaResponseTransformer(data);
+  return data;
+};
+
+export const disableWalletOfferResponseTransformer = async (
+  data: any
+): Promise<DisableWalletOfferResponse> => {
+  data = walletOfferSchemaResponseTransformer(data);
+  return data;
+};
+
 export const listWalletPaymentsResponseTransformer = async (
   data: any
 ): Promise<ListWalletPaymentsResponse> => {
@@ -553,6 +585,21 @@ export const getWalletPaymentResponseTransformer = async (
   data: any
 ): Promise<GetWalletPaymentResponse> => {
   data = paymentSchemaResponseTransformer(data);
+  return data;
+};
+
+export const listOffersResponseTransformer = async (data: any): Promise<ListOffersResponse> => {
+  data = data.map((item: any) => walletOfferSchemaResponseTransformer(item));
+  return data;
+};
+
+export const createOfferResponseTransformer = async (data: any): Promise<CreateOfferResponse> => {
+  data = walletOfferSchemaResponseTransformer(data);
+  return data;
+};
+
+export const disableOfferResponseTransformer = async (data: any): Promise<DisableOfferResponse> => {
+  data = walletOfferSchemaResponseTransformer(data);
   return data;
 };
 
