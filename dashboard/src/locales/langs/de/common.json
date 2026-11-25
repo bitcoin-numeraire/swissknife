@@ -1,4 +1,18 @@
 {
+  "agent_activity": {
+    "title": "Ausgaben der Agenten",
+    "updated": "Aktualisiert um {{time}}",
+    "load_error": "Die Ausgaben der Agenten konnten nicht geladen werden.",
+    "credential": "Zugangsschlüssel",
+    "current": "Letzte 60 Minuten",
+    "previous": "Vorherige 60 Minuten",
+    "sats": "{{amount}} Sats",
+    "payments_one": "{{count}} Zahlung",
+    "payments_other": "{{count}} Zahlungen",
+    "empty": "In den letzten zwei Stunden wurden keine delegierten Zahlungen erfasst.",
+    "back": "Zurück",
+    "next": "Weiter"
+  },
   "payment_review": {
     "title": "Zahlungsfreigaben",
     "load_error": "Die ausstehenden Zahlungsfreigaben konnten nicht geladen werden.",

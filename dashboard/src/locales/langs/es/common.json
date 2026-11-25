@@ -1,4 +1,18 @@
 {
+  "agent_activity": {
+    "title": "Actividad de gasto de los agentes",
+    "updated": "Actualizado a las {{time}}",
+    "load_error": "No se pudo cargar la actividad de gasto de los agentes.",
+    "credential": "Credencial",
+    "current": "Últimos 60 minutos",
+    "previous": "60 minutos anteriores",
+    "sats": "{{amount}} sats",
+    "payments_one": "{{count}} pago",
+    "payments_other": "{{count}} pagos",
+    "empty": "No se registraron pagos delegados en las últimas dos horas.",
+    "back": "Anterior",
+    "next": "Siguiente"
+  },
   "payment_review": {
     "title": "Aprobaciones de pagos",
     "load_error": "No se pudo cargar la cola de pagos pendientes.",
