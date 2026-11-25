@@ -22,6 +22,9 @@ impl IntoResponse for ApplicationError {
             ApplicationError::Database(crate::application::errors::DatabaseError::DuplicatePayment) => {
                 DataError::Conflict("A payment for this invoice already exists".into()).into_response()
             }
+            ApplicationError::Database(error @ crate::application::errors::DatabaseError::PayableOffer) => {
+                DataError::Conflict(error.to_string()).into_response()
+            }
             ApplicationError::Lightning(error) => error.into_response(),
             ApplicationError::Bitcoin(error) => error.into_response(),
             _ => {

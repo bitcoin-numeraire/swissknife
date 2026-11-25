@@ -31,6 +31,8 @@ release notes when a tag is published.
 
 ### Fixed
 
+- Keep wallet and account ownership intact until the original node has disabled each receive offer and SwissKnife has replayed its accepted payments.
+
 - Existing pending LND withdrawals are reconciled against confirmed transactions using their original unsigned PSBT IDs.
 
 - LND withdrawals retain the finalized Bitcoin transaction ID before publication, including when spending nested SegWit inputs.

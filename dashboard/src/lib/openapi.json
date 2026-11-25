@@ -571,13 +571,12 @@
             }
           },
           "409": {
-            "description": "Cannot delete the authenticated account",
+            "description": "Disable wallet receive offers and wait for receipt synchronization",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
-                },
-                "example": "\n{\n    \"status\": \"409 Conflict\",\n    \"reason\": \"Admin account already created\"\n}\n"
+                }
               }
             }
           },
@@ -842,13 +841,12 @@
             }
           },
           "409": {
-            "description": "Cannot delete the authenticated account",
+            "description": "Disable wallet receive offers and wait for receipt synchronization",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
-                },
-                "example": "\n{\n    \"status\": \"409 Conflict\",\n    \"reason\": \"Admin account already created\"\n}\n"
+                }
               }
             }
           },
@@ -9313,6 +9311,16 @@
               }
             }
           },
+          "409": {
+            "description": "Disable wallet receive offers and wait for receipt synchronization",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "500": {
             "description": "Internal Server Error",
             "content": {
@@ -9546,6 +9554,16 @@
                   "$ref": "#/components/schemas/ErrorResponse"
                 },
                 "example": "\n{\n    \"status\": \"404 Not Found\",\n    \"reason\": \"Resource not found\"\n}\n"
+              }
+            }
+          },
+          "409": {
+            "description": "Disable wallet receive offers and wait for receipt synchronization",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
               }
             }
           },

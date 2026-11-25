@@ -206,6 +206,7 @@ async fn replace_account_permissions(
         (status = 403, description = "Forbidden", body = ErrorResponse, example = json!(FORBIDDEN_EXAMPLE)),
         (status = 404, description = "Not Found", body = ErrorResponse, example = json!(NOT_FOUND_EXAMPLE)),
         (status = 409, description = "Cannot delete the authenticated account", body = ErrorResponse, example = json!(CONFLICT_EXAMPLE)),
+        (status = 409, description = "Disable wallet receive offers and wait for receipt synchronization", body = ErrorResponse),
         (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
     )
 )]
@@ -238,6 +239,7 @@ async fn delete_account_by_id(
         (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
         (status = 403, description = "Forbidden", body = ErrorResponse, example = json!(FORBIDDEN_EXAMPLE)),
         (status = 409, description = "Cannot delete the authenticated account", body = ErrorResponse, example = json!(CONFLICT_EXAMPLE)),
+        (status = 409, description = "Disable wallet receive offers and wait for receipt synchronization", body = ErrorResponse),
         (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
     )
 )]

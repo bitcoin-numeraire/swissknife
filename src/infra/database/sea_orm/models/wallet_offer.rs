@@ -22,6 +22,7 @@ pub struct Model {
     #[sea_orm(column_type = "Text", nullable)]
     pub bolt12: Option<String>,
     pub created_at: DateTime,
+    pub deletion_ready: bool,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
