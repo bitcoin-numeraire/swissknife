@@ -698,6 +698,20 @@ export const zResetLocalPasswordRequest = z.object({
   new_password: z.string(),
 });
 
+export const zSaveContactRequest = z.object({
+  label: z.string().nullish(),
+  ln_address: z.string(),
+});
+
+/**
+ * An explicit wallet address-book entry.
+ */
+export const zSavedContact = z.object({
+  label: z.string().nullish(),
+  ln_address: z.string(),
+  saved_at: z.iso.datetime(),
+});
+
 /**
  * Send Payment Request
  */
@@ -885,6 +899,7 @@ export const zAccount = z.object({
  * Independent permissions for a single wallet.
  */
 export const zWalletCapabilities = z.object({
+  manage_contacts: z.boolean().optional(),
   read: z.boolean().optional(),
   receive: z.boolean().optional(),
   spend: z.boolean().optional(),
@@ -2068,6 +2083,36 @@ export const zGetWalletPaymentPath = z.object({
  * Found
  */
 export const zGetWalletPaymentResponse = zPayment;
+
+export const zListSavedContactsPath = z.object({
+  wallet_id: z.uuid(),
+});
+
+/**
+ * Saved contacts, ordered by address
+ */
+export const zListSavedContactsResponse = z.array(zSavedContact);
+
+export const zSaveContactBody = zSaveContactRequest;
+
+export const zSaveContactPath = z.object({
+  wallet_id: z.uuid(),
+});
+
+/**
+ * Saved contact
+ */
+export const zSaveContactResponse = zSavedContact;
+
+export const zRemoveSavedContactPath = z.object({
+  wallet_id: z.uuid(),
+  ln_address: z.string(),
+});
+
+/**
+ * Saved contact removed
+ */
+export const zRemoveSavedContactResponse = z.void();
 
 export const zListOffersQuery = z.object({
   wallet_id: z.uuid().nullish(),

@@ -21,6 +21,7 @@ impl From<Model> for AgentKey {
                 read: row.can_read,
                 receive: row.can_receive,
                 spend: row.can_spend,
+                manage_contacts: row.can_manage_contacts,
             },
             created_at: row.created_at.and_utc(),
             expires_at: row.expires_at.and_utc(),
@@ -40,6 +41,7 @@ impl AgentKeyRepository for SeaOrmAgentKeyRepository {
             can_read: Set(key.capabilities.read),
             can_receive: Set(key.capabilities.receive),
             can_spend: Set(key.capabilities.spend),
+            can_manage_contacts: Set(key.capabilities.manage_contacts),
             created_at: Set(key.created_at.naive_utc()),
             expires_at: Set(key.expires_at.naive_utc()),
         }
@@ -87,6 +89,7 @@ impl AgentKeyRepository for SeaOrmAgentKeyRepository {
                     read: row.can_read,
                     receive: row.can_receive,
                     spend: row.can_spend,
+                    manage_contacts: row.can_manage_contacts,
                 },
             )
         }))

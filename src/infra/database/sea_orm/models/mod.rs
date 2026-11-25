@@ -20,6 +20,7 @@ pub mod offer_cursor;
 pub mod offer_receipt;
 pub mod payment;
 pub mod payment_command;
+pub mod saved_contact;
 pub mod spending_entry;
 pub mod spending_policy;
 pub mod wallet;

@@ -8086,6 +8086,182 @@
         ]
       }
     },
+    "/v1/me/wallets/{wallet_id}/saved-contacts": {
+      "get": {
+        "tags": [
+          "Me"
+        ],
+        "summary": "List saved Lightning Addresses for this wallet.",
+        "operationId": "list_saved_contacts",
+        "parameters": [
+          {
+            "name": "wallet_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Saved contacts, ordered by address",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SavedContact"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid credential"
+          },
+          "403": {
+            "description": "Read permission required"
+          },
+          "404": {
+            "description": "Wallet not found"
+          }
+        },
+        "security": [
+          {
+            "jwt": []
+          },
+          {
+            "api_key": []
+          },
+          {
+            "wallet_key": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Me"
+        ],
+        "summary": "Save a Lightning Address or update its label.",
+        "operationId": "save_contact",
+        "parameters": [
+          {
+            "name": "wallet_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveContactRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Saved contact",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedContact"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid credential"
+          },
+          "403": {
+            "description": "Contact management permission required"
+          },
+          "404": {
+            "description": "Wallet not found"
+          },
+          "422": {
+            "description": "Invalid address or label"
+          }
+        },
+        "security": [
+          {
+            "jwt": []
+          },
+          {
+            "api_key": []
+          },
+          {
+            "wallet_key": []
+          }
+        ]
+      }
+    },
+    "/v1/me/wallets/{wallet_id}/saved-contacts/{ln_address}": {
+      "delete": {
+        "tags": [
+          "Me"
+        ],
+        "summary": "Remove a saved contact. The wallet's payment history is retained.",
+        "operationId": "remove_saved_contact",
+        "parameters": [
+          {
+            "name": "wallet_id",
+            "in": "path",
+            "description": "Wallet ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "ln_address",
+            "in": "path",
+            "description": "Saved Lightning Address",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Saved contact removed"
+          },
+          "401": {
+            "description": "Invalid credential"
+          },
+          "403": {
+            "description": "Contact management permission required"
+          },
+          "404": {
+            "description": "Wallet or saved contact not found"
+          },
+          "422": {
+            "description": "Invalid Lightning Address"
+          }
+        },
+        "security": [
+          {
+            "jwt": []
+          },
+          {
+            "api_key": []
+          },
+          {
+            "wallet_key": []
+          }
+        ]
+      }
+    },
     "/v1/offers": {
       "get": {
         "tags": [
@@ -12103,6 +12279,48 @@
           }
         }
       },
+      "SaveContactRequest": {
+        "type": "object",
+        "required": [
+          "ln_address"
+        ],
+        "properties": {
+          "label": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ln_address": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "SavedContact": {
+        "type": "object",
+        "description": "An explicit wallet address-book entry.",
+        "required": [
+          "ln_address",
+          "saved_at"
+        ],
+        "properties": {
+          "label": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ln_address": {
+            "type": "string"
+          },
+          "saved_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Time the address was first saved, preserved when its label changes."
+          }
+        }
+      },
       "SendPaymentRequest": {
         "type": "object",
         "description": "Send Payment Request",
@@ -12577,6 +12795,10 @@
         "type": "object",
         "description": "Independent permissions for a single wallet.",
         "properties": {
+          "manage_contacts": {
+            "type": "boolean",
+            "description": "Save, rename and remove address-book entries for this wallet."
+          },
           "read": {
             "type": "boolean"
           },

@@ -13,6 +13,9 @@ pub struct WalletCapabilities {
     pub receive: bool,
     #[serde(default)]
     pub spend: bool,
+    /// Save, rename and remove address-book entries for this wallet.
+    #[serde(default)]
+    pub manage_contacts: bool,
 }
 
 #[derive(Clone, Deserialize, Serialize, ToSchema)]

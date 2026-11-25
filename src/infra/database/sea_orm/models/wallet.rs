@@ -21,6 +21,8 @@ pub struct Model {
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
+    #[sea_orm(has_many = "super::saved_contact::Entity")]
+    SavedContact,
     #[sea_orm(has_many = "super::wallet_agent_key::Entity")]
     WalletAgentKey,
     #[sea_orm(has_many = "super::wallet_offer::Entity")]
@@ -100,6 +102,12 @@ impl Related<super::payment::Entity> for Entity {
 impl Related<super::payment_command::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::PaymentCommand.def()
+    }
+}
+
+impl Related<super::saved_contact::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::SavedContact.def()
     }
 }
 

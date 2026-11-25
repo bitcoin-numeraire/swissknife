@@ -12,6 +12,7 @@ pub enum WalletCapability {
     Read,
     Receive,
     Spend,
+    ManageContacts,
 }
 
 #[cfg_attr(test, mockall::automock)]
@@ -52,7 +53,7 @@ impl AgentKeyUseCases for AgentKeyService {
             return Err(DataError::Validation("Choose an expiry within the next 365 days".into()).into());
         }
         let caps = request.capabilities;
-        if !(caps.read || caps.receive || caps.spend) {
+        if !(caps.read || caps.receive || caps.spend || caps.manage_contacts) {
             return Err(DataError::Validation("Select at least one wallet capability".into()).into());
         }
         let bytes: [u8; 32] = rand::random();
@@ -106,6 +107,7 @@ impl AgentKeyUseCases for AgentKeyService {
             WalletCapability::Read => caps.read,
             WalletCapability::Receive => caps.receive,
             WalletCapability::Spend => caps.spend,
+            WalletCapability::ManageContacts => caps.manage_contacts,
         };
         if !allowed {
             return Err(AuthorizationError::WalletCapability.into());

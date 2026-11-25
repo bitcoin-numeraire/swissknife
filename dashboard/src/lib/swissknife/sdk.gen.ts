@@ -55,6 +55,7 @@ import {
   listOffersResponseTransformer,
   listPaymentsResponseTransformer,
   listResponseTransformer,
+  listSavedContactsResponseTransformer,
   listWalletBtcAddressesResponseTransformer,
   listWalletInvoicesResponseTransformer,
   listWalletOffersResponseTransformer,
@@ -70,6 +71,7 @@ import {
   registerWalletResponseTransformer,
   replaceAccountPermissionsResponseTransformer,
   resetLocalLoginResponseTransformer,
+  saveContactResponseTransformer,
   streamAccountEventsResponseTransformer,
   submitPaymentResponseTransformer,
   submitWalletPaymentResponseTransformer,
@@ -288,6 +290,9 @@ import type {
   ListPaymentsErrors,
   ListPaymentsResponses,
   ListResponses,
+  ListSavedContactsData,
+  ListSavedContactsErrors,
+  ListSavedContactsResponses,
   ListWalletBtcAddressesData,
   ListWalletBtcAddressesErrors,
   ListWalletBtcAddressesResponses,
@@ -335,6 +340,9 @@ import type {
   RegisterWalletData,
   RegisterWalletErrors,
   RegisterWalletResponses,
+  RemoveSavedContactData,
+  RemoveSavedContactErrors,
+  RemoveSavedContactResponses,
   ReplaceAccountPermissionsData,
   ReplaceAccountPermissionsErrors,
   ReplaceAccountPermissionsResponses,
@@ -362,6 +370,9 @@ import type {
   RevokeData,
   RevokeErrors,
   RevokeResponses,
+  SaveContactData,
+  SaveContactErrors,
+  SaveContactResponses,
   SetupCheckData,
   SetupCheckErrors,
   SetupCheckResponses,
@@ -1981,6 +1992,66 @@ export const getWalletPayment = <ThrowOnError extends boolean = false>(
       { name: 'Wallet-Key', type: 'apiKey' },
     ],
     url: '/v1/me/wallets/{wallet_id}/payments/{id}',
+    ...options,
+  });
+
+/**
+ * List saved Lightning Addresses for this wallet.
+ */
+export const listSavedContacts = <ThrowOnError extends boolean = false>(
+  options: Options<ListSavedContactsData, ThrowOnError>
+): RequestResult<ListSavedContactsResponses, ListSavedContactsErrors, ThrowOnError> =>
+  (options.client ?? client).get<ListSavedContactsResponses, ListSavedContactsErrors, ThrowOnError>(
+    {
+      responseTransformer: listSavedContactsResponseTransformer,
+      security: [
+        { scheme: 'bearer', type: 'http' },
+        { name: 'Api-Key', type: 'apiKey' },
+        { name: 'Wallet-Key', type: 'apiKey' },
+      ],
+      url: '/v1/me/wallets/{wallet_id}/saved-contacts',
+      ...options,
+    }
+  );
+
+/**
+ * Save a Lightning Address or update its label.
+ */
+export const saveContact = <ThrowOnError extends boolean = false>(
+  options: Options<SaveContactData, ThrowOnError>
+): RequestResult<SaveContactResponses, SaveContactErrors, ThrowOnError> =>
+  (options.client ?? client).post<SaveContactResponses, SaveContactErrors, ThrowOnError>({
+    responseTransformer: saveContactResponseTransformer,
+    security: [
+      { scheme: 'bearer', type: 'http' },
+      { name: 'Api-Key', type: 'apiKey' },
+      { name: 'Wallet-Key', type: 'apiKey' },
+    ],
+    url: '/v1/me/wallets/{wallet_id}/saved-contacts',
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
+
+/**
+ * Remove a saved contact. The wallet's payment history is retained.
+ */
+export const removeSavedContact = <ThrowOnError extends boolean = false>(
+  options: Options<RemoveSavedContactData, ThrowOnError>
+): RequestResult<RemoveSavedContactResponses, RemoveSavedContactErrors, ThrowOnError> =>
+  (options.client ?? client).delete<
+    RemoveSavedContactResponses,
+    RemoveSavedContactErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: 'bearer', type: 'http' },
+      { name: 'Api-Key', type: 'apiKey' },
+      { name: 'Wallet-Key', type: 'apiKey' },
+    ],
+    url: '/v1/me/wallets/{wallet_id}/saved-contacts/{ln_address}',
     ...options,
   });
 

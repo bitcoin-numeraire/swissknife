@@ -127,3 +127,81 @@ async fn owner_delegates_only_selected_operations_on_one_wallet() {
     assert!(!resumed.logs_contain(&short.key));
     assert!(!app.logs_contain(&spend.key));
 }
+
+#[tokio::test]
+async fn saved_contacts_have_independent_permissions_and_survive_restarts() {
+    let app = TestApp::isolated("saved-wallet-contacts", &[]).await;
+    let admin = app.admin_token().await;
+    let owner = app.create_account_with_wallet(admin, "contact-owner").await;
+    let other = app.create_account_with_wallet(admin, "other-contact-owner").await;
+    let wallet = format!("/v1/me/wallets/{}", owner.wallet.id);
+    let keys = format!("{wallet}/agent-keys");
+    let saved = format!("{wallet}/saved-contacts");
+    let other_saved = format!("/v1/me/wallets/{}/saved-contacts", other.wallet.id);
+    let api = app.api();
+    let account = Auth::ApiKey(&owner.key);
+    let issue =
+        |caps| json!({"name":"contact key","expires_at":Utc::now()+ChronoDuration::hours(1),"capabilities":caps});
+    let editor: IssuedAgentKey = api
+        .post(&keys, account, issue(json!({"manage_contacts":true})))
+        .await
+        .parse();
+    let previous: IssuedAgentKey = api
+        .post(&keys, account, issue(json!({"read":true,"receive":true,"spend":true})))
+        .await
+        .parse();
+    assert!(!previous.metadata.capabilities.manage_contacts);
+    let edit = Auth::WalletKey(&editor.key);
+    let read = Auth::WalletKey(&previous.key);
+    let body = json!({"ln_address":"Alice@EXAMPLE.COM","label":" Alice "});
+    assert_error(&api.post(&saved, read, &body).await, StatusCode::FORBIDDEN);
+    assert_error(&api.get(&saved, edit).await, StatusCode::FORBIDDEN);
+    assert_error(&api.post(&other_saved, edit, &body).await, StatusCode::UNAUTHORIZED);
+    assert_error(&api.post(&other_saved, account, &body).await, StatusCode::NOT_FOUND);
+    assert_error(
+        &api.post(&saved, edit, json!({"ln_address":"alice@exam/ple.com"})).await,
+        StatusCode::UNPROCESSABLE_ENTITY,
+    );
+    assert_error(
+        &api.post(
+            &saved,
+            edit,
+            json!({"ln_address":"bob@example.com","label":"x".repeat(101)}),
+        )
+        .await,
+        StatusCode::UNPROCESSABLE_ENTITY,
+    );
+    let (one, two) = tokio::join!(api.post(&saved, edit, &body), api.post(&saved, edit, &body));
+    assert_status(&one, StatusCode::OK);
+    assert_status(&two, StatusCode::OK);
+    let first: swissknife_types::SavedContact = one.parse();
+    assert_eq!(first, two.parse());
+    assert_eq!(first.ln_address, "Alice@example.com");
+    assert_eq!(first.label.as_deref(), Some("Alice"));
+    let updated: swissknife_types::SavedContact = api
+        .post(
+            &saved,
+            account,
+            json!({"ln_address":"Alice@example.com","label":"Billing"}),
+        )
+        .await
+        .parse();
+    assert_eq!(updated.saved_at, first.saved_at);
+    assert_eq!(updated.label.as_deref(), Some("Billing"));
+    let restarted = app.restart("saved-contacts-readback", &[]).await;
+    let api = restarted.api();
+    let book: Vec<swissknife_types::SavedContact> = api.get(&saved, read).await.parse();
+    assert_eq!(book, vec![updated]);
+    let history: Vec<swissknife_types::Contact> = api.get(&format!("{wallet}/contacts"), read).await.parse();
+    assert!(history.is_empty());
+    let target = format!("{saved}/Alice@example.com");
+    assert_error(&api.delete(&target, read).await, StatusCode::FORBIDDEN);
+    assert_status(&api.delete(&target, edit).await, StatusCode::NO_CONTENT);
+    let empty: Vec<swissknife_types::SavedContact> = api.get(&saved, read).await.parse();
+    assert!(empty.is_empty());
+    assert_status(
+        &api.delete(&format!("{keys}/{}", editor.metadata.id), account).await,
+        StatusCode::NO_CONTENT,
+    );
+    assert_error(&api.post(&saved, edit, &body).await, StatusCode::UNAUTHORIZED);
+}

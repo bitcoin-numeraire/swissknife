@@ -1,3 +1,4 @@
+use crate::infra::database::sea_orm::models::{prelude::SavedContact as SavedContactEntity, saved_contact};
 use async_trait::async_trait;
 use chrono::Utc;
 use sea_orm::{
@@ -5,6 +6,7 @@ use sea_orm::{
     ColumnTrait, DatabaseConnection, EntityTrait, ExprTrait, ModelTrait, QueryFilter, QueryOrder, QuerySelect,
     QueryTrait, Set,
 };
+use swissknife_types::SavedContact;
 use uuid::Uuid;
 
 use super::SeaOrmConnection;
@@ -24,6 +26,16 @@ use crate::{
         wallet::{ActiveModel, Column},
     },
 };
+
+impl From<saved_contact::Model> for SavedContact {
+    fn from(contact: saved_contact::Model) -> Self {
+        Self {
+            ln_address: contact.ln_address,
+            label: contact.label,
+            saved_at: contact.saved_at.and_utc(),
+        }
+    }
+}
 
 #[derive(Clone)]
 pub struct SeaOrmWalletRepository<C = DatabaseConnection> {
@@ -411,6 +423,48 @@ where
             .map_err(|e| DatabaseError::Update(e.to_string()))?;
 
         Ok(result.rows_affected == 1)
+    }
+
+    async fn list_saved_contacts(&self, wallet: Uuid) -> Result<Vec<SavedContact>, DatabaseError> {
+        SavedContactEntity::find()
+            .filter(saved_contact::Column::WalletId.eq(wallet))
+            .order_by_asc(saved_contact::Column::LnAddress)
+            .all(self.db.connection())
+            .await
+            .map(|rows| rows.into_iter().map(Into::into).collect())
+            .map_err(|e| DatabaseError::FindMany(e.to_string()))
+    }
+
+    async fn save_contact(
+        &self,
+        wallet: Uuid,
+        address: String,
+        label: Option<String>,
+    ) -> Result<SavedContact, DatabaseError> {
+        use saved_contact::Column as C;
+        SavedContactEntity::insert(saved_contact::ActiveModel {
+            wallet_id: Set(wallet),
+            ln_address: Set(address),
+            label: Set(label),
+            saved_at: Set(Utc::now().naive_utc()),
+        })
+        .on_conflict(
+            OnConflict::columns([C::WalletId, C::LnAddress])
+                .update_column(C::Label)
+                .to_owned(),
+        )
+        .exec_with_returning(self.db.connection())
+        .await
+        .map(Into::into)
+        .map_err(|e| DatabaseError::Insert(e.to_string()))
+    }
+
+    async fn remove_saved_contact(&self, wallet: Uuid, address: String) -> Result<bool, DatabaseError> {
+        SavedContactEntity::delete_by_id((wallet, address))
+            .exec(self.db.connection())
+            .await
+            .map(|result| result.rows_affected > 0)
+            .map_err(|e| DatabaseError::Delete(e.to_string()))
     }
 
     async fn find_contacts(&self, id: Uuid) -> Result<Vec<Contact>, DatabaseError> {
