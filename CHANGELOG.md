@@ -8,6 +8,10 @@ release notes when a tag is published.
 
 ## [Unreleased]
 
+### Added
+
+- Clients can update individual dashboard settings using `PATCH /v1/me/preferences`.
+
 ## [0.3.5] - 2026-11-21
 
 ### Fixed

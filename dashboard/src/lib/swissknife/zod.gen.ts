@@ -424,6 +424,13 @@ export const zNostrNip05Response = z.object({
 export const zOrderDirection = z.enum(['Asc', 'Desc']);
 
 /**
+ * Merge selected fields into the authenticated account's dashboard settings.
+ */
+export const zPatchAccountPreferencesRequest = z.object({
+  dashboard_settings: z.record(z.string(), z.unknown()),
+});
+
+/**
  * Fee quote for a prospective outgoing payment.
  *
  * `estimated_fee_msat` is the route or transaction fee expected at quote time.
@@ -1404,6 +1411,13 @@ export const zUpdateAccountAddressResponse = zLnAddress;
  * Found
  */
 export const zGetAccountPreferencesResponse = zAccountPreferences;
+
+export const zPatchAccountPreferencesBody = zPatchAccountPreferencesRequest;
+
+/**
+ * Updated
+ */
+export const zPatchAccountPreferencesResponse = zAccountPreferences;
 
 export const zUpdateAccountPreferencesBody = zUpdateAccountPreferencesRequest;
 

@@ -1,12 +1,14 @@
 use async_trait::async_trait;
-use serde_json::Value;
 use uuid::Uuid;
 
 use swissknife_types::CreateApiKeyRequest;
 
 use crate::application::errors::ApplicationError;
 
-use super::{Account, AccountFilter, AccountPreferences, ApiKey, ApiKeyFilter, CreateAccountRequest, Permission, User};
+use super::{
+    Account, AccountFilter, AccountPreferences, ApiKey, ApiKeyFilter, CreateAccountRequest, DashboardSettingsUpdate,
+    Permission, User,
+};
 
 /// Operator-only credential recovery, composed separately from the HTTP services.
 #[cfg_attr(test, mockall::automock)]
@@ -65,7 +67,7 @@ pub trait AccountUseCases: Send + Sync {
     async fn update_preferences(
         &self,
         id: Uuid,
-        dashboard_settings: Value,
+        dashboard_settings: DashboardSettingsUpdate,
     ) -> Result<AccountPreferences, ApplicationError>;
     async fn delete(&self, id: Uuid) -> Result<(), ApplicationError>;
     async fn delete_many(&self, filter: AccountFilter) -> Result<u64, ApplicationError>;

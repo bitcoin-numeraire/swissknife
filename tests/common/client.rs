@@ -99,6 +99,10 @@ impl ApiClient {
         self.request(Method::POST, path, auth, Some(to_value(body))).await
     }
 
+    pub async fn patch(&self, path: &str, auth: Auth<'_>, body: impl Serialize) -> TestResponse {
+        self.request(Method::PATCH, path, auth, Some(to_value(body))).await
+    }
+
     pub async fn put(&self, path: &str, auth: Auth<'_>, body: impl Serialize) -> TestResponse {
         self.request(Method::PUT, path, auth, Some(to_value(body))).await
     }

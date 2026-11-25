@@ -39,6 +39,7 @@ import type {
   ListWalletsResponse,
   NewWalletBtcAddressResponse,
   NewWalletInvoiceResponse,
+  PatchAccountPreferencesResponse,
   PayResponse,
   RegisterAccountAddressResponse,
   RegisterAddressResponse,
@@ -399,6 +400,13 @@ export const updateAccountAddressResponseTransformer = async (
 export const getAccountPreferencesResponseTransformer = async (
   data: any
 ): Promise<GetAccountPreferencesResponse> => {
+  data = accountPreferencesSchemaResponseTransformer(data);
+  return data;
+};
+
+export const patchAccountPreferencesResponseTransformer = async (
+  data: any
+): Promise<PatchAccountPreferencesResponse> => {
   data = accountPreferencesSchemaResponseTransformer(data);
   return data;
 };

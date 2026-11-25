@@ -4,15 +4,18 @@ use async_trait::async_trait;
 use chrono::Utc;
 use sea_orm::{
     sea_query::Expr, ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, LoaderTrait, ModelTrait,
-    QueryFilter, QueryOrder, QuerySelect, QueryTrait, Set, TransactionTrait,
+    QueryFilter, QueryOrder, QuerySelect, QueryTrait, Set, SqliteTransactionMode, TransactionOptions, TransactionTrait,
 };
-use serde_json::{json, Value};
+use serde_json::json;
 use uuid::Uuid;
 
 use crate::{
     application::errors::DatabaseError,
     domains::{
-        account::{Account, AccountFilter, AccountPreferences, AccountRepository, AuthProvider, Permission},
+        account::{
+            Account, AccountFilter, AccountPreferences, AccountRepository, AuthProvider, DashboardSettingsUpdate,
+            Permission,
+        },
         payment::PaymentStatus,
         wallet::Wallet as AccountWallet,
     },
@@ -408,27 +411,41 @@ impl AccountRepository for SeaOrmAccountRepository {
     async fn update_preferences(
         &self,
         id: Uuid,
-        dashboard_settings: Value,
+        dashboard_settings: DashboardSettingsUpdate,
     ) -> Result<Option<AccountPreferences>, DatabaseError> {
-        let now = Utc::now().naive_utc();
+        // SQLite reserves its writer at BEGIN. PostgreSQL locks this account's row below.
+        let txn = self
+            .db
+            .begin_with_options(TransactionOptions {
+                sqlite_transaction_mode: Some(SqliteTransactionMode::Immediate),
+                ..Default::default()
+            })
+            .await
+            .map_err(|e| DatabaseError::Transaction(e.to_string()))?;
 
-        let Some(existing) = AccountPreference::find_by_id(id)
-            .one(&self.db)
+        let Some(mut existing) = AccountPreference::find_by_id(id)
+            .lock_exclusive()
+            .one(&txn)
             .await
             .map_err(|e| DatabaseError::FindOne(e.to_string()))?
         else {
             return Ok(None);
         };
 
+        let mut settings = std::mem::take(&mut existing.dashboard_settings);
+        dashboard_settings.apply(&mut settings);
         let mut preference: account_preference::ActiveModel = existing.into();
-        preference.dashboard_settings = Set(dashboard_settings);
-        preference.updated_at = Set(Some(now));
+        preference.dashboard_settings = Set(settings);
+        preference.updated_at = Set(Some(Utc::now().naive_utc()));
 
         let preference = preference
-            .update(&self.db)
+            .update(&txn)
             .await
             .map_err(|e| DatabaseError::Update(e.to_string()))?;
 
+        txn.commit()
+            .await
+            .map_err(|e| DatabaseError::Transaction(e.to_string()))?;
         Ok(Some(preference.into()))
     }
 
