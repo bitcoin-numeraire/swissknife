@@ -440,7 +440,7 @@ where
             .apply_if(filter.ids, |q, ids| q.filter(Column::Id.is_in(ids)))
             .exec(self.db.connection())
             .await
-            .map_err(|e| DatabaseError::Delete(e.to_string()))?;
+            .map_err(crate::infra::database::sea_orm::wallet_deletion_error)?;
 
         Ok(result.rows_affected)
     }

@@ -454,7 +454,7 @@ impl AccountRepository for SeaOrmAccountRepository {
             .apply_if(filter.ids, |query, ids| query.filter(account::Column::Id.is_in(ids)))
             .exec(&self.db)
             .await
-            .map_err(|e| DatabaseError::Delete(e.to_string()))?;
+            .map_err(crate::infra::database::sea_orm::wallet_deletion_error)?;
 
         Ok(result.rows_affected)
     }

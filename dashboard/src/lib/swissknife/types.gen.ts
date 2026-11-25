@@ -1765,7 +1765,7 @@ export type DeleteAccountsErrors = {
    */
   403: ErrorResponse;
   /**
-   * Cannot delete the authenticated account
+   * Disable wallet receive offers and wait for receipt synchronization
    */
   409: ErrorResponse;
   /**
@@ -1903,7 +1903,7 @@ export type DeleteAccountByIdErrors = {
    */
   404: ErrorResponse;
   /**
-   * Cannot delete the authenticated account
+   * Disable wallet receive offers and wait for receipt synchronization
    */
   409: ErrorResponse;
   /**
@@ -5954,6 +5954,10 @@ export type DeleteWalletsErrors = {
    */
   403: ErrorResponse;
   /**
+   * Disable wallet receive offers and wait for receipt synchronization
+   */
+  409: ErrorResponse;
+  /**
    * Internal Server Error
    */
   500: ErrorResponse;
@@ -6116,6 +6120,10 @@ export type DeleteWalletErrors = {
    * Not Found
    */
   404: ErrorResponse;
+  /**
+   * Disable wallet receive offers and wait for receipt synchronization
+   */
+  409: ErrorResponse;
   /**
    * Internal Server Error
    */

@@ -161,6 +161,9 @@ impl OfferUseCases for OfferService {
                 tracing::warn!(%error,"Offer management will retry")
             }
         }
+        // CLN expires outstanding unpaid invoices when an offer becomes inactive. Only release
+        // offers already disabled before observing the node tail and committing its receipts.
+        let disabled = self.store.offer.awaiting_drain(&backend).await?;
         let Some(after) = self.store.offer.cursor(&backend).await? else {
             return Ok(false);
         };
@@ -189,11 +192,16 @@ impl OfferUseCases for OfferService {
             }
             update.invoice_created_at = decoded.invoice_created_at;
         }
-        if page.is_empty() {
-            return Ok(false);
-        }
         let full = page.len() == 100;
-        self.store.offer.project(&backend, after, page).await?;
+        let through = page.last().map_or(after, |item| item.updated_index);
+        if !page.is_empty() {
+            self.store.offer.project(&backend, after, page).await?;
+        }
+        let more_disabled = disabled.len() == 100;
+        if !full && !disabled.is_empty() && self.store.offer.cursor(&backend).await?.is_some_and(|n| n >= through) {
+            self.store.offer.mark_drained(disabled).await?;
+            return Ok(more_disabled);
+        }
         Ok(full)
     }
 }

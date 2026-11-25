@@ -238,6 +238,30 @@ impl OfferRepository for SeaOrmOfferRepository {
             .map(stored)
             .transpose()
     }
+    async fn awaiting_drain(&self, backend: &str) -> Result<Vec<Uuid>, ApplicationError> {
+        Ok(Entity::find()
+            .select_only()
+            .column(Column::Id)
+            .filter(Column::Backend.eq(backend))
+            .filter(Column::State.eq(OfferState::Disabled.to_string()))
+            .filter(Column::DeletionReady.eq(false))
+            .order_by_asc(Column::Id)
+            .limit(100)
+            .into_tuple()
+            .all(&self.0)
+            .await
+            .map_err(db_error)?)
+    }
+    async fn mark_drained(&self, ids: Vec<Uuid>) -> Result<(), ApplicationError> {
+        Entity::update_many()
+            .filter(Column::Id.is_in(ids))
+            .filter(Column::State.eq(OfferState::Disabled.to_string()))
+            .col_expr(Column::DeletionReady, Expr::value(true))
+            .exec(&self.0)
+            .await
+            .map_err(db_error)?;
+        Ok(())
+    }
     async fn cursor(&self, backend: &str) -> Result<Option<u64>, ApplicationError> {
         if Entity::find()
             .filter(Column::Backend.eq(backend))

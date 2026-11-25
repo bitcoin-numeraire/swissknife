@@ -119,6 +119,22 @@ async fn receives_reusable_offers_once_per_paid_invoice_after_restart() {
     assert_status(&result, StatusCode::OK);
     let first: WalletOffer = result.parse();
     assert_eq!(first.state, OfferState::Active);
+    let wallet_path = format!("/v1/wallets/{}", a.wallet.id);
+    let account_path = format!("/v1/accounts/{}", a.account.id);
+    for path in [&wallet_path, &account_path] {
+        assert_error(&api.delete(path, Auth::Bearer(&admin)).await, StatusCode::CONFLICT);
+    }
+    let clean = app.create_account_with_wallet(&admin, "offer-bulk-delete").await;
+    let wallet_batch = format!("/v1/wallets?ids={}&ids={}", clean.wallet.id, a.wallet.id);
+    let account_batch = format!("/v1/accounts?ids={}&ids={}", clean.account.id, a.account.id);
+    for batch in [wallet_batch, account_batch] {
+        assert_error(&api.delete(&batch, Auth::Bearer(&admin)).await, StatusCode::CONFLICT);
+    }
+    assert_status(
+        &api.get(&format!("/v1/wallets/{}", clean.wallet.id), Auth::Bearer(&admin))
+            .await,
+        StatusCode::OK,
+    );
     let scoped = format!("{path}/{}", first.id);
     let op = format!("/v1/offers/{}", first.id);
     assert_eq!(api.get(&scoped, auth).await.parse::<WalletOffer>().id, first.id);
@@ -239,4 +255,14 @@ async fn receives_reusable_offers_once_per_paid_invoice_after_restart() {
         restarted.wallet_balance(&admin, a.wallet.id).await.available_msat,
         32253
     );
+    // The node is now inactive and all receipts have been recorded, including the missed ones.
+    wait_until(Duration::from_secs(30), "offer ownership released", || async {
+        restarted
+            .api()
+            .delete(&account_path, Auth::Bearer(&admin))
+            .await
+            .status
+            .is_success()
+    })
+    .await;
 }

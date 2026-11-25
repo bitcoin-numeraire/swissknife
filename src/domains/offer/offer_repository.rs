@@ -48,6 +48,9 @@ pub trait OfferRepository: Send + Sync {
     async fn transition(&self, id: Uuid, from: OfferState, to: OfferState) -> Result<StoredOffer, ApplicationError>;
     /// Recover registrations and disables interrupted before the provider reply was recorded.
     async fn pending(&self, backend: &str) -> Result<Option<StoredOffer>, ApplicationError>;
+    /// Snapshot revoked offers before checking the original node's invoice tail.
+    async fn awaiting_drain(&self, backend: &str) -> Result<Vec<Uuid>, ApplicationError>;
+    async fn mark_drained(&self, ids: Vec<Uuid>) -> Result<(), ApplicationError>;
     async fn cursor(&self, backend: &str) -> Result<Option<u64>, ApplicationError>;
     async fn project(&self, backend: &str, after: u64, updates: Vec<OfferUpdate>) -> Result<(), ApplicationError>;
 }

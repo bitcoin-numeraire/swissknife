@@ -4,6 +4,8 @@ use thiserror::Error;
 pub enum DatabaseError {
     #[error("A payment with this identifier already exists")]
     DuplicatePayment,
+    #[error("Disable the wallet's receive offers and wait for their receipts to finish synchronizing")]
+    PayableOffer,
     #[error("Monetary amount exceeds the supported storage range")]
     AmountOutOfRange,
 
