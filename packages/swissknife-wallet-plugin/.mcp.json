@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "swissknife-wallet": {
+      "type": "http",
+      "url": "http://127.0.0.1:8452/mcp",
+      "headers": { "Authorization": "Bearer ${SWISSKNIFE_MCP_HTTP_TOKEN}" }
+    }
+  }
+}
