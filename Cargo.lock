@@ -5083,7 +5083,9 @@ version = "0.3.5"
 dependencies = [
  "anyhow",
  "axum",
+ "bitcoin",
  "hex",
+ "l402-proto",
  "lightning-invoice",
  "reqwest 0.13.5",
  "rmcp",

@@ -123,6 +123,20 @@ async fn stdio_discovers_tools_and_resources_and_settles_an_approved_payment_onc
         .await;
     assert_eq!(decoded["structuredContent"]["amount_msat"], "72501");
     let invoice = Counterparty::for_provider(&app.provider).invoice(45001, &unique("mcp-pay"));
+    let signed = invoice.parse::<lightning_invoice::Bolt11Invoice>().unwrap();
+    use bitcoin::hashes::Hash;
+    let bakery = swissknife_l402::Bakery::new(&[9; 32]);
+    let macaroon = bakery
+        .mint("merchant/report", signed.payment_hash().to_byte_array(), u64::MAX)
+        .unwrap();
+    let challenge = format!("L402 macaroon=\"{macaroon}\", invoice=\"{invoice}\"");
+    let inspected = mcp.tool("decode_l402_challenge", json!({"challenge":challenge})).await;
+    assert_eq!(inspected["structuredContent"]["amount_msat"], "45001");
+    assert_eq!(inspected["structuredContent"]["invoice"], invoice);
+    assert_eq!(
+        mcp.tool("decode_l402_challenge", json!({"challenge":"broken"})).await["isError"],
+        true
+    );
     let mut approval =
         json!({"destination":invoice,"amount_msat":"45000","maximum_fee_msat":"1000","idempotency_key":Uuid::new_v4()});
     assert_eq!(mcp.tool("send_payment", approval.clone()).await["isError"], true);
@@ -145,6 +159,31 @@ async fn stdio_discovers_tools_and_resources_and_settles_an_approved_payment_onc
     })
     .await
     .expect("MCP payment settles");
+    let credential = mcp
+        .tool(
+            "create_l402_authorization",
+            json!({"challenge":challenge,"payment_id":id}),
+        )
+        .await;
+    let header = credential["structuredContent"]["authorization"]
+        .as_str()
+        .expect("L402 credential for settled payment");
+    assert_eq!(
+        bakery.verify("merchant/report", header, 1).unwrap().payment_hash,
+        signed.payment_hash().to_byte_array()
+    );
+    let different = format!(
+        "L402 macaroon=\"{macaroon}\", invoice=\"{}\"",
+        Counterparty::for_provider(&app.provider).invoice(45001, &unique("unrelated-l402"))
+    );
+    let mismatched = mcp
+        .tool(
+            "create_l402_authorization",
+            json!({"challenge":different,"payment_id":id}),
+        )
+        .await;
+    assert_eq!(mismatched["isError"], true);
+    assert!(mismatched["structuredContent"].get("authorization").is_none());
     let history = mcp
         .request("resources/read", json!({"uri":"wallet://payments/recent"}))
         .await;

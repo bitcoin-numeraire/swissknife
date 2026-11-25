@@ -13,6 +13,8 @@ axum = "0.8.9"
 hex = "0.4.3"
 subtle = "2.6"
 tokio = { version = "1", features = ["net", "signal"] }
+bitcoin = "=0.32.102"
+l402-proto = { git = "https://github.com/lightninglabs/L402sdk", rev = "300e136e27237ce1720494e8627e3b21fd895243" }
 lightning-invoice = { version = "0.34.2", features = ["std"] }
 reqwest = { version = "0.13.5", features = ["json"] }
 rmcp = { version = "3.11", features = ["transport-io", "transport-streamable-http-server"] }
