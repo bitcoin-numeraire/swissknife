@@ -1738,6 +1738,10 @@ export type GetPaidResourceData = {
 
 export type GetPaidResourceErrors = {
   /**
+   * Invalid L402 credential or payment proof
+   */
+  401: unknown;
+  /**
    * Pay the advertised invoice and present the macaroon and preimage
    */
   402: unknown;

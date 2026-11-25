@@ -157,6 +157,9 @@
               }
             }
           },
+          "401": {
+            "description": "Invalid L402 credential or payment proof"
+          },
           "402": {
             "description": "Pay the advertised invoice and present the macaroon and preimage",
             "headers": {

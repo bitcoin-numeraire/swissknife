@@ -91,6 +91,7 @@ pub struct MerchantHandler;
 #[utoipa::path(get, path="/l402/{name}", tag="L402", security((), ("l402" = [])),
     params(("name" = String, Path, description = "Operator-configured merchant route")),
     responses((status=200, description="Paid resource", content_type="application/octet-stream", body=Vec<u8>),
+        (status=401, description="Invalid L402 credential or payment proof"),
         (status=402, description="Pay the advertised invoice and present the macaroon and preimage",
             headers(("WWW-Authenticate" = String, description = "L402 macaroon and BOLT11 invoice"))),
         (status=404, description="Unknown merchant route"), (status=429, description="Invoice issuance limit reached"),

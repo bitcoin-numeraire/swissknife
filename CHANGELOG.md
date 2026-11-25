@@ -41,6 +41,8 @@ release notes when a tag is published.
 
 ### Fixed
 
+- Invalid L402 payment proofs receive HTTP 401 without creating an invoice. Authentic expired or exhausted passes can renew with a new payment challenge.
+
 - Keep wallet and account ownership intact until the original node has disabled each receive offer and SwissKnife has replayed its accepted payments.
 
 - Existing pending LND withdrawals are reconciled against confirmed transactions using their original unsigned PSBT IDs.

@@ -105,3 +105,55 @@ fn accepts_independently_signed_go_v2_macaroon() {
     assert_eq!(grant.payment_hash, sha256::Hash::hash(&PREIMAGE).to_byte_array());
     assert_eq!(grant.token_id, [9; 32]);
 }
+
+#[tokio::test]
+async fn rejects_invalid_proofs_without_invoicing_and_renews_authentic_passes() {
+    let bakery = Bakery::new(&[21; 32]);
+    let amount_hash = sha256::Hash::hash(&PREIMAGE).to_byte_array();
+    let header = |bakery: &Bakery, scope: &str, expiry: u64| {
+        L402Token::new(bakery.mint(scope, amount_hash, expiry).unwrap(), hex::encode(PREIMAGE)).to_header_value()
+    };
+    let paid = Arc::new(PaidRoute {
+        scope: "reports".into(),
+        validity: Duration::from_secs(60),
+        bakery: bakery.clone(),
+        gate: Arc::new(AcceptOnce(AtomicUsize::new(0))),
+    });
+    let app = Router::new()
+        .route("/", get(|| async { "ok" }))
+        .route_layer(middleware::from_fn_with_state(paid, require_payment));
+    let send = |auth: String| {
+        app.clone().oneshot(
+            Request::builder()
+                .uri("/")
+                .header(header::AUTHORIZATION, auth)
+                .body(Body::empty())
+                .unwrap(),
+        )
+    };
+    let valid = header(&bakery, "reports", u64::MAX);
+    for invalid in [
+        "L402".into(),
+        "L402 invalid".into(),
+        header(&Bakery::new(&[22; 32]), "reports", u64::MAX),
+        header(&Bakery::new(&[22; 32]), "reports", 1),
+        valid.replace(&hex::encode(PREIMAGE), &hex::encode([0; 32])),
+    ] {
+        let denied = send(invalid).await.unwrap();
+        assert_eq!(denied.status(), StatusCode::UNAUTHORIZED);
+        assert_eq!(denied.headers()[header::WWW_AUTHENTICATE], "L402");
+        assert_eq!(denied.headers()[header::CACHE_CONTROL], "private, no-store");
+    }
+    for renew in [
+        header(&bakery, "reports", 1),
+        header(&bakery, "previous terms", u64::MAX),
+    ] {
+        let response = send(renew).await.unwrap();
+        assert_eq!(response.status(), StatusCode::PAYMENT_REQUIRED);
+        assert!(L402Challenge::from_header(response.headers()[header::WWW_AUTHENTICATE].to_str().unwrap()).is_ok());
+    }
+    assert_eq!(
+        send(valid.replacen("L402", "lSaT", 1)).await.unwrap().status(),
+        StatusCode::OK
+    );
+}
