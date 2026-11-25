@@ -37,10 +37,18 @@ async fn main() {
         http_listen,
         public_origin,
         withdraw_origins,
+        merchant_resources,
     }) = cli.command
     {
-        if let Err(error) =
-            swissknife_mcp::run(server, wallet, http_listen, public_origin.as_deref(), &withdraw_origins).await
+        if let Err(error) = swissknife_mcp::run(
+            server,
+            wallet,
+            http_listen,
+            public_origin.as_deref(),
+            &withdraw_origins,
+            &merchant_resources,
+        )
+        .await
         {
             eprintln!("Wallet MCP failed: {error:#}");
             exit(1);

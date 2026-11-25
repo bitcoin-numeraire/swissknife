@@ -30,6 +30,9 @@ pub enum Command {
         /// Trusted LNURL-withdraw service origin. Repeat for additional discovery or callback origins.
         #[arg(long = "withdraw-origin", value_name = "ORIGIN")]
         withdraw_origins: Vec<String>,
+        /// Exact SwissKnife merchant resource URL approved for read-only L402 pass checks. Repeat for each resource.
+        #[arg(long = "l402-resource", value_name = "URL")]
+        merchant_resources: Vec<String>,
     },
     /// Enable an existing local login and issue a one-time password reset code.
     /// Uses the configured database without connecting to a Lightning provider.

@@ -1,3 +1,4 @@
+use super::pass_status::PassClient;
 use super::resources::{LegacySubscriptions, ResourceFeeds, WalletResource};
 use super::wallet::WalletClient;
 use super::withdraw::WithdrawalClient;
@@ -23,9 +24,19 @@ use uuid::Uuid;
 pub struct WalletServer {
     wallet: WalletClient,
     withdrawals: WithdrawalClient,
+    passes: PassClient,
     tool_router: ToolRouter<Self>,
     feeds: ResourceFeeds,
     legacy: Arc<LegacySubscriptions>,
+}
+
+#[derive(Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+struct CachedPass {
+    /// Exact URL of the merchant resource that issued the pass.
+    resource_url: String,
+    /// Private L402 Authorization header from the original purchase.
+    authorization: String,
 }
 
 #[derive(Deserialize, schemars::JsonSchema)]
@@ -165,7 +176,12 @@ fn merchant_invoice(header: &str) -> anyhow::Result<(l402_proto::L402Challenge, 
 }
 
 impl WalletServer {
-    pub(super) fn new(wallet: WalletClient, feeds: ResourceFeeds, withdrawals: WithdrawalClient) -> Self {
+    pub(super) fn new(
+        wallet: WalletClient,
+        feeds: ResourceFeeds,
+        withdrawals: WithdrawalClient,
+        passes: PassClient,
+    ) -> Self {
         let mut tool_router = Self::tool_router();
         if !withdrawals.enabled() {
             tool_router.remove_route("inspect_lnurl_withdraw");
@@ -174,6 +190,7 @@ impl WalletServer {
         Self {
             wallet,
             withdrawals,
+            passes,
             tool_router,
             feeds,
             legacy: Arc::default(),
@@ -297,6 +314,14 @@ impl WalletServer {
     )]
     fn decode_invoice(&self, Parameters(args): Parameters<InvoiceDetails>) -> CallToolResult {
         result(invoice(&args.invoice).map(|invoice| describe_invoice(&invoice)))
+    }
+
+    #[tool(
+        description = "Check a cached L402 pass for a configured SwissKnife merchant resource without using a paid request. Returns active, exhausted, inactive, invalid or unknown. Remaining requests are a snapshot. Neither the original pass nor its preimage is sent to the merchant.",
+        annotations(read_only_hint = true)
+    )]
+    async fn check_l402_token(&self, Parameters(args): Parameters<CachedPass>) -> CallToolResult {
+        result(self.passes.check(&args.resource_url, &args.authorization).await)
     }
 
     #[tool(

@@ -714,3 +714,104 @@ async fn withdraw_voucher_uses_the_selected_invoice_and_reconciles_callback_outc
     );
     mcp.close().await;
 }
+
+#[tokio::test]
+async fn cached_l402_pass_inspection_keeps_payment_credentials_local() {
+    use bitcoin::hashes::{sha256, Hash};
+    use wiremock::{
+        matchers::{method, path},
+        Mock, MockServer, ResponseTemplate,
+    };
+
+    let app = TestApp::isolated("mcp-pass", &[]).await;
+    let merchant = MockServer::start().await;
+    let other = MockServer::start().await;
+    let report = format!("{}/l402/report", merchant.uri());
+    let redirect = format!("{}/l402/moved", merchant.uri());
+    let unsupported = format!("{}/l402/other", merchant.uri());
+    let unreachable = format!("{}/l402/unlisted", other.uri());
+    Mock::given(method("HEAD"))
+        .and(path("/l402/report/status"))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .insert_header("SwissKnife-L402-Status", "active")
+                .insert_header("SwissKnife-L402-Remaining", "1"),
+        )
+        .expect(2)
+        .mount(&merchant)
+        .await;
+    Mock::given(method("HEAD"))
+        .and(path("/l402/moved/status"))
+        .respond_with(ResponseTemplate::new(307).insert_header("Location", unreachable.as_str()))
+        .expect(1)
+        .mount(&merchant)
+        .await;
+
+    let secret = format!("swka_{}", hex::encode([31; 32]));
+    let mut mcp = StdioWallet::start_with_options(
+        &app,
+        Uuid::new_v4(),
+        &secret,
+        &[
+            "--l402-resource",
+            &report,
+            "--l402-resource",
+            &redirect,
+            "--l402-resource",
+            &unsupported,
+        ],
+    )
+    .await;
+    let bakery = swissknife_l402::Bakery::new(&[44; 32]);
+    let preimage = [13; 32];
+    let macaroon = bakery
+        .mint("report", sha256::Hash::hash(&preimage).to_byte_array(), u64::MAX)
+        .unwrap();
+    let preimage = hex::encode(preimage);
+    let token = format!("L402 {macaroon}:{preimage}");
+    let args = |url: &str, proof: &str| json!({"resource_url":url, "authorization":proof});
+    for url in [&unreachable, &format!("{report}?other=1"), &format!("{report}/other")] {
+        assert_eq!(
+            mcp.tool("check_l402_token", args(url, &token)).await["structuredContent"],
+            json!({"status":"unknown"})
+        );
+    }
+    let invalid = format!("L402 {macaroon}:{}", hex::encode([14; 32]));
+    assert_eq!(
+        mcp.tool("check_l402_token", args(&report, &invalid)).await["structuredContent"],
+        json!({"status":"invalid"})
+    );
+    assert!(merchant.received_requests().await.unwrap().is_empty());
+
+    for _ in 0..2 {
+        assert_eq!(
+            mcp.tool("check_l402_token", args(&report, &token)).await["structuredContent"],
+            json!({"status":"active","remaining_requests":1})
+        );
+    }
+    for url in [&redirect, &unsupported] {
+        assert_eq!(
+            mcp.tool("check_l402_token", args(url, &token)).await["structuredContent"],
+            json!({"status":"unknown"})
+        );
+    }
+    assert!(other.received_requests().await.unwrap().is_empty());
+    let requests = merchant.received_requests().await.unwrap();
+    assert_eq!(requests.len(), 4);
+    for request in requests {
+        assert_eq!(request.method.as_str(), "HEAD");
+        assert!(request.body.is_empty());
+        assert!(!request.headers.contains_key("authorization"));
+        assert!(!request.headers.contains_key("wallet-key"));
+        let inspection = request.headers["swissknife-l402-inspection"].to_str().unwrap();
+        assert_ne!(inspection, macaroon);
+        assert!(bakery
+            .verify("report", &format!("L402 {inspection}:{preimage}"), 1)
+            .is_err());
+        for value in request.headers.values() {
+            let value = value.to_str().unwrap();
+            assert!(!value.contains(&preimage) && !value.contains(&macaroon) && !value.contains(&secret));
+        }
+    }
+    mcp.close().await;
+}

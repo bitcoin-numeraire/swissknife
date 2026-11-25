@@ -82,6 +82,7 @@ fn allowed_origins(local: SocketAddr, public_origin: Option<&str>) -> anyhow::Re
 pub(super) async fn serve(
     wallet: WalletClient,
     withdrawals: super::withdraw::WithdrawalClient,
+    passes: super::pass_status::PassClient,
     listen: SocketAddr,
     public_origin: Option<&str>,
 ) -> anyhow::Result<()> {
@@ -104,7 +105,14 @@ pub(super) async fn serve(
         .with_max_request_body_bytes(65536);
     let feeds = crate::resources::ResourceFeeds::default();
     let service = StreamableHttpService::new(
-        move || Ok(WalletServer::new(wallet.clone(), feeds.clone(), withdrawals.clone())),
+        move || {
+            Ok(WalletServer::new(
+                wallet.clone(),
+                feeds.clone(),
+                withdrawals.clone(),
+                passes.clone(),
+            ))
+        },
         Arc::new(LocalSessionManager::default()),
         config,
     );

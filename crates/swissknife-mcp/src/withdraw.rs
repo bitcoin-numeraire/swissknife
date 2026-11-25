@@ -2,7 +2,6 @@ use anyhow::{anyhow, ensure, Context};
 use lnurl::{lnurl::LnUrl, withdraw::WithdrawalResponse, Tag};
 use reqwest::{Client, Url};
 use serde_json::{json, Value};
-use std::{net::IpAddr, time::Duration};
 
 const MAX_RESPONSE_BYTES: usize = 32 * 1024;
 
@@ -43,15 +42,8 @@ impl WithdrawalClient {
         let mut trusted = Vec::new();
         for value in origins {
             let origin = Url::parse(value).context("Invalid withdrawal service origin")?;
-            let loopback = origin
-                .host_str()
-                .and_then(|host| host.trim_matches(['[', ']']).parse::<IpAddr>().ok())
-                .is_some_and(|ip| ip.is_loopback());
             ensure!(
-                (origin.scheme() == "https" || (origin.scheme() == "http" && loopback))
-                    && origin.has_host()
-                    && origin.username().is_empty()
-                    && origin.password().is_none()
+                super::secure_service_url(&origin)
                     && origin.path() == "/"
                     && origin.query().is_none()
                     && origin.fragment().is_none(),
@@ -60,11 +52,7 @@ impl WithdrawalClient {
             trusted.push(origin);
         }
         // Withdrawal services receive invoices. Only the separate WalletClient holds a wallet key.
-        let http = Client::builder()
-            .redirect(reqwest::redirect::Policy::none())
-            .retry(reqwest::retry::never())
-            .timeout(Duration::from_secs(15))
-            .build()?;
+        let http = super::external_client()?;
         Ok(Self { http, origins: trusted })
     }
 

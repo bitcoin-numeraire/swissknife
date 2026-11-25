@@ -8,6 +8,7 @@ Create the credential from the owner account using `POST /v1/me/wallets/{wallet_
 | --- | --- |
 | Local decoding | `decode_invoice`, `decode_l402_challenge` |
 | Read | `get_balance`, `get_wallet_info`, `get_lightning_address`, `list_contacts`, `list_saved_contacts`, `get_invoice`, `list_payments`, `get_payment`, `get_payment_submission`, `create_l402_authorization` |
+| Configured L402 resource | `check_l402_token` |
 | Manage contacts | `add_contact` |
 | Receive | `create_invoice` |
 | Configured withdrawal origin | `inspect_lnurl_withdraw` |
@@ -25,3 +26,9 @@ For a remote MCP client, use `--http-listen` on loopback and set a separate `SWI
 Set `--withdraw-origin https://issuer.example` on the bridge to enable the voucher tools. Repeat the flag if the issuer uses a separate callback origin. A local service can use HTTP on an explicit loopback IP and port. The wallet key goes only to the wallet API.
 
 Use `inspect_lnurl_withdraw` with the encoded voucher to review the issuer and permitted millisatoshi range. Create an invoice for the agreed amount with `create_invoice`, save its UUID, then give `lnurl_withdraw` the same voucher, `invoice_id` and `amount_msat`. An `accepted` callback means the issuer acknowledged the invoice. Use `get_invoice` to confirm receipt. After `rejected` or `unknown`, reconcile that same invoice before attempting redemption again.
+
+## Check a cached L402 pass
+
+Configure each trusted SwissKnife merchant resource with `--l402-resource https://merchant.example/l402/report`. Call `check_l402_token` with that exact `resource_url` and the cached `authorization`. The bridge verifies the preimage locally and presents a status-only macaroon to the issuer. It makes one HEAD request and never follows redirects.
+
+An active request pack includes its remaining count. A time pass returns `remaining_requests: null`. An exhausted pack has zero uses. An inactive pass has expired or its route terms changed. An invalid proof fails verification. An unconfigured resource or an issuer without this protocol returns `unknown`. The count can change if another client uses the pass.
