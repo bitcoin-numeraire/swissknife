@@ -1,4 +1,5 @@
 {
+  "statement": {"action": "Export statement", "title": "Wallet statement", "wallet": "Wallet {{wallet}}", "from": "From (UTC)", "through": "Through (UTC)", "csv": "Download CSV"},
   "overview": "Overview",
   "money": "Wallet",
   "activity": "Activity",

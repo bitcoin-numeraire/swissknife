@@ -96,6 +96,8 @@ import { hasAllPermissions } from 'src/auth/permissions';
 
 import { TransactionType } from 'src/types/transaction';
 
+import { WalletStatementDownload } from '../wallet-statement-download';
+
 // ----------------------------------------------------------------------
 
 type ActivityLens = 'all' | 'received' | 'paid' | 'Pending' | 'Expired' | 'Failed';
@@ -719,6 +721,9 @@ function ActivityLedger({
             ]}
             action={
               <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: 'wrap' }}>
+                {scope === 'wallet' && walletId && (
+                  <WalletStatementDownload key={walletId} walletId={walletId} />
+                )}
                 {onSend && (
                   <Button
                     color="inherit"
