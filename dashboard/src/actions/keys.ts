@@ -7,6 +7,7 @@ export const endpointKeys = {
     lnAddress: { get: 'accountLnAddress' },
     apiKeys: { list: 'accountApiKeys' },
   },
+  assets: { list: 'listAssets' },
   accounts: {
     list: 'listAccounts',
     get: (id: string) => ['getAccount', id] as const,

@@ -1,22 +1,26 @@
 import type { CreateWalletRequest } from 'src/lib/swissknife';
 
-import { useEffect } from 'react';
+import { mutate } from 'swr';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 
-import { Stack } from '@mui/material';
 import Button from '@mui/material/Button';
+import { Stack, Alert } from '@mui/material';
 
 import { handleActionError } from 'src/utils/errors';
 
 import { useTranslate } from 'src/locales';
+import { endpointKeys } from 'src/actions/keys';
+import { useListAssets } from 'src/actions/asset';
 import { registerWallet } from 'src/lib/swissknife';
-import { useAccountContext } from 'src/contexts/account';
+import { useGetAccount } from 'src/actions/account';
 import { zCreateWalletRequest } from 'src/lib/swissknife/zod.gen';
 
 import { toast } from 'src/components/snackbar';
 import { AccountSelect } from 'src/components/account';
 import { Form, RHFTextField } from 'src/components/hook-form';
+
+import { AssetSelect } from './asset-select';
 
 // ----------------------------------------------------------------------
 
@@ -27,14 +31,13 @@ export type NewWalletFormProps = {
 
 export function RegisterWalletForm({ accountId, onSuccess }: NewWalletFormProps) {
   const { t } = useTranslate();
-  const { activeWalletId, wallets, walletsLoading } = useAccountContext();
-  const activeAssetId = wallets.find((wallet) => wallet.id === activeWalletId)?.asset_id ?? '';
+  const catalog = useListAssets();
 
   const methods = useForm<CreateWalletRequest>({
     resolver: zodResolver(zCreateWalletRequest),
     defaultValues: {
       account_id: accountId ?? '',
-      asset_id: activeAssetId,
+      asset_id: '',
     },
   });
 
@@ -46,17 +49,24 @@ export function RegisterWalletForm({ accountId, onSuccess }: NewWalletFormProps)
     watch,
   } = methods;
 
-  const selectedAccountId = watch('account_id');
-
-  useEffect(() => {
-    setValue('asset_id', activeAssetId, { shouldValidate: true });
-  }, [activeAssetId, setValue]);
+  const selectedAccountId = watch('account_id') ?? '';
+  const selectedAssetId = watch('asset_id');
+  const { account, accountLoading, accountError } = useGetAccount(selectedAccountId);
+  const owned = new Set(account?.wallets.map((wallet) => wallet.asset_id));
+  const available = catalog.data?.filter((asset) => !owned.has(asset.id)) ?? [];
+  const loading = accountLoading || catalog.isLoading;
+  const failed = Boolean(accountError || catalog.error);
+  const ready = account?.id === selectedAccountId && !loading && !failed;
+  const canRegister = ready && available.some((asset) => asset.id === selectedAssetId);
 
   const onSubmit = async (body: CreateWalletRequest) => {
+    if (!canRegister) return;
     try {
-      await registerWallet({ body });
+      await registerWallet<true>({ body });
+      void mutate(endpointKeys.accounts.get(selectedAccountId));
+      void mutate(endpointKeys.accounts.list);
       toast.success(t('register_wallet.success_wallet_registration'));
-      reset({ account_id: accountId ?? '', asset_id: activeAssetId });
+      reset({ account_id: accountId ?? '', asset_id: '' });
       onSuccess();
     } catch (error) {
       handleActionError(error);
@@ -74,15 +84,28 @@ export function RegisterWalletForm({ accountId, onSuccess }: NewWalletFormProps)
             disabled
           />
         ) : (
-          <AccountSelect />
+          <AccountSelect onAccountChange={() => setValue('asset_id', '')} />
         )}
+        {failed && <Alert severity="error">{t('register_wallet.asset_load_error')}</Alert>}
+        <AssetSelect
+          assets={ready ? available : []}
+          disabled={!ready || !available.length}
+          loading={loading}
+          helperText={
+            loading
+              ? t('register_wallet.loading_assets')
+              : ready && !available.length
+                ? t('register_wallet.no_assets')
+                : undefined
+          }
+        />
         <Button
           type="submit"
           variant="contained"
           color="inherit"
           size="large"
           loading={isSubmitting}
-          disabled={!selectedAccountId || !activeAssetId || walletsLoading || isSubmitting}
+          disabled={!canRegister || isSubmitting}
         >
           {t('register')}
         </Button>

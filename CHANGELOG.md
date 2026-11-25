@@ -11,6 +11,7 @@ release notes when a tag is published.
 ### Added
 
 - Authenticated clients can discover available wallet assets through `GET /v1/assets`.
+- Administrators can choose an available asset and network when registering an account wallet.
 
 ## [0.3.5] - 2026-11-21
 

@@ -538,8 +538,6 @@ function AccountDetailsView({ id }: { id: string }) {
               accountId={id}
               onClose={newWallet.onFalse}
               onSuccess={() => {
-                mutate(endpointKeys.accounts.get(id));
-                mutate(endpointKeys.accounts.list);
                 mutate(endpointKeys.wallets.listOverviews);
                 newWallet.onFalse();
               }}
