@@ -4,6 +4,7 @@ use crate::{
     application::composition::Ledger,
     domains::{
         account::{AccountHandler, ApiKeyHandler, AuthHandler},
+        asset::AssetHandler,
         bitcoin::BtcAddressHandler,
         invoice::InvoiceHandler,
         ln_address::LnAddressHandler,
@@ -38,6 +39,7 @@ pub fn merged_openapi() -> OpenApi {
     let mut openapi = ApiDoc::openapi();
 
     openapi.merge(AuthHandler::openapi());
+    openapi.merge(AssetHandler::openapi());
     openapi.merge(AccountHandler::openapi());
     openapi.merge(AccountWalletHandler::openapi());
     openapi.merge(WalletHandler::openapi());

@@ -37,6 +37,7 @@ import {
   listAccountWalletsResponseTransformer,
   listAddressesResponseTransformer,
   listApiKeysResponseTransformer,
+  listAssetsResponseTransformer,
   listBtcAddressesResponseTransformer,
   listContactsResponseTransformer,
   listInvoicesResponseTransformer,
@@ -207,6 +208,9 @@ import type {
   ListApiKeysData,
   ListApiKeysErrors,
   ListApiKeysResponses,
+  ListAssetsData,
+  ListAssetsErrors,
+  ListAssetsResponses,
   ListBtcAddressesData,
   ListBtcAddressesErrors,
   ListBtcAddressesResponses,
@@ -653,6 +657,22 @@ export const getApiKey = <ThrowOnError extends boolean = false>(
     responseTransformer: getApiKeyResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/v1/api-keys/{id}',
+    ...options,
+  });
+
+/**
+ * List catalog assets
+ *
+ * Any authenticated account can discover assets, including assets with no wallets.
+ * Results are ordered by code, protocol, network, and asset reference.
+ */
+export const listAssets = <ThrowOnError extends boolean = false>(
+  options?: Options<ListAssetsData, ThrowOnError>
+): RequestResult<ListAssetsResponses, ListAssetsErrors, ThrowOnError> =>
+  (options?.client ?? client).get<ListAssetsResponses, ListAssetsErrors, ThrowOnError>({
+    responseTransformer: listAssetsResponseTransformer,
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/assets',
     ...options,
   });
 

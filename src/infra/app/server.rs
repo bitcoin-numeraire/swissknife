@@ -6,7 +6,7 @@ use crate::{
         docs::merged_openapi,
         errors::WebServerError,
     },
-    domains::{account, bitcoin, invoice, ln_address, lnurl, nostr, payment, system, wallet},
+    domains::{account, asset, bitcoin, invoice, ln_address, lnurl, nostr, payment, system, wallet},
 };
 use axum::{routing::get, Router};
 use std::future::Future;
@@ -33,6 +33,7 @@ impl Server {
             .nest("/v1/payments", payment::router())
             .nest("/v1/me", wallet::account_router())
             .nest("/v1/wallets", wallet::router())
+            .nest(asset::CONTEXT_PATH, asset::router())
             .nest("/v1/accounts", account::router())
             .nest("/v1/auth", account::auth_router())
             .nest("/v1/api-keys", account::api_key_router())

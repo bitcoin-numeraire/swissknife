@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter};
+use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, QueryOrder};
 use uuid::Uuid;
 
 use super::SeaOrmConnection;
@@ -29,6 +29,18 @@ impl<C> AssetRepository for SeaOrmAssetRepository<C>
 where
     C: SeaOrmConnection,
 {
+    async fn list(&self) -> Result<Vec<Asset>, DatabaseError> {
+        let assets = AssetEntity::find()
+            .order_by_asc(Column::Code)
+            .order_by_asc(Column::Protocol)
+            .order_by_asc(Column::Network)
+            .order_by_asc(Column::AssetRef)
+            .all(self.db.connection())
+            .await
+            .map_err(|e| DatabaseError::FindMany(e.to_string()))?;
+        Ok(assets.into_iter().map(Into::into).collect())
+    }
+
     async fn find(&self, id: Uuid) -> Result<Option<Asset>, DatabaseError> {
         let model = AssetEntity::find_by_id(id)
             .one(self.db.connection())

@@ -1887,6 +1887,66 @@
         }
       }
     },
+    "/v1/assets": {
+      "get": {
+        "tags": [
+          "Assets"
+        ],
+        "summary": "List catalog assets",
+        "description": "Any authenticated account can discover assets, including assets with no wallets.\nResults are ordered by code, protocol, network, and asset reference.",
+        "operationId": "list_assets",
+        "responses": {
+          "200": {
+            "description": "Catalog assets",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Asset"
+                  }
+                },
+                "example": [
+                  {
+                    "asset_ref": "native",
+                    "code": "BTC",
+                    "created_at": "2026-07-04T00:00:00Z",
+                    "decimals": 11,
+                    "display_ticker": "BTC",
+                    "id": "00000000-0000-4000-8000-000000000001",
+                    "name": "Bitcoin",
+                    "network": "Bitcoin",
+                    "protocol": "bitcoin"
+                  }
+                ]
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"401 Unauthorized\",\n    \"reason\": \"Invalid credentials\"\n}\n"
+              }
+            }
+          },
+          "500": {
+            "description": "Database unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"500 Internal Server Error\",\n    \"reason\": \"Internal server error, Please contact your administrator or try later\"\n}\n"
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/auth/change-password": {
       "post": {
         "tags": [
@@ -10474,6 +10534,10 @@
     {
       "name": "Authentication",
       "description": "Some endpoints are public, but some require authentication. We provide all the required endpoints to create an account and authorize yourself."
+    },
+    {
+      "name": "Assets",
+      "description": "Installation asset catalog."
     },
     {
       "name": "Accounts",

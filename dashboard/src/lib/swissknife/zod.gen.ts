@@ -999,6 +999,11 @@ export const zGetApiKeyPath = z.object({
  */
 export const zGetApiKeyResponse = zApiKey;
 
+/**
+ * Catalog assets
+ */
+export const zListAssetsResponse = z.array(zAsset);
+
 export const zChangePasswordBody = zChangePasswordRequest;
 
 /**
