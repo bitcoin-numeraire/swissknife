@@ -19,3 +19,5 @@ mod payments;
 mod system;
 mod wallets;
 mod well_known;
+
+mod notifications;

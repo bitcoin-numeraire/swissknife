@@ -20,7 +20,8 @@ use super::{
     SeaOrmAccountRepository, SeaOrmApiKeyRepository, SeaOrmAssetRepository, SeaOrmBitcoinAddressRepository,
     SeaOrmBitcoinOutputRepository, SeaOrmClientEventRepository, SeaOrmConfig, SeaOrmConfigRepository,
     SeaOrmEventProjectionUnitOfWork, SeaOrmInvoiceRepository, SeaOrmLnAddressRepository,
-    SeaOrmLocalCredentialRepository, SeaOrmPaymentRepository, SeaOrmPaymentUnitOfWork, SeaOrmWalletRepository,
+    SeaOrmLocalCredentialRepository, SeaOrmNotificationRepository, SeaOrmPaymentRepository, SeaOrmPaymentUnitOfWork,
+    SeaOrmWalletRepository,
 };
 
 pub struct SeaOrmStore;
@@ -45,6 +46,7 @@ impl SeaOrmStore {
             Arc::new(SeaOrmBitcoinAddressRepository::new(db_conn.clone())),
             Arc::new(SeaOrmBitcoinOutputRepository::new(db_conn.clone())),
             Arc::new(SeaOrmClientEventRepository::new(db_conn.clone())),
+            Arc::new(SeaOrmNotificationRepository::new(db_conn.clone())),
             Arc::new(SeaOrmHealthProbe::new(db_conn.clone())),
             Arc::new(SeaOrmPaymentUnitOfWork::new(db_conn.clone())),
             Arc::new(SeaOrmEventProjectionUnitOfWork::new(db_conn)),

@@ -1,8 +1,8 @@
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use sea_orm::{
-    sea_query::OnConflict, ActiveModelTrait, ColumnTrait, DatabaseConnection, DatabaseTransaction, EntityTrait,
-    QueryFilter, QueryOrder, QuerySelect, Set, TransactionTrait,
+    sea_query::OnConflict, ActiveModelTrait, ColumnTrait, ConnectionTrait, DatabaseConnection, DatabaseTransaction,
+    EntityTrait, QueryFilter, QueryOrder, QuerySelect, Set, TransactionTrait,
 };
 use serde_json::Value;
 use uuid::Uuid;
@@ -103,7 +103,7 @@ impl SeaOrmClientEventRepository<&DatabaseTransaction> {
         event: NewClientEvent,
     ) -> Result<(), DatabaseError> {
         lock_client_event_log(self.db).await?;
-        ClientEventEntity::insert(ActiveModel {
+        let inserted = ClientEventEntity::insert(ActiveModel {
             wallet_id: Set(event.wallet_id),
             event_type: Set(event.event_type.to_string()),
             resource_id: Set(event.resource_id),
@@ -115,10 +115,25 @@ impl SeaOrmClientEventRepository<&DatabaseTransaction> {
                 .do_nothing()
                 .to_owned(),
         )
-        .exec_without_returning(self.db)
+        .try_insert()
+        .exec(self.db)
         .await
         .map_err(|error| DatabaseError::Insert(error.to_string()))?;
-
+        let source_event_id = match inserted {
+            sea_orm::TryInsertResult::Inserted(result) if event.event_type != ClientEventType::InvoicePending => {
+                result.last_insert_id
+            }
+            _ => return Ok(()),
+        };
+        self.db
+            .execute_raw(sea_orm::Statement::from_sql_and_values(
+                self.db.get_database_backend(),
+                "INSERT INTO account_notification (source_event_id, account_id)
+                 SELECT $1, account_id FROM wallet WHERE id = $2",
+                [source_event_id.into(), event.wallet_id.into()],
+            ))
+            .await
+            .map_err(|err| DatabaseError::Insert(err.to_string()))?;
         Ok(())
     }
 }

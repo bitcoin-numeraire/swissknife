@@ -1,4 +1,6 @@
 mod connection;
+mod sea_orm_notification_repository;
+pub use sea_orm_notification_repository::*;
 mod sea_orm_account_repository;
 mod sea_orm_api_key_repository;
 mod sea_orm_asset_repository;

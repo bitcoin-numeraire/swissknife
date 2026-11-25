@@ -42,6 +42,25 @@ export type Account = {
 };
 
 /**
+ * Presentation state for one terminal payment or receipt belonging to the signed-in account.
+ */
+export type AccountNotification = {
+  /**
+   * Decimal integer string so JavaScript clients can represent the full amount.
+   */
+  amount_msat?: string | null;
+  archived: boolean;
+  created_at: Date;
+  description?: string | null;
+  event_type: ClientEventType;
+  is_read: boolean;
+  ledger?: Ledger | null;
+  resource_id: string;
+  source_event_id: number;
+  wallet_id: string;
+};
+
+/**
  * Account-scoped dashboard and UI preferences.
  */
 export type AccountPreferences = {
@@ -944,6 +963,28 @@ export type NostrNip05Response = {
   };
 };
 
+export const NotificationAction = { READ: 'read', ARCHIVE: 'archive' } as const;
+
+export type NotificationAction = (typeof NotificationAction)[keyof typeof NotificationAction];
+
+export type NotificationPage = {
+  items: Array<AccountNotification>;
+  /**
+   * Exclusive cursor for the next page, ordered newest first.
+   */
+  next_before?: number | null;
+  /**
+   * Number of unread items in the active inbox, across all pages.
+   */
+  unread_count: number;
+};
+
+export type NotificationQuery = {
+  archived?: boolean;
+  before?: number | null;
+  limit?: number | null;
+};
+
 /**
  * Direction of result ordering for list endpoints.
  */
@@ -1102,6 +1143,13 @@ export const Protocol = { BITCOIN: 'bitcoin', TAPROOT_ASSETS: 'taproot_assets' }
  * Asset settlement protocol.
  */
 export type Protocol = (typeof Protocol)[keyof typeof Protocol];
+
+export type ReadNotificationsRequest = {
+  /**
+   * Mark notifications through the newest ID observed by the caller.
+   */
+  through: number;
+};
 
 /**
  * Register Lightning Address Request
@@ -1284,6 +1332,10 @@ export type UpdateLocalLoginRequest = {
    * sessions and pending reset codes; API keys retain their own permissions.
    */
   enabled: boolean;
+};
+
+export type UpdateNotificationRequest = {
+  action: NotificationAction;
 };
 
 /**
@@ -3815,6 +3867,108 @@ export type UpdateAccountAddressResponses = {
 
 export type UpdateAccountAddressResponse =
   UpdateAccountAddressResponses[keyof UpdateAccountAddressResponses];
+
+export type ListAccountNotificationsData = {
+  body?: never;
+  path?: never;
+  query?: {
+    before?: number;
+    limit?: number;
+    archived?: boolean;
+  };
+  url: '/v1/me/notifications';
+};
+
+export type ListAccountNotificationsErrors = {
+  /**
+   * Authentication required
+   */
+  401: ErrorResponse;
+  /**
+   * Invalid page or cursor
+   */
+  422: ErrorResponse;
+};
+
+export type ListAccountNotificationsError =
+  ListAccountNotificationsErrors[keyof ListAccountNotificationsErrors];
+
+export type ListAccountNotificationsResponses = {
+  /**
+   * Newest account notifications and total unread count
+   */
+  200: NotificationPage;
+};
+
+export type ListAccountNotificationsResponse =
+  ListAccountNotificationsResponses[keyof ListAccountNotificationsResponses];
+
+export type MarkAccountNotificationsReadData = {
+  body: ReadNotificationsRequest;
+  path?: never;
+  query?: never;
+  url: '/v1/me/notifications/read';
+};
+
+export type MarkAccountNotificationsReadErrors = {
+  /**
+   * Authentication required
+   */
+  401: ErrorResponse;
+  /**
+   * Invalid cursor
+   */
+  422: ErrorResponse;
+};
+
+export type MarkAccountNotificationsReadError =
+  MarkAccountNotificationsReadErrors[keyof MarkAccountNotificationsReadErrors];
+
+export type MarkAccountNotificationsReadResponses = {
+  /**
+   * Account notifications marked read through the supplied ID
+   */
+  204: void;
+};
+
+export type MarkAccountNotificationsReadResponse =
+  MarkAccountNotificationsReadResponses[keyof MarkAccountNotificationsReadResponses];
+
+export type UpdateAccountNotificationData = {
+  body: UpdateNotificationRequest;
+  path: {
+    /**
+     * Source event ID
+     */
+    id: number;
+  };
+  query?: never;
+  url: '/v1/me/notifications/{id}';
+};
+
+export type UpdateAccountNotificationErrors = {
+  /**
+   * Authentication required
+   */
+  401: ErrorResponse;
+  /**
+   * Notification not found in this account
+   */
+  404: ErrorResponse;
+};
+
+export type UpdateAccountNotificationError =
+  UpdateAccountNotificationErrors[keyof UpdateAccountNotificationErrors];
+
+export type UpdateAccountNotificationResponses = {
+  /**
+   * Notification updated
+   */
+  204: void;
+};
+
+export type UpdateAccountNotificationResponse =
+  UpdateAccountNotificationResponses[keyof UpdateAccountNotificationResponses];
 
 export type GetAccountPreferencesData = {
   body?: never;

@@ -33,6 +33,7 @@ import {
   getWalletPaymentResponseTransformer,
   getWalletResponseTransformer,
   listAccountApiKeysResponseTransformer,
+  listAccountNotificationsResponseTransformer,
   listAccountsResponseTransformer,
   listAccountWalletsResponseTransformer,
   listAddressesResponseTransformer,
@@ -196,6 +197,9 @@ import type {
   ListAccountApiKeysData,
   ListAccountApiKeysErrors,
   ListAccountApiKeysResponses,
+  ListAccountNotificationsData,
+  ListAccountNotificationsErrors,
+  ListAccountNotificationsResponses,
   ListAccountsData,
   ListAccountsErrors,
   ListAccountsResponses,
@@ -235,6 +239,9 @@ import type {
   ListWalletsData,
   ListWalletsErrors,
   ListWalletsResponses,
+  MarkAccountNotificationsReadData,
+  MarkAccountNotificationsReadErrors,
+  MarkAccountNotificationsReadResponses,
   MarkWelcomeCompleteData,
   MarkWelcomeCompleteErrors,
   MarkWelcomeCompleteResponses,
@@ -301,6 +308,9 @@ import type {
   UpdateAccountByIdData,
   UpdateAccountByIdErrors,
   UpdateAccountByIdResponses,
+  UpdateAccountNotificationData,
+  UpdateAccountNotificationErrors,
+  UpdateAccountNotificationResponses,
   UpdateAccountPreferencesData,
   UpdateAccountPreferencesErrors,
   UpdateAccountPreferencesResponses,
@@ -1217,6 +1227,62 @@ export const updateAccountAddress = <ThrowOnError extends boolean = false>(
     responseTransformer: updateAccountAddressResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/v1/me/lightning-address',
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
+
+export const listAccountNotifications = <ThrowOnError extends boolean = false>(
+  options?: Options<ListAccountNotificationsData, ThrowOnError>
+): RequestResult<ListAccountNotificationsResponses, ListAccountNotificationsErrors, ThrowOnError> =>
+  (options?.client ?? client).get<
+    ListAccountNotificationsResponses,
+    ListAccountNotificationsErrors,
+    ThrowOnError
+  >({
+    responseTransformer: listAccountNotificationsResponseTransformer,
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/me/notifications',
+    ...options,
+  });
+
+export const markAccountNotificationsRead = <ThrowOnError extends boolean = false>(
+  options: Options<MarkAccountNotificationsReadData, ThrowOnError>
+): RequestResult<
+  MarkAccountNotificationsReadResponses,
+  MarkAccountNotificationsReadErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    MarkAccountNotificationsReadResponses,
+    MarkAccountNotificationsReadErrors,
+    ThrowOnError
+  >({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/me/notifications/read',
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
+
+export const updateAccountNotification = <ThrowOnError extends boolean = false>(
+  options: Options<UpdateAccountNotificationData, ThrowOnError>
+): RequestResult<
+  UpdateAccountNotificationResponses,
+  UpdateAccountNotificationErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).patch<
+    UpdateAccountNotificationResponses,
+    UpdateAccountNotificationErrors,
+    ThrowOnError
+  >({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/me/notifications/{id}',
     ...options,
     headers: {
       'Content-Type': 'application/json',
