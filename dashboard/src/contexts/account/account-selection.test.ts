@@ -2,12 +2,7 @@ import type { Wallet } from 'src/lib/swissknife';
 
 import { it, expect, describe } from 'vitest';
 
-import {
-  selectInitialWalletId,
-  ACTIVE_WALLET_SETTING,
-  settingsWithActiveWallet,
-  DASHBOARD_SETTINGS_SCHEMA_VERSION,
-} from './account-selection';
+import { selectInitialWalletId, ACTIVE_WALLET_SETTING } from './account-selection';
 
 const wallet = (id: string) => ({ id }) as Wallet;
 
@@ -30,15 +25,5 @@ describe('selectInitialWalletId', () => {
 
   it('handles an account without wallets', () => {
     expect(selectInitialWalletId([], undefined, {})).toBeUndefined();
-  });
-});
-
-describe('settingsWithActiveWallet', () => {
-  it('preserves unrelated dashboard settings', () => {
-    expect(settingsWithActiveWallet({ theme: 'dark' }, 'wallet-2')).toEqual({
-      theme: 'dark',
-      schema_version: DASHBOARD_SETTINGS_SCHEMA_VERSION,
-      [ACTIVE_WALLET_SETTING]: 'wallet-2',
-    });
   });
 });

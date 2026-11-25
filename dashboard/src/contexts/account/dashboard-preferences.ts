@@ -1,8 +1,6 @@
 import type { SettingsState } from 'src/components/settings';
 
-import { dashboardSettings, DASHBOARD_SETTINGS_SCHEMA_VERSION } from './account-selection';
-
-export { DASHBOARD_SETTINGS_SCHEMA_VERSION } from './account-selection';
+import { dashboardSettings } from './account-selection';
 
 export type DashboardPreferenceUpdate = Partial<
   Pick<SettingsState, 'mode' | 'currency' | 'displayUnit' | 'hideBalances' | 'defaultAddressType'>
@@ -32,14 +30,15 @@ export function uiSettingsFromDashboardSettings(
   };
 }
 
-export function settingsWithUiPreferences(storedSettings: unknown, state: SettingsState) {
-  return {
-    ...dashboardSettings(storedSettings),
-    schema_version: DASHBOARD_SETTINGS_SCHEMA_VERSION,
-    theme: state.mode,
-    currency: state.currency,
-    display_unit: state.displayUnit,
-    hide_balances: state.hideBalances,
-    default_address_type: state.defaultAddressType,
-  };
+export function dashboardPreferencePatch(
+  update: DashboardPreferenceUpdate
+): Record<string, unknown> {
+  const patch: Record<string, unknown> = {};
+  if (update.mode !== undefined) patch.theme = update.mode;
+  if (update.currency !== undefined) patch.currency = update.currency;
+  if (update.displayUnit !== undefined) patch.display_unit = update.displayUnit;
+  if (update.hideBalances !== undefined) patch.hide_balances = update.hideBalances;
+  if (update.defaultAddressType !== undefined)
+    patch.default_address_type = update.defaultAddressType;
+  return patch;
 }
