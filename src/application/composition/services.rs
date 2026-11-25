@@ -1,3 +1,4 @@
+use crate::infra::lightning::LightningHealthProbe;
 use std::sync::Arc;
 
 use crate::{
@@ -86,7 +87,10 @@ impl AppServices {
             auth_provider,
             bitcoin_wallet.network(),
         );
-        let system = Arc::new(SystemService::new(store.clone(), ln_client.clone()));
+        let system = Arc::new(SystemService::new(
+            store.config.clone(),
+            vec![store.health.clone(), Arc::new(LightningHealthProbe(ln_client.clone()))],
+        ));
         let nostr = NostrService::new(store.clone());
         let api_key = ApiKeyService::new(store.clone());
         let bitcoin = BitcoinService::new(
