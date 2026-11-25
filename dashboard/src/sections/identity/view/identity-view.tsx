@@ -130,7 +130,10 @@ export function IdentityView() {
   const identityLnurl = lnAddress ? encodeLNURL(lnAddress.username) : '';
   const nostrDisplay = useMemo(() => npub(lnAddress?.nostr_pubkey), [lnAddress?.nostr_pubkey]);
   const unusedAddressForType = useMemo(
-    () => btcAddresses?.find((address) => address.address_type === addressType && !address.used),
+    () =>
+      btcAddresses?.find(
+        (address) => address.address_type === addressType && !address.used && !address.dedicated
+      ),
     [addressType, btcAddresses]
   );
 

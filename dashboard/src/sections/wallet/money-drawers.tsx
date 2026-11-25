@@ -1586,7 +1586,7 @@ export function ReceiveMoneyDrawer({
   const addressesForType = useMemo(
     () =>
       (btcAddresses ?? [])
-        .filter((address) => address.address_type === addressType)
+        .filter((address) => address.address_type === addressType && !address.dedicated)
         .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()),
     [addressType, btcAddresses]
   );
@@ -1826,8 +1826,9 @@ export function ReceiveMoneyDrawer({
     setAddressType(nextAddressType);
 
     const nextUnusedAddress =
-      btcAddresses?.find((address) => address.address_type === nextAddressType && !address.used) ??
-      null;
+      btcAddresses?.find(
+        (address) => address.address_type === nextAddressType && !address.used && !address.dedicated
+      ) ?? null;
 
     if (nextUnusedAddress) {
       setBtcAddress(nextUnusedAddress);

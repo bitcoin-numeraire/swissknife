@@ -190,6 +190,7 @@ mod bitcoin {
                 &format!("/v1/me/wallets/{}/bitcoin/addresses", account.wallet.id),
                 Auth::ApiKey(&account.key),
                 NewBtcAddressRequest {
+                    dedicated: false,
                     wallet_id: None,
                     address_type: None,
                 },
@@ -226,6 +227,7 @@ mod bitcoin {
                 &format!("/v1/me/wallets/{}/bitcoin/addresses", bob.wallet.id),
                 Auth::ApiKey(&alice.key),
                 NewBtcAddressRequest {
+                    dedicated: false,
                     wallet_id: None,
                     address_type: None,
                 },

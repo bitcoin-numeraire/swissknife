@@ -76,7 +76,7 @@ async fn generate_btc_address(
 
     let address = services
         .bitcoin
-        .new_deposit_address(wallet_id, payload.address_type)
+        .new_deposit_address(wallet_id, payload.address_type, payload.dedicated)
         .await?;
     Ok(Json(address))
 }
@@ -228,6 +228,7 @@ mod tests {
             wallet_id,
             address: "bcrt1qexample".to_string(),
             used: false,
+            dedicated: false,
             address_type: BtcAddressType::P2wpkh,
             created_at: Utc::now(),
             updated_at: None,
@@ -245,6 +246,7 @@ mod tests {
                 let services = MockAppServicesBuilder::new().build();
 
                 let payload = NewBtcAddressRequest {
+                    dedicated: false,
                     wallet_id: Some(Uuid::new_v4()),
                     address_type: None,
                 };
@@ -267,11 +269,12 @@ mod tests {
                 builder
                     .bitcoin
                     .expect_new_deposit_address()
-                    .withf(move |wallet_id, _| *wallet_id == expected_wallet)
+                    .withf(move |wallet_id, _, _| *wallet_id == expected_wallet)
                     .times(1)
-                    .returning(|wallet_id, _| Ok(btc_address(wallet_id)));
+                    .returning(|wallet_id, _, _| Ok(btc_address(wallet_id)));
 
                 let payload = NewBtcAddressRequest {
+                    dedicated: false,
                     wallet_id: Some(expected_wallet),
                     address_type: None,
                 };

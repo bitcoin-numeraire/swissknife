@@ -140,6 +140,7 @@ async fn every_admin_endpoint_enforces_its_permission() {
         Permission::WriteBtcAddress,
         id,
         body(NewBtcAddressRequest {
+            dedicated: false,
             wallet_id: Some(uuid::Uuid::new_v4()),
             address_type: None,
         }),

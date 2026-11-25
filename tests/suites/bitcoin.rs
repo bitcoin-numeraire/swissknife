@@ -24,6 +24,7 @@ async fn post_address(
             "/v1/bitcoin/addresses",
             Auth::Bearer(token),
             NewBtcAddressRequest {
+                dedicated: false,
                 wallet_id: Some(wallet_id),
                 address_type,
             },
@@ -33,6 +34,47 @@ async fn post_address(
 
 mod generate {
     use super::*;
+
+    #[tokio::test]
+    async fn dedicated_addresses_are_unique_and_excluded_from_ordinary_receive() {
+        let app = app().await;
+        let admin = app.admin_token().await;
+        let account = app.create_account_with_wallet(admin, "dedicated-addresses").await;
+        let path = format!("/v1/me/wallets/{}/bitcoin/addresses", account.wallet.id);
+        let api = app.api();
+        let body = serde_json::json!({"dedicated": true, "type":"p2tr"});
+        let (first, second) = tokio::join!(
+            api.post(&path, Auth::ApiKey(&account.key), &body),
+            api.post(&path, Auth::ApiKey(&account.key), &body),
+        );
+        assert_status(&first, StatusCode::OK);
+        assert_status(&second, StatusCode::OK);
+        let first = first.parse::<BtcAddress>();
+        let second = second.parse::<BtcAddress>();
+        assert!(first.dedicated && second.dedicated);
+        assert_ne!(first.address, second.address);
+        let ordinary = api
+            .post(&path, Auth::ApiKey(&account.key), serde_json::json!({"type":"p2tr"}))
+            .await;
+        assert_status(&ordinary, StatusCode::OK);
+        let ordinary = ordinary.parse::<BtcAddress>();
+        assert!(!ordinary.dedicated);
+        assert_ne!(ordinary.id, first.id);
+        assert_ne!(ordinary.id, second.id);
+        let repeated = api
+            .post(&path, Auth::ApiKey(&account.key), serde_json::json!({"type":"p2tr"}))
+            .await;
+        assert_eq!(repeated.parse::<BtcAddress>().id, ordinary.id);
+        send_to_address(&first.address, 25_000).await;
+        mine(6).await;
+        wait_until(Duration::from_secs(30), "dedicated address settled", || async {
+            app.wallet_balance(admin, account.wallet.id).await.available_msat == 25_000_000
+        })
+        .await;
+        let other = app.create_account_with_wallet(admin, "dedicated-other").await;
+        let denied = api.post(&path, Auth::ApiKey(&other.key), &body).await;
+        assert_error(&denied, StatusCode::NOT_FOUND);
+    }
 
     #[tokio::test]
     async fn p2wpkh_and_p2tr_work_on_every_backend() {
@@ -91,6 +133,7 @@ mod generate {
                 "/v1/bitcoin/addresses",
                 Auth::None,
                 NewBtcAddressRequest {
+                    dedicated: false,
                     wallet_id: Some(uuid::Uuid::new_v4()),
                     address_type: None,
                 },

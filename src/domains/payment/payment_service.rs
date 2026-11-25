@@ -1009,6 +1009,7 @@ mod tests {
             wallet_id,
             address: "bcrt1qrecipient".to_string(),
             used: false,
+            dedicated: false,
             address_type: BtcAddressType::P2wpkh,
             created_at: Utc::now(),
             updated_at: None,
