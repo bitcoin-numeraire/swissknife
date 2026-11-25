@@ -1,4 +1,31 @@
 {
+  "payment_review": {
+    "title": "Approvazioni dei pagamenti",
+    "load_error": "Impossibile caricare i pagamenti da esaminare.",
+    "empty": "Nessun pagamento in attesa di approvazione.",
+    "amount": "{{value}} msat",
+    "review": "Esamina pagamento",
+    "principal": "Importo del pagamento",
+    "fee": "Commissione massima",
+    "maximum": "Totale massimo",
+    "input": "Richiesta di pagamento originale",
+    "destination": "Destinazione risolta",
+    "wallet": "Portafoglio",
+    "credential": "Credenziale delegata",
+    "expires": "Scadenza dell’approvazione",
+    "retry_help": "L’approvazione consente alla credenziale originale di ripresentare il pagamento una volta. Il portafoglio verifica i limiti correnti prima di riservare o trasferire i fondi.",
+    "decision_error": "Impossibile registrare la decisione. Chiudi il pagamento e controlla l’elenco aggiornato.",
+    "reject": "Rifiuta",
+    "approve": "Approva un nuovo tentativo",
+    "approved": "Nuovo tentativo di pagamento approvato.",
+    "rejected": "Pagamento rifiutato."
+  },
+  "spending_templates": {
+    "title": "Inizia da un modello",
+    "conservative": "Prudente",
+    "moderate": "Moderato",
+    "generous": "Generoso"
+  },
   "merchant_tools": {
     "title": "Strumenti per esercenti",
     "routes": "Percorsi a pagamento",
@@ -1228,6 +1255,7 @@
     "sound": "Riproduci un suono per gli avvisi di pagamento"
   },
   "spending_policy": {
+    "approval_above_msat": "Richiedi approvazione oltre",
     "title": "Budget di spesa",
     "load_error": "Impossibile caricare il budget.",
     "loading": "Caricamento del budget…",

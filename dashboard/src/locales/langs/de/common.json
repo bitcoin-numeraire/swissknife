@@ -1,4 +1,31 @@
 {
+  "payment_review": {
+    "title": "Zahlungsfreigaben",
+    "load_error": "Die ausstehenden Zahlungsfreigaben konnten nicht geladen werden.",
+    "empty": "Es warten keine Zahlungen auf Freigabe.",
+    "amount": "{{value}} msat",
+    "review": "Zahlung prüfen",
+    "principal": "Zahlungsbetrag",
+    "fee": "Maximale Gebühr",
+    "maximum": "Maximaler Gesamtbetrag",
+    "input": "Ursprünglicher Zahlungsauftrag",
+    "destination": "Ermitteltes Zahlungsziel",
+    "wallet": "Wallet",
+    "credential": "Delegierter Zugangsschlüssel",
+    "expires": "Freigabe läuft ab",
+    "retry_help": "Mit der Freigabe kann der ursprüngliche Zugangsschlüssel die Zahlung einmal erneut einreichen. Die Wallet prüft ihre aktuellen Limits, bevor sie Guthaben reserviert oder überträgt.",
+    "decision_error": "Die Entscheidung konnte nicht gespeichert werden. Schließe die Zahlung und prüfe die aktuelle Liste.",
+    "reject": "Ablehnen",
+    "approve": "Erneuten Versuch freigeben",
+    "approved": "Erneuter Zahlungsversuch freigegeben.",
+    "rejected": "Zahlung abgelehnt."
+  },
+  "spending_templates": {
+    "title": "Mit einer Vorlage beginnen",
+    "conservative": "Zurückhaltend",
+    "moderate": "Moderat",
+    "generous": "Großzügig"
+  },
   "merchant_tools": {
     "title": "Händlerwerkzeuge",
     "routes": "Kostenpflichtige Routen",
@@ -1228,6 +1255,7 @@
     "sound": "Ton bei Zahlungsbenachrichtigungen abspielen"
   },
   "spending_policy": {
+    "approval_above_msat": "Freigabe erforderlich über",
     "title": "Ausgabenbudget",
     "load_error": "Das Budget konnte nicht geladen werden.",
     "loading": "Budget wird geladen …",
