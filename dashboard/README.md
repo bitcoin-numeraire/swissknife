@@ -43,9 +43,10 @@ public values for your own deployment before building a production image:
 
 `NEXT_PUBLIC_*` values are embedded at build time and visible in browser code;
 do not put credentials or private provider secrets there. Setting these variables
-only on a running container does not reconfigure the browser bundle. The Docker
-builds copy `.env.production`; local override files are excluded from the Docker
-context.
+only on a running container does not reconfigure the browser bundle. The standalone dashboard image uses `.env.production`. The all-in-one
+image defaults to local JWT and a same-origin API. Its root Dockerfile accepts
+`NEXT_PUBLIC_AUTH_METHOD` and `NEXT_PUBLIC_SERVER_URL` as build arguments
+for deployments that need a separate origin or an external identity provider.
 
 There are two build modes:
 

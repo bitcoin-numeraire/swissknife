@@ -48,7 +48,12 @@ COPY ./dashboard/package.json ./dashboard/yarn.lock* ./dashboard/.yarnrc.yml* ./
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_OPTIONS=--max-old-space-size=4096
 
-# Build in static export mode for bundling with backend
+# The bundled UI connects to its own backend and uses the local account flow.
+# Explicit build arguments take precedence over dashboard/.env.production.
+ARG NEXT_PUBLIC_SERVER_URL=""
+ARG NEXT_PUBLIC_AUTH_METHOD=jwt
+ENV NEXT_PUBLIC_SERVER_URL=$NEXT_PUBLIC_SERVER_URL
+ENV NEXT_PUBLIC_AUTH_METHOD=$NEXT_PUBLIC_AUTH_METHOD
 ENV BUILD_STATIC_EXPORT=true
 
 # Install dependencies with yarn cache mount
