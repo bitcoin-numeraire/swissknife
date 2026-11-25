@@ -26,8 +26,8 @@ use crate::{
     domains::{
         bitcoin::{
             BitcoinWallet, BtcAddressType, BtcBroadcastTransaction, BtcLockedUtxo, BtcNetwork, BtcOutput,
-            BtcOutputStatus, BtcPreparedTransaction, BtcTransaction, BtcTransactionOutput, OnchainSyncBatch,
-            OnchainSyncCursor, OnchainTransaction,
+            BtcOutputStatus, BtcPreparedTransaction, BtcTransaction, OnchainSyncBatch, OnchainSyncCursor,
+            OnchainTransaction,
         },
         invoice::{Invoice, InvoiceStatus, LnInvoiceOptions},
         payment::{LnPayment, LnPaymentTarget, Payment, PaymentStatus},
@@ -264,31 +264,6 @@ impl LndGrpcClient {
                 ..Default::default()
             }),
             ..Default::default()
-        }
-    }
-
-    fn transaction_from_lnrpc(transaction: lnrpc::Transaction) -> BtcTransaction {
-        let is_outgoing = transaction
-            .previous_outpoints
-            .iter()
-            .any(|outpoint| outpoint.is_our_output);
-
-        let outputs = transaction
-            .output_details
-            .into_iter()
-            .map(|detail| BtcTransactionOutput {
-                output_index: detail.output_index as u32,
-                address: detail.address,
-                amount_sat: detail.amount as u64,
-                is_ours: detail.is_our_address,
-            })
-            .collect();
-
-        BtcTransaction {
-            txid: transaction.tx_hash,
-            block_height: Some(transaction.block_height as u32),
-            outputs,
-            is_outgoing,
         }
     }
 }
@@ -632,7 +607,7 @@ impl BitcoinWallet for LndGrpcClient {
             .await;
 
         match response {
-            Ok(response) => Ok(Some(Self::transaction_from_lnrpc(response.into_inner()))),
+            Ok(response) => Ok(Some(BtcTransaction::from(response.into_inner()))),
             Err(err) => match err.code() {
                 Code::NotFound => Ok(None),
                 _ => Err(BitcoinError::GetTransaction(err.message().to_string())),
@@ -661,7 +636,7 @@ impl BitcoinWallet for LndGrpcClient {
         let transactions = response
             .transactions
             .into_iter()
-            .map(Self::transaction_from_lnrpc)
+            .map(BtcTransaction::from)
             .collect::<Vec<_>>();
 
         let mut result = Vec::new();

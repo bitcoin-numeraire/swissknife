@@ -5,5 +5,5 @@ mod server;
 
 pub use client_event_retention::ClientEventRetentionWorker;
 pub use event_listener::EventListener;
-pub use payment_worker::start_payment_workers;
+pub use payment_worker::{start_legacy_withdrawal_reconciliation, start_payment_workers};
 pub use server::Server;

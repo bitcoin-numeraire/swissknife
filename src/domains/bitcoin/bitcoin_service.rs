@@ -125,6 +125,30 @@ impl BitcoinUseCases for BitcoinService {
         Ok(n_deleted)
     }
 
+    async fn reconcile_legacy_withdrawals(&self) -> Result<(), ApplicationError> {
+        const KEY: &str = "replay_legacy_lnd_withdrawals";
+        if !self
+            .store
+            .config
+            .find(KEY)
+            .await?
+            .is_some_and(|value| value.as_bool() == Some(true))
+        {
+            return Ok(());
+        }
+        let history = self.wallet.synchronize(Some(OnchainSyncCursor::BlockHeight(0))).await?;
+        for record in history.events {
+            if let OnchainTransaction::Withdrawal(withdrawal) = record {
+                if withdrawal.unsigned_txid.is_some() {
+                    self.events.onchain_withdrawal(withdrawal).await?;
+                }
+            }
+        }
+        self.store.config.upsert(KEY, false.into()).await?;
+        info!("Historical LND withdrawal reconciliation completed");
+        Ok(())
+    }
+
     async fn sync(&self) -> Result<u32, ApplicationError> {
         trace!("Synchronizing on-chain bitcoin transactions...");
 
@@ -351,6 +375,7 @@ mod tests {
                                 ..Default::default()
                             }),
                             OnchainTransaction::Withdrawal(OnchainWithdrawalEvent {
+                                unsigned_txid: None,
                                 txid: "txid".to_string(),
                                 block_height: Some(200),
                             }),

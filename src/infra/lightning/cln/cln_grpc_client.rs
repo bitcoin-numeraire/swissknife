@@ -504,6 +504,7 @@ impl BitcoinWallet for ClnGrpcClient {
         let outputs = outputs?;
 
         Ok(Some(BtcTransaction {
+            unsigned_txid: None,
             txid: hex::encode(transaction.hash),
             block_height: Some(transaction.blockheight),
             outputs,
@@ -602,6 +603,7 @@ impl BitcoinWallet for ClnGrpcClient {
                     };
 
                     events.push(OnchainTransaction::Withdrawal(OnchainWithdrawalEvent {
+                        unsigned_txid: None,
                         txid: hex::encode(spending_txid),
                         block_height: Some(chainmove.blockheight),
                     }));

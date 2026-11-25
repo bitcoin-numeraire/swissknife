@@ -254,6 +254,7 @@ impl ClnGrpcListener {
                     };
 
                     let event = OnchainWithdrawalEvent {
+                        unsigned_txid: None,
                         txid: hex::encode(spending_txid),
                         block_height: Some(chainmove.blockheight),
                     };

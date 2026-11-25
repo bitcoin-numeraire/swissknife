@@ -215,7 +215,22 @@ impl EventUseCases for EventService {
             }
         };
 
-        let Some(mut payment) = self.store.payment.find_by_payment_hash(&event.txid).await? else {
+        let mut matched = self.store.payment.find_by_payment_hash(&event.txid).await?;
+        if matched.is_none() {
+            if let Some(unsigned) = event.unsigned_txid.as_deref() {
+                matched = self
+                    .store
+                    .payment
+                    .find_by_payment_hash(unsigned)
+                    .await?
+                    .filter(|payment| {
+                        payment.ledger == Ledger::Onchain
+                            && payment.status == PaymentStatus::Pending
+                            && payment.bitcoin.as_ref().is_some_and(|bitcoin| bitcoin.txid == unsigned)
+                    });
+            }
+        }
+        let Some(mut payment) = matched else {
             trace!(txid = %event.txid, "Ignoring bitcoin output not matching any known payment");
             return Ok(false);
         };
@@ -224,6 +239,7 @@ impl EventUseCases for EventService {
         payment.payment_time = Some(Utc::now());
 
         let bitcoin = payment.bitcoin.get_or_insert_with(Default::default);
+        bitcoin.txid.clone_from(&event.txid);
         bitcoin.block_height = Some(block_height);
 
         let stored_payment = self.store.payment_uow.settle(payment).await?;
@@ -793,6 +809,7 @@ mod tests {
             async fn ignores_it() {
                 // No store calls expected for an unconfirmed transaction.
                 let event = OnchainWithdrawalEvent {
+                    unsigned_txid: None,
                     txid: "txid".to_string(),
                     block_height: None,
                 };
@@ -804,6 +821,51 @@ mod tests {
 
                 assert!(!processed);
             }
+        }
+
+        #[tokio::test]
+        async fn repairs_only_the_pending_withdrawal_matching_the_exact_unsigned_template() {
+            let mut store = MockAppStoreBuilder::new();
+            store
+                .payment
+                .expect_find_by_payment_hash()
+                .withf(|hash| hash == "signed")
+                .times(1)
+                .returning(|_| Ok(None));
+            store
+                .payment
+                .expect_find_by_payment_hash()
+                .withf(|hash| hash == "unsigned")
+                .times(1)
+                .returning(|_| {
+                    Ok(Some(Payment {
+                        ledger: Ledger::Onchain,
+                        status: PaymentStatus::Pending,
+                        bitcoin: Some(crate::domains::payment::BtcPayment {
+                            txid: "unsigned".into(),
+                            ..Default::default()
+                        }),
+                        ..Default::default()
+                    }))
+                });
+            store
+                .payment_uow
+                .expect_settle()
+                .times(1)
+                .withf(|p| {
+                    p.bitcoin
+                        .as_ref()
+                        .is_some_and(|b| b.txid == "signed" && b.block_height == Some(45))
+                })
+                .returning(Ok);
+            assert!(service(store)
+                .onchain_withdrawal(OnchainWithdrawalEvent {
+                    txid: "signed".into(),
+                    unsigned_txid: Some("unsigned".into()),
+                    block_height: Some(45)
+                })
+                .await
+                .unwrap());
         }
 
         mod when_payment_is_unknown {
@@ -819,6 +881,7 @@ mod tests {
                     .returning(|_| Ok(None));
 
                 let event = OnchainWithdrawalEvent {
+                    unsigned_txid: None,
                     txid: "txid".to_string(),
                     block_height: Some(800_000),
                 };
@@ -851,6 +914,7 @@ mod tests {
                     .returning(Ok);
 
                 let event = OnchainWithdrawalEvent {
+                    unsigned_txid: None,
                     txid: "txid".to_string(),
                     block_height: Some(800_000),
                 };

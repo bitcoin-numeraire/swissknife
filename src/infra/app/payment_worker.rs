@@ -21,3 +21,12 @@ pub fn start_payment_workers(services: Arc<AppServices>) {
         });
     }
 }
+
+pub fn start_legacy_withdrawal_reconciliation(services: Arc<AppServices>) {
+    tokio::spawn(async move {
+        while let Err(error) = services.bitcoin.reconcile_legacy_withdrawals().await {
+            tracing::warn!(%error, "Historical LND withdrawal reconciliation will retry");
+            tokio::time::sleep(Duration::from_secs(60)).await;
+        }
+    });
+}

@@ -36,6 +36,20 @@ pub fn signed_transaction(
     Ok(crate::domains::bitcoin::BtcBroadcastTransaction::Signed(signed))
 }
 
+/// Older LND withdrawals stored the unsigned PSBT id. Match the entire transaction
+/// template, including all inputs and outputs, after verifying the node's reported id.
+pub fn legacy_unsigned_txid(txid: &str, raw_tx_hex: &str) -> Option<String> {
+    let bytes = hex::decode(raw_tx_hex).ok()?;
+    let mut tx: bitcoin::Transaction = bitcoin::consensus::deserialize(&bytes).ok()?;
+    if tx.input.iter().all(|input| input.script_sig.is_empty()) || tx.compute_txid().to_string() != txid {
+        return None;
+    }
+    for input in &mut tx.input {
+        input.script_sig = bitcoin::ScriptBuf::new();
+    }
+    Some(tx.compute_txid().to_string())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -64,6 +78,16 @@ mod tests {
         let mut finalized = tx.clone();
         finalized.input[0].script_sig = ScriptBuf::from_bytes([vec![22, 0, 20], vec![7; 20]].concat());
         assert_ne!(tx.compute_txid(), finalized.compute_txid());
+        let wire = hex::encode(serialize(&finalized));
+        assert_eq!(
+            legacy_unsigned_txid(&finalized.compute_txid().to_string(), &wire),
+            Some(tx.compute_txid().to_string())
+        );
+        assert_eq!(legacy_unsigned_txid(&tx.compute_txid().to_string(), &wire), None);
+        assert_eq!(
+            legacy_unsigned_txid(&tx.compute_txid().to_string(), &hex::encode(serialize(&tx))),
+            None
+        );
         let verified = signed_transaction(&psbt, &serialize(&finalized)).unwrap();
         assert_eq!(verified.txid(), finalized.compute_txid().to_string());
         finalized.output[0].value = Amount::from_sat(11_999);

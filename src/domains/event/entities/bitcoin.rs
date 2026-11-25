@@ -23,6 +23,8 @@ impl From<BtcOutput> for OnchainDepositEvent {
 
 #[derive(Debug, Clone, Default)]
 pub struct OnchainWithdrawalEvent {
+    /// Pre-signing PSBT ID reconstructed from the verified final transaction, when different.
+    pub unsigned_txid: Option<String>,
     pub txid: String,
     pub block_height: Option<u32>,
 }

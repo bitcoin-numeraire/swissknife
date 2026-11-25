@@ -488,6 +488,7 @@ impl BitcoinWallet for ClnRestClient {
         let outputs = outputs?;
 
         Ok(Some(BtcTransaction {
+            unsigned_txid: None,
             txid: transaction.hash,
             block_height: Some(transaction.blockheight),
             outputs,
@@ -581,6 +582,7 @@ impl BitcoinWallet for ClnRestClient {
                     };
 
                     events.push(OnchainTransaction::Withdrawal(OnchainWithdrawalEvent {
+                        unsigned_txid: None,
                         txid: spending_txid,
                         block_height: chainmove.blockheight,
                     }));

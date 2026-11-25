@@ -20,5 +20,6 @@ pub trait BitcoinUseCases: Send + Sync {
     async fn list_addresses(&self, filter: BtcAddressFilter) -> Result<Vec<BtcAddress>, ApplicationError>;
     async fn delete_address(&self, id: Uuid) -> Result<(), ApplicationError>;
     async fn delete_many_addresses(&self, filter: BtcAddressFilter) -> Result<u64, ApplicationError>;
+    async fn reconcile_legacy_withdrawals(&self) -> Result<(), ApplicationError>;
     async fn sync(&self) -> Result<u32, ApplicationError>;
 }

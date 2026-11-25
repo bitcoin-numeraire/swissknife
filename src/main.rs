@@ -14,7 +14,9 @@ use tokio::signal::{
 };
 use tracing::{debug, error, info};
 
-use crate::application::composition::{AppAdapters, AppServices, RecoveryAdapters, RecoveryServices};
+use crate::application::composition::{
+    AppAdapters, AppServices, LightningProvider, RecoveryAdapters, RecoveryServices,
+};
 use crate::infra::{
     app::{ClientEventRetentionWorker, EventListener, Server},
     cli::Cli,
@@ -79,6 +81,13 @@ async fn main() {
     if let Err(err) = event_listener.start().await {
         error!(%err, "failed to start event listener");
         exit(1);
+    }
+
+    if matches!(
+        config.ln_provider,
+        LightningProvider::LndGrpc | LightningProvider::LndRest
+    ) {
+        crate::infra::app::start_legacy_withdrawal_reconciliation(services.clone());
     }
 
     crate::infra::app::start_payment_workers(services.clone());

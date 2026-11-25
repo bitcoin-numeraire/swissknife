@@ -7,7 +7,7 @@ use tracing::warn;
 use crate::{
     application::{composition::AppServices, errors::LightningError},
     domains::{
-        bitcoin::{BitcoinWallet, BtcTransaction, BtcTransactionOutput, OnchainSyncCursor},
+        bitcoin::{BitcoinWallet, BtcTransaction, OnchainSyncCursor},
         event::LnInvoicePaidEvent,
     },
     infra::lightning::{
@@ -83,7 +83,7 @@ impl LndGrpcListener {
             .await
             .map_err(|e| LightningError::Listener(format!("Failed to read transaction stream: {}", e)))?
         {
-            let transaction = Self::map_transaction(transaction);
+            let transaction = BtcTransaction::from(transaction);
             self.handle_transaction(transaction).await?;
         }
 
@@ -115,41 +115,6 @@ impl LndGrpcListener {
             .map_err(|err| LightningError::EventProcessing(err.to_string()))?;
 
         Ok(())
-    }
-
-    fn map_transaction(transaction: lnrpc::Transaction) -> BtcTransaction {
-        let is_outgoing = transaction
-            .previous_outpoints
-            .iter()
-            .any(|outpoint| outpoint.is_our_output);
-
-        let outputs = transaction
-            .output_details
-            .into_iter()
-            .filter_map(|detail| {
-                let output_index = u32::try_from(detail.output_index).ok()?;
-                let amount = u64::try_from(detail.amount).ok()?;
-                Some(BtcTransactionOutput {
-                    output_index,
-                    address: detail.address,
-                    amount_sat: amount,
-                    is_ours: detail.is_our_address,
-                })
-            })
-            .collect();
-
-        let block_height = if transaction.block_height > 0 {
-            Some(transaction.block_height as u32)
-        } else {
-            None
-        };
-
-        BtcTransaction {
-            txid: transaction.tx_hash,
-            block_height,
-            outputs,
-            is_outgoing,
-        }
     }
 
     async fn handle_transaction(&self, transaction: BtcTransaction) -> Result<(), LightningError> {
