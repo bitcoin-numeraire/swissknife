@@ -2,6 +2,8 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum DatabaseError {
+    #[error("A payment with this identifier already exists")]
+    DuplicatePayment,
     #[error("Monetary amount exceeds the supported storage range")]
     AmountOutOfRange,
 

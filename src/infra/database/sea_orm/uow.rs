@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use sea_orm::{DatabaseConnection, TransactionTrait};
+use sea_orm::{DatabaseConnection, DatabaseTransaction, TransactionTrait};
 
 use crate::{
     application::errors::{ApplicationError, DataError, DatabaseError},
@@ -7,7 +7,10 @@ use crate::{
         bitcoin::{BtcAddress, BtcAddressRepository, BtcOutput, BtcOutputRepository},
         event::{ClientEventType, EventProjectionUnitOfWork},
         invoice::{Invoice, InvoiceRepository},
-        payment::{Payment, PaymentRepository, PaymentStatus, PaymentUnitOfWork},
+        payment::{
+            ClaimedPayment, Payment, PaymentInstructions, PaymentRepository, PaymentStatus, PaymentUnitOfWork,
+            SubmissionKey, SubmittedPayment,
+        },
         wallet::WalletRepository,
     },
 };
@@ -28,22 +31,56 @@ impl SeaOrmPaymentUnitOfWork {
     }
 }
 
+pub(super) async fn reserve_in_transaction(
+    txn: &DatabaseTransaction,
+    mut payment: Payment,
+    reserve_amount_msat: u64,
+) -> Result<Payment, ApplicationError> {
+    let wallet_repo = SeaOrmWalletRepository::new(txn);
+    if !wallet_repo.reserve(payment.wallet_id, reserve_amount_msat).await? {
+        return Err(DataError::InsufficientFunds(reserve_amount_msat as f64).into());
+    }
+    payment.reserved_amount = reserve_amount_msat;
+
+    Ok(SeaOrmPaymentRepository::new(txn).insert(payment).await?)
+}
+
 #[async_trait]
 impl PaymentUnitOfWork for SeaOrmPaymentUnitOfWork {
-    async fn reserve(&self, mut payment: Payment, reserve_amount_msat: u64) -> Result<Payment, ApplicationError> {
+    async fn submission_by_id(
+        &self,
+        wallet_id: Option<uuid::Uuid>,
+        id: uuid::Uuid,
+    ) -> Result<Option<SubmittedPayment>, ApplicationError> {
+        super::payment_command::by_id(&self.db, wallet_id, id).await
+    }
+
+    async fn submitted(&self, key: &SubmissionKey) -> Result<Option<SubmittedPayment>, ApplicationError> {
+        super::payment_command::submitted(&self.db, key).await
+    }
+
+    async fn submit(
+        &self,
+        key: &SubmissionKey,
+        payment: Payment,
+        reserve_amount: u64,
+        instructions: PaymentInstructions,
+    ) -> Result<SubmittedPayment, ApplicationError> {
+        super::payment_command::submit(&self.db, key, payment, reserve_amount, instructions).await
+    }
+
+    async fn claim(&self) -> Result<Option<ClaimedPayment>, ApplicationError> {
+        super::payment_command::claim(&self.db).await
+    }
+
+    async fn reserve(&self, payment: Payment, reserve_amount_msat: u64) -> Result<Payment, ApplicationError> {
         let txn = self
             .db
             .begin()
             .await
             .map_err(|e| DatabaseError::Transaction(e.to_string()))?;
 
-        let wallet_repo = SeaOrmWalletRepository::new(&txn);
-        if !wallet_repo.reserve(payment.wallet_id, reserve_amount_msat).await? {
-            return Err(DataError::InsufficientFunds(reserve_amount_msat as f64).into());
-        }
-        payment.reserved_amount = reserve_amount_msat;
-
-        let payment = SeaOrmPaymentRepository::new(&txn).insert(payment).await?;
+        let payment = reserve_in_transaction(&txn, payment, reserve_amount_msat).await?;
 
         txn.commit()
             .await

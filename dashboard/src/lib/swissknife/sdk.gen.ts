@@ -29,8 +29,10 @@ import {
   getInvoiceResponseTransformer,
   getLocalLoginResponseTransformer,
   getPaymentResponseTransformer,
+  getPaymentSubmissionResponseTransformer,
   getWalletInvoiceResponseTransformer,
   getWalletPaymentResponseTransformer,
+  getWalletPaymentSubmissionResponseTransformer,
   getWalletResponseTransformer,
   listAccountApiKeysResponseTransformer,
   listAccountNotificationsResponseTransformer,
@@ -57,6 +59,8 @@ import {
   replaceAccountPermissionsResponseTransformer,
   resetLocalLoginResponseTransformer,
   streamAccountEventsResponseTransformer,
+  submitPaymentResponseTransformer,
+  submitWalletPaymentResponseTransformer,
   updateAccountAddressResponseTransformer,
   updateAccountByIdResponseTransformer,
   updateAccountPreferencesResponseTransformer,
@@ -179,6 +183,9 @@ import type {
   GetPaymentData,
   GetPaymentErrors,
   GetPaymentResponses,
+  GetPaymentSubmissionData,
+  GetPaymentSubmissionErrors,
+  GetPaymentSubmissionResponses,
   GetWalletBalanceData,
   GetWalletBalanceErrors,
   GetWalletBalanceResponses,
@@ -190,6 +197,9 @@ import type {
   GetWalletPaymentData,
   GetWalletPaymentErrors,
   GetWalletPaymentResponses,
+  GetWalletPaymentSubmissionData,
+  GetWalletPaymentSubmissionErrors,
+  GetWalletPaymentSubmissionResponses,
   GetWalletResponses,
   HealthCheckData,
   HealthCheckErrors,
@@ -302,6 +312,12 @@ import type {
   StreamAccountEventsErrors,
   StreamAccountEventsResponse,
   StreamAccountEventsResponses,
+  SubmitPaymentData,
+  SubmitPaymentErrors,
+  SubmitPaymentResponses,
+  SubmitWalletPaymentData,
+  SubmitWalletPaymentErrors,
+  SubmitWalletPaymentResponses,
   UpdateAccountAddressData,
   UpdateAccountAddressErrors,
   UpdateAccountAddressResponses,
@@ -1601,6 +1617,48 @@ export const estimateWalletPaymentFee = <ThrowOnError extends boolean = false>(
   });
 
 /**
+ * Reserve wallet funds and accept an external Lightning payment.
+ */
+export const submitWalletPayment = <ThrowOnError extends boolean = false>(
+  options: Options<SubmitWalletPaymentData, ThrowOnError>
+): RequestResult<SubmitWalletPaymentResponses, SubmitWalletPaymentErrors, ThrowOnError> =>
+  (options.client ?? client).post<
+    SubmitWalletPaymentResponses,
+    SubmitWalletPaymentErrors,
+    ThrowOnError
+  >({
+    responseTransformer: submitWalletPaymentResponseTransformer,
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/me/wallets/{wallet_id}/payments/submissions',
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
+
+/**
+ * Read the authoritative execution and settlement state for a wallet submission.
+ */
+export const getWalletPaymentSubmission = <ThrowOnError extends boolean = false>(
+  options: Options<GetWalletPaymentSubmissionData, ThrowOnError>
+): RequestResult<
+  GetWalletPaymentSubmissionResponses,
+  GetWalletPaymentSubmissionErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    GetWalletPaymentSubmissionResponses,
+    GetWalletPaymentSubmissionErrors,
+    ThrowOnError
+  >({
+    responseTransformer: getWalletPaymentSubmissionResponseTransformer,
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/me/wallets/{wallet_id}/payments/submissions/{id}',
+    ...options,
+  });
+
+/**
  * Get a wallet payment.
  */
 export const getWalletPayment = <ThrowOnError extends boolean = false>(
@@ -1684,6 +1742,40 @@ export const estimatePaymentFee = <ThrowOnError extends boolean = false>(
       'Content-Type': 'application/json',
       ...options.headers,
     },
+  });
+
+/**
+ * Accept an external Lightning payment for background execution.
+ */
+export const submitPayment = <ThrowOnError extends boolean = false>(
+  options: Options<SubmitPaymentData, ThrowOnError>
+): RequestResult<SubmitPaymentResponses, SubmitPaymentErrors, ThrowOnError> =>
+  (options.client ?? client).post<SubmitPaymentResponses, SubmitPaymentErrors, ThrowOnError>({
+    responseTransformer: submitPaymentResponseTransformer,
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/payments/submissions',
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
+
+/**
+ * Read the authoritative execution and settlement state for an administrative payment submission.
+ */
+export const getPaymentSubmission = <ThrowOnError extends boolean = false>(
+  options: Options<GetPaymentSubmissionData, ThrowOnError>
+): RequestResult<GetPaymentSubmissionResponses, GetPaymentSubmissionErrors, ThrowOnError> =>
+  (options.client ?? client).get<
+    GetPaymentSubmissionResponses,
+    GetPaymentSubmissionErrors,
+    ThrowOnError
+  >({
+    responseTransformer: getPaymentSubmissionResponseTransformer,
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/payments/submissions/{id}',
+    ...options,
   });
 
 /**

@@ -9,7 +9,7 @@ use axum_extra::extract::Query;
 use utoipa::OpenApi;
 use uuid::Uuid;
 
-use swissknife_types::{ErrorResponse, SendPaymentRequest};
+use swissknife_types::{ErrorResponse, PaymentSubmission, SendPaymentRequest, SubmitPaymentRequest};
 
 use crate::{
     application::{
@@ -31,7 +31,7 @@ use super::{BtcPayment, InternalPayment, LnPayment, Payment, PaymentFeeEstimate,
 
 #[derive(OpenApi)]
 #[openapi(
-    paths(estimate_payment_fee, pay, get_payment, list_payments, delete_payment, delete_payments),
+    paths(submit_payment, get_payment_submission, estimate_payment_fee, pay, get_payment, list_payments, delete_payment, delete_payments),
     components(schemas(
         Payment,
         PaymentFeeEstimate,
@@ -39,6 +39,8 @@ use super::{BtcPayment, InternalPayment, LnPayment, Payment, PaymentFeeEstimate,
         BtcPayment,
         InternalPayment,
         SendPaymentRequest,
+        SubmitPaymentRequest,
+        PaymentSubmission,
         PaymentStatus,
         LnUrlSuccessAction
     )),
@@ -51,12 +53,64 @@ pub const CONTEXT_PATH: &str = "/v1/payments";
 
 pub fn router() -> Router<Arc<AppServices>> {
     Router::new()
+        .route("/submissions", post(submit_payment))
+        .route("/submissions/{id}", get(get_payment_submission))
         .route("/fee-estimate", post(estimate_payment_fee))
         .route("/", post(pay))
         .route("/", get(list_payments))
         .route("/{id}", get(get_payment))
         .route("/{id}", delete(delete_payment))
         .route("/", delete(delete_payments))
+}
+
+/// Accept an external Lightning payment for background execution.
+#[utoipa::path(post, path = "/submissions", context_path = CONTEXT_PATH, tag = "Payments", request_body = SubmitPaymentRequest,
+    responses((status = 202, description = "Durable payment submission", body = PaymentSubmission), (status = 403, description = "Missing permission", body = ErrorResponse), (status = 409, description = "Conflicting idempotency key", body = ErrorResponse), (status = 422, description = "Invalid payment", body = ErrorResponse)))]
+async fn submit_payment(
+    State(services): State<Arc<AppServices>>,
+    user: User,
+    Json(request): Json<SubmitPaymentRequest>,
+) -> Result<
+    (
+        axum::http::StatusCode,
+        [(axum::http::HeaderName, String); 1],
+        Json<PaymentSubmission>,
+    ),
+    ApplicationError,
+> {
+    user.check_permission(Permission::WriteTransaction)?;
+    let wallet = request
+        .wallet_id
+        .ok_or_else(|| DataError::Malformed("wallet_id is required".into()))?;
+    let submission = services
+        .payment
+        .submit_lightning(wallet, request)
+        .await?
+        .response("/v1/payments/submissions");
+    services.payment_command_available.notify_one();
+    Ok((
+        axum::http::StatusCode::ACCEPTED,
+        [(axum::http::header::LOCATION, submission.status_url.clone())],
+        Json(submission),
+    ))
+}
+
+/// Read the authoritative execution and settlement state for an administrative payment submission.
+#[utoipa::path(get, path = "/submissions/{id}", context_path = CONTEXT_PATH, tag = "Payments",
+    params(("id" = Uuid, Path, description = "Payment ID")), responses((status = 200, body = PaymentSubmission), (status = 404, body = ErrorResponse)))]
+async fn get_payment_submission(
+    State(services): State<Arc<AppServices>>,
+    user: User,
+    Path(id): Path<Uuid>,
+) -> Result<Json<PaymentSubmission>, ApplicationError> {
+    user.check_permission(Permission::ReadTransaction)?;
+    Ok(Json(
+        services
+            .payment
+            .submission(None, id)
+            .await?
+            .response("/v1/payments/submissions"),
+    ))
 }
 
 /// Estimate an outgoing payment fee

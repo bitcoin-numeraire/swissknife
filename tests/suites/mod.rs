@@ -15,6 +15,7 @@ mod ln_addresses;
 mod lnurl_send;
 mod me;
 mod oauth2;
+mod payment_submissions;
 mod payments;
 mod system;
 mod wallets;

@@ -2,11 +2,32 @@ use async_trait::async_trait;
 
 use crate::{application::errors::ApplicationError, domains::invoice::Invoice};
 
-use super::Payment;
+use super::{ClaimedPayment, Payment, PaymentInstructions, SubmissionKey, SubmittedPayment};
 
 #[cfg_attr(test, mockall::automock)]
 #[async_trait]
 pub trait PaymentUnitOfWork: Send + Sync {
+    async fn submission_by_id(
+        &self,
+        wallet_id: Option<uuid::Uuid>,
+        id: uuid::Uuid,
+    ) -> Result<Option<SubmittedPayment>, ApplicationError>;
+
+    /// Return the original result for a matching wallet-scoped request.
+    async fn submitted(&self, key: &SubmissionKey) -> Result<Option<SubmittedPayment>, ApplicationError>;
+
+    /// Reserve funds, attach provider instructions and publish acceptance in one database transaction.
+    async fn submit(
+        &self,
+        key: &SubmissionKey,
+        payment: Payment,
+        reserve_amount: u64,
+        instructions: PaymentInstructions,
+    ) -> Result<SubmittedPayment, ApplicationError>;
+
+    /// Commit the dispatch boundary before contacting the provider. Only one worker can claim a command.
+    async fn claim(&self) -> Result<Option<ClaimedPayment>, ApplicationError>;
+
     /// Reserve `reserve_amount_msat` and insert a pending outgoing payment, atomically.
     async fn reserve(&self, payment: Payment, reserve_amount_msat: u64) -> Result<Payment, ApplicationError>;
 

@@ -142,6 +142,8 @@ export const zClientEventStreamQuery = z.object({
 export const zClientEventType = z.enum([
   'invoice.pending',
   'invoice.paid',
+  'payment.accepted',
+  'payment.processing',
   'payment.settled',
   'payment.failed',
 ]);
@@ -181,10 +183,13 @@ export const zCreateWalletRequest = z.object({
   asset_id: z.uuid(),
 });
 
+export const zErrorCode = z.enum(['internal_transfer_required']);
+
 /**
  * Application error response
  */
 export const zErrorResponse = z.object({
+  code: zErrorCode.nullish(),
   reason: z.string(),
   status: z.string(),
 });
@@ -477,6 +482,8 @@ export const zPatchAccountPreferencesRequest = z.object({
   dashboard_settings: z.record(z.string(), z.unknown()),
 });
 
+export const zPaymentExecutionState = z.enum(['accepted', 'processing', 'settled', 'failed']);
+
 /**
  * Fee quote for a prospective outgoing payment.
  *
@@ -543,6 +550,12 @@ export const zPayment = z.object({
   status: zPaymentStatus,
   updated_at: z.iso.datetime().nullish(),
   wallet_id: z.uuid(),
+});
+
+export const zPaymentSubmission = z.object({
+  payment: zPayment,
+  state: zPaymentExecutionState,
+  status_url: z.string(),
 });
 
 /**
@@ -698,6 +711,30 @@ export const zSignUpRequest = z.object({
   display_name: z.string().nullish(),
   password: z.string(),
   username: z.string(),
+});
+
+/**
+ * Accept an external Lightning payment for durable execution.
+ */
+export const zSubmitPaymentRequest = z.object({
+  amount_msat: z.coerce
+    .bigint()
+    .gte(BigInt(0))
+    .max(BigInt('9223372036854775807'), {
+      error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
+    })
+    .nullish(),
+  comment: z.string().nullish(),
+  idempotency_key: z.uuid(),
+  input: z.string(),
+  maximum_fee_msat: z.coerce
+    .bigint()
+    .gte(BigInt(0))
+    .max(BigInt('9223372036854775807'), {
+      error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
+    })
+    .nullish(),
+  wallet_id: z.uuid().nullish(),
 });
 
 /**
@@ -1763,6 +1800,21 @@ export const zEstimateWalletPaymentFeePath = z.object({
  */
 export const zEstimateWalletPaymentFeeResponse = zPaymentFeeEstimate;
 
+export const zSubmitWalletPaymentBody = zSubmitPaymentRequest;
+
+export const zSubmitWalletPaymentPath = z.object({
+  wallet_id: z.uuid(),
+});
+
+export const zSubmitWalletPaymentResponse = zPaymentSubmission;
+
+export const zGetWalletPaymentSubmissionPath = z.object({
+  wallet_id: z.uuid(),
+  id: z.uuid(),
+});
+
+export const zGetWalletPaymentSubmissionResponse = zPaymentSubmission;
+
 export const zGetWalletPaymentPath = z.object({
   wallet_id: z.uuid(),
   id: z.uuid(),
@@ -1849,6 +1901,19 @@ export const zEstimatePaymentFeeBody = zSendPaymentRequest;
  * Fee estimated
  */
 export const zEstimatePaymentFeeResponse = zPaymentFeeEstimate;
+
+export const zSubmitPaymentBody = zSubmitPaymentRequest;
+
+/**
+ * Durable payment submission
+ */
+export const zSubmitPaymentResponse = zPaymentSubmission;
+
+export const zGetPaymentSubmissionPath = z.object({
+  id: z.uuid(),
+});
+
+export const zGetPaymentSubmissionResponse = zPaymentSubmission;
 
 export const zDeletePaymentPath = z.object({
   id: z.uuid(),

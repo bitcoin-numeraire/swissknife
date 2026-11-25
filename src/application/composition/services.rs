@@ -17,6 +17,7 @@ use crate::{
 };
 
 pub struct AppServices {
+    pub payment_command_available: tokio::sync::Notify,
     pub notification: Box<dyn crate::domains::notification::NotificationUseCases>,
     pub invoice: Box<dyn InvoiceUseCases>,
     pub payment: Box<dyn PaymentsUseCases>,
@@ -100,6 +101,7 @@ impl AppServices {
         );
 
         AppServices {
+            payment_command_available: tokio::sync::Notify::new(),
             invoice: Box::new(invoices),
             payment: Box::new(payments),
             wallet: Box::new(wallet),
@@ -163,6 +165,7 @@ impl MockAppServicesBuilder {
 
     pub fn build(self) -> AppServices {
         AppServices {
+            payment_command_available: tokio::sync::Notify::new(),
             invoice: Box::new(self.invoice),
             payment: Box::new(self.payment),
             wallet: Box::new(self.wallet),

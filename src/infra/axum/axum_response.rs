@@ -19,6 +19,9 @@ impl IntoResponse for ApplicationError {
             ApplicationError::Authentication(error) => error.into_response(),
             ApplicationError::Authorization(error) => error.into_response(),
             ApplicationError::Data(error) => error.into_response(),
+            ApplicationError::Database(crate::application::errors::DatabaseError::DuplicatePayment) => {
+                DataError::Conflict("A payment for this invoice already exists".into()).into_response()
+            }
             ApplicationError::Lightning(error) => error.into_response(),
             ApplicationError::Bitcoin(error) => error.into_response(),
             _ => {
@@ -94,6 +97,12 @@ impl IntoResponse for AuthenticationError {
 impl IntoResponse for DataError {
     fn into_response(self) -> Response {
         let (error_message, status) = match self {
+            DataError::InternalTransferRequired => {
+                let status = StatusCode::UNPROCESSABLE_ENTITY;
+                let mut body = generate_body(status, self.to_string());
+                body.code = Some(swissknife_types::ErrorCode::InternalTransferRequired);
+                return (status, body).into_response();
+            }
             DataError::NotFound(_) => {
                 debug!("{}", self);
                 (self.to_string(), StatusCode::NOT_FOUND)
@@ -160,6 +169,7 @@ impl IntoResponse for BitcoinError {
 fn generate_body(status: StatusCode, reason: String) -> Json<ErrorResponse> {
     ErrorResponse {
         status: status.to_string(),
+        code: None,
         reason,
     }
     .into()

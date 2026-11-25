@@ -21,6 +21,8 @@ import { dashboardSettings } from './account-selection';
 import { notificationPreferences } from './notification-preferences';
 
 const eventKinds = {
+  [ClientEventType.PAYMENT_ACCEPTED]: undefined,
+  [ClientEventType.PAYMENT_PROCESSING]: undefined,
   [ClientEventType.INVOICE_PENDING]: 'pending',
   [ClientEventType.INVOICE_PAID]: 'received',
   [ClientEventType.PAYMENT_SETTLED]: 'sent',

@@ -35,6 +35,7 @@ mod m20260904_192903_local_jwt_credentials;
 mod m20261105_223341_widen_btc_output_indexes;
 mod m20261118_154958_add_lnurl_invoice_verification;
 mod m20261125_165812_account_notification;
+mod m20261125_172416_add_payment_command;
 
 pub struct Migrator;
 
@@ -77,6 +78,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20261105_223341_widen_btc_output_indexes::Migration),
             Box::new(m20261118_154958_add_lnurl_invoice_verification::Migration),
             Box::new(m20261125_165812_account_notification::Migration),
+            Box::new(m20261125_172416_add_payment_command::Migration),
         ]
     }
 }

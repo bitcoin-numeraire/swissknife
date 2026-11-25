@@ -35,7 +35,7 @@ pub use auth::{
     ResetLocalPasswordRequest, SignInRequest, SignInResponse, SignUpRequest, UpdateLocalLoginRequest,
 };
 pub use bitcoin::{BtcAddress, BtcAddressFilter, BtcAddressType, BtcOutput, BtcOutputStatus, NewBtcAddressRequest};
-pub use error::ErrorResponse;
+pub use error::{ErrorCode, ErrorResponse};
 pub use event::{ClientEvent, ClientEventStreamQuery, ClientEventType};
 pub use invoice::{
     Invoice, InvoiceFilter, InvoiceOrderBy, InvoiceStatus, LnInvoice, LnUrlInvoiceData, NewInvoiceRequest,
@@ -49,8 +49,8 @@ pub use network::BtcNetwork;
 pub use nostr::{NostrNIP05QueryParams, NostrNIP05Response};
 pub use notification::*;
 pub use payment::{
-    BtcPayment, InternalPayment, LnPayment, Payment, PaymentFeeEstimate, PaymentFilter, PaymentStatus,
-    SendPaymentRequest,
+    BtcPayment, InternalPayment, LnPayment, Payment, PaymentExecutionState, PaymentFeeEstimate, PaymentFilter,
+    PaymentStatus, PaymentSubmission, SendPaymentRequest, SubmitPaymentRequest,
 };
 pub use permission::Permission;
 pub use query::OrderDirection;

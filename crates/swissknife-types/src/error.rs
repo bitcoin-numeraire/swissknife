@@ -11,4 +11,15 @@ pub struct ErrorResponse {
     /// Error reason
     #[schema(example = "error message")]
     pub reason: String,
+
+    /// Optional machine-readable explanation for clients that can act on this error.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub code: Option<ErrorCode>,
+}
+
+#[derive(Debug, Deserialize, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ErrorCode {
+    /// No command was accepted. The destination belongs to this installation.
+    InternalTransferRequired,
 }
