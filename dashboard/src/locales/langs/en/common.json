@@ -1,4 +1,32 @@
 {
+  "node_health": {
+    "title": "Node health",
+    "refresh": "Refresh",
+    "unavailable": "Unavailable",
+    "failed": "Could not refresh node data.",
+    "outbound": "Outbound liquidity",
+    "inbound": "Inbound liquidity",
+    "confirmed": "Confirmed on-chain",
+    "unconfirmed": "Unconfirmed on-chain",
+    "lnd_basis": "LND liquidity estimates use active-channel balances after channel reserves. Routing fees and pending HTLC limits can reduce the amount a payment can use.",
+    "cln_basis": "Core Lightning reports spendable and receivable amounts for active channels.",
+    "channels": "Channels",
+    "summary": "{{active}} of {{total}} active · {{peers}} connected peers · Block {{height}}",
+    "peer": "Peer and channel",
+    "status": "Status",
+    "active": "Active",
+    "inactive": "Inactive",
+    "alerts": {
+      "info_unavailable": "Check provider connectivity and access to node information.",
+      "peers_unavailable": "Check provider access to the peer list.",
+      "channels_unavailable": "Check provider access to the channel list.",
+      "onchain_unavailable": "Check provider access to on-chain balances.",
+      "chain_not_synced": "The node is still synchronizing with the blockchain.",
+      "no_connected_peers": "The node has no connected peers.",
+      "no_active_channels": "The node has no active channels.",
+      "liquidity_unavailable": "Liquidity is unavailable for one or more active channels."
+    }
+  },
   "overview": "Overview",
   "money": "Wallet",
   "activity": "Activity",

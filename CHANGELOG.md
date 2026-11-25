@@ -10,6 +10,8 @@ release notes when a tag is published.
 
 ### Added
 
+- The dashboard shows live provider liquidity, channel status and balances to operators with node read access.
+
 - Administrators can read provider peers, channel liquidity, on-chain balances, and node alerts with the read:ln_node permission.
 
 ## [0.3.5] - 2026-11-21

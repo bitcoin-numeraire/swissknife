@@ -76,6 +76,7 @@ export const paths = {
     contacts: '/wallet/contacts',
   },
   admin: {
+    node: '/admin/node',
     accounts: '/admin/accounts',
     account: (id: string) => `/admin/accounts?id=${id}`,
     wallets: '/admin/wallets',
