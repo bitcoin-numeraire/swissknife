@@ -122,6 +122,14 @@ impl WalletUseCases for WalletService {
             .ok_or_else(|| DataError::NotFound("Wallet not found.".into()).into())
     }
 
+    async fn transaction_displays(
+        &self,
+        ids: &[Uuid],
+        include_account: bool,
+    ) -> Result<Vec<swissknife_types::TransactionWalletDisplay>, ApplicationError> {
+        Ok(self.store.wallet.transaction_displays(ids, include_account).await?)
+    }
+
     async fn get_balance(&self, id: Uuid) -> Result<Balance, ApplicationError> {
         trace!(%id, "Fetching balance");
 

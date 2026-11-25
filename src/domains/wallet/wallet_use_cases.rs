@@ -20,6 +20,11 @@ pub trait WalletUseCases: Send + Sync {
         account_id: Option<Uuid>,
         period: WalletStatementPeriod,
     ) -> Result<WalletStatement, ApplicationError>;
+    async fn transaction_displays(
+        &self,
+        ids: &[Uuid],
+        include_account: bool,
+    ) -> Result<Vec<swissknife_types::TransactionWalletDisplay>, ApplicationError>;
     async fn get_balance(&self, id: Uuid) -> Result<Balance, ApplicationError>;
     async fn list_contacts(&self, id: Uuid) -> Result<Vec<Contact>, ApplicationError>;
     async fn delete(&self, id: Uuid) -> Result<(), ApplicationError>;

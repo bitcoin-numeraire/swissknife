@@ -640,6 +640,38 @@ export const zSignUpRequest = z.object({
 });
 
 /**
+ * Wallet presentation fields attached to administrative transaction listings.
+ */
+export const zTransactionWalletDisplay = z.object({
+  account_id: z.uuid().nullish(),
+  account_label: z.string().nullish(),
+  account_subject: z.string().nullish(),
+  display_ticker: z.string(),
+  network: z.string(),
+  username: z.string().nullish(),
+  wallet_id: z.uuid(),
+  wallet_label: z.string().nullish(),
+});
+
+/**
+ * An administrative invoice retains the original invoice fields on the wire.
+ */
+export const zAdminInvoiceSummary = zInvoice.and(
+  z.object({
+    wallet_display: zTransactionWalletDisplay.nullish(),
+  })
+);
+
+/**
+ * An administrative payment retains the original payment fields on the wire.
+ */
+export const zAdminPaymentSummary = zPayment.and(
+  z.object({
+    wallet_display: zTransactionWalletDisplay.nullish(),
+  })
+);
+
+/**
  * Replace permissions stored for an account.
  */
 export const zUpdateAccountPermissionsRequest = z.object({
@@ -1172,7 +1204,7 @@ export const zListInvoicesQuery = z.object({
 /**
  * Success
  */
-export const zListInvoicesResponse = z.array(zInvoice);
+export const zListInvoicesResponse = z.array(zAdminInvoiceSummary);
 
 export const zGenerateInvoiceBody = zNewInvoiceRequest;
 
@@ -1741,7 +1773,7 @@ export const zListPaymentsQuery = z.object({
 /**
  * Success
  */
-export const zListPaymentsResponse = z.array(zPayment);
+export const zListPaymentsResponse = z.array(zAdminPaymentSummary);
 
 export const zPayBody = zSendPaymentRequest;
 

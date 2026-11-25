@@ -2992,7 +2992,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/Invoice"
+                    "$ref": "#/components/schemas/AdminInvoiceSummary"
                   }
                 }
               }
@@ -7164,7 +7164,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/Payment"
+                    "$ref": "#/components/schemas/AdminPaymentSummary"
                   }
                 }
               }
@@ -8633,6 +8633,52 @@
             "description": "Date of update in database."
           }
         }
+      },
+      "AdminInvoiceSummary": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Invoice"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "wallet_display": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/TransactionWalletDisplay"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          }
+        ],
+        "description": "An administrative invoice retains the original invoice fields on the wire."
+      },
+      "AdminPaymentSummary": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Payment"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "wallet_display": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/TransactionWalletDisplay"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          }
+        ],
+        "description": "An administrative payment retains the original payment fields on the wire."
       },
       "ApiKey": {
         "type": "object",
@@ -10346,6 +10392,58 @@
             "type": "string",
             "description": "Owner username, normalized to lowercase. Use 3 to 64 ASCII letters,\ndigits, dots, underscores, or hyphens.",
             "example": "admin"
+          }
+        }
+      },
+      "TransactionWalletDisplay": {
+        "type": "object",
+        "description": "Wallet presentation fields attached to administrative transaction listings.",
+        "required": [
+          "wallet_id",
+          "display_ticker",
+          "network"
+        ],
+        "properties": {
+          "account_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "account_label": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "account_subject": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "display_ticker": {
+            "type": "string"
+          },
+          "network": {
+            "type": "string"
+          },
+          "username": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "wallet_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "wallet_label": {
+            "type": [
+              "string",
+              "null"
+            ]
           }
         }
       },

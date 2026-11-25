@@ -3,8 +3,8 @@
 import type { TFunction } from 'i18next';
 import type { IFiatPrices } from 'src/types/bitcoin';
 import type { LabelColor } from 'src/components/label';
-import type { Wallet, Account, Invoice, Payment } from 'src/lib/swissknife';
 import type { ITransaction, ITransactionTableFilters } from 'src/types/transaction';
+import type { Invoice, Payment, TransactionWalletDisplay } from 'src/lib/swissknife';
 
 import { mutate } from 'swr';
 import { sumBy } from 'es-toolkit';
@@ -15,7 +15,6 @@ import Tab from '@mui/material/Tab';
 import Card from '@mui/material/Card';
 import Link from '@mui/material/Link';
 import Tabs from '@mui/material/Tabs';
-import Alert from '@mui/material/Alert';
 import Table from '@mui/material/Table';
 import Stack from '@mui/material/Stack';
 import Button from '@mui/material/Button';
@@ -51,7 +50,6 @@ import {
 import { CONFIG } from 'src/global-config';
 import { useTranslate } from 'src/locales';
 import { endpointKeys } from 'src/actions/keys';
-import { useListAccounts } from 'src/actions/account';
 import { useListPayments } from 'src/actions/payments';
 import { useListInvoices } from 'src/actions/invoices';
 import { DashboardContent } from 'src/layouts/dashboard';
@@ -114,7 +112,7 @@ type ActivityRow = ITransaction & {
   description_label: string;
   account_label: string;
   wallet_label: string;
-  owner?: { account: Account; wallet: Wallet };
+  owner?: TransactionWalletDisplay | null;
 };
 
 const fallbackFiatPrices: IFiatPrices = { USD: 0, EUR: 0, CHF: 0 };
@@ -211,22 +209,18 @@ function isOpenAmountRequest(tx: ITransaction) {
   );
 }
 
-function makeRow(
-  tx: ITransaction,
-  scope: ActivityScope,
-  owner?: ActivityRow['owner']
-): ActivityRow {
+function makeRow(tx: ITransaction, scope: ActivityScope): ActivityRow {
   const direction = txDirection(tx);
+  const owner = scope === 'admin' ? tx.wallet_display : undefined;
 
   return {
     ...tx,
     owner,
-    account_label: owner
-      ? owner.account.display_name || owner.account.identity?.subject || owner.account.id
-      : '',
-    wallet_label: owner
-      ? owner.wallet.label || owner.wallet.asset?.name || owner.wallet.id
-      : tx.wallet_id,
+    account_label:
+      owner?.account_label ||
+      owner?.account_subject ||
+      (owner?.account_id ? compactId(owner.account_id) : ''),
+    wallet_label: owner?.wallet_label || owner?.username || compactId(tx.wallet_id),
     direction,
     row_key: `${tx.transaction_type}-${tx.id}`,
     detail_page_href: detailPageHrefForScope(tx, scope),
@@ -286,9 +280,9 @@ function applyFilter({
         tx.wallet_id.toLowerCase().includes(value) ||
         tx.account_label.toLowerCase().includes(value) ||
         tx.wallet_label.toLowerCase().includes(value) ||
-        !!tx.owner?.account.id.toLowerCase().includes(value) ||
-        !!tx.owner?.account.identity?.subject.toLowerCase().includes(value) ||
-        !!tx.owner?.wallet.ln_address?.username.toLowerCase().includes(value)
+        !!tx.owner?.account_id?.toLowerCase().includes(value) ||
+        !!tx.owner?.account_subject?.toLowerCase().includes(value) ||
+        !!tx.owner?.username?.toLowerCase().includes(value)
       );
     });
   }
@@ -414,9 +408,6 @@ function AdminActivityLedger({
   initialWalletId?: string | null;
   route?: ActivityRoute;
 }) {
-  const { user } = useAuthContext();
-  const canReadAccounts = hasAllPermissions([Permission.READ_ACCOUNT], user?.permissions);
-  const { accounts, accountsError } = useListAccounts(canReadAccounts);
   const { invoices, invoicesLoading, invoicesError } = useListInvoices();
   const { payments, paymentsLoading, paymentsError } = useListPayments();
 
@@ -424,8 +415,6 @@ function AdminActivityLedger({
     <RoleBasedGuard permissions={[Permission.READ_TRANSACTION]} hasContent>
       <ActivityLedger
         scope="admin"
-        accounts={accounts}
-        ownershipError={!!accountsError}
         kind={kind}
         invoices={invoices || []}
         payments={payments || []}
@@ -445,8 +434,6 @@ function AdminActivityLedger({
 }
 
 function ActivityLedger({
-  accounts,
-  ownershipError,
   scope,
   walletId,
   kind,
@@ -463,8 +450,6 @@ function ActivityLedger({
   onCleanSuccess,
 }: {
   scope: ActivityScope;
-  accounts?: Account[];
-  ownershipError?: boolean;
   walletId?: string;
   kind: ActivityTransactionKind;
   invoices: Invoice[];
@@ -506,22 +491,10 @@ function ActivityLedger({
   const visibleInvoices = useMemo(() => (kind === 'payment' ? [] : invoices), [invoices, kind]);
   const visiblePayments = useMemo(() => (kind === 'invoice' ? [] : payments), [kind, payments]);
 
-  const owners = useMemo(
-    () =>
-      new Map(
-        (accounts ?? []).flatMap((account) =>
-          account.wallets.map((wallet) => [wallet.id, { account, wallet }] as const)
-        )
-      ),
-    [accounts]
-  );
-
   const rows = useMemo(
     () =>
-      mergeAndSortTransactions(visibleInvoices, visiblePayments).map((tx) =>
-        makeRow(tx, scope, owners.get(tx.wallet_id))
-      ),
-    [scope, visibleInvoices, visiblePayments, owners]
+      mergeAndSortTransactions(visibleInvoices, visiblePayments).map((tx) => makeRow(tx, scope)),
+    [scope, visibleInvoices, visiblePayments]
   );
 
   useEffect(() => {
@@ -871,11 +844,6 @@ function ActivityLedger({
                 ))}
               </Tabs>
 
-              {ownershipError && (
-                <Alert severity="warning" sx={{ m: 2 }}>
-                  {t('activity_view.ownership_unavailable')}
-                </Alert>
-              )}
               <TransactionTableToolbar
                 filters={filters}
                 onResetPage={table.onResetPage}
@@ -1027,6 +995,8 @@ function ActivityTableRow({
   const popover = usePopover();
   const confirm = useBoolean();
   const isDeleting = useBoolean();
+  const { user } = useAuthContext();
+  const canReadWallets = hasAllPermissions([Permission.READ_WALLET], user?.permissions);
   const invoice = row.transaction_type === TransactionType.INVOICE ? (row as Invoice) : null;
   const payment = row.transaction_type === TransactionType.PAYMENT ? (row as Payment) : null;
   const invoiceBolt11 = invoice?.ln_invoice?.bolt11;
@@ -1076,20 +1046,20 @@ function ActivityTableRow({
         {scope === 'admin' && (
           <>
             <TableCell>
-              {row.owner ? (
+              {row.owner?.account_id ? (
                 <ListItemText
                   sx={{ maxWidth: 180 }}
                   primary={
                     <Link
                       color="inherit"
-                      href={paths.admin.account(row.owner.account.id)}
+                      href={paths.admin.account(row.owner.account_id)}
                       onClick={(event) => event.stopPropagation()}
-                      title={`${row.account_label} (${row.owner.account.id})`}
+                      title={`${row.account_label} (${row.owner.account_id})`}
                     >
                       {row.account_label}
                     </Link>
                   }
-                  secondary={compactId(row.owner.account.id)}
+                  secondary={compactId(row.owner.account_id)}
                   slotProps={{
                     primary: { noWrap: true, sx: { typography: 'body2' } },
                     secondary: { sx: { typography: 'caption' } },
@@ -1105,22 +1075,22 @@ function ActivityTableRow({
               <ListItemText
                 sx={{ maxWidth: 180 }}
                 primary={
-                  <Link
-                    color="inherit"
-                    href={paths.admin.wallet(row.wallet_id)}
-                    onClick={(event) => event.stopPropagation()}
-                    title={`${row.wallet_label} (${row.wallet_id})`}
-                  >
-                    {row.wallet_label}
-                  </Link>
+                  canReadWallets ? (
+                    <Link
+                      color="inherit"
+                      href={paths.admin.wallet(row.wallet_id)}
+                      onClick={(event) => event.stopPropagation()}
+                      title={`${row.wallet_label} (${row.wallet_id})`}
+                    >
+                      {row.wallet_label}
+                    </Link>
+                  ) : (
+                    row.wallet_label
+                  )
                 }
                 secondary={
                   row.owner
-                    ? [
-                        row.owner.wallet.asset?.display_ticker,
-                        row.owner.wallet.asset?.network,
-                        compactId(row.wallet_id),
-                      ]
+                    ? [row.owner.display_ticker, row.owner.network, compactId(row.wallet_id)]
                         .filter(Boolean)
                         .join(' · ')
                     : undefined

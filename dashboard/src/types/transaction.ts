@@ -1,9 +1,10 @@
 import type { IDatePickerControl } from './common';
-import type { Invoice, Payment } from 'src/lib/swissknife';
+import type { Invoice, Payment, TransactionWalletDisplay } from 'src/lib/swissknife';
 
-export type ITransaction =
-  | (Payment & { transaction_type?: TransactionType })
-  | (Invoice & { transaction_type?: TransactionType });
+export type ITransaction = (Payment | Invoice) & {
+  transaction_type?: TransactionType;
+  wallet_display?: TransactionWalletDisplay | null;
+};
 
 export enum TransactionType {
   INVOICE = 'INVOICE',

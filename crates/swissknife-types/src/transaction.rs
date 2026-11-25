@@ -21,3 +21,37 @@ pub enum Currency {
     Simnet,
     Signet,
 }
+
+/// Wallet presentation fields attached to administrative transaction listings.
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+pub struct TransactionWalletDisplay {
+    pub wallet_id: uuid::Uuid,
+    pub wallet_label: Option<String>,
+    pub username: Option<String>,
+    pub display_ticker: String,
+    pub network: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub account_id: Option<uuid::Uuid>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub account_label: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub account_subject: Option<String>,
+}
+
+/// An administrative invoice retains the original invoice fields on the wire.
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+pub struct AdminInvoiceSummary {
+    #[serde(flatten)]
+    pub invoice: crate::Invoice,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub wallet_display: Option<TransactionWalletDisplay>,
+}
+
+/// An administrative payment retains the original payment fields on the wire.
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+pub struct AdminPaymentSummary {
+    #[serde(flatten)]
+    pub payment: crate::Payment,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub wallet_display: Option<TransactionWalletDisplay>,
+}

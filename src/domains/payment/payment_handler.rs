@@ -9,7 +9,7 @@ use axum_extra::extract::Query;
 use utoipa::OpenApi;
 use uuid::Uuid;
 
-use swissknife_types::{ErrorResponse, SendPaymentRequest};
+use swissknife_types::{AdminPaymentSummary, ErrorResponse, SendPaymentRequest};
 
 use crate::{
     application::{
@@ -168,7 +168,7 @@ async fn get_payment(
     context_path = CONTEXT_PATH,
     params(PaymentFilter),
     responses(
-        (status = 200, description = "Success", body = Vec<Payment>),
+        (status = 200, description = "Success", body = Vec<AdminPaymentSummary>),
         (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
         (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
         (status = 403, description = "Forbidden", body = ErrorResponse, example = json!(FORBIDDEN_EXAMPLE)),
@@ -179,12 +179,24 @@ async fn list_payments(
     State(services): State<Arc<AppServices>>,
     user: User,
     Query(query_params): Query<PaymentFilter>,
-) -> Result<Json<Vec<Payment>>, ApplicationError> {
+) -> Result<Json<Vec<AdminPaymentSummary>>, ApplicationError> {
     user.check_permission(Permission::ReadTransaction)?;
 
     let payments = services.payment.list(query_params).await?;
 
-    Ok(Json(payments))
+    Ok(Json(
+        crate::domains::wallet::administrative_summaries(
+            services.wallet.as_ref(),
+            &user,
+            payments,
+            |row| row.wallet_id,
+            |payment, wallet_display| AdminPaymentSummary {
+                payment,
+                wallet_display,
+            },
+        )
+        .await?,
+    ))
 }
 
 /// Delete a payment
