@@ -10,7 +10,7 @@ release notes when a tag is published.
 
 ### Added
 
-- Operators can sell time-limited access to a fixed HTTP resource for a Lightning invoice credited to a selected wallet.
+- Operators can sell time passes, single requests, or request packs for a fixed HTTP resource. The selected wallet receives the Lightning payment. Successful responses share a durable allowance across serving instances.
 
 - Connect an MCP client to a single SwissKnife wallet over stdio to inspect balances, issue invoices, and submit and track approved Lightning payments.
 

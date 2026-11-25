@@ -34,6 +34,7 @@ pub struct MerchantRoute {
     pub target: String,
     pub price_sats: u64,
     pub access_seconds: u32,
+    pub requests_per_payment: Option<NonZeroU32>,
     #[serde(default = "default_issue_limit")]
     pub challenges_per_minute: NonZeroU32,
 }

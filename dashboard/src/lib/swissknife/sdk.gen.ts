@@ -467,7 +467,7 @@ export const wellKnownNostr = <ThrowOnError extends boolean = false>(
 /**
  * Fetch a fixed merchant resource with an L402 access pass. Each configured
  * route advertises its invoice in WWW-Authenticate. A paid pass can be reused
- * until the expiry set when its challenge was issued.
+ * until expiry or exhaustion of its configured request allowance.
  */
 export const getPaidResource = <ThrowOnError extends boolean = false>(
   options: Options<GetPaidResourceData, ThrowOnError>

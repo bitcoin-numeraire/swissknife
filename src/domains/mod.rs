@@ -4,6 +4,7 @@ pub mod asset;
 pub mod bitcoin;
 pub mod event;
 pub mod invoice;
+pub mod l402;
 pub mod ln_address;
 pub mod lnurl;
 pub mod nostr;

@@ -33,6 +33,11 @@ pub enum GateError {
 pub trait InvoiceGate: Send + Sync {
     async fn invoice(&self) -> Result<ChallengeInvoice, GateError>;
     async fn redeem(&self, grant: &PaidGrant) -> Result<bool, GateError>;
+    /// For read-only resources, atomically claim usage after preparing a successful
+    /// response. A competing request may already have claimed the last use.
+    async fn record_success(&self, _grant: &PaidGrant) -> Result<bool, GateError> {
+        Ok(true)
+    }
 }
 
 pub struct PaidRoute {
@@ -71,12 +76,14 @@ pub async fn require_payment(
     {
         if route.gate.redeem(&grant).await? {
             request.headers_mut().remove(header::AUTHORIZATION);
-            request.extensions_mut().insert(grant);
+            request.extensions_mut().insert(grant.clone());
             let mut response = next.run(request).await;
-            response
-                .headers_mut()
-                .insert(header::CACHE_CONTROL, HeaderValue::from_static("private, no-store"));
-            return Ok(response);
+            if !response.status().is_success() || route.gate.record_success(&grant).await? {
+                response
+                    .headers_mut()
+                    .insert(header::CACHE_CONTROL, HeaderValue::from_static("private, no-store"));
+                return Ok(response);
+            }
         }
     }
     let invoice = route.gate.invoice().await?;

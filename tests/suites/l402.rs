@@ -158,3 +158,82 @@ async fn a_real_invoice_unlocks_only_the_selected_merchant_resource() {
     assert_eq!(repriced.status(), StatusCode::PAYMENT_REQUIRED);
     app.stop();
 }
+
+#[tokio::test]
+async fn a_paid_pack_survives_failure_restart_and_competing_replicas() {
+    let setup = TestApp::isolated("pack", &[]).await;
+    let owner = setup
+        .create_account_with_wallet(setup.admin_token().await, "pack-merchant")
+        .await;
+    let upstream = MockServer::start().await;
+    let env = [
+        ("SWISSKNIFE_L402__ROOT_KEY", hex::encode([18u8; 32])),
+        ("SWISSKNIFE_L402__ROUTES__DATA__WALLET_ID", owner.wallet.id.to_string()),
+        (
+            "SWISSKNIFE_L402__ROUTES__DATA__TARGET",
+            format!("{}/read", upstream.uri()),
+        ),
+        ("SWISSKNIFE_L402__ROUTES__DATA__PRICE_SATS", "21".into()),
+        ("SWISSKNIFE_L402__ROUTES__DATA__ACCESS_SECONDS", "600".into()),
+        ("SWISSKNIFE_L402__ROUTES__DATA__REQUESTS_PER_PAYMENT", "3".into()),
+    ];
+    let app = setup.restart("pack-first", &env).await;
+    let http = Client::new();
+    let url = |app: &TestApp| format!("{}/l402/data", app.base_url);
+    let challenge = http.get(url(&app)).send().await.unwrap();
+    assert_eq!(challenge.status(), StatusCode::PAYMENT_REQUIRED);
+    let (macaroon, invoice) = challenge.headers()[header::WWW_AUTHENTICATE]
+        .to_str()
+        .unwrap()
+        .strip_prefix("L402 macaroon=\"")
+        .unwrap()
+        .strip_suffix('"')
+        .unwrap()
+        .split_once("\", invoice=\"")
+        .unwrap();
+    let preimage = Counterparty::for_provider(&app.provider).pay_for_preimage(invoice);
+    let proof = format!("L402 {macaroon}:{preimage}");
+    let paid = |app: &TestApp| http.get(url(app)).header(header::AUTHORIZATION, &proof).send();
+    // The mock's default 404 produces a gateway error and consumes no request.
+    assert_eq!(paid(&app).await.unwrap().status(), StatusCode::BAD_GATEWAY);
+    Mock::given(method("GET"))
+        .and(path("/read"))
+        .respond_with(ResponseTemplate::new(200).set_body_string("delivery"))
+        .mount(&upstream)
+        .await;
+    assert_eq!(paid(&app).await.unwrap().text().await.unwrap(), "delivery");
+    let app = app.restart("pack-resumed", &env).await;
+    let replica = app.replica("pack-replica", &env).await;
+    let results = futures_util::future::join_all((0..8).map(|i| paid(if i % 2 == 0 { &app } else { &replica }))).await;
+    let mut deliveries = 0;
+    for response in results {
+        let response = response.unwrap();
+        match response.status() {
+            StatusCode::OK => {
+                assert_eq!(response.text().await.unwrap(), "delivery");
+                deliveries += 1;
+            }
+            StatusCode::PAYMENT_REQUIRED => {
+                assert!(response.headers().contains_key(header::WWW_AUTHENTICATE));
+            }
+            other => panic!("unexpected pack redemption status {other}"),
+        }
+    }
+    assert_eq!(deliveries, 2);
+    let count = upstream.received_requests().await.unwrap().len();
+    assert_eq!(paid(&replica).await.unwrap().status(), StatusCode::PAYMENT_REQUIRED);
+    assert_eq!(count, upstream.received_requests().await.unwrap().len());
+    wait_until(Duration::from_secs(40), "one pack payment credited", || async {
+        app.wallet_balance(app.admin_token().await, owner.wallet.id)
+            .await
+            .available_msat
+            == 21_000
+    })
+    .await;
+    replica.stop();
+    let mut enlarged = env;
+    enlarged[5].1 = "10".into();
+    let changed = app.restart("pack-new-terms", &enlarged).await;
+    assert_eq!(paid(&changed).await.unwrap().status(), StatusCode::PAYMENT_REQUIRED);
+    changed.stop();
+}

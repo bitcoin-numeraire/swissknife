@@ -14,6 +14,7 @@ pub mod client_event;
 pub mod config;
 pub mod contact;
 pub mod invoice;
+pub mod l402_usage;
 pub mod ln_address;
 pub mod local_credential;
 pub mod offer_cursor;

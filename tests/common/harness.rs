@@ -216,6 +216,11 @@ impl TestApp {
     /// Restart against the same database. Pass any non-default test configuration again.
     pub async fn restart(&self, label: &str, extra_env: &[(&str, String)]) -> Self {
         self.stop();
+        self.replica(label, extra_env).await
+    }
+
+    /// Start another process serving the same database and original node.
+    pub async fn replica(&self, label: &str, extra_env: &[(&str, String)]) -> Self {
         let label = format!("{}-{}-{label}", self.database, self.provider);
         let spawned = spawn_with_database(&self.database_url, &self.provider, &label, extra_env).await;
         Self {

@@ -45,8 +45,13 @@ pub fn router(
 
     for (name, route) in &config.routes {
         let (url, price_msat) = route.validate(name).map_err(WebServerError::Merchant)?;
-        let binding = serde_json::to_vec(&(name, route.wallet_id, url.as_str(), price_msat, route.access_seconds))
-            .map_err(|_| WebServerError::Merchant("could not bind L402 route scope"))?;
+        let terms = (name, route.wallet_id, url.as_str(), price_msat, route.access_seconds);
+        // Retain the original scope for already-paid time passes.
+        let binding = match route.requests_per_payment {
+            Some(limit) => serde_json::to_vec(&(terms, limit)),
+            None => serde_json::to_vec(&terms),
+        }
+        .map_err(|_| WebServerError::Merchant("could not bind L402 route scope"))?;
         let paid = Arc::new(PaidRoute {
             scope: sha256::Hash::hash(&binding).to_string(),
             validity: Duration::from_secs(u64::from(route.access_seconds)),
@@ -56,6 +61,7 @@ pub fn router(
                 name: name.clone(),
                 wallet_id: route.wallet_id,
                 price_msat,
+                requests_per_payment: route.requests_per_payment,
                 invoice_seconds: (route.access_seconds / 2).min(120),
                 challenges: ChallengeLimit::new(route.challenges_per_minute),
             }),
@@ -78,7 +84,7 @@ pub struct MerchantHandler;
 
 /// Fetch a fixed merchant resource with an L402 access pass. Each configured
 /// route advertises its invoice in WWW-Authenticate. A paid pass can be reused
-/// until the expiry set when its challenge was issued.
+/// until expiry or exhaustion of its configured request allowance.
 #[utoipa::path(get, path="/l402/{name}", tag="L402", security((), ("l402" = [])),
     params(("name" = String, Path, description = "Operator-configured merchant route")),
     responses((status=200, description="Paid resource", content_type="application/octet-stream", body=Vec<u8>),
