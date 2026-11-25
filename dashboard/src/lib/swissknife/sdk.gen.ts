@@ -136,6 +136,12 @@ import type {
   EstimateWalletPaymentFeeData,
   EstimateWalletPaymentFeeErrors,
   EstimateWalletPaymentFeeResponses,
+  ExportAccountWalletStatementData,
+  ExportAccountWalletStatementErrors,
+  ExportAccountWalletStatementResponses,
+  ExportWalletStatementData,
+  ExportWalletStatementErrors,
+  ExportWalletStatementResponses,
   GenerateBtcAddressData,
   GenerateBtcAddressErrors,
   GenerateBtcAddressResponses,
@@ -1539,6 +1545,26 @@ export const getWalletPayment = <ThrowOnError extends boolean = false>(
   });
 
 /**
+ * Download wallet activity as a CSV statement. The date interval applies to transaction creation.
+ */
+export const exportAccountWalletStatement = <ThrowOnError extends boolean = false>(
+  options: Options<ExportAccountWalletStatementData, ThrowOnError>
+): RequestResult<
+  ExportAccountWalletStatementResponses,
+  ExportAccountWalletStatementErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    ExportAccountWalletStatementResponses,
+    ExportAccountWalletStatementErrors,
+    ThrowOnError
+  >({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/me/wallets/{wallet_id}/statement',
+    ...options,
+  });
+
+/**
  * Delete payments
  *
  * Deletes all payments matching a filter. Returns the number deleted. Deleting a payment can affect the wallet balance.
@@ -1810,5 +1836,21 @@ export const getWallet = <ThrowOnError extends boolean = false>(
     responseTransformer: getWalletResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/v1/wallets/{id}',
+    ...options,
+  });
+
+/**
+ * Download wallet activity as a CSV statement. The date interval applies to transaction creation.
+ */
+export const exportWalletStatement = <ThrowOnError extends boolean = false>(
+  options: Options<ExportWalletStatementData, ThrowOnError>
+): RequestResult<ExportWalletStatementResponses, ExportWalletStatementErrors, ThrowOnError> =>
+  (options.client ?? client).get<
+    ExportWalletStatementResponses,
+    ExportWalletStatementErrors,
+    ThrowOnError
+  >({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/wallets/{id}/statement',
     ...options,
   });

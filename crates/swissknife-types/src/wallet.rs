@@ -184,3 +184,10 @@ pub struct WalletFilter {
     #[serde(default)]
     pub order_direction: OrderDirection,
 }
+
+/// Creation-time interval for a wallet activity statement, with an exclusive upper bound.
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, IntoParams, ToSchema)]
+pub struct WalletStatementPeriod {
+    pub from: DateTime<Utc>,
+    pub until: DateTime<Utc>,
+}

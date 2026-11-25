@@ -3,7 +3,7 @@ use uuid::Uuid;
 
 use crate::application::errors::ApplicationError;
 
-use super::{Balance, Contact, Wallet, WalletFilter, WalletOverview};
+use super::{Balance, Contact, Wallet, WalletFilter, WalletOverview, WalletStatement, WalletStatementPeriod};
 
 #[cfg_attr(test, mockall::automock)]
 #[async_trait]
@@ -14,6 +14,12 @@ pub trait WalletUseCases: Send + Sync {
     async fn verify_ownership(&self, account_id: Uuid, id: Uuid) -> Result<(), ApplicationError>;
     async fn list(&self, filter: WalletFilter) -> Result<Vec<Wallet>, ApplicationError>;
     async fn list_overviews(&self) -> Result<Vec<WalletOverview>, ApplicationError>;
+    async fn statement(
+        &self,
+        wallet_id: Uuid,
+        account_id: Option<Uuid>,
+        period: WalletStatementPeriod,
+    ) -> Result<WalletStatement, ApplicationError>;
     async fn get_balance(&self, id: Uuid) -> Result<Balance, ApplicationError>;
     async fn list_contacts(&self, id: Uuid) -> Result<Vec<Contact>, ApplicationError>;
     async fn delete(&self, id: Uuid) -> Result<(), ApplicationError>;

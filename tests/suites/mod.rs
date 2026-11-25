@@ -17,5 +17,6 @@ mod me;
 mod oauth2;
 mod payments;
 mod system;
+mod wallet_statements;
 mod wallets;
 mod well_known;

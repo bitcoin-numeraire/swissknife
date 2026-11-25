@@ -4668,6 +4668,49 @@ export type GetWalletPaymentResponses = {
 
 export type GetWalletPaymentResponse = GetWalletPaymentResponses[keyof GetWalletPaymentResponses];
 
+export type ExportAccountWalletStatementData = {
+  body?: never;
+  path: {
+    /**
+     * Wallet ID
+     */
+    wallet_id: string;
+  };
+  query: {
+    from: Date;
+    until: Date;
+  };
+  url: '/v1/me/wallets/{wallet_id}/statement';
+};
+
+export type ExportAccountWalletStatementErrors = {
+  /**
+   * Invalid date interval
+   */
+  400: ErrorResponse;
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Wallet not found
+   */
+  404: ErrorResponse;
+};
+
+export type ExportAccountWalletStatementError =
+  ExportAccountWalletStatementErrors[keyof ExportAccountWalletStatementErrors];
+
+export type ExportAccountWalletStatementResponses = {
+  /**
+   * Wallet activity, oldest first
+   */
+  200: string;
+};
+
+export type ExportAccountWalletStatementResponse =
+  ExportAccountWalletStatementResponses[keyof ExportAccountWalletStatementResponses];
+
 export type DeletePaymentsData = {
   body?: never;
   path?: never;
@@ -5362,3 +5405,50 @@ export type GetWalletResponses = {
 };
 
 export type GetWalletResponse = GetWalletResponses[keyof GetWalletResponses];
+
+export type ExportWalletStatementData = {
+  body?: never;
+  path: {
+    /**
+     * Wallet ID
+     */
+    id: string;
+  };
+  query: {
+    from: Date;
+    until: Date;
+  };
+  url: '/v1/wallets/{id}/statement';
+};
+
+export type ExportWalletStatementErrors = {
+  /**
+   * Invalid date interval
+   */
+  400: ErrorResponse;
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Transaction read permission required
+   */
+  403: ErrorResponse;
+  /**
+   * Wallet not found
+   */
+  404: ErrorResponse;
+};
+
+export type ExportWalletStatementError =
+  ExportWalletStatementErrors[keyof ExportWalletStatementErrors];
+
+export type ExportWalletStatementResponses = {
+  /**
+   * Wallet activity, oldest first
+   */
+  200: string;
+};
+
+export type ExportWalletStatementResponse =
+  ExportWalletStatementResponses[keyof ExportWalletStatementResponses];

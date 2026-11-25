@@ -11,6 +11,7 @@ release notes when a tag is published.
 ### Added
 
 - Authenticated clients can discover available wallet assets through `GET /v1/assets`.
+- Export wallet activity as a UTC date-range CSV with exact millisatoshi amounts and fees.
 
 ## [0.3.5] - 2026-11-21
 
