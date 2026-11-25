@@ -1,0 +1,38 @@
+# Use the same locally built or digest-pinned SwissKnife version for both services.
+x-image: &swissknife-image ${SWISSKNIFE_IMAGE:?Set SWISSKNIFE_IMAGE to a build that includes wallet MCP}
+
+services:
+  wallet:
+    image: *swissknife-image
+    ports:
+      - "127.0.0.1:${SWISSKNIFE_PORT:-3000}:3000"
+    environment:
+      SWISSKNIFE_DATABASE__URL: sqlite:///var/lib/swissknife/wallet.sqlite?mode=rwc
+    volumes:
+      - wallet-data:/var/lib/swissknife
+      - type: bind
+        source: ${SWISSKNIFE_CONFIG:-./production.toml}
+        target: /config/production.toml
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${SWISSKNIFE_CERTS:-./certs}
+        target: /certs
+        read_only: true
+        bind:
+          create_host_path: false
+  mcp:
+    profiles: [mcp]
+    image: *swissknife-image
+    network_mode: service:wallet
+    command: ["mcp", "--server", "http://127.0.0.1:3000", "--wallet", "${SWISSKNIFE_WALLET_ID:-}"]
+    environment:
+      - SWISSKNIFE_MCP_WALLET_KEY
+    stdin_open: true
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+
+volumes:
+  wallet-data:
