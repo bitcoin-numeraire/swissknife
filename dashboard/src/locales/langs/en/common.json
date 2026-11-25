@@ -1,4 +1,10 @@
 {
+  "spending_templates": {
+    "title": "Start from a template",
+    "conservative": "Conservative",
+    "moderate": "Moderate",
+    "generous": "Generous"
+  },
   "notification_inbox": {
     "title": "Notifications",
     "open_one": "Notifications, {{count}} unread",

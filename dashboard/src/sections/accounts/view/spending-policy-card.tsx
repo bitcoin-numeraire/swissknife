@@ -40,6 +40,7 @@ import {
   parseLimits,
   usedPercent,
   satsFromMsat,
+  policyTemplates,
   type LimitsForm,
 } from './spending-limits';
 
@@ -150,6 +151,24 @@ export function SpendingPolicyCard({ accountId }: { accountId: string }) {
             <Typography variant="body2" color="text.secondary">
               {t('spending_policy.input_help')}
             </Typography>
+            <Box role="group" aria-labelledby="policy-template-label">
+              <Typography id="policy-template-label" variant="subtitle2" sx={{ mb: 1 }}>
+                {t('spending_templates.title')}
+              </Typography>
+              <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: 'wrap' }}>
+                {policyTemplates.map(({ name, limits }) => (
+                  <Button
+                    key={name}
+                    size="small"
+                    variant="outlined"
+                    disabled={pending}
+                    onClick={() => setForm({ ...limits })}
+                  >
+                    {t('spending_templates.' + name)}
+                  </Button>
+                ))}
+              </Stack>
+            </Box>
             {form &&
               limitFields.map((field) => (
                 <TextField

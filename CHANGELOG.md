@@ -10,6 +10,8 @@ release notes when a tag is published.
 
 ### Added
 
+- Start an account spending policy from one of three editable templates in the dashboard.
+
 - Operators can cap each delegated wallet credential’s outgoing payments over a rolling hour, including fees and reservations.
 
 - Operators can restrict delegated wallet payments to UTC weekdays and hours, including overnight shifts.

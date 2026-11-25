@@ -5,6 +5,40 @@ export const limitFields = ['per_payment_msat', 'agent_hourly_msat', ...periods]
 export type LimitField = (typeof limitFields)[number];
 export type LimitsForm = Record<LimitField, string>;
 
+// Form amounts are in sats. A template changes the editor until the operator saves.
+export const policyTemplates = [
+  {
+    name: 'conservative',
+    limits: {
+      per_payment_msat: '10',
+      agent_hourly_msat: '30',
+      daily_msat: '100',
+      weekly_msat: '500',
+      monthly_msat: '2000',
+    },
+  },
+  {
+    name: 'moderate',
+    limits: {
+      per_payment_msat: '50',
+      agent_hourly_msat: '150',
+      daily_msat: '500',
+      weekly_msat: '2500',
+      monthly_msat: '10000',
+    },
+  },
+  {
+    name: 'generous',
+    limits: {
+      per_payment_msat: '100',
+      agent_hourly_msat: '300',
+      daily_msat: '1000',
+      weekly_msat: '5000',
+      monthly_msat: '20000',
+    },
+  },
+] as const satisfies ReadonlyArray<{ name: string; limits: LimitsForm }>;
+
 export function satsFromMsat(msat: string): string {
   const value = BigInt(msat);
   const fraction = (value % BigInt(1000)).toString().padStart(3, '0').replace(/0+$/, '');
