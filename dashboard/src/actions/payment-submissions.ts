@@ -10,19 +10,22 @@ export function usePaymentSubmission(
   accountId: string | undefined,
   walletId: string | undefined,
   isAdmin: boolean,
-  receipt: PaymentSubmission | undefined
+  receipt: PaymentSubmission | undefined,
+  paymentId?: string
 ) {
-  const id = receipt?.payment.id;
+  const id = receipt?.payment.id ?? paymentId;
   return useSWR(
     id && accountId && walletId ? [paymentSubmissionKey, walletId, id, accountId, isAdmin] : null,
     async () => {
-      const { data } = isAdmin
-        ? await getPaymentSubmission({ path: { id: id! }, throwOnError: true })
+      const result = isAdmin
+        ? await getPaymentSubmission({ path: { id: id! } })
         : await getWalletPaymentSubmission({
             path: { wallet_id: walletId!, id: id! },
-            throwOnError: true,
           });
-      return data;
+      // Older synchronous payments have no submission resource.
+      if (result.response?.status === 404) return null;
+      if (result.error) throw result.error;
+      return result.data;
     },
     {
       fallbackData: receipt,

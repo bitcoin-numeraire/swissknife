@@ -207,7 +207,7 @@ describe('SendMoneyDrawer', () => {
       const onchain = `bitcoin:${address}?amount=0.0005`;
       expect(screen.getByPlaceholderText('send_money.recipient_placeholder')).toHaveValue(onchain);
       const quote = isAdmin ? estimatePaymentFee : estimateWalletPaymentFee;
-      const send = isAdmin ? pay : walletPay;
+      const send = isAdmin ? submitPayment : submitWalletPayment;
       expect(send).not.toHaveBeenCalled();
       expect(quote).not.toHaveBeenCalled();
       fireEvent.click(screen.getByRole('button', { name: 'send_money.estimate_fee' }));
@@ -221,12 +221,16 @@ describe('SendMoneyDrawer', () => {
           ...(isAdmin && { wallet_id: 'wallet-1' }),
         },
       });
+      expect(screen.getByRole('button', { name: 'send_money.send_onchain' })).toBeDisabled();
+      fireEvent.click(screen.getByRole('button', { name: 'send_money.use_fee_estimate' }));
       fireEvent.click(screen.getByRole('button', { name: 'send_money.send_onchain' }));
       await waitFor(() => expect(send).toHaveBeenCalledOnce());
       expect(vi.mocked(send).mock.calls[0][0]).toEqual({
         throwOnError: true,
         ...(!isAdmin && { path: { wallet_id: 'wallet-1' } }),
         body: {
+          idempotency_key: expect.any(String),
+          maximum_fee_msat: 1000,
           input: onchain,
           amount_msat: 50_000_000,
           comment: null,
@@ -249,9 +253,16 @@ describe('SendMoneyDrawer', () => {
     expect(screen.getByRole('button', { name: 'send_money.send_onchain' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'send_money.estimate_fee' })).toBeDisabled();
     fireEvent.change(screen.getByRole('spinbutton'), { target: { value: '50000' } });
+    expect(screen.getByRole('button', { name: 'send_money.send_onchain' })).toBeDisabled();
+    fireEvent.change(screen.getByLabelText('send_money.maximum_miner_fee'), {
+      target: { value: '350' },
+    });
     fireEvent.click(screen.getByRole('button', { name: 'send_money.send_onchain' }));
-    await waitFor(() => expect(walletPay).toHaveBeenCalledOnce());
-    expect(vi.mocked(walletPay).mock.calls[0][0]?.body).toEqual({
+    await waitFor(() => expect(submitWalletPayment).toHaveBeenCalledOnce());
+    expect(walletPay).not.toHaveBeenCalled();
+    expect(vi.mocked(submitWalletPayment).mock.calls[0][0]?.body).toEqual({
+      idempotency_key: expect.any(String),
+      maximum_fee_msat: 350_000,
       input: `bitcoin:${address}?message=Order%20%2342`,
       amount_msat: 50_000_000,
       comment: null,

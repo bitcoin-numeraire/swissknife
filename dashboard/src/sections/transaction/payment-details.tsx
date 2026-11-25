@@ -18,9 +18,13 @@ import {
 } from 'src/utils/bitcoin-explorer';
 
 import { useTranslate } from 'src/locales';
+import { useAccountContext } from 'src/contexts/account';
+import { usePaymentSubmission } from 'src/actions/payment-submissions';
 
 import { CopyButton } from 'src/components/copy';
 import { SatsWithIcon } from 'src/components/bitcoin';
+
+import { WithdrawalStatus } from 'src/sections/wallet/withdrawal-status';
 
 import { TransactionType } from 'src/types/transaction';
 
@@ -50,6 +54,15 @@ function compactHash(value?: string | null) {
 
 export function PaymentDetails({ payment, isAdmin }: Props) {
   const { t } = useTranslate();
+  const { account } = useAccountContext();
+  const { data: submission, mutate: refreshSubmission } = usePaymentSubmission(
+    account?.id,
+    payment.wallet_id,
+    Boolean(isAdmin),
+    undefined,
+    payment.ledger === 'Onchain' ? payment.id : undefined
+  );
+  const feeUnknown = payment.ledger === 'Onchain' && payment.fee_msat == null;
   const { ln_address, success_action, payment_hash, payment_preimage } = payment.lightning ?? {};
   const amountSent = payment.amount_msat || 0;
   const feeAmount = payment.fee_msat || 0;
@@ -61,7 +74,8 @@ export function PaymentDetails({ payment, isAdmin }: Props) {
   const methodLabel = getLedgerLabel(payment.ledger, t);
   const isLightning = payment.ledger === 'Lightning';
   const isInternal = payment.ledger === 'Internal';
-  const bitcoinAddress = payment.bitcoin?.address || payment.internal?.btc_address;
+  const bitcoinAddress =
+    payment.bitcoin?.address || submission?.withdrawal?.address || payment.internal?.btc_address;
   const bitcoinTxid = payment.bitcoin?.txid;
   const destination =
     ln_address ||
@@ -164,6 +178,7 @@ export function PaymentDetails({ payment, isAdmin }: Props) {
                   <Grid size={{ xs: 4 }}>
                     <MetricTile
                       title={t('payment_details.fees')}
+                      value={feeUnknown ? '—' : undefined}
                       amountMSats={feeAmount}
                       helper={feeHelper}
                     />
@@ -171,6 +186,7 @@ export function PaymentDetails({ payment, isAdmin }: Props) {
                   <Grid size={{ xs: 4 }}>
                     <MetricTile
                       title={t('payment_details.total_spent')}
+                      value={feeUnknown ? '—' : undefined}
                       amountMSats={totalAmount}
                       helper={t('payment_details.amount_plus_fees')}
                     />
@@ -200,6 +216,13 @@ export function PaymentDetails({ payment, isAdmin }: Props) {
                     </Typography>
                   </Stack>
 
+                  {submission?.withdrawal && (
+                    <WithdrawalStatus
+                      submission={submission}
+                      isAdmin={Boolean(isAdmin)}
+                      refresh={refreshSubmission}
+                    />
+                  )}
                   {payment.error && (
                     <Alert severity="error" variant="outlined">
                       {payment.error}

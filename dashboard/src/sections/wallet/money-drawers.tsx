@@ -93,9 +93,9 @@ import { varFade, MotionContainer } from 'src/components/animate';
 
 import { useFeeEstimate } from './use-fee-estimate';
 import { getFeeEstimateState } from './fee-estimate';
-import { getReceiveAddressListState } from './receive-address-list';
-
+import { WithdrawalStatus } from './withdrawal-status';
 // ----------------------------------------------------------------------
+import { getReceiveAddressListState } from './receive-address-list';
 
 type SendMoneyDrawerProps = {
   open: boolean;
@@ -698,6 +698,7 @@ export function SendMoneyDrawer({
 
   const [input, setInput] = useState(initialInput ?? '');
   const [amountValue, setAmountValue] = useState('');
+  const [feeApproval, setFeeApproval] = useState({ scope: '', sats: '' });
   const [amountUnit, setAmountUnit] = useState<AmountUnit>('sats');
   const [comment, setComment] = useState('');
   const { account } = useAccountContext();
@@ -757,7 +758,7 @@ export function SendMoneyDrawer({
       : undefined;
   const accepted = scope && receipt?.scope === scope ? receipt.submission : undefined;
   const pendingRequest = scope && unconfirmed?.scope === scope ? unconfirmed.request : undefined;
-  const { data: liveSubmission } = usePaymentSubmission(
+  const { data: liveSubmission, mutate: refreshSubmission } = usePaymentSubmission(
     account?.id,
     activeWalletId,
     isAdmin,
@@ -765,7 +766,9 @@ export function SendMoneyDrawer({
   );
   const payment = liveSubmission?.payment ?? accepted?.payment ?? immediatePayment;
   const paymentFeedback = PAYMENT_FEEDBACK[payment?.status ?? 'Pending'];
-  const useBackground = kind === 'lnurl' || kind === 'lightning-address' || hasLightningInvoice;
+  const isOnchain = kind === 'bitcoin' || (kind === 'bip21' && !hasLightningInvoice);
+  const useBackground =
+    isOnchain || kind === 'lnurl' || kind === 'lightning-address' || hasLightningInvoice;
 
   useEffect(() => {
     if (!open || !scope) return;
@@ -795,7 +798,18 @@ export function SendMoneyDrawer({
     reset: resetFeeEstimate,
   } = useFeeEstimate(JSON.stringify([open, activeWalletId, isAdmin, requestBody]));
   const feeEstimateState = getFeeEstimateState(feeEstimate, balance);
-  const feeExceedsAvailable = feeEstimateState.exceedsAvailable;
+  const feeScope = JSON.stringify([scope, requestBody]);
+  const approvedSats = feeApproval.scope === feeScope ? feeApproval.sats : '';
+  const feeCapMsat =
+    feeEstimate?.ledger === 'Internal'
+      ? 0
+      : /^\d+$/.test(approvedSats)
+        ? Number(approvedSats) * 1000
+        : undefined;
+  const hasApprovedCap = feeCapMsat != null && Number.isSafeInteger(feeCapMsat);
+  const feeExceedsAvailable = isOnchain
+    ? hasApprovedCap && balance != null && amountMSats + feeCapMsat! > balance
+    : feeEstimateState.exceedsAvailable;
   const canEnterAmount =
     input.trim().length > 0 &&
     embeddedAmountSats === 0 &&
@@ -816,6 +830,7 @@ export function SendMoneyDrawer({
     !hasInvalidBip21Amount &&
     !hasInvalidBitcoinAddress &&
     !amountExceedsAvailable &&
+    (!isOnchain || hasApprovedCap) &&
     !feeExceedsAvailable &&
     !needsWallet &&
     (!useBackground || Boolean(scope));
@@ -882,6 +897,7 @@ export function SendMoneyDrawer({
     setAmountValue('');
     setAmountUnit('sats');
     setComment('');
+    setFeeApproval({ scope: '', sats: '' });
     setImmediatePayment(undefined);
     setReceipt(undefined);
     resetFeeEstimate();
@@ -901,9 +917,13 @@ export function SendMoneyDrawer({
         if (!scope) return;
         const request: SubmitPaymentRequest = pendingRequest ?? {
           ...requestBody,
-          input: bitcoinRequest.lightning ?? stripLightningScheme(input),
+          input: isOnchain
+            ? requestBody.input
+            : (bitcoinRequest.lightning ?? stripLightningScheme(input)),
           idempotency_key: paymentRequestId(),
-          maximum_fee_msat: feeEstimate?.maximum_fee_msat ?? null,
+          maximum_fee_msat: isOnchain
+            ? (feeCapMsat ?? null)
+            : (feeEstimate?.maximum_fee_msat ?? null),
         };
         setInput(request.input);
         // Persist exactly what the user approved before issuing a request. Reloading or
@@ -1007,6 +1027,7 @@ export function SendMoneyDrawer({
     setInput('');
     setAmountValue('');
     setComment('');
+    setFeeApproval({ scope: '', sats: '' });
     resetFeeEstimate();
   };
 
@@ -1041,18 +1062,27 @@ export function SendMoneyDrawer({
               <Stack spacing={1}>
                 <Typography variant="h5">
                   {t(
-                    liveSubmission?.state === 'accepted'
-                      ? 'send_money.accepted'
-                      : liveSubmission?.state === 'processing'
-                        ? 'send_money.processing'
-                        : paymentFeedback.title
+                    liveSubmission?.withdrawal
+                      ? 'send_money.withdrawal'
+                      : liveSubmission?.state === 'accepted'
+                        ? 'send_money.accepted'
+                        : liveSubmission?.state === 'processing'
+                          ? 'send_money.processing'
+                          : paymentFeedback.title
                   )}
                 </Typography>
                 <SatsWithIcon amountMSats={payment.amount_msat} variant="h4" />
                 <Typography variant="body2" color="text.secondary">
                   {truncateText(input, 42)}
                 </Typography>
-                {payment.status === 'Pending' && (
+                {liveSubmission?.withdrawal && (
+                  <WithdrawalStatus
+                    submission={liveSubmission}
+                    isAdmin={isAdmin}
+                    refresh={refreshSubmission}
+                  />
+                )}
+                {payment.status === 'Pending' && !liveSubmission?.withdrawal && (
                   <Typography variant="body2" color="text.secondary">
                     {t('send_money.pending_note')}
                   </Typography>
@@ -1284,6 +1314,40 @@ export function SendMoneyDrawer({
                             }}
                           >
                             {t('send_money.estimate_fee')}
+                          </Button>
+                        )}
+                      </Stack>
+                    )}
+
+                    {isOnchain && feeEstimate?.ledger !== 'Internal' && (
+                      <Stack spacing={0.75}>
+                        <TextField
+                          label={t('send_money.maximum_miner_fee')}
+                          value={approvedSats}
+                          onChange={(event) =>
+                            setFeeApproval({ scope: feeScope, sats: event.target.value })
+                          }
+                          slotProps={{
+                            htmlInput: { inputMode: 'numeric', pattern: '[0-9]*' },
+                            input: {
+                              endAdornment: <InputAdornment position="end">sats</InputAdornment>,
+                            },
+                          }}
+                          helperText={t('send_money.miner_fee_consent')}
+                        />
+                        {feeEstimate?.estimated_fee_msat != null && (
+                          <Button
+                            size="small"
+                            color="inherit"
+                            sx={{ alignSelf: 'flex-start' }}
+                            onClick={() =>
+                              setFeeApproval({
+                                scope: feeScope,
+                                sats: String(Math.ceil(feeEstimate.estimated_fee_msat! / 1000)),
+                              })
+                            }
+                          >
+                            {t('send_money.use_fee_estimate')}
                           </Button>
                         )}
                       </Stack>
