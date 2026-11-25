@@ -1,4 +1,28 @@
 {
+  "merchant_tools": {
+    "title": "Merchant tools",
+    "routes": "Paid routes",
+    "load_error": "Couldn’t load your paid routes.",
+    "no_origins": "Ask your instance operator to assign a resource to this wallet before publishing a route.",
+    "choose": "Choose a route",
+    "new": "New route",
+    "public_url": "Public URL",
+    "withdrawn": "The operator has withdrawn this resource. Sales and access are unavailable.",
+    "name": "Route name",
+    "duplicate": "This name is already in use. Select the existing route to edit it.",
+    "name_help": "Use 1–57 lowercase letters, digits or hyphens.",
+    "origin": "Resource",
+    "quote_limit": "Invoice price ceiling (msat)",
+    "price": "Price (msat)",
+    "maximum": "Maximum {{value}} msat",
+    "duration": "Access lasts {{value}} seconds.",
+    "requests": "Each payment covers {{value}} requests.",
+    "sales": "Accept new sales",
+    "save_error": "Couldn’t save this route. Check the current resource and price, then try again.",
+    "save": "Save changes",
+    "publish": "Publish route",
+    "saved": "Route saved."
+  },
   "merchant_revenue": {
     "title": "Merchant revenue",
     "from": "From (UTC)",
