@@ -1,4 +1,32 @@
 {
+  "node_health": {
+    "title": "Santé du nœud",
+    "refresh": "Actualiser",
+    "unavailable": "Indisponible",
+    "failed": "Impossible d’actualiser les données du nœud.",
+    "outbound": "Liquidité sortante",
+    "inbound": "Liquidité entrante",
+    "confirmed": "Solde confirmé sur la chaîne",
+    "unconfirmed": "Solde non confirmé sur la chaîne",
+    "lnd_basis": "LND estime la liquidité à partir des soldes des canaux actifs après déduction des réserves. Les frais de routage et les limites des HTLC en cours peuvent réduire le montant utilisable.",
+    "cln_basis": "Core Lightning indique les montants disponibles à l’envoi et à la réception pour les canaux actifs.",
+    "channels": "Canaux",
+    "summary": "{{active}} actifs sur {{total}} · {{peers}} pairs connectés · Bloc {{height}}",
+    "peer": "Pair et canal",
+    "status": "État",
+    "active": "Actif",
+    "inactive": "Inactif",
+    "alerts": {
+      "info_unavailable": "Vérifiez la connexion au fournisseur et l’accès aux informations du nœud.",
+      "peers_unavailable": "Vérifiez l’accès à la liste des pairs auprès du fournisseur.",
+      "channels_unavailable": "Vérifiez l’accès à la liste des canaux auprès du fournisseur.",
+      "onchain_unavailable": "Vérifiez l’accès aux soldes sur la chaîne auprès du fournisseur.",
+      "chain_not_synced": "Le nœud se synchronise avec la chaîne.",
+      "no_connected_peers": "Aucun pair n’est connecté.",
+      "no_active_channels": "Aucun canal n’est actif.",
+      "liquidity_unavailable": "La liquidité est indisponible pour un ou plusieurs canaux actifs."
+    }
+  },
   "overview": "Aperçu",
   "money": "Portefeuille",
   "activity": "Activité",

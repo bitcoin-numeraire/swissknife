@@ -142,6 +142,13 @@ export const navData: Array<NavGroupWithPermissions> = [
         modes: ['server', 'self-hosted', 'merchant'],
       },
       {
+        title: 'node_health.title',
+        path: paths.admin.node,
+        icon: ICONS.lightning,
+        permissions: [Permission.READ_LN_NODE],
+        modes: ['server', 'self-hosted', 'merchant', 'desktop'],
+      },
+      {
         title: 'admin_transactions',
         path: paths.admin.transactions,
         icon: ICONS.activity,
