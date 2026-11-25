@@ -1,3 +1,5 @@
+mod bolt12;
+pub use bolt12::DecodedBolt12;
 mod payment_command;
 mod payment_handler;
 mod payment_input;

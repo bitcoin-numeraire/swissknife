@@ -121,7 +121,15 @@ type ReceiveMoneyDrawerProps = {
 };
 
 type RecipientKind =
-  'bip21' | 'bolt11' | 'lightning-address' | 'lnurl' | 'bitcoin' | 'internal' | 'unknown';
+  | 'bip21'
+  | 'bolt11'
+  | 'bolt12-offer'
+  | 'bolt12-invoice'
+  | 'lightning-address'
+  | 'lnurl'
+  | 'bitcoin'
+  | 'internal'
+  | 'unknown';
 type ReceivePayload = 'unified' | 'lightning' | 'onchain' | 'identity';
 type AmountUnit = 'sats' | 'btc' | 'fiat';
 
@@ -340,6 +348,10 @@ function detectRecipientKind(input: string): RecipientKind {
     return 'bip21';
   }
 
+  const lightning = stripLightningScheme(paymentRequest).toLowerCase();
+  if (lightning.startsWith('lno1')) return 'bolt12-offer';
+  if (lightning.startsWith('lni1')) return 'bolt12-invoice';
+
   try {
     decode(stripLightningScheme(paymentRequest));
     return 'bolt11';
@@ -466,6 +478,8 @@ function railLabel(kind: RecipientKind, t: (key: string) => string) {
   if (kind === 'bitcoin') return t('send_money.request_type_onchain');
   if (kind === 'internal') return t('send_money.request_type_internal');
   if (kind === 'bolt11') return t('send_money.request_type_bolt11');
+  if (kind === 'bolt12-offer') return t('send_money.request_type_bolt12_offer');
+  if (kind === 'bolt12-invoice') return t('send_money.request_type_bolt12_invoice');
   if (kind === 'lnurl') return t('send_money.request_type_lnurl');
   if (kind === 'lightning-address') return t('send_money.request_type_lightning_address');
   return t('send_money.request_type_unknown');
@@ -741,12 +755,31 @@ export function SendMoneyDrawer({
     () => amountValueToSats(amountValue, amountUnit, fiatPrices, state.currency),
     [amountUnit, amountValue, fiatPrices, state.currency]
   );
-  const embeddedAmountSats = bolt11Amount || bitcoinRequest.amountSats || 0;
+  const activeWalletId = walletId || selectedWalletId || (!isAdmin ? wallet?.id : '');
+  const isBolt12 = kind === 'bolt12-offer' || kind === 'bolt12-invoice';
+  const canSendComment = ['lnurl', 'lightning-address', 'internal', 'bolt12-offer'].includes(kind);
+  const {
+    feeEstimate,
+    isEstimatingFee,
+    estimate,
+    reset: resetFeeEstimate,
+  } = useFeeEstimate(
+    JSON.stringify([
+      open,
+      activeWalletId,
+      isAdmin,
+      input,
+      manualAmountSats,
+      canSendComment && comment,
+    ])
+  );
+  const quotedOfferAmount = isBolt12 && !manualAmountSats ? feeEstimate?.amount_msat : undefined;
+  const embeddedAmountSats =
+    bolt11Amount || bitcoinRequest.amountSats || (quotedOfferAmount ?? 0) / 1000;
   const amountSats = embeddedAmountSats || manualAmountSats;
-  const amountMSats = amountSats * 1000;
+  const amountMSats = quotedOfferAmount ?? Math.round(amountSats * 1000);
   const amountExceedsAvailable =
     balance != null && amountSats > 0 && amountMSats > Math.max(balance, 0);
-  const activeWalletId = walletId || selectedWalletId || (!isAdmin ? wallet?.id : '');
   const scope =
     account?.id && activeWalletId
       ? [
@@ -768,7 +801,11 @@ export function SendMoneyDrawer({
   const paymentFeedback = PAYMENT_FEEDBACK[payment?.status ?? 'Pending'];
   const isOnchain = kind === 'bitcoin' || (kind === 'bip21' && !hasLightningInvoice);
   const useBackground =
-    isOnchain || kind === 'lnurl' || kind === 'lightning-address' || hasLightningInvoice;
+    isOnchain ||
+    isBolt12 ||
+    kind === 'lnurl' ||
+    kind === 'lightning-address' ||
+    hasLightningInvoice;
 
   useEffect(() => {
     if (!open || !scope) return;
@@ -781,7 +818,6 @@ export function SendMoneyDrawer({
       handleActionError(error);
     }
   }, [open, scope]);
-  const canSendComment = kind === 'lnurl' || kind === 'lightning-address' || kind === 'internal';
   const requestBody = useMemo(
     () => ({
       input,
@@ -791,12 +827,6 @@ export function SendMoneyDrawer({
     [amountExceedsAvailable, amountMSats, amountSats, canSendComment, comment, input]
   );
 
-  const {
-    feeEstimate,
-    isEstimatingFee,
-    estimate,
-    reset: resetFeeEstimate,
-  } = useFeeEstimate(JSON.stringify([open, activeWalletId, isAdmin, requestBody]));
   const feeEstimateState = getFeeEstimateState(feeEstimate, balance);
   const feeScope = JSON.stringify([scope, requestBody]);
   const approvedSats = feeApproval.scope === feeScope ? feeApproval.sats : '';
@@ -830,6 +860,7 @@ export function SendMoneyDrawer({
     !hasInvalidBip21Amount &&
     !hasInvalidBitcoinAddress &&
     !amountExceedsAvailable &&
+    (!isBolt12 || Boolean(feeEstimate)) &&
     (!isOnchain || hasApprovedCap) &&
     !feeExceedsAvailable &&
     !needsWallet &&
@@ -837,7 +868,7 @@ export function SendMoneyDrawer({
   const canEstimateFee =
     kind !== 'unknown' &&
     kind !== 'internal' &&
-    amountSats > 0 &&
+    (isBolt12 || amountSats > 0) &&
     !amountExceedsAvailable &&
     !hasUnsupportedBip21Params &&
     !hasInvalidBip21Amount &&
@@ -1254,7 +1285,7 @@ export function SendMoneyDrawer({
                           {t('send_money.amount')}
                         </Typography>
                         <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-                          <SatsWithIcon amountMSats={amountSats * 1000} />
+                          <SatsWithIcon amountMSats={amountMSats} showMillisatsTooltip />
                           <Typography variant="caption" color="text.secondary">
                             {amountFiatLabel}
                           </Typography>
@@ -1313,7 +1344,7 @@ export function SendMoneyDrawer({
                               whiteSpace: 'nowrap',
                             }}
                           >
-                            {t('send_money.estimate_fee')}
+                            {t(isBolt12 ? 'send_money.review_bolt12' : 'send_money.estimate_fee')}
                           </Button>
                         )}
                       </Stack>

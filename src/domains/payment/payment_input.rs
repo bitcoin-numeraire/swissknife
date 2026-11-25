@@ -23,6 +23,7 @@ use crate::{
 #[derive(Debug)]
 pub enum PaymentInput {
     BitcoinAddress(BitcoinAddressData),
+    Bolt12(String),
     Bolt11(ParsedBolt11Invoice),
     LnUrlPay(LnUrlPayRequestData),
 }
@@ -110,6 +111,14 @@ pub async fn parse_payment_input(input: &str) -> Result<PaymentInput, String> {
     let input = input.trim();
     if input.is_empty() {
         return Err("Payment input cannot be empty".to_string());
+    }
+
+    let lightning = strip_lightning_scheme(input);
+    if lightning
+        .get(..4)
+        .is_some_and(|prefix| prefix.eq_ignore_ascii_case("lno1") || prefix.eq_ignore_ascii_case("lni1"))
+    {
+        return Ok(PaymentInput::Bolt12(lightning.to_owned()));
     }
 
     if let Ok(invoice) = parse_bolt11(input) {

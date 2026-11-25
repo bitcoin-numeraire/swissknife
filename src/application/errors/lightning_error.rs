@@ -2,6 +2,8 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum LightningError {
+    #[error("Invalid Lightning payment target: {0}")]
+    InvalidPaymentTarget(String),
     #[error("Failed to parse config: {0}")]
     ParseConfig(String),
 

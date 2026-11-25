@@ -38,7 +38,9 @@ pub enum PaymentInstructions {
         maximum_fee_msat: u64,
     },
     Lightning {
-        bolt11: String,
+        /// Earlier installations stored the wire invoice under this field name.
+        #[serde(rename = "bolt11")]
+        invoice: String,
         variable_amount_msat: Option<u64>,
         maximum_fee_msat: u64,
     },

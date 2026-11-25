@@ -381,4 +381,8 @@ wait_for_mock_oauth2
 ensure_lnd_synced
 wait_for_cln_synced
 
+if [[ "${SWISSKNIFE_ITEST_PROVIDER:-lnd_grpc}" == cln_* ]]; then
+  "$(dirname "$0")/bootstrap-offers-peer.sh"
+fi
+
 echo "Swissknife integration dependencies are ready."

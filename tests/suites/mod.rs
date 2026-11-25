@@ -21,5 +21,6 @@ mod system;
 mod wallets;
 mod well_known;
 
+mod bolt12;
 mod notifications;
 mod withdrawal_submissions;

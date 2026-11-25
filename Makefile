@@ -149,15 +149,15 @@ test-persistence:
 
 # Bring up the regtest dependency stack (bitcoind + LND + CLN + Postgres).
 itest-up:
-	@SWISSKNIFE_ITEST_COMPOSE_PROJECT=$(ITEST_PROJECT) tests/itest/scripts/bootstrap.sh
+	@$(ITEST_ENV) tests/itest/scripts/bootstrap.sh
 
 # Stop the dependency stack, keeping volumes.
 itest-down:
-	@$(ITEST_COMPOSE) down
+	@$(ITEST_COMPOSE) --profile offers down
 
 # Stop the dependency stack and delete all integration runtime/artifacts.
 itest-shutdown:
-	@$(ITEST_COMPOSE) down -v
+	@$(ITEST_COMPOSE) --profile offers down -v
 	@rm -rf tests/itest/runtime target/itest lcov.info
 
 # Collect dependency logs into target/itest/dependency-logs.
@@ -189,6 +189,7 @@ coverage-lcov: itest-up
 # contention in #267. Override COVERAGE_CELLS to add/drop cells.
 COVERAGE_CELLS ?= sqlite:lnd_grpc sqlite:lnd_rest sqlite:cln_grpc sqlite:cln_rest postgres:lnd_grpc
 coverage-matrix: itest-up
+	@SWISSKNIFE_ITEST_COMPOSE_PROJECT=$(ITEST_PROJECT) tests/itest/scripts/bootstrap-offers-peer.sh
 	@cargo llvm-cov clean --workspace
 	@cargo llvm-cov --no-report --workspace --features itest --bins
 	@SWISSKNIFE_ITEST_DATABASE=postgres cargo llvm-cov --no-report --features itest --bins -- uow_tests

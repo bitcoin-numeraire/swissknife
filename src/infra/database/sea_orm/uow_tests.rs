@@ -1162,7 +1162,7 @@ async fn payment_commands_reserve_once_claim_once_and_retain_deleted_keys() {
     };
     let key = SubmissionKey::new(wallet, &request);
     let instructions = PaymentInstructions::Lightning {
-        bolt11: "synthetic invoice".into(),
+        invoice: "synthetic invoice".into(),
         variable_amount_msat: None,
         maximum_fee_msat: 1_000,
     };

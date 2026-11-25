@@ -159,6 +159,40 @@ describe('SendMoneyDrawer', () => {
     });
   });
 
+  it.each(['lno1testoffer', 'lni1testinvoice'])(
+    'reviews and submits the exact BOLT12 amount for %s',
+    async (input) => {
+      const quote = {
+        ledger: Ledger.LIGHTNING,
+        amount_msat: 42001,
+        maximum_fee_msat: 1000,
+        maximum_total_msat: 43001,
+        estimated_fee_msat: null,
+        estimated_total_msat: null,
+      };
+      vi.mocked(estimateWalletPaymentFee).mockResolvedValue(response(quote));
+      renderSendDrawer(input);
+      const send = screen.getByRole('button', { name: 'send_money.send' });
+      expect(send).toBeDisabled();
+      fireEvent.click(screen.getByRole('button', { name: 'send_money.review_bolt12' }));
+      await waitFor(() => expect(send).toBeEnabled());
+      expect(estimateWalletPaymentFee).toHaveBeenCalledWith(
+        expect.objectContaining({
+          body: expect.objectContaining({ input, amount_msat: null }),
+        })
+      );
+      fireEvent.click(send);
+      await waitFor(() =>
+        expect(submitWalletPayment).toHaveBeenCalledWith(
+          expect.objectContaining({
+            body: expect.objectContaining({ input, amount_msat: 42001, maximum_fee_msat: 1000 }),
+          })
+        )
+      );
+      expect(walletPay).not.toHaveBeenCalled();
+    }
+  );
+
   it('recovers the original request after losing its response and reopening the drawer', async () => {
     vi.setSystemTime(new Date((invoiceTimestamp + 1) * 1000));
     vi.mocked(submitWalletPayment).mockRejectedValueOnce(new TypeError('Lost response'));

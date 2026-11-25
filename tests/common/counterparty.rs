@@ -21,6 +21,7 @@ pub struct Counterparty {
 enum Kind {
     Lnd,
     Cln,
+    ClnOffers,
 }
 
 impl Counterparty {
@@ -30,6 +31,14 @@ impl Counterparty {
         } else {
             Kind::Lnd
         };
+        Self::new(kind)
+    }
+
+    pub fn offers_peer() -> Self {
+        Self::new(Kind::ClnOffers)
+    }
+
+    fn new(kind: Kind) -> Self {
         let project =
             std::env::var("SWISSKNIFE_ITEST_COMPOSE_PROJECT").unwrap_or_else(|_| "swissknife-itest".to_string());
         let compose_file = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -47,6 +56,7 @@ impl Counterparty {
         let service = match self.kind {
             Kind::Lnd => "lnd",
             Kind::Cln => "cln",
+            Kind::ClnOffers => "cln-offers",
         };
         let mut cmd = Command::new("docker");
         cmd.arg("compose")
@@ -99,8 +109,8 @@ impl Counterparty {
         }
     }
 
-    fn cln_rpc(&self, method: &str, params: Value) -> Value {
-        assert!(matches!(self.kind, Kind::Cln));
+    pub fn cln_rpc(&self, method: &str, params: Value) -> Value {
+        assert!(matches!(self.kind, Kind::Cln | Kind::ClnOffers));
         let params: Vec<String> = params
             .as_object()
             .unwrap()
@@ -190,7 +200,7 @@ impl Counterparty {
                 ]);
                 v["payment_request"].as_str().expect("lnd payment_request").to_string()
             }
-            Kind::Cln => {
+            Kind::Cln | Kind::ClnOffers => {
                 let v = self.run_json(&[
                     "lightning-cli",
                     "--network=regtest",
@@ -215,7 +225,7 @@ impl Counterparty {
                 let v = self.run_json(&["lncli", "--network=regtest", "addinvoice", &amount, &preimage]);
                 v["payment_request"].as_str().expect("lnd payment_request").to_string()
             }
-            Kind::Cln => {
+            Kind::Cln | Kind::ClnOffers => {
                 let amount = format!("amount_msat={amount_msat}");
                 let label = format!("label={label}");
                 let preimage = format!("preimage={preimage}");
@@ -240,7 +250,7 @@ impl Counterparty {
             Kind::Lnd => {
                 self.run(&["lncli", "--network=regtest", "payinvoice", "--force", bolt11]);
             }
-            Kind::Cln => {
+            Kind::Cln | Kind::ClnOffers => {
                 self.run(&["lightning-cli", "--network=regtest", "pay", bolt11]);
             }
         }
