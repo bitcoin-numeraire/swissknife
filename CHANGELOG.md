@@ -8,6 +8,10 @@ release notes when a tag is published.
 
 ## [Unreleased]
 
+### Fixed
+
+- LND REST invoices and confirmed deposits use the same TLS trust settings as ordinary node requests on macOS and Linux.
+
 ## [0.3.5] - 2026-11-21
 
 ### Fixed
