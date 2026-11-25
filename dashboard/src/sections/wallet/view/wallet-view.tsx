@@ -26,10 +26,10 @@ import { paths } from 'src/routes/paths';
 import { useRouter } from 'src/routes/hooks';
 
 import { satsToFiat } from 'src/utils/fiat';
-import { shouldFail } from 'src/utils/errors';
 import { fFromNow } from 'src/utils/format-time';
 import { displayLnAddress } from 'src/utils/lnurl';
 import { fCurrency } from 'src/utils/format-number';
+import { shouldFail, handleActionError } from 'src/utils/errors';
 import { mergeAndSortTransactions } from 'src/utils/transactions';
 
 import { useTranslate } from 'src/locales';
@@ -117,15 +117,14 @@ export function WalletView() {
   const sendDrawer = useBoolean();
   const receiveDrawer = useBoolean();
   const { t } = useTranslate();
-  const settings = useSettingsContext();
-  const { state } = settings;
+  const { state } = useSettingsContext();
   const [sendInitialInput, setSendInitialInput] = useState('');
   const [detailTransaction, setDetailTransaction] = useState<ITransaction | null>(null);
   const [lastWalletSyncAt, setLastWalletSyncAt] = useState<Date | null>(null);
   const [isRefreshingWallet, setIsRefreshingWallet] = useState(false);
 
   const { wallet, walletLoading, walletError } = useActiveWallet();
-  const { account } = useAccountContext();
+  const { account, updateDashboardPreferences } = useAccountContext();
   const { fiatPrices, fiatPricesError } = useFetchFiatPrices();
 
   const prices = fiatPrices ?? fallbackFiatPrices;
@@ -199,7 +198,7 @@ export function WalletView() {
     sendDrawer.onFalse();
   };
   const toggleBalances = () => {
-    settings.setState({ hideBalances: !balancesHidden });
+    updateDashboardPreferences({ hideBalances: !balancesHidden }).catch(handleActionError);
   };
   const refreshWallet = async () => {
     try {

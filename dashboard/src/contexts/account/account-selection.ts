@@ -1,7 +1,6 @@
 import type { Wallet } from 'src/lib/swissknife';
 
 export const ACTIVE_WALLET_SETTING = 'active_wallet_id';
-export const DASHBOARD_SETTINGS_SCHEMA_VERSION = 1;
 
 export function dashboardSettings(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
@@ -26,12 +25,4 @@ export function selectInitialWalletId(
   }
 
   return wallets[0]?.id;
-}
-
-export function settingsWithActiveWallet(storedSettings: unknown, walletId: string) {
-  return {
-    ...dashboardSettings(storedSettings),
-    schema_version: DASHBOARD_SETTINGS_SCHEMA_VERSION,
-    [ACTIVE_WALLET_SETTING]: walletId,
-  };
 }

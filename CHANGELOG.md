@@ -11,6 +11,7 @@ release notes when a tag is published.
 ### Added
 
 - Clients can update individual dashboard settings using `PATCH /v1/me/preferences`.
+- The wallet balance visibility toggle follows the account across devices.
 
 ## [0.3.5] - 2026-11-21
 

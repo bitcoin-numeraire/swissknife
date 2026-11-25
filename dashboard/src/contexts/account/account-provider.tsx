@@ -9,18 +9,19 @@ import { useRef, useMemo, useState, useEffect, useCallback } from 'react';
 import { useColorScheme } from '@mui/material/styles';
 
 import { endpointKeys } from 'src/actions/keys';
-import { getAccount, getAccountWallet, updateAccountPreferences } from 'src/lib/swissknife';
+import { getAccount, getAccountWallet, patchAccountPreferences } from 'src/lib/swissknife';
 
 import { defaultSettings, useSettingsContext } from 'src/components/settings';
 
 import { AccountContext } from './account-context';
 import { useAccountEventStream } from './account-event-stream';
 import { useAccountEventNotifications } from './account-event-notifications';
-import { selectInitialWalletId, settingsWithActiveWallet } from './account-selection';
+import { dashboardPreferencePatch, uiSettingsFromDashboardSettings } from './dashboard-preferences';
 import {
-  settingsWithUiPreferences,
-  uiSettingsFromDashboardSettings,
-} from './dashboard-preferences';
+  dashboardSettings,
+  selectInitialWalletId,
+  ACTIVE_WALLET_SETTING,
+} from './account-selection';
 
 type AccountProviderProps = {
   children: React.ReactNode;
@@ -28,9 +29,9 @@ type AccountProviderProps = {
 
 export function AccountProvider({ children }: AccountProviderProps) {
   const [activeWalletId, setActiveWalletId] = useState<string>();
-  const hydratedAccountId = useRef<string | undefined>(undefined);
+  const hydrated = useRef<{ id: string; settings: unknown } | undefined>(undefined);
   const { setMode } = useColorScheme();
-  const { state: settingsState, setState: setSettingsState } = useSettingsContext();
+  const { setState: setSettingsState } = useSettingsContext();
 
   const accountResult = useSWR<Account>(endpointKeys.account.get, async () => {
     const response = await getAccount<true>();
@@ -42,13 +43,15 @@ export function AccountProvider({ children }: AccountProviderProps) {
   useAccountEventNotifications(account?.id, recentClientEvents, wallets);
 
   useEffect(() => {
-    if (!account || hydratedAccountId.current === account.id) return;
+    if (!account) {
+      hydrated.current = undefined;
+      return;
+    }
+    const stored = account.preferences?.dashboard_settings;
+    if (hydrated.current?.id === account.id && hydrated.current.settings === stored) return;
 
-    const persistedSettings = uiSettingsFromDashboardSettings(
-      account.preferences?.dashboard_settings,
-      defaultSettings
-    );
-    hydratedAccountId.current = account.id;
+    const persistedSettings = uiSettingsFromDashboardSettings(stored, defaultSettings);
+    hydrated.current = { id: account.id, settings: stored };
     setSettingsState(persistedSettings);
     setMode(persistedSettings.mode ?? defaultSettings.mode ?? 'system');
   }, [account, setMode, setSettingsState]);
@@ -69,38 +72,49 @@ export function AccountProvider({ children }: AccountProviderProps) {
     }
   );
 
+  const saveSettings = useCallback(
+    async (patch: Record<string, unknown>) => {
+      if (!account) throw new Error('Account unavailable.');
+      await accountResult.mutate(
+        async (current) => {
+          if (!current || current.id !== account?.id) throw new Error('Account changed.');
+          const response = await patchAccountPreferences<true>({
+            body: { dashboard_settings: patch },
+          });
+          return { ...current, preferences: response.data };
+        },
+        {
+          optimisticData: (current) =>
+            current?.preferences && current.id === account?.id
+              ? {
+                  ...current,
+                  preferences: {
+                    ...current.preferences,
+                    dashboard_settings: {
+                      ...dashboardSettings(current.preferences.dashboard_settings),
+                      ...patch,
+                    },
+                  },
+                }
+              : (current ?? account),
+          rollbackOnError: true,
+          revalidate: true,
+        }
+      );
+    },
+    [account, accountResult]
+  );
+
   const updateDashboardPreferences = useCallback(
     async (update: DashboardPreferenceUpdate) => {
-      const previousSettings = settingsState;
-      const nextSettings = { ...settingsState, ...update };
-      setSettingsState(update);
-      if (update.mode) setMode(update.mode);
-
-      try {
-        const response = await updateAccountPreferences<true>({
-          body: {
-            dashboard_settings: settingsWithUiPreferences(
-              account?.preferences?.dashboard_settings,
-              nextSettings
-            ),
-          },
-        });
-        await accountResult.mutate(
-          account
-            ? {
-                ...account,
-                preferences: response.data,
-              }
-            : undefined,
-          { revalidate: false }
-        );
-      } catch (error) {
-        setSettingsState(previousSettings);
-        if (update.mode) setMode(previousSettings.mode ?? 'system');
-        throw error;
+      if (account) {
+        await saveSettings(dashboardPreferencePatch(update));
+      } else {
+        setSettingsState(update);
+        if (update.mode) setMode(update.mode);
       }
     },
-    [account, accountResult, setMode, setSettingsState, settingsState]
+    [account, saveSettings, setMode, setSettingsState]
   );
 
   const selectWallet = useCallback(
@@ -109,32 +123,10 @@ export function AccountProvider({ children }: AccountProviderProps) {
         throw new Error('Wallet does not belong to the authenticated account.');
       }
 
-      const previousWalletId = activeWalletId;
-      const dashboardSettings = settingsWithActiveWallet(
-        account?.preferences?.dashboard_settings,
-        walletId
-      );
+      await saveSettings({ [ACTIVE_WALLET_SETTING]: walletId });
       setActiveWalletId(walletId);
-
-      try {
-        const response = await updateAccountPreferences<true>({
-          body: { dashboard_settings: dashboardSettings },
-        });
-        await accountResult.mutate(
-          account
-            ? {
-                ...account,
-                preferences: response.data,
-              }
-            : undefined,
-          { revalidate: false }
-        );
-      } catch (error) {
-        setActiveWalletId(previousWalletId);
-        throw error;
-      }
     },
-    [account, accountResult, activeWalletId, wallets]
+    [saveSettings, wallets]
   );
 
   const value = useMemo(
