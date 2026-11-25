@@ -1,4 +1,18 @@
 {
+  "agent_activity": {
+    "title": "Activité des dépenses des agents",
+    "updated": "Mise à jour à {{time}}",
+    "load_error": "Impossible de charger les dépenses des agents.",
+    "credential": "Identifiant",
+    "current": "60 dernières minutes",
+    "previous": "60 minutes précédentes",
+    "sats": "{{amount}} sats",
+    "payments_one": "{{count}} paiement",
+    "payments_other": "{{count}} paiements",
+    "empty": "Aucun paiement délégué enregistré au cours des deux dernières heures.",
+    "back": "Précédent",
+    "next": "Suivant"
+  },
   "payment_review": {
     "title": "Approbations de paiement",
     "load_error": "Impossible de charger les paiements à examiner.",

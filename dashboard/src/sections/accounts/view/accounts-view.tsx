@@ -67,6 +67,7 @@ import { LocalLoginCard } from './local-login-card';
 import { AccountDirectory } from './account-directory';
 import { SpendingPolicyCard } from './spending-policy-card';
 import { PaymentApprovalCard } from './payment-approval-card';
+import { AgentSpendingActivityCard } from './agent-spending-activity-card';
 
 // ----------------------------------------------------------------------
 
@@ -486,6 +487,7 @@ function AccountDetailsView({ id }: { id: string }) {
               </Grid>
 
               <SpendingPolicyCard key={account!.id} accountId={account!.id} />
+              <AgentSpendingActivityCard key={'activity-' + account!.id} accountId={account!.id} />
               <PaymentApprovalCard key={'reviews-' + account!.id} accountId={account!.id} />
 
               {CONFIG.auth.method === 'jwt' &&
