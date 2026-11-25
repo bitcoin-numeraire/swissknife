@@ -140,6 +140,9 @@ pub enum PaymentStatus {
 /// Accept an external Lightning or Bitcoin payment for durable execution.
 #[derive(Debug, Clone, Deserialize, Serialize, ToSchema)]
 pub struct SubmitPaymentRequest {
+    /// If supplied, the DNSSEC-verified BIP353 offer ID must still match the reviewed value.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub expected_offer_id: Option<String>,
     pub idempotency_key: Uuid,
     /// Required for administrative submission. The wallet-scoped route uses its path.
     pub wallet_id: Option<Uuid>,
@@ -190,7 +193,7 @@ pub struct SendPaymentRequest {
     /// Wallet ID to pay from. Required by admin endpoints; derived from the path on wallet-scoped endpoints.
     pub wallet_id: Option<Uuid>,
 
-    /// Recipient. Can be a Bolt11 invoice, LNURL or LN Address.
+    /// Recipient. Accepts BOLT11, BOLT12, an explicit ₿ BIP353 name, LNURL, Lightning Address, or Bitcoin address/URI.
     #[schema(example = "hello@numeraire.tech")]
     pub input: String,
 
@@ -208,6 +211,9 @@ pub struct SendPaymentRequest {
 /// the hard cap passed to the Lightning provider (or the prepared on-chain fee).
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq, ToSchema)]
 pub struct PaymentFeeEstimate {
+    /// Signed offer selected for a BIP353 name. Pass back as `expected_offer_id` at submission.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub resolved_offer_id: Option<String>,
     /// Ledger selected for this payment input.
     pub ledger: Ledger,
 

@@ -23,9 +23,15 @@ use crate::{
 #[derive(Debug)]
 pub enum PaymentInput {
     BitcoinAddress(BitcoinAddressData),
-    Bolt12(String),
+    Bolt12(Bolt12Target),
     Bolt11(ParsedBolt11Invoice),
     LnUrlPay(LnUrlPayRequestData),
+}
+
+#[derive(Debug)]
+pub enum Bolt12Target {
+    Encoded(String),
+    Name(String),
 }
 
 #[derive(Clone, Debug)]
@@ -114,11 +120,14 @@ pub async fn parse_payment_input(input: &str) -> Result<PaymentInput, String> {
     }
 
     let lightning = strip_lightning_scheme(input);
+    if let Some(name) = lightning.strip_prefix('₿') {
+        return bip353_name(name).map(|name| PaymentInput::Bolt12(Bolt12Target::Name(name)));
+    }
     if lightning
         .get(..4)
         .is_some_and(|prefix| prefix.eq_ignore_ascii_case("lno1") || prefix.eq_ignore_ascii_case("lni1"))
     {
-        return Ok(PaymentInput::Bolt12(lightning.to_owned()));
+        return Ok(PaymentInput::Bolt12(Bolt12Target::Encoded(lightning.to_owned())));
     }
 
     if let Ok(invoice) = parse_bolt11(input) {
@@ -135,6 +144,21 @@ pub async fn parse_payment_input(input: &str) -> Result<PaymentInput, String> {
     }
 
     Err("Unsupported payment input".to_string())
+}
+
+/// BIP353 uses DNS labels. Display and pass ASCII (including explicit punycode) to CLN.
+pub(crate) fn bip353_name(name: &str) -> Result<String, String> {
+    let (user, domain) = name.split_once('@').ok_or("Expected ₿name@domain")?;
+    let valid_label = |s: &str| {
+        !s.is_empty() && s.len() <= 63 && s.bytes().all(|c| c.is_ascii_alphanumeric() || c == b'-' || c == b'_')
+    };
+    if !valid_label(user)
+        || !domain.split('.').all(valid_label)
+        || user.len() + domain.len() + ".user._bitcoin-payment.".len() > 253
+    {
+        return Err("Invalid BIP353 name; use ASCII DNS labels or their punycode spelling".into());
+    }
+    Ok(name.to_ascii_lowercase())
 }
 
 pub(super) fn parse_bolt11(input: &str) -> Result<ParsedBolt11Invoice, String> {
@@ -291,7 +315,7 @@ fn lnurl_pay_request_data_from_response(
     })
 }
 
-fn strip_lightning_scheme(input: &str) -> &str {
+pub(super) fn strip_lightning_scheme(input: &str) -> &str {
     input
         .strip_prefix("lightning:")
         .or_else(|| input.strip_prefix("LIGHTNING:"))

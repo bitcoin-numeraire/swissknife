@@ -14,12 +14,17 @@ pub struct SubmissionKey {
 impl SubmissionKey {
     pub fn new(wallet_id: Uuid, request: &swissknife_types::SubmitPaymentRequest) -> Self {
         // Fingerprint the original intent. LNURL resolution can return a new invoice on each call.
-        let bytes = serde_json::to_vec(&(
+        let intent = (
             &request.input,
             request.amount_msat,
             &request.comment,
             request.maximum_fee_msat,
-        ))
+        );
+        // Preserve fingerprints of requests admitted before BIP353.
+        let bytes = match &request.expected_offer_id {
+            Some(id) => serde_json::to_vec(&(intent, id)),
+            None => serde_json::to_vec(&intent),
+        }
         .expect("strings and integers serialize");
         Self {
             wallet_id,

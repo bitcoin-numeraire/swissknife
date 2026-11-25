@@ -10239,7 +10239,8 @@
       "ErrorCode": {
         "type": "string",
         "enum": [
-          "internal_transfer_required"
+          "internal_transfer_required",
+          "payment_target_changed"
         ]
       },
       "ErrorResponse": {
@@ -11299,6 +11300,13 @@
             "format": "int64",
             "description": "Amount plus the Lightning cap or current on-chain fee, in millisatoshis.",
             "minimum": 0
+          },
+          "resolved_offer_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Signed offer selected for a BIP353 name. Pass back as `expected_offer_id` at submission."
           }
         }
       },
@@ -11467,7 +11475,7 @@
           },
           "input": {
             "type": "string",
-            "description": "Recipient. Can be a Bolt11 invoice, LNURL or LN Address.",
+            "description": "Recipient. Accepts BOLT11, BOLT12, an explicit ₿ BIP353 name, LNURL, Lightning Address, or Bitcoin address/URI.",
             "example": "hello@numeraire.tech"
           },
           "wallet_id": {
@@ -11584,6 +11592,13 @@
               "string",
               "null"
             ]
+          },
+          "expected_offer_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "If supplied, the DNSSEC-verified BIP353 offer ID must still match the reviewed value."
           },
           "idempotency_key": {
             "type": "string",

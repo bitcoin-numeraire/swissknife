@@ -201,7 +201,7 @@ export const zCreateWalletRequest = z.object({
   asset_id: z.uuid(),
 });
 
-export const zErrorCode = z.enum(['internal_transfer_required']);
+export const zErrorCode = z.enum(['internal_transfer_required', 'payment_target_changed']);
 
 /**
  * Application error response
@@ -555,6 +555,7 @@ export const zPaymentFeeEstimate = z.object({
   maximum_total_msat: z.coerce.bigint().gte(BigInt(0)).max(BigInt('9223372036854775807'), {
     error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
   }),
+  resolved_offer_id: z.string().nullish(),
 });
 
 /**
@@ -758,6 +759,7 @@ export const zSubmitPaymentRequest = z.object({
     })
     .nullish(),
   comment: z.string().nullish(),
+  expected_offer_id: z.string().nullish(),
   idempotency_key: z.uuid(),
   input: z.string(),
   maximum_fee_msat: z.coerce

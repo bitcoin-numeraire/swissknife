@@ -35,11 +35,20 @@ pub trait LnClient: Sync + Send {
             "This Lightning provider does not support BOLT12".into(),
         ))
     }
+    async fn bip353_instructions(
+        &self,
+        _name: &str,
+    ) -> Result<crate::domains::payment::Bip353Instructions, LightningError> {
+        Err(LightningError::InvalidPaymentTarget(
+            "This Lightning provider does not support DNSSEC BIP353 resolution".into(),
+        ))
+    }
     async fn fetch_offer_invoice(
         &self,
         _offer: &str,
         _amount_msat: u64,
         _note: Option<String>,
+        _bip353: Option<String>,
     ) -> Result<String, LightningError> {
         Err(LightningError::InvalidPaymentTarget(
             "This Lightning provider does not support BOLT12".into(),

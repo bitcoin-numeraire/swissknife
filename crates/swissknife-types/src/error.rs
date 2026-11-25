@@ -22,4 +22,6 @@ pub struct ErrorResponse {
 pub enum ErrorCode {
     /// No command was accepted. The destination belongs to this installation.
     InternalTransferRequired,
+    /// The reviewed BIP353 offer changed before admission. Request a new preview.
+    PaymentTargetChanged,
 }

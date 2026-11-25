@@ -95,6 +95,7 @@ impl PaymentService {
         let maximum_total_msat = Self::reserve_amount_msat(amount_msat, maximum_fee_msat)?;
 
         Ok(PaymentFeeEstimate {
+            resolved_offer_id: None,
             ledger,
             amount_msat,
             estimated_fee_msat,
@@ -697,6 +698,9 @@ impl PaymentService {
     }
 
     fn is_internal_payment(&self, input: &str) -> bool {
+        if super::payment_input::strip_lightning_scheme(input.trim()).starts_with('₿') {
+            return false;
+        }
         if let Some((_, input_domain)) = input.split_once('@') {
             return input_domain == self.domain;
         }
@@ -754,6 +758,11 @@ impl PaymentsUseCases for PaymentService {
         if let Some(original) = self.store.payment_uow.submitted(&key).await? {
             return Ok(original.check_original_backend(&self.bitcoin_wallet.withdrawal_backend()));
         }
+        if request.expected_offer_id.is_some()
+            && !super::payment_input::strip_lightning_scheme(request.input.trim()).starts_with('₿')
+        {
+            return Err(DataError::Validation("An expected BIP353 offer ID requires a ₿-prefixed name".into()).into());
+        }
         if self.is_internal_payment(&request.input) {
             return Err(DataError::InternalTransferRequired.into());
         }
@@ -765,7 +774,13 @@ impl PaymentsUseCases for PaymentService {
                 self.ensure_wallet_network(wallet_id, self.bitcoin_wallet.network())
                     .await?;
                 let resolved = self
-                    .resolve_bolt12(wallet_id, input, request.amount_msat, request.comment.as_deref())
+                    .resolve_bolt12(
+                        wallet_id,
+                        input,
+                        request.amount_msat,
+                        request.comment.as_deref(),
+                        request.expected_offer_id.as_deref(),
+                    )
                     .await?;
                 let payment = resolved.payment(wallet_id, request.comment);
                 return self
@@ -926,8 +941,18 @@ impl PaymentsUseCases for PaymentService {
 
         match input_type {
             PaymentInput::Bolt12(value) => {
-                let (_, amount) = self.inspect_bolt12(wallet_id, &value, amount_msat).await?;
-                Self::fee_estimate(Ledger::Lightning, amount, None, self.ln_client.fee_limit_msat(amount))
+                let (input, amount, name) = self.expand_bolt12(value, amount_msat).await?;
+                let (decoded, amount) = self.inspect_bolt12(wallet_id, &input, amount).await?;
+                let mut estimate =
+                    Self::fee_estimate(Ledger::Lightning, amount, None, self.ln_client.fee_limit_msat(amount))?;
+                if name.is_some() {
+                    estimate.resolved_offer_id = Some(
+                        decoded
+                            .offer_id
+                            .ok_or_else(|| DataError::Validation("Missing BIP353 offer ID".into()))?,
+                    );
+                }
+                Ok(estimate)
             }
 
             PaymentInput::BitcoinAddress(data) => {
@@ -1046,7 +1071,7 @@ impl PaymentsUseCases for PaymentService {
             match input_type {
                 PaymentInput::Bolt12(value) => {
                     let resolved = self
-                        .resolve_bolt12(wallet_id, value, amount_msat, comment.as_deref())
+                        .resolve_bolt12(wallet_id, value, amount_msat, comment.as_deref(), None)
                         .await?;
                     let cap = self.ln_client.fee_limit_msat(resolved.amount_msat);
                     let payment = resolved.payment(wallet_id, comment);
