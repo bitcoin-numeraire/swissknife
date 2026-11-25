@@ -14,6 +14,7 @@ use swissknife_types::{
 use crate::common::counterparty::Counterparty;
 use crate::common::fixtures::unique;
 use crate::common::harness::matrix_cell;
+use crate::common::lnd_link::LndLink;
 use crate::common::wait::wait_until;
 use crate::common::{app, assert_error, assert_status, Auth, TestApp};
 
@@ -192,20 +193,21 @@ mod failure {
     use super::*;
 
     #[tokio::test]
-    async fn a_local_lnd_send_timeout_keeps_the_payment_and_reservation_pending() {
+    async fn losing_the_lnd_connection_keeps_the_payment_and_reservation_pending() {
         if crate::common::harness::matrix_cell().1 != "lnd_grpc" {
             return;
         }
+        let link = LndLink::connect().await;
         let app = TestApp::isolated(
-            "ln-send-timeout",
-            &[("SWISSKNIFE_LND_GRPC_CONFIG__PAYMENT_TIMEOUT", "0s".to_string())],
+            "ln-send-disconnect",
+            &[("SWISSKNIFE_LND_GRPC_CONFIG__ENDPOINT", link.endpoint())],
         )
         .await;
         let token = app.admin_token().await;
         let wallet = app.create_wallet(token, "ln-timeout").await;
-        app.fund_onchain(token, wallet.id, 10_000_000).await;
+        app.fund_onchain(token, wallet.id, 100_000).await;
         let before = app.wallet_balance(token, wallet.id).await.available_msat;
-        let amount_msat = 8_000_000_000;
+        let amount_msat = 1_000_000;
         let bolt11 = Counterparty::for_provider(&app.provider).invoice(amount_msat, &unique("cp-timeout"));
         let request = SendPaymentRequest {
             wallet_id: Some(wallet.id),
@@ -220,7 +222,8 @@ mod failure {
         assert_status(&quote, StatusCode::OK);
         let quote = quote.parse::<PaymentFeeEstimate>();
 
-        // This is a local establishment timeout, not proof of an accepted or in-flight HTLC.
+        link.disconnect().await;
+        // A disconnected client has no terminal provider result.
         let response = app.api().post("/v1/payments", Auth::Bearer(token), request).await;
         assert_status(&response, StatusCode::OK);
         let payment = response.parse::<Payment>();
@@ -334,19 +337,18 @@ mod recovery {
         if !provider.starts_with("lnd_") {
             return;
         }
-        let app = TestApp::isolated(
-            "lnd-lookup",
-            &[
-                ("SWISSKNIFE_LN_PROVIDER", "lnd_grpc".to_string()),
-                ("SWISSKNIFE_LND_GRPC_CONFIG__PAYMENT_TIMEOUT", "0s".to_string()),
-            ],
-        )
-        .await;
+        let link = LndLink::connect().await;
+        let config = [
+            ("SWISSKNIFE_LN_PROVIDER", "lnd_grpc".into()),
+            ("SWISSKNIFE_LND_GRPC_CONFIG__ENDPOINT", link.endpoint()),
+        ];
+        let app = TestApp::isolated("lnd-lookup", &config).await;
         let token = app.admin_token().await;
         let wallet = app.create_wallet(token, "lnd-lookup").await;
         app.fund_onchain(token, wallet.id, 100_000).await;
         let mut held = Counterparty::for_provider("cln_grpc").hold_invoice(1_000_000);
-        // The local establishment timeout creates an uncertain payment through
+        link.disconnect().await;
+        // The lost transport creates an uncertain payment through
         // the public API; then the node progresses while SwissKnife is stopped.
         let response = app
             .api()

@@ -11,6 +11,7 @@ pub mod counterparty;
 pub mod db;
 pub mod fixtures;
 pub mod harness;
+pub mod lnd_link;
 pub mod lnurl_server;
 pub mod oauth2;
 pub mod wait;
