@@ -1233,5 +1233,21 @@
     "empty": "In diesem Zeitraum wurden keine Zahlungen auf das Budget angerechnet.",
     "csv": "CSV herunterladen",
     "json": "JSON herunterladen"
+  },
+  "agent_hours": {
+    "title": "Zahlungszeiten für Agenten",
+    "none": "Wallet-Zugangsschlüssel können jederzeit Zahlungen einleiten.",
+    "help": "Wählen Sie die Wochentage, an denen das Zeitfenster beginnt. Alle Zeiten sind in UTC. Liegt die Endzeit vor der Startzeit, endet das Zeitfenster am Folgetag.",
+    "days": "Starttage",
+    "start": "Von (UTC)",
+    "end": "Bis (UTC)",
+    "next_day": "Folgetag",
+    "set": "Zeiten festlegen",
+    "edit": "Zeiten bearbeiten",
+    "remove": "Zeiten entfernen",
+    "confirm": "Wallet-Zugangsschlüssel können dann jederzeit Zahlungen einleiten. Die Betragslimits des Kontos gelten weiterhin.",
+    "save": "Zeiten speichern",
+    "invalid": "Wählen Sie mindestens einen Tag und zwei gültige Uhrzeiten. Von Mitternacht bis Mitternacht gilt der gesamte Tag.",
+    "error": "Die Zahlungszeiten für Agenten konnten nicht geladen werden."
   }
 }

@@ -1233,5 +1233,21 @@
     "empty": "No se registraron pagos sujetos a presupuesto en este período.",
     "csv": "Descargar CSV",
     "json": "Descargar JSON"
+  },
+  "agent_hours": {
+    "title": "Horario de pagos de los agentes",
+    "none": "Las credenciales de la cartera pueden iniciar pagos a cualquier hora.",
+    "help": "Elige los días en los que empieza la franja. Las horas están en UTC. Una hora de fin anterior a la de inicio corresponde al día siguiente.",
+    "days": "Días de inicio",
+    "start": "Desde (UTC)",
+    "end": "Hasta (UTC)",
+    "next_day": "día siguiente",
+    "set": "Definir horario",
+    "edit": "Editar horario",
+    "remove": "Quitar horario",
+    "confirm": "Las credenciales de la cartera podrán iniciar pagos a cualquier hora. Se mantienen los límites de importe de la cuenta.",
+    "save": "Guardar horario",
+    "invalid": "Elige al menos un día y dos horas válidas. De medianoche a medianoche abarca todo el día.",
+    "error": "No se pudo cargar el horario de pagos de los agentes."
   }
 }

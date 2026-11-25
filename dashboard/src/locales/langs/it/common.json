@@ -1233,5 +1233,21 @@
     "empty": "Nessun pagamento conteggiato nel budget in questo periodo.",
     "csv": "Scarica CSV",
     "json": "Scarica JSON"
+  },
+  "agent_hours": {
+    "title": "Orari di pagamento degli agenti",
+    "none": "Le credenziali del portafoglio possono avviare pagamenti in qualsiasi momento.",
+    "help": "Scegli i giorni di inizio della fascia oraria. Gli orari sono in UTC. Se l’orario di fine precede quello di inizio, la fascia termina il giorno successivo.",
+    "days": "Giorni di inizio",
+    "start": "Dalle (UTC)",
+    "end": "Alle (UTC)",
+    "next_day": "giorno successivo",
+    "set": "Imposta orari",
+    "edit": "Modifica orari",
+    "remove": "Rimuovi orari",
+    "confirm": "Le credenziali del portafoglio potranno avviare pagamenti in qualsiasi momento. I limiti di importo del conto restano attivi.",
+    "save": "Salva orari",
+    "invalid": "Scegli almeno un giorno e due orari validi. Da mezzanotte a mezzanotte indica l’intera giornata.",
+    "error": "Impossibile caricare gli orari di pagamento degli agenti."
   }
 }
