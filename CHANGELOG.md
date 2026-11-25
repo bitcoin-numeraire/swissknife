@@ -10,6 +10,8 @@ release notes when a tag is published.
 
 ### Added
 
+- Require an operator decision before a delegated wallet payment above an account threshold can be admitted.
+
 - Start an account spending policy from one of three editable templates in the dashboard.
 
 - Operators can cap each delegated wallet credential’s outgoing payments over a rolling hour, including fees and reservations.

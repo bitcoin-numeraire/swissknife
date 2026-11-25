@@ -1,4 +1,6 @@
+use super::ReviewedPayment;
 use crate::application::errors::{ApplicationError, DataError, DatabaseError};
+use crate::domains::payment::SubmissionKey;
 use async_trait::async_trait;
 use chrono::{Datelike, Days, NaiveDate};
 use std::sync::Arc;
@@ -6,11 +8,23 @@ use swissknife_types::{
     AgentSpendingHours, SpendingInterval, SpendingLimits, SpendingPolicy, SpendingReportQuery, SpendingReportRow,
     SpendingUsage,
 };
+use swissknife_types::{ApprovalDecision, PaymentApproval};
 use uuid::Uuid;
 
 #[cfg_attr(test, mockall::automock)]
 #[async_trait]
 pub trait SpendingPolicyRepository: Send + Sync {
+    async fn reviewed(&self, key: &SubmissionKey) -> Result<Option<ReviewedPayment>, ApplicationError>;
+    async fn pending_approvals(&self, account: Uuid) -> Result<Vec<PaymentApproval>, ApplicationError>;
+    async fn approval(&self, account: Uuid, id: Uuid) -> Result<PaymentApproval, ApplicationError>;
+    async fn decide(
+        &self,
+        account: Uuid,
+        id: Uuid,
+        operator: Uuid,
+        decision: ApprovalDecision,
+    ) -> Result<PaymentApproval, ApplicationError>;
+
     async fn hours(&self, account: Uuid) -> Result<Option<AgentSpendingHours>, DatabaseError>;
     async fn set_hours(&self, account: Uuid, hours: Option<AgentSpendingHours>) -> Result<(), DatabaseError>;
     async fn report(&self, account: Uuid, range: SpendingReportRange) -> Result<Vec<SpendingReportRow>, DatabaseError>;
@@ -22,6 +36,16 @@ pub trait SpendingPolicyRepository: Send + Sync {
 #[cfg_attr(test, mockall::automock)]
 #[async_trait]
 pub trait SpendingPolicyUseCases: Send + Sync {
+    async fn pending_approvals(&self, account: Uuid) -> Result<Vec<PaymentApproval>, ApplicationError>;
+    async fn approval(&self, account: Uuid, id: Uuid) -> Result<PaymentApproval, ApplicationError>;
+    async fn decide(
+        &self,
+        account: Uuid,
+        id: Uuid,
+        operator: Uuid,
+        decision: ApprovalDecision,
+    ) -> Result<PaymentApproval, ApplicationError>;
+
     async fn hours(&self, account: Uuid) -> Result<AgentSpendingHours, ApplicationError>;
     async fn set_hours(&self, account: Uuid, hours: Option<AgentSpendingHours>) -> Result<(), ApplicationError>;
     async fn report(
@@ -46,6 +70,22 @@ pub struct SpendingPolicyService(pub Arc<dyn SpendingPolicyRepository>);
 
 #[async_trait]
 impl SpendingPolicyUseCases for SpendingPolicyService {
+    async fn pending_approvals(&self, account: Uuid) -> Result<Vec<PaymentApproval>, ApplicationError> {
+        self.0.pending_approvals(account).await
+    }
+    async fn approval(&self, account: Uuid, id: Uuid) -> Result<PaymentApproval, ApplicationError> {
+        self.0.approval(account, id).await
+    }
+    async fn decide(
+        &self,
+        account: Uuid,
+        id: Uuid,
+        operator: Uuid,
+        decision: ApprovalDecision,
+    ) -> Result<PaymentApproval, ApplicationError> {
+        self.0.decide(account, id, operator, decision).await
+    }
+
     async fn hours(&self, account: Uuid) -> Result<AgentSpendingHours, ApplicationError> {
         self.0
             .hours(account)
@@ -98,6 +138,7 @@ impl SpendingPolicyUseCases for SpendingPolicyService {
             limits.weekly_msat,
             limits.monthly_msat,
             limits.agent_hourly_msat,
+            limits.approval_above_msat,
         ];
         if amounts.iter().all(Option::is_none) {
             return Err(DataError::Validation("Set at least one spending limit".into()).into());

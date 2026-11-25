@@ -48,6 +48,30 @@ pub(super) async fn reserve_in_transaction(
     Ok(payment)
 }
 
+/// Acquire both wallets in a stable order before either balance or the spending policy is locked.
+/// NO KEY UPDATE coexists with the foreign-key checks from competing command inserts.
+pub(super) async fn lock_internal_wallets(
+    tx: &DatabaseTransaction,
+    sender: uuid::Uuid,
+    recipient: uuid::Uuid,
+) -> Result<(), DatabaseError> {
+    use super::models::wallet;
+    use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect};
+    if tx.get_database_backend() == sea_orm::DatabaseBackend::Postgres {
+        wallet::Entity::find()
+            .select_only()
+            .column(wallet::Column::Id)
+            .filter(wallet::Column::Id.is_in([sender, recipient]))
+            .order_by_asc(wallet::Column::Id)
+            .lock(sea_orm::sea_query::LockType::NoKeyUpdate)
+            .into_tuple::<uuid::Uuid>()
+            .all(tx)
+            .await
+            .map_err(super::payment_command::db_error)?;
+    }
+    Ok(())
+}
+
 pub(super) async fn settle_internal_in_transaction(
     txn: &DatabaseTransaction,
     mut payment: Payment,
@@ -311,6 +335,7 @@ impl PaymentUnitOfWork for SeaOrmPaymentUnitOfWork {
             .await
             .map_err(|e| DatabaseError::Transaction(e.to_string()))?;
 
+        lock_internal_wallets(&txn, payment.wallet_id, invoice.wallet_id).await?;
         let payment = settle_internal_in_transaction(&txn, payment, invoice, None).await?;
         txn.commit()
             .await

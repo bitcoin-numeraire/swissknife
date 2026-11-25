@@ -28,6 +28,10 @@ export const zAgentSpendingHours = z.object({
   ),
 });
 
+export const zApprovalDecision = z.enum(['approve', 'reject']);
+
+export const zApprovalState = z.enum(['pending', 'approved', 'rejected', 'consumed', 'expired']);
+
 /**
  * Authentication provider namespace.
  */
@@ -218,7 +222,15 @@ export const zCreateWalletRequest = z.object({
   asset_id: z.uuid(),
 });
 
-export const zErrorCode = z.enum(['internal_transfer_required', 'payment_target_changed']);
+export const zDecidePaymentApproval = z.object({
+  decision: zApprovalDecision,
+});
+
+export const zErrorCode = z.enum([
+  'internal_transfer_required',
+  'payment_target_changed',
+  'payment_approval_required',
+]);
 
 /**
  * Application error response
@@ -527,6 +539,26 @@ export const zPatchAccountPreferencesRequest = z.object({
   dashboard_settings: z.record(z.string(), z.unknown()),
 });
 
+/**
+ * Immutable payment terms shown to the account operator. Amounts are exact millisatoshi strings.
+ */
+export const zPaymentApproval = z.object({
+  agent_key_id: z.uuid(),
+  amount_msat: z.string(),
+  created_at: z.iso.datetime(),
+  decided_at: z.iso.datetime().nullish(),
+  decided_by: z.uuid().nullish(),
+  destination: z.string(),
+  expires_at: z.iso.datetime(),
+  id: z.uuid(),
+  idempotency_key: z.uuid(),
+  ledger: zLedger,
+  maximum_fee_msat: z.string(),
+  requested_input: z.string(),
+  state: zApprovalState,
+  wallet_id: z.uuid(),
+});
+
 export const zPaymentExecutionState = z.enum([
   'accepted',
   'processing',
@@ -772,6 +804,7 @@ export const zSpendingInterval = z.enum(['day', 'week']);
  */
 export const zSpendingLimits = z.object({
   agent_hourly_msat: z.string().nullish(),
+  approval_above_msat: z.string().nullish(),
   daily_msat: z.string().nullish(),
   monthly_msat: z.string().nullish(),
   per_payment_msat: z.string().nullish(),
@@ -1125,6 +1158,28 @@ export const zSetAgentSpendingHoursPath = z.object({
 });
 
 export const zSetAgentSpendingHoursResponse = z.void();
+
+export const zListPaymentApprovalsPath = z.object({
+  account_id: z.uuid(),
+});
+
+export const zListPaymentApprovalsResponse = z.array(zPaymentApproval);
+
+export const zGetPaymentApprovalPath = z.object({
+  account_id: z.uuid(),
+  id: z.uuid(),
+});
+
+export const zGetPaymentApprovalResponse = zPaymentApproval;
+
+export const zDecidePaymentApprovalBody = zDecidePaymentApproval;
+
+export const zDecidePaymentApprovalPath = z.object({
+  account_id: z.uuid(),
+  id: z.uuid(),
+});
+
+export const zDecidePaymentApprovalResponse = zPaymentApproval;
 
 export const zDisableAccountSpendingPolicyPath = z.object({
   account_id: z.uuid(),

@@ -31,6 +31,7 @@ impl From<policy::Model> for SpendingLimits {
             weekly_msat: row.weekly_msat.map(|n| n as u64),
             monthly_msat: row.monthly_msat.map(|n| n as u64),
             agent_hourly_msat: row.agent_hourly_msat.map(|n| n as u64),
+            approval_above_msat: row.approval_above_msat.map(|n| n as u64),
         }
     }
 }
@@ -71,6 +72,35 @@ impl From<hours::Model> for AgentSpendingHours {
 
 #[async_trait]
 impl SpendingPolicyRepository for SeaOrmSpendingPolicyRepository {
+    async fn reviewed(
+        &self,
+        key: &crate::domains::payment::SubmissionKey,
+    ) -> Result<Option<crate::domains::agent::ReviewedPayment>, crate::application::errors::ApplicationError> {
+        super::payment_approval::reviewed(&self.0, key).await
+    }
+    async fn pending_approvals(
+        &self,
+        account: Uuid,
+    ) -> Result<Vec<swissknife_types::PaymentApproval>, crate::application::errors::ApplicationError> {
+        super::payment_approval::pending(&self.0, account).await
+    }
+    async fn approval(
+        &self,
+        account: Uuid,
+        id: Uuid,
+    ) -> Result<swissknife_types::PaymentApproval, crate::application::errors::ApplicationError> {
+        super::payment_approval::get(&self.0, account, id).await
+    }
+    async fn decide(
+        &self,
+        account: Uuid,
+        id: Uuid,
+        operator: Uuid,
+        decision: swissknife_types::ApprovalDecision,
+    ) -> Result<swissknife_types::PaymentApproval, crate::application::errors::ApplicationError> {
+        super::payment_approval::decide(&self.0, account, id, operator, decision).await
+    }
+
     async fn hours(&self, account: Uuid) -> Result<Option<AgentSpendingHours>, DatabaseError> {
         Ok(HoursEntity::find_by_id(account)
             .one(&self.0)
@@ -187,6 +217,7 @@ impl SpendingPolicyRepository for SeaOrmSpendingPolicyRepository {
             weekly_msat: Set(limits.weekly_msat.map(|n| n as i64)),
             monthly_msat: Set(limits.monthly_msat.map(|n| n as i64)),
             agent_hourly_msat: Set(limits.agent_hourly_msat.map(|n| n as i64)),
+            approval_above_msat: Set(limits.approval_above_msat.map(|n| n as i64)),
         })
         .on_conflict(
             OnConflict::column(AccountId)
@@ -197,6 +228,7 @@ impl SpendingPolicyRepository for SeaOrmSpendingPolicyRepository {
                     WeeklyMsat,
                     MonthlyMsat,
                     AgentHourlyMsat,
+                    ApprovalAboveMsat,
                 ])
                 .to_owned(),
         )

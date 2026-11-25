@@ -143,6 +143,20 @@ export type ApiKey = {
   permissions: Array<Permission>;
 };
 
+export const ApprovalDecision = { APPROVE: 'approve', REJECT: 'reject' } as const;
+
+export type ApprovalDecision = (typeof ApprovalDecision)[keyof typeof ApprovalDecision];
+
+export const ApprovalState = {
+  PENDING: 'pending',
+  APPROVED: 'approved',
+  REJECTED: 'rejected',
+  CONSUMED: 'consumed',
+  EXPIRED: 'expired',
+} as const;
+
+export type ApprovalState = (typeof ApprovalState)[keyof typeof ApprovalState];
+
 /**
  * A spendable asset on one protocol/network.
  */
@@ -565,9 +579,14 @@ export type CreateWalletRequest = {
   asset_id: string;
 };
 
+export type DecidePaymentApproval = {
+  decision: ApprovalDecision;
+};
+
 export const ErrorCode = {
   INTERNAL_TRANSFER_REQUIRED: 'internal_transfer_required',
   PAYMENT_TARGET_CHANGED: 'payment_target_changed',
+  PAYMENT_APPROVAL_REQUIRED: 'payment_approval_required',
 } as const;
 
 export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];
@@ -1151,6 +1170,29 @@ export type Payment = {
   wallet_id: string;
 };
 
+/**
+ * Immutable payment terms shown to the account operator. Amounts are exact millisatoshi strings.
+ */
+export type PaymentApproval = {
+  agent_key_id: string;
+  amount_msat: string;
+  created_at: Date;
+  decided_at?: Date | null;
+  decided_by?: string | null;
+  /**
+   * Lightning payment hash or the Bitcoin address to receive the funds.
+   */
+  destination: string;
+  expires_at: Date;
+  id: string;
+  idempotency_key: string;
+  ledger: Ledger;
+  maximum_fee_msat: string;
+  requested_input: string;
+  state: ApprovalState;
+  wallet_id: string;
+};
+
 export const PaymentExecutionState = {
   ACCEPTED: 'accepted',
   PROCESSING: 'processing',
@@ -1408,6 +1450,10 @@ export type SpendingLimits = {
    * Maximum charged to each delegated credential over a rolling hour, including fees.
    */
   agent_hourly_msat?: string | null;
+  /**
+   * Delegated payments above this fee-inclusive threshold require operator approval.
+   */
+  approval_above_msat?: string | null;
   daily_msat?: string | null;
   monthly_msat?: string | null;
   per_payment_msat?: string | null;
@@ -2038,6 +2084,72 @@ export type SetAgentSpendingHoursResponses = {
 
 export type SetAgentSpendingHoursResponse =
   SetAgentSpendingHoursResponses[keyof SetAgentSpendingHoursResponses];
+
+export type ListPaymentApprovalsData = {
+  body?: never;
+  path: {
+    account_id: string;
+  };
+  query?: never;
+  url: '/v1/accounts/{account_id}/payment-approvals';
+};
+
+export type ListPaymentApprovalsErrors = {
+  403: unknown;
+  404: unknown;
+};
+
+export type ListPaymentApprovalsResponses = {
+  200: Array<PaymentApproval>;
+};
+
+export type ListPaymentApprovalsResponse =
+  ListPaymentApprovalsResponses[keyof ListPaymentApprovalsResponses];
+
+export type GetPaymentApprovalData = {
+  body?: never;
+  path: {
+    account_id: string;
+    id: string;
+  };
+  query?: never;
+  url: '/v1/accounts/{account_id}/payment-approvals/{id}';
+};
+
+export type GetPaymentApprovalErrors = {
+  403: unknown;
+  404: unknown;
+};
+
+export type GetPaymentApprovalResponses = {
+  200: PaymentApproval;
+};
+
+export type GetPaymentApprovalResponse =
+  GetPaymentApprovalResponses[keyof GetPaymentApprovalResponses];
+
+export type DecidePaymentApprovalData = {
+  body: DecidePaymentApproval;
+  path: {
+    account_id: string;
+    id: string;
+  };
+  query?: never;
+  url: '/v1/accounts/{account_id}/payment-approvals/{id}';
+};
+
+export type DecidePaymentApprovalErrors = {
+  403: unknown;
+  404: unknown;
+  409: unknown;
+};
+
+export type DecidePaymentApprovalResponses = {
+  200: PaymentApproval;
+};
+
+export type DecidePaymentApprovalResponse =
+  DecidePaymentApprovalResponses[keyof DecidePaymentApprovalResponses];
 
 export type DisableAccountSpendingPolicyData = {
   body?: never;

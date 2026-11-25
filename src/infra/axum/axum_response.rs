@@ -101,6 +101,13 @@ impl IntoResponse for AuthenticationError {
 impl IntoResponse for DataError {
     fn into_response(self) -> Response {
         let (error_message, status) = match self {
+            DataError::ApprovalRequired { account, approval } => {
+                let status = StatusCode::CONFLICT;
+                let mut body = generate_body(status, self.to_string());
+                body.code = Some(swissknife_types::ErrorCode::PaymentApprovalRequired);
+                let location = format!("/v1/accounts/{account}/payment-approvals/{approval}");
+                return (status, [(axum::http::header::LOCATION, location)], body).into_response();
+            }
             DataError::PaymentTargetChanged => {
                 let status = StatusCode::CONFLICT;
                 let mut body = generate_body(status, self.to_string());

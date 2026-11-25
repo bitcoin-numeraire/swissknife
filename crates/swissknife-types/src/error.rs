@@ -24,4 +24,6 @@ pub enum ErrorCode {
     InternalTransferRequired,
     /// The reviewed BIP353 offer changed before admission. Request a new preview.
     PaymentTargetChanged,
+    /// The delegated payment is waiting for an account operator.
+    PaymentApprovalRequired,
 }

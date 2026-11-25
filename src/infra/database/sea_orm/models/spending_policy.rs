@@ -13,6 +13,7 @@ pub struct Model {
     pub weekly_msat: Option<i64>,
     pub monthly_msat: Option<i64>,
     pub agent_hourly_msat: Option<i64>,
+    pub approval_above_msat: Option<i64>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

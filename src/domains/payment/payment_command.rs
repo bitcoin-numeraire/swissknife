@@ -9,6 +9,7 @@ pub struct SubmissionKey {
     pub wallet_id: Uuid,
     pub key: Uuid,
     pub fingerprint: String,
+    pub requested_input: String,
     pub agent_key_id: Option<Uuid>,
 }
 
@@ -31,6 +32,7 @@ impl SubmissionKey {
             wallet_id,
             key: request.idempotency_key,
             agent_key_id,
+            requested_input: request.input.clone(),
             fingerprint: sha256::Hash::hash(&bytes).to_string(),
         }
     }

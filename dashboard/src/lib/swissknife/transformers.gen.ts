@@ -10,6 +10,7 @@ import type {
   CreateLocalLoginResponse,
   CreateOfferResponse,
   CreateWalletOfferResponse,
+  DecidePaymentApprovalResponse,
   DisableOfferResponse,
   DisableWalletOfferResponse,
   GenerateBtcAddressResponse,
@@ -26,6 +27,7 @@ import type {
   GetInvoiceResponse,
   GetLocalLoginResponse,
   GetOfferResponse,
+  GetPaymentApprovalResponse,
   GetPaymentResponse,
   GetPaymentSubmissionResponse,
   GetWalletInvoiceResponse,
@@ -44,6 +46,7 @@ import type {
   ListContactsResponse,
   ListInvoicesResponse,
   ListOffersResponse,
+  ListPaymentApprovalsResponse,
   ListPaymentsResponse,
   ListResponse,
   ListWalletBtcAddressesResponse,
@@ -200,6 +203,36 @@ export const createAccountResponseTransformer = async (
   data: any
 ): Promise<CreateAccountResponse> => {
   data = accountSchemaResponseTransformer(data);
+  return data;
+};
+
+const paymentApprovalSchemaResponseTransformer = (data: any) => {
+  data.created_at = new Date(data.created_at);
+  if (data.decided_at) {
+    data.decided_at = new Date(data.decided_at);
+  }
+  data.expires_at = new Date(data.expires_at);
+  return data;
+};
+
+export const listPaymentApprovalsResponseTransformer = async (
+  data: any
+): Promise<ListPaymentApprovalsResponse> => {
+  data = data.map((item: any) => paymentApprovalSchemaResponseTransformer(item));
+  return data;
+};
+
+export const getPaymentApprovalResponseTransformer = async (
+  data: any
+): Promise<GetPaymentApprovalResponse> => {
+  data = paymentApprovalSchemaResponseTransformer(data);
+  return data;
+};
+
+export const decidePaymentApprovalResponseTransformer = async (
+  data: any
+): Promise<DecidePaymentApprovalResponse> => {
+  data = paymentApprovalSchemaResponseTransformer(data);
   return data;
 };
 

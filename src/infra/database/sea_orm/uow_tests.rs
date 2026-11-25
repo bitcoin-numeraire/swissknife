@@ -1257,6 +1257,7 @@ async fn withdrawal_claims_fence_stale_workers_and_cancel_only_unstarted_owned_p
     let other = seed_wallet(&conn, 100_000_000).await;
     let uow = SeaOrmPaymentUnitOfWork::new(conn.clone());
     let key = SubmissionKey {
+        requested_input: "regtest fixture".into(),
         wallet_id: wallet,
         key: Uuid::new_v4(),
         fingerprint: "payment A".into(),
@@ -1370,6 +1371,7 @@ async fn withdrawal_reconciliation_keeps_the_signed_payload_and_full_cap_until_c
     let wallet = seed_wallet(&conn, 100_000_000).await;
     let uow = SeaOrmPaymentUnitOfWork::new(conn.clone());
     let key = SubmissionKey {
+        requested_input: "regtest fixture".into(),
         wallet_id: wallet,
         key: Uuid::new_v4(),
         fingerprint: "approved capped payment".into(),

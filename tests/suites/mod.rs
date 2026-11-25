@@ -17,6 +17,7 @@ mod lnurl_send;
 mod mcp;
 mod me;
 mod oauth2;
+mod payment_approvals;
 mod payment_submissions;
 mod payments;
 mod system;

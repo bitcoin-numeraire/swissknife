@@ -24,6 +24,10 @@ pub struct SpendingLimits {
     #[serde_as(as = "Option<DisplayFromStr>")]
     #[schema(value_type = Option<String>, example = "500000")]
     pub agent_hourly_msat: Option<u64>,
+    /// Delegated payments above this fee-inclusive threshold require operator approval.
+    #[serde_as(as = "Option<DisplayFromStr>")]
+    #[schema(value_type = Option<String>)]
+    pub approval_above_msat: Option<u64>,
 }
 
 /// Consumption in the current UTC day, ISO week and calendar month.

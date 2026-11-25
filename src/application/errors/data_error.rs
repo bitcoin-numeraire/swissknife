@@ -5,6 +5,9 @@ pub enum DataError {
     #[error("This destination requires an internal wallet transfer")]
     InternalTransferRequired,
 
+    #[error("Payment is awaiting operator approval ({approval})")]
+    ApprovalRequired { account: uuid::Uuid, approval: uuid::Uuid },
+
     #[error("This BIP353 name now points to a different offer. Review the new payment instructions.")]
     PaymentTargetChanged,
 

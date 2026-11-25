@@ -1101,6 +1101,7 @@
     "reset_display_name_help": "Laissez vide pour conserver votre nom actuel. Votre identifiant de connexion reste inchangé."
   },
   "spending_policy": {
+    "approval_above_msat": "Approbation requise au-delà de",
     "title": "Budget de dépenses",
     "load_error": "Impossible de charger le budget.",
     "loading": "Chargement du budget…",
