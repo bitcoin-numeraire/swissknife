@@ -2756,6 +2756,10 @@ export type DeleteInvoicesData = {
      */
     wallet_id?: string | null;
     /**
+     * Match invoices for outputs sent to this exact Bitcoin address.
+     */
+    bitcoin_address?: string | null;
+    /**
      * Status
      */
     status?: InvoiceStatus | null;
@@ -2825,6 +2829,10 @@ export type ListInvoicesData = {
      * Wallet ID. Automatically populated with your ID
      */
     wallet_id?: string | null;
+    /**
+     * Match invoices for outputs sent to this exact Bitcoin address.
+     */
+    bitcoin_address?: string | null;
     /**
      * Status
      */
@@ -4271,6 +4279,10 @@ export type ListWalletInvoicesData = {
      * Wallet ID. Automatically populated with your ID
      */
     wallet_id?: string | null;
+    /**
+     * Match invoices for outputs sent to this exact Bitcoin address.
+     */
+    bitcoin_address?: string | null;
     /**
      * Status
      */

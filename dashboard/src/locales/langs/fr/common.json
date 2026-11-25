@@ -1018,5 +1018,32 @@
     "display_name": "Nom affiché (facultatif)",
     "display_name_help": "Le nom utilisé pour vous accueillir. Vous pourrez le modifier dans les paramètres.",
     "reset_display_name_help": "Laissez vide pour conserver votre nom actuel. Votre identifiant de connexion reste inchangé."
+  },
+  "pos": {
+    "title": "Point de vente",
+    "amount": "Montant en sats",
+    "reference": "Description ou référence de commande (facultatif)",
+    "sound": "Son",
+    "haptics": "Vibration",
+    "start": "Créer la demande de paiement",
+    "previous": "Dernière vente réglée",
+    "issue_error": "Aucun moyen de paiement disponible. Réessayez.",
+    "waiting": "En attente du paiement",
+    "incoming": "Paiement détecté",
+    "partial": "Paiement partiel",
+    "expired": "Demande expirée",
+    "paid": "Paiement reçu",
+    "pending_amount": "{{amount}} sats en attente de confirmation",
+    "received": "{{amount}} sats reçus",
+    "unified": "Bitcoin ou Lightning",
+    "onchain": "Bitcoin sur la chaîne",
+    "lightning": "Lightning",
+    "receipt": "Afficher le paiement",
+    "next": "Vente suivante",
+    "cancel": "Fermer la vente",
+    "stop_note": "Une adresse Bitcoin peut encore recevoir des fonds après la fermeture de la vente. Les paiements tardifs apparaissent dans l’activité du portefeuille.",
+    "sync_error": "Reconnexion à l’historique des paiements. Vérifiez l’activité du portefeuille avant de conclure la vente.",
+    "back": "Retour au portefeuille",
+    "select_bitcoin": "Sélectionnez un portefeuille Bitcoin pour encaisser."
   }
 }

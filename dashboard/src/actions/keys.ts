@@ -21,7 +21,10 @@ export const endpointKeys = {
       get: (walletId: string, id: string) => ['accountWalletPayment', walletId, id] as const,
     },
     invoices: {
-      list: (walletId: string) => ['accountWalletInvoices', walletId] as const,
+      list: (walletId: string, query?: object) =>
+        query
+          ? (['accountWalletInvoices', walletId, query] as const)
+          : (['accountWalletInvoices', walletId] as const),
       get: (walletId: string, id: string) => ['accountWalletInvoice', walletId, id] as const,
     },
     contacts: { list: (walletId: string) => ['accountWalletContacts', walletId] as const },

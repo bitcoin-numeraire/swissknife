@@ -401,6 +401,12 @@ export function WalletView() {
                     </Grid>
                   </Grid>
 
+                  {wallet?.asset?.protocol === 'bitcoin' && wallet.asset.asset_ref === 'native' && (
+                    <Button variant="outlined" color="inherit" href={paths.wallet.pos}>
+                      {t('pos.title')}
+                    </Button>
+                  )}
+
                   <Box
                     sx={[
                       (theme) => ({

@@ -64,10 +64,17 @@ export function useGetWalletBalance(walletId?: string) {
   );
 }
 
-export function useListWalletInvoices(query?: ListWalletInvoicesData['query'], walletId?: string) {
+export function useListWalletInvoices(
+  query?: ListWalletInvoicesData['query'],
+  walletId?: string,
+  enabled = true
+) {
   const { activeWalletId, walletsLoading, walletsError } = useAccountContext();
   const selectedWalletId = walletId ?? activeWalletId;
-  const key = selectedWalletId ? endpointKeys.accountWallet.invoices.list(selectedWalletId) : null;
+  const key =
+    selectedWalletId && enabled
+      ? endpointKeys.accountWallet.invoices.list(selectedWalletId, query)
+      : null;
 
   const result = useSWR(key, () =>
     listWalletInvoices<true>({

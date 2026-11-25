@@ -2874,6 +2874,18 @@
             }
           },
           {
+            "name": "bitcoin_address",
+            "in": "query",
+            "description": "Match invoices for outputs sent to this exact Bitcoin address.",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
             "name": "status",
             "in": "query",
             "description": "Status",
@@ -3132,6 +3144,18 @@
                 "null"
               ],
               "format": "uuid"
+            }
+          },
+          {
+            "name": "bitcoin_address",
+            "in": "query",
+            "description": "Match invoices for outputs sent to this exact Bitcoin address.",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
             }
           },
           {
@@ -5960,6 +5984,18 @@
                 "null"
               ],
               "format": "uuid"
+            }
+          },
+          {
+            "name": "bitcoin_address",
+            "in": "query",
+            "description": "Match invoices for outputs sent to this exact Bitcoin address.",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
             }
           },
           {

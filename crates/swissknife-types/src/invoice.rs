@@ -155,6 +155,8 @@ pub struct InvoiceFilter {
     pub ids: Option<Vec<Uuid>>,
     /// Wallet ID. Automatically populated with your ID
     pub wallet_id: Option<Uuid>,
+    /// Match invoices for outputs sent to this exact Bitcoin address.
+    pub bitcoin_address: Option<String>,
     /// Status
     pub status: Option<InvoiceStatus>,
     /// Ledger
