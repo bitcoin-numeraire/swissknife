@@ -733,9 +733,9 @@
               "type": [
                 "string",
                 "null"
-              ],
-              "format": "date"
-            }
+              ]
+            },
+            "example": "2026-11-01"
           },
           {
             "name": "through",
@@ -746,9 +746,9 @@
               "type": [
                 "string",
                 "null"
-              ],
-              "format": "date"
-            }
+              ]
+            },
+            "example": "2026-11-30"
           },
           {
             "name": "wallet_id",
@@ -837,9 +837,9 @@
               "type": [
                 "string",
                 "null"
-              ],
-              "format": "date"
-            }
+              ]
+            },
+            "example": "2026-11-01"
           },
           {
             "name": "through",
@@ -850,9 +850,9 @@
               "type": [
                 "string",
                 "null"
-              ],
-              "format": "date"
-            }
+              ]
+            },
+            "example": "2026-11-30"
           },
           {
             "name": "wallet_id",
@@ -12437,8 +12437,8 @@
           },
           "period_start": {
             "type": "string",
-            "format": "date",
-            "description": "UTC day or Monday of the ISO week."
+            "description": "UTC day or Monday of the ISO week.",
+            "example": "2026-11-01"
           }
         }
       },

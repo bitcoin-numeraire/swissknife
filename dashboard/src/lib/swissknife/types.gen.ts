@@ -1409,7 +1409,7 @@ export type SpendingReportRow = {
   /**
    * UTC day or Monday of the ISO week.
    */
-  period_start: Date;
+  period_start: string;
 };
 
 /**
@@ -2026,11 +2026,11 @@ export type GetAccountSpendingReportData = {
     /**
      * First UTC admission date, inclusive. Defaults to 29 days before the last date.
      */
-    from?: Date | null;
+    from?: string | null;
     /**
      * Last UTC admission date, inclusive. Defaults to today.
      */
-    through?: Date | null;
+    through?: string | null;
     wallet_id?: string | null;
     /**
      * Filter by the credential that originally admitted a payment, including revoked keys.
@@ -2063,11 +2063,11 @@ export type ExportAccountSpendingReportData = {
     /**
      * First UTC admission date, inclusive. Defaults to 29 days before the last date.
      */
-    from?: Date | null;
+    from?: string | null;
     /**
      * Last UTC admission date, inclusive. Defaults to today.
      */
-    through?: Date | null;
+    through?: string | null;
     wallet_id?: string | null;
     /**
      * Filter by the credential that originally admitted a payment, including revoked keys.

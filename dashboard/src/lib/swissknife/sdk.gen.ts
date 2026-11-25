@@ -28,7 +28,6 @@ import {
   getAccountByIdResponseTransformer,
   getAccountPreferencesResponseTransformer,
   getAccountResponseTransformer,
-  getAccountSpendingReportResponseTransformer,
   getAccountWalletResponseTransformer,
   getAddressResponseTransformer,
   getApiKeyResponseTransformer,
@@ -623,7 +622,6 @@ export const getAccountSpendingReport = <ThrowOnError extends boolean = false>(
     GetAccountSpendingReportErrors,
     ThrowOnError
   >({
-    responseTransformer: getAccountSpendingReportResponseTransformer,
     security: [
       { scheme: 'bearer', type: 'http' },
       { name: 'Api-Key', type: 'apiKey' },

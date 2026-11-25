@@ -19,7 +19,6 @@ import type {
   GetAccountByIdResponse,
   GetAccountPreferencesResponse,
   GetAccountResponse,
-  GetAccountSpendingReportResponse,
   GetAccountWalletResponse,
   GetAddressResponse,
   GetApiKeyResponse,
@@ -201,18 +200,6 @@ export const createAccountResponseTransformer = async (
   data: any
 ): Promise<CreateAccountResponse> => {
   data = accountSchemaResponseTransformer(data);
-  return data;
-};
-
-const spendingReportRowSchemaResponseTransformer = (data: any) => {
-  data.period_start = new Date(data.period_start);
-  return data;
-};
-
-export const getAccountSpendingReportResponseTransformer = async (
-  data: any
-): Promise<GetAccountSpendingReportResponse> => {
-  data = data.map((item: any) => spendingReportRowSchemaResponseTransformer(item));
   return data;
 };
 

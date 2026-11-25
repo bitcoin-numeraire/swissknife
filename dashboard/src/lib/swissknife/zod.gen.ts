@@ -765,7 +765,7 @@ export const zSpendingReportRow = z.object({
   payments: z.coerce.bigint().gte(BigInt(0)).max(BigInt('9223372036854775807'), {
     error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
   }),
-  period_start: z.iso.date(),
+  period_start: z.string(),
 });
 
 /**
@@ -1113,8 +1113,8 @@ export const zGetAccountSpendingReportPath = z.object({
 });
 
 export const zGetAccountSpendingReportQuery = z.object({
-  from: z.iso.date().nullish(),
-  through: z.iso.date().nullish(),
+  from: z.string().nullish(),
+  through: z.string().nullish(),
   wallet_id: z.uuid().nullish(),
   agent_key_id: z.uuid().nullish(),
   interval: zSpendingInterval.optional(),
@@ -1127,8 +1127,8 @@ export const zExportAccountSpendingReportPath = z.object({
 });
 
 export const zExportAccountSpendingReportQuery = z.object({
-  from: z.iso.date().nullish(),
-  through: z.iso.date().nullish(),
+  from: z.string().nullish(),
+  through: z.string().nullish(),
   wallet_id: z.uuid().nullish(),
   agent_key_id: z.uuid().nullish(),
   interval: zSpendingInterval.optional(),

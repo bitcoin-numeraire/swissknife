@@ -54,8 +54,10 @@ pub enum SpendingInterval {
 #[derive(Default, Deserialize, utoipa::IntoParams)]
 pub struct SpendingReportQuery {
     /// First UTC admission date, inclusive. Defaults to 29 days before the last date.
+    #[param(value_type = Option<String>, example = "2026-11-01")]
     pub from: Option<chrono::NaiveDate>,
     /// Last UTC admission date, inclusive. Defaults to today.
+    #[param(value_type = Option<String>, example = "2026-11-30")]
     pub through: Option<chrono::NaiveDate>,
     pub wallet_id: Option<uuid::Uuid>,
     /// Filter by the credential that originally admitted a payment, including revoked keys.
@@ -67,6 +69,7 @@ pub struct SpendingReportQuery {
 #[derive(Debug, Deserialize, Serialize, ToSchema)]
 pub struct SpendingReportRow {
     /// UTC day or Monday of the ISO week.
+    #[schema(value_type = String, example = "2026-11-01")]
     pub period_start: chrono::NaiveDate,
     /// All admitted payments in the selected period, including subsequently released reservations.
     pub payments: u64,
