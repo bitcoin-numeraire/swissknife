@@ -20,8 +20,13 @@ struct StdioWallet {
 }
 impl StdioWallet {
     async fn start(app: &TestApp, wallet: Uuid, secret: &str) -> Self {
+        Self::start_with_options(app, wallet, secret, &[]).await
+    }
+
+    async fn start_with_options(app: &TestApp, wallet: Uuid, secret: &str, options: &[&str]) -> Self {
         let mut child = Command::new(env!("CARGO_BIN_EXE_swissknife"))
             .args(["mcp", "--server", &app.base_url, "--wallet", &wallet.to_string()])
+            .args(options)
             .env("SWISSKNIFE_MCP_WALLET_KEY", secret)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
@@ -153,6 +158,9 @@ async fn stdio_discovers_tools_and_resources_and_settles_an_approved_payment_onc
     ] {
         assert!(names.iter().any(|tool| tool["name"] == name));
     }
+    assert!(!names
+        .iter()
+        .any(|tool| tool["name"] == "lnurl_withdraw" || tool["name"] == "inspect_lnurl_withdraw"));
     let resources = mcp.request("resources/list", json!({})).await;
     assert_eq!(resources["resources"].as_array().unwrap().len(), 2);
     let balance = mcp.request("resources/read", json!({"uri":"wallet://balance"})).await;
@@ -537,4 +545,172 @@ async fn streamable_http_uses_a_separate_transport_credential_and_enforces_walle
     assert_eq!(revoked["isError"], true);
     child.kill().await.unwrap();
     app.stop();
+}
+
+#[tokio::test]
+async fn withdraw_voucher_uses_the_selected_invoice_and_reconciles_callback_outcomes() {
+    use lnurl::lnurl::LnUrl;
+    use wiremock::{
+        matchers::{method, path},
+        Mock, MockServer, ResponseTemplate,
+    };
+
+    let app = TestApp::isolated("mcp-withdraw-voucher", &[]).await;
+    let admin = app.admin_token().await;
+    let owner = app.create_account_with_wallet(admin, "voucher-owner").await;
+    let issued: IssuedAgentKey = app.api().post(
+        &format!("/v1/me/wallets/{}/agent-keys", owner.wallet.id), Auth::ApiKey(&owner.key),
+        json!({"name":"receive vouchers","capabilities":{"receive":true,"read":true},"expires_at":Utc::now()+ChronoDuration::hours(1)}),
+    ).await.parse();
+    let service = MockServer::start().await;
+    let origin = service.uri();
+    let voucher = |name: &str| {
+        LnUrl {
+            url: format!("{origin}/{name}"),
+        }
+        .encode()
+    };
+    for (name, callback, min, max) in [
+        ("valid", format!("{origin}/redeem?order=42&k1=from-discovery"), 1, 90000),
+        ("rejected", format!("{origin}/decline"), 1, 90000),
+        ("uncertain", format!("{origin}/lost-response"), 1, 90000),
+        ("empty", format!("{origin}/redeem"), 0, 0),
+        (
+            "foreign-callback",
+            "https://unconfigured.example/redeem".to_string(),
+            1,
+            90000,
+        ),
+    ] {
+        Mock::given(method("GET")).and(path(format!("/{name}"))).respond_with(ResponseTemplate::new(200).set_body_json(
+            json!({"tag":"withdrawRequest","callback":callback,"k1":"fixture-voucher-secret","defaultDescription":"payout","minWithdrawable":min,"maxWithdrawable":max})
+        )).mount(&service).await;
+    }
+    Mock::given(method("GET"))
+        .and(path("/redeem"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({"status":"OK"})))
+        .expect(1)
+        .mount(&service)
+        .await;
+    Mock::given(method("GET"))
+        .and(path("/decline"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({"status":"ERROR","reason":"declined"})))
+        .expect(1)
+        .mount(&service)
+        .await;
+    Mock::given(method("GET"))
+        .and(path("/lost-response"))
+        .respond_with(ResponseTemplate::new(502))
+        .expect(1)
+        .mount(&service)
+        .await;
+
+    let mut mcp =
+        StdioWallet::start_with_options(&app, owner.wallet.id, &issued.key, &["--withdraw-origin", &origin]).await;
+    let names = mcp.request("tools/list", json!({})).await;
+    for name in ["lnurl_withdraw", "inspect_lnurl_withdraw"] {
+        assert!(names["tools"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|tool| tool["name"] == name));
+    }
+    let info = mcp
+        .tool(
+            "inspect_lnurl_withdraw",
+            json!({"lnurl":format!("LIGHTNING:{}",voucher("valid").to_uppercase())}),
+        )
+        .await;
+    assert_eq!(
+        info["structuredContent"],
+        json!({"issuer":origin,"callback_origin":origin,"description":"payout","min_msat":"1","max_msat":"90000"})
+    );
+    let invalid = mcp
+        .tool("inspect_lnurl_withdraw", json!({"lnurl":voucher("foreign-callback")}))
+        .await;
+    assert_eq!(invalid["isError"], true);
+    let empty = mcp
+        .tool("inspect_lnurl_withdraw", json!({"lnurl":voucher("empty")}))
+        .await;
+    assert_eq!(empty["structuredContent"]["max_msat"], "0");
+
+    let created = mcp
+        .tool("create_invoice", json!({"amount_msat":"72001","description":"payout"}))
+        .await;
+    let id = created["structuredContent"]["id"].as_str().unwrap();
+    let bolt11 = created["structuredContent"]["ln_invoice"]["bolt11"].as_str().unwrap();
+    let claim = |v: &str, amount: &str| json!({"lnurl":voucher(v),"invoice_id":id,"amount_msat":amount});
+    let other = app.create_wallet(admin, "other-voucher-wallet").await;
+    let foreign = app
+        .api()
+        .post(
+            "/v1/invoices",
+            Auth::Bearer(admin),
+            json!({"wallet_id":other.id,"amount_msat":72001,"description":"another wallet's invoice"}),
+        )
+        .await
+        .parse::<swissknife_types::Invoice>();
+    let mut foreign_claim = claim("valid", "72001");
+    foreign_claim["invoice_id"] = json!(foreign.id);
+    assert_eq!(mcp.tool("lnurl_withdraw", foreign_claim).await["isError"], true);
+
+    assert_eq!(
+        mcp.tool("lnurl_withdraw", claim("valid", "72000")).await["isError"],
+        true
+    );
+    assert_eq!(
+        mcp.tool("lnurl_withdraw", claim("empty", "72001")).await["isError"],
+        true
+    );
+    for (link, outcome) in [
+        ("rejected", "rejected"),
+        ("uncertain", "unknown"),
+        ("valid", "accepted"),
+    ] {
+        let result = mcp.tool("lnurl_withdraw", claim(link, "72001")).await;
+        assert_eq!(
+            result["structuredContent"],
+            json!({"invoice_id":id,"amount_msat":"72001","callback_status":outcome})
+        );
+    }
+    let requests = service.received_requests().await.unwrap();
+    assert!(requests
+        .iter()
+        .all(|r| !r.headers.contains_key("wallet-key") && !r.headers.contains_key("authorization")));
+    let accepted = requests.iter().find(|r| r.url.path() == "/redeem").unwrap();
+    let params: std::collections::BTreeMap<_, _> = accepted.url.query_pairs().collect();
+    assert_eq!(
+        accepted
+            .url
+            .query_pairs()
+            .filter(|(key, _)| key == "k1" || key == "pr")
+            .count(),
+        2
+    );
+    assert_eq!(params.get("k1").unwrap(), "fixture-voucher-secret");
+    assert_eq!(params.get("order").unwrap(), "42");
+    assert_eq!(params.get("pr").unwrap(), bolt11);
+    let lookup = json!({"id":id});
+    assert_eq!(
+        mcp.tool("get_invoice", lookup.clone()).await["structuredContent"]["status"],
+        "Pending"
+    );
+    Counterparty::for_provider(&app.provider).pay(bolt11);
+    timeout(Duration::from_secs(40), async {
+        loop {
+            let receipt = mcp.tool("get_invoice", lookup.clone()).await;
+            if receipt["structuredContent"]["status"] == "Settled" {
+                assert_eq!(receipt["structuredContent"]["amount_received_msat"], "72001");
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(200)).await;
+        }
+    })
+    .await
+    .expect("issuer paid the selected invoice");
+    assert_eq!(
+        mcp.tool("lnurl_withdraw", claim("valid", "72001")).await["isError"],
+        true
+    );
+    mcp.close().await;
 }
