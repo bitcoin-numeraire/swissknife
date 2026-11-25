@@ -1114,10 +1114,15 @@ export function SendMoneyDrawer({
                             />
                             {feeEstimate.onchain ? (
                               <Typography variant="caption" color="text.secondary">
-                                {t(feeEstimate.onchain.target_blocks ? 'send_money.onchain_fee_target' : 'send_money.onchain_fee_normal', {
-                                  rate: feeEstimate.onchain.fee_rate_sat_per_kw,
-                                  count: feeEstimate.onchain.target_blocks ?? 0,
-                                })}
+                                {t(
+                                  feeEstimate.onchain.target_blocks
+                                    ? 'send_money.onchain_fee_target'
+                                    : 'send_money.onchain_fee_normal',
+                                  {
+                                    rate: feeEstimate.onchain.fee_rate_sat_per_kw,
+                                    count: feeEstimate.onchain.target_blocks ?? 0,
+                                  }
+                                )}
                               </Typography>
                             ) : feeEstimateState.maximumOnly ? (
                               <Typography variant="caption" color="text.secondary">
