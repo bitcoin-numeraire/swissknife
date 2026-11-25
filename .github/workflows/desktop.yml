@@ -73,7 +73,9 @@ jobs:
           hdiutil attach -readonly -nobrowse -mountpoint "$mount" "${image[0]}"
           trap 'hdiutil detach "$mount"' EXIT
           executable="$mount/SwissKnife.app/Contents/MacOS/swissknife-desktop"
-          lipo -verify_arch x86_64 arm64 "$executable"
+          architectures=$(lipo -archs "$executable")
+          grep -qw x86_64 <<< "$architectures"
+          grep -qw arm64 <<< "$architectures"
           python3 tests/launch.py "$executable"
       - name: Install and open the Windows wallet
         if: runner.os == 'Windows'
