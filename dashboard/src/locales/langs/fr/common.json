@@ -315,6 +315,26 @@
     "welcome": "Bon retour",
     "welcome_name": "Bienvenue, {{name}}"
   },
+  "offers": {
+    "offer_id": "Identifiant de l’offre",
+    "requires_cln": "La création d’offres nécessite Core Lightning.",
+    "load_error": "Impossible de charger les offres.",
+    "description": "Description de l’offre",
+    "amount": "Montant en sats (facultatif)",
+    "amount_help": "Laisse ce champ vide pour permettre à chaque payeur de choisir le montant.",
+    "single_use": "Accepter un seul paiement",
+    "create": "Créer une offre",
+    "variable": "Montant libre",
+    "creating": "Création en cours",
+    "active": "Active",
+    "disabling": "Désactivation en cours",
+    "disabled": "Désactivée",
+    "qr": "Code QR",
+    "disable": "Désactiver l’offre",
+    "disable_help": "Cesser d’accepter les nouvelles demandes pour « {{description}} » ?",
+    "previous": "Précédent",
+    "next": "Suivant"
+  },
   "send_money": {
     "accepted": "Paiement accepté",
     "processing": "Paiement en cours",

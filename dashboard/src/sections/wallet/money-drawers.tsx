@@ -91,6 +91,8 @@ import { SatsWithIcon } from 'src/components/bitcoin';
 import { useSettingsContext } from 'src/components/settings';
 import { varFade, MotionContainer } from 'src/components/animate';
 
+import { requestId } from './request-id';
+import { WalletOffers } from './wallet-offers';
 import { useFeeEstimate } from './use-fee-estimate';
 import { getFeeEstimateState } from './fee-estimate';
 import { WithdrawalStatus } from './withdrawal-status';
@@ -130,7 +132,7 @@ type RecipientKind =
   | 'bitcoin'
   | 'internal'
   | 'unknown';
-type ReceivePayload = 'unified' | 'lightning' | 'onchain' | 'identity';
+type ReceivePayload = 'unified' | 'lightning' | 'onchain' | 'identity' | 'offer';
 type AmountUnit = 'sats' | 'btc' | 'fiat';
 
 export type ReceivePaymentSuccess = {
@@ -672,22 +674,6 @@ function SendDetailRow({ label, value }: { label: string; value?: string | numbe
 
 // ----------------------------------------------------------------------
 
-function paymentRequestId() {
-  if (typeof crypto.randomUUID === 'function') return crypto.randomUUID();
-  // Self-hosted dashboards on local HTTP still support getRandomValues.
-  const bytes = crypto.getRandomValues(new Uint8Array(16));
-  bytes[6] = 64 + (bytes[6] % 16);
-  bytes[8] = 128 + (bytes[8] % 64);
-  const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
-  return [
-    hex.slice(0, 8),
-    hex.slice(8, 12),
-    hex.slice(12, 16),
-    hex.slice(16, 20),
-    hex.slice(20),
-  ].join('-');
-}
-
 const PAYMENT_FEEDBACK = {
   Pending: { color: 'warning', icon: 'solar:clock-circle-bold', title: 'send_money.pending' },
   Settled: { color: 'success', icon: 'solar:check-circle-bold', title: 'send_money.sent' },
@@ -951,7 +937,7 @@ export function SendMoneyDrawer({
           input: isOnchain
             ? requestBody.input
             : (bitcoinRequest.lightning ?? stripLightningScheme(input)),
-          idempotency_key: paymentRequestId(),
+          idempotency_key: requestId(),
           maximum_fee_msat: isOnchain
             ? (feeCapMsat ?? null)
             : (feeEstimate?.maximum_fee_msat ?? null),
@@ -2155,274 +2141,287 @@ export function ReceiveMoneyDrawer({
             <ToggleButton value="unified">{t('receive_money.unified')}</ToggleButton>
             <ToggleButton value="lightning">{t('receive_money.lightning')}</ToggleButton>
             <ToggleButton value="onchain">{t('receive_money.bitcoin')}</ToggleButton>
+            <ToggleButton value="offer">BOLT12</ToggleButton>
             <ToggleButton value="identity" disabled={!identityAddress}>
               {t('receive_money.paycode')}
             </ToggleButton>
           </ToggleButtonGroup>
         </Stack>
 
-        {selectedNeedsAddress && (
-          <Stack spacing={1}>
-            <Typography variant="caption" color="text.secondary">
-              {t('receive_money.address_type')}
-            </Typography>
-            <ToggleButtonGroup
-              exclusive
-              fullWidth
-              size="small"
-              value={addressType}
-              onChange={(_, value: BtcAddressType | null) =>
-                value && handleAddressTypeChange(value)
-              }
-            >
-              {addressTypeOptions.map((option) => (
-                <ToggleButton key={option.value} value={option.value}>
-                  {t(option.labelKey)}
-                </ToggleButton>
-              ))}
-            </ToggleButtonGroup>
-            <Typography variant="caption" color="text.secondary">
-              {t(
-                addressTypeOptions.find((option) => option.value === addressType)?.helperKey ??
-                  'bitcoin_address_type.taproot_helper'
-              )}
-            </Typography>
-          </Stack>
-        )}
-
-        {canSetAmount && (
-          <Stack spacing={1.5}>
-            <AmountEntryField
-              label={t('receive_money.amount')}
-              value={amountValue}
-              secondaryLabel={
-                amountUnit === 'fiat'
-                  ? bitcoinAmountLabel(amountSats, displayUnit)
-                  : hasFiatPrice
-                    ? fCurrency(satsToFiat(amountSats, fiatPrices, state.currency), {
-                        currency: state.currency,
-                      })
-                    : t('send_money.no_fiat_value')
-              }
-              amountUnit={amountUnit}
-              currency={state.currency}
-              displayUnit={displayUnit}
-              hasFiatPrice={hasFiatPrice}
-              onChange={setAmountValue}
-              onSwap={handleAmountUnitSwap}
-            />
-          </Stack>
-        )}
-
-        {canSetMemo && (
-          <TextField
-            label={t('receive_money.memo')}
-            value={description}
-            onChange={(event) => setDescription(event.target.value)}
-          />
-        )}
-
-        {selectedNeedsInvoice && (
-          <Stack spacing={1}>
-            <Typography variant="caption" color="text.secondary">
-              {t('receive_money.expiry')}
-            </Typography>
-            <ToggleButtonGroup
-              exclusive
-              fullWidth
-              size="small"
-              value={invoiceExpirySeconds}
-              onChange={(_, value: number | null) => value && setInvoiceExpirySeconds(value)}
-            >
-              {invoiceExpiryOptions.map((option) => (
-                <ToggleButton key={option.value} value={option.value}>
-                  {t(option.labelKey)}
-                </ToggleButton>
-              ))}
-            </ToggleButtonGroup>
-          </Stack>
-        )}
-
-        {showRequestAction && (
-          <Button
-            color="inherit"
-            variant="contained"
-            loading={isSubmitting}
-            disabled={needsWallet}
-            onClick={handleGenerate}
-          >
-            {requestActionLabel}
-          </Button>
-        )}
-
-        {addressError && <Alert severity="warning">{addressError}</Alert>}
-
-        {qrValue ? (
-          <Stack spacing={2}>
-            <Box
-              sx={[
-                (theme) => ({
-                  p: 2,
-                  borderRadius: 1,
-                  bgcolor: 'common.white',
-                  border: `1px solid ${theme.vars.palette.divider}`,
-                  '& canvas': { width: '100% !important', height: 'auto !important' },
-                }),
-              ]}
-            >
-              <QRCode
-                value={qrValue}
-                size={420}
-                eyeRadius={5}
-                logoPadding={3}
-                removeQrCodeBehindLogo
-                logoPaddingStyle="circle"
-                logoImage="/logo/logo_square_negative.svg"
-              />
-            </Box>
-
-            <Stack spacing={1.5}>
-              <Stack
-                direction="row"
-                spacing={1}
-                sx={{ alignItems: 'center', justifyContent: 'space-between' }}
-              >
-                <Label color={selectedPayload === 'unified' ? 'success' : 'info'}>
-                  {payloadLabel}
-                </Label>
-                {selectedLightningInvoice && invoiceHasBeenPaid && (
-                  <Label color="success">{t('receive_money.payment_received')}</Label>
-                )}
-                {selectedLightningInvoice && !invoiceHasExpired && !invoiceHasBeenPaid && (
-                  <Label color="success">{t('receive_money.waiting_for_payment')}</Label>
-                )}
-              </Stack>
-              <Typography variant="body2" color="text.secondary">
-                {payloadDescription}
-              </Typography>
-
-              {selectedNeedsAddress && displayedBtcAddress && (
-                <Stack direction="row" spacing={1} sx={{ alignItems: 'center', minWidth: 0 }}>
-                  <Typography variant="caption" color="text.secondary">
-                    {t('receive_money.address')}
-                  </Typography>
-                  <Typography
-                    variant="caption"
-                    noWrap
-                    sx={{ flex: 1, minWidth: 0, fontFamily: 'monospace', textAlign: 'right' }}
-                  >
-                    {compactBitcoinAddress(displayedBtcAddress.address)}
-                  </Typography>
-                  <CopyButton
-                    value={displayedBtcAddress.address}
-                    title={t('receive_money.copy_onchain_address')}
-                  />
-                </Stack>
-              )}
-
-              <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: 'wrap' }}>
-                <Button
-                  color="inherit"
-                  variant="contained"
-                  disabled={primaryPayloadDisabled}
-                  onClick={() => handleCopyPayload(qrValue)}
-                  startIcon={<Iconify icon="solar:copy-bold" />}
-                  sx={{ flex: 1, minWidth: 140 }}
-                >
-                  {payloadCopyLabel}
-                </Button>
-                <Button
-                  color="inherit"
-                  variant="outlined"
-                  disabled={primaryPayloadDisabled}
-                  onClick={handleSharePayload}
-                  startIcon={<Iconify icon="solar:share-bold" />}
-                  sx={{ flex: 1, minWidth: 140 }}
-                >
-                  {t('share')}
-                </Button>
-              </Stack>
-
-              {showInvoiceExpiry && !invoiceHasBeenPaid && (
-                <Typography
-                  variant="caption"
-                  color={invoiceHasExpired ? 'warning.main' : 'text.secondary'}
-                >
-                  {invoiceHasExpired
-                    ? t('receive_money.invoice_expired_description')
-                    : t('receive_money.invoice_expires_short', {
-                        time: invoiceExpiryRelative,
-                        date: invoiceExpiryAbsolute,
-                      })}
+        {selectedPayload === 'offer' ? (
+          addressWalletId && (
+            <WalletOffers key={addressWalletId} walletId={addressWalletId} isAdmin={isAdmin} />
+          )
+        ) : (
+          <>
+            {selectedNeedsAddress && (
+              <Stack spacing={1}>
+                <Typography variant="caption" color="text.secondary">
+                  {t('receive_money.address_type')}
                 </Typography>
-              )}
+                <ToggleButtonGroup
+                  exclusive
+                  fullWidth
+                  size="small"
+                  value={addressType}
+                  onChange={(_, value: BtcAddressType | null) =>
+                    value && handleAddressTypeChange(value)
+                  }
+                >
+                  {addressTypeOptions.map((option) => (
+                    <ToggleButton key={option.value} value={option.value}>
+                      {t(option.labelKey)}
+                    </ToggleButton>
+                  ))}
+                </ToggleButtonGroup>
+                <Typography variant="caption" color="text.secondary">
+                  {t(
+                    addressTypeOptions.find((option) => option.value === addressType)?.helperKey ??
+                      'bitcoin_address_type.taproot_helper'
+                  )}
+                </Typography>
+              </Stack>
+            )}
 
-              {(selectedPayload === 'onchain' || selectedPayload === 'unified') &&
-                displayedBtcAddress && (
-                  <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-                    <Label color={displayedBtcAddress.used ? 'warning' : 'success'}>
-                      {displayedBtcAddress.used
-                        ? t('receive_money.used')
-                        : t('receive_money.unused')}
+            {canSetAmount && (
+              <Stack spacing={1.5}>
+                <AmountEntryField
+                  label={t('receive_money.amount')}
+                  value={amountValue}
+                  secondaryLabel={
+                    amountUnit === 'fiat'
+                      ? bitcoinAmountLabel(amountSats, displayUnit)
+                      : hasFiatPrice
+                        ? fCurrency(satsToFiat(amountSats, fiatPrices, state.currency), {
+                            currency: state.currency,
+                          })
+                        : t('send_money.no_fiat_value')
+                  }
+                  amountUnit={amountUnit}
+                  currency={state.currency}
+                  displayUnit={displayUnit}
+                  hasFiatPrice={hasFiatPrice}
+                  onChange={setAmountValue}
+                  onSwap={handleAmountUnitSwap}
+                />
+              </Stack>
+            )}
+
+            {canSetMemo && (
+              <TextField
+                label={t('receive_money.memo')}
+                value={description}
+                onChange={(event) => setDescription(event.target.value)}
+              />
+            )}
+
+            {selectedNeedsInvoice && (
+              <Stack spacing={1}>
+                <Typography variant="caption" color="text.secondary">
+                  {t('receive_money.expiry')}
+                </Typography>
+                <ToggleButtonGroup
+                  exclusive
+                  fullWidth
+                  size="small"
+                  value={invoiceExpirySeconds}
+                  onChange={(_, value: number | null) => value && setInvoiceExpirySeconds(value)}
+                >
+                  {invoiceExpiryOptions.map((option) => (
+                    <ToggleButton key={option.value} value={option.value}>
+                      {t(option.labelKey)}
+                    </ToggleButton>
+                  ))}
+                </ToggleButtonGroup>
+              </Stack>
+            )}
+
+            {showRequestAction && (
+              <Button
+                color="inherit"
+                variant="contained"
+                loading={isSubmitting}
+                disabled={needsWallet}
+                onClick={handleGenerate}
+              >
+                {requestActionLabel}
+              </Button>
+            )}
+
+            {addressError && <Alert severity="warning">{addressError}</Alert>}
+
+            {qrValue ? (
+              <Stack spacing={2}>
+                <Box
+                  sx={[
+                    (theme) => ({
+                      p: 2,
+                      borderRadius: 1,
+                      bgcolor: 'common.white',
+                      border: `1px solid ${theme.vars.palette.divider}`,
+                      '& canvas': { width: '100% !important', height: 'auto !important' },
+                    }),
+                  ]}
+                >
+                  <QRCode
+                    value={qrValue}
+                    size={420}
+                    eyeRadius={5}
+                    logoPadding={3}
+                    removeQrCodeBehindLogo
+                    logoPaddingStyle="circle"
+                    logoImage="/logo/logo_square_negative.svg"
+                  />
+                </Box>
+
+                <Stack spacing={1.5}>
+                  <Stack
+                    direction="row"
+                    spacing={1}
+                    sx={{ alignItems: 'center', justifyContent: 'space-between' }}
+                  >
+                    <Label color={selectedPayload === 'unified' ? 'success' : 'info'}>
+                      {payloadLabel}
                     </Label>
-                    {!displayedBtcAddress.used && (
-                      <Typography variant="caption" color="text.secondary">
-                        {t('receive_money.address_reuse_note')}
-                      </Typography>
+                    {selectedLightningInvoice && invoiceHasBeenPaid && (
+                      <Label color="success">{t('receive_money.payment_received')}</Label>
+                    )}
+                    {selectedLightningInvoice && !invoiceHasExpired && !invoiceHasBeenPaid && (
+                      <Label color="success">{t('receive_money.waiting_for_payment')}</Label>
                     )}
                   </Stack>
+                  <Typography variant="body2" color="text.secondary">
+                    {payloadDescription}
+                  </Typography>
+
+                  {selectedNeedsAddress && displayedBtcAddress && (
+                    <Stack direction="row" spacing={1} sx={{ alignItems: 'center', minWidth: 0 }}>
+                      <Typography variant="caption" color="text.secondary">
+                        {t('receive_money.address')}
+                      </Typography>
+                      <Typography
+                        variant="caption"
+                        noWrap
+                        sx={{ flex: 1, minWidth: 0, fontFamily: 'monospace', textAlign: 'right' }}
+                      >
+                        {compactBitcoinAddress(displayedBtcAddress.address)}
+                      </Typography>
+                      <CopyButton
+                        value={displayedBtcAddress.address}
+                        title={t('receive_money.copy_onchain_address')}
+                      />
+                    </Stack>
+                  )}
+
+                  <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: 'wrap' }}>
+                    <Button
+                      color="inherit"
+                      variant="contained"
+                      disabled={primaryPayloadDisabled}
+                      onClick={() => handleCopyPayload(qrValue)}
+                      startIcon={<Iconify icon="solar:copy-bold" />}
+                      sx={{ flex: 1, minWidth: 140 }}
+                    >
+                      {payloadCopyLabel}
+                    </Button>
+                    <Button
+                      color="inherit"
+                      variant="outlined"
+                      disabled={primaryPayloadDisabled}
+                      onClick={handleSharePayload}
+                      startIcon={<Iconify icon="solar:share-bold" />}
+                      sx={{ flex: 1, minWidth: 140 }}
+                    >
+                      {t('share')}
+                    </Button>
+                  </Stack>
+
+                  {showInvoiceExpiry && !invoiceHasBeenPaid && (
+                    <Typography
+                      variant="caption"
+                      color={invoiceHasExpired ? 'warning.main' : 'text.secondary'}
+                    >
+                      {invoiceHasExpired
+                        ? t('receive_money.invoice_expired_description')
+                        : t('receive_money.invoice_expires_short', {
+                            time: invoiceExpiryRelative,
+                            date: invoiceExpiryAbsolute,
+                          })}
+                    </Typography>
+                  )}
+
+                  {(selectedPayload === 'onchain' || selectedPayload === 'unified') &&
+                    displayedBtcAddress && (
+                      <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+                        <Label color={displayedBtcAddress.used ? 'warning' : 'success'}>
+                          {displayedBtcAddress.used
+                            ? t('receive_money.used')
+                            : t('receive_money.unused')}
+                        </Label>
+                        {!displayedBtcAddress.used && (
+                          <Typography variant="caption" color="text.secondary">
+                            {t('receive_money.address_reuse_note')}
+                          </Typography>
+                        )}
+                      </Stack>
+                    )}
+                </Stack>
+
+                {displayedBtcAddress?.used && (
+                  <Alert severity="warning" variant="outlined">
+                    {t('receive_money.reuse_warning')}
+                  </Alert>
                 )}
-            </Stack>
-
-            {displayedBtcAddress?.used && (
-              <Alert severity="warning" variant="outlined">
-                {t('receive_money.reuse_warning')}
-              </Alert>
-            )}
-          </Stack>
-        ) : (
-          <Box
-            sx={[
-              (theme) => ({
-                p: 3,
-                borderRadius: 1,
-                textAlign: 'center',
-                bgcolor: 'background.neutral',
-                border: `1px dashed ${theme.vars.palette.divider}`,
-              }),
-            ]}
-          >
-            <Iconify icon="solar:qr-code-bold-duotone" width={52} sx={{ color: 'text.disabled' }} />
-            <Typography variant="subtitle2" sx={{ mt: 1 }}>
-              {t('receive_money.empty_qr')}
-            </Typography>
-          </Box>
-        )}
-
-        {lnAddress && selectedPayload !== 'onchain' && (
-          <Box
-            sx={[
-              (theme) => ({
-                p: 2,
-                borderRadius: 1,
-                bgcolor: 'background.neutral',
-                border: `1px solid ${theme.vars.palette.divider}`,
-              }),
-            ]}
-          >
-            <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-              <Iconify icon="solar:bolt-bold-duotone" sx={{ color: 'warning.main' }} />
-              <Stack sx={{ flex: 1, minWidth: 0 }}>
-                <Typography variant="caption" color="text.secondary">
-                  {t('receive_money.identity')}
-                </Typography>
-                <Typography variant="subtitle2" noWrap>
-                  {displayLnAddress(lnAddress.username)}
-                </Typography>
               </Stack>
-              <CopyButton value={displayLnAddress(lnAddress.username)} title={t('copy')} />
-            </Stack>
-          </Box>
+            ) : (
+              <Box
+                sx={[
+                  (theme) => ({
+                    p: 3,
+                    borderRadius: 1,
+                    textAlign: 'center',
+                    bgcolor: 'background.neutral',
+                    border: `1px dashed ${theme.vars.palette.divider}`,
+                  }),
+                ]}
+              >
+                <Iconify
+                  icon="solar:qr-code-bold-duotone"
+                  width={52}
+                  sx={{ color: 'text.disabled' }}
+                />
+                <Typography variant="subtitle2" sx={{ mt: 1 }}>
+                  {t('receive_money.empty_qr')}
+                </Typography>
+              </Box>
+            )}
+
+            {lnAddress && selectedPayload !== 'onchain' && (
+              <Box
+                sx={[
+                  (theme) => ({
+                    p: 2,
+                    borderRadius: 1,
+                    bgcolor: 'background.neutral',
+                    border: `1px solid ${theme.vars.palette.divider}`,
+                  }),
+                ]}
+              >
+                <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+                  <Iconify icon="solar:bolt-bold-duotone" sx={{ color: 'warning.main' }} />
+                  <Stack sx={{ flex: 1, minWidth: 0 }}>
+                    <Typography variant="caption" color="text.secondary">
+                      {t('receive_money.identity')}
+                    </Typography>
+                    <Typography variant="subtitle2" noWrap>
+                      {displayLnAddress(lnAddress.username)}
+                    </Typography>
+                  </Stack>
+                  <CopyButton value={displayLnAddress(lnAddress.username)} title={t('copy')} />
+                </Stack>
+              </Box>
+            )}
+          </>
         )}
       </Stack>
     </Drawer>

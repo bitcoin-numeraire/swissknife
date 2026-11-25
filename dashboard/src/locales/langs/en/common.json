@@ -316,6 +316,26 @@
     "welcome": "Welcome back",
     "welcome_name": "Welcome, {{name}}"
   },
+  "offers": {
+    "offer_id": "Offer ID",
+    "requires_cln": "Creating offers requires Core Lightning.",
+    "load_error": "Unable to load offers.",
+    "description": "Offer description",
+    "amount": "Amount in sats (optional)",
+    "amount_help": "Leave blank to let each payer choose an amount.",
+    "single_use": "Allow one payment only",
+    "create": "Create offer",
+    "variable": "Payer chooses amount",
+    "creating": "Creating",
+    "active": "Active",
+    "disabling": "Disabling",
+    "disabled": "Disabled",
+    "qr": "QR code",
+    "disable": "Disable offer",
+    "disable_help": "Stop accepting new requests for “{{description}}”?",
+    "previous": "Previous",
+    "next": "Next"
+  },
   "send_money": {
     "accepted": "Payment accepted",
     "processing": "Payment processing",
