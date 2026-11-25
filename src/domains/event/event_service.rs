@@ -259,6 +259,7 @@ mod tests {
             wallet_id: Uuid::new_v4(),
             address: "bc1qknown".to_string(),
             used,
+            dedicated: false,
             address_type: crate::domains::bitcoin::BtcAddressType::P2wpkh,
             created_at: Utc::now(),
             updated_at: None,

@@ -51,6 +51,7 @@ where
         let model = BtcAddressEntity::find()
             .filter(Column::WalletId.eq(wallet_id))
             .filter(Column::Used.eq(false))
+            .filter(Column::Dedicated.eq(false))
             .filter(Column::AddressType.eq(address_type.to_string()))
             .order_by_desc(Column::CreatedAt)
             .one(self.db.connection())
@@ -94,6 +95,7 @@ where
         wallet_id: Uuid,
         address: &str,
         address_type: BtcAddressType,
+        dedicated: bool,
     ) -> Result<BtcAddress, DatabaseError> {
         let model = ActiveModel {
             id: Set(Uuid::new_v4()),
@@ -101,6 +103,7 @@ where
             address: Set(address.to_owned()),
             address_type: Set(address_type.to_string()),
             used: Set(false),
+            dedicated: Set(dedicated),
             ..Default::default()
         };
 

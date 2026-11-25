@@ -64,6 +64,7 @@ export const zBtcAddress = z.object({
   address: z.string(),
   address_type: zBtcAddressType,
   created_at: z.iso.datetime(),
+  dedicated: z.boolean().optional(),
   id: z.uuid(),
   updated_at: z.iso.datetime().nullish(),
   used: z.boolean(),
@@ -391,6 +392,7 @@ export const zLocalLoginReset = z.object({
  * New Bitcoin Address Request
  */
 export const zNewBtcAddressRequest = z.object({
+  dedicated: z.boolean().optional(),
   type: zBtcAddressType.nullish(),
   wallet_id: z.uuid().nullish(),
 });

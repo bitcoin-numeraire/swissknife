@@ -18,6 +18,9 @@ pub struct BtcAddress {
     pub address: String,
     /// Whether the address has already been used on-chain
     pub used: bool,
+    /// Issued for one receive request and excluded from the reusable address pool.
+    #[serde(default)]
+    pub dedicated: bool,
     /// Address type
     pub address_type: BtcAddressType,
     /// Date of creation in database
@@ -98,6 +101,9 @@ pub struct NewBtcAddressRequest {
     /// Address type
     #[serde(rename = "type")]
     pub address_type: Option<BtcAddressType>,
+    /// Derive a fresh address for this request and exclude it from future address reuse.
+    #[serde(default)]
+    pub dedicated: bool,
 }
 
 /// Bitcoin address query filter.

@@ -486,7 +486,7 @@ async fn new_wallet_btc_address(
 
     let address = services
         .bitcoin
-        .new_deposit_address(wallet_id, payload.address_type)
+        .new_deposit_address(wallet_id, payload.address_type, payload.dedicated)
         .await?;
     Ok(Json(address))
 }
@@ -1154,6 +1154,7 @@ mod tests {
             wallet_id,
             address: "bcrt1qexample".to_string(),
             used: false,
+            dedicated: false,
             address_type: BtcAddressType::P2wpkh,
             created_at: Utc::now(),
             updated_at: None,
@@ -1390,11 +1391,12 @@ mod tests {
             builder
                 .bitcoin
                 .expect_new_deposit_address()
-                .withf(move |id, _| *id == wallet_id)
+                .withf(move |id, _, _| *id == wallet_id)
                 .times(1)
-                .returning(|id, _| Ok(btc_address(id)));
+                .returning(|id, _, _| Ok(btc_address(id)));
 
             let payload = NewBtcAddressRequest {
+                dedicated: false,
                 wallet_id: None,
                 address_type: None,
             };

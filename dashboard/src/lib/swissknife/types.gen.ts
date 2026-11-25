@@ -218,6 +218,10 @@ export type BtcAddress = {
    */
   created_at: Date;
   /**
+   * Issued for one receive request and excluded from the reusable address pool.
+   */
+  dedicated?: boolean;
+  /**
    * Internal ID
    */
   id: string;
@@ -903,6 +907,10 @@ export type LocalLoginReset = {
  * New Bitcoin Address Request
  */
 export type NewBtcAddressRequest = {
+  /**
+   * Derive a fresh address for this request and exclude it from future address reuse.
+   */
+  dedicated?: boolean;
   type?: BtcAddressType | null;
   /**
    * Wallet ID to receive into. Required by admin endpoints; derived from the path on wallet-scoped endpoints.

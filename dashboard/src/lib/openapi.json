@@ -8645,6 +8645,10 @@
             "format": "date-time",
             "description": "Date of creation in database"
           },
+          "dedicated": {
+            "type": "boolean",
+            "description": "Issued for one receive request and excluded from the reusable address pool."
+          },
           "id": {
             "type": "string",
             "format": "uuid",
@@ -9648,6 +9652,10 @@
         "type": "object",
         "description": "New Bitcoin Address Request",
         "properties": {
+          "dedicated": {
+            "type": "boolean",
+            "description": "Derive a fresh address for this request and exclude it from future address reuse."
+          },
           "type": {
             "oneOf": [
               {
