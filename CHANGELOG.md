@@ -10,6 +10,8 @@ release notes when a tag is published.
 
 ### Added
 
+- Wallet owners can create or restore a device-held recovery phrase, protect it with a local password, manage their Nostr key, and approve LNURL-auth logins.
+
 - Wallet owners can enroll and update their device's public identity keys with protection against stale updates.
 
 - Expose individual wallet-owned BOLT12 offers and their current state for publication integrations.

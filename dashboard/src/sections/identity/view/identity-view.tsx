@@ -49,8 +49,9 @@ import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';
 import { SettingsLnAddress } from 'src/sections/settings/settings-ln-address';
 
 // ----------------------------------------------------------------------
+import { WalletIdentityPanel } from '../wallet-identity-panel';
 
-type IdentityTab = 'lightning' | 'nostr' | 'onchain';
+type IdentityTab = 'lightning' | 'nostr' | 'onchain' | 'keys';
 
 const addressTypeOptions = [
   {
@@ -107,7 +108,10 @@ export function IdentityView() {
   const searchParams = useSearchParams();
   const requestedTab = searchParams.get('tab');
   const [tab, setTab] = useState<IdentityTab>(
-    requestedTab === 'nostr' || requestedTab === 'onchain' || requestedTab === 'lightning'
+    requestedTab === 'keys' ||
+      requestedTab === 'nostr' ||
+      requestedTab === 'onchain' ||
+      requestedTab === 'lightning'
       ? requestedTab
       : 'lightning'
   );
@@ -300,6 +304,7 @@ export function IdentityView() {
               <Tab value="lightning" label={t('identity_view.lightning')} />
               <Tab value="nostr" label={t('identity_view.nostr')} />
               <Tab value="onchain" label={t('identity_view.onchain')} />
+              <Tab value="keys" label={t('wallet_keys.title')} />
             </Tabs>
 
             <Box sx={{ p: 3 }}>
@@ -460,6 +465,10 @@ export function IdentityView() {
                     />
                   )}
                 </Stack>
+              )}
+
+              {tab === 'keys' && wallet && (
+                <WalletIdentityPanel key={wallet.id} walletId={wallet.id} />
               )}
 
               {tab === 'onchain' && (
