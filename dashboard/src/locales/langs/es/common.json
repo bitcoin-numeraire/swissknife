@@ -1212,5 +1212,26 @@
     "cancel": "Cancelar",
     "save": "Guardar límites",
     "disable_help": "Se permitirán pagos salientes sin estos límites. Se conservarán los gastos ya contabilizados."
+  },
+  "spending_report": {
+    "title": "Informe de gastos",
+    "description": "El presupuesto utilizado incluye las reservas pendientes. Las fechas usan UTC. Por defecto se muestran los últimos 30 días.",
+    "interval": "Agrupar por",
+    "day": "Día",
+    "week": "Semana",
+    "wallet": "Cartera",
+    "all_wallets": "Todas las carteras",
+    "key": "ID de la credencial (opcional)",
+    "invalid_key": "Introduce el UUID completo de la credencial.",
+    "from": "Desde",
+    "through": "Hasta",
+    "invalid_range": "Selecciona un intervalo de hasta 366 días.",
+    "error": "No se pudo cargar el informe de gastos.",
+    "period": "Inicio del período",
+    "payments": "Pagos admitidos",
+    "charged": "Presupuesto utilizado (sats)",
+    "empty": "No se registraron pagos sujetos a presupuesto en este período.",
+    "csv": "Descargar CSV",
+    "json": "Descargar JSON"
   }
 }

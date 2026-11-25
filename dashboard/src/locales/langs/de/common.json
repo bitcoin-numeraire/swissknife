@@ -1212,5 +1212,26 @@
     "cancel": "Abbrechen",
     "save": "Limits speichern",
     "disable_help": "Ausgehende Zahlungen unterliegen diesen Limits dann nicht mehr. Bereits angerechnete Ausgaben bleiben erhalten."
+  },
+  "spending_report": {
+    "title": "Ausgabenbericht",
+    "description": "Die Budgetnutzung umfasst ausstehende Reservierungen. Alle Datumsangaben sind in UTC. Standardmäßig werden die letzten 30 Tage angezeigt.",
+    "interval": "Gruppieren nach",
+    "day": "Tag",
+    "week": "Woche",
+    "wallet": "Wallet",
+    "all_wallets": "Alle Wallets",
+    "key": "Zugangsschlüssel-ID (optional)",
+    "invalid_key": "Geben Sie die vollständige UUID des Zugangsschlüssels ein.",
+    "from": "Von",
+    "through": "Bis",
+    "invalid_range": "Wählen Sie einen Zeitraum von höchstens 366 Tagen.",
+    "error": "Der Ausgabenbericht konnte nicht geladen werden.",
+    "period": "Zeitraumbeginn",
+    "payments": "Genehmigte Zahlungen",
+    "charged": "Genutztes Budget (Sats)",
+    "empty": "In diesem Zeitraum wurden keine Zahlungen auf das Budget angerechnet.",
+    "csv": "CSV herunterladen",
+    "json": "JSON herunterladen"
   }
 }

@@ -1212,5 +1212,26 @@
     "cancel": "Annulla",
     "save": "Salva limiti",
     "disable_help": "I pagamenti in uscita saranno consentiti senza questi limiti. Le spese già contabilizzate saranno conservate."
+  },
+  "spending_report": {
+    "title": "Rendiconto delle spese",
+    "description": "Il budget utilizzato comprende le prenotazioni in sospeso. Le date sono in UTC. Per impostazione predefinita vengono mostrati gli ultimi 30 giorni.",
+    "interval": "Raggruppa per",
+    "day": "Giorno",
+    "week": "Settimana",
+    "wallet": "Portafoglio",
+    "all_wallets": "Tutti i portafogli",
+    "key": "ID della credenziale (facoltativo)",
+    "invalid_key": "Inserisci l’UUID completo della credenziale.",
+    "from": "Dal",
+    "through": "Al",
+    "invalid_range": "Seleziona un intervallo fino a 366 giorni.",
+    "error": "Impossibile caricare il rendiconto delle spese.",
+    "period": "Inizio del periodo",
+    "payments": "Pagamenti ammessi",
+    "charged": "Budget utilizzato (sat)",
+    "empty": "Nessun pagamento conteggiato nel budget in questo periodo.",
+    "csv": "Scarica CSV",
+    "json": "Scarica JSON"
   }
 }
